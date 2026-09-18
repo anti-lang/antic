@@ -1,15 +1,13 @@
-# Work order: object model completion and book consistency
+# Work order: object model completion
 
-The previous work order is done and its report is accepted. Its three questions are answered here. The specification is now `docs/anti-object-model.md`, and `docs/decisions.md` refers to it for the object model instead of holding a section. Read the specification in full before anything else. Every rule in it is decided. A rule that is not implemented yet is work, not a question.
+This is the work order of the object model, as the language repository holds it. Its book steps are in the book repository and are gone from here. The previous work order is done and its report is accepted. Its three questions are answered here. The specification is now `docs/anti-object-model.md`, and `docs/decisions.md` refers to it for the object model instead of holding a section. Read the specification in full before anything else. Every rule in it is decided. A rule that is not implemented yet is work, not a question.
 
 You do not stop to ask. A gap goes through the gap procedure. Search the specification and the log for the direction. Take the smallest option that keeps every struct C layout and the IR free of sizes. Record one `[provisional]` line with its reason. Continue. Questions appear in the report at the end and nowhere else.
 
 ## Answers to the report
 
-1. Force-push the rebuilt chapter series. The tags are rebuilt by rule, and nothing has been released. Do this first.
-2. The test-mention rule is as you read it: one or two sentences per chapter, ending with the outcome line. Chapter 3 shows one build and one `ctest` run. It is now written under "Book rules" below.
-3. The error class is `anti.error.Error`. The specification says so. `anti.rt` stays the runtime's.
-4. Every provisional decision in the report stands. The specification now states that `add`, `sub`, `and`, `or` and `swap` return the previous value and that atomic operations are runtime calls.
+1. The error class is `anti.error.Error`. The specification says so. `anti.rt` stays the runtime's.
+2. Every provisional decision in the report stands. The specification now states that `add`, `sub`, `and`, `or` and `swap` return the previous value and that atomic operations are runtime calls.
 
 ## Step 1. Specification into the repository
 
@@ -39,38 +37,18 @@ Implement every rule of the specification that the previous work order did not. 
 
 Every item has the tests the specification implies, and every message is pinned by a test.
 
-## Step 3. The book
-
-- Apply the consistency checklist at the end of the specification to every chapter. A chapter that disagrees with the specification is corrected to match. Rewrite as prose, never as a change note.
-- Chapter 2 gets the footnote, in the author's voice, verbatim:
-
-  > The compiler refuses a step of zero at compile time. This check is named the Heederik guardrail, after my old friend Robbert Heederik. He has reminded me for thirty years of a loop I once wrote without incrementing its counter.
-
-  Its label is `[^heederik]`. The comment in `sema.c` links to `<chapter 2 url>#fn:heederik` with the site's real path.
-- Chapter 24 stays `draft: true` and links only from chapter 25's guide until chapters 21 to 23 are complete. Chapter 23 gets the two worked examples of the C view. The first is a C program that allocates a `Circle` and calls `anti_Circle_construct`, `Circle_area`, `anti_Shape_area`, `anti_Circle_as_Serializable` and `anti_Circle_delete`. It walks the descriptor to print field names and is compiled with `cc -std=c11` and `c++ -std=c++17`. The second is an Anti class that wraps a raylib struct with `use`.
-- The specification's example is the chapter 2 listing for the object model and is pinned by a test.
-- Every listing in every chapter compiles under the specification and is pinned.
-
 ## Step 4. Standard library
 
-- Build the modules the report left. `anti.log` with `Sink`, `StderrSink`, `FileSink`, `CallbackSink`, `Logger`, the `Log` singleton, `ANTI_LOGGER` and the TOML subset parser in the runtime. `anti.random`. `anti.args`. `anti.collection` with `List` and `Map` over `*Object`. `anti.json` as the format of `serialize` and `deserialize`. `anti.toml`, reading only. Each module has `//!` docs, `///` on every `pub` item, and a test. No chapter text.
+- Build the modules the report left. `anti.log` with `Sink`, `StderrSink`, `FileSink`, `CallbackSink`, `Logger`, the `Log` singleton, `ANTI_LOGGER` and the TOML subset parser in the runtime. `anti.random`. `anti.args`. `anti.collection` with `List` and `Map` over `*Object`. `anti.json` as the format of `serialize` and `deserialize`. `anti.toml`, reading only. Each module has `//!` docs, `///` on every `pub` item, and a test.
 - `anti.error` gains `text()` through `text.Builder`.
 
-## Step 5. Tags, report
+## Step 5. Report
 
-- Rebuild the chapter series and force-push. Check every tag in order.
-- The report is `docs/reports/2026-09-20-object-model-completion.md`. It holds the new `[provisional]` entries with reasons, and what failed and why. It holds what is host-only and what is not done with the reason. It holds the consistency pass as one line per chapter saying what changed. Under two pages. That is the only place a question may appear.
-
-## Book rules
-
-- The book is about writing a compiler. It uses `anti.io`, `anti.text` and `anti.error` and nothing else from `std/`, and says once that the real standard library lives on anti-lang.com.
-- A chapter names no test and describes none. Its "Tests" section is one or two sentences stating what the chapter's code is checked against. It ends with the outcome line. Chapter 3 shows one build and one `ctest` run.
-- Every listing is pinned by a test. Every C and CMake excerpt is in `tests/excerpts.txt`.
-- Never a TODO, a placeholder or an unfinished sentence in chapter text.
+- The report is `docs/reports/2026-09-20-object-model-completion.md`. It holds the new `[provisional]` entries with reasons, and what failed and why. It holds what is host-only and what is not done with the reason. Under two pages. That is the only place a question may appear.
 
 ## Rules, unchanged
 
-- Warnings are errors. All tests pass on the host before every commit. The chapter tags rebuild and pass. The docs-style checker reports zero findings on every touched file. The site builds with and without drafts.
+- Warnings are errors. All tests pass on the host before every commit. The docs-style checker reports zero findings on every touched file.
 - No workflow runs. Every workflow stays `workflow_dispatch` only.
 - One commit per logical change. Push after every completed step.
 - If a step fails after a reasonable number of attempts, isolate it and note it in the report. Move on, and return at the end.
