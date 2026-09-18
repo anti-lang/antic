@@ -1,16 +1,14 @@
 # The release of anti-lang/llvm-tools that the LLVM tools of every host come
 # from. The version stands in tools/llvm-version alone, and @VERSION@ takes
-# it. The tag adds the build number of the recipe. An asset is named after
-# the tag and the host, which @TAG@ and @HOST@ take. The key signs
-# SHA256SUMS of the release, and tools/llvm-tools-key.gpg holds it. Each
-# digest is the SHA-256 of the asset of that host.
-tag=@VERSION@-1
+# it. The tag adds the counter of the rebuilds of that version. An asset is
+# named after the tag and the host, which @TAG@ and @HOST@ take. Each digest
+# is the SHA-256 of the asset of that host. The release also carries an
+# archive for macos-x86_64, which antic does not support and never downloads.
+tag=@VERSION@-anti.1
 release=https://github.com/anti-lang/llvm-tools/releases/download/@TAG@
 file=llvm-tools-@TAG@-@HOST@.tar.xz
-key=6101BC28AF32AA357B54316E8E0D8ADAADFC8154
 linux-x86_64-digest=cdbc33c6ff3b27fd88b081b0a5090dbbfccc939d008cd99fb1a6c13a10be60d5
 linux-arm64-digest=cf91fa01133d4efc196166aa47734d922b66de4bac23d252e85dbac2c6ea0d41
 macos-arm64-digest=258f498deacfab0df33b0884f4a4dd7cdcf5c2b6368f64ef3e3bad4f96b2cce5
-macos-x86_64-digest=28e2e3f90d74ee3bdf0096ab88f1cb5b9e26ac8684b6dc6c56d12e0d44af0cb0
 windows-x86_64-digest=c78eb390a333615f9a4f39eb1a70a8b5f393da020ee81174e6d3108839130ac9
 windows-arm64-digest=39b4769acad802de5320bc8837924e9d5fd29c87e049bb4f80cf738a28cba051

@@ -148,9 +148,9 @@ this installer needs $PACKAGE_API. Install a newer version of Anti."
 fi
 
 # DESIGN: the LLVM tools come from the release that tools/llvm-pin of the
-# package names. The pinned digest decides. gpgv checks the signature of
-# SHA256SUMS where the machine has it, and macOS has none. A package
-# without the pin carries the tools itself.
+# package names. The pinned digest decides, and openssl checks the signature
+# of SHA256SUMS against tools/llvm-tools-key.pem. macOS and Linux carry
+# openssl. A package without the pin carries the tools itself.
 llvm_pin=$home/tools/llvm-pin
 if [ -f "$llvm_pin" ]; then
     row() {
@@ -176,14 +176,17 @@ if [ -f "$llvm_pin" ]; then
     if [ "$listed" != "$digest" ]; then
         fail "SHA256SUMS of $tag lists '$listed' for $tools, and the pin $digest"
     fi
-    if command -v gpgv >/dev/null 2>&1; then
-        if ! gpgv --status-fd 1 --keyring "$home/tools/llvm-tools-key.gpg" \
-            "$work/llvm-sums.sig" "$work/llvm-sums" 2>/dev/null |
-            grep -q "VALIDSIG $(row key) "; then
+    if command -v openssl >/dev/null 2>&1; then
+        openssl dgst -sha256 -binary -out "$work/llvm-sums.sha256" \
+            "$work/llvm-sums"
+        if ! openssl pkeyutl -verify -pubin \
+            -inkey "$home/tools/llvm-tools-key.pem" \
+            -in "$work/llvm-sums.sha256" -sigfile "$work/llvm-sums.sig" \
+            >/dev/null 2>&1; then
             fail "SHA256SUMS of $tag carries no signature of the key of Anti"
         fi
     else
-        say "gpgv is missing, so the pinned digest alone checks $tools"
+        say "warning: openssl is missing, so this installer checked the digest of $tools and not the signature"
     fi
     tar -xJf "$work/$tools" -C "$home" bin licenses
 fi

@@ -117,9 +117,10 @@ try {
     }
 
     # DESIGN: the LLVM tools come from the release that tools/llvm-pin of
-    # the package names. The pinned digest decides. gpgv of Git for Windows
-    # checks the signature of SHA256SUMS where the machine has it. A package
-    # without the pin carries the tools itself.
+    # the package names. The pinned digest decides, and the openssl of Git
+    # for Windows checks the signature of SHA256SUMS against
+    # tools/llvm-tools-key.pem. A package without the pin carries the tools
+    # itself.
     $llvm_pin = "$home_dir\tools\llvm-pin"
     if (Test-Path $llvm_pin) {
         $rows = Get-Content $llvm_pin
@@ -141,26 +142,27 @@ try {
         $line = Get-Content "$work\llvm-sums" | Where-Object { $_.EndsWith("  $tools") }
         $listed = ($line -split "\s+")[0]
         if ($listed -ne $digest) { Fail "SHA256SUMS of $tag lists '$listed' for $tools, and the pin $digest" }
-        $gpgv = (Get-Command gpgv -ErrorAction SilentlyContinue).Source
-        if (-not $gpgv -and (Test-Path "$env:ProgramFiles\Git\usr\bin\gpgv.exe")) {
-            $gpgv = "$env:ProgramFiles\Git\usr\bin\gpgv.exe"
+        $openssl = (Get-Command openssl -ErrorAction SilentlyContinue).Source
+        foreach ($dir in "clangarm64\bin", "mingw64\bin", "usr\bin") {
+            if (-not $openssl -and (Test-Path "$env:ProgramFiles\Git\$dir\openssl.exe")) {
+                $openssl = "$env:ProgramFiles\Git\$dir\openssl.exe"
+            }
         }
-        if ($gpgv) {
-            # The gpgv of Git reads C: in a keyring path as the scheme of a
-            # URL, so the keyring is named from its own directory. gpgv writes
-            # to stderr even on success, which Stop turns into an error.
+        if ($openssl) {
+            # openssl writes to stderr on a failure, which Stop would turn
+            # into an error before the exit code is read.
             $previous = $ErrorActionPreference
             $ErrorActionPreference = "Continue"
-            Push-Location "$home_dir\tools"
-            $status = & $gpgv --status-fd 1 --keyring ./llvm-tools-key.gpg "$work\llvm-sums.sig" "$work\llvm-sums" 2>$null
+            & $openssl dgst -sha256 -binary -out "$work\llvm-sums.sha256" "$work\llvm-sums" 2>$null
+            $hashed = $LASTEXITCODE
+            & $openssl pkeyutl -verify -pubin -inkey "$home_dir\tools\llvm-tools-key.pem" -in "$work\llvm-sums.sha256" -sigfile "$work\llvm-sums.sig" 2>$null | Out-Null
             $verified = $LASTEXITCODE
-            Pop-Location
             $ErrorActionPreference = $previous
-            if ($verified -ne 0 -or -not ($status -match "VALIDSIG $(Row 'key') ")) {
+            if ($hashed -ne 0 -or $verified -ne 0) {
                 Fail "SHA256SUMS of $tag carries no signature of the key of Anti"
             }
         } else {
-            Say "gpgv is missing, so the pinned digest alone checks $tools"
+            Say "warning: openssl is missing, so this installer checked the digest of $tools and not the signature"
         }
         tar.exe -xJf "$work\$tools" -C $home_dir bin licenses
         if ($LASTEXITCODE -ne 0) { Fail "tar.exe failed to unpack $tools" }

@@ -143,9 +143,9 @@ foreach(host IN LISTS HOSTS)
     endforeach()
     file(COPY "${SYSROOT}/licenses/" DESTINATION "${tree}/licenses")
     # The installer reads llvm-pin and checks the signature of the LLVM
-    # release against llvm-tools-key.gpg.
+    # release against llvm-tools-key.pem.
     foreach(name get-sysroot.cmake sysroot-pins cmake-pin cmake-version
-            llvm-version llvm-pin llvm-tools-key.gpg package-api)
+            llvm-version llvm-pin llvm-tools-key.pem package-api)
         file(COPY "${root}/tools/${name}" DESTINATION "${tree}/tools")
     endforeach()
     file(COPY "${root}/LICENSE" DESTINATION "${tree}")

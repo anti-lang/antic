@@ -46,16 +46,17 @@ CDN behind that prefix without a change here.
 ### The LLVM tools
 
 The five LLVM tools are not served from the download area. The repository
-`anti-lang/llvm-tools` builds them for the six hosts from the pinned LLVM source and
-publishes one archive per host as an asset of a GitHub release, tagged
-`<version>-<build>` as in `23.1.1-1`. Beside the archives stand `SHA256SUMS` and its
-signature `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in
-that repository.
+`anti-lang/llvm-tools` builds them from the pinned LLVM source and publishes one archive
+per host as an asset of a GitHub release, tagged `<version>-anti.<build>` as in
+`23.1.1-anti.1`. Beside the archives stand `SHA256SUMS` and its signature
+`SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in that
+repository. It publishes six archives, and antic takes the five of its hosts.
 
-`tools/llvm-pin` names the tag, the address of the release, the name of an asset, the
-fingerprint of the signing key and the digest of each archive. `tools/get-llvm.cmake`
-takes the archive of the host into `build/llvm`, and the installers take it into the
-install directory. Both check the digest of the pin, the line of `SHA256SUMS` and the
+`tools/llvm-pin` names the tag, the address of the release, the name of an asset and
+the digest of the archive of each of the five hosts. `tools/llvm-tools-key.pem` holds
+the public key that checks `SHA256SUMS.sig` with `openssl pkeyutl -verify`.
+`tools/get-llvm.cmake` takes the archive of the host into `build/llvm`, and the
+installers take it into the install directory. Both check the digest of the pin, the line of `SHA256SUMS` and the
 signature. A toolchain bump is a new release there and a new pin here.
 
 ### What the components will hold

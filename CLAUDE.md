@@ -65,7 +65,7 @@ The build needs the pinned LLVM tools in `build/llvm/bin` and the sysroots in
 install, and the pinned raylib source in `build/raylib`, which
 `tools/get-raylib.cmake` installs. `tools/llvm-pin`, `tools/sysroot-pins` and
 `tools/raylib-pin` hold the versions and the digests. The LLVM tools come from
-the releases of `anti-lang/llvm-tools`, and `tools/get-llvm.cmake` needs gpgv
+the releases of `anti-lang/llvm-tools`, and `tools/get-llvm.cmake` needs openssl
 to check their signature.
 
 ## Layout

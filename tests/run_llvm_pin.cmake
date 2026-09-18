@@ -1,12 +1,11 @@
 # tools/llvm-pin names the release of anti-lang/llvm-tools that the LLVM
-# tools come from: its tag, where it lies, the name of an asset, the key
-# that signs SHA256SUMS and the digest of the asset of each host. The
-# version stands in tools/llvm-version alone and the rest in the pin alone.
+# tools come from: its tag, where it lies, the name of an asset and the
+# digest of the asset of each of the five hosts. The version stands in
+# tools/llvm-version alone and the rest in the pin alone.
 #
 #   cmake -DROOT=<repository> -P tests/run_llvm_pin.cmake
 
-set(hosts linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 windows-x86_64
-          windows-arm64)
+set(hosts linux-x86_64 linux-arm64 macos-arm64 windows-x86_64 windows-arm64)
 set(pin "${ROOT}/tools/llvm-pin")
 file(READ "${ROOT}/tools/llvm-version" version)
 string(STRIP "${version}" version)
@@ -25,8 +24,8 @@ function(row key out)
 endfunction()
 
 row(tag tag)
-if(NOT tag MATCHES "^@VERSION@-[1-9][0-9]*$")
-    message(FATAL_ERROR "the tag is `${tag}`, not @VERSION@-<build>")
+if(NOT tag MATCHES "^@VERSION@-anti\\.[1-9][0-9]*$")
+    message(FATAL_ERROR "the tag is `${tag}`, not @VERSION@-anti.<build>")
 endif()
 row(release release)
 if(NOT release STREQUAL "https://github.com/anti-lang/llvm-tools/releases/download/@TAG@")
@@ -37,14 +36,6 @@ if(NOT file MATCHES "@TAG@" OR NOT file MATCHES "@HOST@"
    OR NOT file MATCHES "\\.tar\\.xz$")
     message(FATAL_ERROR "the asset is `${file}`, which names no tag or host")
 endif()
-row(key key)
-if(NOT key MATCHES "^[0-9A-F]+$")
-    message(FATAL_ERROR "the key is `${key}`, not a fingerprint")
-endif()
-string(LENGTH "${key}" length)
-if(NOT length EQUAL 40)
-    message(FATAL_ERROR "the key `${key}` is not a fingerprint of 40 digits")
-endif()
 foreach(host IN LISTS hosts)
     row("${host}-digest" digest)
     string(LENGTH "${digest}" length)
@@ -52,9 +43,24 @@ foreach(host IN LISTS hosts)
         message(FATAL_ERROR "${host} has the digest `${digest}`")
     endif()
 endforeach()
-if(NOT EXISTS "${ROOT}/tools/llvm-tools-key.gpg")
-    message(FATAL_ERROR "tools/llvm-tools-key.gpg, the key that checks "
+# The release carries an archive for macos-x86_64, which is no host of
+# antic. No path in antic downloads it, so the pin names no digest for it.
+file(STRINGS "${pin}" line REGEX "^macos-x86_64-")
+if(NOT line STREQUAL "")
+    message(FATAL_ERROR "tools/llvm-pin names macos-x86_64, which antic does "
+                        "not support: ${line}")
+endif()
+
+# The public key that checks SHA256SUMS.sig, in PEM form, and never a
+# private one.
+set(key "${ROOT}/tools/llvm-tools-key.pem")
+if(NOT EXISTS "${key}")
+    message(FATAL_ERROR "tools/llvm-tools-key.pem, the key that checks "
                         "SHA256SUMS.sig, is missing")
+endif()
+file(READ "${key}" text)
+if(NOT text MATCHES "^-----BEGIN PUBLIC KEY-----\n" OR text MATCHES "PRIVATE")
+    message(FATAL_ERROR "tools/llvm-tools-key.pem is not a public key in PEM form")
 endif()
 
 file(READ "${pin}" text)
@@ -64,10 +70,9 @@ if(text MATCHES "${version}")
 endif()
 foreach(script get-llvm.cmake install.sh install.ps1)
     file(READ "${ROOT}/tools/${script}" text)
-    if(text MATCHES "${version}" OR text MATCHES "anti-lang/llvm-tools"
-       OR text MATCHES "${key}")
-        message(FATAL_ERROR "tools/${script} spells a version, the release or "
-                            "the key, which belong in tools/llvm-version and "
+    if(text MATCHES "${version}" OR text MATCHES "anti-lang/llvm-tools")
+        message(FATAL_ERROR "tools/${script} spells a version or the release, "
+                            "which belong in tools/llvm-version and "
                             "tools/llvm-pin")
     endif()
 endforeach()
