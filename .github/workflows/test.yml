@@ -20,6 +20,10 @@ jobs:
             runner: ubuntu-24.04-arm
           - target: macos-arm64
             runner: macos-15
+          # GitHub offers an Intel runner of macOS for as long as it does.
+          # The development Mac covers macos-x86_64 under Rosetta as well.
+          - target: macos-x86_64
+            runner: macos-15-intel
           - target: windows-x86_64
             runner: windows-2025
             msvc: x64
