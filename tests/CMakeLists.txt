@@ -85,6 +85,14 @@ foreach(source IN LISTS program_sources)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
 
+# The pinned raylib source, which tools/get-raylib.cmake downloads. The
+# directory is named here, before the first test that reads it.
+file(STRINGS "${CMAKE_SOURCE_DIR}/tools/raylib-pin" raylib_version
+     REGEX "^RAYLIB_VERSION=")
+string(REGEX REPLACE "^RAYLIB_VERSION=" "" raylib_version "${raylib_version}")
+set(ANTIC_RAYLIB_DIR "${CMAKE_BINARY_DIR}/raylib/raylib-${raylib_version}"
+    CACHE PATH "raylib release source from tools/get-raylib.cmake")
+
 # The same C files compiled for macos-x86_64, which the ABI programs of
 # that target link. The host runs them, so antic meets clang on the System
 # V rules of x86_64 as well.
@@ -250,11 +258,6 @@ add_test(NAME installer_options
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_installer_options.cmake")
 
-file(STRINGS "${CMAKE_SOURCE_DIR}/tools/raylib-pin" raylib_version
-     REGEX "^RAYLIB_VERSION=")
-string(REGEX REPLACE "^RAYLIB_VERSION=" "" raylib_version "${raylib_version}")
-set(ANTIC_RAYLIB_DIR "${CMAKE_BINARY_DIR}/raylib/raylib-${raylib_version}"
-    CACHE PATH "raylib release source from tools/get-raylib.cmake")
 if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
     add_library(abi_raymath OBJECT abi/raymath.c)
     target_include_directories(abi_raymath PRIVATE "${ANTIC_RAYLIB_DIR}/src")
