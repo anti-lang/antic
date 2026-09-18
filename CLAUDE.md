@@ -32,6 +32,10 @@ without asking Eddie.
 - Warnings are errors. `CMakeLists.txt` sets `-Wall -Wextra -Wpedantic -Werror`
   and `/W4 /WX`. The build produces zero warnings on clang, gcc and MSVC.
 - All tests pass on the host before every commit.
+- The two sanitizer builds run before every push, whatever the work is.
+  `cmake --preset asan` and `cmake --preset ubsan`, each with the full suite.
+  UndefinedBehaviorSanitizer found a real defect on its first run here, a `bool`
+  field read as 64 that the ordinary build passed over.
 - Every comment and every `.md` file follows the docs-style rules. Run
   `python3 tools/docs-style/check_docs.py <files>` before committing, and fix
   every finding. The copy under `tools/` is pinned on purpose, so the rules do
