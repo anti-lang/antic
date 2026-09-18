@@ -1,0 +1,48 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "Host build",
+            "description": "Warnings are errors, the host target, the full test suite",
+            "binaryDir": "${sourceDir}/build"
+        },
+        {
+            "name": "asan",
+            "displayName": "AddressSanitizer",
+            "description": "Debug build of antic and its runtime under AddressSanitizer",
+            "binaryDir": "${sourceDir}/build-asan",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "-fsanitize=address -g",
+                "ANTIC_LLVM_MC": "${sourceDir}/build/toolchain/bin/llvm-mc",
+                "ANTIC_SYSROOT_DIR": "${sourceDir}/build/sysroot",
+                "ANTIC_RAYLIB_DIR": "${sourceDir}/build/raylib/raylib-6.0"
+            }
+        },
+        {
+            "name": "ubsan",
+            "displayName": "Address and UndefinedBehaviorSanitizer",
+            "description": "Debug build under both sanitizers, with no recovery",
+            "binaryDir": "${sourceDir}/build-ubsan",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all",
+                "ANTIC_LLVM_MC": "${sourceDir}/build/toolchain/bin/llvm-mc",
+                "ANTIC_SYSROOT_DIR": "${sourceDir}/build/sysroot",
+                "ANTIC_RAYLIB_DIR": "${sourceDir}/build/raylib/raylib-6.0"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "default", "configurePreset": "default" },
+        { "name": "asan", "configurePreset": "asan" },
+        { "name": "ubsan", "configurePreset": "ubsan" }
+    ],
+    "testPresets": [
+        { "name": "default", "configurePreset": "default", "output": { "outputOnFailure": true } },
+        { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } },
+        { "name": "ubsan", "configurePreset": "ubsan", "output": { "outputOnFailure": true } }
+    ]
+}

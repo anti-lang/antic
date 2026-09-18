@@ -22,7 +22,9 @@ void test_types(void)
     struct types types;
     struct type *i64, *u8, *f32, *f64, *boolean, *character, *str;
     struct type *pixel, *node, *params[2];
-    struct struct_field fields[3];
+    /* Every field record is zero here, so a flag the test does not set
+       reads as false rather than as whatever the stack held. */
+    struct struct_field fields[3] = {0};
 
     types_init(&types, &arena);
     i64 = types_builtin(&types, TYPE_I64);

@@ -1296,20 +1296,23 @@ static struct ir_global *class_global(struct lowerer *l, const struct type *t,
     struct ir_module *m = l->m;
     char *module = cstr(&t->module);
     char *name;
+    size_t size;
     size_t i;
 
     /* DESIGN: an export class gives its table and its descriptor the C
        names the generated header declares, so C code reads them. Every
        other class keeps the name `Class.part` of its module. */
-    name = malloc(t->name.length + strlen(suffix) + 8);
+    size = t->name.length + strlen(suffix) + 8;
+    name = malloc(size);
     if (name == NULL) {
         fputs("antic: out of memory\n", stderr);
         exit(70);
     }
     if (t->item_exported && (strcmp(suffix, "table") == 0 ||
                              strcmp(suffix, "descriptor") == 0)) {
-        sprintf(name, "anti_%.*s_%s", (int)t->name.length, t->name.text,
-                strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
+        snprintf(name, size, "anti_%.*s_%s", (int)t->name.length,
+                 t->name.text,
+                 strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
     } else {
         memcpy(name, t->name.text, t->name.length);
         name[t->name.length] = '.';
