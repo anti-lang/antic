@@ -1,24 +1,24 @@
-# Install llvm-mc, lld, llvm-ar, llvm-objdump and llvm-readobj from the
-# pinned LLVM release for this host into <dir>/bin. llvm-mc assembles, lld
-# links under the names ld.lld, ld64.lld and lld-link, and llvm-ar writes
-# static libraries. llvm-objdump reads the format and architecture of an
-# output, and llvm-readobj decodes the Windows unwind data for the tests.
+# Install llvm-mc, lld, llvm-ar, llvm-objdump and llvm-readobj for this
+# host into <dir>/bin. llvm-mc assembles, lld links under the names ld.lld,
+# ld64.lld and lld-link, and llvm-ar writes static libraries. llvm-objdump
+# reads the format and architecture of an output, and llvm-readobj decodes
+# the Windows unwind data for the tests.
 #
-#   cmake -DDEST=<dir> -P tools/get-llvm.cmake
+#   cmake [-DDEST=<dir>] [-DARCHIVE=<file>] -P tools/get-llvm.cmake
 #
-# The release is the one in tools/llvm-version, and tools/llvm-pin names its
-# archive per host. CMake downloads, checks the digest and unpacks, so the
-# same script runs on macOS, Linux and Windows without a shell. Set ARCHIVE
-# to a file that is already downloaded to skip the download. The digest is
-# checked either way.
+# The tools come from the release that tools/llvm-pin names, whose recipe
+# builds them from the LLVM source of tools/llvm-version. The script
+# downloads the asset of this host and checks its digest against the pin.
+# It checks SHA256SUMS of the release against the pin, and SHA256SUMS.sig
+# with gpgv against the key of tools/llvm-tools-key.gpg. DEST defaults to
+# build/llvm of the repository.
+# ARCHIVE names an asset already downloaded, which is checked all the same.
 cmake_minimum_required(VERSION 3.20)
 
+get_filename_component(root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 if(NOT DEFINED DEST)
-    message(FATAL_ERROR "usage: cmake -DDEST=<dir> -P tools/get-llvm.cmake")
+    set(DEST "${root}/build/llvm")
 endif()
-
-set(TOOLS llvm-mc llvm-ar llvm-objdump llvm-readobj lld ld.lld ld64.lld
-          lld-link)
 
 file(READ "${CMAKE_CURRENT_LIST_DIR}/llvm-version" version)
 string(STRIP "${version}" version)
@@ -35,70 +35,107 @@ elseif(platform MATCHES "^(x86_64|amd64|x64)$")
 endif()
 set(host "${os}-${platform}")
 
-foreach(key url digest)
-    file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/llvm-pin" line
-         REGEX "^${host}-${key}=")
-    string(REGEX REPLACE "^${host}-${key}=" "" ${key} "${line}")
-    string(REPLACE "@VERSION@" "${version}" ${key} "${${key}}")
-endforeach()
-if(url STREQUAL "" OR digest STREQUAL "")
+# Set <out> to the row <key> of the pin, with the tag, the version and the
+# host in place of their markers.
+function(pin key out)
+    file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/llvm-pin" line REGEX "^${key}=")
+    string(REGEX REPLACE "^${key}=" "" value "${line}")
+    string(REPLACE "@TAG@" "${tag}" value "${value}")
+    string(REPLACE "@VERSION@" "${version}" value "${value}")
+    string(REPLACE "@HOST@" "${host}" value "${value}")
+    set(${out} "${value}" PARENT_SCOPE)
+endfunction()
+set(tag "")
+pin(tag tag)
+pin(release release)
+pin(file asset)
+pin(key key)
+pin("${host}-digest" digest)
+if(digest STREQUAL "")
     message(FATAL_ERROR
-            "tools/llvm-pin has no archive of LLVM ${version} for ${host}. "
-            "Every host we publish has one, so this is a host we do not "
-            "publish or a pin that lost a row.")
+            "tools/llvm-pin has no LLVM tools for ${host}. Every host antic "
+            "runs on has them, so this is a host antic does not run on or a "
+            "pin that lost a row.")
 endif()
-get_filename_component(asset "${url}" NAME)
 
-file(MAKE_DIRECTORY "${DEST}/bin")
-if(NOT DEFINED ARCHIVE)
-    set(ARCHIVE "${DEST}/${asset}")
-    file(DOWNLOAD "${url}" "${ARCHIVE}" STATUS status SHOW_PROGRESS)
+# Download <name> of the release to <file>, and stop on a failure.
+function(download name file)
+    file(DOWNLOAD "${release}/${name}" "${file}" STATUS status)
     list(GET status 0 code)
     list(GET status 1 text)
     if(NOT code EQUAL 0)
-        message(FATAL_ERROR "${asset}: ${text}")
+        file(REMOVE "${file}")
+        message(FATAL_ERROR "${release}/${name}: ${text}")
+    endif()
+endfunction()
+
+set(downloads "${DEST}/downloads")
+file(MAKE_DIRECTORY "${downloads}")
+if(NOT DEFINED ARCHIVE)
+    set(ARCHIVE "${downloads}/${asset}")
+    set(actual "")
+    if(EXISTS "${ARCHIVE}")
+        file(SHA256 "${ARCHIVE}" actual)
+    endif()
+    if(NOT actual STREQUAL digest)
+        message(STATUS "download ${asset}")
+        download("${asset}" "${ARCHIVE}")
     endif()
 endif()
 file(SHA256 "${ARCHIVE}" actual)
 if(NOT actual STREQUAL digest)
-    message(FATAL_ERROR "${ARCHIVE}: SHA-256 ${actual}, expected ${digest}")
+    message(FATAL_ERROR "${ARCHIVE}: SHA-256 ${actual}, the pin is ${digest}")
 endif()
 
-# The archive holds every LLVM tool. Unpack the eight that antic needs and
-# leave the rest in the archive. A pattern that matches nothing is an error,
-# so the suffix of the host decides the names.
+# DESIGN: the pin decides which asset is right, and the signature of
+# SHA256SUMS ties the release to the key of anti-lang. Both must agree, so
+# a release that changed under its tag fails here whichever file changed.
+download(SHA256SUMS "${downloads}/SHA256SUMS")
+download(SHA256SUMS.sig "${downloads}/SHA256SUMS.sig")
+file(STRINGS "${downloads}/SHA256SUMS" listed REGEX "  ${asset}$")
+string(REGEX REPLACE " .*$" "" listed "${listed}")
+if(NOT listed STREQUAL digest)
+    message(FATAL_ERROR "SHA256SUMS of ${tag} lists '${listed}' for ${asset}, "
+                        "and the pin ${digest}")
+endif()
+find_program(GPGV gpgv HINTS "C:/Program Files/Git/usr/bin")
+if(NOT GPGV)
+    message(FATAL_ERROR "gpgv is not on the PATH. It checks SHA256SUMS.sig.")
+endif()
+# The gpgv of Git for Windows reads C: in a keyring path as the scheme of a
+# URL, so the keyring is named from its own directory.
+execute_process(COMMAND "${GPGV}" --status-fd 1
+                        --keyring ./llvm-tools-key.gpg
+                        "${downloads}/SHA256SUMS.sig" "${downloads}/SHA256SUMS"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}"
+                OUTPUT_VARIABLE status_lines ERROR_VARIABLE err
+                RESULT_VARIABLE verified)
+if(NOT verified EQUAL 0 OR NOT status_lines MATCHES "VALIDSIG ${key} ")
+    message(FATAL_ERROR "SHA256SUMS.sig of ${tag} is not a signature of the "
+                        "key ${key}: ${err}")
+endif()
+message(STATUS "${asset}: the digest of the pin, in SHA256SUMS signed by ${key}")
+
+# The asset holds bin/ with the five tools, licenses/ and VERSION.
+set(unpacked "${DEST}/unpacked")
+file(REMOVE_RECURSE "${unpacked}" "${DEST}/bin" "${DEST}/licenses"
+     "${DEST}/VERSION")
+file(ARCHIVE_EXTRACT INPUT "${ARCHIVE}" DESTINATION "${unpacked}")
+foreach(name bin licenses VERSION)
+    if(NOT EXISTS "${unpacked}/${name}")
+        message(FATAL_ERROR "${asset} holds no ${name}")
+    endif()
+    file(RENAME "${unpacked}/${name}" "${DEST}/${name}")
+endforeach()
+file(REMOVE_RECURSE "${unpacked}")
+
+# lld answers to its four names through argv[0]. The asset carries one
+# copy, because Windows has no symbolic link without a privilege.
 if(CMAKE_HOST_WIN32)
     set(exe ".exe")
 endif()
-# The pattern fits our archive, which holds bin/ at its root, and an
-# upstream release archive, which holds one directory above it.
-set(patterns "")
-foreach(tool IN LISTS TOOLS)
-    list(APPEND patterns "*bin/${tool}${exe}")
-endforeach()
-set(unpacked "${DEST}/unpacked")
-file(REMOVE_RECURSE "${unpacked}")
-file(ARCHIVE_EXTRACT INPUT "${ARCHIVE}" DESTINATION "${unpacked}"
-     PATTERNS ${patterns})
-file(GLOB found "${unpacked}/bin/*" "${unpacked}/*/bin/*")
-if(found STREQUAL "")
-    message(FATAL_ERROR "${ARCHIVE} holds no tool of ${TOOLS}")
-endif()
-file(COPY ${found} DESTINATION "${DEST}/bin")
-file(REMOVE_RECURSE "${unpacked}")
-
-# lld answers to its four names through argv[0]. Our archive carries one
-# copy, because Windows has no symbolic link without a privilege.
 foreach(name ld.lld ld64.lld lld-link)
-    if(NOT EXISTS "${DEST}/bin/${name}${exe}")
-        execute_process(COMMAND "${CMAKE_COMMAND}" -E copy
-                                "${DEST}/bin/lld${exe}"
-                                "${DEST}/bin/${name}${exe}"
-                        RESULT_VARIABLE copied)
-        if(NOT copied EQUAL 0)
-            message(FATAL_ERROR "${name}${exe}: the copy of lld failed")
-        endif()
-    endif()
+    file(COPY_FILE "${DEST}/bin/lld${exe}" "${DEST}/bin/${name}${exe}")
 endforeach()
 
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${DEST}/bin"

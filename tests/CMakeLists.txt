@@ -55,11 +55,12 @@ set_tests_properties(antic_host_target PROPERTIES
 
 # One test per program in tests/programs
 find_program(ANTIC_LLVM_MC NAMES llvm-mc
-    HINTS "${CMAKE_SOURCE_DIR}/build/toolchain/bin"
+    HINTS "${ANTIC_LLVM_DIR}/bin"
     DOC "llvm-mc from LLVM 23.1.1")
 
-# The runtime archive carries llvm-mc, lld and llvm-ar of the LLVM release
-# in tools/llvm-version, which the build copies to runtime/bin.
+# The runtime archive carries llvm-mc, lld and llvm-ar of LLVM
+# tools/llvm-version, which the build copies to runtime/bin from the
+# directory that tools/get-llvm.cmake installs.
 if(ANTIC_LLVM_MC)
     get_filename_component(ANTIC_LLVM_BIN "${ANTIC_LLVM_MC}" DIRECTORY)
     add_custom_target(llvm_tools ALL
@@ -240,11 +241,12 @@ if(ANTIC_STRINGS AND antic_sanitized EQUAL -1)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_paths.cmake")
 endif()
 
-foreach(name llvm cmake)
-    add_test(NAME ${name}_pin
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" "-DNAME=${name}"
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pin.cmake")
-endforeach()
+add_test(NAME cmake_pin
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=cmake
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pin.cmake")
+add_test(NAME llvm_pin
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_pin.cmake")
 add_test(NAME raylib_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_raylib_pin.cmake")
@@ -668,7 +670,7 @@ endif()
 # Libraries for C, built with antic --lib and used from C programs on the
 # host. Windows needs the MSVC toolchain and is left to the CI runners.
 find_program(ANTIC_LLVM_AR NAMES llvm-ar
-    HINTS "${CMAKE_SOURCE_DIR}/build/toolchain/bin"
+    HINTS "${ANTIC_LLVM_DIR}/bin"
     DOC "llvm-ar from LLVM 23.1.1")
 if(NOT WIN32 AND ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes)

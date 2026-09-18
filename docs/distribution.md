@@ -32,37 +32,31 @@ layout.
 <base>/<component>/<version>/SHA256SUMS
 ```
 
-- `<component>` is `llvm` for the tools of the pinned LLVM release, `anti` for the
-  runtime archive with antic, `raylib` and `musl` for the mirrors of a pinned source.
-- `<version>` is the version of that component, such as `23.1.1` or `6.0`.
+- `<component>` is `anti` for the runtime archive with antic, `raylib` and `musl` for
+  the mirrors of a pinned source.
+- `<version>` is the version of that component, such as `0.1.0` or `6.0`.
 - `<file>` names the component, the version and the target, as in
-  `anti-llvm-23.1.1-macos-arm64.tar.xz`. The target names are the six of `--target`.
+  `anti-0.1.0-macos-arm64.tar.xz`. The target names are the six of `--target`.
 - `SHA256SUMS` beside them holds one line per file, which `shasum -c` reads.
 
 A path is written once and never again. A pin file in the repository names the file and
 its digest, so an older Anti keeps installing its pinned version. The files can move to a
 CDN behind that prefix without a change here.
 
-`tools/pack-llvm.cmake` builds the files of `llvm` and writes both the pin rows and
-`SHA256SUMS`. Uploading them is the last step of a toolchain bump. The burden of a new
-LLVM version stays with us rather than with a user.
+### The LLVM tools
 
-When the LLVM pin moves, three of the six archives are repacked from the release and
-three are rebuilt from source. The macOS x86_64 archive and the two Linux archives come
-out of `tools/build-llvm.cmake`, which compiles LLVM and takes about an hour per host.
-The macOS ARM64 and the two Windows archives are repacked from the release in minutes.
-Start the three builds first.
+The five LLVM tools are not served from the download area. The repository
+`anti-lang/llvm-tools` builds them for the six hosts from the pinned LLVM source and
+publishes one archive per host as an asset of a GitHub release, tagged
+`<version>-<build>` as in `23.1.1-1`. Beside the archives stand `SHA256SUMS` and its
+signature `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in
+that repository.
 
-The macOS ARM64 and Windows archives hold the tools of the LLVM release. The two Linux
-archives and the macOS x86_64 one hold tools built by `tools/build-llvm.cmake`, because the Linux release links
-`ld.lld` against `libicui18n.so.70` of one Ubuntu release, and publishes nothing at all
-for macOS on x86_64. A Linux build leaves ICU, zstd, libxml2 and libedit out and links
-with `-static -s`, so the five tools name no shared library beyond zlib, which is
-compiled in. A macOS build links against the libraries of the system, because macOS has
-no static libSystem. `tools/pack-llvm.cmake` reads the needed libraries of every
-Linux tool with `llvm-readobj` and refuses one that names a library outside the system
-set. A cross build writes the other Linux processor with `CROSS`, and it needs the
-`llvm-tblgen` of a native build.
+`tools/llvm-pin` names the tag, the address of the release, the name of an asset, the
+fingerprint of the signing key and the digest of each archive. `tools/get-llvm.cmake`
+takes the archive of the host into `build/llvm`, and the installers take it into the
+install directory. Both check the digest of the pin, the line of `SHA256SUMS` and the
+signature. A toolchain bump is a new release there and a new pin here.
 
 ### What the components will hold
 
@@ -72,7 +66,6 @@ tree, and one less level is one less path to get wrong.
 
 | Component | Files | Built by |
 |---|---|---|
-| `llvm` | The five tools per host | `tools/pack-llvm.cmake` |
 | `anti` | The runtime archive with antic per target | The release build of chapter 23 |
 | `raylib`, `pcre2`, `mbedtls`, `miniaudio` | The static library per target, with headers | The CMake build in `libs/` |
 | `musl` | The Linux sysroot per processor | `tools/get-sysroot.cmake` |
@@ -111,8 +104,8 @@ for every target it claims. The checks that a build on the development Mac canno
 
 Step 3 is the one that found the missing zlib in our own lld. The musl objects of Alpine
 for x86_64 carry `SHF_COMPRESSED` debug sections, and a linker without zlib stops on
-every one of them. No check on the Mac sees it, because the LLVM release that the macOS
-package carries has zlib.
+every one of them. No check on the Mac saw it, because the LLVM release that the macOS
+package carried then had zlib. Every archive of `anti-lang/llvm-tools` links zlib in.
 
 ## HTTPS
 

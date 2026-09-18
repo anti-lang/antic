@@ -60,11 +60,13 @@ cmake -S . -B build && cmake --build build -j8 && ctest --test-dir build -j8
 asan` and `cmake --preset ubsan`, each with its own build directory. Both run
 the full suite.
 
-The build needs the pinned LLVM tools in `build/toolchain/bin` and the sysroots
-in `build/sysroot`, which `tools/get-llvm.cmake` and `tools/get-sysroot.cmake`
+The build needs the pinned LLVM tools in `build/llvm/bin` and the sysroots in
+`build/sysroot`, which `tools/get-llvm.cmake` and `tools/get-sysroot.cmake`
 install, and the pinned raylib source in `build/raylib`, which
 `tools/get-raylib.cmake` installs. `tools/llvm-pin`, `tools/sysroot-pins` and
-`tools/raylib-pin` hold the versions and the digests.
+`tools/raylib-pin` hold the versions and the digests. The LLVM tools come from
+the releases of `anti-lang/llvm-tools`, and `tools/get-llvm.cmake` needs gpgv
+to check their signature.
 
 ## Layout
 
@@ -81,11 +83,10 @@ install, and the pinned raylib source in `build/raylib`, which
 
 ## First sessions, in order
 
-1. The LLVM toolchain build for every host. `docs/decisions.md` carries it
-   under "Scope and toolchain". The tools are built from the pinned LLVM source
-   with the pinned release binaries as the compiler, and everything stays under
-   the build tree. Each release archive is verified against its Sigstore
-   attestation.
+1. Done. The LLVM tools are built for every host in `anti-lang/llvm-tools`,
+   and antic downloads the archive of its host. `docs/decisions.md` carries it
+   under "Scope and toolchain", and `docs/reports/2026-09-21-llvm-tools.md` of
+   that repository reports the first release.
 2. The whole-program pass over the IR of every module. It is the first
    compiler work. Four things are passes over it: release-mode
    devirtualisation, the class registry, the singleton check and the used-slot

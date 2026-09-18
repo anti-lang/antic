@@ -153,8 +153,12 @@ add_custom_target(anti_rt_license_stub_copy ALL
 # archive with the licences of its components.
 set(ANTIC_SYSROOT_DIR "${CMAKE_SOURCE_DIR}/build/sysroot" CACHE PATH
     "sysroots from tools/get-sysroot.cmake")
+# The LLVM tools of this host, which tools/get-llvm.cmake installs into
+# bin/ of this directory from the release that tools/llvm-pin names.
+set(ANTIC_LLVM_DIR "${CMAKE_SOURCE_DIR}/build/llvm" CACHE PATH
+    "LLVM tools from tools/get-llvm.cmake")
 find_program(ANTIC_LLVM_AR NAMES llvm-ar
-    HINTS "${CMAKE_SOURCE_DIR}/build/toolchain/bin"
+    HINTS "${ANTIC_LLVM_DIR}/bin"
     DOC "llvm-ar from LLVM 23.1.1")
 set(ANTIC_TARGETS linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
     windows-x86_64 windows-arm64)

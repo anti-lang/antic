@@ -16,7 +16,6 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_C_FLAGS": "-fsanitize=address -g",
-                "ANTIC_LLVM_MC": "${sourceDir}/build/toolchain/bin/llvm-mc",
                 "ANTIC_SYSROOT_DIR": "${sourceDir}/build/sysroot",
                 "ANTIC_RAYLIB_DIR": "${sourceDir}/build/raylib/raylib-6.0"
             }
@@ -29,7 +28,6 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all",
-                "ANTIC_LLVM_MC": "${sourceDir}/build/toolchain/bin/llvm-mc",
                 "ANTIC_SYSROOT_DIR": "${sourceDir}/build/sysroot",
                 "ANTIC_RAYLIB_DIR": "${sourceDir}/build/raylib/raylib-6.0"
             }

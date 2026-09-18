@@ -116,7 +116,57 @@ try {
         Fail "Anti $version speaks version $api of the installer interface, and this installer needs $PACKAGE_API. Install a newer version of Anti."
     }
 
-    # lld answers to its four names through argv[0], and the package
+    # DESIGN: the LLVM tools come from the release that tools/llvm-pin of
+    # the package names. The pinned digest decides. gpgv of Git for Windows
+    # checks the signature of SHA256SUMS where the machine has it. A package
+    # without the pin carries the tools itself.
+    $llvm_pin = "$home_dir\tools\llvm-pin"
+    if (Test-Path $llvm_pin) {
+        $rows = Get-Content $llvm_pin
+        function Row($key) {
+            (($rows | Where-Object { $_ -match "^$key=" }) -split "=", 2)[1]
+        }
+        $llvm_version = (Get-Content "$home_dir\tools\llvm-version" -Raw).Trim()
+        $tag = (Row "tag").Replace("@VERSION@", $llvm_version)
+        $release = (Row "release").Replace("@TAG@", $tag)
+        $tools = (Row "file").Replace("@TAG@", $tag).Replace("@HOST@", $host_name)
+        $digest = Row "$host_name-digest"
+        if (-not $digest) { Fail "tools/llvm-pin names no LLVM tools for $host_name" }
+        Say "downloading $tools"
+        Invoke-WebRequest "$release/$tools" -OutFile "$work\$tools"
+        Invoke-WebRequest "$release/SHA256SUMS" -OutFile "$work\llvm-sums"
+        Invoke-WebRequest "$release/SHA256SUMS.sig" -OutFile "$work\llvm-sums.sig"
+        $got = (Get-FileHash "$work\$tools" -Algorithm SHA256).Hash.ToLower()
+        if ($got -ne $digest) { Fail "$tools has SHA-256 $got, expected $digest" }
+        $line = Get-Content "$work\llvm-sums" | Where-Object { $_.EndsWith("  $tools") }
+        $listed = ($line -split "\s+")[0]
+        if ($listed -ne $digest) { Fail "SHA256SUMS of $tag lists '$listed' for $tools, and the pin $digest" }
+        $gpgv = (Get-Command gpgv -ErrorAction SilentlyContinue).Source
+        if (-not $gpgv -and (Test-Path "$env:ProgramFiles\Git\usr\bin\gpgv.exe")) {
+            $gpgv = "$env:ProgramFiles\Git\usr\bin\gpgv.exe"
+        }
+        if ($gpgv) {
+            # The gpgv of Git reads C: in a keyring path as the scheme of a
+            # URL, so the keyring is named from its own directory. gpgv writes
+            # to stderr even on success, which Stop turns into an error.
+            $previous = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            Push-Location "$home_dir\tools"
+            $status = & $gpgv --status-fd 1 --keyring ./llvm-tools-key.gpg "$work\llvm-sums.sig" "$work\llvm-sums" 2>$null
+            $verified = $LASTEXITCODE
+            Pop-Location
+            $ErrorActionPreference = $previous
+            if ($verified -ne 0 -or -not ($status -match "VALIDSIG $(Row 'key') ")) {
+                Fail "SHA256SUMS of $tag carries no signature of the key of Anti"
+            }
+        } else {
+            Say "gpgv is missing, so the pinned digest alone checks $tools"
+        }
+        tar.exe -xJf "$work\$tools" -C $home_dir bin licenses
+        if ($LASTEXITCODE -ne 0) { Fail "tar.exe failed to unpack $tools" }
+    }
+
+    # lld answers to its four names through argv[0], and the archive
     # carries one copy of it.
     foreach ($name in "ld.lld", "ld64.lld", "lld-link") {
         if (-not (Test-Path "$home_dir\bin\$name.exe")) {

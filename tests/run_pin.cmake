@@ -1,14 +1,12 @@
 # A version lives in tools/<name>-version and the archive of each host in
 # tools/<name>-pin, which spells the version as @VERSION@. No copy of
-# either can drift, and every archive comes over HTTPS.
+# either can drift, and every archive comes over HTTPS. The LLVM pin has a
+# form of its own, which tests/run_llvm_pin.cmake checks.
 #
-#   cmake -DROOT=<repository> -DNAME=llvm|cmake -P tests/run_llvm_pin.cmake
+#   cmake -DROOT=<repository> -DNAME=cmake -P tests/run_pin.cmake
 
-set(hosts macos-arm64 linux-x86_64 linux-arm64 windows-x86_64
+set(hosts macos-arm64 macos-x86_64 linux-x86_64 linux-arm64 windows-x86_64
           windows-arm64)
-if(NAME STREQUAL "cmake")
-    list(APPEND hosts macos-x86_64)
-endif()
 set(pin "${ROOT}/tools/${NAME}-pin")
 set(script "${ROOT}/tools/get-${NAME}.cmake")
 file(READ "${ROOT}/tools/${NAME}-version" version)

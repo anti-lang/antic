@@ -29,14 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The script installs the pinned tools on every host that
-      # tools/llvm-pin names, and checks the archive against its SHA-256
-      # digest. Every host has an archive.
+      # The script installs the tools of the release that tools/llvm-pin
+      # names. It checks the asset against the pin and SHA256SUMS against
+      # its signature. Every tool must report the pinned version.
       - name: Install the pinned LLVM tools
-        run: cmake -DDEST=build/toolchain -P tools/get-llvm.cmake
-
-      - name: Check that the LLVM tools are the pinned release
-        run: cmake -DLLVM_BIN=build/toolchain/bin -P tools/check-llvm.cmake
+        run: cmake -P tools/get-llvm.cmake
 
       - name: Set up the MSVC environment
         if: runner.os == 'Windows'
@@ -52,8 +49,6 @@ jobs:
         shell: bash
         run: >
           cmake -S . -B build
-          -DANTIC_LLVM_MC="$PWD/build/toolchain/bin/llvm-mc"
-          -DANTIC_LLVM_AR="$PWD/build/toolchain/bin/llvm-ar"
 
       - name: Build
         run: cmake --build build --config Debug

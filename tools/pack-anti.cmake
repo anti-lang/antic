@@ -8,7 +8,7 @@
 # CMake build wrote. For each host it compiles antic for that host and lays
 # the package out around it:
 #
-#   bin/        antic and the five LLVM tools of the host
+#   bin/        antic
 #   lib/<t>/    the runtime library of all six targets
 #   std/        the standard library
 #   sysroot/    the two Linux sysroots, which are ours to redistribute
@@ -17,27 +17,23 @@
 #
 # The result is anti-<version>-<host>.tar.xz in DEST, with its digest in
 # SHA256SUMS. The macOS SDK stubs and the Microsoft CRT stay out, because
-# neither licence allows redistribution. The installer adds them.
+# neither licence allows redistribution. The installer adds them, and it
+# adds the five LLVM tools from the release that tools/llvm-pin names.
 cmake_minimum_required(VERSION 3.20)
 
-foreach(name DEST CLANG LLVM_BIN LLVM_PACKS SYSROOT RUNTIME HOSTS)
+foreach(name DEST CLANG LLVM_BIN SYSROOT RUNTIME HOSTS)
     if(NOT DEFINED ${name})
         message(FATAL_ERROR "usage: cmake -DDEST=<dir> -DCLANG=<clang> "
-                            "-DLLVM_BIN=<dir> -DLLVM_PACKS=<dir> "
-                            "-DSYSROOT=<dir> -DRUNTIME=<dir> "
+                            "-DLLVM_BIN=<dir> -DSYSROOT=<dir> -DRUNTIME=<dir> "
                             "-DHOSTS=<host>[;<host>] -P tools/pack-anti.cmake")
     endif()
 endforeach()
 
-set(TOOLS llvm-mc llvm-ar llvm-objdump llvm-readobj lld ld.lld ld64.lld
-          lld-link)
 set(TARGETS macos-arm64 macos-x86_64 linux-x86_64 linux-arm64
             windows-x86_64 windows-arm64)
 
 set(tools_dir "${CMAKE_CURRENT_LIST_DIR}")
 get_filename_component(root "${tools_dir}/.." ABSOLUTE)
-file(READ "${root}/tools/llvm-version" llvm_version)
-string(STRIP "${llvm_version}" llvm_version)
 file(STRINGS "${root}/CMakeLists.txt" line REGEX "^    VERSION ")
 string(REGEX REPLACE "^    VERSION " "" version "${line}")
 execute_process(COMMAND "${CLANG}" -print-resource-dir
@@ -137,23 +133,6 @@ foreach(host IN LISTS HOSTS)
     endif()
     build_antic("${host}" "${tree}/bin/antic${suffix}")
 
-    # The LLVM tools of the host come from the archive of that host, not
-    # from the tools of this machine. On Windows lld is one binary under
-    # four names, and the archive carries one copy.
-    set(pack "${LLVM_PACKS}/anti-llvm-${llvm_version}-${host}.tar.xz")
-    if(EXISTS "${pack}")
-        file(ARCHIVE_EXTRACT INPUT "${pack}" DESTINATION "${work}/llvm")
-        file(GLOB tools "${work}/llvm/bin/*")
-        file(COPY ${tools} DESTINATION "${tree}/bin")
-        file(RENAME "${tree}/bin/LICENSE.TXT" "${tree}/licenses/llvm.txt")
-        # On Windows lld answers to four names as four copies of one
-        # binary, which no compressor folds back together. The archive
-        # carries one, and the installer writes the other names.
-    else()
-        message(FATAL_ERROR
-                "${pack} is missing. Every host has an archive of the tools, "
-                "so run tools/pack-llvm.cmake for ${host} first.")
-    endif()
     foreach(target IN LISTS TARGETS)
         file(COPY "${RUNTIME}/lib/${target}" DESTINATION "${tree}/lib")
     endforeach()
@@ -163,8 +142,10 @@ foreach(host IN LISTS HOSTS)
         file(COPY "${SYSROOT}/${target}" DESTINATION "${tree}/sysroot")
     endforeach()
     file(COPY "${SYSROOT}/licenses/" DESTINATION "${tree}/licenses")
+    # The installer reads llvm-pin and checks the signature of the LLVM
+    # release against llvm-tools-key.gpg.
     foreach(name get-sysroot.cmake sysroot-pins cmake-pin cmake-version
-            llvm-version package-api)
+            llvm-version llvm-pin llvm-tools-key.gpg package-api)
         file(COPY "${root}/tools/${name}" DESTINATION "${tree}/tools")
     endforeach()
     file(COPY "${root}/LICENSE" DESTINATION "${tree}")

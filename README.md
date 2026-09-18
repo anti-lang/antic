@@ -27,7 +27,9 @@ ctest --test-dir build -j8
 
 `tools/llvm-pin`, `tools/sysroot-pins` and `tools/raylib-pin` hold the versions
 and the SHA-256 digest of every archive. Nothing installs into a system
-location.
+location. The LLVM tools come from the releases of `anti-lang/llvm-tools`, and
+`tools/get-llvm.cmake` checks their signature with gpgv, which GnuPG and Git for
+Windows carry.
 
 `CMakePresets.json` carries two more configurations. `cmake --preset asan`
 builds antic under AddressSanitizer and `cmake --preset ubsan` under both

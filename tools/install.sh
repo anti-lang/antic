@@ -147,7 +147,48 @@ if [ "$api" -lt "$PACKAGE_API" ]; then
 this installer needs $PACKAGE_API. Install a newer version of Anti."
 fi
 
-# lld answers to its four names through argv[0], and the package carries
+# DESIGN: the LLVM tools come from the release that tools/llvm-pin of the
+# package names. The pinned digest decides. gpgv checks the signature of
+# SHA256SUMS where the machine has it, and macOS has none. A package
+# without the pin carries the tools itself.
+llvm_pin=$home/tools/llvm-pin
+if [ -f "$llvm_pin" ]; then
+    row() {
+        sed -n "s/^$1=//p" "$llvm_pin"
+    }
+    llvm_version=$(tr -d ' \n' < "$home/tools/llvm-version")
+    tag=$(row tag | sed "s/@VERSION@/$llvm_version/g")
+    release=$(row release | sed "s/@TAG@/$tag/g")
+    tools=$(row file | sed "s/@TAG@/$tag/g; s/@HOST@/$host/g")
+    digest=$(row "$host-digest")
+    if [ -z "$digest" ]; then
+        fail "tools/llvm-pin names no LLVM tools for $host"
+    fi
+    say "downloading $tools"
+    curl -fsSL -o "$work/$tools" "$release/$tools"
+    curl -fsSL -o "$work/llvm-sums" "$release/SHA256SUMS"
+    curl -fsSL -o "$work/llvm-sums.sig" "$release/SHA256SUMS.sig"
+    got=$(sha256 "$work/$tools")
+    if [ "$got" != "$digest" ]; then
+        fail "$tools: SHA-256 $got, expected $digest"
+    fi
+    listed=$(grep "  $tools\$" "$work/llvm-sums" | cut -d ' ' -f 1)
+    if [ "$listed" != "$digest" ]; then
+        fail "SHA256SUMS of $tag lists '$listed' for $tools, and the pin $digest"
+    fi
+    if command -v gpgv >/dev/null 2>&1; then
+        if ! gpgv --status-fd 1 --keyring "$home/tools/llvm-tools-key.gpg" \
+            "$work/llvm-sums.sig" "$work/llvm-sums" 2>/dev/null |
+            grep -q "VALIDSIG $(row key) "; then
+            fail "SHA256SUMS of $tag carries no signature of the key of Anti"
+        fi
+    else
+        say "gpgv is missing, so the pinned digest alone checks $tools"
+    fi
+    tar -xJf "$work/$tools" -C "$home" bin licenses
+fi
+
+# lld answers to its four names through argv[0], and the archive carries
 # one copy of it.
 if [ -e "$home/bin/lld" ]; then
     for name in ld.lld ld64.lld lld-link; do
