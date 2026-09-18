@@ -3,7 +3,7 @@
 #   cmake -DDEST=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir> -DSYSROOT=<dir>
 #         -DRUNTIME=<dir> -DHOSTS=<host>[;<host>] -P tools/pack-anti.cmake
 #
-# CLANG is clang of the pinned LLVM release, LLVM_BIN its tools, SYSROOT
+# CLANG is the pinned clang of build/clang, LLVM_BIN its tools, SYSROOT
 # the directory of tools/get-sysroot.cmake and RUNTIME the runtime that the
 # CMake build wrote. For each host it compiles antic for that host and lays
 # the package out around it. ANTIC names an antic already built for the one
@@ -38,6 +38,26 @@ endforeach()
 
 set(TARGETS macos-arm64 macos-x86_64 linux-x86_64 linux-arm64
             windows-x86_64 windows-arm64)
+
+# DESIGN: every binary Anti ships is compiled with the pinned clang. The
+# cache of the build beside RUNTIME names its compiler, and CLANG must
+# report the pinned version, so a release never takes the compiler of the
+# machine.
+get_filename_component(build_dir "${RUNTIME}/.." ABSOLUTE)
+file(STRINGS "${build_dir}/CMakeCache.txt" system
+     REGEX "^ANTIC_SYSTEM_COMPILER:BOOL=(ON|TRUE|YES|1)$")
+if(system)
+    message(FATAL_ERROR "${build_dir} was configured with "
+                        "ANTIC_SYSTEM_COMPILER=ON. A release takes the pinned clang.")
+endif()
+if(DEFINED CLANG)
+    file(READ "${CMAKE_CURRENT_LIST_DIR}/llvm-version" llvm_version)
+    string(STRIP "${llvm_version}" llvm_version)
+    execute_process(COMMAND "${CLANG}" --version OUTPUT_VARIABLE out)
+    if(NOT out MATCHES "^clang version ${llvm_version}[ \n]")
+        message(FATAL_ERROR "${CLANG} is not the pinned clang ${llvm_version}: ${out}")
+    endif()
+endif()
 
 set(tools_dir "${CMAKE_CURRENT_LIST_DIR}")
 get_filename_component(root "${tools_dir}/.." ABSOLUTE)

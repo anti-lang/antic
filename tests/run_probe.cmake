@@ -6,12 +6,13 @@
 #   RUNTIME   the runtime directory
 #   SOURCES   tests/abi
 #   WORK      a directory for the executables
+#   CC        the C compiler of the build, with its options
 
 file(MAKE_DIRECTORY "${WORK}")
-execute_process(COMMAND cc -std=c11 -o "${WORK}/probe_c" "${SOURCES}/probe.c"
+execute_process(COMMAND ${CC} -std=c11 -o "${WORK}/probe_c" "${SOURCES}/probe.c"
     RESULT_VARIABLE status ERROR_VARIABLE err)
 if(NOT status EQUAL 0)
-    message(FATAL_ERROR "cc probe.c failed\n${err}")
+    message(FATAL_ERROR "${CC} probe.c failed\n${err}")
 endif()
 execute_process(
     COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"

@@ -2,10 +2,12 @@
 # <dir>/<target>/, and the licence of each component into <dir>/licenses/.
 #
 #   cmake -DDEST=<dir> -DLLVM_BIN=<dir> -DTARGETS=<target>[;<target>]
-#         [-DACCEPT_LICENSE=yes] -P tools/get-sysroot.cmake
+#         [-DCLANG_DIR=<dir>] [-DACCEPT_LICENSE=yes] -P tools/get-sysroot.cmake
 #
-# linux-x86_64, linux-arm64: musl and the compiler-rt builtins from the
-#   Alpine packages of tools/sysroot-pins, checked against their digests.
+# linux-x86_64, linux-arm64: musl from the Alpine package of
+#   tools/sysroot-pins, checked against its digest, and the compiler-rt
+#   builtins of the pinned clang in CLANG_DIR, which defaults to
+#   build/clang of the repository.
 # macos-arm64, macos-x86_64: the .tbd stubs of libSystem from the newest
 #   SDK of the Command Line Tools for Xcode that ld64.lld in LLVM_BIN
 #   reads. Only on a Mac, because Apple licenses the SDK for its own
@@ -23,6 +25,9 @@ if(NOT DEFINED DEST OR NOT DEFINED LLVM_BIN OR NOT DEFINED TARGETS)
 endif()
 
 set(tools_dir "${CMAKE_CURRENT_LIST_DIR}")
+if(NOT DEFINED CLANG_DIR)
+    get_filename_component(CLANG_DIR "${tools_dir}/../build/clang" ABSOLUTE)
+endif()
 file(STRINGS "${tools_dir}/sysroot-pins" pins REGEX "^[A-Z]")
 foreach(line IN LISTS pins)
     string(REGEX REPLACE "^([^=]+)=(.*)$" "\\1;\\2" pair "${line}")
@@ -82,14 +87,12 @@ function(tree_digest dir out)
     set("${out}" "${digest}" PARENT_SCOPE)
 endfunction()
 
-function(linux_sysroot target arch musl_digest rt_digest)
+function(linux_sysroot target arch musl_digest)
     set(root "${DEST}/${target}")
     set(work "${DEST}/.download/${target}")
     file(MAKE_DIRECTORY "${work}" "${root}/usr/lib")
     fetch("${ALPINE_URL}/${arch}/musl-dev-${MUSL_APK}.apk"
           "${work}/musl-dev.apk" "${musl_digest}")
-    fetch("${ALPINE_URL}/${arch}/compiler-rt-${COMPILER_RT_APK}.apk"
-          "${work}/compiler-rt.apk" "${rt_digest}")
     file(REMOVE_RECURSE "${work}/usr" "${root}/usr/include")
     file(ARCHIVE_EXTRACT INPUT "${work}/musl-dev.apk" DESTINATION "${work}"
          PATTERNS "usr/include/*" "usr/lib/*")
@@ -97,12 +100,15 @@ function(linux_sysroot target arch musl_digest rt_digest)
     foreach(name crt1.o crti.o crtn.o rcrt1.o Scrt1.o libc.a)
         file(COPY "${work}/usr/lib/${name}" DESTINATION "${root}/usr/lib")
     endforeach()
-    set(builtins
-        "usr/lib/llvm${COMPILER_RT_MAJOR}/lib/clang/${COMPILER_RT_MAJOR}/lib/${arch}-alpine-linux-musl/libclang_rt.builtins-${arch}.a")
-    file(ARCHIVE_EXTRACT INPUT "${work}/compiler-rt.apk" DESTINATION "${work}"
-         PATTERNS "${builtins}")
-    file(COPY_FILE "${work}/${builtins}"
-         "${root}/usr/lib/libclang_rt.builtins.a")
+    # DESIGN: the builtins come from the pinned clang, which builds them
+    # from the LLVM source of the pin. A cross build of rt/ for musl then
+    # takes nothing from a distribution but musl itself.
+    file(GLOB builtins "${CLANG_DIR}/lib/clang/*/lib/${arch}-unknown-linux-musl/libclang_rt.builtins.a")
+    if(NOT builtins)
+        message(FATAL_ERROR "${CLANG_DIR} holds no builtins of ${arch} musl. "
+                            "Run tools/get-clang.cmake first.")
+    endif()
+    file(COPY_FILE "${builtins}" "${root}/usr/lib/libclang_rt.builtins.a")
     fetch("${MUSL_SOURCE_URL}" "${DEST}/.download/musl.tar.gz"
           "${MUSL_SOURCE_DIGEST}")
     file(ARCHIVE_EXTRACT INPUT "${DEST}/.download/musl.tar.gz"
@@ -110,8 +116,8 @@ function(linux_sysroot target arch musl_digest rt_digest)
          PATTERNS "musl-${MUSL_VERSION}/COPYRIGHT")
     file(COPY_FILE "${DEST}/.download/musl-${MUSL_VERSION}/COPYRIGHT"
          "${DEST}/licenses/musl.txt")
-    fetch("${COMPILER_RT_LICENSE_URL}" "${DEST}/licenses/compiler-rt.txt"
-          "${COMPILER_RT_LICENSE_DIGEST}")
+    file(COPY_FILE "${CLANG_DIR}/licenses/llvm.txt"
+         "${DEST}/licenses/compiler-rt.txt")
 endfunction()
 
 function(macos_sysroot target arch)
@@ -398,11 +404,9 @@ foreach(target IN LISTS TARGETS)
         set(wrote_script TRUE)
     endif()
     if(target STREQUAL "linux-x86_64")
-        linux_sysroot("${target}" x86_64 "${MUSL_DEV_X86_64}"
-                      "${COMPILER_RT_X86_64}")
+        linux_sysroot("${target}" x86_64 "${MUSL_DEV_X86_64}")
     elseif(target STREQUAL "linux-arm64")
-        linux_sysroot("${target}" aarch64 "${MUSL_DEV_AARCH64}"
-                      "${COMPILER_RT_AARCH64}")
+        linux_sysroot("${target}" aarch64 "${MUSL_DEV_AARCH64}")
     elseif(target STREQUAL "macos-arm64")
         macos_sysroot("${target}" arm64)
     elseif(target STREQUAL "macos-x86_64")

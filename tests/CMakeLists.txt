@@ -53,6 +53,20 @@ add_test(NAME antic_host_target COMMAND antic --print-host-target)
 set_tests_properties(antic_host_target PROPERTIES
     PASS_REGULAR_EXPRESSION "^${ANTIC_HOST_TARGET}\n$")
 
+# DESIGN: a test that compiles C or C++ beside Anti takes the compiler of
+# the build, so a build with the pinned clang runs no compiler of the
+# machine. The pinned clang reads the SDK of macOS from -isysroot and
+# compiles C++ in the driver mode of g++. A reader's build takes c++.
+set(ANTIC_TEST_CC "${CMAKE_C_COMPILER}")
+if(APPLE)
+    list(APPEND ANTIC_TEST_CC -isysroot "${ANTIC_MACOS_SDK}")
+endif()
+if(ANTIC_SYSTEM_COMPILER)
+    set(ANTIC_TEST_CXX c++)
+else()
+    set(ANTIC_TEST_CXX ${ANTIC_TEST_CC} --driver-mode=g++)
+endif()
+
 # One test per program in tests/programs
 find_program(ANTIC_LLVM_MC NAMES llvm-mc
     HINTS "${ANTIC_LLVM_DIR}/bin"
@@ -244,9 +258,13 @@ endif()
 add_test(NAME cmake_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=cmake
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pin.cmake")
-add_test(NAME llvm_pin
+add_test(NAME release_pins
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_pin.cmake")
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_pins.cmake")
+add_test(NAME pinned_compiler
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DCACHE=${CMAKE_BINARY_DIR}/CMakeCache.txt"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pinned_compiler.cmake")
 add_test(NAME release_key
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_key.cmake")
@@ -652,6 +670,7 @@ if(NOT WIN32)
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe"
+            "-DCC=${ANTIC_TEST_CC}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_probe.cmake")
 endif()
 
@@ -699,6 +718,8 @@ if(NOT WIN32 AND ANTIC_LLVM_AR)
                 "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib"
                 "-DCASE=${case}"
+                "-DCC=${ANTIC_TEST_CC}"
+                "-DCXX=${ANTIC_TEST_CXX}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
     endforeach()
 endif()

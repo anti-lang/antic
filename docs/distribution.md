@@ -50,10 +50,12 @@ The five LLVM tools are not served from the download area. The repository
 per host as an asset of a GitHub release, tagged `<version>-anti.<build>` as in
 `23.1.1-anti.1`. Beside the archives stand `SHA256SUMS` and its signature
 `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in that
-repository. It publishes six archives, and antic takes the five of its hosts.
+repository. Each release holds the tools and clang of each of the six hosts. antic takes
+the tools of its host, and a build of antic takes clang as well.
 
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
-the digest of the archive of each of the five hosts. `tools/get-llvm.cmake` takes the
+the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives
+of clang in the same release. `tools/get-llvm.cmake` takes the
 archive of the host into `build/llvm`, and the installers take it into the install
 directory. Both check the digest of the pin, the line of `SHA256SUMS` and the
 signature. A toolchain bump is a new release there and a new pin here.

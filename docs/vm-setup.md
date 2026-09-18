@@ -20,8 +20,10 @@ Run these commands in the VM once. The tools go to `~/anti`, outside the tree th
 sudo apt update
 sudo apt install -y build-essential cmake git curl xz-utils
 git -C /tmp clone --depth 1 https://github.com/FoundingFuture/book-writing-a-compiler book
+cmake -DDEST=$HOME/anti/clang -P /tmp/book/tools/get-clang.cmake
 cmake -DDEST=$HOME/anti/toolchain -P /tmp/book/tools/get-llvm.cmake
 cmake -DDEST=$HOME/anti/sysroot -DLLVM_BIN=$HOME/anti/toolchain/bin \
+  -DCLANG_DIR=$HOME/anti/clang \
   -DTARGETS="linux-x86_64;linux-arm64" -P /tmp/book/tools/get-sysroot.cmake
 cmake -DDEST=$HOME/anti/raylib -P /tmp/book/tools/get-raylib.cmake
 ```
@@ -44,8 +46,8 @@ Run this command in the repository on the Mac. It exports `HEAD`, builds it and 
 
 ```sh
 git archive HEAD | ssh anti-linux 'rm -rf book && mkdir book && tar -x -f - -C book && cd book &&
-  cmake -S . -B build -DANTIC_LLVM_MC="$HOME/anti/toolchain/bin/llvm-mc" \
-    -DANTIC_LLVM_AR="$HOME/anti/toolchain/bin/llvm-ar" \
+  cmake -S . -B build -DANTIC_CLANG_DIR="$HOME/anti/clang" \
+    -DANTIC_LLVM_DIR="$HOME/anti/toolchain" \
     -DANTIC_SYSROOT_DIR="$HOME/anti/sysroot" \
     -DANTIC_RAYLIB_DIR="$HOME/anti/raylib/raylib-6.0" &&
   cmake --build build -j"$(nproc)" &&
@@ -95,20 +97,21 @@ The test `program_abi_raymath` compiles a raymath binding, so the VM needs the p
 cmake -DDEST=C:\anti\raylib -P C:\anti\book\tools\get-raylib.cmake
 ```
 
-The same command installs the pinned LLVM tools, which `tools/llvm-pin` names for Windows on ARM64.
+The same commands install the pinned clang and LLVM tools, which `tools/clang-pin` and `tools/llvm-pin` name for Windows on ARM64.
 
 ```powershell
+cmake -DDEST=C:\anti\clang -P C:\anti\book\tools\get-clang.cmake
 cmake -DDEST=C:\anti\toolchain -P C:\anti\book\tools\get-llvm.cmake
 ```
 
-Create `C:\anti\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment, including the variable `LIB` that lld-link reads.
+Create `C:\anti\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment, including the variable `LIB` that lld-link reads, and puts the Ninja of Visual Studio on the path. The pinned clang needs Ninja, because the Visual Studio generator takes the compiler of its own toolset.
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" arm64
 cd /d C:\anti\book
-cmake -S . -B build -DANTIC_LLVM_MC=C:/anti/toolchain/bin/llvm-mc.exe -DANTIC_LLVM_AR=C:/anti/toolchain/bin/llvm-ar.exe -DANTIC_RAYLIB_DIR=C:/anti/raylib/raylib-6.0
-cmake --build build --config Debug
-ctest --test-dir build -C Debug --output-on-failure
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=C:/anti/clang -DANTIC_LLVM_DIR=C:/anti/toolchain -DANTIC_RAYLIB_DIR=C:/anti/raylib/raylib-6.0
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 ### SSH from the Mac

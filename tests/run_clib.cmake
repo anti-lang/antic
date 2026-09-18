@@ -9,6 +9,8 @@
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header or bundle
+#   CC        the C compiler of the build, with its options
+#   CXX       the same compiler for C++, which checks the headers
 
 set(HOST_SHARED_SUFFIX ".so")
 if(APPLE)
@@ -72,7 +74,7 @@ if(CASE STREQUAL "static")
     endif()
     string(REPLACE "cc main.c " "" inputs "${line}")
     separate_arguments(inputs UNIX_COMMAND "${inputs}")
-    run(cc -I "${dir}" "${SOURCES}/roundtrip.c" ${inputs} -o "${dir}/roundtrip")
+    run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" ${inputs} -o "${dir}/roundtrip")
     expect_output("${dir}/roundtrip" "${SOURCES}/roundtrip.expected")
 elseif(CASE STREQUAL "classes")
     # A C program builds an Anti class, calls through its table and ends
@@ -81,16 +83,16 @@ elseif(CASE STREQUAL "classes")
     expect_header("${dir}/canvas.h" canvas.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${line}")
-    run(cc -std=c11 -I "${dir}" "${SOURCES}/canvas.c" "${dir}/libcanvas.a"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/canvas.c" "${dir}/libcanvas.a"
         "${runtime_library}" -o "${dir}/canvas")
     expect_output("${dir}/canvas" "${SOURCES}/canvas.expected")
     configure_file("${SOURCES}/canvas.c" "${dir}/canvas.cpp" COPYONLY)
-    run(c++ -std=c++17 -I "${dir}" "${dir}/canvas.cpp" "${dir}/libcanvas.a"
+    run(${CXX} -std=c++17 -I "${dir}" "${dir}/canvas.cpp" "${dir}/libcanvas.a"
         "${runtime_library}" -o "${dir}/canvaspp")
     expect_output("${dir}/canvaspp" "${SOURCES}/canvas.expected")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
-    run(cc -I "${dir}" "${SOURCES}/roundtrip.c"
+    run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c"
         "${dir}/libgeo${HOST_SHARED_SUFFIX}" -o "${dir}/roundtrip")
     expect_output("${dir}/roundtrip" "${SOURCES}/roundtrip.expected")
 elseif(CASE STREQUAL "exports")
@@ -116,7 +118,7 @@ elseif(CASE STREQUAL "exports")
 elseif(CASE STREQUAL "two")
     library(geo shared "${dir}/shared")
     library(other shared "${dir}/shared")
-    run(cc -I "${dir}/shared" "${SOURCES}/twolibs.c"
+    run(${CC} -I "${dir}/shared" "${SOURCES}/twolibs.c"
         "${dir}/shared/libgeo${HOST_SHARED_SUFFIX}"
         "${dir}/shared/libother${HOST_SHARED_SUFFIX}" -o "${dir}/two_shared")
     run("${dir}/two_shared")
@@ -127,7 +129,7 @@ elseif(CASE STREQUAL "two")
     library(other static "${dir}/static")
     # The printed link line names the runtime library of the host.
     string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${run_out}")
-    run(cc -I "${dir}/static" "${SOURCES}/twolibs.c" "${dir}/static/libgeo.a"
+    run(${CC} -I "${dir}/static" "${SOURCES}/twolibs.c" "${dir}/static/libgeo.a"
         "${dir}/static/libother.a" ${runtime_library} -o "${dir}/two_static")
     run("${dir}/two_static")
     if(NOT run_out STREQUAL "10\n")
@@ -135,7 +137,7 @@ elseif(CASE STREQUAL "two")
     endif()
 elseif(CASE STREQUAL "loader")
     library(geo shared "${dir}")
-    run(cc "${SOURCES}/loader.c" -o "${dir}/loader")
+    run(${CC} "${SOURCES}/loader.c" -o "${dir}/loader")
     run("${dir}/loader" "${dir}/libgeo${HOST_SHARED_SUFFIX}")
     if(NOT run_out STREQUAL "1\n")
         message(FATAL_ERROR "the constructor did not run: ${run_out}")
@@ -145,13 +147,13 @@ elseif(CASE STREQUAL "header")
     expect_header("${dir}/geo.h" geo.h)
     library(shapes static "${dir}")
     expect_header("${dir}/shapes.h" shapes.h)
-    run(cc -std=c11 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" -fsyntax-only
         "${SOURCES}/header.c")
-    run(c++ -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
         "${SOURCES}/header.cpp")
-    run(cc -std=c11 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" -fsyntax-only
         "${SOURCES}/shapes.c")
-    run(c++ -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
         "${SOURCES}/shapes.cpp")
 elseif(CASE STREQUAL "bundle")
     library(geo static "${dir}" --bundle-runtime)
@@ -168,7 +170,7 @@ elseif(CASE STREQUAL "bundle")
     endif()
     library(other static "${dir}" --bundle-runtime)
     execute_process(
-        COMMAND cc -I "${dir}" "${SOURCES}/twolibs.c" "${dir}/libgeo.a"
+        COMMAND ${CC} -I "${dir}" "${SOURCES}/twolibs.c" "${dir}/libgeo.a"
                 "${dir}/libother.a" -o "${dir}/two_bundled"
         RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
     if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "duplicate symbol|multiple definition")
@@ -180,7 +182,7 @@ elseif(CASE STREQUAL "bundle")
     # A library that reads the notice links against the stub of the bundle
     # and reports an empty notice.
     library(notice static "${dir}/notice" --bundle-runtime)
-    run(cc -I "${dir}/notice" "${SOURCES}/notice.c" "${dir}/notice/libnotice.a"
+    run(${CC} -I "${dir}/notice" "${SOURCES}/notice.c" "${dir}/notice/libnotice.a"
         -o "${dir}/notice/notice")
     run("${dir}/notice/notice")
     if(NOT run_out STREQUAL "0\n")

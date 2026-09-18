@@ -3,7 +3,10 @@
 # Libraries are added in the chapters that need them: the thread pool
 # runtime, raylib, miniaudio, Mbed TLS, PCRE2.
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
+
+# The pinned clang compiles the libraries, as it compiles antic.
+include(../tools/pinned-compiler.cmake)
 
 project(antic-runtime LANGUAGES C)
 

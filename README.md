@@ -12,24 +12,32 @@ specify all of it.
 
 ## Building
 
-The build needs CMake 3.21 or newer and a C11 compiler. It also needs the
-pinned LLVM tools, the sysroots of the six targets and the pinned raylib
-source. Three scripts install them into the build tree:
+The build needs CMake 3.21 or newer and openssl. The pinned clang compiles it, and
+the configure step installs that clang into `build/clang` and the pinned LLVM tools
+into `build/llvm`. The Linux sysroots take the builtins of the pinned clang, so
+`tools/get-clang.cmake` runs before `tools/get-sysroot.cmake`:
 
 ```bash
+cmake -P tools/get-clang.cmake
 cmake -P tools/get-llvm.cmake
-cmake -P tools/get-sysroot.cmake
-cmake -P tools/get-raylib.cmake
+cmake -DDEST=build/sysroot -DLLVM_BIN=build/llvm/bin \
+      -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64" \
+      -P tools/get-sysroot.cmake
+cmake -DDEST=build/raylib -P tools/get-raylib.cmake
 cmake -S . -B build
 cmake --build build -j8
 ctest --test-dir build -j8
 ```
 
-`tools/llvm-pin`, `tools/sysroot-pins` and `tools/raylib-pin` hold the versions
-and the SHA-256 digest of every archive. Nothing installs into a system
-location. The LLVM tools come from the releases of `anti-lang/llvm-tools`, and
-`tools/get-llvm.cmake` checks their signature with openssl, which macOS, Linux and
-Git for Windows carry.
+On Windows the configure step takes `-G Ninja`, because the Visual Studio generator
+takes the compiler of its own toolset. A reader who only wants antic from source
+passes `-DANTIC_SYSTEM_COMPILER=ON`, and the compiler of the machine builds it.
+
+`tools/clang-pin`, `tools/llvm-pin`, `tools/sysroot-pins` and `tools/raylib-pin` hold
+the versions and the SHA-256 digest of every archive. Nothing installs into a system
+location. clang and the LLVM tools come from the releases of `anti-lang/llvm-tools`.
+openssl checks their signature against `keys/release.pem`, and macOS, Linux and Git
+for Windows carry it.
 
 `CMakePresets.json` carries two more configurations. `cmake --preset asan`
 builds antic under AddressSanitizer and `cmake --preset ubsan` under both

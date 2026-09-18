@@ -1,4 +1,8 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
+
+# The pinned clang compiles antic, the runtime and the libraries, unless
+# ANTIC_SYSTEM_COMPILER is on. The file downloads it and the LLVM tools.
+include(tools/pinned-compiler.cmake)
 
 project(antic
     VERSION 0.1.0
@@ -153,10 +157,8 @@ add_custom_target(anti_rt_license_stub_copy ALL
 # archive with the licences of its components.
 set(ANTIC_SYSROOT_DIR "${CMAKE_SOURCE_DIR}/build/sysroot" CACHE PATH
     "sysroots from tools/get-sysroot.cmake")
-# The LLVM tools of this host, which tools/get-llvm.cmake installs into
-# bin/ of this directory from the release that tools/llvm-pin names.
-set(ANTIC_LLVM_DIR "${CMAKE_SOURCE_DIR}/build/llvm" CACHE PATH
-    "LLVM tools from tools/get-llvm.cmake")
+# The LLVM tools of this host lie in bin/ of ANTIC_LLVM_DIR, which
+# tools/pinned-compiler.cmake names and fills.
 find_program(ANTIC_LLVM_AR NAMES llvm-ar
     HINTS "${ANTIC_LLVM_DIR}/bin"
     DOC "llvm-ar from LLVM 23.1.1")

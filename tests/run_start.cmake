@@ -4,6 +4,7 @@
 #   ANTIC     the antic executable
 #   LLVM_MC   the llvm-mc executable
 #   START     the start.c of chapter 1
+#   CC        the C compiler of the build, with its options
 #   SOURCE    the .anti file
 #   WORK      a directory for the files
 
@@ -34,7 +35,7 @@ get_filename_component(dir "${SOURCE}" DIRECTORY)
 run("${ANTIC}" -S -o "${WORK}/${name}.s" "${SOURCE}")
 run("${LLVM_MC}" "-triple=${triple}" -filetype=obj -o "${WORK}/${name}.o"
     "${WORK}/${name}.s")
-run(cc "${START}" "${WORK}/${name}.o" -o "${WORK}/${name}")
+run(${CC} "${START}" "${WORK}/${name}.o" -o "${WORK}/${name}")
 execute_process(COMMAND "${WORK}/${name}" RESULT_VARIABLE exit_code)
 file(READ "${dir}/${name}.expected" expected)
 string(REGEX MATCH "^exit ([0-9]+)" line "${expected}")

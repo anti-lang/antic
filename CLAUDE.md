@@ -60,13 +60,16 @@ cmake -S . -B build && cmake --build build -j8 && ctest --test-dir build -j8
 asan` and `cmake --preset ubsan`, each with its own build directory. Both run
 the full suite.
 
-The build needs the pinned LLVM tools in `build/llvm/bin` and the sysroots in
-`build/sysroot`, which `tools/get-llvm.cmake` and `tools/get-sysroot.cmake`
-install, and the pinned raylib source in `build/raylib`, which
-`tools/get-raylib.cmake` installs. `tools/llvm-pin`, `tools/sysroot-pins` and
-`tools/raylib-pin` hold the versions and the digests. The LLVM tools come from
-the releases of `anti-lang/llvm-tools`, and `tools/get-llvm.cmake` needs openssl
-to check their signature.
+The pinned clang in `build/clang` compiles everything, and the configure step
+installs it and the pinned LLVM tools in `build/llvm/bin` with
+`tools/get-clang.cmake` and `tools/get-llvm.cmake`. The build also needs the
+sysroots in `build/sysroot`, which `tools/get-sysroot.cmake` installs after
+`tools/get-clang.cmake`, and the pinned raylib source in `build/raylib`, which
+`tools/get-raylib.cmake` installs. `tools/clang-pin`, `tools/llvm-pin`,
+`tools/sysroot-pins` and `tools/raylib-pin` hold the versions and the digests.
+clang and the LLVM tools come from the releases of `anti-lang/llvm-tools`, and
+openssl checks their signature. Windows configures with `-G Ninja`.
+`-DANTIC_SYSTEM_COMPILER=ON` is for a reader's build and never for a release.
 
 ## Layout
 
