@@ -79,6 +79,7 @@ to check their signature.
 | `tests/` | Test programs, expected outputs, the runner |
 | `tools/` | Helper scripts, the pins, the installers and the docs-style checker |
 | `docs/` | The specifications, the decisions and the reports |
+| `keys/` | `release.pem`, the public key that checks the LLVM tools |
 | `LICENSES/` | Licence texts of bundled components |
 
 ## First sessions, in order

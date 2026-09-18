@@ -22,6 +22,18 @@
 $ErrorActionPreference = "Stop"
 
 $base = "https://anti-lang.com/downloads/resources"
+
+# DESIGN: the installer carries the public key that checks SHA256SUMS.sig of
+# the LLVM tools, and the package carries none. anti-lang.com serves this
+# script, and GitHub serves the tools. A key that travelled with them could
+# be replaced with them. anti-lang.com serves the same key as keys/release.pem.
+$release_key = @'
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEao0Di9RL8gvG6oA9x7gIDJ7/zLn6
+/J5i5dgtCf82Hvpro/4umWhaPA8APgrIJKLD4XDvTqhLijckvFxj0f3Bhg==
+-----END PUBLIC KEY-----
+'@
+
 $version = $env:ANTI_VERSION
 
 # The processor of the package. A file on disk takes --arm or --intel,
@@ -118,9 +130,8 @@ try {
 
     # DESIGN: the LLVM tools come from the release that tools/llvm-pin of
     # the package names. The pinned digest decides, and the openssl of Git
-    # for Windows checks the signature of SHA256SUMS against
-    # tools/llvm-tools-key.pem. A package without the pin carries the tools
-    # itself.
+    # for Windows checks the signature of SHA256SUMS against the key of this
+    # installer. A package without the pin carries the tools itself.
     $llvm_pin = "$home_dir\tools\llvm-pin"
     if (Test-Path $llvm_pin) {
         $rows = Get-Content $llvm_pin
@@ -151,11 +162,12 @@ try {
         if ($openssl) {
             # openssl writes to stderr on a failure, which Stop would turn
             # into an error before the exit code is read.
+            Set-Content -Path "$work\release.pem" -Value $release_key -Encoding ascii
             $previous = $ErrorActionPreference
             $ErrorActionPreference = "Continue"
             & $openssl dgst -sha256 -binary -out "$work\llvm-sums.sha256" "$work\llvm-sums" 2>$null
             $hashed = $LASTEXITCODE
-            & $openssl pkeyutl -verify -pubin -inkey "$home_dir\tools\llvm-tools-key.pem" -in "$work\llvm-sums.sha256" -sigfile "$work\llvm-sums.sig" 2>$null | Out-Null
+            & $openssl pkeyutl -verify -pubin -inkey "$work\release.pem" -in "$work\llvm-sums.sha256" -sigfile "$work\llvm-sums.sig" 2>$null | Out-Null
             $verified = $LASTEXITCODE
             $ErrorActionPreference = $previous
             if ($hashed -ne 0 -or $verified -ne 0) {

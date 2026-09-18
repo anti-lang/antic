@@ -247,6 +247,21 @@ add_test(NAME cmake_pin
 add_test(NAME llvm_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_pin.cmake")
+add_test(NAME release_key
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_key.cmake")
+# The package of this host, packed from the antic of this build. It needs
+# the two Linux sysroots that every package carries.
+if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND
+   EXISTS "${ANTIC_SYSROOT_DIR}/linux-arm64" AND
+   EXISTS "${ANTIC_SYSROOT_DIR}/licenses")
+    add_test(NAME package_keys
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DANTIC=$<TARGET_FILE:antic>" "-DHOST=${ANTIC_HOST_TARGET}"
+                "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package.cmake")
+endif()
 add_test(NAME raylib_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_raylib_pin.cmake")

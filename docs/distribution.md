@@ -53,11 +53,15 @@ per host as an asset of a GitHub release, tagged `<version>-anti.<build>` as in
 repository. It publishes six archives, and antic takes the five of its hosts.
 
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
-the digest of the archive of each of the five hosts. `tools/llvm-tools-key.pem` holds
-the public key that checks `SHA256SUMS.sig` with `openssl pkeyutl -verify`.
-`tools/get-llvm.cmake` takes the archive of the host into `build/llvm`, and the
-installers take it into the install directory. Both check the digest of the pin, the line of `SHA256SUMS` and the
+the digest of the archive of each of the five hosts. `tools/get-llvm.cmake` takes the
+archive of the host into `build/llvm`, and the installers take it into the install
+directory. Both check the digest of the pin, the line of `SHA256SUMS` and the
 signature. A toolchain bump is a new release there and a new pin here.
+
+The public key that checks `SHA256SUMS.sig` with `openssl pkeyutl -verify` lives in the
+installers, which anti-lang.com serves, and in `keys/release.pem` of the repository,
+which `tools/get-llvm.cmake` reads. anti-lang.com serves it as `keys/release.pem`. No
+package carries a key. A key that travelled with a package could be replaced with it.
 
 ### What the components will hold
 

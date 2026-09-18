@@ -51,17 +51,6 @@ if(NOT line STREQUAL "")
                         "not support: ${line}")
 endif()
 
-# The public key that checks SHA256SUMS.sig, in PEM form, and never a
-# private one.
-set(key "${ROOT}/tools/llvm-tools-key.pem")
-if(NOT EXISTS "${key}")
-    message(FATAL_ERROR "tools/llvm-tools-key.pem, the key that checks "
-                        "SHA256SUMS.sig, is missing")
-endif()
-file(READ "${key}" text)
-if(NOT text MATCHES "^-----BEGIN PUBLIC KEY-----\n" OR text MATCHES "PRIVATE")
-    message(FATAL_ERROR "tools/llvm-tools-key.pem is not a public key in PEM form")
-endif()
 
 file(READ "${pin}" text)
 if(text MATCHES "${version}")

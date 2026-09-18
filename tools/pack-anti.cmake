@@ -6,7 +6,9 @@
 # CLANG is clang of the pinned LLVM release, LLVM_BIN its tools, SYSROOT
 # the directory of tools/get-sysroot.cmake and RUNTIME the runtime that the
 # CMake build wrote. For each host it compiles antic for that host and lays
-# the package out around it:
+# the package out around it. ANTIC names an antic already built for the one
+# host of HOSTS, which the package takes instead, and then CLANG and
+# LLVM_BIN are not needed:
 #
 #   bin/        antic
 #   lib/<t>/    the runtime library of all six targets
@@ -18,10 +20,15 @@
 # The result is anti-<version>-<host>.tar.xz in DEST, with its digest in
 # SHA256SUMS. The macOS SDK stubs and the Microsoft CRT stay out, because
 # neither licence allows redistribution. The installer adds them, and it
-# adds the five LLVM tools from the release that tools/llvm-pin names.
+# adds the five LLVM tools from the release that tools/llvm-pin names. The
+# package carries no key: the installer holds the key that checks them.
 cmake_minimum_required(VERSION 3.20)
 
-foreach(name DEST CLANG LLVM_BIN SYSROOT RUNTIME HOSTS)
+set(needed DEST SYSROOT RUNTIME HOSTS)
+if(NOT DEFINED ANTIC)
+    list(APPEND needed CLANG LLVM_BIN)
+endif()
+foreach(name IN LISTS needed)
     if(NOT DEFINED ${name})
         message(FATAL_ERROR "usage: cmake -DDEST=<dir> -DCLANG=<clang> "
                             "-DLLVM_BIN=<dir> -DSYSROOT=<dir> -DRUNTIME=<dir> "
@@ -36,8 +43,15 @@ set(tools_dir "${CMAKE_CURRENT_LIST_DIR}")
 get_filename_component(root "${tools_dir}/.." ABSOLUTE)
 file(STRINGS "${root}/CMakeLists.txt" line REGEX "^    VERSION ")
 string(REGEX REPLACE "^    VERSION " "" version "${line}")
-execute_process(COMMAND "${CLANG}" -print-resource-dir
-                OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(DEFINED ANTIC)
+    list(LENGTH HOSTS count)
+    if(NOT count EQUAL 1)
+        message(FATAL_ERROR "ANTIC is the antic of one host, and HOSTS names ${HOSTS}")
+    endif()
+else()
+    execute_process(COMMAND "${CLANG}" -print-resource-dir
+                    OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
 
 function(triple_of host out)
     set(triples
@@ -131,7 +145,11 @@ foreach(host IN LISTS HOSTS)
     if(host MATCHES "^windows-")
         set(suffix ".exe")
     endif()
-    build_antic("${host}" "${tree}/bin/antic${suffix}")
+    if(DEFINED ANTIC)
+        file(COPY_FILE "${ANTIC}" "${tree}/bin/antic${suffix}")
+    else()
+        build_antic("${host}" "${tree}/bin/antic${suffix}")
+    endif()
 
     foreach(target IN LISTS TARGETS)
         file(COPY "${RUNTIME}/lib/${target}" DESTINATION "${tree}/lib")
@@ -142,10 +160,10 @@ foreach(host IN LISTS HOSTS)
         file(COPY "${SYSROOT}/${target}" DESTINATION "${tree}/sysroot")
     endforeach()
     file(COPY "${SYSROOT}/licenses/" DESTINATION "${tree}/licenses")
-    # The installer reads llvm-pin and checks the signature of the LLVM
-    # release against llvm-tools-key.pem.
+    # The installer reads llvm-pin, and checks the LLVM release with the key
+    # it holds itself.
     foreach(name get-sysroot.cmake sysroot-pins cmake-pin cmake-version
-            llvm-version llvm-pin llvm-tools-key.pem package-api)
+            llvm-version llvm-pin package-api)
         file(COPY "${root}/tools/${name}" DESTINATION "${tree}/tools")
     endforeach()
     file(COPY "${root}/LICENSE" DESTINATION "${tree}")

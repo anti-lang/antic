@@ -25,6 +25,16 @@
 set -eu
 
 base=https://anti-lang.com/downloads/resources
+
+# DESIGN: the installer carries the public key that checks SHA256SUMS.sig of
+# the LLVM tools, and the package carries none. anti-lang.com serves this
+# script, and GitHub serves the tools. A key that travelled with them could
+# be replaced with them. anti-lang.com serves the same key as keys/release.pem.
+release_key='-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEao0Di9RL8gvG6oA9x7gIDJ7/zLn6
+/J5i5dgtCf82Hvpro/4umWhaPA8APgrIJKLD4XDvTqhLijckvFxj0f3Bhg==
+-----END PUBLIC KEY-----'
+
 version=${ANTI_VERSION:-}
 arch=${ANTI_ARCH:-}
 
@@ -149,7 +159,7 @@ fi
 
 # DESIGN: the LLVM tools come from the release that tools/llvm-pin of the
 # package names. The pinned digest decides, and openssl checks the signature
-# of SHA256SUMS against tools/llvm-tools-key.pem. macOS and Linux carry
+# of SHA256SUMS against the key of this installer. macOS and Linux carry
 # openssl. A package without the pin carries the tools itself.
 llvm_pin=$home/tools/llvm-pin
 if [ -f "$llvm_pin" ]; then
@@ -177,10 +187,10 @@ if [ -f "$llvm_pin" ]; then
         fail "SHA256SUMS of $tag lists '$listed' for $tools, and the pin $digest"
     fi
     if command -v openssl >/dev/null 2>&1; then
+        printf '%s\n' "$release_key" > "$work/release.pem"
         openssl dgst -sha256 -binary -out "$work/llvm-sums.sha256" \
             "$work/llvm-sums"
-        if ! openssl pkeyutl -verify -pubin \
-            -inkey "$home/tools/llvm-tools-key.pem" \
+        if ! openssl pkeyutl -verify -pubin -inkey "$work/release.pem" \
             -in "$work/llvm-sums.sha256" -sigfile "$work/llvm-sums.sig" \
             >/dev/null 2>&1; then
             fail "SHA256SUMS of $tag carries no signature of the key of Anti"

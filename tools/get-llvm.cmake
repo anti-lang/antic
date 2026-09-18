@@ -10,9 +10,10 @@
 # builds them from the LLVM source of tools/llvm-version. The script
 # downloads the asset of this host and checks its digest against the pin.
 # It checks SHA256SUMS of the release against the pin, and SHA256SUMS.sig
-# with openssl against the public key in tools/llvm-tools-key.pem. DEST
-# defaults to build/llvm of the repository. ARCHIVE names an asset already
-# downloaded, which is checked all the same.
+# with openssl against the public key in keys/release.pem of the checkout,
+# which the person who cloned it trusts. DEST defaults to build/llvm of the
+# repository. ARCHIVE names an asset already downloaded, which is checked
+# all the same.
 cmake_minimum_required(VERSION 3.20)
 
 get_filename_component(root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
@@ -110,17 +111,17 @@ execute_process(COMMAND "${OPENSSL}" dgst -sha256 -binary
                         "${downloads}/SHA256SUMS"
                 RESULT_VARIABLE hashed)
 execute_process(COMMAND "${OPENSSL}" pkeyutl -verify -pubin
-                        -inkey "${CMAKE_CURRENT_LIST_DIR}/llvm-tools-key.pem"
+                        -inkey "${root}/keys/release.pem"
                         -in "${downloads}/SHA256SUMS.sha256"
                         -sigfile "${downloads}/SHA256SUMS.sig"
                 OUTPUT_VARIABLE out ERROR_VARIABLE err
                 RESULT_VARIABLE verified)
 if(NOT hashed EQUAL 0 OR NOT verified EQUAL 0)
     message(FATAL_ERROR "SHA256SUMS.sig of ${tag} is not a signature of the "
-                        "key in tools/llvm-tools-key.pem: ${out}${err}")
+                        "key in keys/release.pem: ${out}${err}")
 endif()
 message(STATUS "${asset}: the digest of the pin, in SHA256SUMS signed by "
-               "the key in tools/llvm-tools-key.pem")
+               "the key in keys/release.pem")
 
 # The asset holds bin/ with the five tools, licenses/ and VERSION.
 set(unpacked "${DEST}/unpacked")
