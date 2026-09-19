@@ -1,7 +1,27 @@
 exit 0
 Marked
-1 2
-tag 4 9
-x 1
+9 2
+tag 6 0
+int 9
+small 8 0
+uint 200
+ratio 14 0
+float 0.5
+on 1 0
+bool 1
+letter 2 0
+char 107
+name 16 0
+str mark
+next 17 24
+ptr 1
+level 23 4
+int -1
+bytes 19 8
+none
+1 the value is of another kind than the field takes
+1 no Value carries the type of this field
+1 the class has no field at this index
+x int 1
 8
 sum 8 1

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "sema.h"
+#include "target.h"
 #include "text.h"
 #include "types.h"
 
@@ -1212,7 +1213,7 @@ static uint32_t field_agg(struct lowerer *l)
     fields[1].type = ir_scalar(IR_I64);
     fields[2].name = "offset";
     fields[2].type = ir_scalar(IR_I64);
-    fields[3].name = "kind";
+    fields[3].name = "type";
     fields[3].type = ir_scalar(IR_I64);
     fields[4].name = "owned";
     fields[4].type = ir_scalar(IR_I64);
@@ -1303,15 +1304,16 @@ static struct ir_global *class_global(struct lowerer *l, const struct type *t,
 
     /* DESIGN: an export class gives its table and its descriptor the C
        names the generated header declares, so C code reads them. Every
-       other class keeps the name `Class.part` of its module. */
+       other class, and every struct, keeps the name `Type.part` of its
+       module. */
     size = t->name.length + strlen(suffix) + 8;
     name = malloc(size);
     if (name == NULL) {
         fputs("antic: out of memory\n", stderr);
         exit(70);
     }
-    if (t->item_exported && (strcmp(suffix, "table") == 0 ||
-                             strcmp(suffix, "descriptor") == 0)) {
+    if (t->item_exported && t->kind == TYPE_CLASS &&
+        (strcmp(suffix, "table") == 0 || strcmp(suffix, "descriptor") == 0)) {
         snprintf(name, size, "anti_%.*s_%s", (int)t->name.length,
                  t->name.text,
                  strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
@@ -1349,6 +1351,45 @@ static struct ir_global *class_global(struct lowerer *l, const struct type *t,
 static struct ir_global *class_descriptor(struct lowerer *l,
                                           const struct type *t);
 
+/* The global `<Struct>.<suffix>` of the module being lowered, or NULL
+   with the module and the name to give it. A struct of another module
+   is named with its module path, as `geometry.Size.descriptor`, which
+   no name that the module declares can be. */
+static struct ir_global *struct_global(struct lowerer *l,
+                                       const struct type *t,
+                                       const char *suffix, char **module_out,
+                                       char **name_out)
+{
+    struct ir_module *m = l->m;
+    struct text name = {0};
+    bool here = t->module.length == strlen(l->module_name) &&
+                memcmp(t->module.text, l->module_name, t->module.length) == 0;
+    size_t i;
+
+    if (!here) {
+        text_appendf(&name, "%.*s.", (int)t->module.length, t->module.text);
+    }
+    text_appendf(&name, "%.*s.%s", (int)t->name.length, t->name.text, suffix);
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->module != NULL &&
+            strcmp(m->globals[i]->module, l->module_name) == 0 &&
+            strcmp(m->globals[i]->name, text_cstr(&name)) == 0) {
+            text_free(&name);
+            return m->globals[i];
+        }
+    }
+    *module_out = malloc(strlen(l->module_name) + 1);
+    *name_out = malloc(name.length + 1);
+    if (*module_out == NULL || *name_out == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    memcpy(*module_out, l->module_name, strlen(l->module_name) + 1);
+    memcpy(*name_out, text_cstr(&name), name.length + 1);
+    text_free(&name);
+    return NULL;
+}
+
 /* The count of fields a descriptor lists: the class's own fields, with
    the base and the table pointer left out. Each class lists its own, and
    the parent descriptor holds the rest of the chain. */
@@ -1366,11 +1407,92 @@ static size_t own_fields(const struct type *t)
     return count;
 }
 
-/* DESIGN: the field list of a class names every field it declares, with
-   the offset, the kind and the `own` bit of each. A field of class or
-   struct type carries its descriptor as well, so a walk of the list
-   reaches the whole object. `--no-reflect` drops the list and keeps the
-   rest of the descriptor. */
+/* The type ids of enum anti_type in rt/object.h, in its order. The unit
+   test records_type_ids pins the two together. */
+enum type_id {
+    TYPE_ID_NONE, TYPE_ID_BOOL, TYPE_ID_CHAR, TYPE_ID_I8, TYPE_ID_I16,
+    TYPE_ID_I32, TYPE_ID_I64, TYPE_ID_CLONG, TYPE_ID_U8, TYPE_ID_U16,
+    TYPE_ID_U32, TYPE_ID_U64, TYPE_ID_CULONG, TYPE_ID_CWCHAR, TYPE_ID_F32,
+    TYPE_ID_F64, TYPE_ID_STR, TYPE_ID_PTR, TYPE_ID_FN, TYPE_ID_SLICE,
+    TYPE_ID_ARRAY, TYPE_ID_STRUCT, TYPE_ID_UNION, TYPE_ID_ENUM,
+    TYPE_ID_CLASS
+};
+
+/* The type id of t alone, without the type it is built on. */
+static uint64_t type_id_of(const struct type *t)
+{
+    static const enum type_id builtins[] = {
+        [TYPE_BOOL] = TYPE_ID_BOOL,     [TYPE_CHAR] = TYPE_ID_CHAR,
+        [TYPE_I8] = TYPE_ID_I8,         [TYPE_I16] = TYPE_ID_I16,
+        [TYPE_I32] = TYPE_ID_I32,       [TYPE_I64] = TYPE_ID_I64,
+        [TYPE_CLONG] = TYPE_ID_CLONG,   [TYPE_U8] = TYPE_ID_U8,
+        [TYPE_U16] = TYPE_ID_U16,       [TYPE_U32] = TYPE_ID_U32,
+        [TYPE_U64] = TYPE_ID_U64,       [TYPE_CULONG] = TYPE_ID_CULONG,
+        [TYPE_CWCHAR] = TYPE_ID_CWCHAR, [TYPE_F32] = TYPE_ID_F32,
+        [TYPE_F64] = TYPE_ID_F64,       [TYPE_STR] = TYPE_ID_STR,
+    };
+
+    switch (t->kind) {
+    case TYPE_POINTER: return TYPE_ID_PTR;
+    case TYPE_FN: return TYPE_ID_FN;
+    case TYPE_SLICE: return TYPE_ID_SLICE;
+    case TYPE_ARRAY: return TYPE_ID_ARRAY;
+    case TYPE_STRUCT: return t->is_union ? TYPE_ID_UNION : TYPE_ID_STRUCT;
+    case TYPE_ENUM: return TYPE_ID_ENUM;
+    case TYPE_CLASS: return TYPE_ID_CLASS;
+    default:
+        /* An enum is signed under the ABI of Windows, so the index
+           converts before the comparison. */
+        return (size_t)t->kind < sizeof builtins / sizeof *builtins
+                   ? (uint64_t)builtins[t->kind]
+                   : TYPE_ID_NONE;
+    }
+}
+
+/* DESIGN: a field record names the type of its field and never its
+   width, so the record is the same on every target. A pointer, a slice,
+   an array and an enum add the id of the type they are built on in the
+   byte above their own. An enum there is written as its integer, so a
+   walk knows the size of every element. */
+static uint64_t type_id(const struct type *t)
+{
+    const struct type *on = t->kind == TYPE_ENUM ? t->base
+                            : t->kind == TYPE_POINTER || t->kind == TYPE_SLICE ||
+                                    t->kind == TYPE_ARRAY
+                                ? t->element
+                                : NULL;
+
+    if (on != NULL && on->kind == TYPE_ENUM) {
+        on = on->base;
+    }
+    return type_id_of(t) | (on != NULL ? type_id_of(on) << 8 : 0);
+}
+
+static struct ir_global *struct_descriptor(struct lowerer *l,
+                                           const struct type *t);
+
+/* The descriptor a field of type t carries. It is the one of its class
+   or struct, or of the class or struct that a pointer or a slice
+   reaches. Every other type gives NULL, as a union and a Job do. */
+static const struct ir_global *field_descriptor(struct lowerer *l,
+                                                const struct type *t)
+{
+    if (t->kind == TYPE_POINTER || t->kind == TYPE_SLICE) {
+        t = t->element;
+    }
+    if (t->kind == TYPE_CLASS) {
+        return class_descriptor(l, t);
+    }
+    return t->kind == TYPE_STRUCT ? struct_descriptor(l, t) : NULL;
+}
+
+/* DESIGN: the field list of a class or a struct has one record per
+   field it declares. A record holds the offset, the type id and the
+   `own` bit. A field of class or struct type carries its descriptor as
+   well. So does a pointer or a slice of one. A walk of the list then
+   reaches the whole object. A bitfield has type id none, since no offset
+   reaches its bits. `--no-reflect` drops the list and keeps the rest of
+   the descriptor. */
 static struct ir_global *class_fields(struct lowerer *l,
                                       const struct type *t)
 {
@@ -1383,13 +1505,16 @@ static struct ir_global *class_fields(struct lowerer *l,
     size_t i;
     size_t n = 0;
 
-    g = class_global(l, t, "fields", &module, &name);
+    g = t->kind == TYPE_CLASS
+            ? class_global(l, t, "fields", &module, &name)
+            : struct_global(l, t, "fields", &module, &name);
     if (g != NULL) {
         return g;
     }
     value = ir_const_agg(l->m, ir_aggregate(fields_agg(l, count)), count);
     for (i = 0; i < t->field_count; i++) {
         const struct struct_field *f = &t->fields[i];
+        const struct ir_global *descriptor;
         struct ir_const *item;
         if (f->form == FIELD_BASE || f->form == FIELD_TABLE) {
             continue;
@@ -1408,25 +1533,16 @@ static struct ir_global *class_fields(struct lowerer *l,
         item->items[2].sym = ir_sym_offset_of(l->m, agg_of(l, t), (uint32_t)i);
         item->items[3].kind = IR_CONST_INT;
         item->items[3].scalar = IR_I64;
-        /* An enum is signed under the ABI of Windows, so both arms convert
-           to the unsigned field alike. */
-        item->items[3].integer = is_aggregate(f->type)
-                                     ? (uint64_t)IR_AGG
-                                     : (uint64_t)ir_type_of(f->type);
+        item->items[3].integer = f->bits != 0 ? TYPE_ID_NONE
+                                              : type_id(f->type);
         item->items[4].kind = IR_CONST_INT;
         item->items[4].scalar = IR_I64;
         item->items[4].integer = f->owned ? 1 : 0;
-        /* A field of class type, and a pointer to one, both carry the
-           descriptor of that class, so a deep copy knows its size. */
         item->items[5].scalar = IR_PTR;
-        if (f->type->kind == TYPE_CLASS) {
+        descriptor = field_descriptor(l, f->type);
+        if (descriptor != NULL) {
             item->items[5].kind = IR_CONST_ADDR;
-            item->items[5].global = class_descriptor(l, f->type)->index;
-        } else if (f->type->kind == TYPE_POINTER &&
-                   f->type->element->kind == TYPE_CLASS) {
-            item->items[5].kind = IR_CONST_ADDR;
-            item->items[5].global =
-                class_descriptor(l, f->type->element)->index;
+            item->items[5].global = descriptor->index;
         } else {
             item->items[5].kind = IR_CONST_INT;
             item->items[5].integer = 0;
@@ -1723,6 +1839,64 @@ static struct ir_global *class_descriptor(struct lowerer *l,
             value->items[11].kind = IR_CONST_INT;
             value->items[11].integer = 0;
         }
+    }
+    return g;
+}
+
+/* DESIGN: a struct that appears in a class has a descriptor as well,
+   which the struct itself never points at. A field of the struct's type
+   names it, so a walk of a class reaches the fields of a struct inside
+   it. It holds the name, the size and the field list, and nothing of a
+   chain. Each module that names a struct in a field record writes the
+   descriptor as its own data. The module that declares the struct
+   cannot know which classes of other modules hold it, and nothing
+   compares two descriptors of a struct. A union has none, since no walk
+   knows which of its fields holds the value, and neither does a Job,
+   which no module declares. */
+static struct ir_global *struct_descriptor(struct lowerer *l,
+                                           const struct type *t)
+{
+    static const char runtime[] = RUNTIME_MODULE;
+    struct ir_const *value;
+    struct ir_global *g;
+    struct token_text text;
+    char *module;
+    char *name;
+    size_t count = own_fields(t);
+    size_t k;
+
+    if (t->is_union ||
+        (t->module.length == sizeof runtime - 1 &&
+         memcmp(t->module.text, runtime, sizeof runtime - 1) == 0)) {
+        return NULL;
+    }
+    g = struct_global(l, t, "descriptor", &module, &name);
+    if (g != NULL) {
+        return g;
+    }
+    /* The global is added before the field list, so a struct that
+       points at itself finds it. */
+    value = ir_const_agg(l->m, ir_aggregate(descriptor_agg(l)), 12);
+    g = ir_global_add_value(l->m, module, name, value);
+    free(module);
+    free(name);
+    for (k = 0; k < 12; k++) {
+        value->items[k].kind = IR_CONST_INT;
+        value->items[k].scalar = l->m->aggs[descriptor_agg(l)]
+                                     ->fields[k].type.type;
+        value->items[k].integer = 0;
+    }
+    text.bytes = t->name.text;
+    text.length = t->name.length;
+    value->items[0].kind = IR_CONST_ADDR;
+    value->items[0].global = literal_global(l, &text)->index;
+    value->items[1].integer = t->name.length;
+    value->items[3].kind = IR_CONST_SYM;
+    value->items[3].sym = ir_sym_size_of(l->m, vtype_of(l, t));
+    if (!l->no_reflect && count > 0) {
+        value->items[6].integer = count;
+        value->items[7].kind = IR_CONST_ADDR;
+        value->items[7].global = class_fields(l, t)->index;
     }
     return g;
 }

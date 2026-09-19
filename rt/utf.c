@@ -81,6 +81,34 @@ size_t anti_utf8_repair(const unsigned char *in, size_t n, unsigned char *out)
     return written;
 }
 
+size_t anti_utf8_encode(uint32_t c, unsigned char *out)
+{
+    return put_scalar(c, out);
+}
+
+uint32_t anti_utf8_decode(const unsigned char *in, size_t n, size_t *length)
+{
+    unsigned char low;
+    unsigned char high;
+    size_t count = n == 0 ? 0 : sequence_length(in[0], &low, &high);
+    uint32_t c;
+    size_t i;
+
+    *length = 0;
+    if (count == 0 || count > n) {
+        return 0;
+    }
+    c = count == 1 ? in[0] : (uint32_t)(in[0] & (0x7F >> count));
+    for (i = 1; i < count; i++) {
+        if (in[i] < (i == 1 ? low : 0x80) || in[i] > (i == 1 ? high : 0xBF)) {
+            return 0;
+        }
+        c = c << 6 | (in[i] & 0x3Fu);
+    }
+    *length = count;
+    return c;
+}
+
 /* A surrogate pair gives one scalar value, and any other surrogate
    U+FFFD. out holds 3 * n bytes. */
 size_t anti_utf16_to_utf8(const uint16_t *in, size_t n, unsigned char *out)

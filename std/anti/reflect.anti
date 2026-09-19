@@ -1,10 +1,11 @@
 //! What a program can read of its own classes at run time.
 //!
 //! Every class carries a descriptor in read-only data, and this module
-//! reads it. `describe` gives the descriptor of an object, `fields` and
-//! `functions` count what it lists, and `get` and `set` read and write
-//! one field by its index. `--no-reflect` drops the two lists, and the
-//! counts are then zero.
+//! reads it. `describe` gives the descriptor of an object, `field_count`
+//! and `function_count` count what it lists, and `field` gives the name,
+//! the offset and the type of one field. `get` and `set` read and write
+//! one field by its index as a `Value`. `--no-reflect` drops the two
+//! lists, and the counts are then zero.
 //!
 //! `new` builds an object of a class that it names. It reads the
 //! registry of every class of the program, which the link step writes.
@@ -16,6 +17,7 @@
 //! unpacks them. `--no-reflect` drops the function lists, and every
 //! `call` then gives a value of kind `None`.
 
+import anti.error;
 import anti.text;
 
 extern fn anti_rt_descriptor(object: *byte) -> *byte;
@@ -23,38 +25,46 @@ extern fn anti_rt_reflect_parent(d: *byte) -> *byte;
 extern fn anti_rt_reflect_field_count(d: *byte) -> int;
 extern fn anti_rt_reflect_field_name(d: *byte, index: int) -> str;
 extern fn anti_rt_reflect_field_offset(d: *byte, index: int) -> int;
-extern fn anti_rt_reflect_field_kind(d: *byte, index: int) -> int;
+extern fn anti_rt_reflect_field_type(d: *byte, index: int) -> int;
 extern fn anti_rt_reflect_field_owned(d: *byte, index: int) -> int;
 extern fn anti_rt_reflect_function_count(d: *byte) -> int;
 extern fn anti_rt_reflect_function_name(d: *byte, index: int) -> str;
 extern fn anti_rt_reflect_function_slot(d: *byte, index: int) -> int;
 extern fn anti_rt_reflect_function_params(d: *byte, index: int) -> int;
-extern fn anti_rt_reflect_get(object: *byte, d: *byte, index: int) -> int;
+extern fn anti_rt_reflect_get(object: *byte, d: *byte, index: int,
+	out: *Value);
 extern fn anti_rt_reflect_set(object: *byte, d: *byte, index: int,
-	value: int);
+	value: *Value) -> int;
 extern fn anti_rt_reflect_new(name: *byte, length: int) -> *Object;
 extern fn anti_rt_reflect_call(object: *Object, index: int, args: *Value,
 	count: int, result: *Value) -> bool;
 
-/// The kinds a field record carries.
-pub const KIND_I8: int = 1;
-/// A 16-bit integer.
-pub const KIND_I16: int = 2;
-/// A 32-bit integer.
-pub const KIND_I32: int = 3;
-/// A 64-bit integer.
-pub const KIND_I64: int = 4;
-/// A pointer, a slice element or a class reference.
-pub const KIND_PTR: int = 7;
-/// A struct, a str, a slice or an inline class.
-pub const KIND_AGG: int = 8;
+/// The type of a field, as its record names it.
+///
+/// A pointer, a slice, an array and an enum are built on another type,
+/// which `Field.element` names. An enum there is the integer it is built
+/// on. `None` is a bitfield, which no walk reads.
+pub enum TypeId: u8 {
+	None, Bool, Char, I8, I16, I32, I64, CLong, U8, U16, U32, U64, CULong,
+	CWchar, F32, F64, Str, Ptr, Fn, Slice, Array, Struct, Union, Enum, Class
+}
+
+/// The code of the error of an index that names no field or function.
+pub const BAD_INDEX: int = 1;
+/// The code of the error of a type that no `Value` carries.
+pub const NOT_CARRIED: int = 2;
+/// The code of the error of a `Value` of another kind than its place.
+pub const WRONG_KIND: int = 3;
+/// The code of the error of a call with another count of arguments.
+pub const WRONG_COUNT: int = 4;
 
 /// One field of a class, as its descriptor lists it.
 pub class Field
 {
 	pub name: str = "",
 	pub offset: int = 0,
-	pub kind: int = 0,
+	pub type_id: TypeId = TypeId.None,
+	pub element: TypeId = TypeId.None,
 	pub owned: bool = false,
 }
 
@@ -87,10 +97,12 @@ pub fn field_count(d: *byte) -> int
 /// The field at `index`, which is one of `field_count` of them.
 pub fn field(d: *byte, index: int) -> Field
 {
+	let t = anti_rt_reflect_field_type(d, index);
 	return Field {
 		name: anti_rt_reflect_field_name(d, index),
 		offset: anti_rt_reflect_field_offset(d, index),
-		kind: anti_rt_reflect_field_kind(d, index),
+		type_id: (t & 255) as u8 as TypeId,
+		element: (t >> 8 & 255) as u8 as TypeId,
 		owned: anti_rt_reflect_field_owned(d, index) != 0,
 	};
 }
@@ -111,18 +123,40 @@ pub fn function(d: *byte, index: int) -> Function
 	};
 }
 
-/// The bytes of the field at `index`, as an integer of its width.
+/// The field at `index` as a `Value` of the kind its type gives.
 ///
-/// A field wider than eight bytes gives the address of its first byte.
-pub fn get(object: *byte, d: *byte, index: int) -> int
+/// An integer comes at 64 bits and a float as an `f64`. A field of a
+/// type that no `Value` carries, such as a slice or an inline struct,
+/// and an index out of range give a value of kind `None`.
+pub fn get(object: *byte, d: *byte, index: int) -> Value
 {
-	return anti_rt_reflect_get(object, d, index);
+	let v = none();
+	anti_rt_reflect_get(object, d, index, &v);
+	return v;
 }
 
 /// Write `value` into the field at `index`.
-pub fn set(object: *byte, d: *byte, index: int, value: int)
+///
+/// The value is of the kind that `get` gives for the field, and an
+/// integer or a float narrows to the field's type. An index out of range,
+/// a field that no `Value` carries and a value of another kind each give
+/// an error with the code that names the reason, and write nothing.
+pub fn set(object: *byte, d: *byte, index: int, value: Value) -> *error.Error
 {
-	anti_rt_reflect_set(object, d, index, value);
+	let v = value;
+	let reason = anti_rt_reflect_set(object, d, index, &v);
+	if reason == BAD_INDEX {
+		return error.Error.new(BAD_INDEX, "the class has no field at this index");
+	}
+	if reason == NOT_CARRIED {
+		return error.Error.new(NOT_CARRIED,
+			"no Value carries the type of this field");
+	}
+	if reason == WRONG_KIND {
+		return error.Error.new(WRONG_KIND,
+			"the value is of another kind than the field takes");
+	}
+	return null;
 }
 
 /// The name of the class `d` describes.

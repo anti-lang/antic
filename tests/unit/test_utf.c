@@ -68,6 +68,27 @@ static void splits(const char *line, const char *expected)
     free(out);
 }
 
+/* One scalar value encoded, then decoded back from its bytes. */
+static void round_trips(uint32_t c, size_t length)
+{
+    unsigned char bytes[4];
+    size_t n = anti_utf8_encode(c, bytes);
+    size_t read = 9;
+
+    CHECK(n == length);
+    CHECK(anti_utf8_decode(bytes, n, &read) == c);
+    CHECK(read == n);
+}
+
+/* Bytes that are not one well-formed sequence decode to length 0. */
+static void refuses(const unsigned char *in, size_t n)
+{
+    size_t read = 9;
+
+    anti_utf8_decode(in, n, &read);
+    CHECK(read == 0);
+}
+
 void test_utf(void)
 {
     static const unsigned char valid[] = {'h', 0xC3, 0xA9, 0xF0, 0x90, 0x8C,
@@ -118,4 +139,13 @@ void test_utf(void)
     /* The program name ends at a space outside quotes and keeps its
        backslashes. */
     splits("\"C:\\Program Files\\x.exe\"\targ  ", "C:\\Program Files\\x.exe|arg");
+
+    round_trips('A', 1);
+    round_trips(0xE9, 2);
+    round_trips(0x20AC, 3);
+    round_trips(0x1F600, 4);
+    refuses(table8, 2);
+    refuses(table9, 3);
+    refuses(valid + 1, 1);
+    refuses(valid, 0);
 }

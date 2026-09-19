@@ -6,6 +6,7 @@
 #include "ir.h"
 #include "lexer.h"
 #include "lower.h"
+#include "object.h"
 #include "parser.h"
 #include "sema.h"
 #include "types.h"
@@ -199,6 +200,128 @@ static void records_classes(void)
         CHECK_STR(global_name(&l.ir, call->c.as.index), "Shape.descriptor");
         CHECK(call->field == 8);
     }
+    release(&l);
+}
+
+/* The global of the module named name, or NULL. */
+static const struct ir_global *global_of(const struct ir_module *m,
+                                         const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        if (strcmp(m->globals[i]->name, name) == 0) {
+            return m->globals[i];
+        }
+    }
+    return NULL;
+}
+
+/* One field record: the type id the compiler wrote and the descriptor
+   it names, or "(none)". */
+struct field_expect {
+    uint64_t type;
+    const char *descriptor;
+};
+
+static void check_field_records(const struct ir_module *m,
+                                const char *list,
+                                const struct field_expect *expected,
+                                size_t count)
+{
+    const struct ir_global *g = global_of(m, list);
+    size_t i;
+
+    CHECK(g != NULL && g->value != NULL);
+    if (g == NULL || g->value == NULL) {
+        return;
+    }
+    CHECK(g->value->item_count == count);
+    for (i = 0; i < count && i < g->value->item_count; i++) {
+        const struct ir_const *item = &g->value->items[i];
+        const char *descriptor =
+            item->items[5].kind == IR_CONST_ADDR
+                ? global_name(m, item->items[5].global)
+                : "(none)";
+        if (item->items[3].integer != expected[i].type) {
+            fprintf(stderr, "%s record %zu: type id %llu, expected %llu\n",
+                    list, i, (unsigned long long)item->items[3].integer,
+                    (unsigned long long)expected[i].type);
+            check_failures++;
+        }
+        CHECK_STR(descriptor, expected[i].descriptor);
+    }
+}
+
+/* DESIGN: a field record names the type of its field by the type id of
+   rt/object.h and never by a width. The test pins the numbers that the
+   compiler writes to the ones the runtime reads. A struct that a field
+   names has a descriptor with a field list of its own. */
+static void records_type_ids(void)
+{
+    static const struct field_expect holder[] = {
+        {ANTI_TYPE_BOOL, "(none)"},
+        {ANTI_TYPE_CHAR, "(none)"},
+        {ANTI_TYPE_I8, "(none)"},
+        {ANTI_TYPE_I16, "(none)"},
+        {ANTI_TYPE_I32, "(none)"},
+        {ANTI_TYPE_I64, "(none)"},
+        {ANTI_TYPE_CLONG, "(none)"},
+        {ANTI_TYPE_U8, "(none)"},
+        {ANTI_TYPE_U16, "(none)"},
+        {ANTI_TYPE_U32, "(none)"},
+        {ANTI_TYPE_U64, "(none)"},
+        {ANTI_TYPE_CULONG, "(none)"},
+        {ANTI_TYPE_CWCHAR, "(none)"},
+        {ANTI_TYPE_F32, "(none)"},
+        {ANTI_TYPE_F64, "(none)"},
+        {ANTI_TYPE_STR, "(none)"},
+        {ANTI_TYPE_PTR | ANTI_TYPE_I32 << 8, "(none)"},
+        {ANTI_TYPE_FN, "(none)"},
+        {ANTI_TYPE_SLICE | ANTI_TYPE_U16 << 8, "(none)"},
+        {ANTI_TYPE_ARRAY | ANTI_TYPE_I8 << 8, "(none)"},
+        {ANTI_TYPE_STRUCT, "Size.descriptor"},
+        {ANTI_TYPE_UNION, "(none)"},
+        {ANTI_TYPE_ENUM | ANTI_TYPE_U8 << 8, "(none)"},
+        {ANTI_TYPE_CLASS, "Inner.descriptor"},
+        {ANTI_TYPE_PTR | ANTI_TYPE_STRUCT << 8, "Size.descriptor"},
+        {ANTI_TYPE_SLICE | ANTI_TYPE_STRUCT << 8, "Size.descriptor"},
+        {ANTI_TYPE_PTR | ANTI_TYPE_CLASS << 8, "Inner.descriptor"},
+        {ANTI_TYPE_SLICE | ANTI_TYPE_U8 << 8, "(none)"},
+    };
+    static const struct field_expect size[] = {
+        {ANTI_TYPE_I32, "(none)"},
+        {ANTI_TYPE_F64, "(none)"},
+    };
+    struct lowered l;
+    const struct ir_global *d;
+
+    run(&l,
+        "struct Size { w: i32, h: f64 }\n"
+        "union Bits { i: i32, f: f32 }\n"
+        "enum Mode: u8 { A, B }\n"
+        "class Inner { pub v: int = 0 }\n"
+        "class Holder {\n"
+        "    a: bool, b: char, c: i8, d: i16, e: i32, f: i64, g: c_long,\n"
+        "    h: u8, i: u16, j: u32, k: u64, l: c_ulong, m: c_wchar,\n"
+        "    n: f32, o: f64, p: str, q: *i32, r: fn(i32) -> i32,\n"
+        "    s: []u16, t: [4]i8, u: Size, v: Bits, w: Mode, x: Inner,\n"
+        "    y: *Size, z: []Size, own next: *Inner, modes: []Mode,\n"
+        "}\n");
+    CHECK(l.ok);
+    check_field_records(&l.ir, "Holder.fields", holder,
+                        sizeof holder / sizeof *holder);
+    check_field_records(&l.ir, "Size.fields", size,
+                        sizeof size / sizeof *size);
+    d = global_of(&l.ir, "Size.descriptor");
+    CHECK(d != NULL && d->value != NULL);
+    if (d != NULL && d->value != NULL) {
+        CHECK(d->value->items[6].integer == 2);
+        CHECK(d->value->items[7].kind == IR_CONST_ADDR);
+        CHECK_STR(global_name(&l.ir, d->value->items[7].global),
+                  "Size.fields");
+    }
+    CHECK(global_of(&l.ir, "Bits.descriptor") == NULL);
     release(&l);
 }
 
@@ -915,4 +1038,5 @@ void test_lower(void)
            "    ret i32 %12\n"
            "}\n");
     records_classes();
+    records_type_ids();
 }

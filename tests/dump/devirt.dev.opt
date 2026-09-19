@@ -3,7 +3,7 @@ type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, siz
 type anti.rt.Object = struct { table: ptr }
 type devirt.Only = struct { super: anti.rt.Object, n: i64 }
 type [2]ptr = array 2 of ptr
-type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, kind: i64, owned: i64, descriptor: ptr }
+type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [1]anti.rt.Field = array 1 of anti.rt.Field
 type anti.rt.Function = struct { name: ptr, name_length: i64, slot: i64, param_count: i64, signature: ptr }
 type [8]anti.rt.Function = array 8 of anti.rt.Function
@@ -29,7 +29,7 @@ global devirt.2 size 5 align 1 bytes 4f 6e 6c 79 00
 global (null).anti_rt_Object_descriptor size 0 align 1 bytes
 global devirt.Only.ancestors [2]ptr { @anti_rt_Object_descriptor, @devirt.Only.descriptor }
 global devirt.4 size 2 align 1 bytes 6e 00
-global devirt.Only.fields [1]anti.rt.Field { anti.rt.Field { @devirt.4, i64 1, offset_of devirt.Only.n, i64 4, i64 0, ptr 0 } }
+global devirt.Only.fields [1]anti.rt.Field { anti.rt.Field { @devirt.4, i64 1, offset_of devirt.Only.n, i64 6, i64 0, ptr 0 } }
 global devirt.6 size 4 align 1 bytes 73 74 72 00
 global devirt.7 size 10 align 1 bytes 74 79 70 65 5f 6e 61 6d 65 00
 global devirt.8 size 8 align 1 bytes 74 6f 5f 74 65 78 74 00
@@ -49,7 +49,7 @@ global devirt.Base.table [10]ptr { @devirt.Base.descriptor, @anti_rt_Object_type
 global devirt.Base.descriptor anti.rt.Descriptor { @devirt.23, i64 4, @anti_rt_Object_descriptor, size_of devirt.Base, i64 1, @devirt.Base.ancestors, i64 1, @devirt.Base.fields, ptr 0, i64 0, i64 9, @devirt.Base.functions }
 global devirt.23 size 5 align 1 bytes 42 61 73 65 00
 global devirt.Base.ancestors [2]ptr { @anti_rt_Object_descriptor, @devirt.Base.descriptor }
-global devirt.Base.fields [1]anti.rt.Field { anti.rt.Field { @devirt.4, i64 1, offset_of devirt.Base.n, i64 4, i64 0, ptr 0 } }
+global devirt.Base.fields [1]anti.rt.Field { anti.rt.Field { @devirt.4, i64 1, offset_of devirt.Base.n, i64 6, i64 0, ptr 0 } }
 global devirt.26 size 5 align 1 bytes 73 61 6d 65 00
 global devirt.Base.functions [9]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.19, i64 5, i64 8, i64 1, @devirt.18 }, anti.rt.Function { @devirt.26, i64 4, i64 9, i64 1, @devirt.18 } }
 global devirt.Derived.table [10]ptr { @devirt.Derived.descriptor, @anti_rt_Object_type_name, @anti_rt_Object_to_text, @anti_rt_Object_equals, @anti_rt_Object_hash, @anti_rt_Object_serialize, @anti_rt_Object_destruct, @anti_rt_Object_copy, @devirt.Derived.value, @devirt.Base.same }

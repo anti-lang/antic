@@ -1,10 +1,13 @@
 /* reflect.new and Object.deserialize, which read the registry of the
    classes of a program. */
+#include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "registry.h"
+#include "utf.h"
 
 static bool same_bytes(const unsigned char *a, int64_t a_length,
                        const unsigned char *b, int64_t b_length)
@@ -126,24 +129,26 @@ static int hex_digit(unsigned char c)
     return -1;
 }
 
-/* Append one byte to out, or fail when out has no room. A NULL out keeps
-   nothing and never fails. */
-static bool put_byte(unsigned char *out, size_t *length, unsigned char b)
+/* Append one byte to out, or fail when out holds room bytes already. A
+   NULL out keeps nothing and counts the bytes. */
+static bool put_byte(unsigned char *out, size_t room, size_t *length,
+                     unsigned char b)
 {
-    if (out == NULL) {
-        return true;
+    if (out != NULL) {
+        if (*length >= room) {
+            return false;
+        }
+        out[*length] = b;
     }
-    if (*length + 1 >= NAME_ROOM) {
-        return false;
-    }
-    out[(*length)++] = b;
+    (*length)++;
     return true;
 }
 
-/* A JSON string, decoded into out when out is not NULL. A \u escape of a
-   surrogate half is refused, since no name the serializer writes holds
-   one. */
-static bool read_string(struct reader *r, unsigned char *out, size_t *length)
+/* A JSON string, decoded into out when out is not NULL, and refused when
+   it takes more than room bytes there. A \u escape of a surrogate half is
+   refused, since the serializer writes none. */
+static bool read_string(struct reader *r, unsigned char *out, size_t room,
+                        size_t *length)
 {
     *length = 0;
     if (!take(r, '"')) {
@@ -155,7 +160,7 @@ static bool read_string(struct reader *r, unsigned char *out, size_t *length)
             return false;
         }
         if (c != '\\') {
-            if (!put_byte(out, length, c)) {
+            if (!put_byte(out, room, length, c)) {
                 return false;
             }
             continue;
@@ -190,13 +195,13 @@ static bool read_string(struct reader *r, unsigned char *out, size_t *length)
                 break;
             }
             if (code < 0x800) {
-                if (!put_byte(out, length,
+                if (!put_byte(out, room, length,
                               (unsigned char)(0xC0 | (code >> 6)))) {
                     return false;
                 }
-            } else if (!put_byte(out, length,
+            } else if (!put_byte(out, room, length,
                                  (unsigned char)(0xE0 | (code >> 12))) ||
-                       !put_byte(out, length, (unsigned char)(
+                       !put_byte(out, room, length, (unsigned char)(
                            0x80 | ((code >> 6) & 0x3F)))) {
                 return false;
             }
@@ -206,7 +211,7 @@ static bool read_string(struct reader *r, unsigned char *out, size_t *length)
         default:
             return false;
         }
-        if (!put_byte(out, length, c)) {
+        if (!put_byte(out, room, length, c)) {
             return false;
         }
     }
@@ -246,14 +251,14 @@ static bool skip_value(struct reader *r, int depth)
     }
     switch (*r->at) {
     case '"':
-        return read_string(r, NULL, &length);
+        return read_string(r, NULL, 0, &length);
     case '{':
         r->at++;
         if (take(r, '}')) {
             return true;
         }
         do {
-            if (!read_string(r, NULL, &length) || !take(r, ':') ||
+            if (!read_string(r, NULL, 0, &length) || !take(r, ':') ||
                 !skip_value(r, depth + 1)) {
                 return false;
             }
@@ -287,11 +292,11 @@ static bool type_of(struct reader r, unsigned char *out, size_t *length)
         return false;
     }
     do {
-        if (!read_string(&r, name, &name_length) || !take(&r, ':')) {
+        if (!read_string(&r, name, NAME_ROOM, &name_length) || !take(&r, ':')) {
             return false;
         }
         if (name_length == 4 && memcmp(name, "type", 4) == 0) {
-            return read_string(&r, out, length);
+            return read_string(&r, out, NAME_ROOM, length);
         }
         if (!skip_value(&r, 1)) {
             return false;
@@ -330,58 +335,228 @@ static bool descends(const struct anti_descriptor *d,
 static void *read_object(struct reader *r,
                          const struct anti_descriptor *expected, int depth);
 
-/* An integer of the width of kind, written at bytes. */
-static void store_integer(void *bytes, int64_t kind, long long value)
+static bool fill(struct reader *r, void *object,
+                 const struct anti_descriptor *d, bool typed, int depth);
+static bool read_value(struct reader *r, void *bytes, int64_t type,
+                       const struct anti_descriptor *d, int64_t owned,
+                       int depth);
+
+/* An integer of the type id, refused when the type cannot hold it. */
+static bool read_integer(struct reader *r, void *bytes, int64_t type)
 {
-    switch (kind) {
-    case ANTI_I8: {
-        int8_t v = (int8_t)value;
-        memcpy(bytes, &v, sizeof v);
-        return;
+    char number[64];
+    char *end;
+    unsigned bits = (unsigned)(anti_rt_type_size(type) * 8);
+
+    if (!read_number(r, number, sizeof number)) {
+        return false;
     }
-    case ANTI_I16: {
-        int16_t v = (int16_t)value;
-        memcpy(bytes, &v, sizeof v);
-        return;
+    errno = 0;
+    if (anti_rt_type_signed(type)) {
+        long long high = bits >= 64 ? LLONG_MAX : (1LL << (bits - 1)) - 1;
+        long long value = strtoll(number, &end, 10);
+        if (*end != '\0' || errno != 0 || value > high || value < -high - 1) {
+            return false;
+        }
+        anti_rt_store_integer(bytes, type, (uint64_t)value);
+        return true;
     }
-    case ANTI_I32: {
-        int32_t v = (int32_t)value;
-        memcpy(bytes, &v, sizeof v);
-        return;
-    }
-    case ANTI_CWCHAR: {
-        int v = (int)value;
-        memcpy(bytes, &v, sizeof v);
-        return;
-    }
-    case ANTI_CLONG: {
-        long v = (long)value;
-        memcpy(bytes, &v, sizeof v);
-        return;
-    }
-    default: {
-        int64_t v = (int64_t)value;
-        memcpy(bytes, &v, sizeof v);
-        return;
-    }
+    {
+        unsigned long long high =
+            bits >= 64 ? ULLONG_MAX : (1ULL << bits) - 1;
+        unsigned long long value = strtoull(number, &end, 10);
+        if (number[0] == '-' || *end != '\0' || errno != 0 || value > high) {
+            return false;
+        }
+        anti_rt_store_integer(bytes, type, value);
+        return true;
     }
 }
 
-static bool fill(struct reader *r, void *object,
-                 const struct anti_descriptor *d, int depth);
-
-/* Read the value of field f of the object. A value the field cannot hold
-   fails the whole text. */
-static bool read_field(struct reader *r, void *object,
-                       const struct anti_field *f, int depth)
+/* DESIGN: a str that deserialize reads gets bytes of its own on the
+   heap, which nothing frees. A str never owns its bytes, as the rule of
+   `own` says, so no `destruct` could free them. */
+static bool read_text(struct reader *r, struct anti_text *out)
 {
-    unsigned char *bytes = (unsigned char *)object + f->offset;
+    struct reader scan = *r;
+    unsigned char *bytes;
+    size_t length;
+
+    if (!read_string(&scan, NULL, 0, &length)) {
+        return false;
+    }
+    bytes = malloc(length > 0 ? length : 1);
+    if (bytes == NULL || !read_string(r, bytes, length, &length)) {
+        free(bytes);
+        return false;
+    }
+    out->ptr = bytes;
+    out->len = (int64_t)length;
+    return true;
+}
+
+/* A string of one character, as the scalar value of a char. */
+static bool read_char(struct reader *r, void *bytes)
+{
+    unsigned char text[8];
+    size_t length;
+    size_t used;
+    uint32_t c;
+
+    if (!read_string(r, text, sizeof text, &length)) {
+        return false;
+    }
+    c = anti_utf8_decode(text, length, &used);
+    if (used == 0 || used != length) {
+        return false;
+    }
+    memcpy(bytes, &c, sizeof c);
+    return true;
+}
+
+/* The address and the length of a slice that the object does not own. */
+static bool read_view(struct reader *r, struct anti_text *out)
+{
+    unsigned char name[NAME_ROOM];
+    char number[64];
+    char *end;
+    size_t length;
+    int64_t found = 0;
+
+    if (!take(r, '{')) {
+        return false;
+    }
+    do {
+        unsigned long long value;
+        if (!read_string(r, name, NAME_ROOM, &length) || !take(r, ':') ||
+            !read_number(r, number, sizeof number) || number[0] == '-') {
+            return false;
+        }
+        value = strtoull(number, &end, 10);
+        if (*end != '\0') {
+            return false;
+        }
+        if (length == 7 && memcmp(name, "address", 7) == 0) {
+            out->ptr = (const unsigned char *)(uintptr_t)value;
+            found |= 1;
+        } else if (length == 6 && memcmp(name, "length", 6) == 0) {
+            out->len = (int64_t)value;
+            found |= 2;
+        } else {
+            return false;
+        }
+    } while (take(r, ','));
+    return found == 3 && take(r, '}');
+}
+
+/* The elements of a slice that the object owns, in new memory. */
+static bool read_elements(struct reader *r, struct anti_text *out,
+                          int64_t type, const struct anti_descriptor *d,
+                          int depth)
+{
+    size_t size = anti_rt_element_size(type, d);
+    struct reader scan;
+    unsigned char *items;
+    int64_t count = 0;
+    int64_t i;
+
+    if (take_word(r, "null")) {
+        out->ptr = NULL;
+        out->len = 0;
+        return true;
+    }
+    if (!take(r, '[')) {
+        return false;
+    }
+    scan = *r;
+    if (!take(&scan, ']')) {
+        do {
+            if (!skip_value(&scan, depth + 1)) {
+                return false;
+            }
+            count++;
+        } while (take(&scan, ','));
+    }
+    items = calloc(count > 0 ? (size_t)count : 1, size);
+    if (items == NULL) {
+        return false;
+    }
+    for (i = 0; i < count; i++) {
+        if ((i > 0 && !take(r, ',')) ||
+            !read_value(r, items + (size_t)i * size, ANTI_TYPE_ELEMENT(type),
+                        d, 0, depth + 1)) {
+            free(items);
+            return false;
+        }
+    }
+    if (!take(r, ']')) {
+        free(items);
+        return false;
+    }
+    out->ptr = count > 0 ? items : NULL;
+    out->len = count;
+    if (count == 0) {
+        free(items);
+    }
+    return true;
+}
+
+/* What an `own` pointer points at, in new memory. An object of a class
+   names its class, which is the field's class or one below it. */
+static bool read_owned(struct reader *r, void **out, int64_t type,
+                       const struct anti_descriptor *d, int depth)
+{
+    size_t size = anti_rt_element_size(type, d);
+    void *value;
+
+    if (ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_CLASS) {
+        if (d == NULL) {
+            return false;
+        }
+        value = read_object(r, d, depth + 1);
+    } else {
+        value = calloc(1, size);
+        if (value != NULL &&
+            !read_value(r, value, ANTI_TYPE_ELEMENT(type), d, 0, depth + 1)) {
+            free(value);
+            value = NULL;
+        }
+    }
+    *out = value;
+    return value != NULL;
+}
+
+/* Read one value of the type id into bytes, as serialize writes it. A
+   value the type cannot hold fails the whole text. d and owned are the
+   descriptor and the `own` bit of the field, as in put_value of
+   object.c. */
+static bool read_value(struct reader *r, void *bytes, int64_t type,
+                       const struct anti_descriptor *d, int64_t owned,
+                       int depth)
+{
+    int64_t t = anti_rt_type_scalar(type);
     char number[64];
     char *end;
 
-    switch (f->kind) {
-    case ANTI_F32:
-    case ANTI_F64: {
+    if (depth > DEPTH_LIMIT) {
+        return false;
+    }
+    skip_space(r);
+    switch (t) {
+    case ANTI_TYPE_BOOL: {
+        unsigned char value = 0;
+        if (take_word(r, "true")) {
+            value = 1;
+        } else if (!take_word(r, "false")) {
+            return false;
+        }
+        memcpy(bytes, &value, sizeof value);
+        return true;
+    }
+    case ANTI_TYPE_CHAR:
+        return read_char(r, bytes);
+    case ANTI_TYPE_F32:
+    case ANTI_TYPE_F64: {
         double value;
         if (!read_number(r, number, sizeof number)) {
             return false;
@@ -390,7 +565,7 @@ static bool read_field(struct reader *r, void *object,
         if (*end != '\0') {
             return false;
         }
-        if (f->kind == ANTI_F32) {
+        if (t == ANTI_TYPE_F32) {
             float narrow = (float)value;
             memcpy(bytes, &narrow, sizeof narrow);
         } else {
@@ -398,24 +573,28 @@ static bool read_field(struct reader *r, void *object,
         }
         return true;
     }
-    case ANTI_PTR: {
+    case ANTI_TYPE_STR: {
+        struct anti_text text;
+        if (!read_text(r, &text)) {
+            return false;
+        }
+        memcpy(bytes, &text, sizeof text);
+        return true;
+    }
+    case ANTI_TYPE_PTR:
+    case ANTI_TYPE_FN: {
         void *value = NULL;
-        skip_space(r);
         if (take_word(r, "null")) {
             value = NULL;
-        } else if (r->at < r->end && *r->at == '{') {
-            /* An owned object comes back as a new one. Any other pointer
-               was written as an address. */
-            if (!f->owned || f->descriptor == NULL) {
-                return false;
-            }
-            value = read_object(r, f->descriptor, depth + 1);
-            if (value == NULL) {
+        } else if (owned && t == ANTI_TYPE_PTR &&
+                   (ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_CLASS ||
+                    anti_rt_element_walked(type, d))) {
+            if (!read_owned(r, &value, type, d, depth)) {
                 return false;
             }
         } else {
             unsigned long long address;
-            if (!read_number(r, number, sizeof number)) {
+            if (!read_number(r, number, sizeof number) || number[0] == '-') {
                 return false;
             }
             address = strtoull(number, &end, 10);
@@ -427,42 +606,41 @@ static bool read_field(struct reader *r, void *object,
         memcpy(bytes, &value, sizeof value);
         return true;
     }
-    case ANTI_AGG:
-        skip_space(r);
-        if (f->descriptor != NULL && r->at < r->end && *r->at == '{') {
-            return fill(r, bytes, f->descriptor, depth + 1);
+    case ANTI_TYPE_SLICE: {
+        struct anti_text slice;
+        if (owned && !anti_rt_element_walked(type, d)) {
+            /* The serializer wrote null, and the field keeps its
+               default. */
+            return skip_value(r, depth + 1);
         }
-        /* A str, a slice or a struct without a descriptor was written as
-           null, and keeps its default. */
-        return skip_value(r, depth + 1);
-    case ANTI_VOID:
-        return skip_value(r, depth + 1);
-    default: {
-        long long value;
-        if (take_word(r, "true")) {
-            value = 1;
-        } else if (take_word(r, "false")) {
-            value = 0;
-        } else {
-            if (!read_number(r, number, sizeof number)) {
-                return false;
-            }
-            value = strtoll(number, &end, 10);
-            if (*end != '\0') {
-                return false;
-            }
+        if (!(owned ? read_elements(r, &slice, type, d, depth)
+                    : read_view(r, &slice))) {
+            return false;
         }
-        store_integer(bytes, f->kind, value);
+        memcpy(bytes, &slice, sizeof slice);
         return true;
     }
+    case ANTI_TYPE_STRUCT:
+    case ANTI_TYPE_CLASS:
+        if (d != NULL && r->at < r->end && *r->at == '{') {
+            return fill(r, bytes, d, t == ANTI_TYPE_CLASS, depth + 1);
+        }
+        /* A struct without a descriptor was written as null, and keeps
+           its default. */
+        return skip_value(r, depth + 1);
+    default:
+        if (anti_rt_type_size(t) == 0) {
+            return skip_value(r, depth + 1);
+        }
+        return read_integer(r, bytes, t);
     }
 }
 
 /* Read the members of the object that r stands before into the object
-   of the class d. The member "type" was read before. A member that names
-   no field of the chain is skipped. */
+   of the class or the struct d. The member "type" of a class was read
+   before. A member that names no field of the chain is skipped. */
 static bool fill(struct reader *r, void *object,
-                 const struct anti_descriptor *d, int depth)
+                 const struct anti_descriptor *d, bool typed, int depth)
 {
     unsigned char name[NAME_ROOM];
     size_t length;
@@ -475,13 +653,14 @@ static bool fill(struct reader *r, void *object,
     }
     do {
         const struct anti_field *f;
-        if (!read_string(r, name, &length) || !take(r, ':')) {
+        if (!read_string(r, name, NAME_ROOM, &length) || !take(r, ':')) {
             return false;
         }
-        f = length == 4 && memcmp(name, "type", 4) == 0
+        f = typed && length == 4 && memcmp(name, "type", 4) == 0
                 ? NULL
                 : field_named(d, name, length);
-        if (f != NULL ? !read_field(r, object, f, depth)
+        if (f != NULL ? !read_value(r, (unsigned char *)object + f->offset,
+                                    f->type, f->descriptor, f->owned, depth)
                       : !skip_value(r, depth + 1)) {
             return false;
         }
@@ -510,7 +689,7 @@ static void *read_object(struct reader *r,
         return NULL;
     }
     object = build(c);
-    if (object != NULL && !fill(r, object, c->descriptor, depth)) {
+    if (object != NULL && !fill(r, object, c->descriptor, true, depth)) {
         anti_rt_delete(object);
         return NULL;
     }

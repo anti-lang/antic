@@ -724,7 +724,7 @@ foreach(mode release dev)
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/shared"
             "-DLIBRARIES=points"
-            "-DSTD=text,reflect"
+            "-DSTD=text,io,error,reflect"
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-${mode}"

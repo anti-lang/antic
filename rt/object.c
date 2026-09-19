@@ -1,8 +1,10 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "object.h"
+#include "utf.h"
 
 /* DESIGN: the default bodies of anti.rt.Object walk the field list of the
    descriptor. They are slow by design: a class that needs speed replaces
@@ -57,23 +59,112 @@ struct anti_text anti_rt_Object_to_text(struct anti_object *self)
     return anti_rt_Object_type_name(self);
 }
 
-/* The bytes of a field of the object, or NULL for a kind with no size
-   here. The size of a pointer is the size of a pointer on this host,
-   which is the host the object lives on. */
-static size_t field_size(int64_t kind)
+int64_t anti_rt_type_scalar(int64_t type)
 {
-    switch (kind) {
-    case ANTI_I8: return 1;
-    case ANTI_I16: return 2;
-    case ANTI_I32:
-    case ANTI_F32: return 4;
-    case ANTI_I64:
-    case ANTI_F64: return 8;
-    case ANTI_PTR: return sizeof(void *);
-    case ANTI_CLONG: return sizeof(long);
-    case ANTI_CWCHAR: return sizeof(int);
+    return ANTI_TYPE_OF(type) == ANTI_TYPE_ENUM ? ANTI_TYPE_ELEMENT(type)
+                                               : ANTI_TYPE_OF(type);
+}
+
+/* DESIGN: the size of each type is the size on the host the program runs
+   on, which is the host its objects live on. The record holds none. */
+size_t anti_rt_type_size(int64_t type)
+{
+    switch (anti_rt_type_scalar(type)) {
+    case ANTI_TYPE_BOOL:
+    case ANTI_TYPE_I8:
+    case ANTI_TYPE_U8: return 1;
+    case ANTI_TYPE_I16:
+    case ANTI_TYPE_U16: return 2;
+    case ANTI_TYPE_CHAR:
+    case ANTI_TYPE_I32:
+    case ANTI_TYPE_U32:
+    case ANTI_TYPE_F32: return 4;
+    case ANTI_TYPE_I64:
+    case ANTI_TYPE_U64:
+    case ANTI_TYPE_F64: return 8;
+    case ANTI_TYPE_CLONG: return sizeof(long);
+    case ANTI_TYPE_CULONG: return sizeof(unsigned long);
+    case ANTI_TYPE_CWCHAR: return sizeof(wchar_t);
+    case ANTI_TYPE_PTR:
+    case ANTI_TYPE_FN: return sizeof(void *);
+    case ANTI_TYPE_STR:
+    case ANTI_TYPE_SLICE: return sizeof(struct anti_text);
     default: return 0;
     }
+}
+
+int anti_rt_type_signed(int64_t type)
+{
+    switch (anti_rt_type_scalar(type)) {
+    case ANTI_TYPE_I8:
+    case ANTI_TYPE_I16:
+    case ANTI_TYPE_I32:
+    case ANTI_TYPE_I64:
+    case ANTI_TYPE_CLONG: return 1;
+    default: return 0;
+    }
+}
+
+uint64_t anti_rt_load_integer(const void *bytes, int64_t type)
+{
+    int sign = anti_rt_type_signed(type);
+
+    switch (anti_rt_type_size(type)) {
+    case 1: {
+        uint8_t v;
+        memcpy(&v, bytes, sizeof v);
+        return sign ? (uint64_t)(int64_t)(int8_t)v : v;
+    }
+    case 2: {
+        uint16_t v;
+        memcpy(&v, bytes, sizeof v);
+        return sign ? (uint64_t)(int64_t)(int16_t)v : v;
+    }
+    case 4: {
+        uint32_t v;
+        memcpy(&v, bytes, sizeof v);
+        return sign ? (uint64_t)(int64_t)(int32_t)v : v;
+    }
+    default: {
+        uint64_t v;
+        memcpy(&v, bytes, sizeof v);
+        return v;
+    }
+    }
+}
+
+void anti_rt_store_integer(void *bytes, int64_t type, uint64_t value)
+{
+    switch (anti_rt_type_size(type)) {
+    case 1: {
+        uint8_t v = (uint8_t)value;
+        memcpy(bytes, &v, sizeof v);
+        return;
+    }
+    case 2: {
+        uint16_t v = (uint16_t)value;
+        memcpy(bytes, &v, sizeof v);
+        return;
+    }
+    case 4: {
+        uint32_t v = (uint32_t)value;
+        memcpy(bytes, &v, sizeof v);
+        return;
+    }
+    default:
+        memcpy(bytes, &value, sizeof value);
+        return;
+    }
+}
+
+/* The bytes of a field that equals and hash compare: a scalar, a pointer
+   and an enum. A str, a slice and an inline value give 0. */
+static size_t compared_size(int64_t type)
+{
+    int64_t t = anti_rt_type_scalar(type);
+
+    return t == ANTI_TYPE_STR || t == ANTI_TYPE_SLICE ? 0
+                                                      : anti_rt_type_size(t);
 }
 
 /* Compare the fields the chain declares, from the root down. Two objects
@@ -94,7 +185,7 @@ int8_t anti_rt_Object_equals(struct anti_object *self,
     for (; d != NULL; d = d->parent) {
         for (i = 0; i < d->field_count; i++) {
             const struct anti_field *f = &d->fields[i];
-            size_t size = field_size(f->kind);
+            size_t size = compared_size(f->type);
             if (size == 0) {
                 continue;
             }
@@ -121,7 +212,7 @@ uint64_t anti_rt_Object_hash(struct anti_object *self)
             const struct anti_field *f = &d->fields[i];
             const unsigned char *bytes =
                 (const unsigned char *)self + f->offset;
-            size_t size = field_size(f->kind);
+            size_t size = compared_size(f->type);
             for (k = 0; k < size; k++) {
                 h = (h ^ bytes[k]) * 1099511628211u;
             }
@@ -137,62 +228,162 @@ static void put(struct anti_builder *b, const char *text)
                            (int64_t)strlen(text));
 }
 
-/* Append a name as a JSON string, with the two escapes a field name or a
-   class name can hold. */
-static void put_name(struct anti_builder *b, const unsigned char *bytes,
+/* Append bytes as a JSON string, with the escapes that JSON requires.
+   Every other byte goes out as it is, so the text keeps the bytes of a
+   str. */
+static void put_text(struct anti_builder *b, const unsigned char *bytes,
                      int64_t len)
 {
+    char escape[8];
     int64_t i;
 
     put(b, "\"");
     for (i = 0; i < len; i++) {
-        if (bytes[i] == '"' || bytes[i] == '\\') {
+        unsigned char c = bytes[i];
+        if (c == '"' || c == '\\') {
             anti_rt_builder_append(b, (const unsigned char *)"\\", 1);
+            anti_rt_builder_append(b, &c, 1);
+        } else if (c == '\n') {
+            put(b, "\\n");
+        } else if (c == '\r') {
+            put(b, "\\r");
+        } else if (c == '\t') {
+            put(b, "\\t");
+        } else if (c < 0x20) {
+            snprintf(escape, sizeof escape, "\\u%04x", (unsigned)c);
+            put(b, escape);
+        } else {
+            anti_rt_builder_append(b, &c, 1);
         }
-        anti_rt_builder_append(b, bytes + i, 1);
     }
     put(b, "\"");
 }
 
-/* The signed value of an integer field, which the field list records by
-   its width alone. */
-static int64_t integer_at(const void *bytes, int64_t kind)
+size_t anti_rt_element_size(int64_t type, const struct anti_descriptor *d)
 {
-    switch (kind) {
-    case ANTI_I8: return *(const int8_t *)bytes;
-    case ANTI_I16: return *(const int16_t *)bytes;
-    case ANTI_I32: return *(const int32_t *)bytes;
-    case ANTI_CWCHAR: return *(const int *)bytes;
-    case ANTI_CLONG: return *(const long *)bytes;
-    default: return *(const int64_t *)bytes;
+    int64_t element = ANTI_TYPE_ELEMENT(type);
+
+    if (element == ANTI_TYPE_STRUCT || element == ANTI_TYPE_CLASS) {
+        return d != NULL ? (size_t)d->size : 0;
     }
+    return anti_rt_type_size(element);
+}
+
+int anti_rt_element_walked(int64_t type, const struct anti_descriptor *d)
+{
+    int64_t element = ANTI_TYPE_ELEMENT(type);
+
+    return element != ANTI_TYPE_CLASS && element != ANTI_TYPE_SLICE &&
+           anti_rt_element_size(type, d) > 0;
 }
 
 static void serialize_into(struct anti_builder *b, const void *object,
                            const struct anti_descriptor *d);
+static void put_value(struct anti_builder *b, const void *bytes,
+                      int64_t type, const struct anti_descriptor *d,
+                      int64_t owned);
 
-/* One member of the object, without its name. */
-static void put_field(struct anti_builder *b, const void *object,
-                      const struct anti_field *f)
+/* The fields of the struct d describes, as a JSON object. */
+static void put_struct(struct anti_builder *b, const void *bytes,
+                       const struct anti_descriptor *d)
 {
-    const void *bytes = (const char *)object + f->offset;
-    char number[48];
+    int64_t i;
 
-    switch (f->kind) {
-    case ANTI_F32:
-        snprintf(number, sizeof number, "%.9g", (double)*(const float *)bytes);
+    put(b, "{");
+    for (i = 0; i < d->field_count; i++) {
+        const struct anti_field *f = &d->fields[i];
+        put(b, i == 0 ? "" : ",");
+        put_text(b, f->name, f->name_length);
+        put(b, ":");
+        put_value(b, (const char *)bytes + f->offset, f->type, f->descriptor,
+                  f->owned);
+    }
+    put(b, "}");
+}
+
+/* A slice. One that the object owns is written as its elements, and any
+   other as its address and its length, as a pointer is. */
+static void put_slice(struct anti_builder *b, const void *bytes,
+                      int64_t type, const struct anti_descriptor *d,
+                      int64_t owned)
+{
+    struct anti_text s;
+    char number[80];
+    size_t size = anti_rt_element_size(type, d);
+    int64_t i;
+
+    memcpy(&s, bytes, sizeof s);
+    if (!owned) {
+        snprintf(number, sizeof number, "{\"address\":%llu,\"length\":%lld}",
+                 (unsigned long long)(uintptr_t)s.ptr, (long long)s.len);
         put(b, number);
         return;
-    case ANTI_F64:
-        snprintf(number, sizeof number, "%.17g", *(const double *)bytes);
+    }
+    if (s.ptr == NULL || !anti_rt_element_walked(type, d)) {
+        put(b, "null");
+        return;
+    }
+    put(b, "[");
+    for (i = 0; i < s.len; i++) {
+        put(b, i == 0 ? "" : ",");
+        put_value(b, s.ptr + (size_t)i * size, ANTI_TYPE_ELEMENT(type), d, 0);
+    }
+    put(b, "]");
+}
+
+/* One value of the type id at bytes. d is the descriptor of the struct
+   or the class that the type reaches. owned says that a pointer or a
+   slice owns what it points at. A type no walk reads is null. */
+static void put_value(struct anti_builder *b, const void *bytes,
+                      int64_t type, const struct anti_descriptor *d,
+                      int64_t owned)
+{
+    char number[48];
+    int64_t t = anti_rt_type_scalar(type);
+
+    switch (t) {
+    case ANTI_TYPE_BOOL:
+        put(b, *(const unsigned char *)bytes != 0 ? "true" : "false");
+        return;
+    case ANTI_TYPE_CHAR: {
+        uint32_t c;
+        unsigned char utf8[4];
+        memcpy(&c, bytes, sizeof c);
+        put_text(b, utf8, (int64_t)anti_utf8_encode(c, utf8));
+        return;
+    }
+    case ANTI_TYPE_F32: {
+        float v;
+        memcpy(&v, bytes, sizeof v);
+        snprintf(number, sizeof number, "%.9g", (double)v);
         put(b, number);
         return;
-    case ANTI_PTR: {
-        const void *value = *(const void *const *)bytes;
+    }
+    case ANTI_TYPE_F64: {
+        double v;
+        memcpy(&v, bytes, sizeof v);
+        snprintf(number, sizeof number, "%.17g", v);
+        put(b, number);
+        return;
+    }
+    case ANTI_TYPE_STR: {
+        struct anti_text s;
+        memcpy(&s, bytes, sizeof s);
+        put_text(b, s.ptr, s.len);
+        return;
+    }
+    case ANTI_TYPE_PTR:
+    case ANTI_TYPE_FN: {
+        void *value;
+        memcpy(&value, bytes, sizeof value);
         if (value == NULL) {
             put(b, "null");
-        } else if (f->owned && f->descriptor != NULL) {
+        } else if (owned && ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_CLASS) {
+            value = anti_rt_object_of(value);
             serialize_into(b, value, anti_rt_descriptor(value));
+        } else if (owned && t == ANTI_TYPE_PTR &&
+                   anti_rt_element_walked(type, d)) {
+            put_value(b, value, ANTI_TYPE_ELEMENT(type), d, 0);
         } else {
             snprintf(number, sizeof number, "%llu",
                      (unsigned long long)(uintptr_t)value);
@@ -200,20 +391,31 @@ static void put_field(struct anti_builder *b, const void *object,
         }
         return;
     }
-    case ANTI_AGG:
-        if (f->descriptor != NULL) {
-            serialize_into(b, bytes, f->descriptor);
+    case ANTI_TYPE_SLICE:
+        put_slice(b, bytes, type, d, owned);
+        return;
+    case ANTI_TYPE_STRUCT:
+        if (d != NULL) {
+            put_struct(b, bytes, d);
         } else {
             put(b, "null");
         }
         return;
-    case ANTI_VOID:
-        put(b, "null");
+    case ANTI_TYPE_CLASS:
+        serialize_into(b, bytes, d);
         return;
     default:
-        snprintf(number, sizeof number, "%lld",
-                 (long long)integer_at(bytes, f->kind));
-        put(b, number);
+        if (anti_rt_type_size(t) == 0) {
+            put(b, "null");
+        } else if (anti_rt_type_signed(t)) {
+            snprintf(number, sizeof number, "%lld",
+                     (long long)(int64_t)anti_rt_load_integer(bytes, t));
+            put(b, number);
+        } else {
+            snprintf(number, sizeof number, "%llu",
+                     (unsigned long long)anti_rt_load_integer(bytes, t));
+            put(b, number);
+        }
         return;
     }
 }
@@ -232,7 +434,7 @@ static void serialize_into(struct anti_builder *b, const void *object,
         return;
     }
     put(b, "{\"type\":");
-    put_name(b, d->name, d->name_length);
+    put_text(b, d->name, d->name_length);
     /* The ancestor list is indexed by depth, so the root comes first and
        the class itself last. */
     for (depth = 0; depth <= d->depth; depth++) {
@@ -241,20 +443,26 @@ static void serialize_into(struct anti_builder *b, const void *object,
             continue;
         }
         for (i = 0; i < up->field_count; i++) {
+            const struct anti_field *f = &up->fields[i];
             put(b, ",");
-            put_name(b, up->fields[i].name, up->fields[i].name_length);
+            put_text(b, f->name, f->name_length);
             put(b, ":");
-            put_field(b, object, &up->fields[i]);
+            put_value(b, (const char *)object + f->offset, f->type,
+                      f->descriptor, f->owned);
         }
     }
     put(b, "}");
 }
 
 /* DESIGN: the default `serialize` writes the JSON that `anti.json`
-   defines. A field the descriptor cannot read is written as null. The
-   field list records the width of a field and not its type. A `str` and
-   any other aggregate without a descriptor of its own are such fields,
-   and a class that wants them replaces the body. */
+   defines. Each field goes out by the type its record names. A bool is
+   true or false, a char a string of one character and a str a string.
+   An inline struct or class is an object, and so is what an `own`
+   pointer points at. An `own` slice is an array of its elements. A
+   pointer the object does not own is its address, and a slice it does
+   not own is an object of its address and its length. A union, an
+   array, a bitfield and an `own` slice of class values or of slices are
+   null, and a class that wants them replaces the body. */
 void anti_rt_Object_serialize(struct anti_object *self, void *out)
 {
     serialize_into(out, self, anti_rt_descriptor(self));
@@ -275,14 +483,15 @@ static void **owned_at(void *object, const struct anti_field *f,
 {
     void **slot = (void **)((char *)object + f->offset);
 
-    if (f->kind == ANTI_PTR) {
+    if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_PTR) {
         *size = f->descriptor != NULL ? f->descriptor->size : 0;
         return slot;
     }
     /* A slice is a pointer and a length, and the length counts elements
        of one byte for []byte. Anything wider needs the element size,
        which the field list does not hold, so the copy is shallow. */
-    *size = f->kind == ANTI_AGG ? ((int64_t *)slot)[1] : 0;
+    *size = ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE ? ((int64_t *)slot)[1]
+                                                     : 0;
     return slot;
 }
 

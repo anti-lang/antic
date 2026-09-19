@@ -155,7 +155,7 @@ void test_optimize(void)
               "type main.Box = struct { super: anti.rt.Object, n: i64 }\n"
               "type [2]ptr = array 2 of ptr\n"
               "type anti.rt.Field = struct { name: ptr, name_length: i64, "
-              "offset: i64, kind: i64, owned: i64, descriptor: ptr }\n"
+              "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
               "type [1]anti.rt.Field = array 1 of anti.rt.Field\n"
               "type anti.rt.Function = struct { name: ptr, "
               "name_length: i64, slot: i64, param_count: i64, "

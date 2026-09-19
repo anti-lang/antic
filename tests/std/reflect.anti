@@ -1,11 +1,26 @@
 //! A program reads its own classes. The descriptor of an object names
 //! the class, lists the fields it declares and the public functions of
-//! the whole chain, and `get` and `set` reach one field by its index.
+//! the whole chain. Each field record names the type of its field, and
+//! `get` and `set` reach one field by its index as a `Value`.
 import anti.io;
 import anti.reflect;
 import anti.text;
 
 extern fn printf(fmt: *byte, ...) -> c_int;
+
+enum Level: i16 { Low = -1, High = 1 }
+
+struct Size
+{
+	w: i32,
+	h: i32,
+}
+
+union Bits
+{
+	i: i32,
+	f: f32,
+}
 
 class Point
 {
@@ -22,34 +37,150 @@ class Marked
 {
 	inherits Point,
 	pub tag: int = 9,
+	pub small: u8 = 200,
+	pub ratio: f32 = 0.5,
+	pub on: bool = true,
+	pub letter: char = 'k',
+	pub name: str = "mark",
+	pub next: *Point = null,
+	pub level: Level = Level.Low,
+	pub bytes: []byte,
+}
+
+/* A field of every type, in the order of reflect.TypeId. */
+class Kinds
+{
+	a: bool,
+	b: char,
+	c: i8,
+	d: i16,
+	e: i32,
+	f: i64,
+	g: c_long,
+	h: u8,
+	i: u16,
+	j: u32,
+	k: u64,
+	l: c_ulong,
+	m: c_wchar,
+	n: f32,
+	o: f64,
+	p: str,
+	q: *i32,
+	r: fn(i32) -> i32,
+	s: []u16,
+	t: [4]i8,
+	u: Size,
+	v: Bits,
+	w: Level,
+	x: Point,
+}
+
+fn show(v: reflect.Value)
+{
+	if v.kind == reflect.ValueKind.Int {
+		printf("int %lld\n".ptr, v.data.i);
+	} else if v.kind == reflect.ValueKind.Uint {
+		printf("uint %llu\n".ptr, v.data.u);
+	} else if v.kind == reflect.ValueKind.Float {
+		printf("float %g\n".ptr, v.data.f);
+	} else if v.kind == reflect.ValueKind.Bool {
+		printf("bool %d\n".ptr, v.data.b as c_int);
+	} else if v.kind == reflect.ValueKind.Char {
+		printf("char %u\n".ptr, v.data.c as u32);
+	} else if v.kind == reflect.ValueKind.Str {
+		printf("str %.*s\n".ptr, v.data.s.len as c_int, v.data.s.ptr);
+	} else if v.kind == reflect.ValueKind.Ptr {
+		printf("ptr %d\n".ptr, (v.data.p == null) as c_int);
+	} else {
+		io.println("none");
+	}
 }
 
 fn main() -> int
 {
-	let m = alloc Marked { };
+	let m = alloc Marked { bytes: []byte { ptr: null, len: 0 } };
 	let d = reflect.describe(m as *byte);
 	io.println(reflect.name(d));
 	printf("%d %d\n".ptr, reflect.field_count(d) as c_int,
 		reflect.field_count(reflect.parent(d)) as c_int);
 
-	let tag = reflect.field(d, 0);
-	printf("%s %d %d\n".ptr, tag.name.ptr, tag.kind as c_int,
-		reflect.get(m as *byte, d, 0) as c_int);
-	reflect.set(m as *byte, d, 0, 42);
+	/* The type id of each field, and the type it is built on. */
+	let i = 0;
+	while i < reflect.field_count(d) do {
+		let f = reflect.field(d, i);
+		printf("%s %d %d\n".ptr, f.name.ptr, f.type_id as c_int,
+			f.element as c_int);
+		show(reflect.get(m as *byte, d, i));
+		i += 1;
+	}
+
+	let all = reflect.new("Kinds");
+	let kinds = reflect.describe(all as *byte);
+	let expected = [reflect.TypeId.Bool, reflect.TypeId.Char,
+		reflect.TypeId.I8, reflect.TypeId.I16, reflect.TypeId.I32,
+		reflect.TypeId.I64, reflect.TypeId.CLong, reflect.TypeId.U8,
+		reflect.TypeId.U16, reflect.TypeId.U32, reflect.TypeId.U64,
+		reflect.TypeId.CULong, reflect.TypeId.CWchar, reflect.TypeId.F32,
+		reflect.TypeId.F64, reflect.TypeId.Str, reflect.TypeId.Ptr,
+		reflect.TypeId.Fn, reflect.TypeId.Slice, reflect.TypeId.Array,
+		reflect.TypeId.Struct, reflect.TypeId.Union, reflect.TypeId.Enum,
+		reflect.TypeId.Class];
+	i = 0;
+	while i < 24 do {
+		if reflect.field(kinds, i).type_id != expected[i] {
+			printf("type id of field %d\n".ptr, i as c_int);
+			return 1;
+		}
+		i += 1;
+	}
+
+	/* set writes a Value of the kind the field's type gives. */
+	let p = alloc Point { };
+	reflect.set(m as *byte, d, 0, reflect.of_int(42)) catch fatal;
+	reflect.set(m as *byte, d, 1, reflect.of_uint(7)) catch fatal;
+	reflect.set(m as *byte, d, 2, reflect.of_float(2.5)) catch fatal;
+	reflect.set(m as *byte, d, 3, reflect.of_bool(false)) catch fatal;
+	reflect.set(m as *byte, d, 4, reflect.of_char('z')) catch fatal;
+	reflect.set(m as *byte, d, 5, reflect.of_str("new")) catch fatal;
+	reflect.set(m as *byte, d, 6, reflect.of_ptr(p as *byte)) catch fatal;
+	reflect.set(m as *byte, d, 7, reflect.of_int(1)) catch fatal;
+	if m.tag != 42 || m.small != 7 || m.ratio != 2.5 || m.on ||
+		m.letter != 'z' || !text.equal(m.name, "new") || m.next != p ||
+		m.level != Level.High {
+		return 2;
+	}
+
+	/* A Value of another kind, a type no Value carries and an index out
+	   of range each give an error that names the reason. */
+	reflect.set(m as *byte, d, 0, reflect.of_str("x")) catch e {
+		printf("%d %.*s\n".ptr, (e.code == reflect.WRONG_KIND) as c_int,
+			e.message.len as c_int, e.message.ptr);
+	};
+	reflect.set(m as *byte, d, 8, reflect.of_int(1)) catch e {
+		printf("%d %.*s\n".ptr, (e.code == reflect.NOT_CARRIED) as c_int,
+			e.message.len as c_int, e.message.ptr);
+	};
+	reflect.set(m as *byte, d, 9, reflect.of_int(1)) catch e {
+		printf("%d %.*s\n".ptr, (e.code == reflect.BAD_INDEX) as c_int,
+			e.message.len as c_int, e.message.ptr);
+	};
 	if m.tag != 42 {
-		return 1;
+		return 3;
 	}
 
 	let base = reflect.parent(d);
 	let x = reflect.field(base, 0);
-	printf("%s %d\n".ptr, x.name.ptr,
-		reflect.get(m as *byte, base, 0) as c_int);
+	printf("%s ".ptr, x.name.ptr);
+	show(reflect.get(m as *byte, base, 0));
 
 	/* The chain's public functions come after the seven of the root. */
 	printf("%d\n".ptr, reflect.function_count(d) as c_int);
 	let last = reflect.function(d, reflect.function_count(d) - 1);
 	printf("%s %d %d\n".ptr, last.name.ptr, last.slot as c_int,
 		last.param_count as c_int);
+	delete(all);
+	delete(p);
 	delete(m);
 	return 0;
 }
