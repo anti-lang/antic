@@ -15,7 +15,7 @@ extern fn printf(format: *byte, ...) -> c_int;
 class Leaf
 {
 	pub n: int = 0,
-	pub own next: *Leaf = null,
+	pub own next: *Leaf = none,
 
 	concrete fn destruct(self)
 	{
@@ -47,7 +47,7 @@ class Tag
 class Part
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = null,
+	pub own leaf: *Leaf = none,
 
 	concrete fn destruct(self)
 	{
@@ -60,7 +60,7 @@ class Outer
 	pub n: int = 0,
 	pub part: Part = Part { n: 0 },
 	use extra: Part = Part { n: 0 },
-	pub own named: *Named = null,
+	pub own named: *Named = none,
 
 	concrete fn destruct(self)
 	{
@@ -71,7 +71,7 @@ class Outer
 class Item
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = null,
+	pub own leaf: *Leaf = none,
 
 	concrete fn destruct(self)
 	{

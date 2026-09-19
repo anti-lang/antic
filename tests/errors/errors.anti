@@ -3,7 +3,7 @@ import anti.error;
 fn risky(out: *int) -> *error.Error
 {
 	*out = 1;
-	return null;
+	return none;
 }
 
 fn quiet() -> int

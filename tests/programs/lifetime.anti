@@ -28,7 +28,7 @@ class Leaf
 
 fn main() -> int
 {
-	let inner = alloc Node { n: 1, child: null };
+	let inner = alloc Node { n: 1, child: none };
 	let p = alloc Leaf { n: 7, child: inner };
 	let q = dup(p);
 
@@ -41,10 +41,10 @@ fn main() -> int
 	   of its block, and `destroy` runs the same chain on a heap object
 	   without freeing it. */
 	{
-		let stack = Node { n: 3, child: null };
+		let stack = Node { n: 3, child: none };
 		printf("block %d\n".ptr, stack.n as c_int);
 	}
-	let raw = alloc Node { n: 4, child: null };
+	let raw = alloc Node { n: 4, child: none };
 	destroy(raw);
 	free(raw);
 	return 0;

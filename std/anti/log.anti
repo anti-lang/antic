@@ -75,16 +75,16 @@ pub class FileSink
 	{
 		/* Binary, so a line ends with LF on Windows as well. */
 		let file = fopen(path.ptr, "ab".ptr);
-		if file == null {
+		if file == none {
 			return failure.Error.from_errno();
 		}
 		*out = alloc FileSink { file: file };
-		return null;
+		return none;
 	}
 
 	concrete fn write(self, line: str)
 	{
-		if self.file == null {
+		if self.file == none {
 			return;
 		}
 		fwrite(line.ptr, 1 as c_size_t, line.len as c_size_t, self.file);
@@ -93,9 +93,9 @@ pub class FileSink
 
 	fn destruct(self)
 	{
-		if self.file != null {
+		if self.file != none {
 			fclose(self.file);
-			self.file = null;
+			self.file = none;
 		}
 	}
 }
@@ -140,7 +140,7 @@ pub class Logger
 	/// Write `message` at `level`, unless the logger drops that level.
 	pub fn log(self, level: Level, message: str)
 	{
-		if (level as int) < (self.level as int) || self.sink == null {
+		if (level as int) < (self.level as int) || self.sink == none {
 			return;
 		}
 		let line = text.Builder.new();
@@ -212,8 +212,8 @@ pub class Logger
 /// a file and from the default otherwise.
 pub singleton class Log
 {
-	atomic logger: *Logger = null,
-	atomic kinds: *Kind = null,
+	atomic logger: *Logger = none,
+	atomic kinds: *Kind = none,
 
 	fn construct(self)
 	{
@@ -344,7 +344,7 @@ class Kind
 /// the entry is left out. The kinds `stderr` and `file` are always there.
 pub fn register(name: str, make: fn(str) -> *Sink)
 {
-	let one = alloc Kind { name: name, make: make, next: null };
+	let one = alloc Kind { name: name, make: make, next: none };
 	while true do {
 		one.next = Log.get().kinds.load();
 		if Log.get().kinds.compare_swap(one.next, one) {
@@ -353,7 +353,7 @@ pub fn register(name: str, make: fn(str) -> *Sink)
 	}
 }
 
-/// The sink of the kind `name`, or null.
+/// The sink of the kind `name`, or `none`.
 fn made(name: str, path: str) -> *Sink
 {
 	if text.equal(name, "stderr") {
@@ -364,25 +364,25 @@ fn made(name: str, path: str) -> *Sink
 			io.eprint("anti.log: ");
 			io.eprint(e.message);
 			io.eprint("\n");
-			yield null;
+			yield none;
 		};
 		return sink;
 	}
 	let one = Log.get().kinds.load();
-	while one != null do {
+	while one != none do {
 		if text.equal(one.name, name) {
 			return one.make(path);
 		}
 		one = one.next;
 	}
-	return null;
+	return none;
 }
 
 /// The logger the environment asks for, or the default one.
 fn from_environment() -> *Logger
 {
 	let path = getenv("ANTI_LOGGER".ptr);
-	if path == null {
+	if path == none {
 		return Logger.new("", Level.Info, StderrSink.new());
 	}
 	let source = read_file(text.from_c(path)) catch e {
@@ -427,7 +427,7 @@ fn first_sink(doc: *toml.Document) -> *Sink
 		json.write_int(i, &where);
 		where.append(".path");
 		let sink = made(kind, doc.text_of(where.text(), ""));
-		if sink != null {
+		if sink != none {
 			return sink;
 		}
 		io.eprint("anti.log: no sink of kind ");
@@ -442,7 +442,7 @@ fn first_sink(doc: *toml.Document) -> *Sink
 fn read_file(path: str, out: *str) -> *failure.Error
 {
 	let file = fopen(path.ptr, "rb".ptr);
-	if file == null {
+	if file == none {
 		return failure.Error.from_errno();
 	}
 	fseek(file, 0 as c_long, 2 as c_int);
@@ -451,12 +451,12 @@ fn read_file(path: str, out: *str) -> *failure.Error
 	if size <= 0 {
 		fclose(file);
 		*out = "";
-		return null;
+		return none;
 	}
 	let room = alloc(byte, size + 1);
 	let read = fread(room, 1 as c_size_t, size as c_size_t, file) as int;
 	fclose(file);
 	room[read] = 0;
 	*out = text.from_c(room);
-	return null;
+	return none;
 }

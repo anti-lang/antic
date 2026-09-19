@@ -14,7 +14,7 @@ class Circle
 			return error.Error.new(1, "radius must be positive");
 		}
 		self.r = r;
-		return null;
+		return none;
 	}
 }
 
@@ -30,9 +30,9 @@ fn main() -> int
 	io.println("value");
 	let bad = alloc Circle(-1.0) catch e {
 		io.println("refused");
-		yield null;
+		yield none;
 	};
-	if bad != null {
+	if bad != none {
 		return 1;
 	}
 	return 0;

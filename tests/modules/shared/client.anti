@@ -29,7 +29,7 @@ fn main() -> int
 	printf("%d %d %d\n".ptr, (o == same) as c_int, (o == here) as c_int,
 		made.equals(here) as c_int);
 	let built = reflect.new("com.example.points.Point");
-	if built == null {
+	if built == none {
 		return 1;
 	}
 	printf("%d %d\n".ptr, (built is *points.Point) as c_int,

@@ -70,7 +70,7 @@ enum expr_kind {
     EXPR_STRING,
     EXPR_BYTES,
     EXPR_BOOL,
-    EXPR_NULL,
+    EXPR_NONE,
     EXPR_NAME,
     EXPR_UNARY,
     EXPR_BINARY,
@@ -149,7 +149,7 @@ struct expr {
         struct {
             struct expr *operand;
             struct type_expr *type;
-            bool checked;           /* `as?`, which gives null on a mismatch */
+            bool checked;           /* `as?`, which gives `none` on a mismatch */
             bool test;              /* `is`, which gives a bool */
             bool from_sub;          /* the source may be a sub-object */
             const struct type *target;  /* the class of `is` and `as` */

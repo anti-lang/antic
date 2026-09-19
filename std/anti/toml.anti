@@ -98,7 +98,7 @@ pub class Document
 	fn destruct(self)
 	{
 		anti_rt_toml_free(self.handle);
-		self.handle = null;
+		self.handle = none;
 	}
 
 	/// Read `source` as a TOML document.
@@ -107,10 +107,10 @@ pub class Document
 	pub fn read(source: str, out: *Document) -> *error.Error
 	{
 		let handle = anti_rt_toml_read(source.ptr, source.len);
-		if handle == null {
+		if handle == none {
 			return error.Error.new(1, "the text is not the TOML subset");
 		}
 		*out = Document { handle: handle };
-		return null;
+		return none;
 	}
 }

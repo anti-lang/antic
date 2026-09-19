@@ -209,7 +209,7 @@ void test_lexer(void)
             TOKEN_IMPORT,
             TOKEN_LET, TOKEN_PUB, TOKEN_RETURN, TOKEN_STRUCT, TOKEN_WHILE,
             TOKEN_UNION,
-            TOKEN_TRUE, TOKEN_FALSE, TOKEN_NULL, TOKEN_ALLOC, TOKEN_FREE,
+            TOKEN_TRUE, TOKEN_FALSE, TOKEN_NONE, TOKEN_ALLOC, TOKEN_FREE,
             TOKEN_SIZE_OF, TOKEN_BOOL_TYPE, TOKEN_BYTE_TYPE, TOKEN_CHAR_TYPE,
             TOKEN_F32, TOKEN_F64, TOKEN_FLOAT_TYPE, TOKEN_I8, TOKEN_I16,
             TOKEN_I32, TOKEN_I64, TOKEN_INT_TYPE, TOKEN_STR_TYPE, TOKEN_U8,
@@ -227,7 +227,7 @@ void test_lexer(void)
             TOKEN_IDENT, TOKEN_IDENT, TOKEN_IDENT, TOKEN_IDENT, TOKEN_IDENT,
             TOKEN_IDENT};
         kinds("as break const continue do else export extern fn if import let pub "
-              "return struct while union true false null alloc free size_of bool "
+              "return struct while union true false none alloc free size_of bool "
               "byte char f32 f64 float i8 i16 i32 i64 int str u8 u16 u32 u64 "
               "uint c_char c_double c_float c_int c_longlong c_short c_size_t "
               "c_uchar c_uint c_ulonglong c_ushort c_long c_ulong c_wchar "
@@ -305,6 +305,7 @@ void test_lexer(void)
     error("a \xff", 1, 3, "invalid UTF-8");
     error("\"\xED\xA0\x80\"", 1, 2, "invalid UTF-8");
     error("# x", 1, 1, "unexpected character `#`");
+    error("let p = null;", 1, 9, "`null` is `none` in Anti");
     error("a $ b", 1, 3, "unexpected character `$`");
     error("/* open", 1, 1, "unterminated block comment");
     error("/** text\n*/", 1, 1,

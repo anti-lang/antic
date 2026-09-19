@@ -442,9 +442,9 @@ static struct expr *primary(struct parser *p)
         e = new_expr(p, EXPR_BOOL, t);
         e->as.boolean = t->kind == TOKEN_TRUE;
         return e;
-    case TOKEN_NULL:
+    case TOKEN_NONE:
         next(p);
-        return new_expr(p, EXPR_NULL, t);
+        return new_expr(p, EXPR_NONE, t);
     /* `self` is the receiver of a function of a struct body. It reads as
        a name, and the checker gives it the type *T. */
     case TOKEN_SELF:
@@ -745,7 +745,7 @@ static struct expr *cast(struct parser *p)
         c->pos = e->pos;
         c->as.cast.operand = e;
         c->as.cast.test = test;
-        /* `as?` on a class pointer gives null where `as` traps. */
+        /* `as?` on a class pointer gives `none` where `as` traps. */
         c->as.cast.checked = !test && accept(p, TOKEN_QUESTION);
         if ((c->as.cast.type = type(p)) == NULL) {
             return NULL;

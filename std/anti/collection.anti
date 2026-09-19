@@ -18,7 +18,7 @@ pub class List
 	/// An empty list.
 	pub fn new() -> List
 	{
-		return List { items: []*Object { ptr: null, len: 0 }, count: 0 };
+		return List { items: []*Object { ptr: none, len: 0 }, count: 0 };
 	}
 
 	/// The number of objects in the list.
@@ -35,11 +35,11 @@ pub class List
 		self.count = self.count + 1;
 	}
 
-	/// The object at `index`, or null outside the list.
+	/// The object at `index`, or `none` outside the list.
 	pub fn at(self, index: int) -> *Object
 	{
 		if index < 0 || index >= self.count {
-			return null;
+			return none;
 		}
 		return self.items[index];
 	}
@@ -53,11 +53,11 @@ pub class List
 		self.items[index] = value;
 	}
 
-	/// Take the last object off the end, or null when the list is empty.
+	/// Take the last object off the end, or `none` when the list is empty.
 	pub fn pop(self) -> *Object
 	{
 		if self.count == 0 {
-			return null;
+			return none;
 		}
 		self.count = self.count - 1;
 		return self.items[self.count];
@@ -83,7 +83,7 @@ pub class List
 			size = size * 2;
 		}
 		let room = alloc(*Object, size);
-		if self.items.ptr != null {
+		if self.items.ptr != none {
 			memcpy(room as *byte, self.items.ptr as *byte,
 				(self.count * size_of(*Object)) as c_size_t);
 			free(self.items.ptr);
@@ -113,7 +113,7 @@ pub class Map
 	/// An empty map.
 	pub fn new() -> Map
 	{
-		return Map { buckets: []*Entry { ptr: null, len: 0 }, count: 0 };
+		return Map { buckets: []*Entry { ptr: none, len: 0 }, count: 0 };
 	}
 
 	/// The number of entries.
@@ -128,7 +128,7 @@ pub class Map
 		self.grow();
 		let at = hash_text(key) % (self.buckets.len as u64);
 		let e = self.buckets[at as int];
-		while e != null do {
+		while e != none do {
 			if text.equal(e.key, key) {
 				e.value = value;
 				return;
@@ -141,27 +141,27 @@ pub class Map
 		self.count = self.count + 1;
 	}
 
-	/// The object under `key`, or null when the map has none.
+	/// The object under `key`, or `none` when the map holds nothing there.
 	pub fn get(self, key: str) -> *Object
 	{
 		if self.buckets.len == 0 {
-			return null;
+			return none;
 		}
 		let at = hash_text(key) % (self.buckets.len as u64);
 		let e = self.buckets[at as int];
-		while e != null do {
+		while e != none do {
 			if text.equal(e.key, key) {
 				return e.value;
 			}
 			e = e.next;
 		}
-		return null;
+		return none;
 	}
 
 	/// Whether the map holds `key`.
 	pub fn has(self, key: str) -> bool
 	{
-		return self.get(key) != null;
+		return self.get(key) != none;
 	}
 
 	/// Double the buckets when the map is half full.
@@ -177,13 +177,13 @@ pub class Map
 		let room = alloc(*Entry, size);
 		let i = 0;
 		while i < size do {
-			room[i] = null;
+			room[i] = none;
 			i += 1;
 		}
 		i = 0;
 		while i < self.buckets.len do {
 			let e = self.buckets[i];
-			while e != null do {
+			while e != none do {
 				let after = e.next;
 				let at = (hash_text(e.key) % (size as u64)) as int;
 				e.next = room[at];
@@ -192,7 +192,7 @@ pub class Map
 			}
 			i += 1;
 		}
-		if self.buckets.ptr != null {
+		if self.buckets.ptr != none {
 			free(self.buckets.ptr);
 		}
 		self.buckets = []*Entry { ptr: room, len: size };
@@ -208,7 +208,7 @@ pub class IntMap
 	/// An empty map.
 	pub fn new() -> IntMap
 	{
-		return IntMap { buckets: []*Entry { ptr: null, len: 0 }, count: 0 };
+		return IntMap { buckets: []*Entry { ptr: none, len: 0 }, count: 0 };
 	}
 
 	/// The number of entries.
@@ -223,7 +223,7 @@ pub class IntMap
 		self.grow();
 		let at = (hash_int(key) % (self.buckets.len as u64)) as int;
 		let e = self.buckets[at];
-		while e != null do {
+		while e != none do {
 			if e.number == key {
 				e.value = value;
 				return;
@@ -236,27 +236,27 @@ pub class IntMap
 		self.count = self.count + 1;
 	}
 
-	/// The object under `key`, or null when the map has none.
+	/// The object under `key`, or `none` when the map holds nothing there.
 	pub fn get(self, key: int) -> *Object
 	{
 		if self.buckets.len == 0 {
-			return null;
+			return none;
 		}
 		let at = (hash_int(key) % (self.buckets.len as u64)) as int;
 		let e = self.buckets[at];
-		while e != null do {
+		while e != none do {
 			if e.number == key {
 				return e.value;
 			}
 			e = e.next;
 		}
-		return null;
+		return none;
 	}
 
 	/// Whether the map holds `key`.
 	pub fn has(self, key: int) -> bool
 	{
-		return self.get(key) != null;
+		return self.get(key) != none;
 	}
 
 	/// Double the buckets when the map is half full.
@@ -272,13 +272,13 @@ pub class IntMap
 		let room = alloc(*Entry, size);
 		let i = 0;
 		while i < size do {
-			room[i] = null;
+			room[i] = none;
 			i += 1;
 		}
 		i = 0;
 		while i < self.buckets.len do {
 			let e = self.buckets[i];
-			while e != null do {
+			while e != none do {
 				let after = e.next;
 				let at = (hash_int(e.number) % (size as u64)) as int;
 				e.next = room[at];
@@ -287,7 +287,7 @@ pub class IntMap
 			}
 			i += 1;
 		}
-		if self.buckets.ptr != null {
+		if self.buckets.ptr != none {
 			free(self.buckets.ptr);
 		}
 		self.buckets = []*Entry { ptr: room, len: size };

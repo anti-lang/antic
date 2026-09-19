@@ -68,7 +68,7 @@ pub class Builder
 	/// An empty builder.
 	pub fn new() -> Builder
 	{
-		return Builder { room: null, length: 0, capacity: 0 };
+		return Builder { room: none, length: 0, capacity: 0 };
 	}
 
 	/// Copy the bytes of `s` to the end of the buffer.

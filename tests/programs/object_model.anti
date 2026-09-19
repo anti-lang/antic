@@ -69,7 +69,7 @@ final class Circle
 			return error.Error.new(1, "radius must be positive");
 		}
 		self.r = r;
-		return null;
+		return none;
 	}
 
 	concrete fn area(self) -> f32

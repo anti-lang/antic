@@ -5,7 +5,7 @@
 /* DESIGN: `p as *T` on a class pointer traps when the object is of no
    class below T. The compiler passes the name of T, which lives in the
    read-only data of the module. This routine prints one message and ends
-   the program. `p as? *T` gives null instead and never calls it. */
+   the program. `p as? *T` gives `none` instead and never calls it. */
 void anti_rt_cast_failed(const unsigned char *name, int64_t length)
 {
     fflush(stdout);

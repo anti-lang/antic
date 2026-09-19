@@ -393,7 +393,7 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         [TYPE_U32] = "u32", [TYPE_U64] = "u64", [TYPE_F32] = "f32",
         [TYPE_CLONG] = "c_long", [TYPE_CULONG] = "c_ulong",
         [TYPE_CWCHAR] = "c_wchar",
-        [TYPE_F64] = "float", [TYPE_STR] = "str", [TYPE_NULL] = "null",
+        [TYPE_F64] = "float", [TYPE_STR] = "str", [TYPE_NONE] = "none",
         [TYPE_ERROR] = "<error>",
     };
     size_t i;

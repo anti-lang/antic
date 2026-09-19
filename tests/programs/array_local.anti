@@ -18,7 +18,7 @@ class Leaf
 class Item
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = null,
+	pub own leaf: *Leaf = none,
 
 	concrete fn destruct(self)
 	{

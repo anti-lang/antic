@@ -612,14 +612,14 @@ static void mark_address_taken(struct expr *e)
 }
 
 /* A literal whose type comes from its context: an integer or float
-   literal, one of those after unary '-', or null. */
+   literal, one of those after unary '-', or `none`. */
 static bool is_untyped(const struct expr *e)
 {
     if (e->kind == EXPR_UNARY && e->as.unary.op == TOKEN_MINUS) {
         e = e->as.unary.operand;
         return e->kind == EXPR_INT || e->kind == EXPR_FLOAT;
     }
-    return e->kind == EXPR_INT || e->kind == EXPR_FLOAT || e->kind == EXPR_NULL;
+    return e->kind == EXPR_INT || e->kind == EXPR_FLOAT || e->kind == EXPR_NONE;
 }
 
 static uint64_t max_of(const struct type *t)
@@ -1459,7 +1459,7 @@ static bool descends_from(const struct type *a, const struct type *b)
 
 /* DESIGN: `p is *T` and `p as *T` on a class pointer compare the
    ancestor of the object at T's depth with T's descriptor. `is` gives a
-   bool, `as` traps on a mismatch and `as?` gives null. Both need a class
+   bool, `as` traps on a mismatch and `as?` gives `none`. Both need a class
    pointer on each side, and a conversion up the chain is the implicit
    one, which needs no check. */
 static struct type *check_class_cast(struct checker *c, struct expr *e,
@@ -1586,7 +1586,7 @@ static bool refuse_abstract_value(struct checker *c, struct pos pos,
    counterpart of `serialize`, with its body in the runtime. It is visible
    everywhere but is not `pub` to the tables, which hold functions with
    `self` alone. Every table therefore still starts with the seven
-   functions of the root. It gives null when the text is not an object of
+   functions of the root. It gives `none` when the text is not an object of
    a class of the program. */
 static void declare_deserialize(struct checker *c, struct type *object)
 {
@@ -3067,13 +3067,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return types_slice(c->types, builtin(c, TYPE_U8));
     case EXPR_BOOL:
         return builtin(c, TYPE_BOOL);
-    case EXPR_NULL:
+    case EXPR_NONE:
         if (expected != NULL && (expected->kind == TYPE_POINTER ||
                                  expected->kind == TYPE_FN)) {
             return expected;
         }
         if (expected == NULL || !is_error(expected)) {
-            error_at(c, e->pos, "`null` needs a pointer type from its context");
+            error_at(c, e->pos, "`none` needs a pointer type from its context");
         }
         return builtin(c, TYPE_ERROR);
     case EXPR_NAME:
@@ -3672,7 +3672,7 @@ static bool eval_const(struct checker *c, struct expr *e,
         out->kind = CONST_BOOL;
         out->as.boolean = e->as.boolean;
         return true;
-    case EXPR_NULL:
+    case EXPR_NONE:
         out->kind = CONST_NULL;
         return true;
     case EXPR_STRING:
@@ -5483,7 +5483,7 @@ static bool c_representable(const struct type *t, bool field,
     case TYPE_CHAR:
     case TYPE_STR:
     case TYPE_SLICE:
-    case TYPE_NULL:
+    case TYPE_NONE:
         return false;
     case TYPE_ARRAY:
         return field && t->length_of == NULL &&

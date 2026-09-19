@@ -40,7 +40,7 @@ fn seen(line: str)
 fn write_file(path: str, what: str)
 {
 	let file = fopen(path.ptr, "wb".ptr);
-	if file == null {
+	if file == none {
 		return;
 	}
 	fwrite(what.ptr, 1 as c_size_t, what.len as c_size_t, file);
@@ -50,12 +50,12 @@ fn write_file(path: str, what: str)
 fn show_file(path: str)
 {
 	let file = fopen(path.ptr, "rb".ptr);
-	if file == null {
+	if file == none {
 		io.println("no file");
 		return;
 	}
 	let room = alloc(byte, 512);
-	while fgets(room, 512 as c_int, file) != null do {
+	while fgets(room, 512 as c_int, file) != none do {
 		seen(text.from_c(room));
 	}
 	fclose(file);

@@ -37,7 +37,7 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_UNION] = {"union", CAT_KEYWORD},
     [TOKEN_TRUE] = {"true", CAT_KEYWORD},
     [TOKEN_FALSE] = {"false", CAT_KEYWORD},
-    [TOKEN_NULL] = {"null", CAT_KEYWORD},
+    [TOKEN_NONE] = {"none", CAT_KEYWORD},
     [TOKEN_ALLOC] = {"alloc", CAT_KEYWORD},
     [TOKEN_FREE] = {"free", CAT_KEYWORD},
     [TOKEN_SIZE_OF] = {"size_of", CAT_KEYWORD},
@@ -648,15 +648,28 @@ static enum token_kind word_kind(const char *s, size_t n)
     return TOKEN_IDENT;
 }
 
+/* DESIGN: `none` is the pointer that points to no value. The spelling
+   `null` of C is refused with a message that names `none`, so a program
+   written from habit learns the word at its first use. */
+static bool is_null(const char *s, size_t n)
+{
+    return n == 4 && memcmp(s, "null", 4) == 0;
+}
+
 bool lexer_is_keyword(const char *s, size_t n)
 {
-    return word_kind(s, n) != TOKEN_IDENT;
+    return word_kind(s, n) != TOKEN_IDENT || is_null(s, n);
 }
 
 static void identifier(struct lexer *lx, size_t start, int line, int column)
 {
     while (is_ident_char(at(lx, 0))) {
         advance(lx);
+    }
+    if (is_null(lx->src + start, lx->pos - start)) {
+        error_at(lx, line, column, "`null` is `none` in Anti");
+        push(lx, TOKEN_ERROR, start, line, column);
+        return;
     }
     push(lx, word_kind(lx->src + start, lx->pos - start), start, line, column);
 }

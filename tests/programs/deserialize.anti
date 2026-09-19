@@ -13,7 +13,7 @@ class Point
 fn main() -> int
 {
 	let o = Object.deserialize("{\"type\":\"deserialize.Point\",\"x\":7}");
-	if o == null || !(o is *Point) {
+	if o == none || !(o is *Point) {
 		return 1;
 	}
 	let p = o as *Point;

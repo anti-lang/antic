@@ -71,10 +71,10 @@ fn main() -> int
 {
 	let s = alloc Square { };
 	let o: *Object = s;
-	let none = []reflect.Value { ptr: null, len: 0 };
+	let no_args = []reflect.Value { ptr: none, len: 0 };
 
 	/* The seven functions of the root come first, then the chain's. */
-	let area = reflect.call(o, 7, none) catch fatal;
+	let area = reflect.call(o, 7, no_args) catch fatal;
 	printf("%d %d\n".ptr, area.kind as c_int, area.data.i as c_int);
 
 	let label_args = [reflect.of_int(1), reflect.of_str("tag")];
@@ -95,18 +95,18 @@ fn main() -> int
 	let same = reflect.call(o, 11, char_args[0..1]) catch fatal;
 	printf("%d %d\n".ptr, same.kind as c_int, same.data.c as u32 as c_int);
 
-	let me = reflect.call(o, 12, none) catch fatal;
+	let me = reflect.call(o, 12, no_args) catch fatal;
 	printf("%d %d\n".ptr, me.kind as c_int, (me.data.p == s as *byte) as c_int);
 
 	let small_args = [reflect.of_int(-1)];
 	let small = reflect.call(o, 13, small_args[0..1]) catch fatal;
 	printf("%d %d\n".ptr, small.kind as c_int, small.data.u as c_int);
 
-	let reset = reflect.call(o, 14, none) catch fatal;
+	let reset = reflect.call(o, 14, no_args) catch fatal;
 	printf("%d %d\n".ptr, reset.kind as c_int, s.side as c_int);
 
 	/* A root function goes through the table like any other. */
-	let name = reflect.call(o, 0, none) catch fatal;
+	let name = reflect.call(o, 0, no_args) catch fatal;
 	printf("%.*s\n".ptr, name.data.s.len as c_int, name.data.s.ptr);
 
 	/* A count, a kind or an index that does not fit, and a signature
@@ -115,26 +115,26 @@ fn main() -> int
 	let count = reflect.call(o, 7, flip_args[0..1]) catch e {
 		printf("%d %.*s\n".ptr, (e.code == reflect.WRONG_COUNT) as c_int,
 			e.message.len as c_int, e.message.ptr);
-		yield reflect.none();
+		yield reflect.nothing();
 	};
 	let kind = reflect.call(o, 9, wrong_kind[0..2]) catch e {
 		printf("%d %.*s\n".ptr, (e.code == reflect.WRONG_KIND) as c_int,
 			e.message.len as c_int, e.message.ptr);
-		yield reflect.none();
+		yield reflect.nothing();
 	};
-	let high = reflect.call(o, 99, none) catch e {
+	let high = reflect.call(o, 99, no_args) catch e {
 		printf("%d %.*s\n".ptr, (e.code == reflect.BAD_INDEX) as c_int,
 			e.message.len as c_int, e.message.ptr);
-		yield reflect.none();
+		yield reflect.nothing();
 	};
-	let low = reflect.call(o, -1, none) catch e {
+	let low = reflect.call(o, -1, no_args) catch e {
 		printf("%d\n".ptr, (e.code == reflect.BAD_INDEX) as c_int);
-		yield reflect.none();
+		yield reflect.nothing();
 	};
-	let slices = reflect.call(o, 15, none) catch e {
+	let slices = reflect.call(o, 15, no_args) catch e {
 		printf("%d %.*s\n".ptr, (e.code == reflect.NOT_CARRIED) as c_int,
 			e.message.len as c_int, e.message.ptr);
-		yield reflect.none();
+		yield reflect.nothing();
 	};
 	if count.kind != reflect.ValueKind.None ||
 		kind.kind != reflect.ValueKind.None ||

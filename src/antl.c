@@ -1227,7 +1227,7 @@ static void read_types(struct reader *r)
             break;
         }
         default:
-            if (kind < TYPE_NULL) {
+            if (kind < TYPE_NONE) {
                 t = types_builtin(r->types, (enum type_kind)kind);
             } else {
                 damaged(r);

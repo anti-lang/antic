@@ -83,7 +83,7 @@ pub fn describe(object: *byte) -> *byte
 	return anti_rt_descriptor(object);
 }
 
-/// The descriptor of the base of the class `d` describes, or null.
+/// The descriptor of the base of the class `d` describes, or `none`.
 pub fn parent(d: *byte) -> *byte
 {
 	return anti_rt_reflect_parent(d);
@@ -131,7 +131,7 @@ pub fn function(d: *byte, index: int) -> Function
 /// and an index out of range give a value of kind `None`.
 pub fn get(object: *byte, d: *byte, index: int) -> Value
 {
-	let v = none();
+	let v = nothing();
 	anti_rt_reflect_get(object, d, index, &v);
 	return v;
 }
@@ -157,7 +157,7 @@ pub fn set(object: *byte, d: *byte, index: int, value: Value) -> *error.Error
 		return error.Error.new(WRONG_KIND,
 			"the value is of another kind than the field takes");
 	}
-	return null;
+	return none;
 }
 
 /// The name of the class `d` describes.
@@ -168,13 +168,13 @@ pub fn name(d: *byte) -> str
 
 extern fn anti_rt_reflect_class_name(d: *byte) -> str;
 
-/// A new object on the heap of the class `name` names, or null.
+/// A new object on the heap of the class `name` names, or `none`.
 ///
 /// `name` is the class's own name, or its module path and its name as
 /// `geometry.Circle`. The object has the defaults of every field, and
 /// `construct` has run. A name two modules declare needs the module
 /// path. An abstract class, a singleton and a class whose `construct`
-/// takes arguments give null, as does a name no class of the program has.
+/// takes arguments give `none`, as does a name no class of the program has.
 pub fn new(name: str) -> *Object
 {
 	return anti_rt_reflect_new(name.ptr, name.len);
@@ -207,7 +207,7 @@ pub struct Value
 }
 
 /// A value that holds nothing.
-pub fn none() -> Value
+pub fn nothing() -> Value
 {
 	return Value { kind: ValueKind.None, data: Payload { i: 0 } };
 }
@@ -268,7 +268,7 @@ pub fn of_ptr(v: *byte) -> Value
 pub fn call(object: *Object, index: int, args: []Value, out: *Value)
 	-> *error.Error
 {
-	*out = none();
+	*out = nothing();
 	let reason = anti_rt_reflect_call(object, index, args.ptr, args.len, out);
 	if reason == BAD_INDEX {
 		return error.Error.new(BAD_INDEX,
@@ -286,5 +286,5 @@ pub fn call(object: *Object, index: int, args: []Value, out: *Value)
 		return error.Error.new(WRONG_KIND,
 			"an argument is of another kind than its parameter takes");
 	}
-	return null;
+	return none;
 }

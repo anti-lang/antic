@@ -25,13 +25,13 @@ class TextFile
 
 	pub fn read(self, into: []byte) -> bool
 	{
-		return fgets(into.ptr, into.len as c_int, self.handle) != null;
+		return fgets(into.ptr, into.len as c_int, self.handle) != none;
 	}
 
 	concrete fn destruct(self)
 	{
 		fclose(self.handle);
-		self.handle = null;
+		self.handle = none;
 	}
 }
 

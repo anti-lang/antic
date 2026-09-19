@@ -344,7 +344,7 @@ static const char vec_source[] = "pub struct V2 { x: int, y: int }\n"
                                  "    return alloc(V2, 1);\n"
                                  "}\n"
                                  "pub fn hidden() -> *Hidden {\n"
-                                 "    return null;\n"
+                                 "    return none;\n"
                                  "}\n";
 
 static const char shapes_source[] = "import vec;\n"
@@ -1347,7 +1347,7 @@ static void one_struct_descriptor(void)
         "import vec;\n"
         "class Holder {\n"
         "    pub at: vec.V2 = vec.V2 { x: 0, y: 0 },\n"
-        "    pub p: *vec.V2 = null,\n"
+        "    pub p: *vec.V2 = none,\n"
         "}\n";
     struct session s;
     struct interface *iface;

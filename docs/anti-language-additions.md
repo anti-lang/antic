@@ -37,16 +37,16 @@ After the first release, in this order: the wrapping and saturating operators wi
 
 ## Nullable pointers
 
-- `*T` never holds `null`. The compiler refuses `null` for it, refuses an uninitialised one, and never asks for a check before use.
-- `?*T` may hold `null`. It cannot be dereferenced, called, indexed or passed where `*T` is expected until the program has checked it.
-- `null` has type `?*T` for every `T`.
-- Narrowing is per block. Inside `if p != null { }` the name `p` has type `*T`. After `if p == null { return; }` it has type `*T` for the rest of the enclosing block. After the block that narrowed it, `p` is `?*T` again. Assigning to `p` inside a narrowed block ends the narrowing for that block.
+- `*T` never holds `none`. The compiler refuses `none` for it, refuses an uninitialised one, and never asks for a check before use.
+- `?*T` may hold `none`. It cannot be dereferenced, called, indexed or passed where `*T` is expected until the program has checked it.
+- `none` has type `?*T` for every `T`.
+- Narrowing is per block. Inside `if p != none { }` the name `p` has type `*T`. After `if p == none { return; }` it has type `*T` for the rest of the enclosing block. After the block that narrowed it, `p` is `?*T` again. Assigning to `p` inside a narrowed block ends the narrowing for that block.
 - `let m = p else { leave };` binds `m` as `*T`, and the `else` block must leave the enclosing block. `p catch fatal` and `p catch e { yield q; }` follow the error forms, with the error `anti.error.NullPointer`.
 - `alloc T { }` and `alloc T(args)` return `*T`. Out of memory is fatal. `alloc(T, n)` returns `?*T`, because `malloc` does.
 - `p as *T` returns `*T` and traps. `p as? *T` returns `?*T`. `dup(p)` returns the type of `p`. `is` works on both.
-- A class field of type `*T` without a default must be set in every literal or in `construct`. A field of type `?*T` may default to `null`.
+- A class field of type `*T` without a default must be set in every literal or in `construct`. A field of type `?*T` may default to `none`.
 - Every pointer in an `extern fn`, in a bound struct and in a C callback is `?*T`. The generated header maps `*T` and `?*T` both to `T *`, with `/* non-null */` on the first. An exported function with a `*T` parameter checks nothing at run time.
-- The standard library returns `?*T` wherever "not found" is an answer, and takes `*T` wherever null would be a bug.
+- The standard library returns `?*T` wherever "not found" is an answer, and takes `*T` wherever `none` would be a bug.
 - Nothing is emitted for any of this. The checks are the ones the program wrote.
 
 ## Dev-mode checks
@@ -56,7 +56,7 @@ The switch is the one `assert` uses: emitted in dev mode, absent in release, dec
 - Bounds. Every index into an array, a slice or a `str` is compared against its length before the access. A raw pointer index `p[i]` has no length and is not checked.
 - Overflow. `+`, `-` and `*` on signed integers branch on the overflow flag. A narrowing `as` checks the range. Unsigned arithmetic wraps and is not checked.
 - Division and shifts. `/` and `%` by zero are checked on ARM64, which returns zero, and trap by themselves on x86_64. A shift count negative or at or above the width is checked on both.
-- Null. Not needed. A null dereference cannot be written without a check the compiler demanded.
+- None. Not needed. A dereference of `none` cannot be written without a check the compiler demanded.
 - A failed check calls the runtime's failure routine. It prints the file, the line, the operation and the values, then aborts.
 - Cost in a dev build: a compare and a not-taken branch per checked operation. Cost in release: none.
 
@@ -132,7 +132,7 @@ tests
 - `anti.rt.Mutex` is a struct wrapping the platform's mutex, created with `Mutex.new()` and released with `m.destroy()`.
 - `sync m { }` locks `m` for the block and unlocks it on every exit, including `return`, `break`, `continue` and the error forms. Nested `sync` on the same mutex is a compile error when both are in one function and a run-time deadlock otherwise, which the chapter states.
 - A field written inside a `sync` block and read outside any `sync` is a warning from the whole-program analysis. The warning fires when both sites are in functions a worker reaches.
-- `chan T` is a bounded queue of `T` values, `T` pointer-free by the `parallel` rule. `let c = chan int(16);` creates one. `send(c, v)` blocks when full, `recv(c) -> ?T` blocks when empty and returns `null` after `close(c)`. `select` waits on more than one channel and is written like `switch` over the channels. `chan`, `send`, `recv`, `select` and `sync` were reserved from chapter 2.
+- `chan T` is a bounded queue of `T` values, `T` pointer-free by the `parallel` rule. `let c = chan int(16);` creates one. `send(c, v)` blocks when full, `recv(c) -> ?T` blocks when empty and returns `none` after `close(c)`. `select` waits on more than one channel and is written like `switch` over the channels. `chan`, `send`, `recv`, `select` and `sync` were reserved from chapter 2.
 - Both are implemented in `anti.rt` over the platform layer of the threading chapter.
 
 ## Debug information
@@ -172,7 +172,7 @@ tests
 "anti.log.Logger" = "net.niese.tests.FakeLogger.get"
 ```
 
-- A provider is a static function returning a non-null pointer of the interface type, or a class name whose `get` is a singleton's. `anti build` passes the table to `antic` as `--inject Interface=Provider`. `anti test` passes the test table.
+- A provider is a static function returning a pointer of the interface type that is never `none`, or a class name whose `get` is a singleton's. `anti build` passes the table to `antic` as `--inject Interface=Provider`. `anti test` passes the test table.
 - An interface with no provider is a link-time error naming the class that needs it. A provider of the wrong type is a compile error. A cycle through providers that allocate is detected on the provider graph at link.
 - Every `inject` field is resolved through a slot, a static atomic pointer per interface, initialised to the compiled-in provider. Construction calls through the slot. The run-time configuration may replace what a slot holds. See [Runtime configuration](#runtime-configuration).
 - `inject final name: *Interface` marks a field the run-time configuration may not replace.
@@ -247,8 +247,8 @@ Each is compile-time only. Each removes something people write by hand. None cos
 - Labels. `outer: for ... { }`, `retry: while ... { }` and `cleanup: { }`. `break outer;` and `continue outer;` name the loop or block. There is no `goto`. A label is an identifier followed by `:` before `for`, `while` or `{`.
 - `show(expr)` prints `file:line: expr = value` to stderr and yields the value, so it sits inside any expression. Gone in release, like `assert`. The value is printed through `to_text` for a class and through the primitive formats otherwise.
 - `if let Circle c = v { }` on a variant `v` runs the block with `c` bound to the case's fields when `v` holds that case. It is a `switch` with one arm and no `else`, and `else { }` may follow.
-- `p ?? q` on a `?*T` yields `p` as `*T` when it is not null and `q` otherwise. `q` has type `*T` or `?*T`, and the result has the wider of the two.
-- `p?.x` and `p?.f(args)` on a `?*T` yield `null` when `p` is null and otherwise the field or the call. The result has type `?*U` when the field or result is a pointer, and is refused otherwise, since Anti has no optional values. Chains follow the first null.
+- `p ?? q` on a `?*T` yields `p` as `*T` when it is not `none` and `q` otherwise. `q` has type `*T` or `?*T`, and the result has the wider of the two.
+- `p?.x` and `p?.f(args)` on a `?*T` yield `none` when `p` is `none` and otherwise the field or the call. The result has type `?*U` when the field or result is a pointer, and is refused otherwise, since Anti has no optional values. Chains follow the first `none`.
 - Default parameter values: `fn open(path: str, mode: Mode = Mode.Read) -> *Error`. The default is a constant expression. Named arguments: `open("x", mode: Mode.Write)`. Positional arguments come first and in order. Named ones follow in any order, each at most once. No positional may follow a named one. Defaults fill what is not given.
 - `for i, x in slice { }` binds the index and the element. `for i, x in &slice { }` binds the index and a pointer.
 - `switch` on a `str` compares with `text.equal` in a chain, in arm order. The chapter says it is a chain and not a table.
@@ -324,8 +324,8 @@ Rules:
 
 ## Messages
 
-- `` `n` may be null, check it or use `?*T` ``
-- `` `*T` cannot hold `null` ``
+- `` `n` may be `none`, check it or use `?*T` ``
+- `` `*T` cannot hold `none` ``
 - `` index 12 is out of bounds for length 8 `` at run time, with file and line
 - `` `2147483647 + 1` overflows `i32` `` at run time, with file and line
 - `` `flags` in a two-name `let` must be a `Flags` variable ``

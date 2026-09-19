@@ -41,14 +41,14 @@ fn main() -> int
 	io.println(b.text());
 	delete(p);
 
-	let n = alloc Named { x: 1, y: 2, mark: 7, tag: null };
+	let n = alloc Named { x: 1, y: 2, mark: 7, tag: none };
 	b.clear();
 	json.write(n, &b);
 	io.println(b.text());
 	delete(n);
 
 	b.clear();
-	json.write(null, &b);
+	json.write(none, &b);
 	io.println(b.text());
 
 	let source = "{\"type\":\"Point\",\"x\":3,\"y\":-4,\"inner\":{\"x\":1},\"tag\":\"one, two\"}";

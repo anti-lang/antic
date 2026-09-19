@@ -41,9 +41,9 @@ struct Size
 class Holder
 {
 	pub own counts: []i32,
-	pub own shape: *Shape = null,
-	pub own spot: *Size = null,
-	pub own named: *Named = null,
+	pub own shape: *Shape = none,
+	pub own spot: *Size = none,
+	pub own named: *Named = none,
 }
 
 fn main() -> int

@@ -247,7 +247,7 @@ void test_sema(void)
     rejects("struct B { a: i32 }\nexport struct S { d: [size_of(B)]u8 }", 2, 19,
             "the field `d` of export struct `S` has type `[size_of(B)]byte`, "
             "which C cannot represent");
-    rejects("export const P: *byte = null;", 1, 17,
+    rejects("export const P: *byte = none;", 1, 17,
             "export const `P` has type `*byte`, and an export const is a "
             "number, a bool or a str");
     rejects("export fn main() -> int { return 0; }", 1, 11,
@@ -367,16 +367,16 @@ void test_sema(void)
     rejects("const BIG: c_ulong = 65536 as c_ulong * 65536 as c_ulong;", 1, 22,
             "the value does not fit `c_ulong` on every target");
     accepts("fn f() { let big = 5_000_000_000; let half: f32 = 0.5; }");
-    accepts("fn f() { let x: u8 = 250 + 10; let p: *int = null; }");
-    accepts("fn f(p: *int) -> bool { return p == null; }");
+    accepts("fn f() { let x: u8 = 250 + 10; let p: *int = none; }");
+    accepts("fn f(p: *int) -> bool { return p == none; }");
     rejects("fn f() { let n: u8 = 300; }", 1, 22, "`300` does not fit `byte`");
     rejects("fn f() { let m: u8 = -1; }", 1, 22, "`-1` does not fit `byte`");
     rejects("fn f() { let g: f32 = 1; }", 1, 23,
             "expected `f32`, found an integer literal");
     rejects("fn f() { let x: int = 1.5; }", 1, 23,
             "expected `int`, found a float literal");
-    rejects("fn f() { let p = null; }", 1, 18,
-            "`null` needs a pointer type from its context");
+    rejects("fn f() { let p = none; }", 1, 18,
+            "`none` needs a pointer type from its context");
     rejects("fn f(a: u8) { let b = -a; }", 1, 23,
             "unary `-` needs a signed integer or a float, found `byte`");
 

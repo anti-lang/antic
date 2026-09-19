@@ -209,8 +209,8 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         text_append(d->out, e->as.boolean ? "true" : "false");
         end(d, start, type);
         break;
-    case EXPR_NULL:
-        text_append(d->out, "null");
+    case EXPR_NONE:
+        text_append(d->out, "none");
         end(d, start, type);
         break;
     case EXPR_NAME:

@@ -49,6 +49,6 @@ pub class Pet
 		}
 		self.owner = owner;
 		printf("pet %d\n".ptr, owner as c_int);
-		return null;
+		return none;
 	}
 }

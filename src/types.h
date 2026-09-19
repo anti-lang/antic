@@ -31,7 +31,7 @@ enum type_kind {
     TYPE_F32,
     TYPE_F64,
     TYPE_STR,
-    TYPE_NULL,      /* the type of null before a context gives it one */
+    TYPE_NONE,      /* the type of `none` before a context gives it one */
     TYPE_ERROR,     /* an expression that already produced a diagnostic */
     TYPE_BUILTIN_COUNT,
     TYPE_POINTER = TYPE_BUILTIN_COUNT,

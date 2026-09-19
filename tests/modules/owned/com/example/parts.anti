@@ -16,7 +16,7 @@ pub class Leaf
 pub class Part
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = null,
+	pub own leaf: *Leaf = none,
 
 	fn destruct(self)
 	{
@@ -28,7 +28,7 @@ pub class Part
 pub class Box
 {
 	pub n: int = 0,
-	own leaf: *Leaf = null,
+	own leaf: *Leaf = none,
 
 	fn destruct(self)
 	{

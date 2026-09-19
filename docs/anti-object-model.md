@@ -193,11 +193,12 @@ Four levels, and each applies where it makes sense:
 
 ## Pointers and conversions
 
+- `none` is the pointer that points to no value. It is a concept of the language, and zero is today's encoding of it.
 - `&d` converts implicitly to `*B` for every `B` in `d`'s base chain, `*anti.rt.Object` included, and to `*I` for every interface `d` implements. A base conversion is the same address. An interface conversion adds the sub-object's offset. A conversion with two paths, an interface reached through two sub-objects, is refused, and the program names the path: `&c.ser as *Closable`.
 - Values never convert. Passing a `Circle` where a `Shape` is expected is an error, and `c.super` is the explicit base part.
-- `p is *T` gives a `bool`. `p as *T` on a class pointer is checked and traps on a mismatch. `p as? *T` gives `null` instead. All three work from any base or interface pointer, because every table's descriptor records the offset to the enclosing object.
+- `p is *T` gives a `bool`. `p as *T` on a class pointer is checked and traps on a mismatch. `p as? *T` gives `none` instead. All three work from any base or interface pointer, because every table's descriptor records the offset to the enclosing object.
 - `==` and `!=` on class pointers compare object identity: each pointer is adjusted by its offset to the enclosing object, then the addresses are compared. So a `*Serializable` and a `*Drawable` taken from one circle are equal. Pointers of two unrelated class types are a type error. Struct pointers compare addresses.
-- `delete`, `destroy`, `dup`, `is`, `as` and every dispatch check the table pointer for null and trap with the class name. `delete`, `destroy` and `dup` are calls into the runtime and check in every mode, since the check is cheap there. `is`, `as` and a dispatch check in dev mode, and release mode keeps the raw load.
+- `delete`, `destroy`, `dup`, `is`, `as` and every dispatch check the table pointer for zero and trap with the class name. `delete`, `destroy` and `dup` are calls into the runtime and check in every mode, since the check is cheap there. `is`, `as` and a dispatch check in dev mode, and release mode keeps the raw load.
 
 ## Tables and dispatch
 
@@ -209,7 +210,7 @@ Four levels, and each applies where it makes sense:
 - `concrete fn Circle::f(self)`, the class's own name, means the same as the unqualified form and may be written for clarity. Declaring both for one name is an error.
 - `concrete fn Serializable::f(self)`, a base or an interface, fills that table only, with that table's signature. A qualified body wins in its table over an unqualified one.
 - `concrete` is required on every replacement. A function that matches an inherited entry without it is an error. A `concrete fn` that matches nothing is an error. A replacement of a `final fn` is an error.
-- An abstract entry is null until a class fills it. A class with any null entry is abstract.
+- An abstract entry is zero until a class fills it. A class with any zero entry is abstract.
 - A call through a pointer is direct when the function is `final`, the class is `final`, or release mode proves no class replaces it. Otherwise it loads the entry and calls it with the object as `self`. Release mode devirtualises across the whole program. Dev mode compiles one module and relies on `final`.
 - `self.super.f()` is a direct call to the base's entry. `Serializable.serialize(&self.ser)` is a direct call to the interface's own body by name.
 - `c.f()` on a `*Circle` resolves to the unqualified function when there is one. When only qualified bodies exist for `f`, the call is ambiguous and the message names the interfaces. The caller writes `c.ser.f()` or converts to the interface pointer.
@@ -270,13 +271,13 @@ Four levels, and each applies where it makes sense:
 ## Threads
 
 - The pointer-free test of `parallel` exempts the table pointer and `own` fields. A class value whose other fields are pointer-free is pointer-free, so `[]Circle` chunks like any array. `[]*Shape` is refused with a message that points at `dispatch`.
-- `dispatch obj -> f(args)` submits one object to the pool for `worker fn f(o: *T, args...) -> R`. The other arguments follow the pointer-free rule. It returns a `Job` struct. The pool records the object's address in an in-flight map before running and removes it after. A `dispatch` of an object already in flight returns a null job. `join(job) -> R` blocks and returns the result. `join_all(jobs: []Job)` waits for a set. A dispatched worker may not `delete` its object. Same pool, same inline fallback, same `ANTI_THREADS` as `parallel`. The object header stays one word, and the in-flight state is the pool's.
+- `dispatch obj -> f(args)` submits one object to the pool for `worker fn f(o: *T, args...) -> R`. The other arguments follow the pointer-free rule. It returns a `Job` struct. The pool records the object's address in an in-flight map before running and removes it after. A `dispatch` of an object already in flight returns a job whose handle is `none`. `join(job) -> R` blocks and returns the result. `join_all(jobs: []Job)` waits for a set. A dispatched worker may not `delete` its object. Same pool, same inline fallback, same `ANTI_THREADS` as `parallel`. The object header stays one word, and the in-flight state is the pool's.
 - Analysis that only reports runs on the whole program's IR in every build mode. It runs after the last module compiles and before the link. The singleton check, an abstract class no concrete class fills, and a `delete` inside a worker live there. Optimisation that changes code runs on the whole program in release mode only.
 
 ## Errors
 
 - `anti.error.Error` is a class with `pub code: int`, `pub message: str` and `own cause: *Error`. The runtime owns `anti.rt`, so the class lives in the standard library's `anti.error` module. Libraries subclass it. `Error.new(code, message)`, `Error.from_errno()` and `Error.from_win32()` build one. `e.text()` gives code, message and the cause chain. `e.print()` writes it to stderr. `e.fatal()` prints and exits with `e.code`, or 1 when the code is 0. `rt.on_fatal(f)` registers one function that runs before `fatal` exits.
-- A function that can fail returns `*Error`, `null` on success, and writes its results through out pointers. A function that cannot fail returns its value. A function whose only failure is "not present" may return `bool`.
+- A function that can fail returns `*Error`, `none` on success, and writes its results through out pointers. A function that cannot fail returns its value. A function whose only failure is "not present" may return `bool`.
 - A call to a failing function must handle the error. A bare call that drops it is a compile error.
 - `let n = f(args) catch e { ... };` handles it at the call. The compiler supplies the out pointer for `n`. The handler either leaves the enclosing block or ends with `yield v`, a value of `n`'s type that takes the place of the result. `catch { }` binds no name. `catch fatal` prints and exits.
 - `try f(args)` is `f(args) catch e { return e; }` and is allowed only in a function that returns `*Error`.
@@ -405,7 +406,7 @@ final class Circle
 			return error.Error.new(1, "radius must be positive");
 		}
 		self.r = r;
-		return null;
+		return none;
 	}
 
 	concrete fn area(self) -> f32

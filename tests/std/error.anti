@@ -10,31 +10,31 @@ extern fn fopen(path: *byte, mode: *byte) -> *byte;
 
 fn open_missing(path: str) -> *error.Error
 {
-	if fopen(path.ptr, "r".ptr) == null {
+	if fopen(path.ptr, "r".ptr) == none {
 		return error.Error.from_errno();
 	}
-	return null;
+	return none;
 }
 
 fn read_config() -> *error.Error
 {
 	try open_missing("/nonexistent/anti/config.toml");
-	return null;
+	return none;
 }
 
 fn size_of_file(path: str, out: *int) -> *error.Error
 {
-	if fopen(path.ptr, "r".ptr) == null {
+	if fopen(path.ptr, "r".ptr) == none {
 		*out = 0;
 		return error.Error.new(7, "no such file");
 	}
 	*out = 1;
-	return null;
+	return none;
 }
 
 fn main() -> int
 {
-	error.check(null);
+	error.check(none);
 
 	let size = size_of_file("/nonexistent/anti/size") catch e {
 		if e.code != 7 {
@@ -60,7 +60,7 @@ fn main() -> int
 	/* Windows gives the Win32 error of the fopen that failed last, a
 	   path that does not exist, and every other system gives none. The
 	   two expected files hold the two lines. */
-	if fopen("/nonexistent/anti/win32".ptr, "r".ptr) != null {
+	if fopen("/nonexistent/anti/win32".ptr, "r".ptr) != none {
 		return 5;
 	}
 	let w = error.Error.from_win32();

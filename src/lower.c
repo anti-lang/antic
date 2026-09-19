@@ -1020,7 +1020,7 @@ static bool bound_is_direct(const struct expr *e, const struct type *s)
    name therefore keeps one index in every class of a chain. A call
    through a base pointer reads the entry the derived class filled. A
    `concrete fn` takes the entry of the function it replaces. An
-   `abstract fn` leaves its entry null until a class fills it. */
+   `abstract fn` leaves its entry zero until a class fills it. */
 
 /* One entry of a table. It holds the name a call names and the function
    of the class that fills it. A function of the root has no source, so
@@ -2776,7 +2776,7 @@ static struct ir_function *rt_function(struct lowerer *l, const char *name,
    side therefore moves back to the start of its object before the
    addresses are compared. A pointer to a concrete class is already there. Only a
    pointer whose static type is abstract can be a sub-object. The runtime
-   does the move, because it also has to answer for a null pointer. */
+   does the move, because it also has to answer for `none`. */
 static bool may_be_sub(const struct type *t)
 {
     return t->kind == TYPE_POINTER && t->element->kind == TYPE_CLASS &&
@@ -2917,7 +2917,7 @@ static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
     return temp(l, result);
 }
 
-/* `p as *T` traps on a mismatch and `p as? *T` gives null. */
+/* `p as *T` traps on a mismatch and `p as? *T` gives `none`. */
 static struct ir_operand checked_cast(struct lowerer *l, struct ir_operand p,
                                       const struct type *from,
                                       const struct type *to, bool gives_null,
@@ -3676,7 +3676,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         return ir_int_op(type, e->as.character);
     case EXPR_BOOL:
         return ir_int_op(type, e->as.boolean);
-    case EXPR_NULL:
+    case EXPR_NONE:
         return ir_int_op(type, 0);
     case EXPR_NAME:
         return lower_name(l, e);
@@ -3744,7 +3744,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
             return none();
         }
         /* DESIGN: the elements of a class come zeroed, so one the
-           program has not filled has a zero table, which the null-table
+           program has not filled has a zero table, which the zero-table
            check reports. Other elements are C's and keep malloc. */
         if (e->type->element->kind == TYPE_CLASS) {
             struct ir_operand args[2];
@@ -4307,7 +4307,7 @@ static void destroy_local(struct lowerer *l, const struct symbol *sym)
     object_call(l, "anti_rt_destroy", temp(l, sym->ir), sym->type);
 }
 
-/* DESIGN: a call that can fail gives a pointer. A null pointer is
+/* DESIGN: a call that can fail gives a pointer. A pointer of `none` is
    success, so the branch after the call is the whole of the error
    machinery. It is one compare and one branch, and nothing unwinds. */
 static void handle_error(struct lowerer *l, const struct expr *call,

@@ -26,7 +26,7 @@ fn main() -> int
 	if third.n != 3 {
 		return 2;
 	}
-	if list.at(100) != null {
+	if list.at(100) != none {
 		return 3;
 	}
 	let last = list.pop() as *Item;
@@ -62,7 +62,7 @@ fn main() -> int
 	if found.n != 3 {
 		return 9;
 	}
-	if numbers.get(22) != null {
+	if numbers.get(22) != none {
 		return 10;
 	}
 

@@ -36,7 +36,7 @@ class Sized
 	fn construct(self, n: int) -> *error.Error
 	{
 		self.n = n;
-		return null;
+		return none;
 	}
 }
 
@@ -63,7 +63,7 @@ singleton class Settings
 fn main() -> int
 {
 	let o = reflect.new("Point");
-	if o == null || !(o is *Point) {
+	if o == none || !(o is *Point) {
 		return 1;
 	}
 	let p = o as *Point;
@@ -71,7 +71,7 @@ fn main() -> int
 	delete(p);
 
 	let q = reflect.new("registry.Marked");
-	if q == null || !(q is *Marked) {
+	if q == none || !(q is *Marked) {
 		return 2;
 	}
 	let m = q as *Marked;
@@ -80,8 +80,8 @@ fn main() -> int
 
 	/* No complete value, one instance, arguments to construct, or no
 	   such class. */
-	if reflect.new("Shape") != null || reflect.new("Settings") != null ||
-		reflect.new("Sized") != null || reflect.new("Nothing") != null {
+	if reflect.new("Shape") != none || reflect.new("Settings") != none ||
+		reflect.new("Sized") != none || reflect.new("Nothing") != none {
 		return 3;
 	}
 
@@ -91,7 +91,7 @@ fn main() -> int
 	made.serialize(&b);
 	io.println(b.text());
 	let back = Object.deserialize(b.text());
-	if back == null || !(back is *Marked) {
+	if back == none || !(back is *Marked) {
 		return 4;
 	}
 	let r = back as *Marked;
@@ -107,17 +107,17 @@ fn main() -> int
 	/* A class whose construct takes arguments comes back with its
 	   fields, since they come from the text. */
 	let sized = Object.deserialize("{ \"type\" : \"Sized\", \"n\" : 4 }");
-	if sized == null || !(sized is *Sized) {
+	if sized == none || !(sized is *Sized) {
 		return 5;
 	}
 	printf("%d\n".ptr, (sized as *Sized).n as c_int);
 	delete(sized);
 
-	if Object.deserialize("{\"type\":\"Nothing\"}") != null ||
-		Object.deserialize("{\"type\":\"Shape\"}") != null ||
-		Object.deserialize("{\"x\":1}") != null ||
-		Object.deserialize("{\"type\":\"Point\",\"x\":}") != null ||
-		Object.deserialize("not json") != null {
+	if Object.deserialize("{\"type\":\"Nothing\"}") != none ||
+		Object.deserialize("{\"type\":\"Shape\"}") != none ||
+		Object.deserialize("{\"x\":1}") != none ||
+		Object.deserialize("{\"type\":\"Point\",\"x\":}") != none ||
+		Object.deserialize("not json") != none {
 		return 6;
 	}
 	return 0;

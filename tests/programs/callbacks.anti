@@ -71,8 +71,8 @@ fn main() -> int
 	printf("%d %d %d %d %d\n".ptr, numbers[0], numbers[1], numbers[2],
 		numbers[3], numbers[4]);
 
-	let chosen: fn(i32) -> i32 = null;
-	if chosen == null {
+	let chosen: fn(i32) -> i32 = none;
+	if chosen == none {
 		chosen = negate;
 	}
 	return (chosen(-42) + (abs == abs) as i32) as int;

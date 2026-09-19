@@ -621,8 +621,8 @@ static void reflect_calls(bool calls, bool reflect, const char *prefix,
         text_append(&source,
                     "    let v = reflect.Value { kind: reflect.ValueKind.None,"
                     " data: reflect.Payload { i: 0 } };\n"
-                    "    let none = []reflect.Value { ptr: null, len: 0 };\n"
-                    "    reflect.call(t, 7, none, &v);\n");
+                    "    let no_args = []reflect.Value { ptr: none, len: 0 };\n"
+                    "    reflect.call(t, 7, no_args, &v);\n");
     }
     text_append(&source, "    return 0;\n"
                          "}\n");

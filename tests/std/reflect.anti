@@ -42,7 +42,7 @@ class Marked
 	pub on: bool = true,
 	pub letter: char = 'k',
 	pub name: str = "mark",
-	pub next: *Point = null,
+	pub next: *Point = none,
 	pub level: Level = Level.Low,
 	pub bytes: []byte,
 }
@@ -91,7 +91,7 @@ fn show(v: reflect.Value)
 	} else if v.kind == reflect.ValueKind.Str {
 		printf("str %.*s\n".ptr, v.data.s.len as c_int, v.data.s.ptr);
 	} else if v.kind == reflect.ValueKind.Ptr {
-		printf("ptr %d\n".ptr, (v.data.p == null) as c_int);
+		printf("ptr %d\n".ptr, (v.data.p == none) as c_int);
 	} else {
 		io.println("none");
 	}
@@ -99,7 +99,7 @@ fn show(v: reflect.Value)
 
 fn main() -> int
 {
-	let m = alloc Marked { bytes: []byte { ptr: null, len: 0 } };
+	let m = alloc Marked { bytes: []byte { ptr: none, len: 0 } };
 	let d = reflect.describe(m as *byte);
 	io.println(reflect.name(d));
 	printf("%d %d\n".ptr, reflect.field_count(d) as c_int,

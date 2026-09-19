@@ -202,7 +202,7 @@ void test_parser(void)
          "    let n = size_of(*Vec2);\n"
          "    let c = 'a';\n"
          "    let t = \"hi\";\n"
-         "    let nothing: *byte = null;\n"
+         "    let nothing: *byte = none;\n"
          "    let yes = true;\n"
          "}\n",
          "function f\n"
@@ -255,7 +255,7 @@ void test_parser(void)
          "    let_stmt nothing\n"
          "      type *\n"
          "        type byte\n"
-         "      null\n"
+         "      none\n"
          "    let_stmt yes\n"
          "      true\n");
 

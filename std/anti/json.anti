@@ -14,10 +14,10 @@ import anti.text;
 
 /// Write `value` as a JSON object.
 ///
-/// A null pointer writes `null`.
+/// A pointer that is `none` writes `null`.
 pub fn write(value: *Object, out: *text.Builder)
 {
-	if value == null {
+	if value == none {
 		out.append("null");
 		return;
 	}

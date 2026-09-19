@@ -41,8 +41,8 @@ pub class Parser
 	pub fn new(program: str, about: str) -> Parser
 	{
 		let p = Parser { program: program, about: about,
-			options: []Option { ptr: null, len: 0 }, count: 0,
-			rest: []str { ptr: null, len: 0 }, rest_count: 0,
+			options: []Option { ptr: none, len: 0 }, count: 0,
+			rest: []str { ptr: none, len: 0 }, rest_count: 0,
 			said: text.Builder.new() };
 		p.flag("help", 0x68, "write this text and stop");
 		return p;
@@ -88,7 +88,7 @@ pub class Parser
 			let taken = try self.read_option(arg, argv, i);
 			i = i + taken;
 		}
-		return null;
+		return none;
 	}
 
 	/// Whether the command line gave the option called `name`.
@@ -248,7 +248,7 @@ pub class Parser
 		*taken = 1;
 		if !self.options[at].takes {
 			self.options[at].given = true;
-			return null;
+			return none;
 		}
 		if !has_value {
 			if i + 1 >= argv.len {
@@ -260,7 +260,7 @@ pub class Parser
 		}
 		self.options[at].given = true;
 		self.options[at].value = value;
-		return null;
+		return none;
 	}
 
 	/// Add one option to the declarations.
@@ -285,7 +285,7 @@ pub class Parser
 				size = size * 2;
 			}
 			let room = alloc(str, size);
-			if self.rest.ptr != null {
+			if self.rest.ptr != none {
 				memcpy(room as *byte, self.rest.ptr as *byte,
 					(self.rest_count * size_of(str)) as c_size_t);
 				free(self.rest.ptr);
@@ -310,7 +310,7 @@ pub class Parser
 			size = size * 2;
 		}
 		let room = alloc(Option, size);
-		if self.options.ptr != null {
+		if self.options.ptr != none {
 			memcpy(room as *byte, self.options.ptr as *byte,
 				(self.count * size_of(Option)) as c_size_t);
 			free(self.options.ptr);
