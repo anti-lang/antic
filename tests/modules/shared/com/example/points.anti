@@ -1,0 +1,22 @@
+//! A class that a program of another module builds, tests and compares.
+//! The test `shared_class` links it in release mode and in dev mode.
+
+/// A point that this module and the program both build.
+pub class Point
+{
+	pub x: int = 0,
+	pub y: int = 0,
+}
+
+/// A point that this module allocates.
+pub fn make(x: int) -> *Point
+{
+	return alloc Point { x: x };
+}
+
+/// Whether `o` is a point, tested against the descriptor this module
+/// names.
+pub fn is_point(o: *Object) -> bool
+{
+	return o is *Point;
+}

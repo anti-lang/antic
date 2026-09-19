@@ -1,0 +1,32 @@
+//! Tests a class of module `com.example.points` from another module. The
+//! program and the library name one descriptor and one table, so `is`,
+//! `==`, `equals` and `reflect.new` agree whichever module made the
+//! object.
+
+import com.example.points;
+import anti.reflect;
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let made = points.make(3);
+	let here = alloc points.Point { x: 3, y: 0 };
+	let o: *Object = made;
+	let same: *Object = made;
+
+	printf("%d %d\n".ptr, (o is *points.Point) as c_int,
+		points.is_point(here) as c_int);
+	printf("%d %d %d\n".ptr, (o == same) as c_int, (o == here) as c_int,
+		made.equals(here) as c_int);
+	let built = reflect.new("com.example.points.Point");
+	if built == null {
+		return 1;
+	}
+	printf("%d %d\n".ptr, (built is *points.Point) as c_int,
+		points.is_point(built) as c_int);
+	delete(made);
+	delete(here);
+	delete(built);
+	return 0;
+}

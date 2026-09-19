@@ -13,6 +13,9 @@ language or a user of the tools can observe.
   `--dump-ir` shows the IR before them.
 - The program holds the IR of every module in both modes. A library file carries the IR
   of its module, and antic loads every library file that the program imports.
+- In dev mode the pass reads the tables of other modules before the optimizer turns their
+  data into external symbols. The data the pass writes belong to module `anti.rt` or to no
+  module, so they stay in the object that links.
 
 ## What the IR carries for it
 

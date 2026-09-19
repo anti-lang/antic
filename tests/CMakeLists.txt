@@ -710,6 +710,24 @@ add_test(NAME classlib
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/classlib"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_classlib.cmake")
 
+# A program of two modules holds one descriptor and one table per class,
+# so `is`, `==`, `equals` and `reflect.new` agree whichever module made
+# the object, in release mode and in dev mode
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME shared_class_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/shared"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_shared_class.cmake")
+endforeach()
+
 # The internal level: a module of the same package sees an internal item
 # of a library, and a module of another package does not.
 add_test(NAME internal_package

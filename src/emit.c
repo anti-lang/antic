@@ -141,7 +141,8 @@ static bool reloc_at(struct text *out, enum target t,
 /* The bytes of one global, with an address written as the symbol it
    names, so that the linker fills in the eight bytes. */
 static void emit_global(struct text *out, enum target t,
-                        const struct ir_module *m, const struct ir_global *g)
+                        const struct ir_module *m, const struct ir_global *g,
+                        bool module)
 {
     struct text name = {0};
     uint64_t align;
@@ -160,6 +161,18 @@ static void emit_global(struct text *out, enum target t,
         text_appendf(out, "    .globl %s\n", text_cstr(&name));
     } else {
         mangle(&name, t, g->module, g->name);
+    }
+    /* DESIGN: in an object of one module, a datum is global and hidden,
+       as a function is, so the other modules name the one copy. */
+    if (module && !g->exported) {
+        text_appendf(out, "    .globl %s\n", text_cstr(&name));
+        if (target_info(t)->format != FORMAT_COFF) {
+            text_appendf(out, "    %s %s\n",
+                         target_info(t)->format == FORMAT_MACHO
+                             ? ".private_extern"
+                             : ".hidden",
+                         text_cstr(&name));
+        }
     }
     text_appendf(out, "%s:\n", text_cstr(&name));
     text_free(&name);
@@ -192,7 +205,7 @@ static void emit_global(struct text *out, enum target t,
    loader writes, and every other global to the read-only section. The two
    are written in one pass each, so each section is named once. */
 static void emit_data(struct text *out, enum target t,
-                      const struct ir_module *m)
+                      const struct ir_module *m, bool module)
 {
     enum object_format format = target_info(t)->format;
     bool relocated = false;
@@ -212,13 +225,13 @@ static void emit_data(struct text *out, enum target t,
             relocated = true;
             continue;
         }
-        emit_global(out, t, m, m->globals[i]);
+        emit_global(out, t, m, m->globals[i], module);
     }
     if (written) {
         text_appendf(out, "    .section %s\n", mutable_sections[format]);
         for (i = 0; i < m->global_count; i++) {
             if (m->globals[i]->mutable && !m->globals[i]->is_extern) {
-                emit_global(out, t, m, m->globals[i]);
+                emit_global(out, t, m, m->globals[i], module);
             }
         }
     }
@@ -229,7 +242,7 @@ static void emit_data(struct text *out, enum target t,
     for (i = 0; i < m->global_count; i++) {
         if (!m->globals[i]->mutable && m->globals[i]->reloc_count > 0 &&
             !m->globals[i]->is_extern) {
-            emit_global(out, t, m, m->globals[i]);
+            emit_global(out, t, m, m->globals[i], module);
         }
     }
 }
@@ -269,7 +282,7 @@ static bool emit(struct text *out, enum target t, const struct ir_module *m,
         }
     }
     if (m->global_count > 0) {
-        emit_data(out, t, m);
+        emit_data(out, t, m, one_module);
     }
     /* Without this note GNU ld may mark the stack executable. */
     if (info->format == FORMAT_ELF) {

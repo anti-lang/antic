@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "target.h"
+
 /* DESIGN: the passes rely on three properties and nothing else.
    1. The IR passes ir_verify, including its check that every path to a
       use of a temporary passes a definition of it.
@@ -1359,9 +1361,13 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
         }
     }
     /* The table and the descriptor of an export class are entries of
-       their own, because C code reads them and no Anti code has to. */
+       their own, because C code reads them and no Anti code has to. In an
+       object of one module every datum of the module stays, because
+       another module may name a descriptor that no function here does. */
     for (i = 0; i < m->global_count; i++) {
-        if (m->globals[i]->exported) {
+        const struct ir_global *g = m->globals[i];
+        if (g->exported || (all && !g->is_extern && g->module != NULL &&
+                            strcmp(g->module, entry) == 0)) {
             live_globals[i] = true;
         }
     }
@@ -1483,6 +1489,17 @@ static void drop_body(struct ir_function *f)
     f->is_extern = true;
 }
 
+/* Make g a declaration of data that the object of its module defines. */
+static void drop_data(struct ir_global *g)
+{
+    g->value = NULL;
+    g->bytes = NULL;
+    g->size = 0;
+    g->relocs = NULL;
+    g->reloc_count = 0;
+    g->is_extern = true;
+}
+
 void ir_optimize_module(struct ir_module *program, const char *module)
 {
     size_t i;
@@ -1496,6 +1513,20 @@ void ir_optimize_module(struct ir_module *program, const char *module)
             drop_body(f);
         } else {
             ir_optimize_function(f);
+        }
+    }
+    /* DESIGN: the object of a module holds the one copy of its data, and
+       every other object refers to it by symbol. A class's descriptor and
+       tables then have one address in the program, which `is`, `==` and
+       the registry compare. The passes over the whole program write data
+       of the runtime module and data without a module, and those belong
+       to the object that links. */
+    for (i = 0; i < program->global_count; i++) {
+        struct ir_global *g = program->globals[i];
+        if (!g->is_extern && g->module != NULL &&
+            strcmp(g->module, module) != 0 &&
+            strcmp(g->module, RUNTIME_MODULE) != 0) {
+            drop_data(g);
         }
     }
     remove_unused_functions(program, module, true);
