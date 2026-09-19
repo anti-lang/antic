@@ -83,7 +83,7 @@ let f: fn(int) -> int = double;
 
 ## Literals
 
-Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications. `true`, `false`, `null`. Literals take their type from context.
+Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications. `true`, `false`, `none`. Literals take their type from context.
 
 ```anti
 let a = 1_000_000;
@@ -112,7 +112,7 @@ Not built yet: `undefined`.
 
 ## Operators
 
-C precedence. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`. Conversion `x as T`, checked downcast `p as *T`, nullable downcast `p as? *T`, type test `p is *T`. Wrapping `+% -% *% <<%` and saturating `+| -| *|`. Null coalescing `??` and null chaining `?.`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest. No `++`, no `?:`.
+C precedence. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`. Conversion `x as T`, checked downcast `p as *T`, nullable downcast `p as? *T`, type test `p is *T`. Wrapping `+% -% *% <<%` and saturating `+| -| *|`. Coalescing `??` and chaining `?.` over `none`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest. No `++`, no `?:`.
 
 ```anti
 let q = a / b;
@@ -205,7 +205,7 @@ Not built yet: default values and named arguments.
 
 ## Errors
 
-Every function that can fail returns `*Error`, `null` on success, with results through out pointers. The forms are `catch` at the call, `try` to propagate, `try { }` for a block, `catch fatal` to stop. A bare failing call is a compile error.
+Every function that can fail returns `*Error`, `none` on success, with results through out pointers. The forms are `catch` at the call, `try` to propagate, `try { }` for a block, `catch fatal` to stop. A bare failing call is a compile error.
 
 ```anti
 let n = text.parse_int(s) catch e {
@@ -219,7 +219,7 @@ fn load(path: str, out: *Config) -> *Error
 {
 	let f = try fs.open(path);
 	...
-	return null;
+	return none;
 }
 
 try {
@@ -318,7 +318,7 @@ final class Circle
 	{
 		if r <= 0.0 { return Error.new(1, "radius"); }
 		self.r = r;
-		return null;
+		return none;
 	}
 
 	concrete fn area(self) -> f32 { return 3.14 * self.r * self.r; }
@@ -336,11 +336,11 @@ c.move(1.0, 1.0);
 - `pub fn` goes into the table and is visible everywhere, `protected fn` to the class and its chain, `fn` to the class only. A function without `self` is static: `Circle.new(...)`.
 - `abstract class` is required when any function has no body. `final class` and `final fn` forbid inheritance and replacement.
 - `concrete fn` replaces an inherited entry, `concrete fn Base::f` documents which, `concrete fn Iface::f` fills one interface's table only.
-- Fields are private unless `pub` or `protected`. A literal outside the class names `pub` fields only. Defaults fill the rest, then `construct` runs.
+- Fields are private unless `pub` or `protected`. A literal outside the class names `pub` fields only. Defaults fill the rest, then `construct` runs. An inline class field without a default takes `T { }` when every field of `T` has a default or `T` has none, and `construct` runs on it. Otherwise the literal must name it.
 - `alloc T { fields }` and `alloc T(args)` create on the heap and return `*T`. `T { fields }` and `T(args)` are values. `construct` with arguments may fail.
-- `delete(p)` runs `destruct` up the chain, frees owned fields, frees the object. `destroy(&v)` does the same without the free. A value is destroyed at the end of its block.
-- `dup(p)` is a deep copy through ownership. `=` between values with owned fields is refused.
-- `p is *T`, `p as *T` checked, `p as? *T` nullable. `==` on class pointers is object identity.
+- `delete(p)` runs `destruct` up the chain, frees owned fields, frees the object. `destroy(&v)` does the same without the free. A value is destroyed at the end of its block, and so is each element of a local array of them, last to first.
+- `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
+- `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
 
 Built: the model without interfaces, private fields, `construct` with arguments, `destruct` rename and scope-end destruction. See the completion work order for the rest.
 
@@ -380,7 +380,7 @@ Not built yet.
 
 ## Ownership
 
-`own` on a pointer or slice field says the object owns the memory. `destruct`, `dup`, `equals` and `serialize` follow it. Inline class and struct fields are owned by definition.
+`own` on a pointer or slice field says the object owns the memory. `destruct`, `dup`, `equals` and `serialize` follow it. Inline class and struct fields are owned by definition. The compiler writes a teardown and a copy for every class, which `delete`, `destroy` and `dup` call, so `--no-reflect` loses nothing about ownership. An `own` slice of class values destroys its elements last to first, as a local array does. `alloc(T, n)` of a class gives zeroed memory, so an element not filled yet has a zero table. `delete`, `destroy` and `dup` trap on a zero table with the class name in every mode, and `is`, `as` and a dispatch do in dev mode. `=` into such an element destroys nothing.
 
 ```anti
 class Buffer
@@ -393,13 +393,13 @@ class Buffer
 
 ## Pointers
 
-`*T` is never null. `?*T` may be null and must be checked before use. The check narrows the type for the block.
+`none` is the pointer that points to no value. It is a concept of the language, and zero is today's encoding of it. `*T` is never `none`. `?*T` may be `none` and must be checked before use. The check narrows the type for the block.
 
 ```anti
 fn find(name: str) -> ?*Node { }
 
 let n = find("root");
-if n != null {
+if n != none {
 	n.value = 1;          // n is *Node here
 }
 let m = n else { return 1; };
@@ -425,7 +425,7 @@ reflect.call(obj, m, []);
 let fresh = reflect.new("Circle");
 ```
 
-`anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash`, `serialize`, `copy` and `destruct` with defaults over the descriptor. `--no-reflect` drops the field and function lists.
+`anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `--no-reflect` drops the field and function lists.
 
 Built: descriptors, `get`, `set`. Not built yet: `call`, `new`, `Value`.
 
@@ -658,7 +658,7 @@ Not built yet.
 
 ## Reserved words
 
-Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for in break continue return defer undo try catch yield assert show unreachable undefined embed as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join sync chan send recv select atomic true false null tests fixtures provides`.
+Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for in break continue return defer undo try catch yield assert show unreachable undefined embed as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join sync chan send recv select atomic true false none tests fixtures provides`.
 
 Contextual words: `packed align by final own operator mutable trace inject compatible`.
 
