@@ -6,8 +6,9 @@
    DESIGN: the self-pipe is what makes the callback an ordinary function.
    Anything else would run Anti code inside a handler, where a call of
    malloc or of the runtime is undefined. Windows has no signals of that
-   kind. Its console control handler runs on a thread of its own, so it
-   calls the function directly. */
+   kind. Its console control handler runs on a thread of its own, and the
+   C runtime calls a handler of raise on the thread that raised, so both
+   call the function directly. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)
@@ -17,11 +18,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <signal.h>
+
 #if defined(_WIN32)
 #include <windows.h>
 #else
 #include <pthread.h>
-#include <signal.h>
 #include <unistd.h>
 #endif
 
@@ -101,6 +103,21 @@ static BOOL WINAPI on_console(DWORD event)
     f(sig);
     return TRUE;
 }
+
+/* The C runtime of Windows answers raise from a table of its own. Its
+   default ends the program with code 3, and the console handler above
+   never sees a raised signal. The C runtime resets the handler before it
+   calls it, so the handler installs itself again. */
+static void __cdecl on_raise(int sig)
+{
+    void (*f)(int64_t) = handlers[sig];
+
+    signal(sig, on_raise);
+    anti_rt_atomic_store(&pending, (int64_t)sizeof pending, sig);
+    if (f != NULL) {
+        f(sig);
+    }
+}
 #endif
 
 void anti_rt_on_signal(int64_t sig, void (*f)(int64_t))
@@ -114,6 +131,7 @@ void anti_rt_on_signal(int64_t sig, void (*f)(int64_t))
         SetConsoleCtrlHandler(on_console, TRUE);
         started = 1;
     }
+    signal((int)sig, on_raise);
 #else
     if (!start_reader()) {
         return;
