@@ -38,3 +38,13 @@ foreach(script install.ps1 uninstall.ps1)
                             "for a package of another processor")
     endif()
 endforeach()
+
+# A package that carries Zig's stubs links for macOS with no SDK, so
+# install.sh asks for the Command Line Tools only for a package without
+# them.
+file(READ "${ROOT}/tools/install.sh" text)
+string(FIND "${text}" "/sysroot/macos-$arch/usr/lib/libSystem.tbd" found)
+if(found EQUAL -1)
+    message(FATAL_ERROR "tools/install.sh takes the SDK stubs of a Mac even "
+                        "for a package that carries Zig's")
+endif()

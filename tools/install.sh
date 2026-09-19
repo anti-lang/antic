@@ -230,21 +230,29 @@ if [ -z "$cmake" ]; then
     cmake=$(find "$home/tools/cmake" -name cmake -type f -perm -u+x | head -1)
 fi
 
+# DESIGN: a package that carries Zig's stubs links for macOS with no SDK.
+# A program that names a framework takes the SDK of the Command Line Tools,
+# which antic finds on its own. A package without the stubs, as 0.1.0 is,
+# takes the stubs of the Command Line Tools here.
 case $host in
 macos-*)
-    if [ ! -d /Library/Developer/CommandLineTools/SDKs ]; then
-        say "the macOS SDK is missing. Apple installs it with xcode-select --install"
-        if ask "Run xcode-select --install now?"; then
-            xcode-select --install || true
-            say "run this installer again when the Command Line Tools are in place"
-            exit 0
+    if [ -f "$home/sysroot/macos-$arch/usr/lib/libSystem.tbd" ]; then
+        say "the package links for macOS with Zig's stubs of libSystem"
+    else
+        if [ ! -d /Library/Developer/CommandLineTools/SDKs ]; then
+            say "the macOS SDK is missing. Apple installs it with xcode-select --install"
+            if ask "Run xcode-select --install now?"; then
+                xcode-select --install || true
+                say "run this installer again when the Command Line Tools are in place"
+                exit 0
+            fi
+            fail "no SDK, so no linking for macOS"
         fi
-        fail "no SDK, so no linking for macOS"
+        say "taking the SDK stubs from the Command Line Tools"
+        "$cmake" -DDEST="$home/sysroot" -DLLVM_BIN="$home/bin" \
+            -DTARGETS="macos-arm64;macos-x86_64" \
+            -P "$home/tools/get-sysroot.cmake" >/dev/null
     fi
-    say "taking the SDK stubs from the Command Line Tools"
-    "$cmake" -DDEST="$home/sysroot" -DLLVM_BIN="$home/bin" \
-        -DTARGETS="macos-arm64;macos-x86_64" \
-        -P "$home/tools/get-sysroot.cmake" >/dev/null
     ;;
 esac
 

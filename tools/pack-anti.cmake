@@ -5,23 +5,26 @@
 #
 # CLANG is the pinned clang of build/clang, LLVM_BIN its tools, SYSROOT
 # the directory of tools/get-sysroot.cmake and RUNTIME the runtime that the
-# CMake build wrote. For each host it compiles antic for that host and lays
-# the package out around it. ANTIC names an antic already built for the one
-# host of HOSTS, which the package takes instead, and then CLANG and
-# LLVM_BIN are not needed:
+# CMake build wrote. For each host it compiles antic and anti for that host
+# and lays the package out around them. ANTIC and ANTI name the programs
+# already built for the one host of HOSTS, which the package takes
+# instead, and then CLANG and LLVM_BIN are not needed:
 #
-#   bin/        antic
+#   bin/        antic and anti
 #   lib/<t>/    the runtime library of all six targets
 #   std/        the standard library
-#   sysroot/    the two Linux sysroots, which are ours to redistribute
+#   sysroot/    the two Linux sysroots and the two macOS sysroots of Zig's
+#               stubs, which are ours to redistribute
 #   tools/      the scripts that install the sysroot of the host
 #   licenses/   one file per component
 #
 # The result is anti-<version>-<host>.tar.xz in DEST, with its digest in
-# SHA256SUMS. The macOS SDK stubs and the Microsoft CRT stay out, because
-# neither licence allows redistribution. The installer adds them, and it
-# adds the five LLVM tools from the release that tools/llvm-pin names. The
-# package carries no key: the installer holds the key that checks them.
+# SHA256SUMS. The stubs of Apple's SDK in sdk/ of a macOS sysroot and the
+# Microsoft CRT stay out, because neither licence allows redistribution. A
+# user brings the first from a Mac with anti sdk import, and the installer
+# adds the second. It adds the five LLVM tools from the release that
+# tools/llvm-pin names. The package carries no key: the installer holds
+# the key that checks them.
 cmake_minimum_required(VERSION 3.20)
 
 set(needed DEST SYSROOT RUNTIME HOSTS)
@@ -65,8 +68,9 @@ file(STRINGS "${root}/CMakeLists.txt" line REGEX "^    VERSION ")
 string(REGEX REPLACE "^    VERSION " "" version "${line}")
 if(DEFINED ANTIC)
     list(LENGTH HOSTS count)
-    if(NOT count EQUAL 1)
-        message(FATAL_ERROR "ANTIC is the antic of one host, and HOSTS names ${HOSTS}")
+    if(NOT count EQUAL 1 OR NOT DEFINED ANTI)
+        message(FATAL_ERROR "ANTIC and ANTI are the programs of one host, and "
+                            "HOSTS names ${HOSTS}")
     endif()
 else()
     execute_process(COMMAND "${CLANG}" -print-resource-dir
@@ -90,15 +94,22 @@ function(triple_of host out)
     message(FATAL_ERROR "unknown host ${host}")
 endfunction()
 
-# Compile and link antic for one host. Each family of targets reads its
-# headers from a different place: the SDK of this Mac, the musl sysroot, or
-# the Microsoft headers that xwin wrote.
-function(build_antic host output)
+# Compile and link antic or anti for one host. Each family of targets reads
+# its headers from a different place: the SDK of this Mac, the musl
+# sysroot, or the Microsoft headers that xwin wrote. anti takes the sources
+# of antic but its main.c, and those of tools/anti.
+function(build_program host output program)
     triple_of("${host}" triple)
     file(GLOB sources "${root}/src/*.c")
+    if(program STREQUAL "anti")
+        list(REMOVE_ITEM sources "${root}/src/main.c")
+        file(GLOB anti_sources "${root}/tools/anti/*.c")
+        list(APPEND sources ${anti_sources})
+    endif()
     set(common --target=${triple} -std=c11 -O2 -Wall -Wextra -Wpedantic
                -Werror "-ffile-prefix-map=${root}=."
-               "-DANTIC_VERSION=\"${version}\"" -I "${root}/src")
+               "-DANTIC_VERSION=\"${version}\"" -I "${root}/src"
+               -I "${root}/tools/anti")
     set(link "")
     if(host MATCHES "^macos-")
         execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE sdk
@@ -128,9 +139,10 @@ function(build_antic host output)
         # The clang driver looks for the start files of gcc on Linux, so
         # the objects go to ld.lld with the musl ones instead.
         set(objects "")
+        file(MAKE_DIRECTORY "${DEST}/work/${host}/${program}")
         foreach(source IN LISTS sources)
             get_filename_component(name "${source}" NAME_WE)
-            set(object "${DEST}/work/${host}/${name}.o")
+            set(object "${DEST}/work/${host}/${program}/${name}.o")
             execute_process(COMMAND "${CLANG}" ${common} -c -o "${object}"
                                     "${source}" RESULT_VARIABLE failed)
             if(failed)
@@ -150,7 +162,7 @@ function(build_antic host output)
                                 ${sources} RESULT_VARIABLE failed)
     endif()
     if(failed)
-        message(FATAL_ERROR "${host}: antic did not link")
+        message(FATAL_ERROR "${host}: ${program} did not link")
     endif()
 endfunction()
 
@@ -167,8 +179,10 @@ foreach(host IN LISTS HOSTS)
     endif()
     if(DEFINED ANTIC)
         file(COPY_FILE "${ANTIC}" "${tree}/bin/antic${suffix}")
+        file(COPY_FILE "${ANTI}" "${tree}/bin/anti${suffix}")
     else()
-        build_antic("${host}" "${tree}/bin/antic${suffix}")
+        build_program("${host}" "${tree}/bin/antic${suffix}" antic)
+        build_program("${host}" "${tree}/bin/anti${suffix}" anti)
     endif()
 
     foreach(target IN LISTS TARGETS)
@@ -179,11 +193,16 @@ foreach(host IN LISTS HOSTS)
     foreach(target linux-x86_64 linux-arm64)
         file(COPY "${SYSROOT}/${target}" DESTINATION "${tree}/sysroot")
     endforeach()
+    # The stubs and headers of Zig go in, and never the SDK of Apple in sdk/.
+    foreach(target macos-arm64 macos-x86_64)
+        file(COPY "${SYSROOT}/${target}/usr" "${SYSROOT}/${target}/sdk-version"
+             DESTINATION "${tree}/sysroot/${target}")
+    endforeach()
     file(COPY "${SYSROOT}/licenses/" DESTINATION "${tree}/licenses")
     # The installer reads llvm-pin, and checks the LLVM release with the key
     # it holds itself.
-    foreach(name get-sysroot.cmake sysroot-pins cmake-pin cmake-version
-            llvm-version llvm-pin package-api)
+    foreach(name get-sysroot.cmake sysroot-pins zig-stubs-pin cmake-pin
+            cmake-version llvm-version llvm-pin package-api)
         file(COPY "${root}/tools/${name}" DESTINATION "${tree}/tools")
     endforeach()
     file(COPY "${root}/LICENSE" DESTINATION "${tree}")
