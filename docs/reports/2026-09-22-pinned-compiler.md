@@ -28,14 +28,30 @@ llvm-tools report of the same date covers the archives.
 
 ## Tests
 
-With the archives installed from the local build, 407 of 407 pass on the Mac, and
-ASan and UBSan pass 406 of 406 each. Every cache names `build/clang/bin/clang`.
+A fresh clone set up by the steps of the README downloaded clang and the LLVM tools of
+`23.1.1-anti.2`, checked each against its pin and the signature, and cached
+`build/clang/bin/clang` as `CMAKE_C_COMPILER`. It fetched all six sysroots, and both
+Windows trees matched their pinned digests. The full suite passed 408 of 408, and ASan
+and UBSan passed 407 of 407 each. The LLVM step of both installers took the tools of
+`23.1.1-anti.2` on the Mac and both VMs for all six hosts. A copy with another key
+refused them.
+
+## Corrections
+
+- The build steps of the README fetched four sysroots and left out both Windows
+  targets. They fetch all six again, and the first fresh clone failed `package_keys`
+  until then.
+- `tools/get-sysroot.cmake` hashed no file of a Windows tree under a relative `DEST`,
+  the form the README passes. It makes `DEST` absolute now, and the test
+  `sysroot_digest` checks it.
+- The owner confirmed that every antic produces binaries for all six targets. The
+  provisional entry that left the Apple stubs to a Mac gave way to it. `CLAUDE.md` now
+  holds that a provisional entry binds until the owner reviews it.
 
 ## Not done
 
-- The release of `23.1.1-anti.2` waits for the signature of the owner. Until it is
-  published, a fresh checkout cannot configure, so these commits stay unpushed.
-- The configure of a fresh checkout that downloads both archives, and the installer
-  runs on the VMs and the Mac, wait for the release.
+- A Linux or Windows host fetches no Apple stubs yet, so it links no macOS program.
+- A sanitizer build on Linux or Windows takes `-DANTIC_SYSTEM_COMPILER=ON` until
+  `23.1.1-anti.3` carries their sanitizer runtimes.
 - No macos-x86_64 package is published. That needs a release of Anti on anti-lang.com.
 - `std/` has no C sources yet, so the pinned clang compiles none there.
