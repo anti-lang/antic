@@ -6,7 +6,6 @@ import anti.json;
 import anti.log;
 import anti.text;
 
-extern fn setenv(name: *byte, value: *byte, overwrite: c_int) -> c_int;
 extern fn fopen(path: *byte, mode: *byte) -> *byte;
 extern fn fclose(file: *byte) -> c_int;
 extern fn fwrite(bytes: *byte, size: c_size_t, count: c_size_t,
@@ -67,7 +66,6 @@ fn main() -> int
 {
 	write_file("log-test.toml", CONFIG);
 	write_file("log-test.out", "");
-	setenv("ANTI_LOGGER".ptr, "log-test.toml".ptr, 1 as c_int);
 
 	/* The first call builds the logger the file asks for. */
 	log.info("dropped by the level of the file");

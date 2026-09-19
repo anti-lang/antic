@@ -235,6 +235,10 @@ foreach(source IN LISTS std_sources)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
 
+# The file of the logger that tests/std/log.anti writes. The environment
+# of the test names it, since the C runtime of Windows has no setenv.
+set_tests_properties(std_log PROPERTIES ENVIRONMENT "ANTI_LOGGER=log-test.toml")
+
 # Struct passing checked against C: the functions of tests/abi/structs.c,
 # compiled by the C compiler of the build, take and return structs by value.
 add_library(abi_structs OBJECT abi/structs.c)

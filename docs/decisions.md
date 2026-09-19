@@ -91,6 +91,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - [provisional] The default `serialize` writes a field the descriptor cannot read as `null`. A `str` field is such a field. Reason: the field list records the width of a field and not its type, so a `str` and a struct without a descriptor of its own look alike. A class that wants its text replaces `serialize`.
 
 - [provisional] `Error.from_win32` is one function on every target. On Windows it reads `GetLastError` and formats the message, and everywhere else it gives code 0 and an empty message. Reason: no Windows machine here runs the test suite. A function that exists on one target alone would also make a program for six targets fail to compile for five.
+- The file sink of `anti.log` opens its file in binary mode. Reason: the C runtime of Windows writes a text-mode file with CRLF. The log of one program then differed by host, which `std_log` showed on the Windows VM.
 
 ## Numeric types
 
