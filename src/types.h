@@ -90,6 +90,13 @@ struct symbolic {
 struct type {
     enum type_kind kind;
     struct type *element;           /* TYPE_POINTER, TYPE_ARRAY, TYPE_SLICE */
+    /* DESIGN: `?*T` is a pointer that may hold `none` and `*T` is one
+       that never does. The two are distinct types, so the difference is
+       a pointer comparison like every other, and the flag belongs to the
+       key that interns them. They have the same layout: nothing is
+       emitted for the difference, and the checks are the ones the
+       program wrote. */
+    bool nullable;                  /* TYPE_POINTER: `?*T` */
     uint64_t length;                /* TYPE_ARRAY, 0 when symbolic */
     const struct symbolic *length_of; /* TYPE_ARRAY, a symbolic length */
     struct type **params;           /* TYPE_FN */
@@ -132,7 +139,16 @@ struct types {
 
 void types_init(struct types *types, struct arena *arena);
 struct type *types_builtin(struct types *types, enum type_kind kind);
+/* `*T`, the pointer that never holds `none`. */
 struct type *types_pointer(struct types *types, struct type *element);
+/* `?*T`, the pointer that may hold `none`. */
+struct type *types_pointer_nullable(struct types *types,
+                                    struct type *element);
+/* Either of the two, for a caller that carries the answer in a value. */
+struct type *types_pointer_of(struct types *types, struct type *element,
+                              bool nullable);
+/* Whether t is `?*T`. */
+bool type_is_nullable(const struct type *t);
 struct type *types_array(struct types *types, struct type *element,
                          uint64_t length);
 struct type *types_slice(struct types *types, struct type *element);

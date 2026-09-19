@@ -6,11 +6,11 @@ import anti.json;
 import anti.log;
 import anti.text;
 
-extern fn fopen(path: *byte, mode: *byte) -> *byte;
-extern fn fclose(file: *byte) -> c_int;
-extern fn fwrite(bytes: *byte, size: c_size_t, count: c_size_t,
-	file: *byte) -> c_size_t;
-extern fn fgets(into: *byte, size: c_int, file: *byte) -> *byte;
+extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
+extern fn fclose(file: ?*byte) -> c_int;
+extern fn fwrite(bytes: ?*byte, size: c_size_t, count: c_size_t,
+	file: ?*byte) -> c_size_t;
+extern fn fgets(into: ?*byte, size: c_int, file: ?*byte) -> ?*byte;
 
 const CONFIG: str = "level = \"warn\"\nformat = \"text\"\n\n[[sink]]\nkind = \"file\"\npath = \"log-test.out\"\n";
 
@@ -54,7 +54,7 @@ fn show_file(path: str)
 		io.println("no file");
 		return;
 	}
-	let room = alloc(byte, 512);
+	let room = alloc(byte, 512) else { return; };
 	while fgets(room, 512 as c_int, file) != none do {
 		seen(text.from_c(room));
 	}
@@ -74,7 +74,8 @@ fn main() -> int
 	show_file("log-test.out");
 
 	let sink = log.CallbackSink.new(seen);
-	let before = log.set(log.Logger.new("test", log.Level.Info, sink));
+	let before = log.set(log.Logger.new("test", log.Level.Info, sink))
+		else { return 1; };
 	delete(before);
 
 	log.trace("dropped");

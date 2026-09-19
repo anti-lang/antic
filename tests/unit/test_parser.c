@@ -656,4 +656,25 @@ void test_parser(void)
             {1, 30, "expected an item"}};
         errors("struct P { const N: int = 1; }\n", e, 2);
     }
+
+    /* `?*T` is a pointer that may hold `none`, and it nests like `*T`. */
+    tree("fn f(p: ?*int) -> ?*byte {\n"
+         "    let q: ?**int = none;\n"
+         "    return none;\n"
+         "}\n",
+         "function f\n"
+         "  param p\n"
+         "    type ?*\n"
+         "      type int\n"
+         "  result\n"
+         "    type ?*\n"
+         "      type byte\n"
+         "  block\n"
+         "    let_stmt q\n"
+         "      type ?*\n"
+         "        type *\n"
+         "          type int\n"
+         "      none\n"
+         "    return_stmt\n"
+         "      none\n");
 }

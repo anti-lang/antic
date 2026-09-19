@@ -8,7 +8,7 @@ class Circle
 {
 	pub r: f32 = 0.0,
 
-	fn construct(self, r: f32) -> *error.Error
+	fn construct(self, r: f32) -> ?*error.Error
 	{
 		if r <= 0.0 {
 			return error.Error.new(1, "radius must be positive");
@@ -28,7 +28,7 @@ fn main() -> int
 		return 2;
 	}
 	io.println("value");
-	let bad = alloc Circle(-1.0) catch e {
+	let bad: ?*Circle = alloc Circle(-1.0) catch e {
 		io.println("refused");
 		yield none;
 	};

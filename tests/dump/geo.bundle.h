@@ -44,7 +44,7 @@ Vec2 geo_scale(Vec2 v, int32_t k);
 /** Half of the float in n. */
 Num geo_half(Num n);
 /** The layer of the flags at f, with visible set. */
-uint32_t geo_layer(Flags *f);
+uint32_t geo_layer(Flags * /* non-null */ f);
 /** The squared length of v, through a function pointer. */
 int32_t geo_apply(int32_t (*f)(int32_t), Vec2 v);
 /** 1 once the runtime is initialised. */

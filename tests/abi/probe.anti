@@ -4,7 +4,7 @@
 //! one case that cannot clear the object prints the fields instead. See
 //! the design note at the head of probe.c.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 struct Wide
 {
@@ -157,7 +157,7 @@ fn size(name: str, n: int, box: int)
 fn main() -> int
 {
 	size("Wide", size_of(Wide), size_of(WideBox));
-	let wide = alloc(Wide, 1);
+	let wide = alloc(Wide, 1) else { return 1; };
 	clear(wide as *byte, size_of(Wide));
 	wide.a = 1;
 	dump("Wide.a", wide as *byte, size_of(Wide));
@@ -172,7 +172,7 @@ fn main() -> int
 	dump("Wide.d", wide as *byte, size_of(Wide));
 	free(wide);
 	size("Mixed", size_of(Mixed), size_of(MixedBox));
-	let mixed = alloc(Mixed, 1);
+	let mixed = alloc(Mixed, 1) else { return 1; };
 	clear(mixed as *byte, size_of(Mixed));
 	mixed.a = 1;
 	dump("Mixed.a", mixed as *byte, size_of(Mixed));
@@ -187,7 +187,7 @@ fn main() -> int
 	dump("Mixed.d", mixed as *byte, size_of(Mixed));
 	free(mixed);
 	size("Flags", size_of(Flags), size_of(FlagsBox));
-	let flags = alloc(Flags, 1);
+	let flags = alloc(Flags, 1) else { return 1; };
 	clear(flags as *byte, size_of(Flags));
 	flags.visible = 1;
 	dump("Flags.visible", flags as *byte, size_of(Flags));
@@ -202,7 +202,7 @@ fn main() -> int
 	dump("Flags.pad", flags as *byte, size_of(Flags));
 	free(flags);
 	size("Spread", size_of(Spread), size_of(SpreadBox));
-	let spread = alloc(Spread, 1);
+	let spread = alloc(Spread, 1) else { return 1; };
 	clear(spread as *byte, size_of(Spread));
 	spread.a = 1;
 	dump("Spread.a", spread as *byte, size_of(Spread));
@@ -217,7 +217,7 @@ fn main() -> int
 	dump("Spread.d", spread as *byte, size_of(Spread));
 	free(spread);
 	size("Tight", size_of(Tight), size_of(TightBox));
-	let tight = alloc(Tight, 1);
+	let tight = alloc(Tight, 1) else { return 1; };
 	clear(tight as *byte, size_of(Tight));
 	tight.a = 1;
 	dump("Tight.a", tight as *byte, size_of(Tight));
@@ -229,7 +229,7 @@ fn main() -> int
 	dump("Tight.c", tight as *byte, size_of(Tight));
 	free(tight);
 	size("TightBits", size_of(TightBits), size_of(TightBitsBox));
-	let tightBits = alloc(TightBits, 1);
+	let tightBits = alloc(TightBits, 1) else { return 1; };
 	clear(tightBits as *byte, size_of(TightBits));
 	tightBits.a = 1;
 	dump("TightBits.a", tightBits as *byte, size_of(TightBits));
@@ -238,7 +238,7 @@ fn main() -> int
 	dump("TightBits.b", tightBits as *byte, size_of(TightBits));
 	free(tightBits);
 	size("Aligned", size_of(Aligned), size_of(AlignedBox));
-	let aligned = alloc(Aligned, 1);
+	let aligned = alloc(Aligned, 1) else { return 1; };
 	clear(aligned as *byte, size_of(Aligned));
 	aligned.a = 1;
 	dump("Aligned.a", aligned as *byte, size_of(Aligned));
@@ -247,7 +247,7 @@ fn main() -> int
 	dump("Aligned.b", aligned as *byte, size_of(Aligned));
 	free(aligned);
 	size("BitUnion", size_of(BitUnion), size_of(BitUnionBox));
-	let bitUnion = alloc(BitUnion, 1);
+	let bitUnion = alloc(BitUnion, 1) else { return 1; };
 	clear(bitUnion as *byte, size_of(BitUnion));
 	bitUnion.a = 1;
 	dump("BitUnion.a", bitUnion as *byte, size_of(BitUnion));
@@ -256,7 +256,7 @@ fn main() -> int
 	dump("BitUnion.b", bitUnion as *byte, size_of(BitUnion));
 	free(bitUnion);
 	size("Breaks", size_of(Breaks), size_of(BreaksBox));
-	let breaks = alloc(Breaks, 1);
+	let breaks = alloc(Breaks, 1) else { return 1; };
 	clear(breaks as *byte, size_of(Breaks));
 	breaks.a = 1;
 	dump("Breaks.a", breaks as *byte, size_of(Breaks));

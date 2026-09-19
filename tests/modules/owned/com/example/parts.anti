@@ -1,7 +1,7 @@
 //! Classes that own memory, which the test `owned_modules` holds and
 //! extends in a program. Each prints when it is destroyed.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 pub class Leaf
 {
@@ -16,7 +16,7 @@ pub class Leaf
 pub class Part
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = none,
+	pub own leaf: ?*Leaf = none,
 
 	fn destruct(self)
 	{
@@ -28,7 +28,7 @@ pub class Part
 pub class Box
 {
 	pub n: int = 0,
-	own leaf: *Leaf = none,
+	own leaf: ?*Leaf = none,
 
 	fn destruct(self)
 	{

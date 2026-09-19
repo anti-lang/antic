@@ -1,6 +1,6 @@
 fn main() -> int
 {
-	let room = alloc([2]int, 1);
+	let room = alloc([2]int, 1) else { return 1; };
 	let values = (*room)[0..2];
 	for values {
 		return 1;

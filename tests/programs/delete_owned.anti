@@ -11,12 +11,12 @@
 //! whose inline field needs a teardown is torn down at the end of its
 //! block.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Leaf
 {
 	pub n: int = 0,
-	pub own next: *Leaf = none,
+	pub own next: ?*Leaf = none,
 
 	concrete fn destruct(self)
 	{
@@ -48,7 +48,7 @@ class Tag
 class Part
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = none,
+	pub own leaf: ?*Leaf = none,
 
 	concrete fn destruct(self)
 	{
@@ -61,7 +61,7 @@ class Outer
 	pub n: int = 0,
 	pub part: Part = Part { n: 0 },
 	use extra: Part = Part { n: 0 },
-	pub own named: *Named = none,
+	pub own named: ?*Named = none,
 
 	concrete fn destruct(self)
 	{
@@ -72,7 +72,7 @@ class Outer
 class Item
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = none,
+	pub own leaf: ?*Leaf = none,
 
 	concrete fn destruct(self)
 	{
@@ -108,11 +108,14 @@ fn main() -> int
 	let c = dup(o);
 	c.n = 40;
 	c.part.n = 50;
-	c.part.leaf.n = 70;
+	let c_part_leaf = c.part.leaf else { return 20; };
+	c_part_leaf.n = 70;
 	c.extra.n = 80;
-	c.extra.leaf.n = 90;
+	let c_extra_leaf = c.extra.leaf else { return 21; };
+	c_extra_leaf.n = 90;
+	let o_part_leaf = o.part.leaf else { return 22; };
 	printf("%d %d %d\n".ptr, (c.part.leaf != o.part.leaf) as c_int,
-		(c.extra.leaf != o.extra.leaf) as c_int, o.part.leaf.n as c_int);
+		(c.extra.leaf != o.extra.leaf) as c_int, o_part_leaf.n as c_int);
 	delete(c);
 	delete(o);
 
@@ -121,10 +124,12 @@ fn main() -> int
 	shelf.items[1] = Item { n: 14 };
 	let twin = dup(shelf);
 	twin.items[0].n = 120;
-	twin.items[0].leaf.n = 130;
+	let twin_leaf = twin.items[0].leaf else { return 23; };
+	twin_leaf.n = 130;
 	twin.items[1].n = 140;
+	let shelf_leaf = shelf.items[0].leaf else { return 24; };
 	printf("%d %d\n".ptr, (twin.items[0].leaf != shelf.items[0].leaf) as c_int,
-		shelf.items[0].leaf.n as c_int);
+		shelf_leaf.n as c_int);
 	delete(twin);
 	delete(shelf);
 

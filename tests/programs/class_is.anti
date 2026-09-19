@@ -2,7 +2,7 @@
 //! descriptor, so it holds for T and every class below it. `p as? *T`
 //! gives `none` where the test fails, and `p as *T` traps there.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 abstract class Shape
 {

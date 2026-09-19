@@ -6,7 +6,7 @@ import anti.io;
 import anti.reflect;
 import anti.text;
 
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 enum Level: i16 { Low = -1, High = 1 }
 
@@ -42,7 +42,7 @@ class Marked
 	pub on: bool = true,
 	pub letter: char = 'k',
 	pub name: str = "mark",
-	pub next: *Point = none,
+	pub next: ?*Point = none,
 	pub level: Level = Level.Low,
 	pub bytes: []byte,
 }
@@ -100,10 +100,11 @@ fn show(v: reflect.Value)
 fn main() -> int
 {
 	let m = alloc Marked { bytes: []byte { ptr: none, len: 0 } };
-	let d = reflect.describe(m as *byte);
+	let d = reflect.describe(m as *byte) else { return 1; };
+	let root = reflect.parent(d) else { return 1; };
 	io.println(reflect.name(d));
 	printf("%d %d\n".ptr, reflect.field_count(d) as c_int,
-		reflect.field_count(reflect.parent(d)) as c_int);
+		reflect.field_count(root) as c_int);
 
 	/* The type id of each field, and the type it is built on. */
 	let i = 0;
@@ -115,8 +116,8 @@ fn main() -> int
 		i += 1;
 	}
 
-	let all = reflect.new("Kinds");
-	let kinds = reflect.describe(all as *byte);
+	let all = reflect.new("Kinds") else { return 1; };
+	let kinds = reflect.describe(all as *byte) else { return 1; };
 	let expected = [reflect.TypeId.Bool, reflect.TypeId.Char,
 		reflect.TypeId.I8, reflect.TypeId.I16, reflect.TypeId.I32,
 		reflect.TypeId.I64, reflect.TypeId.CLong, reflect.TypeId.U8,
@@ -169,7 +170,7 @@ fn main() -> int
 		return 3;
 	}
 
-	let base = reflect.parent(d);
+	let base = reflect.parent(d) else { return 4; };
 	let x = reflect.field(base, 0);
 	printf("%s ".ptr, x.name.ptr);
 	show(reflect.get(m as *byte, base, 0));

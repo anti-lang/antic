@@ -2939,11 +2939,9 @@ static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
                                     const struct type *to)
 {
     uint32_t depth = class_depth(to);
-    struct ir_operand table = load_table(l, p, from);
-    struct ir_operand descriptor =
-        temp(l, ir_load(l->f, l->b, IR_PTR, table));
-    struct ir_operand object_depth =
-        descriptor_field(l, descriptor, 4, IR_I64);
+    struct ir_operand table;
+    struct ir_operand descriptor;
+    struct ir_operand object_depth;
     struct ir_block *deep;
     struct ir_block *join;
     uint32_t result;
@@ -2954,6 +2952,22 @@ static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
     result = ir_unary(l->f, l->b, IR_COPY, IR_I8, ir_int_op(IR_I8, 0));
     deep = new_block(l);
     join = new_block(l);
+    /* DESIGN: `is` and `as?` take a `?*T` as readily as a `*T`, and
+       `none` is of no class. The table lies behind the pointer, so the
+       test reads it only once the pointer proves to be there. This is
+       the one place the nullable rules add an instruction, and it sits
+       in a test that already branches. */
+    if (type_is_nullable(from)) {
+        struct ir_block *held = new_block(l);
+        ir_branch(l->f, l->b,
+                  temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, p,
+                                    ir_int_op(IR_PTR, 0))),
+                  held, join);
+        l->b = held;
+    }
+    table = load_table(l, p, from);
+    descriptor = temp(l, ir_load(l->f, l->b, IR_PTR, table));
+    object_depth = descriptor_field(l, descriptor, 4, IR_I64);
     ir_branch(l->f, l->b,
               temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, object_depth,
                                 ir_int_op(IR_I64, depth))),
@@ -4559,6 +4573,70 @@ static bool is_handled_call(const struct expr *e)
            e->as.call.handler.kind != HANDLE_NONE;
 }
 
+/* `let m = p catch fatal` and `let m = p catch e { }`. The handler runs
+   when p is `none`, with an `anti.error.NullPointer` in hand, and it
+   leaves the block or gives the binding a pointer with `yield`. */
+static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
+{
+    const struct handler *h = &s->as.let.guard;
+    const struct symbol *sym = s->as.let.symbol;
+    const struct type *error_type = s->as.let.guard_make->type->result;
+    struct ir_block *bad = new_block(l);
+    struct ir_block *join = new_block(l);
+    struct ir_operand place;
+    struct ir_operand err;
+    struct handling scope;
+    uint32_t error;
+
+    if (sym == NULL || l->b == NULL) {
+        return;
+    }
+    place = temp(l, sym->ir);
+    ir_branch(l->f, l->b,
+              temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
+                                temp(l, ir_load(l->f, l->b, IR_PTR, place)),
+                                ir_int_op(IR_PTR, 0))),
+              bad, join);
+    l->b = bad;
+    err = temp(l, ir_call(l->f, l->b, IR_PTR,
+                          ir_func_op(callee_function(l, s->as.let.guard_make)),
+                          NULL, 0));
+    if (h->kind == HANDLE_FATAL) {
+        static const struct name fatal_name = {"fatal", 5};
+        int index = table_index(error_type->element, &fatal_name);
+        struct ir_operand table = load_table(l, err, error_type);
+        struct ir_operand entry =
+            temp(l, ir_load(l->f, l->b, IR_PTR,
+                            offset_address(l, table,
+                                           entry_offset(l, index))));
+        struct ir_operand self = err;
+        ir_call_indirect(l->f, l->b, IR_VOID, entry, fatal_signature(l),
+                         &self, 1);
+        ir_jump(l->f, l->b, join);
+        l->b = join;
+        return;
+    }
+    error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
+    if (h->symbol != NULL) {
+        ((struct symbol *)h->symbol)->ir = error;
+    }
+    scope.join = join;
+    scope.out = place;
+    scope.has_out = true;
+    scope.error = error;
+    scope.error_type = error_type;
+    scope.passes = h->passes;
+    scope.outer = l->handling;
+    l->handling = &scope;
+    lower_block(l, h->body);
+    l->handling = scope.outer;
+    if (l->b != NULL) {
+        object_call(l, "anti_rt_delete", temp(l, error), error_type);
+        ir_jump(l->f, l->b, join);
+    }
+    l->b = join;
+}
+
 static void lower_let(struct lowerer *l, const struct stmt *s)
 {
     struct symbol *sym = s->as.let.symbol;
@@ -4625,6 +4703,36 @@ static void lower_let(struct lowerer *l, const struct stmt *s)
         ir_store(l->f, l->b, ir_type_of(sym->type), v, temp(l, sym->ir));
     } else {
         sym->ir = ir_unary(l->f, l->b, IR_COPY, ir_type_of(sym->type), v);
+    }
+    /* `let m = p catch fatal` and `let m = p catch e { }` guard the
+       pointer with the error forms. The error is built on the `none`
+       path alone, so the pointer that is there costs one comparison. */
+    if (s->as.let.guard.kind != HANDLE_NONE) {
+        lower_pointer_guard(l, s);
+    }
+    /* `let m = p else { }` is the one check of the nullable rules that
+       emits anything. It emits what the program wrote: a comparison
+       against `none` and the block that leaves. The binding below it is
+       the same value, narrowed by the branch. */
+    if (s->as.let.otherwise != NULL) {
+        struct ir_block *otherwise = new_block(l);
+        struct ir_block *rest = new_block(l);
+        struct ir_operand held =
+            sym->address_taken
+                ? temp(l, ir_load(l->f, l->b, IR_PTR, temp(l, sym->ir)))
+                : temp(l, sym->ir);
+        ir_branch(l->f, l->b,
+                  temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, held,
+                                    ir_int_op(IR_PTR, 0))),
+                  otherwise, rest);
+        l->b = otherwise;
+        lower_block(l, s->as.let.otherwise);
+        /* The block leaves, which the checker refused to compile
+           otherwise, so nothing joins it back to the rest. */
+        if (l->b != NULL) {
+            ir_jump(l->f, l->b, rest);
+        }
+        l->b = rest;
     }
 }
 

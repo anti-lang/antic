@@ -3,7 +3,7 @@
 //! one the concrete class filled, so a class below the static type still
 //! decides which body runs.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Shape
 {

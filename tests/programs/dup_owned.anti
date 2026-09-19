@@ -3,7 +3,7 @@
 //! pointer to a class, at the size of its own class. A pointer to an
 //! interface points into the new object, as it did into the old one, and
 //! `delete` frees the object it points into.
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 class Shape
 {
@@ -41,9 +41,9 @@ struct Size
 class Holder
 {
 	pub own counts: []i32,
-	pub own shape: *Shape = none,
-	pub own spot: *Size = none,
-	pub own named: *Named = none,
+	pub own shape: ?*Shape = none,
+	pub own spot: ?*Size = none,
+	pub own named: ?*Named = none,
 }
 
 fn main() -> int
@@ -61,13 +61,15 @@ fn main() -> int
 	h.counts[3] = 40;
 	let c = dup(h);
 	h.counts[3] = 0;
-	h.spot.w = 0;
+	let h_spot = h.spot else { return 1; };
+	h_spot.w = 0;
 	(h.shape as *Circle).r = 0;
 	printf("%d %d %d %d\n".ptr, c.counts[0] as c_int, c.counts[1] as c_int,
 		c.counts[2] as c_int, c.counts[3] as c_int);
 	printf("%d %d\n".ptr, (c.shape is *Circle) as c_int,
 		(c.shape as *Circle).r as c_int);
-	printf("%d %d\n".ptr, c.spot.w as c_int, c.spot.h as c_int);
+	let c_spot = c.spot else { return 1; };
+	printf("%d %d\n".ptr, c_spot.w as c_int, c_spot.h as c_int);
 	tag.id = 0;
 	printf("%d\n".ptr, c.named.label() as c_int);
 	delete(c);

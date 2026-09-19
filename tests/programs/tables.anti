@@ -3,7 +3,7 @@
 //! value knows its class and goes direct. An abstract class has no value
 //! of its own and appears only behind a pointer.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 abstract class Shape
 {

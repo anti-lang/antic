@@ -1,0 +1,122 @@
+//! The rules of "Nullable pointers" at run time.
+//!
+//! `*T` never holds `none` and `?*T` may. The checks below are the ones
+//! this program wrote, and nothing else is emitted for the difference.
+
+import anti.error;
+import anti.io;
+import anti.text;
+
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+class Shape
+{
+	pub n: int = 0,
+}
+
+class Circle
+{
+	inherits Shape,
+	pub r: int = 0,
+}
+
+/// A list whose last link has no next.
+class Link
+{
+	pub n: int = 0,
+	pub own next: ?*Link = none,
+}
+
+fn shape(yes: bool) -> ?*Shape
+{
+	if yes {
+		return alloc Circle { n: 1, r: 2 };
+	}
+	return none;
+}
+
+/// The length of the chain, which ends at the link that has no next.
+fn length(head: ?*Link) -> int
+{
+	let n = 0;
+	let at = head;
+	while at != none do {
+		n += 1;
+		at = at.next;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	/* A checked pointer is `*T` for the rest of the block. */
+	let one = shape(true) else { return 1; };
+	io.println("built");
+
+	/* `is` and `as?` take a `?*T`, and `none` is of no class. */
+	let missing = shape(false);
+	if missing is *Circle {
+		return 2;
+	}
+	if (missing as? *Circle) != none {
+		return 3;
+	}
+	io.println("none is no Circle");
+
+	/* Narrowing per block: inside the check the name is `*Shape`. */
+	if missing != none {
+		return 4;
+	}
+	io.println("checked");
+
+	/* A chain of owned links, walked by the same rule. */
+	let tail = alloc Link { n: 3 };
+	let middle = alloc Link { n: 2, next: tail };
+	let head = alloc Link { n: 1, next: middle };
+	printf_len(length(head));
+	delete(head);
+
+	/* A `?*T` that comes from C, checked before it is used. */
+	let found = getenv("ANTI_TEST_NULLABLE".ptr);
+	if found == none {
+		io.println("unset");
+	} else {
+		io.println(text.from_c(found));
+	}
+
+	/* `p catch e { }` follows the error forms, with the error
+	   `anti.error.NullPointer`. The handler gives the binding a
+	   pointer with `yield`. */
+	let spare = alloc(byte, 4) else { return 5; };
+	let fallback = shape(false) catch e {
+		io.println(e.message);
+		yield one;
+	};
+	if fallback.n != 1 {
+		return 6;
+	}
+	io.println("caught");
+
+	/* `p catch fatal` on a pointer that is there gives that pointer. */
+	let kept = shape(true) catch fatal;
+	delete(kept);
+
+	/* `alloc(T, n)` gives `?*T`, because `malloc` gives none. */
+	let room = alloc(byte, 8) else { return 5; };
+	room[0] = 65;
+	io.println("allocated");
+	free(room);
+	free(spare);
+
+	delete(one);
+	return 0;
+}
+
+fn printf_len(n: int)
+{
+	if n == 3 {
+		io.println("three links");
+		return;
+	}
+	io.println("wrong length");
+}

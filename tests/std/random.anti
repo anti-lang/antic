@@ -3,7 +3,7 @@
 import anti.io;
 import anti.random;
 
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 fn main() -> int
 {
@@ -18,7 +18,7 @@ fn main() -> int
 	}
 
 	let c = random.Random.new(7);
-	let counts = alloc([6]int, 1);
+	let counts = alloc([6]int, 1) else { return 1; };
 	i = 0;
 	while i < 6 do {
 		(*counts)[i] = 0;

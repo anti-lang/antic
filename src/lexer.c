@@ -124,6 +124,11 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_TILDE] = {"~", CAT_SYMBOL},
     [TOKEN_BANG] = {"!", CAT_SYMBOL},
     [TOKEN_QUESTION] = {"?", CAT_SYMBOL},
+    /* DESIGN: `?*` is one token, so that `p as ?*Circle` reads as a cast
+       to a nullable pointer and `p as? *Circle` as a checked cast. The
+       longest match takes `?*` whenever the two are written together,
+       which is how the nullable type is spelled. */
+    [TOKEN_QUESTION_STAR] = {"?*", CAT_SYMBOL},
     [TOKEN_ATOMIC] = {"atomic", CAT_KEYWORD},
     [TOKEN_DISPATCH] = {"dispatch", CAT_KEYWORD},
     [TOKEN_JOIN] = {"join", CAT_KEYWORD},

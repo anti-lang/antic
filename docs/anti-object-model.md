@@ -74,7 +74,7 @@ class Circle
 	const MAX_R: f32 = 1000.0;
 	static atomic count: int = 0;
 
-	fn construct(self, r: f32) -> *Error { }
+	fn construct(self, r: f32) -> ?*Error { }
 	fn destruct(self) { }
 	pub fn area(self) -> f32 { }
 	concrete fn Serializable::serialize(self, out: *text.Builder) { }
@@ -114,7 +114,7 @@ class Circle
 - `concrete fn` marks a function that replaces an inherited entry. See [Tables and dispatch](#tables-and-dispatch).
 - `final fn` forbids replacement in any derived class.
 - `operator fn` marks a function that an operator calls. See [Operators](#operators).
-- `fn construct(self, args...) -> *Error` and `fn destruct(self)` are the constructor and destructor. See [Literals and construction](#literals-and-construction) and [Destruction](#destruction).
+- `fn construct(self, args...) -> ?*Error` and `fn destruct(self)` are the constructor and destructor. See [Literals and construction](#literals-and-construction) and [Destruction](#destruction).
 - `v.f(args)` resolves in the class first, then its base chain, then its `use` fields, then the module. A field wins over a function. `Class.f(&v, args)` calls the same function without the sugar.
 - `self.super.f(args)` calls the base class's entry for `f`, found in the base's table at compile time. It is a direct call.
 - `let f = c.area;` is a bound function, a value of two words, object and entry, with the function type of `area` without `self`. `f()` calls it. No captures.
@@ -169,7 +169,7 @@ Four levels, and each applies where it makes sense:
 - An inline class field without a default defaults to `T { }` when every field of `T` has a default or `T` has none, and `construct` runs on it. Otherwise the field is required in the literal, like any field without a default. A zero table in an inline field never happens for a constructed object.
 - A literal sets the table pointers of the class and of every interface sub-object, writes every default, then runs `construct`. Lowering may copy a read-only prototype and store only the named fields.
 - `fn construct(self)` runs after every literal and every `alloc` of the class, base first down the chain. It takes no arguments in this form and cannot fail.
-- `fn construct(self, args...) -> *Error` takes arguments and may fail. The class is then created with `alloc Circle(10.0)` on the heap or `Circle(10.0)` as a value. Defaults are applied, then `construct` runs with the arguments. On an error the heap object is freed, or the value is discarded, and the error is handed to the caller. See [Errors](#errors). A base `construct` with arguments is called by name from the derived one, `self.super.construct(x)`, at the top of its body.
+- `fn construct(self, args...) -> ?*Error` takes arguments and may fail. The class is then created with `alloc Circle(10.0)` on the heap or `Circle(10.0)` as a value. Defaults are applied, then `construct` runs with the arguments. On an error the heap object is freed, or the value is discarded, and the error is handed to the caller. See [Errors](#errors). A base `construct` with arguments is called by name from the derived one, `self.super.construct(x)`, at the top of its body.
 - In a `construct`, every field that has no default and is not set by the literal must be assigned on every path before `return none;`. The compiler refuses the construct and names the field otherwise. It is definite assignment, as a local has it, applied to the fields of `self`.
 - One `construct` per class. Every alternative constructor is a static function with a name: `Circle.from_points(a, b)`.
 - `alloc Circle { r: 2.0 }` allocates one object on the heap, writes the literal into it, runs `construct`, and returns `*Circle`. `alloc(T, n)` stays the raw form for any type. For a class it fills the memory with zeros, so an element not filled yet has a zero table, and for a struct or a primitive it stays `malloc` and returns uninitialised memory.
@@ -279,11 +279,11 @@ Four levels, and each applies where it makes sense:
 
 ## Errors
 
-- `anti.error.Error` is a class with `pub code: int`, `pub message: str` and `own cause: *Error`. The runtime owns `anti.rt`, so the class lives in the standard library's `anti.error` module. Libraries subclass it. `Error.new(code, message)`, `Error.from_errno()` and `Error.from_win32()` build one. `e.text()` gives code, message and the cause chain. `e.print()` writes it to stderr. `e.fatal()` prints and exits with `e.code`, or 1 when the code is 0. `rt.on_fatal(f)` registers one function that runs before `fatal` exits.
-- A function that can fail returns `*Error`, `none` on success, and writes its results through out pointers. A function that cannot fail returns its value. A function whose only failure is "not present" may return `bool`.
+- `anti.error.Error` is a class with `pub code: int`, `pub message: str` and `own cause: ?*Error = none`. `anti.error.NullPointer` inherits it and is the error of a `catch` on a `?*T`. The runtime owns `anti.rt`, so the class lives in the standard library's `anti.error` module. Libraries subclass it. `Error.new(code, message)`, `Error.from_errno()` and `Error.from_win32()` build one. `e.text()` gives code, message and the cause chain. `e.print()` writes it to stderr. `e.fatal()` prints and exits with `e.code`, or 1 when the code is 0. `rt.on_fatal(f)` registers one function that runs before `fatal` exits.
+- A function that can fail returns `?*Error`, `none` on success, and writes its results through out pointers. A function that cannot fail returns its value. A function whose only failure is "not present" may return `bool`.
 - A call to a failing function must handle the error. A bare call that drops it is a compile error.
 - `let n = f(args) catch e { ... };` handles it at the call. The compiler supplies the out pointer for `n`. The handler either leaves the enclosing block or ends with `yield v`, a value of `n`'s type that takes the place of the result. `catch { }` binds no name. `catch fatal` prints and exits.
-- `try f(args)` is `f(args) catch e { return e; }` and is allowed only in a function that returns `*Error`.
+- `try f(args)` is `f(args) catch e { return e; }` and is allowed only in a function that returns `?*Error`. The error a handler binds is the `*Error` of that result, since the handler runs on the failure alone.
 - `try { ... } catch e { ... }` handles every unhandled failing call in the block. The first error abandons the rest of the block and runs `defer` statements on the way out. Then the handler runs, and execution continues after the block unless the handler left the function. Nothing crosses a function boundary, so nothing is unwound. Nested blocks bind inward.
 - The name after `catch` is any identifier, scoped to the handler. It shadows an outer name, and `anti check` warns when it does.
 - An error bound by `catch e` is deleted when the handler exits, by `yield`, by falling off the end, by `break` or `continue`. `return e` and `try` pass it to the caller instead. `catch { }` deletes it at once. A handler that keeps the error writes `dup(e)`, and a bare `e` stored into anything is refused.

@@ -1,8 +1,8 @@
-extern fn printf(format: *byte, ...) -> i32;
+extern fn printf(format: ?*byte, ...) -> i32;
 
 fn show(x: f64)
 {
-	let format = alloc(byte, 7);
+	let format = alloc(byte, 7) else { return; };
 	format[0] = 37;
 	format[1] = 46;
 	format[2] = 49;

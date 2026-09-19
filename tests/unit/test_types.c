@@ -38,6 +38,15 @@ void test_types(void)
 
     /* Derived types are interned, so equal spelling means one pointer. */
     CHECK(types_pointer(&types, i64) == types_pointer(&types, i64));
+    /* `*T` and `?*T` are two types, so the checker tells them apart by
+       the pointer alone, as it does for every other pair. */
+    CHECK(types_pointer_nullable(&types, i64) ==
+          types_pointer_nullable(&types, i64));
+    CHECK(types_pointer_nullable(&types, i64) != types_pointer(&types, i64));
+    CHECK(types_pointer_nullable(&types, i64)->element == i64);
+    CHECK(type_is_nullable(types_pointer_nullable(&types, i64)));
+    CHECK(!type_is_nullable(types_pointer(&types, i64)));
+    CHECK(!type_is_nullable(i64));
     CHECK(types_slice(&types, u8) == types_slice(&types, u8));
     CHECK(types_array(&types, f32, 4) == types_array(&types, f32, 4));
     CHECK(types_array(&types, f32, 4) != types_array(&types, f32, 5));
@@ -51,6 +60,9 @@ void test_types(void)
     named(u8, "byte");
     named(types_builtin(&types, TYPE_I32), "i32");
     named(types_pointer(&types, types_slice(&types, u8)), "*[]byte");
+    named(types_pointer_nullable(&types, i64), "?*int");
+    named(types_pointer(&types, types_pointer_nullable(&types, u8)),
+          "*?*byte");
     named(types_array(&types, f32, 4), "[4]f32");
     named(types_fn(&types, params, 2, f64), "fn(int, *byte) -> float");
     named(types_fn(&types, NULL, 0, types_builtin(&types, TYPE_VOID)),

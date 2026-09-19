@@ -17,11 +17,24 @@ struct scope_entry {
     struct symbol *symbol;
 };
 
+/* DESIGN: narrowing is per block. A block that a check opened records
+   the names the check proved are not `none`. The record dies with the
+   block, so after it the name is `?*T` again. An assignment to the name
+   puts the declared type back in the record that holds it, wherever that
+   block is. The value the check proved is gone. */
+struct narrowing {
+    struct symbol *symbol;
+    struct type *type;
+};
+
 struct scope {
     struct scope *parent;
     struct scope_entry *entries;
     size_t count;
     size_t capacity;
+    struct narrowing *narrowed;
+    size_t narrowed_count;
+    size_t narrowed_capacity;
 };
 
 struct checker {
@@ -252,6 +265,71 @@ static void leave_scope(struct checker *c, struct scope *s)
 {
     c->scope = s->parent;
     free(s->entries);
+    free(s->narrowed);
+}
+
+/* The type a check proved for sym, or NULL when no enclosing block holds
+   one. The innermost record wins, so a block that put the declared type
+   back ends the narrowing of every block outside it as well. */
+static struct type *narrowed_type(const struct checker *c,
+                                  const struct symbol *sym)
+{
+    const struct scope *s;
+    size_t i;
+
+    for (s = c->scope; s != NULL; s = s->parent) {
+        for (i = 0; i < s->narrowed_count; i++) {
+            if (s->narrowed[i].symbol == sym) {
+                return s->narrowed[i].type;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* Record that sym has type t for the rest of the current block. */
+static void narrow(struct checker *c, struct symbol *sym, struct type *t)
+{
+    struct scope *s = c->scope;
+    size_t i;
+
+    for (i = 0; i < s->narrowed_count; i++) {
+        if (s->narrowed[i].symbol == sym) {
+            s->narrowed[i].type = t;
+            return;
+        }
+    }
+    if (s->narrowed_count == s->narrowed_capacity) {
+        size_t capacity =
+            s->narrowed_capacity == 0 ? 4 : s->narrowed_capacity * 2;
+        struct narrowing *grown =
+            realloc(s->narrowed, capacity * sizeof *grown);
+        if (grown == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        s->narrowed = grown;
+        s->narrowed_capacity = capacity;
+    }
+    s->narrowed[s->narrowed_count].symbol = sym;
+    s->narrowed[s->narrowed_count].type = t;
+    s->narrowed_count++;
+}
+
+/* An assignment to sym ends every narrowing of it, in the block that
+   holds the record and so in every block inside that one. */
+static void end_narrowing(struct checker *c, const struct symbol *sym)
+{
+    struct scope *s;
+    size_t i;
+
+    for (s = c->scope; s != NULL; s = s->parent) {
+        for (i = 0; i < s->narrowed_count; i++) {
+            if (s->narrowed[i].symbol == sym) {
+                s->narrowed[i].type = sym->type;
+            }
+        }
+    }
 }
 
 /* Types */
@@ -487,7 +565,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         return sym->type;
     case TYPEX_POINTER:
         element = resolve_type(c, t->element);
-        return is_error(element) ? element : types_pointer(c->types, element);
+        return is_error(element)
+                   ? element
+                   : types_pointer_of(c->types, element, t->nullable);
     case TYPEX_SLICE:
         element = resolve_type(c, t->element);
         return is_error(element) ? element : types_slice(c->types, element);
@@ -752,6 +832,61 @@ static const struct struct_field *converts_to_interface(struct checker *c,
     return found;
 }
 
+/* The spelling of e for a message: a name, or a path of field names on
+   one. Anything else has no short spelling and the caller says "the
+   value" instead. */
+static bool spell(struct text *out, const struct expr *e)
+{
+    if (e->kind == EXPR_NAME) {
+        text_appendf(out, "%.*s", (int)e->as.name.length, e->as.name.text);
+        return true;
+    }
+    if (e->kind == EXPR_FIELD && !e->as.field.promoted &&
+        spell(out, e->as.field.base)) {
+        text_appendf(out, ".%.*s", (int)e->as.field.name.length,
+                     e->as.field.name.text);
+        return true;
+    }
+    return false;
+}
+
+static void error_may_be_none(struct checker *c, const struct expr *e)
+{
+    struct text spelling = {0};
+
+    if (spell(&spelling, e)) {
+        error_at(c, e->pos, "`%s` may be `none`, check it or use `?*T`",
+                 text_cstr(&spelling));
+    } else {
+        error_at(c, e->pos, "the value may be `none`, check it or use `?*T`");
+    }
+    text_free(&spelling);
+}
+
+/* DESIGN: a `?*T` reaching a place that dereferences it is the error the
+   nullable rule exists for. Checking continues with the `*T` of the same
+   element, so one unchecked pointer reports once and the rest of the
+   expression is still checked. */
+static struct type *usable_pointer(struct checker *c, const struct expr *e,
+                                   struct type *t)
+{
+    if (!type_is_nullable(t)) {
+        return t;
+    }
+    error_may_be_none(c, e);
+    return types_pointer(c->types, t->element);
+}
+
+/* `*T` passes where `?*T` is expected, because a pointer that never
+   holds `none` is one of the values a `?*T` holds. The reverse needs a
+   check the program wrote. */
+static bool widens_to_nullable(const struct type *got,
+                               const struct type *expected)
+{
+    return got->kind == TYPE_POINTER && !got->nullable &&
+           type_is_nullable(expected);
+}
+
 static bool require(struct checker *c, struct expr *e, struct type *got,
                     struct type *expected)
 {
@@ -759,6 +894,29 @@ static bool require(struct checker *c, struct expr *e, struct type *got,
 
     if (is_error(got) || is_error(expected) || got == expected) {
         return !is_error(got);
+    }
+    /* The one implicit conversion of a pointer and the widening to
+       `?*T` compose: a `*Circle` reaches a `?*Shape` parameter. */
+    if (widens_to_nullable(got, expected)) {
+        struct type *bare = types_pointer(c->types, expected->element);
+        if (got == bare || converts_to_base(got, bare)) {
+            return true;
+        }
+        if ((iface = converts_to_interface(c, e, got, bare)) != NULL) {
+            e->to_iface = iface;
+            return true;
+        }
+    }
+    /* A `?*T` where a `*T` is expected is the nullable rule itself, and
+       names the value rather than the two types. */
+    if (type_is_nullable(got) && expected->kind == TYPE_POINTER &&
+        !expected->nullable) {
+        struct type *bare = types_pointer(c->types, got->element);
+        if (bare == expected || converts_to_base(bare, expected) ||
+            converts_to_interface(c, e, bare, expected) != NULL) {
+            error_may_be_none(c, e);
+            return false;
+        }
     }
     if (converts_to_base(got, expected)) {
         return true;
@@ -852,7 +1010,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             error_at(c, e->pos, "unary `*` needs a pointer, found `%s`", tn(t));
             return builtin(c, TYPE_ERROR);
         }
-        return t->element;
+        return usable_pointer(c, operand, t)->element;
     case TOKEN_AMP:
         t = check_expr(c, operand, NULL);
         if (is_error(t)) {
@@ -888,6 +1046,24 @@ static bool binary_operands(struct checker *c, struct expr *e,
     struct expr *l = e->as.binary.left;
     struct expr *r = e->as.binary.right;
 
+    /* `p == none` and `p != none` are the two comparisons the narrowing
+       rule reads, and they are written against a `*T` as readily as
+       against a `?*T`. The `none` side takes the nullable form of the
+       other, so the comparison names no type the program did not. */
+    if (l->kind == EXPR_NONE || r->kind == EXPR_NONE) {
+        struct expr *value = l->kind == EXPR_NONE ? r : l;
+        struct type **value_type = l->kind == EXPR_NONE ? right : left;
+        struct type **none_type = l->kind == EXPR_NONE ? left : right;
+        if (value->kind != EXPR_NONE) {
+            *value_type = check_expr(c, value, outer);
+            *none_type = check_expr(
+                c, l->kind == EXPR_NONE ? l : r,
+                (*value_type)->kind == TYPE_POINTER
+                    ? types_pointer_nullable(c->types, (*value_type)->element)
+                    : *value_type);
+            return !is_error(*left) && !is_error(*right);
+        }
+    }
     if (is_untyped(l) && !is_untyped(r)) {
         *right = check_expr(c, r, outer);
         *left = check_expr(c, l, is_error(*right) ? outer : *right);
@@ -1312,6 +1488,21 @@ static struct type *check_operator(struct checker *c, struct expr *e,
     return sig->result;
 }
 
+/* DESIGN: `==` on two class pointers compares the identity of the
+   objects. A pointer to one interface of an object and a pointer to
+   another are therefore equal. Their types differ, and the comparison is
+   still the one the program means. Two pointers of one element compare
+   whether or not either of them may hold `none`, which is what
+   `p != none` is written for. */
+static bool comparable_pointers(const struct type *a, const struct type *b)
+{
+    if (a->kind != TYPE_POINTER || b->kind != TYPE_POINTER) {
+        return false;
+    }
+    return a->element == b->element ||
+           (a->element->kind == TYPE_CLASS && b->element->kind == TYPE_CLASS);
+}
+
 static struct type *check_binary(struct checker *c, struct expr *e,
                                  struct type *expected)
 {
@@ -1351,15 +1542,9 @@ static struct type *check_binary(struct checker *c, struct expr *e,
                 return check_operator(c, e, right, fn);
             }
         }
-        /* DESIGN: `==` on two class pointers compares the identity of
-           the objects. A pointer to one interface of an object and a
-           pointer to another are therefore equal. Their types differ,
-           and the comparison is still the one the program means. */
         if (left != right &&
             !((op == TOKEN_EQ || op == TOKEN_NE) &&
-              left->kind == TYPE_POINTER && right->kind == TYPE_POINTER &&
-              left->element->kind == TYPE_CLASS &&
-              right->element->kind == TYPE_CLASS)) {
+              comparable_pointers(left, right))) {
             error_at(c, e->pos, "the operands of `%s` have the types `%s` and "
                      "`%s`", o, tn(left), tn(right));
             return builtin(c, TYPE_ERROR);
@@ -1386,15 +1571,9 @@ static struct type *check_binary(struct checker *c, struct expr *e,
                 return check_operator(c, e, right, fn);
             }
         }
-        /* DESIGN: `==` on two class pointers compares the identity of
-           the objects. A pointer to one interface of an object and a
-           pointer to another are therefore equal. Their types differ,
-           and the comparison is still the one the program means. */
         if (left != right &&
             !((op == TOKEN_EQ || op == TOKEN_NE) &&
-              left->kind == TYPE_POINTER && right->kind == TYPE_POINTER &&
-              left->element->kind == TYPE_CLASS &&
-              right->element->kind == TYPE_CLASS)) {
+              comparable_pointers(left, right))) {
             error_at(c, e->pos, "the operands of `%s` have the types `%s` and "
                      "`%s`", o, tn(left), tn(right));
             return builtin(c, TYPE_ERROR);
@@ -2240,6 +2419,40 @@ static bool const_symbol(struct checker *c, struct symbol *sym,
    `Error` or to a class below it. The compiler knows the convention by
    the module path and the class name, and nothing else of the standard
    library reaches the checker. */
+/* DESIGN: `p catch fatal` and `p catch e { }` on a `?*T` follow the
+   error forms, and the error is `anti.error.NullPointer`. The class is
+   an ordinary imported one, so the module that writes the form imports
+   `anti.error` as it does for every other error it names. */
+static struct symbol *null_pointer_maker(struct checker *c, struct pos pos)
+{
+    static const struct name module = {"anti.error", 10};
+    static const struct name class_name = {"NullPointer", 11};
+    static const struct name maker = {"make", 4};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+    const struct item *m =
+        sym != NULL && sym->kind == SYMBOL_STRUCT && sym->type != NULL
+            ? find_member(sym->type, &maker)
+            : NULL;
+
+    if (m == NULL || m->symbol == NULL || m->symbol->type == NULL) {
+        error_at(c, pos, "`catch` on a `?*T` gives an "
+                 "`anti.error.NullPointer`, so the module imports "
+                 "`anti.error`");
+        return NULL;
+    }
+    return m->symbol;
+}
+
+/* The `*Error` a handler binds, from the `?*Error` a failing function
+   returns. */
+static struct type *caught_error(struct checker *c, struct type *result)
+{
+    return result != NULL && type_is_nullable(result)
+               ? types_pointer(c->types, result->element)
+               : result;
+}
+
 static bool is_failing(const struct checker *c, const struct type *t)
 {
     (void)c;
@@ -2349,7 +2562,7 @@ static struct type *handled_result(struct checker *c, const struct expr *e,
    one, because an error that nothing reads is a bug the checker can
    see. */
 static struct type *check_handled(struct checker *c, struct expr *e,
-                                  struct type *fn)
+                                  struct type *fn, struct type *expected)
 {
     struct handler *h = &e->as.call.handler;
     struct type *result = handled_result(c, e, fn);
@@ -2357,6 +2570,15 @@ static struct type *check_handled(struct checker *c, struct expr *e,
     struct scope scope;
     struct type *outer_yield = c->yields;
     int outer_depth = c->handler_depth;
+
+    /* DESIGN: `yield` gives the value that takes the place of the
+       result, so it is checked against the type the binding holds. A
+       `let n: ?*T = alloc T(args) catch e { yield none; }` names that
+       type, and the handler yields `none` against it. */
+    if (expected != NULL && type_is_nullable(expected) &&
+        result->kind == TYPE_POINTER && result->element == expected->element) {
+        result = expected;
+    }
 
     /* Inside a `try` block every failing call reaches the one handler,
        so it needs none of its own. */
@@ -2395,7 +2617,11 @@ static struct type *check_handled(struct checker *c, struct expr *e,
             h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
                                 "`%.*s` is already declared in this block");
             if (h->symbol != NULL) {
-                h->symbol->type = fn->result;
+                /* DESIGN: a failing function returns `?*Error`, `none`
+                   on success. The handler runs on the failure alone, so
+                   the error it binds is the `*Error` of that result and
+                   needs no check of its own. */
+                h->symbol->type = caught_error(c, fn->result);
                 h->symbol->read_only = true;
             }
         }
@@ -2420,7 +2646,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
    whole expression a failing call, which needs a handler like any
    other. */
 static struct type *check_construct(struct checker *c, struct expr *e,
-                                    struct type *t)
+                                    struct type *t, struct type *expected)
 {
     static const struct name construct_name = {"construct", 9};
     struct item *m = find_member(t, &construct_name);
@@ -2456,12 +2682,13 @@ static struct type *check_construct(struct checker *c, struct expr *e,
         return builtin(c, TYPE_ERROR);
     }
     if (is_failing(c, fn->result)) {
-        return check_handled(c, e, fn);
+        return check_handled(c, e, fn, expected);
     }
     return handled_result(c, e, fn);
 }
 
-static struct type *check_call(struct checker *c, struct expr *e)
+static struct type *check_call(struct checker *c, struct expr *e,
+                               struct type *expected)
 {
     struct expr *callee = e->as.call.callee;
     struct type *fn;
@@ -2561,7 +2788,7 @@ static struct type *check_call(struct checker *c, struct expr *e)
         /* A class name in the place of a function builds a value. */
         if (sym != NULL && sym->kind == SYMBOL_STRUCT &&
             sym->type != NULL && sym->type->kind == TYPE_CLASS) {
-            return check_construct(c, e, sym->type);
+            return check_construct(c, e, sym->type, expected);
         }
         if (sym != NULL && sym->kind == SYMBOL_EXTERN_FN) {
             fn = sym->type;
@@ -2627,12 +2854,18 @@ static struct type *check_call(struct checker *c, struct expr *e)
         return builtin(c, TYPE_ERROR);
     }
     if (is_failing(c, fn->result) && !makes_error(owner_type)) {
-        return check_handled(c, e, fn);
+        return check_handled(c, e, fn, expected);
     }
+    /* A call that cannot fail may still give a `?*T`, and a `catch` on
+       it guards the pointer rather than an error. The `let` that holds
+       it takes the handler over, so the two forms read alike. */
     if (e->as.call.handler.kind != HANDLE_NONE) {
-        error_at(c, e->as.call.handler.pos,
-                 "this call cannot fail, so it has no error to handle");
-        return builtin(c, TYPE_ERROR);
+        if (!type_is_nullable(fn->result)) {
+            error_at(c, e->as.call.handler.pos,
+                     "this call cannot fail, so it has no error to handle");
+            return builtin(c, TYPE_ERROR);
+        }
+        e->as.call.guards_pointer = true;
     }
     return fn->result;
 }
@@ -2733,6 +2966,7 @@ static struct type *check_field(struct checker *c, struct expr *e)
     if (is_error(base)) {
         return base;
     }
+    base = usable_pointer(c, e->as.field.base, base);
     if ((s = struct_of(base)) != NULL) {
         if ((f = find_field(s, name)) == NULL) {
             const struct item *m = find_member(s, name);
@@ -2797,11 +3031,13 @@ static struct type *check_field(struct checker *c, struct expr *e)
                                  base->kind == TYPE_ARRAY)) {
         return builtin(c, TYPE_I64);
     }
+    /* The `ptr` of a str and of a slice is `?*T` for the same reason:
+       neither holds an address when it holds no bytes. */
     if (name_is(name, "ptr") && base->kind == TYPE_STR) {
-        return types_pointer(c->types, builtin(c, TYPE_U8));
+        return types_pointer_nullable(c->types, builtin(c, TYPE_U8));
     }
     if (name_is(name, "ptr") && base->kind == TYPE_SLICE) {
-        return types_pointer(c->types, base->element);
+        return types_pointer_nullable(c->types, base->element);
     }
     error_at(c, e->pos, "`%s` has no field `%.*s`", tn(base),
              (int)name->length, name->text);
@@ -3123,6 +3359,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_BOOL:
         return builtin(c, TYPE_BOOL);
     case EXPR_NONE:
+        /* `none` has type `?*T` for every T, and the context names the
+           T. A `*T` there is the one type that cannot hold it. */
+        if (expected != NULL && expected->kind == TYPE_POINTER &&
+            !expected->nullable) {
+            error_at(c, e->pos, "`%s` cannot hold `none`", tn(expected));
+            return builtin(c, TYPE_ERROR);
+        }
         if (expected != NULL && (expected->kind == TYPE_POINTER ||
                                  expected->kind == TYPE_FN)) {
             return expected;
@@ -3160,6 +3403,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                 return builtin(c, TYPE_ERROR);
             }
         }
+        if (sym->type != NULL && type_is_nullable(sym->type)) {
+            struct type *proved = narrowed_type(c, sym);
+            if (proved != NULL) {
+                return proved;
+            }
+        }
         return sym->type != NULL ? sym->type : builtin(c, TYPE_ERROR);
     case EXPR_UNARY:
         return check_unary(c, e, expected);
@@ -3168,7 +3417,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_CAST:
         return check_cast(c, e);
     case EXPR_CALL:
-        return check_call(c, e);
+        return check_call(c, e, expected);
     case EXPR_PARALLEL:
         return check_parallel(c, e);
     case EXPR_DISPATCH:
@@ -3185,8 +3434,9 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         switch (t->kind) {
         case TYPE_ARRAY:
         case TYPE_SLICE:
-        case TYPE_POINTER:
             return t->element;
+        case TYPE_POINTER:
+            return usable_pointer(c, e->as.index.base, t)->element;
         case TYPE_STR:
             return builtin(c, TYPE_U8);
         default:
@@ -3279,7 +3529,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         memset(fields, 0, sizeof fields);
         fields[0].name.text = "ptr";
         fields[0].name.length = 3;
-        fields[0].type = types_pointer(c->types, element);
+        /* DESIGN: the `ptr` of a slice is `?*T`. A slice of no
+           elements holds no address, and `[]T { ptr: none, len: 0 }` is
+           how a program writes one. */
+        fields[0].type = types_pointer_nullable(c->types, element);
         fields[1].name.text = "len";
         fields[1].name.length = 3;
         fields[1].type = builtin(c, TYPE_I64);
@@ -3331,7 +3584,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                `construct` with the arguments. */
             if (e->as.alloc.value->kind == EXPR_CALL) {
                 e->as.alloc.value->as.call.on_heap = true;
-                t = check_expr(c, e->as.alloc.value, NULL);
+                t = check_expr(c, e->as.alloc.value, expected);
                 if (is_error(t) ||
                     e->as.alloc.value->as.call.builds == NULL) {
                     error_at(c, e->as.alloc.value->pos,
@@ -3361,7 +3614,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         if (refuse_abstract_value(c, e->pos, "`alloc`", t)) {
             return builtin(c, TYPE_ERROR);
         }
-        return types_pointer(c->types, t);
+        /* DESIGN: `alloc(T, n)` gives `?*T`, because it is `malloc` and
+           `malloc` gives none when the memory is not there. `alloc T { }`
+           and `alloc T(args)` give `*T`: out of memory is fatal there. */
+        return types_pointer_nullable(c->types, t);
     case EXPR_FREE:
         t = check_expr(c, e->as.free_pointer, NULL);
         if (!is_error(t) && t->kind != TYPE_POINTER) {
@@ -3386,6 +3642,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         if (is_error(t)) {
             return t;
         }
+        /* All three read the table of the object, so all three need a
+           pointer the program has checked. `dup(p)` then gives the type
+           of `p`, which is the `*T` this leaves behind. */
+        t = usable_pointer(c, e->as.object.operand, t);
         if (e->as.object.op == TOKEN_DELETE && t->kind == TYPE_POINTER &&
             singleton_type(t->element)) {
             error_at(c, e->pos, "`%s` is a singleton and outlives the "
@@ -4146,6 +4406,45 @@ static bool block_returns(const struct block *b)
     return b->count > 0 && stmt_returns(b->stmts[b->count - 1]);
 }
 
+static bool block_leaves(const struct block *b);
+
+/* DESIGN: whether s hands control out of the block it stands in, which
+   is what `if p == none { return; }` and the `else` of a `let` need. It
+   reads the form alone, as the missing-return rule does. `break` and
+   `continue` leave the block as surely as `return` does, and `yield`
+   ends the handler it stands in. */
+static bool stmt_leaves(const struct stmt *s)
+{
+    size_t i;
+
+    switch (s->kind) {
+    case STMT_RETURN:
+    case STMT_BREAK:
+    case STMT_CONTINUE:
+    case STMT_YIELD:
+        return true;
+    case STMT_BLOCK:
+        return block_leaves(s->as.block);
+    case STMT_IF:
+        if (s->as.if_chain.else_body == NULL) {
+            return false;
+        }
+        for (i = 0; i < s->as.if_chain.count; i++) {
+            if (!block_leaves(s->as.if_chain.branches[i].body)) {
+                return false;
+            }
+        }
+        return block_leaves(s->as.if_chain.else_body);
+    default:
+        return false;
+    }
+}
+
+static bool block_leaves(const struct block *b)
+{
+    return b->count > 0 && stmt_leaves(b->stmts[b->count - 1]);
+}
+
 static void check_condition(struct checker *c, struct expr *cond)
 {
     struct type *t = check_expr(c, cond, NULL);
@@ -4154,6 +4453,45 @@ static void check_condition(struct checker *c, struct expr *cond)
         error_at(c, cond->pos, "a condition has type `bool`, found `%s`", tn(t));
     }
 }
+
+/* DESIGN: a check narrows a name and nothing else. `p != none` proves
+   something about the variable p, while `q.next != none` proves it about
+   a field that any call in the block may write. The name is what the
+   specification narrows, and a field keeps its declared type. */
+static struct symbol *checked_against_none(const struct expr *cond,
+                                           enum token_kind op)
+{
+    const struct expr *value;
+
+    if (cond->kind != EXPR_BINARY || cond->as.binary.op != op) {
+        return NULL;
+    }
+    if (cond->as.binary.left->kind == EXPR_NONE) {
+        value = cond->as.binary.right;
+    } else if (cond->as.binary.right->kind == EXPR_NONE) {
+        value = cond->as.binary.left;
+    } else {
+        return NULL;
+    }
+    if (value->kind != EXPR_NAME || value->symbol == NULL ||
+        !type_is_nullable(value->symbol->type)) {
+        return NULL;
+    }
+    return (value->symbol->kind == SYMBOL_LOCAL ||
+            value->symbol->kind == SYMBOL_PARAM)
+               ? value->symbol
+               : NULL;
+}
+
+/* The `*T` that a check proved of sym. */
+static struct type *proved_type(struct checker *c, const struct symbol *sym)
+{
+    return types_pointer(c->types, sym->type->element);
+}
+
+/* Check b with sym narrowed to `*T` inside it, and nowhere else. */
+static void check_block_narrowing(struct checker *c, struct block *b,
+                                  struct symbol *sym);
 
 /* Whether a value of t owns memory: an `own` field anywhere in the chain
    of a class, or a class value held inline that does. An array holds its
@@ -4219,6 +4557,12 @@ static void check_assign(struct checker *c, struct stmt *s)
         check_expr(c, s->as.assign.value, NULL);
         return;
     }
+    /* A narrowed name is still a `?*T` variable, so an assignment to it
+       takes the declared type and any pointer the program has. */
+    if (target->kind == EXPR_NAME && target->symbol != NULL &&
+        type_is_nullable(target->symbol->type)) {
+        t = target->symbol->type;
+    }
     /* The variable of a `for` is read-only, so the loop keeps its step
        and the sequence it walks. */
     if (target->kind == EXPR_NAME && target->symbol != NULL &&
@@ -4255,6 +4599,12 @@ static void check_assign(struct checker *c, struct stmt *s)
         return;
     }
     v = check_expr(c, s->as.assign.value, t);
+    /* The value is checked first, so that `p = p.next` still reads the
+       `p` the check proved. Then the narrowing ends: what it proved is
+       about the value the assignment replaced. */
+    if (target->kind == EXPR_NAME && target->symbol != NULL) {
+        end_narrowing(c, target->symbol);
+    }
     if (!require(c, s->as.assign.value, v, t)) {
         return;
     }
@@ -4389,6 +4739,54 @@ static void check_step(struct checker *c, struct stmt *s, struct type *element)
     heederik_guardrail(c, step, &v);
 }
 
+/* Check the `catch` that guards a `?*T` in a `let`, and give the type
+   the binding holds. The handler runs when the pointer is `none`, with
+   an `anti.error.NullPointer` in hand, and it leaves the block or ends
+   with `yield`, as every handler does. */
+static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
+                                        struct type *value)
+{
+    struct handler *h = &s->as.let.guard;
+    struct type *error;
+    struct scope scope;
+    struct type *outer_yield = c->yields;
+    int outer_depth = c->handler_depth;
+
+    if (is_error(value)) {
+        return value;
+    }
+    if (!type_is_nullable(value)) {
+        error_at(c, h->pos, "`catch` here guards a `?*T`, found `%s`",
+                 tn(value));
+        return builtin(c, TYPE_ERROR);
+    }
+    if ((s->as.let.guard_make = null_pointer_maker(c, h->pos)) == NULL) {
+        return builtin(c, TYPE_ERROR);
+    }
+    error = s->as.let.guard_make->type->result;
+    if (h->kind != HANDLE_BLOCK) {
+        return types_pointer(c->types, value->element);
+    }
+    enter_scope(c, &scope);
+    if (h->name.length > 0) {
+        h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
+                            "`%.*s` is already declared in this block");
+        if (h->symbol != NULL) {
+            h->symbol->type = error;
+            h->symbol->read_only = true;
+            h->symbol->caught = true;
+        }
+    }
+    c->yields = types_pointer(c->types, value->element);
+    c->handler_depth++;
+    check_block(c, h->body);
+    c->handler_depth = outer_depth;
+    c->yields = outer_yield;
+    h->passes = false;
+    leave_scope(c, &scope);
+    return types_pointer(c->types, value->element);
+}
+
 static void check_stmt(struct checker *c, struct stmt *s)
 {
     struct type *t;
@@ -4402,8 +4800,50 @@ static void check_stmt(struct checker *c, struct stmt *s)
         c->target_sized = true;
         declared = s->as.let.type != NULL ? resolve_type(c, s->as.let.type)
                                           : NULL;
-        t = check_expr(c, s->as.let.value, declared);
+        /* `let m: *T = p else { }` names the type the binding has, and
+           the value beside it is the `?*T` of the same element. */
+        if (s->as.let.otherwise != NULL && declared != NULL &&
+            declared->kind == TYPE_POINTER && !declared->nullable) {
+            t = check_expr(c, s->as.let.value,
+                           types_pointer_nullable(c->types,
+                                                  declared->element));
+        } else {
+            t = check_expr(c, s->as.let.value, declared);
+        }
         c->target_sized = false;
+        /* `let m = p catch fatal` and `let m = p catch e { }` guard the
+           pointer with the error forms. A call that gives a `?*T` keeps
+           its handler, and the `let` takes it over here. */
+        if (s->as.let.guard.kind == HANDLE_NONE &&
+            s->as.let.value->kind == EXPR_CALL &&
+            s->as.let.value->as.call.guards_pointer) {
+            s->as.let.guard = s->as.let.value->as.call.handler;
+            memset(&s->as.let.value->as.call.handler, 0,
+                   sizeof s->as.let.value->as.call.handler);
+        }
+        if (s->as.let.guard.kind != HANDLE_NONE) {
+            t = check_pointer_guard(c, s, t);
+        }
+        /* `let m = p else { }` binds m as the `*T` of p's `?*T`. The
+           block runs when p is `none` and leaves, so below the `let` the
+           name holds a pointer on every path. */
+        if (s->as.let.otherwise != NULL) {
+            if (!is_error(t) && !type_is_nullable(t)) {
+                error_at(c, s->as.let.value->pos,
+                         "the `else` of a `let` follows a value of type "
+                         "`?*T`, found `%s`", tn(t));
+                t = builtin(c, TYPE_ERROR);
+            } else if (!is_error(t)) {
+                t = types_pointer(c->types, t->element);
+            }
+            check_block(c, s->as.let.otherwise);
+            if (!block_leaves(s->as.let.otherwise)) {
+                error_at(c, s->as.let.otherwise->pos,
+                         "the `else` of a `let` leaves the block it stands "
+                         "in");
+            }
+            declared = NULL;
+        }
         if (declared != NULL) {
             if (require(c, s->as.let.value, t, declared)) {
                 refuse_owned_copy(c, s->as.let.value, declared);
@@ -4438,6 +4878,11 @@ static void check_stmt(struct checker *c, struct stmt *s)
                 s->as.let.value->as.alloc.value->as.call.builds != NULL) {
                 sym->address_taken = true;
             }
+            /* A `catch` handler may put another pointer in the binding
+               with `yield`, so the binding needs a place of its own. */
+            if (s->as.let.guard.kind != HANDLE_NONE) {
+                sym->address_taken = true;
+            }
         }
         return;
     }
@@ -4457,23 +4902,48 @@ static void check_stmt(struct checker *c, struct stmt *s)
         refuse_escaping_error(c, s->as.assign.value);
         check_assign(c, s);
         return;
-    case STMT_IF:
+    case STMT_IF: {
+        struct symbol *leaves = NULL;
         for (i = 0; i < s->as.if_chain.count; i++) {
-            check_condition(c, s->as.if_chain.branches[i].cond);
-            check_block(c, s->as.if_chain.branches[i].body);
+            struct expr *cond = s->as.if_chain.branches[i].cond;
+            struct symbol *not_none;
+            check_condition(c, cond);
+            not_none = checked_against_none(cond, TOKEN_NE);
+            check_block_narrowing(c, s->as.if_chain.branches[i].body,
+                                  not_none);
+            /* `if p == none { return; }` proves the rest of the
+               enclosing block runs with p bound, so the narrowing
+               outlives the branch. One branch alone can prove it, and
+               only when it leaves. */
+            if (s->as.if_chain.count == 1 && leaves == NULL &&
+                block_leaves(s->as.if_chain.branches[i].body)) {
+                leaves = checked_against_none(cond, TOKEN_EQ);
+            }
         }
         if (s->as.if_chain.else_body != NULL) {
-            check_block(c, s->as.if_chain.else_body);
+            /* The `else` of `if p == none` runs with p bound. */
+            struct symbol *bound =
+                s->as.if_chain.count == 1
+                    ? checked_against_none(s->as.if_chain.branches[0].cond,
+                                           TOKEN_EQ)
+                    : NULL;
+            check_block_narrowing(c, s->as.if_chain.else_body, bound);
+        }
+        if (leaves != NULL && s->as.if_chain.else_body == NULL) {
+            narrow(c, leaves, proved_type(c, leaves));
         }
         return;
+    }
     case STMT_WHILE:
     case STMT_DO_WHILE:
         c->loop_depth++;
         if (s->kind == STMT_WHILE) {
             check_condition(c, s->as.loop.cond);
-        }
-        check_block(c, s->as.loop.body);
-        if (s->kind == STMT_DO_WHILE) {
+            check_block_narrowing(
+                c, s->as.loop.body,
+                checked_against_none(s->as.loop.cond, TOKEN_NE));
+        } else {
+            check_block(c, s->as.loop.body);
             check_condition(c, s->as.loop.cond);
         }
         c->loop_depth--;
@@ -4522,9 +4992,10 @@ static void check_stmt(struct checker *c, struct stmt *s)
             h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
                                 "`%.*s` is already declared in this block");
             if (h->symbol != NULL) {
-                h->symbol->type = c->error_type != NULL
-                                      ? c->error_type
-                                      : builtin(c, TYPE_ERROR);
+                h->symbol->type =
+                    c->error_type != NULL
+                        ? caught_error(c, c->error_type)
+                        : builtin(c, TYPE_ERROR);
                 h->symbol->read_only = true;
                 h->symbol->caught = true;
             }
@@ -4684,10 +5155,19 @@ static void check_stmt(struct checker *c, struct stmt *s)
 
 static void check_block(struct checker *c, struct block *b)
 {
+    check_block_narrowing(c, b, NULL);
+}
+
+static void check_block_narrowing(struct checker *c, struct block *b,
+                                  struct symbol *sym)
+{
     struct scope scope;
     size_t i;
 
     enter_scope(c, &scope);
+    if (sym != NULL) {
+        narrow(c, sym, proved_type(c, sym));
+    }
     for (i = 0; i < b->count; i++) {
         check_stmt(c, b->stmts[i]);
     }
@@ -5071,6 +5551,7 @@ static void declare_import(struct checker *c, const struct import *imp)
 }
 
 static void check_export(struct checker *c, struct item *it);
+static void check_extern_fn(struct checker *c, struct item *it);
 
 bool sema_check(struct module *module, const char *module_name,
                 const char *package,
@@ -5767,8 +6248,14 @@ bool sema_check(struct module *module, const char *module_name,
         }
     }
     for (i = 0; i < module->item_count; i++) {
-        if (module->items[i]->symbol != NULL && module->items[i]->exported) {
+        if (module->items[i]->symbol == NULL) {
+            continue;
+        }
+        if (module->items[i]->exported) {
             check_export(&c, module->items[i]);
+        }
+        if (module->items[i]->kind == ITEM_EXTERN_FN) {
+            check_extern_fn(&c, module->items[i]);
         }
     }
     free(c.module_scope.entries);
@@ -5845,6 +6332,71 @@ static void check_c_type(struct checker *c, struct pos pos, const char *what,
     } else {
         error_at(c, pos, "%s has type `%s`, which C cannot represent", what,
                  tn((struct type *)t));
+    }
+}
+
+/* DESIGN: C has no type that says a pointer is never `none`, so a
+   pointer that comes from C may be `none` whatever the declaration says.
+   Every pointer of an `extern fn` and of the C callbacks in its
+   signature is therefore `?*T`, and the program checks it where it uses
+   it. An export item goes the other way: its pointers are the ones this
+   program holds, so a `*T` there is honest, and the header marks it as
+   non-null in a comment. */
+static bool has_plain_pointer(const struct type *t)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return false;
+    }
+    switch (t->kind) {
+    case TYPE_POINTER:
+        return !t->nullable || has_plain_pointer(t->element);
+    case TYPE_ARRAY:
+    case TYPE_SLICE:
+        return has_plain_pointer(t->element);
+    case TYPE_FN:
+        for (i = 0; i < t->param_count; i++) {
+            if (has_plain_pointer(t->params[i])) {
+                return true;
+            }
+        }
+        return has_plain_pointer(t->result);
+    default:
+        return false;
+    }
+}
+
+/* Report a `*T` where the C boundary takes `?*T`. what names the place. */
+static void check_c_nullable(struct checker *c, struct pos pos,
+                             const char *what, const struct type *t)
+{
+    if (!is_error((struct type *)t) && has_plain_pointer(t)) {
+        error_at(c, pos, "every pointer %s is `?*T`", what);
+    }
+}
+
+/* Every pointer of an `extern fn` signature, the C callbacks in it
+   included. */
+static void check_extern_fn(struct checker *c, struct item *it)
+{
+    const struct type *t = it->symbol->type;
+    char what[160];
+    size_t i;
+
+    if (t == NULL || t->kind != TYPE_FN) {
+        return;
+    }
+    for (i = 0; i < it->param_count && i < t->param_count; i++) {
+        snprintf(what, sizeof what, "of the parameter `%.*s` of `extern fn "
+                 "%.*s`", (int)it->params[i].name.length,
+                 it->params[i].name.text, (int)it->name.length, it->name.text);
+        check_c_nullable(c, it->params[i].pos, what, t->params[i]);
+    }
+    if (it->result != NULL && t->result->kind != TYPE_VOID) {
+        snprintf(what, sizeof what, "of the result of `extern fn %.*s`",
+                 (int)it->name.length, it->name.text);
+        check_c_nullable(c, it->result->pos, what, t->result);
     }
 }
 

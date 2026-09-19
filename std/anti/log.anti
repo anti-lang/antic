@@ -19,16 +19,16 @@ import anti.text;
 import anti.time;
 import anti.toml;
 
-extern fn getenv(name: *byte) -> *byte;
-extern fn fopen(path: *byte, mode: *byte) -> *byte;
-extern fn fclose(file: *byte) -> c_int;
-extern fn fwrite(bytes: *byte, size: c_size_t, count: c_size_t,
-	file: *byte) -> c_size_t;
-extern fn fflush(file: *byte) -> c_int;
-extern fn fseek(file: *byte, offset: c_long, whence: c_int) -> c_int;
-extern fn ftell(file: *byte) -> c_long;
-extern fn fread(into: *byte, size: c_size_t, count: c_size_t,
-	file: *byte) -> c_size_t;
+extern fn getenv(name: ?*byte) -> ?*byte;
+extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
+extern fn fclose(file: ?*byte) -> c_int;
+extern fn fwrite(bytes: ?*byte, size: c_size_t, count: c_size_t,
+	file: ?*byte) -> c_size_t;
+extern fn fflush(file: ?*byte) -> c_int;
+extern fn fseek(file: ?*byte, offset: c_long, whence: c_int) -> c_int;
+extern fn ftell(file: ?*byte) -> c_long;
+extern fn fread(into: ?*byte, size: c_size_t, count: c_size_t,
+	file: ?*byte) -> c_size_t;
 
 /// How much a logger writes, from everything to nothing but a failure.
 pub enum Level: u8 { Trace, Debug, Info, Warn, Error, Fatal, Off }
@@ -66,12 +66,12 @@ pub class FileSink
 {
 	inherits Sink,
 
-	file: *byte,
+	file: ?*byte,
 
 	/// A sink that appends to the file at `path`.
 	///
 	/// A file that will not open gives an error with code 1.
-	pub fn new(path: str, out: **FileSink) -> *failure.Error
+	pub fn new(path: str, out: *?*FileSink) -> ?*failure.Error
 	{
 		/* Binary, so a line ends with LF on Windows as well. */
 		let file = fopen(path.ptr, "ab".ptr);
@@ -212,8 +212,8 @@ pub class Logger
 /// a file and from the default otherwise.
 pub singleton class Log
 {
-	atomic logger: *Logger = none,
-	atomic kinds: *Kind = none,
+	atomic logger: ?*Logger = none,
+	atomic kinds: ?*Kind = none,
 
 	fn construct(self)
 	{
@@ -223,7 +223,14 @@ pub singleton class Log
 	/// The logger every function of the module writes through.
 	pub fn current(self) -> *Logger
 	{
-		return self.logger.load();
+		/* `construct` stores one before any caller reaches this, so the
+		   `else` stands for a logger that `set` replaced with `none`. */
+		let held = self.logger.load() else {
+			let made = Logger.new("", Level.Info, StderrSink.new());
+			self.logger.store(made);
+			return made;
+		};
+		return held;
 	}
 }
 
@@ -237,7 +244,7 @@ pub fn logger() -> *Logger
 ///
 /// The caller owns the logger it gets back and deletes it when nothing
 /// else holds it.
-pub fn set(next: *Logger) -> *Logger
+pub fn set(next: *Logger) -> ?*Logger
 {
 	return Log.get().logger.swap(next);
 }
@@ -334,7 +341,7 @@ class Kind
 {
 	pub name: str = "",
 	pub make: fn(str) -> *Sink,
-	pub next: *Kind,
+	pub next: ?*Kind,
 }
 
 /// Add a kind of sink that a configuration file may name.
@@ -354,7 +361,7 @@ pub fn register(name: str, make: fn(str) -> *Sink)
 }
 
 /// The sink of the kind `name`, or `none`.
-fn made(name: str, path: str) -> *Sink
+fn made(name: str, path: str) -> ?*Sink
 {
 	if text.equal(name, "stderr") {
 		return StderrSink.new();
@@ -439,7 +446,7 @@ fn first_sink(doc: *toml.Document) -> *Sink
 }
 
 /// The bytes of the file at `path`.
-fn read_file(path: str, out: *str) -> *failure.Error
+fn read_file(path: str, out: *str) -> ?*failure.Error
 {
 	let file = fopen(path.ptr, "rb".ptr);
 	if file == none {
@@ -453,7 +460,10 @@ fn read_file(path: str, out: *str) -> *failure.Error
 		*out = "";
 		return none;
 	}
-	let room = alloc(byte, size + 1);
+	let room = alloc(byte, size + 1) else {
+		fclose(file);
+		return failure.Error.new(1, "out of memory");
+	};
 	let read = fread(room, 1 as c_size_t, size as c_size_t, file) as int;
 	fclose(file);
 	room[read] = 0;

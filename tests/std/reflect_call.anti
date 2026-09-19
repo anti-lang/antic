@@ -5,7 +5,7 @@
 //! kind `None` means only that the function has no result.
 import anti.reflect;
 
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class Shape
 {

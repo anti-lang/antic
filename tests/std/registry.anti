@@ -6,7 +6,7 @@ import anti.io;
 import anti.reflect;
 import anti.text;
 
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 class Point
 {
@@ -33,7 +33,7 @@ class Sized
 {
 	pub n: int = 0,
 
-	fn construct(self, n: int) -> *error.Error
+	fn construct(self, n: int) -> ?*error.Error
 	{
 		self.n = n;
 		return none;

@@ -4,7 +4,7 @@
 import anti.collection;
 import anti.io;
 
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 class Item
 {
@@ -35,9 +35,12 @@ fn main() -> int
 	}
 
 	let map = collection.Map.new();
-	map.set("one", list.at(1));
-	map.set("two", list.at(2));
-	map.set("one", list.at(5));
+	let first = list.at(1) else { return 11; };
+	let second = list.at(2) else { return 11; };
+	let fifth = list.at(5) else { return 11; };
+	map.set("one", first);
+	map.set("two", second);
+	map.set("one", fifth);
 	if map.len() != 2 {
 		return 5;
 	}
@@ -52,7 +55,8 @@ fn main() -> int
 	let numbers = collection.IntMap.new();
 	i = 0;
 	while i < 50 do {
-		numbers.set(i * 7, list.at(i));
+		let at = list.at(i) else { return 12; };
+		numbers.set(i * 7, at);
 		i += 1;
 	}
 	if numbers.len() != 50 {
@@ -70,7 +74,8 @@ fn main() -> int
 		numbers.len() as c_int);
 	i = 0;
 	while i < list.len() do {
-		delete(list.at(i));
+		let item = list.at(i) else { return 13; };
+		delete(item);
 		i += 1;
 	}
 	delete(last as *Object);

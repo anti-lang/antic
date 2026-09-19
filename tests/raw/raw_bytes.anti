@@ -1,6 +1,6 @@
 //! A program writes a CR, an LF and a NUL, and the harness reads the bytes
 //! it wrote. The runtime translates none of them on any host.
-extern fn anti_rt_write(stream: c_int, bytes: *byte, count: c_size_t);
+extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
 
 fn main() -> int
 {

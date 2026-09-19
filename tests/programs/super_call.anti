@@ -2,7 +2,7 @@
 //! reaches the base's body directly, so a concrete function can add to
 //! what the function it replaces does.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Base
 {

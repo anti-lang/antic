@@ -6,8 +6,8 @@ import anti.os;
 
 extern fn raise(sig: c_int) -> c_int;
 
-extern fn anti_rt_atomic_load(address: *int, width: int) -> int;
-extern fn anti_rt_atomic_store(address: *int, width: int, value: int);
+extern fn anti_rt_atomic_load(address: ?*int, width: int) -> int;
+extern fn anti_rt_atomic_store(address: ?*int, width: int, value: int);
 
 singleton class Seen
 {

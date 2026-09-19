@@ -3,7 +3,7 @@
 //! defaults from every level apply, and a member function reaches an
 //! inherited field through `self`.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Shape
 {

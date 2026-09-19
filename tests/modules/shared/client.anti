@@ -10,7 +10,7 @@ import com.example.points;
 import anti.reflect;
 import anti.text;
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Bin
 {
@@ -41,7 +41,7 @@ fn main() -> int
 	let crate = alloc points.Crate { w: 3 };
 	let sized: *points.Sized = crate;
 	let inside: *Object = sized;
-	let d = reflect.describe(inside as *byte);
+	let d = reflect.describe(inside as *byte) else { return 1; };
 	let grow = reflect.function(d, 7);
 	printf("%s %d\n".ptr, grow.name.ptr, sized.size() as c_int);
 	let wider = [reflect.of_int(2)];

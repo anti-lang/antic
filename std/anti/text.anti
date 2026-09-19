@@ -4,13 +4,13 @@
 //! string, and `equal` compares two by their bytes. `Builder` collects
 //! bytes and gives the `str` of what it collected.
 
-extern fn memcmp(a: *byte, b: *byte, count: c_size_t) -> c_int;
-extern fn memcpy(to: *byte, from: *byte, count: c_size_t) -> *byte;
-extern fn anti_rt_text_from_c(bytes: *byte) -> str;
-extern fn anti_rt_text_slice(bytes: *byte, len: int) -> str;
-extern fn anti_rt_builder_append(b: *Builder, bytes: *byte, len: int);
-extern fn anti_rt_builder_text(b: *Builder) -> str;
-extern fn anti_rt_builder_clear(b: *Builder);
+extern fn memcmp(a: ?*byte, b: ?*byte, count: c_size_t) -> c_int;
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
+extern fn anti_rt_text_slice(bytes: ?*byte, len: int) -> str;
+extern fn anti_rt_builder_append(b: ?*Builder, bytes: ?*byte, len: int);
+extern fn anti_rt_builder_text(b: ?*Builder) -> str;
+extern fn anti_rt_builder_clear(b: ?*Builder);
 
 /// Whether `a` and `b` hold the same bytes.
 pub fn equal(a: str, b: str) -> bool
@@ -24,7 +24,7 @@ pub fn equal(a: str, b: str) -> bool
 /// The `str` of the NUL-terminated C string at `bytes`, without the NUL.
 ///
 /// The `str` points into the C string, which must outlive it.
-pub fn from_c(bytes: *byte) -> str
+pub fn from_c(bytes: ?*byte) -> str
 {
 	return anti_rt_text_from_c(bytes);
 }
@@ -61,7 +61,7 @@ pub fn char_count(s: str) -> int
 /// `struct anti_builder` of `rt/std.h`, in that order.
 pub class Builder
 {
-	own room: *byte,
+	own room: ?*byte,
 	length: int = 0,
 	capacity: int = 0,
 
@@ -116,7 +116,8 @@ pub fn slice(s: str, from: int, to: int) -> str
 	if from < 0 || from >= high {
 		return "";
 	}
-	return anti_rt_text_slice(&s.ptr[from], high - from);
+	let bytes = s.ptr else { return ""; };
+	return anti_rt_text_slice(&bytes[from], high - from);
 }
 
 /// The index of the first `b` in `s`, or -1.

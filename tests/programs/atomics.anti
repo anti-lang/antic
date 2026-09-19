@@ -2,7 +2,7 @@
 //! one sequentially consistent operation. `static atomic` declares a
 //! field of the class, which is a global with the class's symbol.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Counter
 {

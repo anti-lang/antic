@@ -11,13 +11,13 @@
 import anti.error;
 import anti.text;
 
-extern fn anti_rt_toml_read(bytes: *byte, len: int) -> *byte;
-extern fn anti_rt_toml_count(doc: *byte) -> int;
-extern fn anti_rt_toml_key(doc: *byte, index: int) -> str;
-extern fn anti_rt_toml_value(doc: *byte, index: int) -> str;
-extern fn anti_rt_toml_find(doc: *byte, path: *byte, len: int) -> int;
-extern fn anti_rt_toml_line(doc: *byte, index: int) -> int;
-extern fn anti_rt_toml_free(doc: *byte);
+extern fn anti_rt_toml_read(bytes: ?*byte, len: int) -> ?*byte;
+extern fn anti_rt_toml_count(doc: ?*byte) -> int;
+extern fn anti_rt_toml_key(doc: ?*byte, index: int) -> str;
+extern fn anti_rt_toml_value(doc: ?*byte, index: int) -> str;
+extern fn anti_rt_toml_find(doc: ?*byte, path: ?*byte, len: int) -> int;
+extern fn anti_rt_toml_line(doc: ?*byte, index: int) -> int;
+extern fn anti_rt_toml_free(doc: ?*byte);
 
 /// One read document.
 ///
@@ -25,7 +25,7 @@ extern fn anti_rt_toml_free(doc: *byte);
 /// `str` it gave out ends with it.
 pub class Document
 {
-	own handle: *byte,
+	own handle: ?*byte,
 
 	/// The number of keys the document holds.
 	pub fn len(self) -> int
@@ -104,7 +104,7 @@ pub class Document
 	/// Read `source` as a TOML document.
 	///
 	/// A text outside the subset gives an error with code 1.
-	pub fn read(source: str, out: *Document) -> *error.Error
+	pub fn read(source: str, out: *Document) -> ?*error.Error
 	{
 		let handle = anti_rt_toml_read(source.ptr, source.len);
 		if handle == none {

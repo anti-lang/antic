@@ -2,7 +2,7 @@
 //! single call or assignment, and `else` takes the rest. A switch on an
 //! enum without `else` covers every value.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 enum Kind: u8 { Circle, Square, Line }
 

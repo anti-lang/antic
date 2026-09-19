@@ -180,12 +180,12 @@ about structs, enums, classes, interfaces and errors lives there, and
 - Trailing commas are allowed in every comma-separated list: struct declarations, struct and slice literals, array literals, parameters, arguments and function pointer type parameters.
 - Structs are nominal types. Two struct declarations are two types. Arrays, slices, pointers and function pointer types are equal when spelled the same.
 - `a[lo..hi]` on an array or a slice has type `[]T`. Both bounds are required. The array operand is addressable, because the slice points into it. A slice is built from a pointer as `[]T { ptr: p, len: n }`.
-- `.len` has type `int`. `.ptr` has type `*T`, and `*byte` on `str`. Both are read-only on `str` and slices. Arrays have `.len` only. Index expressions have type `int`.
+- `.len` has type `int`. `.ptr` has type `?*T`, and `?*byte` on `str`. Both are read-only on `str` and slices. Arrays have `.len` only. Index expressions have type `int`.
 - `str` supports `.len`, `.ptr` and `s[i]`, which has type `byte`. `s[lo..hi]` on a `str` has type `[]byte`, which has no NUL rule to break. In the core a `str` comes from a literal or from the arguments of `main`. Building a `str` from parts is a standard-library concern: `anti.text` provides them: after `import anti.text;`, `text.equal(a, b)` compares two, and `text.from_c(p)` makes one from a C string.
 - C `void *` and opaque handles such as `FILE *` are `*byte`, converted with `as`. No void pointer type and no empty struct.
 - `none` is the pointer that points to no value, and a literal of every pointer and function-pointer type. It is a concept of the language, and zero is today's encoding of it. The lexer refuses `null` with a message that names `none`. Pointers compare with `==` and `!=`. No pointer arithmetic.
 - The function `reflect.none()` of `anti.reflect` is `reflect.nothing()`, since `none` is a keyword. The word "nullable" and the section "Nullable pointers" keep their names, and the generated C header keeps `/* non-null */`. Reason: they name the idea, which C readers know by that word, and not the literal.
-- `alloc(T, n) -> *T` returns uninitialised memory, or `none` on failure. `free(p)` releases it. `size_of(T) -> int` is a type's size on the target. The three names are keywords. `alloc` and `size_of` take a type argument.
+- `alloc(T, n) -> ?*T` returns uninitialised memory, or `none` on failure. `free(p)` releases it and takes a `?*T`, as C's `free` takes a null pointer. `size_of(T) -> int` is a type's size on the target. The three names are keywords. `alloc` and `size_of` take a type argument.
 - `union` is declared like a struct and has C layout: every field at offset 0, size the largest field rounded up to the largest alignment. A literal names exactly one field. Reading a field reinterprets the bytes. Method-call sugar does not apply. Unions pass by value under the struct classifier with every field at offset 0.
 - [provisional] A union literal is not a constant expression. Reason: a constant holds a value for every field of an aggregate, and a union literal names one field.
 - Bitfields: `name: u32 : 4` in a struct. The type is a sized integer and carries the signedness. The back end lays bitfields out with the System V rule on Linux and macOS and the MSVC rule on Windows. It lowers access to masks and shifts.
@@ -417,6 +417,21 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The packages of linux-x86_64, linux-arm64, windows-x86_64 and windows-arm64 are built and unpublished. Each holds the right file format for its host, and no test suite has run on those hosts.
 - The Windows branch of `rt/start.c` has not been compiled with MSVC or run. It needs `GetCommandLineW`, `GetEnvironmentStringsW` and `FreeEnvironmentStringsW` from kernel32.
 - Windows DLL functions. A C function that a DLL exports, rather than the static C runtime, has an import thunk as its address in the executable. Pointer equality with the address that the DLL itself uses is untested. Chapter 23 links the first DLL-based libraries.
+
+## Nullable pointers
+
+- `?*T` is one type per element type, interned beside `*T`, and the two have the same layout. The difference is a pointer comparison in the checker and nothing in the output.
+- `?*` is one lexer token. Lexing `?` and `*` apart makes `p as?*Circle` and `p as ?*Circle` the same two tokens, and the longest match settles it in favour of the type. `p as? *Circle` keeps the space, which the formatter writes.
+- [provisional] Narrowing reads a name and nothing else. `if q.next != none` leaves `q.next` a `?*T`, because a call inside the block may write the field. Reason: the specification narrows "the name `p`", and a field needs an aliasing rule that nothing has decided yet.
+- [provisional] `while p != none do { }` narrows its body as `if` does. Reason: the two have the same shape, the rule is per block in both, and a list walk is the form the standard library writes.
+- [provisional] Narrowing follows `p != none` and `p == none` alone, not `&&` chains. Reason: it is the smallest rule that carries the specification's examples, and a chain needs an order of evaluation the specification does not give.
+- [provisional] An assignment to a narrowed name ends the narrowing in the block that holds the record. A nested block therefore ends it for the blocks outside as well. Reason: the branch that assigned may have run.
+- [provisional] `dup`, `delete` and `destroy` take a checked pointer. `is`, `as` and `as?` take a `?*T`: `none` is of no class, so `is` is false, `as?` gives `none` and `as` traps as it does on any other mismatch. Reason: the specification says `is` works on both, and the three that read a table to write through it have nothing to do with `none`.
+- [provisional] The `ptr` of a `str` and of a slice is `?*T`. Reason: a slice of no elements holds no address, and `[]T { ptr: none, len: 0 }` is how a program writes one.
+- [provisional] A failing function returns `?*Error`, since `none` is its success. The error a handler binds is the `*Error` of that result, because the handler runs on the failure alone. Reason: `*T` never holds `none`, so the older spelling `*Error` could not carry the convention.
+- [provisional] `anti.error.NullPointer` inherits `Error` and carries `make()`, which the compiler calls where a `catch` guards a `?*T`. A module that writes the form imports `anti.error`, as it does for every other error it names. Reason: the compiler already knows `anti.error` by module path for the failing convention, and this adds no linkage it did not have. `anti.lang` will hold the class when that namespace exists.
+- [provisional] A bound struct has no marker in the language today, so the `?*T` rule for C is checked on `extern fn` signatures and the C callbacks inside them. An export item goes the other way and keeps `*T`, which the header writes as `T * /* non-null */`. Reason: nothing distinguishes a struct written to mirror a C library's from any other struct.
+- `let m = p else { }` is the one form of the group that emits a branch, and it emits what the program wrote: a comparison against `none` and the block that leaves. `is`, `as` and `as?` add one comparison to a test that already branches.
 
 ## Open
 

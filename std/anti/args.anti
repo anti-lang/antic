@@ -13,7 +13,7 @@
 import anti.error;
 import anti.text;
 
-extern fn memcpy(to: *byte, from: *byte, count: c_size_t) -> *byte;
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 
 /// One declared option, with what the command line gave it.
 struct Option
@@ -69,7 +69,7 @@ pub class Parser
 	///
 	/// An unknown option gives an error with code 1, and an option that
 	/// takes a value and has none gives code 2.
-	pub fn parse(self, argv: []str) -> *error.Error
+	pub fn parse(self, argv: []str) -> ?*error.Error
 	{
 		let only_rest = false;
 		let i = 1;
@@ -220,7 +220,7 @@ pub class Parser
 
 	/// Read the option at `i` of `argv` and say how many entries it took.
 	fn read_option(self, arg: str, argv: []str, i: int,
-		taken: *int) -> *error.Error
+		taken: *int) -> ?*error.Error
 	{
 		let body = text.slice(arg, 1, arg.len);
 		let long = false;
@@ -284,9 +284,9 @@ pub class Parser
 			while size < self.rest_count + 1 do {
 				size = size * 2;
 			}
-			let room = alloc(str, size);
+			let room = alloc(str, size) else { return; };
 			if self.rest.ptr != none {
-				memcpy(room as *byte, self.rest.ptr as *byte,
+				memcpy(room as ?*byte, self.rest.ptr as ?*byte,
 					(self.rest_count * size_of(str)) as c_size_t);
 				free(self.rest.ptr);
 			}
@@ -309,9 +309,9 @@ pub class Parser
 		while size < wanted do {
 			size = size * 2;
 		}
-		let room = alloc(Option, size);
+		let room = alloc(Option, size) else { return; };
 		if self.options.ptr != none {
-			memcpy(room as *byte, self.options.ptr as *byte,
+			memcpy(room as ?*byte, self.options.ptr as ?*byte,
 				(self.count * size_of(Option)) as c_size_t);
 			free(self.options.ptr);
 		}

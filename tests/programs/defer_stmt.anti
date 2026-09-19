@@ -2,7 +2,7 @@
 //! reverse order of declaration. A return, a break and a continue each
 //! leave through the statements they pass.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn note(n: int)
 {

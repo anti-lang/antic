@@ -4,12 +4,12 @@
 //! without the final free. `dup` copies an object of its concrete class and
 //! copies its `own` fields.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Node
 {
 	pub n: int = 0,
-	pub own child: *Node,
+	pub own child: ?*Node,
 
 	concrete fn destruct(self)
 	{

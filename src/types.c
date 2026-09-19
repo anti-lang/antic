@@ -31,6 +31,7 @@ static struct type *find_or_add(struct types *types, const struct type *key)
         if (t->kind != key->kind || t->element != key->element ||
             t->length != key->length || t->length_of != key->length_of ||
             t->result != key->result || t->bound != key->bound ||
+            t->nullable != key->nullable ||
             t->param_count != key->param_count) {
             continue;
         }
@@ -55,13 +56,30 @@ static struct type *find_or_add(struct types *types, const struct type *key)
     return t;
 }
 
-struct type *types_pointer(struct types *types, struct type *element)
+struct type *types_pointer_of(struct types *types, struct type *element,
+                              bool nullable)
 {
     struct type key = {0};
 
     key.kind = TYPE_POINTER;
     key.element = element;
+    key.nullable = nullable;
     return find_or_add(types, &key);
+}
+
+struct type *types_pointer(struct types *types, struct type *element)
+{
+    return types_pointer_of(types, element, false);
+}
+
+struct type *types_pointer_nullable(struct types *types, struct type *element)
+{
+    return types_pointer_of(types, element, true);
+}
+
+bool type_is_nullable(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_POINTER && t->nullable;
 }
 
 struct type *types_array(struct types *types, struct type *element,
@@ -400,7 +418,7 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
 
     switch (t->kind) {
     case TYPE_POINTER:
-        text_append(out, "*");
+        text_append(out, t->nullable ? "?*" : "*");
         print_type(out, t->element, qualified);
         return;
     case TYPE_SLICE:

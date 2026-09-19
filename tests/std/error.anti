@@ -1,4 +1,4 @@
-//! The error convention: a failing function returns `*Error`, and every
+//! The error convention: a failing function returns `?*Error`, and every
 //! call of one handles the error. `catch` handles it at the call, `try`
 //! hands it to the caller, and a `try` block gives one handler to a
 //! whole block.
@@ -6,9 +6,9 @@ import anti.error;
 import anti.io;
 import anti.text;
 
-extern fn fopen(path: *byte, mode: *byte) -> *byte;
+extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
 
-fn open_missing(path: str) -> *error.Error
+fn open_missing(path: str) -> ?*error.Error
 {
 	if fopen(path.ptr, "r".ptr) == none {
 		return error.Error.from_errno();
@@ -16,13 +16,13 @@ fn open_missing(path: str) -> *error.Error
 	return none;
 }
 
-fn read_config() -> *error.Error
+fn read_config() -> ?*error.Error
 {
 	try open_missing("/nonexistent/anti/config.toml");
 	return none;
 }
 
-fn size_of_file(path: str, out: *int) -> *error.Error
+fn size_of_file(path: str, out: *int) -> ?*error.Error
 {
 	if fopen(path.ptr, "r".ptr) == none {
 		*out = 0;
@@ -32,9 +32,34 @@ fn size_of_file(path: str, out: *int) -> *error.Error
 	return none;
 }
 
+/// A failing function whose result is itself a `?*T`.
+///
+/// Its `catch` handles the error of the call, not the pointer, and the
+/// handler yields a pointer of the same type.
+fn first_line(path: str, out: *?*byte) -> ?*error.Error
+{
+	let file = fopen(path.ptr, "r".ptr);
+	if file == none {
+		*out = none;
+		return error.Error.new(8, "no such file");
+	}
+	*out = file;
+	return none;
+}
+
 fn main() -> int
 {
 	error.check(none);
+
+	let handle = first_line("/nonexistent/anti/line") catch e {
+		if e.code != 8 {
+			return 4;
+		}
+		yield none;
+	};
+	if handle != none {
+		return 5;
+	}
 
 	let size = size_of_file("/nonexistent/anti/size") catch e {
 		if e.code != 7 {

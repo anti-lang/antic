@@ -292,7 +292,11 @@ static struct type_expr *type(struct parser *p)
                 return NULL;
             }
         }
-    } else if (accept(p, TOKEN_STAR)) {
+    } else if (check(p, TOKEN_STAR) || check(p, TOKEN_QUESTION_STAR)) {
+        ty->nullable = accept(p, TOKEN_QUESTION_STAR);
+        if (!ty->nullable) {
+            next(p);
+        }
         ty->kind = TYPEX_POINTER;
         if ((ty->element = type(p)) == NULL) {
             return NULL;
@@ -871,13 +875,22 @@ static struct stmt *let_or_const(struct parser *p)
         if (v->kind == EXPR_ALLOC && v->as.alloc.value != NULL) {
             v = v->as.alloc.value;
         }
-        if (v->kind != EXPR_CALL) {
-            error_here(p, "`catch` follows a call");
+        /* A `catch` on anything but a call guards a `?*T`, and the
+           checker refuses a value that is neither. The two forms read
+           alike. A call that cannot fail is a guard as well, and the
+           checker decides which of the two it holds. */
+        if (!read_handler(p, v->kind == EXPR_CALL ? &v->as.call.handler
+                                                  : &s->as.let.guard,
+                          false)) {
             return NULL;
         }
-        if (!read_handler(p, &v->as.call.handler, false)) {
-            return NULL;
-        }
+    }
+    /* `let m = p else { }` binds m as `*T` and runs the block when p is
+       `none`. The block leaves the block the `let` stands in, so the
+       name below it is bound on every path. */
+    if (accept(p, TOKEN_ELSE) &&
+        (s->as.let.otherwise = block(p)) == NULL) {
+        return NULL;
     }
     return expect(p, TOKEN_SEMICOLON) ? s : NULL;
 }

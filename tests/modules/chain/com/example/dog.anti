@@ -3,7 +3,7 @@
 
 import com.example.animal;
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 /// A dog, an animal with a tail.
 pub class Dog

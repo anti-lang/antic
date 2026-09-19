@@ -9,7 +9,7 @@ class Sized
 {
 	pub w: int = 0,
 
-	fn construct(self, w: int) -> *error.Error
+	fn construct(self, w: int) -> ?*error.Error
 	{
 		self.w = w;
 		return none;

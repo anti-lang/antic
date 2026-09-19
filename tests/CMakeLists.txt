@@ -9,6 +9,7 @@ add_executable(antic_unit_tests
     unit/test_parser.c
     unit/test_types.c
     unit/test_sema.c
+    unit/test_nullable.c
     unit/test_ir.c
     unit/test_layout.c
     unit/test_lower.c
@@ -238,11 +239,17 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     endforeach()
     set_tests_properties(program_args_macos-x86_64 PROPERTIES
         ENVIRONMENT "ANTI_TEST_GREETING=héllo")
+    set_tests_properties(program_nullable_macos-x86_64 PROPERTIES
+        ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
 endif()
 
 # The environment variable that tests/programs/args.anti looks for.
 set_tests_properties(program_args PROPERTIES
     ENVIRONMENT "ANTI_TEST_GREETING=héllo")
+
+# The `?*byte` that tests/programs/nullable.anti reads from getenv.
+set_tests_properties(program_nullable PROPERTIES
+    ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
 
 # The modules of the standard library in std/, which the build writes as
 # library files into std/ of the runtime archive. Each test program imports

@@ -93,7 +93,7 @@ static const char eleven[] =
     "}\n";
 
 static const char variadic[] =
-    "extern fn printf(format: *byte, ...) -> i32;\n"
+    "extern fn printf(format: ?*byte, ...) -> i32;\n"
     "fn show(p: *byte, v: int) {\n"
     "    printf(p, v, 7);\n"
     "}\n";
@@ -304,7 +304,7 @@ static void far_slots(void)
     struct text out = {0};
     int i;
 
-    text_append(&source, "extern fn take(p: *int);\nfn big() -> int {\n");
+    text_append(&source, "extern fn take(p: ?*int);\nfn big() -> int {\n");
     for (i = 0; i < 520; i++) {
         text_appendf(&source, "    let x%d = %d;\n    take(&x%d);\n", i, i, i);
     }

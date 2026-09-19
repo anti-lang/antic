@@ -5,7 +5,7 @@
 
 import com.example.parts;
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Crate
 {
@@ -29,8 +29,10 @@ fn main() -> int
 	c.list[0] = parts.Part { n: 4, leaf: alloc parts.Leaf { n: 5 } };
 	c.fill(6);
 	let d = dup(c);
-	d.part.leaf.n = 30;
-	d.list[0].leaf.n = 50;
+	let part_leaf = d.part.leaf else { return 1; };
+	part_leaf.n = 30;
+	let list_leaf = d.list[0].leaf else { return 1; };
+	list_leaf.n = 50;
 	printf("%d %d\n".ptr, (d.part.leaf != c.part.leaf) as c_int,
 		(d.list[0].leaf != c.list[0].leaf) as c_int);
 	delete(d);

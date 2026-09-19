@@ -1,6 +1,6 @@
-extern fn printf(format: *byte, ...) -> i32;
-extern fn qsort(base: *byte, count: u64, size: u64,
-	compare: fn(*byte, *byte) -> i32);
+extern fn printf(format: ?*byte, ...) -> i32;
+extern fn qsort(base: ?*byte, count: u64, size: u64,
+	compare: fn(?*byte, ?*byte) -> i32);
 extern fn abs(x: i32) -> i32;
 
 struct Shape
@@ -25,10 +25,14 @@ fn scale(s: *Shape, k: f64)
 }
 
 // qsort passes pointers to two elements of the array.
-fn descending(a: *byte, b: *byte) -> i32
+fn descending(a: ?*byte, b: ?*byte) -> i32
 {
-	let x = *(a as *i32);
-	let y = *(b as *i32);
+	/* A C callback takes its pointers as `?*T`, because C hands them
+	   over with nothing that says otherwise. */
+	let first = a else { return 0; };
+	let second = b else { return 0; };
+	let x = *(first as *i32);
+	let y = *(second as *i32);
 	if x < y {
 		return 1;
 	}

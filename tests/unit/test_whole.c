@@ -394,9 +394,9 @@ static void registry(bool reads, bool reflect, bool bundled,
                          "}\n");
     if (reads) {
         text_append(&source,
-                    "extern fn anti_rt_reflect_new(name: *byte, length: int)"
-                    " -> *Object;\n"
-                    "fn make() -> *Object\n"
+                    "extern fn anti_rt_reflect_new(name: ?*byte, length: int)"
+                    " -> ?*Object;\n"
+                    "fn make() -> ?*Object\n"
                     "{\n"
                     "    return anti_rt_reflect_new(\"Tile\".ptr, 4);\n"
                     "}\n");
@@ -590,8 +590,8 @@ static const char reflect_module[] =
     "    kind: ValueKind,\n"
     "    data: Payload,\n"
     "}\n"
-    "extern fn anti_rt_reflect_call(object: *Object, index: int,\n"
-    "    args: *Value, count: int, result: *Value) -> int;\n"
+    "extern fn anti_rt_reflect_call(object: ?*Object, index: int,\n"
+    "    args: ?*Value, count: int, result: ?*Value) -> int;\n"
     "pub fn call(object: *Object, index: int, args: []Value,\n"
     "    result: *Value) -> int\n"
     "{\n"

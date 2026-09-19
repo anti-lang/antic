@@ -247,8 +247,8 @@ void test_sema(void)
     rejects("struct B { a: i32 }\nexport struct S { d: [size_of(B)]u8 }", 2, 19,
             "the field `d` of export struct `S` has type `[size_of(B)]byte`, "
             "which C cannot represent");
-    rejects("export const P: *byte = none;", 1, 17,
-            "export const `P` has type `*byte`, and an export const is a "
+    rejects("export const P: ?*byte = none;", 1, 17,
+            "export const `P` has type `?*byte`, and an export const is a "
             "number, a bool or a str");
     rejects("export fn main() -> int { return 0; }", 1, 11,
             "`main` is the entry of the program and cannot be exported");
@@ -367,7 +367,7 @@ void test_sema(void)
     rejects("const BIG: c_ulong = 65536 as c_ulong * 65536 as c_ulong;", 1, 22,
             "the value does not fit `c_ulong` on every target");
     accepts("fn f() { let big = 5_000_000_000; let half: f32 = 0.5; }");
-    accepts("fn f() { let x: u8 = 250 + 10; let p: *int = none; }");
+    accepts("fn f() { let x: u8 = 250 + 10; let p: ?*int = none; }");
     accepts("fn f(p: *int) -> bool { return p == none; }");
     rejects("fn f() { let n: u8 = 300; }", 1, 22, "`300` does not fit `byte`");
     rejects("fn f() { let m: u8 = -1; }", 1, 22, "`-1` does not fit `byte`");
@@ -463,13 +463,13 @@ void test_sema(void)
             "    let part: []byte = t[1..3];\n"
             "    let whole: []int = a[0..4];\n"
             "    let raw: []int = []int { ptr: p, len: 4 };\n"
-            "    let q: *byte = t.ptr;\n"
+            "    let q: ?*byte = t.ptr;\n"
             "    return x;\n"
             "}");
     accepts("fn f() -> int { let a = [1, 2, 3]; let z = [0; 16]; "
             "let m: [2]f32 = [0.5, 1.5]; return a[0] + z.len; }");
-    accepts("fn f() { let p = alloc(int, 4); p[0] = 1; free(p); "
-            "let n = size_of([3]i16); }");
+    accepts("fn f() { let p = alloc(int, 4) else { return; }; p[0] = 1; "
+            "free(p); let n = size_of([3]i16); }");
     rejects("fn f(x: int) -> int { return x[0]; }", 1, 30,
             "cannot index `int`");
     rejects("fn f(a: [4]int) -> int { return a[true]; }", 1, 35,
@@ -481,7 +481,7 @@ void test_sema(void)
     rejects("fn f() { free(3); }", 1, 15, "`free` needs a pointer, found `int`");
 
     /* Calls, externs and function pointers. */
-    accepts("extern fn printf(fmt: *byte, ...) -> i32;\n"
+    accepts("extern fn printf(fmt: ?*byte, ...) -> i32;\n"
             "fn f() { printf(\"%d %f\\n\".ptr, 1, 2.5); }");
     accepts("fn add(a: i32, b: i32) -> i32 { return a + b; }\n"
             "fn f() -> i32 { let op: fn(i32, i32) -> i32 = add; "
@@ -490,7 +490,7 @@ void test_sema(void)
             "`g` takes 1 argument, found 2");
     rejects("fn g(a: int) {}\nfn f() { g(true); }", 2, 12,
             "expected `int`, found `bool`");
-    rejects("extern fn printf(fmt: *byte, ...) -> i32;\n"
+    rejects("extern fn printf(fmt: ?*byte, ...) -> i32;\n"
             "fn f(x: f32) { printf(\"\".ptr, x); }", 2, 31,
             "a variadic argument has type i32, u32, int, u64, float or a "
             "pointer, found `f32`");

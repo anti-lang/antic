@@ -100,8 +100,16 @@ static void declaration(struct text *out, const struct type *t,
     size_t i;
 
     switch (t->kind) {
+    /* DESIGN: C has one pointer type, so `*T` and `?*T` both cross as
+       `T *`. The header marks the one that never holds `none` in a
+       comment beside the star, which a reader sees and which costs the
+       C compiler nothing. An exported function with a `*T` parameter
+       checks nothing at run time, so the comment is the whole of it. */
     case TYPE_POINTER:
-        text_appendf(&inner, "*%s", name);
+        text_append(&inner, t->nullable ? "*" : "* /* non-null */");
+        if (name[0] != '\0') {
+            text_appendf(&inner, "%s%s", t->nullable ? "" : " ", name);
+        }
         declaration(out, t->element, text_cstr(&inner), owner);
         break;
     case TYPE_ARRAY:

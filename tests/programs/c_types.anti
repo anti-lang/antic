@@ -1,5 +1,5 @@
 extern fn labs(n: c_long) -> c_long;
-extern fn wcslen(s: *c_wchar) -> c_size_t;
+extern fn wcslen(s: ?*c_wchar) -> c_size_t;
 
 fn main() -> int
 {

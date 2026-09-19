@@ -1,4 +1,4 @@
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 extern fn abi_big_wchar() -> c_wchar;
 extern fn abi_wchar_i64(w: c_wchar) -> i64;
 extern fn abi_wchar_i32(w: c_wchar) -> i32;

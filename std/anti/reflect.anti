@@ -21,24 +21,24 @@
 import anti.error;
 import anti.text;
 
-extern fn anti_rt_descriptor(object: *byte) -> *byte;
-extern fn anti_rt_reflect_parent(d: *byte) -> *byte;
-extern fn anti_rt_reflect_field_count(d: *byte) -> int;
-extern fn anti_rt_reflect_field_name(d: *byte, index: int) -> str;
-extern fn anti_rt_reflect_field_offset(d: *byte, index: int) -> int;
-extern fn anti_rt_reflect_field_type(d: *byte, index: int) -> int;
-extern fn anti_rt_reflect_field_owned(d: *byte, index: int) -> int;
-extern fn anti_rt_reflect_function_count(d: *byte) -> int;
-extern fn anti_rt_reflect_function_name(d: *byte, index: int) -> str;
-extern fn anti_rt_reflect_function_slot(d: *byte, index: int) -> int;
-extern fn anti_rt_reflect_function_params(d: *byte, index: int) -> int;
-extern fn anti_rt_reflect_get(object: *byte, d: *byte, index: int,
-	out: *Value);
-extern fn anti_rt_reflect_set(object: *byte, d: *byte, index: int,
-	value: *Value) -> int;
-extern fn anti_rt_reflect_new(name: *byte, length: int) -> *Object;
-extern fn anti_rt_reflect_call(object: *Object, index: int, args: *Value,
-	count: int, result: *Value) -> int;
+extern fn anti_rt_descriptor(object: ?*byte) -> ?*byte;
+extern fn anti_rt_reflect_parent(d: ?*byte) -> ?*byte;
+extern fn anti_rt_reflect_field_count(d: ?*byte) -> int;
+extern fn anti_rt_reflect_field_name(d: ?*byte, index: int) -> str;
+extern fn anti_rt_reflect_field_offset(d: ?*byte, index: int) -> int;
+extern fn anti_rt_reflect_field_type(d: ?*byte, index: int) -> int;
+extern fn anti_rt_reflect_field_owned(d: ?*byte, index: int) -> int;
+extern fn anti_rt_reflect_function_count(d: ?*byte) -> int;
+extern fn anti_rt_reflect_function_name(d: ?*byte, index: int) -> str;
+extern fn anti_rt_reflect_function_slot(d: ?*byte, index: int) -> int;
+extern fn anti_rt_reflect_function_params(d: ?*byte, index: int) -> int;
+extern fn anti_rt_reflect_get(object: ?*byte, d: ?*byte, index: int,
+	out: ?*Value);
+extern fn anti_rt_reflect_set(object: ?*byte, d: ?*byte, index: int,
+	value: ?*Value) -> int;
+extern fn anti_rt_reflect_new(name: ?*byte, length: int) -> ?*Object;
+extern fn anti_rt_reflect_call(object: ?*Object, index: int, args: ?*Value,
+	count: int, result: ?*Value) -> int;
 
 /// The type of a field, as its record names it.
 ///
@@ -78,13 +78,13 @@ pub class Function
 }
 
 /// The descriptor of the class of `object`.
-pub fn describe(object: *byte) -> *byte
+pub fn describe(object: *byte) -> ?*byte
 {
 	return anti_rt_descriptor(object);
 }
 
 /// The descriptor of the base of the class `d` describes, or `none`.
-pub fn parent(d: *byte) -> *byte
+pub fn parent(d: *byte) -> ?*byte
 {
 	return anti_rt_reflect_parent(d);
 }
@@ -142,7 +142,7 @@ pub fn get(object: *byte, d: *byte, index: int) -> Value
 /// integer or a float narrows to the field's type. An index out of range,
 /// a field that no `Value` carries and a value of another kind each give
 /// an error with the code that names the reason, and write nothing.
-pub fn set(object: *byte, d: *byte, index: int, value: Value) -> *error.Error
+pub fn set(object: *byte, d: *byte, index: int, value: Value) -> ?*error.Error
 {
 	let v = value;
 	let reason = anti_rt_reflect_set(object, d, index, &v);
@@ -166,7 +166,7 @@ pub fn name(d: *byte) -> str
 	return anti_rt_reflect_class_name(d);
 }
 
-extern fn anti_rt_reflect_class_name(d: *byte) -> str;
+extern fn anti_rt_reflect_class_name(d: ?*byte) -> str;
 
 /// A new object on the heap of the class `name` names, or `none`.
 ///
@@ -175,7 +175,7 @@ extern fn anti_rt_reflect_class_name(d: *byte) -> str;
 /// `construct` has run. A name two modules declare needs the module
 /// path. An abstract class, a singleton and a class whose `construct`
 /// takes arguments give `none`, as does a name no class of the program has.
-pub fn new(name: str) -> *Object
+pub fn new(name: str) -> ?*Object
 {
 	return anti_rt_reflect_new(name.ptr, name.len);
 }
@@ -266,7 +266,7 @@ pub fn of_ptr(v: *byte) -> Value
 /// with `NOT_CARRIED`. Arguments of another count give `WRONG_COUNT`, and
 /// of another kind `WRONG_KIND`.
 pub fn call(object: *Object, index: int, args: []Value, out: *Value)
-	-> *error.Error
+	-> ?*error.Error
 {
 	*out = nothing();
 	let reason = anti_rt_reflect_call(object, index, args.ptr, args.len, out);

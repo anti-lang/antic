@@ -15,7 +15,7 @@ import anti.text;
 /// Write `value` as a JSON object.
 ///
 /// A pointer that is `none` writes `null`.
-pub fn write(value: *Object, out: *text.Builder)
+pub fn write(value: ?*Object, out: *text.Builder)
 {
 	if value == none {
 		out.append("null");

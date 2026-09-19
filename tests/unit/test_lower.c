@@ -137,9 +137,9 @@ static void allocates_zeroed_classes(void)
     static const char source[] =
         "class Item { pub n: int = 0 }\n"
         "struct Point { x: int, y: int }\n"
-        "fn items(n: int) -> *Item { return alloc(Item, n); }\n"
-        "fn points(n: int) -> *Point { return alloc(Point, n); }\n"
-        "fn bytes(n: int) -> *u8 { return alloc(u8, n); }\n"
+        "fn items(n: int) -> ?*Item { return alloc(Item, n); }\n"
+        "fn points(n: int) -> ?*Point { return alloc(Point, n); }\n"
+        "fn bytes(n: int) -> ?*u8 { return alloc(u8, n); }\n"
         "fn one() -> *Item { return alloc Item { n: 1 }; }\n";
 
     CHECK(body_holds(source, "main.items", "call ptr @calloc(%0, "));
@@ -645,8 +645,11 @@ void test_lower(void)
            "}\n");
 
     /* alloc and free call the C library, and p[i] is an address. */
+    /* `alloc(T, n)` gives `?*T`, so the program checks it. The `else`
+       of the `let` is the one branch the nullable rules emit, and it is
+       the one the program wrote. */
     lowers("fn k() -> i16 {\n"
-           "    let p = alloc(i16, 4);\n"
+           "    let p = alloc(i16, 4) else { return 0; };\n"
            "    p[2] = 7;\n"
            "    let v = p[2];\n"
            "    free(p);\n"
@@ -659,17 +662,22 @@ void test_lower(void)
            "    %0 = mul i64 4, size_of i16\n"
            "    %1 = call ptr @malloc(%0)\n"
            "    %2 = copy ptr %1\n"
-           "    %3 = mul i64 2, size_of i16\n"
-           "    %4 = ptradd %2, %3\n"
-           "    store i16 7, %4\n"
-           "    %5 = mul i64 2, size_of i16\n"
-           "    %6 = ptradd %2, %5\n"
-           "    %7 = load i16 %6\n"
-           "    %8 = copy i16 %7\n"
+           "    %3 = eq i8 %2, 0\n"
+           "    branch %3, b1, b2\n"
+           "b1:\n"
+           "    ret i16 0\n"
+           "b2:\n"
+           "    %4 = mul i64 2, size_of i16\n"
+           "    %5 = ptradd %2, %4\n"
+           "    store i16 7, %5\n"
+           "    %6 = mul i64 2, size_of i16\n"
+           "    %7 = ptradd %2, %6\n"
+           "    %8 = load i16 %7\n"
+           "    %9 = copy i16 %8\n"
            "    call void @free(%2)\n"
-           "    %9 = trunc i16 size_of i16\n"
-           "    %10 = add i16 %8, %9\n"
-           "    ret i16 %10\n"
+           "    %10 = trunc i16 size_of i16\n"
+           "    %11 = add i16 %9, %10\n"
+           "    ret i16 %11\n"
            "}\n");
 
     lowers("fn m(x: f32) -> f64 {\n"
@@ -881,7 +889,7 @@ void test_lower(void)
 
     /* A slice literal stores its fields, and a slice of an array points
        into the array. */
-    lowers("fn h(p: *u8, n: int) -> *u8 {\n"
+    lowers("fn h(p: *u8, n: int) -> ?*u8 {\n"
            "    let arr = [5, 6, 7];\n"
            "    let s = []byte { ptr: p, len: n };\n"
            "    let whole = arr[0..3];\n"

@@ -91,7 +91,7 @@ static const char geometry[] =
     "pub fn area(w: int, h: int) -> int {\n"
     "    return w * h;\n"
     "}\n"
-    "pub fn make() -> *Rect {\n"
+    "pub fn make() -> ?*Rect {\n"
     "    return alloc(Rect, 1);\n"
     "}\n"
     "pub fn release(r: *Rect) {\n"
@@ -145,7 +145,7 @@ static void imports(void)
             "import geometry as g;\n"
             "const TWICE: int = geometry.SIDES * 2;\n"
             "fn main() -> int {\n"
-            "    let r: *geometry.Rect = g.make();\n"
+            "    let r = g.make() else { return 1; };\n"
             "    let v = g.Rect { w: 1, h: TWICE };\n"
             "    r.release();\n"
             "    g.putchar(65);\n"
@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: int = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 24, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 25, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -336,20 +336,20 @@ static void writes_format(void)
 }
 
 static const char vec_source[] = "pub struct V2 { x: int, y: int }\n"
-                                 "struct Hidden { v: V2, next: *Hidden }\n"
+                                 "struct Hidden { v: V2, next: ?*Hidden }\n"
                                  "pub const ORIGIN: V2 = V2 { x: 0, y: 0 };\n"
                                  "pub const NAME: str = \"vec\";\n"
                                  "pub const HALF: f64 = 0.5;\n"
-                                 "pub fn make() -> *V2 {\n"
+                                 "pub fn make() -> ?*V2 {\n"
                                  "    return alloc(V2, 1);\n"
                                  "}\n"
-                                 "pub fn hidden() -> *Hidden {\n"
+                                 "pub fn hidden() -> ?*Hidden {\n"
                                  "    return none;\n"
                                  "}\n";
 
 static const char shapes_source[] = "import vec;\n"
                                     "pub struct Box { corner: vec.V2 }\n"
-                                    "pub fn make() -> *vec.V2 {\n"
+                                    "pub fn make() -> ?*vec.V2 {\n"
                                     "    return vec.make();\n"
                                     "}\n";
 
@@ -1208,9 +1208,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 25;
+    copy[4] = 26;
     refuses_file(copy, sizeof copy,
-                 "has format version 25, and antic reads version 24");
+                 "has format version 26, and antic reads version 25");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1347,7 +1347,7 @@ static void one_struct_descriptor(void)
         "import vec;\n"
         "class Holder {\n"
         "    pub at: vec.V2 = vec.V2 { x: 0, y: 0 },\n"
-        "    pub p: *vec.V2 = none,\n"
+        "    pub p: ?*vec.V2 = none,\n"
         "}\n";
     struct session s;
     struct interface *iface;

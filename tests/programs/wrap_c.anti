@@ -2,16 +2,16 @@
 //! handle the C library gave it, its `destruct` body hands the handle back,
 //! and `delete` runs that body before it frees the object.
 
-extern fn fopen(path: *byte, mode: *byte) -> *byte;
-extern fn fclose(file: *byte) -> c_int;
-extern fn fputs(text: *byte, file: *byte) -> c_int;
-extern fn fgets(buffer: *byte, size: c_int, file: *byte) -> *byte;
-extern fn remove(path: *byte) -> c_int;
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
+extern fn fclose(file: ?*byte) -> c_int;
+extern fn fputs(text: ?*byte, file: ?*byte) -> c_int;
+extern fn fgets(buffer: ?*byte, size: c_int, file: ?*byte) -> ?*byte;
+extern fn remove(path: ?*byte) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class TextFile
 {
-	own handle: *byte,
+	own handle: ?*byte,
 
 	pub fn open(path: str, mode: str) -> *TextFile
 	{

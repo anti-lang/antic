@@ -3,7 +3,7 @@
 //! `use` field does the same. A literal that names the field gives its
 //! own value instead.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Part
 {

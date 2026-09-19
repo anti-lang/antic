@@ -1,6 +1,6 @@
 import com.example.shapes;
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn main() -> int
 {

@@ -165,8 +165,8 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 17. Inline atomic instruction sequences, which are runtime calls today.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
-nullable pointers, dev-mode checks, debug information, and tests and fixtures
-before the first public release. After it, the wrapping and saturating operators
+nullable pointers are built. Dev-mode checks, debug information, and tests and
+fixtures come before the first public release. After it, the wrapping and saturating operators
 with `Flags`, then sum types, then locking and channels. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. Then
 generics and closures.
@@ -192,9 +192,12 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 452 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 451 each, without the `no_paths` test, which needs a
+- 454 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 453 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
+- `*T` never holds `none` and `?*T` may. Narrowing is per block, `let m = p
+  else { }` and `p catch` bind the checked pointer, and every pointer of an
+  `extern fn` is `?*T`. A failing function returns `?*Error`.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`

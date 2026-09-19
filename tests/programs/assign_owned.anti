@@ -4,7 +4,7 @@
 //! destroyed there. An array is replaced element by element, last to
 //! first, and so is a class value held inline.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Leaf
 {
@@ -19,7 +19,7 @@ class Leaf
 class Item
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = none,
+	pub own leaf: ?*Leaf = none,
 
 	concrete fn destruct(self)
 	{
@@ -42,7 +42,8 @@ fn main() -> int
 	{
 		let it = Item { n: 1, leaf: alloc Leaf { n: 10 } };
 		it = Item { n: 2, leaf: alloc Leaf { n: 20 } };
-		printf("after %d %d\n".ptr, it.n as c_int, it.leaf.n as c_int);
+		let leaf = it.leaf else { return 1; };
+		printf("after %d %d\n".ptr, it.n as c_int, leaf.n as c_int);
 	}
 	let shelf = alloc Shelf { items: []Item { ptr: alloc(Item, 2), len: 2 } };
 	shelf.items[0] = Item { n: 3 };

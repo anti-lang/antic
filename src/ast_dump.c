@@ -113,7 +113,7 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
         end(d, start, NULL);
         break;
     case TYPEX_POINTER:
-        text_append(d->out, "type *");
+        text_append(d->out, t->nullable ? "type ?*" : "type *");
         end(d, start, NULL);
         dump_type(d, depth + 1, t->element);
         break;

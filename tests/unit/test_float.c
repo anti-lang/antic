@@ -98,7 +98,7 @@ static void far_spills(void)
     int i;
 
     text_append(&source,
-                "extern fn take(p: *int);\n"
+                "extern fn take(p: ?*int);\n"
                 "fn big(p: *f64, x0: f64, x1: f64, x2: f64, x3: f64, x4: f64,\n"
                 "       x5: f64, x6: f64, x7: f64, x8: f64) -> f64 {\n");
     for (i = 0; i < 4100; i++) {

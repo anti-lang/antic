@@ -2,7 +2,7 @@
 //! pointer. `continue` runs the step, so a loop that skips a value still
 //! ends.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn main() -> int
 {

@@ -17,6 +17,15 @@ b0:
     movq $4, %rdi
     call malloc
     movq %rax, %rbx
+    cmpq $0, %rbx
+    jne b2
+b1:
+    movq $1, %rax
+    movq 24(%rsp), %rbx
+    movq %rbp, %rsp
+    popq %rbp
+    ret
+b2:
     movb $37, (%rbx)
     movb $100, 1(%rbx)
     movb $10, 2(%rbx)

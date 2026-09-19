@@ -14,7 +14,7 @@ _Static_assert(TYPE_STRUCT == 23, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
-_Static_assert(TOKEN_KIND_COUNT == 144, "raise ANTL_VERSION, then update this");
+_Static_assert(TOKEN_KIND_COUNT == 145, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_RET == 57, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_SYM == 7, "raise ANTL_VERSION, then update this");
@@ -288,6 +288,11 @@ static void put_type(struct writer *w, const struct type *t)
     put_u8(w, (uint8_t)t->kind);
     switch (t->kind) {
     case TYPE_POINTER:
+        put_type_ref(w, t->element);
+        /* `*T` and `?*T` are two types, and a module that imports this
+           one reads which of them a signature names. */
+        put_u8(w, t->nullable);
+        break;
     case TYPE_SLICE:
         put_type_ref(w, t->element);
         break;
@@ -1074,12 +1079,18 @@ static void read_types(struct reader *r)
         uint8_t kind = get_u8(r);
         struct type *t = NULL;
         switch (kind) {
-        case TYPE_POINTER:
+        case TYPE_POINTER: {
+            struct type *element = type_ref(r, i);
+            bool nullable = get_u8(r) != 0;
+            if (element != NULL && !r->failed) {
+                t = types_pointer_of(r->types, element, nullable);
+            }
+            break;
+        }
         case TYPE_SLICE:
             t = type_ref(r, i);
             if (t != NULL) {
-                t = kind == TYPE_POINTER ? types_pointer(r->types, t)
-                                         : types_slice(r->types, t);
+                t = types_slice(r->types, t);
             }
             break;
         case TYPE_ARRAY: {

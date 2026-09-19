@@ -3,7 +3,7 @@
 //! table. The test `program_devirtualise_dev` runs this program in dev
 //! mode, and both print the same line.
 
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class Speaker
 {

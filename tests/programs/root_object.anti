@@ -3,7 +3,7 @@
 //! `type_name` gives the class name and `equals` and `hash` walk the
 //! fields of the chain. A class replaces one with a `concrete fn`.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Point
 {

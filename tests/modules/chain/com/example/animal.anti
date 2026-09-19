@@ -5,7 +5,7 @@
 
 import anti.error;
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 /// An animal with legs and a sound.
 pub class Animal
@@ -42,7 +42,7 @@ pub class Pet
 {
 	pub owner: int = 0,
 
-	fn construct(self, owner: int) -> *error.Error
+	fn construct(self, owner: int) -> ?*error.Error
 	{
 		if owner < 0 {
 			return error.Error.new(6, "a pet has an owner");

@@ -1,7 +1,7 @@
 //! `construct` runs after a literal, base first down the chain, and a
 //! local of a class that owns memory or declares `destruct` is torn
 //! down at the end of its block.
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 class Base
 {

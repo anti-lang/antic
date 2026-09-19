@@ -1,4 +1,4 @@
-extern fn printf(format: *byte, ...) -> i32;
+extern fn printf(format: ?*byte, ...) -> i32;
 extern fn mix(a: int, x: f64, b: int, y: f32) -> f64;
 extern fn nine(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, g: f64, h: f64, i: f32, j: f32) -> f32;
 

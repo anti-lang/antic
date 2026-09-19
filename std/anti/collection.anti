@@ -7,7 +7,7 @@
 
 import anti.text;
 
-extern fn memcpy(to: *byte, from: *byte, count: c_size_t) -> *byte;
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 
 /// A growing array of objects.
 pub class List
@@ -36,7 +36,7 @@ pub class List
 	}
 
 	/// The object at `index`, or `none` outside the list.
-	pub fn at(self, index: int) -> *Object
+	pub fn at(self, index: int) -> ?*Object
 	{
 		if index < 0 || index >= self.count {
 			return none;
@@ -54,7 +54,7 @@ pub class List
 	}
 
 	/// Take the last object off the end, or `none` when the list is empty.
-	pub fn pop(self) -> *Object
+	pub fn pop(self) -> ?*Object
 	{
 		if self.count == 0 {
 			return none;
@@ -82,9 +82,9 @@ pub class List
 		while size < wanted do {
 			size = size * 2;
 		}
-		let room = alloc(*Object, size);
+		let room = alloc(*Object, size) else { return; };
 		if self.items.ptr != none {
-			memcpy(room as *byte, self.items.ptr as *byte,
+			memcpy(room as ?*byte, self.items.ptr as ?*byte,
 				(self.count * size_of(*Object)) as c_size_t);
 			free(self.items.ptr);
 		}
@@ -98,7 +98,7 @@ class Entry
 	pub key: str = "",
 	pub number: int = 0,
 	pub value: *Object,
-	pub own next: *Entry,
+	pub own next: ?*Entry,
 }
 
 /// A map from `str` keys to objects.
@@ -107,13 +107,13 @@ class Entry
 /// was given rather than a copy of the bytes.
 pub class Map
 {
-	own buckets: []*Entry,
+	own buckets: []?*Entry,
 	count: int = 0,
 
 	/// An empty map.
 	pub fn new() -> Map
 	{
-		return Map { buckets: []*Entry { ptr: none, len: 0 }, count: 0 };
+		return Map { buckets: []?*Entry { ptr: none, len: 0 }, count: 0 };
 	}
 
 	/// The number of entries.
@@ -142,7 +142,7 @@ pub class Map
 	}
 
 	/// The object under `key`, or `none` when the map holds nothing there.
-	pub fn get(self, key: str) -> *Object
+	pub fn get(self, key: str) -> ?*Object
 	{
 		if self.buckets.len == 0 {
 			return none;
@@ -174,7 +174,7 @@ pub class Map
 		if size == 0 {
 			size = 16;
 		}
-		let room = alloc(*Entry, size);
+		let room = alloc(?*Entry, size) else { return; };
 		let i = 0;
 		while i < size do {
 			room[i] = none;
@@ -195,20 +195,20 @@ pub class Map
 		if self.buckets.ptr != none {
 			free(self.buckets.ptr);
 		}
-		self.buckets = []*Entry { ptr: room, len: size };
+		self.buckets = []?*Entry { ptr: room, len: size };
 	}
 }
 
 /// A map from integer keys to objects.
 pub class IntMap
 {
-	own buckets: []*Entry,
+	own buckets: []?*Entry,
 	count: int = 0,
 
 	/// An empty map.
 	pub fn new() -> IntMap
 	{
-		return IntMap { buckets: []*Entry { ptr: none, len: 0 }, count: 0 };
+		return IntMap { buckets: []?*Entry { ptr: none, len: 0 }, count: 0 };
 	}
 
 	/// The number of entries.
@@ -237,7 +237,7 @@ pub class IntMap
 	}
 
 	/// The object under `key`, or `none` when the map holds nothing there.
-	pub fn get(self, key: int) -> *Object
+	pub fn get(self, key: int) -> ?*Object
 	{
 		if self.buckets.len == 0 {
 			return none;
@@ -269,7 +269,7 @@ pub class IntMap
 		if size == 0 {
 			size = 16;
 		}
-		let room = alloc(*Entry, size);
+		let room = alloc(?*Entry, size) else { return; };
 		let i = 0;
 		while i < size do {
 			room[i] = none;
@@ -290,7 +290,7 @@ pub class IntMap
 		if self.buckets.ptr != none {
 			free(self.buckets.ptr);
 		}
-		self.buckets = []*Entry { ptr: room, len: size };
+		self.buckets = []?*Entry { ptr: room, len: size };
 	}
 }
 

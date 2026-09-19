@@ -10,6 +10,7 @@ void test_lexer(void);
 void test_parser(void);
 void test_types(void);
 void test_sema(void);
+void test_nullable(void);
 void test_ir(void);
 void test_layout(void);
 void test_lower(void);
@@ -36,6 +37,7 @@ int main(void)
     test_parser();
     test_types();
     test_sema();
+    test_nullable();
     test_ir();
     test_layout();
     test_lower();

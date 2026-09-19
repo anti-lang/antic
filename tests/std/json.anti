@@ -14,7 +14,7 @@ class Named
 {
 	inherits Point,
 	pub mark: int = 0,
-	pub own tag: *Point,
+	pub own tag: ?*Point,
 
 	concrete fn serialize(self, out: *text.Builder)
 	{

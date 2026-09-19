@@ -8,9 +8,9 @@ class Leaf
 class Item
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = none,
+	pub own leaf: ?*Leaf = none,
 
-	fn construct(self, n: int) -> *error.Error
+	fn construct(self, n: int) -> ?*error.Error
 	{
 		self.n = n;
 		return none;

@@ -191,7 +191,7 @@ Not built yet: labels, `for i, x`.
 
 ```anti
 fn add(a: int, b: int) -> int { return a + b; }
-fn open(path: str, mode: Mode = Mode.Read) -> *Error { }
+fn open(path: str, mode: Mode = Mode.Read) -> ?*Error { }
 
 let e = open("x", mode: Mode.Write);
 let f = add;
@@ -205,7 +205,7 @@ Not built yet: default values and named arguments.
 
 ## Errors
 
-Every function that can fail returns `*Error`, `none` on success, with results through out pointers. The forms are `catch` at the call, `try` to propagate, `try { }` for a block, `catch fatal` to stop. A bare failing call is a compile error.
+Every function that can fail returns `?*Error`, `none` on success, with results through out pointers. The forms are `catch` at the call, `try` to propagate, `try { }` for a block, `catch fatal` to stop. A bare failing call is a compile error.
 
 ```anti
 let n = text.parse_int(s) catch e {
@@ -215,7 +215,7 @@ let n = text.parse_int(s) catch e {
 
 let m = text.parse_int(t) catch fatal;
 
-fn load(path: str, out: *Config) -> *Error
+fn load(path: str, out: *Config) -> ?*Error
 {
 	let f = try fs.open(path);
 	...
@@ -314,7 +314,7 @@ final class Circle
 	inherits Shape,
 	r: f32,
 
-	fn construct(self, r: f32) -> *Error
+	fn construct(self, r: f32) -> ?*Error
 	{
 		if r <= 0.0 { return Error.new(1, "radius"); }
 		self.r = r;
@@ -403,12 +403,13 @@ if n != none {
 	n.value = 1;          // n is *Node here
 }
 let m = n else { return 1; };
+let g = n catch fatal;    // an anti.error.NullPointer on none
 let k = n ?? &default_node;
 ```
 
 `alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing.
 
-Not built yet: `?*T`.
+Built. Not built yet: `??`.
 
 ## Reflection
 

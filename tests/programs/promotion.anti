@@ -3,7 +3,7 @@
 //! field access and a direct call, so nothing below the checker knows
 //! about promotion.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 struct Rect
 {

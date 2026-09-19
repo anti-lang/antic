@@ -1,4 +1,4 @@
-extern fn printf(format: *byte, ...) -> i32;
+extern fn printf(format: ?*byte, ...) -> i32;
 
 struct Vector2
 {
@@ -54,7 +54,7 @@ extern fn QuaternionMultiply(q1: Vector4, q2: Vector4) -> Vector4;
 
 fn line(v: f32)
 {
-	let format = alloc(byte, 6);
+	let format = alloc(byte, 6) else { return; };
 	format[0] = 37;
 	format[1] = 46;
 	format[2] = 57;

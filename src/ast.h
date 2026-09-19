@@ -43,6 +43,7 @@ struct type_expr {
     struct name module;             /* TYPEX_NAMED, empty when unqualified */
     struct name name;               /* TYPEX_NAMED */
     struct type_expr *element;      /* TYPEX_POINTER, TYPEX_ARRAY, TYPEX_SLICE */
+    bool nullable;                  /* TYPEX_POINTER: `?*T` */
     struct expr *length;            /* TYPEX_ARRAY */
     struct type_expr **params;      /* TYPEX_FN */
     size_t param_count;
@@ -172,6 +173,9 @@ struct expr {
                `construct` with the arguments. */
             const struct type *builds;
             bool on_heap;
+            /* The call cannot fail and gives a `?*T`, so its `catch`
+               guards the pointer and the `let` takes it over. */
+            bool guards_pointer;
         } call;
         struct {
             struct expr *base;
@@ -291,6 +295,16 @@ struct stmt {
             struct type_expr *type; /* NULL when a let omits it */
             struct expr *value;
             struct symbol *symbol;
+            /* `let m = p else { }`: the block that runs when p is
+               `none`, and which leaves the block the `let` stands in. */
+            struct block *otherwise;
+            /* `let m = p catch fatal` and `let m = p catch e { }`: the
+               handler that runs when p is `none`, with the error
+               `anti.error.NullPointer`. */
+            struct handler guard;
+            /* `anti.error.NullPointer.make`, which the guard calls to
+               build the error it hands the handler. */
+            struct symbol *guard_make;
         } let;                      /* STMT_LET, STMT_CONST */
         struct expr *expr;          /* STMT_EXPR */
         struct {

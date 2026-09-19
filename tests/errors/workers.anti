@@ -24,7 +24,7 @@ fn helper() -> int
 
 fn main() -> int
 {
-	let room = alloc([2]int, 1);
+	let room = alloc([2]int, 1) else { return 1; };
 	let all = (*room)[0..2];
 	let sums = parallel all by 2 -> tally;
 	return sums[0];

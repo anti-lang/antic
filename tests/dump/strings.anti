@@ -1,4 +1,4 @@
-extern fn puts(s: *byte) -> i32;
+extern fn puts(s: ?*byte) -> i32;
 
 fn tail(s: str, from: int) -> []byte
 {

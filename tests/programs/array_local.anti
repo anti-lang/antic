@@ -3,7 +3,7 @@
 //! An array of such arrays does the same over all its elements. An
 //! element frees what it owns. An array of plain values is left alone.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Leaf
 {
@@ -18,7 +18,7 @@ class Leaf
 class Item
 {
 	pub n: int = 0,
-	pub own leaf: *Leaf = none,
+	pub own leaf: ?*Leaf = none,
 
 	concrete fn destruct(self)
 	{

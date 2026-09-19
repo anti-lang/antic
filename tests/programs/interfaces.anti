@@ -3,7 +3,7 @@
 //! call through an interface pointer and a direct call reach one body.
 import anti.io;
 
-extern fn printf(fmt: *byte, ...) -> c_int;
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class Drawable
 {

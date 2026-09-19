@@ -1,5 +1,5 @@
-extern fn puts(s: *byte) -> i32;
-extern fn printf(format: *byte, ...) -> i32;
+extern fn puts(s: ?*byte) -> i32;
+extern fn printf(format: ?*byte, ...) -> i32;
 
 const WORD: str = "banana";
 
@@ -39,7 +39,7 @@ fn main() -> int
 	printf("%d %d %d %d\n".ptr, numbers[1] as i32, numbers[2] as i32,
 		numbers[4] as i32, numbers[5] as i32);
 
-	let heap = alloc(int, 3);
+	let heap = alloc(int, 3) else { return 1; };
 	let view = []int { ptr: heap, len: 3 };
 	fill(view, 100);
 	let sum = heap[0] + heap[1] + heap[2];

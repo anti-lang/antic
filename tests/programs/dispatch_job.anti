@@ -3,7 +3,7 @@
 //! returns, so a second dispatch of the same object gives no job, and
 //! `join` of that job gives nothing. `join_all` waits for a set.
 
-extern fn printf(format: *byte, ...) -> c_int;
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Counter
 {

@@ -10,9 +10,9 @@ import anti.io;
 import anti.text;
 
 extern fn anti_rt_errno() -> c_int;
-extern fn anti_rt_errno_text(code: c_int) -> *byte;
+extern fn anti_rt_errno_text(code: c_int) -> ?*byte;
 extern fn anti_rt_last_error() -> c_int;
-extern fn anti_rt_last_error_text(code: c_int) -> *byte;
+extern fn anti_rt_last_error_text(code: c_int) -> ?*byte;
 
 /// A failure, with a code, a message and the error that caused it.
 pub class Error
@@ -22,7 +22,7 @@ pub class Error
 	/// One line, without a trailing newline.
 	pub message: str = "",
 	/// The error below this one, or `none`.
-	own cause: *Error,
+	own cause: ?*Error = none,
 
 	/// An error with a code and a message and no cause.
 	pub fn new(code: int, message: str) -> *Error
@@ -99,6 +99,25 @@ pub class Error
 	}
 }
 
+/// The error of a `?*T` that held `none` where a pointer was needed.
+///
+/// `p catch fatal` and `p catch e { }` on a `?*T` give one of these. It
+/// is an `Error` like any other, so a handler that takes an `*Error`
+/// takes it too.
+pub class NullPointer
+{
+	inherits Error,
+
+	/// The error a `catch` on a `none` pointer gives.
+	pub fn make() -> *NullPointer
+	{
+		let e = alloc NullPointer { };
+		e.code = 1;
+		e.message = "the pointer is none";
+		return e;
+	}
+}
+
 /// The one function that runs before `fatal` ends the program.
 singleton class Fatal
 {
@@ -115,7 +134,7 @@ pub fn on_fatal(f: fn())
 }
 
 /// Call `fatal` on an error, and return on `none`.
-pub fn check(e: *Error)
+pub fn check(e: ?*Error)
 {
 	if e != none {
 		e.fatal();

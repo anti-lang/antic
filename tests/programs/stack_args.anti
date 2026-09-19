@@ -1,4 +1,4 @@
-extern fn printf(format: *byte, ...) -> i32;
+extern fn printf(format: ?*byte, ...) -> i32;
 
 fn eleven(a: u8, b: i16, c: int, d: int, e: int, f: int, g: int, h: int,
 	i: i8, j: i32, k: u8) -> int
@@ -9,7 +9,7 @@ fn eleven(a: u8, b: i16, c: int, d: int, e: int, f: int, g: int, h: int,
 
 fn main() -> int
 {
-	let format = alloc(byte, 9);
+	let format = alloc(byte, 9) else { return 1; };
 	format[0] = 37;
 	format[1] = 108;
 	format[2] = 100;

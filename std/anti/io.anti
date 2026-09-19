@@ -3,7 +3,7 @@
 //! The functions write the bytes of a `str` unchanged to standard output or
 //! standard error, through the same C streams as `printf`.
 
-extern fn anti_rt_write(stream: c_int, bytes: *byte, count: c_size_t);
+extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
 extern fn anti_rt_exit(status: c_int);
 
 /// Write `text` to standard output.
