@@ -136,25 +136,18 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 5. Done. Both VMs ran the suite, `emit_identity` included.
 6. Done. `anti.reflect`'s `call` and `Value`, and the bitmap rule.
    `docs/reports/2026-09-19-first-sessions-3-to-6.md` reports 3 to 6.
-7. The next session does 7 to 9 in order, in a fresh context, without
-   stopping between them, and reports at the end. The field record carries a
-   type id, not a width, as the specification says. `get` and `set` take and
-   return `Value`. Recheck `serialize` and `deserialize` on a class with every
-   field kind: every sized integer, `f32`, `f64`, `bool`, `char`, `str`, a
-   slice, a pointer, an inline struct, an inline class and an enum.
-8. Tests: `reflect.call` through an interface pointer, and
+7. Done. The field record carries a type id. `get` and `set` take and return
+   `Value`, and `serialize` and `deserialize` cover every field kind.
+8. Done. Tests of `reflect.call` through an interface pointer and of
    `self.super.construct(x)` on a base from another module, in both modes.
-9. Update the provisional entries for Eddie's answers to the questions of
-   `docs/reports/2026-09-19-first-sessions-3-to-6.md`. `reflect.call` follows
-   the error convention: `call(obj, m, args, out: *Value) -> *Error`, and the
-   error names the reason: a bad index, a wrong argument count or a wrong
-   kind. `None` then means only that the function has no result. `anti.reflect`
-   is standard library, so it may name `anti.error.Error`. `Value` becomes a
-   `variant` when variants exist, with the same layout, and its entry says so.
-10. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
-    its own module path as a compile-time constant. The check is then one
-    comparison against a table read at start. `log.named("http")` may exist
-    beside them for a logger per subsystem, not instead of them.
+9. Done. `reflect.call` follows the error convention, and the decisions hold
+   Eddie's answers. `docs/reports/2026-09-19-first-sessions-7-to-9.md`
+   reports 7 to 9.
+10. The next session starts here, in a fresh context. The `[module]`
+    thresholds of `anti.log`. They stay. Every log call passes its own module
+    path as a compile-time constant. The check is then one comparison against
+    a table read at start. `log.named("http")` may exist beside them for a
+    logger per subsystem, not instead of them.
 11. `f"..."` interpolation, which is compiler work over `anti.text`.
 12. The native libraries in `libs/`, which nothing builds yet.
 13. Inline atomic instruction sequences, which are runtime calls today.
@@ -187,8 +180,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 434 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 433 each, without the `no_paths` test, which needs a
+- 437 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 436 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.

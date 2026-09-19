@@ -23,7 +23,7 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 434 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export` |
+| Mac | 437 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export` |
 | Linux VM | 382 | ASan, UBSan | glibc sysroot, linux-arm64 programs |
 | Windows VM | 366 | none | windows-arm64 programs, the Win32 expected files |
 
@@ -61,6 +61,8 @@ when started by hand.
   Windows host always skips. `emit_identity` passed on both.
 - On Windows, `%USERPROFILE%\main-suite.cmd` extracts `%USERPROFILE%\tree.tar` into the
   tree, then configures, builds and runs the suite into `main-*.log` there.
-- The next session starts at item 7 of "First sessions" in `CLAUDE.md`.
+- Neither VM ran the suite after items 7 to 9. The counts of the table for them are
+  those of item 6.
+- The next session starts at item 10 of "First sessions" in `CLAUDE.md`.
 - A signed enum on Windows turns a comparison with a `size_t`, or a conversion to an
   unsigned operand, into an error that the Mac never shows. Convert the enum first.
