@@ -613,4 +613,21 @@ void test_sema(void)
             "or fn main(args: []str, env: []str) -> int");
     rejects("import geometry;\nfn f() {}", 1, 8,
             "cannot find module `geometry`");
+
+    /* A class below calls the `construct` of its base through
+       `self.super`, although it has no level of its own. Nothing else
+       calls a `construct`. */
+    accepts("class Pet { pub n: int = 0, fn construct(self, n: int) "
+            "{ self.n = n; } }\n"
+            "class Cat { inherits Pet, fn construct(self, n: int) "
+            "{ self.super.construct(n * 2); } }\n");
+    rejects("class Pet { pub n: int = 0, fn construct(self, n: int) "
+            "{ self.n = n; }\n"
+            "    pub fn reset(self) { self.construct(0); } }\n", 2, 26,
+            "`construct` runs after a literal and after `alloc`, and is not "
+            "called directly");
+    rejects("class Pet { pub n: int = 0, fn construct(self, n: int) "
+            "{ self.n = n; } }\n"
+            "fn f(p: *Pet) { p.construct(1); }\n", 2, 17,
+            "`construct` is private to `Pet`");
 }

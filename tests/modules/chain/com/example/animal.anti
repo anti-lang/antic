@@ -1,5 +1,9 @@
 //! The root of a chain of classes over three modules. The test
 //! `inherits_modules` extends it in `com.example.dog` and in a program.
+//! `Pet` has a `construct` with an argument, which a class of the
+//! program calls through `self.super`.
+
+import anti.error;
 
 extern fn printf(format: *byte, ...) -> c_int;
 
@@ -30,5 +34,21 @@ pub class Animal
 	pub fn count(self) -> int
 	{
 		return self.calls;
+	}
+}
+
+/// A pet, whose `construct` takes the number of its owner.
+pub class Pet
+{
+	pub owner: int = 0,
+
+	fn construct(self, owner: int) -> *error.Error
+	{
+		if owner < 0 {
+			return error.Error.new(6, "a pet has an owner");
+		}
+		self.owner = owner;
+		printf("pet %d\n".ptr, owner as c_int);
+		return null;
 	}
 }

@@ -28,6 +28,7 @@ foreach(library IN LISTS libraries)
     set(source "${ROOT}/com/example/${library}.anti")
     execute_process(
         COMMAND "${ANTIC}" -c -I "${ROOT}" -I "${WORK}"
+                --runtime "${RUNTIME}"
                 -o "${WORK}/com/example/${library}.antl" "${source}"
         RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
@@ -37,7 +38,8 @@ foreach(library IN LISTS libraries)
     if(MODE STREQUAL "dev")
         execute_process(
             COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" -I "${ROOT}"
-                    -I "${WORK}" -o "${WORK}/${library}" "${source}"
+                    -I "${WORK}" --runtime "${RUNTIME}"
+                    -o "${WORK}/${library}" "${source}"
             RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
         if(NOT status EQUAL 0)
             message(FATAL_ERROR

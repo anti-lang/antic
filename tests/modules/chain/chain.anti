@@ -1,7 +1,10 @@
 //! A class whose base is `dog.Dog`, whose base is `animal.Animal`: a
 //! chain over three modules. Dispatch, `super`, `is`, the fields,
-//! `construct` and `destruct` follow the chain across the modules.
+//! `construct` and `destruct` follow the chain across the modules. `Cat`
+//! calls the `construct` of its base in another module with an argument,
+//! through `self.super`, and passes its error on.
 
+import anti.error;
 import com.example.animal;
 import com.example.dog;
 
@@ -20,6 +23,19 @@ class Puppy
 	concrete fn sound(self) -> int
 	{
 		return 100 + self.super.sound();
+	}
+}
+
+class Cat
+{
+	inherits animal.Pet,
+	pub lives: int = 9,
+
+	fn construct(self, owner: int) -> *error.Error
+	{
+		try self.super.construct(owner * 2);
+		printf("cat %d %d\n".ptr, self.owner as c_int, self.lives as c_int);
+		return null;
 	}
 }
 
@@ -46,5 +62,17 @@ fn main() -> int
 		p.age as c_int);
 	delete(p);
 	delete(d);
+
+	let cat = alloc Cat(4) catch fatal;
+	let pet: *animal.Pet = cat;
+	printf("%d %d\n".ptr, pet.owner as c_int, (pet is *Cat) as c_int);
+	delete(cat);
+	let stray = alloc Cat(-1) catch e {
+		printf("stray %d\n".ptr, e.code as c_int);
+		yield null;
+	};
+	if stray != null {
+		return 1;
+	}
 	return 0;
 }

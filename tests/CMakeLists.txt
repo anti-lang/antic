@@ -738,6 +738,7 @@ foreach(mode release dev)
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/chain"
             "-DLIBRARIES=animal,dog"
+            "-DSTD=text,io,error"
             "-DPROGRAM=chain"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/chain-${mode}"

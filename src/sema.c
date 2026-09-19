@@ -1789,10 +1789,21 @@ static bool level_allows(const struct checker *c, enum visibility vis,
     return from == declared_in;
 }
 
+/* DESIGN: the class below calls a `construct` with arguments as
+   `self.super.construct(x)`, whatever level it was declared at. The
+   object model document declares `construct` without a level, which
+   alone would keep it to its own class. A call of `construct` needs
+   `self.super`, so nothing else reaches it. */
 static bool member_visible(const struct checker *c, const struct type *t,
                            const struct item *m)
 {
-    return level_allows(c, m->vis, declaring_class(m), t);
+    enum visibility vis = m->vis;
+
+    if (m->kind == ITEM_FN && name_is(&m->name, "construct") &&
+        vis != VIS_PUB) {
+        vis = VIS_PROTECTED;
+    }
+    return level_allows(c, vis, declaring_class(m), t);
 }
 
 /* Whether t is a class declared `singleton`. */
@@ -2106,9 +2117,12 @@ static bool method_call(struct checker *c, struct expr *call)
         return false;
     }
     /* `construct` runs after a literal and after `alloc`. A base with
-       arguments is reached through `self.super`, and nowhere else. */
+       arguments is reached through `self.super`, and nowhere else. The
+       receiver as written is checked, since the call takes its address
+       above. */
     if (member != NULL && name_is(&field->as.field.name, "construct") &&
-        receiver->kind != EXPR_FIELD) {
+        (field->as.field.base->kind != EXPR_FIELD ||
+         !name_is(&field->as.field.base->as.field.name, "super"))) {
         error_at(c, field->pos, "`construct` runs after a literal and after "
                  "`alloc`, and is not called directly");
         return false;
