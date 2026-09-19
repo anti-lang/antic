@@ -1386,6 +1386,15 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
             }
         }
     }
+    /* DESIGN: class records serve the passes over the whole program, which
+       run before the optimizer. The removal below renumbers the globals
+       and the functions, so the records go rather than name the wrong
+       ones. */
+    for (i = 0; i < m->class_count; i++) {
+        free(m->classes[i]->subtables);
+        free(m->classes[i]->mutable_fields);
+    }
+    m->class_count = 0;
     for (i = 0; i < m->function_count; i++) {
         if (live[i]) {
             map[i] = (uint32_t)n;

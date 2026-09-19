@@ -136,6 +136,37 @@ void test_optimize(void)
 {
     one_module();
     jump_cycle();
+    /* Class records serve the passes before the optimizer. Removing the
+       unused globals renumbers the rest, so the records go with them. */
+    optimizes("class Box\n"
+              "{\n"
+              "    n: int = 1,\n"
+              "}\n"
+              "fn main() -> int\n"
+              "{\n"
+              "    return 0;\n"
+              "}\n",
+              "type [8]ptr = array 8 of ptr\n"
+              "type anti.rt.Descriptor = struct { name: ptr, "
+              "name_length: i64, parent: ptr, size: i64, depth: i64, "
+              "ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, "
+              "offset: i64, function_count: i64, functions: ptr }\n"
+              "type anti.rt.Object = struct { table: ptr }\n"
+              "type main.Box = struct { super: anti.rt.Object, n: i64 }\n"
+              "type [2]ptr = array 2 of ptr\n"
+              "type anti.rt.Field = struct { name: ptr, name_length: i64, "
+              "offset: i64, kind: i64, owned: i64, descriptor: ptr }\n"
+              "type [1]anti.rt.Field = array 1 of anti.rt.Field\n"
+              "type anti.rt.Function = struct { name: ptr, "
+              "name_length: i64, slot: i64, param_count: i64 }\n"
+              "type [7]anti.rt.Function = array 7 of anti.rt.Function\n"
+              "type str = struct { ptr: ptr, len: i64 }\n"
+              "global (null).anti_rt_Object_descriptor size 0 align 1 "
+              "bytes\n"
+              "fn main.main() -> i64 {\n"
+              "b0:\n"
+              "    ret i64 0\n"
+              "}\n");
     /* The function scale of chapter 1. */
     optimizes("fn scale(x: int) -> int {\n"
               "    let k = 2 + 4;\n"

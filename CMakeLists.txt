@@ -91,6 +91,7 @@ add_library(antic_core STATIC
     src/target.c
     src/text.c
     src/types.c
+    src/whole.c
     src/x86_64.c)
 target_include_directories(antic_core PUBLIC src)
 

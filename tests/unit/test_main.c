@@ -25,6 +25,7 @@ void test_link(void);
 void test_float(void);
 void test_struct(void);
 void test_utf(void);
+void test_whole(void);
 
 int main(void)
 {
@@ -50,6 +51,7 @@ int main(void)
     test_float();
     test_struct();
     test_utf();
+    test_whole();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

@@ -24,6 +24,7 @@ add_executable(antic_unit_tests
     unit/test_float.c
     unit/test_struct.c
     unit/test_utf.c
+    unit/test_whole.c
     ../rt/utf.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core)
 target_include_directories(antic_unit_tests PRIVATE ../rt)

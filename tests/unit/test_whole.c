@@ -1,0 +1,238 @@
+#include "../binary_stdio.h"
+#include "check.h"
+#include "antl.h"
+#include "arena.h"
+#include "ast.h"
+#include "diagnostic.h"
+#include "ir.h"
+#include "lexer.h"
+#include "lower.h"
+#include "parser.h"
+#include "sema.h"
+#include "types.h"
+#include "whole.h"
+
+/* One program: the modules share the memory pool, the types and the IR,
+   as they do in antic. */
+struct program {
+    struct arena arena;
+    struct types types;
+    struct diagnostics diags;
+    struct token_list tokens[4];
+    size_t token_lists;
+    const struct interface *libraries[4];
+    size_t library_count;
+    struct ir_module ir;
+};
+
+static void open_program(struct program *p)
+{
+    memset(p, 0, sizeof *p);
+    types_init(&p->types, &p->arena);
+    ir_module_init(&p->ir, &p->arena, "");
+}
+
+static void close_program(struct program *p)
+{
+    size_t i;
+
+    ir_module_free(&p->ir);
+    for (i = 0; i < p->token_lists; i++) {
+        token_list_free(&p->tokens[i]);
+    }
+    diagnostics_free(&p->diags);
+    arena_free(&p->arena);
+}
+
+/* Check and lower source as module name into out. */
+static struct module *compile(struct program *p, const char *name,
+                              const char *source, struct ir_module *out)
+{
+    struct token_list *tokens = &p->tokens[p->token_lists++];
+    struct module *module = NULL;
+    bool ok = lex(source, strlen(source), &p->arena, &p->diags, tokens) &&
+              parse(source, tokens, &p->arena, &p->diags, &module) &&
+              sema_check(module, name, NULL, p->libraries, p->library_count,
+                         &p->types, &p->arena, &p->diags, true) &&
+              lower_module(module, name, out, &p->diags, false);
+
+    if (!ok) {
+        check_failures++;
+        fprintf(stderr, "module %s does not compile: %s\n%s\n", name,
+                p->diags.count > 0 ? p->diags.items[0].message : "",
+                source);
+        return NULL;
+    }
+    return module;
+}
+
+/* Compile a library on its own, write its library file and read the
+   file into the program. antic loads the files of its command line so. */
+static void load_library(struct program *p, const char *name,
+                         const char *source)
+{
+    struct ir_module ir;
+    struct interface iface;
+    struct text bytes = {0};
+    struct module *module;
+    char error[160] = "";
+
+    ir_module_init(&ir, &p->arena, name);
+    module = compile(p, name, source, &ir);
+    if (module != NULL) {
+        sema_interface(module, name, &p->arena, &iface);
+        antl_write(&bytes, &iface, &ir, false);
+        p->libraries[p->library_count] =
+            antl_read((const uint8_t *)bytes.data, bytes.length,
+                      p->libraries, p->library_count, &p->types, &p->arena,
+                      &p->ir, error, sizeof error);
+        CHECK_STR(error, "");
+        p->library_count++;
+    }
+    text_free(&bytes);
+    ir_module_free(&ir);
+}
+
+/* The global of a module that holds a definition, not a reference. */
+static uint32_t global_named(const struct ir_module *m, const char *module,
+                             const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        const struct ir_global *g = m->globals[i];
+        if (!g->is_extern && g->module != NULL &&
+            strcmp(g->module, module) == 0 && strcmp(g->name, name) == 0) {
+            return (uint32_t)i;
+        }
+    }
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->module == NULL &&
+            strcmp(m->globals[i]->name, name) == 0) {
+            return (uint32_t)i;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no global %s.%s\n", module, name);
+    return 0;
+}
+
+/* The entries a table call reaches, as the names of their functions in
+   the order the pass gives them, separated by spaces. */
+static void check_entries(struct whole *w, const struct ir_module *m,
+                          uint32_t descriptor, uint32_t slot,
+                          const char *expected)
+{
+    const uint32_t *entries = NULL;
+    size_t count = whole_entries(w, descriptor, slot, &entries);
+    struct text names = {0};
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        text_append(&names, i > 0 ? " " : "");
+        text_append(&names, entries[i] == IR_NO_INDEX
+                                ? "(none)"
+                                : m->functions[entries[i]]->name);
+    }
+    CHECK_STR(text_cstr(&names), expected);
+    text_free(&names);
+}
+
+static const char shapes[] =
+    "pub abstract class Shape\n"
+    "{\n"
+    "    abstract fn area(self) -> int;\n"
+    "    pub fn name(self) -> int\n"
+    "    {\n"
+    "        return 0;\n"
+    "    }\n"
+    "}\n"
+    "pub abstract class Named\n"
+    "{\n"
+    "    abstract fn label(self) -> int;\n"
+    "}\n"
+    "pub class Square\n"
+    "{\n"
+    "    inherits Shape,\n"
+    "    implements n: Named,\n"
+    "    concrete fn area(self) -> int\n"
+    "    {\n"
+    "        return 1;\n"
+    "    }\n"
+    "    concrete fn label(self) -> int\n"
+    "    {\n"
+    "        return 2;\n"
+    "    }\n"
+    "}\n"
+    "pub class Tile\n"
+    "{\n"
+    "    inherits Square,\n"
+    "    concrete fn area(self) -> int\n"
+    "    {\n"
+    "        return 3;\n"
+    "    }\n"
+    "}\n";
+
+/* A call through the table of a class reaches the entry at its slot in
+   the table of every concrete class at or below it. A call through an
+   interface reaches the tables of its sub-objects, and a call through
+   the root reaches every table of the program. */
+static void finds_entries(void)
+{
+    struct program p;
+    struct whole *w;
+    uint32_t shape;
+
+    open_program(&p);
+    compile(&p, "main", shapes, &p.ir);
+    w = whole_build(&p.ir);
+    shape = global_named(&p.ir, "main", "Shape.descriptor");
+    check_entries(w, &p.ir, shape, 8, "Square.area Tile.area");
+    check_entries(w, &p.ir, shape, 9, "Shape.name");
+    check_entries(w, &p.ir, global_named(&p.ir, "main", "Square.descriptor"),
+                  8, "Square.area Tile.area");
+    check_entries(w, &p.ir, global_named(&p.ir, "main", "Tile.descriptor"), 8,
+                  "Tile.area");
+    check_entries(w, &p.ir, global_named(&p.ir, "main", "Named.descriptor"),
+                  8, "Square.n.label.thunk Tile.n.label.thunk");
+    check_entries(w, &p.ir,
+                  global_named(&p.ir, "main", "anti_rt_Object_descriptor"), 1,
+                  "anti_rt_Object_type_name Square.n.type_name.thunk "
+                  "Tile.n.type_name.thunk");
+    whole_free(w);
+    close_program(&p);
+}
+
+/* A module that implements an interface of a library names the
+   library's descriptor through a reference of its own. The pass takes
+   both for one class. */
+static void joins_modules(void)
+{
+    struct program p;
+    struct whole *w;
+
+    open_program(&p);
+    load_library(&p, "shapes", shapes);
+    load_library(&p, "tags",
+                 "import shapes;\n"
+                 "pub class Tag\n"
+                 "{\n"
+                 "    implements n: shapes.Named,\n"
+                 "    concrete fn label(self) -> int\n"
+                 "    {\n"
+                 "        return 4;\n"
+                 "    }\n"
+                 "}\n");
+    w = whole_build(&p.ir);
+    check_entries(w, &p.ir, global_named(&p.ir, "shapes", "Named.descriptor"),
+                  8, "Square.n.label.thunk Tile.n.label.thunk "
+                     "Tag.n.label.thunk");
+    whole_free(w);
+    close_program(&p);
+}
+
+void test_whole(void)
+{
+    finds_entries();
+    joins_modules();
+}
