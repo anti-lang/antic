@@ -185,7 +185,7 @@ Four levels, and each applies where it makes sense:
 
 ## Ownership and copies
 
-- `own` before a pointer or slice field says the object owns the memory behind it. It is refused on `str`, which is immutable and shared. It is refused on inline class and struct fields, which are owned by definition. Ownership is a tree by rule, stated and not checked.
+- `own` before a pointer or slice field says the object owns the memory behind it. It is refused on `str`, which is immutable and shared. It is refused on inline class and struct fields, which are owned by definition. A class value held inline is destroyed with what holds it. A local whose inline field needs a teardown is therefore torn down at the end of its block. Ownership is a tree by rule, stated and not checked.
 - `dup(p)` allocates the object's concrete size from the descriptor and copies it. Value fields copy. `own` fields and inline class fields get fresh memory and a copy of their contents, recursively. Other pointer fields copy the address. `Object.copy` is the function behind it, and a class may replace it with `concrete fn copy`. `dup` returns a pointer of the same static type as `p`.
 - `=` between two values of a class with `own` fields anywhere in its chain is refused, because a byte copy would give two owners. `dup` is the way, and the message says so. `=` between values without `own` fields copies bytes, table pointers included.
 - `serialize` follows `own` fields and writes other pointers as addresses. `equals` compares the contents of `own` fields and the addresses of others. `destruct` frees `own` fields.
