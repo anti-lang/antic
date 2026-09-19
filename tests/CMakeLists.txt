@@ -268,6 +268,10 @@ add_test(NAME pinned_compiler
 add_test(NAME release_key
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_key.cmake")
+add_test(NAME sysroot_digest
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_digest"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_digest.cmake")
 # The package of this host, packed from the antic of this build. It needs
 # the two Linux sysroots that every package carries.
 if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND

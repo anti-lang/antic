@@ -23,6 +23,11 @@ if(NOT DEFINED DEST OR NOT DEFINED LLVM_BIN OR NOT DEFINED TARGETS)
                         "-DTARGETS=<target>[;<target>] "
                         "[-DACCEPT_LICENSE=yes] -P tools/get-sysroot.cmake")
 endif()
+# A relative DEST or LLVM_BIN names a directory under the one this script
+# runs in. The digest of a Windows tree lists its files relative to an
+# absolute path, and finds none under a relative one.
+get_filename_component(DEST "${DEST}" ABSOLUTE)
+get_filename_component(LLVM_BIN "${LLVM_BIN}" ABSOLUTE)
 
 set(tools_dir "${CMAKE_CURRENT_LIST_DIR}")
 if(NOT DEFINED CLANG_DIR)
