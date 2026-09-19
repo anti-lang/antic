@@ -27,3 +27,28 @@ pub fn is_point(o: *Object) -> bool
 {
 	return o is *Point;
 }
+
+/// Something that has a size.
+pub abstract class Sized
+{
+	abstract fn size(self) -> int;
+}
+
+/// A crate, which has a size through its interface.
+pub class Crate
+{
+	pub w: int = 2,
+	implements sized: Sized,
+
+	concrete fn Sized::size(self) -> int
+	{
+		return self.w * 10;
+	}
+
+	/// Widen the crate by `by` and give its new width.
+	pub fn grow(self, by: int) -> int
+	{
+		self.w = self.w + by;
+		return self.w;
+	}
+}

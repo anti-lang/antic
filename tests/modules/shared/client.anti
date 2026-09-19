@@ -1,7 +1,9 @@
 //! Tests a class of module `com.example.points` from another module. The
 //! program and the library name one descriptor and one table, so `is`,
 //! `==`, `equals`, `reflect.new` and `reflect.call` agree whichever
-//! module made the object.
+//! module made the object. `reflect.call` through a pointer to an
+//! interface calls the function of the object's class that the index
+//! names.
 
 import com.example.points;
 import anti.reflect;
@@ -28,6 +30,18 @@ fn main() -> int
 	let by = [reflect.of_int(4)];
 	let shifted = reflect.call(made, 7, by[0..1]);
 	printf("%d %d\n".ptr, shifted.kind as c_int, shifted.data.i as c_int);
+
+	let crate = alloc points.Crate { w: 3 };
+	let sized: *points.Sized = crate;
+	let inside: *Object = sized;
+	let d = reflect.describe(inside as *byte);
+	let grow = reflect.function(d, 7);
+	printf("%s %d\n".ptr, grow.name.ptr, sized.size() as c_int);
+	let wider = [reflect.of_int(2)];
+	let grown = reflect.call(inside, 7, wider[0..1]);
+	printf("%d %d %d\n".ptr, grown.kind as c_int, grown.data.i as c_int,
+		sized.size() as c_int);
+	delete(crate);
 	delete(made);
 	delete(here);
 	delete(built);
