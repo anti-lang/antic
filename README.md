@@ -20,14 +20,18 @@ into `build/llvm`. The Linux sysroots take the builtins of the pinned clang, so
 ```bash
 cmake -P tools/get-clang.cmake
 cmake -P tools/get-llvm.cmake
-cmake -DDEST=build/sysroot -DLLVM_BIN=build/llvm/bin \
-      -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64" \
+cmake -DDEST=build/sysroot -DLLVM_BIN=build/llvm/bin -DACCEPT_LICENSE=yes \
+      -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
       -P tools/get-sysroot.cmake
 cmake -DDEST=build/raylib -P tools/get-raylib.cmake
 cmake -S . -B build
 cmake --build build -j8
 ctest --test-dir build -j8
 ```
+
+`-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK, which xwin
+downloads for the two Windows targets. antic links programs for all six targets on every
+host, so the build needs the sysroots of all six.
 
 On Windows the configure step takes `-G Ninja`, because the Visual Studio generator
 takes the compiler of its own toolset. A reader who only wants antic from source
