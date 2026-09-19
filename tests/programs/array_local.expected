@@ -1,0 +1,13 @@
+exit 0
+block 3
+destruct Item 3
+destruct Leaf 30
+destruct Item 2
+destruct Item 1
+destruct Leaf 10
+grid 6
+destruct Item 7
+destruct Item 6
+destruct Item 5
+destruct Item 4
+end 8

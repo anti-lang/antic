@@ -55,4 +55,11 @@ fn f(shelf: *Shelf, p: *Item)
 	let x = Plain { n: 6 };
 	let y = x;
 	y = x;
+	let pair = [a, a];
+	let rep = [Item { n: 7 }; 2];
+	let h2 = Holder { item: a };
+	let fresh = [Item { n: 8 }, Item { n: 9 }];
+	let h3 = Holder { item: Item { n: 10 } };
+	let plains = [x, x];
+	let more = [Plain { n: 11 }; 2];
 }

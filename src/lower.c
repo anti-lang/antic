@@ -4162,8 +4162,73 @@ static bool type_needs_destruct(const struct type *t)
     return false;
 }
 
+/* DESIGN: a local array whose element class needs the teardown is torn
+   down element by element, last to first, as locals are. An array of
+   arrays is one run of elements in memory and is torn down as one. */
+static const struct type *innermost(const struct type *t)
+{
+    while (t != NULL && t->kind == TYPE_ARRAY) {
+        t = t->element;
+    }
+    return t;
+}
+
+static bool local_needs_teardown(const struct type *t)
+{
+    return type_needs_destruct(innermost(t));
+}
+
+/* The count of elements of the class in the array t, through every
+   level of it. */
+static struct ir_operand element_count(struct lowerer *l, const struct type *t)
+{
+    struct ir_operand count = ir_int_op(IR_I64, 1);
+
+    for (; t->kind == TYPE_ARRAY; t = t->element) {
+        struct ir_operand length =
+            t->length_of != NULL ? ir_sym_operand(l->m, sym_of(l, t->length_of))
+                                 : ir_int_op(IR_I64, t->length);
+        count = temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64, count, length));
+    }
+    return count;
+}
+
+static void destroy_array(struct lowerer *l, struct ir_operand base,
+                          const struct type *t)
+{
+    const struct type *element = innermost(t);
+    struct ir_operand size = size_operand(l, element);
+    struct ir_block *test = new_block(l);
+    struct ir_block *body = new_block(l);
+    struct ir_block *done = new_block(l);
+    uint32_t index = ir_unary(l->f, l->b, IR_COPY, IR_I64,
+                              element_count(l, t));
+    struct ir_operand at;
+
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    ir_branch(l->f, l->b,
+              temp(l, ir_binary(l->f, l->b, IR_SGT, IR_I8, temp(l, index),
+                                ir_int_op(IR_I64, 0))),
+              body, done);
+    l->b = body;
+    ir_assign(l->f, l->b, index,
+              temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64, temp(l, index),
+                                ir_int_op(IR_I64, 1))));
+    at = temp(l, ir_ptradd(l->f, l->b, base,
+                           temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                             temp(l, index), size))));
+    object_call(l, "anti_rt_destroy", at, element);
+    ir_jump(l->f, l->b, test);
+    l->b = done;
+}
+
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
+    if (sym->type->kind == TYPE_ARRAY) {
+        destroy_array(l, temp(l, sym->ir), sym->type);
+        return;
+    }
     object_call(l, "anti_rt_destroy", temp(l, sym->ir), sym->type);
 }
 
@@ -4375,7 +4440,7 @@ static void lower_let(struct lowerer *l, const struct stmt *s)
     }
     if (is_aggregate(sym->type)) {
         build_into(l, s->as.let.value, temp(l, sym->ir));
-        if (type_needs_destruct(sym->type)) {
+        if (local_needs_teardown(sym->type)) {
             l->defers->items = grow_defers(l->defers);
             l->defers->items[l->defers->count].stmt = NULL;
             l->defers->items[l->defers->count++].local = sym;

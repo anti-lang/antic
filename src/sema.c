@@ -578,6 +578,9 @@ static bool is_place(const struct expr *e)
 static const struct struct_field *find_field(const struct type *s,
                                              const struct name *name);
 static struct type *struct_of(struct type *t);
+static bool type_owns(const struct type *t);
+static void refuse_owned_copy(struct checker *c, const struct expr *value,
+                              struct type *t);
 
 /* Whether e reads a bitfield, which has no address. */
 static bool is_bitfield(const struct expr *e)
@@ -2825,8 +2828,12 @@ static bool check_field_inits(struct checker *c, struct expr *e,
                      tn(f->home));
             ok = false;
         }
-        ok = require(c, inits[i].value,
-                     check_expr(c, inits[i].value, f->type), f->type) && ok;
+        if (require(c, inits[i].value,
+                    check_expr(c, inits[i].value, f->type), f->type)) {
+            refuse_owned_copy(c, inits[i].value, f->type);
+        } else {
+            ok = false;
+        }
     }
     if (!ok || skip_missing) {
         return ok;
@@ -3240,6 +3247,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             } else {
                 ok = require(c, item, it, element) && ok;
             }
+            refuse_owned_copy(c, item, it);
         }
         if (!ok || is_error(element)) {
             return builtin(c, TYPE_ERROR);
@@ -3251,6 +3259,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                                    ? expected->element
                                    : NULL;
         t = check_expr(c, e->as.array_repeat.value, element);
+        /* The repeat form writes one value into every element, which
+           gives what it owns one owner per element. */
+        if (!is_error(t) && type_owns(t)) {
+            error_at(c, e->as.array_repeat.value->pos, "`%s` has `own` "
+                     "fields, and the repeat form copies one value into "
+                     "every element", tn(t));
+        }
         return array_of(c, e->as.array_repeat.count, t);
     }
     case EXPR_ALLOC:

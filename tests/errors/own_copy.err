@@ -4,3 +4,7 @@ own_copy.anti:46:6: error: `Item` has `own` fields, use `dup` instead of `=`
 own_copy.anti:47:19: error: `Item` has `own` fields, use `dup` instead of `=`
 own_copy.anti:48:19: error: `Item` has `own` fields, use `dup` instead of `=`
 own_copy.anti:49:6: error: `Item` has `own` fields, use `dup` instead of `=`
+own_copy.anti:58:14: error: `Item` has `own` fields, use `dup` instead of `=`
+own_copy.anti:58:17: error: `Item` has `own` fields, use `dup` instead of `=`
+own_copy.anti:59:13: error: `Item` has `own` fields, and the repeat form copies one value into every element
+own_copy.anti:60:26: error: `Item` has `own` fields, use `dup` instead of `=`

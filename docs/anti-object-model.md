@@ -179,6 +179,7 @@ Four levels, and each applies where it makes sense:
 - `delete(p)` runs the concrete `destruct`, then each base's up the chain, destroys every owned object and frees every owned buffer, then frees the object. `p` must be a heap object.
 - `destroy(&c)` runs the same chain without the final free, for an object on the stack or inline in another object.
 - A local of class type whose chain declares `destruct` or has `own` fields is destroyed at the end of its block, as if `destroy(&c)` had been written as the last `defer`. A heap object is never destroyed by itself.
+- A local of array type whose element type has `destruct` or `own` fields is destroyed element by element at the end of its block, last to first.
 - A direct call `c.destruct()` is refused.
 - `destruct` does not run on an object whose `construct` failed. A `construct` that fails after acquiring something frees it before returning.
 - The memory model stays C's for heap objects. Nothing frees a heap object but `delete`.

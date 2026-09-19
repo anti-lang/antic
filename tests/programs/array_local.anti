@@ -1,0 +1,48 @@
+//! A local array whose element class declares `destruct` or has `own`
+//! fields destroys its elements at the end of its block, last to first.
+//! An array of such arrays does the same over all its elements. An
+//! element frees what it owns. An array of plain values is left alone.
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Leaf %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Item
+{
+	pub n: int = 0,
+	pub own leaf: *Leaf = null,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Item %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	{
+		let items = [Item { n: 1, leaf: alloc Leaf { n: 10 } }, Item { n: 2 },
+			Item { n: 3, leaf: alloc Leaf { n: 30 } }];
+		printf("block %d\n".ptr, items.len as c_int);
+	}
+	{
+		let grid = [[Item { n: 4 }, Item { n: 5 }], [Item { n: 6 }, Item { n: 7 }]];
+		printf("grid %d\n".ptr, grid[1][0].n as c_int);
+	}
+	let plain = [Plain { n: 8 }];
+	printf("end %d\n".ptr, plain[0].n as c_int);
+	return 0;
+}
