@@ -48,6 +48,11 @@ without asking Eddie.
   that keeps every struct C layout and the IR free of sizes. Record one
   `[provisional]` line in `docs/decisions.md` with its reason, and continue.
   Questions go in the report at the end of the session and nowhere else.
+- A `[provisional]` entry is a decision made by a session that Eddie has not
+  reviewed yet. It is binding until Eddie changes it. Nothing is ever removed,
+  disabled or narrowed because it is provisional. Provisional entries are
+  reviewed by Eddie in batches, and a review either removes the tag or changes
+  the entry. No other action follows from the tag.
 - Every session ends with a report in `docs/reports/<date>-<subject>.md`.
 
 ## Building
