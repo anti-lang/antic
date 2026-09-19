@@ -1,4 +1,7 @@
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
 type forward.Point = struct { x: i64, y: i64 }
+type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
+type [2]anti.rt.Field = array 2 of anti.rt.Field
 fn forward.twice(%0: ptr) -> i64 {
 b0:
     %1 = ptradd %0, offset_of forward.Point.y

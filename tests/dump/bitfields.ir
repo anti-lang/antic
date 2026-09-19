@@ -1,4 +1,14 @@
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
 type bitfields.Flags = struct { visible: i32 : 1 zeroext, layer: i32 : 4 zeroext, level: i8 : 3 signext, pad: i16 : 9 zeroext }
+type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
+type [4]anti.rt.Field = array 4 of anti.rt.Field
+global bitfields.Flags.descriptor anti.rt.Descriptor { @bitfields.1, i64 5, ptr 0, size_of bitfields.Flags, i64 0, ptr 0, i64 4, @bitfields.Flags.fields, ptr 0, i64 0, i64 0, ptr 0 }
+global bitfields.1 size 6 align 1 bytes 46 6c 61 67 73 00
+global bitfields.2 size 8 align 1 bytes 76 69 73 69 62 6c 65 00
+global bitfields.3 size 6 align 1 bytes 6c 61 79 65 72 00
+global bitfields.4 size 6 align 1 bytes 6c 65 76 65 6c 00
+global bitfields.5 size 4 align 1 bytes 70 61 64 00
+global bitfields.Flags.fields [4]anti.rt.Field { anti.rt.Field { @bitfields.2, i64 7, offset_of bitfields.Flags.visible, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.3, i64 5, offset_of bitfields.Flags.layer, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.4, i64 5, offset_of bitfields.Flags.level, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.5, i64 3, offset_of bitfields.Flags.pad, i64 0, i64 0, ptr 0 } }
 fn bitfields.main() -> i64 {
 b0:
     %0 = slot bitfields.Flags

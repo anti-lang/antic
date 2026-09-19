@@ -39,8 +39,8 @@ b0:
     add x10, x10, :lo12:measure.length_of
     adrp x20, measure.sum
     add x20, x20, :lo12:measure.sum
-    adrp x11, measure.0
-    add x11, x11, :lo12:measure.0
+    adrp x11, measure.5
+    add x11, x11, :lo12:measure.5
     str x11, [x9]
     mov x11, #4
     str x11, [x9, #8]

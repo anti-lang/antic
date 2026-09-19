@@ -2,6 +2,10 @@ type structs.Pair = struct { a: i64, b: f64 }
 type structs.Big = struct { a: i64, b: i64, c: i64 }
 type structs.Rgb = struct { r: i8, g: i8, b: i8 }
 type structs.V2 = struct { x: f32, y: f32 }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
+type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
+type [2]anti.rt.Field = array 2 of anti.rt.Field
+type [3]anti.rt.Field = array 3 of anti.rt.Field
 extern fn take(agg structs.Pair, agg structs.Big, agg structs.Rgb, agg structs.V2) -> agg structs.Pair
 extern fn make(i64) -> agg structs.Big
 fn structs.call(%0: agg structs.Pair, %1: agg structs.Big, %2: agg structs.Rgb, %3: agg structs.V2) -> agg structs.Pair {

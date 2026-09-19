@@ -3,12 +3,19 @@
 //! `==`, `equals`, `reflect.new` and `reflect.call` agree whichever
 //! module made the object. `reflect.call` through a pointer to an
 //! interface calls the function of the object's class that the index
-//! names.
+//! names. A class of each module holds the struct `Extent`, whose one
+//! descriptor the library writes, and `serialize` walks it from both.
 
 import com.example.points;
 import anti.reflect;
+import anti.text;
 
 extern fn printf(format: *byte, ...) -> c_int;
+
+class Bin
+{
+	pub extent: points.Extent = points.Extent { w: 0, h: 0 },
+}
 
 fn main() -> int
 {
@@ -41,6 +48,16 @@ fn main() -> int
 	let grown = reflect.call(inside, 7, wider[0..1]) catch fatal;
 	printf("%d %d %d\n".ptr, grown.kind as c_int, grown.data.i as c_int,
 		sized.size() as c_int);
+	let pallet = alloc points.Pallet { };
+	let bin = alloc Bin { extent: points.Extent { w: 5, h: 6 } };
+	let b = text.Builder.new();
+	pallet.serialize(&b);
+	b.append(" ");
+	bin.serialize(&b);
+	let written = b.text();
+	printf("%.*s\n".ptr, written.len as c_int, written.ptr);
+	delete(pallet);
+	delete(bin);
 	delete(crate);
 	delete(made);
 	delete(here);

@@ -1,8 +1,11 @@
 type str = struct { ptr: ptr, len: i64 }
 type measure.V2 = struct { x: f32, y: f32 }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
+type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
+type [2]anti.rt.Field = array 2 of anti.rt.Field
 extern fn measure.fn.0(agg str) -> i64
 extern fn measure.fn.1(agg measure.V2) -> i64
-global measure.0 size 5 align 1 bytes 66 6f 75 72 00
+global measure.5 size 5 align 1 bytes 66 6f 75 72 00
 fn measure.length_of(%0: agg str) -> i64 {
 b0:
     %1 = ptradd %0, offset_of str.len
@@ -24,7 +27,7 @@ b0:
     %1 = slot measure.V2
     %2 = addr @measure.length_of
     %3 = addr @measure.sum
-    %4 = addr @measure.0
+    %4 = addr @measure.5
     store ptr %4, %0
     %5 = ptradd %0, offset_of str.len
     store i64 4, %5

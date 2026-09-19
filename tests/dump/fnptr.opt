@@ -1,4 +1,7 @@
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
 type fnptr.Op = struct { apply: ptr }
+type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
+type [1]anti.rt.Field = array 1 of anti.rt.Field
 type [2]fnptr.Op = array 2 of fnptr.Op
 extern fn abs(i32) -> i32
 extern fn fnptr.fn.0(i32) -> i32

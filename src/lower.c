@@ -1351,42 +1351,47 @@ static struct ir_global *class_global(struct lowerer *l, const struct type *t,
 static struct ir_global *class_descriptor(struct lowerer *l,
                                           const struct type *t);
 
-/* The global `<Struct>.<suffix>` of the module being lowered, or NULL
-   with the module and the name to give it. A struct of another module
-   is named with its module path, as `geometry.Size.descriptor`, which
-   no name that the module declares can be. */
+/* The global `<Struct>.<suffix>` of the module that declares the struct,
+   or NULL with the module and the name to give it. */
 static struct ir_global *struct_global(struct lowerer *l,
                                        const struct type *t,
                                        const char *suffix, char **module_out,
                                        char **name_out)
 {
     struct ir_module *m = l->m;
+    char *module = cstr(&t->module);
     struct text name = {0};
-    bool here = t->module.length == strlen(l->module_name) &&
-                memcmp(t->module.text, l->module_name, t->module.length) == 0;
     size_t i;
 
-    if (!here) {
-        text_appendf(&name, "%.*s.", (int)t->module.length, t->module.text);
-    }
     text_appendf(&name, "%.*s.%s", (int)t->name.length, t->name.text, suffix);
     for (i = 0; i < m->global_count; i++) {
         if (m->globals[i]->module != NULL &&
-            strcmp(m->globals[i]->module, l->module_name) == 0 &&
+            strcmp(m->globals[i]->module, module) == 0 &&
             strcmp(m->globals[i]->name, text_cstr(&name)) == 0) {
+            free(module);
             text_free(&name);
             return m->globals[i];
         }
     }
-    *module_out = malloc(strlen(l->module_name) + 1);
     *name_out = malloc(name.length + 1);
-    if (*module_out == NULL || *name_out == NULL) {
+    if (*name_out == NULL) {
         fputs("antic: out of memory\n", stderr);
         exit(70);
     }
-    memcpy(*module_out, l->module_name, strlen(l->module_name) + 1);
     memcpy(*name_out, text_cstr(&name), name.length + 1);
     text_free(&name);
+    /* DESIGN: a struct's descriptor belongs to the module that declares
+       it, as a class's does. A module that names the struct of another
+       refers to it. A program then holds one descriptor per struct, and
+       two field records of one struct hold one address. */
+    if (strcmp(module, l->module_name) != 0) {
+        struct ir_global *g = ir_global_add(m, module, *name_out, NULL, 0, 1);
+        g->is_extern = true;
+        free(module);
+        free(*name_out);
+        return g;
+    }
+    *module_out = module;
     return NULL;
 }
 
@@ -1843,16 +1848,14 @@ static struct ir_global *class_descriptor(struct lowerer *l,
     return g;
 }
 
-/* DESIGN: a struct that appears in a class has a descriptor as well,
-   which the struct itself never points at. A field of the struct's type
-   names it, so a walk of a class reaches the fields of a struct inside
-   it. It holds the name, the size and the field list, and nothing of a
-   chain. Each module that names a struct in a field record writes the
-   descriptor as its own data. The module that declares the struct
-   cannot know which classes of other modules hold it, and nothing
-   compares two descriptors of a struct. A union has none, since no walk
-   knows which of its fields holds the value, and neither does a Job,
-   which no module declares. */
+/* DESIGN: a struct has a descriptor as well, which the struct itself
+   never points at. A field of the struct's type names it, so a walk of a
+   class reaches the fields of a struct inside it. It holds the name, the
+   size and the field list, and nothing of a chain. The module that
+   declares the struct writes it, whether a class there names it or not.
+   It cannot know which classes of other modules hold it. A union
+   has none, since no walk knows which of its fields holds the value, and
+   neither does a Job, which no module declares. */
 static struct ir_global *struct_descriptor(struct lowerer *l,
                                            const struct type *t)
 {
@@ -4993,6 +4996,10 @@ bool lower_module(struct module *module, const char *module_name,
         if (it->kind == ITEM_CLASS && it->symbol != NULL &&
             it->symbol->type != NULL) {
             class_record(&l, it);
+        }
+        if (it->kind == ITEM_STRUCT && it->symbol != NULL &&
+            it->symbol->type != NULL) {
+            struct_descriptor(&l, it->symbol->type);
         }
     }
     for (i = 0; i < module->item_count; i++) {

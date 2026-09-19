@@ -383,8 +383,37 @@ static void round_trip(void)
         CHECK(vec->item_count == 6);
         ir_print(&ir_b, &program);
         CHECK_STR(text_cstr(&ir_b),
+                  "type anti.rt.Descriptor = struct { name: ptr, name_length: "
+                  "i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, "
+                  "field_count: i64, fields: ptr, destruct: ptr, offset: i64, "
+                  "function_count: i64, functions: ptr }\n"
                   "type vec.V2 = struct { x: i64, y: i64 }\n"
+                  "type anti.rt.Field = struct { name: ptr, name_length: i64, "
+                  "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
+                  "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
+                  "type vec.Hidden = struct { v: vec.V2, next: ptr }\n"
                   "extern fn malloc(i64) -> ptr\n"
+                  "global vec.V2.descriptor anti.rt.Descriptor { @vec.1, i64 "
+                  "2, ptr 0, size_of vec.V2, i64 0, ptr 0, i64 2, "
+                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
+                  "global vec.1 size 3 align 1 bytes 56 32 00\n"
+                  "global vec.2 size 2 align 1 bytes 78 00\n"
+                  "global vec.3 size 2 align 1 bytes 79 00\n"
+                  "global vec.V2.fields [2]anti.rt.Field { anti.rt.Field { "
+                  "@vec.2, i64 1, offset_of vec.V2.x, i64 6, i64 0, ptr 0 }, "
+                  "anti.rt.Field { @vec.3, i64 1, offset_of vec.V2.y, i64 6, "
+                  "i64 0, ptr 0 } }\n"
+                  "global vec.Hidden.descriptor anti.rt.Descriptor { @vec.6, "
+                  "i64 6, ptr 0, size_of vec.Hidden, i64 0, ptr 0, i64 2, "
+                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
+                  "global vec.6 size 7 align 1 bytes 48 69 64 64 65 6e 00\n"
+                  "global vec.7 size 2 align 1 bytes 76 00\n"
+                  "global vec.8 size 5 align 1 bytes 6e 65 78 74 00\n"
+                  "global vec.Hidden.fields [2]anti.rt.Field { anti.rt.Field { "
+                  "@vec.7, i64 1, offset_of vec.Hidden.v, i64 21, i64 0, "
+                  "@vec.V2.descriptor }, anti.rt.Field { @vec.8, i64 4, "
+                  "offset_of vec.Hidden.next, i64 5393, i64 0, "
+                  "@vec.Hidden.descriptor } }\n"
                   "fn vec.make() -> ptr {\n"
                   "b0:\n"
                   "    %0 = mul i64 1, size_of vec.V2\n"
@@ -959,7 +988,7 @@ static void keeps_constants(void)
     CHECK(ok && lower_module(module, "main", &program, &b.diags, false));
     ir_print(&ir, &program);
     CHECK(strstr(text_cstr(&ir),
-                 "global pair.0 pair.Pair { i8 7, i32 11 }\n") != NULL);
+                 "global pair.5 pair.Pair { i8 7, i32 11 }\n") != NULL);
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
@@ -1087,8 +1116,48 @@ static void dependencies(void)
               box->fields[0].type == v2);
         ir_print(&ir, &program);
         CHECK_STR(text_cstr(&ir),
+                  "type anti.rt.Descriptor = struct { name: ptr, name_length: "
+                  "i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, "
+                  "field_count: i64, fields: ptr, destruct: ptr, offset: i64, "
+                  "function_count: i64, functions: ptr }\n"
                   "type vec.V2 = struct { x: i64, y: i64 }\n"
+                  "type anti.rt.Field = struct { name: ptr, name_length: i64, "
+                  "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
+                  "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
+                  "type vec.Hidden = struct { v: vec.V2, next: ptr }\n"
+                  "type shapes.Box = struct { corner: vec.V2 }\n"
+                  "type [1]anti.rt.Field = array 1 of anti.rt.Field\n"
                   "extern fn malloc(i64) -> ptr\n"
+                  "global vec.V2.descriptor anti.rt.Descriptor { @vec.1, i64 "
+                  "2, ptr 0, size_of vec.V2, i64 0, ptr 0, i64 2, "
+                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
+                  "global vec.1 size 3 align 1 bytes 56 32 00\n"
+                  "global vec.2 size 2 align 1 bytes 78 00\n"
+                  "global vec.3 size 2 align 1 bytes 79 00\n"
+                  "global vec.V2.fields [2]anti.rt.Field { anti.rt.Field { "
+                  "@vec.2, i64 1, offset_of vec.V2.x, i64 6, i64 0, ptr 0 }, "
+                  "anti.rt.Field { @vec.3, i64 1, offset_of vec.V2.y, i64 6, "
+                  "i64 0, ptr 0 } }\n"
+                  "global vec.Hidden.descriptor anti.rt.Descriptor { @vec.6, "
+                  "i64 6, ptr 0, size_of vec.Hidden, i64 0, ptr 0, i64 2, "
+                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
+                  "global vec.6 size 7 align 1 bytes 48 69 64 64 65 6e 00\n"
+                  "global vec.7 size 2 align 1 bytes 76 00\n"
+                  "global vec.8 size 5 align 1 bytes 6e 65 78 74 00\n"
+                  "global vec.Hidden.fields [2]anti.rt.Field { anti.rt.Field { "
+                  "@vec.7, i64 1, offset_of vec.Hidden.v, i64 21, i64 0, "
+                  "@vec.V2.descriptor }, anti.rt.Field { @vec.8, i64 4, "
+                  "offset_of vec.Hidden.next, i64 5393, i64 0, "
+                  "@vec.Hidden.descriptor } }\n"
+                  "global shapes.Box.descriptor anti.rt.Descriptor { "
+                  "@shapes.1, i64 3, ptr 0, size_of shapes.Box, i64 0, ptr 0, "
+                  "i64 1, @shapes.Box.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
+                  "global shapes.1 size 4 align 1 bytes 42 6f 78 00\n"
+                  "global shapes.2 size 7 align 1 bytes 63 6f 72 6e 65 72 00\n"
+                  "global vec.V2.descriptor size 0 align 1 bytes\n"
+                  "global shapes.Box.fields [1]anti.rt.Field { anti.rt.Field { "
+                  "@shapes.2, i64 6, offset_of shapes.Box.corner, i64 21, i64 "
+                  "0, @vec.V2.descriptor } }\n"
                   "fn vec.make() -> ptr {\n"
                   "b0:\n"
                   "    %0 = mul i64 1, size_of vec.V2\n"
@@ -1249,6 +1318,81 @@ static void keeps_classes(void)
     close_session(&a);
 }
 
+/* The global of ir named name in module, or NULL. */
+static const struct ir_global *global_in(const struct ir_module *ir,
+                                         const char *module, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < ir->global_count; i++) {
+        const struct ir_global *g = ir->globals[i];
+        if (g->module != NULL && strcmp(g->module, module) == 0 &&
+            strcmp(g->name, name) == 0) {
+            return g;
+        }
+    }
+    return NULL;
+}
+
+/* A struct has one descriptor in a program, which the module that
+   declares it writes whether a class there names it or not. A module
+   that names the struct of another in a field record refers to that
+   one, so the two records hold one address. */
+static void one_struct_descriptor(void)
+{
+    static const char vec[] = "pub struct V2 { x: int, y: int }\n"
+                              "struct Hidden { v: V2 }\n"
+                              "union Bits { i: i32, f: f32 }\n";
+    static const char source[] =
+        "import vec;\n"
+        "class Holder {\n"
+        "    pub at: vec.V2 = vec.V2 { x: 0, y: 0 },\n"
+        "    pub p: *vec.V2 = null,\n"
+        "}\n";
+    struct session s;
+    struct interface *iface;
+    struct ir_module lib;
+    struct ir_module ir;
+    struct module *module;
+    const struct ir_global *g;
+    size_t i;
+    bool ok;
+
+    open_session(&s);
+    module = check_module(&s, "vec", vec, &ok);
+    ir_module_init(&lib, &s.arena, "vec");
+    ok = ok && lower_module(module, "vec", &lib, &s.diags, false);
+    CHECK(ok);
+    g = global_in(&lib, "vec", "V2.descriptor");
+    CHECK(g != NULL && !g->is_extern && g->value != NULL);
+    g = global_in(&lib, "vec", "Hidden.descriptor");
+    CHECK(g != NULL && !g->is_extern && g->value != NULL);
+    CHECK(global_in(&lib, "vec", "Bits.descriptor") == NULL);
+    iface = arena_alloc(&s.arena, sizeof *iface);
+    if (ok) {
+        sema_interface(module, "vec", &s.arena, iface);
+        s.libraries[s.library_count++] = iface;
+    }
+
+    module = check_module(&s, "main", source, &ok);
+    ir_module_init(&ir, &s.arena, "main");
+    ok = ok && lower_module(module, "main", &ir, &s.diags, false);
+    CHECK(ok);
+    g = global_in(&ir, "vec", "V2.descriptor");
+    CHECK(g != NULL && g->is_extern && g->value == NULL);
+    for (i = 0; i < ir.global_count; i++) {
+        const struct ir_global *own = ir.globals[i];
+        if (own->module != NULL && strcmp(own->module, "main") == 0 &&
+            strstr(own->name, "V2.") != NULL) {
+            fprintf(stderr, "main writes %s\n", own->name);
+            check_failures++;
+        }
+    }
+    ir_module_free(&ir);
+    ir_module_free(&lib);
+    close_session(&s);
+}
+
 void test_modules(void)
 {
     imports();
@@ -1269,6 +1413,7 @@ void test_modules(void)
     keeps_signatures();
     keeps_extern_aggregates();
     keeps_classes();
+    one_struct_descriptor();
     dependencies();
     damaged_files();
 }

@@ -1,5 +1,6 @@
-//! A class that a program of another module builds, tests and compares.
-//! The test `shared_class` links it in release mode and in dev mode.
+//! A class that a program of another module builds, tests and compares,
+//! and a struct that a class of each module holds. The test
+//! `shared_class` links it in release mode and in dev mode.
 
 /// A point that this module and the program both build.
 pub class Point
@@ -51,4 +52,18 @@ pub class Crate
 		self.w = self.w + by;
 		return self.w;
 	}
+}
+
+/// An extent that a class of this module and one of the program hold.
+/// This module writes its one descriptor.
+pub struct Extent
+{
+	w: int,
+	h: int,
+}
+
+/// A pallet with the extent it covers.
+pub class Pallet
+{
+	pub extent: Extent = Extent { w: 1, h: 2 },
 }

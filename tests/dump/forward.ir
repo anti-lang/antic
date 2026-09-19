@@ -1,4 +1,12 @@
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
 type forward.Point = struct { x: i64, y: i64 }
+type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
+type [2]anti.rt.Field = array 2 of anti.rt.Field
+global forward.Point.descriptor anti.rt.Descriptor { @forward.1, i64 5, ptr 0, size_of forward.Point, i64 0, ptr 0, i64 2, @forward.Point.fields, ptr 0, i64 0, i64 0, ptr 0 }
+global forward.1 size 6 align 1 bytes 50 6f 69 6e 74 00
+global forward.2 size 2 align 1 bytes 78 00
+global forward.3 size 2 align 1 bytes 79 00
+global forward.Point.fields [2]anti.rt.Field { anti.rt.Field { @forward.2, i64 1, offset_of forward.Point.x, i64 6, i64 0, ptr 0 }, anti.rt.Field { @forward.3, i64 1, offset_of forward.Point.y, i64 6, i64 0, ptr 0 } }
 fn forward.twice(%0: ptr) -> i64 {
 b0:
     %1 = ptradd %0, offset_of forward.Point.y
