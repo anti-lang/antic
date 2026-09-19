@@ -23,9 +23,9 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 433 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export` |
-| Linux VM | 381 | ASan, UBSan | glibc sysroot, linux-arm64 programs |
-| Windows VM | 365 | none | windows-arm64 programs, the Win32 expected files |
+| Mac | 434 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export` |
+| Linux VM | 382 | ASan, UBSan | glibc sysroot, linux-arm64 programs |
+| Windows VM | 366 | none | windows-arm64 programs, the Win32 expected files |
 
 No machine here runs linux-x86_64 or windows-x86_64 programs. Only the CI runners do,
 when started by hand.
@@ -56,9 +56,11 @@ when started by hand.
 
 - The toolchain is frozen at `23.1.1-anti.3`. A toolchain change goes to
   `docs/toolchain-later.md` as one line.
-- Both VMs ran the suite on `cde2a29`, the whole-program pass and items 3 and 4 of
-  "First sessions" included. Linux passed 381 of 381. Windows passed 364 and skipped
-  `sysroot_digest`, which a Windows host always skips. `emit_identity` passed on both.
+- Both VMs ran the suite after item 6 of "First sessions". Linux passed 382 of 382 at
+  `226fe66`. Windows passed 365 at `9dbf0dc` and skipped `sysroot_digest`, which a
+  Windows host always skips. `emit_identity` passed on both.
 - On Windows, `%USERPROFILE%\main-suite.cmd` extracts `%USERPROFILE%\tree.tar` into the
   tree, then configures, builds and runs the suite into `main-*.log` there.
-- The next session works through items 3 to 6 of "First sessions" in `CLAUDE.md`.
+- The next session starts at item 7 of "First sessions" in `CLAUDE.md`.
+- A signed enum on Windows turns a comparison with a `size_t`, or a conversion to an
+  unsigned operand, into an error that the Mac never shows. Convert the enum first.

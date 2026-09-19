@@ -131,22 +131,16 @@ openssl checks their signature. Windows configures with `-G Ninja`.
    devirtualisation, the class registry, the singleton check and the used-slot
    bitmaps. `docs/reports/2026-09-19-whole-program.md` reports it, and
    `docs/notes/whole-program.md` holds its choices.
-3. The next session does 3 to 6 in order, in a fresh context, without
-   stopping between them, and reports at the end. Descriptors and tables are
-   emitted once, by the declaring module, as global symbols, and referenced by
-   every other module, in dev and release. Tests: the `is` repro of
-   `docs/reports/2026-09-19-whole-program.md`, `==` across modules and
-   `reflect.new` of a class of another module, in both modes.
-4. `inherits` accepts a qualified `module.Class`. Test: a chain over three
-   modules.
-5. The Linux and Windows VMs run the suite on the current main, with
-   `emit_identity`.
-6. `anti.reflect`'s `call` and `Value`, and the bitmap rule that depends on
-   them. The registry, `new` and `Object.deserialize` are done.
-7. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
-   its own module path as a compile-time constant. The check is then one
-   comparison against a table read at start. `log.named("http")` may exist
-   beside them for a logger per subsystem, not instead of them.
+3. Done. One descriptor and one set of tables per class in dev and release.
+4. Done. `inherits` accepts a qualified `module.Class`.
+5. Done. Both VMs ran the suite, `emit_identity` included.
+6. Done. `anti.reflect`'s `call` and `Value`, and the bitmap rule.
+   `docs/reports/2026-09-19-first-sessions-3-to-6.md` reports 3 to 6.
+7. The next session starts here. The `[module]` thresholds of `anti.log`.
+   They stay. Every log call passes its own module path as a compile-time
+   constant. The check is then one comparison against a table read at start.
+   `log.named("http")` may exist beside them for a logger per subsystem, not
+   instead of them.
 8. `f"..."` interpolation, which is compiler work over `anti.text`.
 9. The native libraries in `libs/`, which nothing builds yet.
 10. Inline atomic instruction sequences, which are runtime calls today.
@@ -179,8 +173,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 428 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 427 each, without the `no_paths` test, which needs a
+- 434 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 433 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
