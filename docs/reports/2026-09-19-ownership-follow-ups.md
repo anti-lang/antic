@@ -64,3 +64,18 @@ development Mac passes 451 of 451 tests. The ASan and UBSan builds pass 450 each
 - Carried: the field record has no visibility, `type_of(T)` does not exist, `equals` and
   `hash` pass over `str`, slices and inline values, and `serialize` writes a NaN as text
   that is not JSON.
+
+## After Eddie's answers
+
+- `71b67fc`. The status lines of the overview are current. Classes, interfaces, operators
+  on classes, `singleton`, and `call`, `new` and `Value` of reflection are built. Threads
+  lists what the runtime configuration has not built. `CLAUDE.md` says a commit that
+  builds a feature changes these lines.
+- `6c1e9fa`. The entries on the `T { }` default and on the owning value of `=` lose their
+  tag.
+- `faa4a2f`. A `construct` with arguments must assign every field without a default on
+  every path to `return none;`. The teardown and the copy of a class trap on a zero table
+  in an inline field, in every mode. The check found `Circle` of `object_model` and of the
+  specification's example leaving `kind` unset. A new `[provisional]` line records how the
+  check reads a body: a base's `construct` sets the fields from that base up, only
+  `self.f = v` counts, and a loop body or a handler counts only inside it.
