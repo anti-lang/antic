@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: int = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 23, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 24, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1103,9 +1103,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 24;
+    copy[4] = 25;
     refuses_file(copy, sizeof copy,
-                 "has format version 24, and antic reads version 23");
+                 "has format version 25, and antic reads version 24");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");

@@ -56,6 +56,10 @@ struct struct_field {
     bool atomic;                    /* `atomic`: read and written by calls */
     bool writable;                  /* `mutable`: a singleton field to write */
     const struct expr *value;       /* a field default or an enum value */
+    /* DESIGN: the value of a field default, which the checker evaluates.
+       A library file carries it, so a module that builds a class of
+       another module writes the defaults that module declared. */
+    const struct const_value *constant;
     uint64_t number;                /* TYPE_ENUM: the value of the name */
 };
 

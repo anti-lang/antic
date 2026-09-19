@@ -1,0 +1,15 @@
+//! `inherits` takes a public class of an imported module. A name that the
+//! module does not declare as one is refused with the module's name.
+
+import com.example.board;
+
+class Score
+{
+	inherits board.bump,
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

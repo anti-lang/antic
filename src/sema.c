@@ -2833,7 +2833,8 @@ static bool check_field_inits(struct checker *c, struct expr *e,
         /* DESIGN: a field with a default may be left out of a literal.
            The lowering writes the default in its place, so the value is
            complete and the layout is unchanged. */
-        if (i == count && fields[j].value == NULL) {
+        if (i == count && fields[j].value == NULL &&
+            fields[j].constant == NULL) {
             error_at(c, e->pos, "the literal of `%s` misses the field `%.*s`",
                      type_name, (int)fields[j].name.length, fields[j].name.text);
             return false;
@@ -4741,6 +4742,7 @@ bool sema_check(struct module *module, const char *module_name,
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         struct symbol *base;
+        struct type *base_type;
         if (it->kind != ITEM_CLASS || it->symbol == NULL) {
             continue;
         }
@@ -4748,21 +4750,38 @@ bool sema_check(struct module *module, const char *module_name,
             it->symbol->type->base = types_object(types);
             continue;
         }
-        base = scope_find_local(&c.module_scope, &it->base_name);
-        if (base == NULL || base->kind != SYMBOL_STRUCT ||
-            base->type == NULL || base->type->kind != TYPE_CLASS) {
-            error_at(&c, it->base_pos, "`%.*s` is not a class",
-                     (int)it->base_name.length, it->base_name.text);
+        /* A qualified base is a public class of an imported module. */
+        if (it->base_module.length > 0) {
+            base_type = imported_struct(&c, &it->base_module, &it->base_name,
+                                        it->base_pos);
+            if (is_error(base_type)) {
+                continue;
+            }
+        } else {
+            base = scope_find_local(&c.module_scope, &it->base_name);
+            base_type = base != NULL && base->kind == SYMBOL_STRUCT
+                            ? base->type
+                            : NULL;
+        }
+        if (base_type == NULL || base_type->kind != TYPE_CLASS) {
+            if (it->base_module.length > 0) {
+                error_at(&c, it->base_pos, "`%.*s.%.*s` is not a class",
+                         (int)it->base_module.length, it->base_module.text,
+                         (int)it->base_name.length, it->base_name.text);
+            } else {
+                error_at(&c, it->base_pos, "`%.*s` is not a class",
+                         (int)it->base_name.length, it->base_name.text);
+            }
             continue;
         }
-        if (base->type->is_final) {
+        if (base_type->is_final) {
             error_at(&c, it->base_pos,
                      "`%.*s` cannot inherit `final` class `%.*s`",
                      (int)it->name.length, it->name.text,
                      (int)it->base_name.length, it->base_name.text);
             continue;
         }
-        it->symbol->type->base = base->type;
+        it->symbol->type->base = base_type;
     }
 
     /* DESIGN: the values of an enum live in its fields, each with the
@@ -4885,14 +4904,21 @@ bool sema_check(struct module *module, const char *module_name,
             }
         }
         /* A default is checked against the type of its field, so the
-           value that lowering writes is complete and typed. */
+           value that lowering writes is complete and typed. It is a
+           constant expression, and its value is kept for the library
+           file. */
         for (j = 0; j < it->param_count; j++) {
-            if (it->params[j].value == NULL) {
+            struct const_value *v;
+            if (it->params[j].value == NULL ||
+                !require(&c, it->params[j].value,
+                         check_expr(&c, it->params[j].value, fields[j].type),
+                         fields[j].type)) {
                 continue;
             }
-            require(&c, it->params[j].value,
-                    check_expr(&c, it->params[j].value, fields[j].type),
-                    fields[j].type);
+            v = arena_alloc(arena, sizeof *v);
+            if (eval_const(&c, it->params[j].value, v)) {
+                fields[j].constant = v;
+            }
         }
         types_set_fields(types, it->symbol->type, fields - base_fields,
                          it->param_count + base_fields);

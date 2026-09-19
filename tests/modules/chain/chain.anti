@@ -1,0 +1,50 @@
+//! A class whose base is `dog.Dog`, whose base is `animal.Animal`: a
+//! chain over three modules. Dispatch, `super`, `is`, the fields,
+//! `construct` and `destruct` follow the chain across the modules.
+
+import com.example.animal;
+import com.example.dog;
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+class Puppy
+{
+	inherits dog.Dog,
+	pub age: int = 0,
+
+	fn construct(self)
+	{
+		printf("puppy %d\n".ptr, self.tail as c_int);
+	}
+
+	concrete fn sound(self) -> int
+	{
+		return 100 + self.super.sound();
+	}
+}
+
+fn scope()
+{
+	let v = dog.Dog { tail: 5 };
+	printf("scope %d\n".ptr, v.tail as c_int);
+}
+
+fn main() -> int
+{
+	scope();
+	let p = alloc Puppy { tail: 3, age: 1 };
+	let a: *animal.Animal = p;
+	let d: *dog.Dog = dog.make();
+	let b: *animal.Animal = d;
+
+	printf("%d %d %d\n".ptr, a.sound() as c_int, b.sound() as c_int,
+		a.count() as c_int);
+	printf("%d %d %d %d\n".ptr, (a is *Puppy) as c_int,
+		(a is *dog.Dog) as c_int, (b is *Puppy) as c_int,
+		(b is *animal.Animal) as c_int);
+	printf("%d %d %d\n".ptr, p.legs as c_int, p.tail as c_int,
+		p.age as c_int);
+	delete(p);
+	delete(d);
+	return 0;
+}

@@ -706,7 +706,7 @@ static void dump_module(struct dumper *d, const struct module *module)
             }
             if (it->base_name.length > 0) {
                 size_t at = begin(d, 1);
-                label_name(d, "inherits", NULL, &it->base_name);
+                label_name(d, "inherits", &it->base_module, &it->base_name);
                 end(d, at, NULL);
             }
             dump_params(d, 1, "field", it->params, it->param_count, type);

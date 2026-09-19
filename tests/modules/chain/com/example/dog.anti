@@ -1,0 +1,29 @@
+//! The middle of a chain of classes over three modules. It inherits a
+//! class of `com.example.animal`, and a program inherits it in turn.
+
+import com.example.animal;
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+/// A dog, an animal with a tail.
+pub class Dog
+{
+	inherits animal.Animal,
+	pub tail: int = 1,
+
+	fn construct(self)
+	{
+		printf("dog %d %d\n".ptr, self.legs as c_int, self.tail as c_int);
+	}
+
+	concrete fn sound(self) -> int
+	{
+		return 10 + self.super.sound();
+	}
+}
+
+/// A dog that this module allocates.
+pub fn make() -> *Dog
+{
+	return alloc Dog { tail: 2 };
+}

@@ -1698,6 +1698,16 @@ static struct ir_function *rt_function(struct lowerer *l, const char *name,
                                        const enum ir_type *params,
                                        size_t count);
 
+/* Whether fn has a body: here, in the runtime, or in the module whose
+   library file declared it. A library file carries no bodies, and an
+   abstract function has none anywhere. */
+static bool has_body(const struct item *fn)
+{
+    return fn->body != NULL || fn->runtime != NULL ||
+           (fn->symbol != NULL && fn->symbol->home != NULL &&
+            fn->contract != FN_ABSTRACT);
+}
+
 /* The global that holds the table of t, built once per class. */
 static struct ir_global *class_table(struct lowerer *l, const struct type *t)
 {
@@ -1724,8 +1734,7 @@ static struct ir_global *class_table(struct lowerer *l, const struct type *t)
     for (i = 0; i < table.count; i++) {
         const struct item *fn = table.entries[i].fn;
         value->items[i + 1].scalar = IR_PTR;
-        if (fn != NULL && fn->symbol != NULL &&
-            (fn->body != NULL || fn->runtime != NULL)) {
+        if (fn != NULL && fn->symbol != NULL && has_body(fn)) {
             value->items[i + 1].kind = IR_CONST_FUNC;
             value->items[i + 1].global =
                 callee_function(l, fn->symbol)->index;
@@ -1858,15 +1867,13 @@ static struct ir_global *interface_table(struct lowerer *l,
            body already takes a pointer to the sub-object. */
         const struct item *fn =
             qualified_member(t, sub->type, &table.entries[i].name);
-        bool own = fn != NULL && fn->symbol != NULL &&
-                   (fn->body != NULL || fn->runtime != NULL);
+        bool own = fn != NULL && fn->symbol != NULL && has_body(fn);
         if (!own) {
             fn = find_member_fn(sub->type, &table.entries[i].name);
             own = false;
         }
         value->items[i + 1].scalar = IR_PTR;
-        if (fn != NULL && fn->symbol != NULL &&
-            (fn->body != NULL || fn->runtime != NULL)) {
+        if (fn != NULL && fn->symbol != NULL && has_body(fn)) {
             value->items[i + 1].kind = IR_CONST_FUNC;
             value->items[i + 1].global =
                 own ? interface_thunk(l, t, sub, fn)->index
@@ -1899,7 +1906,8 @@ static void run_construct(struct lowerer *l, const struct type *t,
     for (i = 0; i < t->member_count && !l->failed; i++) {
         const struct item *m = t->members[i];
         if (m->kind != ITEM_FN || !same_name(&m->name, &construct_name) ||
-            m->body == NULL || m->symbol == NULL || m->param_count != 0) {
+            m->symbol == NULL || !has_body(m) ||
+            m->symbol->type->param_count != 1) {
             continue;
         }
         ir_call(l->f, l->b, IR_VOID,
@@ -1957,6 +1965,45 @@ static void store_value(struct lowerer *l, const struct type *t,
     if (!l->failed) {
         ir_store(l->f, l->b, ir_type_of(t), v, address);
     }
+}
+
+/* Whether field has a default, declared here or read from a library
+   file. */
+static bool has_default(const struct struct_field *field)
+{
+    return field->value != NULL || field->constant != NULL;
+}
+
+/* The scalar default of field. The declaring module lowers the
+   expression, and any other module the value its library file carries. */
+static struct ir_operand default_scalar(struct lowerer *l,
+                                        const struct struct_field *field)
+{
+    if (field->value != NULL) {
+        return lower_expr(l, (struct expr *)field->value);
+    }
+    return constant(l, field->constant, ir_type_of(field->type));
+}
+
+/* Put the default of field at address. */
+static void store_default(struct lowerer *l, const struct struct_field *field,
+                          struct ir_operand address)
+{
+    struct ir_operand v;
+    struct ir_vtype vtype;
+
+    if (field->value != NULL) {
+        store_value(l, field->type, (struct expr *)field->value, address);
+        return;
+    }
+    if (is_aggregate(field->type)) {
+        v = const_address(l, field->constant, field->type);
+        vtype = vtype_of(l, field->type);
+        ir_memcopy(l->f, l->b, address, v, vtype);
+        return;
+    }
+    v = default_scalar(l, field);
+    ir_store(l->f, l->b, ir_type_of(field->type), v, address);
 }
 
 /* The repeat form of an array literal computes its value once, then
@@ -2099,7 +2146,7 @@ static void build_into(struct lowerer *l, const struct expr *e,
             const struct struct_field *field = &owner->fields[i];
             size_t k;
             bool given = false;
-            if (field->value == NULL) {
+            if (!has_default(field)) {
                 continue;
             }
             for (k = 0; k < e->as.struct_lit.field_count; k++) {
@@ -2113,17 +2160,16 @@ static void build_into(struct lowerer *l, const struct expr *e,
                 continue;
             }
             if (field->bits != 0) {
-                struct ir_operand v =
-                    lower_expr(l, (struct expr *)field->value);
+                struct ir_operand v = default_scalar(l, field);
                 if (!l->failed) {
                     ir_bitstore(l->f, l->b, ir_type_of(field->type), v, dest,
                                 agg_of(l, owner), (uint32_t)i);
                 }
                 continue;
             }
-            store_value(l, field->type, (struct expr *)field->value,
-                        offset_address(l, dest,
-                                       field_offset(l, owner, &field->name)));
+            store_default(l, field,
+                          offset_address(l, dest,
+                                         field_offset(l, owner, &field->name)));
         }
         }
         run_construct(l, t, dest);
@@ -3743,8 +3789,9 @@ static bool type_needs_destruct(const struct type *t)
         for (i = 0; i < t->member_count; i++) {
             const struct item *m = t->members[i];
             static const struct name destruct_name = {"destruct", 8};
+            /* The root's `destruct` is empty and never asks for one. */
             if (m->kind == ITEM_FN && same_name(&m->name, &destruct_name) &&
-                m->body != NULL) {
+                m->runtime == NULL && has_body(m)) {
                 return true;
             }
         }
@@ -3877,12 +3924,12 @@ static struct ir_operand lower_construct(struct lowerer *l,
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
         for (i = 0; i < up->field_count && !l->failed; i++) {
             const struct struct_field *field = &up->fields[i];
-            if (field->value == NULL) {
+            if (!has_default(field)) {
                 continue;
             }
-            store_value(l, field->type, (struct expr *)field->value,
-                        offset_address(l, dest,
-                                       field_offset(l, up, &field->name)));
+            store_default(l, field,
+                          offset_address(l, dest,
+                                         field_offset(l, up, &field->name)));
         }
     }
     if (t->base != NULL) {
@@ -4484,13 +4531,13 @@ static void lower_singleton_get(struct lowerer *l, const struct item *it)
                                                              : NULL) {
             for (i = 0; i < up->field_count; i++) {
                 const struct struct_field *field = &up->fields[i];
-                if (field->value == NULL) {
+                if (!has_default(field)) {
                     continue;
                 }
-                store_value(l, field->type, (struct expr *)field->value,
-                            offset_address(l, made,
-                                           field_offset(l, up,
-                                                        &field->name)));
+                store_default(l, field,
+                              offset_address(l, made,
+                                             field_offset(l, up,
+                                                          &field->name)));
             }
         }
     }
@@ -4561,12 +4608,12 @@ static void class_init(struct lowerer *l, const struct item *it)
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *field = &up->fields[i];
-            if (field->value == NULL) {
+            if (!has_default(field)) {
                 continue;
             }
-            store_value(l, field->type, (struct expr *)field->value,
-                        offset_address(l, self,
-                                       field_offset(l, up, &field->name)));
+            store_default(l, field,
+                          offset_address(l, self,
+                                         field_offset(l, up, &field->name)));
         }
     }
     run_construct(l, t, self);

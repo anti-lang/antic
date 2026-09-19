@@ -99,15 +99,27 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
 /* The count of functions of the body of t that another module may see.
    A private function is never one of them, because no other module can
    name it. A protected one is, because a class below it may. */
+/* DESIGN: a class carries its public and protected functions, and its
+   `construct` and `destruct` whatever their level. A class of another
+   module that inherits it runs them, and a private function it cannot
+   name. */
+static bool name_equals(const struct name *n, const char *s);
+
+static bool carried_member(const struct item *m)
+{
+    return m->kind == ITEM_FN && m->symbol != NULL &&
+           (m->vis != VIS_PRIVATE ||
+            (m->body != NULL && (name_equals(&m->name, "construct") ||
+                                 name_equals(&m->name, "destruct"))));
+}
+
 static size_t public_members(const struct type *t)
 {
     size_t count = 0;
     size_t i;
 
     for (i = 0; i < t->member_count; i++) {
-        const struct item *m = t->members[i];
-        if (m->kind == ITEM_FN && m->vis != VIS_PRIVATE &&
-            m->symbol != NULL) {
+        if (carried_member(t->members[i])) {
             count++;
         }
     }
@@ -216,11 +228,13 @@ static void visit_type(struct writer *w, const struct type *t)
         if (is_local_struct(w, t)) {
             for (i = 0; i < t->field_count; i++) {
                 visit_type(w, t->fields[i].type);
+                if (t->fields[i].constant != NULL) {
+                    visit_value(w, t->fields[i].constant);
+                }
             }
             for (i = 0; i < t->member_count; i++) {
                 const struct item *m = t->members[i];
-                if (m->kind == ITEM_FN && m->vis != VIS_PRIVATE &&
-            m->symbol != NULL) {
+                if (carried_member(m)) {
                     visit_type(w, m->symbol->type);
                 }
             }
@@ -326,8 +340,7 @@ static void put_type(struct writer *w, const struct type *t)
             put_u32(w, (uint32_t)public_members(t));
             for (i = 0; i < t->member_count; i++) {
                 const struct item *m = t->members[i];
-                if (m->kind != ITEM_FN || m->vis == VIS_PRIVATE ||
-                    m->symbol == NULL) {
+                if (!carried_member(m)) {
                     continue;
                 }
                 put_bytes(w, m->name.text, m->name.length);
@@ -391,6 +404,25 @@ static void put_value(struct writer *w, const struct const_value *v)
     case CONST_SYMBOLIC:
         put_symbolic(w, v->as.symbolic);
         break;
+    }
+}
+
+/* DESIGN: the defaults of the fields follow the type table. The reader
+   reads a value against the type of its field, and it resolves that type
+   once the whole table is in. Each field of a struct that the file
+   declares gets one byte, and the value follows where that byte is 1. */
+static void put_defaults(struct writer *w, const struct type *t)
+{
+    size_t i;
+
+    if (!type_has_fields(t) || !is_local_struct(w, t)) {
+        return;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        put_u8(w, t->fields[i].constant != NULL);
+        if (t->fields[i].constant != NULL) {
+            put_value(w, t->fields[i].constant);
+        }
     }
 }
 
@@ -661,6 +693,9 @@ void antl_write(struct text *out, const struct interface *iface,
     put_u32(&w, (uint32_t)w.type_count);
     for (i = 0; i < w.type_count; i++) {
         put_type(&w, w.types[i]);
+    }
+    for (i = 0; i < w.type_count; i++) {
+        put_defaults(&w, w.types[i]);
     }
     put_u32(&w, (uint32_t)iface->item_count);
     for (i = 0; i < iface->item_count; i++) {
@@ -1019,6 +1054,9 @@ struct field_refs {
     uint32_t *member_types;
 };
 
+static bool read_value(struct reader *r, struct type *t, struct const_value *v,
+                       int depth);
+
 static void read_types(struct reader *r)
 {
     uint32_t count = get_count(r, 1);
@@ -1248,6 +1286,21 @@ static void read_types(struct reader *r)
         }
     }
     for (i = 0; i < struct_count && !r->failed; i++) {
+        struct type *t = structs[i].s;
+        for (j = 0; j < t->field_count && !r->failed; j++) {
+            struct const_value *v;
+            if (get_u8(r) == 0) {
+                continue;
+            }
+            v = allocate(r, 1, sizeof *v);
+            if (!read_value(r, t->fields[j].type, v, 0)) {
+                damaged(r);
+                break;
+            }
+            t->fields[j].constant = v;
+        }
+    }
+    for (i = 0; i < struct_count && !r->failed; i++) {
         if (types_find_cycle(structs[i].s) != NULL) {
             damaged(r);
         }
@@ -1274,7 +1327,8 @@ static bool read_value(struct reader *r, struct type *t, struct const_value *v,
     switch (kind) {
     case CONST_INT:
         v->as.integer = get_u64(r);
-        return !r->failed && (type_is_integer(t) || t->kind == TYPE_BOOL);
+        return !r->failed && (type_is_integer(t) || t->kind == TYPE_BOOL ||
+                              t->kind == TYPE_ENUM);
     case CONST_FLOAT: {
         uint64_t bits = get_u64(r);
         memcpy(&v->as.floating, &bits, sizeof bits);

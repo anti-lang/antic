@@ -11,7 +11,7 @@ extern fn printf(format: *byte, ...) -> c_int;
 fn main() -> int
 {
 	let made = points.make(3);
-	let here = alloc points.Point { x: 3, y: 0 };
+	let here = alloc points.Point { x: 3 };
 	let o: *Object = made;
 	let same: *Object = made;
 

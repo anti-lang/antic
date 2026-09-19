@@ -1,0 +1,34 @@
+//! The root of a chain of classes over three modules. The test
+//! `inherits_modules` extends it in `com.example.dog` and in a program.
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+/// An animal with legs and a sound.
+pub class Animal
+{
+	pub legs: int = 4,
+	protected calls: int = 0,
+
+	fn construct(self)
+	{
+		printf("animal %d\n".ptr, self.legs as c_int);
+	}
+
+	fn destruct(self)
+	{
+		printf("animal out %d\n".ptr, self.legs as c_int);
+	}
+
+	/// The sound, which each class below replaces.
+	pub fn sound(self) -> int
+	{
+		self.calls = self.calls + 1;
+		return 1;
+	}
+
+	/// How often `sound` of this class ran.
+	pub fn count(self) -> int
+	{
+		return self.calls;
+	}
+}

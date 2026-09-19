@@ -433,6 +433,8 @@ struct item {
     const struct item *owner;       /* the class or enum that declares it */
     struct type_expr *base;         /* ITEM_ENUM: the underlying type, or NULL */
     struct name base_name;          /* ITEM_CLASS: the base after `inherits` */
+    struct name base_module;        /* ITEM_CLASS: the module of the base,
+                                       empty when unqualified */
     struct pos base_pos;
     bool is_abstract;               /* ITEM_CLASS, or ITEM_FN in a body */
     bool is_final;                  /* ITEM_CLASS, ITEM_FN */

@@ -723,9 +723,25 @@ foreach(mode release dev)
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/shared"
+            "-DLIBRARIES=points"
+            "-DSTD=text,reflect"
+            "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-${mode}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_shared_class.cmake")
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+    # A chain of classes over three modules, each naming its base with
+    # the module it comes from
+    add_test(NAME inherits_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/chain"
+            "-DLIBRARIES=animal,dog"
+            "-DPROGRAM=chain"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/chain-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
 # The internal level: a module of the same package sees an internal item
@@ -782,6 +798,17 @@ foreach(mode release dev)
     set_tests_properties(error_worker_reach_${mode} PROPERTIES
         FIXTURES_REQUIRED board_antl)
 endforeach()
+
+# A qualified base that the module does not declare as a public class
+add_test(NAME error_inherits_module
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=-S,-I,${LIBS},-o,${CMAKE_CURRENT_BINARY_DIR}/inherits_module.s,inherits_module.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/inherits_module.err"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+set_tests_properties(error_inherits_module PROPERTIES
+    FIXTURES_REQUIRED board_antl)
 
 add_test(NAME error_missing_library
     COMMAND antic --dump-ir "${MODULES}/main.anti"

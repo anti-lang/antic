@@ -1535,8 +1535,9 @@ static struct item *class_item(struct parser *p, struct item *it)
         field.doc = doc_before(p, TOKEN_DOC);
         field.note = doc_before(p, TOKEN_NOTE);
         field.pos = pos_of(peek(p));
-        /* The base is one name and no field of its own. The checker
-           builds the `super` field from it. */
+        /* The base is one name, qualified by its module or not, and no
+           field of its own. The checker builds the `super` field from
+           it. */
         if (check(p, TOKEN_INHERITS)) {
             if (it->base_name.length > 0) {
                 error_here(p, "a class has one base");
@@ -1545,7 +1546,10 @@ static struct item *class_item(struct parser *p, struct item *it)
             }
             it->base_pos = pos_of(peek(p));
             next(p);
-            if (!expect_name(p, &it->base_name)) {
+            if (!expect_name(p, &it->base_name) ||
+                (accept(p, TOKEN_DOT) &&
+                 (it->base_module = it->base_name,
+                  !expect_name(p, &it->base_name)))) {
                 free(fields.data);
                 return NULL;
             }
