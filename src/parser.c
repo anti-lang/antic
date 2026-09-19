@@ -314,9 +314,14 @@ static struct type_expr *type(struct parser *p)
         if ((ty->element = type(p)) == NULL) {
             return NULL;
         }
-    } else if (accept(p, TOKEN_FN)) {
+    } else if (check(p, TOKEN_FN) ||
+               (check(p, TOKEN_QUESTION) && peek_at(p, 1)->kind == TOKEN_FN)) {
         struct list params = {NULL, 0, 0, sizeof(struct type_expr *)};
 
+        /* A function value follows the pointer rule, so `?fn(...)` may
+           hold `none` and `fn(...)` may not. */
+        ty->nullable = accept(p, TOKEN_QUESTION);
+        next(p);
         ty->kind = TYPEX_FN;
         if (!expect(p, TOKEN_LPAREN)) {
             return NULL;
@@ -749,8 +754,11 @@ static struct expr *cast(struct parser *p)
         c->pos = e->pos;
         c->as.cast.operand = e;
         c->as.cast.test = test;
-        /* `as?` on a class pointer gives `none` where `as` traps. */
-        c->as.cast.checked = !test && accept(p, TOKEN_QUESTION);
+        /* `as?` on a class pointer gives `none` where `as` traps. A `?`
+           before `fn` opens a nullable function type, which `as?` never
+           takes, so the type keeps it. */
+        c->as.cast.checked = !test && peek_at(p, 1)->kind != TOKEN_FN &&
+                             accept(p, TOKEN_QUESTION);
         if ((c->as.cast.type = type(p)) == NULL) {
             return NULL;
         }

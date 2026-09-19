@@ -630,4 +630,29 @@ void test_sema(void)
             "{ self.n = n; } }\n"
             "fn f(p: *Pet) { p.construct(1); }\n", 2, 17,
             "`construct` is private to `Pet`");
+
+    /* A static function is namespaced by its class, so a class below may
+       declare a static of the same name. `Class.f` names one of them and
+       never the other. A function that takes `self` and a field are
+       another matter, and the chain keeps its one name for each. */
+    accepts("class Pet { pub n: int = 0,\n"
+            "    pub fn new(n: int) -> Pet { return Pet { n: n }; } }\n"
+            "class Cat { inherits Pet,\n"
+            "    pub fn new() -> Cat { return Cat { n: 1 }; } }\n"
+            "fn f() -> int { let a = Pet.new(2); let b = Cat.new();\n"
+            "    return a.n + b.n; }\n");
+    rejects("class Pet { pub n: int = 0, pub fn tag(self) -> int "
+            "{ return self.n; } }\n"
+            "class Cat { inherits Pet, pub fn tag(self) -> int "
+            "{ return 1; } }\n", 2, 34,
+            "`Pet` already has `tag`");
+    rejects("class Pet { pub n: int = 0,\n"
+            "    pub fn make() -> Pet { return Pet { n: 1 }; } }\n"
+            "class Cat { inherits Pet, pub make: int = 0 }\n", 3, 27,
+            "`Pet` already has `make`");
+    rejects("class Pet { pub n: int = 0, pub fn tag(self) -> int "
+            "{ return self.n; } }\n"
+            "class Cat { inherits Pet, pub fn tag() -> int "
+            "{ return 1; } }\n", 2, 34,
+            "`Pet` already has `tag`");
 }

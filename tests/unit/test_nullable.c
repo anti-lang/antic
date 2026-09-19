@@ -203,6 +203,47 @@ void test_nullable(void)
                  "    if p != none {\n        take(p);\n    }\n"
                  "    p = maybe();");
 
+    /* Narrowing follows `&&` and `||`. The right operand of `&&` sees
+       what the left proved true, and the right of `||` what it proved
+       false. The body of the `if` keeps an `&&` chain and not an `||`. */
+    body_accepts("    let p = maybe();\n"
+                 "    if p != none && *p > 0 {\n        take(p);\n    }");
+    body_accepts("    let p = maybe();\n"
+                 "    if p == none || *p > 0 {\n        return;\n    }");
+    body_accepts("    let p = maybe();\n    let q = maybe();\n"
+                 "    if p != none && q != none && *p + *q > 0 {\n"
+                 "        take(p);\n        take(q);\n    }");
+    /* An `||` chain proves nothing when it holds. */
+    body_rejects("    let p = maybe();\n    let q = maybe();\n"
+                 "    if p != none || q != none {\n        take(p);\n    }",
+                 "`p` may be `none`, check it or use `?*T`");
+    /* Nor does the right operand of an `||` see the left as checked. */
+    body_rejects("    let p = maybe();\n"
+                 "    if p != none || *p > 0 {\n        return;\n    }",
+                 "`p` may be `none`, check it or use `?*T`");
+    /* Nested: the chain narrows the body, and a block inside keeps it. */
+    body_accepts("    let p = maybe();\n    let q = maybe();\n"
+                 "    if p != none && q != none {\n"
+                 "        if *p > 0 {\n            take(q);\n        }\n"
+                 "    }");
+
+    /* A function value follows the pointer rule. */
+    rejects("fn f() { let g: fn() = none; }\n", "`fn()` cannot hold `none`");
+    accepts("fn f() { let g: ?fn() = none; }\n");
+    rejects("fn one() { }\n"
+            "fn f() { let g: ?fn() = one; g(); }\n",
+            "`g` may be `none`, check it or use `?fn(...)`");
+    accepts("fn one() { }\n"
+            "fn f() { let g: ?fn() = one; if g != none { g(); } }\n");
+    accepts("fn one() { }\n"
+            "fn f() { let g: ?fn() = one; let h = g else { return; }; h(); }\n");
+    /* `fn()` passes where `?fn()` is expected, as `*T` does for `?*T`. */
+    accepts("fn takes(g: ?fn()) { }\n"
+            "fn f(h: fn()) { takes(h); }\n");
+    rejects("fn takes(g: fn()) { }\n"
+            "fn f(h: ?fn()) { takes(h); }\n",
+            "`h` may be `none`, check it or use `?fn(...)`");
+
     /* `while p != none { }` narrows its body by the same rule. */
     body_accepts("    let p = maybe();\n"
                  "    while p != none do {\n        take(p);\n    }");
@@ -220,10 +261,10 @@ void test_nullable(void)
                  "found `int`");
 
     /* `p catch fatal` and `p catch e { }` follow the error forms, with
-       the error `anti.error.NullPointer`. The class is an ordinary
+       the error `anti.error.NoneDereference`. The class is an ordinary
        imported one, so a module that writes the form imports it. */
     body_rejects("    let p = maybe();\n    let m = p catch fatal;",
-                 "`catch` on a `?*T` gives an `anti.error.NullPointer`, so "
+                 "`catch` on a `?*T` gives an `anti.error.NoneDereference`, so "
                  "the module imports `anti.error`");
     body_rejects("    let n = 1 catch fatal;",
                  "`catch` here guards a `?*T`, found `int`");

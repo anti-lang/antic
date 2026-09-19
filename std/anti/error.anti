@@ -22,7 +22,7 @@ pub class Error
 	/// One line, without a trailing newline.
 	pub message: str = "",
 	/// The error below this one, or `none`.
-	own cause: ?*Error = none,
+	protected own cause: ?*Error = none,
 
 	/// An error with a code and a message and no cause.
 	pub fn new(code: int, message: str) -> *Error
@@ -104,14 +104,14 @@ pub class Error
 /// `p catch fatal` and `p catch e { }` on a `?*T` give one of these. It
 /// is an `Error` like any other, so a handler that takes an `*Error`
 /// takes it too.
-pub class NullPointer
+pub class NoneDereference
 {
 	inherits Error,
 
 	/// The error a `catch` on a `none` pointer gives.
-	pub fn make() -> *NullPointer
+	pub fn new() -> *NoneDereference
 	{
-		let e = alloc NullPointer { };
+		let e = alloc NoneDereference { };
 		e.code = 1;
 		e.message = "the pointer is none";
 		return e;
@@ -121,7 +121,7 @@ pub class NullPointer
 /// The one function that runs before `fatal` ends the program.
 singleton class Fatal
 {
-	atomic hook: fn() = none,
+	atomic hook: ?fn() = none,
 }
 
 /// Register the function that runs before `fatal` ends the program.

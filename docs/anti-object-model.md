@@ -91,7 +91,7 @@ class Circle
 - `abstract class Name { }` is required for a class with any function that has no body, own or inherited. A class with an open function and no `abstract` is refused, naming the open functions.
 - `final class Name { }` forbids inheritance. `final` is a contextual word before `class` and before `fn`.
 - `singleton class Name { }` declares a class with one instance. See [Static fields and singletons](#static-fields-and-singletons).
-- A class may not redeclare a field, function or constant that its base chain already has, except a `concrete fn`. Two `implements` of one interface in a class or its chain are refused.
+- A class may not redeclare a field, a function that takes `self`, or a constant that its base chain already has, except a `concrete fn`. A static function is namespaced by its class and may have the same name as a static in the chain, since `Class.f` names one of them and never the other. Two `implements` of one interface in a class or its chain are refused.
 - `packed` and `align(N)` apply to classes as to structs and leave a base, interface or `use` part as it is.
 - The first field of every class is its table pointer. The Anti programmer never names it. See [Tables and dispatch](#tables-and-dispatch).
 
@@ -279,7 +279,7 @@ Four levels, and each applies where it makes sense:
 
 ## Errors
 
-- `anti.error.Error` is a class with `pub code: int`, `pub message: str` and `own cause: ?*Error = none`. `anti.error.NullPointer` inherits it and is the error of a `catch` on a `?*T`. The runtime owns `anti.rt`, so the class lives in the standard library's `anti.error` module. Libraries subclass it. `Error.new(code, message)`, `Error.from_errno()` and `Error.from_win32()` build one. `e.text()` gives code, message and the cause chain. `e.print()` writes it to stderr. `e.fatal()` prints and exits with `e.code`, or 1 when the code is 0. `rt.on_fatal(f)` registers one function that runs before `fatal` exits.
+- `anti.error.Error` is a class with `pub code: int`, `pub message: str` and `own cause: ?*Error = none`. `anti.error.NoneDereference` inherits it and is the error of a `catch` on a `?*T`. The runtime owns `anti.rt`, so the class lives in the standard library's `anti.error` module. Libraries subclass it. `Error.new(code, message)`, `Error.from_errno()` and `Error.from_win32()` build one. `e.text()` gives code, message and the cause chain. `e.print()` writes it to stderr. `e.fatal()` prints and exits with `e.code`, or 1 when the code is 0. `rt.on_fatal(f)` registers one function that runs before `fatal` exits.
 - A function that can fail returns `?*Error`, `none` on success, and writes its results through out pointers. A function that cannot fail returns its value. A function whose only failure is "not present" may return `bool`.
 - A call to a failing function must handle the error. A bare call that drops it is a compile error.
 - `let n = f(args) catch e { ... };` handles it at the call. The compiler supplies the out pointer for `n`. The handler either leaves the enclosing block or ends with `yield v`, a value of `n`'s type that takes the place of the result. `catch { }` binds no name. `catch fatal` prints and exits.

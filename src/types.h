@@ -96,7 +96,7 @@ struct type {
        key that interns them. They have the same layout: nothing is
        emitted for the difference, and the checks are the ones the
        program wrote. */
-    bool nullable;                  /* TYPE_POINTER: `?*T` */
+    bool nullable;                  /* TYPE_POINTER and TYPE_FN: `?*T` */
     uint64_t length;                /* TYPE_ARRAY, 0 when symbolic */
     const struct symbolic *length_of; /* TYPE_ARRAY, a symbolic length */
     struct type **params;           /* TYPE_FN */
@@ -147,8 +147,12 @@ struct type *types_pointer_nullable(struct types *types,
 /* Either of the two, for a caller that carries the answer in a value. */
 struct type *types_pointer_of(struct types *types, struct type *element,
                               bool nullable);
-/* Whether t is `?*T`. */
+/* Whether t is `?*T` or `?fn(...)`. */
 bool type_is_nullable(const struct type *t);
+/* The same type without `none`: `*T` of a `?*T`, `fn()` of a `?fn()`. */
+struct type *types_without_none(struct types *types, struct type *t);
+/* The same type with `none`, for a pointer or a function type. */
+struct type *types_with_none(struct types *types, struct type *t);
 struct type *types_array(struct types *types, struct type *element,
                          uint64_t length);
 struct type *types_slice(struct types *types, struct type *element);

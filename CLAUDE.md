@@ -195,9 +195,10 @@ reports what it finished.
 - 454 ctest tests pass on the development Mac and none is skipped. The ASan and
   the UBSan builds run 453 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
-- `*T` never holds `none` and `?*T` may. Narrowing is per block, `let m = p
-  else { }` and `p catch` bind the checked pointer, and every pointer of an
-  `extern fn` is `?*T`. A failing function returns `?*Error`.
+- `*T` never holds `none` and `?*T` may, and a function value follows the same
+  rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
+  `let m = p else { }` and `p catch` bind the checked value, and every pointer
+  of an `extern fn` is `?*T`. A failing function returns `?*Error`.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`

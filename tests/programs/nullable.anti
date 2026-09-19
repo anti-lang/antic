@@ -69,6 +69,25 @@ fn main() -> int
 	}
 	io.println("checked");
 
+	/* Narrowing follows `&&`: the right operand sees the checked name,
+	   and so does the body. */
+	let two = shape(true);
+	if two != none && two.n == 1 {
+		io.println("chain narrows");
+		delete(two);
+	}
+
+	/* A function value follows the pointer rule. */
+	let hook: ?fn(int) -> int = none;
+	if hook == none {
+		hook = twice;
+	}
+	let call = hook else { return 7; };
+	if call(21) != 42 {
+		return 8;
+	}
+	io.println("function value checked");
+
 	/* A chain of owned links, walked by the same rule. */
 	let tail = alloc Link { n: 3 };
 	let middle = alloc Link { n: 2, next: tail };
@@ -85,7 +104,7 @@ fn main() -> int
 	}
 
 	/* `p catch e { }` follows the error forms, with the error
-	   `anti.error.NullPointer`. The handler gives the binding a
+	   `anti.error.NoneDereference`. The handler gives the binding a
 	   pointer with `yield`. */
 	let spare = alloc(byte, 4) else { return 5; };
 	let fallback = shape(false) catch e {
@@ -110,6 +129,11 @@ fn main() -> int
 
 	delete(one);
 	return 0;
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
 }
 
 fn printf_len(n: int)

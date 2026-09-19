@@ -40,8 +40,10 @@ After the first release, in this order: the wrapping and saturating operators wi
 - `*T` never holds `none`. The compiler refuses `none` for it, refuses an uninitialised one, and never asks for a check before use.
 - `?*T` may hold `none`. It cannot be dereferenced, called, indexed or passed where `*T` is expected until the program has checked it.
 - `none` has type `?*T` for every `T`.
+- A function value follows the same rule. `fn(...)` never holds `none`, `?fn(...)` may, and it is called only after the program has checked it. Narrowing works on it as it does on a pointer.
 - Narrowing is per block. Inside `if p != none { }` the name `p` has type `*T`. After `if p == none { return; }` it has type `*T` for the rest of the enclosing block. After the block that narrowed it, `p` is `?*T` again. Assigning to `p` inside a narrowed block ends the narrowing for that block.
-- `let m = p else { leave };` binds `m` as `*T`, and the `else` block must leave the enclosing block. `p catch fatal` and `p catch e { yield q; }` follow the error forms, with the error `anti.error.NullPointer`.
+- Narrowing follows `&&` and `||`. In `p != none && p.n > 0` the right operand reads `p` as `*T`, and so does the body of the `if`. In `p == none || p.n > 0` the right operand reads it as `*T` and the body does not, because either side may have decided the chain.
+- `let m = p else { leave };` binds `m` as `*T`, and the `else` block must leave the enclosing block. `p catch fatal` and `p catch e { yield q; }` follow the error forms, with the error `anti.error.NoneDereference`.
 - `alloc T { }` and `alloc T(args)` return `*T`. Out of memory is fatal. `alloc(T, n)` returns `?*T`, because `malloc` does.
 - `p as *T` returns `*T` and traps. `p as? *T` returns `?*T`. `dup(p)` returns the type of `p`. `is` works on both.
 - A class field of type `*T` without a default must be set in every literal or in `construct`. A field of type `?*T` may default to `none`.
@@ -144,7 +146,7 @@ tests
 
 ## Namespaces
 
-- `anti.lang` holds every type the compiler knows by name: `Object`, `Error`, `NullPointer`, `Flags`, `Job`, `Mutex`, `Trace`, `TraceHandler`. `anti.rt` is the C runtime and holds no Anti module a program imports. Everything that only helps lives elsewhere: `anti.error` for error conveniences, `anti.trace` for the stock handlers, `anti.log`, `anti.time` and the rest.
+- `anti.lang` holds every type the compiler knows by name: `Object`, `Error`, `NoneDereference`, `Flags`, `Job`, `Mutex`, `Trace`, `TraceHandler`. `anti.rt` is the C runtime and holds no Anti module a program imports. Everything that only helps lives elsewhere: `anti.error` for error conveniences, `anti.trace` for the stock handlers, `anti.log`, `anti.time` and the rest.
 - The rule for a reader: if the compiler needs it, it is in `anti.lang`. If it only helps, it is not.
 - `docs/anti-object-model.md` names `anti.rt.Object` and `anti.error.Error`. Both are `anti.lang` under this rule, and the object model document is corrected when it is next edited.
 

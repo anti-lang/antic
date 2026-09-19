@@ -79,7 +79,35 @@ struct type *types_pointer_nullable(struct types *types, struct type *element)
 
 bool type_is_nullable(const struct type *t)
 {
-    return t != NULL && t->kind == TYPE_POINTER && t->nullable;
+    return t != NULL && (t->kind == TYPE_POINTER || t->kind == TYPE_FN) &&
+           t->nullable;
+}
+
+struct type *types_without_none(struct types *types, struct type *t)
+{
+    struct type key;
+
+    if (!type_is_nullable(t)) {
+        return t;
+    }
+    key = *t;
+    key.nullable = false;
+    key.next = NULL;
+    return find_or_add(types, &key);
+}
+
+struct type *types_with_none(struct types *types, struct type *t)
+{
+    struct type key;
+
+    if (t == NULL || type_is_nullable(t) ||
+        (t->kind != TYPE_POINTER && t->kind != TYPE_FN)) {
+        return t;
+    }
+    key = *t;
+    key.nullable = true;
+    key.next = NULL;
+    return find_or_add(types, &key);
 }
 
 struct type *types_array(struct types *types, struct type *element,
@@ -436,6 +464,9 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         print_type(out, t->element, qualified);
         return;
     case TYPE_FN:
+        if (t->nullable) {
+            text_append(out, "?");
+        }
         text_append(out, t->bound ? "bound fn(" : "fn(");
         for (i = 0; i < t->param_count; i++) {
             if (i > 0) {

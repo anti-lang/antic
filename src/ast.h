@@ -300,9 +300,9 @@ struct stmt {
             struct block *otherwise;
             /* `let m = p catch fatal` and `let m = p catch e { }`: the
                handler that runs when p is `none`, with the error
-               `anti.error.NullPointer`. */
+               `anti.error.NoneDereference`. */
             struct handler guard;
-            /* `anti.error.NullPointer.make`, which the guard calls to
+            /* `anti.error.NoneDereference.make`, which the guard calls to
                build the error it hands the handler. */
             struct symbol *guard_make;
         } let;                      /* STMT_LET, STMT_CONST */

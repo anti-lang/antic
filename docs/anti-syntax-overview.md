@@ -403,11 +403,11 @@ if n != none {
 	n.value = 1;          // n is *Node here
 }
 let m = n else { return 1; };
-let g = n catch fatal;    // an anti.error.NullPointer on none
+let g = n catch fatal;    // an anti.error.NoneDereference on none
 let k = n ?? &default_node;
 ```
 
-`alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing.
+`alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing. A function value follows the same rule: `fn(...)` never holds `none` and `?fn(...)` may.
 
 Built. Not built yet: `??`.
 

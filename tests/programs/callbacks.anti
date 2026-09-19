@@ -75,9 +75,12 @@ fn main() -> int
 	printf("%d %d %d %d %d\n".ptr, numbers[0], numbers[1], numbers[2],
 		numbers[3], numbers[4]);
 
-	let chosen: fn(i32) -> i32 = none;
+	/* A function value follows the pointer rule, so one that starts
+	   as `none` is a `?fn(...)` and is checked before it is called. */
+	let chosen: ?fn(i32) -> i32 = none;
 	if chosen == none {
 		chosen = negate;
 	}
-	return (chosen(-42) + (abs == abs) as i32) as int;
+	let call = chosen else { return 1; };
+	return (call(-42) + (abs == abs) as i32) as int;
 }
