@@ -272,6 +272,11 @@ add_test(NAME sysroot_digest
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_digest"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_digest.cmake")
+add_test(NAME glibc_sysroot
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/glibc_sysroot"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_glibc_sysroot.cmake")
 # The package of this host, packed from the antic of this build. It needs
 # the two Linux sysroots that every package carries.
 if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND

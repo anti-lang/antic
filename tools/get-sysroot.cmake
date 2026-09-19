@@ -8,6 +8,9 @@
 #   tools/sysroot-pins, checked against its digest, and the compiler-rt
 #   builtins of the pinned clang in CLANG_DIR, which defaults to
 #   build/clang of the repository.
+# linux-x86_64-glibc, linux-arm64-glibc: glibc 2.35 and the kernel headers
+#   of Ubuntu 22.04 from the packages of tools/sysroot-pins, for the Linux
+#   link mode against glibc.
 # macos-arm64, macos-x86_64: the .tbd stubs of libSystem from the newest
 #   SDK of the Command Line Tools for Xcode that ld64.lld in LLVM_BIN
 #   reads. Only on a Mac, because Apple licenses the SDK for its own
@@ -90,6 +93,35 @@ function(tree_digest dir out)
     endforeach()
     string(SHA256 digest "${lines}")
     set("${out}" "${digest}" PARENT_SCOPE)
+endfunction()
+
+# Unpack the three glibc packages of <arch> into <target>. A package is an
+# ar archive whose data.tar.zst holds the files. The copyright files of
+# glibc and of the kernel headers go to licenses/.
+function(glibc_sysroot target arch)
+    set(root "${DEST}/${target}")
+    set(work "${DEST}/.download/${target}")
+    file(REMOVE_RECURSE "${root}")
+    file(MAKE_DIRECTORY "${work}" "${root}")
+    foreach(package LIBC_DEV LIBC HEADERS)
+        set(name "${GLIBC_${arch}_${package}}")
+        get_filename_component(asset "${name}" NAME)
+        fetch("${GLIBC_${arch}_URL}/${name}" "${work}/${asset}"
+              "${GLIBC_${arch}_${package}_DIGEST}")
+        file(REMOVE_RECURSE "${work}/deb")
+        file(ARCHIVE_EXTRACT INPUT "${work}/${asset}" DESTINATION "${work}/deb")
+        file(GLOB data "${work}/deb/data.tar.*")
+        list(LENGTH data count)
+        if(NOT count EQUAL 1)
+            message(FATAL_ERROR "${asset} holds ${count} data archives, not one")
+        endif()
+        file(ARCHIVE_EXTRACT INPUT "${data}" DESTINATION "${root}")
+    endforeach()
+    file(REMOVE_RECURSE "${work}/deb")
+    file(COPY_FILE "${root}/usr/share/doc/libc6/copyright"
+         "${DEST}/licenses/glibc.txt")
+    file(COPY_FILE "${root}/usr/share/doc/linux-libc-dev/copyright"
+         "${DEST}/licenses/linux-headers.txt")
 endfunction()
 
 function(linux_sysroot target arch musl_digest)
@@ -412,6 +444,10 @@ foreach(target IN LISTS TARGETS)
         linux_sysroot("${target}" x86_64 "${MUSL_DEV_X86_64}")
     elseif(target STREQUAL "linux-arm64")
         linux_sysroot("${target}" aarch64 "${MUSL_DEV_AARCH64}")
+    elseif(target STREQUAL "linux-x86_64-glibc")
+        glibc_sysroot("${target}" X86_64)
+    elseif(target STREQUAL "linux-arm64-glibc")
+        glibc_sysroot("${target}" AARCH64)
     elseif(target STREQUAL "macos-arm64")
         macos_sysroot("${target}" arm64)
     elseif(target STREQUAL "macos-x86_64")
