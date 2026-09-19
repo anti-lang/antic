@@ -31,11 +31,15 @@ without asking Eddie.
   why. No emoji, no trailers.
 - Warnings are errors. `CMakeLists.txt` sets `-Wall -Wextra -Wpedantic -Werror`
   and `/W4 /WX`. The build produces zero warnings on clang, gcc and MSVC.
-- All tests pass on the host before every commit.
-- The two sanitizer builds run before every push, whatever the work is.
-  `cmake --preset asan` and `cmake --preset ubsan`, each with the full suite.
-  UndefinedBehaviorSanitizer found a real defect on its first run here, a `bool`
-  field read as 64 that the ordinary build passed over.
+- A commit that changes only files under `docs/` or `CLAUDE.md` runs the
+  docs-style checker and nothing else. That covers reports and notes. A push
+  made only of such commits needs no suite.
+- A commit that changes anything else runs the full suite on the host first.
+  A push that includes such a commit runs both sanitizer suites first, once
+  per push and not once per commit. `cmake --preset asan` and `cmake --preset
+  ubsan`, each with the full suite. UndefinedBehaviorSanitizer found a real
+  defect on its first run here, a `bool` field read as 64 that the ordinary
+  build passed over.
 - Every comment and every `.md` file follows the docs-style rules. Run
   `python3 tools/docs-style/check_docs.py <files>` before committing, and fix
   every finding. The copy under `tools/` is pinned on purpose, so the rules do
@@ -68,8 +72,9 @@ without asking Eddie.
 - Do not narrate. No summaries of what you are about to do, no restating of the
   task, no lists of what you read. Say what changed and what failed, in one line
   each, and only when a step completes.
-- Run the full suite once per commit, not per edit. While working on one test, run
-  that test alone. Run the sanitizer suites once, before the push.
+- Run the full suite once per commit that needs it, not per edit. While working on
+  one test, run that test alone. Run the sanitizer suites once per push that needs
+  them.
 - Do not print test output into the context. Redirect it to a file and grep for
   failures. Show me at most the failing lines.
 - Do not show file contents you did not change. When you edit, show the diff, not
