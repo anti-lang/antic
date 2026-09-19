@@ -375,7 +375,10 @@ static bool read_integer(struct reader *r, void *bytes, int64_t type)
 
 /* DESIGN: a str that deserialize reads gets bytes of its own on the
    heap, which nothing frees. A str never owns its bytes, as the rule of
-   `own` says, so no `destruct` could free them. */
+   `own` says, so no `destruct` could free them. They come from libc
+   until `anti.mem` exists. deserialize then takes an Allocator, which
+   gives every string and every owned object it makes. The caller frees
+   that memory at once when the object's life ends. */
 static bool read_text(struct reader *r, struct anti_text *out)
 {
     struct reader scan = *r;
