@@ -136,14 +136,28 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 5. Done. Both VMs ran the suite, `emit_identity` included.
 6. Done. `anti.reflect`'s `call` and `Value`, and the bitmap rule.
    `docs/reports/2026-09-19-first-sessions-3-to-6.md` reports 3 to 6.
-7. The next session starts here. The `[module]` thresholds of `anti.log`.
-   They stay. Every log call passes its own module path as a compile-time
-   constant. The check is then one comparison against a table read at start.
-   `log.named("http")` may exist beside them for a logger per subsystem, not
-   instead of them.
-8. `f"..."` interpolation, which is compiler work over `anti.text`.
-9. The native libraries in `libs/`, which nothing builds yet.
-10. Inline atomic instruction sequences, which are runtime calls today.
+7. The next session does 7 to 9 in order, in a fresh context, without
+   stopping between them, and reports at the end. The field record carries a
+   type id, not a width, as the specification says. `get` and `set` take and
+   return `Value`. Recheck `serialize` and `deserialize` on a class with every
+   field kind: every sized integer, `f32`, `f64`, `bool`, `char`, `str`, a
+   slice, a pointer, an inline struct, an inline class and an enum.
+8. Tests: `reflect.call` through an interface pointer, and
+   `self.super.construct(x)` on a base from another module, in both modes.
+9. Update the provisional entries for Eddie's answers to the questions of
+   `docs/reports/2026-09-19-first-sessions-3-to-6.md`. `reflect.call` follows
+   the error convention: `call(obj, m, args, out: *Value) -> *Error`, and the
+   error names the reason: a bad index, a wrong argument count or a wrong
+   kind. `None` then means only that the function has no result. `anti.reflect`
+   is standard library, so it may name `anti.error.Error`. `Value` becomes a
+   `variant` when variants exist, with the same layout, and its entry says so.
+10. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
+    its own module path as a compile-time constant. The check is then one
+    comparison against a table read at start. `log.named("http")` may exist
+    beside them for a logger per subsystem, not instead of them.
+11. `f"..."` interpolation, which is compiler work over `anti.text`.
+12. The native libraries in `libs/`, which nothing builds yet.
+13. Inline atomic instruction sequences, which are runtime calls today.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, dev-mode checks, debug information, and tests and fixtures
