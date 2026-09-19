@@ -57,12 +57,21 @@ set_tests_properties(antic_host_target PROPERTIES
 # the build, so a build with the pinned clang runs no compiler of the
 # machine. The pinned clang reads the SDK of macOS from -isysroot and
 # compiles C++ in the driver mode of g++. A reader's build takes c++.
-set(ANTIC_TEST_CC "${CMAKE_C_COMPILER}")
+#
+# DESIGN: antic never fuses a multiply and an add, so the C that a test
+# compiles as the reference of an Anti result fuses none either. Otherwise
+# the test compares two arithmetics. clang fuses by default on arm64 Linux.
+# MSVC fuses nothing by default and knows no such option.
+set(ANTIC_REFERENCE_C_FLAGS "")
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    set(ANTIC_REFERENCE_C_FLAGS -ffp-contract=off)
+endif()
+set(ANTIC_TEST_CC "${CMAKE_C_COMPILER}" ${ANTIC_REFERENCE_C_FLAGS})
 if(APPLE)
     list(APPEND ANTIC_TEST_CC -isysroot "${ANTIC_MACOS_SDK}")
 endif()
 if(ANTIC_SYSTEM_COMPILER)
-    set(ANTIC_TEST_CXX c++)
+    set(ANTIC_TEST_CXX c++ ${ANTIC_REFERENCE_C_FLAGS})
 else()
     set(ANTIC_TEST_CXX ${ANTIC_TEST_CC} --driver-mode=g++)
 endif()
@@ -114,7 +123,7 @@ set(ANTIC_RAYLIB_DIR "${CMAKE_BINARY_DIR}/raylib/raylib-${raylib_version}"
 function(abi_x86_64_object name source)
     add_library(${name} OBJECT "${source}")
     target_compile_options(${name} PRIVATE -arch x86_64
-        -mmacosx-version-min=11.0 -fno-sanitize=all)
+        -mmacosx-version-min=11.0 -fno-sanitize=all ${ANTIC_REFERENCE_C_FLAGS})
 endfunction()
 
 # A macos-arm64 host runs a macos-x86_64 program as well, so every program
@@ -146,7 +155,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
                 "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_raymath_x86_64>,,>"
                 "-DOPTIONS=--target,macos-x86_64"
-                "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.macos-x86_64.expected"
+                "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
     endif()
@@ -190,6 +199,7 @@ endforeach()
 # Struct passing checked against C: the functions of tests/abi/structs.c,
 # compiled by the C compiler of the build, take and return structs by value.
 add_library(abi_structs OBJECT abi/structs.c)
+target_compile_options(abi_structs PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
 if(APPLE)
     target_compile_options(abi_structs PRIVATE -mmacosx-version-min=11.0)
 endif()
@@ -212,6 +222,7 @@ add_test(NAME program_abi_structs
 # wchar_t on the host, as clang does. The expected output holds the values
 # of macOS, where wchar_t is a signed int.
 add_library(abi_wchar OBJECT abi/wchar.c)
+target_compile_options(abi_wchar PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
 if(APPLE)
     target_compile_options(abi_wchar PRIVATE -mmacosx-version-min=11.0)
 endif()
@@ -304,6 +315,7 @@ add_test(NAME installer_options
 
 if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
     add_library(abi_raymath OBJECT abi/raymath.c)
+    target_compile_options(abi_raymath PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
     target_include_directories(abi_raymath PRIVATE "${ANTIC_RAYLIB_DIR}/src")
     if(APPLE)
         target_compile_options(abi_raymath PRIVATE -mmacosx-version-min=11.0)
@@ -311,16 +323,11 @@ if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
     if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
         target_compile_options(abi_raymath PRIVATE -fno-sanitize=all)
     endif()
-    # DESIGN: raymath calls the maths library of the host, and two of its
-    # twenty-one values differ in the ninth digit between Apple's libm and
-    # glibc. A host whose values differ brings an expected file of its own.
+    # DESIGN: one expected file serves every target. The values that once
+    # differed between hosts came from a multiply and an add that clang
+    # fused on arm64, and the reference C fuses none now.
     set(raymath_expected
         "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected")
-    if(EXISTS
-       "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.${ANTIC_HOST_TARGET}.expected")
-        set(raymath_expected
-            "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.${ANTIC_HOST_TARGET}.expected")
-    endif()
     add_test(NAME program_abi_raymath
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
