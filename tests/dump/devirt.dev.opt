@@ -15,6 +15,9 @@ type devirt.Derived = struct { super: devirt.Base }
 type [3]ptr = array 3 of ptr
 type devirt.Speaker = struct { super: anti.rt.Object }
 type devirt.Dog = struct { super: devirt.Speaker }
+type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
+type anti.rt.SlotTable = struct { count: i64, interfaces: ptr }
+type [1]anti.rt.Slots = array 1 of anti.rt.Slots
 extern fn anti_rt_Object_type_name(ptr) -> agg str
 extern fn anti_rt_Object_to_text(ptr) -> agg str
 extern fn anti_rt_Object_equals(ptr, ptr) -> i8
@@ -61,6 +64,9 @@ global devirt.33 size 6 align 1 bytes 73 70 65 61 6b 00
 global devirt.Speaker.functions [8]anti.rt.Function { anti.rt.Function { @devirt.6, i64 9, i64 1, i64 1 }, anti.rt.Function { @devirt.7, i64 7, i64 2, i64 1 }, anti.rt.Function { @devirt.8, i64 6, i64 3, i64 2 }, anti.rt.Function { @devirt.9, i64 4, i64 4, i64 1 }, anti.rt.Function { @devirt.10, i64 9, i64 5, i64 2 }, anti.rt.Function { @devirt.11, i64 8, i64 6, i64 1 }, anti.rt.Function { @devirt.12, i64 4, i64 7, i64 2 }, anti.rt.Function { @devirt.33, i64 5, i64 8, i64 1 } }
 global devirt.Dog.ancestors [3]ptr { @anti_rt_Object_descriptor, @devirt.Speaker.descriptor, @devirt.Dog.descriptor }
 global devirt.Dog.functions [8]anti.rt.Function { anti.rt.Function { @devirt.6, i64 9, i64 1, i64 1 }, anti.rt.Function { @devirt.7, i64 7, i64 2, i64 1 }, anti.rt.Function { @devirt.8, i64 6, i64 3, i64 2 }, anti.rt.Function { @devirt.9, i64 4, i64 4, i64 1 }, anti.rt.Function { @devirt.10, i64 9, i64 5, i64 2 }, anti.rt.Function { @devirt.11, i64 8, i64 6, i64 1 }, anti.rt.Function { @devirt.12, i64 4, i64 7, i64 2 }, anti.rt.Function { @devirt.33, i64 5, i64 8, i64 1 } }
+global anti.rt.slots.0 size 2 align 1 bytes 00 01
+global anti.rt.slots.list [1]anti.rt.Slots { anti.rt.Slots { @devirt.Speaker.descriptor, i64 9, @anti.rt.slots.0 } }
+global (null).anti_rt_slots anti.rt.SlotTable { i64 1, @anti.rt.slots.list }
 fn devirt.Only.value(%0: ptr) -> i64 {
 b0:
     %1 = ptradd %0, offset_of devirt.Only.n

@@ -78,3 +78,15 @@ language or a user of the tools can observe.
 - The pass runs before the optimizer, whose folding could combine offsets.
 - A report is one line per field and worker, printed by the driver as
   `<file>: error: <message>`.
+
+## The used-slot bitmaps
+
+- The pass walks the functions that the entries reach and takes every table call there,
+  before devirtualisation. The slot of the call is set in the bitmap of every abstract
+  class at or below its static class. A call through the root sets it in all of them.
+- A bitmap has bit k of byte k / 8 for slot k, and its length is the highest slot reached,
+  plus one, which `slot_count` holds. The table itself is `anti_rt_slots`, a count and an
+  array of `anti.rt.Slots` records: descriptor, slot count, bits. Its byte globals are
+  `slots.<n>` of module `anti.rt`.
+- Nothing reads the table yet. The plugin loader will, and so will a devirtualisation that
+  must keep a call through an injectable interface indirect once plugins exist.

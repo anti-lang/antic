@@ -519,6 +519,58 @@ static void checks_singletons(void)
     close_program(&p);
 }
 
+/* The program keeps, per abstract class, the table slots that its calls
+   can reach, as a bitmap with bit k for slot k. A call through a class
+   reaches the slot in every abstract class at or below it, so a call
+   through `*Object` marks every interface. A call in a function the
+   entries never reach marks nothing. */
+static void records_slots(void)
+{
+    struct program p;
+    struct text errors = {0};
+    struct text out = {0};
+    struct text source = {0};
+    struct whole_options options;
+
+    text_append(&source, shapes);
+    text_append(&source,
+                "fn calls(s: *Shape, n: *Named, o: *Object) -> int\n"
+                "{\n"
+                "    let t = o.to_text();\n"
+                "    return s.area() + n.label() + t.len;\n"
+                "}\n"
+                "fn unused(s: *Shape) -> int\n"
+                "{\n"
+                "    return s.name();\n"
+                "}\n"
+                "fn main() -> int\n"
+                "{\n"
+                "    let t = Tile { };\n"
+                "    return calls(&t, &t, &t);\n"
+                "}\n");
+    open_program(&p);
+    compile(&p, "main", text_cstr(&source), &p.ir);
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    CHECK(whole_program(&p.ir, &options, &errors));
+    print_lines(&out, &p.ir, "global anti.rt.");
+    print_lines(&out, &p.ir, "global (null).anti_rt_slots");
+    CHECK_STR(text_cstr(&out),
+              "global anti.rt.slots.0 size 2 align 1 bytes 04 01\n"
+              "global anti.rt.slots.1 size 2 align 1 bytes 04 01\n"
+              "global anti.rt.slots.list [2]anti.rt.Slots { "
+              "anti.rt.Slots { @main.Shape.descriptor, i64 9, "
+              "@anti.rt.slots.0 }, "
+              "anti.rt.Slots { @main.Named.descriptor, i64 9, "
+              "@anti.rt.slots.1 } }\n"
+              "global (null).anti_rt_slots anti.rt.SlotTable { i64 2, "
+              "@anti.rt.slots.list }\n");
+    text_free(&errors);
+    text_free(&out);
+    text_free(&source);
+    close_program(&p);
+}
+
 void test_whole(void)
 {
     finds_entries();
@@ -526,4 +578,5 @@ void test_whole(void)
     devirtualises();
     writes_registry();
     checks_singletons();
+    records_slots();
 }

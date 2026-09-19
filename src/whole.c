@@ -199,18 +199,26 @@ static uint32_t entry_at(const struct whole *w, uint32_t table, uint32_t slot)
     return value->items[slot].global;
 }
 
-size_t whole_entries(struct whole *w, uint32_t descriptor, uint32_t slot,
-                     const uint32_t **out)
+/* The class record of a descriptor, ROOT for the root, or IR_NO_INDEX. */
+static uint32_t record_of(const struct whole *w, uint32_t descriptor)
 {
     uint32_t record = class_of(w, descriptor);
-    size_t i;
-    size_t k;
 
     if (record == IR_NO_INDEX && descriptor < w->m->global_count &&
         w->m->globals[descriptor]->module == NULL &&
         strcmp(w->m->globals[descriptor]->name, root_descriptor) == 0) {
         record = ROOT;
     }
+    return record;
+}
+
+size_t whole_entries(struct whole *w, uint32_t descriptor, uint32_t slot,
+                     const uint32_t **out)
+{
+    uint32_t record = record_of(w, descriptor);
+    size_t i;
+    size_t k;
+
     free(w->entries);
     w->entries = allocate(w->table_count, sizeof *w->entries);
     w->entry_count = 0;
@@ -695,6 +703,144 @@ static bool check_singletons(struct whole *w, const struct ir_module *m,
     return ok;
 }
 
+/* The slots of one abstract class that the calls of the program reach,
+   bit k of byte k / 8 for slot k. */
+struct slots {
+    uint8_t *bits;
+    uint32_t count;                 /* the highest slot reached, plus one */
+};
+
+static void mark_slot(struct slots *s, uint32_t slot)
+{
+    if (slot >= s->count) {
+        uint32_t bytes = slot / 8 + 1;
+        uint8_t *grown = realloc(s->bits, bytes);
+        if (grown == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        memset(grown + (s->count + 7) / 8, 0, bytes - (s->count + 7) / 8);
+        s->bits = grown;
+        s->count = slot + 1;
+    }
+    s->bits[slot / 8] = (uint8_t)(s->bits[slot / 8] | (1u << (slot % 8)));
+}
+
+/* Whether the class record lies at or below the class above. */
+static bool at_or_below(const struct whole *w, uint32_t record, uint32_t above)
+{
+    uint32_t up;
+    size_t depth = 0;
+
+    if (above == ROOT) {
+        return true;
+    }
+    for (up = record; up != IR_NO_INDEX && depth <= w->m->class_count;
+         up = class_of(w, w->m->classes[up]->base)) {
+        if (up == above) {
+            return true;
+        }
+        depth++;
+    }
+    return false;
+}
+
+/* DESIGN: a plugin that provides an interface must fill every slot the
+   program can call through it. The program therefore carries the slots
+   its calls reach, per abstract class. A call at a slot through a class
+   reaches that slot in every abstract class at or below the class. A
+   pointer to one converts to a pointer to the other at the same address.
+   The pass counts the calls of the functions that the entries reach,
+   before devirtualisation makes any of them direct. Every abstract class
+   stands for an injectable interface until `inject` exists. The table
+   `anti_rt_slots` lists each abstract class with a slot reached, and a
+   program with none has no table. A library for C has none, because its
+   host program carries it. */
+static void write_slots(struct whole *w, struct ir_module *m,
+                        const struct reach *r)
+{
+    static const char *const slot_names[] = {"descriptor", "slot_count",
+                                             "bits"};
+    static const enum ir_type slot_types[] = {IR_PTR, IR_I64, IR_PTR};
+    static const char *const table_names[] = {"count", "interfaces"};
+    static const enum ir_type table_types[] = {IR_I64, IR_PTR};
+    size_t classes = m->class_count;
+    struct slots *slots = allocate(classes, sizeof *slots);
+    size_t emitted = 0;
+    size_t i;
+    size_t b;
+    size_t k;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (!r->functions[i]) {
+            continue;
+        }
+        for (b = 0; b < f->block_count; b++) {
+            for (k = 0; k < f->blocks[b]->count; k++) {
+                const struct ir_inst *inst = &f->blocks[b]->insts[k];
+                uint32_t above;
+                size_t c;
+                if (inst->op != IR_CALL || inst->c.kind != IR_GLOBAL) {
+                    continue;
+                }
+                above = record_of(w, inst->c.as.index);
+                for (c = 0; above != IR_NO_INDEX && c < classes; c++) {
+                    if ((m->classes[c]->flags & IR_CLASS_ABSTRACT) != 0 &&
+                        at_or_below(w, (uint32_t)c, above)) {
+                        mark_slot(&slots[c], inst->field);
+                    }
+                }
+            }
+        }
+    }
+    for (i = 0; i < classes; i++) {
+        emitted += slots[i].count > 0 ? 1 : 0;
+    }
+    if (emitted > 0) {
+        uint32_t slot_agg = struct_agg(m, "anti.rt.Slots", slot_names,
+                                       slot_types, 3);
+        uint32_t table_agg = struct_agg(m, "anti.rt.SlotTable", table_names,
+                                        table_types, 2);
+        char name[48];
+        struct ir_const *list;
+        struct ir_const *value;
+        struct ir_global *g;
+        size_t n = 0;
+        snprintf(name, sizeof name, "[%zu]anti.rt.Slots", emitted);
+        list = ir_const_agg(m, ir_aggregate(ir_array_add(
+                                   m, name, ir_aggregate(slot_agg),
+                                   ir_sym_int(m, IR_I64, emitted), NULL)),
+                            emitted);
+        for (i = 0; i < classes; i++) {
+            struct ir_const *item;
+            uint32_t bits;
+            if (slots[i].count == 0) {
+                continue;
+            }
+            snprintf(name, sizeof name, "slots.%zu", n);
+            bits = ir_global_add(m, "anti.rt", name, slots[i].bits,
+                                 (slots[i].count + 7) / 8, 1)->index;
+            item = ir_const_agg(m, ir_aggregate(slot_agg), 3);
+            const_addr(&item->items[0], m->classes[i]->descriptor);
+            const_int(&item->items[1], IR_I64, slots[i].count);
+            const_addr(&item->items[2], bits);
+            list->items[n++] = *item;
+        }
+        value = ir_const_agg(m, ir_aggregate(table_agg), 2);
+        const_int(&value->items[0], IR_I64, emitted);
+        const_addr(&value->items[1],
+                   ir_global_add_value(m, "anti.rt", "slots.list",
+                                       list)->index);
+        g = ir_global_add_value(m, NULL, "anti_rt_slots", value);
+        g->exported = true;
+    }
+    for (i = 0; i < classes; i++) {
+        free(slots[i].bits);
+    }
+    free(slots);
+}
+
 bool whole_program(struct ir_module *program,
                    const struct whole_options *options, struct text *errors)
 {
@@ -709,6 +855,9 @@ bool whole_program(struct ir_module *program,
         write_registry(program, options->reflect);
     } else if (options->bundled) {
         write_registry(program, false);
+    }
+    if (!options->library) {
+        write_slots(w, program, &reach);
     }
     reach_free(&reach);
     if (options->release) {
