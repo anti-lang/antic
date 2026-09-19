@@ -131,6 +131,17 @@ add_test(NAME program_deserialize_dev
         "-DOPTIONS=--dev"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+# Ownership without a field list: delete, destroy and dup call the
+# teardown and the copy that the compiler writes for each class.
+add_test(NAME program_delete_owned_no_reflect
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/delete_owned.anti"
+        "-DOPTIONS=--no-reflect"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 
 # The pinned raylib source, which tools/get-raylib.cmake downloads. The
 # directory is named here, before the first test that reads it.
@@ -742,6 +753,21 @@ foreach(mode release dev)
             "-DPROGRAM=chain"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/chain-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+    # Ownership over two modules: the teardown and the copy of a class
+    # call those of the base, the inline field and the elements that
+    # another module declares
+    add_test(NAME owned_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/owned"
+            "-DLIBRARIES=parts"
+            "-DSTD="
+            "-DPROGRAM=crate"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/owned-${mode}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 

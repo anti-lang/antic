@@ -105,8 +105,8 @@ struct anti_function {
 };
 
 /* The record at entry 0 of the table of a class. The destruct entry is the
-   body the class declares, not the one it inherits, because delete runs
-   one body per level of the chain. */
+   body the class declares, not the one it inherits. The teardown that the
+   compiler writes for a class calls the body of each level. */
 struct anti_descriptor {
     const unsigned char *name;
     int64_t name_length;
@@ -127,7 +127,9 @@ struct anti_descriptor {
 
 /* DESIGN: the seven functions of the root take the entries after the
    descriptor, in this order, in the table of every class. The order is
-   root_names in src/lower.c, and a unit test pins the two together. */
+   root_names in src/lower.c, and a unit test pins the two together. The
+   destruct entry of a class holds the teardown the compiler writes for
+   it. The copy entry holds its copy unless the chain declares one. */
 enum anti_entry {
     ANTI_ENTRY_DESCRIPTOR,
     ANTI_ENTRY_TYPE_NAME,
@@ -163,6 +165,20 @@ void anti_rt_delete(void *object, const struct anti_descriptor *type);
 /* The same without the final free, for an object that is not on the
    heap of its own. */
 void anti_rt_destroy(void *object, const struct anti_descriptor *type);
+
+/* The teardown of each of count class values of the type in a row, first
+   to last, as an `own` slice of them holds. */
+void anti_rt_destroy_elements(void *elements, int64_t count,
+                              const struct anti_descriptor *type);
+
+/* The copy of each of count class values of the type from one row into
+   another. */
+void anti_rt_copy_elements(void *from, void *into, int64_t count,
+                           const struct anti_descriptor *type);
+
+/* A new buffer on the heap with the bytes at from, or NULL when there are
+   none. */
+void *anti_rt_copy_buffer(const void *from, int64_t bytes);
 
 /* The descriptor of the root and its one ancestor, which every module
    of a program shares. */

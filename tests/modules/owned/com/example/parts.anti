@@ -1,0 +1,43 @@
+//! Classes that own memory, which the test `owned_modules` holds and
+//! extends in a program. Each prints when it is destroyed.
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+pub class Leaf
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("leaf out %d\n".ptr, self.n as c_int);
+	}
+}
+
+pub class Part
+{
+	pub n: int = 0,
+	pub own leaf: *Leaf = null,
+
+	fn destruct(self)
+	{
+		printf("part out %d\n".ptr, self.n as c_int);
+	}
+}
+
+/// A base whose private `own` field only its own module names.
+pub class Box
+{
+	pub n: int = 0,
+	own leaf: *Leaf = null,
+
+	fn destruct(self)
+	{
+		printf("box out %d\n".ptr, self.n as c_int);
+	}
+
+	/// Give the box a leaf numbered n.
+	pub fn fill(self, n: int)
+	{
+		self.leaf = alloc Leaf { n: n };
+	}
+}

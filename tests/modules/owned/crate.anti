@@ -1,0 +1,39 @@
+//! A class whose base, inline field and `own` slice come from
+//! `com.example.parts`. Its teardown and its copy, which the compiler
+//! writes in this module, reach the ones that module writes, in release
+//! mode and in dev mode.
+
+import com.example.parts;
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+class Crate
+{
+	inherits parts.Box,
+	pub part: parts.Part = parts.Part { n: 0 },
+	pub own list: []parts.Part,
+
+	fn destruct(self)
+	{
+		printf("crate out %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn main() -> int
+{
+	let c = alloc Crate {
+		n: 1,
+		part: parts.Part { n: 2, leaf: alloc parts.Leaf { n: 3 } },
+		list: []parts.Part { ptr: alloc(parts.Part, 1), len: 1 },
+	};
+	c.list[0] = parts.Part { n: 4, leaf: alloc parts.Leaf { n: 5 } };
+	c.fill(6);
+	let d = dup(c);
+	d.part.leaf.n = 30;
+	d.list[0].leaf.n = 50;
+	printf("%d %d\n".ptr, (d.part.leaf != c.part.leaf) as c_int,
+		(d.list[0].leaf != c.list[0].leaf) as c_int);
+	delete(d);
+	delete(c);
+	return 0;
+}

@@ -1971,6 +1971,70 @@ static bool has_body(const struct item *fn)
             fn->contract != FN_ABSTRACT);
 }
 
+/* DESIGN: the compiler writes a teardown and a copy for every complete
+   class, `Class.destroy` and `Class.copy` in the module that declares it.
+   They fill the destruct and the copy entries of its table, and delete,
+   destroy and dup reach them through it. Ownership therefore never reads
+   the field list, which --no-reflect drops. A chain that declares `copy`
+   keeps that function in the entry, and no copy is written. */
+static struct ir_function *class_function(struct lowerer *l,
+                                          const struct type *t,
+                                          const char *part)
+{
+    char *module = cstr(&t->module);
+    struct ir_function *f;
+    char name[160];
+
+    snprintf(name, sizeof name, "%.*s.%s", (int)t->name.length, t->name.text,
+             part);
+    f = find_function(l->m, module, name);
+    if (f == NULL) {
+        f = strcmp(module, l->module_name) == 0
+                ? ir_function_add(l->m, l->module_name, name, IR_VOID,
+                                  IR_NO_AGG)
+                : ir_declare_add(l->m, module, name, IR_VOID, IR_NO_AGG);
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+        if (strcmp(part, "copy") == 0) {
+            ir_param_add(f, IR_PTR, IR_NO_AGG);
+        }
+    }
+    free(module);
+    return f;
+}
+
+/* The function name that level t of a chain declares with a body, or
+   NULL. */
+static const struct item *level_fn(const struct type *t,
+                                   const struct name *name)
+{
+    size_t i;
+
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind == ITEM_FN && m->runtime == NULL && has_body(m) &&
+            m->name.length == name->length &&
+            memcmp(m->name.text, name->text, name->length) == 0) {
+            return m;
+        }
+    }
+    return NULL;
+}
+
+static const struct name copy_name = {"copy", 4};
+
+/* The `copy` the chain of t declares nearest to t, or NULL when it keeps
+   the one of the root and the compiler writes it. */
+static const struct item *declared_copy(const struct type *t)
+{
+    const struct item *m = NULL;
+
+    for (; t != NULL && t->kind == TYPE_CLASS && t->base != NULL && m == NULL;
+         t = t->base) {
+        m = level_fn(t, &copy_name);
+    }
+    return m;
+}
+
 /* The global that holds the table of t, built once per class. */
 static struct ir_global *class_table(struct lowerer *l, const struct type *t)
 {
@@ -1995,9 +2059,20 @@ static struct ir_global *class_table(struct lowerer *l, const struct type *t)
     value->items[0].scalar = IR_PTR;
     value->items[0].global = class_descriptor(l, t)->index;
     for (i = 0; i < table.count; i++) {
+        static const struct name destruct_name = {"destruct", 8};
         const struct item *fn = table.entries[i].fn;
+        const struct ir_function *written =
+            same_name(&table.entries[i].name, &destruct_name)
+                ? class_function(l, t, "destroy")
+            : same_name(&table.entries[i].name, &copy_name) &&
+                    declared_copy(t) == NULL
+                ? class_function(l, t, "copy")
+                : NULL;
         value->items[i + 1].scalar = IR_PTR;
-        if (fn != NULL && fn->symbol != NULL && has_body(fn)) {
+        if (written != NULL) {
+            value->items[i + 1].kind = IR_CONST_FUNC;
+            value->items[i + 1].global = written->index;
+        } else if (fn != NULL && fn->symbol != NULL && has_body(fn)) {
             value->items[i + 1].kind = IR_CONST_FUNC;
             value->items[i + 1].global =
                 callee_function(l, fn->symbol)->index;
@@ -5031,6 +5106,215 @@ static void class_init(struct lowerer *l, const struct item *it)
     ir_ret(l->f, l->b, IR_VOID, none());
 }
 
+/* Branch to a new block when the class value at p has a table, and give
+   the block after it, where both paths meet. A class value held inline
+   has a zero table when its field had no default. It was never made and
+   holds nothing. */
+static struct ir_block *when_made(struct lowerer *l, struct ir_operand p)
+{
+    struct ir_block *made = new_block(l);
+    struct ir_block *after = new_block(l);
+    struct ir_operand table = temp(l, ir_load(l->f, l->b, IR_PTR, p));
+
+    ir_branch(l->f, l->b,
+              temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, table,
+                                ir_int_op(IR_PTR, 0))),
+              made, after);
+    l->b = made;
+    return after;
+}
+
+/* A call of the runtime function name with the count arguments of the
+   types in params. It gives the result when there is one. */
+static struct ir_operand rt_call(struct lowerer *l, const char *name,
+                                 enum ir_type result,
+                                 const enum ir_type *params,
+                                 struct ir_operand *args, size_t count)
+{
+    struct ir_function *f = rt_function_giving(l, name, result, params, count);
+    uint32_t call = ir_call(l->f, l->b, result, ir_func_op(f), args, count);
+
+    return result == IR_VOID ? none() : temp(l, call);
+}
+
+/* The count of elements of the `own` slice whose field is at p. */
+static struct ir_operand slice_length(struct lowerer *l, struct ir_operand p,
+                                      const struct type *slice)
+{
+    return temp(l, ir_load(l->f, l->b, IR_I64,
+                           offset_address(l, p,
+                                          field_offset(l, slice, &len_name))));
+}
+
+/* The teardown of the field f of level up, in the object at self. */
+static void teardown_field(struct lowerer *l, const struct type *up,
+                           const struct struct_field *f,
+                           struct ir_operand self)
+{
+    static const enum ir_type three[] = {IR_PTR, IR_I64, IR_PTR};
+    const struct type *element = f->type->element;
+    struct ir_operand at;
+    struct ir_operand v;
+
+    if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
+        return;
+    }
+    if (!f->owned && !(f->type->kind == TYPE_CLASS &&
+                       type_needs_destruct(f->type))) {
+        return;
+    }
+    at = offset_address(l, self, field_offset(l, up, &f->name));
+    if (!f->owned) {
+        struct ir_block *after = when_made(l, at);
+        struct ir_operand arg = at;
+        ir_call(l->f, l->b, IR_VOID,
+                ir_func_op(class_function(l, f->type, "destroy")), &arg, 1);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+        return;
+    }
+    v = temp(l, ir_load(l->f, l->b, IR_PTR, at));
+    if (f->type->kind == TYPE_POINTER && element->kind == TYPE_CLASS) {
+        object_call(l, "anti_rt_delete", v, element);
+    } else {
+        if (f->type->kind == TYPE_SLICE && element->kind == TYPE_CLASS) {
+            struct ir_operand args[3];
+            args[0] = v;
+            args[1] = slice_length(l, at, f->type);
+            args[2] = static_descriptor(l, element);
+            rt_call(l, "anti_rt_destroy_elements", IR_VOID, three, args, 3);
+        }
+        ir_call(l->f, l->b, IR_VOID,
+                ir_func_op(c_function(l, "free", IR_VOID, IR_PTR)), &v, 1);
+    }
+    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
+}
+
+/* DESIGN: the teardown runs the destruct body of every level, concrete
+   first. It then destroys what each level owns, so a body still reads
+   what it owns. An object behind an `own` pointer is deleted, and each
+   element of an `own` slice of class values is destroyed before the
+   buffer is freed. A class value held inline runs its own teardown. */
+static void class_teardown(struct lowerer *l, const struct type *t)
+{
+    static const struct name destruct_name = {"destruct", 8};
+    struct ir_function *f = class_function(l, t, "destroy");
+    const struct type *up;
+    struct ir_operand self;
+    size_t i;
+
+    l->f = f;
+    l->b = ir_block_add(f);
+    self = temp(l, f->params[0].temp);
+    for (up = t; up->base != NULL; up = up->base) {
+        const struct item *m = level_fn(up, &destruct_name);
+        if (m != NULL) {
+            struct ir_operand arg = self;
+            ir_call(l->f, l->b, IR_VOID,
+                    ir_func_op(callee_function(l, m->symbol)), &arg, 1);
+        }
+    }
+    for (up = t; up->base != NULL; up = up->base) {
+        for (i = 0; i < up->field_count; i++) {
+            teardown_field(l, up, &up->fields[i], self);
+        }
+    }
+    ir_ret(l->f, l->b, IR_VOID, none());
+}
+
+/* The copy of the class value t, the one its chain declares or the one
+   the compiler writes. */
+static struct ir_function *copy_of(struct lowerer *l, const struct type *t)
+{
+    const struct item *m = declared_copy(t);
+
+    return m != NULL ? callee_function(l, m->symbol)
+                     : class_function(l, t, "copy");
+}
+
+/* The copy of the field f of level up, from the object at self into the
+   one at to, whose bytes are already the same. */
+static void copy_field(struct lowerer *l, const struct type *up,
+                       const struct struct_field *f, struct ir_operand self,
+                       struct ir_operand to)
+{
+    static const enum ir_type two[] = {IR_PTR, IR_I64};
+    static const enum ir_type four[] = {IR_PTR, IR_PTR, IR_I64, IR_PTR};
+    const struct type *element = f->type->element;
+    struct ir_operand offset;
+    struct ir_operand from;
+    struct ir_operand into;
+    struct ir_operand v;
+    struct ir_operand made;
+    struct ir_operand args[4];
+
+    if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
+        return;
+    }
+    if (!f->owned && f->type->kind != TYPE_CLASS) {
+        return;
+    }
+    offset = field_offset(l, up, &f->name);
+    from = offset_address(l, self, offset);
+    into = offset_address(l, to, offset);
+    if (!f->owned) {
+        struct ir_block *after = when_made(l, from);
+        args[0] = from;
+        args[1] = into;
+        ir_call(l->f, l->b, IR_VOID, ir_func_op(copy_of(l, f->type)), args,
+                2);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+        return;
+    }
+    v = temp(l, ir_load(l->f, l->b, IR_PTR, from));
+    if (f->type->kind == TYPE_POINTER && element->kind == TYPE_CLASS) {
+        made = object_call(l, "anti_rt_dup", v, element);
+    } else {
+        struct ir_operand count =
+            f->type->kind == TYPE_SLICE ? slice_length(l, from, f->type)
+                                        : ir_int_op(IR_I64, 1);
+        args[0] = v;
+        args[1] = temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64, count,
+                                    size_operand(l, element)));
+        made = rt_call(l, "anti_rt_copy_buffer", IR_PTR, two, args, 2);
+        if (f->type->kind == TYPE_SLICE && element->kind == TYPE_CLASS) {
+            args[0] = v;
+            args[1] = made;
+            args[2] = count;
+            args[3] = static_descriptor(l, element);
+            rt_call(l, "anti_rt_copy_elements", IR_VOID, four, args, 4);
+        }
+    }
+    ir_store(l->f, l->b, IR_PTR, made, into);
+}
+
+/* DESIGN: the copy starts from every byte of the object. It then gives
+   each `own` field fresh memory with a copy of its contents. The object
+   behind a pointer is copied, and so is each element of a slice of class
+   values. A class value held inline copies itself with its own copy.
+   Other pointers keep the address. */
+static void class_copy(struct lowerer *l, const struct type *t)
+{
+    struct ir_function *f = class_function(l, t, "copy");
+    const struct type *up;
+    struct ir_operand self;
+    struct ir_operand to;
+    size_t i;
+
+    l->f = f;
+    l->b = ir_block_add(f);
+    self = temp(l, f->params[0].temp);
+    to = temp(l, f->params[1].temp);
+    ir_memcopy(l->f, l->b, to, self, vtype_of(l, t));
+    for (up = t; up->base != NULL; up = up->base) {
+        for (i = 0; i < up->field_count; i++) {
+            copy_field(l, up, &up->fields[i], self, to);
+        }
+    }
+    ir_ret(l->f, l->b, IR_VOID, none());
+}
+
 /* Whether the class declares a `construct` that takes arguments. */
 static bool constructs_with_arguments(const struct type *t)
 {
@@ -5147,6 +5431,10 @@ bool lower_module(struct module *module, const char *module_name,
             }
             if (it->exported || !it->is_singleton) {
                 class_init(&l, it);
+            }
+            class_teardown(&l, t);
+            if (declared_copy(t) == NULL) {
+                class_copy(&l, t);
             }
         }
     }

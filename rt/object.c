@@ -484,42 +484,11 @@ void anti_rt_Object_serialize(struct anti_object *self, void *out)
     serialize_into(out, self, anti_rt_descriptor(self));
 }
 
-/* The root frees nothing. delete destroys what each class of the chain
-   owns and then frees the object itself. */
+/* The root frees nothing. The teardown the compiler writes for a class
+   runs each destruct body of its chain and destroys what it owns. */
 void anti_rt_Object_destruct(struct anti_object *self)
 {
     (void)self;
-}
-
-/* The address of the memory an `own` field points at, and its size in
-   bytes. A pointer owns one element of its type, and a slice its length
-   in elements. */
-static void **owned_at(void *object, const struct anti_field *f,
-                       int64_t *size)
-{
-    void **slot = (void **)((char *)object + f->offset);
-    int64_t count = 1;
-
-    if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE) {
-        memcpy(&count, (char *)slot + sizeof(void *), sizeof count);
-    }
-    *size = count * (int64_t)anti_rt_element_size(f->type, f->descriptor);
-    return slot;
-}
-
-/* The class value a field holds inside the object, or NULL. The
-   sub-object of an interface is a field of class type too. It is part of
-   the object and not a value of its own. Its table records its distance
-   from the object, and that of a value is zero. */
-static void *inline_object(void *object, const struct anti_field *f)
-{
-    void *at = (char *)object + f->offset;
-
-    if (ANTI_TYPE_OF(f->type) != ANTI_TYPE_CLASS ||
-        anti_rt_object_of(at) != at) {
-        return NULL;
-    }
-    return at;
 }
 
 /* The entry of a table, which the compiler fills with the function the
@@ -531,187 +500,99 @@ static void *table_entry(const void *object, enum anti_entry entry)
     return o == NULL || o->table == NULL ? NULL : (void *)o->table[entry];
 }
 
-/* Copy each class value of an `own` slice with its own copy entry, over
-   the bytes already copied. The elements are values of the field's
-   class, so each one takes the size of that class. */
-static void copy_elements(char *from, char *into, int64_t size,
-                          const struct anti_descriptor *d)
-{
-    int64_t at;
-
-    for (at = 0; d != NULL && d->size > 0 && at < size; at += d->size) {
-        void (*copy)(struct anti_object *, struct anti_object *) =
-            (void (*)(struct anti_object *, struct anti_object *))
-                table_entry(checked_object(from + at, d), ANTI_ENTRY_COPY);
-        if (copy != NULL) {
-            copy((struct anti_object *)(from + at),
-                 (struct anti_object *)(into + at));
-        }
-    }
-}
-
-/* A copy of every byte of the object, then a fresh copy of the memory
-   behind each `own` field of the chain. An object behind an `own`
-   pointer is copied by its own copy entry, at the size of its own class.
-   Its `own` fields are then copied too. A class value held inline, and
-   each element of an `own` slice of class values, copies what it owns by
-   its own copy entry, into its place in the copy. */
+/* The bytes of the object. The copy the compiler writes for a class
+   replaces this body in its table and copies what the object owns. */
 void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
-    int64_t i;
 
-    if (d == NULL) {
-        return;
-    }
-    memcpy(to, self, (size_t)d->size);
-    for (; d != NULL; d = d->parent) {
-        for (i = 0; i < d->field_count; i++) {
-            const struct anti_field *f = &d->fields[i];
-            int64_t size = 0;
-            void **from;
-            void **into;
-            void *value = inline_object(self, f);
-            if (value != NULL) {
-                void (*copy)(struct anti_object *, struct anti_object *) =
-                    (void (*)(struct anti_object *, struct anti_object *))
-                        table_entry(value, ANTI_ENTRY_COPY);
-                if (copy != NULL) {
-                    copy(value, (struct anti_object *)((char *)to +
-                                                       f->offset));
-                }
-                continue;
-            }
-            if (!f->owned) {
-                continue;
-            }
-            from = owned_at(self, f, &size);
-            into = owned_at(to, f, &size);
-            if (*from == NULL) {
-                continue;
-            }
-            if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_PTR &&
-                ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
-                /* A pointer to an interface points into its object, and
-                   the copy keeps the same place in the new one. */
-                size_t inside = (size_t)((char *)*from -
-                                         (char *)anti_rt_object_of(*from));
-                char *made = anti_rt_dup(*from, f->descriptor);
-                *into = made == NULL ? NULL : made + inside;
-                continue;
-            }
-            if (size <= 0) {
-                continue;
-            }
-            *into = malloc((size_t)size);
-            if (*into != NULL) {
-                memcpy(*into, *from, (size_t)size);
-                if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE &&
-                    ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
-                    copy_elements(*from, *into, size, f->descriptor);
-                }
-            }
-        }
+    if (d != NULL) {
+        memcpy(to, self, (size_t)d->size);
     }
 }
 
+/* DESIGN: delete, destroy and dup call the teardown and the copy that
+   the compiler writes for every class. The destruct and copy entries of
+   the table hold them. Ownership therefore never depends on the field
+   list, which --no-reflect drops. A copy keeps the place a pointer to an
+   interface points at, in the new object. */
 void *anti_rt_dup(void *object, const struct anti_descriptor *type)
 {
-    const struct anti_descriptor *d;
-
-    object = checked_object(object, type);
-    d = anti_rt_descriptor(object);
+    char *start = checked_object(object, type);
+    const struct anti_descriptor *d = anti_rt_descriptor(start);
     void (*copy)(struct anti_object *, struct anti_object *) =
         (void (*)(struct anti_object *, struct anti_object *))
-            table_entry(object, ANTI_ENTRY_COPY);
-    void *made;
+            table_entry(start, ANTI_ENTRY_COPY);
+    char *made;
 
     if (d == NULL || copy == NULL) {
         return NULL;
     }
     made = malloc((size_t)d->size);
-    if (made != NULL) {
-        copy(object, made);
+    if (made == NULL) {
+        return NULL;
     }
-    return made;
-}
-
-/* DESIGN: the destruct body of the concrete class runs first and the root's
-   last. A class therefore tears down what it added before its base does.
-   What each level owns is destroyed after every body has run, so a body
-   still reads what it owns. An object behind an `own` pointer is deleted,
-   which runs its whole chain and destroys what it owns in turn, then
-   frees it. A class value held inline runs its chain in place, and so
-   does each element of an `own` slice of class values before the buffer
-   is freed. Any other `own` field is a buffer and is freed. */
-/* Run the chain of each class value of an `own` slice in place. */
-static void destroy_elements(char *elements, int64_t size,
-                             const struct anti_descriptor *d)
-{
-    int64_t at;
-
-    for (at = 0; d != NULL && d->size > 0 && at < size; at += d->size) {
-        anti_rt_destroy(elements + at, d);
-    }
-}
-
-/* The teardown of an object whose table is known to be set, or of a
-   class value held inline. A literal leaves that value zero when its
-   field has no default. It was never made and holds nothing. */
-static void destroy_object(void *object)
-{
-    const struct anti_descriptor *d = anti_rt_descriptor(object);
-    const struct anti_descriptor *level;
-    int64_t i;
-
-    if (d == NULL) {
-        return;
-    }
-    for (level = d; level != NULL; level = level->parent) {
-        if (level->destruct != NULL) {
-            level->destruct(object);
-        }
-    }
-    for (level = d; level != NULL; level = level->parent) {
-        for (i = 0; i < level->field_count; i++) {
-            const struct anti_field *f = &level->fields[i];
-            int64_t size = 0;
-            void **slot;
-            void *value = inline_object(object, f);
-            if (value != NULL) {
-                destroy_object(value);
-                continue;
-            }
-            if (!f->owned) {
-                continue;
-            }
-            slot = owned_at(object, f, &size);
-            /* delete starts at the object that a pointer to an interface
-               points into. */
-            if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_PTR &&
-                ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
-                anti_rt_delete(*slot, f->descriptor);
-            } else {
-                if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE &&
-                    ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS &&
-                    *slot != NULL) {
-                    destroy_elements(*slot, size, f->descriptor);
-                }
-                free(*slot);
-            }
-            *slot = NULL;
-        }
-    }
+    copy((struct anti_object *)start, (struct anti_object *)made);
+    return made + ((char *)object - start);
 }
 
 void anti_rt_destroy(void *object, const struct anti_descriptor *type)
 {
-    destroy_object(checked_object(object, type));
+    void *start = checked_object(object, type);
+    void (*teardown)(struct anti_object *) =
+        (void (*)(struct anti_object *))table_entry(start, ANTI_ENTRY_DROP);
+
+    if (teardown != NULL) {
+        teardown(start);
+    }
 }
 
 void anti_rt_delete(void *object, const struct anti_descriptor *type)
 {
-    object = checked_object(object, type);
-    destroy_object(object);
-    free(object);
+    void *start = checked_object(object, type);
+
+    anti_rt_destroy(start, type);
+    free(start);
+}
+
+void anti_rt_destroy_elements(void *elements, int64_t count,
+                              const struct anti_descriptor *type)
+{
+    int64_t i;
+
+    for (i = 0; elements != NULL && type != NULL && i < count; i++) {
+        anti_rt_destroy((char *)elements + i * type->size, type);
+    }
+}
+
+void anti_rt_copy_elements(void *from, void *into, int64_t count,
+                           const struct anti_descriptor *type)
+{
+    int64_t i;
+
+    for (i = 0; from != NULL && into != NULL && type != NULL && i < count;
+         i++) {
+        char *at = checked_object((char *)from + i * type->size, type);
+        void (*copy)(struct anti_object *, struct anti_object *) =
+            (void (*)(struct anti_object *, struct anti_object *))
+                table_entry(at, ANTI_ENTRY_COPY);
+        if (copy != NULL) {
+            copy((struct anti_object *)at,
+                 (struct anti_object *)((char *)into + i * type->size));
+        }
+    }
+}
+
+void *anti_rt_copy_buffer(const void *from, int64_t bytes)
+{
+    void *made;
+
+    if (from == NULL || bytes <= 0) {
+        return NULL;
+    }
+    made = malloc((size_t)bytes);
+    if (made != NULL) {
+        memcpy(made, from, (size_t)bytes);
+    }
+    return made;
 }
