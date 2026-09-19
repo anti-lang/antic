@@ -53,6 +53,11 @@ without asking Eddie.
   disabled or narrowed because it is provisional. Provisional entries are
   reviewed by Eddie in batches, and a review either removes the tag or changes
   the entry. No other action follows from the tag.
+- Never two calls that emit code or have side effects in one argument list.
+  Bind each to a local first. C leaves the order of the arguments unspecified.
+  antic built by clang for Windows emitted another program when a call in
+  lower.c passed two of them. The test `emit_identity` compares the output with
+  the Mac's.
 - Every session ends with a report in `docs/reports/<date>-<subject>.md`.
 
 ## Building

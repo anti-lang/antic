@@ -454,6 +454,16 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
     endforeach()
 endforeach()
 
+# antic writes the same assembly for every test program on every host.
+add_test(NAME emit_identity
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DPROGRAMS=${CMAKE_CURRENT_SOURCE_DIR}/programs"
+        "-DMANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/emit-identity/programs.sha256"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/emit-identity"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_emit_identity.cmake")
+
 # One object links to the same bytes for macos-arm64 on every host.
 add_test(NAME link_identity_macos-arm64
     COMMAND "${CMAKE_COMMAND}"
