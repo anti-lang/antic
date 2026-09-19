@@ -48,8 +48,10 @@ committed.
 - My first commit of the context rules also took two renames that `git mv` had staged.
   It was undone before any push and committed again alone.
 
-## Questions
+## The C side
 
-- `run_probe` and `run_clib` still read through `OUTPUT_VARIABLE`. They compare the output
-  of C programs, whose stdout stays in text mode on Windows. Do they follow the rule too,
-  with binary mode in each C file?
+A probe that compares a C program with an Anti program compared two conventions on
+Windows. Every C and C++ test file now includes `tests/binary_stdio.h`, which puts stdout
+and stderr into binary mode there. `run_probe.cmake` and `run_clib.cmake` read their
+programs through `OUTPUT_FILE`. `raw_output` runs `tests/raw/raw_bytes.c` and checks that
+every C test file includes the header. Commit `a49c667`.
