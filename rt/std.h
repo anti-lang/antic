@@ -26,6 +26,10 @@ void anti_rt_assert_failed(const unsigned char *text, int64_t length);
    is not a C string, so its length comes with it. */
 void anti_rt_cast_failed(const unsigned char *name, int64_t length);
 
+/* Print the name of the class an object with a zero table was taken for
+   and abort. */
+void anti_rt_table_unset(const unsigned char *name, int64_t length);
+
 /* The str of a NUL-terminated C string, without the NUL. */
 struct anti_text anti_rt_text_from_c(const unsigned char *bytes);
 struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len);

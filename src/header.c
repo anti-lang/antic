@@ -427,19 +427,23 @@ static void class_view(struct text *out, const struct symbol *sym)
     }
     text_appendf(out,
                  "static inline void anti_%.*s_delete(%.*s *self)\n"
-                 "{\n    anti_rt_delete(self);\n}\n"
+                 "{\n    anti_rt_delete(self, &anti_%.*s_descriptor);\n}\n"
                  "static inline void anti_%.*s_destroy(%.*s *self)\n"
-                 "{\n    anti_rt_destroy(self);\n}\n"
+                 "{\n    anti_rt_destroy(self, &anti_%.*s_descriptor);\n}\n"
                  "static inline %.*s *anti_%.*s_dup(%.*s *self)\n"
-                 "{\n    return (%.*s *)anti_rt_dup(self);\n}\n\n",
+                 "{\n    return (%.*s *)anti_rt_dup(self, "
+                 "&anti_%.*s_descriptor);\n}\n\n",
+                 name_length, name_text, name_length, name_text,
+                 name_length, name_text,
+                 name_length, name_text, name_length, name_text,
+                 name_length, name_text,
                  name_length, name_text, name_length, name_text,
                  name_length, name_text, name_length, name_text,
-                 name_length, name_text, name_length, name_text,
-                 name_length, name_text, name_length, name_text);
+                 name_length, name_text);
 
     /* DESIGN: an interface sub-object is a field of the object, so C
        reaches the interface by taking its address. The table of that
-       sub-object belongs to this class and holds thunks. */
+       sub-object belongs to the class t and holds thunks. */
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *f = &up->fields[i];
@@ -637,9 +641,12 @@ void header_write(struct text *out, const char *name,
                     "} anti_Object;\n\n"
                     "/* Run the destruct chain of the object, free what it owns "
                     "and free it. */\n"
-                    "void anti_rt_delete(void *object);\n"
-                    "void anti_rt_destroy(void *object);\n"
-                    "void *anti_rt_dup(void *object);\n\n");
+                    "void anti_rt_delete(void *object, "
+                    "const anti_descriptor *type);\n"
+                    "void anti_rt_destroy(void *object, "
+                    "const anti_descriptor *type);\n"
+                    "void *anti_rt_dup(void *object, "
+                    "const anti_descriptor *type);\n\n");
                 i = count;
                 break;
             }

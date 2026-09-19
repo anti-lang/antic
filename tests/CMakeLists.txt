@@ -861,6 +861,16 @@ if(ANTIC_LLVM_MC AND ANTIC_STRINGS)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asserts.cmake")
 endif()
 
+# A zero table traps with the name of the class.
+add_test(NAME table_unset
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/table.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_table.cmake")
+
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)
     add_test(NAME abi_probe

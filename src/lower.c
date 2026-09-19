@@ -46,6 +46,7 @@ struct handling {
     struct ir_block *join;      /* the block after the call */
     struct ir_operand out;      /* where the result is written */
     uint32_t error;             /* the error the handler binds */
+    const struct type *error_type;  /* its class, or NULL */
     bool has_out;
     bool passes;                /* a `return e` hands the error on */
     struct handling *outer;
@@ -74,6 +75,7 @@ struct lowerer {
     struct ir_operand out_address;  /* the out parameter of a failing call */
     const struct symbol *moved;     /* the local a `return` hands over */
     bool no_reflect;            /* --no-reflect: no field list */
+    bool dev;                   /* --dev: every dispatch checks its table */
     bool failed;
 };
 
@@ -1956,6 +1958,8 @@ static struct ir_global *interface_descriptor(struct lowerer *l,
 static struct ir_function *rt_function(struct lowerer *l, const char *name,
                                        const enum ir_type *params,
                                        size_t count);
+static struct ir_operand load_table(struct lowerer *l, struct ir_operand p,
+                                    const struct type *t);
 
 /* Whether fn has a body: here, in the runtime, or in the module whose
    library file declared it. A library file carries no bodies, and an
@@ -2481,8 +2485,7 @@ static void build_into(struct lowerer *l, const struct expr *e,
                 break;
             }
             if (index > 0 && !bound_is_direct(e, s)) {
-                struct ir_operand table =
-                    temp(l, ir_load(l->f, l->b, IR_PTR, object));
+                struct ir_operand table = load_table(l, object, s);
                 entry = temp(l, ir_load(l->f, l->b, IR_PTR,
                                         offset_address(l, table,
                                             entry_offset(l, index))));
@@ -2756,16 +2759,57 @@ static struct ir_operand descriptor_field(struct lowerer *l,
     return temp(l, ir_load(l->f, l->b, type, at));
 }
 
+/* DESIGN: the table of the object at p, which the program holds as a t.
+   In dev mode a zero table traps with the name of t before an entry is
+   read. The element of an `alloc(T, n)` that the program never filled
+   has one. Release mode keeps the raw load. */
+static struct ir_operand load_table(struct lowerer *l, struct ir_operand p,
+                                    const struct type *t)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_I64};
+    struct ir_operand table = temp(l, ir_load(l->f, l->b, IR_PTR, p));
+    struct ir_block *bad;
+    struct ir_block *join;
+    struct token_text text;
+    struct ir_operand args[2];
+
+    if (t != NULL && t->kind == TYPE_POINTER) {
+        t = t->element;
+    }
+    if (!l->dev || t == NULL || t->kind != TYPE_CLASS) {
+        return table;
+    }
+    bad = new_block(l);
+    join = new_block(l);
+    ir_branch(l->f, l->b,
+              temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, table,
+                                ir_int_op(IR_PTR, 0))),
+              bad, join);
+    l->b = bad;
+    text.bytes = t->name.text;
+    text.length = t->name.length;
+    args[0] = temp(l, ir_addr(l->f, l->b,
+                              ir_global_op(literal_global(l, &text))));
+    args[1] = ir_int_op(IR_I64, t->name.length);
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(rt_function(l, "anti_rt_table_unset", params, 2)),
+            args, 2);
+    ir_jump(l->f, l->b, join);
+    l->b = join;
+    return table;
+}
+
 /* DESIGN: `p is *T` holds when the object is T or a class below it. The
    ancestors of a class are its descriptors from the root down. The entry
    at T's depth is therefore T's descriptor for every class below T. An
    object shallower than T has no entry there, so the depth is compared
    first. The two comparisons are one branch each. */
 static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
+                                    const struct type *from,
                                     const struct type *to)
 {
     uint32_t depth = class_depth(to);
-    struct ir_operand table = temp(l, ir_load(l->f, l->b, IR_PTR, p));
+    struct ir_operand table = load_table(l, p, from);
     struct ir_operand descriptor =
         temp(l, ir_load(l->f, l->b, IR_PTR, table));
     struct ir_operand object_depth =
@@ -2800,11 +2844,12 @@ static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
 
 /* `p as *T` traps on a mismatch and `p as? *T` gives null. */
 static struct ir_operand checked_cast(struct lowerer *l, struct ir_operand p,
+                                      const struct type *from,
                                       const struct type *to, bool gives_null,
                                       bool from_sub)
 {
     static const enum ir_type params[] = {IR_PTR, IR_I64};
-    struct ir_operand ok = class_test(l, p, to);
+    struct ir_operand ok = class_test(l, p, from, to);
     struct ir_block *bad = new_block(l);
     struct ir_block *join = new_block(l);
     struct token_text text;
@@ -2891,7 +2936,7 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
     /* A class test, and a conversion down a chain, which needs a check.
        A conversion up a chain is the same address and needs none. */
     if (e->as.cast.test) {
-        return class_test(l, v, e->as.cast.target);
+        return class_test(l, v, from, e->as.cast.target);
     }
     if (from->kind == TYPE_POINTER && from->element->kind == TYPE_CLASS &&
         to->kind == TYPE_POINTER && to->element->kind == TYPE_CLASS) {
@@ -2902,7 +2947,7 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
             class_depth(to->element) <= class_depth(from->element)) {
             return v;
         }
-        return checked_cast(l, v, to->element, e->as.cast.checked,
+        return checked_cast(l, v, from, to->element, e->as.cast.checked,
                             e->as.cast.from_sub);
     }
     if (type_is_float(from) && type_is_float(to)) {
@@ -3036,7 +3081,7 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         if (index > 0) {
             slot = (uint32_t)index;
             struct ir_operand table =
-                temp(l, ir_load(l->f, l->b, IR_PTR, args[0]));
+                load_table(l, args[0], e->as.call.dispatch);
             target = temp(l, ir_load(l->f, l->b, IR_PTR,
                                      offset_address(l, table,
                                                     entry_offset(l, index))));
@@ -3093,20 +3138,64 @@ static uint32_t next_thunk(const struct lowerer *l, const char *prefix)
 
 /* An extern declaration of a runtime function whose parameters are all
    scalars. A module that calls it twice shares the declaration. */
-static struct ir_function *rt_function(struct lowerer *l, const char *name,
-                                       const enum ir_type *params,
-                                       size_t count)
+static struct ir_function *rt_function_giving(struct lowerer *l,
+                                              const char *name,
+                                              enum ir_type result,
+                                              const enum ir_type *params,
+                                              size_t count)
 {
     struct ir_function *f = find_function(l->m, NULL, name);
     size_t i;
 
     if (f == NULL) {
-        f = ir_extern_add(l->m, name, IR_VOID, false);
+        f = ir_extern_add(l->m, name, result, false);
         for (i = 0; i < count; i++) {
             ir_param_add(f, params[i], IR_NO_AGG);
         }
     }
     return f;
+}
+
+static struct ir_function *rt_function(struct lowerer *l, const char *name,
+                                       const enum ir_type *params,
+                                       size_t count)
+{
+    return rt_function_giving(l, name, IR_VOID, params, count);
+}
+
+/* The address of the descriptor of the class that t is or points at, or
+   zero for any other type. The runtime names that class when the table
+   of the object is zero. */
+static struct ir_operand static_descriptor(struct lowerer *l,
+                                           const struct type *t)
+{
+    if (t != NULL && t->kind == TYPE_POINTER) {
+        t = t->element;
+    }
+    if (t == NULL || t->kind != TYPE_CLASS) {
+        return ir_int_op(IR_PTR, 0);
+    }
+    return temp(l, ir_addr(l->f, l->b, ir_global_op(class_descriptor(l, t))));
+}
+
+/* A call of anti_rt_delete, anti_rt_destroy or anti_rt_dup on object,
+   which the program holds as a t. Only dup gives a value. */
+static struct ir_operand object_call(struct lowerer *l, const char *name,
+                                     struct ir_operand object,
+                                     const struct type *t)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_PTR};
+    enum ir_type result =
+        strcmp(name, "anti_rt_dup") == 0 ? IR_PTR : IR_VOID;
+    struct ir_operand args[2];
+    struct ir_function *f;
+    uint32_t call;
+
+    args[0] = object;
+    args[1] = static_descriptor(l, t);
+    f = rt_function_giving(l, name, result, params, 2);
+    call = ir_call(l->f, l->b, result, ir_func_op(f), args, 2);
+    return result == IR_PTR ? temp(l, call) : none();
 }
 
 /* The aggregate that carries the arguments every chunk receives, or
@@ -3652,24 +3741,17 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         return narrow_from_i64(l, temp(l, call), e->type);
     }
     /* The three read the table of the object, so the runtime does the
-       walk and the compiler passes the pointer. */
+       walk. The compiler passes the pointer and the class it has. */
     case EXPR_OBJECT: {
         const char *name = e->as.object.op == TOKEN_DUP    ? "anti_rt_dup"
                            : e->as.object.op == TOKEN_DELETE
                                ? "anti_rt_delete"
                                : "anti_rt_destroy";
-        bool gives = e->as.object.op == TOKEN_DUP;
-        uint32_t call;
         v = lower_expr(l, e->as.object.operand);
         if (l->failed) {
             return none();
         }
-        call = ir_call(l->f, l->b, gives ? IR_PTR : IR_VOID,
-                       ir_func_op(c_function(l, name,
-                                             gives ? IR_PTR : IR_VOID,
-                                             IR_PTR)),
-                       &v, 1);
-        return gives ? temp(l, call) : none();
+        return object_call(l, name, v, e->as.object.operand->type);
     }
     case EXPR_SIZE_OF:
         return size_operand(l, e->as.size_of->type);
@@ -4082,11 +4164,7 @@ static bool type_needs_destruct(const struct type *t)
 
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
-    static const enum ir_type params[] = {IR_PTR};
-    struct ir_operand p = temp(l, sym->ir);
-
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(rt_function(l, "anti_rt_destroy", params, 1)), &p, 1);
+    object_call(l, "anti_rt_destroy", temp(l, sym->ir), sym->type);
 }
 
 /* DESIGN: a call that can fail gives a pointer. A null pointer is
@@ -4096,7 +4174,6 @@ static void handle_error(struct lowerer *l, const struct expr *call,
                          struct ir_operand err, struct ir_operand out,
                          bool has_out, struct ir_operand release)
 {
-    static const enum ir_type one[] = {IR_PTR};
     const struct handler *h = &call->as.call.handler;
     struct ir_block *bad = new_block(l);
     struct ir_block *join = new_block(l);
@@ -4136,7 +4213,7 @@ static void handle_error(struct lowerer *l, const struct expr *call,
         static const struct name fatal_name = {"fatal", 5};
         const struct type *error_type = call->as.call.callee->type->result;
         int index = table_index(error_type->element, &fatal_name);
-        struct ir_operand table = temp(l, ir_load(l->f, l->b, IR_PTR, err));
+        struct ir_operand table = load_table(l, err, error_type);
         struct ir_operand entry =
             temp(l, ir_load(l->f, l->b, IR_PTR,
                             offset_address(l, table,
@@ -4156,6 +4233,7 @@ static void handle_error(struct lowerer *l, const struct expr *call,
         scope.out = out;
         scope.has_out = has_out;
         scope.error = error;
+        scope.error_type = call->as.call.callee->type->result;
         scope.passes = h->passes;
         scope.outer = l->handling;
         l->handling = &scope;
@@ -4164,10 +4242,8 @@ static void handle_error(struct lowerer *l, const struct expr *call,
         /* The error belongs to the handler, which ends it, unless the
            handler hands it to the caller with `return e`. */
         if (l->b != NULL && !h->passes) {
-            struct ir_operand p = temp(l, error);
-            ir_call(l->f, l->b, IR_VOID,
-                    ir_func_op(rt_function(l, "anti_rt_delete", one, 1)),
-                    &p, 1);
+            object_call(l, "anti_rt_delete", temp(l, error),
+                        scope.error_type);
         }
         if (l->b != NULL) {
             ir_jump(l->f, l->b, join);
@@ -4363,11 +4439,8 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         }
         /* `yield` is an exit of the handler, so the error ends here. */
         if (l->b != NULL && !h->passes) {
-            static const enum ir_type one[] = {IR_PTR};
-            struct ir_operand p = temp(l, h->error);
-            ir_call(l->f, l->b, IR_VOID,
-                    ir_func_op(rt_function(l, "anti_rt_delete", one, 1)),
-                    &p, 1);
+            object_call(l, "anti_rt_delete", temp(l, h->error),
+                        h->error_type);
         }
         if (l->b != NULL) {
             ir_jump(l->f, l->b, h->join);
@@ -4382,7 +4455,6 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         struct try_scope scope;
         struct ir_block *handler = new_block(l);
         struct ir_block *join = new_block(l);
-        static const enum ir_type one[] = {IR_PTR};
         const struct handler *h = &s->as.try_block.handler;
         scope.handler = handler;
         scope.error = ir_unary(l->f, l->b, IR_COPY, IR_PTR,
@@ -4402,10 +4474,8 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
             lower_block(l, h->body);
         }
         if (l->b != NULL && !h->passes) {
-            struct ir_operand p = temp(l, scope.error);
-            ir_call(l->f, l->b, IR_VOID,
-                    ir_func_op(rt_function(l, "anti_rt_delete", one, 1)),
-                    &p, 1);
+            object_call(l, "anti_rt_delete", temp(l, scope.error),
+                        h->symbol != NULL ? h->symbol->type : NULL);
         }
         if (l->b != NULL) {
             ir_jump(l->f, l->b, join);
@@ -4960,7 +5030,7 @@ static void class_record(struct lowerer *l, const struct item *it)
 
 bool lower_module(struct module *module, const char *module_name,
                   struct ir_module *out, struct diagnostics *diags,
-                  bool no_reflect)
+                  unsigned options)
 {
     struct lowerer l;
     bool ok = true;
@@ -4971,7 +5041,8 @@ bool lower_module(struct module *module, const char *module_name,
     l.diags = diags;
     l.module_name = module_name;
     l.file = module->file != NULL ? module->file : module_name;
-    l.no_reflect = no_reflect;
+    l.no_reflect = (options & LOWER_NO_REFLECT) != 0;
+    l.dev = (options & LOWER_DEV) != 0;
     /* A function of a struct body is a function of the module with one
        more segment in its name. It is declared and lowered like a free
        function. */

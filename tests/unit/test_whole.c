@@ -54,7 +54,7 @@ static struct module *compile(struct program *p, const char *name,
               parse(source, tokens, &p->arena, &p->diags, &module) &&
               sema_check(module, name, NULL, p->libraries, p->library_count,
                          &p->types, &p->arena, &p->diags, true) &&
-              lower_module(module, name, out, &p->diags, false);
+              lower_module(module, name, out, &p->diags, 0);
 
     if (!ok) {
         check_failures++;

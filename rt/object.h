@@ -148,17 +148,21 @@ struct anti_object {
 /* The descriptor of an object, or NULL when its table is not set. */
 const struct anti_descriptor *anti_rt_descriptor(const void *object);
 
+/* DESIGN: the three take the descriptor of the class the program holds
+   the object as. It names that class when the table of the object is
+   zero. A null object is left alone. */
+
 /* A copy of the object on the heap, of its concrete size, made by the
    copy entry of its table. */
-void *anti_rt_dup(void *object);
+void *anti_rt_dup(void *object, const struct anti_descriptor *type);
 
 /* Run the destruct body of each class of the chain, destroy every object
    the chain owns, free every buffer it owns, and free the object. */
-void anti_rt_delete(void *object);
+void anti_rt_delete(void *object, const struct anti_descriptor *type);
 
 /* The same without the final free, for an object that is not on the
    heap of its own. */
-void anti_rt_destroy(void *object);
+void anti_rt_destroy(void *object, const struct anti_descriptor *type);
 
 /* The descriptor of the root and its one ancestor, which every module
    of a program shares. */

@@ -13,8 +13,13 @@
    IR function index. Returns false after an error in diags. Semantic
    analysis rejects every module that lowering cannot translate, so no
    construct of the language reports one. */
+enum lower_option {
+    LOWER_NO_REFLECT = 1u << 0,     /* --no-reflect: no field list */
+    LOWER_DEV = 1u << 1             /* --dev: every dispatch checks its table */
+};
+
 bool lower_module(struct module *module, const char *module_name,
                   struct ir_module *out, struct diagnostics *diags,
-                  bool no_reflect);
+                  unsigned options);
 
 #endif

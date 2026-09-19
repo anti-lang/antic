@@ -22,9 +22,9 @@ typedef struct anti_Object {
 } anti_Object;
 
 /* Run the destruct chain of the object, free what it owns and free it. */
-void anti_rt_delete(void *object);
-void anti_rt_destroy(void *object);
-void *anti_rt_dup(void *object);
+void anti_rt_delete(void *object, const anti_descriptor *type);
+void anti_rt_destroy(void *object, const anti_descriptor *type);
+void *anti_rt_dup(void *object, const anti_descriptor *type);
 
 typedef struct Ink Ink;
 typedef struct Ink_vtable {
@@ -50,15 +50,15 @@ extern const anti_descriptor anti_Ink_descriptor;
 /* Ink is abstract: no table and no init, because it has no complete value. */
 static inline void anti_Ink_delete(Ink *self)
 {
-    anti_rt_delete(self);
+    anti_rt_delete(self, &anti_Ink_descriptor);
 }
 static inline void anti_Ink_destroy(Ink *self)
 {
-    anti_rt_destroy(self);
+    anti_rt_destroy(self, &anti_Ink_descriptor);
 }
 static inline Ink *anti_Ink_dup(Ink *self)
 {
-    return (Ink *)anti_rt_dup(self);
+    return (Ink *)anti_rt_dup(self, &anti_Ink_descriptor);
 }
 
 /** The colour the shape draws with. */
@@ -97,15 +97,15 @@ extern const Shape_vtable anti_Shape_vtable;
 void anti_Shape_init(Shape *self);
 static inline void anti_Shape_delete(Shape *self)
 {
-    anti_rt_delete(self);
+    anti_rt_delete(self, &anti_Shape_descriptor);
 }
 static inline void anti_Shape_destroy(Shape *self)
 {
-    anti_rt_destroy(self);
+    anti_rt_destroy(self, &anti_Shape_descriptor);
 }
 static inline Shape *anti_Shape_dup(Shape *self)
 {
-    return (Shape *)anti_rt_dup(self);
+    return (Shape *)anti_rt_dup(self, &anti_Shape_descriptor);
 }
 
 /** The area of the shape, which each class below decides. */
@@ -151,15 +151,15 @@ extern const Square_vtable anti_Square_vtable;
 void anti_Square_init(Square *self);
 static inline void anti_Square_delete(Square *self)
 {
-    anti_rt_delete(self);
+    anti_rt_delete(self, &anti_Square_descriptor);
 }
 static inline void anti_Square_destroy(Square *self)
 {
-    anti_rt_destroy(self);
+    anti_rt_destroy(self, &anti_Square_descriptor);
 }
 static inline Square *anti_Square_dup(Square *self)
 {
-    return (Square *)anti_rt_dup(self);
+    return (Square *)anti_rt_dup(self, &anti_Square_descriptor);
 }
 
 extern const Ink_vtable anti_Square_Ink_vtable;

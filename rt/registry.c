@@ -693,7 +693,7 @@ static void *read_object(struct reader *r,
     }
     object = build(c);
     if (object != NULL && !fill(r, object, c->descriptor, true, depth)) {
-        anti_rt_delete(object);
+        anti_rt_delete(object, c->descriptor);
         return NULL;
     }
     return object;
@@ -709,7 +709,7 @@ void *anti_rt_Object_deserialize(struct anti_text input)
     object = read_object(&r, NULL, 0);
     skip_space(&r);
     if (object != NULL && r.at != r.end) {
-        anti_rt_delete(object);
+        anti_rt_delete(object, NULL);
         return NULL;
     }
     return object;

@@ -34,7 +34,7 @@ static void run(const char *source, enum target target, struct text *out)
     if (!lex(source, strlen(source), &arena, &diags, &tokens) ||
         !parse(source, &tokens, &arena, &diags, &module) ||
         !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
-        !lower_module(module, "main", &ir, &diags, false)) {
+        !lower_module(module, "main", &ir, &diags, 0)) {
         check_failures++;
         fprintf(stderr, "test source does not lower: %s\n%s\n",
                 diags.count > 0 ? diags.items[0].message : "", source);

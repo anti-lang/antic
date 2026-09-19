@@ -36,7 +36,7 @@ static void run(struct lowered *l, const char *source)
         check_failures++;
         return;
     }
-    l->ok = lower_module(l->module, "main", &l->ir, &l->diags, false);
+    l->ok = lower_module(l->module, "main", &l->ir, &l->diags, 0);
 }
 
 static void release(struct lowered *l)

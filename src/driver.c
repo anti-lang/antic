@@ -453,16 +453,22 @@ static void dump_tokens(const char *source, const struct token_list *tokens)
     }
 }
 
+/* The options of lowering that the command line sets. */
+static unsigned lower_options(const struct options *o)
+{
+    return (o->no_reflect ? LOWER_NO_REFLECT : 0u) | (o->dev ? LOWER_DEV : 0u);
+}
+
 /* Lower the module into ir and verify the result. */
 static bool lower_checked(const char *input, struct module *tree,
                           const char *module, struct ir_module *ir,
-                          struct diagnostics *diags, bool no_reflect)
+                          struct diagnostics *diags, unsigned options)
 {
     struct text errors = {0};
     bool ok = false;
 
     tree->file = input;
-    if (!lower_module(tree, module, ir, diags, no_reflect)) {
+    if (!lower_module(tree, module, ir, diags, options)) {
         print_diagnostics(input, diags);
     } else if (!ir_verify(ir, &errors)) {
         fprintf(stderr, "antic: internal error, the IR of %s fails "
@@ -510,12 +516,13 @@ static bool has_main(const struct ir_module *program, const char *module);
    them. Returns 2, the status of a finished dump, on success. */
 static int dump_ir(const char *input, struct module *tree, const char *module,
                    struct ir_module *program, bool optimize, bool release,
-                   struct diagnostics *diags, bool no_reflect)
+                   struct diagnostics *diags, unsigned options)
 {
+    bool no_reflect = (options & LOWER_NO_REFLECT) != 0;
     struct text out = {0};
     struct text errors = {0};
 
-    if (!lower_checked(input, tree, module, program, diags, no_reflect)) {
+    if (!lower_checked(input, tree, module, program, diags, options)) {
         return 1;
     }
     if (optimize) {
@@ -573,7 +580,7 @@ static int back_end(const struct options *o, struct module *tree,
 
     if (tree != NULL &&
         !lower_checked(o->input, tree, module, program, diags,
-                       o->no_reflect)) {
+                       lower_options(o))) {
         return 1;
     }
     /* DESIGN: the passes over the whole program run where the program is
@@ -731,7 +738,7 @@ static int write_library(const struct options *o, struct module *tree,
     int status = 1;
 
     ir_module_init(&ir, arena, module);
-    if (lower_checked(o->input, tree, module, &ir, diags, o->no_reflect) &&
+    if (lower_checked(o->input, tree, module, &ir, diags, lower_options(o)) &&
         own_interface(o, tree, module, arena, &iface)) {
         antl_write(&bytes, &iface, &ir, o->strip_docs);
         if (o->output != NULL) {
@@ -1188,7 +1195,7 @@ static int compile(const struct options *o, struct text *source,
     }
     if (o->dump_ir || o->dump_opt) {
         status = dump_ir(o->input, tree, text_cstr(module), &program,
-                         o->dump_opt, !o->dev, &diags, o->no_reflect);
+                         o->dump_opt, !o->dev, &diags, lower_options(o));
         goto done;
     }
     if (o->lib != LIB_NONE && defines_main(tree)) {

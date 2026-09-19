@@ -196,7 +196,7 @@ Four levels, and each applies where it makes sense:
 - Values never convert. Passing a `Circle` where a `Shape` is expected is an error, and `c.super` is the explicit base part.
 - `p is *T` gives a `bool`. `p as *T` on a class pointer is checked and traps on a mismatch. `p as? *T` gives `null` instead. All three work from any base or interface pointer, because every table's descriptor records the offset to the enclosing object.
 - `==` and `!=` on class pointers compare object identity: each pointer is adjusted by its offset to the enclosing object, then the addresses are compared. So a `*Serializable` and a `*Drawable` taken from one circle are equal. Pointers of two unrelated class types are a type error. Struct pointers compare addresses.
-- In dev mode `delete`, `destroy`, `dup`, `is`, `as` and every dispatch check the table pointer for null and trap with the class name. Release mode keeps the raw load.
+- `delete`, `destroy`, `dup`, `is`, `as` and every dispatch check the table pointer for null and trap with the class name. `delete`, `destroy` and `dup` are calls into the runtime and check in every mode, since the check is cheap there. `is`, `as` and a dispatch check in dev mode, and release mode keeps the raw load.
 
 ## Tables and dispatch
 

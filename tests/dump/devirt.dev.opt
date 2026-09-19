@@ -22,6 +22,7 @@ extern fn anti_rt_Object_hash(ptr) -> i64
 extern fn anti_rt_Object_serialize(ptr, ptr)
 extern fn anti_rt_Object_destruct(ptr)
 extern fn anti_rt_Object_copy(ptr, ptr)
+extern fn anti_rt_table_unset(ptr, i64)
 extern fn devirt.fn.0(ptr) -> i64
 global devirt.Only.table [9]ptr { @devirt.Only.descriptor, @anti_rt_Object_type_name, @anti_rt_Object_to_text, @anti_rt_Object_equals, @anti_rt_Object_hash, @anti_rt_Object_serialize, @anti_rt_Object_destruct, @anti_rt_Object_copy, @devirt.Only.value }
 global devirt.Only.descriptor anti.rt.Descriptor { @devirt.2, i64 4, @anti_rt_Object_descriptor, size_of devirt.Only, i64 1, @devirt.Only.ancestors, i64 1, @devirt.Only.fields, ptr 0, i64 0, i64 8, @devirt.Only.functions }
@@ -91,14 +92,21 @@ fn devirt.total(%0: ptr, %1: ptr) -> i64 {
 b0:
     %2 = call i64 @devirt.Only.value(%0)
     %3 = load ptr %1
-    %4 = shl i64 size_of ptr, 3
-    %5 = ptradd %3, %4
-    %6 = load ptr %5
-    %7 = call i64 %6 via @devirt.fn.0(%1) table @devirt.Base.descriptor 8
-    %8 = add i64 %2, %7
-    %9 = call i64 @devirt.Base.same(%1)
-    %10 = add i64 %8, %9
-    ret i64 %10
+    %4 = eq i8 %3, 0
+    branch %4, b1, b2
+b1:
+    %5 = addr @devirt.23
+    call void @anti_rt_table_unset(%5, 4)
+    jump b2
+b2:
+    %6 = shl i64 size_of ptr, 3
+    %7 = ptradd %3, %6
+    %8 = load ptr %7
+    %9 = call i64 %8 via @devirt.fn.0(%1) table @devirt.Base.descriptor 8
+    %10 = add i64 %2, %9
+    %11 = call i64 @devirt.Base.same(%1)
+    %12 = add i64 %10, %11
+    ret i64 %12
 }
 fn devirt.Dog.speak(%0: ptr) -> i64 {
 b0:
@@ -107,11 +115,18 @@ b0:
 fn devirt.talk(%0: ptr) -> i64 {
 b0:
     %1 = load ptr %0
-    %2 = shl i64 size_of ptr, 3
-    %3 = ptradd %1, %2
-    %4 = load ptr %3
-    %5 = call i64 %4 via @devirt.fn.0(%0) table @devirt.Speaker.descriptor 8
-    ret i64 %5
+    %2 = eq i8 %1, 0
+    branch %2, b1, b2
+b1:
+    %3 = addr @devirt.37
+    call void @anti_rt_table_unset(%3, 7)
+    jump b2
+b2:
+    %4 = shl i64 size_of ptr, 3
+    %5 = ptradd %1, %4
+    %6 = load ptr %5
+    %7 = call i64 %6 via @devirt.fn.0(%0) table @devirt.Speaker.descriptor 8
+    ret i64 %7
 }
 fn devirt.Only.init(%0: ptr) {
 b0:

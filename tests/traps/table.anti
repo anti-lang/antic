@@ -1,0 +1,72 @@
+//! Each case reads the table of an element of `alloc(T, n)` that the
+//! program never filled, so its table is zero. `delete`, `destroy` and
+//! `dup` trap in every mode. A dispatch, `is` and `as` trap in dev mode.
+//! The argument names the case.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	inherits Shape,
+	pub side: int = 0,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+class Round
+{
+	inherits Shape,
+
+	concrete fn area(self) -> int
+	{
+		return 3;
+	}
+}
+
+fn same(a: str, b: str) -> bool
+{
+	if a.len != b.len {
+		return false;
+	}
+	for i in 0..a.len {
+		if a[i] != b[i] {
+			return false;
+		}
+	}
+	return true;
+}
+
+fn run(case: str, items: *Square) -> int
+{
+	let item = &items[1];
+	let shape = item as *Shape;
+	if same(case, "delete") {
+		delete(item);
+	} else if same(case, "destroy") {
+		destroy(item);
+	} else if same(case, "dup") {
+		let copy = dup(item);
+		return copy.side;
+	} else if same(case, "call") {
+		return shape.area();
+	} else if same(case, "is") {
+		return (shape is *Round) as int;
+	} else if same(case, "as") {
+		return (shape as *Square).side;
+	}
+	return 0;
+}
+
+fn main(args: []str, env: []str) -> int
+{
+	let round = Round {};
+	let items = alloc(Square, 2);
+	items[0] = Square { side: 2 };
+	return run(args[1], items) + (&round as *Shape).area() * 0;
+}

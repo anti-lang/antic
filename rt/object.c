@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "object.h"
+#include "std.h"
 #include "utf.h"
 
 /* DESIGN: the default bodies of anti.rt.Object walk the field list of the
@@ -42,6 +43,21 @@ void *anti_rt_object_of(void *object)
     const struct anti_descriptor *d = anti_rt_descriptor(object);
 
     return d == NULL ? object : (char *)object - d->offset;
+}
+
+/* The start of the object, once its table is known to be set. type is
+   the class the program holds it as, and the trap names it. */
+static void *checked_object(void *object, const struct anti_descriptor *type)
+{
+    const struct anti_object *o = object;
+
+    if (o != NULL && o->table == NULL) {
+        if (type == NULL) {
+            type = &anti_rt_Object_descriptor;
+        }
+        anti_rt_table_unset(type->name, type->name_length);
+    }
+    return anti_rt_object_of(object);
 }
 
 struct anti_text anti_rt_Object_type_name(struct anti_object *self)
@@ -526,7 +542,7 @@ static void copy_elements(char *from, char *into, int64_t size,
     for (at = 0; d != NULL && d->size > 0 && at < size; at += d->size) {
         void (*copy)(struct anti_object *, struct anti_object *) =
             (void (*)(struct anti_object *, struct anti_object *))
-                table_entry(from + at, ANTI_ENTRY_COPY);
+                table_entry(checked_object(from + at, d), ANTI_ENTRY_COPY);
         if (copy != NULL) {
             copy((struct anti_object *)(from + at),
                  (struct anti_object *)(into + at));
@@ -580,7 +596,7 @@ void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
                    the copy keeps the same place in the new one. */
                 size_t inside = (size_t)((char *)*from -
                                          (char *)anti_rt_object_of(*from));
-                char *made = anti_rt_dup(*from);
+                char *made = anti_rt_dup(*from, f->descriptor);
                 *into = made == NULL ? NULL : made + inside;
                 continue;
             }
@@ -599,11 +615,11 @@ void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
     }
 }
 
-void *anti_rt_dup(void *object)
+void *anti_rt_dup(void *object, const struct anti_descriptor *type)
 {
     const struct anti_descriptor *d;
 
-    object = anti_rt_object_of(object);
+    object = checked_object(object, type);
     d = anti_rt_descriptor(object);
     void (*copy)(struct anti_object *, struct anti_object *) =
         (void (*)(struct anti_object *, struct anti_object *))
@@ -635,18 +651,18 @@ static void destroy_elements(char *elements, int64_t size,
     int64_t at;
 
     for (at = 0; d != NULL && d->size > 0 && at < size; at += d->size) {
-        anti_rt_destroy(elements + at);
+        anti_rt_destroy(elements + at, d);
     }
 }
 
-void anti_rt_destroy(void *object)
+/* The teardown of an object whose table is known to be set, or of a
+   class value held inline. A literal leaves that value zero when its
+   field has no default. It was never made and holds nothing. */
+static void destroy_object(void *object)
 {
-    const struct anti_descriptor *d;
+    const struct anti_descriptor *d = anti_rt_descriptor(object);
     const struct anti_descriptor *level;
     int64_t i;
-
-    object = anti_rt_object_of(object);
-    d = anti_rt_descriptor(object);
 
     if (d == NULL) {
         return;
@@ -663,7 +679,7 @@ void anti_rt_destroy(void *object)
             void **slot;
             void *value = inline_object(object, f);
             if (value != NULL) {
-                anti_rt_destroy(value);
+                destroy_object(value);
                 continue;
             }
             if (!f->owned) {
@@ -674,7 +690,7 @@ void anti_rt_destroy(void *object)
                points into. */
             if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_PTR &&
                 ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
-                anti_rt_delete(*slot);
+                anti_rt_delete(*slot, f->descriptor);
             } else {
                 if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE &&
                     ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS &&
@@ -688,9 +704,14 @@ void anti_rt_destroy(void *object)
     }
 }
 
-void anti_rt_delete(void *object)
+void anti_rt_destroy(void *object, const struct anti_descriptor *type)
 {
-    object = anti_rt_object_of(object);
-    anti_rt_destroy(object);
+    destroy_object(checked_object(object, type));
+}
+
+void anti_rt_delete(void *object, const struct anti_descriptor *type)
+{
+    object = checked_object(object, type);
+    destroy_object(object);
     free(object);
 }
