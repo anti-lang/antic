@@ -1075,7 +1075,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "loop_name|-S,-o,${LISTINGS}/loop_name.s,loop_name.anti"
         "visibility|-S,-o,${LISTINGS}/visibility.s,visibility.anti"
         "errors|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/errors.s,errors.anti"
-        "workers|-S,-o,${LISTINGS}/workers.s,workers.anti")
+        "workers|-S,-o,${LISTINGS}/workers.s,workers.anti"
+        "own_copy|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_copy.s,own_copy.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

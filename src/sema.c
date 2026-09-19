@@ -4085,6 +4085,59 @@ static void check_condition(struct checker *c, struct expr *cond)
     }
 }
 
+/* Whether a value of t owns memory: an `own` field anywhere in the chain
+   of a class, or a class value held inline that does. An array holds its
+   elements inline, so one of them makes the array an owner too. */
+static bool type_owns(const struct type *t)
+{
+    size_t i;
+
+    while (t != NULL && t->kind == TYPE_ARRAY) {
+        t = t->element;
+    }
+    for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if (f->owned || ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                             type_owns(f->type))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* Whether e reads a value that already lives somewhere. A literal, a
+   call and `*dup(p)` make a fresh one instead. */
+static bool reads_existing(const struct expr *e)
+{
+    switch (e->kind) {
+    case EXPR_NAME:
+    case EXPR_FIELD:
+    case EXPR_INDEX:
+        return true;
+    case EXPR_UNARY:
+        return e->as.unary.op == TOKEN_STAR &&
+               !(e->as.unary.operand->kind == EXPR_OBJECT &&
+                 e->as.unary.operand->as.object.op == TOKEN_DUP);
+    default:
+        return false;
+    }
+}
+
+/* DESIGN: `=` refuses to copy an existing value that owns memory, since
+   the bytes would give it two owners. A fresh value on the right has no
+   other owner, so `=` moves it. The bytes it replaces are not destroyed:
+   the element of an `alloc(T, n)` it fills has no value yet. */
+static void refuse_owned_copy(struct checker *c, const struct expr *value,
+                              struct type *t)
+{
+    if (!is_error(t) && type_owns(t) && reads_existing(value)) {
+        error_at(c, value->pos, "`%s` has `own` fields, use `dup` instead "
+                 "of `=`", tn(t));
+    }
+}
+
 static void check_assign(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
@@ -4132,7 +4185,11 @@ static void check_assign(struct checker *c, struct stmt *s)
         return;
     }
     v = check_expr(c, s->as.assign.value, t);
-    if (!require(c, s->as.assign.value, v, t) || op == TOKEN_ASSIGN) {
+    if (!require(c, s->as.assign.value, v, t)) {
+        return;
+    }
+    if (op == TOKEN_ASSIGN) {
+        refuse_owned_copy(c, s->as.assign.value, t);
         return;
     }
     if ((op == TOKEN_PLUS_ASSIGN || op == TOKEN_MINUS_ASSIGN ||
@@ -4278,11 +4335,15 @@ static void check_stmt(struct checker *c, struct stmt *s)
         t = check_expr(c, s->as.let.value, declared);
         c->target_sized = false;
         if (declared != NULL) {
-            require(c, s->as.let.value, t, declared);
+            if (require(c, s->as.let.value, t, declared)) {
+                refuse_owned_copy(c, s->as.let.value, declared);
+            }
             t = declared;
         } else if (!is_error(t) && t->kind == TYPE_VOID) {
             require(c, s->as.let.value, t, builtin(c, TYPE_I64));
             t = builtin(c, TYPE_ERROR);
+        } else {
+            refuse_owned_copy(c, s->as.let.value, t);
         }
         if (refuse_abstract_value(c, s->as.let.name_pos, "this local", t)) {
             t = builtin(c, TYPE_ERROR);

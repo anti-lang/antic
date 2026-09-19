@@ -1,0 +1,58 @@
+import anti.error;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Item
+{
+	pub n: int = 0,
+	pub own leaf: *Leaf = null,
+
+	fn construct(self, n: int) -> *error.Error
+	{
+		self.n = n;
+		return null;
+	}
+}
+
+class Holder
+{
+	pub item: Item = Item { n: 0 },
+}
+
+class Shelf
+{
+	pub own items: []Item,
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn make() -> Item
+{
+	return Item { n: 3 };
+}
+
+fn f(shelf: *Shelf, p: *Item)
+{
+	let a = Item { n: 1 };
+	let b = a;
+	let h = Holder { item: Item { n: 2 } };
+	let g = h;
+	b = a;
+	shelf.items[0] = a;
+	shelf.items[1] = *p;
+	b = h.item;
+
+	shelf.items[0] = Item { n: 4 };
+	let c = Item(5) catch fatal;
+	b = *dup(p);
+	b = make();
+	let x = Plain { n: 6 };
+	let y = x;
+	y = x;
+}

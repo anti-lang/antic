@@ -1,0 +1,6 @@
+own_copy.anti:43:10: error: `Item` has `own` fields, use `dup` instead of `=`
+own_copy.anti:45:10: error: `Holder` has `own` fields, use `dup` instead of `=`
+own_copy.anti:46:6: error: `Item` has `own` fields, use `dup` instead of `=`
+own_copy.anti:47:19: error: `Item` has `own` fields, use `dup` instead of `=`
+own_copy.anti:48:19: error: `Item` has `own` fields, use `dup` instead of `=`
+own_copy.anti:49:6: error: `Item` has `own` fields, use `dup` instead of `=`
