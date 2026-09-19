@@ -1,3 +1,6 @@
+/* lstat and stat are POSIX, outside the C11 library. */
+#define _POSIX_C_SOURCE 200809L
+
 #include "sdk.h"
 
 #include <stdio.h>

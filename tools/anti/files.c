@@ -1,3 +1,6 @@
+/* lstat, rmdir and unlink are POSIX, outside the C11 library. */
+#define _POSIX_C_SOURCE 200809L
+
 #include "files.h"
 
 #include <errno.h>
