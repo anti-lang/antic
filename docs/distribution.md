@@ -81,9 +81,12 @@ A file we build carries the prefix `anti-`, as in `anti-raylib-6.0-linux-x86_64.
 A mirror of an untouched upstream file keeps its own name, as in `raylib-6.0.tar.gz`. A
 variant, should one appear, follows the target in the name.
 
-Two sysroots can never be served here. The macOS SDK stubs are Apple's and the Windows
-CRT and SDK are Microsoft's, and neither licence allows redistribution. Those stay a step
-on the user's machine, which is why `tools/get-sysroot.cmake` asks for `ACCEPT_LICENSE`.
+Two sysroots can never be served here. Apple's SDK is Apple's and the Windows CRT and SDK
+are Microsoft's, and neither licence allows redistribution. The CRT stays a step on the
+user's machine, which is why `tools/get-sysroot.cmake` asks for `ACCEPT_LICENSE`. Apple's
+SDK comes from a Mac the user owns, with `anti sdk export` and `anti sdk import`, for a
+program that names a framework. Zig's stubs of libSystem are ours to serve, and every
+package carries them.
 
 ### Publishing
 

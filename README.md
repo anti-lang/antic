@@ -54,6 +54,11 @@ Anti 0.1.0 installs with one command on every host. The installers and the
 packages are served from anti-lang.com, and `docs/distribution.md` describes the
 package of each host and the checks it passes.
 
+The stubs in every package link any macOS program that names no framework, on every
+host. A program that names a framework needs the bundle that `anti sdk export` writes on
+a Mac you own, and `anti sdk import` installs. Apple's licence governs where that bundle
+may be used, and it is yours to read.
+
 ## Documents
 
 | File | Contents |
