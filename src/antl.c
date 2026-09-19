@@ -1581,6 +1581,44 @@ static struct ir_vtype read_vtype(struct reader *r, bool scalar_only)
     return v;
 }
 
+/* Whether the program holds everything that aggregate agg of the file
+   is built from. */
+static bool agg_ready(const struct ir_maps *maps, uint32_t agg)
+{
+    const struct ir_aggtype *t = &maps->aggs[agg];
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        uint32_t of = t->fields[i].type.agg;
+        if (t->fields[i].type.type == IR_AGG &&
+            (of >= maps->agg_count || maps->agg_state[of] != MAP_DONE)) {
+            return false;
+        }
+    }
+    return t->kind != IR_AGG_ARRAY ||
+           (t->length < maps->sym_count &&
+            maps->sym_state[t->length] == MAP_DONE);
+}
+
+/* Whether the program holds everything that symbolic value sym of the
+   file is computed from. */
+static bool sym_ready(const struct ir_maps *maps, uint32_t sym)
+{
+    const struct ir_sym *s = &maps->syms[sym];
+
+    if ((s->kind == IR_SYM_SIZE_OF || s->kind == IR_SYM_OFFSET_OF) &&
+        s->of.type == IR_AGG) {
+        return s->of.agg < maps->agg_count &&
+               maps->agg_state[s->of.agg] == MAP_DONE;
+    }
+    if (s->kind == IR_SYM_OP) {
+        return s->a < maps->sym_count && maps->sym_state[s->a] == MAP_DONE &&
+               (s->b == IR_NO_AGG ||
+                (s->b < maps->sym_count && maps->sym_state[s->b] == MAP_DONE));
+    }
+    return true;
+}
+
 /* The aggregate and symbolic tables of the file. They refer to each other
    by index, so both are read before either is added to the program. */
 static void read_tables(struct reader *r, struct ir_module *program,
@@ -1588,6 +1626,7 @@ static void read_tables(struct reader *r, struct ir_module *program,
 {
     uint32_t i;
     uint32_t j;
+    uint32_t a = 0;
 
     maps->sym_count = get_count(r, 27);
     maps->syms = allocate(r, maps->sym_count, sizeof *maps->syms);
@@ -1645,11 +1684,27 @@ static void read_tables(struct reader *r, struct ir_module *program,
             damaged(r);
         }
     }
-    for (i = 0; i < maps->agg_count && !r->failed; i++) {
-        map_agg(r, program, maps, i);
-    }
-    for (i = 0; i < maps->sym_count && !r->failed; i++) {
-        map_sym(r, program, maps, i);
+    /* DESIGN: the file keeps the aggregates and the symbolic values each
+       in the order the program made them, and the two orders interleave.
+       The reader keeps both orders. It makes the next aggregate when the
+       program holds what it is built from, and the next value otherwise.
+       The order they were made in is one such interleaving, so one of
+       the two is always ready. A library read and written again then
+       comes out byte for byte. A file that fits no interleaving is
+       mapped on demand. */
+    i = 0;
+    while (!r->failed && (a < maps->agg_count || i < maps->sym_count)) {
+        if (a < maps->agg_count &&
+            (maps->agg_state[a] == MAP_DONE || agg_ready(maps, a))) {
+            map_agg(r, program, maps, a++);
+        } else if (i < maps->sym_count &&
+                   (maps->sym_state[i] == MAP_DONE || sym_ready(maps, i))) {
+            map_sym(r, program, maps, i++);
+        } else if (a < maps->agg_count) {
+            map_agg(r, program, maps, a++);
+        } else {
+            map_sym(r, program, maps, i++);
+        }
     }
 }
 

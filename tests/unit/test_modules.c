@@ -405,6 +405,42 @@ static void round_trip(void)
     close_session(&a);
 }
 
+/* A library whose symbolic values and aggregates were made interleaved
+   comes out of a read and a write as it went in. The descriptor of a
+   class takes the size of the class before its field list makes the
+   array that holds the records. */
+static void round_trip_class(void)
+{
+    struct session a;
+    struct session b;
+    struct text first = {0};
+    struct text second = {0};
+    struct ir_module program;
+    struct interface *iface;
+    char error[160] = "";
+
+    open_session(&a);
+    build_library(&a, "boxes",
+                  "pub class Box { pub w: int = 1, pub h: int = 2 }\n",
+                  &first);
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "boxes");
+    iface = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
+                      &b.types, &b.arena, &program, error, sizeof error);
+    CHECK_STR(error, "");
+    CHECK(iface != NULL);
+    if (iface != NULL) {
+        antl_write(&second, iface, &program, false);
+        CHECK(first.length == second.length &&
+              memcmp(first.data, second.data, first.length) == 0);
+    }
+    text_free(&first);
+    text_free(&second);
+    ir_module_free(&program);
+    close_session(&b);
+    close_session(&a);
+}
+
 /* A constant and an array length computed from size_of stay symbolic in
    the interface and in the IR of a library. A module that imports it uses
    them in its own types. */
@@ -1220,6 +1256,7 @@ void test_modules(void)
     lowers_imports();
     writes_format();
     round_trip();
+    round_trip_class();
     keeps_symbolic_sizes();
     package_and_docs();
     private_field_docs();
