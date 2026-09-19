@@ -94,8 +94,9 @@ extern const struct anti_trampolines anti_rt_trampolines;
 
 /* Call the function at index of the list of the object's class through
    its table, with the reflect.Values at args. The result goes to result.
-   Gives 0 and leaves result alone when the call cannot be made. */
-int8_t anti_rt_reflect_call(void *object, int64_t index, const void *args,
-                            int64_t count, void *result);
+   Gives the reason, and leaves result alone, when the call cannot be
+   made. */
+int64_t anti_rt_reflect_call(void *object, int64_t index, const void *args,
+                             int64_t count, void *result);
 
 #endif

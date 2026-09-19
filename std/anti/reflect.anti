@@ -14,8 +14,9 @@
 //! `call` calls a public function by its index through the table of the
 //! object's class. Its arguments and its result are `Value`s, and the
 //! compiler writes one trampoline per signature of the program that
-//! unpacks them. `--no-reflect` drops the function lists, and every
-//! `call` then gives a value of kind `None`.
+//! unpacks them. `set` and `call` follow the error convention, and the
+//! code of an error names the reason. `--no-reflect` drops the function
+//! lists, and every `call` then gives the error `BAD_INDEX`.
 
 import anti.error;
 import anti.text;
@@ -37,7 +38,7 @@ extern fn anti_rt_reflect_set(object: *byte, d: *byte, index: int,
 	value: *Value) -> int;
 extern fn anti_rt_reflect_new(name: *byte, length: int) -> *Object;
 extern fn anti_rt_reflect_call(object: *Object, index: int, args: *Value,
-	count: int, result: *Value) -> bool;
+	count: int, result: *Value) -> int;
 
 /// The type of a field, as its record names it.
 ///
@@ -258,14 +259,32 @@ pub fn of_ptr(v: *byte) -> Value
 /// The index counts the list that `function` reads, so the seven
 /// functions of the root come first. `args` holds one value per
 /// parameter after `self`, of the kind that parameter takes, and the call
-/// goes through the table of the object as any call does. The result is
-/// the value the function returns. An index out of range, an abstract
-/// function, a signature that a `Value` cannot carry and arguments of
-/// another count or kind give a value of kind `None`, as a function
-/// without a result does.
-pub fn call(object: *Object, index: int, args: []Value) -> Value
+/// goes through the table of the object as any call does. `out` receives
+/// the value the function returns, which is of kind `None` for a function
+/// without a result. An index out of range gives an error with the code
+/// `BAD_INDEX`, and a signature with a type that no `Value` carries one
+/// with `NOT_CARRIED`. Arguments of another count give `WRONG_COUNT`, and
+/// of another kind `WRONG_KIND`.
+pub fn call(object: *Object, index: int, args: []Value, out: *Value)
+	-> *error.Error
 {
-	let result = none();
-	anti_rt_reflect_call(object, index, args.ptr, args.len, &result);
-	return result;
+	*out = none();
+	let reason = anti_rt_reflect_call(object, index, args.ptr, args.len, out);
+	if reason == BAD_INDEX {
+		return error.Error.new(BAD_INDEX,
+			"the class has no public function at this index");
+	}
+	if reason == NOT_CARRIED {
+		return error.Error.new(NOT_CARRIED,
+			"no Value carries a type of this function");
+	}
+	if reason == WRONG_COUNT {
+		return error.Error.new(WRONG_COUNT,
+			"the function takes another number of arguments");
+	}
+	if reason == WRONG_KIND {
+		return error.Error.new(WRONG_KIND,
+			"an argument is of another kind than its parameter takes");
+	}
+	return null;
 }

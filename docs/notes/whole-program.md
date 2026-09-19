@@ -103,6 +103,8 @@ language or a user of the tools can observe.
   call follows is `anti.rt.signature.<text>`. It checks the count and the kind of every
   `Value`, reads each argument at the type of its parameter, narrowing from the width the
   `Value` holds, calls the entry and widens the result back into a `Value`.
+- `rt/call.c` checks the index, the entry, the signature and the count before it calls the
+  trampoline. A trampoline that refuses the call therefore found a wrong kind.
 - A `str` argument passes the address of its bytes inside the `Value`, as lowering passes
   an aggregate.
 - The layout of a `Value` is the aggregate `anti.reflect.Value`, so the trampolines hold

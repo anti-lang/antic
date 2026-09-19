@@ -8,4 +8,8 @@ exit 0
 2 299
 0 1
 Square
-0 0 0 0
+1 the function takes another number of arguments
+1 an argument is of another kind than its parameter takes
+1 the class has no public function at this index
+1
+1 no Value carries a type of this function

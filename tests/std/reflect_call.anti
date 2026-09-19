@@ -1,7 +1,8 @@
 //! `reflect.call` calls a public function through the table of the
 //! object's class. The arguments and the result are `Value`s, and the
 //! compiler writes one trampoline per signature of the program. A call
-//! whose arguments do not fit the function gives a value of kind `None`.
+//! that cannot be made gives an error whose code names the reason, and
+//! kind `None` means only that the function has no result.
 import anti.reflect;
 
 extern fn printf(fmt: *byte, ...) -> c_int;
@@ -59,6 +60,11 @@ class Square
 	{
 		self.side = 1;
 	}
+
+	pub fn total(self, parts: []int) -> int
+	{
+		return parts.len;
+	}
 }
 
 fn main() -> int
@@ -68,47 +74,75 @@ fn main() -> int
 	let none = []reflect.Value { ptr: null, len: 0 };
 
 	/* The seven functions of the root come first, then the chain's. */
-	let area = reflect.call(o, 7, none);
+	let area = reflect.call(o, 7, none) catch fatal;
 	printf("%d %d\n".ptr, area.kind as c_int, area.data.i as c_int);
 
 	let label_args = [reflect.of_int(1), reflect.of_str("tag")];
-	let label = reflect.call(o, 8, label_args[0..2]);
+	let label = reflect.call(o, 8, label_args[0..2]) catch fatal;
 	printf("%d %.*s\n".ptr, label.kind as c_int, label.data.s.len as c_int,
 		label.data.s.ptr);
 
 	let grow_args = [reflect.of_uint(2), reflect.of_float(1.5)];
-	let grown = reflect.call(o, 9, grow_args[0..2]);
+	let grown = reflect.call(o, 9, grow_args[0..2]) catch fatal;
 	printf("%d %.2f %d\n".ptr, grown.kind as c_int, grown.data.f,
 		s.side as c_int);
 
 	let flip_args = [reflect.of_bool(true)];
-	let flipped = reflect.call(o, 10, flip_args[0..1]);
+	let flipped = reflect.call(o, 10, flip_args[0..1]) catch fatal;
 	printf("%d %d\n".ptr, flipped.kind as c_int, flipped.data.b as c_int);
 
 	let char_args = [reflect.of_char('z')];
-	let same = reflect.call(o, 11, char_args[0..1]);
+	let same = reflect.call(o, 11, char_args[0..1]) catch fatal;
 	printf("%d %d\n".ptr, same.kind as c_int, same.data.c as u32 as c_int);
 
-	let me = reflect.call(o, 12, none);
+	let me = reflect.call(o, 12, none) catch fatal;
 	printf("%d %d\n".ptr, me.kind as c_int, (me.data.p == s as *byte) as c_int);
 
 	let small_args = [reflect.of_int(-1)];
-	let small = reflect.call(o, 13, small_args[0..1]);
+	let small = reflect.call(o, 13, small_args[0..1]) catch fatal;
 	printf("%d %d\n".ptr, small.kind as c_int, small.data.u as c_int);
 
-	let reset = reflect.call(o, 14, none);
+	let reset = reflect.call(o, 14, none) catch fatal;
 	printf("%d %d\n".ptr, reset.kind as c_int, s.side as c_int);
 
 	/* A root function goes through the table like any other. */
-	let name = reflect.call(o, 0, none);
+	let name = reflect.call(o, 0, none) catch fatal;
 	printf("%.*s\n".ptr, name.data.s.len as c_int, name.data.s.ptr);
 
-	/* A count, a kind or an index that does not fit gives None. */
+	/* A count, a kind or an index that does not fit, and a signature
+	   that no Value carries, give an error that names the reason. */
 	let wrong_kind = [reflect.of_int(2), reflect.of_float(1.5)];
-	printf("%d %d %d %d\n".ptr, reflect.call(o, 7, flip_args[0..1]).kind as c_int,
-		reflect.call(o, 9, wrong_kind[0..2]).kind as c_int,
-		reflect.call(o, 99, none).kind as c_int,
-		reflect.call(o, -1, none).kind as c_int);
+	let count = reflect.call(o, 7, flip_args[0..1]) catch e {
+		printf("%d %.*s\n".ptr, (e.code == reflect.WRONG_COUNT) as c_int,
+			e.message.len as c_int, e.message.ptr);
+		yield reflect.none();
+	};
+	let kind = reflect.call(o, 9, wrong_kind[0..2]) catch e {
+		printf("%d %.*s\n".ptr, (e.code == reflect.WRONG_KIND) as c_int,
+			e.message.len as c_int, e.message.ptr);
+		yield reflect.none();
+	};
+	let high = reflect.call(o, 99, none) catch e {
+		printf("%d %.*s\n".ptr, (e.code == reflect.BAD_INDEX) as c_int,
+			e.message.len as c_int, e.message.ptr);
+		yield reflect.none();
+	};
+	let low = reflect.call(o, -1, none) catch e {
+		printf("%d\n".ptr, (e.code == reflect.BAD_INDEX) as c_int);
+		yield reflect.none();
+	};
+	let slices = reflect.call(o, 15, none) catch e {
+		printf("%d %.*s\n".ptr, (e.code == reflect.NOT_CARRIED) as c_int,
+			e.message.len as c_int, e.message.ptr);
+		yield reflect.none();
+	};
+	if count.kind != reflect.ValueKind.None ||
+		kind.kind != reflect.ValueKind.None ||
+		high.kind != reflect.ValueKind.None ||
+		low.kind != reflect.ValueKind.None ||
+		slices.kind != reflect.ValueKind.None {
+		return 1;
+	}
 	delete(s);
 	return 0;
 }
