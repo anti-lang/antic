@@ -187,8 +187,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 439 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 438 each, without the `no_paths` test, which needs a
+- 446 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 445 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
