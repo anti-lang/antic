@@ -112,45 +112,41 @@ set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "rt/${source}.c")
 endforeach()
-add_library(anti_rt STATIC ${anti_rt_files})
-set_target_properties(anti_rt PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}"
-    C_VISIBILITY_PRESET hidden)
-if(APPLE)
-    # The minimum macOS version of both macOS targets, the same value as
-    # MACOS_MIN_MAJOR and MACOS_MIN_MINOR in src/target.h. The linker warns
-    # when an object was built for a newer version than the executable.
-    target_compile_options(anti_rt PRIVATE -mmacosx-version-min=11.0)
-endif()
-# DESIGN: sanitizers check antic. Anti programs link the runtime without a
-# sanitizer runtime, so the runtime carries no sanitizer instrumentation,
-# whatever CMAKE_C_FLAGS holds in a sanitizer configuration.
-if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(anti_rt PRIVATE -fno-sanitize=all)
-endif()
-configure_file(rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
+# DESIGN: a macOS runtime library comes from the cross build below on every
+# host, the Mac included, so that one object links to the same bytes on
+# every host. A Mac builds no host library of its own.
+if(NOT ANTIC_HOST_OS STREQUAL "macos")
+    add_library(anti_rt STATIC ${anti_rt_files})
+    set_target_properties(anti_rt PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}"
+        C_VISIBILITY_PRESET hidden)
+    # DESIGN: sanitizers check antic. Anti programs link the runtime without a
+    # sanitizer runtime, so the runtime carries no sanitizer instrumentation,
+    # whatever CMAKE_C_FLAGS holds in a sanitizer configuration.
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(anti_rt PRIVATE -fno-sanitize=all)
+    endif()
 
-# The licence stub of a bundled archive lies beside the runtime library as
-# an object of its own, so that a program never links it instead of the
-# licence text of rt/license.c.
-add_library(anti_rt_license_stub OBJECT rt/license_stub.c)
-if(APPLE)
-    target_compile_options(anti_rt_license_stub PRIVATE
-        -mmacosx-version-min=11.0)
+    # The licence stub of a bundled archive lies beside the runtime library as
+    # an object of its own, so that a program never links it instead of the
+    # licence text of rt/license.c.
+    add_library(anti_rt_license_stub OBJECT rt/license_stub.c)
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(anti_rt_license_stub PRIVATE -fno-sanitize=all)
+    endif()
+    set_target_properties(anti_rt_license_stub PROPERTIES C_VISIBILITY_PRESET hidden)
+    add_custom_target(anti_rt_license_stub_copy ALL
+        COMMAND "${CMAKE_COMMAND}" -E make_directory
+            "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_OBJECTS:anti_rt_license_stub>"
+            "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}/anti_rt_license_stub${CMAKE_C_OUTPUT_EXTENSION}"
+        DEPENDS anti_rt_license_stub
+        COMMAND_EXPAND_LISTS
+        VERBATIM)
 endif()
-if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(anti_rt_license_stub PRIVATE -fno-sanitize=all)
-endif()
-set_target_properties(anti_rt_license_stub PROPERTIES C_VISIBILITY_PRESET hidden)
-add_custom_target(anti_rt_license_stub_copy ALL
-    COMMAND "${CMAKE_COMMAND}" -E make_directory
-        "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        "$<TARGET_OBJECTS:anti_rt_license_stub>"
-        "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}/anti_rt_license_stub${CMAKE_C_OUTPUT_EXTENSION}"
-    DEPENDS anti_rt_license_stub
-    COMMAND_EXPAND_LISTS
-    VERBATIM)
+
+configure_file(rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
 
 # The sysroot of each target that lld links against, which
 # tools/get-sysroot.cmake installs, goes to sysroot/<target> of the runtime
@@ -188,8 +184,8 @@ endif()
 
 # DESIGN: clang compiles the runtime for every other target that has a
 # sysroot, so that antic links a program for each of them from this host.
-# Linux takes the headers of musl, macOS the SDK of the host and Windows
-# the headers that xwin installs.
+# Linux takes the headers of musl, macOS the headers of the Zig release
+# that the sysroot holds and Windows the headers that xwin installs.
 function(anti_cross_runtime target triple)
     set(objects "")
     set(work "${CMAKE_BINARY_DIR}/cross/${target}")
@@ -247,7 +243,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
         OUTPUT_VARIABLE clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
     foreach(target IN LISTS ANTIC_TARGETS)
         set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
-        if(target STREQUAL ANTIC_HOST_TARGET OR NOT EXISTS "${sysroot}")
+        if(NOT EXISTS "${sysroot}" OR
+           (target STREQUAL ANTIC_HOST_TARGET AND NOT target MATCHES "^macos-"))
             continue()
         endif()
         if(target STREQUAL "linux-x86_64" OR target STREQUAL "linux-arm64")
@@ -256,14 +253,14 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
             anti_cross_runtime(${target} ${arch}-linux-musl -fPIC -nostdinc
                 -isystem "${sysroot}/usr/include"
                 -isystem "${clang_resource}/include")
-        elseif(APPLE AND target STREQUAL "macos-x86_64")
-            # DESIGN: a clang from the LLVM release has no default SDK, so
-            # the cross compile names the one of this Mac.
+        elseif(target STREQUAL "macos-x86_64")
+            # The minimum macOS version of the triple is 11.0, the value of
+            # MACOS_MIN_MAJOR and MACOS_MIN_MINOR in src/target.h.
             anti_cross_runtime(${target} x86_64-apple-macos11
-                -isysroot "${ANTIC_MACOS_SDK}")
-        elseif(APPLE AND target STREQUAL "macos-arm64")
+                -isysroot "${sysroot}")
+        elseif(target STREQUAL "macos-arm64")
             anti_cross_runtime(${target} arm64-apple-macos11
-                -isysroot "${ANTIC_MACOS_SDK}")
+                -isysroot "${sysroot}")
         elseif(target MATCHES "^windows")
             string(REPLACE "windows-arm64" "aarch64" arch "${target}")
             string(REPLACE "windows-x86_64" "x86_64" arch "${arch}")

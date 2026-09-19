@@ -2,7 +2,8 @@
 # <dir>/<target>/, and the licence of each component into <dir>/licenses/.
 #
 #   cmake -DDEST=<dir> -DLLVM_BIN=<dir> -DTARGETS=<target>[;<target>]
-#         [-DCLANG_DIR=<dir>] [-DACCEPT_LICENSE=yes] -P tools/get-sysroot.cmake
+#         [-DCLANG_DIR=<dir>] [-DACCEPT_LICENSE=yes] [-DAPPLE_SDK=<dir>]
+#         -P tools/get-sysroot.cmake
 #
 # linux-x86_64, linux-arm64: musl from the Alpine package of
 #   tools/sysroot-pins, checked against its digest, and the compiler-rt
@@ -11,10 +12,11 @@
 # linux-x86_64-glibc, linux-arm64-glibc: glibc 2.35 and the kernel headers
 #   of Ubuntu 22.04 from the packages of tools/sysroot-pins, for the Linux
 #   link mode against glibc.
-# macos-arm64, macos-x86_64: the .tbd stubs of libSystem from the newest
-#   SDK of the Command Line Tools for Xcode that ld64.lld in LLVM_BIN
-#   reads. Only on a Mac, because Apple licenses the SDK for its own
-#   hardware.
+# macos-arm64, macos-x86_64: the stubs of libSystem that Zig generates and
+#   the headers of the macOS C library, from the release of Zig that
+#   tools/zig-stubs-pin names, on every host. They link every program that
+#   names no framework. APPLE_SDK=<MacOSX.sdk> also copies the .tbd stubs
+#   of that SDK into sdk/ of the sysroot, for a program that names one.
 # windows-x86_64, windows-arm64: the MSVC CRT and the Windows SDK import
 #   libraries, which xwin downloads at the versions of tools/sysroot-pins.
 #   Microsoft licenses them to the user, so the script runs xwin only with
@@ -37,6 +39,8 @@ if(NOT DEFINED CLANG_DIR)
     get_filename_component(CLANG_DIR "${tools_dir}/../build/clang" ABSOLUTE)
 endif()
 file(STRINGS "${tools_dir}/sysroot-pins" pins REGEX "^[A-Z]")
+file(STRINGS "${tools_dir}/zig-stubs-pin" zig_pins REGEX "^[A-Z]")
+list(APPEND pins ${zig_pins})
 foreach(line IN LISTS pins)
     string(REGEX REPLACE "^([^=]+)=(.*)$" "\\1;\\2" pair "${line}")
     list(GET pair 0 key)
@@ -157,50 +161,67 @@ function(linux_sysroot target arch musl_digest)
          "${DEST}/licenses/compiler-rt.txt")
 endfunction()
 
-function(macos_sysroot target arch)
-    if(NOT CMAKE_HOST_APPLE)
-        message(FATAL_ERROR "${target}: Apple licenses the SDK for its own "
-                            "hardware, so the stubs come from a Mac")
+# Copy the .tbd stubs of the SDK that APPLE_SDK names into <dest>: those of
+# usr/lib and of System/Library/Frameworks, as regular files. A linked stub
+# becomes a copy, as the top-level stub of a framework is. A linked
+# directory stays out, since lld reads no path through Versions/Current.
+# Write the version of the SDK and the digest of what was copied.
+function(apple_sdk dest)
+    get_filename_component(sdk "${APPLE_SDK}" ABSOLUTE)
+    if(NOT EXISTS "${sdk}/SDKSettings.json")
+        message(FATAL_ERROR "APPLE_SDK names ${sdk}, which holds no "
+                            "SDKSettings.json of a MacOSX.sdk")
     endif()
-    set(sdks "/Library/Developer/CommandLineTools/SDKs")
-    file(GLOB found "${sdks}/MacOSX[0-9]*.[0-9]*.sdk")
-    if(found STREQUAL "")
-        message(FATAL_ERROR "${sdks} holds no SDK. Run xcode-select --install")
-    endif()
-    list(SORT found COMPARE NATURAL ORDER DESCENDING)
-    set(chosen "")
-    foreach(path IN LISTS found)
-        string(REGEX REPLACE ".*MacOSX(.*)\\.sdk$" "\\1" version "${path}")
-        execute_process(
-            COMMAND "${LLVM_BIN}/ld64.lld" -arch "${arch}"
-                    -platform_version macos 11.0 "${version}"
-                    -syslibroot "${path}" -dylib -o "${DEST}/.probe.dylib"
-                    -lSystem
-            RESULT_VARIABLE linked OUTPUT_QUIET ERROR_QUIET)
-        if(linked EQUAL 0)
-            set(chosen "${version}")
-            set(chosen_path "${path}")
-            break()
-        endif()
+    file(READ "${sdk}/SDKSettings.json" settings)
+    string(JSON version GET "${settings}" Version)
+    file(REMOVE_RECURSE "${dest}")
+    foreach(dir usr/lib System/Library/Frameworks)
+        file(GLOB_RECURSE stubs RELATIVE "${sdk}" "${sdk}/${dir}/*.tbd")
+        foreach(stub IN LISTS stubs)
+            get_filename_component(parent "${dest}/${stub}" DIRECTORY)
+            file(MAKE_DIRECTORY "${parent}")
+            file(READ "${sdk}/${stub}" text)
+            file(WRITE "${dest}/${stub}" "${text}")
+        endforeach()
     endforeach()
-    file(REMOVE "${DEST}/.probe.dylib")
-    if(chosen STREQUAL "")
-        message(FATAL_ERROR "no SDK of the Command Line Tools links with "
-                            "${LLVM_BIN}/ld64.lld")
-    endif()
+    tree_digest("${dest}" digest)
+    file(WRITE "${dest}/sdk-version" "${version}\n")
+    file(WRITE "${dest}/digest" "${digest}\n")
+    message(STATUS "${dest}: the stubs of the SDK ${version}")
+endfunction()
+
+# DESIGN: a macOS program that names no framework links against the stubs
+# of libSystem that Zig generates, on every host and the Mac as well, so
+# one object links to the same bytes anywhere. The runtime library
+# compiles against the headers beside them for the same reason. Zig ships
+# no framework, so a program that names one takes Apple's SDK. The SDK
+# keeps to sdk/ of the sysroot, which this function leaves alone.
+function(macos_sysroot target arch)
     set(root "${DEST}/${target}")
-    file(REMOVE_RECURSE "${root}")
+    set(work "${DEST}/.download/zig")
+    set(zig "zig-${ZIG_TAG}")
+    string(REPLACE "@TAG@" "${ZIG_TAG}" url "${ZIG_URL}")
+    fetch("${url}" "${work}/${zig}.tar.xz" "${ZIG_DIGEST}")
+    if(NOT EXISTS "${work}/${zig}/LICENSE")
+        file(ARCHIVE_EXTRACT INPUT "${work}/${zig}.tar.xz" DESTINATION "${work}"
+             PATTERNS "${zig}/LICENSE" "${zig}/lib/libc/darwin/*"
+                      "${zig}/lib/libc/include/any-darwin-any/*")
+    endif()
+    file(REMOVE_RECURSE "${root}/usr" "${root}/sdk-version")
     file(MAKE_DIRECTORY "${root}/usr/lib")
-    file(COPY "${chosen_path}/usr/lib/libSystem.tbd"
-              "${chosen_path}/usr/lib/libSystem.B.tbd"
-              "${chosen_path}/usr/lib/system"
-         DESTINATION "${root}/usr/lib")
-    file(WRITE "${root}/sdk-version" "${chosen}\n")
-    file(WRITE "${DEST}/licenses/macos-sdk.txt"
-"The .tbd stubs in sysroot/macos-arm64 and sysroot/macos-x86_64 are copied
-from MacOSX${chosen}.sdk of the Command Line Tools for Xcode on the build Mac.
-Apple distributes that SDK under the Xcode and Apple SDKs Agreement.
-")
+    file(COPY_FILE "${work}/${zig}/lib/libc/darwin/libSystem.tbd"
+         "${root}/usr/lib/libSystem.tbd")
+    file(COPY "${work}/${zig}/lib/libc/include/any-darwin-any/"
+         DESTINATION "${root}/usr/include")
+    file(READ "${work}/${zig}/lib/libc/darwin/SDKSettings.json" settings)
+    string(JSON version GET "${settings}" MinimalDisplayName)
+    file(WRITE "${root}/sdk-version" "${version}\n")
+    file(COPY_FILE "${work}/${zig}/LICENSE" "${DEST}/licenses/zig.txt")
+    fetch("${APSL_URL}" "${DEST}/.download/apsl.txt" "${APSL_DIGEST}")
+    file(COPY_FILE "${DEST}/.download/apsl.txt" "${DEST}/licenses/apsl.txt")
+    if(DEFINED APPLE_SDK)
+        apple_sdk("${root}/sdk")
+    endif()
 endfunction()
 
 # The xwin program of the pin, from the path or from its own release.

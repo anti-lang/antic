@@ -1,0 +1,11 @@
+# The release of Zig whose generated stubs of libSystem link a program for
+# macos-arm64 and macos-x86_64 on every host, and whose headers of the
+# macOS C library rt/ compiles against. The digest is the one that
+# ziglang.org publishes for the source archive, and @TAG@ takes the tag.
+# Zig's own files carry its MIT licence. The headers carry Apple's APSL
+# 2.0, whose text comes from a release of the SPDX licence list.
+ZIG_TAG=0.16.0
+ZIG_URL=https://ziglang.org/download/@TAG@/zig-@TAG@.tar.xz
+ZIG_DIGEST=43186959edc87d5c7a1be7b7d2a25efffd22ce5807c7af99067f86f99641bfdf
+APSL_URL=https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/APSL-2.0.txt
+APSL_DIGEST=2d0c12edaaf8d31fec6796fef99291b12e833b6bef28100975120a53d209e06d
