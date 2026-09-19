@@ -1,0 +1,76 @@
+//! `dup` gives an `own` field memory of its own and copies what it holds:
+//! every element of an `own` slice, and the whole object behind an `own`
+//! pointer to a class, at the size of its own class. A pointer to an
+//! interface points into the new object, as it did into the old one, and
+//! `delete` frees the object it points into.
+extern fn printf(fmt: *byte, ...) -> c_int;
+
+class Shape
+{
+	pub n: int = 1,
+}
+
+class Circle
+{
+	inherits Shape,
+	pub r: int = 5,
+}
+
+abstract class Named
+{
+	abstract fn label(self) -> int;
+}
+
+class Tag
+{
+	pub id: int = 3,
+	implements named: Named,
+
+	concrete fn Named::label(self) -> int
+	{
+		return self.id * 100;
+	}
+}
+
+struct Size
+{
+	w: i32,
+	h: i32,
+}
+
+class Holder
+{
+	pub own counts: []i32,
+	pub own shape: *Shape = null,
+	pub own spot: *Size = null,
+	pub own named: *Named = null,
+}
+
+fn main() -> int
+{
+	let h = alloc Holder {
+		counts: []i32 { ptr: alloc(i32, 4), len: 4 },
+		shape: alloc Circle { r: 7 },
+		spot: alloc Size { w: 2, h: 3 },
+	};
+	let tag = alloc Tag { id: 4 };
+	h.named = tag as *Named;
+	h.counts[0] = 10;
+	h.counts[1] = 20;
+	h.counts[2] = 30;
+	h.counts[3] = 40;
+	let c = dup(h);
+	h.counts[3] = 0;
+	h.spot.w = 0;
+	(h.shape as *Circle).r = 0;
+	printf("%d %d %d %d\n".ptr, c.counts[0] as c_int, c.counts[1] as c_int,
+		c.counts[2] as c_int, c.counts[3] as c_int);
+	printf("%d %d\n".ptr, (c.shape is *Circle) as c_int,
+		(c.shape as *Circle).r as c_int);
+	printf("%d %d\n".ptr, c.spot.w as c_int, c.spot.h as c_int);
+	tag.id = 0;
+	printf("%d\n".ptr, c.named.label() as c_int);
+	delete(c);
+	delete(h);
+	return 0;
+}

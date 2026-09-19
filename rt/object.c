@@ -475,28 +475,26 @@ void anti_rt_Object_destruct(struct anti_object *self)
     (void)self;
 }
 
-/* The bytes and the length of the memory an `own` field points at. A
-   pointer field owns one value of the class the field names, and a slice
-   field owns its length in bytes of its element. */
+/* The address of the memory an `own` field points at, and its size in
+   bytes. A pointer owns one element of its type, and a slice its length
+   in elements. */
 static void **owned_at(void *object, const struct anti_field *f,
                        int64_t *size)
 {
     void **slot = (void **)((char *)object + f->offset);
+    int64_t count = 1;
 
-    if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_PTR) {
-        *size = f->descriptor != NULL ? f->descriptor->size : 0;
-        return slot;
+    if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE) {
+        memcpy(&count, (char *)slot + sizeof(void *), sizeof count);
     }
-    /* A slice is a pointer and a length, and the length counts elements
-       of one byte for []byte. Anything wider needs the element size,
-       which the field list does not hold, so the copy is shallow. */
-    *size = ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE ? ((int64_t *)slot)[1]
-                                                     : 0;
+    *size = count * (int64_t)anti_rt_element_size(f->type, f->descriptor);
     return slot;
 }
 
 /* A copy of every byte of the object, then a fresh copy of the memory
-   behind each `own` field of the chain. */
+   behind each `own` field of the chain. An object behind an `own`
+   pointer is copied by its own copy entry, at the size of its own class.
+   Its `own` fields are then copied too. */
 void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
@@ -517,7 +515,20 @@ void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
             }
             from = owned_at(self, f, &size);
             into = owned_at(to, f, &size);
-            if (*from == NULL || size <= 0) {
+            if (*from == NULL) {
+                continue;
+            }
+            if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_PTR &&
+                ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
+                /* A pointer to an interface points into its object, and
+                   the copy keeps the same place in the new one. */
+                size_t inside = (size_t)((char *)*from -
+                                         (char *)anti_rt_object_of(*from));
+                char *made = anti_rt_dup(*from);
+                *into = made == NULL ? NULL : made + inside;
+                continue;
+            }
+            if (size <= 0) {
                 continue;
             }
             *into = malloc((size_t)size);
@@ -588,7 +599,14 @@ void anti_rt_destroy(void *object)
                 continue;
             }
             slot = owned_at(object, f, &size);
-            free(*slot);
+            /* A pointer to an interface points into its object, and the
+               memory to free starts at the object. */
+            if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_PTR &&
+                ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
+                free(anti_rt_object_of(*slot));
+            } else {
+                free(*slot);
+            }
             *slot = NULL;
         }
     }
