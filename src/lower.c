@@ -362,6 +362,19 @@ static struct ir_function *c_function(struct lowerer *l, const char *name,
     return f;
 }
 
+/* calloc of C, which takes a count and a size. */
+static struct ir_function *calloc_function(struct lowerer *l)
+{
+    struct ir_function *f = find_function(l->m, NULL, "calloc");
+
+    if (f == NULL) {
+        f = ir_extern_add(l->m, "calloc", IR_PTR, false);
+        ir_param_add(f, IR_I64, IR_NO_AGG);
+        ir_param_add(f, IR_I64, IR_NO_AGG);
+    }
+    return f;
+}
+
 /* The IR function of a function symbol. An imported function is found by
    its module and name, or declared at its first call. */
 static struct ir_function *callee_function(struct lowerer *l,
@@ -3565,6 +3578,16 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         v = lower_expr(l, e->as.alloc.count);
         if (l->failed) {
             return none();
+        }
+        /* DESIGN: the elements of a class come zeroed, so one the
+           program has not filled has a zero table, which the null-table
+           check reports. Other elements are C's and keep malloc. */
+        if (e->type->element->kind == TYPE_CLASS) {
+            struct ir_operand args[2];
+            args[0] = v;
+            args[1] = size_operand(l, e->type->element);
+            return temp(l, ir_call(l->f, l->b, IR_PTR,
+                                   ir_func_op(calloc_function(l)), args, 2));
         }
         size = ir_binary(l->f, l->b, IR_MUL, IR_I64, v,
                          size_operand(l, e->type->element));

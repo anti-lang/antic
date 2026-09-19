@@ -98,6 +98,56 @@ static const struct ir_function *function_named(const struct ir_module *m,
     return NULL;
 }
 
+/* Whether the printed body of function name in the IR of source holds
+   fragment. */
+static bool body_holds(const char *source, const char *name,
+                       const char *fragment)
+{
+    struct lowered l;
+    struct text out = {0};
+    char header[128];
+    const char *start;
+    const char *end;
+    bool found = false;
+
+    run(&l, source);
+    CHECK(l.ok);
+    ir_print(&out, &l.ir);
+    snprintf(header, sizeof header, "fn %s(", name);
+    start = strstr(text_cstr(&out), header);
+    end = start != NULL ? strstr(start, "\n}\n") : NULL;
+    if (end != NULL) {
+        const char *at = strstr(start, fragment);
+        found = at != NULL && at < end;
+    }
+    if (!found) {
+        fprintf(stderr, "%s holds no `%s`:\n%s", name, fragment,
+                text_cstr(&out));
+    }
+    text_free(&out);
+    release(&l);
+    return found;
+}
+
+/* alloc(T, n) of a class fills the memory with zeros, so an element the
+   program has not filled has a zero table. A struct and a primitive keep
+   malloc. */
+static void allocates_zeroed_classes(void)
+{
+    static const char source[] =
+        "class Item { pub n: int = 0 }\n"
+        "struct Point { x: int, y: int }\n"
+        "fn items(n: int) -> *Item { return alloc(Item, n); }\n"
+        "fn points(n: int) -> *Point { return alloc(Point, n); }\n"
+        "fn bytes(n: int) -> *u8 { return alloc(u8, n); }\n"
+        "fn one() -> *Item { return alloc Item { n: 1 }; }\n";
+
+    CHECK(body_holds(source, "main.items", "call ptr @calloc(%0, "));
+    CHECK(body_holds(source, "main.points", "call ptr @malloc("));
+    CHECK(body_holds(source, "main.bytes", "call ptr @malloc("));
+    CHECK(body_holds(source, "main.one", "call ptr @malloc("));
+}
+
 /* A class record names the tables of a class, its base, its interfaces
    and the `mutable` fields of a singleton. A `worker fn` keeps its mark.
    A call through a table names the class and the slot. */
@@ -1186,4 +1236,5 @@ void test_lower(void)
            "}\n");
     records_classes();
     records_type_ids();
+    allocates_zeroed_classes();
 }

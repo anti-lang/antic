@@ -170,7 +170,7 @@ Four levels, and each applies where it makes sense:
 - `fn construct(self)` runs after every literal and every `alloc` of the class, base first down the chain. It takes no arguments in this form and cannot fail.
 - `fn construct(self, args...) -> *Error` takes arguments and may fail. The class is then created with `alloc Circle(10.0)` on the heap or `Circle(10.0)` as a value. Defaults are applied, then `construct` runs with the arguments. On an error the heap object is freed, or the value is discarded, and the error is handed to the caller. See [Errors](#errors). A base `construct` with arguments is called by name from the derived one, `self.super.construct(x)`, at the top of its body.
 - One `construct` per class. Every alternative constructor is a static function with a name: `Circle.from_points(a, b)`.
-- `alloc Circle { r: 2.0 }` allocates one object on the heap, writes the literal into it, runs `construct`, and returns `*Circle`. `alloc(T, n)` stays the raw form for any type and returns uninitialised memory.
+- `alloc Circle { r: 2.0 }` allocates one object on the heap, writes the literal into it, runs `construct`, and returns `*Circle`. `alloc(T, n)` stays the raw form for any type. For a class it fills the memory with zeros, so an element not filled yet has a zero table, and for a struct or a primitive it stays `malloc` and returns uninitialised memory.
 - `[&c, &s]` has type `[2]*Shape` only when the context gives that type. Without context each element keeps its own pointer type.
 
 ## Destruction
