@@ -122,12 +122,12 @@ openssl checks their signature. Windows configures with `-G Ninja`.
    and antic downloads the archive of its host. `docs/decisions.md` carries it
    under "Scope and toolchain", and `docs/reports/2026-09-21-llvm-tools.md` of
    that repository reports the first release.
-2. The whole-program pass over the IR of every module. It is the first
-   compiler work. Four things are passes over it: release-mode
+2. Done. The whole-program pass over the IR of every module, with release-mode
    devirtualisation, the class registry, the singleton check and the used-slot
-   bitmaps that plugins need. Build the pass once, then those.
-3. The class registry, and with it `anti.reflect`'s `call`, `new` and `Value`,
-   and `Object.deserialize`.
+   bitmaps. `docs/reports/2026-09-19-whole-program.md` reports it, and
+   `docs/notes/whole-program.md` holds its choices.
+3. `anti.reflect`'s `call` and `Value`. The registry, `new` and
+   `Object.deserialize` are done.
 4. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
    its own module path as a compile-time constant. The check is then one
    comparison against a table read at start. `log.named("http")` may exist
@@ -158,11 +158,14 @@ reports what it finished.
   with thunks, four visibility levels, `construct` and `destruct`, operators,
   singletons, the error forms and reflection over descriptors.
 - `worker fn`, `parallel` and `dispatch` compile and run on all six targets.
+- A pass over the whole program's IR runs after lowering. In dev mode it runs
+  for the module that links. It holds release devirtualisation, the class
+  registry, the singleton check and the used-slot bitmaps.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 404 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 403 each, without the `no_paths` test, which needs a
+- 428 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 427 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
