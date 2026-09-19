@@ -453,6 +453,19 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
     endforeach()
 endforeach()
 
+# One object links to the same bytes for macos-arm64 on every host.
+add_test(NAME link_identity_macos-arm64
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/return42.macos-arm64.sha256"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/link-identity"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_link_identity.cmake")
+set_tests_properties(link_identity_macos-arm64 PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # A program that names a framework links against Apple's SDK.
 foreach(target macos-arm64 macos-x86_64)
     add_test(NAME framework_${target}
