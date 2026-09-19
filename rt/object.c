@@ -515,11 +515,31 @@ static void *table_entry(const void *object, enum anti_entry entry)
     return o == NULL || o->table == NULL ? NULL : (void *)o->table[entry];
 }
 
+/* Copy each class value of an `own` slice with its own copy entry, over
+   the bytes already copied. The elements are values of the field's
+   class, so each one takes the size of that class. */
+static void copy_elements(char *from, char *into, int64_t size,
+                          const struct anti_descriptor *d)
+{
+    int64_t at;
+
+    for (at = 0; d != NULL && d->size > 0 && at < size; at += d->size) {
+        void (*copy)(struct anti_object *, struct anti_object *) =
+            (void (*)(struct anti_object *, struct anti_object *))
+                table_entry(from + at, ANTI_ENTRY_COPY);
+        if (copy != NULL) {
+            copy((struct anti_object *)(from + at),
+                 (struct anti_object *)(into + at));
+        }
+    }
+}
+
 /* A copy of every byte of the object, then a fresh copy of the memory
    behind each `own` field of the chain. An object behind an `own`
    pointer is copied by its own copy entry, at the size of its own class.
-   Its `own` fields are then copied too. A class value held inline copies
-   what it owns by its own copy entry, into its place in the copy. */
+   Its `own` fields are then copied too. A class value held inline, and
+   each element of an `own` slice of class values, copies what it owns by
+   its own copy entry, into its place in the copy. */
 void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
@@ -570,6 +590,10 @@ void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
             *into = malloc((size_t)size);
             if (*into != NULL) {
                 memcpy(*into, *from, (size_t)size);
+                if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE &&
+                    ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
+                    copy_elements(*from, *into, size, f->descriptor);
+                }
             }
         }
     }
@@ -601,10 +625,20 @@ void *anti_rt_dup(void *object)
    What each level owns is destroyed after every body has run, so a body
    still reads what it owns. An object behind an `own` pointer is deleted,
    which runs its whole chain and destroys what it owns in turn, then
-   frees it. A class value held inline runs its chain in place. Any other
-   `own` field is a buffer and is freed. The elements of an `own` slice of
-   class values are not destroyed, since `alloc(T, n)` gives them no
-   table. */
+   frees it. A class value held inline runs its chain in place, and so
+   does each element of an `own` slice of class values before the buffer
+   is freed. Any other `own` field is a buffer and is freed. */
+/* Run the chain of each class value of an `own` slice in place. */
+static void destroy_elements(char *elements, int64_t size,
+                             const struct anti_descriptor *d)
+{
+    int64_t at;
+
+    for (at = 0; d != NULL && d->size > 0 && at < size; at += d->size) {
+        anti_rt_destroy(elements + at);
+    }
+}
+
 void anti_rt_destroy(void *object)
 {
     const struct anti_descriptor *d;
@@ -642,6 +676,11 @@ void anti_rt_destroy(void *object)
                 ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
                 anti_rt_delete(*slot);
             } else {
+                if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_SLICE &&
+                    ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS &&
+                    *slot != NULL) {
+                    destroy_elements(*slot, size, f->descriptor);
+                }
                 free(*slot);
             }
             *slot = NULL;

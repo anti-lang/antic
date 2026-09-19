@@ -4,8 +4,10 @@
 //! object it points into. A class value held inline, as a plain field or
 //! as a `use` field, runs its chain in place. `dup` gives such a value
 //! fresh copies of what it owns, so the copy and the original each free
-//! their own. A local whose inline field needs a teardown is torn down
-//! at the end of its block.
+//! their own. The elements of an `own` slice of class values run their
+//! chains before the buffer is freed, and `dup` copies each of them. A
+//! local whose inline field needs a teardown is torn down at the end of
+//! its block.
 
 extern fn printf(format: *byte, ...) -> c_int;
 
@@ -65,6 +67,22 @@ class Outer
 	}
 }
 
+class Item
+{
+	pub n: int = 0,
+	pub own leaf: *Leaf = null,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Item %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Shelf
+{
+	pub own items: []Item,
+}
+
 /* No destruct of its own and no `own` field: only the inline part asks
    for the teardown. */
 class Plain
@@ -95,6 +113,18 @@ fn main() -> int
 		(c.extra.leaf != o.extra.leaf) as c_int, o.part.leaf.n as c_int);
 	delete(c);
 	delete(o);
+
+	let shelf = alloc Shelf { items: []Item { ptr: alloc(Item, 2), len: 2 } };
+	shelf.items[0] = Item { n: 12, leaf: alloc Leaf { n: 13 } };
+	shelf.items[1] = Item { n: 14 };
+	let twin = dup(shelf);
+	twin.items[0].n = 120;
+	twin.items[0].leaf.n = 130;
+	twin.items[1].n = 140;
+	printf("%d %d\n".ptr, (twin.items[0].leaf != shelf.items[0].leaf) as c_int,
+		shelf.items[0].leaf.n as c_int);
+	delete(twin);
+	delete(shelf);
 
 	{
 		let p = Plain { part: Part { n: 10, leaf: alloc Leaf { n: 11 } } };
