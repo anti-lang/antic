@@ -124,10 +124,9 @@ ctest --test-dir build --output-on-failure
 ```
 
 The machine ran the whole suite on 2026-09-19 with the pinned clang and the sysroots of all
-six targets. It passes 343 of 349, among them every cross link and `link_identity_macos-arm64`.
-Six fail on Windows alone: `program_args` and `std_text` read UTF-8 output as the console
-code page, `program_abi_wchar` expects a `wchar_t` of 32 bits, and `std_error`, `std_log` and
-`std_signals` wait for a look.
+six targets. It passes 351 of 351, among them every cross link and `link_identity_macos-arm64`.
+Extract a tree from the Mac with `tar -xmf`. Ninja otherwise keeps objects that are newer
+than the files the tar restores.
 
 ### SSH from the Mac
 
