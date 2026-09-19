@@ -4619,9 +4619,11 @@ static void class_record(struct lowerer *l, const struct item *it)
              up = up->kind == TYPE_CLASS ? up->base : NULL) {
             for (k = 0; k < up->field_count; k++) {
                 if (up->fields[k].form == FIELD_IMPL) {
-                    ir_class_subtable(
-                        c, class_descriptor(l, up->fields[k].type)->index,
-                        interface_table(l, t, &up->fields[k])->index);
+                    uint32_t interface =
+                        class_descriptor(l, up->fields[k].type)->index;
+                    uint32_t table =
+                        interface_table(l, t, &up->fields[k])->index;
+                    ir_class_subtable(c, interface, table);
                 }
             }
         }
