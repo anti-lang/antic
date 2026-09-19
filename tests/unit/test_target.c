@@ -1,3 +1,4 @@
+#include "../binary_stdio.h"
 #include "check.h"
 #include "target.h"
 #include "text.h"

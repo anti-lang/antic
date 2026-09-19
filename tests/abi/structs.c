@@ -1,6 +1,7 @@
 /* C functions that take and return structs by value. The program test
    abi_structs calls them from Anti, so that clang checks the struct rules
    of each calling convention in antic. */
+#include "../binary_stdio.h"
 #include <stdint.h>
 
 struct Pair { int64_t a; double b; };

@@ -17,6 +17,8 @@ if(APPLE)
     set(HOST_SHARED_SUFFIX ".dylib")
 endif()
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 function(run)
     execute_process(COMMAND ${ARGN} RESULT_VARIABLE status
         OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
@@ -49,12 +51,21 @@ function(expect_header header expected)
     endif()
 endfunction()
 
-function(expect_output program expected)
-    run("${program}")
-    file(READ "${expected}" wanted)
-    if(NOT run_out STREQUAL wanted)
-        message(FATAL_ERROR "${program} printed\n${run_out}expected\n${wanted}")
+# Fail unless the program of ARGN exits with 0 and prints <wanted>, byte
+# for byte.
+function(expect_printed wanted)
+    program_output(got status "${dir}/printed.stdout" ${ARGN})
+    string(HEX "${wanted}" want)
+    if(NOT status EQUAL 0 OR NOT got STREQUAL want)
+        file(READ "${dir}/printed.stdout" text)
+        message(FATAL_ERROR "${ARGN} exited with ${status} and printed\n${text}"
+                            "expected\n${wanted}")
     endif()
+endfunction()
+
+function(expect_output program expected)
+    file(READ "${expected}" wanted)
+    expect_printed("${wanted}" "${program}")
 endfunction()
 
 set(dir "${WORK}/${CASE}")
@@ -86,8 +97,9 @@ elseif(CASE STREQUAL "classes")
     run(${CC} -std=c11 -I "${dir}" "${SOURCES}/canvas.c" "${dir}/libcanvas.a"
         "${runtime_library}" -o "${dir}/canvas")
     expect_output("${dir}/canvas" "${SOURCES}/canvas.expected")
+    # The copy finds ../binary_stdio.h through the directory of canvas.c.
     configure_file("${SOURCES}/canvas.c" "${dir}/canvas.cpp" COPYONLY)
-    run(${CXX} -std=c++17 -I "${dir}" "${dir}/canvas.cpp" "${dir}/libcanvas.a"
+    run(${CXX} -std=c++17 -I "${dir}" -I "${SOURCES}" "${dir}/canvas.cpp" "${dir}/libcanvas.a"
         "${runtime_library}" -o "${dir}/canvaspp")
     expect_output("${dir}/canvaspp" "${SOURCES}/canvas.expected")
 elseif(CASE STREQUAL "shared")
@@ -121,27 +133,18 @@ elseif(CASE STREQUAL "two")
     run(${CC} -I "${dir}/shared" "${SOURCES}/twolibs.c"
         "${dir}/shared/libgeo${HOST_SHARED_SUFFIX}"
         "${dir}/shared/libother${HOST_SHARED_SUFFIX}" -o "${dir}/two_shared")
-    run("${dir}/two_shared")
-    if(NOT run_out STREQUAL "10\n")
-        message(FATAL_ERROR "two shared libraries printed ${run_out}")
-    endif()
+    expect_printed("10\n" "${dir}/two_shared")
     library(geo static "${dir}/static")
     library(other static "${dir}/static")
     # The printed link line names the runtime library of the host.
     string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${run_out}")
     run(${CC} -I "${dir}/static" "${SOURCES}/twolibs.c" "${dir}/static/libgeo.a"
         "${dir}/static/libother.a" ${runtime_library} -o "${dir}/two_static")
-    run("${dir}/two_static")
-    if(NOT run_out STREQUAL "10\n")
-        message(FATAL_ERROR "two static libraries printed ${run_out}")
-    endif()
+    expect_printed("10\n" "${dir}/two_static")
 elseif(CASE STREQUAL "loader")
     library(geo shared "${dir}")
     run(${CC} "${SOURCES}/loader.c" -o "${dir}/loader")
-    run("${dir}/loader" "${dir}/libgeo${HOST_SHARED_SUFFIX}")
-    if(NOT run_out STREQUAL "1\n")
-        message(FATAL_ERROR "the constructor did not run: ${run_out}")
-    endif()
+    expect_printed("1\n" "${dir}/loader" "${dir}/libgeo${HOST_SHARED_SUFFIX}")
 elseif(CASE STREQUAL "header")
     library(geo static "${dir}")
     expect_header("${dir}/geo.h" geo.h)
@@ -184,10 +187,7 @@ elseif(CASE STREQUAL "bundle")
     library(notice static "${dir}/notice" --bundle-runtime)
     run(${CC} -I "${dir}/notice" "${SOURCES}/notice.c" "${dir}/notice/libnotice.a"
         -o "${dir}/notice/notice")
-    run("${dir}/notice/notice")
-    if(NOT run_out STREQUAL "0\n")
-        message(FATAL_ERROR "the notice length is ${run_out}")
-    endif()
+    expect_printed("0\n" "${dir}/notice/notice")
 else()
     message(FATAL_ERROR "unknown CASE ${CASE}")
 endif()

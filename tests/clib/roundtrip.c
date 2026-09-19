@@ -1,5 +1,6 @@
 /* A C program that calls every export fn of the library geo, with structs
    and unions by value, and prints the results. */
+#include "../binary_stdio.h"
 #include <stdio.h>
 
 #include "geo.h"

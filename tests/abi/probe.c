@@ -9,6 +9,7 @@
    object, so every byte of the image is defined. A case that cannot clear
    the object prints the value of each field instead. C leaves the padding
    of a struct unspecified once a value is stored in it (C11 6.2.6.1p6). */
+#include "../binary_stdio.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>

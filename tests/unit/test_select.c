@@ -1,3 +1,4 @@
+#include "../binary_stdio.h"
 #include "check.h"
 #include <inttypes.h>
 #include <stdlib.h>

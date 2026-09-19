@@ -1,3 +1,4 @@
+#include "../binary_stdio.h"
 #include "check.h"
 
 int check_failures = 0;

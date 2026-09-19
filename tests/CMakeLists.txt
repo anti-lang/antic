@@ -317,11 +317,13 @@ add_test(NAME sysroot_digest
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_digest"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_digest.cmake")
 set_tests_properties(sysroot_digest PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+add_executable(raw_bytes_c raw/raw_bytes.c)
 add_test(NAME raw_output
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DC_PROGRAM=$<TARGET_FILE:raw_bytes_c>"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/raw"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_raw_output.cmake")
 add_test(NAME anti_sdk

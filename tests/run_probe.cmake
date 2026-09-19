@@ -8,6 +8,8 @@
 #   WORK      a directory for the executables
 #   CC        the C compiler of the build, with its options
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
 execute_process(COMMAND ${CC} -std=c11 -o "${WORK}/probe_c" "${SOURCES}/probe.c"
     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
@@ -21,8 +23,10 @@ execute_process(
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic probe.anti failed\n${err}")
 endif()
-execute_process(COMMAND "${WORK}/probe_c" OUTPUT_VARIABLE from_c ENCODING NONE)
-execute_process(COMMAND "${WORK}/probe_anti" OUTPUT_VARIABLE from_anti ENCODING NONE)
-if(NOT from_c STREQUAL from_anti)
+program_output(c_hex c_status "${WORK}/probe_c.stdout" "${WORK}/probe_c")
+program_output(anti_hex anti_status "${WORK}/probe_anti.stdout" "${WORK}/probe_anti")
+if(NOT c_hex STREQUAL anti_hex)
+    file(READ "${WORK}/probe_c.stdout" from_c)
+    file(READ "${WORK}/probe_anti.stdout" from_anti)
     message(FATAL_ERROR "the layouts differ\nC:\n${from_c}\nAnti:\n${from_anti}")
 endif()

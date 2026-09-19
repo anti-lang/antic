@@ -1,6 +1,7 @@
 /* A C program that builds Anti classes, calls through the table and ends
    them. The header of com.example.canvas gives the layout, the table type
    and one prototype per public function. */
+#include "../binary_stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
 

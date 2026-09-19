@@ -2,6 +2,7 @@
    of a wchar_t of 16 bits and of one of 32. clang converts it with the
    width and signedness of wchar_t on the target, and the test compares
    the conversions of antic with these. */
+#include "../binary_stdio.h"
 #include <stdint.h>
 #include <wchar.h>
 

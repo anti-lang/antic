@@ -1,4 +1,5 @@
 /* A C program that links two Anti libraries. */
+#include "../binary_stdio.h"
 #include <stdio.h>
 
 #include "geo.h"

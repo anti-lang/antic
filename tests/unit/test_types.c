@@ -1,3 +1,4 @@
+#include "../binary_stdio.h"
 #include "check.h"
 #include "arena.h"
 #include "types.h"

@@ -1,5 +1,6 @@
 /* A C program that loads a shared Anti library at run time. The first call
    finds the runtime initialised by the library's constructor. */
+#include "../binary_stdio.h"
 #include <dlfcn.h>
 #include <stdio.h>
 

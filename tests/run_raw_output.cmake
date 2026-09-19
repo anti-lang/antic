@@ -3,8 +3,8 @@
 # writes a CR, an LF and a NUL, then a program that writes them.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DLLVM_MC=<llvm-mc>
-#         -DRUNTIME=<runtime directory> -DWORK=<dir>
-#         -P tests/run_raw_output.cmake
+#         -DRUNTIME=<runtime directory> -DC_PROGRAM=<raw_bytes_c>
+#         -DWORK=<dir> -P tests/run_raw_output.cmake
 
 include("${ROOT}/tests/program_output.cmake")
 file(MAKE_DIRECTORY "${WORK}")
@@ -29,6 +29,23 @@ execute_process(COMMAND "${CMAKE_COMMAND}" "-DANTIC=${ANTIC}"
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "tests/raw/raw_bytes.anti failed:\n${out}${err}")
 endif()
+
+# A C program writes the same bytes. Every C test file includes
+# tests/binary_stdio.h, which keeps the C streams of Windows from
+# translating them.
+program_output(got status "${WORK}/c.out" "${C_PROGRAM}")
+string(LENGTH "exit 0\n" skip)
+file(READ "${bytes_file}" wanted OFFSET ${skip} HEX)
+if(NOT status EQUAL 0 OR NOT got STREQUAL wanted)
+    message(FATAL_ERROR "the C program wrote ${got}\nwhere it should write ${wanted}")
+endif()
+file(GLOB_RECURSE c_files "${ROOT}/tests/*.c" "${ROOT}/tests/*.cpp")
+foreach(c_file IN LISTS c_files)
+    file(STRINGS "${c_file}" found REGEX "^#include \"\\.\\./binary_stdio\\.h\"$")
+    if(NOT found)
+        message(FATAL_ERROR "${c_file} does not include ../binary_stdio.h")
+    endif()
+endforeach()
 
 # CMake decodes the output of execute_process on Windows by the console
 # code page unless ENCODING NONE says otherwise. Every other call of a test
