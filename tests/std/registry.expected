@@ -1,0 +1,7 @@
+exit 0
+1 12
+12 9 -3
+{"type":"Marked","x":5,"y":16,"tag":7,"next":{"type":"Point","x":8,"y":19},"ratio":2.25,"small":-3}
+5 16 7 8 19 2.25 -3
+{"type":"Marked","x":5,"y":16,"tag":7,"next":{"type":"Point","x":8,"y":19},"ratio":2.25,"small":-3}
+4

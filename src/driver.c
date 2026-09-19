@@ -477,7 +477,8 @@ static bool lower_checked(const char *input, struct module *tree,
 /* Run the passes over the whole program and print what they report,
    one line each. Returns false after an error. */
 static bool whole_checked(const char *input, struct ir_module *program,
-                          bool release)
+                          const char *module, bool release, bool reflect,
+                          bool bundled)
 {
     struct whole_options options;
     struct text errors = {0};
@@ -485,7 +486,10 @@ static bool whole_checked(const char *input, struct ir_module *program,
     bool ok;
 
     memset(&options, 0, sizeof options);
+    options.entry = module;
     options.release = release;
+    options.reflect = reflect;
+    options.bundled = bundled;
     ok = whole_program(program, &options, &errors);
     for (line = text_cstr(&errors); *line != '\0';) {
         const char *end = strchr(line, '\n');
@@ -512,7 +516,8 @@ static int dump_ir(const char *input, struct module *tree, const char *module,
         return 1;
     }
     if (optimize) {
-        if (!whole_checked(input, program, release)) {
+        if (!whole_checked(input, program, module, release, !no_reflect,
+                           false)) {
             return 1;
         }
         ir_optimize(program, module);
@@ -572,7 +577,8 @@ static int back_end(const struct options *o, struct module *tree,
        module that links, which has main, and a library for C. A dev
        object of any other module never links. */
     if ((!o->dev || o->lib != LIB_NONE || has_main(program, module)) &&
-        !whole_checked(o->input, program, !o->dev)) {
+        !whole_checked(o->input, program, module, !o->dev,
+                       !o->no_reflect, o->bundle_runtime)) {
         return 1;
     }
     /* The build that compiles the program decides, so an assertion of a

@@ -4522,10 +4522,20 @@ static void lower_singleton_get(struct lowerer *l, const struct item *it)
     ir_ret(l->f, l->b, IR_PTR, temp(l, result));
 }
 
-/* DESIGN: an export class gives C a function that prepares an object it
-   allocated itself. It stores the table pointer and writes the default of
-   every field of the chain, which is what a literal of the class does.
-   An abstract class has no complete value and therefore none. */
+/* DESIGN: every complete class has a function that prepares an object
+   allocated elsewhere. It stores the table pointers and writes the
+   default of every field of the chain, as a literal of the class does.
+   Then it runs construct when that takes no arguments. An export
+   class gives it to C as `anti_<Class>_init`. The registry that
+   `reflect.new` reads names it for the others as `<Class>.init`. An
+   abstract class has no complete value and therefore none. */
+static void init_name(const struct type *t, bool exported, char *out,
+                      size_t size)
+{
+    snprintf(out, size, exported ? "anti_%.*s_init" : "%.*s.init",
+             (int)t->name.length, t->name.text);
+}
+
 static void class_init(struct lowerer *l, const struct item *it)
 {
     const struct type *t = it->symbol->type;
@@ -4536,10 +4546,9 @@ static void class_init(struct lowerer *l, const struct item *it)
     char name[128];
     size_t i;
 
-    snprintf(name, sizeof name, "anti_%.*s_init", (int)t->name.length,
-             t->name.text);
+    init_name(t, it->exported, name, sizeof name);
     f = ir_function_add(l->m, l->module_name, name, IR_VOID, IR_NO_AGG);
-    f->exported = true;
+    f->exported = it->exported;
     ir_param_add(f, IR_PTR, IR_NO_AGG);
     entry = ir_block_add(f);
     l->f = f;
@@ -4600,6 +4609,11 @@ static void class_record(struct lowerer *l, const struct item *it)
     c->base = class_descriptor(l, t->base)->index;
     c->agg = agg_of(l, t);
     if (!it->is_abstract) {
+        char init[128];
+        const struct ir_function *f;
+        init_name(t, it->exported, init, sizeof init);
+        f = find_function(l->m, l->module_name, init);
+        c->init = f != NULL ? f->index : IR_NO_INDEX;
         c->table = class_table(l, t)->index;
         for (up = t; up != NULL;
              up = up->kind == TYPE_CLASS ? up->base : NULL) {
@@ -4670,7 +4684,7 @@ bool lower_module(struct module *module, const char *module_name,
                     }
                 }
             }
-            if (it->exported) {
+            if (it->exported || !it->is_singleton) {
                 class_init(&l, it);
             }
         }

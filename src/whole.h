@@ -32,8 +32,12 @@ void whole_free(struct whole *w);
 size_t whole_entries(struct whole *w, uint32_t descriptor, uint32_t slot,
                      const uint32_t **out);
 
+/* A NULL entry makes every function an entry. */
 struct whole_options {
+    const char *entry;              /* the main module, or NULL */
     bool release;                   /* the optimisations that change code */
+    bool reflect;                   /* the registry lists the classes */
+    bool bundled;                   /* the whole runtime joins the output */
 };
 
 /* Run the passes over program. Each error goes to errors as one line.

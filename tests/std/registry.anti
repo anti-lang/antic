@@ -1,0 +1,124 @@
+//! The link step writes a registry of every class of the program.
+//! `reflect.new` builds an object of a class it names, and
+//! `Object.deserialize` builds one from the JSON that `serialize` writes.
+import anti.error;
+import anti.io;
+import anti.reflect;
+import anti.text;
+
+extern fn printf(fmt: *byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 1,
+	pub y: int = 2,
+
+	fn construct(self)
+	{
+		self.y = self.y + 10;
+	}
+}
+
+class Marked
+{
+	inherits Point,
+
+	pub tag: int = 9,
+	pub own next: *Point,
+	pub ratio: f64 = 0.5,
+	pub small: i8 = -3,
+}
+
+class Sized
+{
+	pub n: int = 0,
+
+	fn construct(self, n: int) -> *error.Error
+	{
+		self.n = n;
+		return null;
+	}
+}
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	inherits Shape,
+
+	concrete fn area(self) -> int
+	{
+		return 4;
+	}
+}
+
+singleton class Settings
+{
+	level: int = 3,
+}
+
+fn main() -> int
+{
+	let o = reflect.new("Point");
+	if o == null || !(o is *Point) {
+		return 1;
+	}
+	let p = o as *Point;
+	printf("%d %d\n".ptr, p.x as c_int, p.y as c_int);
+	delete(p);
+
+	let q = reflect.new("registry.Marked");
+	if q == null || !(q is *Marked) {
+		return 2;
+	}
+	let m = q as *Marked;
+	printf("%d %d %d\n".ptr, m.y as c_int, m.tag as c_int, m.small as c_int);
+	delete(m);
+
+	/* No complete value, one instance, arguments to construct, or no
+	   such class. */
+	if reflect.new("Shape") != null || reflect.new("Settings") != null ||
+		reflect.new("Sized") != null || reflect.new("Nothing") != null {
+		return 3;
+	}
+
+	let first = alloc Point { x: 8, y: 9 };
+	let made = alloc Marked { x: 5, y: 6, tag: 7, next: first, ratio: 2.25 };
+	let b = text.Builder.new();
+	made.serialize(&b);
+	io.println(b.text());
+	let back = Object.deserialize(b.text());
+	if back == null || !(back is *Marked) {
+		return 4;
+	}
+	let r = back as *Marked;
+	printf("%d %d %d %d %d %g %d\n".ptr, r.x as c_int, r.y as c_int,
+		r.tag as c_int, r.next.x as c_int, r.next.y as c_int, r.ratio,
+		r.small as c_int);
+	b.clear();
+	r.serialize(&b);
+	io.println(b.text());
+	delete(r);
+	delete(made);
+
+	/* A class whose construct takes arguments comes back with its
+	   fields, since they come from the text. */
+	let sized = Object.deserialize("{ \"type\" : \"Sized\", \"n\" : 4 }");
+	if sized == null || !(sized is *Sized) {
+		return 5;
+	}
+	printf("%d\n".ptr, (sized as *Sized).n as c_int);
+	delete(sized);
+
+	if Object.deserialize("{\"type\":\"Nothing\"}") != null ||
+		Object.deserialize("{\"type\":\"Shape\"}") != null ||
+		Object.deserialize("{\"x\":1}") != null ||
+		Object.deserialize("{\"type\":\"Point\",\"x\":}") != null ||
+		Object.deserialize("not json") != null {
+		return 6;
+	}
+	return 0;
+}

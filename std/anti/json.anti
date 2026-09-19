@@ -6,9 +6,9 @@
 //! read is written as `null`, and a class that wants more replaces
 //! `serialize` and writes its members with the functions here.
 //!
-//! Reading gives the text of a member rather than an object, because
-//! building an object of a named class needs a registry of every class
-//! of the program that `anti.reflect` does not have.
+//! `Object.deserialize` builds an object back from the JSON of the
+//! default `serialize`. The functions here read the text of one member,
+//! for a class that writes its own members.
 
 import anti.text;
 

@@ -120,6 +120,17 @@ add_test(NAME program_devirtualise_dev
         "-DOPTIONS=--dev"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+# The registry of the classes in dev mode, where the module that links
+# writes it.
+add_test(NAME program_deserialize_dev
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/deserialize.anti"
+        "-DOPTIONS=--dev"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 
 # The pinned raylib source, which tools/get-raylib.cmake downloads. The
 # directory is named here, before the first test that reads it.

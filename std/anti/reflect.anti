@@ -5,6 +5,10 @@
 //! `functions` count what it lists, and `get` and `set` read and write
 //! one field by its index. `--no-reflect` drops the two lists, and the
 //! counts are then zero.
+//!
+//! `new` builds an object of a class that it names. It reads the
+//! registry of every class of the program, which the link step writes.
+//! `--no-reflect` leaves the registry empty.
 
 import anti.text;
 
@@ -22,6 +26,7 @@ extern fn anti_rt_reflect_function_params(d: *byte, index: int) -> int;
 extern fn anti_rt_reflect_get(object: *byte, d: *byte, index: int) -> int;
 extern fn anti_rt_reflect_set(object: *byte, d: *byte, index: int,
 	value: int);
+extern fn anti_rt_reflect_new(name: *byte, length: int) -> *Object;
 
 /// The kinds a field record carries.
 pub const KIND_I8: int = 1;
@@ -119,3 +124,15 @@ pub fn name(d: *byte) -> str
 }
 
 extern fn anti_rt_reflect_class_name(d: *byte) -> str;
+
+/// A new object on the heap of the class `name` names, or null.
+///
+/// `name` is the class's own name, or its module path and its name as
+/// `geometry.Circle`. The object has the defaults of every field, and
+/// `construct` has run. A name two modules declare needs the module
+/// path. An abstract class, a singleton and a class whose `construct`
+/// takes arguments give null, as does a name no class of the program has.
+pub fn new(name: str) -> *Object
+{
+	return anti_rt_reflect_new(name.ptr, name.len);
+}

@@ -265,12 +265,297 @@ static void devirtualise(struct whole *w, struct ir_module *m)
     }
 }
 
+/* What the entries of the program reach. */
+struct reach {
+    bool *functions;
+    bool *globals;
+    uint32_t *work;                 /* functions, then globals + count */
+    size_t work_count;
+};
+
+static void reach_function(struct reach *r, uint32_t f)
+{
+    if (!r->functions[f]) {
+        r->functions[f] = true;
+        r->work[r->work_count++] = f;
+    }
+}
+
+static void reach_global(struct reach *r, const struct ir_module *m,
+                         uint32_t g)
+{
+    if (!r->globals[g]) {
+        r->globals[g] = true;
+        r->work[r->work_count++] = (uint32_t)m->function_count + g;
+    }
+}
+
+static void reach_const(struct reach *r, const struct ir_module *m,
+                        const struct ir_const *c)
+{
+    size_t i;
+
+    if (c->kind == IR_CONST_ADDR) {
+        reach_global(r, m, c->global);
+    } else if (c->kind == IR_CONST_FUNC) {
+        reach_function(r, c->global);
+    } else if (c->kind == IR_CONST_AGG) {
+        for (i = 0; i < c->item_count; i++) {
+            reach_const(r, m, &c->items[i]);
+        }
+    }
+}
+
+static void reach_operand(struct reach *r, const struct ir_module *m,
+                          const struct ir_operand *o)
+{
+    if (o->kind == IR_FUNC) {
+        reach_function(r, o->as.index);
+    } else if (o->kind == IR_GLOBAL) {
+        reach_global(r, m, o->as.index);
+    }
+}
+
+/* DESIGN: the functions and globals that the entries of the program
+   reach, as the optimizer's removal of unused functions marks them. The
+   entry is main of the main module, or every function of that module
+   when it has none, and every export fn and export global. What the
+   entries do not reach never links, so a pass that asks whether the
+   program uses something asks this. */
+static void reach_program(struct reach *r, const struct ir_module *m,
+                          const char *entry)
+{
+    bool has_main = false;
+    size_t i;
+    size_t b;
+    size_t k;
+
+    r->functions = allocate(m->function_count, sizeof *r->functions);
+    r->globals = allocate(m->global_count, sizeof *r->globals);
+    r->work = allocate(m->function_count + m->global_count, sizeof *r->work);
+    for (i = 0; entry != NULL && i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        has_main = has_main || (!f->is_extern && f->module != NULL &&
+                                strcmp(f->module, entry) == 0 &&
+                                strcmp(f->name, "main") == 0);
+    }
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (!f->is_extern &&
+            (entry == NULL || f->exported ||
+             (f->module != NULL && strcmp(f->module, entry) == 0 &&
+              (!has_main || strcmp(f->name, "main") == 0)))) {
+            reach_function(r, (uint32_t)i);
+        }
+    }
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->exported) {
+            reach_global(r, m, (uint32_t)i);
+        }
+    }
+    while (r->work_count > 0) {
+        uint32_t item = r->work[--r->work_count];
+        if (item < m->function_count) {
+            const struct ir_function *f = m->functions[item];
+            for (b = 0; b < f->block_count; b++) {
+                for (i = 0; i < f->blocks[b]->count; i++) {
+                    const struct ir_inst *inst = &f->blocks[b]->insts[i];
+                    reach_operand(r, m, &inst->a);
+                    reach_operand(r, m, &inst->b);
+                    reach_operand(r, m, &inst->c);
+                    for (k = 0; k < inst->arg_count; k++) {
+                        reach_operand(r, m, &inst->args[k]);
+                    }
+                }
+            }
+        } else {
+            const struct ir_global *g =
+                m->globals[item - m->function_count];
+            if (g->value != NULL) {
+                reach_const(r, m, g->value);
+            }
+            for (k = 0; k < g->reloc_count; k++) {
+                if (g->relocs[k].fn) {
+                    reach_function(r, g->relocs[k].global);
+                } else {
+                    reach_global(r, m, g->relocs[k].global);
+                }
+            }
+        }
+    }
+}
+
+static void reach_free(struct reach *r)
+{
+    free(r->functions);
+    free(r->globals);
+    free(r->work);
+}
+
+/* The runtime functions that read the registry. */
+static const char *const registry_readers[] = {
+    "anti_rt_reflect_new", "anti_rt_Object_deserialize"
+};
+
+static bool reads_registry(const struct ir_module *m, const struct reach *r)
+{
+    size_t i;
+    size_t k;
+
+    for (i = 0; i < m->function_count; i++) {
+        for (k = 0; k < sizeof registry_readers / sizeof *registry_readers;
+             k++) {
+            if (r->functions[i] && m->functions[i]->module == NULL &&
+                strcmp(m->functions[i]->name, registry_readers[k]) == 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static uint32_t struct_agg(struct ir_module *m, const char *name,
+                           const char *const *names,
+                           const enum ir_type *types, size_t count)
+{
+    struct ir_field fields[8];
+    size_t i;
+
+    memset(fields, 0, sizeof fields);
+    for (i = 0; i < count; i++) {
+        fields[i].name = names[i];
+        fields[i].type = ir_scalar(types[i]);
+    }
+    return ir_struct_add(m, IR_AGG_STRUCT, name, fields, count, false, 0);
+}
+
+static void const_int(struct ir_const *c, enum ir_type type, uint64_t value)
+{
+    c->kind = IR_CONST_INT;
+    c->scalar = type;
+    c->integer = value;
+}
+
+static void const_addr(struct ir_const *c, uint32_t global)
+{
+    c->kind = IR_CONST_ADDR;
+    c->scalar = IR_PTR;
+    c->global = global;
+}
+
+/* The global that holds the bytes of a module path, one per module. */
+static uint32_t module_text(struct ir_module *m, const char *module,
+                            const char **seen, uint32_t *globals,
+                            size_t *count)
+{
+    char name[32];
+    size_t i;
+
+    for (i = 0; i < *count; i++) {
+        if (strcmp(seen[i], module) == 0) {
+            return globals[i];
+        }
+    }
+    snprintf(name, sizeof name, "registry.%zu", *count);
+    seen[*count] = module;
+    globals[*count] = ir_global_add(m, "anti.rt", name,
+                                    (const uint8_t *)module,
+                                    strlen(module) + 1, 1)->index;
+    return globals[(*count)++];
+}
+
+/* DESIGN: the registry lists every class that `reflect.new` may build.
+   That is each complete class that is not a singleton, with its
+   descriptor, the function that prepares an object and the path of its
+   module. The runtime reads it as `anti_rt_registry`. A program whose
+   entries reach no reader of it gets none, so the classes it never names
+   stay out of the link. `--no-reflect` drops the list and keeps an empty
+   registry for a reader that remains. A library for C with the runtime
+   bundled holds every file of the runtime, the readers among them. It
+   gets an empty registry when nothing reads it. */
+static void write_registry(struct ir_module *m, bool reflect)
+{
+    static const char *const class_names[] = {
+        "descriptor", "init", "module", "module_length", "flags"
+    };
+    static const enum ir_type class_types[] = {
+        IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_I64
+    };
+    static const char *const registry_names[] = {"count", "classes"};
+    static const enum ir_type registry_types[] = {IR_I64, IR_PTR};
+    uint32_t class_agg = struct_agg(m, "anti.rt.Class", class_names,
+                                    class_types, 5);
+    uint32_t registry_agg = struct_agg(m, "anti.rt.Registry", registry_names,
+                                       registry_types, 2);
+    size_t class_count = m->class_count;
+    const char **seen = allocate(class_count, sizeof *seen);
+    uint32_t *texts = allocate(class_count, sizeof *texts);
+    struct ir_const *items =
+        allocate(class_count, sizeof *items);
+    struct ir_const *value;
+    struct ir_global *g;
+    size_t modules = 0;
+    size_t n = 0;
+    size_t i;
+
+    for (i = 0; reflect && i < class_count; i++) {
+        const struct ir_class *c = m->classes[i];
+        struct ir_const *item;
+        if (c->table == IR_NO_INDEX || c->init == IR_NO_INDEX ||
+            (c->flags & IR_CLASS_SINGLETON) != 0) {
+            continue;
+        }
+        item = ir_const_agg(m, ir_aggregate(class_agg), 5);
+        const_addr(&item->items[0], c->descriptor);
+        item->items[1].kind = IR_CONST_FUNC;
+        item->items[1].scalar = IR_PTR;
+        item->items[1].global = c->init;
+        const_addr(&item->items[2],
+                   module_text(m, c->module, seen, texts, &modules));
+        const_int(&item->items[3], IR_I64, strlen(c->module));
+        const_int(&item->items[4], IR_I64,
+                  (c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0);
+        items[n++] = *item;
+    }
+    value = ir_const_agg(m, ir_aggregate(registry_agg), 2);
+    const_int(&value->items[0], IR_I64, n);
+    if (n > 0) {
+        char length[32];
+        struct ir_const *list;
+        snprintf(length, sizeof length, "[%zu]anti.rt.Class", n);
+        list = ir_const_agg(m, ir_aggregate(ir_array_add(
+                                   m, length, ir_aggregate(class_agg),
+                                   ir_sym_int(m, IR_I64, n), NULL)),
+                            n);
+        memcpy(list->items, items, n * sizeof *items);
+        const_addr(&value->items[1],
+                   ir_global_add_value(m, "anti.rt", "registry.classes",
+                                       list)->index);
+    } else {
+        const_int(&value->items[1], IR_PTR, 0);
+    }
+    g = ir_global_add_value(m, NULL, "anti_rt_registry", value);
+    g->exported = true;
+    free(seen);
+    free(texts);
+    free(items);
+}
+
 bool whole_program(struct ir_module *program,
                    const struct whole_options *options, struct text *errors)
 {
     struct whole *w = whole_build(program);
+    struct reach reach;
 
     (void)errors;
+    memset(&reach, 0, sizeof reach);
+    reach_program(&reach, program, options->entry);
+    if (reads_registry(program, &reach)) {
+        write_registry(program, options->reflect);
+    } else if (options->bundled) {
+        write_registry(program, false);
+    }
+    reach_free(&reach);
     if (options->release) {
         devirtualise(w, program);
     }

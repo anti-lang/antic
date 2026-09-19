@@ -1,0 +1,23 @@
+//! `Object.deserialize` reads the registry of every class of the
+//! program, which the module that links writes. The test
+//! `program_deserialize_dev` builds this program in dev mode as well.
+
+extern fn printf(fmt: *byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 1,
+	pub y: int = 2,
+}
+
+fn main() -> int
+{
+	let o = Object.deserialize("{\"type\":\"deserialize.Point\",\"x\":7}");
+	if o == null || !(o is *Point) {
+		return 1;
+	}
+	let p = o as *Point;
+	printf("%d %d\n".ptr, p.x as c_int, p.y as c_int);
+	delete(p);
+	return 0;
+}

@@ -47,3 +47,22 @@ language or a user of the tools can observe.
 - Two sub-objects of one interface in two classes give two thunks, even when both reach
   one body. The call stays indirect.
 - A call whose static class no concrete class serves keeps its table call.
+
+## The registry
+
+- Lowering gives every complete class that is not a singleton an init function,
+  `<Class>.init`. An export class keeps its C name `anti_<Class>_init`. The class record
+  names it.
+- The pass asks what the entries of the program reach, the way the optimizer's removal of
+  unused functions marks them. When `anti_rt_reflect_new` or `anti_rt_Object_deserialize`
+  is among them, it writes `anti_rt_registry`. The registry is an exported global with
+  a count and an array of `anti.rt.Class` records. Each record holds the descriptor, the
+  init function, the module path and a flag for a `construct` with arguments.
+- The module paths are byte globals of module `anti.rt`, one per module, named
+  `registry.<n>`.
+- `rt/registry.c` holds both readers and nothing else. A program that reaches neither does
+  not link it, so the registry symbol is never missing. A bundled runtime holds every
+  file, so a library for C with the runtime bundled gets an empty registry.
+- `Object.deserialize` is the eighth member of the root. It is not `pub`, which keeps it
+  out of every table and every header, and its visibility level is `pub`, which lets any
+  module call it.

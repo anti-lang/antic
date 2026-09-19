@@ -1579,6 +1579,40 @@ static bool refuse_abstract_value(struct checker *c, struct pos pos,
     return true;
 }
 
+/* DESIGN: `Object.deserialize(input: str) -> *Object` is the static
+   counterpart of `serialize`, with its body in the runtime. It is visible
+   everywhere but is not `pub` to the tables, which hold functions with
+   `self` alone. Every table therefore still starts with the seven
+   functions of the root. It gives null when the text is not an object of
+   a class of the program. */
+static void declare_deserialize(struct checker *c, struct type *object)
+{
+    struct item **members =
+        arena_alloc(c->arena, (object->member_count + 1) * sizeof *members);
+    struct item *it = arena_alloc(c->arena, sizeof *it);
+    struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
+    struct type **params = arena_alloc(c->arena, sizeof *params);
+
+    memset(it, 0, sizeof *it);
+    memset(sym, 0, sizeof *sym);
+    params[0] = builtin(c, TYPE_STR);
+    it->kind = ITEM_FN;
+    it->vis = VIS_PUB;
+    it->runtime = "deserialize";
+    it->name.text = "deserialize";
+    it->name.length = 11;
+    it->symbol = sym;
+    sym->kind = SYMBOL_FN;
+    sym->name = it->name;
+    sym->item = it;
+    sym->type = types_fn(c->types, params, 1,
+                         types_pointer(c->types, object));
+    memcpy(members, object->members, object->member_count * sizeof *members);
+    members[object->member_count] = it;
+    object->members = members;
+    object->member_count++;
+}
+
 /* DESIGN: anti.rt.Object declares seven public functions whose bodies
    live in the runtime. The checker builds one item per function, so
    `v.type_name()` resolves like any inherited call and lowering finds the
@@ -1629,6 +1663,7 @@ static void declare_root(struct checker *c)
     }
     object->members = members;
     object->member_count = sizeof root / sizeof root[0];
+    declare_deserialize(c, object);
 }
 
 /* The class that t inherits, or NULL. */
@@ -2397,6 +2432,19 @@ static struct type *check_call(struct checker *c, struct expr *e)
         }
         fixed = 0;
     } else if (callee->kind == EXPR_FIELD &&
+               callee->as.field.base->kind == EXPR_NAME &&
+               lookup(c, &callee->as.field.base->as.name) == NULL &&
+               name_is(&callee->as.field.base->as.name, "Object")) {
+        /* `Object.f(args)` calls a static function of the root. */
+        struct type *root = types_object(c->types);
+        owner_type = root;
+        fn = check_type_member(c, callee, root);
+        callee->type = fn;
+        if (is_error(fn)) {
+            return fn;
+        }
+        fixed = 0;
+    } else if (callee->kind == EXPR_FIELD &&
                callee->as.field.base->kind == EXPR_FIELD &&
                (module = qualifier(c, callee->as.field.base)) != NULL &&
                (sym = library_item(c, module->home,
@@ -2591,6 +2639,11 @@ static struct type *check_field(struct checker *c, struct expr *e)
         const struct symbol *sym = lookup(c, &e->as.field.base->as.name);
         if (sym != NULL && sym->kind == SYMBOL_STRUCT) {
             return check_type_member(c, e, sym->type);
+        }
+        /* The root reaches its namespace by its name as it does as a
+           type, for `Object.deserialize`. */
+        if (sym == NULL && name_is(&e->as.field.base->as.name, "Object")) {
+            return check_type_member(c, e, types_object(c->types));
         }
     }
     /* A type of another module reaches its namespace as well, so

@@ -357,9 +357,95 @@ static void devirtualises(void)
            "}\n");
 }
 
+/* The printed lines of the program that start with prefix. */
+static void print_lines(struct text *out, const struct ir_module *m,
+                        const char *prefix)
+{
+    struct text all = {0};
+    const char *line;
+
+    ir_print(&all, m);
+    for (line = text_cstr(&all); *line != '\0';) {
+        const char *end = strchr(line, '\n');
+        size_t length = (size_t)(end - line) + 1;
+        if (strncmp(line, prefix, strlen(prefix)) == 0) {
+            text_append_bytes(out, line, length);
+        }
+        line += length;
+    }
+    text_free(&all);
+}
+
+/* Run the passes over a program that reads the registry when reads is
+   set, and compare the printed globals of the registry. */
+static void registry(bool reads, bool reflect, bool bundled,
+                     const char *expected)
+{
+    struct program p;
+    struct text errors = {0};
+    struct text out = {0};
+    struct text source = {0};
+    struct whole_options options;
+
+    text_append(&source, shapes);
+    text_append(&source, "singleton class Only\n"
+                         "{\n"
+                         "    n: int = 1,\n"
+                         "}\n");
+    if (reads) {
+        text_append(&source,
+                    "extern fn anti_rt_reflect_new(name: *byte, length: int)"
+                    " -> *Object;\n"
+                    "fn make() -> *Object\n"
+                    "{\n"
+                    "    return anti_rt_reflect_new(\"Tile\".ptr, 4);\n"
+                    "}\n");
+    }
+    open_program(&p);
+    compile(&p, "main", text_cstr(&source), &p.ir);
+    memset(&options, 0, sizeof options);
+    options.reflect = reflect;
+    options.bundled = bundled;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    print_lines(&out, &p.ir, "global anti.rt.");
+    print_lines(&out, &p.ir, "global (null).anti_rt_registry");
+    CHECK_STR(text_cstr(&out), expected);
+    text_free(&errors);
+    text_free(&out);
+    text_free(&source);
+    close_program(&p);
+}
+
+/* The registry lists every class that `reflect.new` may build. That is
+   each complete class that is not a singleton, with its descriptor, the
+   function that prepares an object and the path of its module. A program
+   that never reads the registry gets none, and `--no-reflect` leaves it
+   empty. A library with the runtime bundled holds the readers whatever it
+   reads, and gets an empty one. */
+static void writes_registry(void)
+{
+    registry(true, true, false,
+             "global anti.rt.registry.0 size 5 align 1 bytes 6d 61 69 6e 00\n"
+             "global anti.rt.registry.classes [2]anti.rt.Class { "
+             "anti.rt.Class { @main.Square.descriptor, @main.Square.init, "
+             "@anti.rt.registry.0, i64 4, i64 0 }, "
+             "anti.rt.Class { @main.Tile.descriptor, @main.Tile.init, "
+             "@anti.rt.registry.0, i64 4, i64 0 } }\n"
+             "global (null).anti_rt_registry anti.rt.Registry { i64 2, "
+             "@anti.rt.registry.classes }\n");
+    registry(true, false, false,
+             "global (null).anti_rt_registry anti.rt.Registry { i64 0, "
+             "ptr 0 }\n");
+    registry(false, true, false, "");
+    registry(false, true, true,
+             "global (null).anti_rt_registry anti.rt.Registry { i64 0, "
+             "ptr 0 }\n");
+}
+
 void test_whole(void)
 {
     finds_entries();
     joins_modules();
     devirtualises();
+    writes_registry();
 }
