@@ -1113,7 +1113,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "errors|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/errors.s,errors.anti"
         "workers|-S,-o,${LISTINGS}/workers.s,workers.anti"
         "own_copy|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_copy.s,own_copy.anti"
-        "inline_required|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/inline_required.s,inline_required.anti")
+        "inline_required|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/inline_required.s,inline_required.anti"
+        "construct_sets|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/construct_sets.s,construct_sets.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

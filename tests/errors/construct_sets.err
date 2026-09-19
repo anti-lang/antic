@@ -1,0 +1,4 @@
+construct_sets.anti:20:3: error: `construct` of `Box` returns `none` before it sets `part`
+construct_sets.anti:33:3: error: `construct` of `Branches` returns `none` before it sets `a`
+construct_sets.anti:46:3: error: `construct` of `Loop` returns `none` before it sets `a`
+construct_sets.anti:69:3: error: `construct` of `Orphan` returns `none` before it sets `b`

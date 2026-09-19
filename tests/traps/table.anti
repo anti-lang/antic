@@ -1,7 +1,9 @@
 //! Each case reads the table of an element of `alloc(T, n)` that the
 //! program never filled, so its table is zero. `delete`, `destroy` and
 //! `dup` trap in every mode. A dispatch, `is` and `as` trap in dev mode.
-//! The argument names the case.
+//! The teardown and the copy of a holder trap in every mode on a class
+//! value held inline whose table is zero, which the cases make by writing
+//! over it. The argument names the case.
 
 abstract class Shape
 {
@@ -27,6 +29,29 @@ class Round
 	{
 		return 3;
 	}
+}
+
+class Part
+{
+	pub n: int = 0,
+
+	concrete fn destruct(self)
+	{
+	}
+}
+
+class Holder
+{
+	pub part: Part,
+}
+
+/* The holder with the table of its inline part written over. */
+fn broken() -> *Holder
+{
+	let h = alloc Holder { };
+	let words = h as *byte as *u64;
+	words[1] = 0;
+	return h;
 }
 
 fn same(a: str, b: str) -> bool
@@ -59,6 +84,10 @@ fn run(case: str, items: *Square) -> int
 		return (shape is *Round) as int;
 	} else if same(case, "as") {
 		return (shape as *Square).side;
+	} else if same(case, "inline") {
+		delete(broken());
+	} else if same(case, "copy_inline") {
+		return dup(broken()).part.n;
 	}
 	return 0;
 }

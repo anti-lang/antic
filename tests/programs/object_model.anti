@@ -68,6 +68,7 @@ final class Circle
 		if r <= 0.0 {
 			return error.Error.new(1, "radius must be positive");
 		}
+		self.kind = Kind.Circle;
 		self.r = r;
 		return none;
 	}

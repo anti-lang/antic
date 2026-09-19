@@ -337,7 +337,7 @@ c.move(1.0, 1.0);
 - `abstract class` is required when any function has no body. `final class` and `final fn` forbid inheritance and replacement.
 - `concrete fn` replaces an inherited entry, `concrete fn Base::f` documents which, `concrete fn Iface::f` fills one interface's table only.
 - Fields are private unless `pub` or `protected`. A literal outside the class names `pub` fields only. Defaults fill the rest, then `construct` runs. An inline class field without a default takes `T { }` when every field of `T` has a default or `T` has none, and `construct` runs on it. Otherwise the literal must name it.
-- `alloc T { fields }` and `alloc T(args)` create on the heap and return `*T`. `T { fields }` and `T(args)` are values. `construct` with arguments may fail.
+- `alloc T { fields }` and `alloc T(args)` create on the heap and return `*T`. `T { fields }` and `T(args)` are values. `construct` with arguments may fail, and it assigns every field without a default on every path to `return none`, which the compiler checks.
 - `delete(p)` runs `destruct` up the chain, frees owned fields, frees the object. `destroy(&v)` does the same without the free. A value is destroyed at the end of its block, and so is each element of a local array of them, last to first.
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
 - `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.

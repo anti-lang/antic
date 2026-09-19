@@ -2883,22 +2883,33 @@ static struct ir_operand descriptor_field(struct lowerer *l,
    In dev mode a zero table traps with the name of t before an entry is
    read. The element of an `alloc(T, n)` that the program never filled
    has one. Release mode keeps the raw load. */
+static void check_table(struct lowerer *l, struct ir_operand table,
+                        const struct type *t);
+
 static struct ir_operand load_table(struct lowerer *l, struct ir_operand p,
                                     const struct type *t)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_operand table = temp(l, ir_load(l->f, l->b, IR_PTR, p));
+
+    if (t != NULL && t->kind == TYPE_POINTER) {
+        t = t->element;
+    }
+    if (l->dev && t != NULL && t->kind == TYPE_CLASS) {
+        check_table(l, table, t);
+    }
+    return table;
+}
+
+/* Trap with the name of t when table is zero. */
+static void check_table(struct lowerer *l, struct ir_operand table,
+                        const struct type *t)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_block *bad;
     struct ir_block *join;
     struct token_text text;
     struct ir_operand args[2];
 
-    if (t != NULL && t->kind == TYPE_POINTER) {
-        t = t->element;
-    }
-    if (!l->dev || t == NULL || t->kind != TYPE_CLASS) {
-        return table;
-    }
     bad = new_block(l);
     join = new_block(l);
     ir_branch(l->f, l->b,
@@ -2916,7 +2927,6 @@ static struct ir_operand load_table(struct lowerer *l, struct ir_operand p,
             args, 2);
     ir_jump(l->f, l->b, join);
     l->b = join;
-    return table;
 }
 
 /* DESIGN: `p is *T` holds when the object is T or a class below it. The
@@ -5174,8 +5184,8 @@ static void class_init(struct lowerer *l, const struct item *it)
 }
 
 /* Branch to a new block when the class value at p has a table, and give
-   the block after it, where both paths meet. A class value held inline
-   has a zero table when its field had no default. It was never made and
+   the block after it, where both paths meet. A place that `=` fills has a
+   zero table when it is an element of `alloc(T, n)` never filled. It
    holds nothing. */
 static struct ir_block *when_made(struct lowerer *l, struct ir_operand p)
 {
@@ -5232,12 +5242,10 @@ static void teardown_field(struct lowerer *l, const struct type *up,
     }
     at = offset_address(l, self, field_offset(l, up, &f->name));
     if (!f->owned) {
-        struct ir_block *after = when_made(l, at);
         struct ir_operand arg = at;
+        check_table(l, temp(l, ir_load(l->f, l->b, IR_PTR, at)), f->type);
         ir_call(l->f, l->b, IR_VOID,
                 ir_func_op(class_function(l, f->type, "destroy")), &arg, 1);
-        ir_jump(l->f, l->b, after);
-        l->b = after;
         return;
     }
     v = temp(l, ir_load(l->f, l->b, IR_PTR, at));
@@ -5261,7 +5269,9 @@ static void teardown_field(struct lowerer *l, const struct type *up,
    first. It then destroys what each level owns, so a body still reads
    what it owns. An object behind an `own` pointer is deleted, and each
    element of an `own` slice of class values is destroyed before the
-   buffer is freed. A class value held inline runs its own teardown. */
+   buffer is freed. A class value held inline runs its own teardown. Its
+   table is never zero in an object a literal or `construct` made, so a
+   zero one traps, as every zero table does. */
 static void class_teardown(struct lowerer *l, const struct type *t)
 {
     static const struct name destruct_name = {"destruct", 8};
@@ -5325,13 +5335,11 @@ static void copy_field(struct lowerer *l, const struct type *up,
     from = offset_address(l, self, offset);
     into = offset_address(l, to, offset);
     if (!f->owned) {
-        struct ir_block *after = when_made(l, from);
+        check_table(l, temp(l, ir_load(l->f, l->b, IR_PTR, from)), f->type);
         args[0] = from;
         args[1] = into;
         ir_call(l->f, l->b, IR_VOID, ir_func_op(copy_of(l, f->type)), args,
                 2);
-        ir_jump(l->f, l->b, after);
-        l->b = after;
         return;
     }
     v = temp(l, ir_load(l->f, l->b, IR_PTR, from));

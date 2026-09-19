@@ -4694,6 +4694,265 @@ static void check_block(struct checker *c, struct block *b)
     leave_scope(c, &scope);
 }
 
+/* DESIGN: a `construct` with arguments makes the object without a
+   literal, so it sets every field that has no default. Each path to
+   `return none` assigns each such field of the chain, or calls the
+   `construct` of a base, which sets the fields from that base up. The
+   checker refuses the construct and names the field otherwise. A path
+   that returns an error leaves no object behind and needs nothing. It is
+   definite assignment, as a local has it, applied to the fields of self.
+   A loop body may not run, so what it assigns counts only inside it. */
+struct required {
+    const struct item *fn;
+    const struct type *owner;
+    const struct struct_field **fields;
+    const struct type **levels;
+    size_t count;
+};
+
+static bool sets_block(struct checker *c, const struct required *r,
+                       const struct block *b, bool *set);
+static bool sets_stmt(struct checker *c, const struct required *r,
+                      const struct stmt *s, bool *set);
+
+/* Mark the field that the target of `=` names on self. */
+static void set_target(const struct required *r, const struct expr *target,
+                       bool *set)
+{
+    const struct expr *base;
+    size_t i;
+
+    if (target->kind != EXPR_FIELD) {
+        return;
+    }
+    for (base = target->as.field.base;
+         base->kind == EXPR_FIELD && name_is(&base->as.field.name, "super");
+         base = base->as.field.base) {
+    }
+    if (base->kind != EXPR_NAME || base->symbol == NULL ||
+        base->symbol != r->fn->self) {
+        return;
+    }
+    for (i = 0; i < r->count; i++) {
+        if (same_name(&r->fields[i]->name, &target->as.field.name)) {
+            set[i] = true;
+        }
+    }
+}
+
+/* Mark every field from the class whose `construct` e calls up, when e
+   is the call of a base's `construct`. */
+static void set_by_base(const struct required *r, const struct expr *e,
+                        bool *set)
+{
+    const struct item *callee;
+    const struct type *from;
+    const struct type *up;
+    size_t i;
+
+    if (e == NULL || e->kind != EXPR_CALL ||
+        e->as.call.callee->kind != EXPR_NAME ||
+        e->as.call.callee->symbol == NULL) {
+        return;
+    }
+    callee = e->as.call.callee->symbol->item;
+    if (callee == NULL || callee == r->fn ||
+        !name_is(&callee->name, "construct")) {
+        return;
+    }
+    from = declaring_class(callee);
+    for (up = from; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
+        for (i = 0; i < r->count; i++) {
+            if (r->levels[i] == up) {
+                set[i] = true;
+            }
+        }
+    }
+}
+
+/* The handler of a failing call runs on a path of its own. What it
+   assigns does not count after the call. */
+static void sets_handler(struct checker *c, const struct required *r,
+                         const struct handler *h, const bool *set)
+{
+    bool *copy;
+
+    if (h->kind != HANDLE_BLOCK || h->body == NULL) {
+        return;
+    }
+    copy = arena_alloc(c->arena, r->count + 1);
+    memcpy(copy, set, r->count);
+    sets_block(c, r, h->body, copy);
+}
+
+/* Fold a path that goes on into the meet of the paths so far. */
+static void meet(const struct required *r, bool *into, const bool *path,
+                 bool *any)
+{
+    size_t i;
+
+    for (i = 0; i < r->count; i++) {
+        into[i] = (*any ? into[i] : true) && path[i];
+    }
+    *any = true;
+}
+
+static bool sets_stmt(struct checker *c, const struct required *r,
+                      const struct stmt *s, bool *set)
+{
+    bool *copy = arena_alloc(c->arena, r->count + 1);
+    bool *out = arena_alloc(c->arena, r->count + 1);
+    bool any = false;
+    size_t i;
+
+    switch (s->kind) {
+    case STMT_ASSIGN:
+        if (s->as.assign.op == TOKEN_ASSIGN) {
+            set_target(r, s->as.assign.target, set);
+        }
+        return true;
+    case STMT_EXPR:
+        set_by_base(r, s->as.expr, set);
+        if (s->as.expr->kind == EXPR_CALL) {
+            sets_handler(c, r, &s->as.expr->as.call.handler, set);
+        }
+        return true;
+    case STMT_LET:
+        if (s->as.let.value != NULL && s->as.let.value->kind == EXPR_CALL) {
+            sets_handler(c, r, &s->as.let.value->as.call.handler, set);
+        }
+        return true;
+    case STMT_IF:
+        for (i = 0; i < s->as.if_chain.count; i++) {
+            memcpy(copy, set, r->count);
+            if (sets_block(c, r, s->as.if_chain.branches[i].body, copy)) {
+                meet(r, out, copy, &any);
+            }
+        }
+        memcpy(copy, set, r->count);
+        if (s->as.if_chain.else_body == NULL ||
+            sets_block(c, r, s->as.if_chain.else_body, copy)) {
+            meet(r, out, copy, &any);
+        }
+        break;
+    case STMT_SWITCH:
+        for (i = 0; i < s->as.switch_stmt.count; i++) {
+            memcpy(copy, set, r->count);
+            if (sets_stmt(c, r, s->as.switch_stmt.arms[i].body, copy)) {
+                meet(r, out, copy, &any);
+            }
+        }
+        memcpy(copy, set, r->count);
+        if (s->as.switch_stmt.otherwise == NULL ||
+            sets_stmt(c, r, s->as.switch_stmt.otherwise, copy)) {
+            meet(r, out, copy, &any);
+        }
+        break;
+    case STMT_TRY:
+        memcpy(copy, set, r->count);
+        if (sets_block(c, r, s->as.try_block.body, copy)) {
+            meet(r, out, copy, &any);
+        }
+        memcpy(copy, set, r->count);
+        if (s->as.try_block.handler.kind != HANDLE_BLOCK ||
+            sets_block(c, r, s->as.try_block.handler.body, copy)) {
+            meet(r, out, copy, &any);
+        }
+        break;
+    case STMT_WHILE:
+    case STMT_DO_WHILE:
+        memcpy(copy, set, r->count);
+        sets_block(c, r, s->as.loop.body, copy);
+        return true;
+    case STMT_FOR:
+        memcpy(copy, set, r->count);
+        sets_block(c, r, s->as.for_loop.body, copy);
+        return true;
+    case STMT_BLOCK:
+        return sets_block(c, r, s->as.block, set);
+    case STMT_RETURN:
+        if (s->as.return_value != NULL &&
+            s->as.return_value->kind == EXPR_NONE) {
+            for (i = 0; i < r->count && set[i]; i++) {
+            }
+            if (i < r->count) {
+                error_at(c, s->pos, "`construct` of `%s` returns `none` "
+                         "before it sets `%.*s`", tn((struct type *)r->owner),
+                         (int)r->fields[i]->name.length,
+                         r->fields[i]->name.text);
+            }
+        }
+        return false;
+    case STMT_BREAK:
+    case STMT_CONTINUE:
+    case STMT_YIELD:
+        return false;
+    default:
+        return true;
+    }
+    if (!any) {
+        return false;
+    }
+    memcpy(set, out, r->count);
+    return true;
+}
+
+/* A statement after one that leaves the block is never reached. */
+static bool sets_block(struct checker *c, const struct required *r,
+                       const struct block *b, bool *set)
+{
+    size_t i;
+
+    for (i = 0; i < b->count; i++) {
+        if (!sets_stmt(c, r, b->stmts[i], set)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void check_construct_sets(struct checker *c, const struct item *it)
+{
+    const struct type *owner = declaring_class(it);
+    const struct type *up;
+    struct required r;
+    bool *set;
+    size_t n = 0;
+    size_t i;
+
+    if (owner == NULL || owner->kind != TYPE_CLASS || !it->has_self ||
+        it->param_count == 0 || !name_is(&it->name, "construct") ||
+        it->body == NULL) {
+        return;
+    }
+    for (up = owner; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
+        n += up->field_count;
+    }
+    r.fn = it;
+    r.owner = owner;
+    r.fields = arena_alloc(c->arena, (n + 1) * sizeof *r.fields);
+    r.levels = arena_alloc(c->arena, (n + 1) * sizeof *r.levels);
+    r.count = 0;
+    for (up = owner; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
+        for (i = 0; i < up->field_count; i++) {
+            const struct struct_field *f = &up->fields[i];
+            if ((f->form != FIELD_PLAIN && f->form != FIELD_USE) ||
+                type_field_is_unit_break(f) || f->value != NULL ||
+                f->constant != NULL || sema_field_takes_literal(f)) {
+                continue;
+            }
+            r.fields[r.count] = f;
+            r.levels[r.count++] = up;
+        }
+    }
+    if (r.count == 0) {
+        return;
+    }
+    set = arena_alloc(c->arena, r.count + 1);
+    memset(set, 0, r.count);
+    sets_block(c, &r, it->body, set);
+}
+
 static void check_function(struct checker *c, struct item *it)
 {
     struct scope params;
@@ -4724,6 +4983,7 @@ static void check_function(struct checker *c, struct item *it)
         }
     }
     check_block(c, it->body);
+    check_construct_sets(c, it);
     leave_scope(c, &params);
     if (it->symbol->type->result->kind != TYPE_VOID &&
         !block_returns(it->body)) {

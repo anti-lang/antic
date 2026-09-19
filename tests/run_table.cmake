@@ -7,8 +7,9 @@
 #   WORK      a directory for the files
 #
 # delete, destroy and dup are calls into the runtime, which checks in
-# every mode. A dispatch, `is` and `as` check in dev mode, and release
-# mode keeps the raw load.
+# every mode, and so do the teardown and the copy of a class value held
+# inline. A dispatch, `is` and `as` check in dev mode, and release mode
+# keeps the raw load.
 
 function(build name)
     execute_process(COMMAND "${ANTIC}" ${ARGN} --llvm-mc "${LLVM_MC}"
@@ -40,11 +41,19 @@ endforeach()
 foreach(case call is as)
     traps(dev ${case} Shape)
 endforeach()
+foreach(case inline copy_inline)
+    traps(release ${case} Part)
+    traps(dev ${case} Part)
+endforeach()
 
 execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" -S
                         -o "${WORK}/release.s" "${SOURCE}"
                 RESULT_VARIABLE status)
+# The function run holds the dispatch, `is` and `as`. The teardown and
+# the copy of Holder, which follow it, check in every mode.
 file(READ "${WORK}/release.s" release)
-if(NOT status EQUAL 0 OR release MATCHES "anti_rt_table_unset")
-    message(FATAL_ERROR "release mode checks a table")
+string(REGEX MATCH "table\\.run:.*table\\.main:" run "${release}")
+if(NOT status EQUAL 0 OR run STREQUAL "" OR
+   run MATCHES "anti_rt_table_unset")
+    message(FATAL_ERROR "release mode checks a table in a dispatch")
 endif()

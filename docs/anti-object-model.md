@@ -170,6 +170,7 @@ Four levels, and each applies where it makes sense:
 - A literal sets the table pointers of the class and of every interface sub-object, writes every default, then runs `construct`. Lowering may copy a read-only prototype and store only the named fields.
 - `fn construct(self)` runs after every literal and every `alloc` of the class, base first down the chain. It takes no arguments in this form and cannot fail.
 - `fn construct(self, args...) -> *Error` takes arguments and may fail. The class is then created with `alloc Circle(10.0)` on the heap or `Circle(10.0)` as a value. Defaults are applied, then `construct` runs with the arguments. On an error the heap object is freed, or the value is discarded, and the error is handed to the caller. See [Errors](#errors). A base `construct` with arguments is called by name from the derived one, `self.super.construct(x)`, at the top of its body.
+- In a `construct`, every field that has no default and is not set by the literal must be assigned on every path before `return none;`. The compiler refuses the construct and names the field otherwise. It is definite assignment, as a local has it, applied to the fields of `self`.
 - One `construct` per class. Every alternative constructor is a static function with a name: `Circle.from_points(a, b)`.
 - `alloc Circle { r: 2.0 }` allocates one object on the heap, writes the literal into it, runs `construct`, and returns `*Circle`. `alloc(T, n)` stays the raw form for any type. For a class it fills the memory with zeros, so an element not filled yet has a zero table, and for a struct or a primitive it stays `malloc` and returns uninitialised memory.
 - `[&c, &s]` has type `[2]*Shape` only when the context gives that type. Without context each element keeps its own pointer type.
@@ -200,7 +201,7 @@ Four levels, and each applies where it makes sense:
 - Values never convert. Passing a `Circle` where a `Shape` is expected is an error, and `c.super` is the explicit base part.
 - `p is *T` gives a `bool`. `p as *T` on a class pointer is checked and traps on a mismatch. `p as? *T` gives `none` instead. All three work from any base or interface pointer, because every table's descriptor records the offset to the enclosing object.
 - `==` and `!=` on class pointers compare object identity: each pointer is adjusted by its offset to the enclosing object, then the addresses are compared. So a `*Serializable` and a `*Drawable` taken from one circle are equal. Pointers of two unrelated class types are a type error. Struct pointers compare addresses.
-- `delete`, `destroy`, `dup`, `is`, `as` and every dispatch check the table pointer for zero and trap with the class name. `delete`, `destroy` and `dup` are calls into the runtime and check in every mode, since the check is cheap there. `is`, `as` and a dispatch check in dev mode, and release mode keeps the raw load.
+- `delete`, `destroy`, `dup`, `is`, `as` and every dispatch check the table pointer for zero and trap with the class name. `delete`, `destroy` and `dup` are calls into the runtime and check in every mode, since the check is cheap there. So do the teardown and the copy of a class value held inline. `is`, `as` and a dispatch check in dev mode, and release mode keeps the raw load.
 
 ## Tables and dispatch
 
@@ -320,6 +321,7 @@ Four levels, and each applies where it makes sense:
 - `` `destruct` is never called directly, use `delete` or `destroy` ``
 - `` `title` is `mutable` in singleton `Config` and `worker fn render` reaches it ``
 - `` `Circle` has `own` fields, use `dup` instead of `=` ``
+- `` `construct` of `Circle` returns `none` before it sets `r` ``
 - `` the error of `parse_int` is not handled ``
 - `` `e` outlives its `catch`, use `dup` ``
 - `` `[]Shape` holds no complete values, use `[]*Shape` ``
@@ -407,6 +409,7 @@ final class Circle
 		if r <= 0.0 {
 			return error.Error.new(1, "radius must be positive");
 		}
+		self.kind = Kind.Circle;
 		self.r = r;
 		return none;
 	}

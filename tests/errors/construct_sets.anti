@@ -1,0 +1,116 @@
+import anti.error;
+
+class Needs
+{
+	pub v: int,
+}
+
+class Box
+{
+	pub w: int,
+	pub part: Needs,
+	pub label: str = "",
+
+	fn construct(self, w: int) -> *error.Error
+	{
+		if w < 0 {
+			return error.Error.new(1, "negative");
+		}
+		self.w = w;
+		return none;
+	}
+}
+
+class Branches
+{
+	pub a: int,
+
+	fn construct(self, x: int) -> *error.Error
+	{
+		if x > 0 {
+			self.a = x;
+		}
+		return none;
+	}
+}
+
+class Loop
+{
+	pub a: int,
+
+	fn construct(self, x: int) -> *error.Error
+	{
+		for i in 0..x {
+			self.a = i;
+		}
+		return none;
+	}
+}
+
+class Base
+{
+	pub b: int,
+
+	fn construct(self, b: int) -> *error.Error
+	{
+		self.b = b;
+		return none;
+	}
+}
+
+class Orphan
+{
+	inherits Base,
+	pub d: int,
+
+	fn construct(self, x: int) -> *error.Error
+	{
+		self.d = x;
+		return none;
+	}
+}
+
+class Good
+{
+	pub a: int,
+	pub part: Needs,
+
+	fn construct(self, x: int) -> *error.Error
+	{
+		if x < 0 {
+			return error.Error.new(1, "negative");
+		}
+		if x > 0 {
+			self.a = x;
+		} else {
+			self.a = 0;
+		}
+		self.part = Needs { v: x };
+		return none;
+	}
+}
+
+class Derived
+{
+	inherits Base,
+	pub d: int,
+
+	fn construct(self, x: int) -> *error.Error
+	{
+		try self.super.construct(x);
+		switch x {
+			0 => self.d = 1,
+			else => self.d = x,
+		}
+		return none;
+	}
+}
+
+class Plain
+{
+	pub a: int,
+
+	fn construct(self)
+	{
+	}
+}
