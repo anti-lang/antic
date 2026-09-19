@@ -126,15 +126,25 @@ openssl checks their signature. Windows configures with `-G Ninja`.
    devirtualisation, the class registry, the singleton check and the used-slot
    bitmaps. `docs/reports/2026-09-19-whole-program.md` reports it, and
    `docs/notes/whole-program.md` holds its choices.
-3. `anti.reflect`'s `call` and `Value`. The registry, `new` and
-   `Object.deserialize` are done.
-4. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
+3. The next session does 3 to 6 in order, in a fresh context, without
+   stopping between them, and reports at the end. Descriptors and tables are
+   emitted once, by the declaring module, as global symbols, and referenced by
+   every other module, in dev and release. Tests: the `is` repro of
+   `docs/reports/2026-09-19-whole-program.md`, `==` across modules and
+   `reflect.new` of a class of another module, in both modes.
+4. `inherits` accepts a qualified `module.Class`. Test: a chain over three
+   modules.
+5. The Linux and Windows VMs run the suite on the current main, with
+   `emit_identity`.
+6. `anti.reflect`'s `call` and `Value`, and the bitmap rule that depends on
+   them. The registry, `new` and `Object.deserialize` are done.
+7. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
    its own module path as a compile-time constant. The check is then one
    comparison against a table read at start. `log.named("http")` may exist
    beside them for a logger per subsystem, not instead of them.
-5. `f"..."` interpolation, which is compiler work over `anti.text`.
-6. The native libraries in `libs/`, which nothing builds yet.
-7. Inline atomic instruction sequences, which are runtime calls today.
+8. `f"..."` interpolation, which is compiler work over `anti.text`.
+9. The native libraries in `libs/`, which nothing builds yet.
+10. Inline atomic instruction sequences, which are runtime calls today.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, dev-mode checks, debug information, and tests and fixtures

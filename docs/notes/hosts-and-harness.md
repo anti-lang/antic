@@ -58,3 +58,4 @@ when started by hand.
   `docs/toolchain-later.md` as one line.
 - The whole-program pass is done, `docs/reports/2026-09-19-whole-program.md`. Neither VM
   has run it, and the counts of their rows predate it.
+- The next session works through items 3 to 6 of "First sessions" in `CLAUDE.md`.
