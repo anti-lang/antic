@@ -16,12 +16,12 @@ destruct Part 8
 destruct Leaf 9
 destruct Tag 6
 1 13
+destruct Item 140
 destruct Item 120
 destruct Leaf 130
-destruct Item 140
+destruct Item 14
 destruct Item 12
 destruct Leaf 13
-destruct Item 14
 label 21
 destruct Tag 21
 destruct Tag 21

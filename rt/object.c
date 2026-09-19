@@ -555,12 +555,14 @@ void anti_rt_delete(void *object, const struct anti_descriptor *type)
     free(start);
 }
 
+/* DESIGN: every sequence of class values is torn down last to first, a
+   local array and an `own` slice alike. */
 void anti_rt_destroy_elements(void *elements, int64_t count,
                               const struct anti_descriptor *type)
 {
     int64_t i;
 
-    for (i = 0; elements != NULL && type != NULL && i < count; i++) {
+    for (i = count - 1; elements != NULL && type != NULL && i >= 0; i--) {
         anti_rt_destroy((char *)elements + i * type->size, type);
     }
 }

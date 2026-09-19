@@ -166,8 +166,8 @@ void anti_rt_delete(void *object, const struct anti_descriptor *type);
    heap of its own. */
 void anti_rt_destroy(void *object, const struct anti_descriptor *type);
 
-/* The teardown of each of count class values of the type in a row, first
-   to last, as an `own` slice of them holds. */
+/* The teardown of each of count class values of the type in a row, last
+   to first, as an `own` slice of them holds. */
 void anti_rt_destroy_elements(void *elements, int64_t count,
                               const struct anti_descriptor *type);
 
