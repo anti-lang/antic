@@ -4204,6 +4204,13 @@ static enum token_kind compound_op(enum token_kind op)
 /* Chapter 2 evaluates the place first and the value second. A compound
    assignment reads the old value before it evaluates the new operand, as
    x = x + e reads x first. */
+static bool local_needs_teardown(const struct type *t);
+static void destroy_value(struct lowerer *l, struct ir_operand p,
+                          const struct type *t, bool replaced);
+static void destroy_array(struct lowerer *l, struct ir_operand base,
+                          const struct type *t, bool replaced);
+static struct ir_block *when_made(struct lowerer *l, struct ir_operand p);
+
 static void lower_assign(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *target = s->as.assign.target;
@@ -4214,11 +4221,25 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     if (!lower_place(l, target, &p)) {
         return;
     }
+    /* DESIGN: `=` into a place that holds a value needing a teardown
+       destroys the old value first, then moves the new one in. The new
+       value is complete before the old one goes, so it may read it. A
+       place whose table is zero, an unfilled element of `alloc(T, n)`,
+       holds no value, and nothing is destroyed. The zero-table trap is for
+       use, not for assignment into. */
     if (is_aggregate(target->type)) {
         v = lower_address(l, s->as.assign.value);
-        if (!l->failed) {
-            ir_memcopy(l->f, l->b, p.address, v, vtype_of(l, target->type));
+        if (l->failed) {
+            return;
         }
+        if (local_needs_teardown(target->type)) {
+            if (target->type->kind == TYPE_ARRAY) {
+                destroy_array(l, p.address, target->type, true);
+            } else {
+                destroy_value(l, p.address, target->type, true);
+            }
+        }
+        ir_memcopy(l->f, l->b, p.address, v, vtype_of(l, target->type));
         return;
     }
     if (s->as.assign.op != TOKEN_ASSIGN) {
@@ -4313,8 +4334,27 @@ static struct ir_operand element_count(struct lowerer *l, const struct type *t)
     return count;
 }
 
+/* The teardown of the class value at p. The end of a block checks its
+   table in the runtime. An assignment passes over a value whose table is
+   zero, which was never made. */
+static void destroy_value(struct lowerer *l, struct ir_operand p,
+                          const struct type *t, bool replaced)
+{
+    struct ir_block *after;
+
+    if (!replaced) {
+        object_call(l, "anti_rt_destroy", p, t);
+        return;
+    }
+    after = when_made(l, p);
+    ir_call(l->f, l->b, IR_VOID, ir_func_op(class_function(l, t, "destroy")),
+            &p, 1);
+    ir_jump(l->f, l->b, after);
+    l->b = after;
+}
+
 static void destroy_array(struct lowerer *l, struct ir_operand base,
-                          const struct type *t)
+                          const struct type *t, bool replaced)
 {
     const struct type *element = innermost(t);
     struct ir_operand size = size_operand(l, element);
@@ -4338,7 +4378,7 @@ static void destroy_array(struct lowerer *l, struct ir_operand base,
     at = temp(l, ir_ptradd(l->f, l->b, base,
                            temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
                                              temp(l, index), size))));
-    object_call(l, "anti_rt_destroy", at, element);
+    destroy_value(l, at, element, replaced);
     ir_jump(l->f, l->b, test);
     l->b = done;
 }
@@ -4346,10 +4386,10 @@ static void destroy_array(struct lowerer *l, struct ir_operand base,
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
     if (sym->type->kind == TYPE_ARRAY) {
-        destroy_array(l, temp(l, sym->ir), sym->type);
+        destroy_array(l, temp(l, sym->ir), sym->type, false);
         return;
     }
-    object_call(l, "anti_rt_destroy", temp(l, sym->ir), sym->type);
+    destroy_value(l, temp(l, sym->ir), sym->type, false);
 }
 
 /* DESIGN: a call that can fail gives a pointer. A pointer of `none` is

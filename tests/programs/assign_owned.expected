@@ -1,0 +1,17 @@
+exit 0
+destruct Item 1
+destruct Leaf 10
+after 2 20
+destruct Item 2
+destruct Leaf 20
+destruct Item 3
+destruct Item 5
+destruct Item 4
+destruct Item 7
+destruct Item 6
+pair 8
+destruct Item 9
+destruct Item 8
+destruct Item 11
+holder 12
+destruct Item 12

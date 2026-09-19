@@ -1,0 +1,61 @@
+//! `=` into a place that holds a value needing a teardown destroys the old
+//! value first, then moves the new one in. An unfilled element of
+//! `alloc(T, n)` has a zero table, holds no value, and nothing is
+//! destroyed there. An array is replaced element by element, last to
+//! first, and so is a class value held inline.
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Leaf %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Item
+{
+	pub n: int = 0,
+	pub own leaf: *Leaf = none,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Item %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Shelf
+{
+	pub own items: []Item,
+}
+
+class Holder
+{
+	pub part: Item,
+}
+
+fn main() -> int
+{
+	{
+		let it = Item { n: 1, leaf: alloc Leaf { n: 10 } };
+		it = Item { n: 2, leaf: alloc Leaf { n: 20 } };
+		printf("after %d %d\n".ptr, it.n as c_int, it.leaf.n as c_int);
+	}
+	let shelf = alloc Shelf { items: []Item { ptr: alloc(Item, 2), len: 2 } };
+	shelf.items[0] = Item { n: 3 };
+	shelf.items[0] = Item { n: 4 };
+	shelf.items[1] = Item { n: 5 };
+	delete(shelf);
+	{
+		let pair = [Item { n: 6 }, Item { n: 7 }];
+		pair = [Item { n: 8 }, Item { n: 9 }];
+		printf("pair %d\n".ptr, pair[0].n as c_int);
+	}
+	let h = Holder { part: Item { n: 11 } };
+	h.part = Item { n: 12 };
+	printf("holder %d\n".ptr, h.part.n as c_int);
+	return 0;
+}
