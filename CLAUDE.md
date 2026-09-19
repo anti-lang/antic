@@ -60,6 +60,27 @@ without asking Eddie.
   the Mac's.
 - Every session ends with a report in `docs/reports/<date>-<subject>.md`.
 
+## Context and budget
+
+- Read what the task needs. Name sections, not documents: "Tables and dispatch" in
+  docs/anti-object-model.md, not the whole file. Never reread a file already in the
+  context.
+- Do not narrate. No summaries of what you are about to do, no restating of the
+  task, no lists of what you read. Say what changed and what failed, in one line
+  each, and only when a step completes.
+- Run the full suite once per commit, not per edit. While working on one test, run
+  that test alone. Run the sanitizer suites once, before the push.
+- Do not print test output into the context. Redirect it to a file and grep for
+  failures. Show me at most the failing lines.
+- Do not show file contents you did not change. When you edit, show the diff, not
+  the file.
+- One task per session. When a task ends, write the report and stop. Do not start
+  the next task in the same context.
+- When context is compacted, first write the current state to
+  docs/reports/<date>-state.md: steps done, step in progress, next command. Then
+  continue from that file.
+- Reports under two pages, as before. The state file under half a page.
+
 ## Building
 
 ```bash
