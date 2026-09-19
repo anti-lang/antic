@@ -152,8 +152,8 @@ const struct anti_descriptor *anti_rt_descriptor(const void *object);
    copy entry of its table. */
 void *anti_rt_dup(void *object);
 
-/* Run the destruct body of each class of the chain, free the memory behind
-   each `own` field, and free the object. */
+/* Run the destruct body of each class of the chain, destroy every object
+   the chain owns, free every buffer it owns, and free the object. */
 void anti_rt_delete(void *object);
 
 /* The same without the final free, for an object that is not on the

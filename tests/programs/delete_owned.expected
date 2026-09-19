@@ -1,0 +1,20 @@
+exit 0
+destruct Leaf 1
+destruct Leaf 2
+destruct Leaf 3
+1 1 7
+destruct Outer 40
+destruct Part 50
+destruct Leaf 70
+destruct Part 80
+destruct Leaf 90
+destruct Tag 6
+destruct Outer 4
+destruct Part 5
+destruct Leaf 7
+destruct Part 8
+destruct Leaf 9
+destruct Tag 6
+block 10
+destruct Part 10
+destruct Leaf 11

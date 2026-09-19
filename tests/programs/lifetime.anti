@@ -1,7 +1,8 @@
 //! `delete` runs the destruct body of each class of the chain, the concrete
-//! one first, then frees the memory behind every `own` field and the
-//! object. `destroy` runs the same chain without the final free. `dup`
-//! copies an object of its concrete class and copies its `own` fields.
+//! one first. It then deletes the object behind every `own` pointer, whose
+//! chain runs in turn, and frees the object. `destroy` runs the same chain
+//! without the final free. `dup` copies an object of its concrete class and
+//! copies its `own` fields.
 
 extern fn printf(format: *byte, ...) -> c_int;
 

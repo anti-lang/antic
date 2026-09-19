@@ -176,7 +176,7 @@ Four levels, and each applies where it makes sense:
 ## Destruction
 
 - `fn destruct(self)` is the destructor. A class declares it for anything the `own` rule cannot express. It never calls `self.super.destruct()`, because the compiler chains it.
-- `delete(p)` runs the concrete `destruct`, then each base's up the chain, frees the `own` fields at each level, then frees the object. `p` must be a heap object.
+- `delete(p)` runs the concrete `destruct`, then each base's up the chain, destroys every owned object and frees every owned buffer, then frees the object. `p` must be a heap object.
 - `destroy(&c)` runs the same chain without the final free, for an object on the stack or inline in another object.
 - A local of class type whose chain declares `destruct` or has `own` fields is destroyed at the end of its block, as if `destroy(&c)` had been written as the last `defer`. A heap object is never destroyed by itself.
 - A direct call `c.destruct()` is refused.

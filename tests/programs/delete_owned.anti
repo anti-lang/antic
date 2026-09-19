@@ -1,0 +1,104 @@
+//! `delete` destroys every object the deleted one owns. An object behind
+//! an `own` pointer runs its whole chain and is freed, and so does every
+//! object that one owns in turn. A pointer to an interface frees the
+//! object it points into. A class value held inline, as a plain field or
+//! as a `use` field, runs its chain in place. `dup` gives such a value
+//! fresh copies of what it owns, so the copy and the original each free
+//! their own. A local whose inline field needs a teardown is torn down
+//! at the end of its block.
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+	pub own next: *Leaf = null,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Leaf %d\n".ptr, self.n as c_int);
+	}
+}
+
+abstract class Named
+{
+	abstract fn label(self) -> int;
+}
+
+class Tag
+{
+	pub id: int = 0,
+	implements named: Named,
+
+	concrete fn Named::label(self) -> int
+	{
+		return self.id;
+	}
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Tag %d\n".ptr, self.id as c_int);
+	}
+}
+
+class Part
+{
+	pub n: int = 0,
+	pub own leaf: *Leaf = null,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Part %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Outer
+{
+	pub n: int = 0,
+	pub part: Part = Part { n: 0 },
+	use extra: Part = Part { n: 0 },
+	pub own named: *Named = null,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Outer %d\n".ptr, self.n as c_int);
+	}
+}
+
+/* No destruct of its own and no `own` field: only the inline part asks
+   for the teardown. */
+class Plain
+{
+	pub part: Part = Part { n: 0 },
+}
+
+fn main() -> int
+{
+	let chain = alloc Leaf { n: 1, next: alloc Leaf { n: 2,
+		next: alloc Leaf { n: 3 } } };
+	delete(chain);
+
+	let tag = alloc Tag { id: 6 };
+	let o = alloc Outer {
+		n: 4,
+		part: Part { n: 5, leaf: alloc Leaf { n: 7 } },
+		extra: Part { n: 8, leaf: alloc Leaf { n: 9 } },
+		named: tag as *Named,
+	};
+	let c = dup(o);
+	c.n = 40;
+	c.part.n = 50;
+	c.part.leaf.n = 70;
+	c.extra.n = 80;
+	c.extra.leaf.n = 90;
+	printf("%d %d %d\n".ptr, (c.part.leaf != o.part.leaf) as c_int,
+		(c.extra.leaf != o.extra.leaf) as c_int, o.part.leaf.n as c_int);
+	delete(c);
+	delete(o);
+
+	{
+		let p = Plain { part: Part { n: 10, leaf: alloc Leaf { n: 11 } } };
+		printf("block %d\n".ptr, p.part.n as c_int);
+	}
+	return 0;
+}

@@ -4019,8 +4019,10 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
    assignment to the variable it was copied from leaves it unchanged. */
 /* DESIGN: a local of a class whose chain declares `destruct` or owns
    memory is torn down at the end of its block, as if the program had
-   written `defer destroy(&c)` after the `let`. A heap object is never
-   torn down by itself, and `delete` is the only way to free one. */
+   written `defer destroy(&c)` after the `let`. A class value held inline
+   is owned, so one that needs the teardown asks for it too. A heap object
+   is never torn down by itself, and `delete` is the only way to free
+   one. */
 static bool type_needs_destruct(const struct type *t)
 {
     size_t i;
@@ -4039,7 +4041,12 @@ static bool type_needs_destruct(const struct type *t)
             }
         }
         for (i = 0; i < t->field_count; i++) {
-            if (t->fields[i].owned) {
+            const struct struct_field *f = &t->fields[i];
+            if (f->owned) {
+                return true;
+            }
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                type_needs_destruct(f->type)) {
                 return true;
             }
         }

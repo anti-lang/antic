@@ -468,8 +468,8 @@ void anti_rt_Object_serialize(struct anti_object *self, void *out)
     serialize_into(out, self, anti_rt_descriptor(self));
 }
 
-/* The root frees nothing. delete frees the `own` fields of each class of
-   the chain and then the object itself. */
+/* The root frees nothing. delete destroys what each class of the chain
+   owns and then frees the object itself. */
 void anti_rt_Object_destruct(struct anti_object *self)
 {
     (void)self;
@@ -491,10 +491,35 @@ static void **owned_at(void *object, const struct anti_field *f,
     return slot;
 }
 
+/* The class value a field holds inside the object, or NULL. The
+   sub-object of an interface is a field of class type too. It is part of
+   the object and not a value of its own. Its table records its distance
+   from the object, and that of a value is zero. */
+static void *inline_object(void *object, const struct anti_field *f)
+{
+    void *at = (char *)object + f->offset;
+
+    if (ANTI_TYPE_OF(f->type) != ANTI_TYPE_CLASS ||
+        anti_rt_object_of(at) != at) {
+        return NULL;
+    }
+    return at;
+}
+
+/* The entry of a table, which the compiler fills with the function the
+   concrete class ended with. */
+static void *table_entry(const void *object, enum anti_entry entry)
+{
+    const struct anti_object *o = object;
+
+    return o == NULL || o->table == NULL ? NULL : (void *)o->table[entry];
+}
+
 /* A copy of every byte of the object, then a fresh copy of the memory
    behind each `own` field of the chain. An object behind an `own`
    pointer is copied by its own copy entry, at the size of its own class.
-   Its `own` fields are then copied too. */
+   Its `own` fields are then copied too. A class value held inline copies
+   what it owns by its own copy entry, into its place in the copy. */
 void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
@@ -510,6 +535,17 @@ void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
             int64_t size = 0;
             void **from;
             void **into;
+            void *value = inline_object(self, f);
+            if (value != NULL) {
+                void (*copy)(struct anti_object *, struct anti_object *) =
+                    (void (*)(struct anti_object *, struct anti_object *))
+                        table_entry(value, ANTI_ENTRY_COPY);
+                if (copy != NULL) {
+                    copy(value, (struct anti_object *)((char *)to +
+                                                       f->offset));
+                }
+                continue;
+            }
             if (!f->owned) {
                 continue;
             }
@@ -539,15 +575,6 @@ void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
     }
 }
 
-/* The entry of a table, which the compiler fills with the function the
-   concrete class ended with. */
-static void *table_entry(const void *object, enum anti_entry entry)
-{
-    const struct anti_object *o = object;
-
-    return o == NULL || o->table == NULL ? NULL : (void *)o->table[entry];
-}
-
 void *anti_rt_dup(void *object)
 {
     const struct anti_descriptor *d;
@@ -571,8 +598,13 @@ void *anti_rt_dup(void *object)
 
 /* DESIGN: the destruct body of the concrete class runs first and the root's
    last. A class therefore tears down what it added before its base does.
-   The `own` fields of each level are freed after every body has run, so
-   a body still reads what it owns. */
+   What each level owns is destroyed after every body has run, so a body
+   still reads what it owns. An object behind an `own` pointer is deleted,
+   which runs its whole chain and destroys what it owns in turn, then
+   frees it. A class value held inline runs its chain in place. Any other
+   `own` field is a buffer and is freed. The elements of an `own` slice of
+   class values are not destroyed, since `alloc(T, n)` gives them no
+   table. */
 void anti_rt_destroy(void *object)
 {
     const struct anti_descriptor *d;
@@ -595,15 +627,20 @@ void anti_rt_destroy(void *object)
             const struct anti_field *f = &level->fields[i];
             int64_t size = 0;
             void **slot;
+            void *value = inline_object(object, f);
+            if (value != NULL) {
+                anti_rt_destroy(value);
+                continue;
+            }
             if (!f->owned) {
                 continue;
             }
             slot = owned_at(object, f, &size);
-            /* A pointer to an interface points into its object, and the
-               memory to free starts at the object. */
+            /* delete starts at the object that a pointer to an interface
+               points into. */
             if (ANTI_TYPE_OF(f->type) == ANTI_TYPE_PTR &&
                 ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_CLASS) {
-                free(anti_rt_object_of(*slot));
+                anti_rt_delete(*slot);
             } else {
                 free(*slot);
             }
