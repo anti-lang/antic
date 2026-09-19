@@ -1509,7 +1509,10 @@ void ir_optimize_module(struct ir_module *program, const char *module)
         if (f->is_extern) {
             continue;
         }
-        if (strcmp(f->module, module) != 0) {
+        /* The passes over the whole program write the functions of the
+           runtime module, and the object that links holds them. */
+        if (strcmp(f->module, module) != 0 &&
+            strcmp(f->module, RUNTIME_MODULE) != 0) {
             drop_body(f);
         } else {
             ir_optimize_function(f);

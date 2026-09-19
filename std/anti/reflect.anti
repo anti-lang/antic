@@ -9,6 +9,12 @@
 //! `new` builds an object of a class that it names. It reads the
 //! registry of every class of the program, which the link step writes.
 //! `--no-reflect` leaves the registry empty.
+//!
+//! `call` calls a public function by its index through the table of the
+//! object's class. Its arguments and its result are `Value`s, and the
+//! compiler writes one trampoline per signature of the program that
+//! unpacks them. `--no-reflect` drops the function lists, and every
+//! `call` then gives a value of kind `None`.
 
 import anti.text;
 
@@ -27,6 +33,8 @@ extern fn anti_rt_reflect_get(object: *byte, d: *byte, index: int) -> int;
 extern fn anti_rt_reflect_set(object: *byte, d: *byte, index: int,
 	value: int);
 extern fn anti_rt_reflect_new(name: *byte, length: int) -> *Object;
+extern fn anti_rt_reflect_call(object: *Object, index: int, args: *Value,
+	count: int, result: *Value) -> bool;
 
 /// The kinds a field record carries.
 pub const KIND_I8: int = 1;
@@ -135,4 +143,95 @@ extern fn anti_rt_reflect_class_name(d: *byte) -> str;
 pub fn new(name: str) -> *Object
 {
 	return anti_rt_reflect_new(name.ptr, name.len);
+}
+
+/// The kind of value that a `Value` holds.
+///
+/// A signed integer of any width is an `Int`, an unsigned one a `Uint`,
+/// and `f32` and `f64` are a `Float`. A function without a result gives
+/// `None`.
+pub enum ValueKind: u8 { None, Int, Uint, Float, Bool, Char, Str, Ptr }
+
+/// The bytes of a `Value`, read through the field its kind names.
+pub union Payload
+{
+	i: int,
+	u: uint,
+	f: f64,
+	b: bool,
+	c: char,
+	s: str,
+	p: *byte,
+}
+
+/// A value of a primitive type, a `str` or a pointer, with its kind.
+pub struct Value
+{
+	kind: ValueKind,
+	data: Payload,
+}
+
+/// A value that holds nothing.
+pub fn none() -> Value
+{
+	return Value { kind: ValueKind.None, data: Payload { i: 0 } };
+}
+
+/// A signed integer.
+pub fn of_int(v: int) -> Value
+{
+	return Value { kind: ValueKind.Int, data: Payload { i: v } };
+}
+
+/// An unsigned integer.
+pub fn of_uint(v: uint) -> Value
+{
+	return Value { kind: ValueKind.Uint, data: Payload { u: v } };
+}
+
+/// A float.
+pub fn of_float(v: f64) -> Value
+{
+	return Value { kind: ValueKind.Float, data: Payload { f: v } };
+}
+
+/// A `bool`.
+pub fn of_bool(v: bool) -> Value
+{
+	return Value { kind: ValueKind.Bool, data: Payload { b: v } };
+}
+
+/// A `char`.
+pub fn of_char(v: char) -> Value
+{
+	return Value { kind: ValueKind.Char, data: Payload { c: v } };
+}
+
+/// A `str`, which keeps pointing at the bytes of `v`.
+pub fn of_str(v: str) -> Value
+{
+	return Value { kind: ValueKind.Str, data: Payload { s: v } };
+}
+
+/// A pointer of any type, as its address.
+pub fn of_ptr(v: *byte) -> Value
+{
+	return Value { kind: ValueKind.Ptr, data: Payload { p: v } };
+}
+
+/// Call the public function at `index` of the class of `object`.
+///
+/// The index counts the list that `function` reads, so the seven
+/// functions of the root come first. `args` holds one value per
+/// parameter after `self`, of the kind that parameter takes, and the call
+/// goes through the table of the object as any call does. The result is
+/// the value the function returns. An index out of range, an abstract
+/// function, a signature that a `Value` cannot carry and arguments of
+/// another count or kind give a value of kind `None`, as a function
+/// without a result does.
+pub fn call(object: *Object, index: int, args: []Value) -> Value
+{
+	let result = none();
+	anti_rt_reflect_call(object, index, args.ptr, args.len, &result);
+	return result;
 }

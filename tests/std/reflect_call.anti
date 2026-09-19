@@ -1,0 +1,114 @@
+//! `reflect.call` calls a public function through the table of the
+//! object's class. The arguments and the result are `Value`s, and the
+//! compiler writes one trampoline per signature of the program. A call
+//! whose arguments do not fit the function gives a value of kind `None`.
+import anti.reflect;
+
+extern fn printf(fmt: *byte, ...) -> c_int;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+
+	pub fn label(self, by: i32, text: str) -> str
+	{
+		if by > 0 {
+			return text;
+		}
+		return "none";
+	}
+}
+
+class Square
+{
+	inherits Shape,
+	pub side: int = 3,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+
+	pub fn grow(self, by: u8, factor: f32) -> f64
+	{
+		self.side = self.side + by as int;
+		return self.side as f64 * factor as f64;
+	}
+
+	pub fn flip(self, on: bool) -> bool
+	{
+		return !on;
+	}
+
+	pub fn same(self, c: char) -> char
+	{
+		return c;
+	}
+
+	pub fn me(self) -> *Square
+	{
+		return self;
+	}
+
+	pub fn small(self, n: i8) -> u16
+	{
+		return (n as int + 300) as u16;
+	}
+
+	pub fn reset(self)
+	{
+		self.side = 1;
+	}
+}
+
+fn main() -> int
+{
+	let s = alloc Square { };
+	let o: *Object = s;
+	let none = []reflect.Value { ptr: null, len: 0 };
+
+	/* The seven functions of the root come first, then the chain's. */
+	let area = reflect.call(o, 7, none);
+	printf("%d %d\n".ptr, area.kind as c_int, area.data.i as c_int);
+
+	let label_args = [reflect.of_int(1), reflect.of_str("tag")];
+	let label = reflect.call(o, 8, label_args[0..2]);
+	printf("%d %.*s\n".ptr, label.kind as c_int, label.data.s.len as c_int,
+		label.data.s.ptr);
+
+	let grow_args = [reflect.of_uint(2), reflect.of_float(1.5)];
+	let grown = reflect.call(o, 9, grow_args[0..2]);
+	printf("%d %.2f %d\n".ptr, grown.kind as c_int, grown.data.f,
+		s.side as c_int);
+
+	let flip_args = [reflect.of_bool(true)];
+	let flipped = reflect.call(o, 10, flip_args[0..1]);
+	printf("%d %d\n".ptr, flipped.kind as c_int, flipped.data.b as c_int);
+
+	let char_args = [reflect.of_char('z')];
+	let same = reflect.call(o, 11, char_args[0..1]);
+	printf("%d %d\n".ptr, same.kind as c_int, same.data.c as u32 as c_int);
+
+	let me = reflect.call(o, 12, none);
+	printf("%d %d\n".ptr, me.kind as c_int, (me.data.p == s as *byte) as c_int);
+
+	let small_args = [reflect.of_int(-1)];
+	let small = reflect.call(o, 13, small_args[0..1]);
+	printf("%d %d\n".ptr, small.kind as c_int, small.data.u as c_int);
+
+	let reset = reflect.call(o, 14, none);
+	printf("%d %d\n".ptr, reset.kind as c_int, s.side as c_int);
+
+	/* A root function goes through the table like any other. */
+	let name = reflect.call(o, 0, none);
+	printf("%.*s\n".ptr, name.data.s.len as c_int, name.data.s.ptr);
+
+	/* A count, a kind or an index that does not fit gives None. */
+	let wrong_kind = [reflect.of_int(2), reflect.of_float(1.5)];
+	printf("%d %d %d %d\n".ptr, reflect.call(o, 7, flip_args[0..1]).kind as c_int,
+		reflect.call(o, 9, wrong_kind[0..2]).kind as c_int,
+		reflect.call(o, 99, none).kind as c_int,
+		reflect.call(o, -1, none).kind as c_int);
+	delete(s);
+	return 0;
+}

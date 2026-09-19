@@ -39,12 +39,15 @@ struct anti_field {
 
 /* One public function of the chain of a class, with the entry of the
    table that holds it. A program reads the list and calls through the
-   table, so reflection needs no name of its own. */
+   table, so reflection needs no name of its own. The signature names
+   the result and the parameters after self, as `i64.i32.str`. It is
+   NULL where a reflect.Value cannot carry one of them. */
 struct anti_function {
     const unsigned char *name;
     int64_t name_length;
     int64_t slot;
     int64_t param_count;
+    const unsigned char *signature;
 };
 
 /* The record at entry 0 of the table of a class. The destruct entry is the

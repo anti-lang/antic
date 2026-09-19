@@ -6,8 +6,10 @@
 void ir_optimize(struct ir_module *program, const char *entry);
 
 /* Optimize the functions of module alone, for an object of its own in dev
-   mode. The functions of other modules become declarations, whose symbols
-   the objects of those modules define. Every function of module stays. */
+   mode. The functions and data of other modules become declarations,
+   whose symbols the objects of those modules define. Every function of
+   module stays, and so does every one of the runtime module, which the
+   passes over the whole program write. */
 void ir_optimize_module(struct ir_module *program, const char *module);
 
 /* Run the passes of ir_optimize on one function, without removing unused

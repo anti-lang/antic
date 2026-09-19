@@ -549,6 +549,354 @@ static void write_registry(struct ir_module *m, bool reflect)
     free(items);
 }
 
+/* The kinds of anti.reflect.ValueKind, in its order. */
+enum value_kind {
+    VALUE_NONE, VALUE_INT, VALUE_UINT, VALUE_FLOAT, VALUE_BOOL, VALUE_CHAR,
+    VALUE_STR, VALUE_PTR
+};
+
+/* One name of a signature. The type passes the value, the kind of
+   reflect.Value carries it, and the Value holds it at the wide type. */
+struct value_type {
+    const char *name;
+    enum ir_type type;
+    enum ir_ext ext;
+    enum value_kind kind;
+    enum ir_type wide;
+};
+
+static const struct value_type value_types[] = {
+    {"void", IR_VOID, IR_EXT_NONE, VALUE_NONE, IR_VOID},
+    {"bool", IR_I8, IR_EXT_ZERO, VALUE_BOOL, IR_I8},
+    {"char", IR_I32, IR_EXT_NONE, VALUE_CHAR, IR_I32},
+    {"i8", IR_I8, IR_EXT_SIGN, VALUE_INT, IR_I64},
+    {"i16", IR_I16, IR_EXT_SIGN, VALUE_INT, IR_I64},
+    {"i32", IR_I32, IR_EXT_NONE, VALUE_INT, IR_I64},
+    {"i64", IR_I64, IR_EXT_NONE, VALUE_INT, IR_I64},
+    {"u8", IR_I8, IR_EXT_ZERO, VALUE_UINT, IR_I64},
+    {"u16", IR_I16, IR_EXT_ZERO, VALUE_UINT, IR_I64},
+    {"u32", IR_I32, IR_EXT_NONE, VALUE_UINT, IR_I64},
+    {"u64", IR_I64, IR_EXT_NONE, VALUE_UINT, IR_I64},
+    {"f32", IR_F32, IR_EXT_NONE, VALUE_FLOAT, IR_F64},
+    {"f64", IR_F64, IR_EXT_NONE, VALUE_FLOAT, IR_F64},
+    {"str", IR_AGG, IR_EXT_NONE, VALUE_STR, IR_AGG},
+    {"ptr", IR_PTR, IR_EXT_NONE, VALUE_PTR, IR_PTR},
+};
+
+/* The most names a signature holds: the result and the parameters. */
+#define SIGNATURE_MAX 64
+
+/* The names of the signature text, result first. Returns the count, or
+   0 for a text with a name that no Value carries. */
+static size_t read_signature(const char *text,
+                             const struct value_type **out)
+{
+    size_t count = 0;
+
+    while (count < SIGNATURE_MAX) {
+        size_t length = strcspn(text, ".");
+        size_t k;
+        for (k = 0; k < sizeof value_types / sizeof *value_types; k++) {
+            if (strlen(value_types[k].name) == length &&
+                strncmp(value_types[k].name, text, length) == 0) {
+                break;
+            }
+        }
+        if (k == sizeof value_types / sizeof *value_types ||
+            (count > 0 && value_types[k].type == IR_VOID)) {
+            return 0;
+        }
+        out[count++] = &value_types[k];
+        if (text[length] == '\0') {
+            return count;
+        }
+        text += length + 1;
+    }
+    return 0;
+}
+
+/* The argument of the type t passes, read from the payload of a Value at
+   the pointer at. A str passes the address of its bytes in the Value. */
+static struct ir_operand unpack(struct ir_function *f, struct ir_block *b,
+                                const struct value_type *t,
+                                struct ir_operand at)
+{
+    uint32_t wide;
+    uint32_t narrow;
+
+    if (t->type == IR_AGG) {
+        return at;
+    }
+    wide = ir_load(f, b, t->wide, at);
+    if (t->wide == t->type) {
+        return ir_temp_op(f, wide);
+    }
+    narrow = ir_unary(f, b, t->kind == VALUE_FLOAT ? IR_FTRUNC : IR_TRUNC,
+                      t->type, ir_temp_op(f, wide));
+    return ir_temp_op(f, narrow);
+}
+
+/* Store the result r, of the type t passes, into the payload of a Value
+   at the pointer at. It is widened to the type the Value holds it at. */
+static void pack(struct ir_function *f, struct ir_block *b,
+                 const struct value_type *t, uint32_t str_agg,
+                 struct ir_operand r, struct ir_operand at)
+{
+    enum ir_op op = t->kind == VALUE_FLOAT ? IR_FEXT
+                    : t->kind == VALUE_INT ? IR_SEXT
+                                           : IR_ZEXT;
+    uint32_t wide;
+
+    if (t->type == IR_AGG) {
+        ir_memcopy(f, b, at, r, ir_aggregate(str_agg));
+        return;
+    }
+    if (t->wide == t->type) {
+        ir_store(f, b, t->type, r, at);
+        return;
+    }
+    wide = ir_unary(f, b, op, t->wide, r);
+    ir_store(f, b, t->wide, ir_temp_op(f, wide), at);
+}
+
+/* DESIGN: a trampoline takes the entry of a table, the object, the
+   Values of the arguments, their count and the Value of the result. It
+   checks the count and the kind of every Value first, and gives 0 when
+   one does not fit. It then reads each argument at the type of its
+   parameter, calls the entry, writes the result as a Value and gives 1.
+   The layout of a Value is the aggregate of anti.reflect, so the IR
+   holds no size. */
+static uint32_t write_trampoline(struct ir_module *m, const char *text,
+                                 uint32_t value_agg, uint32_t str_agg)
+{
+    const struct value_type *types[SIGNATURE_MAX];
+    struct ir_operand args[SIGNATURE_MAX];
+    struct ir_operand at[SIGNATURE_MAX];
+    size_t count = read_signature(text, types);
+    size_t params = count > 0 ? count - 1 : 0;
+    uint32_t stride = ir_sym_size_of(m, ir_aggregate(value_agg));
+    uint32_t data = ir_sym_offset_of(m, value_agg, 1);
+    struct ir_function *signature;
+    struct ir_function *f;
+    struct ir_block *b;
+    struct ir_block *fail;
+    struct ir_block *call;
+    struct ir_operand entry;
+    struct ir_operand object;
+    struct ir_operand values;
+    struct ir_operand result;
+    struct ir_operand bad;
+    char name[256];
+    uint32_t r;
+    uint32_t test;
+    size_t k;
+
+    if (count == 0 || strlen(text) + 16 > sizeof name) {
+        return IR_NO_INDEX;
+    }
+    snprintf(name, sizeof name, "signature.%s", text);
+    signature = ir_declare_add(m, "anti.rt", name, types[0]->type,
+                               types[0]->type == IR_AGG ? str_agg
+                                                        : IR_NO_AGG);
+    ir_param_add(signature, IR_PTR, IR_NO_AGG);
+    for (k = 1; k < count; k++) {
+        ir_param_add(signature, types[k]->type,
+                     types[k]->type == IR_AGG ? str_agg : IR_NO_AGG);
+        signature->params[k].ext = types[k]->ext;
+    }
+    snprintf(name, sizeof name, "trampoline.%s", text);
+    f = ir_function_add(m, "anti.rt", name, IR_I8, IR_NO_AGG);
+    entry = ir_temp_op(f, ir_param_add(f, IR_PTR, IR_NO_AGG));
+    object = ir_temp_op(f, ir_param_add(f, IR_PTR, IR_NO_AGG));
+    values = ir_temp_op(f, ir_param_add(f, IR_PTR, IR_NO_AGG));
+    bad = ir_temp_op(f, ir_param_add(f, IR_I64, IR_NO_AGG));
+    result = ir_temp_op(f, ir_param_add(f, IR_PTR, IR_NO_AGG));
+    b = ir_block_add(f);
+    fail = ir_block_add(f);
+    ir_ret(f, fail, IR_I8, ir_int_op(IR_I8, 0));
+    /* The count first, then the kind of each Value, its field 0. */
+    test = ir_binary(f, b, IR_NE, IR_I64, bad, ir_int_op(IR_I64, params));
+    bad = ir_temp_op(f, test);
+    for (k = 0; k < params; k++) {
+        struct ir_block *check = ir_block_add(f);
+        uint32_t index = ir_sym_int(m, IR_I64, k);
+        uint32_t offset = ir_sym_op(m, IR_MUL, IR_I64, stride, index);
+        uint32_t kind;
+        ir_branch(f, b, bad, fail, check);
+        b = check;
+        if (k == 0) {
+            at[k] = values;
+        } else {
+            uint32_t moved =
+                ir_ptradd(f, b, values, ir_sym_operand(m, offset));
+            at[k] = ir_temp_op(f, moved);
+        }
+        kind = ir_load(f, b, IR_I8, at[k]);
+        test = ir_binary(f, b, IR_NE, IR_I8, ir_temp_op(f, kind),
+                         ir_int_op(IR_I8, types[k + 1]->kind));
+        bad = ir_temp_op(f, test);
+    }
+    call = ir_block_add(f);
+    ir_branch(f, b, bad, fail, call);
+    b = call;
+    args[0] = object;
+    for (k = 0; k < params; k++) {
+        uint32_t payload = ir_ptradd(f, b, at[k], ir_sym_operand(m, data));
+        args[k + 1] = unpack(f, b, types[k + 1], ir_temp_op(f, payload));
+    }
+    r = ir_call_indirect(f, b, types[0]->type, entry, signature, args,
+                         count);
+    ir_store(f, b, IR_I8, ir_int_op(IR_I8, types[0]->kind), result);
+    if (types[0]->type != IR_VOID) {
+        uint32_t payload = ir_ptradd(f, b, result, ir_sym_operand(m, data));
+        pack(f, b, types[0], str_agg, ir_temp_op(f, r),
+             ir_temp_op(f, payload));
+    }
+    ir_ret(f, b, IR_I8, ir_int_op(IR_I8, 1));
+    return f->index;
+}
+
+/* Whether the entries reach the runtime function of reflect.call. */
+static bool calls_through_reflection(const struct ir_module *m,
+                                     const struct reach *r)
+{
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        if (r->functions[i] && m->functions[i]->module == NULL &&
+            strcmp(m->functions[i]->name, "anti_rt_reflect_call") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The text of the signature of the function record item, or NULL. */
+static const char *signature_of(const struct ir_module *m,
+                                const struct ir_const *item)
+{
+    const struct ir_global *g;
+
+    if (item->kind != IR_CONST_AGG || item->item_count < 5 ||
+        item->items[4].kind != IR_CONST_ADDR) {
+        return NULL;
+    }
+    g = m->globals[item->items[4].global];
+    return g->bytes != NULL && g->size > 0 && g->bytes[g->size - 1] == 0
+               ? (const char *)g->bytes
+               : NULL;
+}
+
+/* Add each signature of the function list of the class record c to
+   seen, once. */
+static void add_signatures(const struct ir_module *m, const struct ir_class *c,
+                           const char **seen, size_t *count, size_t max)
+{
+    const struct ir_const *descriptor = m->globals[c->descriptor]->value;
+    const struct ir_const *list;
+    size_t i;
+    size_t k;
+
+    if (descriptor == NULL || descriptor->kind != IR_CONST_AGG ||
+        descriptor->item_count < 12 ||
+        descriptor->items[11].kind != IR_CONST_ADDR) {
+        return;
+    }
+    list = m->globals[descriptor->items[11].global]->value;
+    for (i = 0; list != NULL && i < list->item_count; i++) {
+        const char *text = signature_of(m, &list->items[i]);
+        for (k = 0; text != NULL && k < *count; k++) {
+            if (strcmp(seen[k], text) == 0) {
+                break;
+            }
+        }
+        if (text != NULL && k == *count && *count < max) {
+            seen[(*count)++] = text;
+        }
+    }
+}
+
+/* DESIGN: the table of trampolines maps the text of each signature to
+   its trampoline, and `reflect.call` looks the text of a function up in
+   it. The pass writes it as `anti_rt_trampolines` when the program
+   reaches the runtime's call, and empty for a bundled runtime.
+   `--no-reflect` empties it along with the function lists. */
+static void write_trampolines(struct ir_module *m, bool full)
+{
+    static const char *const item_names[] = {"signature", "call"};
+    static const enum ir_type item_types[] = {IR_PTR, IR_PTR};
+    static const char *const table_names[] = {"count", "items"};
+    static const enum ir_type table_types[] = {IR_I64, IR_PTR};
+    uint32_t item_agg = struct_agg(m, "anti.rt.Trampoline", item_names,
+                                   item_types, 2);
+    uint32_t table_agg = struct_agg(m, "anti.rt.Trampolines", table_names,
+                                    table_types, 2);
+    uint32_t value_agg = ir_agg_find(m, "anti.reflect.Value");
+    uint32_t str_agg = ir_agg_find(m, "str");
+    size_t max = 0;
+    const char **seen;
+    struct ir_const *items;
+    struct ir_const *value;
+    struct ir_global *g;
+    size_t count = 0;
+    size_t n = 0;
+    size_t i;
+
+    for (i = 0; i < m->class_count; i++) {
+        const struct ir_const *d = m->globals[m->classes[i]->descriptor]->value;
+        max += d != NULL && d->item_count >= 12 &&
+                       d->items[10].kind == IR_CONST_INT
+                   ? (size_t)d->items[10].integer
+                   : 0;
+    }
+    seen = allocate(max, sizeof *seen);
+    items = allocate(max, sizeof *items);
+    for (i = 0; full && value_agg != IR_NO_AGG && str_agg != IR_NO_AGG &&
+                i < m->class_count;
+         i++) {
+        add_signatures(m, m->classes[i], seen, &count, max);
+    }
+    for (i = 0; i < count; i++) {
+        char name[32];
+        uint32_t function = write_trampoline(m, seen[i], value_agg, str_agg);
+        struct ir_const *item;
+        uint32_t text;
+        if (function == IR_NO_INDEX) {
+            continue;
+        }
+        snprintf(name, sizeof name, "trampolines.%zu", n);
+        text = ir_global_add(m, "anti.rt", name, (const uint8_t *)seen[i],
+                             strlen(seen[i]) + 1, 1)->index;
+        item = ir_const_agg(m, ir_aggregate(item_agg), 2);
+        const_addr(&item->items[0], text);
+        item->items[1].kind = IR_CONST_FUNC;
+        item->items[1].scalar = IR_PTR;
+        item->items[1].global = function;
+        items[n++] = *item;
+    }
+    value = ir_const_agg(m, ir_aggregate(table_agg), 2);
+    const_int(&value->items[0], IR_I64, n);
+    if (n > 0) {
+        char length[48];
+        struct ir_const *list;
+        uint32_t array;
+        snprintf(length, sizeof length, "[%zu]anti.rt.Trampoline", n);
+        array = ir_array_add(m, length, ir_aggregate(item_agg),
+                             ir_sym_int(m, IR_I64, n), NULL);
+        list = ir_const_agg(m, ir_aggregate(array), n);
+        memcpy(list->items, items, n * sizeof *items);
+        const_addr(&value->items[1],
+                   ir_global_add_value(m, "anti.rt", "trampolines.list",
+                                       list)->index);
+    } else {
+        const_int(&value->items[1], IR_PTR, 0);
+    }
+    g = ir_global_add_value(m, NULL, "anti_rt_trampolines", value);
+    g->exported = true;
+    free(seen);
+    free(items);
+}
+
 /* Whether the symbolic value sym is, or is built from, the offset of
    field of aggregate agg. */
 static bool names_field(const struct ir_module *m, uint32_t sym, uint32_t agg,
@@ -756,8 +1104,25 @@ static bool at_or_below(const struct whole *w, uint32_t record, uint32_t above)
    `anti_rt_slots` lists each abstract class with a slot reached, and a
    program with none has no table. A library for C has none, because its
    host program carries it. */
+/* The number of public functions in the list of the class whose
+   descriptor is the global descriptor, or 0 without a list. */
+static uint32_t function_count(const struct ir_module *m, uint32_t descriptor)
+{
+    const struct ir_const *value = m->globals[descriptor]->value;
+
+    if (value == NULL || value->kind != IR_CONST_AGG ||
+        value->item_count < 12 || value->items[10].kind != IR_CONST_INT) {
+        return 0;
+    }
+    return (uint32_t)value->items[10].integer;
+}
+
+/* DESIGN: `reflect.call` may reach any slot of any interface, because it
+   takes the index at run time. A program that calls through reflection
+   therefore reaches every slot of every abstract class, slot 1 up to its
+   last public function. */
 static void write_slots(struct whole *w, struct ir_module *m,
-                        const struct reach *r)
+                        const struct reach *r, bool every)
 {
     static const char *const slot_names[] = {"descriptor", "slot_count",
                                              "bits"};
@@ -792,6 +1157,15 @@ static void write_slots(struct whole *w, struct ir_module *m,
                     }
                 }
             }
+        }
+    }
+    for (i = 0; every && i < classes; i++) {
+        uint32_t last = (m->classes[i]->flags & IR_CLASS_ABSTRACT) != 0
+                            ? function_count(m, m->classes[i]->descriptor)
+                            : 0;
+        uint32_t slot;
+        for (slot = 1; slot <= last; slot++) {
+            mark_slot(&slots[i], slot);
         }
     }
     for (i = 0; i < classes; i++) {
@@ -846,6 +1220,7 @@ bool whole_program(struct ir_module *program,
 {
     struct whole *w = whole_build(program);
     struct reach reach;
+    bool calls;
     bool ok;
 
     ok = check_singletons(w, program, errors);
@@ -856,8 +1231,12 @@ bool whole_program(struct ir_module *program,
     } else if (options->bundled) {
         write_registry(program, false);
     }
+    calls = calls_through_reflection(program, &reach);
+    if (calls || options->bundled) {
+        write_trampolines(program, calls && options->reflect);
+    }
     if (!options->library) {
-        write_slots(w, program, &reach);
+        write_slots(w, program, &reach, calls && options->reflect);
     }
     reach_free(&reach);
     if (options->release) {

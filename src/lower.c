@@ -1163,7 +1163,7 @@ static struct ir_operand entry_offset(struct lowerer *l, int index)
 static uint32_t function_agg(struct lowerer *l)
 {
     static const char name[] = "anti.rt.Function";
-    struct ir_field fields[4];
+    struct ir_field fields[5];
     uint32_t agg = ir_agg_find(l->m, name);
 
     if (agg != IR_NO_AGG) {
@@ -1178,7 +1178,9 @@ static uint32_t function_agg(struct lowerer *l)
     fields[2].type = ir_scalar(IR_I64);
     fields[3].name = "param_count";
     fields[3].type = ir_scalar(IR_I64);
-    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 4, false, 0);
+    fields[4].name = "signature";
+    fields[4].type = ir_scalar(IR_PTR);
+    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 5, false, 0);
 }
 
 /* The aggregate of a function list of n records. */
@@ -1494,6 +1496,58 @@ static struct ir_global *class_ancestors(struct lowerer *l,
 }
 
 /* The list of public functions of the chain, in table order. */
+/* The name a signature gives a type that a reflect.Value carries, or
+   NULL for a type it cannot carry. */
+static const char *value_type_name(const struct type *t)
+{
+    static const char *const names[] = {
+        [TYPE_VOID] = "void", [TYPE_BOOL] = "bool", [TYPE_CHAR] = "char",
+        [TYPE_I8] = "i8",     [TYPE_I16] = "i16",   [TYPE_I32] = "i32",
+        [TYPE_I64] = "i64",   [TYPE_U8] = "u8",     [TYPE_U16] = "u16",
+        [TYPE_U32] = "u32",   [TYPE_U64] = "u64",   [TYPE_F32] = "f32",
+        [TYPE_F64] = "f64",   [TYPE_STR] = "str",
+    };
+
+    if (t->kind == TYPE_POINTER || (t->kind == TYPE_FN && !t->bound)) {
+        return "ptr";
+    }
+    return t->kind < sizeof names / sizeof *names ? names[t->kind] : NULL;
+}
+
+/* DESIGN: the signature of a function names its result and then each
+   parameter after self, joined by dots, as `i64.i32.str`. The pass over
+   the whole program writes one trampoline per such text, so equal
+   signatures share one. A signature holding a type that a Value cannot
+   carry has no text, and reflect.call refuses the function. */
+static const struct ir_global *signature_text(struct lowerer *l,
+                                              const struct type *fn)
+{
+    struct token_text text;
+    struct text code = {0};
+    const char *name;
+    const struct ir_global *g;
+    size_t i;
+
+    if (fn == NULL || fn->kind != TYPE_FN ||
+        (name = value_type_name(fn->result)) == NULL) {
+        return NULL;
+    }
+    text_append(&code, name);
+    for (i = 1; i < fn->param_count; i++) {
+        name = value_type_name(fn->params[i]);
+        if (name == NULL || strcmp(name, "void") == 0) {
+            text_free(&code);
+            return NULL;
+        }
+        text_appendf(&code, ".%s", name);
+    }
+    text.bytes = text_cstr(&code);
+    text.length = code.length;
+    g = literal_global(l, &text);
+    text_free(&code);
+    return g;
+}
+
 static struct ir_global *class_functions(struct lowerer *l,
                                          const struct type *t,
                                          size_t *count_out)
@@ -1521,8 +1575,12 @@ static struct ir_global *class_functions(struct lowerer *l,
                          table.count);
     for (i = 0; i < table.count; i++) {
         struct ir_const *item =
-            ir_const_agg(l->m, ir_aggregate(function_agg(l)), 4);
+            ir_const_agg(l->m, ir_aggregate(function_agg(l)), 5);
         const struct item *fn = table.entries[i].fn;
+        const struct ir_global *signature =
+            fn != NULL && fn->symbol != NULL
+                ? signature_text(l, fn->symbol->type)
+                : NULL;
         text.bytes = table.entries[i].name.text;
         text.length = table.entries[i].name.length;
         item->items[0].kind = IR_CONST_ADDR;
@@ -1541,6 +1599,14 @@ static struct ir_global *class_functions(struct lowerer *l,
                     fn->symbol->type->kind == TYPE_FN
                 ? fn->symbol->type->param_count
                 : 1;
+        item->items[4].scalar = IR_PTR;
+        if (signature != NULL) {
+            item->items[4].kind = IR_CONST_ADDR;
+            item->items[4].global = signature->index;
+        } else {
+            item->items[4].kind = IR_CONST_INT;
+            item->items[4].integer = 0;
+        }
         value->items[i] = *item;
     }
     free(table.entries);

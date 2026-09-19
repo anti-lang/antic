@@ -93,3 +93,22 @@ language or a user of the tools can observe.
   `slots.<n>` of module `anti.rt`.
 - Nothing reads the table yet. The plugin loader will, and so will a devirtualisation that
   must keep a call through an injectable interface indirect once plugins exist.
+
+## The trampolines of reflect.call
+
+- Lowering gives each record of a function list the text of its signature, a byte global
+  of the module. The pass reads the texts from the function lists of the class records,
+  so it sees the classes of every module.
+- A trampoline is `anti.rt.trampoline.<text>`, and the declaration whose parameters its
+  call follows is `anti.rt.signature.<text>`. It checks the count and the kind of every
+  `Value`, reads each argument at the type of its parameter, narrowing from the width the
+  `Value` holds, calls the entry and widens the result back into a `Value`.
+- A `str` argument passes the address of its bytes inside the `Value`, as lowering passes
+  an aggregate.
+- The layout of a `Value` is the aggregate `anti.reflect.Value`, so the trampolines hold
+  symbolic sizes and offsets alone. A program without that aggregate gets an empty table.
+- The table is `anti_rt_trampolines`: a count and an array of `anti.rt.Trampoline`
+  records, each the text and the trampoline. The texts are byte globals `trampolines.<n>`
+  of module `anti.rt`.
+- In dev mode the optimizer keeps the functions of module `anti.rt` in the object that
+  links, as it keeps that module's data.

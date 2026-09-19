@@ -571,6 +571,116 @@ static void records_slots(void)
     close_program(&p);
 }
 
+/* The part of anti.reflect that the trampolines read: the value, its
+   kinds and the call into the runtime. */
+static const char reflect_module[] =
+    "pub enum ValueKind: u8 { None, Int, Uint, Float, Bool, Char, Str, Ptr }\n"
+    "pub union Payload\n"
+    "{\n"
+    "    i: int,\n"
+    "    u: uint,\n"
+    "    f: f64,\n"
+    "    b: bool,\n"
+    "    c: char,\n"
+    "    s: str,\n"
+    "    p: *byte,\n"
+    "}\n"
+    "pub struct Value\n"
+    "{\n"
+    "    kind: ValueKind,\n"
+    "    data: Payload,\n"
+    "}\n"
+    "extern fn anti_rt_reflect_call(object: *Object, index: int,\n"
+    "    args: *Value, count: int, result: *Value) -> bool;\n"
+    "pub fn call(object: *Object, index: int, args: []Value,\n"
+    "    result: *Value) -> bool\n"
+    "{\n"
+    "    return anti_rt_reflect_call(object, index, args.ptr, args.len,\n"
+    "        result);\n"
+    "}\n";
+
+/* Run the passes over a program that calls through reflection when calls
+   is set, and print what the passes wrote under prefix. */
+static void reflect_calls(bool calls, bool reflect, const char *prefix,
+                          const char *expected)
+{
+    struct program p;
+    struct text errors = {0};
+    struct text out = {0};
+    struct text source = {0};
+    struct whole_options options;
+
+    open_program(&p);
+    load_library(&p, "anti.reflect", reflect_module);
+    text_append(&source, "import anti.reflect;\n");
+    text_append(&source, shapes);
+    text_append(&source, "fn main() -> int\n"
+                         "{\n"
+                         "    let t = alloc Tile { };\n");
+    if (calls) {
+        text_append(&source,
+                    "    let v = reflect.Value { kind: reflect.ValueKind.None,"
+                    " data: reflect.Payload { i: 0 } };\n"
+                    "    let none = []reflect.Value { ptr: null, len: 0 };\n"
+                    "    reflect.call(t, 7, none, &v);\n");
+    }
+    text_append(&source, "    return 0;\n"
+                         "}\n");
+    compile(&p, "main", text_cstr(&source), &p.ir);
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.reflect = reflect;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    print_lines(&out, &p.ir, prefix);
+    CHECK_STR(text_cstr(&out), expected);
+    text_free(&errors);
+    text_free(&out);
+    text_free(&source);
+    close_program(&p);
+}
+
+/* DESIGN: a program that calls through reflection gets one trampoline per
+   signature that its function lists name. A table maps the text of each
+   signature to its trampoline. A program that never calls gets none.
+   `--no-reflect` drops the function lists and leaves the table empty. */
+static void writes_trampolines(void)
+{
+    reflect_calls(true, true, "fn anti.rt.trampoline.",
+                  "fn anti.rt.trampoline.str(%0: ptr, %1: ptr, %2: ptr, "
+                  "%3: i64, %4: ptr) -> i8 {\n"
+                  "fn anti.rt.trampoline.bool.ptr(%0: ptr, %1: ptr, %2: ptr, "
+                  "%3: i64, %4: ptr) -> i8 {\n"
+                  "fn anti.rt.trampoline.u64(%0: ptr, %1: ptr, %2: ptr, "
+                  "%3: i64, %4: ptr) -> i8 {\n"
+                  "fn anti.rt.trampoline.void.ptr(%0: ptr, %1: ptr, %2: ptr, "
+                  "%3: i64, %4: ptr) -> i8 {\n"
+                  "fn anti.rt.trampoline.void(%0: ptr, %1: ptr, %2: ptr, "
+                  "%3: i64, %4: ptr) -> i8 {\n"
+                  "fn anti.rt.trampoline.i64(%0: ptr, %1: ptr, %2: ptr, "
+                  "%3: i64, %4: ptr) -> i8 {\n");
+    reflect_calls(true, true, "global (null).anti_rt_trampolines",
+                  "global (null).anti_rt_trampolines anti.rt.Trampolines "
+                  "{ i64 6, @anti.rt.trampolines.list }\n");
+    reflect_calls(false, true, "global (null).anti_rt_trampolines", "");
+    reflect_calls(true, false, "global (null).anti_rt_trampolines",
+                  "global (null).anti_rt_trampolines anti.rt.Trampolines "
+                  "{ i64 0, ptr 0 }\n");
+}
+
+/* A call through reflection may reach any slot of any interface, so every
+   slot of every abstract class counts as reached. */
+static void call_reaches_every_slot(void)
+{
+    reflect_calls(true, true, "global anti.rt.slots.",
+                  "global anti.rt.slots.0 size 2 align 1 bytes fe 03\n"
+                  "global anti.rt.slots.1 size 2 align 1 bytes fe 01\n"
+                  "global anti.rt.slots.list [2]anti.rt.Slots { "
+                  "anti.rt.Slots { @main.Shape.descriptor, i64 10, "
+                  "@anti.rt.slots.0 }, "
+                  "anti.rt.Slots { @main.Named.descriptor, i64 9, "
+                  "@anti.rt.slots.1 } }\n");
+}
+
 void test_whole(void)
 {
     finds_entries();
@@ -579,4 +689,6 @@ void test_whole(void)
     writes_registry();
     checks_singletons();
     records_slots();
+    writes_trampolines();
+    call_reaches_every_slot();
 }

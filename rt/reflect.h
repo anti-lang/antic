@@ -38,4 +38,31 @@ int64_t anti_rt_reflect_get(void *object, const struct anti_descriptor *d,
 void anti_rt_reflect_set(void *object, const struct anti_descriptor *d,
                          int64_t index, int64_t value);
 
+/* One trampoline of the program. It checks that count and the kinds of
+   the reflect.Values at args fit the signature. It then calls entry with
+   object and the unpacked values, and writes the result as a Value. It
+   gives 0 when the values do not fit. */
+struct anti_trampoline {
+    const unsigned char *signature;
+    int8_t (*call)(const void *entry, void *object, const void *args,
+                   int64_t count, void *result);
+};
+
+/* DESIGN: the compiler writes the table of every trampoline of the
+   program as `anti_rt_trampolines` when the program reaches
+   anti_rt_reflect_call. call.c alone reads it, so a program that never
+   calls through reflection links no table and misses no symbol. */
+struct anti_trampolines {
+    int64_t count;
+    const struct anti_trampoline *items;
+};
+
+extern const struct anti_trampolines anti_rt_trampolines;
+
+/* Call the function at index of the list of the object's class through
+   its table, with the reflect.Values at args. The result goes to result.
+   Gives 0 and leaves result alone when the call cannot be made. */
+int8_t anti_rt_reflect_call(void *object, int64_t index, const void *args,
+                            int64_t count, void *result);
+
 #endif

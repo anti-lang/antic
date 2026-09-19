@@ -6,6 +6,13 @@ pub class Point
 {
 	pub x: int = 0,
 	pub y: int = 0,
+
+	/// Move the point right by `by` and give its new `x`.
+	pub fn shift(self, by: int) -> int
+	{
+		self.x = self.x + by;
+		return self.x;
+	}
 }
 
 /// A point that this module allocates.
