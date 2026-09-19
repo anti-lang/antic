@@ -11,6 +11,11 @@
 /* The flag of a class whose construct takes arguments. */
 #define ANTI_CLASS_ARGS 1
 
+/* The flag of a class with an inline class field that no default fills.
+   Only a literal that names the field makes one, so a zero table never
+   sits in an inline field of an object the registry built. */
+#define ANTI_CLASS_REQUIRED 2
+
 /* One class the program may build by name. init sets the tables of an
    object of the class, writes its defaults and runs construct when it
    takes no arguments. The module path names the module that declares the

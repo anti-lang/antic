@@ -2081,7 +2081,10 @@ static void read_classes(struct reader *r, struct ir_module *program,
         uint32_t mutables;
         struct ir_class *c;
 
-        if (r->failed || flags > 15 || module[0] == '\0' ||
+        if (r->failed ||
+            flags > (IR_CLASS_ABSTRACT | IR_CLASS_FINAL | IR_CLASS_SINGLETON |
+                     IR_CLASS_ARGS | IR_CLASS_REQUIRED) ||
+            module[0] == '\0' ||
             (init != IR_NO_INDEX && init >= maps->function_count)) {
             damaged(r);
             return;

@@ -1,0 +1,12 @@
+exit 0
+construct Part 5
+construct Part 5
+construct Empty
+block 5 5 1
+destruct Part 5
+destruct Part 5
+construct Part 7
+construct Part 5
+construct Empty
+destruct Part 7
+destruct Part 5

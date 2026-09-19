@@ -1,0 +1,49 @@
+//! An inline class field without a default takes `T { }` when every field
+//! of `T` has a default or `T` has none, and `construct` runs on it. A
+//! `use` field does the same. A literal that names the field gives its
+//! own value instead.
+
+extern fn printf(format: *byte, ...) -> c_int;
+
+class Part
+{
+	pub n: int = 5,
+
+	fn construct(self)
+	{
+		printf("construct Part %d\n".ptr, self.n as c_int);
+	}
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Part %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Empty
+{
+	fn construct(self)
+	{
+		printf("construct Empty\n".ptr);
+	}
+}
+
+class Holder
+{
+	pub part: Part,
+	use extra: Part,
+	pub empty: Empty,
+	pub n: int = 1,
+}
+
+fn main() -> int
+{
+	{
+		let h = Holder { };
+		printf("block %d %d %d\n".ptr, h.part.n as c_int, h.extra.n as c_int,
+			h.n as c_int);
+	}
+	let p = alloc Holder { part: Part { n: 7 } };
+	delete(p);
+	return 0;
+}

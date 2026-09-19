@@ -1825,6 +1825,60 @@ static bool singleton_type(const struct type *t)
     return false;
 }
 
+/* Whether the class declares a `construct` that takes arguments. */
+static bool constructs_with_arguments(const struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind == ITEM_FN && name_is(&m->name, "construct") &&
+            m->symbol != NULL && m->symbol->type->kind == TYPE_FN &&
+            m->symbol->type->param_count > 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: an inline class field without a default takes `T { }` when a
+   literal of T may leave every field out. Each field of its chain then
+   has a default, written or taken this way, or T has none. `construct`
+   runs on it as on any literal, so a `construct` with arguments rules it
+   out. Any other such field is required in a literal, like any field
+   without a default. */
+static bool literal_complete(const struct type *t)
+{
+    const struct type *up;
+    size_t i;
+
+    if (t == NULL || t->kind != TYPE_CLASS || t->has_abstract ||
+        singleton_type(t) || constructs_with_arguments(t)) {
+        return false;
+    }
+    for (up = t; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
+        for (i = 0; i < up->field_count; i++) {
+            const struct struct_field *f = &up->fields[i];
+            if (f->form == FIELD_BASE || f->form == FIELD_TABLE ||
+                f->form == FIELD_IMPL || type_field_is_unit_break(f)) {
+                continue;
+            }
+            if (f->value == NULL && f->constant == NULL &&
+                !sema_field_takes_literal(f)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool sema_field_takes_literal(const struct struct_field *f)
+{
+    return f->value == NULL && f->constant == NULL &&
+           (f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+           literal_complete(f->type);
+}
+
 /* DESIGN: every field of a struct is readable and writable everywhere,
    because a struct is the bytes C declares. A field of a class carries
    the level its declaration gave it. The base and the table pointer are
@@ -2855,7 +2909,8 @@ static bool check_field_inits(struct checker *c, struct expr *e,
            The lowering writes the default in its place, so the value is
            complete and the layout is unchanged. */
         if (i == count && fields[j].value == NULL &&
-            fields[j].constant == NULL) {
+            fields[j].constant == NULL &&
+            !sema_field_takes_literal(&fields[j])) {
             error_at(c, e->pos, "the literal of `%s` misses the field `%.*s`",
                      type_name, (int)fields[j].name.length, fields[j].name.text);
             return false;

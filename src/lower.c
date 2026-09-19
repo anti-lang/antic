@@ -2306,10 +2306,48 @@ static void store_value(struct lowerer *l, const struct type *t,
 }
 
 /* Whether field has a default, declared here or read from a library
-   file. */
+   file, or takes `T { }` as an inline class value. */
 static bool has_default(const struct struct_field *field)
 {
-    return field->value != NULL || field->constant != NULL;
+    return field->value != NULL || field->constant != NULL ||
+           sema_field_takes_literal(field);
+}
+
+/* DESIGN: every complete class has a function that prepares an object
+   allocated elsewhere. It stores the table pointers and writes the
+   default of every field of the chain, as a literal of the class does.
+   Then it runs construct when that takes no arguments. An export
+   class gives it to C as `anti_<Class>_init`. The registry that
+   `reflect.new` reads names it for the others as `<Class>.init`. An
+   abstract class has no complete value and therefore none. */
+static void init_name(const struct type *t, bool exported, char *out,
+                      size_t size)
+{
+    snprintf(out, size, exported ? "anti_%.*s_init" : "%.*s.init",
+             (int)t->name.length, t->name.text);
+}
+
+/* The init function of class t, declared in the module that declares t
+   and referred to from any other. */
+static struct ir_function *init_function(struct lowerer *l,
+                                         const struct type *t)
+{
+    char *module = cstr(&t->module);
+    struct ir_function *f;
+    char name[128];
+
+    init_name(t, t->item_exported, name, sizeof name);
+    f = find_function(l->m, module, name);
+    if (f == NULL) {
+        f = strcmp(module, l->module_name) == 0
+                ? ir_function_add(l->m, l->module_name, name, IR_VOID,
+                                  IR_NO_AGG)
+                : ir_declare_add(l->m, module, name, IR_VOID, IR_NO_AGG);
+        f->exported = t->item_exported;
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+    }
+    free(module);
+    return f;
 }
 
 /* The scalar default of field. The declaring module lowers the
@@ -2330,6 +2368,13 @@ static void store_default(struct lowerer *l, const struct struct_field *field,
     struct ir_operand v;
     struct ir_vtype vtype;
 
+    /* An inline class field without a default is written as `T { }`
+       would write it, which the init of T does. */
+    if (field->value == NULL && field->constant == NULL) {
+        ir_call(l->f, l->b, IR_VOID, ir_func_op(init_function(l, field->type)),
+                &address, 1);
+        return;
+    }
     if (field->value != NULL) {
         store_value(l, field->type, (struct expr *)field->value, address);
         return;
@@ -5055,20 +5100,6 @@ static void lower_singleton_get(struct lowerer *l, const struct item *it)
     ir_ret(l->f, l->b, IR_PTR, temp(l, result));
 }
 
-/* DESIGN: every complete class has a function that prepares an object
-   allocated elsewhere. It stores the table pointers and writes the
-   default of every field of the chain, as a literal of the class does.
-   Then it runs construct when that takes no arguments. An export
-   class gives it to C as `anti_<Class>_init`. The registry that
-   `reflect.new` reads names it for the others as `<Class>.init`. An
-   abstract class has no complete value and therefore none. */
-static void init_name(const struct type *t, bool exported, char *out,
-                      size_t size)
-{
-    snprintf(out, size, exported ? "anti_%.*s_init" : "%.*s.init",
-             (int)t->name.length, t->name.text);
-}
-
 static void class_init(struct lowerer *l, const struct item *it)
 {
     const struct type *t = it->symbol->type;
@@ -5076,13 +5107,9 @@ static void class_init(struct lowerer *l, const struct item *it)
     struct ir_function *f;
     struct ir_block *entry;
     struct ir_operand self;
-    char name[128];
     size_t i;
 
-    init_name(t, it->exported, name, sizeof name);
-    f = ir_function_add(l->m, l->module_name, name, IR_VOID, IR_NO_AGG);
-    f->exported = it->exported;
-    ir_param_add(f, IR_PTR, IR_NO_AGG);
+    f = init_function(l, t);
     entry = ir_block_add(f);
     l->f = f;
     l->b = entry;
@@ -5332,6 +5359,24 @@ static bool constructs_with_arguments(const struct type *t)
     return false;
 }
 
+/* Whether a field of the chain of t holds a class value inline that no
+   default fills. Only a literal that names it then makes the class. */
+static bool requires_class_field(const struct type *t)
+{
+    size_t i;
+
+    for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                f->type->kind == TYPE_CLASS && !has_default(f)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /* The record of a class that the module being lowered declares, for the
    passes over the whole program. */
 static void class_record(struct lowerer *l, const struct item *it)
@@ -5346,7 +5391,8 @@ static void class_record(struct lowerer *l, const struct item *it)
     c->flags = (it->is_abstract ? IR_CLASS_ABSTRACT : 0u) |
                (t->is_final ? IR_CLASS_FINAL : 0u) |
                (it->is_singleton ? IR_CLASS_SINGLETON : 0u) |
-               (constructs_with_arguments(t) ? IR_CLASS_ARGS : 0u);
+               (constructs_with_arguments(t) ? IR_CLASS_ARGS : 0u) |
+               (requires_class_field(t) ? IR_CLASS_REQUIRED : 0u);
     c->descriptor = class_descriptor(l, t)->index;
     c->base = class_descriptor(l, t->base)->index;
     c->agg = agg_of(l, t);

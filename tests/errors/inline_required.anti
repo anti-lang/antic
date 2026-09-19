@@ -1,0 +1,32 @@
+import anti.error;
+
+class Needs
+{
+	pub v: int,
+}
+
+class Sized
+{
+	pub w: int = 0,
+
+	fn construct(self, w: int) -> *error.Error
+	{
+		self.w = w;
+		return none;
+	}
+}
+
+class Holder
+{
+	pub need: Needs,
+	pub sized: Sized,
+	pub n: int = 0,
+}
+
+fn f() -> int
+{
+	let a = Holder { sized: Sized { w: 1 } };
+	let b = Holder { need: Needs { v: 1 } };
+	let c = Holder { need: Needs { v: 2 }, sized: Sized { w: 2 } };
+	return a.n + b.n + c.n;
+}

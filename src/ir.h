@@ -271,7 +271,8 @@ enum ir_class_flag {
     IR_CLASS_ABSTRACT = 1,
     IR_CLASS_FINAL = 2,
     IR_CLASS_SINGLETON = 4,
-    IR_CLASS_ARGS = 8               /* its construct takes arguments */
+    IR_CLASS_ARGS = 8,              /* its construct takes arguments */
+    IR_CLASS_REQUIRED = 16          /* an inline class field no default fills */
 };
 
 /* The table of one interface sub-object of a concrete class, the ones it

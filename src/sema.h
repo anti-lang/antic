@@ -123,6 +123,10 @@ bool sema_check(struct module *module, const char *module_name,
                 struct arena *arena, struct diagnostics *diags,
                 bool whole_program);
 
+/* Whether a field without a written default takes `T { }`: an inline
+   class value whose class a literal may write with no field named. */
+bool sema_field_takes_literal(const struct struct_field *f);
+
 /* Warn about each pub item with a `//#` note and no `///` comment. */
 void sema_doc_warnings(const struct module *module, struct diagnostics *diags);
 

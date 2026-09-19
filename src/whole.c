@@ -522,7 +522,8 @@ static void write_registry(struct ir_module *m, bool reflect)
                    module_text(m, c->module, seen, texts, &modules));
         const_int(&item->items[3], IR_I64, strlen(c->module));
         const_int(&item->items[4], IR_I64,
-                  (c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0);
+                  ((c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0) |
+                      ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
         items[n++] = *item;
     }
     value = ir_const_agg(m, ir_aggregate(registry_agg), 2);

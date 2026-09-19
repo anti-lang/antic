@@ -65,8 +65,10 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
 {
     const struct anti_class *c = anti_rt_registry_find(name, length);
 
-    /* A construct with arguments has none to take here. */
-    if (c == NULL || (c->flags & ANTI_CLASS_ARGS) != 0) {
+    /* A construct with arguments has none to take here, and a required
+       class field has no value. */
+    if (c == NULL ||
+        (c->flags & (ANTI_CLASS_ARGS | ANTI_CLASS_REQUIRED)) != 0) {
         return NULL;
     }
     return build(c);
@@ -688,7 +690,8 @@ static void *read_object(struct reader *r,
         return NULL;
     }
     c = anti_rt_registry_find(name, (int64_t)length);
-    if (c == NULL || !descends(c->descriptor, expected)) {
+    if (c == NULL || !descends(c->descriptor, expected) ||
+        (c->flags & ANTI_CLASS_REQUIRED) != 0) {
         return NULL;
     }
     object = build(c);
