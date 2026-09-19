@@ -342,7 +342,7 @@ c.move(1.0, 1.0);
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
 - `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
 
-Built: the model without interfaces, private fields, `construct` with arguments, `destruct` rename and scope-end destruction. See the completion work order for the rest.
+Built. The root is `anti.rt.Object` until the namespaces move under `anti.lang`.
 
 ## Interfaces
 
@@ -376,7 +376,7 @@ s.serialize(&b);
 
 `implements name: Iface,` places the interface's table pointer and fields inside the object at a named field. `&c` converts to `*Serializable` implicitly. A `concrete fn` without a qualifier fills every table with that name. `use name: T,` is composition: `T`'s public names are reachable on the class and the class does not convert to `*T`.
 
-Not built yet.
+Built.
 
 ## Ownership
 
@@ -427,7 +427,7 @@ let fresh = reflect.new("Circle");
 
 `anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `--no-reflect` drops the field and function lists.
 
-Built: descriptors, `get`, `set`. Not built yet: `call`, `new`, `Value`.
+Built: descriptors, `get`, `set`, `call`, `new` and `Value`.
 
 ## Operators on classes
 
@@ -449,7 +449,7 @@ if a == b { }
 
 The names: `add sub mul div rem neg eq lt and or xor shl shr not`. `!=`, `>`, `<=`, `>=` and compound assignments derive. For a struct the operator is a free function in the declaring module.
 
-Not built yet.
+Built.
 
 ## Static fields and singletons
 
@@ -476,7 +476,7 @@ Config.get().requests.add(1);
 
 Atomic operations: `load store add sub and or xor swap compare_swap`, sequentially consistent. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` fields may be written anywhere except from a worker, which the compiler checks.
 
-Built: static atomics. Not built yet: `singleton`.
+Built.
 
 ## Threads
 
@@ -494,7 +494,7 @@ join(job);
 
 Worker parameters are pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `ANTI_THREADS` is gone. `--anti.threads` and the configuration file set the pool size. `sync m { }` and `chan T` are the locking and channel forms.
 
-Built: `parallel`, `dispatch`, `join`. Not built yet: `sync`, `chan`.
+Built: `parallel`, `dispatch`, `join`. Not built yet: `sync`, `chan`, `--anti.threads` and the configuration file. `ANTI_THREADS` still sets the pool size.
 
 ## Injection
 

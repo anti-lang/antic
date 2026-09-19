@@ -19,7 +19,9 @@ and is not a concern here.
    goes into both.
 
 `docs/anti-syntax-overview.md` summarises the two specifications and adds
-nothing. A change to either specification changes it in the same commit.
+nothing. A change to either specification changes it in the same commit. Its
+"Built" and "Not built yet" lines are the status page of the implementation,
+and a commit that builds a feature changes them.
 
 The choices inside a compiler pass are in `docs/notes/`. The design pages of the
 runtime archive, the build tool and the standard library are in `docs/site/`.
