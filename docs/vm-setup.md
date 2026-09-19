@@ -23,12 +23,15 @@ git -C /tmp clone --depth 1 https://github.com/FoundingFuture/book-writing-a-com
 cmake -DDEST=$HOME/anti/clang -P /tmp/book/tools/get-clang.cmake
 cmake -DDEST=$HOME/anti/toolchain -P /tmp/book/tools/get-llvm.cmake
 cmake -DDEST=$HOME/anti/sysroot -DLLVM_BIN=$HOME/anti/toolchain/bin \
-  -DCLANG_DIR=$HOME/anti/clang \
-  -DTARGETS="linux-x86_64;linux-arm64" -P /tmp/book/tools/get-sysroot.cmake
+  -DCLANG_DIR=$HOME/anti/clang -DACCEPT_LICENSE=yes \
+  -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
+  -P /tmp/book/tools/get-sysroot.cmake
 cmake -DDEST=$HOME/anti/raylib -P /tmp/book/tools/get-raylib.cmake
 ```
 
-The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/book/` instead.
+The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/book/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. `-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK that xwin downloads.
+
+A program that names a framework also needs the stubs of Apple's SDK. On the Mac, `build/anti sdk export` writes `apple-sdk-<version>.tar.xz`. Copy it to the VM and install it with `anti sdk import <bundle> --sysroot $HOME/anti/sysroot`. A copy of the SDK itself works too, as `-DAPPLE_SDK=<MacOSX.sdk>` of `get-sysroot.cmake`.
 
 ### SSH from the Mac
 
@@ -56,10 +59,10 @@ git archive HEAD | ssh anti-linux 'rm -rf book && mkdir book && tar -x -f - -C b
 
 ### Coverage
 
-The machine ran the whole suite on 2026-09-16. It passes 694 of 695 tests. Five cross links
-skip, for the targets whose sysroot or runtime library a gcc host does not hold. The test
-`abi_probe` fails on the padding of a constant aggregate, which stands under Open in
-`docs/decisions.md`.
+The machine ran the whole suite on 2026-09-19 with the pinned clang of `23.1.1-anti.3` and
+the sysroots of all six targets. It passes 364 of 364, and ASan and UBSan with the pinned
+runtimes of the clang archive pass 363 of 363 each. The macOS programs link against Zig's
+stubs, and `link_identity_macos-arm64` finds the bytes that the Mac links.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -104,15 +107,27 @@ cmake -DDEST=C:\anti\clang -P C:\anti\book\tools\get-clang.cmake
 cmake -DDEST=C:\anti\toolchain -P C:\anti\book\tools\get-llvm.cmake
 ```
 
+One command installs the sysroots of all six targets. The Windows ones come from the Build Tools of the VM, and the macOS ones from Zig. A program that names a framework takes Apple's SDK as on the Linux VM.
+
+```powershell
+cmake -DDEST=C:\anti\sysroot -DLLVM_BIN=C:\anti\toolchain\bin -DCLANG_DIR=C:\anti\clang -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" -P C:\anti\book\tools\get-sysroot.cmake
+```
+
 Create `C:\anti\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment, including the variable `LIB` that lld-link reads, and puts the Ninja of Visual Studio on the path. The pinned clang needs Ninja, because the Visual Studio generator takes the compiler of its own toolset.
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" arm64
 cd /d C:\anti\book
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=C:/anti/clang -DANTIC_LLVM_DIR=C:/anti/toolchain -DANTIC_RAYLIB_DIR=C:/anti/raylib/raylib-6.0
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=C:/anti/clang -DANTIC_LLVM_DIR=C:/anti/toolchain -DANTIC_SYSROOT_DIR=C:/anti/sysroot -DANTIC_RAYLIB_DIR=C:/anti/raylib/raylib-6.0
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+The machine ran the whole suite on 2026-09-19 with the pinned clang and the sysroots of all
+six targets. It passes 343 of 349, among them every cross link and `link_identity_macos-arm64`.
+Six fail on Windows alone: `program_args` and `std_text` read UTF-8 output as the console
+code page, `program_abi_wchar` expects a `wchar_t` of 32 bits, and `std_error`, `std_log` and
+`std_signals` wait for a look.
 
 ### SSH from the Mac
 
