@@ -1,9 +1,9 @@
 # macOS on every host
 
 antic now takes clang and the LLVM tools from `23.1.1-anti.3`. Every host links a program
-for all six targets, macOS included, as `docs/decisions.md` requires. The
-Linux and Windows VMs built and ran antic with the pinned clang for the first time, and
-they found defects that the Mac could not show.
+for all six targets, macOS included, as `docs/decisions.md` requires. The Linux and
+Windows VMs built and ran antic with the pinned clang for the first time. They found
+defects that the Mac could not show.
 
 ## Pins
 
