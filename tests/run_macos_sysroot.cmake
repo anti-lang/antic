@@ -135,7 +135,12 @@ file(WRITE "${sdk}/usr/include/stdio.h" "/* header */\n")
 set(framework "${sdk}/System/Library/Frameworks/Foo.framework")
 file(WRITE "${framework}/Versions/A/Foo.tbd" "Foo\n")
 file(WRITE "${framework}/Versions/A/Headers/Foo.h" "/* header */\n")
-file(CREATE_LINK A "${framework}/Versions/Current" SYMBOLIC RESULT linked)
+# A copy of an SDK on Windows holds no symbolic link, so the stand-in
+# there copies instead.
+set(linked 1)
+if(NOT CMAKE_HOST_WIN32)
+    file(CREATE_LINK A "${framework}/Versions/Current" SYMBOLIC RESULT linked)
+endif()
 if(linked STREQUAL "0")
     file(CREATE_LINK Versions/Current/Foo.tbd "${framework}/Foo.tbd" SYMBOLIC)
 else()

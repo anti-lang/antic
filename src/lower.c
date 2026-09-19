@@ -1406,8 +1406,11 @@ static struct ir_global *class_fields(struct lowerer *l,
         item->items[2].sym = ir_sym_offset_of(l->m, agg_of(l, t), (uint32_t)i);
         item->items[3].kind = IR_CONST_INT;
         item->items[3].scalar = IR_I64;
-        item->items[3].integer = is_aggregate(f->type) ? IR_AGG
-                                                       : ir_type_of(f->type);
+        /* An enum is signed under the ABI of Windows, so both arms convert
+           to the unsigned field alike. */
+        item->items[3].integer = is_aggregate(f->type)
+                                     ? (uint64_t)IR_AGG
+                                     : (uint64_t)ir_type_of(f->type);
         item->items[4].kind = IR_CONST_INT;
         item->items[4].scalar = IR_I64;
         item->items[4].integer = f->owned ? 1 : 0;

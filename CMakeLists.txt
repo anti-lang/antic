@@ -19,11 +19,14 @@ endif()
 
 # One warning set for clang, gcc and MSVC. Warnings are errors so that
 # the code in the book compiles without noise on every platform.
+# DESIGN: the C runtime of Microsoft deprecates fopen, getenv and the other
+# functions that C11 defines, for MSVC and for clang with its headers alike,
+# and the warnings are errors here.
+if(WIN32)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+endif()
 if(MSVC)
     add_compile_options(/W4 /WX /utf-8)
-    # DESIGN: the C runtime of Microsoft deprecates fopen, getenv and the
-    # other functions that C11 defines, and the warnings are errors here.
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror
         -Wshadow -Wconversion -Wstrict-prototypes)

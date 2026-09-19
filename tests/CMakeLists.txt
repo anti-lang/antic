@@ -283,6 +283,7 @@ add_test(NAME sysroot_digest
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_digest"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_digest.cmake")
+set_tests_properties(sysroot_digest PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 add_test(NAME anti_sdk
     COMMAND "${CMAKE_COMMAND}" "-DANTI=$<TARGET_FILE:anti>"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti_sdk"

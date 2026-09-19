@@ -326,6 +326,7 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
         [OS_WINDOWS] = "lld-link",
     };
     struct text marker = {0};
+    enum target host;
     bool present;
 
     memset(f, 0, sizeof *f);
@@ -347,7 +348,10 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
         return true;
     }
     text_appendf(&f->lld_dir, "%s/%s", o->runtime, RUNTIME_BIN_DIR);
-    text_appendf(&marker, "%s/%s", text_cstr(&f->lld_dir), flavours[os]);
+    /* The flavour of lld is a program of the host, which ends in .exe on
+       Windows. The command line may leave the suffix out. */
+    text_appendf(&marker, "%s/%s%s", text_cstr(&f->lld_dir), flavours[os],
+                 target_host(&host) ? target_info(host)->executable_suffix : "");
     in->lld_dir = file_exists(text_cstr(&marker)) ? text_cstr(&f->lld_dir)
                                                   : NULL;
     text_free(&marker);

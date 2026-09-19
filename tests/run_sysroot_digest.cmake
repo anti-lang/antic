@@ -5,6 +5,12 @@
 #
 #   cmake -DROOT=<repository> -DWORK=<dir> -P tests/run_sysroot_digest.cmake
 
+# A Windows host takes its Windows sysroots from the Build Tools and hashes
+# no tree of xwin.
+if(CMAKE_HOST_WIN32)
+    message("SKIP: a Windows host takes the Build Tools rather than xwin")
+    return()
+endif()
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/sysroot/windows-x86_64/crt")
 file(WRITE "${WORK}/sysroot/windows-x86_64/crt/one.lib" "one\n")
