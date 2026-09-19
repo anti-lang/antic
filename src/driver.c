@@ -502,10 +502,12 @@ static bool whole_checked(const char *input, struct ir_module *program,
     return ok;
 }
 
+static bool has_main(const struct ir_module *program, const char *module);
+
 /* Lower the module after the loaded libraries and print the whole
    program, optimized when optimize is set. The optimized program has
-   been through the passes over the whole program. Returns 2, the status
-   of a finished dump, on success. */
+   been through the passes over the whole program where the build runs
+   them. Returns 2, the status of a finished dump, on success. */
 static int dump_ir(const char *input, struct module *tree, const char *module,
                    struct ir_module *program, bool optimize, bool release,
                    struct diagnostics *diags, bool no_reflect)
@@ -517,7 +519,8 @@ static int dump_ir(const char *input, struct module *tree, const char *module,
         return 1;
     }
     if (optimize) {
-        if (!whole_checked(input, program, module, release, !no_reflect,
+        if ((release || has_main(program, module)) &&
+            !whole_checked(input, program, module, release, !no_reflect,
                            false, false)) {
             return 1;
         }

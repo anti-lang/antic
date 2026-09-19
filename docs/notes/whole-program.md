@@ -9,8 +9,8 @@ language or a user of the tools can observe.
 - The driver runs the passes after lowering and before the optimizer. In release mode
   that is every compilation of a program. In dev mode it is the compilation of the module
   that links, which has `main`, and of a library for C. A dev object of any other module
-  never links and skips them. `--dump-opt` runs them, and `--dump-ir` shows the IR before
-  them.
+  never links and skips them. `--dump-opt` runs them where the build would, and
+  `--dump-ir` shows the IR before them.
 - The program holds the IR of every module in both modes. A library file carries the IR
   of its module, and antic loads every library file that the program imports.
 
