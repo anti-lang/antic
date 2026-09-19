@@ -215,14 +215,22 @@ set_tests_properties(program_args PROPERTIES
 # one of them.
 file(GLOB std_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/std/*.anti")
+# A program whose output follows the Win32 errors of Windows brings
+# NAME.win32.expected for the Windows targets.
 foreach(source IN LISTS std_sources)
     get_filename_component(name "${source}" NAME_WE)
+    set(expected "")
+    set(win32_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.win32.expected")
+    if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${win32_expected}")
+        set(expected "-DEXPECTED=${win32_expected}")
+    endif()
     add_test(NAME std_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${source}"
+            ${expected}
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()

@@ -1,4 +1,4 @@
 exit 0
 block caught
-no win32 error
+win32 error 3
 done

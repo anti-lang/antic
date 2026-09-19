@@ -4,6 +4,7 @@
 //! whole block.
 import anti.error;
 import anti.io;
+import anti.text;
 
 extern fn fopen(path: *byte, mode: *byte) -> *byte;
 
@@ -56,9 +57,18 @@ fn main() -> int
 		io.println("block caught");
 	}
 
-	/* Every system but Windows has no Win32 error to give. */
+	/* Windows gives the Win32 error of the fopen that failed last, a
+	   path that does not exist, and every other system gives none. The
+	   two expected files hold the two lines. */
+	if fopen("/nonexistent/anti/win32".ptr, "r".ptr) != null {
+		return 5;
+	}
 	let w = error.Error.from_win32();
-	if w.code != 0 {
+	if w.code == 0 && text.byte_count(w.message) == 0 {
+		io.println("no win32 error");
+	} else if w.code == 3 && text.byte_count(w.message) > 0 {
+		io.println("win32 error 3");
+	} else {
 		return 4;
 	}
 	delete(w);
