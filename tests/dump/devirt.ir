@@ -49,6 +49,9 @@ global devirt.Derived.descriptor anti.rt.Descriptor { @devirt.24, i64 7, @devirt
 global devirt.24 size 8 align 1 bytes 44 65 72 69 76 65 64 00
 global devirt.Derived.ancestors [3]ptr { @anti_rt_Object_descriptor, @devirt.Base.descriptor, @devirt.Derived.descriptor }
 global devirt.Derived.functions [9]anti.rt.Function { anti.rt.Function { @devirt.6, i64 9, i64 1, i64 1 }, anti.rt.Function { @devirt.7, i64 7, i64 2, i64 1 }, anti.rt.Function { @devirt.8, i64 6, i64 3, i64 2 }, anti.rt.Function { @devirt.9, i64 4, i64 4, i64 1 }, anti.rt.Function { @devirt.10, i64 9, i64 5, i64 2 }, anti.rt.Function { @devirt.11, i64 8, i64 6, i64 1 }, anti.rt.Function { @devirt.12, i64 4, i64 7, i64 2 }, anti.rt.Function { @devirt.13, i64 5, i64 8, i64 1 }, anti.rt.Function { @devirt.20, i64 4, i64 9, i64 1 } }
+class devirt.Only final descriptor @devirt.Only.descriptor base @anti_rt_Object_descriptor table @devirt.Only.table
+class devirt.Base descriptor @devirt.Base.descriptor base @anti_rt_Object_descriptor table @devirt.Base.table
+class devirt.Derived descriptor @devirt.Derived.descriptor base @devirt.Base.descriptor table @devirt.Derived.table
 fn devirt.Only.value(%0: ptr) -> i64 {
 b0:
     %1 = ptradd %0, offset_of devirt.Only.n
@@ -76,7 +79,7 @@ b0:
     %4 = mul i64 8, size_of ptr
     %5 = ptradd %3, %4
     %6 = load ptr %5
-    %7 = call i64 %6 via @devirt.fn.0(%1)
+    %7 = call i64 %6 via @devirt.fn.0(%1) table @devirt.Base.descriptor 8
     %8 = add i64 %2, %7
     %9 = call i64 @devirt.Base.same(%1)
     %10 = add i64 %8, %9

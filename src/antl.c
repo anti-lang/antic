@@ -544,7 +544,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
     for (i = 0; i < ir->function_count; i++) {
         const struct ir_function *f = ir->functions[i];
         put_u8(w, (uint8_t)((f->is_extern ? 1 : 0) | (f->variadic ? 2 : 0) |
-                            (f->exported ? 4 : 0)));
+                            (f->exported ? 4 : 0) | (f->worker ? 8 : 0)));
         put_str(w, f->module);
         put_str(w, f->name);
         put_u8(w, (uint8_t)f->result);
@@ -574,6 +574,27 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
             for (k = 0; k < f->blocks[j]->count; k++) {
                 put_inst(w, &f->blocks[j]->insts[k]);
             }
+        }
+    }
+    put_u32(w, (uint32_t)ir->class_count);
+    for (i = 0; i < ir->class_count; i++) {
+        const struct ir_class *c = ir->classes[i];
+        put_str(w, c->module);
+        put_str(w, c->name);
+        put_u8(w, (uint8_t)c->flags);
+        put_u32(w, c->descriptor);
+        put_u32(w, c->base);
+        put_u32(w, c->table);
+        put_u32(w, c->init);
+        put_u32(w, c->agg);
+        put_u32(w, (uint32_t)c->subtable_count);
+        for (j = 0; j < c->subtable_count; j++) {
+            put_u32(w, c->subtables[j].interface);
+            put_u32(w, c->subtables[j].table);
+        }
+        put_u32(w, (uint32_t)c->mutable_count);
+        for (j = 0; j < c->mutable_count; j++) {
+            put_u32(w, c->mutable_fields[j]);
         }
     }
 }
@@ -1853,7 +1874,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     if (r->failed) {
         return 0;
     }
-    if (!valid_type(result) || flags > 7 ||
+    if (!valid_type(result) || flags > 15 ||
         ((flags & 1) == 0 && module[0] == '\0') ||
         (module[0] != '\0' && (flags & 2) != 0) ||
         (module[0] == '\0' && (flags & 4) != 0)) {
@@ -1890,6 +1911,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
                                result_agg);
         }
         f->exported = (flags & 4) != 0;
+        f->worker = (flags & 8) != 0;
         for (i = 0; i < param_count && !r->failed; i++) {
             uint8_t type = get_u8(r);
             uint8_t ext = get_u8(r);
@@ -1911,6 +1933,73 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         }
     }
     return f->index;
+}
+
+/* A global of the file as the program's index. none allows
+   IR_NO_INDEX. */
+static uint32_t map_global(struct reader *r, const struct ir_maps *maps,
+                           uint32_t g, bool none)
+{
+    if (none && g == IR_NO_INDEX) {
+        return g;
+    }
+    if (g >= maps->global_count) {
+        damaged(r);
+        return 0;
+    }
+    return maps->globals[g];
+}
+
+/* The class records of the file. Each names globals, a function and an
+   aggregate of the file, which move to the program's indices. */
+static void read_classes(struct reader *r, struct ir_module *program,
+                         struct ir_maps *maps)
+{
+    uint32_t count = get_count(r, 37);
+    uint32_t i;
+    uint32_t j;
+
+    for (i = 0; i < count && !r->failed; i++) {
+        const char *module = get_cstr(r);
+        const char *name = get_cstr(r);
+        uint8_t flags = get_u8(r);
+        uint32_t descriptor = get_u32(r);
+        uint32_t base = get_u32(r);
+        uint32_t table = get_u32(r);
+        uint32_t init = get_u32(r);
+        uint32_t agg = get_u32(r);
+        uint32_t subtables;
+        uint32_t mutables;
+        struct ir_class *c;
+
+        if (r->failed || flags > 15 || module[0] == '\0' ||
+            (init != IR_NO_INDEX && init >= maps->function_count)) {
+            damaged(r);
+            return;
+        }
+        c = ir_class_add(program, module, name);
+        c->flags = flags;
+        c->descriptor = map_global(r, maps, descriptor, false);
+        c->base = map_global(r, maps, base, false);
+        c->table = map_global(r, maps, table, true);
+        c->init = init == IR_NO_INDEX ? init : maps->functions[init];
+        c->agg = map_agg(r, program, maps, agg);
+        subtables = get_count(r, 8);
+        for (j = 0; j < subtables && !r->failed; j++) {
+            uint32_t interface = get_u32(r);
+            uint32_t at = get_u32(r);
+            ir_class_subtable(c, map_global(r, maps, interface, false),
+                              map_global(r, maps, at, false));
+        }
+        mutables = get_count(r, 4);
+        for (j = 0; j < mutables && !r->failed; j++) {
+            uint32_t field = get_u32(r);
+            if (r->failed || field >= program->aggs[c->agg]->field_count) {
+                damaged(r);
+            }
+            ir_class_mutable(c, field);
+        }
+    }
 }
 
 struct relocs {
@@ -2022,6 +2111,9 @@ static void read_ir(struct reader *r, struct ir_module *program)
             ir_global_reloc_fn(program, g, relocs[i].offsets[j],
                                maps.functions[relocs[i].targets[j]]);
         }
+    }
+    if (!r->failed) {
+        read_classes(r, program, &maps);
     }
 }
 

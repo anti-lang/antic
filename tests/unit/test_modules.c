@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: int = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 22, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 23, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -311,6 +311,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 255, 255, 255, 255, 0, 0, 0, 0,
     0, 0, 0, 0,
+    0, 0, 0, 0,                                     /* classes */
 };
 
 static void writes_format(void)
@@ -1102,9 +1103,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 23;
+    copy[4] = 24;
     refuses_file(copy, sizeof copy,
-                 "has format version 23, and antic reads version 22");
+                 "has format version 24, and antic reads version 23");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1114,16 +1115,102 @@ static void damaged_files(void)
     }
     /* The result type agg needs an aggregate of the type table. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[sizeof copy - 2 * 49 - 14 - 10 - 5] = IR_AGG;
+    copy[sizeof copy - 4 - 2 * 49 - 14 - 10 - 5] = IR_AGG;
     refuses_file(copy, sizeof copy, NULL);
     /* Only a parameter of 8 or 16 bits extends. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[sizeof copy - 2 * 49 - 14 - 10 + 5] = IR_EXT_SIGN;
+    copy[sizeof copy - 4 - 2 * 49 - 14 - 10 + 5] = IR_EXT_SIGN;
     refuses_file(copy, sizeof copy, NULL);
     /* The temporary of the mul instruction points past the temporaries. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[sizeof copy - 2 * 49 + 8] = 9;
+    copy[sizeof copy - 4 - 2 * 49 + 8] = 9;
     refuses_file(copy, sizeof copy, NULL);
+}
+
+/* A library file keeps the class records, the mark of a `worker fn` and
+   the class and slot of a call through a table. The passes over the
+   whole program read them. The program read back prints as the module
+   did. */
+static void keeps_classes(void)
+{
+    static const char source[] =
+        "pub abstract class Shape\n"
+        "{\n"
+        "    abstract fn area(self) -> int;\n"
+        "}\n"
+        "pub abstract class Named\n"
+        "{\n"
+        "    abstract fn label(self) -> int;\n"
+        "}\n"
+        "pub final class Square\n"
+        "{\n"
+        "    inherits Shape,\n"
+        "    implements n: Named,\n"
+        "    side: int = 2,\n"
+        "    concrete fn area(self) -> int\n"
+        "    {\n"
+        "        return self.side * self.side;\n"
+        "    }\n"
+        "    concrete fn label(self) -> int\n"
+        "    {\n"
+        "        return 1;\n"
+        "    }\n"
+        "}\n"
+        "pub singleton class Board\n"
+        "{\n"
+        "    atomic hits: int = 0,\n"
+        "    mutable score: int = 0,\n"
+        "}\n"
+        "pub worker fn tally(part: []int) -> int\n"
+        "{\n"
+        "    return part.len;\n"
+        "}\n"
+        "pub fn total(s: *Shape) -> int\n"
+        "{\n"
+        "    return s.area();\n"
+        "}\n";
+    struct session a;
+    struct session b;
+    struct interface *iface;
+    struct ir_module ir;
+    struct ir_module program;
+    struct module *module;
+    struct text bytes = {0};
+    struct text before = {0};
+    struct text after = {0};
+    char error[160] = "";
+    bool ok;
+
+    open_session(&a);
+    module = check_module(&a, "shapes", source, &ok);
+    ir_module_init(&ir, &a.arena, "shapes");
+    ok = ok && lower_module(module, "shapes", &ir, &a.diags, false);
+    CHECK(ok);
+    iface = arena_alloc(&a.arena, sizeof *iface);
+    if (ok) {
+        sema_interface(module, "shapes", &a.arena, iface);
+        antl_write(&bytes, iface, &ir, false);
+        ir_print(&before, &ir);
+    }
+    CHECK(strstr(text_cstr(&before), "class shapes.Square") != NULL);
+    CHECK(strstr(text_cstr(&before), "worker fn shapes.tally") != NULL);
+    CHECK(strstr(text_cstr(&before), " table @shapes.Shape.descriptor 8") !=
+          NULL);
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "");
+    CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
+                    &b.types, &b.arena, &program, error,
+                    sizeof error) != NULL);
+    CHECK_STR(error, "");
+    ir_print(&after, &program);
+    CHECK_STR(text_cstr(&after), text_cstr(&before));
+    text_free(&bytes);
+    text_free(&before);
+    text_free(&after);
+    ir_module_free(&program);
+    ir_module_free(&ir);
+    close_session(&b);
+    close_session(&a);
 }
 
 void test_modules(void)
@@ -1144,6 +1231,7 @@ void test_modules(void)
     keeps_constants();
     keeps_signatures();
     keeps_extern_aggregates();
+    keeps_classes();
     dependencies();
     damaged_files();
 }

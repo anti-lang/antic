@@ -182,6 +182,13 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
                      inst->arg_count, callee->name, callee->param_count);
             }
         }
+        /* A call through a table names the descriptor of its class and
+           a slot after the descriptor's own. */
+        if (inst->c.kind != IR_NONE &&
+            (inst->c.kind != IR_GLOBAL || !operand_ok(v, inst, &inst->c) ||
+             inst->field == 0)) {
+            fail(v, "call names a table that is not a class and a slot");
+        }
         break;
     }
     case IR_JUMP:
@@ -313,12 +320,46 @@ static void check_definitions(struct verifier *v)
     free(in);
 }
 
+static bool global_ok(const struct ir_module *m, uint32_t g, bool optional)
+{
+    return (optional && g == IR_NO_INDEX) || g < m->global_count;
+}
+
+/* Every global, function, aggregate and field a class record names
+   exists. */
+static bool check_class(const struct ir_module *m, const struct ir_class *c,
+                        struct text *errors)
+{
+    bool ok = global_ok(m, c->descriptor, false) &&
+              global_ok(m, c->base, false) && global_ok(m, c->table, true) &&
+              (c->init == IR_NO_INDEX || c->init < m->function_count) &&
+              (c->mutable_count == 0 || c->agg < m->agg_count);
+    size_t i;
+
+    for (i = 0; ok && i < c->subtable_count; i++) {
+        ok = global_ok(m, c->subtables[i].interface, false) &&
+             global_ok(m, c->subtables[i].table, false);
+    }
+    for (i = 0; ok && i < c->mutable_count; i++) {
+        ok = c->mutable_fields[i] < m->aggs[c->agg]->field_count;
+    }
+    if (!ok) {
+        text_appendf(errors, "class %s.%s names what the module does not "
+                             "hold\n", c->module, c->name);
+    }
+    return ok;
+}
+
 bool ir_verify(const struct ir_module *m, struct text *errors)
 {
     struct verifier v = {m, NULL, NULL, errors, true};
     size_t i;
     size_t j;
     size_t k;
+
+    for (i = 0; i < m->class_count; i++) {
+        v.ok = check_class(m, m->classes[i], errors) && v.ok;
+    }
 
     for (i = 0; i < m->function_count; i++) {
         v.f = m->functions[i];

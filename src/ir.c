@@ -83,6 +83,11 @@ void ir_module_free(struct ir_module *m)
     for (i = 0; i < m->function_count; i++) {
         ir_function_free(m->functions[i]);
     }
+    for (i = 0; i < m->class_count; i++) {
+        free(m->classes[i]->subtables);
+        free(m->classes[i]->mutable_fields);
+    }
+    free(m->classes);
     free(m->functions);
     free(m->globals);
     free(m->aggs);
@@ -375,6 +380,53 @@ struct ir_global *ir_global_add_value(struct ir_module *m, const char *module,
     g->bytes = NULL;
     g->value = value;
     return g;
+}
+
+struct ir_class *ir_class_add(struct ir_module *m, const char *module,
+                              const char *name)
+{
+    struct ir_class *c = arena_alloc(m->arena, sizeof *c);
+
+    memset(c, 0, sizeof *c);
+    m->classes = grow(m->classes, &m->class_capacity, m->class_count,
+                      sizeof *m->classes);
+    c->module = keep(m->arena, module);
+    c->name = keep(m->arena, name);
+    c->descriptor = IR_NO_INDEX;
+    c->base = IR_NO_INDEX;
+    c->table = IR_NO_INDEX;
+    c->init = IR_NO_INDEX;
+    c->agg = IR_NO_AGG;
+    m->classes[m->class_count++] = c;
+    return c;
+}
+
+void ir_class_subtable(struct ir_class *c, uint32_t interface, uint32_t table)
+{
+    struct ir_subtable *grown =
+        realloc(c->subtables, (c->subtable_count + 1) * sizeof *grown);
+
+    if (grown == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    c->subtables = grown;
+    c->subtables[c->subtable_count].interface = interface;
+    c->subtables[c->subtable_count].table = table;
+    c->subtable_count++;
+}
+
+void ir_class_mutable(struct ir_class *c, uint32_t field)
+{
+    uint32_t *grown =
+        realloc(c->mutable_fields, (c->mutable_count + 1) * sizeof *grown);
+
+    if (grown == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    c->mutable_fields = grown;
+    c->mutable_fields[c->mutable_count++] = field;
 }
 
 struct ir_const *ir_const_agg(struct ir_module *m, struct ir_vtype type,

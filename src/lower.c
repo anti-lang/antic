@@ -2675,6 +2675,7 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     struct ir_operand bound = none();
     struct ir_operand *args;
     uint32_t result;
+    uint32_t slot;
     enum ir_type declared;
     size_t i;
 
@@ -2721,10 +2722,14 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     /* DESIGN: a call through the table loads the table pointer from the
        object, which is its first word, then the entry of the function.
        The index is the same in every class of a chain, so the entry the
-       concrete class filled is the one this call reads. */
+       concrete class filled is the one this call reads. The call names
+       the class and the index, so the passes over the whole program see
+       which entries it may reach. */
+    slot = 0;
     if (e->as.call.dispatch != NULL && n > 0) {
         int index = table_index(e->as.call.dispatch, &e->as.call.entry);
         if (index > 0) {
+            slot = (uint32_t)index;
             struct ir_operand table =
                 temp(l, ir_load(l->f, l->b, IR_PTR, args[0]));
             target = temp(l, ir_load(l->f, l->b, IR_PTR,
@@ -2751,6 +2756,11 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
                                       ? bound_signature(l, callee->type)
                                       : signature(l, callee->type),
                                   args, n);
+        if (slot > 0) {
+            struct ir_inst *call = &l->b->insts[l->b->count - 1];
+            call->c = ir_global_op(class_descriptor(l, e->as.call.dispatch));
+            call->field = slot;
+        }
     }
     free(args);
     return result == IR_NO_RESULT ? none() : temp(l, result);
@@ -4344,6 +4354,7 @@ static void declare_function(struct lowerer *l, struct item *it)
                                 it->variadic);
         f->result_agg = result_agg(l, t->result);
         f->exported = it->exported;
+        f->worker = it->worker;
         for (i = 0; i < t->param_count; i++) {
             add_param(l, f, t->params[i]);
         }
@@ -4553,6 +4564,61 @@ static void class_init(struct lowerer *l, const struct item *it)
     ir_ret(l->f, l->b, IR_VOID, none());
 }
 
+/* Whether the class declares a `construct` that takes arguments. */
+static bool constructs_with_arguments(const struct type *t)
+{
+    static const struct name construct_name = {"construct", 9};
+    size_t i;
+
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind == ITEM_FN && same_name(&m->name, &construct_name) &&
+            m->symbol != NULL && m->symbol->type->kind == TYPE_FN &&
+            m->symbol->type->param_count > 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The record of a class that the module being lowered declares, for the
+   passes over the whole program. */
+static void class_record(struct lowerer *l, const struct item *it)
+{
+    const struct type *t = it->symbol->type;
+    char *name = cstr(&t->name);
+    struct ir_class *c = ir_class_add(l->m, l->module_name, name);
+    const struct type *up;
+    size_t k;
+
+    free(name);
+    c->flags = (it->is_abstract ? IR_CLASS_ABSTRACT : 0u) |
+               (t->is_final ? IR_CLASS_FINAL : 0u) |
+               (it->is_singleton ? IR_CLASS_SINGLETON : 0u) |
+               (constructs_with_arguments(t) ? IR_CLASS_ARGS : 0u);
+    c->descriptor = class_descriptor(l, t)->index;
+    c->base = class_descriptor(l, t->base)->index;
+    c->agg = agg_of(l, t);
+    if (!it->is_abstract) {
+        c->table = class_table(l, t)->index;
+        for (up = t; up != NULL;
+             up = up->kind == TYPE_CLASS ? up->base : NULL) {
+            for (k = 0; k < up->field_count; k++) {
+                if (up->fields[k].form == FIELD_IMPL) {
+                    ir_class_subtable(
+                        c, class_descriptor(l, up->fields[k].type)->index,
+                        interface_table(l, t, &up->fields[k])->index);
+                }
+            }
+        }
+    }
+    for (k = 0; k < t->field_count; k++) {
+        if (t->fields[k].writable) {
+            ir_class_mutable(c, (uint32_t)k);
+        }
+    }
+}
+
 bool lower_module(struct module *module, const char *module_name,
                   struct ir_module *out, struct diagnostics *diags,
                   bool no_reflect)
@@ -4607,6 +4673,13 @@ bool lower_module(struct module *module, const char *module_name,
             if (it->exported) {
                 class_init(&l, it);
             }
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        const struct item *it = module->items[i];
+        if (it->kind == ITEM_CLASS && it->symbol != NULL &&
+            it->symbol->type != NULL) {
+            class_record(&l, it);
         }
     }
     for (i = 0; i < module->item_count; i++) {

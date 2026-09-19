@@ -115,7 +115,10 @@ enum ir_op {
     IR_BITLOAD,     /* Result: load bitfield field of aggregate of from a. */
     IR_BITSTORE,    /* Store a into bitfield field of aggregate of at b. */
     /* Calls. */
-    IR_CALL,        /* Result: call a with args, as signature b if set. */
+    IR_CALL,        /* Result: call a with args, as signature b if set.
+                       A call through a table names in c the descriptor
+                       of the class whose table it reads and in field
+                       the slot. */
     /* Terminators, the last instruction of a block. */
     IR_JUMP,        /* Go to block a. */
     IR_BRANCH,      /* Go to b when a is nonzero, else c. */
@@ -145,6 +148,9 @@ struct ir_operand {
 };
 
 #define IR_NO_RESULT UINT32_MAX
+
+/* A global or a function that a class record does not have. */
+#define IR_NO_INDEX UINT32_MAX
 
 struct ir_inst {
     enum ir_op op;
@@ -189,6 +195,7 @@ struct ir_function {
     bool is_extern;                 /* no body: C or another module */
     bool variadic;
     bool exported;                  /* an export fn, with a C symbol */
+    bool worker;                    /* a worker fn */
     struct ir_block **blocks;
     size_t block_count;
     size_t block_capacity;
@@ -254,6 +261,46 @@ struct ir_global {
     bool is_extern;
 };
 
+/* DESIGN: a class record tells the passes over the whole program what
+   the functions and globals of the IR do not say. It names the tables a
+   class fills, its base, its interfaces and the `mutable` fields of a
+   singleton. The module that declares a class writes its record. Every
+   reference in it is a global, a function or an aggregate of the module,
+   so a library file maps it like the rest. */
+enum ir_class_flag {
+    IR_CLASS_ABSTRACT = 1,
+    IR_CLASS_FINAL = 2,
+    IR_CLASS_SINGLETON = 4,
+    IR_CLASS_ARGS = 8               /* its construct takes arguments */
+};
+
+/* The table of one interface sub-object of a concrete class, the ones it
+   inherits among them. */
+struct ir_subtable {
+    uint32_t interface;             /* the global of the interface's
+                                       descriptor */
+    uint32_t table;                 /* the global of the table */
+};
+
+/* A class record. The descriptor, the base's descriptor and the tables
+   are globals. The table of an abstract class is IR_NO_INDEX. The init
+   function sets the tables of an object, writes the defaults and runs
+   construct. */
+struct ir_class {
+    const char *module;
+    const char *name;
+    unsigned flags;                 /* enum ir_class_flag */
+    uint32_t descriptor;
+    uint32_t base;
+    uint32_t table;
+    uint32_t init;                  /* a function, or IR_NO_INDEX */
+    uint32_t agg;                   /* its aggregate */
+    struct ir_subtable *subtables;
+    size_t subtable_count;
+    uint32_t *mutable_fields;       /* fields of agg */
+    size_t mutable_count;
+};
+
 struct ir_module {
     struct arena *arena;
     const char *name;
@@ -269,6 +316,9 @@ struct ir_module {
     struct ir_global **globals;
     size_t global_count;
     size_t global_capacity;
+    struct ir_class **classes;
+    size_t class_count;
+    size_t class_capacity;
 };
 
 void ir_module_init(struct ir_module *m, struct arena *arena,
@@ -331,6 +381,13 @@ void ir_global_reloc_fn(struct ir_module *m, struct ir_global *g,
 struct ir_global *ir_global_add_value(struct ir_module *m, const char *module,
                                       const char *name,
                                       struct ir_const *value);
+
+/* Add the record of a class with no tables, no base and no fields. */
+struct ir_class *ir_class_add(struct ir_module *m, const char *module,
+                              const char *name);
+void ir_class_subtable(struct ir_class *c, uint32_t interface,
+                       uint32_t table);
+void ir_class_mutable(struct ir_class *c, uint32_t field);
 
 /* Room for an aggregate constant of count items, in the memory pool. */
 struct ir_const *ir_const_agg(struct ir_module *m, struct ir_vtype type,

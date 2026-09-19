@@ -65,6 +65,143 @@ static void lowers(const char *source, const char *expected)
     release(&l);
 }
 
+/* The class record of the module named name, or NULL. */
+static const struct ir_class *class_named(const struct ir_module *m,
+                                          const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->class_count; i++) {
+        if (strcmp(m->classes[i]->name, name) == 0) {
+            return m->classes[i];
+        }
+    }
+    return NULL;
+}
+
+static const char *global_name(const struct ir_module *m, uint32_t g)
+{
+    return g < m->global_count ? m->globals[g]->name : "(none)";
+}
+
+static const struct ir_function *function_named(const struct ir_module *m,
+                                                const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        if (strcmp(m->functions[i]->name, name) == 0) {
+            return m->functions[i];
+        }
+    }
+    return NULL;
+}
+
+/* A class record names the tables of a class, its base, its interfaces
+   and the `mutable` fields of a singleton. A `worker fn` keeps its mark.
+   A call through a table names the class and the slot. */
+static void records_classes(void)
+{
+    struct lowered l;
+    const struct ir_class *shape;
+    const struct ir_class *square;
+    const struct ir_class *board;
+    const struct ir_function *total;
+    const struct ir_inst *call = NULL;
+    size_t b;
+    size_t i;
+
+    run(&l, "abstract class Shape\n"
+            "{\n"
+            "    abstract fn area(self) -> int;\n"
+            "}\n"
+            "abstract class Named\n"
+            "{\n"
+            "    abstract fn label(self) -> int;\n"
+            "}\n"
+            "final class Square\n"
+            "{\n"
+            "    inherits Shape,\n"
+            "    implements n: Named,\n"
+            "    side: int = 2,\n"
+            "    concrete fn area(self) -> int\n"
+            "    {\n"
+            "        return self.side * self.side;\n"
+            "    }\n"
+            "    concrete fn label(self) -> int\n"
+            "    {\n"
+            "        return 1;\n"
+            "    }\n"
+            "}\n"
+            "singleton class Board\n"
+            "{\n"
+            "    atomic hits: int = 0,\n"
+            "    mutable score: int = 0,\n"
+            "}\n"
+            "worker fn tally(part: []int) -> int\n"
+            "{\n"
+            "    return part.len;\n"
+            "}\n"
+            "fn total(s: *Shape) -> int\n"
+            "{\n"
+            "    return s.area();\n"
+            "}\n");
+    CHECK(l.ok);
+    shape = class_named(&l.ir, "Shape");
+    square = class_named(&l.ir, "Square");
+    board = class_named(&l.ir, "Board");
+    CHECK(l.ir.class_count == 4 && class_named(&l.ir, "Named") != NULL);
+    CHECK(shape != NULL && square != NULL && board != NULL);
+    if (shape != NULL) {
+        CHECK_STR(shape->module, "main");
+        CHECK(shape->flags == IR_CLASS_ABSTRACT);
+        CHECK(shape->table == IR_NO_INDEX);
+        CHECK_STR(global_name(&l.ir, shape->descriptor), "Shape.descriptor");
+        CHECK_STR(global_name(&l.ir, shape->base),
+                  "anti_rt_Object_descriptor");
+    }
+    if (square != NULL) {
+        CHECK(square->flags == IR_CLASS_FINAL);
+        CHECK_STR(global_name(&l.ir, square->table), "Square.table");
+        CHECK_STR(global_name(&l.ir, square->base), "Shape.descriptor");
+        CHECK(square->subtable_count == 1);
+        if (square->subtable_count == 1) {
+            CHECK_STR(global_name(&l.ir, square->subtables[0].interface),
+                      "Named.descriptor");
+            CHECK_STR(global_name(&l.ir, square->subtables[0].table),
+                      "Square.n.table");
+        }
+        CHECK(square->mutable_count == 0);
+    }
+    if (board != NULL) {
+        CHECK(board->flags == IR_CLASS_SINGLETON);
+        CHECK(board->mutable_count == 1);
+        if (board->mutable_count == 1 && board->agg < l.ir.agg_count) {
+            CHECK_STR(l.ir.aggs[board->agg]
+                          ->fields[board->mutable_fields[0]].name,
+                      "score");
+        }
+    }
+    CHECK(function_named(&l.ir, "tally") != NULL &&
+          function_named(&l.ir, "tally")->worker);
+    total = function_named(&l.ir, "total");
+    CHECK(total != NULL && !total->worker);
+    for (b = 0; total != NULL && b < total->block_count; b++) {
+        for (i = 0; i < total->blocks[b]->count; i++) {
+            if (total->blocks[b]->insts[i].op == IR_CALL) {
+                call = &total->blocks[b]->insts[i];
+            }
+        }
+    }
+    CHECK(call != NULL);
+    if (call != NULL) {
+        CHECK(call->c.kind == IR_GLOBAL);
+        CHECK_STR(global_name(&l.ir, call->c.as.index), "Shape.descriptor");
+        CHECK(call->field == 8);
+    }
+    release(&l);
+}
+
 void test_lower(void)
 {
     /* A bitfield is read and written through the address of its struct and
@@ -777,4 +914,5 @@ void test_lower(void)
            "    %12 = add i32 %7, %11\n"
            "    ret i32 %12\n"
            "}\n");
+    records_classes();
 }

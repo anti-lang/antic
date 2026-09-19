@@ -195,6 +195,7 @@ static void signature(struct text *out, const struct ir_module *m,
     size_t i;
 
     text_append(out, f->exported ? "export " : "");
+    text_append(out, f->worker ? "worker " : "");
     text_append(out, f->is_extern ? "extern fn " : "fn ");
     if (f->module != NULL) {
         text_appendf(out, "%s.", f->module);
@@ -285,6 +286,11 @@ static void instruction(struct text *out, const struct ir_module *m,
             operand(out, m, &inst->args[i]);
         }
         text_append(out, ")");
+        if (inst->c.kind == IR_GLOBAL) {
+            text_append(out, " table ");
+            operand(out, m, &inst->c);
+            text_appendf(out, " %" PRIu32, inst->field);
+        }
         break;
     case IR_RET:
         if (inst->type != IR_VOID) {
@@ -341,6 +347,47 @@ static void aggtype(struct text *out, const struct ir_module *m,
     text_append(out, " }\n");
 }
 
+static void global_ref(struct text *out, const struct ir_module *m,
+                       const char *what, uint32_t g)
+{
+    if (g != IR_NO_INDEX) {
+        text_appendf(out, " %s ", what);
+        symbol(out, m->globals[g]->module, m->globals[g]->name);
+    }
+}
+
+/* A class record prints as class, its flags, then each global it names,
+   its interface tables and its `mutable` fields. */
+static void class_record(struct text *out, const struct ir_module *m,
+                         const struct ir_class *c)
+{
+    size_t i;
+
+    text_appendf(out, "class %s.%s", c->module, c->name);
+    text_append(out, (c->flags & IR_CLASS_ABSTRACT) != 0 ? " abstract" : "");
+    text_append(out, (c->flags & IR_CLASS_FINAL) != 0 ? " final" : "");
+    text_append(out,
+                (c->flags & IR_CLASS_SINGLETON) != 0 ? " singleton" : "");
+    text_append(out, (c->flags & IR_CLASS_ARGS) != 0 ? " args" : "");
+    global_ref(out, m, "descriptor", c->descriptor);
+    global_ref(out, m, "base", c->base);
+    global_ref(out, m, "table", c->table);
+    if (c->init != IR_NO_INDEX) {
+        text_append(out, " init ");
+        symbol(out, m->functions[c->init]->module,
+               m->functions[c->init]->name);
+    }
+    for (i = 0; i < c->subtable_count; i++) {
+        global_ref(out, m, "implements", c->subtables[i].interface);
+        global_ref(out, m, "in", c->subtables[i].table);
+    }
+    for (i = 0; i < c->mutable_count; i++) {
+        text_appendf(out, " mutable %s.%s", m->aggs[c->agg]->name,
+                     m->aggs[c->agg]->fields[c->mutable_fields[i]].name);
+    }
+    text_append(out, "\n");
+}
+
 void ir_print(struct text *out, const struct ir_module *m)
 {
     size_t i;
@@ -376,6 +423,9 @@ void ir_print(struct text *out, const struct ir_module *m)
                    m->globals[g->relocs[j].global]->name);
         }
         text_append(out, "\n");
+    }
+    for (i = 0; i < m->class_count; i++) {
+        class_record(out, m, m->classes[i]);
     }
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
