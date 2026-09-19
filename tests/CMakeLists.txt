@@ -117,6 +117,33 @@ string(REGEX REPLACE "^RAYLIB_VERSION=" "" raylib_version "${raylib_version}")
 set(ANTIC_RAYLIB_DIR "${CMAKE_BINARY_DIR}/raylib/raylib-${raylib_version}"
     CACHE PATH "raylib release source from tools/get-raylib.cmake")
 
+# DESIGN: the output of program_abi_wchar follows the width and signedness
+# of wchar_t, never the host. The C compiler that builds wchar.c names the
+# type as i32, u32 or u16. The file abi_wchar.<type>.expected holds its
+# values, and decisions.md gives the type of each target.
+include(CheckCSourceCompiles)
+function(abi_wchar_expected result suffix)
+    set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+    list(JOIN ARGN " " CMAKE_REQUIRED_FLAGS)
+    set(CMAKE_REQUIRED_QUIET ON)
+    foreach(type i32 u32 u16)
+        string(SUBSTRING "${type}" 1 -1 bits)
+        set(signed 0)
+        if(type MATCHES "^i")
+            set(signed 1)
+        endif()
+        check_c_source_compiles("#include <stddef.h>
+_Static_assert(sizeof(wchar_t) * 8 == ${bits} && ((wchar_t)-1 < 0) == ${signed}, \"\");
+int abi_wchar_type;" ANTIC_WCHAR_${type}${suffix})
+        if(ANTIC_WCHAR_${type}${suffix})
+            set(${result} "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_wchar.${type}.expected"
+                PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+    message(FATAL_ERROR "wchar_t of ${CMAKE_C_COMPILER} is none of i32, u32 and u16")
+endfunction()
+
 # The same C files compiled for macos-x86_64, which the ABI programs of
 # that target link. The host runs them, so antic meets clang on the System
 # V rules of x86_64 as well.
@@ -131,6 +158,9 @@ endfunction()
 if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     abi_x86_64_object(abi_structs_x86_64 abi/structs.c)
     abi_x86_64_object(abi_wchar_x86_64 abi/wchar.c)
+    abi_wchar_expected(abi_wchar_x86_64_expected _X86_64 -arch x86_64)
+    set(abi_structs_x86_64_options "")
+    set(abi_wchar_x86_64_options "-DEXPECTED=${abi_wchar_x86_64_expected}")
     foreach(case structs wchar)
         add_test(NAME program_abi_${case}_macos-x86_64
             COMMAND "${CMAKE_COMMAND}"
@@ -140,6 +170,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
                 "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_${case}_x86_64>,,>"
                 "-DOPTIONS=--target,macos-x86_64"
+                ${abi_${case}_x86_64_options}
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
     endforeach()
@@ -218,9 +249,6 @@ add_test(NAME program_abi_structs
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 
-# c_wchar above 0x7FFFFFFF converts and compares with the signedness of
-# wchar_t on the host, as clang does. The expected output holds the values
-# of macOS, where wchar_t is a signed int.
 add_library(abi_wchar OBJECT abi/wchar.c)
 target_compile_options(abi_wchar PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
 if(APPLE)
@@ -229,14 +257,7 @@ endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(abi_wchar PRIVATE -fno-sanitize=all)
 endif()
-# DESIGN: wchar_t is signed on macOS and on Linux x86_64, and unsigned on
-# Linux ARM64. The program prints what the host gives, so a host whose
-# signedness differs from the shared file brings one of its own.
-set(abi_wchar_expected "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_wchar.expected")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_wchar.${ANTIC_HOST_TARGET}.expected")
-    set(abi_wchar_expected
-        "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_wchar.${ANTIC_HOST_TARGET}.expected")
-endif()
+abi_wchar_expected(abi_wchar_expected "")
 add_test(NAME program_abi_wchar
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
