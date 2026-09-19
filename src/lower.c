@@ -1511,7 +1511,10 @@ static const char *value_type_name(const struct type *t)
     if (t->kind == TYPE_POINTER || (t->kind == TYPE_FN && !t->bound)) {
         return "ptr";
     }
-    return t->kind < sizeof names / sizeof *names ? names[t->kind] : NULL;
+    /* An enum is signed under the ABI of Windows, so the index converts
+       before the comparison. */
+    return (size_t)t->kind < sizeof names / sizeof *names ? names[t->kind]
+                                                          : NULL;
 }
 
 /* DESIGN: the signature of a function names its result and then each

@@ -733,7 +733,7 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
         }
         kind = ir_load(f, b, IR_I8, at[k]);
         test = ir_binary(f, b, IR_NE, IR_I8, ir_temp_op(f, kind),
-                         ir_int_op(IR_I8, types[k + 1]->kind));
+                         ir_int_op(IR_I8, (uint64_t)types[k + 1]->kind));
         bad = ir_temp_op(f, test);
     }
     call = ir_block_add(f);
@@ -746,7 +746,7 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
     }
     r = ir_call_indirect(f, b, types[0]->type, entry, signature, args,
                          count);
-    ir_store(f, b, IR_I8, ir_int_op(IR_I8, types[0]->kind), result);
+    ir_store(f, b, IR_I8, ir_int_op(IR_I8, (uint64_t)types[0]->kind), result);
     if (types[0]->type != IR_VOID) {
         uint32_t payload = ir_ptradd(f, b, result, ir_sym_operand(m, data));
         pack(f, b, types[0], str_agg, ir_temp_op(f, r),
