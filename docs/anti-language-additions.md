@@ -2,7 +2,7 @@
 
 Rules for the features decided after `docs/anti-object-model.md` and outside it. `docs/decisions.md` refers to the additions document and repeats none of it. The book covers what the compiler does for each. The rest is the language's and lives on anti-lang.com.
 
-Settled on 2026-09-20.
+Settled on 2026-09-20. The small things, wire formats, binary I/O and the SDK were settled on 2026-09-23.
 
 Contents:
 
@@ -22,6 +22,10 @@ Contents:
 - [Plugins](#plugins)
 - [Versions](#versions)
 - [Runtime configuration](#runtime-configuration)
+- [Small things](#small-things)
+- [Wire formats](#wire-formats)
+- [Binary I/O](#binary-io)
+- [SDK and frameworks](#sdk-and-frameworks)
 - [Messages](#messages)
 - [Keywords](#keywords)
 
@@ -29,7 +33,7 @@ Contents:
 
 Before the first public release: nullable pointers, dev-mode checks, debug information, tests and fixtures. Each changes signatures or output that a user would otherwise depend on.
 
-After the first release, in this order: the wrapping and saturating operators with `Flags`, sum types, locking and channels. Then injection, hooks and tracing, plugins and runtime configuration, which belong together. Then generics and closures, which `docs/anti-object-model.md` names.
+After the first release, in this order: the wrapping and saturating operators with `Flags`, sum types, locking and channels, then the small things and wire formats. Then injection, hooks and tracing, plugins and runtime configuration, which belong together. Then generics and closures, which `docs/anti-object-model.md` names.
 
 ## Nullable pointers
 
@@ -230,6 +234,93 @@ trace = 'leaks'
 - Precedence per key, highest first: the command line, the configuration file with its includes, the build.
 - `[injections]` replaces the provider in the slot of the named interface with the class the named library provides. The version checks of [Versions](#versions) run first. A line for an interface the program does not have is a startup error naming what it does have. So is a line for an `inject final` field.
 - `os.site_config_dir(app)` and `os.user_config_dir(app)` give the platform's directories for machine-wide and per-user configuration, `/Library/Application Support/<app>` and `~/Library/Application Support/<app>` on macOS, `/etc/<app>` and `$XDG_CONFIG_HOME/<app>` on Linux, `%ProgramData%\<app>` and `%APPDATA%\<app>` on Windows. A desktop application passes one of them to `rt.configure`. A program ships no configuration file, since the build is the default, and a file holds only what someone changed.
+- `anti sdk export` on a Mac and `anti sdk import` on any host move the stubs of Apple's SDK. A program that needs a framework links against that SDK, and every other program against the stubs of the runtime archive. Both are in [SDK and frameworks](#sdk-and-frameworks).
+
+## Small things
+
+Each is compile-time only. Each removes something people write by hand. None costs anything in a release build unless it says so.
+
+- `embed("shaders/basic.glsl")` is a constant of type `[]byte` holding the file's bytes. The file is read at compile time relative to the source file and emitted in read-only data. A missing file is a compile error naming the path.
+- `undo stmt;` runs `stmt` only when the enclosing block exits through an error, in reverse order of declaration, before the `defer` statements of the same block run. `defer` is "always", `undo` is "only if this block fails".
+- `unreachable;` traps in dev mode with file and line. In release mode it is undefined and the optimizer may drop the branch that leads to it.
+- `let buf: [65536]byte = undefined;` opts one local out of mandatory initialisation. Dev mode fills it with `0xAA`. Allowed for locals only, not for fields. Reading it before a write is what the fill makes visible.
+- Labels. `outer: for ... { }`, `retry: while ... { }` and `cleanup: { }`. `break outer;` and `continue outer;` name the loop or block. There is no `goto`. A label is an identifier followed by `:` before `for`, `while` or `{`.
+- `show(expr)` prints `file:line: expr = value` to stderr and yields the value, so it sits inside any expression. Gone in release, like `assert`. The value is printed through `to_text` for a class and through the primitive formats otherwise.
+- `if let Circle c = v { }` on a variant `v` runs the block with `c` bound to the case's fields when `v` holds that case. It is a `switch` with one arm and no `else`, and `else { }` may follow.
+- `p ?? q` on a `?*T` yields `p` as `*T` when it is not null and `q` otherwise. `q` has type `*T` or `?*T`, and the result has the wider of the two.
+- `p?.x` and `p?.f(args)` on a `?*T` yield `null` when `p` is null and otherwise the field or the call. The result has type `?*U` when the field or result is a pointer, and is refused otherwise, since Anti has no optional values. Chains follow the first null.
+- Default parameter values: `fn open(path: str, mode: Mode = Mode.Read) -> *Error`. The default is a constant expression. Named arguments: `open("x", mode: Mode.Write)`. Positional arguments come first and in order. Named ones follow in any order, each at most once. No positional may follow a named one. Defaults fill what is not given.
+- `for i, x in slice { }` binds the index and the element. `for i, x in &slice { }` binds the index and a pointer.
+- `switch` on a `str` compares with `text.equal` in a chain, in arm order. The chapter says it is a chain and not a table.
+- `x in lo..hi` is `x >= lo && x < hi`. `in` applies to ranges only. Membership in a slice is `slice.contains(x)`, a call, because it is a search.
+- Format specifications in `f"..."`: `f"{x:08.3f}"`, `f"{name:>20}"`, `f"{n:x}"`, `f"{n:b}"`. Width, precision, alignment with `<`, `>` and `^`, zero padding, `x`, `X`, `b`, `o` and `e`. Parsed at compile time into calls of `anti.text`. An unknown specification is a compile error.
+- Compile-time targets. `target.os`, `target.cpu` and `target.mode` are constants of the enums `Os { Linux, MacOS, Windows }`, `Cpu { X86_64, Arm64 }` and `Mode { Dev, Release }`. A `switch` on one of them is allowed at module level, where its arms hold declarations, and inside functions. It follows the exhaustiveness rule of every `switch`: every value or `else`. Lowering keeps every arm in the IR, tagged with its condition, and the back end keeps the arm for its target and drops the rest before optimisation. Two arms may declare the same name. A library file therefore serves all six targets.
+- `anti check --targets all` runs the front end once per target. A program that type-checks on the host is then proven to type-check on all six.
+- Script mode. A file whose first line is `#!/usr/bin/env anti` runs with `./tool.anti`. `anti file.anti` compiles the file as a dev build into `~/.anti/cache/<digest>/`, keyed by the file's digest and the compiler version, and runs the result. A second run is a cache hit. No manifest, and `anti.io`, `anti.text` and the rest of the standard library are available.
+
+## Wire formats
+
+A wire format is a description of bytes from which `anti format` generates a parser, a writer and the classes that hold the parsed data. It is a tool, like `anti bind`. The language gains no keyword. The description lives in a `.fmt` file and the generated module is ordinary Anti over `anti.binary`.
+
+```text
+format NetworkPacket endian big
+{
+	ip: [4]byte,
+	ip6: [16]byte,
+	seq: u64,
+	packet_length: u16,
+	body: packet_length bytes Body
+	{
+		magic: str : 4 = "ANTI",
+		flags: u16
+		{
+			compressed: bit 0,
+			encrypted: bit 1,
+			version: bits 2..6,
+			_: bits 6..16,
+		},
+		header_length: u8,
+		headers: [header_length] Header
+		{
+			kind: u8 as Kind,
+			name_length: u8,
+			name: str : name_length,
+			value: str until 0x00,
+		},
+	},
+}
+```
+
+Rules:
+
+- `format Name endian big|little { }`. The byte order is required. A field may override it: `seq: u64 endian little`.
+- Fixed fields: the sized integers, `f32`, `f64`, `bool` as one byte, `[N]byte` and `[N]T` for a fixed-size type `T`. `str : n` and `[]byte : n` take `n` bytes, where `n` is a constant or a path to an earlier field.
+- Terminated fields: `str until 0x00`, `str until "\r\n"`, `[]byte until ','`. The terminator is consumed and not part of the value. `until ... keep` leaves it in the value. `[]byte until end` takes the rest of the enclosing group.
+- Literals: `magic: str : 4 = "ANTI"` and `version: u8 = 2`. The parser checks and fails naming the expected and actual value. The writer writes the constant. The field is not in the generated class.
+- Enums: `kind: u8 as Kind` for an enum declared in the same file or imported. A value outside the enum is a parse error.
+- Groups: `name: size bytes ClassName { }` for a group that occupies that many bytes, and `name: [count] ClassName { }` for a group repeated that many times. The class name is optional, and a group without one gets the format's name followed by the field name, `NetworkPacketBody`. Groups nest.
+- Paths: a bare name resolves from the innermost group outward. A qualified name is a path from a named group, `body.header_length`, or from the format, `NetworkPacket.packet_length`. A bare name that matches at two levels is refused with both paths. A field may reference only fields that come before it in the byte stream.
+- Bit containers: an integer field followed by `{ }` with one line per bit field. Each names its bits in the assembled value, `bit 0`, `bits 2..6`, or a comma-separated list of pieces from most to least significant, `bits 2..4, bit 15, bit 12`. Bit 0 is the least significant. Ranges are half-open. Every bit of the container is named exactly once, by a field or by `_`, and an unaccounted or doubly named bit is an error naming the bits. A one-bit field is a `bool` in the generated class and a wider one the smallest unsigned type. The sequence form, `msb` or `lsb` after the container and fields with a width only, is allowed as an alternative and never mixed with positions in one container.
+- Padding: `pad: 3 bytes` and `align 4`. Both write zero.
+- The generated module holds one class per group, all at module level. The format's class has `fn construct(self, data: []byte) -> *Error`, so `alloc NetworkPacket(data) catch e { }` parses a buffer, and a static `parse(r: *binary.Reader)` for a packet inside a stream. `write(self, w: *binary.Writer)` and `size(self) -> int` are generated. Length and count fields are computed on write and are not fields of the class.
+- `str` and `[]byte` fields are slices into the buffer, so the object is valid while the buffer is. `format Name endian big copy { }` makes them `own` copies instead.
+- Conditions, `if version >= 2 { }`, are the second version.
+
+## Binary I/O
+
+`anti.binary` is what the generated code and hand-written parsers use.
+
+- `Reader` over a `[]byte` with a position. `take(T) -> *T` returns a pointer to a packed struct at the position and advances by `size_of(T)`. `u8()`, `u16_le()`, `u16_be()`, `u32_le()`, `u32_be()`, `u64_le()`, `u64_be()`, `f32_le()` and the rest name their byte order. `bytes(n) -> []byte`, `str(n) -> str`, `until(terminator) -> []byte`, `rest() -> []byte`. Every function returns `*Error` at the end of the buffer and never reads past it. `position()`, `seek(n)`, `remaining()`.
+- `Writer` is the mirror, over a growable buffer or a fixed one. It has the same names, and `finish() -> []byte`.
+- A fixed layout needs neither: a `packed struct` over the bytes is the parse, and filling one is the write.
+
+## SDK and frameworks
+
+- The runtime archive carries libSystem stubs for macOS 11 and later in `sysroot/macos-<cpu>/`. They are taken from a pinned Zig release under Zig's MIT licence. They are the default on every host, the Mac included, so the same object links to the same bytes anywhere. A program that needs no framework links against them.
+- A program that needs a framework links against Apple's SDK. A binding declares its frameworks with `link framework "CoreAudio";` at module level. `anti bind` writes the line from a table, and `anti` passes the names to antic as `--framework <name>`. A program never names a framework itself.
+- On a Mac the SDK is found from the Command Line Tools. Elsewhere a repository build passes `APPLE_SDK=<path>` to `get-sysroot.cmake`. An installed Anti uses two commands. `anti sdk export` on macOS packs the SDK's `.tbd` stubs and version into `apple-sdk-<version>.tar.xz`. `anti sdk import <file>` on any host unpacks that bundle into the sysroot and records its digest. `import` reads a file and fetches nothing. Both use the host's `tar`.
+- Without the SDK a framework link fails with a message naming the frameworks and where a Mac keeps the SDK. Nothing of Apple's is ever served from the download area. The README says in three sentences what the shipped stubs cover and that frameworks need the bundle from a Mac. It says that Apple's licence governs where the bundle may be used.
+- Two builds of a framework program are byte-identical across hosts only when the same SDK version was used. Builds of every other program are byte-identical across hosts. A test links one program for `macos-arm64` on the Mac and on the Linux VM and compares the files.
 
 ## Messages
 
@@ -249,11 +340,20 @@ trace = 'leaks'
 - `` `anti.log.Logger` is provided by both `fancy.so` and `ciso.so`, pick one in `[injections]` ``
 - `` `--anti.thread` is not a runtime key, the keys are `threads`, `logger`, `plugins`, `trace` ``
 - `` `log` is `inject final` in `Renderer` and cannot be replaced ``
+- `` `shaders/basic.glsl` not found for `embed` ``
+- `` `undefined` is allowed for a local only ``
+- `` no loop or block named `outer` ``
+- `` `?.` on `p.count`, which is not a pointer ``
+- `` positional argument after named argument ``
+- `` `in` takes a range ``
+- `` unknown format `{x:q}` ``
+- `` `switch target.os` lacks `Windows` ``
 
 ## Keywords
 
-- Keywords added: `variant`, `tests`, `fixtures`, `provides`. `sync`, `chan`, `send`, `recv`, `select` were reserved.
-- Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body.
+- Keywords added: `variant`, `tests`, `fixtures`, `provides`, `undo`, `unreachable`, `undefined`, `show`, `embed`. `sync`, `chan`, `send`, `recv`, `select` were reserved.
+- Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range.
+- Labels added: an identifier and `:` before `for`, `while` or a block.
 - Tokens added: `?*`, `+% -% *% <<%`, `+| -| *|`, the two-name `let` form `let (a, b) =`.
 - Built-in types added: `Flags`, `Mutex`, `chan T`.
 - Built-ins added: `mul_high`.
