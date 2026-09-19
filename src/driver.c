@@ -16,6 +16,7 @@
 #include "modpath.h"
 #include "notice.h"
 #include "optimize.h"
+#include "whole.h"
 #include "regalloc.h"
 #include "select.h"
 #include "parser.h"
@@ -473,11 +474,35 @@ static bool lower_checked(const char *input, struct module *tree,
     return ok;
 }
 
+/* Run the passes over the whole program and print what they report,
+   one line each. Returns false after an error. */
+static bool whole_checked(const char *input, struct ir_module *program,
+                          bool release)
+{
+    struct whole_options options;
+    struct text errors = {0};
+    const char *line;
+    bool ok;
+
+    memset(&options, 0, sizeof options);
+    options.release = release;
+    ok = whole_program(program, &options, &errors);
+    for (line = text_cstr(&errors); *line != '\0';) {
+        const char *end = strchr(line, '\n');
+        size_t length = end != NULL ? (size_t)(end - line) : strlen(line);
+        fprintf(stderr, "%s: error: %.*s\n", input, (int)length, line);
+        line += length + (end != NULL ? 1 : 0);
+    }
+    text_free(&errors);
+    return ok;
+}
+
 /* Lower the module after the loaded libraries and print the whole
-   program, optimized when optimize is set. Returns 2, the status of a
-   finished dump, on success. */
+   program, optimized when optimize is set. The optimized program has
+   been through the passes over the whole program. Returns 2, the status
+   of a finished dump, on success. */
 static int dump_ir(const char *input, struct module *tree, const char *module,
-                   struct ir_module *program, bool optimize,
+                   struct ir_module *program, bool optimize, bool release,
                    struct diagnostics *diags, bool no_reflect)
 {
     struct text out = {0};
@@ -487,6 +512,9 @@ static int dump_ir(const char *input, struct module *tree, const char *module,
         return 1;
     }
     if (optimize) {
+        if (!whole_checked(input, program, release)) {
+            return 1;
+        }
         ir_optimize(program, module);
         if (!ir_verify(program, &errors)) {
             fprintf(stderr, "antic: internal error, the optimized IR of %s "
@@ -537,6 +565,14 @@ static int back_end(const struct options *o, struct module *tree,
     if (tree != NULL &&
         !lower_checked(o->input, tree, module, program, diags,
                        o->no_reflect)) {
+        return 1;
+    }
+    /* DESIGN: the passes over the whole program run where the program is
+       whole. That is every build in release mode. In dev mode it is the
+       module that links, which has main, and a library for C. A dev
+       object of any other module never links. */
+    if ((!o->dev || o->lib != LIB_NONE || has_main(program, module)) &&
+        !whole_checked(o->input, program, !o->dev)) {
         return 1;
     }
     /* The build that compiles the program decides, so an assertion of a
@@ -1141,7 +1177,7 @@ static int compile(const struct options *o, struct text *source,
     }
     if (o->dump_ir || o->dump_opt) {
         status = dump_ir(o->input, tree, text_cstr(module), &program,
-                         o->dump_opt, &diags, o->no_reflect);
+                         o->dump_opt, !o->dev, &diags, o->no_reflect);
         goto done;
     }
     if (o->lib != LIB_NONE && defines_main(tree)) {

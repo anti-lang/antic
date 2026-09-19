@@ -109,6 +109,17 @@ foreach(source IN LISTS program_sources)
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
+# The program whose calls release mode makes direct, in dev mode, which
+# keeps every call through a table.
+add_test(NAME program_devirtualise_dev
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/devirtualise.anti"
+        "-DOPTIONS=--dev"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 
 # The pinned raylib source, which tools/get-raylib.cmake downloads. The
 # directory is named here, before the first test that reads it.
@@ -1006,6 +1017,8 @@ foreach(case "symbolic.types|--dump-types,${DUMP}/symbolic.anti"
         "c_long/main.windows-x86_64.sel|--dump-select,--target,windows-x86_64,${DUMP}/c_long/main.anti"
         "devirt.ir|--dump-ir,${DUMP}/devirt.anti"
         "devirt.dev.ir|--dev,--dump-ir,${DUMP}/devirt.anti"
+        "devirt.opt|--dump-opt,${DUMP}/devirt.anti"
+        "devirt.dev.opt|--dev,--dump-opt,${DUMP}/devirt.anti"
         "forward.ir|--dump-ir,${DUMP}/forward.anti"
         "forward.opt|--dump-opt,${DUMP}/forward.anti"
         "probe.ir|--dump-ir,${CMAKE_CURRENT_SOURCE_DIR}/abi/probe.anti"

@@ -1,0 +1,88 @@
+//! Release mode calls a function directly when every table that a call
+//! may read holds that one function at its slot. Dev mode reads the
+//! table. The test `program_devirtualise_dev` runs this program in dev
+//! mode, and both print the same line.
+
+extern fn printf(fmt: *byte, ...) -> c_int;
+
+abstract class Speaker
+{
+	abstract fn speak(self) -> int;
+}
+
+class Dog
+{
+	inherits Speaker,
+
+	pub legs: int = 4,
+
+	concrete fn speak(self) -> int
+	{
+		return self.legs;
+	}
+}
+
+abstract class Counter
+{
+	abstract fn count(self) -> int;
+}
+
+class Clock
+{
+	implements c: Counter,
+
+	pub hours: int = 12,
+
+	concrete fn count(self) -> int
+	{
+		return self.hours;
+	}
+}
+
+class Base
+{
+	pub fn value(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Derived
+{
+	inherits Base,
+
+	concrete fn value(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn speak(s: *Speaker) -> int
+{
+	return s.speak();
+}
+
+fn count(c: *Counter) -> int
+{
+	return c.count();
+}
+
+fn value(b: *Base) -> int
+{
+	return b.value();
+}
+
+fn main() -> int
+{
+	let d = Dog { legs: 3 };
+	let k = Clock { hours: 7 };
+	let b = Base { };
+	let e = Derived { };
+	let spoken = speak(&d);
+	let counted = count(&k);
+	let first = value(&b);
+	let second = value(&e);
+	printf("%d %d %d %d\n".ptr, spoken as c_int, counted as c_int,
+		first as c_int, second as c_int);
+	return 0;
+}

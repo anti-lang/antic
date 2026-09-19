@@ -32,4 +32,13 @@ void whole_free(struct whole *w);
 size_t whole_entries(struct whole *w, uint32_t descriptor, uint32_t slot,
                      const uint32_t **out);
 
+struct whole_options {
+    bool release;                   /* the optimisations that change code */
+};
+
+/* Run the passes over program. Each error goes to errors as one line.
+   Returns true when there is none. */
+bool whole_program(struct ir_module *program,
+                   const struct whole_options *options, struct text *errors);
+
 #endif

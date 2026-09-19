@@ -231,3 +231,49 @@ size_t whole_entries(struct whole *w, uint32_t descriptor, uint32_t slot,
     *out = w->entries;
     return w->entry_count;
 }
+
+/* DESIGN: release mode calls a function directly when every table that a
+   call may read holds that one function at the slot. No class of the
+   program then replaces it for the static type of the call. Dev mode
+   compiles one module against objects it does not see, so it keeps the
+   call through the table. A call with no concrete class to read keeps
+   it as well. */
+static void devirtualise(struct whole *w, struct ir_module *m)
+{
+    size_t i;
+    size_t b;
+    size_t k;
+
+    for (i = 0; i < m->function_count; i++) {
+        struct ir_function *f = m->functions[i];
+        for (b = 0; b < f->block_count; b++) {
+            for (k = 0; k < f->blocks[b]->count; k++) {
+                struct ir_inst *inst = &f->blocks[b]->insts[k];
+                const uint32_t *entries;
+                if (inst->op != IR_CALL || inst->c.kind != IR_GLOBAL ||
+                    whole_entries(w, inst->c.as.index, inst->field,
+                                  &entries) != 1 ||
+                    entries[0] == IR_NO_INDEX) {
+                    continue;
+                }
+                inst->a = ir_func_op(m->functions[entries[0]]);
+                memset(&inst->b, 0, sizeof inst->b);
+                memset(&inst->c, 0, sizeof inst->c);
+                inst->field = 0;
+            }
+        }
+    }
+}
+
+bool whole_program(struct ir_module *program,
+                   const struct whole_options *options, struct text *errors)
+{
+    struct whole *w = whole_build(program);
+
+    (void)errors;
+    if (options->release) {
+        devirtualise(w, program);
+    }
+    whole_free(w);
+    return true;
+}

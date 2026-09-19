@@ -231,8 +231,135 @@ static void joins_modules(void)
     close_program(&p);
 }
 
+/* The printed body of the function named name. */
+static void print_function(struct text *out, const struct ir_module *m,
+                           const char *name)
+{
+    struct text all = {0};
+    const char *start;
+    const char *end;
+    char header[80];
+
+    ir_print(&all, m);
+    snprintf(header, sizeof header, "fn main.%s(", name);
+    start = strstr(text_cstr(&all), header);
+    end = start != NULL ? strstr(start, "\n}\n") : NULL;
+    if (end != NULL) {
+        text_append_bytes(out, start, (size_t)(end - start) + 3);
+    }
+    text_free(&all);
+}
+
+/* Run the passes over shapes and a function that calls through tables,
+   and compare the printed function. */
+static void passes(bool release, const char *expected)
+{
+    struct program p;
+    struct text errors = {0};
+    struct text out = {0};
+    struct text source = {0};
+    struct whole_options options;
+
+    text_append(&source, shapes);
+    text_append(&source,
+                "final class Dot\n"
+                "{\n"
+                "    pub fn size(self) -> int\n"
+                "    {\n"
+                "        return 5;\n"
+                "    }\n"
+                "}\n"
+                "fn calls(s: *Shape, n: *Named, t: *Tile) -> int\n"
+                "{\n"
+                "    return s.area() + s.name() + n.label() + t.area();\n"
+                "}\n");
+    open_program(&p);
+    compile(&p, "main", text_cstr(&source), &p.ir);
+    memset(&options, 0, sizeof options);
+    options.release = release;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    CHECK_STR(text_cstr(&errors), "");
+    print_function(&out, &p.ir, "calls");
+    CHECK_STR(text_cstr(&out), expected);
+    text_free(&errors);
+    text_free(&out);
+    text_free(&source);
+    close_program(&p);
+}
+
+/* Release mode calls a function directly when every table that the
+   pointer may point at holds that one function at the slot. Two classes
+   fill `area`, and two sub-objects give `label` a thunk each, so those
+   two calls stay indirect. Dev mode changes no call. */
+static void devirtualises(void)
+{
+    passes(true,
+           "fn main.calls(%0: ptr, %1: ptr, %2: ptr) -> i64 {\n"
+           "b0:\n"
+           "    %3 = load ptr %0\n"
+           "    %4 = mul i64 8, size_of ptr\n"
+           "    %5 = ptradd %3, %4\n"
+           "    %6 = load ptr %5\n"
+           "    %7 = call i64 %6 via @main.fn.0(%0) table "
+           "@main.Shape.descriptor 8\n"
+           "    %8 = load ptr %0\n"
+           "    %9 = mul i64 9, size_of ptr\n"
+           "    %10 = ptradd %8, %9\n"
+           "    %11 = load ptr %10\n"
+           "    %12 = call i64 @main.Shape.name(%0)\n"
+           "    %13 = add i64 %7, %12\n"
+           "    %14 = load ptr %1\n"
+           "    %15 = mul i64 8, size_of ptr\n"
+           "    %16 = ptradd %14, %15\n"
+           "    %17 = load ptr %16\n"
+           "    %18 = call i64 %17 via @main.fn.0(%1) table "
+           "@main.Named.descriptor 8\n"
+           "    %19 = add i64 %13, %18\n"
+           "    %20 = load ptr %2\n"
+           "    %21 = mul i64 8, size_of ptr\n"
+           "    %22 = ptradd %20, %21\n"
+           "    %23 = load ptr %22\n"
+           "    %24 = call i64 @main.Tile.area(%2)\n"
+           "    %25 = add i64 %19, %24\n"
+           "    ret i64 %25\n"
+           "}\n");
+    passes(false,
+           "fn main.calls(%0: ptr, %1: ptr, %2: ptr) -> i64 {\n"
+           "b0:\n"
+           "    %3 = load ptr %0\n"
+           "    %4 = mul i64 8, size_of ptr\n"
+           "    %5 = ptradd %3, %4\n"
+           "    %6 = load ptr %5\n"
+           "    %7 = call i64 %6 via @main.fn.0(%0) table "
+           "@main.Shape.descriptor 8\n"
+           "    %8 = load ptr %0\n"
+           "    %9 = mul i64 9, size_of ptr\n"
+           "    %10 = ptradd %8, %9\n"
+           "    %11 = load ptr %10\n"
+           "    %12 = call i64 %11 via @main.fn.0(%0) table "
+           "@main.Shape.descriptor 9\n"
+           "    %13 = add i64 %7, %12\n"
+           "    %14 = load ptr %1\n"
+           "    %15 = mul i64 8, size_of ptr\n"
+           "    %16 = ptradd %14, %15\n"
+           "    %17 = load ptr %16\n"
+           "    %18 = call i64 %17 via @main.fn.0(%1) table "
+           "@main.Named.descriptor 8\n"
+           "    %19 = add i64 %13, %18\n"
+           "    %20 = load ptr %2\n"
+           "    %21 = mul i64 8, size_of ptr\n"
+           "    %22 = ptradd %20, %21\n"
+           "    %23 = load ptr %22\n"
+           "    %24 = call i64 %23 via @main.fn.0(%2) table "
+           "@main.Tile.descriptor 8\n"
+           "    %25 = add i64 %19, %24\n"
+           "    ret i64 %25\n"
+           "}\n");
+}
+
 void test_whole(void)
 {
     finds_entries();
     joins_modules();
+    devirtualises();
 }
