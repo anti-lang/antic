@@ -203,6 +203,11 @@ bool select_uses_got(const struct selector *s, const struct ir_operand *o);
 struct mach_operand select_result_slot(struct selector *s,
                                        const struct ir_inst *inst,
                                        const struct layout *agg);
+/* DESIGN: select_reg emits a load for a constant, as the lowering emits
+   IR from many of its helpers. A call passes at most one argument that
+   emits code, because C leaves the order of the arguments unspecified.
+   clang for Windows takes them right to left, and antic built there
+   emitted another program. */
 struct mach_operand select_reg(struct selector *s,
                                const struct ir_operand *o);
 struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,

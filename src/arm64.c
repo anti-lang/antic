@@ -675,8 +675,10 @@ static struct mach_operand copy_argument(struct selector *s,
 
 static void emit_memcopy(struct selector *s, const struct ir_inst *inst)
 {
-    copy_memory(s, select_reg(s, &inst->a), select_reg(s, &inst->b),
-                select_size(s, inst->of));
+    struct mach_operand to = select_reg(s, &inst->a);
+    struct mach_operand from = select_reg(s, &inst->b);
+
+    copy_memory(s, to, from, select_size(s, inst->of));
 }
 
 /* Floats */
@@ -722,8 +724,11 @@ static void emit_float_binary(struct selector *s, const struct ir_inst *inst)
                      : inst->op == IR_FMUL ? A64_FMUL
                                            : A64_FDIV;
 
-    emit3(s, op, select_result(s, inst), select_reg(s, &inst->a),
-          select_reg(s, &inst->b));
+    struct mach_operand result = select_result(s, inst);
+    struct mach_operand a = select_reg(s, &inst->a);
+    struct mach_operand b = select_reg(s, &inst->b);
+
+    emit3(s, op, result, a, b);
 }
 
 /* fcmp sets N for less, Z and C for equal, C for greater and C and V for
@@ -737,7 +742,10 @@ static void emit_float_compare(struct selector *s, const struct ir_inst *inst)
                        : inst->op == IR_FGT ? COND_GT
                                             : COND_GE;
 
-    emit2(s, A64_FCMP, select_reg(s, &inst->a), select_reg(s, &inst->b));
+    struct mach_operand a = select_reg(s, &inst->a);
+    struct mach_operand b = select_reg(s, &inst->b);
+
+    emit2(s, A64_FCMP, a, b);
     emit2(s, A64_CSET, select_result(s, inst), cond(c));
 }
 

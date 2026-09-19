@@ -1918,15 +1918,18 @@ static void store_interface_tables(struct lowerer *l, const struct type *t,
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *field = &up->fields[i];
+            struct ir_operand table;
+            struct ir_operand at;
+
             if (field->form != FIELD_IMPL) {
                 continue;
             }
-            ir_store(l->f, l->b, IR_PTR,
-                     temp(l, ir_addr(l->f, l->b,
-                                     ir_global_op(interface_table(l, t,
-                                                                  field)))),
-                     offset_address(l, dest,
-                                    field_offset(l, up, &field->name)));
+            /* One call, one argument that emits code: the order of the
+               arguments of a C call is unspecified. */
+            table = temp(l, ir_addr(l->f, l->b,
+                                    ir_global_op(interface_table(l, t, field))));
+            at = offset_address(l, dest, field_offset(l, up, &field->name));
+            ir_store(l->f, l->b, IR_PTR, table, at);
         }
     }
 }
@@ -2016,6 +2019,8 @@ static void build_slice(struct lowerer *l, const struct expr *e,
     struct ir_operand base = first_element(l, e->as.slice.base);
     struct ir_operand low = lower_expr(l, e->as.slice.low);
     struct ir_operand high = lower_expr(l, e->as.slice.high);
+    struct ir_operand length;
+    struct ir_operand at;
     uint32_t offset;
 
     if (l->failed) {
@@ -2025,9 +2030,9 @@ static void build_slice(struct lowerer *l, const struct expr *e,
                        size_operand(l, e->type->element));
     ir_store(l->f, l->b, IR_PTR,
              temp(l, ir_ptradd(l->f, l->b, base, temp(l, offset))), dest);
-    ir_store(l->f, l->b, IR_I64,
-             temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64, high, low)),
-             offset_address(l, dest, field_offset(l, e->type, &len_name)));
+    length = temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64, high, low));
+    at = offset_address(l, dest, field_offset(l, e->type, &len_name));
+    ir_store(l->f, l->b, IR_I64, length, at);
 }
 
 /* Construct the aggregate value of e at dest. A literal fills its fields
@@ -3083,6 +3088,8 @@ static struct ir_operand lower_parallel(struct lowerer *l,
     struct ir_operand context = ir_int_op(IR_PTR, 0);
     struct ir_operand args[9];
     struct ir_operand array;
+    struct ir_operand length;
+    struct ir_operand length_at;
     uint32_t agg = IR_NO_AGG;
     uint32_t results;
     uint32_t count;
@@ -3140,10 +3147,10 @@ static struct ir_operand lower_parallel(struct lowerer *l,
     ir_store(l->f, l->b, IR_PTR, temp(l, ir_load(l->f, l->b, IR_PTR,
                                                  temp(l, results))),
              temp(l, out));
-    ir_store(l->f, l->b, IR_I64,
-             temp(l, ir_load(l->f, l->b, IR_I64, temp(l, count))),
-             offset_address(l, temp(l, out),
-                            field_offset(l, e->type, &len_name)));
+    length = temp(l, ir_load(l->f, l->b, IR_I64, temp(l, count)));
+    length_at = offset_address(l, temp(l, out),
+                               field_offset(l, e->type, &len_name));
+    ir_store(l->f, l->b, IR_I64, length, length_at);
     return temp(l, out);
 }
 

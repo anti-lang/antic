@@ -1422,8 +1422,10 @@ static void incoming_address(struct selector *s, struct mach_operand dst,
 
 static void emit_memcopy(struct selector *s, const struct ir_inst *inst)
 {
-    copy_memory(s, select_reg(s, &inst->a), select_reg(s, &inst->b),
-                select_size(s, inst->of));
+    struct mach_operand to = select_reg(s, &inst->a);
+    struct mach_operand from = select_reg(s, &inst->b);
+
+    copy_memory(s, to, from, select_size(s, inst->of));
 }
 
 static void emit_ptradd(struct selector *s, const struct ir_inst *inst)
