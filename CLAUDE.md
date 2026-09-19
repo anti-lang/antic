@@ -143,22 +143,14 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 9. Done. `reflect.call` follows the error convention, and the decisions hold
    Eddie's answers. `docs/reports/2026-09-19-first-sessions-7-to-9.md`
    reports 7 to 9.
-10. The next session does 10 to 13 in order, in a fresh context, and reports
-    at the end. `delete` runs the whole chain on owned objects: `delete(p)`
-    runs `destruct` on `p`, then on every object it owns, recursively, then
-    frees the memory of each. Change the sentence of "Destruction" in
-    `docs/anti-object-model.md` to "destroys every owned object and frees
-    every owned buffer". Change `lifetime.anti` to expect it, and put back the
-    change that the session of items 7 to 9 made and undid.
-11. One descriptor per struct per program, written by the module that
-    declares it, as for classes. Two copies are two addresses for one type.
-12. The entry on the `str` that `Object.deserialize` reads. Until `anti.mem`
-    exists it allocates from libc, and the entry says that the form with an
-    `Allocator` replaces it: `Object.deserialize` takes an `Allocator`, every
-    string and every owned sub-object it creates comes from it, and the
-    caller frees that memory at once when the object's life ends. It is the
-    first real use of injected allocation. The tag stays.
-13. Both VMs run the suite, since neither has seen items 7 to 9.
+10. Done. `delete(p)` runs `destruct` on `p`, then on every object it owns,
+    recursively, then frees the memory of each.
+11. Done. One descriptor per struct per program, written by the module that
+    declares it, as for classes.
+12. Done. The entry on the `str` that `Object.deserialize` reads names the
+    form with an `Allocator` that replaces it. The tag stays.
+13. Done. Both VMs ran the suite at `03d1064`.
+    `docs/reports/2026-09-19-first-sessions-10-to-13.md` reports 10 to 13.
 14. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
     its own module path as a compile-time constant. The check is then one
     comparison against a table read at start. `log.named("http")` may exist
@@ -195,8 +187,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 437 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 436 each, without the `no_paths` test, which needs a
+- 439 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 438 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
