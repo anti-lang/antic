@@ -6,3 +6,7 @@
 # A batch file is the one thing that wants the line endings of Windows.
 *.cmd text eol=crlf
 *.bat text eol=crlf
+
+# The expected file of the raw-bytes test holds a CR, an LF and a NUL, which
+# reach the comparison unchanged.
+tests/raw/raw_bytes.expected -text

@@ -24,7 +24,7 @@ file(REMOVE "${exe}")
 execute_process(
     COMMAND "${ANTIC}" --target macos-arm64 --llvm-mc "${LLVM_MC}"
             --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err)
+    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed for macos-arm64\n${err}")
 endif()

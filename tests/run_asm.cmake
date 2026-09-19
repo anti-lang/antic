@@ -23,7 +23,8 @@ execute_process(
             "${SOURCE}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
     message(FATAL_ERROR "antic -S failed with ${status}\n${out}${err}")
 endif()
@@ -32,7 +33,8 @@ execute_process(
     COMMAND "${LLVM_MC}" "-triple=${TRIPLE}" -filetype=obj
             -o "${WORK}/${name}.${TARGET}.o" "${assembly}"
     RESULT_VARIABLE status
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT err STREQUAL "")
     message(FATAL_ERROR "llvm-mc failed for ${assembly}\n${err}")
 endif()

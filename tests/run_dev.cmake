@@ -17,7 +17,8 @@ foreach(module scale twice)
                 -I "${LIBS}" -o "${WORK}/${module}"
                 "${MODULES}/com/example/${module}.anti"
         RESULT_VARIABLE status
-        ERROR_VARIABLE err)
+        ERROR_VARIABLE err
+        ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic --dev ${module}.anti failed\n${err}")
     endif()
@@ -27,7 +28,8 @@ execute_process(
             -I "${LIBS}" -o "${WORK}/main" "${MODULES}/main.anti"
             "${WORK}/scale.o" "${WORK}/twice.o"
     RESULT_VARIABLE status
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic --dev main.anti failed\n${err}")
 endif()
@@ -42,7 +44,8 @@ foreach(module scale twice)
                 -o "${WORK}/${module}_antl"
                 "${LIBS}/com/example/${module}.antl"
         RESULT_VARIABLE status
-        ERROR_VARIABLE err)
+        ERROR_VARIABLE err
+        ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic --dev ${module}.antl failed\n${err}")
     endif()
@@ -57,7 +60,8 @@ execute_process(
             -I "${LIBS}" -o "${WORK}/main_antl" "${MODULES}/main.anti"
             "${WORK}/scale_antl.o" "${WORK}/twice_antl.o"
     RESULT_VARIABLE status
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic --dev main.anti with library objects failed\n${err}")
 endif()

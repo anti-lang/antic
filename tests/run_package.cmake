@@ -30,7 +30,7 @@ if(NOT archive)
     message(FATAL_ERROR "tools/pack-anti.cmake wrote no archive for ${HOST}")
 endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" -E tar tf "${archive}"
-                OUTPUT_VARIABLE entries RESULT_VARIABLE listed)
+                OUTPUT_VARIABLE entries RESULT_VARIABLE listed ENCODING NONE)
 if(NOT listed EQUAL 0)
     message(FATAL_ERROR "${archive} does not list")
 endif()
@@ -66,7 +66,7 @@ execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/refused"
                         "-DANTIC=${ANTIC}" "-DHOSTS=${HOST}"
                         "-DSYSROOT=${SYSROOT}" "-DRUNTIME=${system}/runtime"
                         -P "${ROOT}/tools/pack-anti.cmake"
-                RESULT_VARIABLE refused ERROR_VARIABLE err)
+                RESULT_VARIABLE refused ERROR_VARIABLE err ENCODING NONE)
 if(refused EQUAL 0 OR NOT err MATCHES "ANTIC_SYSTEM_COMPILER")
     message(FATAL_ERROR "tools/pack-anti.cmake packed a build with the compiler "
                         "of the machine: ${err}")

@@ -29,12 +29,12 @@ set(exe "${WORK}/${program}-${TARGET}")
 execute_process(
     COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
             --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err)
+    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")
 endif()
 execute_process(COMMAND "${LLVM_OBJDUMP}" -h "${exe}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT out MATCHES "file format ${FORMAT}\n")
     message(FATAL_ERROR "the executable for ${TARGET} is not ${FORMAT}\n${out}${err}")
 endif()

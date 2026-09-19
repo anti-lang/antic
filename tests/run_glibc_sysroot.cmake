@@ -92,7 +92,8 @@ function(get_sysroot result)
     execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/sysroot"
                             -DLLVM_BIN=bin -DTARGETS=linux-x86_64-glibc
                             -P "${WORK}/tools/get-sysroot.cmake"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                    ENCODING NONE)
     set(${result} "${status}" PARENT_SCOPE)
     set(output "${out}${err}" PARENT_SCOPE)
 endfunction()

@@ -26,7 +26,7 @@ if(NOT system)
     file(READ "${ROOT}/tools/llvm-version" version)
     string(STRIP "${version}" version)
     execute_process(COMMAND "${compiler}" --version OUTPUT_VARIABLE out
-                    RESULT_VARIABLE status)
+                    RESULT_VARIABLE status ENCODING NONE)
     if(NOT status EQUAL 0 OR NOT out MATCHES "clang version ${version}")
         message(FATAL_ERROR "${compiler} is not clang ${version}: ${out}")
     endif()

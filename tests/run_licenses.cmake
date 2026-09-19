@@ -13,7 +13,7 @@ execute_process(
     COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
             --package-name com.example.hello --package-version 2.0.0
             --license MIT -o "${WORK}/licensed" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err)
+    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed\n${err}")
 endif()

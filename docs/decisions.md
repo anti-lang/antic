@@ -186,6 +186,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - Both are valid `str` values. The runtime converts argv and the environment to UTF-8, replaces invalid sequences with U+FFFD and NUL-terminates each entry. On Windows it reads UTF-16 through `GetCommandLineW` and `GetEnvironmentStringsW`.
 - A C startup file, `rt/start.c` in `anti_rt`, does the conversion, defines the C `main` and calls the Anti `main` under its mangled name. It reaches that name through the global symbol `anti.rt.main`, which antic defines as a second name for the main module's `main` with `.set`.
 - Exit code: Linux and macOS keep the low 8 bits, Windows keeps 32 bits.
+- The raw-bytes rule: an Anti program writes the bytes it was given, and the runtime never translates them. `rt/start.c` puts stdout and stderr into binary mode on Windows before `main`, and `rt/io.c` writes through them. The test scripts read the output of a program through `OUTPUT_FILE` as bytes on every host, since an `OUTPUT_VARIABLE` loses the CR of each CRLF and every NUL. The test `raw_output` checks those scripts and a program that writes a CR, an LF and a NUL.
 
 ## Libraries and runtime
 

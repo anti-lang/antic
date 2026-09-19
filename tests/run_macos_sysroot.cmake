@@ -68,7 +68,8 @@ function(get_sysroot result)
     execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/sysroot"
                             -DLLVM_BIN=bin "-DTARGETS=macos-arm64;macos-x86_64"
                             -P "${WORK}/tools/get-sysroot.cmake"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                    ENCODING NONE)
     set(${result} "${status}" PARENT_SCOPE)
     set(output "${out}${err}" PARENT_SCOPE)
 endfunction()
@@ -152,7 +153,8 @@ endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/sysroot"
                         -DLLVM_BIN=bin "-DTARGETS=macos-arm64;macos-x86_64"
                         "-DAPPLE_SDK=${sdk}" -P "${WORK}/tools/get-sysroot.cmake"
-                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                ENCODING NONE)
 set(output "${out}${err}")
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "tools/get-sysroot.cmake failed with APPLE_SDK:\n${output}")
@@ -195,7 +197,8 @@ endforeach()
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/sysroot"
                         -DLLVM_BIN=bin -DTARGETS=macos-arm64
                         "-DAPPLE_SDK=${WORK}/source" -P "${WORK}/tools/get-sysroot.cmake"
-                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                ENCODING NONE)
 if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "SDKSettings.json")
     message(FATAL_ERROR "tools/get-sysroot.cmake took a directory that is no "
                         "SDK:\n${out}${err}")

@@ -20,7 +20,8 @@ execute_process(
     COMMAND "${ANTIC}" ${arguments}
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT err STREQUAL "")
     message(FATAL_ERROR "antic ${OPTION} failed with ${status}\n${err}")
 endif()

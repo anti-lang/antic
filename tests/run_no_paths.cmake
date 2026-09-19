@@ -15,7 +15,7 @@ get_filename_component(root "${ROOT}" ABSOLUTE)
 set(found "")
 foreach(file IN LISTS shipped)
     execute_process(COMMAND "${STRINGS}" "${file}" OUTPUT_VARIABLE text
-                    ERROR_VARIABLE ignored)
+                    ERROR_VARIABLE ignored ENCODING NONE)
     string(FIND "${text}" "${root}" at)
     if(NOT at EQUAL -1)
         get_filename_component(name "${file}" NAME)

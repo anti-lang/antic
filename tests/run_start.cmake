@@ -10,7 +10,7 @@
 
 function(run)
     execute_process(COMMAND ${ARGN} RESULT_VARIABLE status
-        OUTPUT_VARIABLE out ERROR_VARIABLE err)
+        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0 OR NOT err STREQUAL "")
         message(FATAL_ERROR "${ARGN} failed with ${status}\n${out}${err}")
     endif()

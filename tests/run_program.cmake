@@ -14,6 +14,8 @@
 # Every byte after that line is the expected standard output. An optional
 # NAME.args file beside the source holds one command-line argument per line.
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 if(NOT EXISTS "${LLVM_MC}")
     message(FATAL_ERROR
         "llvm-mc not found at '${LLVM_MC}'. Configure with -DANTIC_LLVM_MC=<path>.")
@@ -35,7 +37,8 @@ execute_process(
             -o "${exe}" "${SOURCE}" ${objects}
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
 endif()
@@ -48,17 +51,15 @@ set(program_args "")
 if(EXISTS "${dir}/${name}.args")
     file(STRINGS "${dir}/${name}.args" program_args ENCODING UTF-8)
 endif()
-execute_process(
-    COMMAND "${exe}" ${program_args}
-    RESULT_VARIABLE exit_code
-    OUTPUT_VARIABLE stdout)
+program_output(stdout_hex exit_code "${exe}.stdout" "${exe}" ${program_args})
 
 file(READ "${expected_file}" expected)
 if(NOT expected MATCHES "^exit ([0-9]+)\n")
     message(FATAL_ERROR "${expected_file} does not start with 'exit N'")
 endif()
 set(expected_exit "${CMAKE_MATCH_1}")
-string(REGEX REPLACE "^exit [0-9]+\n" "" expected_stdout "${expected}")
+string(LENGTH "exit ${expected_exit}\n" skip)
+file(READ "${expected_file}" expected_hex OFFSET ${skip} HEX)
 
 # DESIGN: an expected file records the exit code that POSIX shows, which
 # is the low eight bits of what the program returned. Windows reports all
@@ -70,6 +71,10 @@ endif()
 if(NOT exit_code STREQUAL expected_exit)
     message(FATAL_ERROR "exit code ${exit_code}, expected ${expected_exit}")
 endif()
-if(NOT stdout STREQUAL expected_stdout)
-    message(FATAL_ERROR "standard output differs\nexpected:\n${expected_stdout}\ngot:\n${stdout}")
+if(NOT stdout_hex STREQUAL expected_hex)
+    string(REGEX REPLACE "^exit [0-9]+\n" "" expected_stdout "${expected}")
+    file(READ "${exe}.stdout" stdout)
+    message(FATAL_ERROR "standard output differs\nexpected:\n${expected_stdout}\n"
+                        "got:\n${stdout}\nexpected bytes: ${expected_hex}\n"
+                        "got bytes: ${stdout_hex}")
 endif()

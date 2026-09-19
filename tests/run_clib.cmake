@@ -19,7 +19,7 @@ endif()
 
 function(run)
     execute_process(COMMAND ${ARGN} RESULT_VARIABLE status
-        OUTPUT_VARIABLE out ERROR_VARIABLE err)
+        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "${ARGN} failed with ${status}\n${out}${err}")
     endif()
@@ -172,7 +172,7 @@ elseif(CASE STREQUAL "bundle")
     execute_process(
         COMMAND ${CC} -I "${dir}" "${SOURCES}/twolibs.c" "${dir}/libgeo.a"
                 "${dir}/libother.a" -o "${dir}/two_bundled"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
     if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "duplicate symbol|multiple definition")
         message(FATAL_ERROR "two bundled runtimes linked: ${status}\n${out}${err}")
     endif()

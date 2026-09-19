@@ -21,7 +21,8 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -DDEST=sysroot -DLLVM_BIN=bin
                         -DTARGETS=windows-x86_64 -DSPLAT=done
                         -DACCEPT_LICENSE=yes -P "${ROOT}/tools/get-sysroot.cmake"
                 WORKING_DIRECTORY "${WORK}"
-                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                ENCODING NONE)
 # The tree is not the pinned one, so the script refuses it and names the
 # digest it computed.
 if(status EQUAL 0)

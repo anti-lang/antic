@@ -10,6 +10,8 @@
 #include "utf.h"
 
 #if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
 #include <windows.h>
 #endif
 
@@ -145,6 +147,11 @@ int main(void)
     struct anti_slice args;
     struct anti_slice env;
 
+    /* DESIGN: the raw-bytes rule. An Anti program writes the bytes it was
+       given, and the runtime never translates them. The C streams of
+       Windows start in text mode, which writes CRLF for each LF. */
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
     anti_rt_init();
     args = arguments();
     env = environment();

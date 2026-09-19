@@ -38,13 +38,14 @@ set(stubs usr/lib/libSystem.tbd usr/lib/system/libsystem_c.tbd
 set(bundle "${WORK}/out/apple-sdk-9.9.tar.xz")
 file(MAKE_DIRECTORY "${WORK}/out")
 execute_process(COMMAND "${ANTI}" sdk export --sdk "${sdk}" -o "${WORK}/out"
-                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                ENCODING NONE)
 if(CMAKE_HOST_APPLE)
     if(NOT status EQUAL 0 OR NOT EXISTS "${bundle}")
         message(FATAL_ERROR "anti sdk export wrote no ${bundle}:\n${out}${err}")
     endif()
     execute_process(COMMAND "${CMAKE_COMMAND}" -E tar tf "${bundle}"
-                    OUTPUT_VARIABLE listing COMMAND_ERROR_IS_FATAL ANY)
+                    OUTPUT_VARIABLE listing COMMAND_ERROR_IS_FATAL ANY ENCODING NONE)
     string(REGEX REPLACE "(^|\n)\\./" "\\1" listing "${listing}")
     foreach(entry sdk-version ${stubs})
         if(NOT listing MATCHES "(^|\n)${entry}\n")
@@ -86,7 +87,8 @@ endfunction()
 function(import file result)
     execute_process(COMMAND "${ANTI}" sdk import "${file}"
                             --sysroot "${WORK}/sysroot"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                    ENCODING NONE)
     set(${result} "${status}" PARENT_SCOPE)
     set(output "${out}${err}" PARENT_SCOPE)
 endfunction()

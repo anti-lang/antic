@@ -24,7 +24,7 @@ foreach(source IN LISTS sources)
         set(out "${WORK}/${name}.${target}.s")
         execute_process(COMMAND "${ANTIC}" --target ${target} --runtime "${RUNTIME}"
                                 -S -o "${out}" "${source}"
-                        RESULT_VARIABLE status ERROR_VARIABLE err)
+                        RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
         if(NOT status EQUAL 0)
             message(FATAL_ERROR "antic -S failed for ${name} on ${target}\n${err}")
         endif()

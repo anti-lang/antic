@@ -14,7 +14,7 @@ function(build name)
     execute_process(COMMAND "${ANTIC}" ${ARGN} --llvm-mc "${LLVM_MC}"
                             --runtime "${RUNTIME}" -o "${WORK}/${name}"
                             "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err)
+                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic failed for ${name}\n${err}")
     endif()
@@ -25,12 +25,13 @@ file(MAKE_DIRECTORY "${WORK}")
 # Release is the default, so the assertion is gone.
 build(release)
 execute_process(COMMAND "${WORK}/release" RESULT_VARIABLE code
-                OUTPUT_VARIABLE out ERROR_VARIABLE err)
+                OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
 if(NOT code EQUAL 7)
     message(FATAL_ERROR "the release build exited with ${code}, expected 7"
                         "\n${out}${err}")
 endif()
-execute_process(COMMAND "${STRINGS}" "${WORK}/release" OUTPUT_VARIABLE text)
+execute_process(COMMAND "${STRINGS}" "${WORK}/release" OUTPUT_VARIABLE text
+                ENCODING NONE)
 if(text MATCHES "assertion failed")
     message(FATAL_ERROR "the release build carries the text of an assertion")
 endif()
@@ -39,7 +40,7 @@ endif()
 # source of the condition.
 build(forced --asserts)
 execute_process(COMMAND "${WORK}/forced" RESULT_VARIABLE code
-                ERROR_VARIABLE err)
+                ERROR_VARIABLE err ENCODING NONE)
 if(code EQUAL 7)
     message(FATAL_ERROR "the assertion did not stop the program")
 endif()
@@ -71,7 +72,7 @@ file(WRITE "${WORK}/root/com/example/checked.anti"
 execute_process(COMMAND "${ANTIC}" -c -I "${WORK}/root"
                         -o "${WORK}/lib/com/example/checked.antl"
                         "${WORK}/root/com/example/checked.anti"
-                RESULT_VARIABLE status ERROR_VARIABLE err)
+                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic -c failed\n${err}")
 endif()
@@ -88,14 +89,14 @@ foreach(case "quiet;" "trap;--asserts")
     execute_process(COMMAND "${ANTIC}" ${flag} --llvm-mc "${LLVM_MC}"
                             --runtime "${RUNTIME}" -I "${WORK}/lib"
                             -o "${WORK}/${name}" "${WORK}/consumer.anti"
-                    RESULT_VARIABLE status ERROR_VARIABLE err)
+                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic failed for ${name}\n${err}")
     endif()
     execute_process(COMMAND "${WORK}/${name}" RESULT_VARIABLE code
-                    ERROR_VARIABLE ran)
+                    ERROR_VARIABLE ran ENCODING NONE)
     execute_process(COMMAND "${STRINGS}" "${WORK}/${name}"
-                    OUTPUT_VARIABLE text)
+                    OUTPUT_VARIABLE text ENCODING NONE)
     if(name STREQUAL "quiet")
         if(NOT code EQUAL 0 OR text MATCHES "assertion failed")
             message(FATAL_ERROR "the library assertion reached a release "

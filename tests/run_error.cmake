@@ -11,7 +11,8 @@ execute_process(
     WORKING_DIRECTORY "${DIRECTORY}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(status EQUAL 0)
     message(FATAL_ERROR "antic accepted the program\n${out}")
 endif()

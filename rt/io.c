@@ -3,7 +3,8 @@
 #include "std.h"
 
 /* DESIGN: anti.io writes through the C streams, so its output and the
-   output of printf in one program keep their order. */
+   output of printf in one program keep their order. rt/start.c puts both
+   streams into binary mode on Windows, so no byte is translated. */
 void anti_rt_write(int32_t stream, const unsigned char *bytes, size_t count)
 {
     fwrite(bytes, 1, count, stream == 1 ? stdout : stderr);

@@ -12,7 +12,8 @@ execute_process(
     COMMAND "${ANTIC}" -c -I "${ROOT}" ${options} -o "${OUTPUT}" "${SOURCE}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
     message(FATAL_ERROR "antic -c failed with ${status}\n${out}${err}")
 endif()

@@ -23,7 +23,7 @@ execute_process(
     COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
             --runtime "${RUNTIME}" --framework CoreFoundation -o "${exe}"
             "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err)
+    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}/sdk/sdk-version" AND
    NOT CMAKE_HOST_APPLE)
     string(REGEX REPLACE "[ \n]+" " " said "${err}")
@@ -39,7 +39,7 @@ if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")
 endif()
 execute_process(COMMAND "${LLVM_OBJDUMP}" --macho --dylibs-used "${exe}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0 OR
    NOT out MATCHES "CoreFoundation\\.framework/Versions/A/CoreFoundation")
     message(FATAL_ERROR "${exe} names no CoreFoundation\n${out}${err}")
