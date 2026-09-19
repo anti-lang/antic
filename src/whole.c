@@ -1232,13 +1232,15 @@ bool whole_program(struct ir_module *program,
         write_registry(program, false);
     }
     calls = calls_through_reflection(program, &reach);
-    if (calls || options->bundled) {
-        write_trampolines(program, calls && options->reflect);
-    }
     if (!options->library) {
         write_slots(w, program, &reach, calls && options->reflect);
     }
     reach_free(&reach);
+    /* The trampolines come after every reader of the reach, because they
+       add functions that it does not cover. */
+    if (calls || options->bundled) {
+        write_trampolines(program, calls && options->reflect);
+    }
     if (options->release) {
         devirtualise(w, program);
     }
