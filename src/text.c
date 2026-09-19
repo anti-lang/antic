@@ -40,7 +40,10 @@ void text_append(struct text *t, const char *s)
 void text_append_bytes(struct text *t, const void *bytes, size_t n)
 {
     reserve(t, n);
-    memcpy(t->data + t->length, bytes, n);
+    /* An empty slice may carry a null pointer, and memcpy takes none. */
+    if (n > 0) {
+        memcpy(t->data + t->length, bytes, n);
+    }
     t->length += n;
     t->data[t->length] = '\0';
 }

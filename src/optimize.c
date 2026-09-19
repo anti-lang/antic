@@ -902,7 +902,10 @@ static void renumber_temps(struct ir_function *f)
             }
         }
     }
-    memcpy(f->temps, types, next * sizeof *types);
+    /* A function without temporaries holds no array to copy into. */
+    if (next > 0) {
+        memcpy(f->temps, types, next * sizeof *types);
+    }
     f->temp_count = next;
     free(map);
     free(types);

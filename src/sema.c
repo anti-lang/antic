@@ -2099,8 +2099,11 @@ static bool method_call(struct checker *c, struct expr *call)
     callee->type = f->type;
     args = arena_alloc(c->arena, (call->as.call.arg_count + 1) * sizeof *args);
     args[0] = receiver;
-    memcpy(args + 1, call->as.call.args,
-           call->as.call.arg_count * sizeof *args);
+    /* A call without arguments holds no array to copy. */
+    if (call->as.call.arg_count > 0) {
+        memcpy(args + 1, call->as.call.args,
+               call->as.call.arg_count * sizeof *args);
+    }
     call->as.call.callee = callee;
     call->as.call.args = args;
     call->as.call.arg_count++;

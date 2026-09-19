@@ -48,7 +48,11 @@ struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,
 
     inst->op = op;
     inst->count = (uint8_t)count;
-    memcpy(inst->operands, operands, count * sizeof *operands);
+    /* An instruction without operands may pass no array, and memcpy takes
+       no null pointer even for zero bytes. */
+    if (count > 0) {
+        memcpy(inst->operands, operands, count * sizeof *operands);
+    }
     return inst;
 }
 
