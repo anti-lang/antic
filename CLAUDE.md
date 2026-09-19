@@ -143,14 +143,29 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 9. Done. `reflect.call` follows the error convention, and the decisions hold
    Eddie's answers. `docs/reports/2026-09-19-first-sessions-7-to-9.md`
    reports 7 to 9.
-10. The next session starts here, in a fresh context. The `[module]`
-    thresholds of `anti.log`. They stay. Every log call passes its own module
-    path as a compile-time constant. The check is then one comparison against
-    a table read at start. `log.named("http")` may exist beside them for a
-    logger per subsystem, not instead of them.
-11. `f"..."` interpolation, which is compiler work over `anti.text`.
-12. The native libraries in `libs/`, which nothing builds yet.
-13. Inline atomic instruction sequences, which are runtime calls today.
+10. The next session does 10 to 13 in order, in a fresh context, and reports
+    at the end. `delete` runs the whole chain on owned objects: `delete(p)`
+    runs `destruct` on `p`, then on every object it owns, recursively, then
+    frees the memory of each. Change the sentence of "Destruction" in
+    `docs/anti-object-model.md` to "destroys every owned object and frees
+    every owned buffer". Change `lifetime.anti` to expect it, and put back the
+    change that the session of items 7 to 9 made and undid.
+11. One descriptor per struct per program, written by the module that
+    declares it, as for classes. Two copies are two addresses for one type.
+12. The entry on the `str` that `Object.deserialize` reads. Until `anti.mem`
+    exists it allocates from libc, and the entry says that the form with an
+    `Allocator` replaces it: `Object.deserialize` takes an `Allocator`, every
+    string and every owned sub-object it creates comes from it, and the
+    caller frees that memory at once when the object's life ends. It is the
+    first real use of injected allocation. The tag stays.
+13. Both VMs run the suite, since neither has seen items 7 to 9.
+14. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
+    its own module path as a compile-time constant. The check is then one
+    comparison against a table read at start. `log.named("http")` may exist
+    beside them for a logger per subsystem, not instead of them.
+15. `f"..."` interpolation, which is compiler work over `anti.text`.
+16. The native libraries in `libs/`, which nothing builds yet.
+17. Inline atomic instruction sequences, which are runtime calls today.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, dev-mode checks, debug information, and tests and fixtures
