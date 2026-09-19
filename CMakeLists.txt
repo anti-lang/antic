@@ -60,6 +60,7 @@ set(ANTIC_HOST_TARGET "${ANTIC_HOST_OS}-${ANTIC_HOST_CPU}")
 # objects as the antic executable.
 add_library(antic_core STATIC
     src/antl.c
+    src/applesdk.c
     src/arm64.c
     src/arena.c
     src/ast_dump.c
@@ -93,6 +94,17 @@ target_include_directories(antic_core PUBLIC src)
 add_executable(antic
     src/main.c)
 target_link_libraries(antic PRIVATE antic_core)
+
+# DESIGN: anti is the user-facing command. docs/tooling.md places it in
+# tools/anti/, linked against antic_core. Its only commands are sdk export
+# and sdk import, which move the stubs of Apple's SDK from a Mac to a host
+# that links a program naming a framework.
+add_executable(anti
+    tools/anti/main.c
+    tools/anti/files.c
+    tools/anti/sdk.c
+    tools/anti/sha256.c)
+target_link_libraries(anti PRIVATE antic_core)
 
 target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
