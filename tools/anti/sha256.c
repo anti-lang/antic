@@ -112,7 +112,7 @@ bool sha256_file(const char *path, char hex[65])
     }
     compress(hash, block);
     for (i = 0; i < 8; i++) {
-        sprintf(hex + 8 * i, "%08x", (unsigned)hash[i]);
+        snprintf(hex + 8 * i, 9, "%08x", (unsigned)hash[i]);
     }
     hex[64] = '\0';
     return true;
