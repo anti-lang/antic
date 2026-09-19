@@ -27,6 +27,8 @@ static int usage(FILE *out)
           "  --llvm-ar <path>     the llvm-ar executable\n"
           "  --linker lld|platform  link with lld of the runtime archive, the\n"
           "                       default, or with the platform linker\n"
+          "  --framework <name>   link a macOS program against a framework\n"
+          "                       of Apple's SDK\n"
           "  -I <dir>             a search root: module a.b is a/b.anti\n"
           "                       or a/b.antl under it\n"
           "  --anti-internal      allow -c for a module under anti.\n"
@@ -202,6 +204,13 @@ static int run(int argc, char **argv, struct options *o)
         } else if (strcmp(arg, "--doc-warnings") == 0) {
             options.doc_warnings = true;
             continue;
+        } else if (strcmp(arg, "--framework") == 0) {
+            const char *value = value_of(argc, argv, &i);
+            if (value == NULL) {
+                return 2;
+            }
+            options.frameworks[options.framework_count++] = value;
+            continue;
         } else if (strcmp(arg, "--dependency") == 0 ||
                    strcmp(arg, "--attribution") == 0) {
             const char *value = value_of(argc, argv, &i);
@@ -318,9 +327,10 @@ int main(int argc, char **argv)
     options.roots = malloc((size_t)argc * sizeof *options.roots);
     options.dependencies = malloc((size_t)argc * sizeof *options.dependencies);
     options.attribution = malloc((size_t)argc * sizeof *options.attribution);
+    options.frameworks = malloc((size_t)argc * sizeof *options.frameworks);
     if (options.libraries == NULL || options.objects == NULL ||
         options.roots == NULL || options.dependencies == NULL ||
-        options.attribution == NULL) {
+        options.attribution == NULL || options.frameworks == NULL) {
         fputs("antic: out of memory\n", stderr);
         return 70;
     }
@@ -330,5 +340,6 @@ int main(int argc, char **argv)
     free((void *)options.roots);
     free((void *)options.dependencies);
     free((void *)options.attribution);
+    free((void *)options.frameworks);
     return status;
 }

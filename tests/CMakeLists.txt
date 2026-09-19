@@ -446,6 +446,22 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
     endforeach()
 endforeach()
 
+# A program that names a framework links against Apple's SDK.
+foreach(target macos-arm64 macos-x86_64)
+    add_test(NAME framework_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/framework/core_foundation.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/framework"
+            "-DTARGET=${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_framework.cmake")
+    set_tests_properties(framework_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # The platform linker of the host links the first executable of chapter 3.
 if(NOT WIN32)
     add_test(NAME program_platform_linker

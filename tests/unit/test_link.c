@@ -10,33 +10,33 @@ static const char *const extra_windows[] = {"shapes.obj"};
 
 static const struct link_inputs unix_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/x86_64-linux-gnu",
-    NULL, 0, LINKER_PLATFORM, NULL, NULL
+    NULL, 0, LINKER_PLATFORM, NULL, NULL, NULL, 0
 };
 
 static const struct link_inputs windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, NULL, 0,
-    LINKER_PLATFORM, NULL, NULL
+    LINKER_PLATFORM, NULL, NULL, NULL, 0
 };
 
 static const struct link_inputs extra_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/aarch64-linux-gnu",
-    extra_unix, 2, LINKER_PLATFORM, NULL, NULL
+    extra_unix, 2, LINKER_PLATFORM, NULL, NULL, NULL, 0
 };
 
 static const struct link_inputs extra_windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, extra_windows, 1,
-    LINKER_PLATFORM, NULL, NULL
+    LINKER_PLATFORM, NULL, NULL, NULL, 0
 };
 
 /* lld of the runtime archive with the sysroot of the target. */
 static const struct link_inputs lld_inputs = {
     "prog.o", "prog", "/rt", NULL, "26.5", NULL, extra_unix, 1, LINKER_LLD,
-    "/rt/sysroot/t", "/rt/bin"
+    "/rt/sysroot/t", "/rt/bin", NULL, 0
 };
 
 static const struct link_inputs lld_windows_inputs = {
     "prog.obj", "prog.exe", "/rt", NULL, NULL, NULL, NULL, 0, LINKER_LLD,
-    "/rt/sysroot/t", "/rt/bin"
+    "/rt/sysroot/t", "/rt/bin", NULL, 0
 };
 
 /* Build the command line of target t and compare it, joined by spaces. */
@@ -319,9 +319,49 @@ static void libraries(void)
     text_free(&line);
 }
 
+/* A macOS program that names no framework links against the stubs of the
+   sysroot. One that names a framework links against Apple's SDK, whose
+   path and version the driver finds, with each framework after -lSystem.
+   Other targets have no frameworks, so the names change nothing there. */
+static void frameworks(void)
+{
+    static const char *const names[] = {"CoreFoundation", "Cocoa"};
+    struct link_inputs in = lld_inputs;
+
+    in.frameworks = names;
+    in.framework_count = 2;
+    in.sdk_path = "/rt/sysroot/t/sdk";
+    in.sdk_version = "26.5";
+    links(TARGET_MACOS_ARM64, &in,
+          "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
+          "-syslibroot /rt/sysroot/t/sdk -o prog prog.o shapes.o "
+          "/rt/lib/macos-arm64/libanti_rt.a -lSystem -framework CoreFoundation "
+          "-framework Cocoa");
+    in.linker = LINKER_PLATFORM;
+    in.lld_dir = NULL;
+    in.sdk_path = "/sdk";
+    links(TARGET_MACOS_X86_64, &in,
+          "ld -S -arch x86_64 -platform_version macos 11.0 26.5 "
+          "-syslibroot /sdk -o prog prog.o shapes.o "
+          "/rt/lib/macos-x86_64/libanti_rt.a -lSystem -framework CoreFoundation "
+          "-framework Cocoa");
+    in = lld_inputs;
+    in.frameworks = names;
+    in.framework_count = 2;
+    links(TARGET_LINUX_ARM64, &in,
+          "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
+          "-o prog "
+          "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o prog.o "
+          "shapes.o /rt/lib/linux-arm64/libanti_rt.a "
+          "/rt/sysroot/t/usr/lib/libc.a "
+          "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "/rt/sysroot/t/usr/lib/crtn.o");
+}
+
 void test_link(void)
 {
     libraries();
+    frameworks();
     strips_debug();
     runtime_entry();
     runtime_markers();

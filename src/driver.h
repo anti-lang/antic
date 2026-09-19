@@ -31,6 +31,9 @@ struct options {
     bool bundle_runtime;        /* --bundle-runtime, with --lib static. */
     bool soname;                /* --soname, with --lib shared. */
     const char *llvm_ar;        /* NULL: llvm-ar from PATH. */
+    const char **frameworks;    /* --framework, macOS frameworks of Apple's
+                                   SDK. */
+    size_t framework_count;
     enum linker linker;         /* --linker lld|platform, lld by default. */
     const char *package_name;   /* --package-name, of the header. */
     const char *package_version;

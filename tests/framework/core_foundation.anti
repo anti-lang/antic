@@ -1,0 +1,11 @@
+// Calls a function of CoreFoundation, a framework that only Apple's SDK
+// links against.
+extern fn CFAbsoluteTimeGetCurrent() -> f64;
+
+fn main() -> int
+{
+	if CFAbsoluteTimeGetCurrent() > 0.0 {
+		return 0;
+	}
+	return 1;
+}

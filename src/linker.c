@@ -77,8 +77,8 @@ static const char *program(struct link_command *c, const struct link_inputs *in,
 }
 
 /* The start of a Mach-O link: -arch, the versions and libSystem's root.
-   ld64 of Apple takes the SDK that xcrun names, and ld64.lld the stubs of
-   the sysroot. */
+   ld64 of Apple takes the SDK that xcrun names. ld64.lld takes the stubs
+   of the sysroot, or Apple's SDK for a program that names a framework. */
 static void macos_start(struct link_command *c, enum target t,
                         const struct link_inputs *in, bool dylib)
 {
@@ -98,7 +98,20 @@ static void macos_start(struct link_command *c, enum target t,
     add(c, text_cstr(version));
     add(c, in->sdk_version);
     add(c, "-syslibroot");
-    add(c, in->linker == LINKER_LLD ? in->sysroot : in->sdk_path);
+    add(c, in->linker == LINKER_LLD && in->framework_count == 0 ? in->sysroot
+                                                               : in->sdk_path);
+}
+
+/* The frameworks of a macOS link, which follow libSystem. */
+static void macos_frameworks(struct link_command *c,
+                             const struct link_inputs *in)
+{
+    size_t i;
+
+    for (i = 0; i < in->framework_count; i++) {
+        add(c, "-framework");
+        add(c, in->frameworks[i]);
+    }
 }
 
 static void macos(struct link_command *c, enum target t,
@@ -113,6 +126,7 @@ static void macos(struct link_command *c, enum target t,
     add_inputs(c, in);
     add(c, text_cstr(library));
     add(c, "-lSystem");
+    macos_frameworks(c, in);
 }
 
 /* DESIGN: ld.lld links a Linux program statically against the musl of
@@ -260,7 +274,9 @@ void link_command(struct link_command *c, enum target t,
                   const struct link_inputs *in)
 {
     memset(c, 0, sizeof *c);
-    c->argv = calloc(LINK_FIXED_ARGS + in->extra_count + 1, sizeof *c->argv);
+    c->argv = calloc(LINK_FIXED_ARGS + in->extra_count +
+                         2 * in->framework_count + 1,
+                     sizeof *c->argv);
     if (c->argv == NULL) {
         fputs("antic: out of memory\n", stderr);
         exit(70);
@@ -305,7 +321,7 @@ void link_shared_command(struct link_command *c, enum target t,
 {
     struct text *library;
 
-    start(c, in->extra_count);
+    start(c, in->extra_count + 2 * in->framework_count);
     library = next(c);
     link_runtime_library(library, in->runtime, t);
     switch (target_info(t)->os) {
@@ -330,6 +346,7 @@ void link_shared_command(struct link_command *c, enum target t,
         add_inputs(c, in);
         add(c, text_cstr(library));
         add(c, "-lSystem");
+        macos_frameworks(c, in);
         break;
     }
     case OS_LINUX: {

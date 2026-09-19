@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__APPLE__)
+#include <dirent.h>
+#endif
 
 #include "antl.h"
 #include "diagnostic.h"
@@ -263,6 +266,95 @@ static bool file_exists(const char *path)
     return f != NULL;
 }
 
+/* DESIGN: a program that names a framework links against Apple's SDK,
+   which Anti never fetches. sdk/ of the sysroot holds its stubs, from
+   tools/get-sysroot.cmake with APPLE_SDK or from anti sdk import. A Mac
+   without them takes the newest SDK of its Command Line Tools up to
+   MACOS_SDK_NEWEST_MAJOR, the newest that ld64.lld of the pinned LLVM
+   reads. ld64.lld 23.1.1 refuses the target arm64e.x1 in the stubs of
+   27.0. */
+#define MACOS_SDK_NEWEST_MAJOR 26
+#define MACOS_CLT_SDKS "/Library/Developer/CommandLineTools/SDKs"
+
+/* Set f->sdk_path and f->sdk_version to the newest SDK of the Command Line
+   Tools that ld64.lld reads. Only a Mac has one. */
+static bool command_line_tools_sdk(struct link_facts *f)
+{
+#if defined(__APPLE__)
+    DIR *dir = opendir(MACOS_CLT_SDKS);
+    struct dirent *entry;
+    int best_major = -1;
+    int best_minor = -1;
+
+    if (dir == NULL) {
+        return false;
+    }
+    while ((entry = readdir(dir)) != NULL) {
+        int major;
+        int minor;
+        char rest[8];
+
+        if (sscanf(entry->d_name, "MacOSX%d.%d%7s", &major, &minor, rest) != 3 ||
+            strcmp(rest, ".sdk") != 0 || major > MACOS_SDK_NEWEST_MAJOR ||
+            major < best_major || (major == best_major && minor <= best_minor)) {
+            continue;
+        }
+        best_major = major;
+        best_minor = minor;
+    }
+    closedir(dir);
+    if (best_major < 0) {
+        return false;
+    }
+    f->sdk_path.length = 0;
+    f->sdk_version.length = 0;
+    text_appendf(&f->sdk_path, "%s/MacOSX%d.%d.sdk", MACOS_CLT_SDKS, best_major,
+                 best_minor);
+    text_appendf(&f->sdk_version, "%d.%d", best_major, best_minor);
+    return true;
+#else
+    (void)f;
+    return false;
+#endif
+}
+
+/* Set f->sdk_path and f->sdk_version to Apple's SDK, which a program that
+   names a framework links against, or explain where it comes from. */
+static bool apple_sdk(const struct options *o, struct link_facts *f)
+{
+    struct text marker = {0};
+    struct text version = {0};
+    bool found;
+    size_t i;
+
+    text_appendf(&f->sdk_path, "%s/%s", text_cstr(&f->sysroot),
+                 SYSROOT_APPLE_SDK_DIR);
+    text_appendf(&marker, "%s/%s", text_cstr(&f->sdk_path), SYSROOT_SDK_VERSION);
+    found = file_exists(text_cstr(&marker)) &&
+            read_bytes(text_cstr(&marker), &version);
+    text_free(&marker);
+    if (found) {
+        f->sdk_version.length = 0;
+        text_appendf(&f->sdk_version, "%s", text_cstr(&version));
+        text_free(&version);
+        return true;
+    }
+    text_free(&version);
+    if (command_line_tools_sdk(f)) {
+        return true;
+    }
+    fprintf(stderr, "antic: the frameworks");
+    for (i = 0; i < o->framework_count; i++) {
+        fprintf(stderr, "%s %s", i > 0 ? "," : "", o->frameworks[i]);
+    }
+    fprintf(stderr, " link for %s against Apple's SDK, which %s lacks. A Mac "
+                    "keeps the SDK in " MACOS_CLT_SDKS ". Pass a copy of it "
+                    "as APPLE_SDK to tools/get-sysroot.cmake, or run anti sdk "
+                    "export on that Mac and anti sdk import here.\n",
+            target_name(o->target), text_cstr(&f->sdk_path));
+    return false;
+}
+
 /* The facts of a link for the target. lld takes the sysroot and the lld
    programs of the runtime archive, and the SDK version of a macOS
    sysroot. The platform linker takes the macOS SDK from xcrun and the
@@ -322,6 +414,12 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
         return false;
     }
     in->sysroot = present ? text_cstr(&f->sysroot) : NULL;
+    if (os == OS_MACOS && o->framework_count > 0) {
+        if (!apple_sdk(o, f)) {
+            return false;
+        }
+        in->sdk_path = text_cstr(&f->sdk_path);
+    }
     while (f->sdk_version.length > 0 &&
            (f->sdk_version.data[f->sdk_version.length - 1] == '\n' ||
             f->sdk_version.data[f->sdk_version.length - 1] == '\r')) {
@@ -345,6 +443,8 @@ static bool link_program(const struct options *o, const char *object,
     in.runtime = o->runtime;
     in.extra = o->objects;
     in.extra_count = o->object_count;
+    in.frameworks = o->frameworks;
+    in.framework_count = o->framework_count;
     ok = link_facts(o, &in, &facts);
     if (ok) {
         link_command(&command, o->target, &in);

@@ -11,7 +11,8 @@
    <runtime>/RUNTIME_LIB_DIR/<target>/. The sysroot that lld links against
    is <runtime>/RUNTIME_SYSROOT_DIR/<target>/, and the pinned LLVM tools
    are in <runtime>/RUNTIME_BIN_DIR/. A macOS sysroot names the version of
-   its SDK in the file SYSROOT_SDK_VERSION. */
+   its stubs in the file SYSROOT_SDK_VERSION. The stubs of Apple's SDK for
+   a program that names a framework lie in SYSROOT_APPLE_SDK_DIR of it. */
 #define RUNTIME_LIB_DIR "lib"
 #define RUNTIME_SYSROOT_DIR "sysroot"
 #define RUNTIME_BIN_DIR "bin"
@@ -21,6 +22,7 @@
    instead of the licence text of rt/license.c. */
 #define RUNTIME_LICENSE_STUB "anti_rt_license_stub"
 #define SYSROOT_SDK_VERSION "sdk-version"
+#define SYSROOT_APPLE_SDK_DIR "sdk"
 
 /* DESIGN: lld of the pinned LLVM release links for every target, and
    --linker platform selects the linker of the host's own toolchain. */
@@ -32,14 +34,16 @@ struct link_inputs {
     const char *object;
     const char *executable;
     const char *runtime;        /* the directory of the runtime archive */
-    const char *sdk_path;       /* macOS: xcrun --show-sdk-path */
-    const char *sdk_version;    /* macOS: xcrun --show-sdk-version */
+    const char *sdk_path;       /* macOS: xcrun or frameworks */
+    const char *sdk_version;    /* macOS: its version */
     const char *crt_dir;        /* Linux: the directory that holds Scrt1.o */
     const char *const *extra;   /* object files and archives to link */
     size_t extra_count;
     enum linker linker;
     const char *sysroot;        /* lld: <runtime>/sysroot/<target> */
     const char *lld_dir;        /* lld: its directory, or NULL for PATH */
+    const char *const *frameworks; /* macOS: -framework */
+    size_t framework_count;
 };
 
 /* The suffixes of the object files and archives that antic passes to the
