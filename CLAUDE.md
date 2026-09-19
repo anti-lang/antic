@@ -18,6 +18,9 @@ and is not a concern here.
    `docs/libraries-for-c.md`. They agree with `docs/decisions.md`, and a change
    goes into both.
 
+`docs/anti-syntax-overview.md` summarises the two specifications and adds
+nothing. A change to either specification changes it in the same commit.
+
 The choices inside a compiler pass are in `docs/notes/`. The design pages of the
 runtime archive, the build tool and the standard library are in `docs/site/`.
 The test machines are in `docs/vm-setup.md`. Do not re-open a settled decision
@@ -187,8 +190,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 446 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 445 each, without the `no_paths` test, which needs a
+- 451 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 450 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
