@@ -59,7 +59,8 @@ The entry on what `delete` destroys records item 10 and has no tag.
 
 - With `--no-reflect` a descriptor has no field list, so `delete` and `dup` find no
   `own` field. `delete` neither runs the `destruct` of an owned object nor frees it, and
-  `dup` shares it. A program built both ways shows it. See the question below.
+  `dup` shares it. A program built both ways shows it. Eddie's answer below fixes it and
+  is not implemented.
 - `=` between two values of a class with `own` fields is accepted, which the
   specification refuses. Both values are then destroyed at the end of their block, and
   the owned object is freed twice.
@@ -69,9 +70,18 @@ The entry on what `delete` destroys records item 10 and has no tag.
   exist, `equals` and `hash` pass over `str`, slices and inline values, and `serialize`
   writes a NaN or an infinity as text that is not JSON.
 
-## Questions
+## After Eddie's answers
 
-- `--no-reflect` drops the field list, and `delete` and `dup` read it to find what an
-  object owns. Should `--no-reflect` keep the records of the `own` fields and the inline
-  class values? The other way is a teardown and a copy that the compiler writes per
-  class, which no flag removes.
+- `010e2fb`. An `own` slice of class values destroys each element before its buffer is
+  freed, and `dup` copies each element. `delete_owned` covers both. The entry has no tag.
+- `894c7c9`. The entry on inline class values has no tag, and "Ownership and copies"
+  states it.
+- `c3c445b`. `docs/decisions.md` records that the compiler writes a teardown and a copy
+  for every class, which `delete`, `destroy` and `dup` call. Nothing implements it yet.
+
+Three points under the answer on owned slices do not hold in the code. `alloc(T, n)`
+lowers to `malloc`, so the table of an element never filled holds whatever the memory
+held, and zero only by chance. No build checks a table for null: lowering has no dev
+mode, and `delete`, `destroy` and `dup` are plain calls into the runtime. No
+specification states that a local `[N]Circle` destroys its elements at the end of its
+scope, and no local of array type is destroyed.
