@@ -442,10 +442,88 @@ static void writes_registry(void)
              "ptr 0 }\n");
 }
 
+static const char board[] =
+    "pub singleton class Board\n"
+    "{\n"
+    "    pub mutable score: int = 0,\n"
+    "    pub atomic hits: int = 0,\n"
+    "}\n"
+    "pub fn bump()\n"
+    "{\n"
+    "    Board.get().score = 1;\n"
+    "}\n"
+    "pub fn hit()\n"
+    "{\n"
+    "    Board.get().hits.add(1);\n"
+    "}\n"
+    "pub abstract class Task\n"
+    "{\n"
+    "    abstract fn run(self) -> int;\n"
+    "}\n"
+    "pub class Scoring\n"
+    "{\n"
+    "    inherits Task,\n"
+    "    concrete fn run(self) -> int\n"
+    "    {\n"
+    "        return Board.get().score;\n"
+    "    }\n"
+    "}\n"
+    "pub class Quiet\n"
+    "{\n"
+    "    inherits Task,\n"
+    "    concrete fn run(self) -> int\n"
+    "    {\n"
+    "        return 0;\n"
+    "    }\n"
+    "}\n";
+
+/* DESIGN: a `worker fn` may not reach a `mutable` field of a singleton,
+   in any function it calls directly or through a table, in any module.
+   The checker of each module walks its own functions. The pass sees
+   what they call in the other modules and through the tables. */
+static void checks_singletons(void)
+{
+    struct program p;
+    struct text errors = {0};
+    struct whole_options options;
+
+    open_program(&p);
+    load_library(&p, "board", board);
+    compile(&p, "main",
+            "import board;\n"
+            "worker fn tally(part: []int) -> int\n"
+            "{\n"
+            "    board.bump();\n"
+            "    return part.len;\n"
+            "}\n"
+            "worker fn spin(part: []int) -> int\n"
+            "{\n"
+            "    let s = board.Scoring { };\n"
+            "    let t: *board.Task = &s;\n"
+            "    return t.run() + part.len;\n"
+            "}\n"
+            "worker fn count(part: []int) -> int\n"
+            "{\n"
+            "    board.hit();\n"
+            "    return part.len;\n"
+            "}\n",
+            &p.ir);
+    memset(&options, 0, sizeof options);
+    CHECK(!whole_program(&p.ir, &options, &errors));
+    CHECK_STR(text_cstr(&errors),
+              "`score` is `mutable` in singleton `Board` and `worker fn "
+              "tally` reaches it\n"
+              "`score` is `mutable` in singleton `Board` and `worker fn "
+              "spin` reaches it\n");
+    text_free(&errors);
+    close_program(&p);
+}
+
 void test_whole(void)
 {
     finds_entries();
     joins_modules();
     devirtualises();
     writes_registry();
+    checks_singletons();
 }

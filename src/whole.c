@@ -541,13 +541,168 @@ static void write_registry(struct ir_module *m, bool reflect)
     free(items);
 }
 
+/* Whether the symbolic value sym is, or is built from, the offset of
+   field of aggregate agg. */
+static bool names_field(const struct ir_module *m, uint32_t sym, uint32_t agg,
+                        uint32_t field, int depth)
+{
+    const struct ir_sym *s;
+
+    if (sym >= m->sym_count || depth > 64) {
+        return false;
+    }
+    s = &m->syms[sym];
+    if (s->kind == IR_SYM_OFFSET_OF) {
+        return s->of.type == IR_AGG && s->of.agg == agg && s->field == field;
+    }
+    if (s->kind == IR_SYM_OP) {
+        return names_field(m, s->a, agg, field, depth + 1) ||
+               (s->b != IR_NO_AGG &&
+                names_field(m, s->b, agg, field, depth + 1));
+    }
+    return false;
+}
+
+/* A `mutable` field of a singleton. */
+struct watched {
+    uint32_t record;
+    uint32_t agg;
+    uint32_t field;
+    bool reported;
+};
+
+/* Report every watched field that function f reaches through the offset
+   of an address, once per worker. */
+static void check_accesses(const struct ir_module *m,
+                           const struct ir_function *f,
+                           const struct ir_function *worker,
+                           struct watched *fields, size_t count,
+                           struct text *errors)
+{
+    size_t b;
+    size_t i;
+    size_t k;
+
+    for (b = 0; b < f->block_count; b++) {
+        for (i = 0; i < f->blocks[b]->count; i++) {
+            const struct ir_inst *inst = &f->blocks[b]->insts[i];
+            if (inst->op != IR_PTRADD || inst->b.kind != IR_SYM) {
+                continue;
+            }
+            for (k = 0; k < count; k++) {
+                const struct ir_class *c = m->classes[fields[k].record];
+                if (fields[k].reported ||
+                    !names_field(m, inst->b.as.index, fields[k].agg,
+                                 fields[k].field, 0)) {
+                    continue;
+                }
+                fields[k].reported = true;
+                text_appendf(errors, "`%s` is `mutable` in singleton `%s` "
+                                     "and `worker fn %s` reaches it\n",
+                             m->aggs[fields[k].agg]
+                                 ->fields[fields[k].field].name,
+                             c->name, worker->name);
+            }
+        }
+    }
+}
+
+/* DESIGN: the singleton check follows every call a worker makes, direct
+   or through a table, into every module of the program. A call through
+   a table reaches each function that the class model lists for its
+   slot. A call through a function pointer or a bound function names no
+   function the pass can know, and the walk stops there. Each field is
+   reported once per worker, because the IR holds no positions. */
+static bool check_singletons(struct whole *w, const struct ir_module *m,
+                             struct text *errors)
+{
+    size_t count = 0;
+    struct watched *fields;
+    bool *seen;
+    uint32_t *work;
+    size_t i;
+    size_t j;
+    bool ok = true;
+
+    for (i = 0; i < m->class_count; i++) {
+        count += m->classes[i]->mutable_count;
+    }
+    if (count == 0) {
+        return true;
+    }
+    fields = allocate(count, sizeof *fields);
+    count = 0;
+    for (i = 0; i < m->class_count; i++) {
+        for (j = 0; j < m->classes[i]->mutable_count; j++) {
+            fields[count].record = (uint32_t)i;
+            fields[count].agg = m->classes[i]->agg;
+            fields[count].field = m->classes[i]->mutable_fields[j];
+            count++;
+        }
+    }
+    seen = allocate(m->function_count, sizeof *seen);
+    work = allocate(m->function_count, sizeof *work);
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *worker = m->functions[i];
+        size_t pending = 0;
+        size_t before = errors->length;
+        if (!worker->worker || worker->is_extern) {
+            continue;
+        }
+        memset(seen, 0, m->function_count * sizeof *seen);
+        for (j = 0; j < count; j++) {
+            fields[j].reported = false;
+        }
+        seen[i] = true;
+        work[pending++] = (uint32_t)i;
+        while (pending > 0) {
+            const struct ir_function *f = m->functions[work[--pending]];
+            size_t b;
+            size_t k;
+            check_accesses(m, f, worker, fields, count, errors);
+            for (b = 0; b < f->block_count; b++) {
+                for (k = 0; k < f->blocks[b]->count; k++) {
+                    const struct ir_inst *inst = &f->blocks[b]->insts[k];
+                    const uint32_t *entries = NULL;
+                    size_t n = 0;
+                    size_t e;
+                    if (inst->op != IR_CALL) {
+                        continue;
+                    }
+                    if (inst->a.kind == IR_FUNC) {
+                        entries = &inst->a.as.index;
+                        n = 1;
+                    } else if (inst->c.kind == IR_GLOBAL) {
+                        n = whole_entries(w, inst->c.as.index, inst->field,
+                                          &entries);
+                    }
+                    for (e = 0; e < n; e++) {
+                        uint32_t g = entries[e];
+                        if (g != IR_NO_INDEX && !seen[g] &&
+                            !m->functions[g]->is_extern) {
+                            seen[g] = true;
+                            work[pending++] = g;
+                        }
+                    }
+                }
+            }
+        }
+        ok = ok && errors->length == before;
+    }
+    free(fields);
+    free(seen);
+    free(work);
+    return ok;
+}
+
 bool whole_program(struct ir_module *program,
                    const struct whole_options *options, struct text *errors)
 {
     struct whole *w = whole_build(program);
     struct reach reach;
+    bool ok;
 
-    (void)errors;
+    ok = check_singletons(w, program, errors);
     memset(&reach, 0, sizeof reach);
     reach_program(&reach, program, options->entry);
     if (reads_registry(program, &reach)) {
@@ -560,5 +715,5 @@ bool whole_program(struct ir_module *program,
         devirtualise(w, program);
     }
     whole_free(w);
-    return true;
+    return ok;
 }

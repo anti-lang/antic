@@ -66,3 +66,15 @@ language or a user of the tools can observe.
 - `Object.deserialize` is the eighth member of the root. It is not `pub`, which keeps it
   out of every table and every header, and its visibility level is `pub`, which lets any
   module call it.
+
+## The singleton check
+
+- Lowering reaches a field at a symbolic offset, `offset_of Agg.field`, and a later field
+  of a class always has one, because field 0 is the base. The check matches that offset,
+  or a symbolic operation built from it, against the `mutable` fields of the class
+  records.
+- The walk starts at each function marked `worker` and follows direct calls and table
+  calls. A table call reaches every entry the class model lists for its slot.
+- The pass runs before the optimizer, whose folding could combine offsets.
+- A report is one line per field and worker, printed by the driver as
+  `<file>: error: <message>`.

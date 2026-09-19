@@ -743,6 +743,28 @@ if(NOT WIN32)
     set_tests_properties(dev_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 endif()
 
+# The singleton check follows a worker into another module, in release
+# mode and in the dev compilation of the module that links.
+add_test(NAME antl_board
+    COMMAND antic -c -I "${MODULES}" -o "${LIBS}/com/example/board.antl"
+            "${MODULES}/com/example/board.anti")
+set_tests_properties(antl_board PROPERTIES FIXTURES_SETUP board_antl)
+foreach(mode release dev)
+    set(flag "")
+    if(mode STREQUAL "dev")
+        set(flag "--dev,")
+    endif()
+    add_test(NAME error_worker_reach_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+            "-DCOMMAND=${flag}-S,-I,${LIBS},-o,${CMAKE_CURRENT_BINARY_DIR}/worker_reach.s,worker_reach.anti"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/worker_reach.err"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+    set_tests_properties(error_worker_reach_${mode} PROPERTIES
+        FIXTURES_REQUIRED board_antl)
+endforeach()
+
 add_test(NAME error_missing_library
     COMMAND antic --dump-ir "${MODULES}/main.anti"
             "${LIBS}/com/example/twice.antl")

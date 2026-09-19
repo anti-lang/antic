@@ -1,0 +1,14 @@
+//! A singleton with a `mutable` field and a function that writes it.
+//! The worker of `tests/errors/worker_reach.anti` calls the function.
+
+/// The score of a game.
+pub singleton class Board
+{
+	pub mutable score: int = 0,
+}
+
+/// Raise the score by one.
+pub fn bump()
+{
+	Board.get().score = Board.get().score + 1;
+}

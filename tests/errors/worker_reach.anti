@@ -1,0 +1,18 @@
+//! A worker calls a function of another module that writes a `mutable`
+//! field of a singleton. The checker of this module cannot see that
+//! function. The pass over the whole program reports it.
+import com.example.board;
+
+worker fn tally(part: []int) -> int
+{
+	board.bump();
+	return part.len;
+}
+
+fn main() -> int
+{
+	let room = alloc([2]int, 1);
+	let all = (*room)[0..2];
+	let sums = parallel all by 2 -> tally;
+	return sums[0];
+}
