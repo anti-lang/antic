@@ -15,10 +15,11 @@
 # the earlier steps produced, so a failure is resumed rather than
 # restarted. The preflight runs every time.
 #
-# Two steps hold a secret and stay manual. RELEASE_KEY names the
-# encrypted private key, whose passphrase openssl asks for once, and gh
-# holds the login that the preflight reads. Without the key the run
-# prints the two signing commands and stops before the tag.
+# Two steps hold a secret and stay manual. The private key that signs
+# SHA256SUMS stands at keys/private/release-key.pem, which .gitignore
+# excludes and which git therefore never sees. gh holds the login that
+# the preflight reads. Without the key the run prints the two signing
+# commands and stops before the tag.
 #
 # docs/work-order-release-script.md holds the eleven steps.
 set -eu
@@ -34,6 +35,13 @@ version=$(sed -n '1p' "$root/tools/version" | tr -d ' \r\n')
 tag=v$version
 hosts='macos-arm64 macos-x86_64 linux-x86_64 linux-arm64 windows-x86_64 windows-arm64'
 cpu_levels=$root/tools/cpu-levels
+# DESIGN: the signing key has one path, which the tooling knows. A
+# release needs no environment variable for it, so no run of ./r depends
+# on a shell that was set up right. .gitignore excludes keys/private, and
+# check_key proves before every signature that git sees neither the file
+# nor its directory.
+key_path=keys/private/release-key.pem
+release_key=$root/$key_path
 site_row() {
     sed -n "s/^$1=//p" "$root/tools/site-base" | tr -d ' \r\n'
 }
@@ -43,7 +51,7 @@ signature_url=$(site_row signature |
 key_url=$(site_row key | sed "s|@SITE@|$site_base|g")
 # The paths under the webroot, which is what the site serves.
 signature_path=${signature_url#"$site_base/"}
-key_path=${key_url#"$site_base/"}
+site_key_path=${key_url#"$site_base/"}
 
 dry_run=no
 skip_vms=no
@@ -123,6 +131,33 @@ digest_of() {
     shasum -a 256 "$1" | cut -d ' ' -f 1
 }
 
+# Prove that git sees nothing of the signing key, and read which form it
+# holds. It sets key_form to plaintext or encrypted.
+#
+# DESIGN: where the key sits does not matter. That git cannot see it
+# does. A key git tracks is a published key. A key no rule ignores is one
+# `git add -A` from being tracked. Both are refused by name before
+# anything is signed. The key of release@anti-lang.com is plaintext,
+# because it stands on the offline Mac mini that cuts every release. That
+# machine is the protection, and a passphrase would add a step to every
+# release rather than a defence.
+check_key() {
+    [ -f "$release_key" ] ||
+        die "step 6: $key_path is missing"
+    if git -C "$root" ls-files --error-unmatch "$key_path" > /dev/null 2>&1; then
+        die "step 6: git tracks $key_path, and a tracked signing key is a published one. Remove it from the index before a release."
+    fi
+    git -C "$root" check-ignore -q "$key_path" ||
+        die "step 6: no rule of .gitignore excludes $key_path, so one git add -A publishes the signing key"
+    case $(head -1 "$release_key") in
+    *'BEGIN ENCRYPTED PRIVATE KEY'*) key_form=encrypted ;;
+    *'BEGIN PRIVATE KEY'* | *'BEGIN EC PRIVATE KEY'* | *'BEGIN RSA PRIVATE KEY'*)
+        key_form=plaintext
+        ;;
+    *) die "step 6: $key_path holds no private key" ;;
+    esac
+}
+
 # The file name of the package of a host, and of its symbols.
 package_name() {
     printf 'anti-%s-%s.tar.xz\n' "$version" "$1"
@@ -174,6 +209,17 @@ preflight() {
     gh auth status > /dev/null 2>&1 ||
         die "gh is not logged in. Run gh auth login."
     say "gh is logged in"
+
+    # DESIGN: a key that step 6 would refuse is refused here, before the
+    # suites, the packages and the two VMs. A key that is not there is no
+    # refusal. The run then stops before the tag, with the two signing
+    # commands, which is what a machine without the key is for.
+    if [ -f "$release_key" ]; then
+        check_key
+        say "$key_path holds a $key_form key, which git neither tracks nor sees"
+    else
+        say "$key_path is missing, so the run would stop before the tag"
+    fi
 
     # DESIGN: step 9 publishes the text of the site, and the webroot it
     # writes to is read here rather than after the tag exists. A release
@@ -652,7 +698,13 @@ digests() {
     hashed=$work/SHA256SUMS.sha256
     if [ "$dry_run" = yes ]; then
         printf 'r: step 6, the signature of the manifest\n'
-        say "would sign $manifest with \$RELEASE_KEY into SHA256SUMS.sig"
+        if [ -f "$release_key" ]; then
+            check_key
+            say "would sign $manifest into SHA256SUMS.sig with the $key_form key $key_path"
+        else
+            say "would sign $manifest into SHA256SUMS.sig with $key_path"
+            say "$key_path is missing here, so a run would stop before the tag"
+        fi
         return 0
     fi
     starts 06 digests "the signature of the manifest" || return 0
@@ -683,18 +735,22 @@ digests() {
         say "the signature beside the manifest is of another manifest, so it goes"
     fi
 
-    key=${RELEASE_KEY:-}
-    if [ -z "$key" ] || [ ! -f "$key" ]; then
+    if [ ! -f "$release_key" ]; then
         printf 'r: the release key is missing, so the run stops before the tag\n'
-        printf 'r: sign the manifest and run ./r again:\n'
+        printf 'r: sign the manifest on the machine that holds it and run ./r again:\n'
         printf '    openssl dgst -sha256 -binary -out %s %s\n' "$hashed" "$manifest"
-        printf '    openssl pkeyutl -sign -inkey <release-key.enc.pem> -in %s -out %s/SHA256SUMS.sig\n' \
-            "$hashed" "$packages"
-        die "RELEASE_KEY names no file"
+        printf '    openssl pkeyutl -sign -inkey %s -in %s -out %s/SHA256SUMS.sig\n' \
+            "$key_path" "$hashed" "$packages"
+        die "$key_path is missing"
     fi
+    check_key
     openssl dgst -sha256 -binary -out "$hashed" "$manifest"
-    printf 'r: openssl asks for the passphrase of %s\n' "$key"
-    openssl pkeyutl -sign -inkey "$key" -in "$hashed" \
+    if [ "$key_form" = encrypted ]; then
+        printf 'r: openssl asks for the passphrase of %s\n' "$key_path"
+    else
+        say "$key_path holds a plaintext key, and the machine it stands on is the protection"
+    fi
+    openssl pkeyutl -sign -inkey "$release_key" -in "$hashed" \
         -out "$packages/SHA256SUMS.sig" || die "step 6: openssl signed nothing"
     # A signature that fails the check never reaches a release.
     openssl pkeyutl -verify -pubin -inkey "$root/keys/release.pem" \
@@ -865,7 +921,7 @@ site() {
         say "would rsync tools/install.sh and tools/install.ps1 to ${ANTI_SITE:-\$ANTI_SITE}/"
         say "would rsync the downloads page to ${ANTI_SITE:-\$ANTI_SITE}/downloads/index.html"
         say "would rsync SHA256SUMS.sig to ${ANTI_SITE:-\$ANTI_SITE}/$signature_path"
-        say "would rsync keys/release.pem to ${ANTI_SITE:-\$ANTI_SITE}/$key_path"
+        say "would rsync keys/release.pem to ${ANTI_SITE:-\$ANTI_SITE}/$site_key_path"
         say "would read $signature_url and $key_url back"
         say "would send nothing else, and no binary"
         say "the page it would publish stands in $page"
@@ -899,7 +955,7 @@ site() {
         die "step 9: SHA256SUMS.sig did not reach $destination"
     say "SHA256SUMS.sig of $version stands in $destination/$signature_path"
     rsync --chmod=u=rw,g=r,o= "$root/keys/release.pem" \
-        "$destination/$key_path" ||
+        "$destination/$site_key_path" ||
         die "step 9: keys/release.pem did not reach $destination"
 
     # The two files a user's installer reads from here, read back over
