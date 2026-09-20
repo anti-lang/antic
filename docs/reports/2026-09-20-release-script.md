@@ -203,6 +203,18 @@ url = "https://github.com/anti-lang/antic/releases/download/v0.1.0/anti-0.1.0-ma
 
 ```
 
+## Follow-ups
+
+Both follow from the one manifest of a release, and both are code.
+
+- `./r` writes the packages and the symbols archives into one directory,
+  `build/dist/packages`, and step 6 signs the packer's `SHA256SUMS` in place
+  there. `tools/publish.cmake` is then satisfied by twelve files under one
+  manifest.
+- The installers verify `SHA256SUMS.sig` with the key they already carry
+  before they trust a line of `SHA256SUMS`, on every host, the way they
+  verify the LLVM tools. A missing or wrong signature stops the install.
+
 ## Questions
 
 1. Where is the site's repository? Step 9 writes `downloads/index.toml` into the

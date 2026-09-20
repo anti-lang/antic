@@ -163,6 +163,13 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 15. `f"..."` interpolation, which is compiler work over `anti.text`.
 16. The native libraries in `libs/`, which nothing builds yet.
 17. Inline atomic instruction sequences, which are runtime calls today.
+18. The one manifest of a release. `./r` writes the packages and the symbols
+    archives into `build/dist/packages`, and step 6 signs the packer's
+    `SHA256SUMS` in place there, so `tools/publish.cmake` reads twelve files
+    under one manifest. The installers then verify `SHA256SUMS.sig` with the
+    key they carry before they trust a line of `SHA256SUMS`, on every host,
+    as they verify the LLVM tools. The follow-ups of
+    `docs/reports/2026-09-20-release-script.md` hold both.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
