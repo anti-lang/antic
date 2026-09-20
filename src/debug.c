@@ -29,10 +29,10 @@ enum {
     DW_FORM_data4 = 0x06,
     DW_FORM_string = 0x08,
     DW_FORM_sec_offset = 0x17,
-    /* [provisional] No DWARF language code names Anti. The code of an
-       assembler is the one llvm-mc writes for a file of `.loc`
-       directives, and the debuggers are tested against it. A code of its
-       own replaces this one the day Anti has one. */
+    /* No DWARF language code names Anti. The code of an assembler is the
+       one llvm-mc writes for a file of `.loc` directives, and the
+       debuggers are tested against it. A code of its own replaces this
+       one the day Anti has one. */
     DW_LANG_assembler = 0x8001,
     /* The version of the unit. llvm-mc writes a line table of version 4
        for an assembly file, and the two agree. */

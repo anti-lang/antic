@@ -141,6 +141,7 @@ tests
 ## Debug information
 
 - `antic -g` writes a `.loc` directive before the first instruction of every statement and a `.file` directive per source file. llvm-mc turns them into DWARF on ELF and Mach-O and CodeView on COFF. The link step then keeps debug sections instead of stripping them.
+- antic also writes the compile unit itself, because a line table alone names no source file and a debugger resolves nothing without one. `docs/decisions.md` holds its shape.
 - With `-g` a debugger shows Anti source lines, sets breakpoints by file and line, and prints a backtrace with function names. Variables are not described in the first version, so `print x` shows nothing. That is the next step, and the closing guide names it.
 - `anti build` passes `-g` in dev mode. Release mode never does.
 - `.loc` costs nothing in the emitted code and is never a reason for a program to behave differently.
