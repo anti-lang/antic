@@ -122,8 +122,8 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # DESIGN: one list of runtime sources. The host library and the cross
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
-set(ANTIC_RUNTIME_SOURCES assert atomic call cast errno init io license object
-    reflect registry signal start text threads time toml utf)
+set(ANTIC_RUNTIME_SOURCES assert atomic call cast check errno init io license
+    object reflect registry signal start text threads time toml utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "rt/${source}.c")

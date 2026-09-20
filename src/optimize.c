@@ -1535,9 +1535,9 @@ void ir_optimize_module(struct ir_module *program, const char *module)
     remove_unused_functions(program, module, true);
 }
 
-/* Replace every branch into an assertion's failure block with a jump to
+/* Replace every branch into a failure block of that kind with a jump to
    the block that follows it. */
-void ir_drop_asserts(struct ir_module *program)
+void ir_drop_failures(struct ir_module *program, enum ir_fail kind)
 {
     size_t i;
     size_t b;
@@ -1551,12 +1551,20 @@ void ir_drop_asserts(struct ir_module *program)
                 continue;
             }
             last = &block->insts[block->count - 1];
-            if (last->op != IR_BRANCH ||
-                !f->blocks[last->c.as.index]->assert_fail) {
+            if (last->op != IR_BRANCH) {
+                continue;
+            }
+            /* The failure block is the arm the condition decides. A
+               check that tests for success has it as the false arm, and
+               one that tests for the failure has it as the true arm. */
+            if (f->blocks[last->c.as.index]->fail == kind) {
+                last->a = last->b;
+            } else if (f->blocks[last->b.as.index]->fail == kind) {
+                last->a = last->c;
+            } else {
                 continue;
             }
             last->op = IR_JUMP;
-            last->a = last->b;
             last->b = none();
             last->c = none();
         }

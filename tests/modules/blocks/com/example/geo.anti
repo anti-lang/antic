@@ -14,8 +14,8 @@ pub struct Point
 	/**
         Across.
     */
-	x: int,
-	y: int,
+	x: f64,
+	y: f64,
 }
 
 /**
@@ -24,7 +24,7 @@ Dot product.
 /*#
   Not a note in the file.
 */
-pub fn dot(a: Point, b: Point) -> int
+pub fn dot(a: Point, b: Point) -> f64
 {
 	return a.x * b.x + a.y * b.y;
 }
@@ -32,7 +32,7 @@ pub fn dot(a: Point, b: Point) -> int
 /**
   Private, not in the file.
 */
-fn hidden() -> int
+fn hidden() -> f64
 {
-	return 1;
+	return 1.0;
 }

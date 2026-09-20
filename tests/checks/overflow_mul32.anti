@@ -1,0 +1,18 @@
+//! A product of two 32-bit values that leaves the range of i32. ARM64
+//! multiplies into 64 bits for this one.
+
+fn opaque(n: i32) -> i32
+{
+	return n;
+}
+
+fn sink(n: i32)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(100000);
+	sink(x * x);
+	return 7;
+}

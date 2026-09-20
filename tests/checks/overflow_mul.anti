@@ -1,0 +1,18 @@
+//! A product of two 64-bit values that leaves the range of int. ARM64
+//! reads the high half of the product for this one.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(4000000000);
+	sink(x * x);
+	return 7;
+}

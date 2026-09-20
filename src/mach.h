@@ -60,7 +60,8 @@ enum mach_cond {
     COND_EQ, COND_NE, COND_LT, COND_LE, COND_GT, COND_GE,
     COND_LO, COND_LS, COND_HI, COND_HS,
     COND_MI, COND_PL,       /* ARM64: the sign flag, set for less */
-    COND_P, COND_NP         /* x86_64: the parity flag, set for NaN */
+    COND_P, COND_NP,        /* x86_64: the parity flag, set for NaN */
+    COND_VS, COND_VC        /* the overflow flag of a signed + or - */
 };
 
 enum { MACH_MAX_OPERANDS = 4 };

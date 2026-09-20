@@ -184,6 +184,12 @@ static int run(int argc, char **argv, struct options *o)
         } else if (strcmp(arg, "--no-asserts") == 0) {
             options.asserts = ASSERTS_OFF;
             continue;
+        } else if (strcmp(arg, "--checks") == 0) {
+            options.checks = CHECKS_ON;
+            continue;
+        } else if (strcmp(arg, "--no-checks") == 0) {
+            options.checks = CHECKS_OFF;
+            continue;
         } else if (strcmp(arg, "--strip-docs") == 0) {
             options.strip_docs = true;
             continue;

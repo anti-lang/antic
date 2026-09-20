@@ -597,7 +597,10 @@ static int back_end(const struct options *o, struct module *tree,
        library file follows this build and not the one that wrote it. */
     if (o->asserts == ASSERTS_OFF ||
         (o->asserts == ASSERTS_MODE && !o->dev)) {
-        ir_drop_asserts(program);
+        ir_drop_failures(program, IR_FAIL_ASSERT);
+    }
+    if (o->checks == CHECKS_OFF || (o->checks == CHECKS_MODE && !o->dev)) {
+        ir_drop_failures(program, IR_FAIL_CHECK);
     }
     if (o->dev) {
         ir_optimize_module(program, module);

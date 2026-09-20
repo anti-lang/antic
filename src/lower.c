@@ -741,6 +741,145 @@ static struct ir_operand literal_address(struct lowerer *l,
     return temp(l, ir_addr(l->f, l->b, ir_global_op(literal_global(l, text))));
 }
 
+/* The kinds of enum anti_check in rt/std.h, in its order. The unit test
+   records_check_kinds pins the two together. */
+enum check_kind {
+    CHECK_BOUNDS, CHECK_OVERFLOW, CHECK_VALUE, CHECK_VALUE_U, CHECK_LEFT,
+    CHECK_LEFT_U, CHECK_SHIFT
+};
+
+static struct ir_function *rt_function(struct lowerer *l, const char *name,
+                                       const enum ir_type *params,
+                                       size_t count);
+static struct ir_operand slice_length(struct lowerer *l, struct ir_operand p,
+                                      const struct type *slice);
+
+/* The text of a failed check: the file, the line and the operation. The
+   values the kind names follow it at run time. The back end formats
+   nothing, and a build without the checks drops the whole string. */
+static const struct ir_global *check_text(struct lowerer *l, int line,
+                                          const char *operation)
+{
+    struct token_text text;
+    struct text message = {0};
+    const struct ir_global *g;
+
+    text_appendf(&message, "%s:%d: %s", l->file, line, operation);
+    text.bytes = text_cstr(&message);
+    text.length = message.length;
+    g = literal_global(l, &text);
+    text_free(&message);
+    return g;
+}
+
+/* DESIGN: a dev-mode check is a branch to a block that calls the runtime
+   and falls through to the rest, as an assertion is. The failure block
+   carries its own kind, so the build that compiles the program drops the
+   checks and the assertions under separate options. cond decides the
+   failure when bad is set, and decides the rest otherwise. */
+static void check_branch(struct lowerer *l, struct ir_operand cond, bool bad,
+                         const struct ir_global *text, enum check_kind kind,
+                         struct ir_operand a, struct ir_operand b)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_I32, IR_I64,
+                                          IR_I64};
+    struct ir_block *fail = new_block(l);
+    struct ir_block *rest = new_block(l);
+    struct ir_operand args[5];
+
+    fail->fail = IR_FAIL_CHECK;
+    ir_branch(l->f, l->b, cond, bad ? fail : rest, bad ? rest : fail);
+    l->b = fail;
+    args[0] = temp(l, ir_addr(l->f, l->b, ir_global_op(text)));
+    args[1] = ir_int_op(IR_I64, text->size - 1);
+    args[2] = ir_int_op(IR_I32, (uint64_t)kind);
+    args[3] = a;
+    args[4] = b;
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(rt_function(l, "anti_rt_check_failed", params, 5)),
+            args, 5);
+    ir_jump(l->f, l->b, rest);
+    l->b = rest;
+}
+
+/* The value v of an integer type as the i64 the failure routine takes. */
+static struct ir_operand widen_operand(struct lowerer *l, struct ir_operand v,
+                                       const struct type *t)
+{
+    if (ir_type_of(t) == IR_I64) {
+        return v;
+    }
+    return temp(l, ir_unary(l->f, l->b,
+                            type_is_signed(t) ? IR_SEXT : IR_ZEXT, IR_I64, v));
+}
+
+static enum ir_op overflow_op(enum token_kind op)
+{
+    return op == TOKEN_PLUS    ? IR_ADD_OV
+           : op == TOKEN_MINUS ? IR_SUB_OV
+                               : IR_MUL_OV;
+}
+
+/* The checks of a binary operation, emitted before it so that a divisor
+   of zero never reaches the instruction. They are overflow on a signed
+   + - or *, a zero divisor of / and %, and a shift count outside the
+   width of the type. Unsigned arithmetic wraps and is not
+   checked. The width is the size of the type in bits, which a
+   target-sized type leaves to the back end. */
+static void binary_checks(struct lowerer *l, enum token_kind op,
+                          const struct type *t, struct ir_operand left,
+                          struct ir_operand right, int line)
+{
+    char operation[64];
+    struct ir_operand ok;
+    struct ir_operand count;
+    struct ir_operand width;
+
+    if (!type_is_integer(t)) {
+        return;
+    }
+    switch (op) {
+    case TOKEN_PLUS:
+    case TOKEN_MINUS:
+    case TOKEN_STAR:
+        if (!type_is_signed(t)) {
+            return;
+        }
+        ok = temp(l, ir_binary(l->f, l->b, overflow_op(op), IR_I8, left,
+                               right));
+        snprintf(operation, sizeof operation, "overflow in %s",
+                 op == TOKEN_PLUS ? "+" : op == TOKEN_MINUS ? "-" : "*");
+        check_branch(l, ok, true, check_text(l, line, operation),
+                     CHECK_OVERFLOW, widen_operand(l, left, t),
+                     widen_operand(l, right, t));
+        return;
+    case TOKEN_SLASH:
+    case TOKEN_PERCENT:
+        ok = temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, right,
+                               ir_int_op(ir_type_of(t), 0)));
+        snprintf(operation, sizeof operation, "division by zero in %s",
+                 op == TOKEN_SLASH ? "/" : "%");
+        check_branch(l, ok, false, check_text(l, line, operation),
+                     type_is_signed(t) ? CHECK_LEFT : CHECK_LEFT_U,
+                     widen_operand(l, left, t), ir_int_op(IR_I64, 0));
+        return;
+    case TOKEN_SHL:
+    case TOKEN_SHR:
+        count = widen_operand(l, right, t);
+        width = temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                  size_operand(l, t), ir_int_op(IR_I64, 8)));
+        ok = temp(l, ir_binary(l->f, l->b, IR_ULT, IR_I8, count, width));
+        snprintf(operation, sizeof operation,
+                 "shift count out of range for %s",
+                 op == TOKEN_SHL ? "<<" : ">>");
+        check_branch(l, ok, false, check_text(l, line, operation),
+                     CHECK_SHIFT, count, width);
+        return;
+    default:
+        return;
+    }
+}
+
 /* v.f is f's offset after the address of v. A pointer base p.f uses the
    pointer. */
 static struct ir_operand field_address(struct lowerer *l,
@@ -759,33 +898,66 @@ static struct ir_operand field_address(struct lowerer *l,
 }
 
 /* The address of element 0: an array starts at its own address, a str or
-   a slice at its pointer, and a pointer is the address. */
-static struct ir_operand first_element(struct lowerer *l, const struct expr *e)
+   a slice at its pointer, and a pointer is the address. The count of
+   elements comes with it, which an array takes from its type and a str
+   or a slice reads beside the pointer. A raw pointer has none, and
+   length is left empty. */
+static struct ir_operand first_element(struct lowerer *l, const struct expr *e,
+                                       struct ir_operand *length)
 {
     struct ir_operand address;
 
+    *length = none();
     switch (e->type->kind) {
     case TYPE_ARRAY:
-        return lower_address(l, e);
+        address = lower_address(l, e);
+        if (!l->failed) {
+            *length = e->type->length_of != NULL
+                          ? ir_sym_operand(l->m, sym_of(l, e->type->length_of))
+                          : ir_int_op(IR_I64, e->type->length);
+        }
+        return address;
     case TYPE_STR:
     case TYPE_SLICE:
         address = lower_address(l, e);
-        return l->failed ? none()
-                         : temp(l, ir_load(l->f, l->b, IR_PTR, address));
+        if (l->failed) {
+            return none();
+        }
+        *length = slice_length(l, address, e->type);
+        return temp(l, ir_load(l->f, l->b, IR_PTR, address));
     default:
         return lower_expr(l, e);
     }
 }
 
+/* DESIGN: one unsigned comparison covers both ends. A negative index is
+   a large unsigned value, so it fails the same test as an index past the
+   length. The check stays a compare and a branch. */
+static void bounds_check(struct lowerer *l, const struct expr *e,
+                         struct ir_operand index, struct ir_operand length)
+{
+    struct ir_operand ok =
+        temp(l, ir_binary(l->f, l->b, IR_ULT, IR_I8, index, length));
+
+    check_branch(l, ok, false,
+                 check_text(l, e->as.index.index->pos.line,
+                            "index out of bounds"),
+                 CHECK_BOUNDS, index, length);
+}
+
 static struct ir_operand element_address(struct lowerer *l,
                                          const struct expr *e)
 {
-    struct ir_operand base = first_element(l, e->as.index.base);
+    struct ir_operand length;
+    struct ir_operand base = first_element(l, e->as.index.base, &length);
     struct ir_operand index = lower_expr(l, e->as.index.index);
     uint32_t offset;
 
     if (l->failed) {
         return none();
+    }
+    if (length.kind != IR_NONE) {
+        bounds_check(l, e, index, length);
     }
     offset = ir_binary(l->f, l->b, IR_MUL, IR_I64, index,
                        size_operand(l, e->type));
@@ -2446,7 +2618,8 @@ static void fill_array(struct lowerer *l, const struct expr *e,
 static void build_slice(struct lowerer *l, const struct expr *e,
                         struct ir_operand dest)
 {
-    struct ir_operand base = first_element(l, e->as.slice.base);
+    struct ir_operand whole;
+    struct ir_operand base = first_element(l, e->as.slice.base, &whole);
     struct ir_operand low = lower_expr(l, e->as.slice.low);
     struct ir_operand high = lower_expr(l, e->as.slice.high);
     struct ir_operand length;
@@ -2860,6 +3033,7 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
         left = object_of(l, left);
         right = object_of(l, right);
     }
+    binary_checks(l, op, operands, left, right, e->pos.line);
     return temp(l, ir_binary(l->f, l->b, binary_op(op, operands),
                              is_comparison(op) ? IR_I8 : ir_type_of(operands),
                              left, right));
@@ -3063,6 +3237,48 @@ static struct ir_operand narrow_from_i64(struct lowerer *l,
     return temp(l, ir_unary(l->f, l->b, IR_TRUNC, to, v));
 }
 
+/* DESIGN: a narrowing `as` is checked by the round trip. The value goes
+   to the target type and back to the source with the target's
+   signedness. A value the target cannot hold comes back changed.
+   The round trip is blind to a change of sign alone, because a target of
+   the same width keeps every bit. That case is a comparison against
+   zero. A target-sized type leaves both to the back end, because a
+   conversion that is a copy on one target passes the round trip. */
+static void narrow_check(struct lowerer *l, const struct expr *e,
+                         const struct type *from, const struct type *to,
+                         struct ir_operand v)
+{
+    enum ir_type source = ir_type_of(from);
+    enum ir_type target = ir_type_of(to);
+    enum check_kind kind =
+        type_is_signed(from) ? CHECK_VALUE : CHECK_VALUE_U;
+    bool sign_changes = type_is_signed(from) != type_is_signed(to);
+    struct text name = {0};
+    char operation[80];
+    struct ir_operand ok;
+    struct ir_operand round;
+
+    type_name(&name, to);
+    snprintf(operation, sizeof operation, "value out of range for %s",
+             text_cstr(&name));
+    text_free(&name);
+    if (sign_changes && (type_is_signed(from) || narrows(source, target))) {
+        ok = temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, v,
+                               ir_int_op(source, 0)));
+        check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind,
+                     widen_operand(l, v, from), ir_int_op(IR_I64, 0));
+    }
+    if (source != target && narrows(source, target)) {
+        round = temp(l, ir_unary(l->f, l->b, IR_TRUNC, target, v));
+        round = temp(l, ir_unary(l->f, l->b,
+                                 type_is_signed(to) ? IR_SEXT : IR_ZEXT,
+                                 source, round));
+        ok = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, round, v));
+        check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind,
+                     widen_operand(l, v, from), ir_int_op(IR_I64, 0));
+    }
+}
+
 /* The conversions of chapter 2. Two types with one IR type, such as u32
    and char, convert without an instruction. */
 static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
@@ -3093,6 +3309,9 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
         }
         return checked_cast(l, v, from, to->element, e->as.cast.checked,
                             e->as.cast.from_sub);
+    }
+    if (type_is_integer(from) && type_is_integer(to)) {
+        narrow_check(l, e, from, to, v);
     }
     if (type_is_float(from) && type_is_float(to)) {
         if (source == target) {
@@ -4274,9 +4493,9 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         return;
     }
     if (s->as.assign.op != TOKEN_ASSIGN) {
-        v = temp(l, ir_binary(l->f, l->b,
-                              binary_op(compound_op(s->as.assign.op),
-                                        target->type),
+        enum token_kind op = compound_op(s->as.assign.op);
+        binary_checks(l, op, target->type, old, v, target->pos.line);
+        v = temp(l, ir_binary(l->f, l->b, binary_op(op, target->type),
                               p.type, old, v));
     }
     if (p.in_temp) {
@@ -4748,7 +4967,7 @@ static void assert_branch(struct lowerer *l, struct ir_operand cond,
     struct ir_block *rest = new_block(l);
     struct ir_operand args[2];
 
-    fail->assert_fail = true;
+    fail->fail = IR_FAIL_ASSERT;
     ir_branch(l->f, l->b, cond, rest, fail);
     l->b = fail;
     args[0] = temp(l, ir_addr(l->f, l->b, ir_global_op(text)));

@@ -25,7 +25,7 @@ b5:
     addq $1, %rcx
     jmp b4
 b6:
-    leaq sizes.11(%rip), %rdi
+    leaq sizes.14(%rip), %rdi
     movq $16, %rsi
     movq $24, %rcx
     movl $0, %eax

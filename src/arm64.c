@@ -21,6 +21,7 @@ enum {
 
 enum a64_op {
     A64_MOV, A64_MOVZ, A64_MOVK, A64_ADD, A64_SUB, A64_MUL, A64_AND,
+    A64_ADDS, A64_SUBS, A64_SMULL, A64_SMULH,
     A64_ORR, A64_EOR, A64_NEG, A64_MVN, A64_CMP, A64_CSET, A64_B, A64_BCOND,
     A64_CBZ, A64_CBNZ, A64_BL, A64_BLR, A64_LDRGOT, A64_RET, A64_LDR, A64_STR, A64_STP, A64_LDP,
     A64_CMN, A64_SXTB, A64_SXTH, A64_SXTW, A64_UXTB, A64_UXTH, A64_SDIV,
@@ -42,6 +43,12 @@ static const struct mach_opcode opcodes[] = {
     [A64_ADD] = {"add", {DEF, USE, USE}, 0},
     [A64_SUB] = {"sub", {DEF, USE, USE}, 0},
     [A64_MUL] = {"mul", {DEF, USE, USE}, 0},
+    /* The flag-setting forms of add and sub, and the two multiplies that
+       give the part of a product a single register cannot hold. */
+    [A64_ADDS] = {"adds", {DEF, USE, USE}, 0},
+    [A64_SUBS] = {"subs", {DEF, USE, USE}, 0},
+    [A64_SMULL] = {"smull", {DEF, USE, USE}, 0},
+    [A64_SMULH] = {"smulh", {DEF, USE, USE}, 0},
     [A64_AND] = {"and", {DEF, USE, USE}, 0},
     [A64_ORR] = {"orr", {DEF, USE, USE}, 0},
     [A64_EOR] = {"eor", {DEF, USE, USE}, 0},
@@ -906,6 +913,69 @@ static void emit_set(struct selector *s, const struct ir_inst *inst)
     emit2(s, A64_CSET, select_result(s, inst), cond(select_cond(inst->op)));
 }
 
+/* DESIGN: overflow of + and - is the V flag of adds and subs, whose
+   result no one reads. ARM64 has no arithmetic narrower than 32 bits. A
+   narrower type therefore operates in 32, and the result is compared
+   with its own sign extension. A multiply sets no flag at all, so it
+   takes the same route one width up. smull holds the whole product of
+   two 32-bit values, and at 64 bits smulh gives the half that the
+   product's own sign would be. Returns the condition that holds after an
+   overflow. */
+static enum mach_cond overflow_flags(struct selector *s,
+                                     const struct ir_inst *inst)
+{
+    uint8_t n = bits(inst->a.type);
+    struct mach_operand a = select_reg(s, &inst->a);
+    struct mach_operand b = select_reg(s, &inst->b);
+    struct mach_operand low;
+    struct mach_operand high;
+    struct mach_operand back;
+
+    if (n < 32) {
+        struct mach_operand wa = select_new_vreg(s, 32);
+        struct mach_operand wb = select_new_vreg(s, 32);
+        low = select_new_vreg(s, 32);
+        back = select_new_vreg(s, 32);
+        emit2(s, extension(n, true), wa, a);
+        emit2(s, extension(n, true), wb, b);
+        emit3(s, inst->op == IR_ADD_OV   ? A64_ADD
+                 : inst->op == IR_SUB_OV ? A64_SUB
+                                         : A64_MUL,
+              low, wa, wb);
+        emit2(s, extension(n, true), back, low);
+        emit2(s, A64_CMP, low, back);
+        return COND_NE;
+    }
+    if (inst->op != IR_MUL_OV) {
+        emit3(s, inst->op == IR_ADD_OV ? A64_ADDS : A64_SUBS,
+              select_new_vreg(s, n), a, b);
+        return COND_VS;
+    }
+    if (n == 32) {
+        low = select_new_vreg(s, 64);
+        back = select_new_vreg(s, 64);
+        emit3(s, A64_SMULL, low, a, b);
+        emit2(s, A64_SXTW, back, widened(low, 32));
+        emit2(s, A64_CMP, low, back);
+        return COND_NE;
+    }
+    low = select_new_vreg(s, 64);
+    high = select_new_vreg(s, 64);
+    back = select_new_vreg(s, 64);
+    emit3(s, A64_MUL, low, a, b);
+    emit3(s, A64_SMULH, high, a, b);
+    emit3(s, A64_ASR, back, low, mach_imm(63));
+    emit2(s, A64_CMP, high, back);
+    return COND_NE;
+}
+
+static void emit_overflow(struct selector *s, const struct ir_inst *inst)
+{
+    enum mach_cond c = overflow_flags(s, inst);
+
+    emit2(s, A64_CSET, select_result(s, inst), cond(c));
+}
+
 static void jump(struct selector *s, const struct ir_operand *target)
 {
     struct mach_operand b = block(target);
@@ -924,9 +994,14 @@ static void emit_jump(struct selector *s, const struct ir_inst *inst)
    block, and control falls through otherwise. */
 static void emit_fused_branch(struct selector *s, const struct ir_inst *inst)
 {
-    enum mach_cond c = select_cond(s->fused->op);
+    enum mach_cond c;
 
-    compare(s, s->fused);
+    if (select_is_overflow(s->fused->op)) {
+        c = overflow_flags(s, s->fused);
+    } else {
+        c = select_cond(s->fused->op);
+        compare(s, s->fused);
+    }
     if (select_is_next(s, &inst->b)) {
         emit2(s, A64_BCOND, cond(select_negate(c)), block(&inst->c));
         return;
@@ -1439,6 +1514,9 @@ static const struct pattern patterns[] = {
     {IR_SEXT, match_convert, emit_convert},
     {IR_ZEXT, match_convert, emit_convert},
     {IR_ADDR, NULL, emit_addr},
+    {IR_ADD_OV, NULL, emit_overflow},
+    {IR_SUB_OV, NULL, emit_overflow},
+    {IR_MUL_OV, NULL, emit_overflow},
 };
 
 /* Printing */
@@ -1521,6 +1599,7 @@ static const char *const cond_names[] = {
     [COND_EQ] = "eq", [COND_NE] = "ne", [COND_LT] = "lt", [COND_LE] = "le",
     [COND_GT] = "gt", [COND_GE] = "ge", [COND_LO] = "lo", [COND_LS] = "ls",
     [COND_HI] = "hi", [COND_HS] = "hs", [COND_MI] = "mi", [COND_PL] = "pl",
+    [COND_VS] = "vs", [COND_VC] = "vc",
 };
 
 static void print(struct text *out, const struct ir_module *m,

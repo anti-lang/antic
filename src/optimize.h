@@ -16,10 +16,11 @@ void ir_optimize_module(struct ir_module *program, const char *module);
    functions. The back end uses it after it folds symbolic values. */
 void ir_optimize_function(struct ir_function *f);
 
-/* DESIGN: an assertion reaches this pass as a branch to a block that
-   lowering marked. A library file carries it, so the build that compiles
-   the program decides. Cutting the branch makes the block unreachable,
-   and the passes that follow remove the call and the text with it. */
-void ir_drop_asserts(struct ir_module *program);
+/* DESIGN: an assertion and a dev-mode check both reach this pass as a
+   branch to a block that lowering marked. A library file carries them,
+   so the build that compiles the program decides. Cutting the branch
+   makes the block unreachable, and the passes that follow remove the
+   call and the text with it. */
+void ir_drop_failures(struct ir_module *program, enum ir_fail kind);
 
 #endif

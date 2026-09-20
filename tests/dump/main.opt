@@ -1,7 +1,24 @@
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+global main.0 size 32 align 1 bytes 64 75 6d 70 2f 6d 61 69 6e 2e 61 6e 74 69 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global main.1 size 32 align 1 bytes 64 75 6d 70 2f 6d 61 69 6e 2e 61 6e 74 69 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
 fn main.scale(%0: i64) -> i64 {
 b0:
-    %1 = mul i64 %0, 6
-    ret i64 %1
+    %1 = addov i8 2, 4
+    branch %1, b1, b2
+b1:
+    %2 = addr @main.0
+    call void @anti_rt_check_failed(%2, 31, 1, 2, 4)
+    jump b2
+b2:
+    %3 = mulov i8 %0, 6
+    branch %3, b3, b4
+b3:
+    %4 = addr @main.1
+    call void @anti_rt_check_failed(%4, 31, 1, %0, 6)
+    jump b4
+b4:
+    %5 = mul i64 %0, 6
+    ret i64 %5
 }
 fn main.main() -> i64 {
 b0:

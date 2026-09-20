@@ -24,6 +24,7 @@ type probe.Breaks = struct { a: i8, _: i32 : 0, b: i8 : 3 zeroext, _: i64 : 0, c
 type [5]anti.rt.Field = array 5 of anti.rt.Field
 type probe.BreaksBox = struct { c: i8, t: probe.Breaks }
 extern fn printf(ptr, ...) -> i32
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 extern fn malloc(i64) -> ptr
 extern fn free(ptr)
 global probe.Wide.descriptor anti.rt.Descriptor { @probe.1, i64 4, ptr 0, size_of probe.Wide, i64 0, ptr 0, i64 4, @probe.Wide.fields, ptr 0, i64 0, i64 0, ptr 0 }
@@ -84,42 +85,47 @@ global probe.Breaks.fields [5]anti.rt.Field { anti.rt.Field { @probe.2, i64 1, o
 global probe.BreaksBox.descriptor anti.rt.Descriptor { @probe.56, i64 9, ptr 0, size_of probe.BreaksBox, i64 0, ptr 0, i64 2, @probe.BreaksBox.fields, ptr 0, i64 0, i64 0, ptr 0 }
 global probe.56 size 10 align 1 bytes 42 72 65 61 6b 73 42 6f 78 00
 global probe.BreaksBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.BreaksBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.9, i64 1, offset_of probe.BreaksBox.t, i64 21, i64 0, @probe.Breaks.descriptor } }
-global probe.58 size 3 align 1 bytes 25 73 00
-global probe.59 size 6 align 1 bytes 20 25 30 32 78 00
-global probe.60 size 2 align 1 bytes 0a 00
-global probe.61 size 21 align 1 bytes 25 73 20 73 69 7a 65 20 25 64 20 61 6c 69 67 6e 20 25 64 0a 00
-global probe.62 size 7 align 1 bytes 57 69 64 65 2e 61 00
-global probe.63 size 7 align 1 bytes 57 69 64 65 2e 62 00
-global probe.64 size 7 align 1 bytes 57 69 64 65 2e 63 00
-global probe.65 size 7 align 1 bytes 57 69 64 65 2e 64 00
-global probe.66 size 6 align 1 bytes 4d 69 78 65 64 00
-global probe.67 size 8 align 1 bytes 4d 69 78 65 64 2e 61 00
-global probe.68 size 8 align 1 bytes 4d 69 78 65 64 2e 62 00
-global probe.69 size 8 align 1 bytes 4d 69 78 65 64 2e 63 00
-global probe.70 size 8 align 1 bytes 4d 69 78 65 64 2e 64 00
-global probe.71 size 14 align 1 bytes 46 6c 61 67 73 2e 76 69 73 69 62 6c 65 00
-global probe.72 size 12 align 1 bytes 46 6c 61 67 73 2e 6c 61 79 65 72 00
-global probe.73 size 12 align 1 bytes 46 6c 61 67 73 2e 6c 65 76 65 6c 00
-global probe.74 size 10 align 1 bytes 46 6c 61 67 73 2e 70 61 64 00
-global probe.75 size 9 align 1 bytes 53 70 72 65 61 64 2e 61 00
-global probe.76 size 9 align 1 bytes 53 70 72 65 61 64 2e 62 00
-global probe.77 size 9 align 1 bytes 53 70 72 65 61 64 2e 63 00
-global probe.78 size 9 align 1 bytes 53 70 72 65 61 64 2e 64 00
-global probe.79 size 8 align 1 bytes 54 69 67 68 74 2e 61 00
-global probe.80 size 8 align 1 bytes 54 69 67 68 74 2e 62 00
-global probe.81 size 8 align 1 bytes 54 69 67 68 74 2e 63 00
-global probe.82 size 12 align 1 bytes 54 69 67 68 74 42 69 74 73 2e 61 00
-global probe.83 size 12 align 1 bytes 54 69 67 68 74 42 69 74 73 2e 62 00
-global probe.84 size 10 align 1 bytes 41 6c 69 67 6e 65 64 2e 61 00
-global probe.85 size 10 align 1 bytes 41 6c 69 67 6e 65 64 2e 62 00
-global probe.86 size 9 align 1 bytes 42 69 74 55 6e 69 6f 6e 00
-global probe.87 size 11 align 1 bytes 42 69 74 55 6e 69 6f 6e 2e 61 00
-global probe.88 size 11 align 1 bytes 42 69 74 55 6e 69 6f 6e 2e 62 00
-global probe.89 size 9 align 1 bytes 42 72 65 61 6b 73 2e 61 00
-global probe.90 size 9 align 1 bytes 42 72 65 61 6b 73 2e 62 00
-global probe.91 size 9 align 1 bytes 42 72 65 61 6b 73 2e 63 00
-global probe.92 probe.Breaks { i8 1, -, i8 2, -, i8 3 }
-global probe.93 size 29 align 1 bytes 42 72 65 61 6b 73 2e 63 6f 6e 73 74 20 61 20 25 64 20 62 20 25 64 20 63 20 25 64 0a 00
+global probe.58 size 34 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 33 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global probe.59 size 3 align 1 bytes 25 73 00
+global probe.60 size 6 align 1 bytes 20 25 30 32 78 00
+global probe.61 size 34 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 34 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global probe.62 size 2 align 1 bytes 0a 00
+global probe.63 size 21 align 1 bytes 25 73 20 73 69 7a 65 20 25 64 20 61 6c 69 67 6e 20 25 64 0a 00
+global probe.64 size 47 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 33 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
+global probe.65 size 34 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
+global probe.66 size 47 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
+global probe.67 size 7 align 1 bytes 57 69 64 65 2e 61 00
+global probe.68 size 7 align 1 bytes 57 69 64 65 2e 62 00
+global probe.69 size 7 align 1 bytes 57 69 64 65 2e 63 00
+global probe.70 size 7 align 1 bytes 57 69 64 65 2e 64 00
+global probe.71 size 6 align 1 bytes 4d 69 78 65 64 00
+global probe.72 size 8 align 1 bytes 4d 69 78 65 64 2e 61 00
+global probe.73 size 8 align 1 bytes 4d 69 78 65 64 2e 62 00
+global probe.74 size 8 align 1 bytes 4d 69 78 65 64 2e 63 00
+global probe.75 size 8 align 1 bytes 4d 69 78 65 64 2e 64 00
+global probe.76 size 14 align 1 bytes 46 6c 61 67 73 2e 76 69 73 69 62 6c 65 00
+global probe.77 size 12 align 1 bytes 46 6c 61 67 73 2e 6c 61 79 65 72 00
+global probe.78 size 12 align 1 bytes 46 6c 61 67 73 2e 6c 65 76 65 6c 00
+global probe.79 size 10 align 1 bytes 46 6c 61 67 73 2e 70 61 64 00
+global probe.80 size 9 align 1 bytes 53 70 72 65 61 64 2e 61 00
+global probe.81 size 9 align 1 bytes 53 70 72 65 61 64 2e 62 00
+global probe.82 size 9 align 1 bytes 53 70 72 65 61 64 2e 63 00
+global probe.83 size 9 align 1 bytes 53 70 72 65 61 64 2e 64 00
+global probe.84 size 8 align 1 bytes 54 69 67 68 74 2e 61 00
+global probe.85 size 8 align 1 bytes 54 69 67 68 74 2e 62 00
+global probe.86 size 8 align 1 bytes 54 69 67 68 74 2e 63 00
+global probe.87 size 12 align 1 bytes 54 69 67 68 74 42 69 74 73 2e 61 00
+global probe.88 size 12 align 1 bytes 54 69 67 68 74 42 69 74 73 2e 62 00
+global probe.89 size 10 align 1 bytes 41 6c 69 67 6e 65 64 2e 61 00
+global probe.90 size 10 align 1 bytes 41 6c 69 67 6e 65 64 2e 62 00
+global probe.91 size 9 align 1 bytes 42 69 74 55 6e 69 6f 6e 00
+global probe.92 size 11 align 1 bytes 42 69 74 55 6e 69 6f 6e 2e 61 00
+global probe.93 size 11 align 1 bytes 42 69 74 55 6e 69 6f 6e 2e 62 00
+global probe.94 size 9 align 1 bytes 42 72 65 61 6b 73 2e 61 00
+global probe.95 size 9 align 1 bytes 42 72 65 61 6b 73 2e 62 00
+global probe.96 size 9 align 1 bytes 42 72 65 61 6b 73 2e 63 00
+global probe.97 probe.Breaks { i8 1, -, i8 2, -, i8 3 }
+global probe.98 size 29 align 1 bytes 42 72 65 61 6b 73 2e 63 6f 6e 73 74 20 61 20 25 64 20 62 20 25 64 20 63 20 25 64 0a 00
 fn probe.clear(%0: ptr, %1: i64) {
 b0:
     %2 = copy i64 0
@@ -131,18 +137,25 @@ b2:
     %4 = mul i64 %2, size_of i8
     %5 = ptradd %0, %4
     store i8 0, %5
-    %6 = add i64 %2, 1
-    %2 = copy i64 %6
-    jump b1
+    %6 = addov i8 %2, 1
+    branch %6, b4, b5
 b3:
     ret
+b4:
+    %7 = addr @probe.58
+    call void @anti_rt_check_failed(%7, 33, 1, %2, 1)
+    jump b5
+b5:
+    %8 = add i64 %2, 1
+    %2 = copy i64 %8
+    jump b1
 }
 fn probe.dump(%0: agg str, %1: ptr, %2: i64) {
 b0:
     %3 = slot str
     %11 = slot str
-    %21 = slot str
-    %4 = addr @probe.58
+    %23 = slot str
+    %4 = addr @probe.59
     store ptr %4, %3
     %5 = ptradd %3, offset_of str.len
     store i64 2, %5
@@ -155,7 +168,7 @@ b1:
     %10 = slt i8 %9, %2
     branch %10, b2, b3
 b2:
-    %12 = addr @probe.59
+    %12 = addr @probe.60
     store ptr %12, %11
     %13 = ptradd %11, offset_of str.len
     store i64 5, %13
@@ -165,31 +178,63 @@ b2:
     %17 = load i8 %16
     %18 = zext i32 %17
     %19 = call i32 @printf(%14, %18)
-    %20 = add i64 %9, 1
-    %9 = copy i64 %20
-    jump b1
+    %20 = addov i8 %9, 1
+    branch %20, b4, b5
 b3:
-    %22 = addr @probe.60
-    store ptr %22, %21
-    %23 = ptradd %21, offset_of str.len
-    store i64 1, %23
-    %24 = load ptr %21
-    %25 = call i32 @printf(%24)
+    %24 = addr @probe.62
+    store ptr %24, %23
+    %25 = ptradd %23, offset_of str.len
+    store i64 1, %25
+    %26 = load ptr %23
+    %27 = call i32 @printf(%26)
     ret
+b4:
+    %21 = addr @probe.61
+    call void @anti_rt_check_failed(%21, 33, 1, %9, 1)
+    jump b5
+b5:
+    %22 = add i64 %9, 1
+    %9 = copy i64 %22
+    jump b1
 }
 fn probe.size(%0: agg str, %1: i64, %2: i64) {
 b0:
     %3 = slot str
-    %4 = addr @probe.61
+    %4 = addr @probe.63
     store ptr %4, %3
     %5 = ptradd %3, offset_of str.len
     store i64 20, %5
     %6 = load ptr %3
     %7 = load ptr %0
     %8 = trunc i32 %1
-    %9 = sub i64 %2, %1
-    %10 = trunc i32 %9
-    %11 = call i32 @printf(%6, %7, %8, %10)
+    %9 = sext i64 %8
+    %10 = eq i8 %9, %1
+    branch %10, b2, b1
+b1:
+    %11 = addr @probe.64
+    call void @anti_rt_check_failed(%11, 46, 2, %1, 0)
+    jump b2
+b2:
+    %12 = trunc i32 %1
+    %13 = subov i8 %2, %1
+    branch %13, b3, b4
+b3:
+    %14 = addr @probe.65
+    call void @anti_rt_check_failed(%14, 33, 1, %2, %1)
+    jump b4
+b4:
+    %15 = sub i64 %2, %1
+    %16 = trunc i32 %15
+    %17 = sext i64 %16
+    %18 = eq i8 %17, %15
+    branch %18, b6, b5
+b5:
+    %19 = addr @probe.66
+    call void @anti_rt_check_failed(%19, 46, 2, %15, 0)
+    jump b6
+b6:
+    %20 = trunc i32 %15
+    %21 = call i32 @printf(%6, %7, %12, %20)
     ret
 }
 fn probe.main() -> i64 {
@@ -247,7 +292,7 @@ b1:
 b2:
     call void @probe.clear(%5, size_of probe.Wide)
     store i8 1, %5
-    %8 = addr @probe.62
+    %8 = addr @probe.67
     store ptr %8, %7
     %9 = ptradd %7, offset_of str.len
     store i64 6, %9
@@ -255,7 +300,7 @@ b2:
     call void @probe.clear(%5, size_of probe.Wide)
     %10 = ptradd %5, offset_of probe.Wide.b
     store clong 1, %10
-    %12 = addr @probe.63
+    %12 = addr @probe.68
     store ptr %12, %11
     %13 = ptradd %11, offset_of str.len
     store i64 6, %13
@@ -263,7 +308,7 @@ b2:
     call void @probe.clear(%5, size_of probe.Wide)
     %14 = ptradd %5, offset_of probe.Wide.c
     store cwchar 1, %14
-    %16 = addr @probe.64
+    %16 = addr @probe.69
     store ptr %16, %15
     %17 = ptradd %15, offset_of str.len
     store i64 6, %17
@@ -271,13 +316,13 @@ b2:
     call void @probe.clear(%5, size_of probe.Wide)
     %18 = ptradd %5, offset_of probe.Wide.d
     store i16 1, %18
-    %20 = addr @probe.65
+    %20 = addr @probe.70
     store ptr %20, %19
     %21 = ptradd %19, offset_of str.len
     store i64 6, %21
     call void @probe.dump(%19, %5, size_of probe.Wide)
     call void @free(%5)
-    %23 = addr @probe.66
+    %23 = addr @probe.71
     store ptr %23, %22
     %24 = ptradd %22, offset_of str.len
     store i64 5, %24
@@ -292,28 +337,28 @@ b3:
 b4:
     call void @probe.clear(%27, size_of probe.Mixed)
     store i8 1, %27
-    %30 = addr @probe.67
+    %30 = addr @probe.72
     store ptr %30, %29
     %31 = ptradd %29, offset_of str.len
     store i64 7, %31
     call void @probe.dump(%29, %27, size_of probe.Mixed)
     call void @probe.clear(%27, size_of probe.Mixed)
     store i32 1, %27
-    %33 = addr @probe.68
+    %33 = addr @probe.73
     store ptr %33, %32
     %34 = ptradd %32, offset_of str.len
     store i64 7, %34
     call void @probe.dump(%32, %27, size_of probe.Mixed)
     call void @probe.clear(%27, size_of probe.Mixed)
     store f64 1, %27
-    %36 = addr @probe.69
+    %36 = addr @probe.74
     store ptr %36, %35
     %37 = ptradd %35, offset_of str.len
     store i64 7, %37
     call void @probe.dump(%35, %27, size_of probe.Mixed)
     call void @probe.clear(%27, size_of probe.Mixed)
     store i64 1, %27
-    %39 = addr @probe.70
+    %39 = addr @probe.75
     store ptr %39, %38
     %40 = ptradd %38, offset_of str.len
     store i64 7, %40
@@ -334,28 +379,28 @@ b5:
 b6:
     call void @probe.clear(%46, size_of probe.Flags)
     bitstore i32 1, %46, probe.Flags.visible
-    %49 = addr @probe.71
+    %49 = addr @probe.76
     store ptr %49, %48
     %50 = ptradd %48, offset_of str.len
     store i64 13, %50
     call void @probe.dump(%48, %46, size_of probe.Flags)
     call void @probe.clear(%46, size_of probe.Flags)
     bitstore i32 1, %46, probe.Flags.layer
-    %52 = addr @probe.72
+    %52 = addr @probe.77
     store ptr %52, %51
     %53 = ptradd %51, offset_of str.len
     store i64 11, %53
     call void @probe.dump(%51, %46, size_of probe.Flags)
     call void @probe.clear(%46, size_of probe.Flags)
     bitstore i8 1, %46, probe.Flags.level
-    %55 = addr @probe.73
+    %55 = addr @probe.78
     store ptr %55, %54
     %56 = ptradd %54, offset_of str.len
     store i64 11, %56
     call void @probe.dump(%54, %46, size_of probe.Flags)
     call void @probe.clear(%46, size_of probe.Flags)
     bitstore i16 1, %46, probe.Flags.pad
-    %58 = addr @probe.74
+    %58 = addr @probe.79
     store ptr %58, %57
     %59 = ptradd %57, offset_of str.len
     store i64 9, %59
@@ -376,28 +421,28 @@ b7:
 b8:
     call void @probe.clear(%65, size_of probe.Spread)
     store i8 1, %65
-    %68 = addr @probe.75
+    %68 = addr @probe.80
     store ptr %68, %67
     %69 = ptradd %67, offset_of str.len
     store i64 8, %69
     call void @probe.dump(%67, %65, size_of probe.Spread)
     call void @probe.clear(%65, size_of probe.Spread)
     bitstore i32 1, %65, probe.Spread.b
-    %71 = addr @probe.76
+    %71 = addr @probe.81
     store ptr %71, %70
     %72 = ptradd %70, offset_of str.len
     store i64 8, %72
     call void @probe.dump(%70, %65, size_of probe.Spread)
     call void @probe.clear(%65, size_of probe.Spread)
     bitstore i64 1, %65, probe.Spread.c
-    %74 = addr @probe.77
+    %74 = addr @probe.82
     store ptr %74, %73
     %75 = ptradd %73, offset_of str.len
     store i64 8, %75
     call void @probe.dump(%73, %65, size_of probe.Spread)
     call void @probe.clear(%65, size_of probe.Spread)
     bitstore i8 1, %65, probe.Spread.d
-    %77 = addr @probe.78
+    %77 = addr @probe.83
     store ptr %77, %76
     %78 = ptradd %76, offset_of str.len
     store i64 8, %78
@@ -418,7 +463,7 @@ b9:
 b10:
     call void @probe.clear(%84, size_of probe.Tight)
     store i8 1, %84
-    %87 = addr @probe.79
+    %87 = addr @probe.84
     store ptr %87, %86
     %88 = ptradd %86, offset_of str.len
     store i64 7, %88
@@ -426,7 +471,7 @@ b10:
     call void @probe.clear(%84, size_of probe.Tight)
     %89 = ptradd %84, offset_of probe.Tight.b
     store i32 1, %89
-    %91 = addr @probe.80
+    %91 = addr @probe.85
     store ptr %91, %90
     %92 = ptradd %90, offset_of str.len
     store i64 7, %92
@@ -434,7 +479,7 @@ b10:
     call void @probe.clear(%84, size_of probe.Tight)
     %93 = ptradd %84, offset_of probe.Tight.c
     store i16 1, %93
-    %95 = addr @probe.81
+    %95 = addr @probe.86
     store ptr %95, %94
     %96 = ptradd %94, offset_of str.len
     store i64 7, %96
@@ -455,14 +500,14 @@ b11:
 b12:
     call void @probe.clear(%102, size_of probe.TightBits)
     bitstore i8 1, %102, probe.TightBits.a
-    %105 = addr @probe.82
+    %105 = addr @probe.87
     store ptr %105, %104
     %106 = ptradd %104, offset_of str.len
     store i64 11, %106
     call void @probe.dump(%104, %102, size_of probe.TightBits)
     call void @probe.clear(%102, size_of probe.TightBits)
     bitstore i32 1, %102, probe.TightBits.b
-    %108 = addr @probe.83
+    %108 = addr @probe.88
     store ptr %108, %107
     %109 = ptradd %107, offset_of str.len
     store i64 11, %109
@@ -483,7 +528,7 @@ b13:
 b14:
     call void @probe.clear(%115, size_of probe.Aligned)
     store i8 1, %115
-    %118 = addr @probe.84
+    %118 = addr @probe.89
     store ptr %118, %117
     %119 = ptradd %117, offset_of str.len
     store i64 9, %119
@@ -491,13 +536,13 @@ b14:
     call void @probe.clear(%115, size_of probe.Aligned)
     %120 = ptradd %115, offset_of probe.Aligned.b
     store i32 1, %120
-    %122 = addr @probe.85
+    %122 = addr @probe.90
     store ptr %122, %121
     %123 = ptradd %121, offset_of str.len
     store i64 9, %123
     call void @probe.dump(%121, %115, size_of probe.Aligned)
     call void @free(%115)
-    %125 = addr @probe.86
+    %125 = addr @probe.91
     store ptr %125, %124
     %126 = ptradd %124, offset_of str.len
     store i64 8, %126
@@ -512,14 +557,14 @@ b15:
 b16:
     call void @probe.clear(%129, size_of probe.BitUnion)
     bitstore i32 1, %129, probe.BitUnion.a
-    %132 = addr @probe.87
+    %132 = addr @probe.92
     store ptr %132, %131
     %133 = ptradd %131, offset_of str.len
     store i64 10, %133
     call void @probe.dump(%131, %129, size_of probe.BitUnion)
     call void @probe.clear(%129, size_of probe.BitUnion)
     bitstore i8 1, %129, probe.BitUnion.b
-    %135 = addr @probe.88
+    %135 = addr @probe.93
     store ptr %135, %134
     %136 = ptradd %134, offset_of str.len
     store i64 10, %136
@@ -540,28 +585,28 @@ b17:
 b18:
     call void @probe.clear(%142, size_of probe.Breaks)
     store i8 1, %142
-    %145 = addr @probe.89
+    %145 = addr @probe.94
     store ptr %145, %144
     %146 = ptradd %144, offset_of str.len
     store i64 8, %146
     call void @probe.dump(%144, %142, size_of probe.Breaks)
     call void @probe.clear(%142, size_of probe.Breaks)
     bitstore i8 1, %142, probe.Breaks.b
-    %148 = addr @probe.90
+    %148 = addr @probe.95
     store ptr %148, %147
     %149 = ptradd %147, offset_of str.len
     store i64 8, %149
     call void @probe.dump(%147, %142, size_of probe.Breaks)
     call void @probe.clear(%142, size_of probe.Breaks)
     bitstore i8 1, %142, probe.Breaks.c
-    %151 = addr @probe.91
+    %151 = addr @probe.96
     store ptr %151, %150
     %152 = ptradd %150, offset_of str.len
     store i64 8, %152
     call void @probe.dump(%150, %142, size_of probe.Breaks)
-    %153 = addr @probe.92
+    %153 = addr @probe.97
     memcopy %142, %153, probe.Breaks
-    %155 = addr @probe.93
+    %155 = addr @probe.98
     store ptr %155, %154
     %156 = ptradd %154, offset_of str.len
     store i64 28, %156

@@ -1,0 +1,16 @@
+//! A remainder by zero, which follows division.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(10) % opaque(0));
+	return 7;
+}

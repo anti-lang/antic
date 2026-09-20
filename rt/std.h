@@ -22,6 +22,24 @@ void anti_rt_exit(int32_t status);
    compiler built the text, so this adds only a newline. */
 void anti_rt_assert_failed(const unsigned char *text, int64_t length);
 
+/* Which values a failed dev-mode check prints after its text. The
+   compiler names the file, the line and the operation. The kind names
+   the labels of the values. */
+enum anti_check {
+    ANTI_CHECK_BOUNDS,      /* An index and a length. */
+    ANTI_CHECK_OVERFLOW,    /* The two operands of + - or *. */
+    ANTI_CHECK_VALUE,       /* One signed value. */
+    ANTI_CHECK_VALUE_U,     /* One unsigned value. */
+    ANTI_CHECK_LEFT,        /* The signed left operand of / or %. */
+    ANTI_CHECK_LEFT_U,      /* The unsigned left operand of / or %. */
+    ANTI_CHECK_SHIFT        /* A shift count and the width of its type. */
+};
+
+/* Print the text of a failed check, the values the kind names, and
+   abort. */
+void anti_rt_check_failed(const unsigned char *text, int64_t length,
+                          int32_t kind, int64_t a, int64_t b);
+
 /* Print the name of the class a checked cast wanted and abort. The name
    is not a C string, so its length comes with it. */
 void anti_rt_cast_failed(const unsigned char *name, int64_t length);

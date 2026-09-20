@@ -214,6 +214,7 @@ struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,
                               const struct mach_operand *operands);
 enum mach_cond select_cond(enum ir_op op);
 enum mach_cond select_negate(enum mach_cond cond);
+bool select_is_overflow(enum ir_op op);
 bool select_is_next(const struct selector *s, const struct ir_operand *block);
 void select_refuse(struct selector *s, const struct ir_inst *inst);
 void select_fail(struct selector *s, const char *message);

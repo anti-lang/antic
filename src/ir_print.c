@@ -29,6 +29,8 @@ const char *ir_op_name(enum ir_op op)
         [IR_ULE] = "ule", [IR_UGT] = "ugt", [IR_UGE] = "uge",
         [IR_FEQ] = "feq", [IR_FNE] = "fne", [IR_FLT] = "flt",
         [IR_FLE] = "fle", [IR_FGT] = "fgt", [IR_FGE] = "fge",
+        [IR_ADD_OV] = "addov", [IR_SUB_OV] = "subov",
+        [IR_MUL_OV] = "mulov",
         [IR_TRUNC] = "trunc", [IR_SEXT] = "sext", [IR_ZEXT] = "zext",
         [IR_SITOF] = "sitof", [IR_UITOF] = "uitof", [IR_FTOSI] = "ftosi",
         [IR_FTOUI] = "ftoui", [IR_FEXT] = "fext", [IR_FTRUNC] = "ftrunc",

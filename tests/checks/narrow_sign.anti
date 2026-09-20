@@ -1,0 +1,17 @@
+//! An `as` of the same width that changes the sign. The value fits the
+//! bits and not the range.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: uint)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(-1) as uint);
+	return 7;
+}

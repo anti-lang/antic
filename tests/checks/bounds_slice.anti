@@ -1,0 +1,19 @@
+//! An index past the end of a slice, whose length is a field of the
+//! value and not of its type.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let a = [1, 2, 3, 4];
+	let s = a[1..3];
+	sink(s[opaque(4)]);
+	return 7;
+}

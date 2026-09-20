@@ -1,8 +1,10 @@
 type []byte = struct { ptr: ptr, len: i64 }
 type str = struct { ptr: ptr, len: i64 }
 extern fn puts(ptr) -> i32
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global strings.0 size 6 align 1 bytes 68 65 6c 6c 6f 00
 global strings.1 size 3 align 1 bytes 68 69 00
+global strings.2 size 42 align 1 bytes 64 75 6d 70 2f 73 74 72 69 6e 67 73 2e 61 6e 74 69 3a 31 32 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00
 fn strings.tail(%0: agg str, %1: i64) -> agg []byte {
 b0:
     %2 = slot []byte
@@ -29,9 +31,18 @@ b0:
     memcopy %0, %4, []byte
     %5 = addr @strings.1
     %6 = call i32 @puts(%5)
-    %7 = load ptr %0
-    %8 = ptradd %7, 0
-    %9 = load i8 %8
-    %10 = zext i64 %9
-    ret i64 %10
+    %7 = ptradd %0, offset_of []byte.len
+    %8 = load i64 %7
+    %9 = load ptr %0
+    %10 = ult i8 0, %8
+    branch %10, b2, b1
+b1:
+    %11 = addr @strings.2
+    call void @anti_rt_check_failed(%11, 41, 0, 0, %8)
+    jump b2
+b2:
+    %12 = ptradd %9, 0
+    %13 = load i8 %12
+    %14 = zext i64 %13
+    ret i64 %14
 }

@@ -1,0 +1,18 @@
+//! An index past the end of a str, which carries its length as a slice
+//! does.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let s = "abc";
+	sink(s[opaque(7)] as int);
+	return 7;
+}

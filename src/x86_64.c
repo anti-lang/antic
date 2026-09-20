@@ -783,8 +783,51 @@ static void conditional(struct selector *s, const struct ir_inst *inst,
     jump(s, &inst->c);
 }
 
+/* DESIGN: add, sub and the two-operand imul each set the overflow flag
+   for their own width. The sequence is the operation into a register the
+   program never reads, and the flag it leaves. imul has no two-operand
+   form for 8 bits, so an 8-bit product goes through the 32-bit registers
+   and is compared with its own sign extension. Returns the condition
+   that holds after an overflow. */
+static enum mach_cond overflow_flags(struct selector *s,
+                                     const struct ir_inst *inst)
+{
+    uint8_t w = s->target->width(inst->a.type);
+    struct mach_operand r;
+    struct mach_operand back;
+
+    if (inst->op == IR_MUL_OV && w == 8) {
+        r = select_new_vreg(s, 32);
+        back = select_new_vreg(s, 32);
+        emit2(s, X64_MOVSX, r, select_reg(s, &inst->a));
+        emit2(s, X64_MOVSX, back, select_reg(s, &inst->b));
+        emit2(s, X64_IMUL, r, back);
+        emit2(s, X64_MOVSX, back, widened(r, 8));
+        emit2(s, X64_CMP, r, back);
+        return COND_NE;
+    }
+    r = select_new_vreg(s, w);
+    move(s, r, select_reg(s, &inst->a));
+    emit2(s, inst->op == IR_ADD_OV   ? X64_ADD
+             : inst->op == IR_SUB_OV ? X64_SUB
+                                     : X64_IMUL,
+          r, select_reg(s, &inst->b));
+    return COND_VS;
+}
+
+static void emit_overflow(struct selector *s, const struct ir_inst *inst)
+{
+    enum mach_cond c = overflow_flags(s, inst);
+
+    emit2(s, X64_SET, select_result(s, inst), cond(c));
+}
+
 static void emit_fused_branch(struct selector *s, const struct ir_inst *inst)
 {
+    if (select_is_overflow(s->fused->op)) {
+        conditional(s, inst, overflow_flags(s, s->fused));
+        return;
+    }
     compare(s, s->fused);
     conditional(s, inst, select_cond(s->fused->op));
 }
@@ -1493,6 +1536,9 @@ static const struct pattern patterns[] = {
     {IR_SEXT, match_convert, emit_convert},
     {IR_ZEXT, match_convert, emit_convert},
     {IR_ADDR, NULL, emit_addr},
+    {IR_ADD_OV, NULL, emit_overflow},
+    {IR_SUB_OV, NULL, emit_overflow},
+    {IR_MUL_OV, NULL, emit_overflow},
 };
 
 /* Printing in AT&T syntax: the source comes before the destination, a
@@ -1519,6 +1565,7 @@ static const char *const cond_names[] = {
     [COND_EQ] = "e", [COND_NE] = "ne", [COND_LT] = "l", [COND_LE] = "le",
     [COND_GT] = "g", [COND_GE] = "ge", [COND_LO] = "b", [COND_LS] = "be",
     [COND_HI] = "a", [COND_HS] = "ae", [COND_P] = "p", [COND_NP] = "np",
+    [COND_VS] = "o", [COND_VC] = "no",
 };
 
 static const char *const xmm_names[] = {

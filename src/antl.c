@@ -16,7 +16,8 @@ _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
 _Static_assert(TOKEN_KIND_COUNT == 145, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
-_Static_assert(IR_RET == 57, "raise ANTL_VERSION, then update this");
+_Static_assert(IR_RET == 60, "raise ANTL_VERSION, then update this");
+_Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_SYM == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_EXT_ZERO == 2, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CONST_AGG == 6, "raise ANTL_VERSION, then update this");
@@ -606,7 +607,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         for (j = 0; j < f->block_count; j++) {
             /* The failure block of an assertion carries its flag, so the
                build that compiles the program can still drop it. */
-            put_u8(w, f->blocks[j]->assert_fail);
+            put_u8(w, (uint8_t)f->blocks[j]->fail);
             put_u32(w, (uint32_t)f->blocks[j]->count);
             for (k = 0; k < f->blocks[j]->count; k++) {
                 put_inst(w, &f->blocks[j]->insts[k]);
@@ -1930,7 +1931,7 @@ static void read_body(struct reader *r, struct ir_module *program,
     }
     for (i = 0; i < blocks && !r->failed; i++) {
         uint32_t count;
-        f->blocks[i]->assert_fail = get_u8(r) != 0;
+        f->blocks[i]->fail = (enum ir_fail)get_u8(r);
         count = get_count(r, 46);
         for (j = 0; j < count && !r->failed; j++) {
             struct ir_inst inst;

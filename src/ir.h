@@ -102,6 +102,11 @@ enum ir_op {
     IR_EQ, IR_NE, IR_SLT, IR_SLE, IR_SGT, IR_SGE,
     IR_ULT, IR_ULE, IR_UGT, IR_UGE,
     IR_FEQ, IR_FNE, IR_FLT, IR_FLE, IR_FGT, IR_FGE,
+    /* result i8 = op a, b: 1 when the signed operation of the named type
+       leaves its range, else 0. The back end reads the overflow flag
+       where the instruction sets it, and multiplies into twice the width
+       where it does not. */
+    IR_ADD_OV, IR_SUB_OV, IR_MUL_OV,
     /* result = op a, with the result type named by the instruction */
     IR_TRUNC, IR_SEXT, IR_ZEXT, IR_SITOF, IR_UITOF, IR_FTOSI, IR_FTOUI,
     IR_FEXT, IR_FTRUNC,
@@ -165,12 +170,22 @@ struct ir_inst {
     size_t arg_count;
 };
 
+/* DESIGN: the failure arm of an assertion and the failure arm of a
+   dev-mode check carry which one they are. The build that compiles the
+   program drops each under its own switch. A library file holds both,
+   and the build that links decides. */
+enum ir_fail {
+    IR_FAIL_NONE,
+    IR_FAIL_ASSERT,     /* the failure arm of an assertion */
+    IR_FAIL_CHECK       /* the failure arm of a dev-mode check */
+};
+
 struct ir_block {
     uint32_t index;
     struct ir_inst *insts;
     size_t count;
     size_t capacity;
-    bool assert_fail;           /* the failure arm of an assertion */
+    enum ir_fail fail;
     uint32_t loop_depth;        /* the loops this block sits inside */
 };
 

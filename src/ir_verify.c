@@ -118,6 +118,20 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
     case IR_NEG: case IR_NOT: case IR_FNEG: case IR_COPY:
         same_type(v, inst, &inst->a, inst->type);
         break;
+    /* An overflow test gives i8 and its operands share the type whose
+       range it tests, which the instruction names. */
+    case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV:
+        if (operand_ok(v, inst, &inst->a) && operand_ok(v, inst, &inst->b) &&
+            type_of(v, &inst->a) != type_of(v, &inst->b)) {
+            fail(v, "%s tests %s against %s", ir_op_name(inst->op),
+                 ir_type_name(type_of(v, &inst->a)),
+                 ir_type_name(type_of(v, &inst->b)));
+        }
+        if (inst->type != IR_I8) {
+            fail(v, "%s gives i8, not %s", ir_op_name(inst->op),
+                 ir_type_name(inst->type));
+        }
+        break;
     case IR_EQ: case IR_NE: case IR_SLT: case IR_SLE: case IR_SGT:
     case IR_SGE: case IR_ULT: case IR_ULE: case IR_UGT: case IR_UGE:
     case IR_FEQ: case IR_FNE: case IR_FLT: case IR_FLE: case IR_FGT:

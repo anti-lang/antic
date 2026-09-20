@@ -1,0 +1,16 @@
+//! A narrowing `as` whose value does not fit the target type.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: i8)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(300) as i8);
+	return 7;
+}

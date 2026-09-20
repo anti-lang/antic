@@ -1,0 +1,16 @@
+//! A sum that leaves the range of int.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(9223372036854775807) + opaque(1));
+	return 7;
+}

@@ -2,6 +2,7 @@ type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, siz
 type bitfields.Flags = struct { visible: i32 : 1 zeroext, layer: i32 : 4 zeroext, level: i8 : 3 signext, pad: i16 : 9 zeroext }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [4]anti.rt.Field = array 4 of anti.rt.Field
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global bitfields.Flags.descriptor anti.rt.Descriptor { @bitfields.1, i64 5, ptr 0, size_of bitfields.Flags, i64 0, ptr 0, i64 4, @bitfields.Flags.fields, ptr 0, i64 0, i64 0, ptr 0 }
 global bitfields.1 size 6 align 1 bytes 46 6c 61 67 73 00
 global bitfields.2 size 8 align 1 bytes 76 69 73 69 62 6c 65 00
@@ -9,6 +10,9 @@ global bitfields.3 size 6 align 1 bytes 6c 61 79 65 72 00
 global bitfields.4 size 6 align 1 bytes 6c 65 76 65 6c 00
 global bitfields.5 size 4 align 1 bytes 70 61 64 00
 global bitfields.Flags.fields [4]anti.rt.Field { anti.rt.Field { @bitfields.2, i64 7, offset_of bitfields.Flags.visible, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.3, i64 5, offset_of bitfields.Flags.layer, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.4, i64 5, offset_of bitfields.Flags.level, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.5, i64 3, offset_of bitfields.Flags.pad, i64 0, i64 0, ptr 0 } }
+global bitfields.7 size 42 align 1 bytes 70 72 6f 67 72 61 6d 73 2f 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
+global bitfields.8 size 42 align 1 bytes 70 72 6f 67 72 61 6d 73 2f 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
+global bitfields.9 size 42 align 1 bytes 70 72 6f 67 72 61 6d 73 2f 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 fn bitfields.main() -> i64 {
 b0:
     %0 = slot bitfields.Flags
@@ -20,20 +24,64 @@ b0:
     %2 = add i32 %1, 3
     bitstore i32 %2, %0, bitfields.Flags.layer
     %3 = bitload i8 %0, bitfields.Flags.level
-    %4 = sub i8 %3, 1
-    bitstore i8 %4, %0, bitfields.Flags.level
-    %5 = bitload i32 %0, bitfields.Flags.visible
-    %6 = zext i64 %5
-    %7 = bitload i32 %0, bitfields.Flags.layer
-    %8 = zext i64 %7
-    %9 = mul i64 %8, 10
-    %10 = add i64 %6, %9
-    %11 = bitload i8 %0, bitfields.Flags.level
-    %12 = sext i64 %11
-    %13 = mul i64 %12, 100
-    %14 = add i64 %10, %13
-    %15 = bitload i16 %0, bitfields.Flags.pad
-    %16 = zext i64 %15
-    %17 = add i64 %14, %16
-    ret i64 %17
+    %4 = subov i8 %3, 1
+    %5 = sext i64 %3
+    %6 = sext i64 1
+    branch %4, b1, b2
+b1:
+    %7 = addr @bitfields.7
+    call void @anti_rt_check_failed(%7, 41, 1, %5, %6)
+    jump b2
+b2:
+    %8 = sub i8 %3, 1
+    bitstore i8 %8, %0, bitfields.Flags.level
+    %9 = bitload i32 %0, bitfields.Flags.visible
+    %10 = zext i64 %9
+    %11 = bitload i32 %0, bitfields.Flags.layer
+    %12 = zext i64 %11
+    %13 = mulov i8 %12, 10
+    branch %13, b3, b4
+b3:
+    %14 = addr @bitfields.8
+    call void @anti_rt_check_failed(%14, 41, 1, %12, 10)
+    jump b4
+b4:
+    %15 = mul i64 %12, 10
+    %16 = addov i8 %10, %15
+    branch %16, b5, b6
+b5:
+    %17 = addr @bitfields.9
+    call void @anti_rt_check_failed(%17, 41, 1, %10, %15)
+    jump b6
+b6:
+    %18 = add i64 %10, %15
+    %19 = bitload i8 %0, bitfields.Flags.level
+    %20 = sext i64 %19
+    %21 = mulov i8 %20, 100
+    branch %21, b7, b8
+b7:
+    %22 = addr @bitfields.8
+    call void @anti_rt_check_failed(%22, 41, 1, %20, 100)
+    jump b8
+b8:
+    %23 = mul i64 %20, 100
+    %24 = addov i8 %18, %23
+    branch %24, b9, b10
+b9:
+    %25 = addr @bitfields.9
+    call void @anti_rt_check_failed(%25, 41, 1, %18, %23)
+    jump b10
+b10:
+    %26 = add i64 %18, %23
+    %27 = bitload i16 %0, bitfields.Flags.pad
+    %28 = zext i64 %27
+    %29 = addov i8 %26, %28
+    branch %29, b11, b12
+b11:
+    %30 = addr @bitfields.9
+    call void @anti_rt_check_failed(%30, 41, 1, %26, %28)
+    jump b12
+b12:
+    %31 = add i64 %26, %28
+    ret i64 %31
 }

@@ -262,14 +262,14 @@ static bool build_library(struct session *s, const char *name,
     return ok;
 }
 
-static const char scale_source[] = "pub const SCALE: int = 6;\n"
-                                   "pub fn scale(x: int) -> int {\n"
+static const char scale_source[] = "pub const SCALE: uint = 6;\n"
+                                   "pub fn scale(x: uint) -> uint {\n"
                                    "    return x * SCALE;\n"
                                    "}\n";
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 25, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 26, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -280,7 +280,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0,                                     /* imports */
     0, 0, 0, 0,                                     /* module doc */
     2, 0, 0, 0,                                     /* types */
-    6,                                              /* 0: int */
+    11,                                             /* 0: uint */
     22, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,         /* 1: fn(int) -> int */
     2, 0, 0, 0,                                     /* items */
     2, 5, 0, 0, 0, 'S', 'C', 'A', 'L', 'E', 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -305,7 +305,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 255, 255, 255, 255, 0, 0, 0, 0,              /* no type, field 0 */
     0, 0, 0, 0,                                     /* no arguments */
-    57, 4, 255, 255, 255, 255,                      /* ret i64 */
+    60, 4, 255, 255, 255, 255,                      /* ret i64 */
     1, 4, 1, 0, 0, 0, 0, 0, 0, 0,                   /* %1 */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -681,14 +681,14 @@ static const char line_docs[] =
     "///     Two fields.\n"
     "pub struct Point {\n"
     "    /// Across.\n"
-    "    x: int,\n"
-    "    y: int,\n"
+    "    x: f64,\n"
+    "    y: f64,\n"
     "}\n"
     "/// Dot product.\n"
     "//# Not a note in the file.\n"
-    "pub fn dot(a: Point, b: Point) -> int { return a.x * b.x + a.y * b.y; }\n"
+    "pub fn dot(a: Point, b: Point) -> f64 { return a.x * b.x + a.y * b.y; }\n"
     "/// Private, not in the file.\n"
-    "fn hidden() -> int { return 1; }\n";
+    "fn hidden() -> f64 { return 1.0; }\n";
 
 static const char block_docs[] =
     "/" "*!\n"
@@ -706,8 +706,8 @@ static const char block_docs[] =
     "    /" "**\n"
     "        Across.\n"
     "    *" "/\n"
-    "    x: int,\n"
-    "    y: int,\n"
+    "    x: f64,\n"
+    "    y: f64,\n"
     "}\n"
     "/" "** \n"
     "Dot product.\n"
@@ -715,19 +715,19 @@ static const char block_docs[] =
     "/" "*#\n"
     "  Not a note in the file.\n"
     "*/\n"
-    "pub fn dot(a: Point, b: Point) -> int { return a.x * b.x + a.y * b.y; }\n"
+    "pub fn dot(a: Point, b: Point) -> f64 { return a.x * b.x + a.y * b.y; }\n"
     "/" "**\n"
     "  Private, not in the file.\n"
     "*/\n"
-    "fn hidden() -> int { return 1; }\n";
+    "fn hidden() -> f64 { return 1.0; }\n";
 
 static const char no_docs[] =
     "pub struct Point {\n"
-    "    x: int,\n"
-    "    y: int,\n"
+    "    x: f64,\n"
+    "    y: f64,\n"
     "}\n"
-    "pub fn dot(a: Point, b: Point) -> int { return a.x * b.x + a.y * b.y; }\n"
-    "fn hidden() -> int { return 1; }\n";
+    "pub fn dot(a: Point, b: Point) -> f64 { return a.x * b.x + a.y * b.y; }\n"
+    "fn hidden() -> f64 { return 1.0; }\n";
 
 /* The package header and the doc text of the public interface. The line
    and the block form of the comments write the same bytes. Without doc
@@ -919,8 +919,10 @@ static void keeps_literals(void)
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
               "type str = struct { ptr: ptr, len: i64 }\n"
+              "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
               "global words.0 size 3 align 1 bytes 68 69 00\n"
               "global main.0 size 3 align 1 bytes 68 69 00\n"
+              "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
               "fn words.hi() -> agg str {\n"
               "b0:\n"
               "    %0 = slot str\n"
@@ -942,8 +944,15 @@ static void keeps_literals(void)
               "    store i64 2, %5\n"
               "    %6 = ptradd %3, offset_of str.len\n"
               "    %7 = load i64 %6\n"
-              "    %8 = add i64 %2, %7\n"
-              "    ret i64 %8\n"
+              "    %8 = addov i8 %2, %7\n"
+              "    branch %8, b1, b2\n"
+              "b1:\n"
+              "    %9 = addr @main.1\n"
+              "    call void @anti_rt_check_failed(%9, 21, 1, %2, %7)\n"
+              "    jump b2\n"
+              "b2:\n"
+              "    %10 = add i64 %2, %7\n"
+              "    ret i64 %10\n"
               "}\n");
     text_free(&bytes);
     text_free(&ir);
@@ -1208,9 +1217,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 26;
+    copy[4] = 27;
     refuses_file(copy, sizeof copy,
-                 "has format version 26, and antic reads version 25");
+                 "has format version 27, and antic reads version 26");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");

@@ -200,6 +200,7 @@ enum mach_cond select_negate(enum mach_cond cond)
         [COND_LO] = COND_HS, [COND_LS] = COND_HI, [COND_HI] = COND_LS,
         [COND_HS] = COND_LO, [COND_MI] = COND_PL, [COND_PL] = COND_MI,
         [COND_P] = COND_NP, [COND_NP] = COND_P,
+        [COND_VS] = COND_VC, [COND_VC] = COND_VS,
     };
     return negated[cond];
 }
@@ -261,6 +262,14 @@ static bool is_comparison(enum ir_op op)
     return op >= IR_EQ && op <= IR_UGE;
 }
 
+/* An overflow test fuses with the branch after it the way a comparison
+   does. The target leaves the answer in its flags and never builds the
+   byte. */
+bool select_is_overflow(enum ir_op op)
+{
+    return op == IR_ADD_OV || op == IR_SUB_OV || op == IR_MUL_OV;
+}
+
 /* A comparison whose only use is the branch right after it becomes flags
    and a conditional jump, without a value in a register. */
 static bool fuses(const struct selector *s, const struct ir_block *b,
@@ -269,7 +278,8 @@ static bool fuses(const struct selector *s, const struct ir_block *b,
     const struct ir_inst *inst = &b->insts[i];
     const struct ir_inst *next = i + 1 < b->count ? &b->insts[i + 1] : NULL;
 
-    return is_comparison(inst->op) && next != NULL &&
+    return (is_comparison(inst->op) || select_is_overflow(inst->op)) &&
+           next != NULL &&
            next->op == IR_BRANCH && next->a.kind == IR_TEMP &&
            next->a.as.temp == inst->result && s->uses[inst->result] == 1 &&
            find_pattern(s, inst) != NULL;

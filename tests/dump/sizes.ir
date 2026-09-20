@@ -8,6 +8,7 @@ type [2]anti.rt.Field = array 2 of anti.rt.Field
 type [size_of(sizes.Header)]byte = array size_of sizes.Header of i8
 type str = struct { ptr: ptr, len: i64 }
 extern fn printf(ptr, ...) -> i32
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global sizes.Header.descriptor anti.rt.Descriptor { @sizes.1, i64 6, ptr 0, size_of sizes.Header, i64 0, ptr 0, i64 3, @sizes.Header.fields, ptr 0, i64 0, i64 0, ptr 0 }
 global sizes.1 size 7 align 1 bytes 48 65 61 64 65 72 00
 global sizes.2 size 4 align 1 bytes 74 61 67 00
@@ -19,11 +20,15 @@ global sizes.7 size 7 align 1 bytes 42 75 66 66 65 72 00
 global sizes.8 size 5 align 1 bytes 68 65 61 64 00
 global sizes.9 size 4 align 1 bytes 70 61 64 00
 global sizes.Buffer.fields [2]anti.rt.Field { anti.rt.Field { @sizes.8, i64 4, offset_of sizes.Buffer.head, i64 21, i64 0, @sizes.Header.descriptor }, anti.rt.Field { @sizes.9, i64 3, offset_of sizes.Buffer.pad, i64 2068, i64 0, ptr 0 } }
-global sizes.11 size 16 align 1 bytes 25 6c 6c 64 20 25 6c 6c 64 20 25 6c 6c 64 0a 00
+global sizes.11 size 44 align 1 bytes 70 72 6f 67 72 61 6d 73 2f 73 69 7a 65 73 2e 61 6e 74 69 3a 32 34 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00
+global sizes.12 size 38 align 1 bytes 70 72 6f 67 72 61 6d 73 2f 73 69 7a 65 73 2e 61 6e 74 69 3a 32 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global sizes.13 size 38 align 1 bytes 70 72 6f 67 72 61 6d 73 2f 73 69 7a 65 73 2e 61 6e 74 69 3a 32 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global sizes.14 size 16 align 1 bytes 25 6c 6c 64 20 25 6c 6c 64 20 25 6c 6c 64 0a 00
+global sizes.15 size 38 align 1 bytes 70 72 6f 67 72 61 6d 73 2f 73 69 7a 65 73 2e 61 6e 74 69 3a 32 38 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
 fn sizes.main() -> i64 {
 b0:
     %0 = slot [size_of(sizes.Header)]byte
-    %15 = slot str
+    %21 = slot str
     %1 = copy i64 0
     jump b1
 b1:
@@ -44,22 +49,50 @@ b4:
     %8 = slt i8 %7, size_of sizes.Header
     branch %8, b5, b6
 b5:
-    %9 = mul i64 %7, size_of i8
-    %10 = ptradd %0, %9
-    %11 = load i8 %10
-    %12 = zext i64 %11
-    %13 = add i64 %6, %12
-    %6 = copy i64 %13
-    %14 = add i64 %7, 1
-    %7 = copy i64 %14
-    jump b4
+    %9 = ult i8 %7, size_of sizes.Header
+    branch %9, b8, b7
 b6:
-    %16 = addr @sizes.11
-    store ptr %16, %15
-    %17 = ptradd %15, offset_of str.len
-    store i64 15, %17
-    %18 = load ptr %15
-    %19 = call i32 @printf(%18, size_of sizes.Header, %6, size_of sizes.Buffer)
-    %20 = sub i64 size_of sizes.Header, 16
-    ret i64 %20
+    %22 = addr @sizes.14
+    store ptr %22, %21
+    %23 = ptradd %21, offset_of str.len
+    store i64 15, %23
+    %24 = load ptr %21
+    %25 = call i32 @printf(%24, size_of sizes.Header, %6, size_of sizes.Buffer)
+    %26 = subov i8 size_of sizes.Header, 16
+    branch %26, b13, b14
+b7:
+    %10 = addr @sizes.11
+    call void @anti_rt_check_failed(%10, 43, 0, %7, size_of sizes.Header)
+    jump b8
+b8:
+    %11 = mul i64 %7, size_of i8
+    %12 = ptradd %0, %11
+    %13 = load i8 %12
+    %14 = zext i64 %13
+    %15 = addov i8 %6, %14
+    branch %15, b9, b10
+b9:
+    %16 = addr @sizes.12
+    call void @anti_rt_check_failed(%16, 37, 1, %6, %14)
+    jump b10
+b10:
+    %17 = add i64 %6, %14
+    %6 = copy i64 %17
+    %18 = addov i8 %7, 1
+    branch %18, b11, b12
+b11:
+    %19 = addr @sizes.13
+    call void @anti_rt_check_failed(%19, 37, 1, %7, 1)
+    jump b12
+b12:
+    %20 = add i64 %7, 1
+    %7 = copy i64 %20
+    jump b4
+b13:
+    %27 = addr @sizes.15
+    call void @anti_rt_check_failed(%27, 37, 1, size_of sizes.Header, 16)
+    jump b14
+b14:
+    %28 = sub i64 size_of sizes.Header, 16
+    ret i64 %28
 }

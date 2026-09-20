@@ -1,0 +1,16 @@
+//! A shift by a negative count.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(1024) >> opaque(-1));
+	return 7;
+}

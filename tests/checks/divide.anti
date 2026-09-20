@@ -1,0 +1,17 @@
+//! A division by zero. ARM64 returns zero for it and x86_64 traps, so
+//! the build without the checks is not run.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(10) / opaque(0));
+	return 7;
+}

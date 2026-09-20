@@ -10,12 +10,18 @@
 #   LIBS      the search root of the library files
 #   WORK      a directory for the objects and the executable
 
+include("${CMAKE_CURRENT_LIST_DIR}/relative_paths.cmake")
+set(roots "${MODULES}")
+relative_paths(roots)
+list(GET roots 0 modules)
+
 file(MAKE_DIRECTORY "${WORK}")
 foreach(module scale twice)
     execute_process(
-        COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" -I "${MODULES}"
+        COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" -I "${modules}"
                 -I "${LIBS}" -o "${WORK}/${module}"
-                "${MODULES}/com/example/${module}.anti"
+                "${modules}/com/example/${module}.anti"
+        WORKING_DIRECTORY "${ANTIC_TESTS}"
         RESULT_VARIABLE status
         ERROR_VARIABLE err
         ENCODING NONE)
@@ -25,8 +31,9 @@ foreach(module scale twice)
 endforeach()
 execute_process(
     COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-            -I "${LIBS}" -o "${WORK}/main" "${MODULES}/main.anti"
+            -I "${LIBS}" -o "${WORK}/main" "${modules}/main.anti"
             "${WORK}/scale.o" "${WORK}/twice.o"
+    WORKING_DIRECTORY "${ANTIC_TESTS}"
     RESULT_VARIABLE status
     ERROR_VARIABLE err
     ENCODING NONE)
@@ -57,8 +64,9 @@ foreach(module scale twice)
 endforeach()
 execute_process(
     COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-            -I "${LIBS}" -o "${WORK}/main_antl" "${MODULES}/main.anti"
+            -I "${LIBS}" -o "${WORK}/main_antl" "${modules}/main.anti"
             "${WORK}/scale_antl.o" "${WORK}/twice_antl.o"
+    WORKING_DIRECTORY "${ANTIC_TESTS}"
     RESULT_VARIABLE status
     ERROR_VARIABLE err
     ENCODING NONE)

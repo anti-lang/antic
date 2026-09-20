@@ -27,6 +27,9 @@ struct options {
        because dev compiles one module and release the whole program.
        --asserts and --no-asserts decide instead of the mode. */
     enum { ASSERTS_MODE, ASSERTS_ON, ASSERTS_OFF } asserts;
+    /* The dev-mode checks follow the mode the same way, under their own
+       pair of options. --checks and --no-checks decide instead of it. */
+    enum { CHECKS_MODE, CHECKS_ON, CHECKS_OFF } checks;
     enum { LIB_NONE, LIB_STATIC, LIB_SHARED } lib; /* --lib static|shared */
     bool bundle_runtime;        /* --bundle-runtime, with --lib static. */
     bool soname;                /* --soname, with --lib shared. */
