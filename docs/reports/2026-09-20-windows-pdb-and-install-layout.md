@@ -62,7 +62,10 @@ the directory above itself no longer finds it. `runtime_archive` in
 above the running executable when it holds `lib/`, and the user's data directory
 otherwise. `anti.os` gives a program the same three directories, and asks
 `rt/platform.c` which platform it is compiled for rather than reading
-`LOCALAPPDATA` and guessing.
+`LOCALAPPDATA` and guessing. Each of the three follows the error convention: a
+missing home is a failure, and the message names the variable that is absent.
+The test `std_userdirs_no_home` runs the same program without those variables
+and reads it.
 
 Both test machines keep their own tools in `~/.local/share/anti-vm` and
 `%LOCALAPPDATA%\anti-vm`, under a name of their own so an install of Anti stands
@@ -90,19 +93,32 @@ tests that use the platform toolchain until Eddie agreed to it.
 
 ## Suites
 
-The Mac 487, ASan 486, UBSan 486, the Linux VM 426, the Windows VM 406. The dry
+The Mac 488, ASan 487, UBSan 487, the Linux VM 426, the Windows VM 406. The dry
 run ran steps 1 to 5 and printed the plan for the rest.
+
+## A defect of the compiler
+
+`*out = try f();` compiles and reads a null pointer at run time. The implicit
+out parameter of the call reaches `f` as null, and the program faults where `f`
+writes through it. Binding first is right:
+
+```anti
+fn outer(out: *str) -> ?*failure.Error
+{
+	let v = try inner();    /* correct */
+	*out = v;
+	*out = try inner();     /* compiles, faults at run time */
+	return none;
+}
+```
+
+Twenty lines reproduce it with no standard library. `anti.os` binds to a local
+and carries an `[AI AGENT]` comment that says why. Nothing else in the tree
+writes the faulting form. The fix is compiler work of its own, and no test
+pins the defect, because a test of it would be red.
 
 ## Questions
 
-- The name `anti-vm` for the tools of the two test machines is provisional. It
-  keeps them clear of an install of Anti in `~/.local/share/anti`, which step 5
-  writes and removes on the same machine.
-- `/ignore:4099` on every Windows link is provisional. It drops that warning and
-  no other.
-- `os.user_config_dir` and its two siblings answer `""` when the environment
-  names no home. The error convention would be the other form, and nothing in
-  `anti.os` returns an error today.
 - `os.site_config_dir` is specified and not built. It is the one directory of
   the three that lies outside the user's profile, and nothing writes there.
 - `%USERPROFILE%\test.cmd` on the Windows VM is a file I wrote from

@@ -13,7 +13,11 @@ file does.
   asking. Use `ssh -n` inside a script, since `ssh` otherwise eats the input of the
   script.
 - Both VMs hold their tools in the data directory of the user, under a name of their own:
-  `~/.local/share/anti-vm` on Linux and `%LOCALAPPDATA%\anti-vm` on Windows. The tree each
+  `~/.local/share/anti-vm` on Linux and `%LOCALAPPDATA%\anti-vm` on Windows. The name is
+  of the test machines and of no product. A name of its own keeps it clear of an install
+  of Anti in `~/.local/share/anti`, which step 5 of a release writes and removes on the
+  same machine. The product installs to `%LOCALAPPDATA%\anti` as `docs/decisions.md`
+  settles. The tree each
   run replaces is `~/antic-check` and `%USERPROFILE%\antic-check`, built with Ninja on
   Windows. Nothing of a VM stands outside the profile of its user, so a reset is those
   directories. `C:\anti` held the Windows tools once and is gone. A directory there is

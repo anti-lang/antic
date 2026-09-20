@@ -9,9 +9,16 @@
 //! `user_config_dir`, `user_data_dir` and `user_cache_dir` give the
 //! per-user directories of the platform. They are the directories an
 //! install of Anti itself uses, and nothing outside the user's profile
-//! is among them.
+//! is among them. Each of them fails when the environment names no home,
+//! and the message names the variable that is absent.
 
+import anti.error as failure;
 import anti.text;
+
+/* [AI AGENT] The result of a `try` is bound to a local before it reaches
+   `*out`. Writing `*out = try f();` in one statement compiles and then
+   reads a null pointer at run time, which is a defect of the compiler and
+   not of this module. The report of 2026-09-20 holds the case. */
 
 extern fn anti_rt_on_signal(sig: int, f: fn(int));
 extern fn anti_rt_signal_pending() -> int;
@@ -55,18 +62,19 @@ fn variable(name: str) -> str
 	return text.from_c(value);
 }
 
-/// Copy `parts` into memory of its own, ending with a zero byte.
+/// Write the bytes of `b` to `out`, in memory of its own.
 ///
-/// The three directory functions return memory the caller owns, so the
+/// The three directory functions give memory the caller owns, so the
 /// text of a builder, which the builder frees, does not leave here.
-fn owned(b: *text.Builder) -> str
+fn owned(b: *text.Builder, out: *str) -> ?*failure.Error
 {
 	let s = b.text();
 	let from = s.ptr else {
-		return "";
+		*out = "";
+		return none;
 	};
 	let room = alloc(byte, s.len + 1) else {
-		return "";
+		return failure.Error.new(1, "out of memory");
 	};
 	let i = 0;
 	while i < s.len do {
@@ -74,7 +82,8 @@ fn owned(b: *text.Builder) -> str
 		i += 1;
 	}
 	room[s.len] = 0;
-	return text.from_c(room);
+	*out = text.from_c(room);
+	return none;
 }
 
 /// Whether this program follows the conventions of Windows.
@@ -107,7 +116,9 @@ fn xdg(name: str) -> str
 }
 
 /// `<root>/<app>` under the XDG root `name`, or `$HOME/<fallback>/<app>`.
-fn unix_dir(name: str, fallback: str, app: str) -> str
+///
+/// Fails when neither the XDG root nor `HOME` names a directory.
+fn unix_dir(name: str, fallback: str, app: str, out: *str) -> ?*failure.Error
 {
 	let b = text.Builder.new();
 	let root = xdg(name);
@@ -116,7 +127,7 @@ fn unix_dir(name: str, fallback: str, app: str) -> str
 	} else {
 		let home = variable("HOME");
 		if text.byte_count(home) == 0 {
-			return "";
+			return failure.Error.new(1, "the environment names no HOME");
 		}
 		b.append(home);
 		b.append("/");
@@ -124,16 +135,20 @@ fn unix_dir(name: str, fallback: str, app: str) -> str
 	}
 	b.append("/");
 	b.append(app);
-	return owned(&b);
+	let made = try owned(&b);
+	*out = made;
+	return none;
 }
 
 /// `%LOCALAPPDATA%\<app>` with `tail` below it, which may be empty.
-fn windows_dir(app: str, tail: str) -> str
+///
+/// Fails when `LOCALAPPDATA` names no directory.
+fn windows_dir(app: str, tail: str, out: *str) -> ?*failure.Error
 {
 	let b = text.Builder.new();
 	let local = variable("LOCALAPPDATA");
 	if text.byte_count(local) == 0 {
-		return "";
+		return failure.Error.new(1, "the environment names no LOCALAPPDATA");
 	}
 	b.append(local);
 	b.append("\\");
@@ -142,43 +157,59 @@ fn windows_dir(app: str, tail: str) -> str
 		b.append("\\");
 		b.append(tail);
 	}
-	return owned(&b);
+	let made = try owned(&b);
+	*out = made;
+	return none;
 }
 
 /// The per-user configuration directory of `app`.
 ///
 /// `$XDG_CONFIG_HOME/<app>` on Linux and macOS, which falls back to
 /// `~/.config/<app>`, and `config\` of `%LOCALAPPDATA%\<app>` on
-/// Windows. The answer is `""` when the environment says nothing about
-/// where the user's files are.
-pub fn user_config_dir(app: str) -> str
+/// Windows. It fails when the environment names no home, and the message
+/// names the variable that is absent.
+pub fn user_config_dir(app: str, out: *str) -> ?*failure.Error
 {
 	if windows() {
-		return windows_dir(app, "config");
+		let made = try windows_dir(app, "config");
+		*out = made;
+		return none;
 	}
-	return unix_dir("XDG_CONFIG_HOME", ".config", app);
+	let made = try unix_dir("XDG_CONFIG_HOME", ".config", app);
+	*out = made;
+	return none;
 }
 
 /// The per-user data directory of `app`, which holds what it installs.
 ///
 /// `$XDG_DATA_HOME/<app>` on Linux and macOS, which falls back to
-/// `~/.local/share/<app>`, and `%LOCALAPPDATA%\<app>` on Windows.
-pub fn user_data_dir(app: str) -> str
+/// `~/.local/share/<app>`, and `%LOCALAPPDATA%\<app>` on Windows. It
+/// fails as `user_config_dir` does.
+pub fn user_data_dir(app: str, out: *str) -> ?*failure.Error
 {
 	if windows() {
-		return windows_dir(app, "");
+		let made = try windows_dir(app, "");
+		*out = made;
+		return none;
 	}
-	return unix_dir("XDG_DATA_HOME", ".local/share", app);
+	let made = try unix_dir("XDG_DATA_HOME", ".local/share", app);
+	*out = made;
+	return none;
 }
 
 /// The per-user cache directory of `app`, which it may lose at any time.
 ///
 /// `$XDG_CACHE_HOME/<app>` on Linux and macOS, which falls back to
 /// `~/.cache/<app>`, and `cache\` of `%LOCALAPPDATA%\<app>` on Windows.
-pub fn user_cache_dir(app: str) -> str
+/// It fails as `user_config_dir` does.
+pub fn user_cache_dir(app: str, out: *str) -> ?*failure.Error
 {
 	if windows() {
-		return windows_dir(app, "cache");
+		let made = try windows_dir(app, "cache");
+		*out = made;
+		return none;
 	}
-	return unix_dir("XDG_CACHE_HOME", ".cache", app);
+	let made = try unix_dir("XDG_CACHE_HOME", ".cache", app);
+	*out = made;
+	return none;
 }

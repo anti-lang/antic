@@ -1,18 +1,41 @@
 //! The per-user directories of the platform, which are the ones an
 //! install of Anti uses. The test of the suite sets the XDG variables and
 //! LOCALAPPDATA, so one expected output stands on every host of a family.
+//! The test std_userdirs_no_home unsets them and reads the failure, whose
+//! message names the variable that is absent.
+import anti.error as failure;
 import anti.io;
 import anti.os;
+import anti.text;
+
+/// Print `dir`, or nothing when the call that gave it failed.
+fn show(dir: str)
+{
+	if text.byte_count(dir) == 0 {
+		return;
+	}
+	io.print(dir);
+	io.print("\n");
+}
+
+/// Print the message of `e` and give the empty text.
+fn failed(e: *failure.Error) -> str
+{
+	io.print("failed: ");
+	io.print(e.message);
+	io.print("\n");
+	return "";
+}
 
 fn main() -> int
 {
-	io.print(os.user_config_dir("anti"));
-	io.print("\n");
-	io.print(os.user_data_dir("anti"));
-	io.print("\n");
-	io.print(os.user_cache_dir("anti"));
-	io.print("\n");
-	io.print(os.user_data_dir("anti-x86_64"));
-	io.print("\n");
+	let config = os.user_config_dir("anti") catch e { yield failed(e); };
+	show(config);
+	let data = os.user_data_dir("anti") catch e { yield failed(e); };
+	show(data);
+	let cache = os.user_cache_dir("anti") catch e { yield failed(e); };
+	show(cache);
+	let other = os.user_data_dir("anti-x86_64") catch e { yield failed(e); };
+	show(other);
 	return 0;
 }

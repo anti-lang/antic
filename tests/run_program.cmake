@@ -9,6 +9,9 @@
 #   OPTIONS   optional options of antic, separated by commas
 #   EXPECTED  optional expected file, instead of NAME.expected beside the
 #             source, for a target whose output differs
+#   UNSET     optional environment variables the program runs without,
+#             separated by commas, for a program whose subject is what it
+#             does when one of them is absent
 #
 # The expected file starts with the line "exit N", the process exit code.
 # Every byte after that line is the expected standard output. An optional
@@ -51,7 +54,16 @@ set(program_args "")
 if(EXISTS "${dir}/${name}.args")
     file(STRINGS "${dir}/${name}.args" program_args ENCODING UTF-8)
 endif()
-program_output(stdout_hex exit_code "${exe}.stdout" "${exe}" ${program_args})
+set(runner "")
+if(DEFINED UNSET AND NOT UNSET STREQUAL "")
+    string(REPLACE "," ";" unset_names "${UNSET}")
+    set(runner "${CMAKE_COMMAND}" -E env)
+    foreach(name IN LISTS unset_names)
+        list(APPEND runner "--unset=${name}")
+    endforeach()
+endif()
+program_output(stdout_hex exit_code "${exe}.stdout" ${runner} "${exe}"
+               ${program_args})
 
 file(READ "${expected_file}" expected)
 if(NOT expected MATCHES "^exit ([0-9]+)\n")

@@ -409,6 +409,25 @@ endforeach()
 # of the test names it, since the C runtime of Windows has no setenv.
 set_tests_properties(std_log PROPERTIES ENVIRONMENT "ANTI_LOGGER=log-test.toml")
 
+# DESIGN: the three directory functions of anti.os fail when the
+# environment names no home, and the message names the variable that is
+# absent. The same program runs a second time without those variables,
+# and reads the failure rather than a directory.
+set(no_home "${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs-no-home.expected")
+if(ANTIC_HOST_TARGET MATCHES "^windows-")
+    set(no_home "${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs-no-home.win32.expected")
+endif()
+add_test(NAME std_userdirs_no_home
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs.anti"
+        "-DEXPECTED=${no_home}"
+        "-DUNSET=HOME,LOCALAPPDATA,XDG_CONFIG_HOME,XDG_DATA_HOME,XDG_CACHE_HOME"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-no-home"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+
 # The roots that tests/std/userdirs.anti reads. The environment of the
 # test holds them, so one expected output stands on every machine. A
 # Windows host reads LOCALAPPDATA alone and no XDG variable, and the two
