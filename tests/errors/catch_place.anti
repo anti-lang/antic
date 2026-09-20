@@ -1,0 +1,26 @@
+import anti.error;
+
+fn risky(out: *int) -> ?*error.Error
+{
+	*out = 1;
+	return none;
+}
+
+/// `catch` after a call fills the place, in every form the `let` takes.
+fn filled(p: *int) -> int
+{
+	let n = 0;
+	n = risky() catch fatal;
+	*p = risky() catch { yield 2; };
+	return n + *p;
+}
+
+/// A `catch` that guards a pointer binds the one it proved, and an
+/// assignment has no name for it.
+fn guarded(q: ?*int) -> int
+{
+	let n = 0;
+	let r = &n;
+	r = q catch fatal;
+	return *r;
+}

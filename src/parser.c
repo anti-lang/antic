@@ -1212,6 +1212,25 @@ static struct stmt *statement(struct parser *p)
             if ((s->as.assign.value = expression(p)) == NULL) {
                 return NULL;
             }
+            /* `*p = f(args) catch e { ... };` handles the error of the
+               call that fills the place, as the `let` of the same call
+               does. The two forms of a failing call stand wherever the
+               call stands, so neither `try` nor `catch` has a statement
+               it is missing from. A `catch` on anything else guards a
+               pointer and binds the one it proved, which an assignment
+               has no name for. */
+            if (check(p, TOKEN_CATCH)) {
+                struct expr *v = s->as.assign.value;
+                if (v->kind != EXPR_CALL) {
+                    error_here(p, "`catch` stands after a call here, and a "
+                                  "`catch` that guards a pointer stands in "
+                                  "a `let`");
+                    return NULL;
+                }
+                if (!read_handler(p, &v->as.call.handler, false)) {
+                    return NULL;
+                }
+            }
         } else {
             /* A call that can fail carries its handler here. */
             if (e->kind == EXPR_CALL && check(p, TOKEN_CATCH) &&

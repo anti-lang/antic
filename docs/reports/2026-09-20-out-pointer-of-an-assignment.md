@@ -66,7 +66,10 @@ value path and the failure path.
 four new tests are the two programs, each run natively and cross-built
 for macos-x86_64. `CLAUDE.md` carries the counts.
 
-## The first question, answered
+## The two questions, answered
+
+Both were put to Eddie at the end of the first part and answered in the
+same session.
 
 A failing call on the right of `+=` stays. A failing call is handled at
 the point of use. That rule holds everywhere an expression stands,
@@ -74,9 +77,11 @@ rather than having a hole cut in it for one operator. A reader who
 writes `total += try next();` means it. The entry in `docs/decisions.md`
 is settled, not provisional.
 
-## The question that remains
+The parser gap was the bug. `catch` now stands wherever `try` stands, so
+`*p = f(args) catch e { }` parses. `program_out_place_forms` runs both
+forms in each of the six places, and `listing_error_catch_place` holds
+the message for a `catch` that guards a pointer, which binds the one it
+proved and so stays in a `let`.
 
-- The parser takes `try` in assignment position but not `catch`. So
-  `x = f() catch e { }` is a syntax error while `let x = f() catch e { }`
-  is not. The lowering handles the handler blocks either way. Whether the
-  parser should take them is undecided.
+493 ctest tests pass on the Mac after the second part, ASan 492, UBSan
+492.

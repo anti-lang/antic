@@ -3,6 +3,10 @@
 //! temporary, a bitfield and a compound assignment have no address to
 //! give the call, so it writes a slot of its own and the value moves
 //! from there into the place.
+//!
+//! Each place carries both forms. `try` hands the error to the caller,
+//! and a `catch` handler takes it here, where `yield` puts a value of
+//! its own in the place.
 
 import anti.error;
 
@@ -75,6 +79,31 @@ fn passed_on(out: *Pair) -> ?*error.Error
 	return none;
 }
 
+/// The same five places with a handler of their own, and `*p` as well.
+fn handled() -> int
+{
+	let n = 0;
+	let numbers: [4]int = [0; 4];
+	let pair = Pair { left: 0, right: 0 };
+	let flags = Flags { layer: 1, pad: 0 };
+	let one = Pair { left: 0, right: 0 };
+	let into = &one;
+
+	n = value(5) catch fatal;
+	numbers[2] = value(-1) catch { yield 7; };
+	pair.right = value(11) catch e {
+		printf("unreached %d\n".ptr, e.code as c_int);
+		yield 0;
+	};
+	flags.layer = small() catch fatal;
+	n += value(-1) catch { yield 13; };
+	*into = made() catch fatal;
+	printf("handled %d %d %d %d %d %d\n".ptr, n as c_int,
+		numbers[2] as c_int, pair.right as c_int, flags.layer as c_int,
+		one.left as c_int, one.right as c_int);
+	return n + numbers[2] + pair.right + flags.layer as int;
+}
+
 fn main() -> int
 {
 	let total = places() catch fatal;
@@ -83,10 +112,12 @@ fn main() -> int
 		yield 0;
 	};
 	let pair = passed_on() catch fatal;
+	let sum = handled();
 
-	printf("total %d n %d pair %d %d\n".ptr, total as c_int, n as c_int,
-		pair.left as c_int, pair.right as c_int);
-	if total != 45 {
+	printf("total %d n %d pair %d %d sum %d\n".ptr, total as c_int,
+		n as c_int, pair.left as c_int, pair.right as c_int,
+		sum as c_int);
+	if total != 45 || sum != 45 {
 		return 1;
 	}
 	if n != 0 {

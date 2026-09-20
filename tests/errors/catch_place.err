@@ -1,0 +1,1 @@
+catch_place.anti:24:8: error: `catch` stands after a call here, and a `catch` that guards a pointer stands in a `let`
