@@ -735,6 +735,16 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
     endforeach()
 endforeach()
 
+# A release links its macOS binaries against the pinned Apple SDK, and an
+# SDK that changed under that name is refused.
+add_test(NAME macos_sdk
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DCLANG=${ANTIC_CLANG_DIR}/bin/clang"
+            "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macossdk"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_macos_sdk.cmake")
+set_tests_properties(macos_sdk PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # Without --runtime, antic takes the runtime archive of the user's data
 # directory, which is where an install puts it.
 add_test(NAME runtime_from_data_dir

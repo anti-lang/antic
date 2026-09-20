@@ -80,6 +80,10 @@ else()
                     OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
+# The pinned Apple SDK, whose reason tools/macos-sdk.cmake holds. A test
+# of its own drives that file, so the rule is read where it is written.
+include("${tools_dir}/macos-sdk.cmake")
+
 function(triple_of host out)
     set(triples
         "macos-arm64=arm64-apple-macos11"
@@ -132,18 +136,7 @@ function(build_program host output program)
                -I "${root}/tools/anti")
     set(link "")
     if(host MATCHES "^macos-")
-        # DESIGN: macOS links against the stubs of SYSROOT, as Linux links
-        # against the pinned musl, and never against the SDK of the machine
-        # that packs. A release is then the same whatever Xcode is
-        # installed, which is the reason the stubs are shipped at all.
-        # Xcode brought SDK 27.0 on 2026-09-20, whose libSystem.tbd names
-        # the target arm64e.x1-macos. The pinned ld64.lld read that file as
-        # malformed and left every symbol of libSystem undefined, and the
-        # packer stopped at "macos-arm64: antic did not link". The stubs
-        # carry the target list the pinned linker reads. A framework link
-        # still needs Apple's own SDK, through APPLE_SDK of
-        # tools/get-sysroot.cmake, which is no part of this.
-        list(APPEND common -isysroot "${SYSROOT}/${host}")
+        list(APPEND common -isysroot "${macos_sdk}")
         set(link --ld-path=${LLVM_BIN}/ld64.lld)
     elseif(host MATCHES "^linux-")
         list(APPEND common --sysroot "${SYSROOT}/${host}")
@@ -218,6 +211,19 @@ function(build_program host output program)
     endif()
 endfunction()
 
+
+# The pinned Apple SDK, read once and only when a macOS program is
+# compiled here. A run that packs programs ANTIC and ANTI already named
+# links nothing and needs no SDK.
+set(macos_sdk "")
+if(NOT DEFINED ANTIC)
+    foreach(host IN LISTS HOSTS)
+        if(host MATCHES "^macos-" AND macos_sdk STREQUAL "")
+            pinned_macos_sdk("${tools_dir}/macos-sdk-pin" "" macos_sdk)
+            message(STATUS "macOS SDK of ${tools_dir}/macos-sdk-pin in ${macos_sdk}")
+        endif()
+    endforeach()
+endif()
 
 set(sums "")
 foreach(host IN LISTS HOSTS)

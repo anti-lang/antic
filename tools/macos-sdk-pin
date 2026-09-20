@@ -1,0 +1,14 @@
+# The Apple SDK that a release links its macOS binaries against.
+# tools/pack-anti.cmake resolves it by version through the Command Line
+# Tools and never by a bare xcrun, which follows whatever Xcode is
+# installed. MACOS_SDK_DIGEST is the SHA-256 of usr/lib/libSystem.tbd of
+# that SDK, so an SDK that changed under the same name is caught rather
+# than used.
+#
+# The pin moves only as a deliberate step, together with the pinned LLVM.
+# macOS SDK 27.0 names the target arm64e.x1-macos in libSystem.tbd, which
+# ld64.lld 23.1.1 reads as malformed. docs/toolchain-later.md holds what
+# the day of that bump needs.
+MACOS_SDK_VERSION=26.5
+MACOS_SDK_NAME=MacOSX26.5.sdk
+MACOS_SDK_DIGEST=20cfce043f11a083e2eb6111efe3579919a8082fa4cc912a7bd839af2010ec57

@@ -14,3 +14,10 @@ toolchain work that came up after the freeze. It waits until a need makes it a r
 - The newest SDK of the Command Line Tools that antic takes, `APPLE_SDK_NEWEST_MAJOR` in
   `src/applesdk.h`, follows the ld64.lld of the pin. A new LLVM pin checks whether it reads
   the stubs of SDK 27 and later.
+- The pinned Apple SDK of a release, `MACOS_SDK_VERSION` in `tools/macos-sdk-pin`, is 26.5
+  and is bounded by the same linker. macOS SDK 27.0 names the target `arm64e.x1-macos` in
+  `libSystem.tbd`, which ld64.lld 23.1.1 reads as malformed, and every symbol of libSystem
+  is then undefined. The day a build machine carries SDK 27 or later alone, the pinned LLVM
+  has to be bumped to one that parses that target list, and `MACOS_SDK_VERSION` moves with
+  it in the same step. Until then the Command Line Tools keep 26.5 beside the newer SDK,
+  and the packer asks for it by version.
