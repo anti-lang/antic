@@ -695,34 +695,25 @@ add_test(NAME antl_scale
 set_tests_properties(antl_scale PROPERTIES FIXTURES_SETUP scale_antl)
 
 # The line form and the block form of the doc comments write one file.
-# Each runs in its own search root and names the source the same way, so
-# that the file a dev-mode check carries is the same in both libraries
-# and only the form of the doc comments differs.
 add_test(NAME antl_docs_lines
-    COMMAND antic -c -I . -o "${LIBS}/lines.antl" ./com/example/geo.anti)
-set_tests_properties(antl_docs_lines PROPERTIES
-    WORKING_DIRECTORY "${MODULES}/lines" FIXTURES_SETUP docs_lines)
+    COMMAND antic -c -I "${MODULES}/lines" -o "${LIBS}/lines.antl"
+            "${MODULES}/lines/com/example/geo.anti")
+set_tests_properties(antl_docs_lines PROPERTIES FIXTURES_SETUP docs_lines)
 add_test(NAME antl_docs_blocks
-    COMMAND antic -c -I . -o "${LIBS}/blocks.antl" ./com/example/geo.anti)
-set_tests_properties(antl_docs_blocks PROPERTIES
-    WORKING_DIRECTORY "${MODULES}/blocks" FIXTURES_SETUP docs_blocks)
+    COMMAND antic -c -I "${MODULES}/blocks" -o "${LIBS}/blocks.antl"
+            "${MODULES}/blocks/com/example/geo.anti")
+set_tests_properties(antl_docs_blocks PROPERTIES FIXTURES_SETUP docs_blocks)
 add_test(NAME antl_docs_equivalent
     COMMAND "${CMAKE_COMMAND}" -E compare_files "${LIBS}/lines.antl"
             "${LIBS}/blocks.antl")
 set_tests_properties(antl_docs_equivalent PROPERTIES
     FIXTURES_REQUIRED "docs_lines;docs_blocks")
 
-# DESIGN: the source is named relative to this directory, as
-# relative_paths.cmake names it for every runner that compares antic's
-# output. A dev-mode check carries the file into the library, and
-# dev_modules compiles the same module from its source and from this
-# file and compares the two.
 add_test(NAME antl_twice
-    COMMAND antic -c -I modules -I "${LIBS}"
+    COMMAND antic -c -I "${MODULES}" -I "${LIBS}"
             -o "${LIBS}/com/example/twice.antl"
-            modules/com/example/twice.anti)
+            "${MODULES}/com/example/twice.anti")
 set_tests_properties(antl_twice PROPERTIES
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     FIXTURES_REQUIRED scale_antl FIXTURES_SETUP twice_antl)
 
 # A library whose interface holds a class and an enum: the file carries

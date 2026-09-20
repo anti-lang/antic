@@ -3,32 +3,30 @@ type forward.Point = struct { x: i64, y: i64 }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global forward.5 size 36 align 1 bytes 64 75 6d 70 2f 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
-global forward.6 size 36 align 1 bytes 64 75 6d 70 2f 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global forward.5 size 31 align 1 bytes 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global forward.6 size 31 align 1 bytes 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 fn forward.twice(%0: ptr) -> i64 {
 b0:
     %1 = ptradd %0, offset_of forward.Point.y
     %2 = load i64 %1
-    %3 = addov i8 %2, %2
-    branch %3, b1, b2
+    %3 = addov i64 %2, %2
+    branchov %3, b1, b2
 b1:
     %4 = addr @forward.5
-    call void @anti_rt_check_failed(%4, 35, 1, %2, %2)
+    call void @anti_rt_check_failed(%4, 30, 1, %2, %2)
     jump b2
 b2:
-    %5 = add i64 %2, %2
-    ret i64 %5
+    ret i64 %3
 }
 fn forward.round_trip(%0: ptr, %1: i64) -> i64 {
 b0:
     store i64 %1, %0
-    %2 = addov i8 %1, %1
-    branch %2, b1, b2
+    %2 = addov i64 %1, %1
+    branchov %2, b1, b2
 b1:
     %3 = addr @forward.6
-    call void @anti_rt_check_failed(%3, 35, 1, %1, %1)
+    call void @anti_rt_check_failed(%3, 30, 1, %1, %1)
     jump b2
 b2:
-    %4 = add i64 %1, %1
-    ret i64 %4
+    ret i64 %2
 }

@@ -35,6 +35,23 @@ static const char *under(const char *source, const char *root)
     return source + n + 1;
 }
 
+const char *module_file_of_source(const char *source,
+                                  const char *const *roots, size_t root_count)
+{
+    const char *rest = NULL;
+    const char *slash;
+    size_t i;
+
+    for (i = 0; i < root_count && rest == NULL; i++) {
+        rest = under(source, roots[i]);
+    }
+    if (rest != NULL) {
+        return rest;
+    }
+    slash = strrchr(source, '/');
+    return slash != NULL ? slash + 1 : source;
+}
+
 bool module_path_of_source(const char *source, const char *const *roots,
                            size_t root_count, struct text *out, char *error,
                            size_t error_size)

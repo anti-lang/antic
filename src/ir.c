@@ -777,6 +777,18 @@ void ir_branch(struct ir_function *f, struct ir_block *b,
     inst->c = ir_block_op(else_block);
 }
 
+void ir_branch_ov(struct ir_function *f, struct ir_block *b,
+                  struct ir_operand value, const struct ir_block *then_block,
+                  const struct ir_block *else_block)
+{
+    struct ir_inst *inst = append(b, IR_BRANCH_OV, IR_VOID, IR_NO_RESULT);
+
+    (void)f;
+    inst->a = value;
+    inst->b = ir_block_op(then_block);
+    inst->c = ir_block_op(else_block);
+}
+
 void ir_ret(struct ir_function *f, struct ir_block *b, enum ir_type type,
             struct ir_operand value)
 {

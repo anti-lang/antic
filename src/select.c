@@ -278,8 +278,7 @@ static bool fuses(const struct selector *s, const struct ir_block *b,
     const struct ir_inst *inst = &b->insts[i];
     const struct ir_inst *next = i + 1 < b->count ? &b->insts[i + 1] : NULL;
 
-    return (is_comparison(inst->op) || select_is_overflow(inst->op)) &&
-           next != NULL &&
+    return is_comparison(inst->op) && next != NULL &&
            next->op == IR_BRANCH && next->a.kind == IR_TEMP &&
            next->a.as.temp == inst->result && s->uses[inst->result] == 1 &&
            find_pattern(s, inst) != NULL;
@@ -480,6 +479,9 @@ static void select_function(struct selector *s)
                 break;
             }
             p->emit(s, inst);
+            /* A branch on overflow reads the flags of the operation
+               right before it, which the verifier keeps adjacent. */
+            s->overflow = select_is_overflow(inst->op) ? inst : NULL;
             s->fused = NULL;
             s->has_address = false;
         }

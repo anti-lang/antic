@@ -147,6 +147,7 @@ struct selector {
     size_t block;                       /* the index of the IR block */
     uint32_t *uses;                     /* uses of each IR temporary */
     const struct ir_inst *fused;        /* a comparison for the branch */
+    const struct ir_inst *overflow;     /* What a branchov reads. */
     struct address address;             /* for the next load or store */
     bool has_address;
     struct mach_operand result_address; /* of an aggregate result */

@@ -44,20 +44,28 @@ takes the count from its type, and a `str` and a slice read it beside the
 pointer. `first_element` returns both, so the base is evaluated once. A raw
 pointer has no count and is not checked.
 
-Overflow. `IR_ADD_OV`, `IR_SUB_OV` and `IR_MUL_OV` give 1 when the signed
-operation leaves the range of its type. The arithmetic is repeated: the
-flag-setting instruction writes a register that nothing reads, and the ordinary
-operation still produces the value. `select_is_overflow` lets the selector fuse
-the test with the branch after it, so the fused form is the flag-setting
-instruction and a conditional branch.
+Overflow. `IR_ADD_OV`, `IR_SUB_OV` and `IR_MUL_OV` give the result of the
+signed operation and record whether it left the range of its type. The
+terminator `IR_BRANCH_OV` reads that. The two are adjacent, which the verifier
+checks, so the back end emits the arithmetic once and branches on what it left.
+`binary_checks` therefore returns the operation's result, which becomes the
+value of the expression. The selector keeps the operation in `s->overflow` for
+the branch that follows it.
 
-The sequences are in `overflow_flags` of `src/arm64.c` and `src/x86_64.c`.
-ARM64 has no arithmetic narrower than 32 bits. A narrow type therefore operates
-in 32 and compares the result with its own sign extension. It has no
-flag-setting multiply either. A 32-bit `*` reads the whole product from
-`smull`, and a 64-bit `*` compares `smulh` against the sign of the low half.
-x86_64 sets the overflow flag for all three. Its `imul` has no two-operand form
-for 8 bits, which takes the same route through the 32-bit registers.
+The sequences are in `emit_overflow` of `src/arm64.c` and `src/x86_64.c`, and
+`overflow_cond` gives the condition each one leaves. ARM64 uses the V flag of
+`adds` and `subs`. It has no arithmetic narrower than 32 bits, so a narrow type
+operates one width up and compares the result with its own sign extension. It
+has no flag-setting multiply either. A 64-bit `*` takes its result from `mul`
+and compares `smulh` against the sign of that result. A 32-bit `*` takes the
+low half of `smull` and compares it against its own sign extension. x86_64 sets
+the overflow flag for all three, so `two_operand` and `emit_mul` serve
+unchanged. Its `imul` has no two-operand form below 32 bits, which takes the
+route through the wider registers.
+
+Dropping the checks turns every overflow operation back into its plain
+arithmetic, so a build without them emits what it emitted before the checks
+existed.
 
 Narrowing. `narrow_check` in `src/lower.c`. The value goes to the target type
 and back to the source with the target's signedness. A value the target cannot
@@ -85,9 +93,23 @@ before it, as `lower_binary` does.
 
 ## The path in the text
 
-The text holds the source path the command line gave, which is what `assert`
-already writes. A test that compares antic's output byte for byte therefore
-runs antic in `tests/` with every path under it made relative, which
-`tests/relative_paths.cmake` does for `run_dump.cmake`, `run_antl.cmake` and
-`run_dev.cmake`. Two runners that spell one path differently would compile one
-module into two programs, which `dev_modules` compares.
+`module_file_of_source` in `src/modpath.c` gives the path of the source under
+the first search root that holds it, and its file name alone outside every
+root. `lower_checked` records that as the module's file, which an assertion
+and a check name, while a message keeps the path the command line gave. The
+same text gives the module path, so the two never disagree, and a library file
+holds the same bytes whichever checkout compiled it.
+
+## The values a failure prints
+
+They are widened to 64 bits inside the failure block, which runs only when the
+check fails. The path a program takes therefore pays the test and the branch
+alone. It also keeps an overflow operation next to its branch, since nothing
+may come between them.
+
+## An ordering in the optimizer
+
+`ir_optimize_function` merges the blocks before its first round. A dropped
+check leaves a jump into the block that follows it, and the peephole that
+fuses `t = op` with `x = copy t` needs the two adjacent. A round of
+propagation between the two gives `t` a second use, and the pair never fuses.

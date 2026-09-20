@@ -777,31 +777,6 @@ static const struct ir_global *check_text(struct lowerer *l, int line,
    carries its own kind, so the build that compiles the program drops the
    checks and the assertions under separate options. cond decides the
    failure when bad is set, and decides the rest otherwise. */
-static void check_branch(struct lowerer *l, struct ir_operand cond, bool bad,
-                         const struct ir_global *text, enum check_kind kind,
-                         struct ir_operand a, struct ir_operand b)
-{
-    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_I32, IR_I64,
-                                          IR_I64};
-    struct ir_block *fail = new_block(l);
-    struct ir_block *rest = new_block(l);
-    struct ir_operand args[5];
-
-    fail->fail = IR_FAIL_CHECK;
-    ir_branch(l->f, l->b, cond, bad ? fail : rest, bad ? rest : fail);
-    l->b = fail;
-    args[0] = temp(l, ir_addr(l->f, l->b, ir_global_op(text)));
-    args[1] = ir_int_op(IR_I64, text->size - 1);
-    args[2] = ir_int_op(IR_I32, (uint64_t)kind);
-    args[3] = a;
-    args[4] = b;
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(rt_function(l, "anti_rt_check_failed", params, 5)),
-            args, 5);
-    ir_jump(l->f, l->b, rest);
-    l->b = rest;
-}
-
 /* The value v of an integer type as the i64 the failure routine takes. */
 static struct ir_operand widen_operand(struct lowerer *l, struct ir_operand v,
                                        const struct type *t)
@@ -813,6 +788,52 @@ static struct ir_operand widen_operand(struct lowerer *l, struct ir_operand v,
                             type_is_signed(t) ? IR_SEXT : IR_ZEXT, IR_I64, v));
 }
 
+/* DESIGN: the values the failure prints are widened inside the failure
+   block, which runs only when the check fails. The path a program takes
+   pays the test and the branch alone. widen names the type they are
+   widened from, or is NULL when they are already i64. An empty b is a
+   check that prints one value. */
+static void check_call(struct lowerer *l, struct ir_block *fail,
+                       struct ir_block *rest, const struct ir_global *text,
+                       enum check_kind kind, struct ir_operand a,
+                       struct ir_operand b, const struct type *widen)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_I32, IR_I64,
+                                          IR_I64};
+    struct ir_operand args[5];
+
+    l->b = fail;
+    if (widen != NULL) {
+        a = widen_operand(l, a, widen);
+        if (b.kind != IR_NONE) {
+            b = widen_operand(l, b, widen);
+        }
+    }
+    args[0] = temp(l, ir_addr(l->f, l->b, ir_global_op(text)));
+    args[1] = ir_int_op(IR_I64, text->size - 1);
+    args[2] = ir_int_op(IR_I32, (uint64_t)kind);
+    args[3] = a;
+    args[4] = b.kind == IR_NONE ? ir_int_op(IR_I64, 0) : b;
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(rt_function(l, "anti_rt_check_failed", params, 5)),
+            args, 5);
+    ir_jump(l->f, l->b, rest);
+    l->b = rest;
+}
+
+static void check_branch(struct lowerer *l, struct ir_operand cond, bool bad,
+                         const struct ir_global *text, enum check_kind kind,
+                         struct ir_operand a, struct ir_operand b,
+                         const struct type *widen)
+{
+    struct ir_block *fail = new_block(l);
+    struct ir_block *rest = new_block(l);
+
+    fail->fail = IR_FAIL_CHECK;
+    ir_branch(l->f, l->b, cond, bad ? fail : rest, bad ? rest : fail);
+    check_call(l, fail, rest, text, kind, a, b, widen);
+}
+
 static enum ir_op overflow_op(enum token_kind op)
 {
     return op == TOKEN_PLUS    ? IR_ADD_OV
@@ -820,15 +841,22 @@ static enum ir_op overflow_op(enum token_kind op)
                                : IR_MUL_OV;
 }
 
-/* The checks of a binary operation, emitted before it so that a divisor
-   of zero never reaches the instruction. They are overflow on a signed
-   + - or *, a zero divisor of / and %, and a shift count outside the
-   width of the type. Unsigned arithmetic wraps and is not
-   checked. The width is the size of the type in bits, which a
-   target-sized type leaves to the back end. */
-static void binary_checks(struct lowerer *l, enum token_kind op,
-                          const struct type *t, struct ir_operand left,
-                          struct ir_operand right, int line)
+/* DESIGN: the overflow test is the arithmetic itself. The operation
+   gives its result and records whether it left the range, and the branch
+   reads that. A dev build pays the branch and not a second add. The
+   value of the expression is therefore the operation's result, which
+   binary_checks returns. Every other check gives nothing back and is
+   emitted before the operation, so a divisor of zero never reaches the
+   instruction.
+
+   The checks are overflow on a signed + - or *, a zero divisor of / and
+   %, and a shift count outside the width of the type. Unsigned
+   arithmetic wraps and is not checked. The width is the size of the type
+   in bits, which a target-sized type leaves to the back end. */
+static struct ir_operand binary_checks(struct lowerer *l, enum token_kind op,
+                                       const struct type *t,
+                                       struct ir_operand left,
+                                       struct ir_operand right, int line)
 {
     char operation[64];
     struct ir_operand ok;
@@ -836,23 +864,31 @@ static void binary_checks(struct lowerer *l, enum token_kind op,
     struct ir_operand width;
 
     if (!type_is_integer(t)) {
-        return;
+        return none();
     }
     switch (op) {
     case TOKEN_PLUS:
     case TOKEN_MINUS:
-    case TOKEN_STAR:
+    case TOKEN_STAR: {
+        const struct ir_global *text;
+        struct ir_block *fail;
+        struct ir_block *rest;
+        struct ir_operand result;
         if (!type_is_signed(t)) {
-            return;
+            return none();
         }
-        ok = temp(l, ir_binary(l->f, l->b, overflow_op(op), IR_I8, left,
-                               right));
         snprintf(operation, sizeof operation, "overflow in %s",
                  op == TOKEN_PLUS ? "+" : op == TOKEN_MINUS ? "-" : "*");
-        check_branch(l, ok, true, check_text(l, line, operation),
-                     CHECK_OVERFLOW, widen_operand(l, left, t),
-                     widen_operand(l, right, t));
-        return;
+        text = check_text(l, line, operation);
+        result = temp(l, ir_binary(l->f, l->b, overflow_op(op),
+                                   ir_type_of(t), left, right));
+        fail = new_block(l);
+        rest = new_block(l);
+        fail->fail = IR_FAIL_CHECK;
+        ir_branch_ov(l->f, l->b, result, fail, rest);
+        check_call(l, fail, rest, text, CHECK_OVERFLOW, left, right, t);
+        return result;
+    }
     case TOKEN_SLASH:
     case TOKEN_PERCENT:
         ok = temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, right,
@@ -860,9 +896,9 @@ static void binary_checks(struct lowerer *l, enum token_kind op,
         snprintf(operation, sizeof operation, "division by zero in %s",
                  op == TOKEN_SLASH ? "/" : "%");
         check_branch(l, ok, false, check_text(l, line, operation),
-                     type_is_signed(t) ? CHECK_LEFT : CHECK_LEFT_U,
-                     widen_operand(l, left, t), ir_int_op(IR_I64, 0));
-        return;
+                     type_is_signed(t) ? CHECK_LEFT : CHECK_LEFT_U, left,
+                     none(), t);
+        return none();
     case TOKEN_SHL:
     case TOKEN_SHR:
         count = widen_operand(l, right, t);
@@ -873,10 +909,10 @@ static void binary_checks(struct lowerer *l, enum token_kind op,
                  "shift count out of range for %s",
                  op == TOKEN_SHL ? "<<" : ">>");
         check_branch(l, ok, false, check_text(l, line, operation),
-                     CHECK_SHIFT, count, width);
-        return;
+                     CHECK_SHIFT, count, width, NULL);
+        return none();
     default:
-        return;
+        return none();
     }
 }
 
@@ -942,7 +978,7 @@ static void bounds_check(struct lowerer *l, const struct expr *e,
     check_branch(l, ok, false,
                  check_text(l, e->as.index.index->pos.line,
                             "index out of bounds"),
-                 CHECK_BOUNDS, index, length);
+                 CHECK_BOUNDS, index, length, NULL);
 }
 
 static struct ir_operand element_address(struct lowerer *l,
@@ -3017,6 +3053,7 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     const struct type *operands = e->as.binary.left->type;
     struct ir_operand left;
     struct ir_operand right;
+    struct ir_operand checked;
     bool identity = (op == TOKEN_EQ || op == TOKEN_NE) &&
                     may_be_sub(e->as.binary.left->type) &&
                     may_be_sub(e->as.binary.right->type);
@@ -3033,7 +3070,10 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
         left = object_of(l, left);
         right = object_of(l, right);
     }
-    binary_checks(l, op, operands, left, right, e->pos.line);
+    checked = binary_checks(l, op, operands, left, right, e->pos.line);
+    if (checked.kind != IR_NONE) {
+        return checked;
+    }
     return temp(l, ir_binary(l->f, l->b, binary_op(op, operands),
                              is_comparison(op) ? IR_I8 : ir_type_of(operands),
                              left, right));
@@ -3266,7 +3306,7 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
         ok = temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, v,
                                ir_int_op(source, 0)));
         check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind,
-                     widen_operand(l, v, from), ir_int_op(IR_I64, 0));
+                     v, none(), from);
     }
     if (source != target && narrows(source, target)) {
         round = temp(l, ir_unary(l->f, l->b, IR_TRUNC, target, v));
@@ -3275,7 +3315,7 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
                                  source, round));
         ok = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, round, v));
         check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind,
-                     widen_operand(l, v, from), ir_int_op(IR_I64, 0));
+                     v, none(), from);
     }
 }
 
@@ -4494,9 +4534,12 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     }
     if (s->as.assign.op != TOKEN_ASSIGN) {
         enum token_kind op = compound_op(s->as.assign.op);
-        binary_checks(l, op, target->type, old, v, target->pos.line);
-        v = temp(l, ir_binary(l->f, l->b, binary_op(op, target->type),
-                              p.type, old, v));
+        struct ir_operand checked =
+            binary_checks(l, op, target->type, old, v, target->pos.line);
+        v = checked.kind != IR_NONE
+                ? checked
+                : temp(l, ir_binary(l->f, l->b, binary_op(op, target->type),
+                                    p.type, old, v));
     }
     if (p.in_temp) {
         ir_assign(l->f, l->b, p.temp, v);

@@ -1,32 +1,30 @@
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global com.example.scale.0 size 48 align 1 bytes 6d 6f 64 75 6c 65 73 2f 63 6f 6d 2f 65 78 61 6d 70 6c 65 2f 73 63 61 6c 65 2e 61 6e 74 69 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
-global com.example.twice.0 size 48 align 1 bytes 6d 6f 64 75 6c 65 73 2f 63 6f 6d 2f 65 78 61 6d 70 6c 65 2f 74 77 69 63 65 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
-global main.0 size 43 align 1 bytes 6d 6f 64 75 6c 65 73 2f 6d 61 69 6e 2e 61 6e 74 69 3a 35 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00
+global com.example.scale.0 size 40 align 1 bytes 63 6f 6d 2f 65 78 61 6d 70 6c 65 2f 73 63 61 6c 65 2e 61 6e 74 69 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
+global com.example.twice.0 size 40 align 1 bytes 63 6f 6d 2f 65 78 61 6d 70 6c 65 2f 74 77 69 63 65 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global main.0 size 35 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 35 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00
 fn com.example.scale.scale(%0: i64) -> i64 {
 b0:
-    %1 = mulov i8 %0, 6
-    branch %1, b1, b2
+    %1 = mulov i64 %0, 6
+    branchov %1, b1, b2
 b1:
     %2 = addr @com.example.scale.0
-    call void @anti_rt_check_failed(%2, 47, 1, %0, 6)
+    call void @anti_rt_check_failed(%2, 39, 1, %0, 6)
     jump b2
 b2:
-    %3 = mul i64 %0, 6
-    ret i64 %3
+    ret i64 %1
 }
 fn com.example.twice.twice(%0: i64) -> i64 {
 b0:
     %1 = call i64 @com.example.scale.scale(%0)
     %2 = call i64 @com.example.scale.scale(%0)
-    %3 = addov i8 %1, %2
-    branch %3, b1, b2
+    %3 = addov i64 %1, %2
+    branchov %3, b1, b2
 b1:
     %4 = addr @com.example.twice.0
-    call void @anti_rt_check_failed(%4, 47, 1, %1, %2)
+    call void @anti_rt_check_failed(%4, 39, 1, %1, %2)
     jump b2
 b2:
-    %5 = add i64 %1, %2
-    ret i64 %5
+    ret i64 %3
 }
 fn main.main() -> i64 {
 b0:
@@ -35,7 +33,7 @@ b0:
     branch %1, b2, b1
 b1:
     %2 = addr @main.0
-    call void @anti_rt_check_failed(%2, 42, 4, %0, 0)
+    call void @anti_rt_check_failed(%2, 34, 4, %0, 0)
     jump b2
 b2:
     %3 = sdiv i64 %0, 2

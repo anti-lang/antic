@@ -85,15 +85,15 @@ global probe.Breaks.fields [5]anti.rt.Field { anti.rt.Field { @probe.2, i64 1, o
 global probe.BreaksBox.descriptor anti.rt.Descriptor { @probe.56, i64 9, ptr 0, size_of probe.BreaksBox, i64 0, ptr 0, i64 2, @probe.BreaksBox.fields, ptr 0, i64 0, i64 0, ptr 0 }
 global probe.56 size 10 align 1 bytes 42 72 65 61 6b 73 42 6f 78 00
 global probe.BreaksBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.BreaksBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.9, i64 1, offset_of probe.BreaksBox.t, i64 21, i64 0, @probe.Breaks.descriptor } }
-global probe.58 size 34 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 33 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global probe.58 size 30 align 1 bytes 70 72 6f 62 65 2e 61 6e 74 69 3a 31 33 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global probe.59 size 3 align 1 bytes 25 73 00
 global probe.60 size 6 align 1 bytes 20 25 30 32 78 00
-global probe.61 size 34 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 34 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global probe.61 size 30 align 1 bytes 70 72 6f 62 65 2e 61 6e 74 69 3a 31 34 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global probe.62 size 2 align 1 bytes 0a 00
 global probe.63 size 21 align 1 bytes 25 73 20 73 69 7a 65 20 25 64 20 61 6c 69 67 6e 20 25 64 0a 00
-global probe.64 size 47 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 33 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
-global probe.65 size 34 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
-global probe.66 size 47 align 1 bytes 61 62 69 2f 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
+global probe.64 size 43 align 1 bytes 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 33 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
+global probe.65 size 30 align 1 bytes 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
+global probe.66 size 43 align 1 bytes 70 72 6f 62 65 2e 61 6e 74 69 3a 31 35 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
 global probe.67 size 7 align 1 bytes 57 69 64 65 2e 61 00
 global probe.68 size 7 align 1 bytes 57 69 64 65 2e 62 00
 global probe.69 size 7 align 1 bytes 57 69 64 65 2e 63 00
@@ -137,24 +137,23 @@ b2:
     %4 = mul i64 %2, size_of i8
     %5 = ptradd %0, %4
     store i8 0, %5
-    %6 = addov i8 %2, 1
-    branch %6, b4, b5
+    %6 = addov i64 %2, 1
+    branchov %6, b4, b5
 b3:
     ret
 b4:
     %7 = addr @probe.58
-    call void @anti_rt_check_failed(%7, 33, 1, %2, 1)
+    call void @anti_rt_check_failed(%7, 29, 1, %2, 1)
     jump b5
 b5:
-    %8 = add i64 %2, 1
-    %2 = copy i64 %8
+    %2 = copy i64 %6
     jump b1
 }
 fn probe.dump(%0: agg str, %1: ptr, %2: i64) {
 b0:
     %3 = slot str
     %11 = slot str
-    %23 = slot str
+    %22 = slot str
     %4 = addr @probe.59
     store ptr %4, %3
     %5 = ptradd %3, offset_of str.len
@@ -178,23 +177,22 @@ b2:
     %17 = load i8 %16
     %18 = zext i32 %17
     %19 = call i32 @printf(%14, %18)
-    %20 = addov i8 %9, 1
-    branch %20, b4, b5
+    %20 = addov i64 %9, 1
+    branchov %20, b4, b5
 b3:
-    %24 = addr @probe.62
-    store ptr %24, %23
-    %25 = ptradd %23, offset_of str.len
-    store i64 1, %25
-    %26 = load ptr %23
-    %27 = call i32 @printf(%26)
+    %23 = addr @probe.62
+    store ptr %23, %22
+    %24 = ptradd %22, offset_of str.len
+    store i64 1, %24
+    %25 = load ptr %22
+    %26 = call i32 @printf(%25)
     ret
 b4:
     %21 = addr @probe.61
-    call void @anti_rt_check_failed(%21, 33, 1, %9, 1)
+    call void @anti_rt_check_failed(%21, 29, 1, %9, 1)
     jump b5
 b5:
-    %22 = add i64 %9, 1
-    %9 = copy i64 %22
+    %9 = copy i64 %20
     jump b1
 }
 fn probe.size(%0: agg str, %1: i64, %2: i64) {
@@ -212,29 +210,28 @@ b0:
     branch %10, b2, b1
 b1:
     %11 = addr @probe.64
-    call void @anti_rt_check_failed(%11, 46, 2, %1, 0)
+    call void @anti_rt_check_failed(%11, 42, 2, %1, 0)
     jump b2
 b2:
     %12 = trunc i32 %1
-    %13 = subov i8 %2, %1
-    branch %13, b3, b4
+    %13 = subov i64 %2, %1
+    branchov %13, b3, b4
 b3:
     %14 = addr @probe.65
-    call void @anti_rt_check_failed(%14, 33, 1, %2, %1)
+    call void @anti_rt_check_failed(%14, 29, 1, %2, %1)
     jump b4
 b4:
-    %15 = sub i64 %2, %1
-    %16 = trunc i32 %15
-    %17 = sext i64 %16
-    %18 = eq i8 %17, %15
-    branch %18, b6, b5
+    %15 = trunc i32 %13
+    %16 = sext i64 %15
+    %17 = eq i8 %16, %13
+    branch %17, b6, b5
 b5:
-    %19 = addr @probe.66
-    call void @anti_rt_check_failed(%19, 46, 2, %15, 0)
+    %18 = addr @probe.66
+    call void @anti_rt_check_failed(%18, 42, 2, %13, 0)
     jump b6
 b6:
-    %20 = trunc i32 %15
-    %21 = call i32 @printf(%6, %7, %12, %20)
+    %19 = trunc i32 %13
+    %20 = call i32 @printf(%6, %7, %12, %19)
     ret
 }
 fn probe.main() -> i64 {

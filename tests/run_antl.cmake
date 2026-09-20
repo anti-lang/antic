@@ -8,15 +8,8 @@
 #   EXPECTED  the hex listing
 
 string(REPLACE "|" ";" options "${OPTIONS}")
-
-include("${CMAKE_CURRENT_LIST_DIR}/relative_paths.cmake")
-set(paths "${ROOT}" "${SOURCE}")
-relative_paths(paths)
-list(GET paths 0 root)
-list(GET paths 1 source)
 execute_process(
-    COMMAND "${ANTIC}" -c -I "${root}" ${options} -o "${OUTPUT}" "${source}"
-    WORKING_DIRECTORY "${ANTIC_TESTS}"
+    COMMAND "${ANTIC}" -c -I "${ROOT}" ${options} -o "${OUTPUT}" "${SOURCE}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
     ERROR_VARIABLE err

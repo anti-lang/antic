@@ -16,7 +16,7 @@ _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
 _Static_assert(TOKEN_KIND_COUNT == 145, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
-_Static_assert(IR_RET == 60, "raise ANTL_VERSION, then update this");
+_Static_assert(IR_RET == 61, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_SYM == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_EXT_ZERO == 2, "raise ANTL_VERSION, then update this");

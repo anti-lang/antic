@@ -16,12 +16,8 @@ if(DEFINED COMMAND)
 else()
     set(arguments "${OPTION}" "${SOURCE}" ${libraries})
 endif()
-
-include("${CMAKE_CURRENT_LIST_DIR}/relative_paths.cmake")
-relative_paths(arguments)
 execute_process(
     COMMAND "${ANTIC}" ${arguments}
-    WORKING_DIRECTORY "${ANTIC_TESTS}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
     ERROR_VARIABLE err

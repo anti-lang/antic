@@ -39,9 +39,15 @@ static void fail(struct verifier *v, const char *format, ...)
     v->ok = false;
 }
 
+static bool is_overflow(enum ir_op op)
+{
+    return op == IR_ADD_OV || op == IR_SUB_OV || op == IR_MUL_OV;
+}
+
 static bool is_terminator(enum ir_op op)
 {
-    return op == IR_JUMP || op == IR_BRANCH || op == IR_RET;
+    return op == IR_JUMP || op == IR_BRANCH || op == IR_BRANCH_OV ||
+           op == IR_RET;
 }
 
 /* The type an operand carries, after checking that it refers to
@@ -118,19 +124,11 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
     case IR_NEG: case IR_NOT: case IR_FNEG: case IR_COPY:
         same_type(v, inst, &inst->a, inst->type);
         break;
-    /* An overflow test gives i8 and its operands share the type whose
-       range it tests, which the instruction names. */
+    /* An overflow operation gives the result of the arithmetic, and
+       IR_BRANCH_OV reads whether it left the range. */
     case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV:
-        if (operand_ok(v, inst, &inst->a) && operand_ok(v, inst, &inst->b) &&
-            type_of(v, &inst->a) != type_of(v, &inst->b)) {
-            fail(v, "%s tests %s against %s", ir_op_name(inst->op),
-                 ir_type_name(type_of(v, &inst->a)),
-                 ir_type_name(type_of(v, &inst->b)));
-        }
-        if (inst->type != IR_I8) {
-            fail(v, "%s gives i8, not %s", ir_op_name(inst->op),
-                 ir_type_name(inst->type));
-        }
+        same_type(v, inst, &inst->a, inst->type);
+        same_type(v, inst, &inst->b, inst->type);
         break;
     case IR_EQ: case IR_NE: case IR_SLT: case IR_SLE: case IR_SGT:
     case IR_SGE: case IR_ULT: case IR_ULE: case IR_UGT: case IR_UGE:
@@ -213,6 +211,14 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
         operand_ok(v, inst, &inst->b);
         operand_ok(v, inst, &inst->c);
         break;
+    case IR_BRANCH_OV:
+        if (inst->a.kind != IR_TEMP) {
+            fail(v, "branchov reads %s and not a temporary",
+                 ir_op_name(inst->op));
+        }
+        operand_ok(v, inst, &inst->b);
+        operand_ok(v, inst, &inst->c);
+        break;
     case IR_RET:
         if (inst->type != result) {
             fail(v, "ret %s in a function that returns %s",
@@ -269,7 +275,7 @@ static void entry_set(const struct ir_function *f, size_t b,
         }
         last = &pred->insts[pred->count - 1];
         if ((last->op == IR_JUMP && last->a.as.index == b) ||
-            (last->op == IR_BRANCH &&
+            ((last->op == IR_BRANCH || last->op == IR_BRANCH_OV) &&
              (last->b.as.index == b || last->c.as.index == b))) {
             for (k = 0; k < words; k++) {
                 in[k] &= out[i * words + k];
@@ -385,6 +391,15 @@ bool ir_verify(const struct ir_module *m, struct text *errors)
             v.b = b;
             for (k = 0; k < b->count; k++) {
                 check_inst(&v, &b->insts[k]);
+                /* A branch on overflow reads the flags of the
+                   instruction right before it, so nothing may come
+                   between the two. */
+                if (b->insts[k].op == IR_BRANCH_OV &&
+                    (k == 0 ||
+                     !is_overflow(b->insts[k - 1].op) ||
+                     b->insts[k - 1].result != b->insts[k].a.as.temp)) {
+                    fail(&v, "branchov does not follow its operation");
+                }
                 if (is_terminator(b->insts[k].op) && k + 1 < b->count) {
                     fail(&v, "%s is not the last instruction",
                          ir_op_name(b->insts[k].op));

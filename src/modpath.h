@@ -18,6 +18,15 @@ bool module_path_of_source(const char *source, const char *const *roots,
                            size_t root_count, struct text *out, char *error,
                            size_t error_size);
 
+/* DESIGN: the path of source under the first root that holds it, or its
+   file name alone when no root does. It is the form a failed assertion
+   and a failed dev-mode check name, so a library file holds the same
+   bytes whichever checkout compiled it. The module path comes from the
+   same text. Returns a pointer into source. */
+const char *module_file_of_source(const char *source,
+                                  const char *const *roots,
+                                  size_t root_count);
+
 /* Whether path starts with the segment anti, which the language's own
    libraries use. */
 bool module_path_reserved(const char *path);

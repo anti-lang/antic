@@ -8,35 +8,32 @@ global main.1 size 2 align 1 bytes 48 00
 global main.2 size 4 align 1 bytes 74 61 67 00
 global main.3 size 2 align 1 bytes 6e 00
 global main.H.fields [2]anti.rt.Field { anti.rt.Field { @main.2, i64 3, offset_of main.H.tag, i64 8, i64 0, ptr 0 }, anti.rt.Field { @main.3, i64 1, offset_of main.H.n, i64 5, i64 0, ptr 0 } }
-global main.5 size 41 align 1 bytes 64 75 6d 70 2f 73 69 7a 65 5f 6f 66 2f 6d 61 69 6e 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
-global main.6 size 41 align 1 bytes 64 75 6d 70 2f 73 69 7a 65 5f 6f 66 2f 6d 61 69 6e 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
-global main.7 size 41 align 1 bytes 64 75 6d 70 2f 73 69 7a 65 5f 6f 66 2f 6d 61 69 6e 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
+global main.5 size 28 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
+global main.6 size 28 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global main.7 size 28 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
 fn main.f() -> i64 {
 b0:
     %0 = copy i64 size_of main.H
-    %1 = mulov i8 %0, 1
-    branch %1, b1, b2
+    %1 = mulov i64 %0, 1
+    branchov %1, b1, b2
 b1:
     %2 = addr @main.5
-    call void @anti_rt_check_failed(%2, 40, 1, %0, 1)
+    call void @anti_rt_check_failed(%2, 27, 1, %0, 1)
     jump b2
 b2:
-    %3 = mul i64 %0, 1
-    %4 = addov i8 %3, 4
-    branch %4, b3, b4
+    %3 = addov i64 %1, 4
+    branchov %3, b3, b4
 b3:
-    %5 = addr @main.6
-    call void @anti_rt_check_failed(%5, 40, 1, %3, 4)
+    %4 = addr @main.6
+    call void @anti_rt_check_failed(%4, 27, 1, %1, 4)
     jump b4
 b4:
-    %6 = add i64 %3, 4
-    %7 = subov i8 %6, 4
-    branch %7, b5, b6
+    %5 = subov i64 %3, 4
+    branchov %5, b5, b6
 b5:
-    %8 = addr @main.7
-    call void @anti_rt_check_failed(%8, 40, 1, %6, 4)
+    %6 = addr @main.7
+    call void @anti_rt_check_failed(%6, 27, 1, %3, 4)
     jump b6
 b6:
-    %9 = sub i64 %6, 4
-    ret i64 %9
+    ret i64 %5
 }

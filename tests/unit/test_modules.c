@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 26, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 27, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -305,7 +305,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 255, 255, 255, 255, 0, 0, 0, 0,              /* no type, field 0 */
     0, 0, 0, 0,                                     /* no arguments */
-    60, 4, 255, 255, 255, 255,                      /* ret i64 */
+    61, 4, 255, 255, 255, 255,                      /* ret i64 */
     1, 4, 1, 0, 0, 0, 0, 0, 0, 0,                   /* %1 */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -944,15 +944,14 @@ static void keeps_literals(void)
               "    store i64 2, %5\n"
               "    %6 = ptradd %3, offset_of str.len\n"
               "    %7 = load i64 %6\n"
-              "    %8 = addov i8 %2, %7\n"
-              "    branch %8, b1, b2\n"
+              "    %8 = addov i64 %2, %7\n"
+              "    branchov %8, b1, b2\n"
               "b1:\n"
               "    %9 = addr @main.1\n"
               "    call void @anti_rt_check_failed(%9, 21, 1, %2, %7)\n"
               "    jump b2\n"
               "b2:\n"
-              "    %10 = add i64 %2, %7\n"
-              "    ret i64 %10\n"
+              "    ret i64 %8\n"
               "}\n");
     text_free(&bytes);
     text_free(&ir);
@@ -1217,9 +1216,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 27;
+    copy[4] = 28;
     refuses_file(copy, sizeof copy,
-                 "has format version 27, and antic reads version 26");
+                 "has format version 28, and antic reads version 27");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");

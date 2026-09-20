@@ -99,7 +99,8 @@ static bool is_pure(enum ir_op op)
 {
     return op != IR_STORE && op != IR_BITSTORE && op != IR_MEMCOPY &&
            op != IR_CALL &&
-           op != IR_JUMP && op != IR_BRANCH && op != IR_RET;
+           op != IR_JUMP && op != IR_BRANCH && op != IR_BRANCH_OV &&
+           op != IR_RET;
 }
 
 static struct ir_operand *operand(struct ir_inst *inst, size_t i)
@@ -660,7 +661,7 @@ static bool apply_peephole_rules(struct ir_function *f)
             }
             if (inst->op == IR_JUMP) {
                 changed = retarget(f, &inst->a) || changed;
-            } else if (inst->op == IR_BRANCH) {
+            } else if (inst->op == IR_BRANCH || inst->op == IR_BRANCH_OV) {
                 changed = retarget(f, &inst->b) || changed;
                 changed = retarget(f, &inst->c) || changed;
             }
@@ -730,7 +731,7 @@ static void mark_reachable(const struct ir_function *f, uint32_t b,
     last = &block->insts[block->count - 1];
     if (last->op == IR_JUMP) {
         mark_reachable(f, last->a.as.index, reached);
-    } else if (last->op == IR_BRANCH) {
+    } else if (last->op == IR_BRANCH || last->op == IR_BRANCH_OV) {
         mark_reachable(f, last->b.as.index, reached);
         mark_reachable(f, last->c.as.index, reached);
     }
@@ -797,7 +798,7 @@ static bool merge_blocks(struct ir_function *f)
         }
         if (last->op == IR_JUMP) {
             preds[last->a.as.index]++;
-        } else if (last->op == IR_BRANCH) {
+        } else if (last->op == IR_BRANCH || last->op == IR_BRANCH_OV) {
             preds[last->b.as.index]++;
             preds[last->c.as.index]++;
         }
@@ -1241,6 +1242,12 @@ void ir_optimize_function(struct ir_function *f)
 {
     bool changed = true;
 
+    /* DESIGN: the blocks merge before the first round. A dropped check
+       leaves a jump into the block that follows it, and the peephole
+       that fuses `t = op` with `x = copy t` needs the two adjacent. A
+       round of propagation between the two gives t a second use and the
+       pair never fuses. */
+    remove_dead_code(f);
     /* The peephole rules run before copy propagation. Propagation would
        give t in the pair t = op and x = copy t a second use. */
     while (changed) {
@@ -1535,23 +1542,44 @@ void ir_optimize_module(struct ir_module *program, const char *module)
     remove_unused_functions(program, module, true);
 }
 
+/* The plain arithmetic of an overflow operation, which is what it is
+   once nothing reads whether it overflowed. */
+static enum ir_op without_overflow(enum ir_op op)
+{
+    return op == IR_ADD_OV   ? IR_ADD
+           : op == IR_SUB_OV ? IR_SUB
+                             : IR_MUL;
+}
+
 /* Replace every branch into a failure block of that kind with a jump to
-   the block that follows it. */
+   the block that follows it. Dropping the checks also turns every
+   overflow operation back into its arithmetic, so a build without them
+   emits what it emitted before they existed. */
 void ir_drop_failures(struct ir_module *program, enum ir_fail kind)
 {
     size_t i;
     size_t b;
+    size_t k;
 
     for (i = 0; i < program->function_count; i++) {
         struct ir_function *f = program->functions[i];
         for (b = 0; b < f->block_count; b++) {
             struct ir_block *block = f->blocks[b];
             struct ir_inst *last;
+            if (kind == IR_FAIL_CHECK) {
+                for (k = 0; k < block->count; k++) {
+                    struct ir_inst *inst = &block->insts[k];
+                    if (inst->op == IR_ADD_OV || inst->op == IR_SUB_OV ||
+                        inst->op == IR_MUL_OV) {
+                        inst->op = without_overflow(inst->op);
+                    }
+                }
+            }
             if (block->count == 0) {
                 continue;
             }
             last = &block->insts[block->count - 1];
-            if (last->op != IR_BRANCH) {
+            if (last->op != IR_BRANCH && last->op != IR_BRANCH_OV) {
                 continue;
             }
             /* The failure block is the arm the condition decides. A

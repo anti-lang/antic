@@ -1,23 +1,21 @@
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global main.0 size 39 align 1 bytes 64 75 6d 70 2f 68 65 61 64 65 72 2f 6d 61 69 6e 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
-global main.1 size 39 align 1 bytes 64 75 6d 70 2f 68 65 61 64 65 72 2f 6d 61 69 6e 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global main.0 size 27 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
+global main.1 size 27 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 fn main.bytes(%0: i64) -> i64 {
 b0:
-    %1 = mulov i8 %0, size_of i64
-    branch %1, b1, b2
+    %1 = mulov i64 %0, size_of i64
+    branchov %1, b1, b2
 b1:
     %2 = addr @main.0
-    call void @anti_rt_check_failed(%2, 38, 1, %0, size_of i64)
+    call void @anti_rt_check_failed(%2, 26, 1, %0, size_of i64)
     jump b2
 b2:
-    %3 = mul i64 %0, size_of i64
-    %4 = addov i8 mul i64(size_of i32, 2), %3
-    branch %4, b3, b4
+    %3 = addov i64 mul i64(size_of i32, 2), %1
+    branchov %3, b3, b4
 b3:
-    %5 = addr @main.1
-    call void @anti_rt_check_failed(%5, 38, 1, mul i64(size_of i32, 2), %3)
+    %4 = addr @main.1
+    call void @anti_rt_check_failed(%4, 26, 1, mul i64(size_of i32, 2), %1)
     jump b4
 b4:
-    %6 = add i64 mul i64(size_of i32, 2), %3
-    ret i64 %6
+    ret i64 %3
 }

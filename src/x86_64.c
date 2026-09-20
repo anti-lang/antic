@@ -783,51 +783,59 @@ static void conditional(struct selector *s, const struct ir_inst *inst,
     jump(s, &inst->c);
 }
 
-/* DESIGN: add, sub and the two-operand imul each set the overflow flag
-   for their own width. The sequence is the operation into a register the
-   program never reads, and the flag it leaves. imul has no two-operand
-   form for 8 bits, so an 8-bit product goes through the 32-bit registers
-   and is compared with its own sign extension. Returns the condition
-   that holds after an overflow. */
-static enum mach_cond overflow_flags(struct selector *s,
-                                     const struct ir_inst *inst)
+/* The condition that holds when the operation left the range of its
+   type. add, sub and imul leave it in the overflow flag. A product
+   narrower than 32 bits goes through the wider registers, whose flag is
+   of the wrong width, and ends in a compare instead. */
+static enum mach_cond overflow_cond(const struct selector *s,
+                                    const struct ir_inst *inst)
 {
-    uint8_t w = s->target->width(inst->a.type);
-    struct mach_operand r;
-    struct mach_operand back;
-
-    if (inst->op == IR_MUL_OV && w == 8) {
-        r = select_new_vreg(s, 32);
-        back = select_new_vreg(s, 32);
-        emit2(s, X64_MOVSX, r, select_reg(s, &inst->a));
-        emit2(s, X64_MOVSX, back, select_reg(s, &inst->b));
-        emit2(s, X64_IMUL, r, back);
-        emit2(s, X64_MOVSX, back, widened(r, 8));
-        emit2(s, X64_CMP, r, back);
-        return COND_NE;
-    }
-    r = select_new_vreg(s, w);
-    move(s, r, select_reg(s, &inst->a));
-    emit2(s, inst->op == IR_ADD_OV   ? X64_ADD
-             : inst->op == IR_SUB_OV ? X64_SUB
-                                     : X64_IMUL,
-          r, select_reg(s, &inst->b));
-    return COND_VS;
+    return inst->op == IR_MUL_OV && s->target->width(inst->a.type) < 32
+               ? COND_NE
+               : COND_VS;
 }
 
+/* DESIGN: the operation gives its result and leaves whether it
+   overflowed, so the arithmetic is emitted once. add, sub and the
+   two-operand imul each set the overflow flag for their own width. imul
+   has no two-operand form below 32 bits, so a narrow product goes
+   through the 32-bit registers and is compared with its own sign
+   extension. */
 static void emit_overflow(struct selector *s, const struct ir_inst *inst)
 {
-    enum mach_cond c = overflow_flags(s, inst);
+    uint8_t w = s->target->width(inst->a.type);
+    struct mach_operand r = select_result(s, inst);
+    struct mach_operand wide;
+    struct mach_operand back;
 
-    emit2(s, X64_SET, select_result(s, inst), cond(c));
+    if (inst->op == IR_MUL_OV && w < 32) {
+        wide = select_new_vreg(s, 32);
+        back = select_new_vreg(s, 32);
+        emit2(s, X64_MOVSX, wide, select_reg(s, &inst->a));
+        emit2(s, X64_MOVSX, back, select_reg(s, &inst->b));
+        emit2(s, X64_IMUL, wide, back);
+        move(s, r, widened(wide, w));
+        emit2(s, X64_MOVSX, back, widened(wide, w));
+        emit2(s, X64_CMP, wide, back);
+        return;
+    }
+    if (inst->op == IR_MUL_OV) {
+        emit_mul(s, inst);
+        return;
+    }
+    two_operand(s, inst, inst->op == IR_ADD_OV ? X64_ADD : X64_SUB,
+                inst->op == IR_ADD_OV);
+}
+
+/* The operation right before this one left the flags, so the branch
+   needs no compare of its own. */
+static void emit_branch_ov(struct selector *s, const struct ir_inst *inst)
+{
+    conditional(s, inst, overflow_cond(s, s->overflow));
 }
 
 static void emit_fused_branch(struct selector *s, const struct ir_inst *inst)
 {
-    if (select_is_overflow(s->fused->op)) {
-        conditional(s, inst, overflow_flags(s, s->fused));
-        return;
-    }
     compare(s, s->fused);
     conditional(s, inst, select_cond(s->fused->op));
 }
@@ -1539,6 +1547,7 @@ static const struct pattern patterns[] = {
     {IR_ADD_OV, NULL, emit_overflow},
     {IR_SUB_OV, NULL, emit_overflow},
     {IR_MUL_OV, NULL, emit_overflow},
+    {IR_BRANCH_OV, NULL, emit_branch_ov},
 };
 
 /* Printing in AT&T syntax: the source comes before the destination, a

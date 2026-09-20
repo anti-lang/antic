@@ -1,31 +1,30 @@
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global loops.0 size 32 align 1 bytes 6f 70 74 2f 6c 6f 6f 70 73 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global loops.0 size 28 align 1 bytes 6c 6f 6f 70 73 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 fn loops.count(%0: i64) -> i64 {
 b0:
     %1 = copy i64 0
     jump b1
 b1:
-    %2 = addov i8 %1, 1
-    branch %2, b4, b5
+    %2 = addov i64 %1, 1
+    branchov %2, b4, b5
 b2:
-    %7 = slt i8 %1, %0
-    branch %7, b1, b3
+    %6 = slt i8 %1, %0
+    branch %6, b1, b3
 b3:
     ret i64 %1
 b4:
     %3 = addr @loops.0
-    call void @anti_rt_check_failed(%3, 31, 1, %1, 1)
+    call void @anti_rt_check_failed(%3, 27, 1, %1, 1)
     jump b5
 b5:
-    %4 = add i64 %1, 1
-    %1 = copy i64 %4
-    %5 = eq i8 %1, 5
-    branch %5, b6, b7
+    %1 = copy i64 %2
+    %4 = eq i8 %1, 5
+    branch %4, b6, b7
 b6:
     jump b2
 b7:
-    %6 = sgt i8 %1, 8
-    branch %6, b8, b9
+    %5 = sgt i8 %1, 8
+    branch %5, b8, b9
 b8:
     jump b3
 b9:

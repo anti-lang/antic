@@ -9,7 +9,7 @@ type [3]anti.rt.Field = array 3 of anti.rt.Field
 extern fn take(agg structs.Pair, agg structs.Big, agg structs.Rgb, agg structs.V2) -> agg structs.Pair
 extern fn make(i64) -> agg structs.Big
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global structs.19 size 36 align 1 bytes 64 75 6d 70 2f 73 74 72 75 63 74 73 2e 61 6e 74 69 3a 33 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global structs.19 size 31 align 1 bytes 73 74 72 75 63 74 73 2e 61 6e 74 69 3a 33 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 fn structs.call(%0: agg structs.Pair, %1: agg structs.Big, %2: agg structs.Rgb, %3: agg structs.V2) -> agg structs.Pair {
 b0:
     %4 = slot structs.Big
@@ -22,14 +22,13 @@ b0:
     %9 = load i64 %5
     %10 = ptradd %1, offset_of structs.Big.c
     %11 = load i64 %10
-    %12 = addov i8 %9, %11
-    branch %12, b1, b2
+    %12 = addov i64 %9, %11
+    branchov %12, b1, b2
 b1:
     %13 = addr @structs.19
-    call void @anti_rt_check_failed(%13, 35, 1, %9, %11)
+    call void @anti_rt_check_failed(%13, 30, 1, %9, %11)
     jump b2
 b2:
-    %14 = add i64 %9, %11
-    store i64 %14, %5
+    store i64 %12, %5
     ret ptr %5
 }

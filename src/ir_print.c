@@ -38,6 +38,7 @@ const char *ir_op_name(enum ir_op op)
         [IR_PTRADD] = "ptradd", [IR_MEMCOPY] = "memcopy", [IR_ADDR] = "addr",
         [IR_BITLOAD] = "bitload", [IR_BITSTORE] = "bitstore",
         [IR_CALL] = "call", [IR_JUMP] = "jump", [IR_BRANCH] = "branch",
+        [IR_BRANCH_OV] = "branchov",
         [IR_RET] = "ret",
     };
     return names[op];
@@ -240,11 +241,12 @@ static void instruction(struct text *out, const struct ir_module *m,
         break;
     case IR_PTRADD:
     case IR_BRANCH:
+    case IR_BRANCH_OV:
         text_append(out, " ");
         operand(out, m, &inst->a);
         text_append(out, ", ");
         operand(out, m, &inst->b);
-        if (inst->op == IR_BRANCH) {
+        if (inst->op == IR_BRANCH || inst->op == IR_BRANCH_OV) {
             text_append(out, ", ");
             operand(out, m, &inst->c);
         }

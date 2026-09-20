@@ -7,7 +7,7 @@ extern fn measure.fn.0(agg str) -> i64
 extern fn measure.fn.1(agg measure.V2) -> i64
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global measure.5 size 5 align 1 bytes 66 6f 75 72 00
-global measure.6 size 36 align 1 bytes 64 75 6d 70 2f 6d 65 61 73 75 72 65 2e 61 6e 74 69 3a 32 31 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global measure.6 size 31 align 1 bytes 6d 65 61 73 75 72 65 2e 61 6e 74 69 3a 32 31 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 fn measure.length_of(%0: agg str) -> i64 {
 b0:
     %1 = ptradd %0, offset_of str.len
@@ -38,13 +38,12 @@ b0:
     %7 = ptradd %1, offset_of measure.V2.y
     store f32 1.5, %7
     %8 = call i64 %3 via @measure.fn.1(%1)
-    %9 = addov i8 %6, %8
-    branch %9, b1, b2
+    %9 = addov i64 %6, %8
+    branchov %9, b1, b2
 b1:
     %10 = addr @measure.6
-    call void @anti_rt_check_failed(%10, 35, 1, %6, %8)
+    call void @anti_rt_check_failed(%10, 30, 1, %6, %8)
     jump b2
 b2:
-    %11 = add i64 %6, %8
-    ret i64 %11
+    ret i64 %9
 }

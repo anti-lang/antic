@@ -913,67 +913,66 @@ static void emit_set(struct selector *s, const struct ir_inst *inst)
     emit2(s, A64_CSET, select_result(s, inst), cond(select_cond(inst->op)));
 }
 
-/* DESIGN: overflow of + and - is the V flag of adds and subs, whose
-   result no one reads. ARM64 has no arithmetic narrower than 32 bits. A
-   narrower type therefore operates in 32, and the result is compared
-   with its own sign extension. A multiply sets no flag at all, so it
-   takes the same route one width up. smull holds the whole product of
-   two 32-bit values, and at 64 bits smulh gives the half that the
-   product's own sign would be. Returns the condition that holds after an
-   overflow. */
-static enum mach_cond overflow_flags(struct selector *s,
-                                     const struct ir_inst *inst)
+/* The condition that holds when the operation left the range of its
+   type. adds and subs leave it in the V flag, and every other sequence
+   ends in a compare whose NE means overflow. */
+static enum mach_cond overflow_cond(const struct ir_inst *inst)
+{
+    return inst->op != IR_MUL_OV && bits(inst->a.type) >= 32 ? COND_VS
+                                                             : COND_NE;
+}
+
+/* DESIGN: the operation gives its result and leaves whether it
+   overflowed, so the arithmetic is emitted once. + and - use the
+   flag-setting adds and subs. ARM64 has no arithmetic narrower than 32
+   bits. A narrower type therefore operates in 32, and the result is
+   compared with its own sign extension. A multiply sets no flag at all.
+   smull holds the whole product of two 32-bit values, and at 64 bits mul
+   gives the result and smulh the half that its sign would be. */
+static void emit_overflow(struct selector *s, const struct ir_inst *inst)
 {
     uint8_t n = bits(inst->a.type);
+    struct mach_operand r = select_result(s, inst);
     struct mach_operand a = select_reg(s, &inst->a);
     struct mach_operand b = select_reg(s, &inst->b);
-    struct mach_operand low;
     struct mach_operand high;
     struct mach_operand back;
 
     if (n < 32) {
         struct mach_operand wa = select_new_vreg(s, 32);
         struct mach_operand wb = select_new_vreg(s, 32);
-        low = select_new_vreg(s, 32);
+        struct mach_operand wide = select_new_vreg(s, 32);
         back = select_new_vreg(s, 32);
         emit2(s, extension(n, true), wa, a);
         emit2(s, extension(n, true), wb, b);
         emit3(s, inst->op == IR_ADD_OV   ? A64_ADD
                  : inst->op == IR_SUB_OV ? A64_SUB
                                          : A64_MUL,
-              low, wa, wb);
-        emit2(s, extension(n, true), back, low);
-        emit2(s, A64_CMP, low, back);
-        return COND_NE;
+              wide, wa, wb);
+        emit2(s, A64_MOV, r, widened(wide, n));
+        emit2(s, extension(n, true), back, wide);
+        emit2(s, A64_CMP, wide, back);
+        return;
     }
     if (inst->op != IR_MUL_OV) {
-        emit3(s, inst->op == IR_ADD_OV ? A64_ADDS : A64_SUBS,
-              select_new_vreg(s, n), a, b);
-        return COND_VS;
+        emit3(s, inst->op == IR_ADD_OV ? A64_ADDS : A64_SUBS, r, a, b);
+        return;
     }
     if (n == 32) {
-        low = select_new_vreg(s, 64);
+        struct mach_operand wide = select_new_vreg(s, 64);
         back = select_new_vreg(s, 64);
-        emit3(s, A64_SMULL, low, a, b);
-        emit2(s, A64_SXTW, back, widened(low, 32));
-        emit2(s, A64_CMP, low, back);
-        return COND_NE;
+        emit3(s, A64_SMULL, wide, a, b);
+        emit2(s, A64_MOV, r, widened(wide, 32));
+        emit2(s, A64_SXTW, back, widened(wide, 32));
+        emit2(s, A64_CMP, wide, back);
+        return;
     }
-    low = select_new_vreg(s, 64);
     high = select_new_vreg(s, 64);
     back = select_new_vreg(s, 64);
-    emit3(s, A64_MUL, low, a, b);
+    emit3(s, A64_MUL, r, a, b);
     emit3(s, A64_SMULH, high, a, b);
-    emit3(s, A64_ASR, back, low, mach_imm(63));
+    emit3(s, A64_ASR, back, r, mach_imm(63));
     emit2(s, A64_CMP, high, back);
-    return COND_NE;
-}
-
-static void emit_overflow(struct selector *s, const struct ir_inst *inst)
-{
-    enum mach_cond c = overflow_flags(s, inst);
-
-    emit2(s, A64_CSET, select_result(s, inst), cond(c));
 }
 
 static void jump(struct selector *s, const struct ir_operand *target)
@@ -992,22 +991,31 @@ static void emit_jump(struct selector *s, const struct ir_inst *inst)
 
 /* When the true block follows, the negated condition jumps to the false
    block, and control falls through otherwise. */
-static void emit_fused_branch(struct selector *s, const struct ir_inst *inst)
+/* The arm the condition takes, and the other one after it. */
+static void conditional(struct selector *s, const struct ir_inst *inst,
+                        enum mach_cond c)
 {
-    enum mach_cond c;
-
-    if (select_is_overflow(s->fused->op)) {
-        c = overflow_flags(s, s->fused);
-    } else {
-        c = select_cond(s->fused->op);
-        compare(s, s->fused);
-    }
     if (select_is_next(s, &inst->b)) {
         emit2(s, A64_BCOND, cond(select_negate(c)), block(&inst->c));
         return;
     }
     emit2(s, A64_BCOND, cond(c), block(&inst->b));
     jump(s, &inst->c);
+}
+
+/* The operation right before this one left the flags, so the branch
+   needs no compare of its own. */
+static void emit_branch_ov(struct selector *s, const struct ir_inst *inst)
+{
+    conditional(s, inst, overflow_cond(s->overflow));
+}
+
+static void emit_fused_branch(struct selector *s, const struct ir_inst *inst)
+{
+    enum mach_cond c = select_cond(s->fused->op);
+
+    compare(s, s->fused);
+    conditional(s, inst, c);
 }
 
 static void emit_branch(struct selector *s, const struct ir_inst *inst)
@@ -1517,6 +1525,7 @@ static const struct pattern patterns[] = {
     {IR_ADD_OV, NULL, emit_overflow},
     {IR_SUB_OV, NULL, emit_overflow},
     {IR_MUL_OV, NULL, emit_overflow},
+    {IR_BRANCH_OV, NULL, emit_branch_ov},
 };
 
 /* Printing */

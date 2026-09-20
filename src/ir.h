@@ -102,10 +102,10 @@ enum ir_op {
     IR_EQ, IR_NE, IR_SLT, IR_SLE, IR_SGT, IR_SGE,
     IR_ULT, IR_ULE, IR_UGT, IR_UGE,
     IR_FEQ, IR_FNE, IR_FLT, IR_FLE, IR_FGT, IR_FGE,
-    /* result i8 = op a, b: 1 when the signed operation of the named type
-       leaves its range, else 0. The back end reads the overflow flag
-       where the instruction sets it, and multiplies into twice the width
-       where it does not. */
+    /* result = op a, b: the signed operation, which also records whether
+       it left the range of the type. IR_BRANCH_OV reads that. The back
+       end emits one instruction where it sets the overflow flag, and a
+       multiply into twice the width where none does. */
     IR_ADD_OV, IR_SUB_OV, IR_MUL_OV,
     /* result = op a, with the result type named by the instruction */
     IR_TRUNC, IR_SEXT, IR_ZEXT, IR_SITOF, IR_UITOF, IR_FTOSI, IR_FTOUI,
@@ -127,6 +127,10 @@ enum ir_op {
     /* Terminators, the last instruction of a block. */
     IR_JUMP,        /* Go to block a. */
     IR_BRANCH,      /* Go to b when a is nonzero, else c. */
+    IR_BRANCH_OV,   /* Go to b when the operation that gave a left the
+                       range of its type, else c. a is the result of an
+                       IR_ADD_OV, IR_SUB_OV or IR_MUL_OV, which is the
+                       instruction right before this one. */
     IR_RET          /* Return a, or nothing. */
 };
 
@@ -468,6 +472,10 @@ uint32_t ir_call_indirect(struct ir_function *f, struct ir_block *b,
                           const struct ir_operand *args, size_t arg_count);
 void ir_jump(struct ir_function *f, struct ir_block *b,
              const struct ir_block *target);
+void ir_branch_ov(struct ir_function *f, struct ir_block *b,
+                  struct ir_operand value, const struct ir_block *then_block,
+                  const struct ir_block *else_block);
+
 void ir_branch(struct ir_function *f, struct ir_block *b,
                struct ir_operand cond, const struct ir_block *then_block,
                const struct ir_block *else_block);
