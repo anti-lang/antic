@@ -226,9 +226,11 @@ static bool compile_object(struct unit *u, const struct options *base,
     int status;
 
     /* DESIGN: antic takes -o as the base of a dev build and adds the
-       suffix of each file it writes, so the object is <base>.o. */
+       suffix of each file it writes. The suffix of an object is the
+       target's, `.obj` on Windows and `.o` everywhere else. */
     text_appendf(&base_path, "%s/%s", work, text_cstr(&u->path));
-    text_appendf(&u->object, "%s.o", text_cstr(&base_path));
+    text_appendf(&u->object, "%s%s", text_cstr(&base_path),
+                 target_info(base->target)->object_suffix);
     o.input = u->source;
     o.output = text_cstr(&base_path);
     o.dev = true;
