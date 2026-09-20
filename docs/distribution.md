@@ -37,7 +37,10 @@ layout.
 - `<version>` is the version of that component, such as `0.1.0` or `6.0`.
 - `<file>` names the component, the version and the target, as in
   `anti-0.1.0-macos-arm64.tar.xz`. The target names are the six of `--target`.
-- `SHA256SUMS` beside them holds one line per file, which `shasum -c` reads.
+- `SHA256SUMS` beside them holds one line per file, which `shasum -c` reads. It is the
+  manifest the release script signed, and `SHA256SUMS.sig` stands beside it. A version
+  directory of `anti` holds the six packages and the six symbols archives, and the
+  manifest names all twelve.
 
 A path is written once and never again. A pin file in the repository names the file and
 its digest, so an older Anti keeps installing its pinned version. The files can move to a
@@ -115,7 +118,7 @@ sends nothing.
 `tools/version` and its entry from `CHANGELOG.md`. It runs the suite of the Mac
 and the two sanitizer suites in an export of the commit, packs the six hosts,
 writes the symbols archives and checks the packages on both VMs. It then signs
-`SHA256SUMS` with the release key, tags the commit and uploads the assets to a
+the one `SHA256SUMS` of the release with the release key, tags the commit and uploads the assets to a
 GitHub release. It runs the runner matrix once, writes `downloads/index.toml`
 for anti-lang.com and installs the result from outside. `./r --dry-run` performs the
 first five steps and prints what the rest would do.

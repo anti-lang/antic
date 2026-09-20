@@ -12,6 +12,7 @@ You do not stop to ask. Where a step is unclear, take the smallest option that k
 - `CHANGELOG.md` holds an entry for the version, above the previous one, in the docs style. `./r` refuses when the entry is missing.
 - `main` is checked out, without uncommitted changes, and pushed. `./r` refuses otherwise.
 - The runtime archive's downloads are in place: the LLVM tools and clang at the pins, the six sysroots, raylib, from `build/`. `./r` runs the download steps when they are missing.
+- `ANTI_SITE` holds the path to a clone of the repository of anti-lang.com on the machine that runs `./r`. Step 9 writes into that clone and refuses without the variable.
 
 ## Steps, in order
 
@@ -23,7 +24,7 @@ You do not stop to ask. Where a step is unclear, take the smallest option that k
 6. Digests and signature: `SHA256SUMS` over the six packages and the symbols archives, signed with the release key by `openssl pkeyutl -sign`. The key is read from `RELEASE_KEY`, which names an encrypted PEM. The passphrase is asked once. Without the key the script prints the two signing commands and stops before step 7.
 7. Tag and release: `git tag -s v<version>` and push the tag. `gh release create v<version>` with the changelog entry as the body. Upload the six packages, the symbols archives, `SHA256SUMS` and `SHA256SUMS.sig`.
 8. The runner matrix: `gh workflow run test.yml --ref v<version>` and wait for it. This is the one workflow run per release that the CI rule allows. A failure stops the script after the release exists. The report says so and the release is marked as a pre-release until the run is green.
-9. The site: write `downloads/index.toml` for anti-lang.com with the version, the six package names, digests and URLs, and the key's fingerprint. Push it to the site's repository. The site's build publishes it. Nothing binary goes to the site.
+9. The site: write `downloads/index.toml` for anti-lang.com, in the clone that `ANTI_SITE` names, with the version, the six package names, digests and URLs, and the key's fingerprint. Push it to the site's repository. The site's build publishes it. Nothing binary goes to the site.
 10. Verification from outside: a fresh directory, `curl` of the installer from anti-lang.com, install. `anti --version` prints the version, `antic --version` prints the version and the LLVM pin. A hello program compiles and runs for the host and links for the other five.
 11. Report: `docs/reports/<date>-release-<version>.md` with the outcome of every step, the counts, the digests and the run id of the matrix. It notes anything that was resumed. Commit and push the report. It is the last commit of the release.
 
