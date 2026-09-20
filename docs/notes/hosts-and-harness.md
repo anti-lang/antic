@@ -23,12 +23,17 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 462 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
-| Linux VM | 404 | ASan, UBSan | glibc sysroot, linux-arm64 programs, gdb |
-| Windows VM | 368 | none | windows-arm64 programs, the Win32 expected files |
+| Mac | 467 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
+| Linux VM | 407 | see below | glibc sysroot, linux-arm64 programs, gdb |
+| Windows VM | 387 | none | windows-arm64 programs, the Win32 expected files |
 
 `debug_info` runs the debugger of the host, lldb on the Mac and gdb on Linux, and takes
 neither from the other. No host here debugs a Windows program.
+
+The sanitizer presets read the sysroot from `build/sysroot`, which the Mac has and the
+Linux VM does not. Its own build installed the sysroot into `build/runtime/sysroot`
+instead, so `cmake --preset asan` there builds a runtime with no sysroot and 102 programs
+fail to link. The plain suite covers that host today. Nothing is fixed.
 
 No machine here runs linux-x86_64 or windows-x86_64 programs. Only the CI runners do,
 when started by hand.
@@ -67,16 +72,27 @@ when started by hand.
 
 - The toolchain is frozen at `23.1.1-anti.3`. A toolchain change goes to
   `docs/toolchain-later.md` as one line.
-- Both VMs ran the suite after item 13 of "First sessions". Linux passed 385 of 385 at
-  `03d1064`. Windows passed 367 at `03d1064` and skipped `sysroot_digest`, which a
-  Windows host always skips. `emit_identity` passed on both.
-- Linux ran the suite again after the debug information, at `d32dd31` with the tree in
-  `~/antic-check`. It passed 403 of 404, `debug_info` with gdb among them. `std_toml`
-  fails there with a segmentation fault in `anti_rt_toml_free` of `rt/toml.c:350`, which
-  `anti.toml.Document.destruct` reaches from the error path of `Document.read`. The Mac
-  passes that test, under both sanitizers as well. The failure predates the debug
-  information: the same build of `ae83536` fails the same way. Nothing of it is fixed.
-- Windows has not run since `03d1064`.
+- Both VMs ran the suite at `928baa3`. Linux passed 407 of 407, `std_toml` and
+  `debug_info` among them. Windows passed 386 of 387 and skipped `sysroot_digest`, which
+  a Windows host always skips. `emit_identity` passed on both.
+- The `std_toml` segmentation fault of `d32dd31` is fixed. It was never the error path:
+  antic supplied the out pointer of a `catch` binding over stack storage it never zeroed,
+  and the `=` in `Document.read` tore down whatever the frame held. `docs/decisions.md`
+  holds it under "Object model", and `program_out_slot` pins it on every host.
+- `table_unset` fails on Windows and nowhere else. Its release check reads the assembly
+  between `table.run:` and `table.main:`, and a Windows host mangles those to
+  `_A5table_run:` and `_A5table_main:`, so the match is empty and the test reports that
+  release mode checks a table. The check is newer than `03d1064`, the last Windows run
+  before this one, so it has never passed there. Nothing of it is fixed.
+- Windows has no debugger test. The CodeView line table of a `-g` build was read instead,
+  with `build\runtime\bin\llvm-readobj.exe --codeview` on the object of the two sources
+  that `tests/run_debug.cmake` writes. It names `com/example/step.anti` and `app.anti` in
+  its `FileChecksums`, and one `FunctionLineTable` per function with the statement lines:
+  1, 3 and 4 for `step`, 3 and 5 for `helper`, 8, 10 and 11 for `main`. A debugger check
+  on Windows, with lldb of the tools or WinDbg, is the one debug test not run on any host.
+- antic takes the search roots and the sources of `-I` with forward slashes on Windows. A
+  root spelled with backslashes matches no source, and every module path is then the whole
+  path, which is not a lowercase identifier.
 - On Windows, `%USERPROFILE%\main-suite.cmd` extracts `%USERPROFILE%\tree.tar` into the
   tree, then configures, builds and runs the suite into `main-*.log` there.
 - The next session starts at item 14 of "First sessions" in `CLAUDE.md`.
