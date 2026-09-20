@@ -1,8 +1,8 @@
-# Chapter 6 notes
+# Semantic analysis
 
-Choices made while writing chapter 6, Semantic analysis. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made in semantic analysis. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 6 semantic analysis reports every error it finds. An expression that already failed gets `TYPE_ERROR`, which silences the checks above it.
 - Messages and typed dumps name the aliased types `int`, `float` and `byte`, so `u8` appears as `byte`.

@@ -1,8 +1,8 @@
-# Chapter 16 notes
+# Assembly emission per operating system
 
-Choices made while writing chapter 16, Assembly emission per operating system. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made in assembly emission. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 16 removes the direct path of chapter 3. Every program goes through lowering, the optimizer, selection, register allocation and the emitter in `src/emit.c`.
 - One assembly file holds the whole program. Anti functions are local symbols. The main module's `main` gets the global second name `anti.rt.main` through `.globl` and `.set`, in the symbol form of the object format. A program without `main` stops with `the program has no function` and the name, unless `-S` writes only the assembly.

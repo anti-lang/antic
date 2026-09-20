@@ -1,6 +1,6 @@
 # Decisions
 
-Settled design decisions for the language, the compiler, the `anti` tool and the runtime. One entry per decision. Open items are listed at the end. The rules of the object model are in `docs/anti-object-model.md` and the features decided after it are in `docs/anti-language-additions.md`. Neither is repeated here. The choices inside a compiler pass live in `docs/notes/`, written while the book walked through them.
+Settled design decisions for the language, the compiler, the `anti` tool and the runtime. One entry per decision. Open items are listed at the end. The rules of the object model are in `docs/anti-object-model.md` and the features decided after it are in `docs/anti-language-additions.md`. Neither is repeated here. The choices inside a compiler pass live in `docs/notes/`, one file per pass.
 
 `docs/decisions.md` is the authority. The details of the `anti` tool, of distribution and of libraries for C are in `docs/tooling.md`, `docs/tooling-addendum.md`, `docs/distribution.md` and `docs/libraries-for-c.md`. Those files agree with `docs/decisions.md`, and a change goes into both.
 
@@ -349,7 +349,7 @@ These decisions are the language's, not the book's. They are recorded here and d
 - A constant aggregate is a read-only global that a use copies from, rather than a stack slot that lowering fills field by field. The IR carries the constant as a typed tree. The back end writes the bytes with the padding zeroed, because the back end is what computes the layout. Reason: it removes a copy from every use of a constant, and the bytes of a program stop depending on what the frame held.
 - Global data that holds an address goes to a section of its own: `.data.rel.ro` on ELF, `__DATA,__const` on Mach-O and `.rdata` on COFF. The emitter writes the address as `.quad` with the symbol it names. Reason: a `str` constant holds the address of its literal, and the loader writes that address. A section mapped read-only from the first page cannot hold it. clang chooses the same three sections for the same value, and PE protects `.rdata` after its base relocations.
 
-What antic does that the design above leaves open, as far as a user of the language or of the tools sees it. The choices inside each pass live in `docs/notes/chapter-NN.md`, beside the chapter that made them.
+What antic does that the design above leaves open, as far as a user of the language or of the tools sees it. The choices inside each pass live in `docs/notes/`, one file per pass, named after it.
 
 - antic prints each stage with `--dump-tokens`, `--dump-ast`, `--dump-types`, `--dump-ir`, `--dump-opt`, `--dump-select` and `--dump-alloc`. `--print-targets` prints the target matrix. The listings of chapter 1 are pinned by tests.
 - Driver options: `-o`, `-S`, `--target`, `--llvm-mc`, `--runtime` and `--print-host-target`. No environment variables. Without `-o` the executable is the input path without `.anti`. The `.s` and `.o` files stay beside the executable.

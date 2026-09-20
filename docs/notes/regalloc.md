@@ -1,8 +1,8 @@
-# Chapter 13 notes
+# Register allocation and stack frames
 
-Choices made while writing chapter 13, Register allocation and stack frames. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made in register allocation and the stack frames. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 13 register allocation is linear scan after Poletto and Sarkar, with one interval per virtual register. Instruction k reads at position 2k and writes at 2k + 1. Physical registers named by instructions or overwritten by calls form fixed ranges. Moves give hints. The spilled interval is the one that ends last. Candidates are the new interval and the active intervals whose register it can take.
 - Allocation order on ARM64: `x9` to `x15`, `x0` to `x8`, `x19` to `x28`. `x16` and `x17` are spill scratch registers, and `x18` is never allocated. On System V x86_64: `rax`, `rcx`, `rdx`, `rsi`, `rdi`, `r8`, `r9`, `rbx`, `r12` to `r15`. On Windows x64 `rsi` and `rdi` move to the callee-saved end. `r10` and `r11` are spill scratch registers, and `rbp` is the frame pointer.

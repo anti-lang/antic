@@ -1,8 +1,8 @@
-# Chapter 22 notes
+# Threads
 
-Choices made while writing chapter 22, Threads. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made for threads. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - The grammar is `parallel <array> [by <count>] -> <worker>` and
   `parallel <array> [by <count>] -> <worker>(<args>)`. The array and the count are

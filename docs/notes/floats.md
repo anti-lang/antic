@@ -1,8 +1,8 @@
-# Chapter 17 notes
+# Floating point
 
-Choices made while writing chapter 17, Floating point. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made for floating point. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 17 float comparisons follow IEEE 754: `fne` holds for NaN, and `feq`, `flt`, `fle`, `fgt` and `fge` fail. Float comparisons compute a `bool` and do not fuse into branches.
 - Float registers get the numbers after the integer registers: `xmm0` to `xmm15` are 16 to 31, and ARM64 `v0` to `v31` are 32 to 63, printed `dn` or `sn`. Each virtual register records its class in the machine function, and the allocator chooses from the register list of that class.

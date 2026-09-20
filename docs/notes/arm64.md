@@ -1,8 +1,8 @@
-# Chapter 15 notes
+# The ARM64 back end
 
-Choices made while writing chapter 15, The ARM64 back end. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made in the ARM64 back end. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 15 ARM64 patterns cover integers of 8, 16, 32 and 64 bits and pointers. Values of 8, 16 and 32 bits live in w registers, and the bits above their width are unknown, as on x86_64.
 - A comparison of 8 or 16 bits extends the first operand with `sxtb`, `sxth`, `uxtb` or `uxth` into a new register and extends a register second operand inside `cmp`, as in `cmp w9, w1, sxth`. `eq` and `ne` extend with zeros. A constant from -4095 to -1, or its shifted form, compares with `cmn`.

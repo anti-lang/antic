@@ -1,8 +1,8 @@
-# Chapter 10 notes
+# The optimizer
 
-Choices made while writing chapter 10, The optimizer. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made in the optimizer. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 10 optimizer: constant folding, copy propagation, peephole rules and dead code elimination, repeated per function until nothing changes, then renumbering of temporaries. The peephole rules run before copy propagation. Block merging runs once before the first round. A dropped dev-mode check leaves a jump into the block that follows it, and the rule that fuses `t = op` with `x = copy t` needs the two adjacent. A round of propagation between them gives `t` a second use, and the pair never fuses. After the functions, the optimizer removes functions and globals that the entry cannot reach. The entry is `main` of the main module, or every function of that module when it has no `main`.
 - Folding leaves division by zero, `MIN / -1`, shifts by the width or more and out-of-range float to integer conversions in the IR. Folding an `f32` computes in C `float`.

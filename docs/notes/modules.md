@@ -1,8 +1,8 @@
-# Chapter 9 notes
+# Modules and library files
 
-Choices made while writing chapter 9, Modules and library files. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made for modules and library files. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Library format: magic `ANTL`, the version, little-endian integers of fixed width, strings as a u32 length and bytes, floats as IEEE 754 bits. Enum values are stored as bytes, and `_Static_assert` checks guard them. All function signatures precede all bodies. Each instruction is a 49-byte record.
 - An IR function of another module is an `extern fn` with a module name, as in `extern fn scale.scale(i64) -> i64`. Loading maps it to the loaded definition.

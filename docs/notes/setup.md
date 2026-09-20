@@ -1,8 +1,8 @@
-# Chapter 3 notes
+# Setup and the first executable
 
-Choices made while writing chapter 3, Setup and the first executable. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made for the setup and the first executable. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 3 direct path: antic recognises one program shape, `fn main() -> int { return N; }`, and emits assembly for macos-arm64 only. Chapter 16 adds the five other targets.
 - The sources of `anti_rt` live in `rt/` at the repository root. The main CMake build compiles `anti_rt` for the host into `build/runtime/lib/<target>/libanti_rt.a`, the layout of the runtime archive, with hidden visibility, and copies `rt/LICENSE` to `build/runtime/licenses/anti_rt.txt`.

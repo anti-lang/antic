@@ -1,8 +1,8 @@
-# Chapter 18 notes
+# Structs and arrays
 
-Choices made while writing chapter 18, Structs and arrays. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made for structs and arrays. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 18 lowers a struct or array expression to the address of its value. Every aggregate local gets a slot in the entry block, and an aggregate parameter is the pointer the back end gives it. A literal fills its destination element by element. `[v; n]` computes `v` once and fills the elements in a loop.
 - An aggregate assignment or `let` from another aggregate is `memcopy`. A function with an aggregate result returns its address with `ret ptr`, and the back end moves the value to where the convention puts it. `.len` of an array is its constant length, and the base expression is still evaluated.

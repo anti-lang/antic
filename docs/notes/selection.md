@@ -1,8 +1,8 @@
-# Chapter 12 notes
+# Instruction selection
 
-Choices made while writing chapter 12, Instruction selection. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made in instruction selection. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 12 machine code in `src/mach.h`: instructions with a target opcode, up to four operands in destination-first order, and implicit physical register uses and definitions. Each opcode table gives the role of every operand.
 - The IR temporary `%n` becomes the virtual register `tn`. Registers that selection adds take the numbers after the temporaries.

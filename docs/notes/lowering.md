@@ -1,8 +1,8 @@
-# Chapter 8 notes
+# Lowering the syntax tree to IR
 
-Choices made while writing chapter 8, Lowering the syntax tree to IR. They describe the inside of the
-compiler. `docs/decisions.md` holds what a reader of the language or a user of
-the tools can observe.
+Choices made in lowering. They describe the inside of the compiler.
+`docs/decisions.md` holds what a reader of the language or a user of the
+tools can observe.
 
 - Chapter 8 lowering handles scalar values: `bool`, `char`, integers, floats and pointers. A struct or array value reports that its lowering arrives in chapter 18, a `str` or slice in chapter 19 and a function pointer in chapter 20. Field access waits for chapter 18.
 - A local whose address is never taken lives in a temporary. Its `let` copies the value into a new temporary, so a later assignment to the source variable leaves it unchanged. Semantic analysis sets `address_taken`, and lowering records each variable's temporary in the symbol field `ir`.
