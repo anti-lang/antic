@@ -285,8 +285,14 @@ build_packages() {
 }
 
 # Step 4. The symbols of every shipped program, beside the packages and
-# never inside one. A release build carries no debug section, so the
-# table of a binary is what names a frame of a report from a user.
+# never inside one. The packer passes no -g, so the symbol table of a
+# binary is what names a frame of a report from a user.
+#
+# DESIGN: the section headers say nothing here. A static musl program
+# carries the debug sections of the sysroot's own objects, whose strings
+# name __libc_malloc and tsd_used and no source of antic. The first dry
+# run stopped on them. What the archive needs is a symbol table with
+# entries, and that is what the step reads.
 build_symbols() {
     starts 04 symbols "the symbols of the twelve programs" || return 0
     mkdir -p "$symbols" "$work"
@@ -300,13 +306,14 @@ build_symbols() {
         mkdir -p "$work/$host/syms"
         for program in $(programs_of "$host"); do
             binary=$work/$host/anti/bin/$program
-            sections=$("$llvm_bin/llvm-objdump" --section-headers "$binary") ||
-                die "step 4: $host: llvm-objdump read no section of $program"
-            if echo "$sections" | grep -q 'debug_info'; then
-                die "step 4: $host: $program carries debug sections, and a release build passes no -g"
-            fi
-            "$llvm_bin/llvm-objdump" --syms "$binary" > "$work/$host/syms/$program.syms" ||
+            table=$work/$host/syms/$program.syms
+            "$llvm_bin/llvm-objdump" --syms "$binary" > "$table" ||
                 die "step 4: $host: llvm-objdump read no symbol of $program"
+            # The three object formats spell a section of code their own
+            # way, so the count is of the rows below the heading.
+            rows=$(sed -n '/^SYMBOL TABLE:/,$p' "$table" | grep -c .)
+            [ "$rows" -gt 1 ] ||
+                die "step 4: $host: the symbol table of $program is empty"
         done
         archive=$symbols/$(symbols_name "$host")
         rm -f "$archive"
