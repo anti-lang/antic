@@ -9,6 +9,19 @@
 #         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
 #         -DWORK=<dir> -P tests/run_package.cmake
 
+# DESIGN: the packer links macOS against the stubs the release ships and
+# never against the SDK of the machine. Today's Xcode brought SDK 27.0,
+# whose libSystem.tbd names the target arm64e.x1-macos. The pinned
+# ld64.lld read that file as malformed and left every symbol of libSystem
+# undefined. A release must not depend on which Xcode is installed, which
+# is the reason the stubs exist, so no call of xcrun stands in the packer.
+file(READ "${ROOT}/tools/pack-anti.cmake" packer_text)
+string(FIND "${packer_text}" "xcrun" found)
+if(NOT found EQUAL -1)
+    message(FATAL_ERROR "tools/pack-anti.cmake calls xcrun, so a release "
+                        "takes the SDK of the machine that packed it")
+endif()
+
 file(REMOVE_RECURSE "${WORK}")
 # The sysroots that a package carries, and an SDK of Apple beside the
 # stubs of a macOS sysroot, as APPLE_SDK or anti sdk import leave it.

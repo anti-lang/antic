@@ -115,7 +115,7 @@ function(check_libc host binary program)
 endfunction()
 
 # Compile and link antic or anti for one host. Each family of targets reads
-# its headers from a different place: the SDK of this Mac, the musl
+# its headers from a different place: the macOS stubs of SYSROOT, the musl
 # sysroot, or the Microsoft headers that xwin wrote. anti takes the sources
 # of antic but its main.c, and those of tools/anti.
 function(build_program host output program)
@@ -132,9 +132,18 @@ function(build_program host output program)
                -I "${root}/tools/anti")
     set(link "")
     if(host MATCHES "^macos-")
-        execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE sdk
-                        OUTPUT_STRIP_TRAILING_WHITESPACE)
-        list(APPEND common -isysroot "${sdk}")
+        # DESIGN: macOS links against the stubs of SYSROOT, as Linux links
+        # against the pinned musl, and never against the SDK of the machine
+        # that packs. A release is then the same whatever Xcode is
+        # installed, which is the reason the stubs are shipped at all.
+        # Xcode brought SDK 27.0 on 2026-09-20, whose libSystem.tbd names
+        # the target arm64e.x1-macos. The pinned ld64.lld read that file as
+        # malformed and left every symbol of libSystem undefined, and the
+        # packer stopped at "macos-arm64: antic did not link". The stubs
+        # carry the target list the pinned linker reads. A framework link
+        # still needs Apple's own SDK, through APPLE_SDK of
+        # tools/get-sysroot.cmake, which is no part of this.
+        list(APPEND common -isysroot "${SYSROOT}/${host}")
         set(link --ld-path=${LLVM_BIN}/ld64.lld)
     elseif(host MATCHES "^linux-")
         list(APPEND common --sysroot "${SYSROOT}/${host}")
