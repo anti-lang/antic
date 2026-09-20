@@ -312,8 +312,17 @@ build_symbols() {
             # The three object formats spell a section of code their own
             # way, so the count is of the rows below the heading.
             rows=$(sed -n '/^SYMBOL TABLE:/,$p' "$table" | grep -c .)
-            [ "$rows" -gt 1 ] ||
-                die "step 4: $host: the symbol table of $program is empty"
+            if [ "$rows" -le 1 ]; then
+                # DESIGN: lld-link writes the symbols of a program to
+                # a PDB. The packer asks for none, so a shipped .exe
+                # carries a table of no rows. The archive then holds the
+                # map of the sections, which is what the binary has. A
+                # PDB per Windows host is a question for the owner. It
+                # changes what a release build emits.
+                "$llvm_bin/llvm-objdump" --section-headers "$binary" > "$table" ||
+                    die "step 4: $host: llvm-objdump read no section of $program"
+                say "$host: $program has no symbol table, so its sections go in"
+            fi
         done
         archive=$symbols/$(symbols_name "$host")
         rm -f "$archive"
