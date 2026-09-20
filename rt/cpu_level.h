@@ -31,10 +31,10 @@ enum anti_cpu_level {
    none. */
 const char *anti_cpu_level_name(int32_t level);
 
-/* What a machine that cannot run a program of this level is missing, as
-   the text of the start-up message: "AVX2 (x86-64-v3, 2013 or later)".
-   Returns "" for a value that names no level. */
-const char *anti_cpu_level_needs(int32_t level);
+/* The start-up message of a machine that cannot run a program of this
+   level, without the "anti: " that the runtime writes in front. Returns ""
+   for a value that names no level. */
+const char *anti_cpu_level_message(int32_t level);
 
 /* The highest level this machine runs, for the architecture the runtime
    was compiled for. ANTI_CPU_NONE on an architecture with no level table.
@@ -46,7 +46,7 @@ const char *anti_cpu_level_needs(int32_t level);
 int32_t anti_cpu_level(void);
 
 /* Zero when this machine runs a program built for needed. Otherwise the
-   level it is missing, for anti_cpu_level_needs. */
+   level it is missing, for anti_cpu_level_message. */
 int32_t anti_cpu_missing(int32_t needed);
 
 /* The level this runtime was compiled for, which is the level of the

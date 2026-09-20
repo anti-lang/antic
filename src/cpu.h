@@ -32,9 +32,9 @@ enum cpu_feature {
     CPU_DOTPROD = 1u << 4   /* the dot products */
 };
 
-/* The widest vector register of any level antic knows, and the cap on the
-   size of a simd struct. The section names both in the level table. */
-enum { CPU_VECTOR_REGISTER_BYTES = 32, CPU_SIMD_STRUCT_CAP = 256 };
+/* The cap on the size of a simd struct, which the section calls a constant
+   in the level table. Nothing reads it until simd structs exist. */
+enum { CPU_VECTOR_BYTE_CAP = 256 };
 
 const char *cpu_name(enum cpu_level level);
 enum target_arch cpu_arch(enum cpu_level level);
@@ -47,9 +47,6 @@ const char *cpu_clang_arch(enum cpu_level level);
 
 /* The -mattr= value of llvm-mc, empty where the assembler needs none. */
 const char *cpu_attributes(enum cpu_level level);
-
-/* The widest vector register of the level, in bytes. */
-unsigned cpu_vector_bytes(enum cpu_level level);
 
 /* The default level of a target: x86-64-v3 on both x86_64 targets, and
    per operating system on ARM64. */

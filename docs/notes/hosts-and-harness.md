@@ -72,6 +72,15 @@ when started by hand.
   as `com.example.step[step]`, and a test that matches a function name leaves the character
   before the segment open.
 
+## Test hooks
+
+- `ANTI_DEV_CPU` compiles the processor simulation into `rt/cpu.c`. With it,
+  `anti_cpu_level` reads the level from the environment variable `ANTI_CPU_LEVEL`
+  instead of the processor, so a test on this machine sees the refusal a lower machine
+  gets. The unit tests are the only build that defines it. The runtime of the archive
+  is compiled without it, so a shipped program reads no variable of its own and the
+  one-environment-variable rule holds.
+
 ## For the next session
 
 - The toolchain is frozen at `23.1.1-anti.3`. A toolchain change goes to

@@ -26,8 +26,11 @@
 #if defined(ANTI_CPU_ARM64)
 #if defined(_WIN32)
 #include <windows.h>
-/* The value of IsProcessorFeaturePresent, which an older SDK may not
+/* The values of IsProcessorFeaturePresent, which an older SDK may not
    declare. */
+#ifndef PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE
+#define PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE 34
+#endif
 #ifndef PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE
 #define PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE 43
 #endif
@@ -55,25 +58,34 @@
 #error "define ANTI_CPU_LEVEL_ID, the anti_cpu_level of this runtime"
 #endif
 
-/* One row per level. needs is the text of the start-up message. */
+/* One row per level. message is the start-up message of a machine that
+   cannot run a program of the level. */
 struct row {
     int32_t level;
     const char *name;
-    const char *needs;
+    const char *message;
 };
 
-/* DESIGN: the years are the first year a machine of the level shipped.
-   A reader of the message then knows what hardware it asks for. The x86
-   line is the one docs/anti-language-additions.md gives. */
+/* DESIGN: a message names hardware a reader recognises. The x86 lines say
+   the instruction set and the first year a machine had it, as
+   docs/anti-language-additions.md gives for v3. The ARM64 lines name
+   machines, because nobody buys an ARM64 machine by its extensions.
+
+   The lowest level of an architecture never refuses. The machine is at
+   least that: an x86_64 machine runs v1 and an ARM64 machine runs
+   armv8.0. Those two messages are unreachable and are written for the
+   table's shape. */
 static const struct row rows[] = {
-    {ANTI_CPU_X86_64_V1, "v1", "SSE2 (x86-64, 2003 or later)"},
-    {ANTI_CPU_X86_64_V2, "v2", "SSE4.2 (x86-64-v2, 2009 or later)"},
-    {ANTI_CPU_X86_64_V3, "v3", "AVX2 (x86-64-v3, 2013 or later)"},
-    {ANTI_CPU_ARMV8_0, "armv8.0", "ARMv8-A (armv8.0, 2012 or later)"},
+    {ANTI_CPU_X86_64_V1, "v1", "this program needs an x86-64 processor"},
+    {ANTI_CPU_X86_64_V2, "v2",
+     "this program needs a processor with SSE4.2 (x86-64-v2, 2009 or later)"},
+    {ANTI_CPU_X86_64_V3, "v3",
+     "this program needs a processor with AVX2 (x86-64-v3, 2013 or later)"},
+    {ANTI_CPU_ARMV8_0, "armv8.0", "this program needs an ARMv8-A processor"},
     {ANTI_CPU_ARMV8_2, "armv8.2",
-     "the ARMv8.2 extensions (armv8.2, 2017 or later)"},
-    {ANTI_CPU_ARMV8_5, "armv8.5",
-     "the ARMv8.5 extensions (armv8.5, 2020 or later)"},
+     "this program needs an ARMv8.2 processor (Raspberry Pi 5, Apple "
+     "Silicon, or later)"},
+    {ANTI_CPU_ARMV8_5, "armv8.5", "this program needs an Apple Silicon Mac"},
 };
 
 static const struct row *row_of(int32_t level)
@@ -95,11 +107,11 @@ const char *anti_cpu_level_name(int32_t level)
     return r == NULL ? "" : r->name;
 }
 
-const char *anti_cpu_level_needs(int32_t level)
+const char *anti_cpu_level_message(int32_t level)
 {
     const struct row *r = row_of(level);
 
-    return r == NULL ? "" : r->needs;
+    return r == NULL ? "" : r->message;
 }
 
 #if defined(ANTI_CPU_X86_64)
@@ -197,11 +209,17 @@ static int32_t machine_level(void)
 
 static int32_t machine_level(void)
 {
-    /* Windows answers for the ARMv8.2 dot products and for nothing above
-       them, so armv8.5 is a level this platform cannot deny. */
-    return IsProcessorFeaturePresent(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE)
-               ? ANTI_CPU_ARMV8_5
-               : ANTI_CPU_ARMV8_0;
+    /* DESIGN: Windows answers for the ARMv8.1 atomics and the ARMv8.2 dot
+       products and has no query above them. Where a feature has no flag
+       the level is assumed, because every Windows-on-ARM machine sold is
+       armv8.2 or later. A machine with both flags therefore reports
+       armv8.5 as well. */
+    if (IsProcessorFeaturePresent(
+            PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE) &&
+        IsProcessorFeaturePresent(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE)) {
+        return ANTI_CPU_ARMV8_5;
+    }
+    return ANTI_CPU_ARMV8_0;
 }
 
 #elif defined(__APPLE__)
@@ -298,7 +316,6 @@ void anti_cpu_check(void)
     if (missing == 0) {
         return;
     }
-    fprintf(stderr, "anti: this program needs a processor with %s\n",
-            anti_cpu_level_needs(missing));
+    fprintf(stderr, "anti: %s\n", anti_cpu_level_message(missing));
     exit(70);
 }

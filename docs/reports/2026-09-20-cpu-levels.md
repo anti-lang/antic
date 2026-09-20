@@ -2,8 +2,9 @@
 
 The "CPU levels" section of `docs/anti-language-additions.md` is implemented.
 477 ctest tests pass on the Mac, and the ASan and the UBSan suites run 476 each.
-Eddie answered the first two questions of this report during the session, and
-the section and `docs/decisions.md` carry both answers.
+Eddie answered every question of this report during the session.
+`docs/decisions.md` carries the answers, and the section carries the two that
+change what the archive holds.
 
 ## What was built
 
@@ -43,7 +44,11 @@ without it, so no build can ship a runtime that checks the wrong processor.
 `rt/start.c` calls the check before anything else. A machine below the level
 reads
 `anti: this program needs a processor with AVX2 (x86-64-v3, 2013 or later)` and
-the process exits with 70.
+the process exits with 70. An ARM64 message names machines rather than
+extensions: `this program needs an ARMv8.2 processor (Raspberry Pi 5, Apple
+Silicon, or later)` and `this program needs an Apple Silicon Mac`. The lowest
+level of an architecture never refuses, because every machine of it is at least
+that.
 
 `driver_run` refuses a level of the other architecture. The zero value of
 `enum cpu_level` is v1, so a caller that builds its own options can forget to
@@ -68,51 +73,47 @@ unwind data, the emit-identity manifest and the link-identity digest were
 rewritten. `tests/unit/test_float.c` and `tests/unit/test_x86_64.c` now name v1
 where they hold SSE text, so those expectations say which level they are.
 
-## Questions
+## Answers
 
-Eddie answered the first two during the session. The archive now holds one
-`anti_rt` per target and level, the native libraries stay at the default level
-and refuse a lower program at link, and the Rosetta programs link the archive's
-v1 runtime like any `--cpu v1` build. The second runtime root is gone. The
-refusal for a native library has no site yet, because nothing in `libs/` builds
-one. The message it will write is in `docs/decisions.md`.
+Eddie settled every open item during the session. `docs/decisions.md` holds
+each one with its reason.
 
-1. **The simulated level.** The refusal is exercised on a real machine under
-   Rosetta and, portably, in the unit tests, where `rt/cpu.c` is compiled with
-   `ANTI_DEV_CPU` and reads `ANTI_CPU_LEVEL`. A released runtime carries neither.
-   The alternative is to compile the switch in always, at one `getenv` per start.
-   A user on a v3 machine could then see the message a v1 user would get.
+1. **The simulated level stays a test hook.** `ANTI_DEV_CPU` is compiled into
+   the unit tests alone and is absent from the runtime of the archive. A
+   shipped program therefore reads no environment variable of its own.
+   `docs/notes/hosts-and-harness.md` records it under "Test hooks".
 
-2. **The message for ARM64.** The section gives the x86 line. The ARM64 lines
-   are `the ARMv8.2 extensions (armv8.2, 2017 or later)` and the same for 8.5,
-   and `ARMv8-A (armv8.0, 2012 or later)`.
+2. **The ARM64 messages name machines.** `armv8.2` reads "this program needs an
+   ARMv8.2 processor (Raspberry Pi 5, Apple Silicon, or later)" and `armv8.5`
+   "this program needs an Apple Silicon Mac". `armv8.0` never refuses, as `v1`
+   never does: a machine of an architecture is at least its baseline.
 
-3. **Windows on ARM64 has no query above armv8.2.** `IsProcessorFeaturePresent`
-   answers for the dot products and for nothing higher. A program built with
-   `--cpu armv8.5` for windows-arm64 is therefore not refused there. The check
-   refuses only a machine that is known to be below the level.
+3. **Windows on ARM64 reads both flags.**
+   `PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE` and
+   `PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE`. A machine with both reports
+   `armv8.5`, which has no flag of its own. Every Windows-on-ARM machine sold is
+   armv8.2 or later, and `rt/cpu.c` says so at the query.
 
-4. **The vector byte cap.** The section calls it a constant in the level table
-   and "the widest vector register of any level antic knows". That is 32 bytes
-   at v3. "Simd structs" gives 256 bytes to start, which no vector register has.
-   Both are in the table, as `CPU_VECTOR_REGISTER_BYTES` and
-   `CPU_SIMD_STRUCT_CAP`, and nothing reads either yet.
+4. **The vector byte cap is one constant**, `CPU_VECTOR_BYTE_CAP`, 256 today.
+   The per-level widest register is gone, because the cap is the size of a
+   `simd struct` and not the width of a register. Nothing reads it until simd
+   structs exist.
 
-5. **v2 changes no instruction antic writes.** The language has no operation
-   that asks for SSE4.2 or `popcnt`. v1 and v2 therefore differ in the assembler
-   and the runtime archive alone. The same holds for every ARM64 level in the
-   emitter: the level's instructions there are the atomics of the runtime.
+5. **v2 stays a level with no codegen difference from v1.** It exists so that a
+   program can state it. It also gives `popcnt` and the other v2 instructions a
+   level to appear at, when a built-in uses them.
 
-6. **`docs/tooling.md` was not changed.** `--cpu` is an antic option and the
-   table in that file describes `anti build`, which is not built. If `anti build`
-   should forward `--cpu`, that is a change to the tooling document as well.
+6. **`anti build --cpu` is a rule in `docs/tooling.md`**, waiting for
+   `anti build` as the `-g` rule does.
 
-7. **The docs-style checker and CMake.** `tests/CMakeLists.txt` had 105 findings
-   before this session. Each is the checker reading a comment's last line as a
-   heading, or a `foreach` line as prose. The ones the new blocks add are of
-   those two kinds. The comments of the C sources and the `.md` files report
-   nothing.
+7. **The docs-style checker is not run on CMake files.** It covers prose and
+   code comments, and a CMake comment follows the comment rules by hand.
 
-8. **Build time.** The archive now compiles the runtime eighteen times rather
-   than six, three levels for each of the six targets. The runtime is twenty-one
-   small files, and a full build on the Mac is unchanged to the second.
+8. **The eighteen runtime builds stay.** They run once per runtime archive
+   build, a release-day job, and the archive caches them by target and level.
+
+## Open
+
+- The refusal of a native library below its level has no site yet, because
+  nothing in `libs/` builds one. `docs/decisions.md` holds the message it will
+  write.

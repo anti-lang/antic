@@ -74,9 +74,8 @@ static void features(void)
     CHECK(cpu_has(CPU_ARMV8_5, CPU_LSE));
     CHECK(cpu_has(CPU_ARMV8_2, CPU_FP16));
     CHECK(cpu_has(CPU_ARMV8_2, CPU_DOTPROD));
-    /* The widest vector register of any level antic knows. */
-    CHECK(cpu_vector_bytes(CPU_V3) == CPU_VECTOR_REGISTER_BYTES);
-    CHECK(cpu_vector_bytes(CPU_V1) == 16);
+    /* The cap on the size of a simd struct, which nothing reads yet. */
+    CHECK(CPU_VECTOR_BYTE_CAP == 256);
 }
 
 /* The ids the runtime reads, which rise with the level inside one
@@ -105,13 +104,21 @@ static void refusal(void)
     CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V3) == ANTI_CPU_X86_64_V3);
     CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V2) == ANTI_CPU_X86_64_V2);
     CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V1) == 0);
-    CHECK_STR(anti_cpu_level_needs(ANTI_CPU_X86_64_V3),
-              "AVX2 (x86-64-v3, 2013 or later)");
+    CHECK_STR(anti_cpu_level_message(ANTI_CPU_X86_64_V3),
+              "this program needs a processor with AVX2 "
+              "(x86-64-v3, 2013 or later)");
+    CHECK_STR(anti_cpu_level_message(ANTI_CPU_ARMV8_5),
+              "this program needs an Apple Silicon Mac");
+    CHECK_STR(anti_cpu_level_message(ANTI_CPU_ARMV8_2),
+              "this program needs an ARMv8.2 processor "
+              "(Raspberry Pi 5, Apple Silicon, or later)");
 
     set_level("v3");
     CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V3) == 0);
     CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V1) == 0);
 
+    /* The lowest level of an architecture never refuses: every machine of
+       it is at least that. */
     set_level("armv8.0");
     CHECK(anti_cpu_missing(ANTI_CPU_ARMV8_2) == ANTI_CPU_ARMV8_2);
     CHECK(anti_cpu_missing(ANTI_CPU_ARMV8_5) == ANTI_CPU_ARMV8_5);

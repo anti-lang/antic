@@ -76,6 +76,11 @@ shows none of its code.
 the line of every statement, and a debugger stops by file and line. `docs/decisions.md`
 holds the shape of that information under "Debug information".
 
+`anti build --cpu <level>` forwards the level to `antic --cpu` for every module of the
+build. Without it each target takes its default level. The levels and the defaults are
+in `docs/anti-language-additions.md` under "CPU levels". Like `-g`, this is a rule that
+waits for `anti build`.
+
 `antic` keeps working without a manifest:
 `antic main.anti ../libs/com/niese/anti/geometry.antl`. In that mode nothing is fetched
 and every transitive dependency must be on the command line.
