@@ -1,0 +1,6 @@
+exit 0
+filled 1 10
+destruct Box 1
+destruct Leaf 10
+caught 1
+done

@@ -230,7 +230,7 @@ try {
 }
 ```
 
-A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and the error is deleted when the handler exits unless returned. `Error` has `code`, `message` and an owned `cause`. Libraries subclass it and callers test with `is`.
+A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and the error is deleted when the handler exits unless returned. The compiler supplies the out pointer of the binding over storage whose table it zeroes, and the binding is destroyed at the end of its block like any other local. `Error` has `code`, `message` and an owned `cause`. Libraries subclass it and callers test with `is`.
 
 ## Structs
 
@@ -380,7 +380,7 @@ Built.
 
 ## Ownership
 
-`own` on a pointer or slice field says the object owns the memory. `destruct`, `dup`, `equals` and `serialize` follow it. Inline class and struct fields are owned by definition. The compiler writes a teardown and a copy for every class, which `delete`, `destroy` and `dup` call, so `--no-reflect` loses nothing about ownership. An `own` slice of class values destroys its elements last to first, as a local array does. `alloc(T, n)` of a class gives zeroed memory, so an element not filled yet has a zero table. `delete`, `destroy` and `dup` trap on a zero table with the class name in every mode, and `is`, `as` and a dispatch do in dev mode. `=` into such an element destroys nothing.
+`own` on a pointer or slice field says the object owns the memory. `destruct`, `dup`, `equals` and `serialize` follow it. Inline class and struct fields are owned by definition. The compiler writes a teardown and a copy for every class, which `delete`, `destroy` and `dup` call, so `--no-reflect` loses nothing about ownership. An `own` slice of class values destroys its elements last to first, as a local array does. `alloc(T, n)` of a class gives zeroed memory, so an element not filled yet has a zero table. So does the storage the compiler supplies for the out pointer of a `catch` binding. `delete`, `destroy` and `dup` trap on a zero table with the class name in every mode, and `is`, `as` and a dispatch do in dev mode. `=` into such an element destroys nothing.
 
 ```anti
 class Buffer

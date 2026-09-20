@@ -4780,6 +4780,54 @@ static void destroy_array(struct lowerer *l, struct ir_operand base,
     l->b = done;
 }
 
+/* DESIGN: the out pointer the compiler supplies for `let n = f(args) catch
+   e { }` points at storage that holds no value yet, and the `=` the callee
+   writes destroys the old value first. That `=` reads the table to learn
+   whether there is one, so the table is zero before the call. The bytes an
+   earlier call left in the frame are otherwise a table the callee follows,
+   which is a free of whatever the frame held. It is the zero table of
+   `alloc(T, n)`, in a frame instead of on the heap. */
+static void clear_tables(struct lowerer *l, struct ir_operand base,
+                         const struct type *t)
+{
+    const struct type *element = innermost(t);
+    struct ir_block *test;
+    struct ir_block *body;
+    struct ir_block *done;
+    struct ir_operand size;
+    struct ir_operand at;
+    uint32_t index;
+
+    if (!type_needs_destruct(element)) {
+        return;
+    }
+    if (t->kind != TYPE_ARRAY) {
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), base);
+        return;
+    }
+    size = size_operand(l, element);
+    test = new_block(l);
+    body = new_block(l);
+    done = new_block(l);
+    index = ir_unary(l->f, l->b, IR_COPY, IR_I64, element_count(l, t));
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    ir_branch(l->f, l->b,
+              temp(l, ir_binary(l->f, l->b, IR_SGT, IR_I8, temp(l, index),
+                                ir_int_op(IR_I64, 0))),
+              body, done);
+    l->b = body;
+    ir_assign(l->f, l->b, index,
+              temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64, temp(l, index),
+                                ir_int_op(IR_I64, 1))));
+    at = temp(l, ir_ptradd(l->f, l->b, base,
+                           temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                             temp(l, index), size))));
+    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
+    ir_jump(l->f, l->b, test);
+    l->b = done;
+}
+
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
     if (sym->type->kind == TYPE_ARRAY) {
@@ -5051,12 +5099,27 @@ static void lower_let(struct lowerer *l, const struct stmt *s)
         struct ir_operand out = temp(l, sym->ir);
         struct ir_operand err;
         bool has_out = s->as.let.value->as.call.out != NULL;
+        if (has_out) {
+            clear_tables(l, out, sym->type);
+        }
         l->out_address = out;
         err = lower_call(l, s->as.let.value);
         if (l->failed) {
             return;
         }
         handle_error(l, s->as.let.value, err, out, has_out, none());
+        /* DESIGN: the binding is a local of its type and is torn down at
+           the end of its block like any other. It is registered after the
+           handler. Every path that reaches this point has a value in the
+           slot: the call wrote it, or the handler gave one with `yield`.
+           A handler that leaves the block never passes here. The defers it
+           runs on the way out leave the slot alone. The zero table of a
+           call that wrote nothing so reaches no teardown. */
+        if (has_out && local_needs_teardown(sym->type)) {
+            l->defers->items = grow_defers(l->defers);
+            l->defers->items[l->defers->count].stmt = NULL;
+            l->defers->items[l->defers->count++].local = sym;
+        }
         return;
     }
     if (is_aggregate(sym->type)) {

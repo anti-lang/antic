@@ -1,0 +1,95 @@
+//! The out pointer the compiler supplies for `let n = f(args) catch e { }`
+//! points at storage that holds no value yet, so its table is zero before
+//! the call. The `=` in the callee then destroys nothing. The frame the
+//! binding sits in is dirtied first, because the bytes a previous call
+//! left there are a table the callee would otherwise follow.
+//!
+//! The binding is a local of its type and is torn down at the end of its
+//! block. On the error path the callee writes nothing, the handler leaves
+//! the block, and the zero table it leaves behind reaches no teardown.
+
+import anti.error;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Leaf %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Box
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	concrete fn destruct(self)
+	{
+		printf("destruct Box %d\n".ptr, self.n as c_int);
+	}
+
+	/// Write a box through `out`, or fail when `n` is negative.
+	pub fn make(n: int, out: *Box) -> ?*error.Error
+	{
+		if n < 0 {
+			return error.Error.new(1, "n is negative");
+		}
+		*out = Box { n: n, leaf: alloc Leaf { n: n * 10 } };
+		return none;
+	}
+}
+
+/// Leave a pattern in the frame that the next call at this depth reuses.
+fn dirty() -> int
+{
+	let slots: [16]int = [0x4142434445464748; 16];
+	let i = 0;
+	let sum = 0;
+	while i < 16 do {
+		sum += slots[i];
+		i += 1;
+	}
+	return sum;
+}
+
+/// A binding in a frame the dirty pattern just filled.
+fn filled() -> int
+{
+	let box = Box.make(1) catch fatal;
+	let leaf = box.leaf else { return 0; };
+	printf("filled %d %d\n".ptr, box.n as c_int, leaf.n as c_int);
+	return box.n;
+}
+
+/// The same binding on the path where the callee writes nothing.
+fn failed() -> int
+{
+	let box = Box.make(-1) catch e {
+		printf("caught %d\n".ptr, e.code as c_int);
+		return 2;
+	};
+	printf("unreached %d\n".ptr, box.n as c_int);
+	return 3;
+}
+
+fn main() -> int
+{
+	if dirty() == 0 {
+		return 1;
+	}
+	if filled() != 1 {
+		return 4;
+	}
+	if dirty() == 0 {
+		return 1;
+	}
+	if failed() != 2 {
+		return 5;
+	}
+	printf("done\n".ptr);
+	return 0;
+}
