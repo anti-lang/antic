@@ -26,11 +26,12 @@ execute_process(
             "${ANTIC}" -o "${WORK}/prog" "${SOURCE}"
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
     ENCODING NONE)
-set(printed "${out}${err}")
-file(TO_NATIVE_PATH "${data}" native)
-string(REPLACE "\\" "\\\\" quoted "${native}")
-if(NOT printed MATCHES "${quoted}")
-    message(FATAL_ERROR "antic did not take ${native} as the runtime archive\n"
+# antic joins the data directory of Windows with backslashes and the
+# rest of a path with slashes, so both sides are read with one separator.
+string(REPLACE "\\" "/" printed "${out}${err}")
+string(REPLACE "\\" "/" want "${data}")
+if(NOT printed MATCHES "${want}")
+    message(FATAL_ERROR "antic did not take ${data} as the runtime archive\n"
                         "${printed}")
 endif()
 
