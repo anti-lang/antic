@@ -675,17 +675,19 @@ static int back_end(const struct options *o, struct module *tree,
     if (ok && dump) {
         for (i = 0; i < program->function_count; i++) {
             if (functions[i] != NULL) {
-                mach_print(&out, target_desc(o->target), program,
+                mach_print(&out, target_desc(o->target), o->cpu, program,
                            functions[i]);
             }
         }
         fputs(text_cstr(&out), stdout);
         status = 2;
     } else if (ok) {
-        ok = o->dev ? emit_module(assembly, o->target, program, functions,
-                                  module, o->debug, error, sizeof error)
-                    : emit_program(assembly, o->target, program, functions,
-                                   module, o->debug, error, sizeof error);
+        ok = o->dev ? emit_module(assembly, o->target, o->cpu, program,
+                                  functions, module, o->debug, error,
+                                  sizeof error)
+                    : emit_program(assembly, o->target, o->cpu, program,
+                                   functions, module, o->debug, error,
+                                   sizeof error);
         if (ok && o->dev && !has_main(program, module)) {
             status = 3;
         }
@@ -1416,16 +1418,26 @@ static bool assemble(const struct options *o, const char *assembly,
                      const char *object)
 {
     struct text triple = {0};
+    struct text attributes = {0};
     struct text found = {0};
     const char *argv[] = {NULL, NULL, "-filetype=obj", "-o", object, assembly,
-                          NULL};
+                          NULL, NULL};
     int run;
 
     argv[0] = o->llvm_mc != NULL ? o->llvm_mc
                                  : archive_tool(o, "llvm-mc", &found);
     text_appendf(&triple, "-triple=%s", target_info(o->target)->triple);
     argv[1] = text_cstr(&triple);
+    /* The assembler of the level, so that it takes the instructions the
+       level adds. The x86_64 assembler needs no attributes. */
+    if (cpu_attributes(o->cpu)[0] != '\0') {
+        text_appendf(&attributes, "-mattr=%s", cpu_attributes(o->cpu));
+        argv[6] = argv[5];
+        argv[5] = text_cstr(&attributes);
+        argv[7] = NULL;
+    }
     run = process_run(argv);
+    text_free(&attributes);
     text_free(&triple);
     text_free(&found);
     if (run != 0) {

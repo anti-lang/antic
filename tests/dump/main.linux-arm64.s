@@ -1,6 +1,12 @@
     .text
     .globl anti.rt.main
     .set anti.rt.main, main.main
+    .section .rodata
+    .globl anti_cpu_required
+    .p2align 2
+anti_cpu_required:
+    .long 16
+    .text
     .p2align 2
 main.scale:
 .Lmain.scale.b0:

@@ -103,6 +103,7 @@ add_library(antic_core STATIC
     src/arm64.c
     src/arena.c
     src/ast_dump.c
+    src/cpu.c
     src/debug.c
     src/diagnostic.c
     src/driver.c
@@ -154,6 +155,40 @@ target_compile_definitions(antic PRIVATE
 target_compile_definitions(antic_core PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
 
+# DESIGN: the levels of tools/cpu-levels are the table src/cpu.c holds, and
+# the test cpu_levels_pin compares the two. The build reads the file rather
+# than repeating the names, so the runtime archive's native libraries are
+# built for the level each target defaults to.
+set(ANTIC_CPU_LEVELS "${CMAKE_SOURCE_DIR}/tools/cpu-levels")
+file(STRINGS "${ANTIC_CPU_LEVELS}" antic_cpu_lines REGEX "^(level|default) ")
+foreach(line IN LISTS antic_cpu_lines)
+    string(REPLACE " " ";" fields "${line}")
+    list(GET fields 0 kind)
+    list(GET fields 1 key)
+    if(kind STREQUAL "level")
+        list(GET fields 4 march)
+        set(ANTIC_CPU_MARCH_${key} "${march}")
+    else()
+        list(GET fields 2 ANTIC_CPU_LEVEL_${key})
+    endif()
+endforeach()
+
+# The default level of a target, and the -march= value of a level.
+function(antic_cpu_level out target)
+    set(level "${ANTIC_CPU_LEVEL_${target}}")
+    if(level STREQUAL "")
+        message(FATAL_ERROR "no default processor level for ${target} in ${ANTIC_CPU_LEVELS}")
+    endif()
+    set(${out} "${level}" PARENT_SCOPE)
+endfunction()
+
+function(antic_cpu_march out level)
+    if(ANTIC_CPU_MARCH_${level} STREQUAL "")
+        message(FATAL_ERROR "no -march= value for level ${level} in ${ANTIC_CPU_LEVELS}")
+    endif()
+    set(${out} "-march=${ANTIC_CPU_MARCH_${level}}" PARENT_SCOPE)
+endfunction()
+
 # anti_rt for the host, laid out as the runtime archive: lib/<target>/ with
 # libanti_rt.a, or anti_rt.lib on Windows, and licenses/ with the licence
 # of each component.
@@ -161,8 +196,8 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # DESIGN: one list of runtime sources. The host library and the cross
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
-set(ANTIC_RUNTIME_SOURCES assert atomic call cast check errno init io license
-    object reflect registry signal start text threads time toml utf)
+set(ANTIC_RUNTIME_SOURCES assert atomic call cast check cpu errno init io
+    license object reflect registry signal start text threads time toml utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "rt/${source}.c")
@@ -179,7 +214,9 @@ if(NOT ANTIC_HOST_OS STREQUAL "macos")
     # sanitizer runtime, so the runtime carries no sanitizer instrumentation,
     # whatever CMAKE_C_FLAGS holds in a sanitizer configuration.
     if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-        target_compile_options(anti_rt PRIVATE -fno-sanitize=all)
+        antic_cpu_level(host_level "${ANTIC_HOST_TARGET}")
+        antic_cpu_march(host_march "${host_level}")
+        target_compile_options(anti_rt PRIVATE -fno-sanitize=all "${host_march}")
     endif()
 
     # The licence stub of a bundled archive lies beside the runtime library as
@@ -241,13 +278,19 @@ endif()
 # sysroot, so that antic links a program for each of them from this host.
 # Linux takes the headers of musl, macOS the headers of the Zig release
 # that the sysroot holds and Windows the headers that xwin installs.
-function(anti_cross_runtime target triple)
+# DESIGN: one runtime library per target and level, so that a second root
+# can hold the same target at a lower level. The archive that ships holds
+# the default level of each target, which anti_cross_runtime builds.
+function(anti_cross_runtime_at target triple level root)
     set(objects "")
-    set(work "${CMAKE_BINARY_DIR}/cross/${target}")
+    set(work "${CMAKE_BINARY_DIR}/cross/${target}-${level}")
+    # The level of the library, so that its atomics are one instruction
+    # wherever the level has them.
+    antic_cpu_march(march "${level}")
     if(target MATCHES "^windows")
-        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/anti_rt.lib")
+        set(library "${root}/lib/${target}/anti_rt.lib")
     else()
-        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/libanti_rt.a")
+        set(library "${root}/lib/${target}/libanti_rt.a")
     endif()
     foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
         set(object "${work}/${source}.o")
@@ -255,12 +298,13 @@ function(anti_cross_runtime target triple)
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
                 -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
-                "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+                "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                 -c "${PROJECT_SOURCE_DIR}/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/rt/${source}.c"
                 "${PROJECT_SOURCE_DIR}/rt/rt.h" "${PROJECT_SOURCE_DIR}/rt/std.h"
                 "${PROJECT_SOURCE_DIR}/rt/object.h"
                 "${PROJECT_SOURCE_DIR}/rt/atomic.h"
+                "${PROJECT_SOURCE_DIR}/rt/cpu_level.h"
                 "${PROJECT_SOURCE_DIR}/rt/reflect.h"
                 "${PROJECT_SOURCE_DIR}/rt/signal.h"
                 "${PROJECT_SOURCE_DIR}/rt/toml.h"
@@ -269,16 +313,16 @@ function(anti_cross_runtime target triple)
         list(APPEND objects "${object}")
     endforeach()
     if(target MATCHES "^windows")
-        set(stub "${ANTIC_RUNTIME_DIR}/lib/${target}/anti_rt_license_stub.obj")
+        set(stub "${root}/lib/${target}/anti_rt_license_stub.obj")
     else()
-        set(stub "${ANTIC_RUNTIME_DIR}/lib/${target}/anti_rt_license_stub.o")
+        set(stub "${root}/lib/${target}/anti_rt_license_stub.o")
     endif()
     add_custom_command(OUTPUT "${stub}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory
-            "${ANTIC_RUNTIME_DIR}/lib/${target}"
+            "${root}/lib/${target}"
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
             -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
-            "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+            "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
             -c "${PROJECT_SOURCE_DIR}/rt/license_stub.c" -o "${stub}"
         DEPENDS "${PROJECT_SOURCE_DIR}/rt/license_stub.c"
             "${PROJECT_SOURCE_DIR}/rt/std.h"
@@ -286,11 +330,18 @@ function(anti_cross_runtime target triple)
     # The stub stays beside the library, never a member of it.
     add_custom_command(OUTPUT "${library}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory
-            "${ANTIC_RUNTIME_DIR}/lib/${target}"
+            "${root}/lib/${target}"
         COMMAND "${ANTIC_LLVM_AR}" rcs "${library}" ${objects}
         DEPENDS ${objects}
         VERBATIM)
-    add_custom_target(anti_rt_${target} ALL DEPENDS "${library}" "${stub}")
+    add_custom_target(anti_rt_${target}_${level} ALL
+        DEPENDS "${library}" "${stub}")
+endfunction()
+
+function(anti_cross_runtime target triple)
+    antic_cpu_level(level "${target}")
+    anti_cross_runtime_at("${target}" "${triple}" "${level}"
+        "${ANTIC_RUNTIME_DIR}" ${ARGN})
 endfunction()
 
 if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
@@ -331,6 +382,26 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
                 -isystem "${sysroot}/sdk/include/shared")
         endif()
     endforeach()
+    # DESIGN: a macos-arm64 host runs a macos-x86_64 program under
+    # Rosetta, which has no AVX2, so it runs no program of the default
+    # level x86-64-v3. The suite keeps its macos-x86_64 program tests by
+    # compiling them with --cpu v1 against a second runtime root of that
+    # level. Only the suite reads it, and the archive that ships holds the
+    # default level alone.
+    if(ANTIC_HOST_TARGET STREQUAL "macos-arm64" AND
+       EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/macos-x86_64")
+        set(ANTIC_RUNTIME_V1_DIR "${CMAKE_BINARY_DIR}/runtime-v1")
+        anti_cross_runtime_at(macos-x86_64 x86_64-apple-macos11 v1
+            "${ANTIC_RUNTIME_V1_DIR}"
+            -isysroot "${ANTIC_RUNTIME_DIR}/sysroot/macos-x86_64")
+        # Everything but lib/ is the archive's, so the second root names
+        # it rather than holding a copy.
+        file(MAKE_DIRECTORY "${ANTIC_RUNTIME_V1_DIR}")
+        foreach(entry sysroot std licenses bin)
+            file(CREATE_LINK "${ANTIC_RUNTIME_DIR}/${entry}"
+                "${ANTIC_RUNTIME_V1_DIR}/${entry}" SYMBOLIC)
+        endforeach()
+    endif()
 endif()
 
 # The standard library in std/, written as library files into std/ of the

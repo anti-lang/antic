@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "cpu.h"
 #include <stdlib.h>
 #include "arena.h"
 #include "ast.h"
@@ -50,7 +51,8 @@ static void run(const char *source, enum target target, struct text *out)
         }
         for (i = 0; ok && i < ir.function_count; i++) {
             if (functions[i] != NULL) {
-                mach_print(out, target_desc(target), &ir, functions[i]);
+                mach_print(out, target_desc(target), cpu_default(target), &ir,
+                           functions[i]);
             }
         }
         if (!ok) {
@@ -108,8 +110,10 @@ static void probe(void)
     frame.saved_count = 2;
     target->prologue(&b, &frame);
     target->epilogue(&b, &frame);
+    /* The SSE forms of v1. x86-64-v3 writes the VEX forms, which
+       vex_float_forms checks. */
     for (i = 0; i < b.count; i++) {
-        target->print(&out, &m, &b.insts[i], NULL);
+        target->print(&out, CPU_V1, &m, &b.insts[i], NULL);
         text_append(&out, "\n");
     }
     CHECK_STR(text_cstr(&out), "pushq %rbp\n"
@@ -156,7 +160,8 @@ static void rip_relative(void)
     for (i = 0; i < 2; i++) {
         CHECK(regalloc_function(TARGET_LINUX_X86_64, functions[i], error,
                                 sizeof error));
-        mach_print(&out, target_desc(TARGET_LINUX_X86_64), &m, functions[i]);
+        mach_print(&out, target_desc(TARGET_LINUX_X86_64),
+                   cpu_default(TARGET_LINUX_X86_64), &m, functions[i]);
         mach_function_free(functions[i]);
         free(functions[i]);
     }

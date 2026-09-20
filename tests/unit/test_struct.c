@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "cpu.h"
 #include <stdlib.h>
 #include <string.h>
 #include "arena.h"
@@ -51,7 +52,8 @@ static void run(const char *source, enum target target, struct text *out)
         }
         for (i = 0; ok && i < ir.function_count; i++) {
             if (functions[i] != NULL) {
-                mach_print(out, target_desc(target), &ir, functions[i]);
+                mach_print(out, target_desc(target), cpu_default(target), &ir,
+                           functions[i]);
             }
         }
         if (!ok) {

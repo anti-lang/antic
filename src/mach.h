@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "cpu.h"
 #include "ir.h"
 #include "target.h"
 #include "text.h"
@@ -138,9 +139,11 @@ uint32_t mach_vreg_add(struct mach_function *f, bool fp);
 
 void mach_function_free(struct mach_function *f);
 
-/* Append the text of f, one instruction per line. */
+/* Append the text of f, one instruction per line. The level decides the
+   forms of the instructions that a level of the target changes. */
 void mach_print(struct text *out, const struct target_desc *target,
-                const struct ir_module *m, const struct mach_function *f);
+                enum cpu_level cpu, const struct ir_module *m,
+                const struct mach_function *f);
 
 /* Append the symbol or label of operand o, of kind MACH_BLOCK, MACH_FUNC,
    MACH_GLOBAL or MACH_NAME. An IR function without a module and a name

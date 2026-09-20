@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "cpu.h"
 #include <stdlib.h>
 #include <string.h>
 #include "arena.h"
@@ -17,6 +18,14 @@
 
 /* Compile source as module main through register allocation for target,
    and append the machine code of every function, or the error. */
+/* The x86_64 cases below hold the SSE forms, which are the levels v1 and
+   v2. vex_float_forms checks the VEX forms of v3. */
+static enum cpu_level level_of(enum target target)
+{
+    return target_info(target)->arch == ARCH_X86_64 ? CPU_V1
+                                                    : cpu_default(target);
+}
+
 static void run(const char *source, enum target target, struct text *out)
 {
     struct arena arena = {0};
@@ -51,7 +60,8 @@ static void run(const char *source, enum target target, struct text *out)
         }
         for (i = 0; ok && i < ir.function_count; i++) {
             if (functions[i] != NULL) {
-                mach_print(out, target_desc(target), &ir, functions[i]);
+                mach_print(out, target_desc(target), level_of(target), &ir,
+                           functions[i]);
             }
         }
         if (!ok) {

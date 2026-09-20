@@ -1672,9 +1672,29 @@ static char suffix(const struct mach_inst *inst)
     return 'q';
 }
 
-static void print(struct text *out, const struct ir_module *m,
-                  const struct mach_inst *inst, const struct names *names)
+/* DESIGN: x86-64-v3 has AVX, so the scalar float instructions take their
+   VEX forms. VEX gives a two-operand SSE instruction a separate first
+   source. An instruction that reads and writes one register therefore
+   names that register twice. A move between two registers cannot be
+   written that way with two operands. It takes vmovaps instead, which
+   copies the whole register rather than merging one lane. */
+static void print_vex_three(struct text *out, const struct ir_module *m,
+                            const struct mach_inst *inst,
+                            const struct names *names)
 {
+    text_append(out, " ");
+    print_operand(out, m, names, &inst->operands[1]);
+    text_append(out, ", ");
+    print_operand(out, m, names, &inst->operands[0]);
+    text_append(out, ", ");
+    print_operand(out, m, names, &inst->operands[0]);
+}
+
+static void print(struct text *out, enum cpu_level cpu,
+                  const struct ir_module *m, const struct mach_inst *inst,
+                  const struct names *names)
+{
+    const char *v = cpu_has(cpu, CPU_AVX) ? "v" : "";
     size_t i;
     bool first = true;
 
@@ -1728,39 +1748,63 @@ static void print(struct text *out, const struct ir_module *m,
                      width_suffix(inst->operands[1].width),
                      width_suffix(inst->operands[0].width));
         break;
-    case X64_MOVS:
     case X64_ADDS:
     case X64_SUBS:
     case X64_MULS:
     case X64_DIVS:
-    case X64_UCOMIS:
     case X64_XORP:
     case X64_ANDP:
     case X64_ANDNP:
     case X64_ORP:
-        text_appendf(out, "%s%c", opcodes[inst->op].name,
+        text_appendf(out, "%s%s%c", v, opcodes[inst->op].name,
+                     float_suffix(inst->operands[0].width));
+        if (*v != '\0') {
+            print_vex_three(out, m, inst, names);
+            return;
+        }
+        break;
+    case X64_MOVS:
+        if (*v != '\0' && inst->operands[0].kind != MACH_MEM &&
+            inst->operands[1].kind != MACH_MEM) {
+            text_append(out, "vmovaps");
+            break;
+        }
+        text_appendf(out, "%s%s%c", v, opcodes[inst->op].name,
+                     float_suffix(inst->operands[0].width));
+        break;
+    case X64_UCOMIS:
+        text_appendf(out, "%s%s%c", v, opcodes[inst->op].name,
                      float_suffix(inst->operands[0].width));
         break;
     case X64_CVTSI2S:
         /* cvtsi2sdq names the float width and the integer width. */
-        text_appendf(out, "%s%c%c", opcodes[inst->op].name,
+        text_appendf(out, "%s%s%c%c", v, opcodes[inst->op].name,
                      float_suffix(inst->operands[0].width),
                      width_suffix(inst->operands[1].width));
+        if (*v != '\0') {
+            print_vex_three(out, m, inst, names);
+            return;
+        }
         break;
     case X64_CVTTS2SI:
-        text_appendf(out, "%s%c2si", opcodes[inst->op].name,
+        text_appendf(out, "%s%s%c2si", v, opcodes[inst->op].name,
                      float_suffix(inst->operands[1].width));
         break;
     case X64_CVTS2S:
-        text_appendf(out, "%s%c2s%c", opcodes[inst->op].name,
+        text_appendf(out, "%s%s%c2s%c", v, opcodes[inst->op].name,
                      float_suffix(inst->operands[1].width),
                      float_suffix(inst->operands[0].width));
+        if (*v != '\0') {
+            print_vex_three(out, m, inst, names);
+            return;
+        }
         break;
     case X64_MOVQX:
-        text_append(out, inst->operands[0].width == 64 ? "movq" : "movd");
+        text_appendf(out, "%s%s", v,
+                     inst->operands[0].width == 64 ? "movq" : "movd");
         break;
     case X64_MOVUPS:
-        text_append(out, opcodes[inst->op].name);
+        text_appendf(out, "%s%s", v, opcodes[inst->op].name);
         break;
     default:
         text_appendf(out, "%s%c", opcodes[inst->op].name, suffix(inst));

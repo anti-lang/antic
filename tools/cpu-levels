@@ -1,0 +1,20 @@
+# The processor levels and the default level of each target, for the
+# build. src/cpu.c holds the same table for antic, and the test
+# cpu_levels_pin compares `antic --print-cpu-levels` with this file.
+#
+# level <name> <architecture> <id> <clang -march= value> <llvm-mc -mattr= value>
+# default <target> <level name>
+#
+# A - in the attributes column means the assembler needs none.
+level v1 x86_64 1 x86-64 -
+level v2 x86_64 2 x86-64-v2 -
+level v3 x86_64 3 x86-64-v3 -
+level armv8.0 arm64 16 armv8-a -
+level armv8.2 arm64 18 armv8.2-a +lse,+fullfp16,+dotprod
+level armv8.5 arm64 21 armv8.5-a +lse,+fullfp16,+dotprod
+default linux-x86_64 v3
+default linux-arm64 armv8.0
+default macos-x86_64 v3
+default macos-arm64 armv8.5
+default windows-x86_64 v3
+default windows-arm64 armv8.2

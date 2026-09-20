@@ -1611,12 +1611,18 @@ static const char *const cond_names[] = {
     [COND_VS] = "vs", [COND_VC] = "vc",
 };
 
-static void print(struct text *out, const struct ir_module *m,
-                  const struct mach_inst *inst, const struct names *names)
+static void print(struct text *out, enum cpu_level cpu,
+                  const struct ir_module *m, const struct mach_inst *inst,
+                  const struct names *names)
 {
     bool macho = names != NULL &&
                  target_info(names->target)->format == FORMAT_MACHO;
     size_t i;
+
+    /* No instruction of the ARM64 back end changes with the level yet.
+       The atomics of the runtime archive are the level's instructions,
+       and clang writes them for the level it is built at. */
+    (void)cpu;
 
     if (inst->op == A64_BCOND) {
         text_appendf(out, "b.%s ", cond_names[inst->operands[0].value]);

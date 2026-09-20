@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "cpu.h"
 #include <stdlib.h>
 #include <string.h>
 #include "arena.h"
@@ -51,7 +52,8 @@ static void run(const char *source, enum target target, struct text *out)
         }
         for (i = 0; ok && i < ir.function_count; i++) {
             if (functions[i] != NULL) {
-                mach_print(out, target_desc(target), &ir, functions[i]);
+                mach_print(out, target_desc(target), cpu_default(target), &ir,
+                           functions[i]);
             }
         }
         if (!ok) {
@@ -124,7 +126,8 @@ static void page_address(void)
     for (i = 0; i < 2 && functions[i] != NULL; i++) {
         CHECK(regalloc_function(TARGET_LINUX_ARM64, functions[i], error,
                                 sizeof error));
-        mach_print(&out, target_desc(TARGET_LINUX_ARM64), &m, functions[i]);
+        mach_print(&out, target_desc(TARGET_LINUX_ARM64),
+                   cpu_default(TARGET_LINUX_ARM64), &m, functions[i]);
         mach_function_free(functions[i]);
         free(functions[i]);
     }
@@ -151,7 +154,8 @@ static void print_block(struct text *out, const struct target_desc *target,
 
     memset(&m, 0, sizeof m);
     for (i = 0; i < b->count; i++) {
-        target->print(out, &m, &b->insts[i], NULL);
+        target->print(out, cpu_default(TARGET_LINUX_ARM64), &m, &b->insts[i],
+                      NULL);
         text_append(out, "\n");
     }
     free(b->insts);

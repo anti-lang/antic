@@ -10,7 +10,7 @@
 /* DESIGN: one assembly file holds the whole program. Every Anti function
    is a local symbol, and only the runtime entry is global. */
 
-static void emit_function(struct text *out, enum target t,
+static void emit_function(struct text *out, enum target t, enum cpu_level cpu,
                           const struct ir_module *m,
                           const struct mach_function *f, bool module,
                           struct debug *debug)
@@ -55,7 +55,7 @@ static void emit_function(struct text *out, enum target t,
         for (i = 0; i < f->blocks[b].count; i++) {
             debug_at(debug, out, f->blocks[b].insts[i].line);
             text_append(out, "    ");
-            desc->print(out, m, &f->blocks[b].insts[i], &names);
+            desc->print(out, cpu, m, &f->blocks[b].insts[i], &names);
             text_append(out, "\n");
         }
     }
@@ -97,6 +97,34 @@ static const char *const data_sections[] = {
     [FORMAT_MACHO] = "__TEXT,__const",
     [FORMAT_COFF] = ".rdata,\"dr\"",
 };
+
+/* DESIGN: the processor level of a program is a 32-bit global beside its
+   entry, and rt/start.c reads it before it calls main. The module that
+   defines main writes it, so a program carries one and a library carries
+   none. rt/cpu_level.h holds the value of each level for both
+   sides. */
+static void emit_cpu_level(struct text *out, enum target t, enum cpu_level cpu,
+                           const struct ir_module *m, const char *module)
+{
+    struct text symbol = {0};
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (f->is_extern || f->module == NULL ||
+            strcmp(f->module, module) != 0 || strcmp(f->name, "main") != 0) {
+            continue;
+        }
+        c_symbol(&symbol, t, "anti_cpu_required");
+        text_appendf(out,
+                     "    .section %s\n    .globl %s\n    .p2align 2\n"
+                     "%s:\n    .long %d\n    .text\n",
+                     data_sections[target_info(t)->format], text_cstr(&symbol),
+                     text_cstr(&symbol), (int)cpu_id(cpu));
+        break;
+    }
+    text_free(&symbol);
+}
 
 /* DESIGN: data that holds an address is written once when the program
    loads, so a section mapped read-only from the start cannot hold it.
@@ -252,10 +280,10 @@ static void emit_data(struct text *out, enum target t,
     }
 }
 
-static bool emit(struct text *out, enum target t, const struct ir_module *m,
-                 struct mach_function **functions, const char *module,
-                 bool one_module, bool debug_info, char *error,
-                 size_t error_size)
+static bool emit(struct text *out, enum target t, enum cpu_level cpu,
+                 const struct ir_module *m, struct mach_function **functions,
+                 const char *module, bool one_module, bool debug_info,
+                 char *error, size_t error_size)
 {
     const struct target_info *info = target_info(t);
     struct debug debug;
@@ -285,10 +313,12 @@ static bool emit(struct text *out, enum target t, const struct ir_module *m,
     }
     text_append(out, "    .text\n");
     emit_entry(out, t, m, module);
+    emit_cpu_level(out, t, cpu, m, module);
     debug_files(&debug, out);
     for (i = 0; i < m->function_count; i++) {
         if (functions[i] != NULL) {
-            emit_function(out, t, m, functions[i], one_module, &debug);
+            emit_function(out, t, cpu, m, functions[i], one_module,
+                          &debug);
         }
     }
     /* The debug information ends the text section, because the range of
@@ -304,19 +334,21 @@ static bool emit(struct text *out, enum target t, const struct ir_module *m,
     return true;
 }
 
-bool emit_program(struct text *out, enum target t, const struct ir_module *m,
-                  struct mach_function **functions, const char *module,
-                  bool debug_info, char *error, size_t error_size)
+bool emit_program(struct text *out, enum target t, enum cpu_level cpu,
+                  const struct ir_module *m, struct mach_function **functions,
+                  const char *module, bool debug_info, char *error,
+                  size_t error_size)
 {
-    return emit(out, t, m, functions, module, false, debug_info, error,
+    return emit(out, t, cpu, m, functions, module, false, debug_info, error,
                 error_size);
 }
 
-bool emit_module(struct text *out, enum target t, const struct ir_module *m,
-                 struct mach_function **functions, const char *module,
-                 bool debug_info, char *error, size_t error_size)
+bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
+                 const struct ir_module *m, struct mach_function **functions,
+                 const char *module, bool debug_info, char *error,
+                 size_t error_size)
 {
-    return emit(out, t, m, functions, module, true, debug_info, error,
+    return emit(out, t, cpu, m, functions, module, true, debug_info, error,
                 error_size);
 }
 

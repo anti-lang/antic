@@ -4,18 +4,18 @@ AddressSize: 64bit
 UnwindInformation [
   RuntimeFunction {
     StartAddress: _A6unwind_spin (0x0)
-    EndAddress: _A6unwind_spin +0x171 (0x4)
+    EndAddress: _A6unwind_spin +0x174 (0x4)
     UnwindInfoAddress: .xdata (0x8)
     UnwindInfo {
       Version: 1
       Flags [ (0x0)
       ]
-      PrologSize: 73
+      PrologSize: 74
       FrameRegister: -
       FrameOffset: -
       UnwindCodeCount: 17
       UnwindCodes [
-        0x49: SAVE_XMM128 reg=XMM6, offset=0x13B0
+        0x4A: SAVE_XMM128 reg=XMM6, offset=0x13B0
         0x41: SAVE_NONVOL reg=R14, offset=0x13C0
         0x39: SAVE_NONVOL reg=R13, offset=0x13C8
         0x31: SAVE_NONVOL reg=R12, offset=0x13D0

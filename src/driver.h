@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#include "cpu.h"
 #include "linker.h"
 #include "target.h"
 
@@ -64,6 +65,9 @@ struct options {
     bool dump_select;           /* --dump-select. */
     bool dump_alloc;            /* --dump-alloc. */
     enum target target;
+    /* DESIGN: the processor level is a code-generation setting, not a
+       target. --cpu sets it and the target's default stands otherwise. */
+    enum cpu_level cpu;
 };
 
 /* Compile options->input and return the process exit status for antic. */

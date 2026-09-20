@@ -680,7 +680,7 @@ A release binary carries no symbol data. `anti build --release` writes a symbols
 
 The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `armv8.5` on macOS, `armv8.2` on Windows and `armv8.0` on Linux. `--cpu` overrides on every target, and a program refuses to start on a processor below its level. A level is a code-generation setting, not a target.
 
-Built: the checks, with `--checks` and `--no-checks`, and `-g`, which writes the line of every statement and keeps the debug sections of the link. Not built yet: the variables of `-g`, `trace`, the symbols archives, the backtraces and the CPU levels.
+Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, and the CPU levels, with `--cpu`, the start-up check and the runtime archive built for the default level of each target. Not built yet: the variables of `-g`, `trace`, the symbols archives and the backtraces.
 
 ## Wire formats
 

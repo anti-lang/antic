@@ -165,8 +165,8 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 17. Inline atomic instruction sequences, which are runtime calls today.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
-nullable pointers, the dev-mode checks, the lines of `-g` and tests and
-fixtures are built. The variables of `-g` come before the first public
+nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
+and the CPU levels are built. The variables of `-g` come before the first public
 release. After it, the wrapping and saturating operators
 with `Flags`, then sum types, then locking and channels. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. Then
@@ -193,8 +193,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 462 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 461 each, without the `no_paths` test, which needs a
+- 476 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 475 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -212,3 +212,12 @@ reports what it finished.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
   both blocks after parsing.
+- The processor levels are built. `--cpu` takes `v1`, `v2` or `v3` on x86_64 and
+  `armv8.0`, `armv8.2` or `armv8.5` on ARM64, and each target has a default:
+  x86-64-v3 on both x86_64 targets, `armv8.5` on macos-arm64, `armv8.2` on
+  windows-arm64 and `armv8.0` on linux-arm64. x86-64-v3 writes the VEX forms of
+  the scalar float instructions. The runtime archive is built for each target's
+  default, so its atomics are one instruction at `armv8.2` and above. Every
+  program checks the processor at start and refuses a machine below its level.
+  `src/cpu.c` holds the table, `tools/cpu-levels` holds it for the build and
+  `cpu_levels_pin` compares the two.

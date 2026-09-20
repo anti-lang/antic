@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include "arena.h"
+#include "cpu.h"
 #include "ast.h"
 #include "diagnostic.h"
 #include "ir.h"
@@ -43,7 +44,8 @@ static void run(const char *source, enum target target, struct text *out)
         if (select_module(target, &ir, functions, error, sizeof error)) {
             for (i = 0; i < ir.function_count; i++) {
                 if (functions[i] != NULL) {
-                    mach_print(out, target_desc(target), &ir, functions[i]);
+                    mach_print(out, target_desc(target), cpu_default(target), &ir,
+                               functions[i]);
                 }
             }
         } else {

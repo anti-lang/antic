@@ -68,7 +68,7 @@ sysroot.
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
                 -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
-                "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+                "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                 -c "${PROJECT_SOURCE_DIR}/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/rt/${source}.c"
                 "${PROJECT_SOURCE_DIR}/rt/rt.h" "${PROJECT_SOURCE_DIR}/rt/std.h"
@@ -88,17 +88,33 @@ runtime symbols out of the dynamic table of a shared library. The option
 `-fno-sanitize=all` keeps the instrumentation of a sanitizer build of antic out of the
 programs a reader compiles.
 
+## The processor level of a library
+
+The value of `march` is the `-march=` of the target's default processor level, which
+`tools/cpu-levels` gives and `src/cpu.c` holds for antic. Both x86_64 targets default
+to `x86-64-v3`. macos-arm64 defaults to `armv8.5`, windows-arm64 to `armv8.2` and
+linux-arm64 to `armv8.0`. A level decides what clang writes for `rt/atomic.c`. At
+`armv8.2` and above an atomic operation is one instruction, `casal`, `ldaddal` or
+`swpal`. Below it the body is a load-store exclusive loop of `ldaxr` and `stlxr`. The
+tests `cpu_level_armv8.0`, `cpu_level_armv8.2` and `cpu_level_armv8.5` read the
+library of the target that defaults to each and check for those mnemonics.
+
+The archive holds the default level of each target and no other library. A program
+built with `--cpu` below the default therefore carries its own code at the lower
+level and the runtime at the default one.
+
 ## One archive with llvm-ar
 
 ```cmake
     # The stub stays beside the library, never a member of it.
     add_custom_command(OUTPUT "${library}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory
-            "${ANTIC_RUNTIME_DIR}/lib/${target}"
+            "${root}/lib/${target}"
         COMMAND "${ANTIC_LLVM_AR}" rcs "${library}" ${objects}
         DEPENDS ${objects}
         VERBATIM)
-    add_custom_target(anti_rt_${target} ALL DEPENDS "${library}" "${stub}")
+    add_custom_target(anti_rt_${target}_${level} ALL
+        DEPENDS "${library}" "${stub}")
 ```
 
 `llvm-ar rcs` replaces the members, creates the archive when it is absent and writes

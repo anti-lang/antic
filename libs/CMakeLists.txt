@@ -20,3 +20,31 @@ endif()
 set(ANTIC_RUNTIME_OUTPUT
     "${CMAKE_BINARY_DIR}/runtime/lib/${ANTIC_RUNTIME_TARGET}")
 file(MAKE_DIRECTORY "${ANTIC_RUNTIME_OUTPUT}")
+
+# DESIGN: every native library of the runtime archive is built for the
+# default level of its target, as docs/anti-language-additions.md settles
+# under "CPU levels". The levels come from tools/cpu-levels, the file
+# src/cpu.c holds the same table for antic, and the test cpu_levels_pin
+# compares the two. A library added here takes ANTIC_RUNTIME_C_FLAGS.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../tools/cpu-levels" antic_cpu_lines
+    REGEX "^(level|default) ")
+foreach(line IN LISTS antic_cpu_lines)
+    string(REPLACE " " ";" fields "${line}")
+    list(GET fields 0 kind)
+    list(GET fields 1 key)
+    if(kind STREQUAL "level")
+        list(GET fields 4 ANTIC_CPU_MARCH_${key})
+    else()
+        list(GET fields 2 ANTIC_CPU_LEVEL_${key})
+    endif()
+endforeach()
+
+set(ANTIC_RUNTIME_LEVEL "${ANTIC_CPU_LEVEL_${ANTIC_RUNTIME_TARGET}}")
+if(ANTIC_RUNTIME_LEVEL STREQUAL "")
+    message(FATAL_ERROR
+        "no default processor level for ${ANTIC_RUNTIME_TARGET} in tools/cpu-levels")
+endif()
+set(ANTIC_RUNTIME_C_FLAGS "-march=${ANTIC_CPU_MARCH_${ANTIC_RUNTIME_LEVEL}}")
+add_compile_options("${ANTIC_RUNTIME_C_FLAGS}")
+message(STATUS
+    "Runtime libraries for ${ANTIC_RUNTIME_TARGET} at level ${ANTIC_RUNTIME_LEVEL}")

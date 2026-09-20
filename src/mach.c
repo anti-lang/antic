@@ -84,7 +84,8 @@ void mach_function_free(struct mach_function *f)
 }
 
 void mach_print(struct text *out, const struct target_desc *target,
-                const struct ir_module *m, const struct mach_function *f)
+                enum cpu_level cpu, const struct ir_module *m,
+                const struct mach_function *f)
 {
     size_t b;
     size_t i;
@@ -94,7 +95,7 @@ void mach_print(struct text *out, const struct target_desc *target,
         text_appendf(out, "b%zu:\n", b);
         for (i = 0; i < f->blocks[b].count; i++) {
             text_append(out, "    ");
-            target->print(out, m, &f->blocks[b].insts[i], NULL);
+            target->print(out, cpu, m, &f->blocks[b].insts[i], NULL);
             text_append(out, "\n");
         }
     }

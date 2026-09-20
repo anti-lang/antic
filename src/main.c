@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "antl.h"
+#include "cpu.h"
 #include "driver.h"
 #include "linker.h"
 #include "selfpath.h"
@@ -45,6 +46,10 @@ static int usage(FILE *out)
           "  --license-text <f>   the file of the licence text\n"
           "  --attribution <line> and one attribution line\n"
           "  --target <name>      compile for <name>, for example macos-arm64\n"
+          "  --cpu <level>        the processor level: v1, v2 or v3 on\n"
+          "                       x86_64, armv8.0, armv8.2 or armv8.5 on\n"
+          "                       ARM64. The target's default stands\n"
+          "                       otherwise\n"
           "  --llvm-mc <path>     the llvm-mc executable\n"
           "  --runtime <dir>      the directory holding lib/<target>/\n"
           "  --dump-tokens        print the tokens of <file.anti> and stop\n"
@@ -57,6 +62,8 @@ static int usage(FILE *out)
           "                       allocation and stop\n"
           "  --print-host-target  print the target antic runs on\n"
           "  --print-targets      print the six targets and their facts\n"
+          "  --print-cpu-levels   print the processor levels and the\n"
+          "                       default level of each target\n"
           "  --version            print the version\n",
           out);
     return out == stderr ? 2 : 0;
@@ -75,6 +82,27 @@ static int print_targets(void)
         printf("%-15s %-7s %-15s %s\n", target_name((enum target)t),
                object_format_name(info->format),
                convention_name(info->convention), info->triple);
+    }
+    return 0;
+}
+
+/* The level table and the defaults, in the form of tools/cpu-levels. The
+   test cpu_levels_pin compares the two. */
+static int print_cpu_levels(void)
+{
+    int i;
+
+    for (i = 0; i < CPU_LEVEL_COUNT; i++) {
+        enum cpu_level level = (enum cpu_level)i;
+        const char *attributes = cpu_attributes(level);
+        printf("level %s %s %d %s %s\n", cpu_name(level),
+               cpu_arch(level) == ARCH_ARM64 ? "arm64" : "x86_64",
+               (int)cpu_id(level), cpu_clang_arch(level),
+               attributes[0] == '\0' ? "-" : attributes);
+    }
+    for (i = 0; i < TARGET_COUNT; i++) {
+        printf("default %s %s\n", target_name((enum target)i),
+               cpu_name(cpu_default((enum target)i)));
     }
     return 0;
 }
@@ -101,6 +129,7 @@ static int run(int argc, char **argv, struct options *o)
     struct options options = *o;
     bool have_host = target_host(&options.target);
     const char *target = NULL;
+    const char *cpu = NULL;
     struct text home = {0};
     int status;
     int i;
@@ -123,6 +152,8 @@ static int run(int argc, char **argv, struct options *o)
             return 0;
         } else if (strcmp(arg, "--print-targets") == 0) {
             return print_targets();
+        } else if (strcmp(arg, "--print-cpu-levels") == 0) {
+            return print_cpu_levels();
         } else if (strcmp(arg, "--dump-tokens") == 0) {
             options.dump_tokens = true;
             continue;
@@ -258,6 +289,8 @@ static int run(int argc, char **argv, struct options *o)
             slot = &options.output;
         } else if (strcmp(arg, "--target") == 0) {
             slot = &target;
+        } else if (strcmp(arg, "--cpu") == 0) {
+            slot = &cpu;
         } else if (strcmp(arg, "--llvm-mc") == 0) {
             slot = &options.llvm_mc;
         } else if (strcmp(arg, "--runtime") == 0) {
@@ -300,6 +333,14 @@ static int run(int argc, char **argv, struct options *o)
         }
     } else if (!have_host) {
         fputs("antic: unknown host target, pass --target\n", stderr);
+        return 2;
+    }
+    /* The level follows the target, so --cpu is read after it and its
+       name is checked against the target's architecture. */
+    options.cpu = cpu_default(options.target);
+    if (cpu != NULL && !cpu_from_name(cpu, options.target, &options.cpu)) {
+        fprintf(stderr, "antic: %s is no processor level of %s\n", cpu,
+                target_name(options.target));
         return 2;
     }
     /* DESIGN: an installed antic sits in bin/ of the runtime archive, so

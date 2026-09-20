@@ -91,8 +91,9 @@ struct target_desc {
     void (*move)(struct selector *s, struct mach_operand dst,
                  struct mach_operand src);
     void (*load)(struct selector *s, struct mach_operand dst, uint64_t value);
-    void (*print)(struct text *out, const struct ir_module *m,
-                  const struct mach_inst *inst, const struct names *names);
+    void (*print)(struct text *out, enum cpu_level cpu,
+                  const struct ir_module *m, const struct mach_inst *inst,
+                  const struct names *names);
     /* Addressing modes and stack parameters, chapters 14 and 15. */
     bool (*fits_address)(const struct selector *s, const struct address *a,
                          const struct ir_inst *use);

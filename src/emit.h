@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "cpu.h"
 #include "ir.h"
 #include "mach.h"
 #include "target.h"
@@ -15,16 +16,18 @@
    entry. debug_info is -g, which adds the directives of the source
    positions. Returns false and writes a message to error for a program
    that the emitter cannot write yet. */
-bool emit_program(struct text *out, enum target t, const struct ir_module *m,
-                  struct mach_function **functions, const char *module,
-                  bool debug_info, char *error, size_t error_size);
+bool emit_program(struct text *out, enum target t, enum cpu_level cpu,
+                  const struct ir_module *m, struct mach_function **functions,
+                  const char *module, bool debug_info, char *error,
+                  size_t error_size);
 
 /* Append the assembly file of one module in dev mode. Every function of
    the module is global and hidden, and the functions of other modules are
    symbols that their own objects define. */
-bool emit_module(struct text *out, enum target t, const struct ir_module *m,
-                 struct mach_function **functions, const char *module,
-                 bool debug_info, char *error, size_t error_size);
+bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
+                 const struct ir_module *m, struct mach_function **functions,
+                 const char *module, bool debug_info, char *error,
+                 size_t error_size);
 
 /* Append a constructor that calls C function function when the library
    loads. */

@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "cpu.h"
 #include <stdlib.h>
 #include "arena.h"
 #include "ast.h"
@@ -57,9 +58,11 @@ static void emits_as(const char *source, enum target target, bool one_module,
             }
         }
         ok = ok && (one_module
-                        ? emit_module(&out, target, &ir, functions, "main",
+                        ? emit_module(&out, target, cpu_default(target), &ir,
+                                      functions, "main",
                                       false, error, sizeof error)
-                        : emit_program(&out, target, &ir, functions, "main",
+                        : emit_program(&out, target, cpu_default(target), &ir,
+                                       functions, "main",
                                        false, error, sizeof error));
         if (!ok) {
             text_append(&out, error);
@@ -131,7 +134,9 @@ static void page_offsets(void)
         CHECK(regalloc_function(TARGET_MACOS_ARM64, functions[i], error,
                                 sizeof error));
     }
-    CHECK(emit_program(&out, TARGET_MACOS_ARM64, &m, functions, "main", false,
+    CHECK(emit_program(&out, TARGET_MACOS_ARM64,
+                       cpu_default(TARGET_MACOS_ARM64), &m, functions, "main",
+                       false,
                        error, sizeof error));
     CHECK_STR(text_cstr(&out), "    .build_version macos, 11, 0\n"
                                "    .text\n"
@@ -178,7 +183,8 @@ static void data_section(enum target target, const char *expected)
     ir_ret(f, f->blocks[0], IR_PTR, ir_temp_op(f, address));
     CHECK(select_module(target, &m, functions, error, sizeof error));
     CHECK(regalloc_function(target, functions[0], error, sizeof error));
-    if (!emit_program(&out, target, &m, functions, "main", false, error,
+    if (!emit_program(&out, target, cpu_default(target), &m, functions,
+                      "main", false, error,
                       sizeof error)) {
         text_append(&out, error);
     }
@@ -208,7 +214,9 @@ static void data_relocation(void)
     ir_global_add(&m, "main", "0", hi, sizeof hi, 1);
     table = ir_global_add(&m, "main", "1", zero, sizeof zero, 8);
     ir_global_reloc(&m, table, 0, 0);
-    CHECK(emit_program(&out, TARGET_LINUX_ARM64, &m, functions, "main", false,
+    CHECK(emit_program(&out, TARGET_LINUX_ARM64,
+                       cpu_default(TARGET_LINUX_ARM64), &m, functions, "main",
+                       false,
                        error, sizeof error));
     CHECK_STR(text_cstr(&out), "    .text\n"
                                "    .section .rodata\n"
@@ -241,7 +249,9 @@ static void data_relocation_past_end(void)
     ir_module_init(&m, &arena, "main");
     table = ir_global_add(&m, "main", "0", zero, sizeof zero, 8);
     ir_global_reloc(&m, table, 4, 0);
-    CHECK(!emit_program(&out, TARGET_LINUX_ARM64, &m, functions, "main", false,
+    CHECK(!emit_program(&out, TARGET_LINUX_ARM64,
+                       cpu_default(TARGET_LINUX_ARM64), &m, functions, "main",
+                       false,
                        error, sizeof error));
     CHECK_STR(error, "the address at 4 of `main.0` ends past its 8 bytes");
     text_free(&out);
@@ -372,6 +382,12 @@ void test_emit(void)
              "    .text\n"
              "    .globl anti.rt.main\n"
              "    .set anti.rt.main, main.main\n"
+             "    .section .rodata\n"
+             "    .globl anti_cpu_required\n"
+             "    .p2align 2\n"
+             "anti_cpu_required:\n"
+             "    .long 3\n"
+             "    .text\n"
              "    .globl main.unused\n"
              "    .hidden main.unused\n"
              "main.unused:\n"
@@ -390,6 +406,12 @@ void test_emit(void)
              "    .text\n"
              "    .globl _anti.rt.main\n"
              "    .set _anti.rt.main, _main.main\n"
+             "    .section __TEXT,__const\n"
+             "    .globl _anti_cpu_required\n"
+             "    .p2align 2\n"
+             "_anti_cpu_required:\n"
+             "    .long 21\n"
+             "    .text\n"
              "    .globl _main.main\n"
              "    .private_extern _main.main\n"
              "    .p2align 2\n"
@@ -473,6 +495,12 @@ void test_emit(void)
           "    .text\n"
           "    .globl _anti.rt.main\n"
           "    .set _anti.rt.main, _main.main\n"
+          "    .section __TEXT,__const\n"
+          "    .globl _anti_cpu_required\n"
+          "    .p2align 2\n"
+          "_anti_cpu_required:\n"
+          "    .long 21\n"
+          "    .text\n"
           "    .globl _twice\n"
           "    .p2align 2\n"
           "_twice:\n"
@@ -523,6 +551,12 @@ void test_emit(void)
           "    .text\n"
           "    .globl _anti.rt.main\n"
           "    .set _anti.rt.main, _main.main\n"
+          "    .section __TEXT,__const\n"
+          "    .globl _anti_cpu_required\n"
+          "    .p2align 2\n"
+          "_anti_cpu_required:\n"
+          "    .long 21\n"
+          "    .text\n"
           "    .p2align 2\n"
           "_main.scale:\n"
           "L_main.scale.b0:\n"
@@ -588,6 +622,12 @@ void test_emit(void)
           "    .text\n"
           "    .globl _anti.rt.main\n"
           "    .set _anti.rt.main, _main.main\n"
+          "    .section __TEXT,__const\n"
+          "    .globl _anti_cpu_required\n"
+          "    .p2align 2\n"
+          "_anti_cpu_required:\n"
+          "    .long 3\n"
+          "    .text\n"
           "_main.scale:\n"
           "L_main.scale.b0:\n"
           "    pushq %rbp\n"
@@ -648,6 +688,12 @@ void test_emit(void)
           "    .text\n"
           "    .globl anti.rt.main\n"
           "    .set anti.rt.main, main.main\n"
+          "    .section .rodata\n"
+          "    .globl anti_cpu_required\n"
+          "    .p2align 2\n"
+          "anti_cpu_required:\n"
+          "    .long 16\n"
+          "    .text\n"
           "    .p2align 2\n"
           "main.scale:\n"
           ".Lmain.scale.b0:\n"
@@ -715,6 +761,12 @@ void test_emit(void)
           "    .text\n"
           "    .globl _A4anti2rt_main\n"
           "    .set _A4anti2rt_main, _A4main_main\n"
+          "    .section .rdata,\"dr\"\n"
+          "    .globl anti_cpu_required\n"
+          "    .p2align 2\n"
+          "anti_cpu_required:\n"
+          "    .long 3\n"
+          "    .text\n"
           "_A4main_scale:\n"
           "    .seh_proc _A4main_scale\n"
           ".L_A4main_scale.b0:\n"
@@ -790,6 +842,12 @@ void test_emit(void)
           "    .text\n"
           "    .globl anti.rt.main\n"
           "    .set anti.rt.main, main.main\n"
+          "    .section .rodata\n"
+          "    .globl anti_cpu_required\n"
+          "    .p2align 2\n"
+          "anti_cpu_required:\n"
+          "    .long 3\n"
+          "    .text\n"
           "main.main:\n"
           ".Lmain.main.b0:\n"
           "    pushq %rbp\n"
@@ -866,6 +924,12 @@ void test_emit(void)
           "    .text\n"
           "    .globl _anti.rt.main\n"
           "    .set _anti.rt.main, _main.main\n"
+          "    .section __TEXT,__const\n"
+          "    .globl _anti_cpu_required\n"
+          "    .p2align 2\n"
+          "_anti_cpu_required:\n"
+          "    .long 21\n"
+          "    .text\n"
           "    .p2align 2\n"
           "_main.main:\n"
           "L_main.main.b0:\n"

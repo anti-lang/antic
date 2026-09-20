@@ -3,50 +3,50 @@ b0:
     pushq %rbp
     movq %rsp, %rbp
     subq $32, %rsp
-    movsd %xmm0, %xmm14
-    movsd %xmm14, 16(%rsp)
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm0
+    vmovaps %xmm0, %xmm14
+    vmovsd %xmm14, 16(%rsp)
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm0
     movq $3, %rsi
     movl $1, %eax
     call printf
     movq $1, %rdi
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm0
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm0
     movq $2, %rsi
     movl $1056964608, %eax
-    movd %eax, %xmm1
+    vmovd %eax, %xmm1
     call mix
-    movsd %xmm0, %xmm14
-    movsd %xmm14, 24(%rsp)
+    vmovaps %xmm0, %xmm14
+    vmovsd %xmm14, 24(%rsp)
     movl $1065353216, %eax
-    movd %eax, %xmm0
-    movss %xmm0, (%rsp)
+    vmovd %eax, %xmm0
+    vmovss %xmm0, (%rsp)
     movl $1073741824, %eax
-    movd %eax, %xmm0
-    movss %xmm0, 8(%rsp)
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm0
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm1
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm2
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm3
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm4
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm5
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm6
-    movsd 16(%rsp), %xmm14
-    movsd %xmm14, %xmm7
+    vmovd %eax, %xmm0
+    vmovss %xmm0, 8(%rsp)
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm0
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm1
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm2
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm3
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm4
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm5
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm6
+    vmovsd 16(%rsp), %xmm14
+    vmovaps %xmm14, %xmm7
     call nine
-    cvtss2sd %xmm0, %xmm0
-    movsd 24(%rsp), %xmm14
-    movsd %xmm14, %xmm1
-    addsd %xmm0, %xmm1
-    movsd %xmm1, %xmm0
+    vcvtss2sd %xmm0, %xmm0, %xmm0
+    vmovsd 24(%rsp), %xmm14
+    vmovaps %xmm14, %xmm1
+    vaddsd %xmm0, %xmm1, %xmm1
+    vmovaps %xmm1, %xmm0
     movq %rbp, %rsp
     popq %rbp
     ret
@@ -54,6 +54,6 @@ floatcalls.last:
 b0:
     pushq %rbp
     movq %rsp, %rbp
-    movss 24(%rbp), %xmm0
+    vmovss 24(%rbp), %xmm0
     popq %rbp
     ret
