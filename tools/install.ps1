@@ -1,4 +1,4 @@
-# Install Anti for the user who runs it, under $HOME\.anti.
+# Install Anti for the user who runs it, in the directories of Windows.
 #
 #   irm https://anti-lang.com/install.ps1 | iex
 #   $env:ANTI_ARCH = "x86_64"; irm https://anti-lang.com/install.ps1 | iex
@@ -23,8 +23,13 @@
 #                   step 5. It takes a manifest without a signature, and
 #                   never one whose signature is wrong
 #   ANTI_ARCH       arm64 or x86_64, default the processor of this machine
-#   ANTI_HOME       where to install, default $HOME\.anti, and
-#                   $HOME\.anti-<cpu> for another processor
+#   ANTI_HOME       one tree to install everything under, executables
+#                   included. Without it the install follows Windows:
+#                   the executables in %LOCALAPPDATA%\Programs\anti\bin,
+#                   the toolchain and the runtime archive in
+#                   %LOCALAPPDATA%\anti. The package of another processor
+#                   takes %LOCALAPPDATA%\anti-<cpu> and keeps its
+#                   executables there.
 #   ANTI_REPLACE    yes or no to replacing an install that is there
 #   ANTI_PATH       yes or no to the entry in the PATH of the account
 $ErrorActionPreference = "Stop"
@@ -137,13 +142,29 @@ if ($arch -ne "arm64" -and $arch -ne "x86_64") {
 }
 $host_name = "windows-$arch"
 
-# DESIGN: a package of the other processor runs under emulation and is
-# installed beside the native one, never over it. Both directories then
-# work, and the one on the PATH stays the native one.
-if ($arch -eq $native) {
-    $home_dir = if ($env:ANTI_HOME) { $env:ANTI_HOME } else { "$HOME\.anti" }
-} else {
-    $home_dir = if ($env:ANTI_HOME) { $env:ANTI_HOME } else { "$HOME\.anti-$arch" }
+# DESIGN: an install of Anti is local to the user and follows the
+# conventions of Windows. LOCALAPPDATA is the root of the per-user files
+# of an application that is not roamed. The toolchain and the runtime
+# archive go in %LOCALAPPDATA%\anti, and the two executables under
+# Programs\ of it, which is where a user-local install goes. "Names and
+# publication" in docs/decisions.md holds the rule, src/userdirs.c builds
+# the same paths for antic, and the test installer_options pins the
+# spellings together.
+#
+# A package of the other processor runs under emulation and stands beside
+# the native one. Its executables stay in the bin\ of that tree, because
+# the PATH names one antic and it is the one this machine runs without
+# emulation.
+$local = $env:LOCALAPPDATA
+if (-not $local) { throw "anti: LOCALAPPDATA names no directory of this account" }
+$app = if ($arch -eq $native) { "anti" } else { "anti-$arch" }
+$bin = "$local\Programs\anti\bin"
+# DESIGN: ANTI_HOME names one tree that carries everything, the two
+# executables included, and nothing outside it is written. A release
+# checks a package that way on each VM.
+$one_tree = [bool]$env:ANTI_HOME
+$home_dir = if ($env:ANTI_HOME) { $env:ANTI_HOME } else { "$local\$app" }
+if ($arch -ne $native) {
     Say "installing the $arch package, which this machine runs under emulation"
 }
 
@@ -198,6 +219,9 @@ try {
     Remove-Item -Recurse -Force $home_dir -ErrorAction SilentlyContinue
     tar.exe -xJf "$work\$asset" -C $work
     Move-Item "$work\anti" $home_dir
+    # The marker that tells a tree this installer wrote from any other
+    # directory. The uninstaller removes nothing without it.
+    Set-Content -Path "$home_dir\.anti-install" -Value $version
     Say "installed $version in $home_dir"
 
     # DESIGN: the site serves this installer, so it is always the
@@ -306,16 +330,25 @@ try {
 
     # DESIGN: the PATH names one antic, and it is the one this machine runs
     # without emulation. A package of the other processor is therefore
-    # called by its path.
-    if ($arch -ne $native) {
+    # called by its path, and so is an install that ANTI_HOME put in one
+    # tree.
+    if (($arch -ne $native) -or $one_tree) {
         Say "run it with: $home_dir\bin\antic.exe hello.anti -o hello.exe"
         return
     }
 
+    # The two executables go in the bin directory of the user, and the
+    # rest of the archive stays where it is. antic finds it by the same
+    # rule that src/userdirs.c holds.
+    New-Item -ItemType Directory -Force -Path $bin | Out-Null
+    foreach ($program in @("antic", "anti")) {
+        Copy-Item "$home_dir\bin\$program.exe" "$bin\$program.exe" -Force
+    }
+    Say "put antic.exe and anti.exe in $bin"
+
     # The PATH of the account lives under HKCU and needs no administrator.
     # The installer writes it only with a yes, and the uninstaller removes
     # what it wrote.
-    $bin = "$home_dir\bin"
     $path = [Environment]::GetEnvironmentVariable("PATH", "User")
     if ($path -and ($path -split ";" | Where-Object { $_ -eq $bin })) {
         Say "$bin is already in the PATH of your account"

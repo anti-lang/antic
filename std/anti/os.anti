@@ -5,9 +5,18 @@
 //! call. A handler of the operating system runs on a stack the program
 //! knows nothing about, so the runtime writes the signal into a pipe and
 //! a thread of its own calls the function.
+//!
+//! `user_config_dir`, `user_data_dir` and `user_cache_dir` give the
+//! per-user directories of the platform. They are the directories an
+//! install of Anti itself uses, and nothing outside the user's profile
+//! is among them.
+
+import anti.text;
 
 extern fn anti_rt_on_signal(sig: int, f: fn(int));
 extern fn anti_rt_signal_pending() -> int;
+extern fn anti_rt_is_windows() -> int;
+extern fn getenv(name: ?*byte) -> ?*byte;
 
 /// The interrupt a console sends, which is `Ctrl-C`.
 pub const INTERRUPT: int = 2;
@@ -34,4 +43,142 @@ pub fn on_signal(sig: int, f: fn(int))
 pub fn signal_pending() -> int
 {
 	return anti_rt_signal_pending();
+}
+
+/// The value of the environment variable `name`, or `""`.
+fn variable(name: str) -> str
+{
+	let value = getenv(name.ptr);
+	if value == none {
+		return "";
+	}
+	return text.from_c(value);
+}
+
+/// Copy `parts` into memory of its own, ending with a zero byte.
+///
+/// The three directory functions return memory the caller owns, so the
+/// text of a builder, which the builder frees, does not leave here.
+fn owned(b: *text.Builder) -> str
+{
+	let s = b.text();
+	let from = s.ptr else {
+		return "";
+	};
+	let room = alloc(byte, s.len + 1) else {
+		return "";
+	};
+	let i = 0;
+	while i < s.len do {
+		room[i] = from[i];
+		i += 1;
+	}
+	room[s.len] = 0;
+	return text.from_c(room);
+}
+
+/// Whether this program follows the conventions of Windows.
+///
+/// The runtime is compiled once per target and answers from its own
+/// build. Reading `LOCALAPPDATA` instead would take the layout of
+/// Windows on any machine that happens to carry that variable.
+fn windows() -> bool
+{
+	return anti_rt_is_windows() != 0;
+}
+
+/// An XDG root counts only when it holds an absolute path.
+///
+/// A relative value would resolve against the working directory of
+/// whoever started the program, which is no directory of the user.
+fn xdg(name: str) -> str
+{
+	let value = variable(name);
+	if text.byte_count(value) == 0 {
+		return "";
+	}
+	let first = value.ptr else {
+		return "";
+	};
+	if first[0] != 47 {
+		return "";
+	}
+	return value;
+}
+
+/// `<root>/<app>` under the XDG root `name`, or `$HOME/<fallback>/<app>`.
+fn unix_dir(name: str, fallback: str, app: str) -> str
+{
+	let b = text.Builder.new();
+	let root = xdg(name);
+	if text.byte_count(root) > 0 {
+		b.append(root);
+	} else {
+		let home = variable("HOME");
+		if text.byte_count(home) == 0 {
+			return "";
+		}
+		b.append(home);
+		b.append("/");
+		b.append(fallback);
+	}
+	b.append("/");
+	b.append(app);
+	return owned(&b);
+}
+
+/// `%LOCALAPPDATA%\<app>` with `tail` below it, which may be empty.
+fn windows_dir(app: str, tail: str) -> str
+{
+	let b = text.Builder.new();
+	let local = variable("LOCALAPPDATA");
+	if text.byte_count(local) == 0 {
+		return "";
+	}
+	b.append(local);
+	b.append("\\");
+	b.append(app);
+	if text.byte_count(tail) > 0 {
+		b.append("\\");
+		b.append(tail);
+	}
+	return owned(&b);
+}
+
+/// The per-user configuration directory of `app`.
+///
+/// `$XDG_CONFIG_HOME/<app>` on Linux and macOS, which falls back to
+/// `~/.config/<app>`, and `config\` of `%LOCALAPPDATA%\<app>` on
+/// Windows. The answer is `""` when the environment says nothing about
+/// where the user's files are.
+pub fn user_config_dir(app: str) -> str
+{
+	if windows() {
+		return windows_dir(app, "config");
+	}
+	return unix_dir("XDG_CONFIG_HOME", ".config", app);
+}
+
+/// The per-user data directory of `app`, which holds what it installs.
+///
+/// `$XDG_DATA_HOME/<app>` on Linux and macOS, which falls back to
+/// `~/.local/share/<app>`, and `%LOCALAPPDATA%\<app>` on Windows.
+pub fn user_data_dir(app: str) -> str
+{
+	if windows() {
+		return windows_dir(app, "");
+	}
+	return unix_dir("XDG_DATA_HOME", ".local/share", app);
+}
+
+/// The per-user cache directory of `app`, which it may lose at any time.
+///
+/// `$XDG_CACHE_HOME/<app>` on Linux and macOS, which falls back to
+/// `~/.cache/<app>`, and `cache\` of `%LOCALAPPDATA%\<app>` on Windows.
+pub fn user_cache_dir(app: str) -> str
+{
+	if windows() {
+		return windows_dir(app, "cache");
+	}
+	return unix_dir("XDG_CACHE_HOME", ".cache", app);
 }

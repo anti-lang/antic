@@ -1,0 +1,18 @@
+//! The per-user directories of the platform, which are the ones an
+//! install of Anti uses. The test of the suite sets the XDG variables and
+//! LOCALAPPDATA, so one expected output stands on every host of a family.
+import anti.io;
+import anti.os;
+
+fn main() -> int
+{
+	io.print(os.user_config_dir("anti"));
+	io.print("\n");
+	io.print(os.user_data_dir("anti"));
+	io.print("\n");
+	io.print(os.user_cache_dir("anti"));
+	io.print("\n");
+	io.print(os.user_data_dir("anti-x86_64"));
+	io.print("\n");
+	return 0;
+}

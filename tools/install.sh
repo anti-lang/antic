@@ -1,5 +1,6 @@
 #!/bin/sh
-# Install Anti for the user who runs it, under ~/.anti.
+# Install Anti for the user who runs it, in the directories of the
+# platform.
 #
 #   curl -fsSL https://anti-lang.com/install.sh | sh
 #   curl -fsSL https://anti-lang.com/install.sh | sh -s -- --intel  # docs-style:ignore
@@ -24,8 +25,13 @@
 #              It takes a manifest without a signature, and never one
 #              whose signature is wrong.
 #   ANTI_ARCH: arm64 or x86_64, default the processor of this machine.
-#   ANTI_HOME: where to install, default $HOME/.anti, and
-#              $HOME/.anti-<cpu> for the package of another processor.
+#   ANTI_HOME: one tree to install everything under, executables
+#              included. Without it the install follows the platform:
+#              the executables in $XDG_BIN_HOME or ~/.local/bin, the
+#              toolchain and the runtime archive in $XDG_DATA_HOME/anti
+#              or ~/.local/share/anti. The package of another processor
+#              takes the data directory of the name anti-<cpu> and keeps
+#              its executables there.
 #   ANTI_REPLACE: replace an install that is there.
 #   ANTI_PATH: add the line to the shell profile.
 #   ANTI_MICROSOFT: let xwin fetch the CRT and the Windows SDK.
@@ -146,13 +152,45 @@ arm64 | x86_64) ;;
 esac
 host=$os-$arch
 
-# DESIGN: a package of the other processor runs under emulation and is
-# installed beside the native one, never over it. Both directories then
-# work, and the one on the PATH stays the native one.
-if [ "$arch" = "$native" ]; then
-    home=${ANTI_HOME:-$HOME/.anti}
+# DESIGN: an install of Anti is local to the user and follows the
+# conventions of the platform. The toolchain and the runtime archive go
+# in the data directory, and the two executables in the bin directory,
+# which is on the PATH. "Names and publication" in docs/decisions.md
+# holds the rule. src/userdirs.c builds the same paths for antic, anti.os
+# gives them to a program, and the test installer_options pins the
+# spellings together.
+#
+# A package of the other processor runs under emulation and stands beside
+# the native one in a data directory of its own. Its executables stay in
+# the bin/ of that tree, because the PATH names one antic and it is the
+# one this machine runs without emulation.
+app=anti
+if [ "$arch" != "$native" ]; then
+    app=anti-$arch
+fi
+data_root=${XDG_DATA_HOME:-}
+case $data_root in
+/*) ;;
+*) data_root=$HOME/.local/share ;;
+esac
+bin_dir=${XDG_BIN_HOME:-}
+case $bin_dir in
+/*) ;;
+*) bin_dir=$HOME/.local/bin ;;
+esac
+
+# DESIGN: ANTI_HOME names one tree that carries everything, the two
+# executables included, and nothing outside it is written. Step 10 of a
+# release checks a download that way, into a directory of its own. A user
+# who wants the whole install in one place asks for it the same way.
+one_tree=no
+if [ -n "${ANTI_HOME:-}" ]; then
+    home=$ANTI_HOME
+    one_tree=yes
 else
-    home=${ANTI_HOME:-$HOME/.anti-$arch}
+    home=$data_root/$app
+fi
+if [ "$arch" != "$native" ]; then
     say "installing the $arch package, which this machine runs under emulation"
 fi
 
@@ -180,6 +218,9 @@ rm -rf "$home"
 mkdir -p "$(dirname "$home")"
 tar -xJf "$work/$asset" -C "$work"
 mv "$work/anti" "$home"
+# The marker that tells a tree this installer wrote from any other
+# directory. The uninstaller removes nothing without it.
+printf '%s\n' "$version" > "$home/.anti-install"
 say "installed $version in $home"
 
 # DESIGN: the site serves this installer, so it is always the newest.
@@ -318,31 +359,40 @@ fi
 
 # DESIGN: the PATH names one antic, and it is the one this machine runs
 # without emulation. A package of the other processor is therefore called
-# by its path.
-if [ "$arch" != "$native" ]; then
+# by its path, and so is an install that ANTI_HOME put in one tree.
+if [ "$arch" != "$native" ] || [ "$one_tree" = yes ]; then
     say "run it with: $home/bin/antic hello.anti -o hello"
     exit 0
 fi
 
-# The profile of the login shell, which the installer writes only with a
-# yes. The marker lets the uninstaller remove its own line and leave one
-# that the user wrote.
+# The two executables go in the bin directory of the user, and the rest
+# of the archive stays where it is. antic finds it by the same rule that
+# src/userdirs.c holds: the directory above itself when that one carries
+# lib/, and the user's data directory otherwise.
+mkdir -p "$bin_dir"
+for program in antic anti; do
+    cp "$home/bin/$program" "$bin_dir/$program"
+done
+say "put antic and anti in $bin_dir"
+
+# The profile of the login shell. The marker lets the uninstaller remove
+# its own line and leave one that the user wrote.
 case ${SHELL:-} in
 */zsh) profile=$HOME/.zshrc ;;
 */bash) profile=$HOME/.bashrc ;;
 *) profile=$HOME/.profile ;;
 esac
-line="export PATH=\"$home/bin:\$PATH\"  # anti"
+line="export PATH=\"$bin_dir:\$PATH\"  # anti"
 case :${PATH}: in
-*:"$home/bin":*)
-    say "$home/bin is already on the PATH"
+*:"$bin_dir":*)
+    say "$bin_dir is already on the PATH"
     ;;
 *)
     if [ -f "$profile" ] && grep -q "# anti\$" "$profile"; then
         say "$profile already holds the line for Anti"
-    elif ask PATH "Add $home/bin to the PATH in $profile?"; then
+    elif ask PATH "Add $bin_dir to the PATH in $profile?"; then
         printf '%s\n' "$line" >> "$profile"
-        say "added the line to $profile, which a new shell reads"
+        say "added $bin_dir to the PATH in $profile, which a new shell reads"
     else
         say "add this line to your shell profile yourself:"
         echo "    $line"

@@ -405,7 +405,10 @@ write_linux_script() {
 set -eu
 cd "\$HOME/antic-check"
 tar -xmf "\$HOME/anti-release/tree.tar"
-A=\$HOME/anti
+# The tools of the VM stand in the data directory of its user, under a
+# name of their own. A reset of that user is then those directories and
+# never the machine. docs/vm-setup.md installs them there.
+A=\${XDG_DATA_HOME:-\$HOME/.local/share}/anti-vm
 opts="-DANTIC_CLANG_DIR=\$A/clang -DANTIC_LLVM_DIR=\$A/toolchain"
 opts="\$opts -DANTIC_SYSROOT_DIR=\$A/sysroot -DANTIC_RAYLIB_DIR=\$A/raylib/raylib-6.0"
 cmake -S . -B build \$opts > release-configure.log 2>&1
@@ -413,10 +416,15 @@ cmake --build build -j"\$(nproc)" > release-build.log 2>&1
 ctest --test-dir build -j"\$(nproc)" > release-ctest.log 2>&1
 grep 'tests passed' release-ctest.log
 
-home=\$HOME/anti-release/installed
-rm -rf "\$home"
+# DESIGN: the install the VM checks is the one a user gets, in the
+# directories of the platform, and not a tree under ANTI_HOME. The
+# executables land on the PATH and the archive in the data directory,
+# which is the pair antic has to find its runtime through.
+data=\${XDG_DATA_HOME:-\$HOME/.local/share}/anti
+bin=\${XDG_BIN_HOME:-\$HOME/.local/bin}
+rm -rf "\$data" "\$bin/antic" "\$bin/anti"
 if ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release \\
-    ANTI_HOME=\$home ANTI_REPLACE=yes ANTI_PATH=no ANTI_MICROSOFT=no \\
+    ANTI_REPLACE=yes ANTI_PATH=yes ANTI_MICROSOFT=no \\
     sh "\$HOME/anti-release/install.sh" > release-unsigned.log 2>&1; then
     echo "the installer took a manifest without a signature"
     exit 1
@@ -427,19 +435,33 @@ grep -q 'SHA256SUMS.sig' release-unsigned.log || {
     exit 1
 }
 echo "the installer refuses a manifest without a signature"
-rm -rf "\$home"
+rm -rf "\$data"
 ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release ANTI_STAGING=yes \\
-    ANTI_HOME=\$home ANTI_REPLACE=yes ANTI_PATH=no ANTI_MICROSOFT=no \\
+    ANTI_REPLACE=yes ANTI_PATH=yes ANTI_MICROSOFT=no \\
     sh "\$HOME/anti-release/install.sh" > release-install.log 2>&1
-"\$home/bin/antic" --version
-"\$home/bin/anti" --version
+[ -f "\$data/.anti-install" ] || { echo "the installer wrote no marker"; exit 1; }
+"\$bin/antic" --version
+"\$bin/anti" --version
 cd "\$HOME/anti-release"
 printf 'import anti.io;\n\nfn main() -> int\n{\n    io.print("hello");\n    return 0;\n}\n' > hello.anti
-"\$home/bin/antic" hello.anti -o hello
+# No --runtime: antic on the PATH finds the archive of the data directory.
+"\$bin/antic" hello.anti -o hello
 ./hello
-ANTI_HOME=\$home ANTI_REMOVE=yes sh "\$HOME/anti-release/uninstall.sh" \\
+# A tree with no marker is refused, which is what keeps an uninstaller
+# from taking a directory that no installer of Anti wrote.
+mkdir -p "\$HOME/anti-release/not-an-install"
+if ANTI_HOME=\$HOME/anti-release/not-an-install ANTI_REMOVE=yes \\
+    sh "\$HOME/anti-release/uninstall.sh" > release-marker.log 2>&1; then
+    echo "the uninstaller removed a directory with no marker"
+    exit 1
+fi
+[ -d "\$HOME/anti-release/not-an-install" ] ||
+    { echo "the uninstaller removed a directory with no marker"; exit 1; }
+echo "the uninstaller refuses a directory without the marker"
+ANTI_REMOVE=yes sh "\$HOME/anti-release/uninstall.sh" \\
     > release-uninstall.log 2>&1
-[ ! -d "\$home" ] || { echo "the uninstaller left \$home"; exit 1; }
+[ ! -d "\$data" ] || { echo "the uninstaller left \$data"; exit 1; }
+[ ! -f "\$bin/antic" ] || { echo "the uninstaller left \$bin/antic"; exit 1; }
 echo "the install of linux-arm64 is checked and removed"
 LINUX
     printf '%s\n' "$work/vm-linux.sh"
@@ -465,26 +487,46 @@ if errorlevel 1 (echo the suite failed & findstr /R /C:"^	 *[0-9]* - " release-c
 findstr /C:"tests passed" release-ctest.log
 set ANTI_VERSION=$version
 set ANTI_BASE=%USERPROFILE%\anti-release
-set ANTI_HOME=%USERPROFILE%\anti-release\installed
 set ANTI_REPLACE=yes
-set ANTI_PATH=no
+set ANTI_PATH=yes
 set ANTI_MICROSOFT=no
-if exist "%ANTI_HOME%" rmdir /s /q "%ANTI_HOME%"
+rem DESIGN: the install the VM checks is the one a user gets, in the
+rem directories of Windows and not a tree under ANTI_HOME. DATA holds the
+rem archive and BIN the two executables that go on the PATH.
+set DATA=%LOCALAPPDATA%\anti
+set BIN=%LOCALAPPDATA%\Programs\anti\bin
+if exist "%DATA%" rmdir /s /q "%DATA%"
+if exist "%BIN%" rmdir /s /q "%BIN%"
 powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > release-unsigned.log 2>&1
 if not errorlevel 1 (echo the installer took a manifest without a signature & exit /b 1)
 findstr /C:"SHA256SUMS.sig" release-unsigned.log > nul
 if errorlevel 1 (echo the installer stopped for another reason than the signature & type release-unsigned.log & exit /b 1)
 echo the installer refuses a manifest without a signature
-if exist "%ANTI_HOME%" rmdir /s /q "%ANTI_HOME%"
+if exist "%DATA%" rmdir /s /q "%DATA%"
 set ANTI_STAGING=yes
 powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > release-install.log 2>&1
 if errorlevel 1 (echo the install failed & type release-install.log & exit /b 1)
-"%ANTI_HOME%\bin\antic.exe" --version
-"%ANTI_HOME%\bin\anti.exe" --version
+if not exist "%DATA%\.anti-install" (echo the installer wrote no marker & exit /b 1)
+"%BIN%\antic.exe" --version
+"%BIN%\anti.exe" --version
 cd /d %USERPROFILE%\anti-release
+powershell -Command "'fn main() -> int','{','    return 0;','}' | Set-Content hello.anti"
+rem No --runtime: antic of the bin directory finds the archive of DATA.
+"%BIN%\antic.exe" hello.anti -o hello.exe
+if errorlevel 1 (echo antic did not find the runtime archive & exit /b 1)
+hello.exe
+rem A tree with no marker is refused, which is what keeps an uninstaller
+rem from taking a directory that no installer of Anti wrote.
+if not exist "%USERPROFILE%\anti-release\not-an-install" mkdir "%USERPROFILE%\anti-release\not-an-install"
 set ANTI_REMOVE=yes
+set ANTI_HOME=%USERPROFILE%\anti-release\not-an-install
+powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\uninstall.ps1 > release-marker.log 2>&1
+if not exist "%USERPROFILE%\anti-release\not-an-install" (echo the uninstaller removed a directory with no marker & exit /b 1)
+echo the uninstaller refuses a directory without the marker
+set ANTI_HOME=
 powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\uninstall.ps1 > release-uninstall.log 2>&1
-if exist "%ANTI_HOME%" (echo the uninstaller left %ANTI_HOME% & exit /b 1)
+if exist "%DATA%" (echo the uninstaller left %DATA% & exit /b 1)
+if exist "%BIN%\antic.exe" (echo the uninstaller left %BIN%\antic.exe & exit /b 1)
 echo the install of windows-arm64 is checked and removed
 WINDOWS
     # CRLF, which cmd reads and a Unix line ending breaks.

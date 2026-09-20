@@ -6,6 +6,7 @@
 #include "linker.h"
 #include "sdk.h"
 #include "selfpath.h"
+#include "userdirs.h"
 #include "test.h"
 #include "text.h"
 
@@ -30,54 +31,28 @@ static int usage(FILE *out)
     return out == stdout ? 0 : 2;
 }
 
-/* DESIGN: an installed anti sits in bin/ beside antic, and the sysroot of
-   the runtime archive lies beside bin/. --sysroot names another one. */
+/* DESIGN: the sysroot of the runtime archive lies beside its lib/, so it
+   is found wherever the archive is. --sysroot names another one. */
 static bool default_sysroot(struct text *out)
 {
-    struct text bin = {0};
-    size_t cut;
+    struct text archive = {0};
 
-    if (!self_directory(&bin)) {
-        text_free(&bin);
+    if (!runtime_archive(&archive)) {
+        text_free(&archive);
         return false;
     }
-    cut = bin.length;
-    while (cut > 0 && bin.data[cut - 1] != '/' && bin.data[cut - 1] != '\\') {
-        cut--;
-    }
-    text_append_bytes(out, bin.data, cut);
-    text_append(out, RUNTIME_SYSROOT_DIR);
-    text_free(&bin);
+    text_appendf(out, "%s/%s", text_cstr(&archive), RUNTIME_SYSROOT_DIR);
+    text_free(&archive);
     return true;
 }
 
-/* DESIGN: an installed anti sits in bin/ of the runtime archive, so
-   without --runtime it takes the directory above itself, as antic does.
-   A tree with no lib/ is a build tree, and the driver reports the missing
-   runtime then. */
+/* DESIGN: anti finds the runtime archive where antic does, by the one
+   rule in runtime_archive. That is the directory above the running
+   executable when it holds lib/, and the user's data directory
+   otherwise. */
 static bool default_runtime(struct text *out)
 {
-    struct text bin = {0};
-    struct text lib = {0};
-    bool ok = false;
-    size_t cut;
-
-    if (!self_directory(&bin)) {
-        text_free(&bin);
-        return false;
-    }
-    cut = bin.length;
-    while (cut > 0 && bin.data[cut - 1] != '/' && bin.data[cut - 1] != '\\') {
-        cut--;
-    }
-    if (cut > 1) {
-        text_append_bytes(out, bin.data, cut - 1);
-        text_appendf(&lib, "%s/%s", text_cstr(out), RUNTIME_LIB_DIR);
-        ok = directory_exists(text_cstr(&lib));
-    }
-    text_free(&bin);
-    text_free(&lib);
-    return ok;
+    return runtime_archive(out);
 }
 
 int main(int argc, char **argv)

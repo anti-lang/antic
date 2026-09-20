@@ -22,20 +22,87 @@ endforeach()
 
 # A package of another processor installs beside the one of this machine
 # rather than over it, so both directories stay usable.
-foreach(script install.sh uninstall.sh)
+foreach(script install.sh uninstall.sh install.ps1 uninstall.ps1)
     file(READ "${ROOT}/tools/${script}" text)
-    string(FIND "${text}" ".anti-" found)
+    string(FIND "${text}" "anti-$" found)
     if(found EQUAL -1)
         message(FATAL_ERROR "tools/${script} writes no directory of its own "
                             "for a package of another processor")
     endif()
 endforeach()
-foreach(script install.ps1 uninstall.ps1)
-    file(READ "${ROOT}/tools/${script}" text)
-    string(FIND "${text}" ".anti-" found)
+
+# DESIGN: an install of Anti follows the conventions of the platform, and
+# the four roots are spelled in five places: the two installers, the two
+# uninstallers, src/userdirs.c for antic, std/anti/os.anti for a program
+# and docs/decisions.md for a reader. A script necessarily repeats what
+# the binary uses, so the seam is pinned here rather than trusted. A
+# spelling that moves in one place fails this test.
+#
+# The four roots stand in src/userdirs.c, which antic reads them from,
+# and in docs/decisions.md, which a reader does.
+foreach(root XDG_BIN_HOME .local/bin XDG_DATA_HOME .local/share
+        XDG_CONFIG_HOME .config XDG_CACHE_HOME .cache)
+    foreach(file src/userdirs.c docs/decisions.md)
+        file(READ "${ROOT}/${file}" text)
+        string(FIND "${text}" "${root}" found)
+        if(found EQUAL -1)
+            message(FATAL_ERROR "${file} does not name ${root}, which is a "
+                                "root of an install on Linux and macOS")
+        endif()
+    endforeach()
+endforeach()
+# anti.os gives a program the three directories of its own files. The bin
+# directory is of an install and no program asks for it.
+foreach(root XDG_DATA_HOME .local/share XDG_CONFIG_HOME .config
+        XDG_CACHE_HOME .cache)
+    file(READ "${ROOT}/std/anti/os.anti" text)
+    string(FIND "${text}" "${root}" found)
     if(found EQUAL -1)
-        message(FATAL_ERROR "tools/${script} writes no directory of its own "
-                            "for a package of another processor")
+        message(FATAL_ERROR "std/anti/os.anti does not name ${root}, which is "
+                            "a root it gives to a program")
+    endif()
+endforeach()
+# The two installers of the shell write the bin and the data root, and
+# read the XDG variables of both.
+foreach(script install.sh uninstall.sh)
+    file(READ "${ROOT}/tools/${script}" text)
+    foreach(root XDG_BIN_HOME .local/bin XDG_DATA_HOME .local/share)
+        string(FIND "${text}" "${root}" found)
+        if(found EQUAL -1)
+            message(FATAL_ERROR "tools/${script} does not name ${root}")
+        endif()
+    endforeach()
+endforeach()
+# Windows keeps everything under LOCALAPPDATA, with the executables in
+# Programs\anti\bin.
+foreach(file tools/install.ps1 tools/uninstall.ps1 src/userdirs.c
+        std/anti/os.anti docs/decisions.md)
+    file(READ "${ROOT}/${file}" text)
+    string(FIND "${text}" "LOCALAPPDATA" found)
+    if(found EQUAL -1)
+        message(FATAL_ERROR "${file} does not name LOCALAPPDATA, which is the "
+                            "root of an install on Windows")
+    endif()
+endforeach()
+foreach(file tools/install.ps1 tools/uninstall.ps1 src/userdirs.c
+        docs/decisions.md)
+    file(READ "${ROOT}/${file}" text)
+    string(FIND "${text}" "Programs" found)
+    if(found EQUAL -1)
+        message(FATAL_ERROR "${file} does not put the executables of a "
+                            "Windows install under Programs")
+    endif()
+endforeach()
+
+# DESIGN: an uninstaller removes a tree only when the installer's marker
+# stands in it. The four scripts spell the same file name.
+foreach(script install.sh uninstall.sh install.ps1 uninstall.ps1)
+    file(READ "${ROOT}/tools/${script}" text)
+    string(FIND "${text}" ".anti-install" found)
+    if(found EQUAL -1)
+        message(FATAL_ERROR "tools/${script} does not know the marker "
+                            ".anti-install, which is what an uninstaller "
+                            "checks before it removes a directory")
     endif()
 endforeach()
 

@@ -12,8 +12,12 @@ file does.
 - Pass `-o BatchMode=yes` to every `ssh` and `scp`, so a missing key fails rather than
   asking. Use `ssh -n` inside a script, since `ssh` otherwise eats the input of the
   script.
-- Linux holds the tools in `~/anti` and a tree in `~/antic-check`. Windows holds the tools in
-  `%USERPROFILE%\anti3` and a tree in `%USERPROFILE%\antic-check`, built with Ninja.
+- Both VMs hold their tools in the data directory of the user, under a name of their own:
+  `~/.local/share/anti-vm` on Linux and `%LOCALAPPDATA%\anti-vm` on Windows. The tree each
+  run replaces is `~/antic-check` and `%USERPROFILE%\antic-check`, built with Ninja on
+  Windows. Nothing of a VM stands outside the profile of its user, so a reset is those
+  directories. `C:\anti` held the Windows tools once and is gone. A directory there is
+  outside the profile, and no backup, sync or reset of the account reaches it.
 - Send a tree as `git ls-files -z | xargs -0 tar cf tree.tar` and extract it with
   `tar -xmf`. Without `-m` the Mac's file times return, and Ninja keeps newer objects of an
   older source. That cost four false failures on 2026-09-19.
@@ -26,7 +30,7 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 480 | ASan, UBSan, 479 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
+| Mac | 486 | ASan, UBSan, 485 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
 | Linux VM | 419 | ASan, UBSan, 407 each on 2026-09-19 | glibc sysroot, linux-arm64 programs, gdb |
 | Windows VM | 399 | none | windows-arm64 programs, the Win32 expected files |
 
@@ -42,7 +46,8 @@ A sanitizer preset names no path of one machine. It takes the sysroot and the ra
 source of the default build, from the cache of `build/`, when its own default is not on
 disk. That is the `antic_shared_path` macro of `CMakeLists.txt`. The presets held the
 Mac's `build/sysroot` before, and `cmake --preset asan` on the Linux VM, whose downloads
-live in `~/anti`, then built a runtime with no sysroot and failed to link 102 programs.
+live in `~/.local/share/anti-vm`, then built a runtime with no sysroot and failed to link
+102 programs.
 
 No machine here runs linux-x86_64 or windows-x86_64 programs. Only the CI runners do,
 when started by hand.

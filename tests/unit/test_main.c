@@ -24,6 +24,7 @@ void test_x86_64(void);
 void test_arm64(void);
 void test_emit(void);
 void test_link(void);
+void test_userdirs(void);
 void test_float(void);
 void test_struct(void);
 void test_utf(void);
@@ -52,6 +53,7 @@ int main(void)
     test_arm64();
     test_emit();
     test_link();
+    test_userdirs();
     test_float();
     test_struct();
     test_utf();

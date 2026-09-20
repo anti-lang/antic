@@ -7,6 +7,7 @@
 #include "driver.h"
 #include "linker.h"
 #include "selfpath.h"
+#include "userdirs.h"
 #include "target.h"
 
 static int usage(FILE *out)
@@ -343,30 +344,15 @@ static int run(int argc, char **argv, struct options *o)
                 target_name(options.target));
         return 2;
     }
-    /* DESIGN: an installed antic sits in bin/ of the runtime archive, so
-       without --runtime it takes the directory above itself. A tree with
-       no lib/ is a build tree rather than an archive, and the driver then
-       reports the missing runtime as before. */
-    if (options.runtime == NULL) {
-        struct text bin = {0};
-        struct text lib = {0};
-        if (self_directory(&bin)) {
-            const char *path = text_cstr(&bin);
-            size_t cut = bin.length;
-            while (cut > 0 && path[cut - 1] != '/' && path[cut - 1] != '\\') {
-                cut--;
-            }
-            if (cut > 1) {
-                text_append_bytes(&home, path, cut - 1);
-                text_appendf(&lib, "%s/%s", text_cstr(&home),
-                             RUNTIME_LIB_DIR);
-                if (directory_exists(text_cstr(&lib))) {
-                    options.runtime = text_cstr(&home);
-                }
-            }
-        }
-        text_free(&bin);
-        text_free(&lib);
+    /* DESIGN: antic looks for the runtime archive in two places, in this
+       order. An antic that sits in the bin/ of an archive takes the
+       directory above itself. That is the tree of a build, and of a
+       package before it is installed. An installed antic sits on the
+       PATH instead, in the bin directory of the user, and the archive
+       stands in the user's data directory. runtime_archive holds the
+       rule, and the anti tool asks the same function. */
+    if (options.runtime == NULL && runtime_archive(&home)) {
+        options.runtime = text_cstr(&home);
     }
     status = driver_run(&options);
     text_free(&home);

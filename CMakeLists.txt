@@ -130,6 +130,7 @@ add_library(antic_core STATIC
     src/regalloc.c
     src/select.c
     src/selfpath.c
+    src/userdirs.c
     src/sema.c
     src/target.c
     src/text.c
@@ -222,7 +223,8 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
 set(ANTIC_RUNTIME_SOURCES assert atomic call cast check cpu errno init io
-    license object reflect registry signal start text threads time toml utf)
+    license object platform reflect registry signal start text threads time
+    toml utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "rt/${source}.c")

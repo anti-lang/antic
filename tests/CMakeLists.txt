@@ -32,6 +32,7 @@ add_executable(antic_unit_tests
     unit/test_arm64.c
     unit/test_emit.c
     unit/test_link.c
+    unit/test_userdirs.c
     unit/test_float.c
     unit/test_struct.c
     unit/test_utf.c
@@ -408,6 +409,13 @@ endforeach()
 # of the test names it, since the C runtime of Windows has no setenv.
 set_tests_properties(std_log PROPERTIES ENVIRONMENT "ANTI_LOGGER=log-test.toml")
 
+# The roots that tests/std/userdirs.anti reads. The environment of the
+# test holds them, so one expected output stands on every machine. A
+# Windows host reads LOCALAPPDATA alone and no XDG variable, and the two
+# expected files differ by that.
+set_tests_properties(std_userdirs PROPERTIES ENVIRONMENT
+    "XDG_CONFIG_HOME=/conf;XDG_DATA_HOME=/data;XDG_CACHE_HOME=/tmp/cache;LOCALAPPDATA=C:\\Users\\Test\\AppData\\Local")
+
 # Struct passing checked against C: the functions of tests/abi/structs.c,
 # compiled by the C compiler of the build, take and return structs by value.
 add_library(abi_structs OBJECT abi/structs.c)
@@ -726,6 +734,15 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
             SKIP_REGULAR_EXPRESSION "SKIP: ")
     endforeach()
 endforeach()
+
+# Without --runtime, antic takes the runtime archive of the user's data
+# directory, which is where an install puts it.
+add_test(NAME runtime_from_data_dir
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/datadir"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_runtime_from_data_dir.cmake")
 
 # A Windows executable carries the CodeView record of the PDB that
 # lld-link wrote beside it. It holds no path of the machine that linked it
