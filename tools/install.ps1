@@ -3,9 +3,10 @@
 #   irm https://anti-lang.com/install.ps1 | iex
 #   $env:ANTI_ARCH = "x86_64"; irm https://anti-lang.com/install.ps1 | iex
 #
-# It downloads the package of this host, checks its SHA-256 against the
-# SHA256SUMS beside it, unpacks it and offers the sysroot of Windows. The
-# C runtime and the Windows SDK belong to Microsoft, so the script asks
+# It downloads the package of this host from the GitHub release of the
+# version, checks its SHA-256 against the SHA256SUMS beside it, whose
+# signature it checks first, unpacks it and offers the sysroot of Windows.
+# The C runtime and the Windows SDK belong to Microsoft, so the script asks
 # before xwin fetches them. Unpacking uses tar.exe, which Windows 10 and
 # later carry.
 #
@@ -13,11 +14,20 @@
 # runs under emulation. A copy of the file on disk takes --arm or --intel
 # on its command line instead, because iex passes no arguments.
 #
-#   ANTI_VERSION    the version to install, default the newest
-#   ANTI_BASE       where the packages are served from, default
-#                   anti-lang.com. A release checks its own packages
-#                   through it, before they are published, with a local
-#                   directory or a file:// prefix
+#   ANTI_VERSION    the version to install, default the newest, which the
+#                   latest-release API of GitHub names
+#   ANTI_BASE       a staging area to install from rather than the
+#                   release, in the layout <base>\anti\<version>\<file>
+#                   that the packer writes, as a local directory or with a
+#                   file:// prefix. A release checks its own packages
+#                   through it before they are published. It takes
+#                   ANTI_VERSION with it, because a staging area names no
+#                   newest version
+#   ANTI_GITHUB     the release area, default the releases of
+#                   anti-lang/antic. The tests of the installer stand a
+#                   fake one on disk, and a fork names its own
+#   ANTI_GITHUB_API the latest-release API that names the newest version,
+#                   default the one of anti-lang/antic
 #   ANTI_STAGING    the base is the staging area of a release, whose
 #                   manifest step 6 of ./r signs after the checks of
 #                   step 5. It takes a manifest without a signature, and
@@ -34,7 +44,16 @@
 #   ANTI_PATH       yes or no to the entry in the PATH of the account
 $ErrorActionPreference = "Stop"
 
-$base = if ($env:ANTI_BASE) { $env:ANTI_BASE } else { "https://anti-lang.com/downloads/resources" }
+# DESIGN: the packages, SHA256SUMS and SHA256SUMS.sig are assets of the
+# GitHub release of the tag, and anti-lang.com serves text alone: this
+# script, the downloads page and the public key. The binaries and the key
+# that checks them therefore stand on two hosts, and whoever takes one
+# host holds one half. tools/release-base of the repository names these
+# two addresses, and the test installer_github pins them against this
+# copy.
+$github = if ($env:ANTI_GITHUB) { $env:ANTI_GITHUB } else { "https://github.com/anti-lang/antic/releases/download" }
+$github_api = if ($env:ANTI_GITHUB_API) { $env:ANTI_GITHUB_API } else { "https://api.github.com/repos/anti-lang/antic/releases/latest" }
+$base = $env:ANTI_BASE
 
 # Read one file of the download area. A base that names a directory of
 # this machine is copied rather than fetched, which is how a release
@@ -58,9 +77,10 @@ function Get-AntiText($source) {
 }
 
 # DESIGN: the installer carries the public key that checks SHA256SUMS.sig of
-# the LLVM tools, and the package carries none. anti-lang.com serves this
-# script, and GitHub serves the tools. A key that travelled with them could
-# be replaced with them. anti-lang.com serves the same key as keys/release.pem.
+# the package and of the LLVM tools, and neither carries a key of its own.
+# anti-lang.com serves this script, and GitHub serves both downloads. A key
+# that travelled with them could be replaced with them. anti-lang.com serves
+# the same key as keys/release.pem.
 $release_key = @'
 -----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEao0Di9RL8gvG6oA9x7gIDJ7/zLn6
@@ -168,17 +188,32 @@ if ($arch -ne $native) {
     Say "installing the $arch package, which this machine runs under emulation"
 }
 
+# The newest version is the tag of the newest release, which the
+# latest-release API names. A staging area holds one version and no API,
+# so a run against one takes the version from the caller.
 if (-not $version) {
-    $version = (Get-AntiText "$base/anti/latest").Trim()
+    if ($base) {
+        Fail "ANTI_BASE names a staging area, which names no newest version. Set ANTI_VERSION with it."
+    }
+    $answer = Get-AntiText $github_api
+    $found = [regex]::Match($answer, '"tag_name"\s*:\s*"v?([^"]+)"')
+    if (-not $found.Success) {
+        Fail "$github_api names no newest version of Anti"
+    }
+    $version = $found.Groups[1].Value
 }
+
+# The assets of a release stand under its tag. A staging area of a
+# release holds the layout the packer writes, one directory per version.
+$area = if ($base) { "$base/anti/$version" } else { "$github/v$version" }
 $asset = "anti-$version-$host_name.tar.xz"
 $work = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Force $work | Out-Null
 
 try {
     Say "downloading $asset"
-    Get-AntiFile "$base/anti/$version/$asset" "$work\$asset"
-    Get-AntiFile "$base/anti/$version/SHA256SUMS" "$work\SHA256SUMS"
+    Get-AntiFile "$area/$asset" "$work\$asset"
+    Get-AntiFile "$area/SHA256SUMS" "$work\SHA256SUMS"
 
     # DESIGN: SHA256SUMS says which bytes are the package, so no line of
     # it is read before openssl has checked SHA256SUMS.sig against the key
@@ -189,7 +224,7 @@ try {
     # well.
     $signed = $true
     try {
-        Get-AntiFile "$base/anti/$version/SHA256SUMS.sig" "$work\SHA256SUMS.sig"
+        Get-AntiFile "$area/SHA256SUMS.sig" "$work\SHA256SUMS.sig"
     } catch {
         $signed = $false
     }
@@ -205,7 +240,7 @@ try {
     } elseif ($env:ANTI_STAGING -match "^(y|Y|yes|Yes)$") {
         Say "warning: the staging area of a release holds no SHA256SUMS.sig, so this installer checked the digest and not the signature"
     } else {
-        Fail "$base/anti/$version holds no SHA256SUMS.sig, and an unsigned manifest names no package"
+        Fail "$area holds no SHA256SUMS.sig, and an unsigned manifest names no package"
     }
 
     $sums = Get-Content "$work\SHA256SUMS" -Raw

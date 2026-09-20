@@ -160,6 +160,24 @@ ssh anti-windows %USERPROFILE%\test.cmd
 | The published package of this host | `anti-<version>-windows-<cpu>.tar.xz`, once the suite passes here. |
 | Pointer equality of DLL functions | Waits for the DLL-based libraries of chapter 23. |
 
+## Installing a package on a VM
+
+A user installs with `curl -fsSL https://anti-lang.com/install.sh | sh`, or with
+`irm https://anti-lang.com/install.ps1 | iex` on Windows. The site serves the installer
+and nothing binary. The package, `SHA256SUMS` and `SHA256SUMS.sig` come from the GitHub
+release of the newest tag, which the latest-release API names. That route is the default
+and needs no variable.
+
+Step 5 of a release installs a package that is not published yet. It copies the staging
+directory of `build/dist/packages` to the machine and names it in `ANTI_BASE`, with
+`ANTI_VERSION` beside it, because a staging area names no newest version. The layout
+there is `<base>/anti/<version>/<file>`, which the packer writes. The run first reads the
+installer's refusal of a manifest without a signature, and then installs with
+`ANTI_STAGING=yes`, because step 6 signs the manifest after these checks.
+
+`ANTI_BASE` is therefore the override of a release before it is published, on a VM and
+nowhere else. A machine that installs the way a user does sets none of the three.
+
 ## Runners
 
 The workflow `.github/workflows/test.yml` covers linux-x86_64 and windows-x86_64 when Eddie starts it on a release day. They are the Linux programs of that target and the Windows x64 unwind data at run time. The Mac already runs the macos-x86_64 programs, float conversions included.

@@ -595,6 +595,15 @@ add_test(NAME installer_options
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_installer_options.cmake")
 
+# The binaries of a release are assets of its GitHub release, and the
+# installers take them from there and from nowhere else.
+add_test(NAME installer_github
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/installer-github"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_installer_github.cmake")
+set_tests_properties(installer_github PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # The installer trusts no line of SHA256SUMS before it has checked
 # SHA256SUMS.sig against the key it carries.
 add_test(NAME manifest_signature

@@ -1,0 +1,10 @@
+# Where the binaries of Anti are published. The GitHub release of the tag
+# holds the six packages, the six symbols archives, SHA256SUMS and
+# SHA256SUMS.sig, and nothing else serves them. Both installers carry
+# these two addresses, because the site serves them and they read no file
+# of the repository before they have a package. The test installer_github
+# pins their copies against this file, and a move of the release area is a
+# change here.
+repository=anti-lang/antic
+download=https://github.com/@REPOSITORY@/releases/download/@TAG@
+api=https://api.github.com/repos/@REPOSITORY@/releases/latest

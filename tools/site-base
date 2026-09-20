@@ -1,0 +1,5 @@
+# The site of Anti, which serves text alone: the two installers, the
+# downloads page and the public key of the release. Step 9 of ./r publishes
+# that text, step 10 installs from it, and the binaries of a release are
+# assets of its GitHub release, which tools/release-base names.
+https://anti-lang.com

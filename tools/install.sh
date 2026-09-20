@@ -5,9 +5,10 @@
 #   curl -fsSL https://anti-lang.com/install.sh | sh
 #   curl -fsSL https://anti-lang.com/install.sh | sh -s -- --intel  # docs-style:ignore
 #
-# It downloads the package of this host. It checks the SHA-256 against the
-# SHA256SUMS beside it, unpacks it and installs the sysroot of the host.
-# The SDK of macOS belongs to Apple and the C runtime of Windows to
+# It downloads the package of this host from the GitHub release of the
+# version. It checks the SHA-256 against the SHA256SUMS beside it, whose
+# signature it checks first, unpacks it and installs the sysroot of the
+# host. The SDK of macOS belongs to Apple and the C runtime of Windows to
 # Microsoft. The script asks before it takes either of them.
 #
 # The option --arm or --intel takes the package of that processor rather
@@ -16,10 +17,19 @@
 #
 # Each question takes yes or no from a variable of its own name.
 #
-#   ANTI_VERSION: the version to install, default the newest.
-#   ANTI_BASE: where the packages are served from, default anti-lang.com.
-#              A release checks its own packages through it, before they
-#              are published, with a file:// prefix of a local directory.
+#   ANTI_VERSION: the version to install, default the newest, which the
+#              latest-release API names.
+#   ANTI_BASE: a staging area to install from rather than the release,
+#              in the layout <base>/anti/<version>/<file> that the packer
+#              writes, usually with a file:// prefix. A release checks its
+#              own packages through it before they are published. It takes
+#              ANTI_VERSION with it, because a staging area names no
+#              newest version.
+#   ANTI_GITHUB: the release area, default the releases of
+#              anti-lang/antic. The tests of the installer stand a fake
+#              one on disk, and a fork names its own.
+#   ANTI_GITHUB_API: the latest-release API that names the newest version,
+#              default the one of anti-lang/antic.
 #   ANTI_STAGING: the base is the staging area of a release, whose
 #              manifest step 6 of ./r signs after the checks of step 5.
 #              It takes a manifest without a signature, and never one
@@ -37,12 +47,23 @@
 #   ANTI_MICROSOFT: let xwin fetch the CRT and the Windows SDK.
 set -eu
 
-base=${ANTI_BASE:-https://anti-lang.com/downloads/resources}
+# DESIGN: the packages, SHA256SUMS and SHA256SUMS.sig are assets of the
+# GitHub release of the tag. anti-lang.com serves text alone: the two
+# installers, the downloads page and the public key. The binaries and the
+# key that checks them therefore stand on two hosts, and whoever takes one
+# host holds one half. Mirroring the packages to the site would put both
+# halves in one place and answer nothing. tools/release-base of the
+# repository names these two addresses, and the test installer_github
+# pins them against this copy.
+github=${ANTI_GITHUB:-https://github.com/anti-lang/antic/releases/download}
+github_api=${ANTI_GITHUB_API:-https://api.github.com/repos/anti-lang/antic/releases/latest}
+base=${ANTI_BASE:-}
 
-# DESIGN: the installer carries the public key that checks SHA256SUMS.sig of
-# the LLVM tools, and the package carries none. anti-lang.com serves this
-# script, and GitHub serves the tools. A key that travelled with them could
-# be replaced with them. anti-lang.com serves the same key as keys/release.pem.
+# DESIGN: the installer carries the public key that checks SHA256SUMS.sig
+# of the package and of the LLVM tools. Neither download carries a key of
+# its own. anti-lang.com serves the installer, and GitHub serves both
+# downloads. A key that travelled with them could be replaced with them.
+# anti-lang.com serves the same key as keys/release.pem.
 release_key='-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEao0Di9RL8gvG6oA9x7gIDJ7/zLn6
 /J5i5dgtCf82Hvpro/4umWhaPA8APgrIJKLD4XDvTqhLijckvFxj0f3Bhg==
@@ -110,7 +131,7 @@ sha256() {
 # tools/llvm-pin of the package carries as well.
 check_manifest() {
     if curl -fsSL -o "$work/SHA256SUMS.sig" \
-        "$base/anti/$version/SHA256SUMS.sig" 2>/dev/null; then
+        "$area/SHA256SUMS.sig" 2>/dev/null; then
         command -v openssl >/dev/null 2>&1 ||
             fail "openssl is missing, and without it SHA256SUMS.sig is no signature of anything"
         printf '%s\n' "$release_key" > "$work/release.pem"
@@ -128,7 +149,7 @@ check_manifest() {
         say "warning: the staging area of a release holds no SHA256SUMS.sig, so this installer checked the digest and not the signature"
         ;;
     *)
-        fail "$base/anti/$version holds no SHA256SUMS.sig, and an unsigned manifest names no package"
+        fail "$area holds no SHA256SUMS.sig, and an unsigned manifest names no package"
         ;;
     esac
 }
@@ -194,16 +215,32 @@ if [ "$arch" != "$native" ]; then
     say "installing the $arch package, which this machine runs under emulation"
 fi
 
+# The newest version is the tag of the newest release, which the
+# latest-release API names. A staging area holds one version and no API,
+# so a run against one takes the version from the caller.
 if [ -z "$version" ]; then
-    version=$(curl -fsSL "$base/anti/latest" | tr -d ' \n')
+    if [ -n "$base" ]; then
+        fail "ANTI_BASE names a staging area, which names no newest version. Set ANTI_VERSION with it."
+    fi
+    version=$(curl -fsSL "$github_api" |
+        sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p')
+    [ -n "$version" ] || fail "$github_api names no newest version of Anti"
+fi
+
+# The assets of a release stand under its tag. A staging area of a release
+# holds the layout the packer writes, one directory per version.
+if [ -n "$base" ]; then
+    area=$base/anti/$version
+else
+    area=$github/v$version
 fi
 asset=anti-$version-$host.tar.xz
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 say "downloading $asset"
-curl -fsSL -o "$work/$asset" "$base/anti/$version/$asset"
-curl -fsSL -o "$work/SHA256SUMS" "$base/anti/$version/SHA256SUMS"
+curl -fsSL -o "$work/$asset" "$area/$asset"
+curl -fsSL -o "$work/SHA256SUMS" "$area/SHA256SUMS"
 check_manifest
 want=$(grep " $asset\$" "$work/SHA256SUMS" | cut -d ' ' -f 1)
 got=$(sha256 "$work/$asset")

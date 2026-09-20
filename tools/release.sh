@@ -34,7 +34,7 @@ version=$(sed -n '1p' "$root/tools/version" | tr -d ' \r\n')
 tag=v$version
 hosts='macos-arm64 macos-x86_64 linux-x86_64 linux-arm64 windows-x86_64 windows-arm64'
 cpu_levels=$root/tools/cpu-levels
-download_base=$(grep -v '^#' "$root/tools/download-base" | tr -d ' \r\n')
+site_base=$(grep -v '^#' "$root/tools/site-base" | tr -d ' \r\n')
 
 dry_run=no
 skip_vms=no
@@ -165,6 +165,20 @@ preflight() {
     gh auth status > /dev/null 2>&1 ||
         die "gh is not logged in. Run gh auth login."
     say "gh is logged in"
+
+    # DESIGN: step 9 publishes the text of the site, and the webroot it
+    # writes to is read here rather than after the tag exists. A release
+    # that stops at step 9 has published its binaries and named them
+    # nowhere.
+    case ${ANTI_SITE:-} in
+    "") die "ANTI_SITE names no webroot of the site, and step 9 publishes its text there" ;;
+    *:/*) ;;
+    *) die "ANTI_SITE holds '$ANTI_SITE', and step 9 rsyncs to <host>:<webroot>" ;;
+    esac
+    site_host=${ANTI_SITE%%:*}
+    ssh -n -o BatchMode=yes -o ConnectTimeout=20 "$site_host" true ||
+        die "$site_host does not answer, and step 9 rsyncs the text of the site there"
+    say "$site_host answers, and takes the text of the site"
 
     if [ "$skip_vms" = yes ]; then
         say "the VMs are skipped, so the release is marked as a pre-release"
@@ -777,50 +791,84 @@ matrix() {
 # Write the index of the download area, which the site's build reads.
 # It names the version, the six packages with their digests and URLs,
 # and the fingerprint of the key that signs the manifest.
-write_index() {
+# The downloads page, from tools/downloads.html.in and the digests of the
+# packages step 3 wrote. Every file it names is an asset of the release.
+write_page() {
     release_url=https://github.com/$(repository)/releases/download/$tag
-    {
-        printf '# The published packages of Anti. The release script of\n'
-        printf '# antic writes the entries, and the build of the site\n'
-        printf '# publishes them.\n'
-        printf '\n[anti]\n'
-        printf 'version = "%s"\n' "$version"
-        printf 'released = "%s"\n' "$(date -u '+%Y-%m-%d')"
-        printf 'base = "%s/anti/%s"\n' "$download_base" "$version"
-        printf 'release = "%s"\n' "$release_url"
-        printf 'key_fingerprint = "%s"\n' "$(key_fingerprint)"
-        for host in $hosts; do
-            name=$(package_name "$host")
-            printf '\n[anti.%s]\n' "$host"
-            printf 'file = "%s"\n' "$name"
-            printf 'sha256 = "%s"\n' "$(digest_of "$packages/$name")"
-            printf 'url = "%s/%s"\n' "$release_url" "$name"
-        done
-    } > "$1"
+    mkdir -p "$work"
+    : > "$work/rows.html"
+    for host in $hosts; do
+        name=$(package_name "$host")
+        {
+            printf '        <tr><td>%s</td>\n' "$host"
+            printf '          <td><a href="%s/%s">%s</a></td>\n' \
+                "$release_url" "$name" "$name"
+            printf '          <td class="digest">%s</td></tr>\n' \
+                "$(digest_of "$packages/$name")"
+        } >> "$work/rows.html"
+    done
+    awk -v rows="$work/rows.html" '
+        /@ROWS@/ {
+            while ((getline line < rows) > 0) {
+                print line
+            }
+            next
+        }
+        { print }' "$root/tools/downloads.html.in" |
+        sed -e "s|@VERSION@|$version|g" \
+            -e "s|@TAG@|$tag|g" \
+            -e "s|@RELEASED@|$(date -u '+%Y-%m-%d')|g" \
+            -e "s|@RELEASE@|https://github.com/$(repository)/releases/tag/$tag|g" \
+            -e "s|@FINGERPRINT@|$(key_fingerprint)|g" > "$1"
 }
 
-# Step 9. The index of the site, in the checkout that ANTI_SITE names.
-# Nothing binary goes there: the site's build takes the packages from
-# the release and publishes them under the download base.
+# Step 9. The text of the site, in the webroot that ANTI_SITE names on the
+# host that serves anti-lang.com. It carries no git clone and no build, so
+# the files are rsynced as they are.
+#
+# DESIGN: nothing binary reaches the site. The packages, SHA256SUMS and
+# SHA256SUMS.sig are assets of the GitHub release, and the public key that
+# checks the manifest stands here. The two halves are on two hosts, and a
+# host that is taken holds one of them. Mirroring the packages to the site
+# would put both in one place and prove nothing.
+#
+# The mode is spelled for openrsync, which macOS ships as rsync and which
+# refuses --chmod=F640 and --chmod=0640. The webroot is setgid, so a file
+# rsynced into it keeps the group of the server.
 site() {
+    page=$dist/downloads-index.html
     if [ "$dry_run" = yes ]; then
         printf 'r: step 9, the site\n'
-        write_index "$dist/index.toml"
-        say "would write index.toml of downloads/ and push it to \$ANTI_SITE"
-        say "the file it would write stands in $dist/index.toml"
+        write_page "$page"
+        say "would rsync tools/install.sh and tools/install.ps1 to ${ANTI_SITE:-\$ANTI_SITE}/"
+        say "would rsync the downloads page to ${ANTI_SITE:-\$ANTI_SITE}/downloads/index.html"
+        say "would read $site_base/keys/release.pem and compare it with keys/release.pem"
+        say "would send nothing else, and no binary"
+        say "the page it would publish stands in $page"
         return 0
     fi
     starts 09 site "the site" || return 0
-    checkout=${ANTI_SITE:-}
-    [ -n "$checkout" ] && [ -d "$checkout/.git" ] ||
-        die "step 9: ANTI_SITE names no checkout of the site"
-    mkdir -p "$checkout/downloads"
-    write_index "$checkout/downloads/index.toml"
-    git -C "$checkout" add downloads/index.toml
-    git -C "$checkout" commit -q -m "Publish Anti $version" ||
-        say "the site holds this index already"
-    git -C "$checkout" push -q || die "step 9: the index did not reach the site"
-    say "downloads/index.toml of the site names $version"
+    destination=${ANTI_SITE:-}
+    [ -n "$destination" ] ||
+        die "step 9: ANTI_SITE names no webroot of the site"
+    write_page "$page"
+    rsync --chmod=u=rw,g=r,o= "$root/tools/install.sh" \
+        "$root/tools/install.ps1" "$destination/" ||
+        die "step 9: the installers did not reach $destination"
+    say "install.sh and install.ps1 stand in $destination"
+    rsync --chmod=u=rw,g=r,o= "$page" "$destination/downloads/index.html" ||
+        die "step 9: the downloads page did not reach $destination"
+    say "the downloads page of $version stands in $destination/downloads"
+
+    # The key the installers carry is the key the site serves. A user who
+    # wants a second source of it fetches this URL. A release reads it
+    # rather than trusting that an earlier one put it there.
+    mkdir -p "$work"
+    curl -fsSL "$site_base/keys/release.pem" > "$work/site-key.pem" ||
+        die "step 9: $site_base/keys/release.pem answered nothing"
+    cmp -s "$work/site-key.pem" "$root/keys/release.pem" ||
+        die "step 9: the key at $site_base/keys/release.pem is not keys/release.pem"
+    say "$site_base/keys/release.pem is the public key of the release"
     finished 09 site
 }
 
@@ -830,7 +878,7 @@ site() {
 verify() {
     if [ "$dry_run" = yes ]; then
         printf 'r: step 10, the check from outside\n'
-        say "would install $version from ${download_base%/downloads/resources} into $dist/verify"
+        say "would install $version from $site_base into $dist/verify"
         say "would compile a program for this host and link one for the other five"
         return 0
     fi
@@ -838,7 +886,7 @@ verify() {
     rm -rf "$dist/verify"
     mkdir -p "$dist/verify"
     home=$dist/verify/anti
-    site_root=${download_base%/downloads/resources}
+    site_root=$site_base
     curl -fsSL "$site_root/install.sh" > "$dist/verify/install.sh" ||
         die "step 10: the installer did not download from $site_root"
     ANTI_VERSION=$version ANTI_HOME=$home ANTI_REPLACE=yes ANTI_PATH=no \

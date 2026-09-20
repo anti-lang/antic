@@ -263,7 +263,12 @@ exit 0
 file(WRITE "${WORK}/bin/scp" "#!/bin/sh
 exit 0
 ")
-foreach(name cmake ctest gh ssh scp)
+# The stand-in for the rsync of step 9, which a dry run never calls and
+# which answers nothing when it does.
+file(WRITE "${WORK}/bin/rsync" "#!/bin/sh
+exit 0
+")
+foreach(name cmake ctest gh ssh scp rsync)
     execute_process(COMMAND chmod +x "${WORK}/bin/${name}")
 endforeach()
 
@@ -291,6 +296,10 @@ run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
 run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
 
 set(saved_path "$ENV{PATH}")
+# Step 9 rsyncs the text of the site to the webroot that ANTI_SITE names,
+# and the preflight refuses a run without it. The stand-in for ssh
+# answers for the host of this one.
+set(ENV{ANTI_SITE} "site.example:/var/www/anti-lang.com/webroot")
 set(ENV{PATH} "${WORK}/bin:${saved_path}")
 execute_process(COMMAND "${copy}/r" --dry-run
                 WORKING_DIRECTORY "${copy}"
@@ -368,7 +377,8 @@ foreach(name packages/SHA256SUMS.sig state/06-digests state/07-release)
     endif()
 endforeach()
 foreach(line "would sign" "would tag v${version}" "would create the release"
-        "would run the workflow" "would write index.toml" "would install")
+        "would run the workflow" "would rsync tools/install.sh"
+        "would rsync the downloads page" "keys/release.pem" "would install")
     if(NOT out MATCHES "${line}")
         message(FATAL_ERROR "the dry run does not say what it would do: "
                             "`${line}` is missing\n${out}${err}")

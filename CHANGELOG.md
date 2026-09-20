@@ -23,4 +23,7 @@ The first release of Anti.
 - The processor levels of `--cpu`, with one runtime per level in the
   archive and a check at the start of every program.
 - `anti` holds `sdk export`, `sdk import` and `test`.
-- Six packages, one per host, with the installers of the two shells.
+- Six packages, one per host, with the installers of the two shells. The
+  packages, the symbols archives and the signed manifest are assets of the
+  GitHub release of the tag. anti-lang.com serves the installers, the
+  downloads page and the public key, and no binary.

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<!-- The downloads page of anti-lang.com. Step 9 of ./r fills the marks
+     and rsyncs the page to the webroot. Every file it names is an asset
+     of the GitHub release, and the site serves none of them. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anti @VERSION@</title>
+  <style>
+    :root {
+      --txt: #fff1c8;
+      --txt-dim: rgba(255, 241, 200, .78);
+      --amber: #ffb000;
+      --glow: rgba(255, 176, 0, .75);
+    }
+    html { height: 100%; }
+    body {
+      min-height: 100%; margin: 0; padding: 3rem 1rem; box-sizing: border-box;
+      display: grid; place-items: start center;
+      background: linear-gradient(160deg, #f5f0e1 0%, #c9a77c 55%, #5b3a21 100%);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    .terminal {
+      position: relative; overflow: hidden;
+      width: min(52rem, 94vw); padding: 2.25rem 2.5rem 2.75rem;
+      border-radius: 1rem; background: #1a1206;
+      border: 2px solid rgba(255, 176, 0, .55);
+      box-shadow: 0 0 0 6px #2b1d0c, 0 24px 60px rgba(40, 20, 0, .45),
+                  inset 0 0 90px rgba(255, 140, 0, .08);
+    }
+    .terminal, .terminal * {
+      color: var(--txt);
+      text-shadow: 0 0 max(5px, .21em) rgba(255, 176, 0, .85),
+                   0 0 .46em var(--glow),
+                   0 0 .96em rgba(255, 176, 0, .35);
+    }
+    .terminal::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px,
+                                            transparent 1px 3px);
+      mix-blend-mode: multiply;
+    }
+    h1 { margin: 0 0 .25rem; font-size: 1.9rem; }
+    h2 { margin: 2rem 0 .5rem; font-size: 1.15rem; }
+    p, li, td, th { font-size: 1rem; line-height: 1.7; }
+    p { margin: 0 0 .75rem; }
+    .dim { color: var(--txt-dim); }
+    a { color: var(--amber); }
+    pre {
+      margin: 0 0 1rem; padding: .85rem 1rem; overflow-x: auto;
+      border: 1px solid rgba(255, 176, 0, .35); border-radius: .5rem;
+      background: rgba(0, 0, 0, .35);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: .4rem .5rem; text-align: left; vertical-align: top;
+      border-bottom: 1px solid rgba(255, 176, 0, .25);
+    }
+    td.digest { word-break: break-all; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <main class="terminal">
+    <h1>Anti @VERSION@</h1>
+    <p class="dim">Released @RELEASED@. One command installs the compiler,
+      the runtime archive, the standard library and the tools into your own
+      account. Nothing outside your home directory is written.</p>
+
+    <h2>Install on macOS and Linux</h2>
+    <pre>curl -fsSL https://anti-lang.com/install.sh | sh</pre>
+
+    <h2>Install on Windows</h2>
+    <pre>irm https://anti-lang.com/install.ps1 | iex</pre>
+
+    <h2>Packages</h2>
+    <p>The installer downloads the package of your platform from the
+      <a href="@RELEASE@">GitHub release of @TAG@</a>, checks the signature
+      of <code>SHA256SUMS</code> against the public key it carries and then
+      the digest of the package. The packages, the symbols archives,
+      <code>SHA256SUMS</code> and <code>SHA256SUMS.sig</code> are assets of
+      that release. This site serves no binary.</p>
+    <table>
+      <thead>
+        <tr><th>Target</th><th>Package</th><th>SHA-256</th></tr>
+      </thead>
+      <tbody>
+@ROWS@
+      </tbody>
+    </table>
+
+    <h2>The public key</h2>
+    <p>The installers carry the public key of the release and check every
+      manifest against it. The same key stands at
+      <a href="/keys/release.pem">/keys/release.pem</a>, so a second source
+      of it is one fetch away. Its SHA-256 fingerprint is:</p>
+    <pre>@FINGERPRINT@</pre>
+    <p class="dim">The binaries and the key that checks them are served by
+      two different hosts on purpose. A host that is taken holds one half.</p>
+  </main>
+</body>
+</html>

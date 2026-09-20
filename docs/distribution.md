@@ -1,7 +1,8 @@
 # Anti distribution
 
 Design of how Anti libraries are published and how licence obligations travel with
-programs. Settled on 2026-09-14 and aligned with `docs/decisions.md` on 2026-09-15.
+programs. Settled on 2026-09-14 and aligned with `docs/decisions.md` on 2026-09-15. The
+binaries moved to the GitHub release and the site to text alone on 2026-09-20.
 `docs/decisions.md` is the authority, and the details below agree with it, with
 `docs/tooling.md` and with `docs/tooling-addendum.md`.
 
@@ -23,29 +24,57 @@ Contents:
 
 ## Binary downloads
 
-The repository holds no binary. Everything a user downloads is served from the prefix in
-`tools/download-base`, today `https://anti-lang.com/downloads/resources`, under one
-layout.
+The repository holds no binary, and neither does anti-lang.com. The binaries of a
+version are the assets of the GitHub release of its tag, under one layout.
 
 ```text
-<base>/<component>/<version>/<file>
-<base>/<component>/<version>/SHA256SUMS
+https://github.com/anti-lang/antic/releases/download/v<version>/<file>
+https://github.com/anti-lang/antic/releases/download/v<version>/SHA256SUMS
+https://github.com/anti-lang/antic/releases/download/v<version>/SHA256SUMS.sig
 ```
 
-- `<component>` is `anti` for the runtime archive with antic, `raylib` and `musl` for
-  the mirrors of a pinned source.
-- `<version>` is the version of that component, such as `0.1.0` or `6.0`.
+- `tools/release-base` names the repository, that download prefix and the
+  latest-release API `https://api.github.com/repos/anti-lang/antic/releases/latest`.
+  Both installers carry the two addresses, because the site serves them and they read
+  no file of the repository before they hold a package. The test `installer_github`
+  pins their copies against that file.
 - `<file>` names the component, the version and the target, as in
   `anti-0.1.0-macos-arm64.tar.xz`. The target names are the six of `--target`.
-- `SHA256SUMS` beside them holds one line per file, which `shasum -c` reads. It is the
-  manifest the release script signed, and `SHA256SUMS.sig` stands beside it. A version
-  directory of `anti` holds the six packages and the six symbols archives, and the
-  manifest names all twelve. Both installers read the signature against the key they
-  carry before they trust a line of the manifest, and stop when it is missing or wrong.
+- A release holds the six packages and the six symbols archives. `SHA256SUMS` names
+  all twelve, and `shasum -c` reads it. It is the manifest the release script signed,
+  and `SHA256SUMS.sig` stands beside it. Both installers read the signature against the key they
+  carry before they trust a line of the manifest. A signature that is missing or
+  wrong stops the install.
+- The newest version is the tag of the newest release, which the latest-release API
+  names. `ANTI_VERSION` names another one, and `ANTI_BASE` points an installer at a
+  staging area of a release instead, in the layout `<base>/anti/<version>/<file>` that
+  the packer writes.
 
-A path is written once and never again. A pin file in the repository names the file and
-its digest, so an older Anti keeps installing its pinned version. The files can move to a
-CDN behind that prefix without a change here.
+A tag is published once and never again, so a path is written once and never again. A
+pin file in the repository names the file and its digest, so an older Anti keeps
+installing its pinned version.
+
+### What the site serves
+
+anti-lang.com serves text alone, from the webroot that `ANTI_SITE` names. `tools/site-base`
+holds its address, today `https://anti-lang.com`.
+
+```text
+https://anti-lang.com/install.sh
+https://anti-lang.com/install.ps1
+https://anti-lang.com/downloads/
+https://anti-lang.com/keys/release.pem
+```
+
+Step 9 of a release rsyncs the two installers and the downloads page there over ssh.
+It then reads the key of the site against the one of the checkout. The page names every
+asset of the release by URL and carries its digest.
+
+The binaries and the public key that checks them are therefore served by two hosts,
+and whoever takes one host holds one half. A mirror of the packages on the site would
+put both halves in one place and answer nothing. Eddie decided this on 2026-09-20, and
+it replaces the download area under `downloads/resources` that this document described
+before.
 
 ### The LLVM tools
 
@@ -67,7 +96,8 @@ signature. A toolchain bump is a new release there and a new pin here.
 The public key that checks `SHA256SUMS.sig` with `openssl pkeyutl -verify` lives in the
 installers, which anti-lang.com serves, and in `keys/release.pem` of the repository,
 which `tools/get-llvm.cmake` reads. anti-lang.com serves it as `keys/release.pem`. No
-package carries a key. A key that travelled with a package could be replaced with it.
+package carries a key. A key that travelled with a package could be replaced with it,
+which is why the key and the packages stand on two hosts.
 
 ### What the components will hold
 
@@ -124,21 +154,21 @@ and the two sanitizer suites in an export of the commit, packs the six hosts,
 writes the symbols archives beside them and checks the packages on both VMs. The
 packages and the archives stand in `build/dist/packages` under the one `SHA256SUMS`
 that the packer wrote, which it then signs in place with the release key. It tags
-the commit and uploads the assets to a GitHub release. It runs the runner matrix once, writes `downloads/index.toml`
-for anti-lang.com and installs the result from outside. `./r --dry-run` performs the
+the commit and uploads the assets to a GitHub release. It runs the runner matrix once, publishes the text of
+anti-lang.com and installs the result from outside. `./r --dry-run` performs the
 first five steps and prints what the rest would do.
 
-The site's repository takes the index alone. It names the version, the six
-packages with their digests, the URLs of the release assets and the fingerprint
-of the public key. The site's build publishes the files it names under the
-download base. Nothing binary is committed to the site.
+The site takes the two installers and the downloads page. That page names the version and the six
+packages, with the digest and the release URL of each. It carries the fingerprint of
+the public key. Step 9 rsyncs the three files and reads the
+key at its URL. Nothing binary reaches the site.
 
 `docs/work-order-release-script.md` holds the eleven steps, and
 `docs/decisions.md` holds the decisions under "The release script".
 
 ### After publishing a package
 
-A package is accepted when a machine of that host installs it from the site and links
+A package is accepted when a machine of that host installs it with the installer of the site and links
 for every target it claims. The checks that a build on the development Mac cannot make:
 
 1. `curl -fsSL https://anti-lang.com/install.sh | sh` on the target machine.
