@@ -3284,25 +3284,134 @@ static struct ir_operand narrow_from_i64(struct lowerer *l,
    the same width keeps every bit. That case is a comparison against
    zero. A target-sized type leaves both to the back end, because a
    conversion that is a copy on one target passes the round trip. */
+/* The integer type that t converts as. An enum converts as its base
+   type, and char as the unsigned 32-bit value it already is. */
+static const struct type *integer_form(const struct type *t)
+{
+    return t->kind == TYPE_ENUM ? t->base : t;
+}
+
+/* Whether t takes part in the conversion checks. An integer, char and an
+   enum each have a range or a set of values of their own. */
+static bool converts_as_integer(const struct type *t)
+{
+    return type_is_integer(t) || t->kind == TYPE_CHAR ||
+           t->kind == TYPE_ENUM;
+}
+
+/* The value an enum declares for its name at index i, as an i64. A
+   signed base type extends its sign, so the constant compares against
+   the widened value the check builds. */
+static uint64_t enum_value(const struct type *t, size_t i)
+{
+    uint64_t n = t->fields[i].number;
+    int width = type_bits(t->base);
+
+    if (type_is_signed(t->base) && width > 0 && width < 64 &&
+        ((n >> (width - 1)) & 1) != 0) {
+        n |= ~(uint64_t)0 << width;
+    }
+    return n;
+}
+
+/* DESIGN: a value that becomes a char must be a Unicode scalar value:
+   at most 0x10FFFF and never one of the surrogates. The comparison is
+   unsigned on the widened value, so a negative source fails the first
+   test and needs no test of its own. The surrogates are one range, so
+   subtracting its start turns the pair of bounds into one comparison. */
+static void scalar_check(struct lowerer *l, const struct expr *e,
+                         const struct type *from, struct ir_operand wide,
+                         const char *operation, enum check_kind kind,
+                         struct ir_operand v)
+{
+    struct ir_operand low =
+        temp(l, ir_binary(l->f, l->b, IR_ULE, IR_I8, wide,
+                          ir_int_op(IR_I64, 0x10FFFF)));
+    struct ir_operand off =
+        temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64, wide,
+                          ir_int_op(IR_I64, 0xD800)));
+    struct ir_operand off_ok =
+        temp(l, ir_binary(l->f, l->b, IR_UGE, IR_I8, off,
+                          ir_int_op(IR_I64, 0x800)));
+    struct ir_operand ok =
+        temp(l, ir_binary(l->f, l->b, IR_AND, IR_I8, low, off_ok));
+
+    check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind, v,
+                 none(), from);
+}
+
+/* DESIGN: a value that becomes an enum must be one of the values the
+   enum declares. The test compares the widened value against each of
+   them and takes the union. That is one comparison per name and no
+   block of its own. */
+static void enum_check(struct lowerer *l, const struct expr *e,
+                       const struct type *from, const struct type *to,
+                       struct ir_operand wide, const char *operation,
+                       enum check_kind kind, struct ir_operand v)
+{
+    struct ir_operand ok = none();
+    size_t i;
+
+    for (i = 0; i < to->field_count; i++) {
+        struct ir_operand is =
+            temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, wide,
+                              ir_int_op(IR_I64, enum_value(to, i))));
+        ok = ok.kind == IR_NONE
+                 ? is
+                 : temp(l, ir_binary(l->f, l->b, IR_OR, IR_I8, ok, is));
+    }
+    check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind, v,
+                 none(), from);
+}
+
+/* DESIGN: a narrowing `as` is checked by the round trip. The value goes
+   to the target type and back to the source with the target's
+   signedness. A value the target cannot hold comes back changed.
+   The round trip is blind to a change of sign alone, because a target of
+   the same width keeps every bit. That case is a comparison against
+   zero. A target-sized type leaves both to the back end, because a
+   conversion that is a copy on one target passes the round trip.
+
+   char and an enum have a set of values rather than a width, so each
+   replaces the two tests with one of its own. */
 static void narrow_check(struct lowerer *l, const struct expr *e,
                          const struct type *from, const struct type *to,
                          struct ir_operand v)
 {
+    const struct type *source_form = integer_form(from);
     enum ir_type source = ir_type_of(from);
     enum ir_type target = ir_type_of(to);
     enum check_kind kind =
-        type_is_signed(from) ? CHECK_VALUE : CHECK_VALUE_U;
-    bool sign_changes = type_is_signed(from) != type_is_signed(to);
+        type_is_signed(source_form) ? CHECK_VALUE : CHECK_VALUE_U;
+    bool sign_changes =
+        type_is_signed(source_form) != type_is_signed(integer_form(to));
     struct text name = {0};
     char operation[80];
     struct ir_operand ok;
     struct ir_operand round;
 
+    if (from == to) {
+        return;
+    }
     type_name(&name, to);
-    snprintf(operation, sizeof operation, "value out of range for %s",
+    snprintf(operation, sizeof operation,
+             to->kind == TYPE_ENUM ? "value not declared by %s"
+                                   : "value out of range for %s",
              text_cstr(&name));
     text_free(&name);
-    if (sign_changes && (type_is_signed(from) || narrows(source, target))) {
+    if (to->kind == TYPE_CHAR || to->kind == TYPE_ENUM) {
+        struct ir_block *here = l->b;
+        struct ir_operand wide = widen_operand(l, v, source_form);
+        l->b = here;
+        if (to->kind == TYPE_CHAR) {
+            scalar_check(l, e, from, wide, operation, kind, v);
+        } else if (to->field_count > 0) {
+            enum_check(l, e, from, to, wide, operation, kind, v);
+        }
+        return;
+    }
+    if (sign_changes &&
+        (type_is_signed(source_form) || narrows(source, target))) {
         ok = temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, v,
                                ir_int_op(source, 0)));
         check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind,
@@ -3311,7 +3420,8 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
     if (source != target && narrows(source, target)) {
         round = temp(l, ir_unary(l->f, l->b, IR_TRUNC, target, v));
         round = temp(l, ir_unary(l->f, l->b,
-                                 type_is_signed(to) ? IR_SEXT : IR_ZEXT,
+                                 type_is_signed(integer_form(to)) ? IR_SEXT
+                                                                  : IR_ZEXT,
                                  source, round));
         ok = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, round, v));
         check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind,
@@ -3350,7 +3460,7 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
         return checked_cast(l, v, from, to->element, e->as.cast.checked,
                             e->as.cast.from_sub);
     }
-    if (type_is_integer(from) && type_is_integer(to)) {
+    if (converts_as_integer(from) && converts_as_integer(to)) {
         narrow_check(l, e, from, to, v);
     }
     if (type_is_float(from) && type_is_float(to)) {

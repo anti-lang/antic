@@ -1,0 +1,17 @@
+//! A value converted to `char` must be a Unicode scalar value. This one
+//! is past the last of them.
+
+fn opaque(n: u32) -> u32
+{
+	return n;
+}
+
+fn sink(c: char)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(1114112) as char);
+	return 7;
+}

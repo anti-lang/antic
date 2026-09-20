@@ -23,8 +23,14 @@ to the runtime's by reading the call lowering writes.
 The checks. An index is one unsigned comparison against the count, so a
 negative index fails the same test. A narrowing `as` is the round trip, with
 a comparison against zero where the sign changes and the width does not.
-Division compares the divisor before the operation. A shift compares the
-count against `size_of` the type times eight.
+Division compares the divisor before the operation, on every target.
+A shift compares the count against `size_of` the type times eight.
+
+`char` and an enum are checked with the integers. A value that becomes a
+`char` must be at most `0x10FFFF` and outside the surrogates, which is two
+unsigned comparisons. A value that becomes an enum must be one it declares,
+which is one comparison per name joined by `or`. An enum converts as its
+base type everywhere else.
 
 Overflow. Three IR operations, `addov`, `subov` and `mulov`, give the result
 of a signed `+`, `-` or `*` and record whether it left the range of its
@@ -41,7 +47,7 @@ checked `+`, `-` or `*`. `adds x20, x19, x9` and `b.vc` on ARM64, `addq` and
 `jno` on x86_64. The values a failure prints are widened inside the failure
 block, so the path a program takes carries none of that.
 
-Tests. `tests/checks/` holds thirteen programs, one per check. Each is built
+Tests. `tests/checks/` holds sixteen programs, one per check. Each is built
 in release and in dev mode: release runs to its end and carries no text of
 the check, and dev prints the file, the line, the operation and the values,
 then aborts. `--checks` reaches a release build and `--no-checks` clears a
@@ -82,17 +88,15 @@ The `scale_source` fixture of `test_modules.c` is unsigned for the same
 reason, and its byte-by-byte library changed in two bytes: the type of the
 constant and the opcode of `ret`.
 
-## Questions
+## A sweep for false positives
 
-1. The check of `/` and `%` by zero is emitted for every target, not for
-   ARM64 alone. x86_64 traps by itself, but the trap gives no file, line or
-   values. A target-dependent check would put the host that wrote a `.antl`
-   into it.
-2. A conversion is range-checked when both types are integers. `char` is a
-   Unicode scalar value with a rule of its own that nothing has decided, and
-   an enum's range is its set of names. Neither is checked.
+Every program of `tests/programs` was built in dev mode and run. One stops:
+`narrow_ops` adds 1 to an `i8` holding 127, which the suite runs in release
+to watch it wrap. The check is right and the program means it. No other
+program of the suite trips a check.
 
 ## State
 
 455 tests pass on the development Mac and none is skipped. The ASan and the
-UBSan builds run 454 each, without `no_paths`.
+UBSan builds run 454 each, without `no_paths`. Nothing of the section is left:
+bounds, overflow, conversions, division and shifts are all built.

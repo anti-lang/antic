@@ -1,0 +1,17 @@
+//! A surrogate is no Unicode scalar value, though it is below the last
+//! of them.
+
+fn opaque(n: u32) -> u32
+{
+	return n;
+}
+
+fn sink(c: char)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(55296) as char);
+	return 7;
+}

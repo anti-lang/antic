@@ -602,7 +602,7 @@ Not built yet.
 
 ## Checks and debugging
 
-In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted. `--checks`, `--asserts`, `--trace` and `-g` override.
+In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted. `--checks`, `--asserts`, `--trace` and `-g` override.
 
 ```anti
 trace class Renderer { }

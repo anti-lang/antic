@@ -76,9 +76,17 @@ every width. An unsigned source and a signed target need it only where the
 target is no wider. A target-sized type needs no case of its own, because the
 round trip passes wherever the conversion turns into a copy.
 
+Conversions to `char` and to an enum replace the two tests with one of their
+own, in `scalar_check` and `enum_check`. A `char` must be at most `0x10FFFF`
+and outside the surrogates, which is one unsigned comparison and one more on
+the value less `0xD800`. An enum value must be one the enum declares, which is
+one comparison per name joined by `or`. `integer_form` gives the type a value
+converts as, since an enum converts as its base type, and `enum_value` extends
+the sign of a declared value whose base type is signed.
+
 Division. The divisor is compared against zero before the operation, so a
 divisor of zero never reaches the instruction. The check is emitted for every
-target, not for ARM64 alone, because the IR is target-independent.
+target, x86_64 included, whose own trap is a signal with no message.
 
 Shifts. The count widens to 64 bits by the signedness of the type and is
 compared, unsigned, against the width. The width is `size_of` the type times

@@ -73,6 +73,12 @@ check(narrow "out of range"
       "narrow\\.anti:[0-9]+: value out of range for i8: value 300" ON)
 check(narrow_sign "out of range"
       "narrow_sign\\.anti:[0-9]+: value out of range for u64: value -1" ON)
+check(narrow_char "out of range"
+      "narrow_char\\.anti:[0-9]+: value out of range for char: value 1114112" ON)
+check(narrow_surrogate "out of range"
+      "narrow_surrogate\\.anti:[0-9]+: value out of range for char: value 55296" ON)
+check(narrow_enum "not declared by"
+      "narrow_enum\\.anti:[0-9]+: value not declared by Kind: value 7" ON)
 check(divide "division by zero"
       "divide\\.anti:[0-9]+: division by zero in /: left 10" OFF)
 check(remainder "division by zero"

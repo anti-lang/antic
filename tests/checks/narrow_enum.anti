@@ -1,0 +1,18 @@
+//! A value converted to an enum must be one the enum declares.
+
+enum Kind: u8 { Circle, Square, Line }
+
+fn opaque(n: u8) -> u8
+{
+	return n;
+}
+
+fn sink(k: Kind)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(7) as Kind);
+	return 7;
+}
