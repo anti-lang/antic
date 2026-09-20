@@ -649,6 +649,7 @@ site() {
     checkout=${ANTI_SITE:-}
     [ -n "$checkout" ] && [ -d "$checkout/.git" ] ||
         die "step 9: ANTI_SITE names no checkout of the site"
+    mkdir -p "$checkout/downloads"
     write_index "$checkout/downloads/index.toml"
     git -C "$checkout" add downloads/index.toml
     git -C "$checkout" commit -q -m "Publish Anti $version" ||
@@ -698,8 +699,15 @@ HELLO
     (cd "$dist/verify" && "$home/bin/antic" hello.anti -o hello) ||
         die "step 10: the program did not compile for $host_target"
     [ "$("$dist/verify/hello")" = hello ] || die "step 10: the program printed nothing"
+    # A fresh install links for the four targets whose sysroot it
+    # carries. The C runtime of Windows is Microsoft's, and the
+    # installer takes it only from a user who accepts their licence.
     for target in $hosts; do
         [ "$target" != "$host_target" ] || continue
+        if [ ! -d "$home/sysroot/$target" ]; then
+            say "$target waits for the C runtime of Microsoft, which this install left out"
+            continue
+        fi
         (cd "$dist/verify" && "$home/bin/antic" --target "$target" hello.anti \
             -o "hello-$target") || die "step 10: nothing linked for $target"
         say "links for $target"
