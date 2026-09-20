@@ -36,9 +36,10 @@ without asking Eddie.
   why. No emoji, no trailers.
 - Warnings are errors. `CMakeLists.txt` sets `-Wall -Wextra -Wpedantic -Werror`
   and `/W4 /WX`. The build produces zero warnings on clang, gcc and MSVC.
-- A commit that changes only files under `docs/` or `CLAUDE.md` runs the
-  docs-style checker and nothing else. That covers reports and notes. A push
-  made only of such commits needs no suite.
+- A commit that changes only files under `docs/`, or `CLAUDE.md`, `README.md`
+  or `CHANGELOG.md`, runs the docs-style checker and nothing else. That covers
+  reports and notes. Prose is prose wherever it sits. A push made only of such
+  commits needs no suite.
 - A commit that changes anything else runs the full suite on the host first.
   A push that includes such a commit runs both sanitizer suites first, once
   per push and not once per commit. `cmake --preset asan` and `cmake --preset
