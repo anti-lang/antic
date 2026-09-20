@@ -4604,15 +4604,60 @@ static void destroy_value(struct lowerer *l, struct ir_operand p,
 static void destroy_array(struct lowerer *l, struct ir_operand base,
                           const struct type *t, bool replaced);
 static struct ir_block *when_made(struct lowerer *l, struct ir_operand p);
+static bool is_handled_call(const struct expr *e);
+
+/* DESIGN: `*p = try f();` gives the call the address of the place it
+   assigns to. The place is read once, before the call, so a target that
+   computes an address runs its parts exactly once. Nothing is cleared
+   first: the place holds a value, and the `=` the callee runs destroys
+   it, as in every other assignment.
+
+   Three targets have no address to hand over. A place the back end keeps
+   in a temporary has none, and a bitfield has none. A compound
+   assignment wants the operand in the place, not the result. Each of
+   them takes a slot of the frame instead, and the value moves from there
+   into the place. All three are scalars, so the slot needs no zero
+   table. A local of an aggregate type has a place of its own, and a
+   bitfield is an integer. */
+static struct ir_operand call_into_slot(struct lowerer *l,
+                                        const struct expr *call,
+                                        const struct place *p)
+{
+    struct ir_operand out =
+        temp(l, ir_slot(l->f, l->b, vtype_of(l, call->type)));
+    struct ir_operand err;
+
+    l->out_address = out;
+    err = lower_call(l, call);
+    if (l->failed) {
+        return none();
+    }
+    handle_error(l, call, err, out, true, none());
+    return temp(l, ir_load(l->f, l->b, p->type, out));
+}
 
 static void lower_assign(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *target = s->as.assign.target;
+    const struct expr *value = s->as.assign.value;
+    bool handled = is_handled_call(value) && value->as.call.out != NULL;
     struct place p;
     struct ir_operand old = none();
     struct ir_operand v;
 
     if (!lower_place(l, target, &p)) {
+        return;
+    }
+    /* The place itself is the out parameter of the call that fills it. */
+    if (handled && !p.in_temp && !p.bitfield &&
+        s->as.assign.op == TOKEN_ASSIGN) {
+        struct ir_operand err;
+        l->out_address = p.address;
+        err = lower_call(l, value);
+        if (l->failed) {
+            return;
+        }
+        handle_error(l, value, err, p.address, true, none());
         return;
     }
     /* DESIGN: `=` into a place that holds a value needing a teardown
@@ -4622,7 +4667,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
        holds no value, and nothing is destroyed. The zero-table trap is for
        use, not for assignment into. */
     if (is_aggregate(target->type)) {
-        v = lower_address(l, s->as.assign.value);
+        v = lower_address(l, value);
         if (l->failed) {
             return;
         }
@@ -4639,7 +4684,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     if (s->as.assign.op != TOKEN_ASSIGN) {
         old = read_place(l, &p);
     }
-    v = lower_expr(l, s->as.assign.value);
+    v = handled ? call_into_slot(l, value, &p) : lower_expr(l, value);
     if (l->failed) {
         return;
     }

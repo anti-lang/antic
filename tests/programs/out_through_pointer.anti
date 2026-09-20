@@ -1,0 +1,31 @@
+//! `*out = try f();` stores the result of a failing call through a
+//! pointer. The out pointer the compiler supplies for that call is the
+//! pointer's target, read once before the call, so the callee writes
+//! where the program asked. Binding the result to a local first is the
+//! same program and was the only form that ran.
+
+import anti.error;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn inner(out: *int) -> ?*error.Error
+{
+	*out = 42;
+	return none;
+}
+
+fn outer(out: *int) -> ?*error.Error
+{
+	*out = try inner();
+	return none;
+}
+
+fn main() -> int
+{
+	let n = outer() catch fatal;
+	printf("n %d\n".ptr, n as c_int);
+	if n != 42 {
+		return 1;
+	}
+	return 0;
+}

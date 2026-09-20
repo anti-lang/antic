@@ -1,0 +1,99 @@
+//! Every place a failing call writes its result into, beside the `*p`
+//! of out_through_pointer.anti. A local the back end keeps in a
+//! temporary, a bitfield and a compound assignment have no address to
+//! give the call, so it writes a slot of its own and the value moves
+//! from there into the place.
+
+import anti.error;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Flags
+{
+	layer: u32 : 4,
+	pad: u32 : 28,
+}
+
+struct Pair
+{
+	left: int,
+	right: int,
+}
+
+fn value(n: int, out: *int) -> ?*error.Error
+{
+	if n < 0 {
+		return error.Error.new(1, "n is negative");
+	}
+	*out = n;
+	return none;
+}
+
+fn small(out: *u32) -> ?*error.Error
+{
+	*out = 9;
+	return none;
+}
+
+fn places(out: *int) -> ?*error.Error
+{
+	let n = 0;
+	let numbers: [4]int = [0; 4];
+	let pair = Pair { left: 0, right: 0 };
+	let flags = Flags { layer: 1, pad: 0 };
+
+	n = try value(5);
+	numbers[2] = try value(7);
+	pair.right = try value(11);
+	flags.layer = try small();
+	n += try value(13);
+	printf("places %d %d %d %d\n".ptr, n as c_int, numbers[2] as c_int,
+		pair.right as c_int, flags.layer as c_int);
+	*out = n + numbers[2] + pair.right + flags.layer as int;
+	return none;
+}
+
+/// The error of a call in assignment position reaches the caller.
+fn fails(out: *int) -> ?*error.Error
+{
+	let n = 0;
+	n = try value(-1);
+	*out = n;
+	return none;
+}
+
+fn made(out: *Pair) -> ?*error.Error
+{
+	*out = Pair { left: 3, right: 4 };
+	return none;
+}
+
+/// A value of an aggregate type through `*out`, the form anti.os writes.
+fn passed_on(out: *Pair) -> ?*error.Error
+{
+	*out = try made();
+	return none;
+}
+
+fn main() -> int
+{
+	let total = places() catch fatal;
+	let n = fails() catch e {
+		printf("caught %d\n".ptr, e.code as c_int);
+		yield 0;
+	};
+	let pair = passed_on() catch fatal;
+
+	printf("total %d n %d pair %d %d\n".ptr, total as c_int, n as c_int,
+		pair.left as c_int, pair.right as c_int);
+	if total != 45 {
+		return 1;
+	}
+	if n != 0 {
+		return 2;
+	}
+	if pair.left != 3 || pair.right != 4 {
+		return 3;
+	}
+	return 0;
+}
