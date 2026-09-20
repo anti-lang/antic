@@ -193,8 +193,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 477 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 476 each, without the `no_paths` test, which needs a
+- 478 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 477 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -205,6 +205,11 @@ reports what it finished.
   of an `extern fn` is `?*T`. A failing function returns `?*Error`.
 - Anti 0.1.0 installs with one command, and all six packages are published under
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
+- `./r` makes a release, in eleven steps from a pushed `main` to the published
+  download. The version stands in `tools/version` and its entry in
+  `CHANGELOG.md`. `./r --dry-run` runs the first five steps and prints a plan
+  for the rest. See `docs/work-order-release-script.md`, and its decisions
+  under "The release script" in `docs/decisions.md`.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
   only. It has never run.
 - The `anti` tool holds `sdk export`, `sdk import` and `test`, and nothing else

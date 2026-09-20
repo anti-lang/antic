@@ -16,6 +16,9 @@
 # Each question takes yes or no from a variable of its own name.
 #
 #   ANTI_VERSION: the version to install, default the newest.
+#   ANTI_BASE: where the packages are served from, default anti-lang.com.
+#              A release checks its own packages through it, before they
+#              are published, with a file:// prefix of a local directory.
 #   ANTI_ARCH: arm64 or x86_64, default the processor of this machine.
 #   ANTI_HOME: where to install, default $HOME/.anti, and
 #              $HOME/.anti-<cpu> for the package of another processor.
@@ -24,7 +27,7 @@
 #   ANTI_MICROSOFT: let xwin fetch the CRT and the Windows SDK.
 set -eu
 
-base=https://anti-lang.com/downloads/resources
+base=${ANTI_BASE:-https://anti-lang.com/downloads/resources}
 
 # DESIGN: the installer carries the public key that checks SHA256SUMS.sig of
 # the LLVM tools, and the package carries none. anti-lang.com serves this

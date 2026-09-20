@@ -14,6 +14,10 @@
 # on its command line instead, because iex passes no arguments.
 #
 #   ANTI_VERSION    the version to install, default the newest
+#   ANTI_BASE       where the packages are served from, default
+#                   anti-lang.com. A release checks its own packages
+#                   through it, before they are published, with a local
+#                   directory or a file:// prefix
 #   ANTI_ARCH       arm64 or x86_64, default the processor of this machine
 #   ANTI_HOME       where to install, default $HOME\.anti, and
 #                   $HOME\.anti-<cpu> for another processor
@@ -21,7 +25,28 @@
 #   ANTI_PATH       yes or no to the entry in the PATH of the account
 $ErrorActionPreference = "Stop"
 
-$base = "https://anti-lang.com/downloads/resources"
+$base = if ($env:ANTI_BASE) { $env:ANTI_BASE } else { "https://anti-lang.com/downloads/resources" }
+
+# Read one file of the download area. A base that names a directory of
+# this machine is copied rather than fetched, which is how a release
+# checks its packages before anyone can download them.
+function Get-AntiFile($source, $destination) {
+    if ($source -match '^file://') {
+        Copy-Item ($source -replace '^file:///?', '') $destination -Force
+    } elseif ($source -match '^[A-Za-z]:\\|^\\\\') {
+        Copy-Item $source $destination -Force
+    } else {
+        Invoke-WebRequest $source -OutFile $destination
+    }
+}
+
+function Get-AntiText($source) {
+    $work_file = [System.IO.Path]::GetTempFileName()
+    Get-AntiFile $source $work_file
+    $text = Get-Content $work_file -Raw
+    Remove-Item $work_file -Force
+    return $text
+}
 
 # DESIGN: the installer carries the public key that checks SHA256SUMS.sig of
 # the LLVM tools, and the package carries none. anti-lang.com serves this
@@ -92,7 +117,7 @@ if ($arch -eq $native) {
 }
 
 if (-not $version) {
-    $version = (Invoke-RestMethod "$base/anti/latest").Trim()
+    $version = (Get-AntiText "$base/anti/latest").Trim()
 }
 $asset = "anti-$version-$host_name.tar.xz"
 $work = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
@@ -100,8 +125,8 @@ New-Item -ItemType Directory -Force $work | Out-Null
 
 try {
     Say "downloading $asset"
-    Invoke-WebRequest "$base/anti/$version/$asset" -OutFile "$work\$asset"
-    $sums = Invoke-RestMethod "$base/anti/$version/SHA256SUMS"
+    Get-AntiFile "$base/anti/$version/$asset" "$work\$asset"
+    $sums = Get-AntiText "$base/anti/$version/SHA256SUMS"
     $want = ($sums -split "`n" | Where-Object { $_ -match [regex]::Escape($asset) }) -split "\s+" | Select-Object -First 1
     $got = (Get-FileHash "$work\$asset" -Algorithm SHA256).Hash.ToLower()
     if ($want -ne $got) { Fail "$asset has SHA-256 $got, expected $want" }

@@ -147,9 +147,10 @@ add_test(NAME workflows_dispatch_only
         "-DWORKFLOWS=${PROJECT_SOURCE_DIR}/.github/workflows"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_workflows.cmake")
 
+# The version stands in tools/version alone, and antic prints that one.
 add_test(NAME antic_version COMMAND antic --version)
 set_tests_properties(antic_version PROPERTIES
-    PASS_REGULAR_EXPRESSION "^antic [0-9]+\\.[0-9]+\\.[0-9]+")
+    PASS_REGULAR_EXPRESSION "^antic ${PROJECT_VERSION}\n")
 
 # The host target name has two spellings: ANTIC_HOST_TARGET here and the
 # detection in src/target.c. This test fails when they disagree.
@@ -539,6 +540,18 @@ add_test(NAME line_endings
 add_test(NAME installer_options
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_installer_options.cmake")
+
+# ./r on a copy of the tree, with the build, the packer and the two VMs
+# stood in for on the PATH. It checks the order of the steps, the output
+# of each and the refusals of the preflight.
+add_test(NAME release_dry_run
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DCC=${CMAKE_C_COMPILER}"
+            "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_dry_run.cmake")
+set_tests_properties(release_dry_run PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
     add_library(abi_raymath OBJECT abi/raymath.c)

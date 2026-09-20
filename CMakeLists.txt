@@ -4,8 +4,13 @@ cmake_minimum_required(VERSION 3.21)
 # ANTIC_SYSTEM_COMPILER is on. The file downloads it and the LLVM tools.
 include(tools/pinned-compiler.cmake)
 
+# The version of Anti is written in tools/version and nowhere else. The
+# packer and the release script read the same file.
+file(STRINGS tools/version ANTIC_VERSION_LINE LIMIT_COUNT 1)
+string(STRIP "${ANTIC_VERSION_LINE}" ANTIC_VERSION_LINE)
+
 project(antic
-    VERSION 0.1.0
+    VERSION ${ANTIC_VERSION_LINE}
     DESCRIPTION "Compiler for the Anti language"
     LANGUAGES C)
 

@@ -109,6 +109,25 @@ disagree, or that holds a file the manifest does not name. It then sends the fil
 the manifest last, and reads the digests back over ssh. `CHECK_ONLY` runs the checks and
 sends nothing.
 
+### The release script
+
+`./r` in the root of the repository makes a release. It reads the version from
+`tools/version` and its entry from `CHANGELOG.md`. It runs the suite of the Mac
+and the two sanitizer suites in an export of the commit, packs the six hosts,
+writes the symbols archives and checks the packages on both VMs. It then signs
+`SHA256SUMS` with the release key, tags the commit and uploads the assets to a
+GitHub release. It runs the runner matrix once, writes `downloads/index.toml`
+for anti-lang.com and installs the result from outside. `./r --dry-run` performs the
+first five steps and prints what the rest would do.
+
+The site's repository takes the index alone. It names the version, the six
+packages with their digests, the URLs of the release assets and the fingerprint
+of the public key. The site's build publishes the files it names under the
+download base. Nothing binary is committed to the site.
+
+`docs/work-order-release-script.md` holds the eleven steps, and
+`docs/decisions.md` holds the decisions under "The release script".
+
 ### After publishing a package
 
 A package is accepted when a machine of that host installs it from the site and links
