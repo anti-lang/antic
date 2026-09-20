@@ -377,13 +377,23 @@ foreach(name packages/SHA256SUMS.sig state/06-digests state/07-release)
     endif()
 endforeach()
 foreach(line "would sign" "would tag v${version}" "would create the release"
+        "would upload 13 files" "would upload no SHA256SUMS.sig"
         "would run the workflow" "would rsync tools/install.sh"
-        "would rsync the downloads page" "keys/release.pem" "would install")
+        "would rsync the downloads page" "would rsync SHA256SUMS.sig"
+        "keys/release.pem" "would install")
     if(NOT out MATCHES "${line}")
         message(FATAL_ERROR "the dry run does not say what it would do: "
                             "`${line}` is missing\n${out}${err}")
     endif()
 endforeach()
+
+# DESIGN: the assets of the release are the twelve files and the manifest.
+# The signature stands on the site, so the plan of step 7 names it only to
+# say that it stays off GitHub.
+if(out MATCHES "would upload 14 files")
+    message(FATAL_ERROR "step 7 still uploads the signature to the host that "
+                        "serves the binaries\n${out}")
+endif()
 
 # A version that is a tag is published, and a second run refuses it.
 run("the tag failed" "${GIT}" -C "${copy}" tag "v${version}")

@@ -1,13 +1,15 @@
-# The installers take the package, SHA256SUMS and SHA256SUMS.sig from the
-# GitHub release of the tag, and anti-lang.com serves no binary. The test
-# stands a fake release area on disk, signs its manifest with a key of its
-# own and runs the installer against a copy of itself that carries the
-# public half, because the private key of the release is not in this
-# repository.
+# The installers take the package and SHA256SUMS from the GitHub release
+# of the tag, and SHA256SUMS.sig from anti-lang.com. The two halves of a
+# release stand on two hosts, so a forged release needs both. The test
+# stands a fake release area and a fake site on disk, signs the manifest
+# with a key of its own and runs the installer against a copy of itself
+# that carries the public half, because the private key of the release is
+# not in this repository.
 #
 #   cmake -DROOT=<repository> -DWORK=<dir> -P tests/run_installer_github.cmake
 
-# The three lines of tools/release-base, which both installers carry.
+# The lines of tools/release-base and tools/site-base, which both
+# installers carry.
 file(READ "${ROOT}/tools/release-base" pins)
 foreach(key repository download api)
     if(NOT pins MATCHES "(^|\n)${key}=([^\n]+)")
@@ -19,6 +21,21 @@ string(REPLACE "@REPOSITORY@" "${pin_repository}" pin_download "${pin_download}"
 string(REPLACE "@REPOSITORY@" "${pin_repository}" pin_api "${pin_api}")
 string(REPLACE "/@TAG@" "" pin_download "${pin_download}")
 
+file(READ "${ROOT}/tools/site-base" site_pins)
+foreach(key site signature key)
+    if(NOT site_pins MATCHES "(^|\n)${key}=([^\n]+)")
+        message(FATAL_ERROR "tools/site-base names no ${key}")
+    endif()
+    set("site_${key}" "${CMAKE_MATCH_2}")
+endforeach()
+string(REPLACE "@SITE@" "${site_site}" site_signature "${site_signature}")
+string(REPLACE "@SITE@" "${site_site}" site_key "${site_key}")
+# The directory of the signature under the webroot, without the version of
+# one release. The fake site of this test holds the same shape.
+string(REPLACE "/@VERSION@/SHA256SUMS.sig" "" site_signature_root
+       "${site_signature}")
+string(REPLACE "${site_site}/" "" signature_dir "${site_signature_root}")
+
 # DESIGN: a release is published once, to the GitHub release of its tag.
 # The two installers stand on the site and cannot read a file of the
 # repository, so each carries the address. This test is the seam: a move
@@ -26,7 +43,8 @@ string(REPLACE "/@TAG@" "" pin_download "${pin_download}")
 # that kept the old one fails here.
 foreach(installer install.sh install.ps1)
     file(READ "${ROOT}/tools/${installer}" text)
-    foreach(name "${pin_download}" "${pin_api}" ANTI_GITHUB ANTI_BASE)
+    foreach(name "${pin_download}" "${pin_api}" "${site_site}"
+            ANTI_GITHUB ANTI_SITE_BASE ANTI_BASE)
         string(FIND "${text}" "${name}" found)
         if(found EQUAL -1)
             message(FATAL_ERROR "tools/${installer} does not name `${name}`, "
@@ -134,12 +152,16 @@ endif()
 string(REGEX REPLACE "${block}" "${public}" installer "${installer}")
 file(WRITE "${WORK}/install.sh" "${installer}")
 
-# Sign the manifest the way step 6 of ./r signs it.
+# Sign the manifest the way step 6 of ./r signs it, and publish the
+# signature on the fake site rather than beside the package. Step 9 puts
+# it under <webroot>/${signature_dir}/<version>/.
+set(site_area "${WORK}/site/${signature_dir}/${version}")
+file(MAKE_DIRECTORY "${site_area}")
 run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
     -out "${WORK}/SHA256SUMS.sha256" "${area}/SHA256SUMS")
 run("openssl signed nothing" "${OPENSSL}" pkeyutl -sign
     -inkey "${WORK}/private.pem" -in "${WORK}/SHA256SUMS.sha256"
-    -out "${area}/SHA256SUMS.sig")
+    -out "${site_area}/SHA256SUMS.sig")
 
 # Run the installer into a directory of its own, against the fake release
 # area, and answer every question with no. ANTI_VERSION stays unset, so
@@ -152,6 +174,7 @@ function(install_run name out_variable log_variable)
                 "PATH=${cmake_dir}:$ENV{PATH}"
                 "ANTI_GITHUB=file://${WORK}/github"
                 "ANTI_GITHUB_API=file://${WORK}/github/latest.json"
+                "ANTI_SITE_BASE=file://${WORK}/site"
                 "ANTI_HOME=${home}"
                 ANTI_REPLACE=yes ANTI_PATH=no ANTI_MICROSOFT=no
                 ${ARGN}
@@ -178,6 +201,25 @@ endif()
 if(NOT "${log}" MATCHES "signature")
     message(FATAL_ERROR "the installer says nothing of the signature\n${log}")
 endif()
+if(NOT "${log}" MATCHES "${WORK}/site")
+    message(FATAL_ERROR "the installer did not name the site it read the "
+                        "signature from\n${log}")
+endif()
+
+# DESIGN: the signature never comes from the host that serves the
+# binaries. A release whose signature stands on GitHub alone is refused,
+# even when that signature is the right one over the right manifest.
+file(RENAME "${site_area}/SHA256SUMS.sig" "${area}/SHA256SUMS.sig")
+install_run(github_signature failed log)
+if(failed EQUAL 0)
+    message(FATAL_ERROR "the installer took a signature from the release that "
+                        "holds the binaries\n${log}")
+endif()
+if(NOT "${log}" MATCHES "SHA256SUMS.sig")
+    message(FATAL_ERROR "the installer stopped for another reason than the "
+                        "missing signature\n${log}")
+endif()
+file(RENAME "${area}/SHA256SUMS.sig" "${site_area}/SHA256SUMS.sig")
 
 # A version the caller names reaches the same release and asks the API
 # nothing. The answer of the API is moved away, so a run that reads it
@@ -207,11 +249,15 @@ file(WRITE "${area}/SHA256SUMS" "${manifest}")
 # packer writes, and the version with it.
 set(staging "${WORK}/staging/anti/${version}")
 file(MAKE_DIRECTORY "${staging}")
-foreach(name "${asset}" SHA256SUMS SHA256SUMS.sig)
+foreach(name "${asset}" SHA256SUMS)
     file(COPY "${area}/${name}" DESTINATION "${staging}")
 endforeach()
+file(COPY "${site_area}/SHA256SUMS.sig" DESTINATION "${staging}")
+# The site publishes nothing of a release that step 6 has not signed yet,
+# so a staging area carries its own signature and this run reads no site.
 install_run(staging failed log "ANTI_BASE=file://${WORK}/staging"
-            "ANTI_VERSION=${version}")
+            "ANTI_VERSION=${version}"
+            "ANTI_SITE_BASE=file://${WORK}/no-site")
 if(NOT failed EQUAL 0)
     message(FATAL_ERROR "the installer refused the staging area of a "
                         "release\n${log}")

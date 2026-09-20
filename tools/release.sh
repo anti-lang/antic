@@ -34,7 +34,16 @@ version=$(sed -n '1p' "$root/tools/version" | tr -d ' \r\n')
 tag=v$version
 hosts='macos-arm64 macos-x86_64 linux-x86_64 linux-arm64 windows-x86_64 windows-arm64'
 cpu_levels=$root/tools/cpu-levels
-site_base=$(grep -v '^#' "$root/tools/site-base" | tr -d ' \r\n')
+site_row() {
+    sed -n "s/^$1=//p" "$root/tools/site-base" | tr -d ' \r\n'
+}
+site_base=$(site_row site)
+signature_url=$(site_row signature |
+    sed "s|@SITE@|$site_base|g; s|@VERSION@|$version|g")
+key_url=$(site_row key | sed "s|@SITE@|$site_base|g")
+# The paths under the webroot, which is what the site serves.
+signature_path=${signature_url#"$site_base/"}
+key_path=${key_url#"$site_base/"}
 
 dry_run=no
 skip_vms=no
@@ -722,8 +731,13 @@ repository() {
         sed -E 's|^.*[:/]([^/]+/[^/]+)$|\1|' | sed -E 's|\.git$||'
 }
 
-# Step 7. The signed tag, and the release with its twelve assets and
-# the two files of the manifest.
+# Step 7. The signed tag, and the release with its twelve assets and the
+# manifest that names them.
+#
+# DESIGN: SHA256SUMS.sig stays off the release. The binaries and the
+# signature that covers them live on two hosts, so a forged release needs
+# both. Step 9 publishes the signature on anti-lang.com, and both
+# installers read it from there.
 tag_and_release() {
     pre=""
     [ "$skip_vms" = no ] || pre=" as a pre-release, since step 5 did not run"
@@ -731,7 +745,9 @@ tag_and_release() {
         printf 'r: step 7, the tag and the release\n'
         say "would tag $tag on $(git -C "$root" rev-parse --short HEAD) and push it"
         say "would create the release $tag of $(repository)$pre"
-        say "would upload 14 files, the body from the entry of CHANGELOG.md"
+        say "would upload 13 files, the six packages, the six symbols archives and SHA256SUMS"
+        say "would upload no SHA256SUMS.sig, which step 9 publishes on the site"
+        say "the body of the release is the entry of CHANGELOG.md"
         return 0
     fi
     starts 07 release "the tag and the release" || return 0
@@ -752,7 +768,7 @@ tag_and_release() {
     gh release create "$tag" --repo "$(repository)" --verify-tag $draft \
         --title "Anti $version" --notes-file "$work/notes.md" > /dev/null ||
         die "step 7: gh wrote no release"
-    for file in $(release_files) "$packages/SHA256SUMS" "$packages/SHA256SUMS.sig"; do
+    for file in $(release_files) "$packages/SHA256SUMS"; do
         gh release upload "$tag" "$file" --repo "$(repository)" ||
             die "step 7: the upload of $file failed, and $tag stays a draft"
         say "uploaded $(basename "$file")"
@@ -819,6 +835,7 @@ write_page() {
             -e "s|@TAG@|$tag|g" \
             -e "s|@RELEASED@|$(date -u '+%Y-%m-%d')|g" \
             -e "s|@RELEASE@|https://github.com/$(repository)/releases/tag/$tag|g" \
+            -e "s|@SIGNATURE@|$signature_url|g" \
             -e "s|@FINGERPRINT@|$(key_fingerprint)|g" > "$1"
 }
 
@@ -826,23 +843,30 @@ write_page() {
 # host that serves anti-lang.com. It carries no git clone and no build, so
 # the files are rsynced as they are.
 #
-# DESIGN: nothing binary reaches the site. The packages, SHA256SUMS and
-# SHA256SUMS.sig are assets of the GitHub release, and the public key that
-# checks the manifest stands here. The two halves are on two hosts, and a
-# host that is taken holds one of them. Mirroring the packages to the site
-# would put both in one place and prove nothing.
+# DESIGN: nothing binary reaches the site, and the signature of the
+# manifest reaches nothing else. The GitHub release holds the packages,
+# the symbols archives and SHA256SUMS. This host holds SHA256SUMS.sig and
+# the public key beside the two installers and the downloads page. A
+# forged release therefore needs both hosts. Whoever takes GitHub changes
+# binaries that the signature no longer covers. Whoever takes this host
+# signs nothing, because the private key is on neither. A signature stored
+# beside the binaries it covers would leave the private key as the only
+# thing between an attacker and a release.
 #
 # The mode is spelled for openrsync, which macOS ships as rsync and which
 # refuses --chmod=F640 and --chmod=0640. The webroot is setgid, so a file
 # rsynced into it keeps the group of the server.
 site() {
     page=$dist/downloads-index.html
+    signature=$packages/SHA256SUMS.sig
     if [ "$dry_run" = yes ]; then
         printf 'r: step 9, the site\n'
         write_page "$page"
         say "would rsync tools/install.sh and tools/install.ps1 to ${ANTI_SITE:-\$ANTI_SITE}/"
         say "would rsync the downloads page to ${ANTI_SITE:-\$ANTI_SITE}/downloads/index.html"
-        say "would read $site_base/keys/release.pem and compare it with keys/release.pem"
+        say "would rsync SHA256SUMS.sig to ${ANTI_SITE:-\$ANTI_SITE}/$signature_path"
+        say "would rsync keys/release.pem to ${ANTI_SITE:-\$ANTI_SITE}/$key_path"
+        say "would read $signature_url and $key_url back"
         say "would send nothing else, and no binary"
         say "the page it would publish stands in $page"
         return 0
@@ -851,6 +875,8 @@ site() {
     destination=${ANTI_SITE:-}
     [ -n "$destination" ] ||
         die "step 9: ANTI_SITE names no webroot of the site"
+    [ -f "$signature" ] ||
+        die "step 9: $signature is missing, and the site serves the signature of a release"
     write_page "$page"
     rsync --chmod=u=rw,g=r,o= "$root/tools/install.sh" \
         "$root/tools/install.ps1" "$destination/" ||
@@ -860,15 +886,42 @@ site() {
         die "step 9: the downloads page did not reach $destination"
     say "the downloads page of $version stands in $destination/downloads"
 
-    # The key the installers carry is the key the site serves. A user who
-    # wants a second source of it fetches this URL. A release reads it
-    # rather than trusting that an earlier one put it there.
+    # DESIGN: the signature of this version goes in a directory of its
+    # own. The signature of every release then stays fetchable, and an
+    # installer of an older version keeps working. openrsync has no
+    # --mkpath, so the directory is made over ssh first.
+    site_host=${destination%%:*}
+    site_root=${destination#*:}
+    ssh -n -o BatchMode=yes "$site_host" \
+        "mkdir -p '$site_root/$(dirname "$signature_path")'" ||
+        die "step 9: $site_host made no directory for the signature"
+    rsync --chmod=u=rw,g=r,o= "$signature" "$destination/$signature_path" ||
+        die "step 9: SHA256SUMS.sig did not reach $destination"
+    say "SHA256SUMS.sig of $version stands in $destination/$signature_path"
+    rsync --chmod=u=rw,g=r,o= "$root/keys/release.pem" \
+        "$destination/$key_path" ||
+        die "step 9: keys/release.pem did not reach $destination"
+
+    # The two files a user's installer reads from here, read back over
+    # HTTPS. A release proves them rather than trusting that an earlier
+    # one put them there.
     mkdir -p "$work"
-    curl -fsSL "$site_base/keys/release.pem" > "$work/site-key.pem" ||
-        die "step 9: $site_base/keys/release.pem answered nothing"
+    curl -fsSL "$key_url" > "$work/site-key.pem" ||
+        die "step 9: $key_url answered nothing"
     cmp -s "$work/site-key.pem" "$root/keys/release.pem" ||
-        die "step 9: the key at $site_base/keys/release.pem is not keys/release.pem"
-    say "$site_base/keys/release.pem is the public key of the release"
+        die "step 9: the key at $key_url is not keys/release.pem"
+    say "$key_url is the public key of the release"
+    curl -fsSL "$signature_url" > "$work/site-signature.sig" ||
+        die "step 9: $signature_url answered nothing"
+    cmp -s "$work/site-signature.sig" "$signature" ||
+        die "step 9: the signature at $signature_url is not the one of this release"
+    openssl dgst -sha256 -binary -out "$work/SHA256SUMS.sha256" \
+        "$packages/SHA256SUMS"
+    openssl pkeyutl -verify -pubin -inkey "$work/site-key.pem" \
+        -in "$work/SHA256SUMS.sha256" -sigfile "$work/site-signature.sig" \
+        > /dev/null 2>&1 ||
+        die "step 9: the signature of the site does not cover the manifest of the release"
+    say "the signature of the site covers SHA256SUMS of the GitHub release"
     finished 09 site
 }
 

@@ -5,11 +5,12 @@
 #   curl -fsSL https://anti-lang.com/install.sh | sh
 #   curl -fsSL https://anti-lang.com/install.sh | sh -s -- --intel  # docs-style:ignore
 #
-# It downloads the package of this host from the GitHub release of the
-# version. It checks the SHA-256 against the SHA256SUMS beside it, whose
-# signature it checks first, unpacks it and installs the sysroot of the
-# host. The SDK of macOS belongs to Apple and the C runtime of Windows to
-# Microsoft. The script asks before it takes either of them.
+# It downloads the package of this host and SHA256SUMS from the GitHub
+# release of the version, and SHA256SUMS.sig from anti-lang.com. It checks
+# the signature first, then the SHA-256 of the package against the
+# manifest, unpacks it and installs the sysroot of the host. The SDK of
+# macOS belongs to Apple and the C runtime of Windows to Microsoft. The
+# script asks before it takes either of them.
 #
 # The option --arm or --intel takes the package of that processor rather
 # than the one of this machine. A machine that emulates the other
@@ -30,6 +31,9 @@
 #              one on disk, and a fork names its own.
 #   ANTI_GITHUB_API: the latest-release API that names the newest version,
 #              default the one of anti-lang/antic.
+#   ANTI_SITE_BASE: the site that serves SHA256SUMS.sig, default
+#              anti-lang.com. The tests of the installer stand a fake one
+#              on disk.
 #   ANTI_STAGING: the base is the staging area of a release, whose
 #              manifest step 6 of ./r signs after the checks of step 5.
 #              It takes a manifest without a signature, and never one
@@ -47,16 +51,20 @@
 #   ANTI_MICROSOFT: let xwin fetch the CRT and the Windows SDK.
 set -eu
 
-# DESIGN: the packages, SHA256SUMS and SHA256SUMS.sig are assets of the
-# GitHub release of the tag. anti-lang.com serves text alone: the two
-# installers, the downloads page and the public key. The binaries and the
-# key that checks them therefore stand on two hosts, and whoever takes one
-# host holds one half. Mirroring the packages to the site would put both
-# halves in one place and answer nothing. tools/release-base of the
-# repository names these two addresses, and the test installer_github
-# pins them against this copy.
+# DESIGN: the two halves of a release stand on two hosts, and a forged
+# release needs both of them. The GitHub release of the tag holds the
+# packages, the symbols archives and SHA256SUMS. anti-lang.com holds
+# SHA256SUMS.sig, the public key, the two installers and the downloads
+# page. Whoever takes GitHub changes binaries the signature no longer
+# covers. Whoever takes the site signs nothing, because the private key
+# is on neither host. A signature stored beside the binaries it covers
+# would leave the private key as the only thing between an attacker and a
+# release. tools/release-base and tools/site-base of the repository name
+# these addresses, and the test installer_github pins them against this
+# copy.
 github=${ANTI_GITHUB:-https://github.com/anti-lang/antic/releases/download}
 github_api=${ANTI_GITHUB_API:-https://api.github.com/repos/anti-lang/antic/releases/latest}
+site=${ANTI_SITE_BASE:-https://anti-lang.com}
 base=${ANTI_BASE:-}
 
 # DESIGN: the installer carries the public key that checks SHA256SUMS.sig
@@ -126,12 +134,13 @@ sha256() {
 # DESIGN: SHA256SUMS says which bytes are the package, so no line of it is
 # read before openssl has checked SHA256SUMS.sig against the key above.
 # The digest of the download proves nothing on its own: whoever serves the
-# package serves the manifest beside it. A missing openssl therefore stops
-# the install here. It only warns for the LLVM tools, whose digest
-# tools/llvm-pin of the package carries as well.
+# package serves the manifest beside it. The signature comes from the
+# other host for that reason. openssl checks it against the key the
+# installer carries, never against one fetched beside it. A missing
+# openssl therefore stops the install here. It only warns for the LLVM
+# tools, whose digest tools/llvm-pin of the package carries as well.
 check_manifest() {
-    if curl -fsSL -o "$work/SHA256SUMS.sig" \
-        "$area/SHA256SUMS.sig" 2>/dev/null; then
+    if curl -fsSL -o "$work/SHA256SUMS.sig" "$signature" 2>/dev/null; then
         command -v openssl >/dev/null 2>&1 ||
             fail "openssl is missing, and without it SHA256SUMS.sig is no signature of anything"
         printf '%s\n' "$release_key" > "$work/release.pem"
@@ -141,7 +150,7 @@ check_manifest() {
             -in "$work/SHA256SUMS.sha256" -sigfile "$work/SHA256SUMS.sig" \
             >/dev/null 2>&1 ||
             fail "SHA256SUMS of $version carries no signature of the key of Anti"
-        say "SHA256SUMS carries the signature of the key of Anti"
+        say "SHA256SUMS carries the signature of the key of Anti, from ${signature%/*}"
         return 0
     fi
     case ${ANTI_STAGING:-no} in
@@ -149,7 +158,7 @@ check_manifest() {
         say "warning: the staging area of a release holds no SHA256SUMS.sig, so this installer checked the digest and not the signature"
         ;;
     *)
-        fail "$area holds no SHA256SUMS.sig, and an unsigned manifest names no package"
+        fail "$signature answered nothing, and an unsigned manifest names no package"
         ;;
     esac
 }
@@ -227,12 +236,16 @@ if [ -z "$version" ]; then
     [ -n "$version" ] || fail "$github_api names no newest version of Anti"
 fi
 
-# The assets of a release stand under its tag. A staging area of a release
-# holds the layout the packer writes, one directory per version.
+# The assets of a release stand under its tag, and the signature of the
+# manifest stands on the site. A staging area of a release holds both in
+# the layout the packer writes, one directory per version, because step 5
+# installs before step 9 publishes anything.
 if [ -n "$base" ]; then
     area=$base/anti/$version
+    signature=$area/SHA256SUMS.sig
 else
     area=$github/v$version
+    signature=$site/downloads/anti/$version/SHA256SUMS.sig
 fi
 asset=anti-$version-$host.tar.xz
 work=$(mktemp -d)

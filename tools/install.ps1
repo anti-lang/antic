@@ -3,12 +3,12 @@
 #   irm https://anti-lang.com/install.ps1 | iex
 #   $env:ANTI_ARCH = "x86_64"; irm https://anti-lang.com/install.ps1 | iex
 #
-# It downloads the package of this host from the GitHub release of the
-# version, checks its SHA-256 against the SHA256SUMS beside it, whose
-# signature it checks first, unpacks it and offers the sysroot of Windows.
-# The C runtime and the Windows SDK belong to Microsoft, so the script asks
-# before xwin fetches them. Unpacking uses tar.exe, which Windows 10 and
-# later carry.
+# It downloads the package of this host and SHA256SUMS from the GitHub
+# release of the version, and SHA256SUMS.sig from anti-lang.com. It checks
+# the signature first, then the SHA-256 of the package against the
+# manifest, unpacks it and offers the sysroot of Windows. The C runtime and
+# the Windows SDK belong to Microsoft, so the script asks before xwin
+# fetches them. Unpacking uses tar.exe, which Windows 10 and later carry.
 #
 # ANTI_ARCH takes the package of another processor, which Windows on ARM
 # runs under emulation. A copy of the file on disk takes --arm or --intel
@@ -28,6 +28,9 @@
 #                   fake one on disk, and a fork names its own
 #   ANTI_GITHUB_API the latest-release API that names the newest version,
 #                   default the one of anti-lang/antic
+#   ANTI_SITE_BASE  the site that serves SHA256SUMS.sig, default
+#                   anti-lang.com. The tests of the installer stand a fake
+#                   one on disk
 #   ANTI_STAGING    the base is the staging area of a release, whose
 #                   manifest step 6 of ./r signs after the checks of
 #                   step 5. It takes a manifest without a signature, and
@@ -44,15 +47,18 @@
 #   ANTI_PATH       yes or no to the entry in the PATH of the account
 $ErrorActionPreference = "Stop"
 
-# DESIGN: the packages, SHA256SUMS and SHA256SUMS.sig are assets of the
-# GitHub release of the tag, and anti-lang.com serves text alone: this
-# script, the downloads page and the public key. The binaries and the key
-# that checks them therefore stand on two hosts, and whoever takes one
-# host holds one half. tools/release-base of the repository names these
-# two addresses, and the test installer_github pins them against this
-# copy.
+# DESIGN: the two halves of a release stand on two hosts, and a forged
+# release needs both of them. The GitHub release of the tag holds the
+# packages, the symbols archives and SHA256SUMS. anti-lang.com holds
+# SHA256SUMS.sig, the public key, the two installers and the downloads
+# page. Whoever takes GitHub changes binaries the signature no longer
+# covers. Whoever takes the site signs nothing, because the private key is
+# on neither host. tools/release-base and tools/site-base of the
+# repository name these addresses, and the test installer_github pins them
+# against this copy.
 $github = if ($env:ANTI_GITHUB) { $env:ANTI_GITHUB } else { "https://github.com/anti-lang/antic/releases/download" }
 $github_api = if ($env:ANTI_GITHUB_API) { $env:ANTI_GITHUB_API } else { "https://api.github.com/repos/anti-lang/antic/releases/latest" }
+$site = if ($env:ANTI_SITE_BASE) { $env:ANTI_SITE_BASE } else { "https://anti-lang.com" }
 $base = $env:ANTI_BASE
 
 # Read one file of the download area. A base that names a directory of
@@ -203,9 +209,12 @@ if (-not $version) {
     $version = $found.Groups[1].Value
 }
 
-# The assets of a release stand under its tag. A staging area of a
-# release holds the layout the packer writes, one directory per version.
+# The assets of a release stand under its tag, and the signature of the
+# manifest stands on the site. A staging area of a release holds both in
+# the layout the packer writes, one directory per version, because step 5
+# installs before step 9 publishes anything.
 $area = if ($base) { "$base/anti/$version" } else { "$github/v$version" }
+$signature = if ($base) { "$area/SHA256SUMS.sig" } else { "$site/downloads/anti/$version/SHA256SUMS.sig" }
 $asset = "anti-$version-$host_name.tar.xz"
 $work = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Force $work | Out-Null
@@ -218,13 +227,15 @@ try {
     # DESIGN: SHA256SUMS says which bytes are the package, so no line of
     # it is read before openssl has checked SHA256SUMS.sig against the key
     # above. The digest of the download proves nothing on its own:
-    # whoever serves the package serves the manifest beside it. That is
-    # why a missing openssl stops the install here and only warns for the
-    # LLVM tools, whose digest tools/llvm-pin of the package carries as
-    # well.
+    # whoever serves the package serves the manifest beside it. The
+    # signature comes from the other host for that reason. openssl checks
+    # it against the key this file carries, never against one fetched
+    # beside it. That is why a missing openssl stops the install here and
+    # only warns for the LLVM tools, whose digest tools/llvm-pin of the
+    # package carries as well.
     $signed = $true
     try {
-        Get-AntiFile "$area/SHA256SUMS.sig" "$work\SHA256SUMS.sig"
+        Get-AntiFile $signature "$work\SHA256SUMS.sig"
     } catch {
         $signed = $false
     }
@@ -236,11 +247,11 @@ try {
         if (-not (Test-AntiSignature $openssl "$work\SHA256SUMS" "$work\SHA256SUMS.sig")) {
             Fail "SHA256SUMS of $version carries no signature of the key of Anti"
         }
-        Say "SHA256SUMS carries the signature of the key of Anti"
+        Say "SHA256SUMS carries the signature of the key of Anti, from $signature"
     } elseif ($env:ANTI_STAGING -match "^(y|Y|yes|Yes)$") {
         Say "warning: the staging area of a release holds no SHA256SUMS.sig, so this installer checked the digest and not the signature"
     } else {
-        Fail "$area holds no SHA256SUMS.sig, and an unsigned manifest names no package"
+        Fail "$signature answered nothing, and an unsigned manifest names no package"
     }
 
     $sums = Get-Content "$work\SHA256SUMS" -Raw

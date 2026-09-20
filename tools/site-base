@@ -1,5 +1,9 @@
 # The site of Anti, which serves text alone: the two installers, the
-# downloads page and the public key of the release. Step 9 of ./r publishes
-# that text, step 10 installs from it, and the binaries of a release are
-# assets of its GitHub release, which tools/release-base names.
-https://anti-lang.com
+# downloads page, the public key and the signature of the manifest of
+# every release. The binaries stand on the GitHub release that
+# tools/release-base names, and the signature never stands beside them.
+# Step 9 of ./r publishes this text, and both installers carry these three
+# addresses. The test installer_github pins their copies against this file.
+site=https://anti-lang.com
+signature=@SITE@/downloads/anti/@VERSION@/SHA256SUMS.sig
+key=@SITE@/keys/release.pem

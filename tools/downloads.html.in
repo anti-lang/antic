@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- The downloads page of anti-lang.com. Step 9 of ./r fills the marks
-     and rsyncs the page to the webroot. Every file it names is an asset
-     of the GitHub release, and the site serves none of them. -->
+     and rsyncs the page to the webroot. Every package it names is an
+     asset of the GitHub release, and this site serves none of them. It
+     serves the signature of the manifest and the public key. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -74,12 +75,16 @@
     <pre>irm https://anti-lang.com/install.ps1 | iex</pre>
 
     <h2>Packages</h2>
-    <p>The installer downloads the package of your platform from the
-      <a href="@RELEASE@">GitHub release of @TAG@</a>, checks the signature
-      of <code>SHA256SUMS</code> against the public key it carries and then
-      the digest of the package. The packages, the symbols archives,
-      <code>SHA256SUMS</code> and <code>SHA256SUMS.sig</code> are assets of
-      that release. This site serves no binary.</p>
+    <p>The installer downloads the package of your platform and
+      <code>SHA256SUMS</code> from the
+      <a href="@RELEASE@">GitHub release of @TAG@</a>, and
+      <a href="@SIGNATURE@"><code>SHA256SUMS.sig</code></a> from this site.
+      It checks the signature against the public key it carries, and then
+      the digest of the package against the manifest.</p>
+    <p>The two halves stand on two hosts on purpose. Whoever takes GitHub
+      changes binaries that the signature no longer covers. Whoever takes
+      this site signs nothing, because the private key is on neither host.
+      A release is genuine only when both agree.</p>
     <table>
       <thead>
         <tr><th>Target</th><th>Package</th><th>SHA-256</th></tr>
@@ -95,8 +100,9 @@
       <a href="/keys/release.pem">/keys/release.pem</a>, so a second source
       of it is one fetch away. Its SHA-256 fingerprint is:</p>
     <pre>@FINGERPRINT@</pre>
-    <p class="dim">The binaries and the key that checks them are served by
-      two different hosts on purpose. A host that is taken holds one half.</p>
+    <p class="dim">The key is the trust anchor of every Anti download.
+      The same key signs the LLVM tools of
+      <a href="https://github.com/anti-lang/llvm-tools">anti-lang/llvm-tools</a>.</p>
   </main>
 </body>
 </html>

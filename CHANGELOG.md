@@ -24,6 +24,7 @@ The first release of Anti.
   archive and a check at the start of every program.
 - `anti` holds `sdk export`, `sdk import` and `test`.
 - Six packages, one per host, with the installers of the two shells. The
-  packages, the symbols archives and the signed manifest are assets of the
-  GitHub release of the tag. anti-lang.com serves the installers, the
-  downloads page and the public key, and no binary.
+  packages, the symbols archives and `SHA256SUMS` are assets of the GitHub
+  release of the tag. anti-lang.com serves the installers, the downloads
+  page, `SHA256SUMS.sig` and the public key, and no binary. A forged
+  release needs both hosts.

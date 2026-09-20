@@ -164,14 +164,16 @@ ssh anti-windows %USERPROFILE%\test.cmd
 
 A user installs with `curl -fsSL https://anti-lang.com/install.sh | sh`, or with
 `irm https://anti-lang.com/install.ps1 | iex` on Windows. The site serves the installer
-and nothing binary. The package, `SHA256SUMS` and `SHA256SUMS.sig` come from the GitHub
-release of the newest tag, which the latest-release API names. That route is the default
-and needs no variable.
+and nothing binary. The package and `SHA256SUMS` come from the GitHub release of the
+newest tag, which the latest-release API names. `SHA256SUMS.sig` comes from the site,
+which is the other host. That route is the default and needs no variable.
 
 Step 5 of a release installs a package that is not published yet. It copies the staging
 directory of `build/dist/packages` to the machine and names it in `ANTI_BASE`, with
 `ANTI_VERSION` beside it, because a staging area names no newest version. The layout
-there is `<base>/anti/<version>/<file>`, which the packer writes. The run first reads the
+there is `<base>/anti/<version>/<file>`, which the packer writes. A staging area holds
+its own `SHA256SUMS.sig` when it has one, and the installer reads no site for it,
+because step 9 publishes nothing before the release exists. The run first reads the
 installer's refusal of a manifest without a signature, and then installs with
 `ANTI_STAGING=yes`, because step 6 signs the manifest after these checks.
 

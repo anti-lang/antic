@@ -25,12 +25,12 @@ Contents:
 ## Binary downloads
 
 The repository holds no binary, and neither does anti-lang.com. The binaries of a
-version are the assets of the GitHub release of its tag, under one layout.
+version are the assets of the GitHub release of its tag, under one layout. The
+signature of the manifest is not among them.
 
 ```text
 https://github.com/anti-lang/antic/releases/download/v<version>/<file>
 https://github.com/anti-lang/antic/releases/download/v<version>/SHA256SUMS
-https://github.com/anti-lang/antic/releases/download/v<version>/SHA256SUMS.sig
 ```
 
 - `tools/release-base` names the repository, that download prefix and the
@@ -41,10 +41,10 @@ https://github.com/anti-lang/antic/releases/download/v<version>/SHA256SUMS.sig
 - `<file>` names the component, the version and the target, as in
   `anti-0.1.0-macos-arm64.tar.xz`. The target names are the six of `--target`.
 - A release holds the six packages and the six symbols archives. `SHA256SUMS` names
-  all twelve, and `shasum -c` reads it. It is the manifest the release script signed,
-  and `SHA256SUMS.sig` stands beside it. Both installers read the signature against the key they
-  carry before they trust a line of the manifest. A signature that is missing or
-  wrong stops the install.
+  all twelve, and `shasum -c` reads it. It is the manifest the release script signed.
+  `SHA256SUMS.sig` stands on anti-lang.com, never here. Both installers read the
+  signature against the key they carry before they trust a line of the manifest. A
+  signature that is missing or wrong stops the install.
 - The newest version is the tag of the newest release, which the latest-release API
   names. `ANTI_VERSION` names another one, and `ANTI_BASE` points an installer at a
   staging area of a release instead, in the layout `<base>/anti/<version>/<file>` that
@@ -57,24 +57,45 @@ installing its pinned version.
 ### What the site serves
 
 anti-lang.com serves text alone, from the webroot that `ANTI_SITE` names. `tools/site-base`
-holds its address, today `https://anti-lang.com`.
+holds its address, today `https://anti-lang.com`, and the two paths below it.
 
 ```text
 https://anti-lang.com/install.sh
 https://anti-lang.com/install.ps1
 https://anti-lang.com/downloads/
+https://anti-lang.com/downloads/anti/<version>/SHA256SUMS.sig
 https://anti-lang.com/keys/release.pem
 ```
 
-Step 9 of a release rsyncs the two installers and the downloads page there over ssh.
-It then reads the key of the site against the one of the checkout. The page names every
-asset of the release by URL and carries its digest.
+Step 9 of a release rsyncs four files there over ssh: the two installers, the downloads
+page, `SHA256SUMS.sig` of the version and `keys/release.pem`. It then reads the
+signature and the key back over HTTPS, and checks that the signature covers the
+manifest of the GitHub release. The page names every asset of the release by URL and
+carries its digest. The signature of a version keeps its own directory, so the
+installer of an older version still finds the signature of that version.
 
-The binaries and the public key that checks them are therefore served by two hosts,
-and whoever takes one host holds one half. A mirror of the packages on the site would
-put both halves in one place and answer nothing. Eddie decided this on 2026-09-20, and
-it replaces the download area under `downloads/resources` that this document described
-before.
+### Why the two halves stand apart
+
+The binaries stand on GitHub and the signature that covers them stands on
+anti-lang.com. The private key is on neither host.
+
+- Whoever holds the GitHub release can replace a package. The manifest that names its
+  digest is then covered by no signature, and both installers stop.
+- Whoever holds the site can serve another signature or another key. Neither signs a
+  package, because signing needs the private key.
+- A forged release therefore needs both hosts at once.
+
+A signature stored beside the binaries it covers leaves the private key as the only
+thing between an attacker and a release. That is what this layout removes. Eddie
+decided the split on 2026-09-21, after deciding on 2026-09-20 that the binaries leave
+the site.
+
+One release key signs everything Anti publishes, `anti-lang/antic` and
+`anti-lang/llvm-tools` alike. The public half at `https://anti-lang.com/keys/release.pem`
+is the single trust anchor of every download, and its SHA-256 fingerprint over the DER
+form is `7e64c56e26a42946823a66aa1f30bf686b6b5dbd0dc0e2c165a080540ffc3eca`. A session
+that meets a signature it cannot check does not generate a second key, and does not
+move a signature onto the host that serves the binaries.
 
 ### The LLVM tools
 
@@ -154,14 +175,16 @@ and the two sanitizer suites in an export of the commit, packs the six hosts,
 writes the symbols archives beside them and checks the packages on both VMs. The
 packages and the archives stand in `build/dist/packages` under the one `SHA256SUMS`
 that the packer wrote, which it then signs in place with the release key. It tags
-the commit and uploads the assets to a GitHub release. It runs the runner matrix once, publishes the text of
-anti-lang.com and installs the result from outside. `./r --dry-run` performs the
+the commit and uploads the assets to a GitHub release. It uploads thirteen files and no signature. It runs the
+runner matrix once, publishes the text of anti-lang.com and installs the result from
+outside. `./r --dry-run` performs the
 first five steps and prints what the rest would do.
 
-The site takes the two installers and the downloads page. That page names the version and the six
-packages, with the digest and the release URL of each. It carries the fingerprint of
-the public key. Step 9 rsyncs the three files and reads the
-key at its URL. Nothing binary reaches the site.
+The site takes the two installers, the downloads page, the signature of the manifest
+and the public key. That page names the version and the six packages, with the digest
+and the release URL of each. It carries the fingerprint of the public key. Step 9
+rsyncs the four files and reads the signature and the key back. Nothing binary reaches
+the site.
 
 `docs/work-order-release-script.md` holds the eleven steps, and
 `docs/decisions.md` holds the decisions under "The release script".

@@ -211,11 +211,12 @@ reports what it finished.
   rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer
   of an `extern fn` is `?*T`. A failing function returns `?*Error`.
-- Anti 0.1.0 installs with one command. The six packages, the six symbols archives,
-  `SHA256SUMS` and `SHA256SUMS.sig` are assets of the GitHub release of the tag, which
-  `tools/release-base` names. anti-lang.com serves text alone: the two installers, the
-  downloads page and the public key. `tools/site-base` names it.
-  See `docs/distribution.md`.
+- Anti 0.1.0 installs with one command. The six packages, the six symbols archives and
+  `SHA256SUMS` are assets of the GitHub release of the tag, which `tools/release-base`
+  names. anti-lang.com serves text alone: the two installers, the downloads page,
+  `SHA256SUMS.sig` of every version and the public key, which is the single trust
+  anchor. `tools/site-base` names it. The two halves stand on two hosts on purpose, so
+  a forged release needs both. See `docs/distribution.md`.
   An install follows the platform: `~/.local/bin` and `~/.local/share/anti`, or
   `%LOCALAPPDATA%\Programs\anti\bin` and `%LOCALAPPDATA%\anti`. Nothing outside
   the user's profile is written. The packer links macOS against the Apple SDK
