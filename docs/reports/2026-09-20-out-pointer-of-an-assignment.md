@@ -66,13 +66,16 @@ value path and the failure path.
 four new tests are the two programs, each run natively and cross-built
 for macos-x86_64. `CLAUDE.md` carries the counts.
 
-## Questions
+## The first question, answered
 
-- The `[provisional]` entry gives a compound assignment a slot, so
-  `*p += try f();` compiles. Whether a failing call belongs on the right
-  of `+=` at all is a question for the specification. Refusing it in the
-  checker would be the other answer. It is smaller than it looks, because
-  the form is in no program and in no document.
+A failing call on the right of `+=` stays. A failing call is handled at
+the point of use. That rule holds everywhere an expression stands,
+rather than having a hole cut in it for one operator. A reader who
+writes `total += try next();` means it. The entry in `docs/decisions.md`
+is settled, not provisional.
+
+## The question that remains
+
 - The parser takes `try` in assignment position but not `catch`. So
   `x = f() catch e { }` is a syntax error while `let x = f() catch e { }`
   is not. The lowering handles the handler blocks either way. Whether the
