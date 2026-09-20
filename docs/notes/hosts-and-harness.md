@@ -26,9 +26,14 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 468 | ASan, UBSan, 467 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
-| Linux VM | 408 | ASan, UBSan, 407 each | glibc sysroot, linux-arm64 programs, gdb |
-| Windows VM | 388 | none | windows-arm64 programs, the Win32 expected files |
+| Mac | 480 | ASan, UBSan, 479 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
+| Linux VM | 419 | ASan, UBSan, 407 each on 2026-09-19 | glibc sysroot, linux-arm64 programs, gdb |
+| Windows VM | 399 | none | windows-arm64 programs, the Win32 expected files |
+
+The counts of the Mac and of the two VMs are of 2026-09-20, from the release
+script's own step 5. A host runs fewer tests than the Mac because a test that
+needs something it lacks skips, `release_dry_run` and `sysroot_digest` among
+them.
 
 `debug_info` runs the debugger of the host, lldb on the Mac and gdb on Linux, and takes
 neither from the other. No host here debugs a Windows program.
@@ -80,6 +85,24 @@ when started by hand.
   gets. The unit tests are the only build that defines it. The runtime of the archive
   is compiled without it, so a shipped program reads no variable of its own and the
   one-environment-variable rule holds.
+
+## What a fresh build and the VMs catch
+
+- A build directory here has been configured more than once. That hides a read
+  of a `find_program` variable above the call that writes it, since the first
+  run alone takes an empty string. The release script configures a fresh export
+  of the commit, which is the only build that sees it. `find_order` refuses the
+  order now.
+- `setenv` and `unsetenv` are POSIX and outside the C11 library. The headers of
+  Apple declare them under `-std=c11` and musl and glibc do not, so a file that
+  uses them without `_POSIX_C_SOURCE` compiles on the Mac alone.
+- On a host that is not the Mac, `runtime/lib/<host target>/` holds the library
+  that build compiled, at its own optimisation. Every other target is a cross
+  build. A Debug build writes a call where a release writes the exclusive loop,
+  so a test of a level's instructions skips the host's own library.
+- The Windows VM answers ssh with `cmd`, not with a shell. A command with `;`
+  or `&&` in it reaches the program as arguments. Send a `.cmd` file, or call
+  `cmd /c` with one command.
 
 ## For the next session
 

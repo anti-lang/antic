@@ -9,34 +9,30 @@ two files it reads: `tools/version` and `CHANGELOG.md`.
 
 1. Preflight. The host is the Mac, the version is no tag here and none on
    origin, `CHANGELOG.md` holds its entry, `main` is committed and pushed, `gh`
-   is logged in, and both VMs answer. It reads the four download paths from
-   `build/CMakeCache.txt`, and configures `build/` first when that cache is
-   missing. It runs on every call, since it is a gate rather than an output.
+   is logged in, both VMs answer, and `build/CMakeCache.txt` names the four
+   downloads. It runs on every call, because it is a gate and not an output.
 2. The suite. `git checkout-index` writes the commit to `build/dist/export`,
    which is configured with those paths, built and run. The two sanitizer
-   presets follow in the same export, each with the full suite.
-3. The packages. `tools/pack-anti.cmake` writes the six, and each is read back:
+   presets follow in the same export.
+3. The packages. `tools/pack-anti.cmake` writes the six. Each is read back:
    `tools/check-cpu.cmake` against `tools/cpu-levels`, `tools/check-libc.cmake`
-   on the two programs of both Linux packages, and `antic --version` of the
-   macOS x86_64 package under Rosetta.
+   on both programs of both Linux packages, and `antic --version` of the macOS
+   x86_64 package under Rosetta.
 4. The symbols. `llvm-objdump --syms` of every shipped program goes into
-   `build/dist/symbols/anti-<version>-<host>-symbols.zip`. A package that
-   carries a symbols archive of its own stops the run.
-5. The VMs. The tracked files go over as a tar. Each VM extracts them into its
-   own tree, configures, builds and runs the full suite. It then installs the
-   package of its host with the installer of its shell. It prints the version
-   of both programs, compiles and runs a program on Linux, and uninstalls.
-6. The digests. `SHA256SUMS` over the six packages and the six symbols
-   archives, signed with the key that `RELEASE_KEY` names. Without the key the
-   run prints the two signing commands and stops. A signature made by hand
-   afterwards is taken when it verifies against the manifest of the run.
-7. The tag and the release. A signed tag, a draft release with the entry of the
-   changelog as its body, the fourteen assets one at a time, then published.
-8. The matrix. One `workflow_dispatch` run of `test.yml` on the tag, watched to
-   the end. A failure leaves the release as a pre-release.
-9. The site. `downloads/index.toml` in the checkout that `ANTI_SITE` names. It
-   holds the version, the six packages with their digests, the URLs of the
-   release assets and the fingerprint of the public key.
+   `build/dist/symbols/`. A package that carries an archive of its own stops
+   the run.
+5. The VMs. The tracked files go over as a tar. Each VM configures, builds and
+   runs the full suite. It installs the package of its host with the installer
+   of its shell, prints the version of both programs and uninstalls. Linux
+   compiles and runs a program too.
+6. The digests. `SHA256SUMS` over the twelve files, signed with the key that
+   `RELEASE_KEY` names. Without the key the run prints the two signing commands
+   and stops. A signature made by hand afterwards is taken when it verifies.
+7. The tag and the release. A signed tag, a draft release with the changelog
+   entry as its body, the fourteen assets one at a time, then published.
+8. The matrix. One run of `test.yml` on the tag, watched to the end. A failure
+   leaves the release as a pre-release.
+9. The site. `downloads/index.toml` in the checkout that `ANTI_SITE` names.
 10. The check from outside. The installer from anti-lang.com writes a fresh
     directory. Both programs print the version. A program compiles and runs for
     this host, and links for every target whose sysroot the install carries.
@@ -44,8 +40,7 @@ two files it reads: `tools/version` and `CHANGELOG.md`.
 
 Every step writes a stamp in `build/dist/state/`, and a rerun starts at the
 first one that is missing. The state names the commit it ran on, and a run on
-another commit removes it and starts over. A dry run writes under
-`build/dist/dry-run/`, so nothing it leaves behind stands in for a release.
+another commit starts over. A dry run writes under `build/dist/dry-run/`.
 
 ## The files
 
@@ -66,16 +61,16 @@ another commit removes it and starts over. A dry run writes under
 version bumped to 99.0.0. The copy gets a history of one commit and a bare
 origin, so the preflight sees a pushed `main`. `cmake`, `ctest`, `gh`, `ssh` and
 `scp` are stood in for on the PATH by scripts that write what the real ones
-write. One of them packs six small archives, with a real x86_64 program in the
-macOS package for the check under Rosetta.
+write. One packs six small archives, with a real x86_64 program in the macOS
+package for the check under Rosetta.
 
 The test reads the stamps of steps 2 to 5, the six packages, the six symbols
-archives, the five logs, the plan the run prints for steps 6 to 10, and the
-absence of a signature. It drives three refusals of the preflight: a version
-that is a tag, an uncommitted change and a missing entry in the changelog. A run
-with `build_symbols` taken out of the driver fails it. `tools/check-cpu.cmake`
-is checked for real in the same test, on a package tree with every level and on
-one without `armv8.2` of `linux-arm64`.
+archives, the five logs, the plan printed for steps 6 to 10 and the absence of a
+signature. It drives three refusals of the preflight: a version that is a tag,
+an uncommitted change and a missing entry in the changelog. A run with
+`build_symbols` taken out of the driver fails it. `tools/check-cpu.cmake` is
+checked for real in the same test, on a package tree with every level and on one
+without `armv8.2` of `linux-arm64`.
 
 ## What the dry runs found
 
@@ -121,7 +116,92 @@ uninstallers travel with the installers, because a package carries neither.
 
 ## The first dry run
 
-PLACEHOLDER
+`./r --dry-run` on `2930e2a`, after the three fixes above. It ran steps 1 to 5
+and printed a plan for the rest. Every count is of the export of that commit,
+and the two VMs ran the suite of the same tree.
+
+```text
+r: Anti 0.1.0, a dry run. Nothing is signed, tagged or uploaded.
+r: step 1, preflight
+  0.1.0 is no tag here and none on origin
+  CHANGELOG.md holds the entry of 0.1.0
+  main is committed and pushed at 2930e2a
+  gh is logged in
+  anti-linux answers
+  anti-windows answers
+  the state is of d5efaa4, so the steps run again
+  the downloads of build/ are in place
+r: step 2, the suite of the Mac, then ASan and UBSan
+  the commit is exported to build/dist/dry-run/export
+  the Mac: 100% tests passed out of 480
+  asan: 100% tests passed out of 479
+  ubsan: 100% tests passed out of 479
+r: step 3, the six packages
+  anti-0.1.0-macos-arm64.tar.xz, 06be375b813c, levels of tools/cpu-levels
+  anti-0.1.0-macos-x86_64.tar.xz, dc9c8c9436dd, levels of tools/cpu-levels
+  anti-0.1.0-linux-x86_64.tar.xz, 964755ed30d4, levels of tools/cpu-levels
+  anti-0.1.0-linux-arm64.tar.xz, be0c3f6d2a3f, levels of tools/cpu-levels
+  anti-0.1.0-windows-x86_64.tar.xz, c9e07e1ef7b7, levels of tools/cpu-levels
+  anti-0.1.0-windows-arm64.tar.xz, 367ea93c1b8a, levels of tools/cpu-levels
+  linux-x86_64: both programs link the pinned sysroot
+  linux-arm64: both programs link the pinned sysroot
+  macos-x86_64 under Rosetta: antic 0.1.0
+r: step 4, the symbols of the twelve programs
+  anti-0.1.0-macos-arm64-symbols.zip, 00e568fa63c4
+  anti-0.1.0-macos-x86_64-symbols.zip, aaa9e53c03d5
+  anti-0.1.0-linux-x86_64-symbols.zip, 5a7b7b87a27d
+  anti-0.1.0-linux-arm64-symbols.zip, 29bc49348f5f
+  windows-x86_64: antic.exe has no symbol table, so its sections go in
+  windows-x86_64: anti.exe has no symbol table, so its sections go in
+  anti-0.1.0-windows-x86_64-symbols.zip, e6f3ae05eb3b
+  windows-arm64: antic.exe has no symbol table, so its sections go in
+  windows-arm64: anti.exe has no symbol table, so its sections go in
+  anti-0.1.0-windows-arm64-symbols.zip, fcf1ca34070d
+r: step 5, the two VMs
+  anti-linux: 100% tests passed, 0 tests failed out of 419
+  anti-linux: the package installs, compiles a program and uninstalls
+  anti-windows: 100% tests passed out of 399
+  anti-windows: the package installs and uninstalls
+r: step 6, the digests and the signature
+  would write SHA256SUMS of 12 files in build/dist/dry-run
+  would sign it with $RELEASE_KEY into SHA256SUMS.sig
+r: step 7, the tag and the release
+  would tag v0.1.0 on 2930e2a and push it
+  would create the release v0.1.0 of anti-lang/antic
+  would upload 14 files, the body from the entry of CHANGELOG.md
+r: step 8, the runner matrix
+  would run the workflow test.yml on v0.1.0 and wait for it
+r: step 9, the site
+  would write index.toml of downloads/ and push it to $ANTI_SITE
+  the file it would write stands in build/dist/dry-run/index.toml
+r: step 10, the check from outside
+  would install 0.1.0 from https://anti-lang.com into build/dist/dry-run/verify
+  would compile a program for this host and link one for the other five
+r: step 11, the report
+  would write docs/reports/2026-09-20-release-0.1.0.md and push it as the last commit
+r: the dry run of 0.1.0 is done, and its files stand in build/dist/dry-run
+```
+
+The index of step 9 stands in `build/dist/dry-run/index.toml`. Its head:
+
+```toml
+# The published packages of Anti. The release script of
+# antic writes the entries, and the build of the site
+# publishes them.
+
+[anti]
+version = "0.1.0"
+released = "2026-09-20"
+base = "https://anti-lang.com/downloads/resources/anti/0.1.0"
+release = "https://github.com/anti-lang/antic/releases/download/v0.1.0"
+key_fingerprint = "7e64c56e26a42946823a66aa1f30bf686b6b5dbd0dc0e2c165a080540ffc3eca"
+
+[anti.macos-arm64]
+file = "anti-0.1.0-macos-arm64.tar.xz"
+sha256 = "06be375b813c3c90889677f7c57f617b04f45218354daf8b518303d758e9551e"
+url = "https://github.com/anti-lang/antic/releases/download/v0.1.0/anti-0.1.0-macos-arm64.tar.xz"
+
+```
 
 ## Questions
 
