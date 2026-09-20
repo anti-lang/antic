@@ -3,6 +3,12 @@
    ANTI_DEV_CPU. The environment variable ANTI_CPU_LEVEL then stands in
    for the processor, and this machine sees the refusal of a lower one.
    The runtime of the archive is compiled without it. */
+
+/* setenv and unsetenv are POSIX, outside the C11 library. The headers of
+   Apple declare them anyway, and musl and glibc hide them under -std=c11,
+   so the Mac compiled this file and the Linux VM did not. */
+#define _POSIX_C_SOURCE 200809L
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include <stdlib.h>
