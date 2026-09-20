@@ -38,31 +38,27 @@ prefix list.
 The docs-style checker passes on all three files. No code changed, so no suite
 ran, which the rule for a docs-only commit allows.
 
-## One reading to confirm
+## Three readings, all answered by Eddie in this session
 
-The addendum's tuples section says the two special forms are "removed from the
-additions document and described here instead". `for i, x in &slice`, which
-binds a pointer, was in the small things and is not in the addendum's wording.
-It is carried into the tuples section as destructuring of an `(int, *T)`, so
-nothing was lost. Say if that is wrong.
-
-## Questions
-
-1. `docs/decisions.md` line 305 still holds the old sentence, "A function that
-   can fail returns `*Error`, `none` on success, and writes its results through
-   out pointers", inside a planning-era entry that also says `anti.rt.Error` and
-   `rt.check`. The addendum says to replace that sentence "wherever it appears",
-   but the session was scoped to the additions document, the object model and
-   the syntax overview, and decisions.md is the first authority. It was left
-   alone. Should that entry be corrected, or does the header line, which says
-   the object model and the additions document are not repeated there, already
-   settle it?
+1. The errors entry of `docs/decisions.md` held the old sentence, "A function
+   that can fail returns `*Error`, `none` on success, and writes its results
+   through out pointers", in a planning-era entry that also said `anti.rt.Error`
+   and `rt.check`. It predates `may fail`, `anti.lang` and the `none` rename.
+   Eddie said to correct it. The entry now says the standard library uses
+   `may fail` and points at "Failing functions" in the additions document for
+   the rule. It keeps the out-pointer convention as the ABI and names
+   `anti.error.Error` and `error.check`. `error.check` is what the standard
+   library ships, in `std/anti/error.anti`, and what `tests/std/error.anti`
+   calls.
 2. `fn construct(self, args...) -> ?*Error` keeps the hand-written spelling in
-   both specifications and in the overview's examples. The addendum leaves the
-   rewrite of the standard library's signatures to a later session and says the
-   hand-written form stays legal, so nothing was changed. Confirm that
-   `construct` becomes `may fail` in that rewrite rather than staying as it is.
-3. The additions document's nullable-pointers section never carried the
-   out-pointer sentence, so the addendum's instruction to replace it there had
-   nothing to act on. A one-line pointer to "Failing functions" was added at the
-   end of that section instead.
+   both specifications and in the overview's examples. Eddie confirmed it
+   becomes `fn construct(self, args...) may fail` when the standard library's
+   signatures are rewritten, in that same session, with both specifications and
+   the overview changing with it. Until then the hand-written spelling stands.
+3. Two judgement calls, both confirmed. The additions document's
+   nullable-pointers section never carried the out-pointer sentence, so the
+   addendum's instruction to replace it there had nothing to act on. A one-line
+   pointer to "Failing functions" was added at the end of that section instead.
+   `for i, x in &slice`, which binds a pointer, was in the small things
+   and is not in the addendum's tuples wording. It is carried into the tuples
+   section as destructuring of an `(int, *T)`, so nothing was lost.
