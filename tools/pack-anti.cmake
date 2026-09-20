@@ -11,7 +11,7 @@
 # instead, and then CLANG and LLVM_BIN are not needed:
 #
 #   bin/        antic and anti
-#   lib/<t>/    the runtime library of all six targets
+#   lib/<t>/<l>/ the runtime library of all six targets, per processor level
 #   std/        the standard library
 #   sysroot/    the two Linux sysroots and the two macOS sysroots of Zig's
 #               stubs, which are ours to redistribute

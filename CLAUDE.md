@@ -193,8 +193,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 476 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 475 each, without the `no_paths` test, which needs a
+- 477 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 476 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -216,8 +216,10 @@ reports what it finished.
   `armv8.0`, `armv8.2` or `armv8.5` on ARM64, and each target has a default:
   x86-64-v3 on both x86_64 targets, `armv8.5` on macos-arm64, `armv8.2` on
   windows-arm64 and `armv8.0` on linux-arm64. x86-64-v3 writes the VEX forms of
-  the scalar float instructions. The runtime archive is built for each target's
-  default, so its atomics are one instruction at `armv8.2` and above. Every
-  program checks the processor at start and refuses a machine below its level.
-  `src/cpu.c` holds the table, `tools/cpu-levels` holds it for the build and
+  the scalar float instructions. The runtime archive holds one anti_rt per
+  target and level in `lib/<target>/<level>/`, so a program below the default
+  links a runtime of its own level, and its atomics are one instruction at
+  `armv8.2` and above. Every program checks the processor at start, against the
+  level of the runtime it linked, and refuses a machine below it. `src/cpu.c`
+  holds the table, `tools/cpu-levels` holds it for the build and
   `cpu_levels_pin` compares the two.

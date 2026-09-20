@@ -1,12 +1,6 @@
     .text
     .globl anti.rt.main
     .set anti.rt.main, main.main
-    .section .rodata
-    .globl anti_cpu_required
-    .p2align 2
-anti_cpu_required:
-    .long 3
-    .text
     .globl main.main
     .hidden main.main
 main.main:

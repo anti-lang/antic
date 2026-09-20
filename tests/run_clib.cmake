@@ -75,7 +75,7 @@ if(CASE STREQUAL "static")
     library(geo static "${dir}")
     # The printed line links main.c with the archive and the runtime.
     string(STRIP "${run_out}" line)
-    if(NOT line MATCHES "^cc main.c ${dir}/libgeo.a ${RUNTIME}/lib/[a-z0-9_-]+/libanti_rt.a")
+    if(NOT line MATCHES "^cc main.c ${dir}/libgeo.a ${RUNTIME}/lib/[a-z0-9_-]+/[a-z0-9.]+/libanti_rt.a")
         message(FATAL_ERROR "unexpected link line: ${line}")
     endif()
     # The archive keeps the copy of the package header in an object.

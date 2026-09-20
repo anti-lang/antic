@@ -27,11 +27,6 @@ struct anti_slice {
     int64_t len;
 };
 
-/* The level the program was built for, which antic writes into the object
-   that defines main. The check runs before anything else, so a machine
-   below the level reads the message rather than an illegal instruction. */
-extern const int32_t anti_cpu_required;
-
 /* DESIGN: the entry always passes args and env. All six calling
    conventions pass both slices, or pointers to them, in registers. A main
    with fewer parameters ignores those registers. */
@@ -158,7 +153,7 @@ int main(void)
        Windows start in text mode, which writes CRLF for each LF. */
     _setmode(_fileno(stdout), _O_BINARY);
     _setmode(_fileno(stderr), _O_BINARY);
-    anti_cpu_check(anti_cpu_required);
+    anti_cpu_check();
     anti_rt_init();
     args = arguments();
     env = environment();
@@ -188,7 +183,7 @@ int main(int argc, char **argv)
 {
     size_t count = 0;
 
-    anti_cpu_check(anti_cpu_required);
+    anti_cpu_check();
     anti_rt_init();
     while (environ != NULL && environ[count] != NULL) {
         count++;

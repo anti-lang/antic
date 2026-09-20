@@ -10,7 +10,7 @@
 #   WORK      a directory for the executable
 #   NEEDS     the text the message must name
 
-file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/libanti_rt.a")
+file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")
 if(runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no runtime for ${TARGET}")
     return()

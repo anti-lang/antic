@@ -166,8 +166,12 @@ foreach(line IN LISTS antic_cpu_lines)
     list(GET fields 0 kind)
     list(GET fields 1 key)
     if(kind STREQUAL "level")
+        list(GET fields 2 arch)
+        list(GET fields 3 id)
         list(GET fields 4 march)
         set(ANTIC_CPU_MARCH_${key} "${march}")
+        set(ANTIC_CPU_ID_${key} "${id}")
+        list(APPEND ANTIC_CPU_LEVELS_${arch} "${key}")
     else()
         list(GET fields 2 ANTIC_CPU_LEVEL_${key})
     endif()
@@ -189,6 +193,18 @@ function(antic_cpu_march out level)
     set(${out} "-march=${ANTIC_CPU_MARCH_${level}}" PARENT_SCOPE)
 endfunction()
 
+# DESIGN: the runtime is what every program links, so the archive holds one
+# of it per level the target's architecture has. A program built with --cpu
+# below the target's default then links a runtime of its own level. The
+# levels of a target are those of its architecture, which its name ends in.
+function(antic_cpu_levels out target)
+    if(target MATCHES "arm64$")
+        set(${out} "${ANTIC_CPU_LEVELS_arm64}" PARENT_SCOPE)
+    else()
+        set(${out} "${ANTIC_CPU_LEVELS_x86_64}" PARENT_SCOPE)
+    endif()
+endfunction()
+
 # anti_rt for the host, laid out as the runtime archive: lib/<target>/ with
 # libanti_rt.a, or anti_rt.lib on Windows, and licenses/ with the licence
 # of each component.
@@ -206,36 +222,49 @@ endforeach()
 # host, the Mac included, so that one object links to the same bytes on
 # every host. A Mac builds no host library of its own.
 if(NOT ANTIC_HOST_OS STREQUAL "macos")
-    add_library(anti_rt STATIC ${anti_rt_files})
-    set_target_properties(anti_rt PROPERTIES
-        ARCHIVE_OUTPUT_DIRECTORY "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}"
-        C_VISIBILITY_PRESET hidden)
-    # DESIGN: sanitizers check antic. Anti programs link the runtime without a
-    # sanitizer runtime, so the runtime carries no sanitizer instrumentation,
-    # whatever CMAKE_C_FLAGS holds in a sanitizer configuration.
-    if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-        antic_cpu_level(host_level "${ANTIC_HOST_TARGET}")
-        antic_cpu_march(host_march "${host_level}")
-        target_compile_options(anti_rt PRIVATE -fno-sanitize=all "${host_march}")
-    endif()
+    antic_cpu_levels(host_levels "${ANTIC_HOST_TARGET}")
+    foreach(level IN LISTS host_levels)
+        set(out "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}/${level}")
+        add_library(anti_rt_${level} STATIC ${anti_rt_files})
+        set_target_properties(anti_rt_${level} PROPERTIES
+            OUTPUT_NAME anti_rt
+            ARCHIVE_OUTPUT_DIRECTORY "${out}"
+            C_VISIBILITY_PRESET hidden)
+        target_compile_definitions(anti_rt_${level} PRIVATE
+            ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}})
+        # DESIGN: sanitizers check antic. Anti programs link the runtime without a
+        # sanitizer runtime, so the runtime carries no sanitizer instrumentation,
+        # whatever CMAKE_C_FLAGS holds in a sanitizer configuration.
+        if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+            antic_cpu_march(host_march "${level}")
+            target_compile_options(anti_rt_${level} PRIVATE
+                -fno-sanitize=all "${host_march}")
+        elseif(MSVC AND level STREQUAL "v3")
+            # MSVC names a level with /arch: and has a value for AVX2 and
+            # none for the SSE4.2 of v2. A reader's build on Windows then
+            # writes the baseline for v1 and v2.
+            target_compile_options(anti_rt_${level} PRIVATE /arch:AVX2)
+        endif()
 
-    # The licence stub of a bundled archive lies beside the runtime library as
-    # an object of its own, so that a program never links it instead of the
-    # licence text of rt/license.c.
-    add_library(anti_rt_license_stub OBJECT rt/license_stub.c)
-    if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-        target_compile_options(anti_rt_license_stub PRIVATE -fno-sanitize=all)
-    endif()
-    set_target_properties(anti_rt_license_stub PROPERTIES C_VISIBILITY_PRESET hidden)
-    add_custom_target(anti_rt_license_stub_copy ALL
-        COMMAND "${CMAKE_COMMAND}" -E make_directory
-            "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}"
-        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "$<TARGET_OBJECTS:anti_rt_license_stub>"
-            "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}/anti_rt_license_stub${CMAKE_C_OUTPUT_EXTENSION}"
-        DEPENDS anti_rt_license_stub
-        COMMAND_EXPAND_LISTS
-        VERBATIM)
+        # The licence stub of a bundled archive lies beside the runtime library as
+        # an object of its own, so that a program never links it instead of the
+        # licence text of rt/license.c.
+        add_library(anti_rt_license_stub_${level} OBJECT rt/license_stub.c)
+        if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+            target_compile_options(anti_rt_license_stub_${level} PRIVATE
+                -fno-sanitize=all)
+        endif()
+        set_target_properties(anti_rt_license_stub_${level} PROPERTIES
+            C_VISIBILITY_PRESET hidden)
+        add_custom_target(anti_rt_license_stub_copy_${level} ALL
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "$<TARGET_OBJECTS:anti_rt_license_stub_${level}>"
+                "${out}/anti_rt_license_stub${CMAKE_C_OUTPUT_EXTENSION}"
+            DEPENDS anti_rt_license_stub_${level}
+            COMMAND_EXPAND_LISTS
+            VERBATIM)
+    endforeach()
 endif()
 
 configure_file(rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
@@ -287,10 +316,11 @@ function(anti_cross_runtime_at target triple level root)
     # The level of the library, so that its atomics are one instruction
     # wherever the level has them.
     antic_cpu_march(march "${level}")
+    set(out "${root}/lib/${target}/${level}")
     if(target MATCHES "^windows")
-        set(library "${root}/lib/${target}/anti_rt.lib")
+        set(library "${out}/anti_rt.lib")
     else()
-        set(library "${root}/lib/${target}/libanti_rt.a")
+        set(library "${out}/libanti_rt.a")
     endif()
     foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
         set(object "${work}/${source}.o")
@@ -298,7 +328,8 @@ function(anti_cross_runtime_at target triple level root)
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
                 -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
-                "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+                "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
+                "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                 -c "${PROJECT_SOURCE_DIR}/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/rt/${source}.c"
                 "${PROJECT_SOURCE_DIR}/rt/rt.h" "${PROJECT_SOURCE_DIR}/rt/std.h"
@@ -313,13 +344,12 @@ function(anti_cross_runtime_at target triple level root)
         list(APPEND objects "${object}")
     endforeach()
     if(target MATCHES "^windows")
-        set(stub "${root}/lib/${target}/anti_rt_license_stub.obj")
+        set(stub "${out}/anti_rt_license_stub.obj")
     else()
-        set(stub "${root}/lib/${target}/anti_rt_license_stub.o")
+        set(stub "${out}/anti_rt_license_stub.o")
     endif()
     add_custom_command(OUTPUT "${stub}"
-        COMMAND "${CMAKE_COMMAND}" -E make_directory
-            "${root}/lib/${target}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
             -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
             "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
@@ -329,8 +359,7 @@ function(anti_cross_runtime_at target triple level root)
         VERBATIM)
     # The stub stays beside the library, never a member of it.
     add_custom_command(OUTPUT "${library}"
-        COMMAND "${CMAKE_COMMAND}" -E make_directory
-            "${root}/lib/${target}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${ANTIC_LLVM_AR}" rcs "${library}" ${objects}
         DEPENDS ${objects}
         VERBATIM)
@@ -339,9 +368,11 @@ function(anti_cross_runtime_at target triple level root)
 endfunction()
 
 function(anti_cross_runtime target triple)
-    antic_cpu_level(level "${target}")
-    anti_cross_runtime_at("${target}" "${triple}" "${level}"
-        "${ANTIC_RUNTIME_DIR}" ${ARGN})
+    antic_cpu_levels(levels "${target}")
+    foreach(level IN LISTS levels)
+        anti_cross_runtime_at("${target}" "${triple}" "${level}"
+            "${ANTIC_RUNTIME_DIR}" ${ARGN})
+    endforeach()
 endfunction()
 
 if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
@@ -382,26 +413,6 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
                 -isystem "${sysroot}/sdk/include/shared")
         endif()
     endforeach()
-    # DESIGN: a macos-arm64 host runs a macos-x86_64 program under
-    # Rosetta, which has no AVX2, so it runs no program of the default
-    # level x86-64-v3. The suite keeps its macos-x86_64 program tests by
-    # compiling them with --cpu v1 against a second runtime root of that
-    # level. Only the suite reads it, and the archive that ships holds the
-    # default level alone.
-    if(ANTIC_HOST_TARGET STREQUAL "macos-arm64" AND
-       EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/macos-x86_64")
-        set(ANTIC_RUNTIME_V1_DIR "${CMAKE_BINARY_DIR}/runtime-v1")
-        anti_cross_runtime_at(macos-x86_64 x86_64-apple-macos11 v1
-            "${ANTIC_RUNTIME_V1_DIR}"
-            -isysroot "${ANTIC_RUNTIME_DIR}/sysroot/macos-x86_64")
-        # Everything but lib/ is the archive's, so the second root names
-        # it rather than holding a copy.
-        file(MAKE_DIRECTORY "${ANTIC_RUNTIME_V1_DIR}")
-        foreach(entry sysroot std licenses bin)
-            file(CREATE_LINK "${ANTIC_RUNTIME_DIR}/${entry}"
-                "${ANTIC_RUNTIME_V1_DIR}/${entry}" SYMBOLIC)
-        endforeach()
-    endif()
 endif()
 
 # The standard library in std/, written as library files into std/ of the

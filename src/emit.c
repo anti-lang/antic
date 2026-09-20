@@ -98,34 +98,6 @@ static const char *const data_sections[] = {
     [FORMAT_COFF] = ".rdata,\"dr\"",
 };
 
-/* DESIGN: the processor level of a program is a 32-bit global beside its
-   entry, and rt/start.c reads it before it calls main. The module that
-   defines main writes it, so a program carries one and a library carries
-   none. rt/cpu_level.h holds the value of each level for both
-   sides. */
-static void emit_cpu_level(struct text *out, enum target t, enum cpu_level cpu,
-                           const struct ir_module *m, const char *module)
-{
-    struct text symbol = {0};
-    size_t i;
-
-    for (i = 0; i < m->function_count; i++) {
-        const struct ir_function *f = m->functions[i];
-        if (f->is_extern || f->module == NULL ||
-            strcmp(f->module, module) != 0 || strcmp(f->name, "main") != 0) {
-            continue;
-        }
-        c_symbol(&symbol, t, "anti_cpu_required");
-        text_appendf(out,
-                     "    .section %s\n    .globl %s\n    .p2align 2\n"
-                     "%s:\n    .long %d\n    .text\n",
-                     data_sections[target_info(t)->format], text_cstr(&symbol),
-                     text_cstr(&symbol), (int)cpu_id(cpu));
-        break;
-    }
-    text_free(&symbol);
-}
-
 /* DESIGN: data that holds an address is written once when the program
    loads, so a section mapped read-only from the start cannot hold it.
    Every format has a section for data the loader writes and then
@@ -313,7 +285,6 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
     }
     text_append(out, "    .text\n");
     emit_entry(out, t, m, module);
-    emit_cpu_level(out, t, cpu, m, module);
     debug_files(&debug, out);
     for (i = 0; i < m->function_count; i++) {
         if (functions[i] != NULL) {

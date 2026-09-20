@@ -2,12 +2,6 @@
     .text
     .globl _anti.rt.main
     .set _anti.rt.main, _fnptr.main
-    .section __TEXT,__const
-    .globl _anti_cpu_required
-    .p2align 2
-_anti_cpu_required:
-    .long 21
-    .text
     .p2align 2
 _fnptr.twice:
 L_fnptr.twice.b0:

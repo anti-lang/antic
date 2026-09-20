@@ -1,12 +1,6 @@
     .text
     .globl _A4anti2rt_main
     .set _A4anti2rt_main, _A4main_main
-    .section .rdata,"dr"
-    .globl anti_cpu_required
-    .p2align 2
-anti_cpu_required:
-    .long 3
-    .text
 _A4main_scale:
 .L_A4main_scale.b0:
     imulq $6, %rcx, %rax

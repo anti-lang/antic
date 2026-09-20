@@ -17,8 +17,8 @@ endif()
 # The runtime library of another target is compiled by clang, which a host
 # that builds antic with gcc does not use. The link has nothing to link
 # against there.
-file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/libanti_rt.a"
-     "${RUNTIME}/lib/${TARGET}/anti_rt.lib")
+file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a"
+     "${RUNTIME}/lib/${TARGET}/*/anti_rt.lib")
 if(runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no runtime library for ${TARGET}")
     return()

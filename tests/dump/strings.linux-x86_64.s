@@ -1,12 +1,6 @@
     .text
     .globl anti.rt.main
     .set anti.rt.main, strings.main
-    .section .rodata
-    .globl anti_cpu_required
-    .p2align 2
-anti_cpu_required:
-    .long 3
-    .text
 strings.tail:
 .Lstrings.tail.b0:
     pushq %rbp

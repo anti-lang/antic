@@ -33,9 +33,12 @@ target_link_libraries(antic_unit_tests PRIVATE antic_core)
 target_include_directories(antic_unit_tests PRIVATE ../rt)
 # ANTI_DEV_CPU lets test_cpu.c stand a level in for the processor, so the
 # refusal of a lower machine is checked on this one. The runtime of the
-# archive is compiled without it.
+# archive is compiled without it. ANTI_CPU_LEVEL_ID is the level of a
+# runtime, which every build of rt/cpu.c names.
+antic_cpu_level(unit_level "${ANTIC_HOST_TARGET}")
 target_compile_definitions(antic_unit_tests PRIVATE
-    ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}" ANTI_DEV_CPU)
+    ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}" ANTI_DEV_CPU
+    ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}})
 add_test(NAME unit COMMAND antic_unit_tests)
 
 # The runtime archive holds the licence text of every component.
@@ -51,6 +54,17 @@ add_test(NAME cpu_levels_pin
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DLEVELS=${PROJECT_SOURCE_DIR}/tools/cpu-levels"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_pin.cmake")
+
+# The archive holds a runtime per level, so that a program built with --cpu
+# below its target's default links a runtime of that level.
+add_test(NAME cpu_archive_levels
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLEVELS=${PROJECT_SOURCE_DIR}/tools/cpu-levels"
+        "-DTARGETS=linux-x86_64|linux-arm64|macos-x86_64|macos-arm64|windows-x86_64|windows-arm64"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_archive.cmake")
+set_tests_properties(cpu_archive_levels PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # One test per x86_64 level: v3 writes the VEX forms of AVX and the two
 # levels below it write the SSE forms. v2 adds no instruction that antic
@@ -90,9 +104,9 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
     list(GET parts 2 uses)
     list(GET parts 3 avoids)
     if(target STREQUAL "windows-arm64")
-        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/anti_rt.lib")
+        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/anti_rt.lib")
     else()
-        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/libanti_rt.a")
+        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/libanti_rt.a")
     endif()
     add_test(NAME cpu_level_${level}
         COMMAND "${CMAKE_COMMAND}"
@@ -279,11 +293,10 @@ endfunction()
 
 # A macos-arm64 host runs a macos-x86_64 program as well, so every program
 # runs for that target too. The other four targets need their own machine.
-# Rosetta has no AVX2, so those programs take --cpu v1 and the v1 runtime
-# root that the top-level build writes for the suite.
+# Rosetta has no AVX2, so those programs take --cpu v1 and link the v1
+# runtime of the archive, as any --cpu v1 build does.
 set(ANTIC_X86_64_OPTIONS "--target,macos-x86_64,--cpu,v1")
-if(ANTIC_HOST_TARGET STREQUAL "macos-arm64" AND
-   DEFINED ANTIC_RUNTIME_V1_DIR)
+if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     abi_x86_64_object(abi_structs_x86_64 abi/structs.c)
     abi_x86_64_object(abi_wchar_x86_64 abi/wchar.c)
     abi_wchar_expected(abi_wchar_x86_64_expected _X86_64 -arch x86_64)
@@ -294,7 +307,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64" AND
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DRUNTIME=${ANTIC_RUNTIME_V1_DIR}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
                 "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_${case}_x86_64>,,>"
                 "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
@@ -310,7 +323,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64" AND
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DRUNTIME=${ANTIC_RUNTIME_V1_DIR}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
                 "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_raymath_x86_64>,,>"
                 "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
@@ -324,7 +337,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64" AND
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DRUNTIME=${ANTIC_RUNTIME_V1_DIR}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${source}"
                 "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64"
@@ -681,12 +694,10 @@ set_tests_properties(link_identity_macos-arm64 PROPERTIES
 
 # A program that names a framework links against Apple's SDK. The
 # macos-x86_64 program runs under Rosetta, which has no AVX2, so it takes
-# the v1 level and the runtime root of that level.
+# the v1 level and the v1 runtime of the archive.
 foreach(target macos-arm64 macos-x86_64)
-    set(framework_runtime "${ANTIC_RUNTIME_DIR}")
     set(framework_options "")
-    if(target STREQUAL "macos-x86_64" AND DEFINED ANTIC_RUNTIME_V1_DIR)
-        set(framework_runtime "${ANTIC_RUNTIME_V1_DIR}")
+    if(target STREQUAL "macos-x86_64")
         set(framework_options "--cpu,v1")
     endif()
     add_test(NAME framework_${target}
@@ -694,7 +705,7 @@ foreach(target macos-arm64 macos-x86_64)
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
-            "-DRUNTIME=${framework_runtime}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DOPTIONS=${framework_options}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/framework/core_foundation.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/framework"

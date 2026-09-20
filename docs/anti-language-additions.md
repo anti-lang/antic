@@ -151,7 +151,9 @@ if f.overflow {
 
 - The x86_64 baseline for everything Anti ships and for release builds is x86-64-v3. `--cpu v1` and `--cpu v2` stay available for a program that must run older hardware. The runtime archive's native libraries are built for v3.
 - The ARM64 baseline is per operating system. `macos-arm64` is `armv8.5`, since every Apple Silicon Mac is an M1 or later. `linux-arm64` is `armv8.0`, for the Pi 4 and older boards. `windows-arm64` is `armv8.2`, since every Windows-on-ARM machine sold is a Snapdragon 8cx or later. `--cpu` overrides on every target. `armv8.2` and above make atomics one instruction and add half-precision conversion and the dot products.
-- `rt/start.c` checks the processor once at start. When the machine has less than the program needs, it exits with a message naming the level. The message reads "this program needs a processor with AVX2 (x86-64-v3, 2013 or later)".
+- The runtime archive holds one `anti_rt` per target and level, in `lib/<target>/<level>/`. The runtime is small and it is what every program links, so it comes in every level its target supports. A program built with `--cpu` below its target's default links the runtime of its own level, and `--cpu v1` therefore gives a program that runs on older hardware.
+- The native libraries stay at the default level only, in `lib/<target>/`. A program below the default that imports a bundled library is refused at link: "anti.raylib is built for x86-64-v3, this program targets v1".
+- `rt/start.c` checks the processor once at start, against the level of the runtime that was linked. When the machine has less than the program needs, it exits with a message naming the level. The message reads "this program needs a processor with AVX2 (x86-64-v3, 2013 or later)".
 - A level is a code-generation setting, not a target. The six targets stay six.
 - The vector byte cap of [Simd structs](#simd-structs) is a constant in the level table. It is the widest vector register of any level antic knows.
 

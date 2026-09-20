@@ -12,7 +12,7 @@
 #   TARGET        macos-arm64 or macos-x86_64
 #   OPTIONS       optional options of antic, separated by commas
 
-file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/libanti_rt.a")
+file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}" OR runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no sysroot or runtime for ${TARGET}")
     return()

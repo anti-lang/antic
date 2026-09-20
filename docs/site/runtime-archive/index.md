@@ -29,7 +29,7 @@ Chapter 3 installs Anti with one command. That package is this archive with anti
 | `bin/lld` and its three names | The linker | One program links ELF, Mach-O and COFF, under `ld.lld`, `ld64.lld` and `lld-link` |
 | `bin/llvm-ar` | The archiver | Static libraries for C, which `antic --lib static` writes |
 | `bin/llvm-objdump`, `bin/llvm-readobj` | Readers of object files | The tests of chapters 16 and 21 check what the emitter produced |
-| `lib/<target>/` | anti_rt for all six targets | A program of any target links the runtime, whichever host compiled it |
+| `lib/<target>/<level>/` | anti_rt for all six targets, one per processor level | A program of any target and level links the runtime, whichever host compiled it |
 | `std/` | The standard library as `.antl` files | One file serves every target, because the IR holds no sizes |
 | `sysroot/linux-x86_64`, `sysroot/linux-arm64` | musl and the compiler-rt builtins | Ours to pass on, so a Linux program links with nothing else installed |
 | `licenses/` | One file per component | The obligations that travel with a shipped program |
@@ -90,18 +90,27 @@ programs a reader compiles.
 
 ## The processor level of a library
 
-The value of `march` is the `-march=` of the target's default processor level, which
-`tools/cpu-levels` gives and `src/cpu.c` holds for antic. Both x86_64 targets default
-to `x86-64-v3`. macos-arm64 defaults to `armv8.5`, windows-arm64 to `armv8.2` and
-linux-arm64 to `armv8.0`. A level decides what clang writes for `rt/atomic.c`. At
-`armv8.2` and above an atomic operation is one instruction, `casal`, `ldaddal` or
-`swpal`. Below it the body is a load-store exclusive loop of `ldaxr` and `stlxr`. The
-tests `cpu_level_armv8.0`, `cpu_level_armv8.2` and `cpu_level_armv8.5` read the
-library of the target that defaults to each and check for those mnemonics.
+The value of `march` is the `-march=` of the level being built, which
+`tools/cpu-levels` gives and `src/cpu.c` holds for antic. The same compile defines
+`ANTI_CPU_LEVEL_ID`, the id of that level, which `rt/cpu.c` reads and refuses to
+compile without. The start-up check then asks for the level of the runtime the
+program linked.
 
-The archive holds the default level of each target and no other library. A program
-built with `--cpu` below the default therefore carries its own code at the lower
-level and the runtime at the default one.
+A level decides what clang writes for `rt/atomic.c`. At `armv8.2` and above an atomic
+operation is one instruction, `casal`, `ldaddal` or `swpal`. Below it the body is a
+load-store exclusive loop of `ldaxr` and `stlxr`. The tests `cpu_level_armv8.0`,
+`cpu_level_armv8.2` and `cpu_level_armv8.5` read the library of the target that
+defaults to each and check for those mnemonics.
+
+The archive holds one runtime per target and level, because the runtime is small and
+every program links it. A program built with `--cpu v1` links
+`lib/<target>/v1/libanti_rt.a` and runs on hardware without AVX2. The test
+`cpu_archive_levels` checks that every level of every target in the archive has its
+library.
+
+The native libraries stay at the default level, in `lib/<target>/`. They are large and
+are built once. A program below the default that imports one is refused at link, with
+`anti.raylib is built for x86-64-v3, this program targets v1`.
 
 ## One archive with llvm-ar
 

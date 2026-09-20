@@ -364,6 +364,7 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
 
     memset(f, 0, sizeof *f);
     in->linker = o->linker;
+    in->cpu = o->cpu;
     in->debug = o->debug;
     if (o->linker == LINKER_PLATFORM) {
         if (os == OS_MACOS) {
@@ -1480,7 +1481,7 @@ static bool bundle(const struct options *o, const char *object,
         add_path(members, object);
         return true;
     }
-    link_runtime_library(&library, o->runtime, o->target);
+    link_runtime_library(&library, o->runtime, o->target, o->cpu);
     text_appendf(&dir, "%s.rt", base);
     text_appendf(&output, "--output=%s", text_cstr(&dir));
     {
@@ -1491,8 +1492,9 @@ static bool bundle(const struct options *o, const char *object,
     {
         struct text stub = {0};
         char *path;
-        text_appendf(&stub, "%s/%s/%s/%s%s", o->runtime, RUNTIME_LIB_DIR,
-                     target_name(o->target), RUNTIME_LICENSE_STUB,
+        text_appendf(&stub, "%s/%s/%s/%s/%s%s", o->runtime, RUNTIME_LIB_DIR,
+                     target_name(o->target), cpu_name(o->cpu),
+                     RUNTIME_LICENSE_STUB,
                      target_info(o->target)->object_suffix);
         path = arena_alloc(arena, stub.length + 1);
         memcpy(path, text_cstr(&stub), stub.length + 1);
@@ -1634,7 +1636,7 @@ static bool build_c_library(const struct options *o, const char *object,
         }
         if (ok) {
             struct text line = {0};
-            link_line(&line, o->target, text_cstr(&path), o->runtime,
+            link_line(&line, o->target, text_cstr(&path), o->runtime, o->cpu,
                       o->bundle_runtime);
             printf("%s\n", text_cstr(&line));
             text_free(&line);
@@ -1726,6 +1728,16 @@ int driver_run(const struct options *o)
     bool object_only = false;
     int status = 1;
 
+    /* DESIGN: a caller that builds its own options sets the level, because
+       the zero value of enum cpu_level names v1 rather than the target's
+       default. A level of the other architecture is that mistake, and it
+       would link a runtime directory that does not exist. */
+    if (cpu_arch(o->cpu) != target_info(o->target)->arch) {
+        fprintf(stderr, "antic: %s is no processor level of %s\n",
+                cpu_name(o->cpu), target_name(o->target));
+        return 2;
+    }
+
     memset(&extras, 0, sizeof extras);
 
     if (!ends_with(o->input, SOURCE_SUFFIX) &&
@@ -1736,7 +1748,7 @@ int driver_run(const struct options *o)
     }
     if (links(o) && !o->dev && o->runtime == NULL) {
         fprintf(stderr, "antic: linking needs --runtime <dir>, the directory "
-                        "that holds %s/<target>/\n",
+                        "that holds %s/<target>/<level>/\n",
                 RUNTIME_LIB_DIR);
         return 2;
     }
@@ -1751,7 +1763,7 @@ int driver_run(const struct options *o)
           !can_link(o)))) {
         if (o->runtime == NULL) {
             fprintf(stderr, "antic: --lib needs --runtime <dir>, the directory "
-                            "that holds %s/<target>/\n",
+                            "that holds %s/<target>/<level>/\n",
                     RUNTIME_LIB_DIR);
         }
         return 2;

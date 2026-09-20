@@ -678,7 +678,7 @@ trace class Renderer { }
 
 A release binary carries no symbol data. `anti build --release` writes a symbols archive beside it, and `anti symbols inventory`, `check` and `resolve` collect the archives of a deployment and turn a raw trace into names and lines. `anti.debug.backtrace` captures one at run time, and `--anti.backtrace` turns the frames of an error on in a release build.
 
-The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `armv8.5` on macOS, `armv8.2` on Windows and `armv8.0` on Linux. `--cpu` overrides on every target, and a program refuses to start on a processor below its level. A level is a code-generation setting, not a target.
+The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `armv8.5` on macOS, `armv8.2` on Windows and `armv8.0` on Linux. `--cpu` overrides on every target, and a program refuses to start on a processor below its level. A level is a code-generation setting, not a target. The runtime archive holds one runtime per target and level, so a program below the default links a runtime of its own level. The native libraries are built for the default level alone, and a program below it that imports one is refused at link.
 
 Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, and the CPU levels, with `--cpu`, the start-up check and the runtime archive built for the default level of each target. Not built yet: the variables of `-g`, `trace`, the symbols archives and the backtraces.
 

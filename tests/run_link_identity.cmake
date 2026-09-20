@@ -11,7 +11,7 @@
 #   EXPECTED  the file of the digest
 #   WORK      a directory for the executable
 
-file(GLOB runtime_library "${RUNTIME}/lib/macos-arm64/libanti_rt.a")
+file(GLOB runtime_library "${RUNTIME}/lib/macos-arm64/*/libanti_rt.a")
 if(NOT EXISTS "${RUNTIME}/sysroot/macos-arm64/usr/lib/libSystem.tbd" OR
    runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no macOS stubs or runtime")

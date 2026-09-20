@@ -2,7 +2,7 @@
 # the expected file beside the source. Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   LLVM_MC   the llvm-mc executable
-#   RUNTIME   the runtime directory, holding lib/<target>/libanti_rt.a
+#   RUNTIME   the runtime directory, holding lib/<target>/<level>/
 #   SOURCE    the .anti file
 #   WORK      a directory for the executable and intermediate files
 #   OBJECTS   optional object files to link, separated by commas

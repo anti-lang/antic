@@ -48,6 +48,13 @@
 #endif
 #endif
 
+/* The build compiles one runtime per target and level and names the level
+   here. A build that leaves it out would ship a runtime that checks the
+   wrong processor, so it stops instead. */
+#ifndef ANTI_CPU_LEVEL_ID
+#error "define ANTI_CPU_LEVEL_ID, the anti_cpu_level of this runtime"
+#endif
+
 /* One row per level. needs is the text of the start-up message. */
 struct row {
     int32_t level;
@@ -279,9 +286,14 @@ int32_t anti_cpu_missing(int32_t needed)
     return have < needed ? needed : 0;
 }
 
-void anti_cpu_check(int32_t needed)
+int32_t anti_cpu_built(void)
 {
-    int32_t missing = anti_cpu_missing(needed);
+    return ANTI_CPU_LEVEL_ID;
+}
+
+void anti_cpu_check(void)
+{
+    int32_t missing = anti_cpu_missing(ANTI_CPU_LEVEL_ID);
 
     if (missing == 0) {
         return;

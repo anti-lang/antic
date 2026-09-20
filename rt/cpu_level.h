@@ -1,10 +1,12 @@
 /* The processor levels, shared by antic and the runtime.
 
-   DESIGN: the ids below are one definition read from both sides. antic
-   writes the level of a program into the object that defines main, as the
-   32-bit global anti_cpu_required. rt/start.c compares it against the
-   machine before it calls main. src/cpu.h includes this header rather
-   than repeating the numbers, so the two never drift.
+   DESIGN: the ids below are one definition read from both sides. The
+   runtime archive holds one runtime per target and level, and the build
+   compiles each with ANTI_CPU_LEVEL_ID set to its own id. A program
+   therefore carries the level of the runtime it linked, and rt/start.c
+   checks that against the machine before it calls main. src/cpu.h
+   includes this header rather than repeating the numbers, so antic and
+   the runtime never drift.
 
    A level is a code-generation setting and not a target. The ids of one
    architecture rise with the level, so a comparison decides whether a
@@ -47,8 +49,13 @@ int32_t anti_cpu_level(void);
    level it is missing, for anti_cpu_level_needs. */
 int32_t anti_cpu_missing(int32_t needed);
 
-/* Exit with the message of the section when this machine is too low for
-   needed, and return otherwise. rt/start.c calls it before main. */
-void anti_cpu_check(int32_t needed);
+/* The level this runtime was compiled for, which is the level of the
+   program that linked it. */
+int32_t anti_cpu_built(void);
+
+/* Exit with the message of the section when this machine is below the
+   level of the runtime, and return otherwise. rt/start.c calls it before
+   main. */
+void anti_cpu_check(void);
 
 #endif

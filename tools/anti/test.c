@@ -13,6 +13,7 @@
 
 #include "arena.h"
 #include "ast.h"
+#include "cpu.h"
 #include "diagnostic.h"
 #include "driver.h"
 #include "files.h"
@@ -199,6 +200,9 @@ static void base_options(struct options *o, const char *runtime,
         fputs("anti: unknown host target\n", stderr);
         exit(2);
     }
+    /* A test run builds for the host at the host target's default
+       processor level, as a build without --cpu does. */
+    o->cpu = cpu_default(o->target);
     o->tests = true;
     /* DESIGN: a test names the insides of its own module. `anti test`
        runs the standard library's tests too, so the run allows the

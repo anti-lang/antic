@@ -4,13 +4,17 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "cpu.h"
 #include "target.h"
 #include "text.h"
 
-/* The runtime archive keeps the libraries of each target in
-   <runtime>/RUNTIME_LIB_DIR/<target>/. The sysroot that lld links against
-   is <runtime>/RUNTIME_SYSROOT_DIR/<target>/, and the pinned LLVM tools
-   are in <runtime>/RUNTIME_BIN_DIR/. A macOS sysroot names the version of
+/* The runtime archive keeps the runtime of each target and processor
+   level in <runtime>/RUNTIME_LIB_DIR/<target>/<level>/, so that a program
+   built with --cpu below the target's default links a runtime of its own
+   level. The native libraries stay in <runtime>/RUNTIME_LIB_DIR/<target>/
+   and are built for the default level alone. The sysroot that lld links
+   against is <runtime>/RUNTIME_SYSROOT_DIR/<target>/, and the pinned LLVM
+   tools are in <runtime>/RUNTIME_BIN_DIR/. A macOS sysroot names the version of
    its stubs in the file SYSROOT_SDK_VERSION. The stubs of Apple's SDK for
    a program that names a framework lie in SYSROOT_APPLE_SDK_DIR of it. */
 #define RUNTIME_LIB_DIR "lib"
@@ -40,6 +44,7 @@ struct link_inputs {
     const char *const *extra;   /* object files and archives to link */
     size_t extra_count;
     enum linker linker;
+    enum cpu_level cpu;         /* the level of the runtime to link */
     const char *sysroot;        /* lld: <runtime>/sysroot/<target> */
     const char *lld_dir;        /* lld: its directory, or NULL for PATH */
     const char *const *frameworks; /* macOS: -framework */
@@ -102,13 +107,15 @@ void relocatable_command(struct link_command *c, enum target t,
 /* Append the command line that links a C program main.c with the static
    library, as antic prints it. A bundled runtime needs no runtime library. */
 void link_line(struct text *out, enum target t, const char *library,
-               const char *runtime, bool bundled);
+               const char *runtime, enum cpu_level cpu, bool bundled);
 
 /* Whether path names an object file or an archive for the linker. */
 bool link_is_input(const char *path);
 
-/* Append the path of the runtime library of target t below runtime. */
-void link_runtime_library(struct text *out, const char *runtime, enum target t);
+/* Append the path of the runtime library of target t at level cpu below
+   runtime. */
+void link_runtime_library(struct text *out, const char *runtime, enum target t,
+                          enum cpu_level cpu);
 
 /* The directories that may hold the glibc start files for a Linux target,
    in the order of search, ending with NULL. */

@@ -36,11 +36,14 @@ static struct text *next(struct link_command *c)
     return &c->strings[c->string_count++];
 }
 
-void link_runtime_library(struct text *out, const char *runtime, enum target t)
+void link_runtime_library(struct text *out, const char *runtime, enum target t,
+                          enum cpu_level cpu)
 {
     /* DESIGN: MSVC names a static library name.lib, and the other
-       toolchains libname.a. */
-    text_appendf(out, "%s/%s/%s/%s", runtime, RUNTIME_LIB_DIR, target_name(t),
+       toolchains libname.a. The level names the directory, because the
+       archive holds one runtime per level of the target. */
+    text_appendf(out, "%s/%s/%s/%s/%s", runtime, RUNTIME_LIB_DIR,
+                 target_name(t), cpu_name(cpu),
                  target_info(t)->format == FORMAT_COFF ? "anti_rt.lib"
                                                        : "libanti_rt.a");
 }
@@ -121,7 +124,7 @@ static void macos(struct link_command *c, enum target t,
 {
     struct text *library = next(c);
 
-    link_runtime_library(library, in->runtime, t);
+    link_runtime_library(library, in->runtime, t, in->cpu);
     macos_start(c, t, in, false);
     add(c, "-o");
     add(c, in->executable);
@@ -147,7 +150,7 @@ static void linux_lld(struct link_command *c, enum target t,
     struct text *library = next(c);
     size_t i;
 
-    link_runtime_library(library, in->runtime, t);
+    link_runtime_library(library, in->runtime, t, in->cpu);
     add(c, linker);
     add(c, "-static");
     add(c, "-pie");
@@ -211,7 +214,7 @@ static void linux_ld(struct link_command *c, enum target t,
                      : "/lib64/ld-linux-x86-64.so.2");
     text_appendf(start, "%s/Scrt1.o", in->crt_dir);
     text_appendf(crti, "%s/crti.o", in->crt_dir);
-    link_runtime_library(library, in->runtime, t);
+    link_runtime_library(library, in->runtime, t, in->cpu);
     text_appendf(search, "-L%s", in->crt_dir);
     text_appendf(crtn, "%s/crtn.o", in->crt_dir);
     add(c, "ld");
@@ -245,7 +248,7 @@ static void windows(struct link_command *c, enum target t,
     struct text *library = next(c);
 
     text_appendf(output, "/OUT:%s", in->executable);
-    link_runtime_library(library, in->runtime, t);
+    link_runtime_library(library, in->runtime, t, in->cpu);
     add(c, linker);
     add(c, "/NOLOGO");
     add(c, in->debug ? "/DEBUG" : "/debug:none");
@@ -329,7 +332,7 @@ void link_shared_command(struct link_command *c, enum target t,
 
     start(c, in->extra_count + 2 * in->framework_count);
     library = next(c);
-    link_runtime_library(library, in->runtime, t);
+    link_runtime_library(library, in->runtime, t, in->cpu);
     switch (target_info(t)->os) {
     case OS_MACOS: {
         struct text *install = next(c);
@@ -453,14 +456,14 @@ void relocatable_command(struct link_command *c, enum target t,
 }
 
 void link_line(struct text *out, enum target t, const char *library,
-               const char *runtime, bool bundled)
+               const char *runtime, enum cpu_level cpu, bool bundled)
 {
     bool windows = target_info(t)->os == OS_WINDOWS;
 
     text_appendf(out, "%s main.c %s", windows ? "cl" : "cc", library);
     if (!bundled) {
         text_append(out, " ");
-        link_runtime_library(out, runtime, t);
+        link_runtime_library(out, runtime, t, cpu);
     }
     if (target_info(t)->os == OS_LINUX) {
         text_append(out, " -lpthread -lm");

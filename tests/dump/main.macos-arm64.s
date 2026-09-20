@@ -2,12 +2,6 @@
     .text
     .globl _anti.rt.main
     .set _anti.rt.main, _main.main
-    .section __TEXT,__const
-    .globl _anti_cpu_required
-    .p2align 2
-_anti_cpu_required:
-    .long 21
-    .text
     .p2align 2
 _main.scale:
 L_main.scale.b0:
