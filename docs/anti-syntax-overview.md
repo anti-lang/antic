@@ -13,8 +13,10 @@ Contents:
 - [Statements](#statements)
 - [Loops](#loops)
 - [Functions](#functions)
+- [Tuples](#tuples)
 - [Errors](#errors)
 - [Structs](#structs)
+- [Simd structs](#simd-structs)
 - [Enums](#enums)
 - [Variants](#variants)
 - [Classes](#classes)
@@ -30,6 +32,7 @@ Contents:
 - [Tests](#tests)
 - [C interop](#c-interop)
 - [Compile-time targets](#compile-time-targets)
+- [Source locations](#source-locations)
 - [Checks and debugging](#checks-and-debugging)
 - [Wire formats](#wire-formats)
 - [Script mode](#script-mode)
@@ -71,7 +74,7 @@ let c = r.Canvas.new();
 
 ## Types
 
-Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Function pointers `fn(i32) -> i32`. Structs, enums, variants, classes. The C types `c_int`, `c_long`, `c_wchar` and the rest for bindings. No implicit conversions between numbers.
+Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Function pointers `fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. The C types `c_int`, `c_long`, `c_wchar` and the rest for bindings. No implicit conversions between numbers.
 
 ```anti
 let n: i32 = 5;
@@ -79,11 +82,15 @@ let xs: [4]int = [1, 2, 3, 4];
 let s: []int = xs[1..3];
 let p: *Rect = &r;
 let f: fn(int) -> int = double;
+let t: (int, str) = (1, "one");
+let h: f16 = 1.5 as f16;
 ```
+
+Not built yet: tuples, `f16`.
 
 ## Literals
 
-Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications. `true`, `false`, `none`. Literals take their type from context.
+Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. Bytes in hex `x"00 AB CC"`. The prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
 
 ```anti
 let a = 1_000_000;
@@ -92,10 +99,12 @@ let c = 3.14;
 let d = r#"a "quoted" string"#;
 let e = b"\x00\x01";
 let g = f"{name:>10} costs {price:8.2f}";
+let h = rf"C:\tools\{name}";
+let i = x"00 AB CC";
 let x: i8 = -128;
 ```
 
-Not built yet: `f"..."`.
+Not built yet: `f"..."`, `rf"..."`, `x"..."`.
 
 ## Variables and constants
 
@@ -131,7 +140,7 @@ Not built yet: wrapping and saturating operators, `Flags`, `??`, `?.`, `in`.
 
 ## Statements
 
-`if`, `else if`, `else`. `switch` with no fallthrough. Assignment is a statement. Blocks `{ }` are statements. `defer` and `undo`. `assert`, `show`, `unreachable`. Labels on blocks.
+`if`, `else if`, `else`. `switch` falls through only where an arm ends in `fallthrough;`. Assignment is a statement. Blocks `{ }` are statements. `defer` and `undo`. `assert`, `show`, `unreachable`. Labels on blocks.
 
 ```anti
 if x > 0 {
@@ -154,9 +163,9 @@ assert(n > 0, "n must be positive");
 let v = show(compute(x));
 ```
 
-`switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release. `unreachable` traps in dev and is undefined in release.
+`switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release. `unreachable` traps in dev and is undefined in release.
 
-Not built yet: `undo`, `show`, `unreachable`, `switch` on `str`.
+Not built yet: `undo`, `show`, `unreachable`, `switch` on `str`, `fallthrough`.
 
 ## Loops
 
@@ -191,9 +200,9 @@ Not built yet: labels, `for i, x`.
 
 ```anti
 fn add(a: int, b: int) -> int { return a + b; }
-fn open(path: str, mode: Mode = Mode.Read) -> ?*Error { }
+fn open(path: str, mode: Mode = Mode.Read) -> *File may fail { }
 
-let e = open("x", mode: Mode.Write);
+let h = open("x", mode: Mode.Write) catch fatal;
 let f = add;
 let g = c.area;         // bound to c, no captures
 let n = g();
@@ -203,9 +212,26 @@ Positional arguments first, named ones after in any order. No overloading by sig
 
 Not built yet: default values and named arguments.
 
+## Tuples
+
+An anonymous struct with C layout, for a function with two answers and no name for the pair.
+
+```anti
+fn divmod(a: int, b: int) -> (int, int) { return (a / b, a % b); }
+
+let t = divmod(7, 2);
+let q = t.0;
+let (d, r) = divmod(7, 2);
+for i, x in items { }
+```
+
+Elements are `t.0`, `t.1` and on. Destructuring is `let (a, b) = e;` and `for i, x in items`, and nowhere else: not in a parameter list and not nested. Two tuple types are the same when their element types are the same in order. A tuple of more than three elements, or one that crosses a module boundary, is a struct that has not been named yet.
+
+Not built yet.
+
 ## Errors
 
-Every function that can fail returns `?*Error`, `none` on success, with results through out pointers. The forms are `catch` at the call, `try` to propagate, `try { }` for a block, `catch fatal` to stop. A bare failing call is a compile error.
+Mark a function that can fail with `may fail`. It leaves on one of two channels: `return v;` with the result, `fail e;` with a `*Error`. The forms at the call are `catch`, `try` to propagate, `try { }` for a block, `catch fatal` to stop. A bare failing call is a compile error.
 
 ```anti
 let n = text.parse_int(s) catch e {
@@ -215,11 +241,11 @@ let n = text.parse_int(s) catch e {
 
 let m = text.parse_int(t) catch fatal;
 
-fn load(path: str, out: *Config) -> ?*Error
+fn load(path: str) -> Config may fail
 {
 	let f = try fs.open(path);
-	...
-	return none;
+	if f.size == 0 { fail "empty configuration"; }
+	return parse(f);
 }
 
 try {
@@ -230,7 +256,11 @@ try {
 }
 ```
 
-A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and the error is deleted when the handler exits unless returned. The compiler supplies the out pointer of the binding over storage whose table it zeroes, and the binding is destroyed at the end of its block like any other local. `Error` has `code`, `message` and an owned `cause`. Libraries subclass it and callers test with `is`.
+A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and the error is deleted when the handler exits unless returned. `fail "text"` is `fail Error.new(0, "text")`. `try` forwards the error and is refused outside a function that may fail. `undo` runs on the `fail` path and not on `return`. `Error` has `code`, `message`, an owned `cause`, the origin `at` that `fail` fills, and the frames of a trace when backtraces are on. Libraries subclass it and callers test with `is`.
+
+The ABI is the hand-written convention, `?*Error f(args, R *out)`, with the result through an out pointer. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. A function written by hand in that form stays legal, and bindings produce it.
+
+Built: `catch`, `try`, the `try` block and `catch fatal` over the hand-written form. Not built yet: `may fail`, `fail`, the origin and the frames.
 
 ## Structs
 
@@ -252,6 +282,25 @@ let a = r.area();       // area(&r)
 ```
 
 `packed struct` removes padding. `struct Foo align(16)` raises alignment. `union` has C layout. Bitfields `flags: u32 : 4`. `size_of(T)` is the size on the target.
+
+## Simd structs
+
+`simd struct` declares a vector whose fields are its lanes. Every field has the same primitive type and the count is a power of two.
+
+```anti
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+let a = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+let b = Vec4.splat(2.0);
+let c = a * b;
+let m = a < b;
+let d = simd.select(m, a, b);
+let s = c.sum();
+```
+
+Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus apply lane by lane. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select`, `simd.any` and `simd.all` are in `anti.simd`. `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` are built in. `as` between a `simd struct` and the array or plain struct of the same bytes is free. The back end maps each operation to the target's native width, so the lane count is the programmer's and the instruction count is the machine's. Above the vector cap it is an array and a loop.
+
+Not built yet.
 
 ## Enums
 
@@ -602,6 +651,21 @@ switch target.os {
 
 Not built yet.
 
+## Source locations
+
+`here` is the position it is written at, as a `SourceLocation` with `file`, `line`, `column`, `function` and `module`. As a default parameter value it is evaluated at the call site, which is how a logger reads its caller's line without a macro.
+
+```anti
+fn warn(msg: str, at: SourceLocation = here) { }
+
+warn("disk is full");       // at is the caller's position
+let p = here;               // the position of this expression
+```
+
+The value is constant data. `here` in an ordinary expression gives the position of that expression, which is rarely what a message wants.
+
+Not built yet.
+
 ## Checks and debugging
 
 In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted. `--checks`, `--asserts`, `--trace` and `-g` override.
@@ -612,7 +676,11 @@ trace class Renderer { }
 
 `trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest.
 
-Built: the checks, with `--checks` and `--no-checks`, and `-g`, which writes the line of every statement and keeps the debug sections of the link. Not built yet: the variables of `-g`, `trace`.
+A release binary carries no symbol data. `anti build --release` writes a symbols archive beside it, and `anti symbols inventory`, `check` and `resolve` collect the archives of a deployment and turn a raw trace into names and lines. `anti.debug.backtrace` captures one at run time, and `--anti.backtrace` turns the frames of an error on in a release build.
+
+The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `armv8.5` on macOS, `armv8.2` on Windows and `armv8.0` on Linux. `--cpu` overrides on every target, and a program refuses to start on a processor below its level. A level is a code-generation setting, not a target.
+
+Built: the checks, with `--checks` and `--no-checks`, and `-g`, which writes the line of every statement and keeps the debug sections of the link. Not built yet: the variables of `-g`, `trace`, the symbols archives, the backtraces and the CPU levels.
 
 ## Wire formats
 
@@ -661,8 +729,10 @@ Not built yet.
 
 ## Reserved words
 
-Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for in break continue return defer undo try catch yield assert show unreachable undefined embed as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join sync chan send recv select atomic true false none tests fixtures provides`.
+Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for in break continue return defer undo try catch yield fail assert show unreachable undefined embed here fallthrough as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join sync chan send recv select atomic true false none tests fixtures provides`.
 
-Contextual words: `packed align by final own operator mutable trace inject compatible`.
+Contextual words: `packed align by final own operator mutable trace inject compatible simd`, and `may fail` after a signature.
+
+String prefixes: `r b br f rf x`.
 
 Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types.

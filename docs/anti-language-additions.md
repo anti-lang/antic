@@ -2,19 +2,26 @@
 
 Rules for the features decided after `docs/anti-object-model.md` and outside it. `docs/decisions.md` refers to the additions document and repeats none of it. The book covers what the compiler does for each. The rest is the language's and lives on anti-lang.com.
 
-Settled on 2026-09-20. The small things, wire formats, binary I/O and the SDK were settled on 2026-09-23.
+Settled on 2026-09-20. The small things, wire formats, binary I/O and the SDK were settled on 2026-09-23. Failing functions, tuples, error origins, source locations, the symbols tooling, the CPU levels, the simd structs and the round-three small items were settled on 2026-09-21.
 
 Contents:
 
 - [Timing](#timing)
 - [Nullable pointers](#nullable-pointers)
+- [Failing functions](#failing-functions)
+- [Tuples](#tuples)
+- [Error origin and stack traces](#error-origin-and-stack-traces)
+- [Source locations](#source-locations)
 - [Dev-mode checks](#dev-mode-checks)
 - [Wrapping and saturating operators](#wrapping-and-saturating-operators)
 - [Flags](#flags)
+- [CPU levels](#cpu-levels)
+- [Simd structs](#simd-structs)
 - [Tests and fixtures](#tests-and-fixtures)
 - [Sum types](#sum-types)
 - [Locking and channels](#locking-and-channels)
 - [Debug information](#debug-information)
+- [Symbols tooling](#symbols-tooling)
 - [Namespaces](#namespaces)
 - [Hooks and tracing](#hooks-and-tracing)
 - [Injection](#injection)
@@ -23,6 +30,7 @@ Contents:
 - [Versions](#versions)
 - [Runtime configuration](#runtime-configuration)
 - [Small things](#small-things)
+- [Small items, round three](#small-items-round-three)
 - [Wire formats](#wire-formats)
 - [Binary I/O](#binary-io)
 - [SDK and frameworks](#sdk-and-frameworks)
@@ -31,9 +39,11 @@ Contents:
 
 ## Timing
 
-Before the first public release: nullable pointers, dev-mode checks, debug information, tests and fixtures. Each changes signatures or output that a user would otherwise depend on.
+Before the first public release: nullable pointers, dev-mode checks, debug information, tests and fixtures, the CPU levels and `none`. Each changes signatures or output that a user would otherwise depend on. The CPU levels change what a release is built for, and `none` is a rename.
 
-After the first release, in this order: the wrapping and saturating operators with `Flags`, sum types, locking and channels, then the small things and wire formats. Then injection, hooks and tracing, plugins and runtime configuration, which belong together. Then generics and closures, which `docs/anti-object-model.md` names.
+After the first release, in this order: the wrapping and saturating operators with `Flags`, sum types, locking and channels. Then `may fail` with tuples, error origins and stack traces, then the symbols tooling, then the small things and wire formats. Then injection, hooks and tracing, plugins and runtime configuration, which belong together. Then generics and closures, which `docs/anti-object-model.md` names.
+
+The round-three small items and the simd structs stay where the small things are.
 
 ## Nullable pointers
 
@@ -50,6 +60,54 @@ After the first release, in this order: the wrapping and saturating operators wi
 - Every pointer in an `extern fn`, in a bound struct and in a C callback is `?*T`. The generated header maps `*T` and `?*T` both to `T *`, with `/* non-null */` on the first. An exported function with a `*T` parameter checks nothing at run time.
 - The standard library returns `?*T` wherever "not found" is an answer, and takes `*T` wherever `none` would be a bug.
 - Nothing is emitted for any of this. The checks are the ones the program wrote.
+- A failing function is written with `may fail`. See [Failing functions](#failing-functions).
+
+## Failing functions
+
+`may fail` replaces the hand-written convention. The convention stays the ABI.
+
+- `fn divide(a: int, b: int) -> (int, int) may fail` declares a function with two channels. `return v;` leaves on the result channel. `fail e;` leaves on the error channel with `e`, a `*Error`. `fn close(f: *File) may fail` has no result and returns success at its closing brace.
+- `fail "text";` is sugar for `fail Error.new(0, "text");`. Code zero means "no code", and `fatal` turns it into exit status 1.
+- A call to a `may fail` function must be handled with `catch`, `try`, `catch fatal` or a `try` block, which is the existing rule. `try` inside a `may fail` function forwards the error. Inside any other function `try` is refused.
+- `undo` runs on the `fail` path and not on `return`.
+- A `may fail` function with no `fail` and no `try` is a warning from `anti check`, not an error, since an interface function may fail in one implementation and not another.
+- The ABI is the old convention: `?*Error f(args, R *out)`, with `out` absent for a function without a result. The header writes that form and the doc comment says the function may fail. A `.antl` records the flag, so a caller in another module handles it.
+- A function written by hand as `-> ?*Error` with out pointers stays legal and is called the same way. Bindings produce that form. The standard library uses `may fail` everywhere, and the rewrite of its signatures is one session when the parser has the form.
+
+```anti
+fn divide(a: int, b: int) -> (int, int) may fail
+{
+	if b == 0 { fail "division by zero"; }
+	return (a / b, a % b);
+}
+
+let (q, r) = divide(7, 2) catch fatal;
+let (q, r) = divide(7, 0) catch e { yield (0, 0); };
+```
+
+## Tuples
+
+- A tuple type is an anonymous struct with C layout. `(int, str)` is a struct of two fields in that order, laid out as the target lays out structs. It is passed and returned by value under the struct rules. Two tuple types are the same when their element types are the same in order.
+- A tuple value is `(a, b)`. Its elements are `t.0`, `t.1`, up to the last. Destructuring is `let (a, b) = e;` and `for i, x in items`, and nowhere else: not in a parameter list and not nested.
+- `for i, x in items` is destructuring of an `(int, T)` per element, and `for i, x in &items` of an `(int, *T)`. `let (result, flags) = a + b;` is destructuring of a `(T, Flags)` result.
+- The C header writes a tuple as a named struct, `struct anti_tuple_int_str { int64_t _0; const struct anti_str *_1; }`, one per distinct tuple type used in an exported signature.
+- Tuples are for functions that have two answers and no name for the pair: `divmod`, `min_max`, a coordinate pair, the flags. A tuple of more than three elements is a struct that has not been named yet. So is one that crosses a module boundary. The site says so.
+
+## Error origin and stack traces
+
+- `Error` gains `pub at: SourceLocation`, set by `fail` at the position of the `fail` statement when the error has no location yet. The first `fail` wins, so an error forwarded through `try` keeps its origin, and the `cause` chain shows the path it took.
+- `Error` gains `own frames: ?*StackTrace`, captured by the same `fail` when backtraces are on. On in dev mode, off in release. `--anti.backtrace` and `backtrace = true` in the runtime configuration turn it on for a release build. When off the field is `none` and `fail` costs what it costs today.
+- `e.text()` prints `file:line:column: message`, then the cause chain, then the trace when there is one. `print` and `fatal` inherit it.
+- `Error.new` takes no location. `fail` supplies it.
+- `anti.debug.StackTrace`: `StackTrace.capture(skip: int = 0) -> *StackTrace` walks frame pointers and stores the return addresses with, per frame, the module the address is in, that module's build id and its load base. `t.frames` is the raw form. `t.text()` prints one address per line with the modules on top. `t.symbolize() -> []Frame` fills `Frame { address, function: str, file: str, line: int }` from the symbol table for the function and from the line table for file and line, so a release build gives functions and a `-g` build gives everything. Symbolising is lazy and never runs for an error that was handled.
+- `anti.debug.backtrace(n)` is the short form returning a `StackTrace`.
+- Every Anti executable and shared library carries a build id, the digest of its code, in `anti_licenses` beside the version.
+
+## Source locations
+
+- `here` is a keyword whose value is a `SourceLocation` for the position it is written at: `file`, `line`, `column`, `function`, `module`. `file` is the root-relative path the checks use. `function` is the full name, `module.Class.f`. The value is constant data, so it costs the loads.
+- `here` as a default parameter value is evaluated at the call site, so `fn log(level: Level, msg: str, at: SourceLocation = here)` sees the caller's position. That is how a logger, `show` and a traced error get the caller's line without a macro.
+- `here` in an ordinary expression gives the position of that expression, which is rarely what a message wants. The site says so.
 
 ## Dev-mode checks
 
@@ -73,13 +131,13 @@ The switch is the one `assert` uses: emitted in dev mode, absent in release, dec
 
 ## Flags
 
-- `let (result, flags) = e;` is a two-name `let` whose right side is one arithmetic operation on an integer type: `+ - *`, `<< >>`, or unary `-`. `result` has the operand type and holds the wrapped value. `flags` has the built-in struct type `Flags`.
+- `let (result, flags) = e;` destructures a `(T, Flags)` result whose right side is one arithmetic operation on an integer type: `+ - *`, `<< >>`, or unary `-`. `result` has the operand type and holds the wrapped value. `flags` has the built-in struct type `Flags`. See [Tuples](#tuples).
 - `Flags` has four `bool` fields: `overflow`, `carry`, `zero`, `negative`. It is a struct of four bytes, and C sees it as such.
 - No trap in any build. Asking for the flags states that overflow is expected.
 - The lowering is the instruction plus one flag read per field the program uses. Unused fields cost nothing.
 - Carry in. When the last operand of `+` is the `carry` field of a `Flags` value, the lowering is `adc` on x86_64 and `adcs` on ARM64, and the result's `carry` is the carry out. The same holds for `-` with `borrow`, which is the `carry` field read the way subtraction uses it.
 - The result name is always new. The flags name may be a new variable or an existing `Flags` variable in scope, which is then assigned. The plain form `(result, flags) = e;` assigns to two existing names.
-- There is no pair type. The two-name `let` is the only place two names bind from one expression. Nothing else in the language takes or returns a pair.
+- The pair is a tuple and the two names are its destructuring, so the form is the one [Tuples](#tuples) gives.
 
 ```anti
 let (lo, f) = a.lo + b.lo;
@@ -88,6 +146,25 @@ if f.overflow {
 	return error.Error.new(1, "sum does not fit");
 }
 ```
+
+## CPU levels
+
+- The x86_64 baseline for everything Anti ships and for release builds is x86-64-v3. `--cpu v1` and `--cpu v2` stay available for a program that must run older hardware. The runtime archive's native libraries are built for v3.
+- The ARM64 baseline is per operating system. `macos-arm64` is `armv8.5`, since every Apple Silicon Mac is an M1 or later. `linux-arm64` is `armv8.0`, for the Pi 4 and older boards. `windows-arm64` is `armv8.2`, since every Windows-on-ARM machine sold is a Snapdragon 8cx or later. `--cpu` overrides on every target. `armv8.2` and above make atomics one instruction and add half-precision conversion and the dot products.
+- `rt/start.c` checks the processor once at start. When the machine has less than the program needs, it exits with a message naming the level. The message reads "this program needs a processor with AVX2 (x86-64-v3, 2013 or later)".
+- A level is a code-generation setting, not a target. The six targets stay six.
+- The vector byte cap of [Simd structs](#simd-structs) is a constant in the level table. It is the widest vector register of any level antic knows.
+
+## Simd structs
+
+- `simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }` declares a vector. Every field is the same primitive type and the field count is a power of two. The size is a multiple of eight bytes up to the level table's cap, 256 bytes to start. The alignment is the size or sixteen, whichever is smaller. Fields are visible and named, so `v.x` is a lane.
+- `+ - * /`, the bitwise operators on integer lanes, comparisons and unary minus apply element-wise, built in. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select(mask, a, b)`, `simd.any(mask)` and `simd.all(mask)` live in `anti.simd`.
+- Built-ins on the type and on values, lowered straight to instructions: `Vec4.splat(v)`, `Vec4.load(slice, i)`, `v.store(slice, i)`, `v.shuffle(...)` with constant indexes, `v.sum()`, `v.min()`, `v.max()`, `a.dot(b)`. Anything that costs more than one instruction on the native width is a named function, so a reader sees it.
+- `as` between a `simd struct` and the array or plain struct of the same bytes is free, both ways. A raylib `Vector4` becomes a `Vec4` that way.
+- C layout: a 16-byte `simd struct` is `float32x4_t` on ARM64 and `__m128` on x86_64, passed and returned in vector registers. The header writes the vector type.
+- The back end maps every operation to the target's native width. One instruction where the width exists, two or more where it does not. The same result everywhere. A `f32x8` is one instruction on x86_64 at v3 and two on ARM64. A `f32x64` is sixteen on ARM64. The lane count is the programmer's, the instruction count is the machine's.
+- `f16` lanes are storage only, as `f16` is: every operation converts to `f32` lanes and back.
+- Above the cap it is an array and a loop, with a message that says which. Variable-length vectors, scatter and gather, and vectorisation of scalar loops are not part of it.
 
 ## Tests and fixtures
 
@@ -145,6 +222,17 @@ tests
 - With `-g` a debugger shows Anti source lines, sets breakpoints by file and line, and prints a backtrace with function names. Variables are not described in the first version, so `print x` shows nothing. That is the next step, and the closing guide names it.
 - `anti build` passes `-g` in dev mode. Release mode never does.
 - `.loc` costs nothing in the emitted code and is never a reason for a program to behave differently.
+
+## Symbols tooling
+
+The release binary carries no symbol data. Every deliverable ships a symbols archive beside it. `anti symbols` manages those archives.
+
+- `anti build --release` writes, beside `prog`, `prog-symbols.zip` holding `prog.debug`, the same link with the debug sections kept, and `prog.map`, a text map of address ranges to function, file and line. Both carry the build id. A shared library or a plugin is its own deliverable with its own archive. Zip, because every host opens one without a tool.
+- `anti symbols inventory --conf config.toml [--from dir] [--out symbols.zip]` reads the runtime configuration, finds the program, the `plugins` directories and the `[injections]` libraries, reads every Anti binary's build id, and folds each one's symbols archive into one `symbols.zip` for the deployment, keyed by id, with an `index.toml` of module, id, version and source. It reports what it could not find.
+- `anti symbols check --conf config.toml [--symbols symbols.zip]` walks the same binaries and reports per module whether its symbols are present, stale because the binary changed, or missing. Non-zero exit when anything is missing, so a deployment script can stop a rollout.
+- `anti symbols resolve trace.txt --symbols symbols.zip` turns a raw trace into function names and lines, matching each frame to an archive by build id. More than one `--symbols` is allowed. An archive whose id matches no frame is ignored. A frame whose id matches no archive is printed raw.
+- The `.debug` twin is preferred over the map when both are present, because it carries inlining. The twin holds root-relative paths and names and nothing else, so keeping it is a matter of size, not secrecy.
+- The release layout on the site and on GitHub keeps `symbols/` beside each release, never in the package a user downloads.
 
 ## Namespaces
 
@@ -254,13 +342,24 @@ Each is compile-time only. Each removes something people write by hand. None cos
 - `p ?? q` on a `?*T` yields `p` as `*T` when it is not `none` and `q` otherwise. `q` has type `*T` or `?*T`, and the result has the wider of the two.
 - `p?.x` and `p?.f(args)` on a `?*T` yield `none` when `p` is `none` and otherwise the field or the call. The result has type `?*U` when the field or result is a pointer, and is refused otherwise, since Anti has no optional values. Chains follow the first `none`.
 - Default parameter values: `fn open(path: str, mode: Mode = Mode.Read) -> *Error`. The default is a constant expression. Named arguments: `open("x", mode: Mode.Write)`. Positional arguments come first and in order. Named ones follow in any order, each at most once. No positional may follow a named one. Defaults fill what is not given.
-- `for i, x in slice { }` binds the index and the element. `for i, x in &slice { }` binds the index and a pointer.
 - `switch` on a `str` compares with `text.equal` in a chain, in arm order. The chapter says it is a chain and not a table.
 - `x in lo..hi` is `x >= lo && x < hi`. `in` applies to ranges only. Membership in a slice is `slice.contains(x)`, a call, because it is a search.
 - Format specifications in `f"..."`: `f"{x:08.3f}"`, `f"{name:>20}"`, `f"{n:x}"`, `f"{n:b}"`. Width, precision, alignment with `<`, `>` and `^`, zero padding, `x`, `X`, `b`, `o` and `e`. Parsed at compile time into calls of `anti.text`. An unknown specification is a compile error.
 - Compile-time targets. `target.os`, `target.cpu` and `target.mode` are constants of the enums `Os { Linux, MacOS, Windows }`, `Cpu { X86_64, Arm64 }` and `Mode { Dev, Release }`. A `switch` on one of them is allowed at module level, where its arms hold declarations, and inside functions. It follows the exhaustiveness rule of every `switch`: every value or `else`. Lowering keeps every arm in the IR, tagged with its condition, and the back end keeps the arm for its target and drops the rest before optimisation. Two arms may declare the same name. A library file therefore serves all six targets.
 - `anti check --targets all` runs the front end once per target. A program that type-checks on the host is then proven to type-check on all six.
 - Script mode. A file whose first line is `#!/usr/bin/env anti` runs with `./tool.anti`. `anti file.anti` compiles the file as a dev build into `~/.anti/cache/<digest>/`, keyed by the file's digest and the compiler version, and runs the result. A second run is a cache hit. No manifest, and `anti.io`, `anti.text` and the rest of the standard library are available.
+
+## Small items, round three
+
+- `fallthrough;` as the last statement of a `switch` arm continues into the next arm's body without testing its values. Not in the last arm, and not into an arm that binds a variant's fields.
+- `rf"..."` and `rf#"..."#`: interpolation without escape processing. `{expr}` and the format specifications work as in `f"..."`, every backslash is literal, `{{` and `}}` write a brace. `fr` is refused with a message naming `rf`.
+- `x"00 AB CC"`: a `[]byte` literal of hex pairs with whitespace ignored. An odd digit count or a non-hex character is an error naming the position. No hash delimiters, since the content is hex and spaces.
+- The string prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, letters only, one meaning each, listed in one table. No word-form prefixes.
+- `f16` is a storage type: sixteen bits in a field, an array or a slice, read as `f32`, written with `as f16`. No arithmetic on it. The conversion is one instruction on ARM64 and on x86_64 at v3, and a runtime routine at `v1`.
+- `anti check` compiles every constant pattern passed to `regex.compile` with PCRE2. It reports a syntax error with the pattern's file, line and the position PCRE2 names. A pattern built at run time is not checked. The check is skipped with a note when the runtime archive is absent.
+- `none`, replacing `null`: the value of a `?*T` or `?fn` that points at nothing. On every current target it is represented as address 0, so that C's `NULL` and Anti's `none` are one value across a call. The language does not promise that representation, and a target where address 0 is memory may choose another.
+- A static function is namespaced by its class and may share a name with a static in the chain. The redeclaration rule covers fields, functions that take `self`, and constants.
+- Considered and declined: a power operator `**`. It would be the one arithmetic operator that compiles to a library call, and `math.pow` says that it is one. Considered and declined: multiple names in one `let`, `let a, b = e;`, since a `let` binds one name and the two-name form is tuple destructuring.
 
 ## Wire formats
 
@@ -352,11 +451,23 @@ Rules:
 - `` `in` takes a range ``
 - `` unknown format `{x:q}` ``
 - `` `switch target.os` lacks `Windows` ``
+- `` `divide` may fail and its error is not handled ``
+- `` `try` outside a function that may fail ``
+- `` `close` may fail and never does `` as a warning from `anti check`
+- `` `fallthrough` in the last arm ``
+- `` `fr"` is not a prefix, write `rf"` ``
+- `` odd digit count in `x"..."` at column 7 ``
+- `` `f16` has no arithmetic, convert with `as f32` ``
+- `` pattern `[a-` at column 3: missing terminating ] `` from `anti check`
+- `` `Vec4` lanes must share one type ``
+- `` `f32x128` exceeds the vector cap, use an array ``
+- `` this program needs a processor with AVX2 (x86-64-v3, 2013 or later) `` at run time
 
 ## Keywords
 
-- Keywords added: `variant`, `tests`, `fixtures`, `provides`, `undo`, `unreachable`, `undefined`, `show`, `embed`. `sync`, `chan`, `send`, `recv`, `select` were reserved.
-- Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range.
+- Keywords added: `variant`, `tests`, `fixtures`, `provides`, `undo`, `unreachable`, `undefined`, `show`, `embed`, `fail`, `here`, `fallthrough`. `sync`, `chan`, `send`, `recv`, `select` were reserved.
+- Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range, `may fail` after a signature, `simd` before `struct`.
+- String prefixes added: `rf` and `x`.
 - Labels added: an identifier and `:` before `for`, `while` or a block.
 - Tokens added: `?*`, `+% -% *% <<%`, `+| -| *|`, the two-name `let` form `let (a, b) =`.
 - Built-in types added: `Flags`, `Mutex`, `chan T`.
