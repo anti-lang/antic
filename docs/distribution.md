@@ -40,7 +40,8 @@ layout.
 - `SHA256SUMS` beside them holds one line per file, which `shasum -c` reads. It is the
   manifest the release script signed, and `SHA256SUMS.sig` stands beside it. A version
   directory of `anti` holds the six packages and the six symbols archives, and the
-  manifest names all twelve.
+  manifest names all twelve. Both installers read the signature against the key they
+  carry before they trust a line of the manifest, and stop when it is missing or wrong.
 
 A path is written once and never again. A pin file in the repository names the file and
 its digest, so an older Anti keeps installing its pinned version. The files can move to a
@@ -108,18 +109,22 @@ cmake -DDIR=<directory> -DREMOTE=<user@host:/path> -P tools/publish.cmake
 ```
 
 It refuses a directory whose `SHA256SUMS` names a file that is missing, whose digests
-disagree, or that holds a file the manifest does not name. It then sends the files, sends
-the manifest last, and reads the digests back over ssh. `CHECK_ONLY` runs the checks and
-sends nothing.
+disagree, or that holds a file the manifest does not name. It refuses one without
+`SHA256SUMS.sig`, or whose signature is of another manifest, because an installer takes
+neither. It then sends the files, the signature and the manifest last, and reads the
+digests back over ssh. `CHECK_ONLY` runs the checks and sends nothing, which is what step
+6 of a release does before it tags. `KEY` names another public key than
+`keys/release.pem`.
 
 ### The release script
 
 `./r` in the root of the repository makes a release. It reads the version from
 `tools/version` and its entry from `CHANGELOG.md`. It runs the suite of the Mac
 and the two sanitizer suites in an export of the commit, packs the six hosts,
-writes the symbols archives and checks the packages on both VMs. It then signs
-the one `SHA256SUMS` of the release with the release key, tags the commit and uploads the assets to a
-GitHub release. It runs the runner matrix once, writes `downloads/index.toml`
+writes the symbols archives beside them and checks the packages on both VMs. The
+packages and the archives stand in `build/dist/packages` under the one `SHA256SUMS`
+that the packer wrote, which it then signs in place with the release key. It tags
+the commit and uploads the assets to a GitHub release. It runs the runner matrix once, writes `downloads/index.toml`
 for anti-lang.com and installs the result from outside. `./r --dry-run` performs the
 first five steps and prints what the rest would do.
 

@@ -568,6 +568,24 @@ add_test(NAME installer_options
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_installer_options.cmake")
 
+# The installer trusts no line of SHA256SUMS before it has checked
+# SHA256SUMS.sig against the key it carries.
+add_test(NAME manifest_signature
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/manifest-signature"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_manifest_signature.cmake")
+set_tests_properties(manifest_signature PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The checks tools/publish.cmake makes before it uploads a version
+# directory of the download area.
+add_test(NAME publish_manifest
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/publish-manifest"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_publish_manifest.cmake")
+set_tests_properties(publish_manifest PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # ./r on a copy of the tree, with the build, the packer and the two VMs
 # stood in for on the PATH. It checks the order of the steps, the output
 # of each and the refusals of the preflight.

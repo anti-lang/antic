@@ -57,8 +57,12 @@ dist=$root/build/dist
 [ "$dry_run" = no ] || dist=$root/build/dist/dry-run
 state=$dist/state
 logs=$dist/logs
+# DESIGN: the packages and the symbols archives of a release stand in one
+# directory under one SHA256SUMS. The packer writes that manifest, step 4
+# extends it and step 6 signs it in place. The directory is what
+# tools/publish.cmake uploads and what a user downloads from. A file
+# beside the twelve is a file a user takes for part of the release.
 packages=$dist/packages
-symbols=$dist/symbols
 work=$dist/work
 export_tree=$dist/export
 
@@ -184,7 +188,7 @@ preflight() {
     # publishing a package of one commit beside a suite of another.
     if [ -f "$state/head" ] && [ "$(cat "$state/head")" != "$head" ]; then
         say "the state is of $(cut -c1-7 < "$state/head"), so the steps run again"
-        rm -rf "$state" "$logs" "$packages" "$symbols" "$work" "$export_tree"
+        rm -rf "$state" "$logs" "$packages" "$work" "$export_tree"
     fi
     mkdir -p "$state"
     echo "$head" > "$state/head"
@@ -305,7 +309,7 @@ build_packages() {
 # entries, and that is what the step reads.
 build_symbols() {
     starts 04 symbols "the symbols of the twelve programs" || return 0
-    mkdir -p "$symbols" "$work"
+    mkdir -p "$packages" "$work"
     for host in $hosts; do
         name=$(package_name "$host")
         if tar -tf "$packages/$name" | grep -q 'symbols\.zip$'; then
@@ -334,12 +338,31 @@ build_symbols() {
                 say "$host: $program has no symbol table, so its sections go in"
             fi
         done
-        archive=$symbols/$(symbols_name "$host")
+        archive=$packages/$(symbols_name "$host")
         rm -f "$archive"
         (cd "$work/$host/syms" && zip -q -j "$archive" ./*.syms) ||
             die "step 4: $host: zip wrote no symbols archive"
         say "$(symbols_name "$host"), $(digest_of "$archive" | cut -c1-12)"
     done
+
+    # The packer wrote a line per package. The six archives join them, so
+    # that the directory of the release carries one manifest of twelve
+    # files. The step is run again after a failure, and a line it wrote
+    # before is replaced rather than doubled.
+    manifest=$packages/SHA256SUMS
+    [ -f "$manifest" ] || die "step 4: the packer wrote no SHA256SUMS"
+    for host in $hosts; do
+        grep -q "  $(package_name "$host")\$" "$manifest" ||
+            die "step 4: SHA256SUMS names no $(package_name "$host")"
+    done
+    grep -v -e '-symbols\.zip$' "$manifest" > "$work/SHA256SUMS.new"
+    for host in $hosts; do
+        (cd "$packages" && shasum -a 256 "$(symbols_name "$host")") \
+            >> "$work/SHA256SUMS.new"
+    done
+    sort -k2 "$work/SHA256SUMS.new" > "$manifest"
+    rm -f "$work/SHA256SUMS.new"
+    say "SHA256SUMS of $packages names $(wc -l < "$manifest" | tr -d ' ') files"
     finished 04 symbols
 }
 
@@ -361,7 +384,20 @@ grep 'tests passed' release-ctest.log
 
 home=\$HOME/anti-release/installed
 rm -rf "\$home"
-ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release \\
+if ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release \\
+    ANTI_HOME=\$home ANTI_REPLACE=yes ANTI_PATH=no ANTI_MICROSOFT=no \\
+    sh "\$HOME/anti-release/install.sh" > release-unsigned.log 2>&1; then
+    echo "the installer took a manifest without a signature"
+    exit 1
+fi
+grep -q 'SHA256SUMS.sig' release-unsigned.log || {
+    echo "the installer stopped for another reason than the signature"
+    cat release-unsigned.log
+    exit 1
+}
+echo "the installer refuses a manifest without a signature"
+rm -rf "\$home"
+ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release ANTI_STAGING=yes \\
     ANTI_HOME=\$home ANTI_REPLACE=yes ANTI_PATH=no ANTI_MICROSOFT=no \\
     sh "\$HOME/anti-release/install.sh" > release-install.log 2>&1
 "\$home/bin/antic" --version
@@ -403,6 +439,13 @@ set ANTI_REPLACE=yes
 set ANTI_PATH=no
 set ANTI_MICROSOFT=no
 if exist "%ANTI_HOME%" rmdir /s /q "%ANTI_HOME%"
+powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > release-unsigned.log 2>&1
+if not errorlevel 1 (echo the installer took a manifest without a signature & exit /b 1)
+findstr /C:"SHA256SUMS.sig" release-unsigned.log > nul
+if errorlevel 1 (echo the installer stopped for another reason than the signature & type release-unsigned.log & exit /b 1)
+echo the installer refuses a manifest without a signature
+if exist "%ANTI_HOME%" rmdir /s /q "%ANTI_HOME%"
+set ANTI_STAGING=yes
 powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > release-install.log 2>&1
 if errorlevel 1 (echo the install failed & type release-install.log & exit /b 1)
 "%ANTI_HOME%\bin\antic.exe" --version
@@ -438,6 +481,10 @@ send_to_vm() {
     fi
     scp -q -o BatchMode=yes "$work/tree.tar" "$machine:anti-release/tree.tar" ||
         die "step 5: the tree did not reach $machine"
+    # DESIGN: the manifest travels without its signature, which step 6
+    # writes after this step. The VM therefore checks both halves of the
+    # rule: the installer refuses the unsigned manifest, and takes it
+    # with ANTI_STAGING, which only a release sets.
     scp -q -o BatchMode=yes "$packages/$(package_name "$host")" \
         "$packages/SHA256SUMS" "$machine:anti-release/anti/$version/" ||
         die "step 5: the package did not reach $machine"
@@ -469,6 +516,8 @@ vm_checks() {
     say "anti-linux: $(grep 'tests passed' "$logs/linux.log" || echo 'the suite printed no count')"
     grep -q "antic $version" "$logs/linux.log" ||
         die "step 5: the install on anti-linux printed no antic $version"
+    grep -q "refuses a manifest without a signature" "$logs/linux.log" ||
+        die "step 5: the installer of anti-linux checked no signature"
     say "anti-linux: the package installs, compiles a program and uninstalls"
 
     send_to_vm anti-windows windows-arm64
@@ -481,6 +530,8 @@ vm_checks() {
     say "anti-windows: $(grep 'tests passed' "$logs/windows.log" || echo 'the suite printed no count')"
     grep -q "antic $version" "$logs/windows.log" ||
         die "step 5: the install on anti-windows printed no antic $version"
+    grep -q "refuses a manifest without a signature" "$logs/windows.log" ||
+        die "step 5: the installer of anti-windows checked no signature"
     say "anti-windows: the package installs and uninstalls"
     finished 05 vms
 }
@@ -492,44 +543,47 @@ release_files() {
         printf '%s/%s\n' "$packages" "$(package_name "$host")"
     done
     for host in $hosts; do
-        printf '%s/%s\n' "$symbols" "$(symbols_name "$host")"
+        printf '%s/%s\n' "$packages" "$(symbols_name "$host")"
     done
 }
 
-# Step 6. One manifest over the twelve files, signed with the release
-# key. The manifest of the packages alone, which the packer wrote, is
-# the one the download area carries.
+# Step 6. The signature of the one manifest, written in place beside the
+# twelve files it names. The packer wrote the lines of the six packages
+# and step 4 added the six archives. This step adds no digest. It checks
+# that the manifest is the whole release, and signs it.
 digests() {
+    manifest=$packages/SHA256SUMS
+    hashed=$work/SHA256SUMS.sha256
     if [ "$dry_run" = yes ]; then
-        printf 'r: step 6, the digests and the signature\n'
-        say "would write SHA256SUMS of 12 files in $dist"
-        say "would sign it with \$RELEASE_KEY into SHA256SUMS.sig"
+        printf 'r: step 6, the signature of the manifest\n'
+        say "would sign $manifest with \$RELEASE_KEY into SHA256SUMS.sig"
         return 0
     fi
-    starts 06 digests "the digests and the signature" || return 0
-    : > "$dist/SHA256SUMS.new"
+    starts 06 digests "the signature of the manifest" || return 0
+    mkdir -p "$work"
     for file in $(release_files); do
         [ -f "$file" ] || die "step 6: $file is missing"
-        (cd "$(dirname "$file")" && shasum -a 256 "$(basename "$file")") \
-            >> "$dist/SHA256SUMS.new"
+        grep -q "  $(basename "$file")\$" "$manifest" ||
+            die "step 6: SHA256SUMS names no $(basename "$file")"
     done
-    sort -k2 "$dist/SHA256SUMS.new" > "$dist/SHA256SUMS"
-    rm -f "$dist/SHA256SUMS.new"
-    say "SHA256SUMS holds $(wc -l < "$dist/SHA256SUMS" | tr -d ' ') files"
+    lines=$(wc -l < "$manifest" | tr -d ' ')
+    [ "$lines" = 12 ] ||
+        die "step 6: SHA256SUMS holds $lines lines, and a release has twelve files"
+    say "SHA256SUMS names the twelve files of the release"
 
     # A signature made by hand, after an earlier run stopped without the
     # key, is taken when it verifies against the manifest of this run.
-    if [ -f "$dist/SHA256SUMS.sig" ]; then
-        openssl dgst -sha256 -binary -out "$dist/SHA256SUMS.sha256" \
-            "$dist/SHA256SUMS"
+    if [ -f "$packages/SHA256SUMS.sig" ]; then
+        openssl dgst -sha256 -binary -out "$hashed" "$manifest"
         if openssl pkeyutl -verify -pubin -inkey "$root/keys/release.pem" \
-            -in "$dist/SHA256SUMS.sha256" -sigfile "$dist/SHA256SUMS.sig" \
+            -in "$hashed" -sigfile "$packages/SHA256SUMS.sig" \
             > /dev/null 2>&1; then
             say "the signature beside the manifest verifies against keys/release.pem"
+            check_area
             finished 06 digests
             return 0
         fi
-        rm -f "$dist/SHA256SUMS.sig"
+        rm -f "$packages/SHA256SUMS.sig"
         say "the signature beside the manifest is of another manifest, so it goes"
     fi
 
@@ -537,23 +591,35 @@ digests() {
     if [ -z "$key" ] || [ ! -f "$key" ]; then
         printf 'r: the release key is missing, so the run stops before the tag\n'
         printf 'r: sign the manifest and run ./r again:\n'
-        printf '    openssl dgst -sha256 -binary -out %s/SHA256SUMS.sha256 %s/SHA256SUMS\n' \
-            "$dist" "$dist"
-        printf '    openssl pkeyutl -sign -inkey <release-key.enc.pem> -in %s/SHA256SUMS.sha256 -out %s/SHA256SUMS.sig\n' \
-            "$dist" "$dist"
+        printf '    openssl dgst -sha256 -binary -out %s %s\n' "$hashed" "$manifest"
+        printf '    openssl pkeyutl -sign -inkey <release-key.enc.pem> -in %s -out %s/SHA256SUMS.sig\n' \
+            "$hashed" "$packages"
         die "RELEASE_KEY names no file"
     fi
-    openssl dgst -sha256 -binary -out "$dist/SHA256SUMS.sha256" "$dist/SHA256SUMS"
+    openssl dgst -sha256 -binary -out "$hashed" "$manifest"
     printf 'r: openssl asks for the passphrase of %s\n' "$key"
-    openssl pkeyutl -sign -inkey "$key" -in "$dist/SHA256SUMS.sha256" \
-        -out "$dist/SHA256SUMS.sig" || die "step 6: openssl signed nothing"
+    openssl pkeyutl -sign -inkey "$key" -in "$hashed" \
+        -out "$packages/SHA256SUMS.sig" || die "step 6: openssl signed nothing"
     # A signature that fails the check never reaches a release.
     openssl pkeyutl -verify -pubin -inkey "$root/keys/release.pem" \
-        -in "$dist/SHA256SUMS.sha256" -sigfile "$dist/SHA256SUMS.sig" \
+        -in "$hashed" -sigfile "$packages/SHA256SUMS.sig" \
         > /dev/null 2>&1 ||
         die "step 6: the signature does not verify against keys/release.pem"
     say "the signature verifies against keys/release.pem"
+    check_area
     finished 06 digests
+}
+
+# The checks tools/publish.cmake makes before it uploads the directory of
+# a version, run here on the directory that goes up. A leftover file or a
+# digest that moved stops the release before the tag rather than after
+# the upload.
+check_area() {
+    mkdir -p "$logs"
+    cmake -DDIR="$packages" -DCHECK_ONLY=yes -P "$root/tools/publish.cmake" \
+        > "$logs/area.log" 2>&1 ||
+        die "step 6: $packages is no download area, see $logs/area.log"
+    say "$(grep -o '[0-9]* files, each named and each digest right' "$logs/area.log")"
 }
 
 # The SHA-256 fingerprint of the public release key, which the site
@@ -599,7 +665,7 @@ tag_and_release() {
     gh release create "$tag" --repo "$(repository)" --verify-tag $draft \
         --title "Anti $version" --notes-file "$work/notes.md" > /dev/null ||
         die "step 7: gh wrote no release"
-    for file in $(release_files) "$dist/SHA256SUMS" "$dist/SHA256SUMS.sig"; do
+    for file in $(release_files) "$packages/SHA256SUMS" "$packages/SHA256SUMS.sig"; do
         gh release upload "$tag" "$file" --repo "$(repository)" ||
             die "step 7: the upload of $file failed, and $tag stays a draft"
         say "uploaded $(basename "$file")"
@@ -764,7 +830,7 @@ report() {
                 "$(grep 'tests passed' "$logs/$name.log" || echo 'no count')"
         done
         printf '\n## Digests\n\n```text\n'
-        cat "$dist/SHA256SUMS"
+        cat "$packages/SHA256SUMS"
         printf '```\n'
         if [ -f "$dist/matrix-run" ]; then
             printf '\nThe run of the matrix is %s.\n' "$(cat "$dist/matrix-run")"

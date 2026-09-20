@@ -251,6 +251,10 @@ foreach(host IN LISTS HOSTS)
     message(STATUS "${packed} ${size} bytes")
     file(REMOVE_RECURSE "${work}")
 endforeach()
+# DESIGN: DEST is the directory of the release, which carries the files
+# the manifest names and nothing else. The objects of a Linux program are
+# written under it and go with the last package.
+file(REMOVE_RECURSE "${DEST}/work")
 # DESIGN: the manifest covers the directory on the server. A run of one
 # host keeps the lines of the packages that DEST already holds, so that
 # publishing one host does not drop the other five from SHA256SUMS.

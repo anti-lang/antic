@@ -2,9 +2,12 @@
 #
 #   cmake -DDIR=<directory> -DREMOTE=<user@host:/path> -P tools/publish.cmake
 #
-# DIR holds the files of one version and a SHA256SUMS that names each of
-# them. REMOTE is the directory of that version on the server, which scp
-# and ssh understand. Set CHECK_ONLY to run the checks and upload nothing.
+# DIR holds the files of one version, a SHA256SUMS that names each of them
+# and the signature SHA256SUMS.sig. REMOTE is the directory of that
+# version on the server, which scp and ssh understand. Set CHECK_ONLY to
+# run the checks and upload nothing. KEY names the public key that the
+# signature is read against, keys/release.pem of this repository by
+# default.
 #
 # DESIGN: the download area holds the files that its manifest names and
 # nothing else. A file beside them is either a leftover of a debugging
@@ -17,10 +20,35 @@ if(NOT DEFINED DIR)
     message(FATAL_ERROR "usage: cmake -DDIR=<directory> -DREMOTE=<dest> "
                         "-P tools/publish.cmake")
 endif()
+if(NOT DEFINED KEY)
+    set(KEY "${CMAKE_CURRENT_LIST_DIR}/../keys/release.pem")
+endif()
 
 set(manifest "${DIR}/SHA256SUMS")
 if(NOT EXISTS "${manifest}")
     message(FATAL_ERROR "${DIR} holds no SHA256SUMS")
+endif()
+
+# DESIGN: every installer reads SHA256SUMS.sig before it trusts a line of
+# SHA256SUMS, so a version directory without it installs nowhere. The
+# signature is read here with the openssl of the installers, against the
+# key they carry, and a manifest changed after it was signed stops the
+# upload rather than the user.
+set(signature "${DIR}/SHA256SUMS.sig")
+if(NOT EXISTS "${signature}")
+    message(FATAL_ERROR "${DIR} holds no SHA256SUMS.sig, and an installer "
+                        "takes no manifest without one")
+endif()
+find_program(OPENSSL openssl)
+if(NOT OPENSSL)
+    message(FATAL_ERROR "openssl is missing, and without it SHA256SUMS.sig is "
+                        "no signature of anything")
+endif()
+execute_process(COMMAND "${OPENSSL}" dgst -sha256 -verify "${KEY}"
+                        -signature "${signature}" "${manifest}"
+                RESULT_VARIABLE wrong OUTPUT_QUIET ERROR_QUIET)
+if(NOT wrong EQUAL 0)
+    message(FATAL_ERROR "SHA256SUMS.sig is no signature of SHA256SUMS by ${KEY}")
 endif()
 
 # The names the manifest lists, and the digest of each.
@@ -45,7 +73,7 @@ endforeach()
 # Everything in the directory is either the manifest or a file it names.
 file(GLOB found RELATIVE "${DIR}" "${DIR}/*")
 foreach(name IN LISTS found)
-    if(name STREQUAL "SHA256SUMS")
+    if(name STREQUAL "SHA256SUMS" OR name STREQUAL "SHA256SUMS.sig")
         continue()
     endif()
     if(NOT name IN_LIST listed)
@@ -72,6 +100,12 @@ foreach(name IN LISTS listed)
     endif()
     message(STATUS "sent ${name}")
 endforeach()
+# The signature goes before the manifest, because an installer reads the
+# manifest first and asks for the signature next.
+execute_process(COMMAND scp -q "${signature}" "${REMOTE}/" RESULT_VARIABLE sent)
+if(NOT sent EQUAL 0)
+    message(FATAL_ERROR "scp of SHA256SUMS.sig failed")
+endif()
 execute_process(COMMAND scp -q "${manifest}" "${REMOTE}/" RESULT_VARIABLE sent)
 if(NOT sent EQUAL 0)
     message(FATAL_ERROR "scp of SHA256SUMS failed")

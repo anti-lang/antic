@@ -195,9 +195,11 @@ exit 0
 ")
 
 # The stand-ins for the two VMs. Every command answers with the lines the
-# script reads: the version of a program it installed and the count of a
+# script reads: the refusal of the unsigned manifest that the installer
+# there prints, the version of a program it installed and the count of a
 # suite.
 file(WRITE "${WORK}/bin/ssh" "#!/bin/sh
+echo 'the installer refuses a manifest without a signature'
 echo 'antic ${version}'
 echo 'anti ${version}'
 echo '100% tests passed, 0 tests failed out of 409'
@@ -255,17 +257,37 @@ foreach(name state/02-suite state/03-packages state/04-symbols state/05-vms
         message(FATAL_ERROR "the dry run wrote no ${name}\n${out}${err}")
     endif()
 endforeach()
+# DESIGN: the packages and the symbols archives stand in one directory
+# under one manifest, which is the directory tools/publish.cmake uploads
+# and step 6 signs. A file beside the twelve is a file a user downloads.
+file(READ "${dist}/packages/SHA256SUMS" manifest)
 foreach(host IN LISTS hosts)
-    foreach(name "packages/anti-${version}-${host}.tar.xz"
-            "symbols/anti-${version}-${host}-symbols.zip")
-        if(NOT EXISTS "${dist}/${name}")
-            message(FATAL_ERROR "the dry run wrote no ${name}\n${out}${err}")
+    foreach(name "anti-${version}-${host}.tar.xz"
+            "anti-${version}-${host}-symbols.zip")
+        if(NOT EXISTS "${dist}/packages/${name}")
+            message(FATAL_ERROR "the dry run wrote no packages/${name}\n${out}${err}")
+        endif()
+        if(NOT manifest MATCHES "  ${name}\n")
+            message(FATAL_ERROR "SHA256SUMS names no ${name}\n${manifest}")
         endif()
     endforeach()
 endforeach()
+string(REGEX MATCHALL "\n" rows "${manifest}")
+list(LENGTH rows count)
+if(NOT count EQUAL 12)
+    message(FATAL_ERROR "SHA256SUMS holds ${count} lines, and a release has "
+                        "twelve files\n${manifest}")
+endif()
+file(GLOB beside RELATIVE "${dist}/packages" "${dist}/packages/*")
+foreach(name IN LISTS beside)
+    if(NOT name STREQUAL "SHA256SUMS" AND NOT manifest MATCHES "  ${name}\n")
+        message(FATAL_ERROR "${name} stands beside the twelve files of the "
+                            "release, and SHA256SUMS does not name it")
+    endif()
+endforeach()
 
 # Nothing is signed, tagged or uploaded, and the run says what it would do.
-foreach(name SHA256SUMS.sig state/06-digests state/07-release)
+foreach(name packages/SHA256SUMS.sig state/06-digests state/07-release)
     if(EXISTS "${dist}/${name}")
         message(FATAL_ERROR "the dry run wrote ${name}")
     endif()

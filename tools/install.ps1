@@ -18,6 +18,10 @@
 #                   anti-lang.com. A release checks its own packages
 #                   through it, before they are published, with a local
 #                   directory or a file:// prefix
+#   ANTI_STAGING    the base is the staging area of a release, whose
+#                   manifest step 6 of ./r signs after the checks of
+#                   step 5. It takes a manifest without a signature, and
+#                   never one whose signature is wrong
 #   ANTI_ARCH       arm64 or x86_64, default the processor of this machine
 #   ANTI_HOME       where to install, default $HOME\.anti, and
 #                   $HOME\.anti-<cpu> for another processor
@@ -80,6 +84,33 @@ if ($arch -eq "intel" -or $arch -eq "x64") { $arch = "x86_64" }
 function Say($text) { Write-Host "anti: $text" }
 function Fail($text) { throw "anti: $text" }
 
+# The openssl of this machine, or the one Git for Windows carries.
+function Find-AntiOpenssl {
+    $found = (Get-Command openssl -ErrorAction SilentlyContinue).Source
+    foreach ($dir in "clangarm64\bin", "mingw64\bin", "usr\bin") {
+        if (-not $found -and (Test-Path "$env:ProgramFiles\Git\$dir\openssl.exe")) {
+            $found = "$env:ProgramFiles\Git\$dir\openssl.exe"
+        }
+    }
+    return $found
+}
+
+# Answer whether $sigfile holds the signature of $file by the release key.
+function Test-AntiSignature($openssl, $file, $sigfile) {
+    Set-Content -Path "$work\release.pem" -Value $release_key -Encoding ascii
+    # openssl writes to stderr on a failure, which Stop would turn into an
+    # error before the exit code is read.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $openssl dgst -sha256 -binary -out "$file.sha256" $file 2>$null
+    $hashed = $LASTEXITCODE
+    & $openssl pkeyutl -verify -pubin -inkey "$work\release.pem" `
+        -in "$file.sha256" -sigfile $sigfile 2>$null | Out-Null
+    $verified = $LASTEXITCODE
+    $ErrorActionPreference = $previous
+    return ($hashed -eq 0 -and $verified -eq 0)
+}
+
 # Ask one yes or no question. The variable of its name answers it, and a
 # plain return accepts.
 function Ask($name, $question) {
@@ -126,7 +157,37 @@ New-Item -ItemType Directory -Force $work | Out-Null
 try {
     Say "downloading $asset"
     Get-AntiFile "$base/anti/$version/$asset" "$work\$asset"
-    $sums = Get-AntiText "$base/anti/$version/SHA256SUMS"
+    Get-AntiFile "$base/anti/$version/SHA256SUMS" "$work\SHA256SUMS"
+
+    # DESIGN: SHA256SUMS says which bytes are the package, so no line of
+    # it is read before openssl has checked SHA256SUMS.sig against the key
+    # above. The digest of the download proves nothing on its own:
+    # whoever serves the package serves the manifest beside it. That is
+    # why a missing openssl stops the install here and only warns for the
+    # LLVM tools, whose digest tools/llvm-pin of the package carries as
+    # well.
+    $signed = $true
+    try {
+        Get-AntiFile "$base/anti/$version/SHA256SUMS.sig" "$work\SHA256SUMS.sig"
+    } catch {
+        $signed = $false
+    }
+    if ($signed) {
+        $openssl = Find-AntiOpenssl
+        if (-not $openssl) {
+            Fail "openssl is missing, and without it SHA256SUMS.sig is no signature of anything. Git for Windows carries one."
+        }
+        if (-not (Test-AntiSignature $openssl "$work\SHA256SUMS" "$work\SHA256SUMS.sig")) {
+            Fail "SHA256SUMS of $version carries no signature of the key of Anti"
+        }
+        Say "SHA256SUMS carries the signature of the key of Anti"
+    } elseif ($env:ANTI_STAGING -match "^(y|Y|yes|Yes)$") {
+        Say "warning: the staging area of a release holds no SHA256SUMS.sig, so this installer checked the digest and not the signature"
+    } else {
+        Fail "$base/anti/$version holds no SHA256SUMS.sig, and an unsigned manifest names no package"
+    }
+
+    $sums = Get-Content "$work\SHA256SUMS" -Raw
     $want = ($sums -split "`n" | Where-Object { $_ -match [regex]::Escape($asset) }) -split "\s+" | Select-Object -First 1
     $got = (Get-FileHash "$work\$asset" -Algorithm SHA256).Hash.ToLower()
     if ($want -ne $got) { Fail "$asset has SHA-256 $got, expected $want" }
@@ -178,24 +239,9 @@ try {
         $line = Get-Content "$work\llvm-sums" | Where-Object { $_.EndsWith("  $tools") }
         $listed = ($line -split "\s+")[0]
         if ($listed -ne $digest) { Fail "SHA256SUMS of $tag lists '$listed' for $tools, and the pin $digest" }
-        $openssl = (Get-Command openssl -ErrorAction SilentlyContinue).Source
-        foreach ($dir in "clangarm64\bin", "mingw64\bin", "usr\bin") {
-            if (-not $openssl -and (Test-Path "$env:ProgramFiles\Git\$dir\openssl.exe")) {
-                $openssl = "$env:ProgramFiles\Git\$dir\openssl.exe"
-            }
-        }
+        $openssl = Find-AntiOpenssl
         if ($openssl) {
-            # openssl writes to stderr on a failure, which Stop would turn
-            # into an error before the exit code is read.
-            Set-Content -Path "$work\release.pem" -Value $release_key -Encoding ascii
-            $previous = $ErrorActionPreference
-            $ErrorActionPreference = "Continue"
-            & $openssl dgst -sha256 -binary -out "$work\llvm-sums.sha256" "$work\llvm-sums" 2>$null
-            $hashed = $LASTEXITCODE
-            & $openssl pkeyutl -verify -pubin -inkey "$work\release.pem" -in "$work\llvm-sums.sha256" -sigfile "$work\llvm-sums.sig" 2>$null | Out-Null
-            $verified = $LASTEXITCODE
-            $ErrorActionPreference = $previous
-            if ($hashed -ne 0 -or $verified -ne 0) {
+            if (-not (Test-AntiSignature $openssl "$work\llvm-sums" "$work\llvm-sums.sig")) {
                 Fail "SHA256SUMS of $tag carries no signature of the key of Anti"
             }
         } else {

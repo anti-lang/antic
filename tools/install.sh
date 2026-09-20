@@ -19,6 +19,10 @@
 #   ANTI_BASE: where the packages are served from, default anti-lang.com.
 #              A release checks its own packages through it, before they
 #              are published, with a file:// prefix of a local directory.
+#   ANTI_STAGING: the base is the staging area of a release, whose
+#              manifest step 6 of ./r signs after the checks of step 5.
+#              It takes a manifest without a signature, and never one
+#              whose signature is wrong.
 #   ANTI_ARCH: arm64 or x86_64, default the processor of this machine.
 #   ANTI_HOME: where to install, default $HOME/.anti, and
 #              $HOME/.anti-<cpu> for the package of another processor.
@@ -92,6 +96,37 @@ sha256() {
     fi
 }
 
+# DESIGN: SHA256SUMS says which bytes are the package, so no line of it is
+# read before openssl has checked SHA256SUMS.sig against the key above.
+# The digest of the download proves nothing on its own: whoever serves the
+# package serves the manifest beside it. A missing openssl therefore stops
+# the install here. It only warns for the LLVM tools, whose digest
+# tools/llvm-pin of the package carries as well.
+check_manifest() {
+    if curl -fsSL -o "$work/SHA256SUMS.sig" \
+        "$base/anti/$version/SHA256SUMS.sig" 2>/dev/null; then
+        command -v openssl >/dev/null 2>&1 ||
+            fail "openssl is missing, and without it SHA256SUMS.sig is no signature of anything"
+        printf '%s\n' "$release_key" > "$work/release.pem"
+        openssl dgst -sha256 -binary -out "$work/SHA256SUMS.sha256" \
+            "$work/SHA256SUMS"
+        openssl pkeyutl -verify -pubin -inkey "$work/release.pem" \
+            -in "$work/SHA256SUMS.sha256" -sigfile "$work/SHA256SUMS.sig" \
+            >/dev/null 2>&1 ||
+            fail "SHA256SUMS of $version carries no signature of the key of Anti"
+        say "SHA256SUMS carries the signature of the key of Anti"
+        return 0
+    fi
+    case ${ANTI_STAGING:-no} in
+    y | Y | yes | Yes)
+        say "warning: the staging area of a release holds no SHA256SUMS.sig, so this installer checked the digest and not the signature"
+        ;;
+    *)
+        fail "$base/anti/$version holds no SHA256SUMS.sig, and an unsigned manifest names no package"
+        ;;
+    esac
+}
+
 case "$(uname -s)" in
 Darwin) os=macos ;;
 Linux) os=linux ;;
@@ -131,6 +166,7 @@ trap 'rm -rf "$work"' EXIT
 say "downloading $asset"
 curl -fsSL -o "$work/$asset" "$base/anti/$version/$asset"
 curl -fsSL -o "$work/SHA256SUMS" "$base/anti/$version/SHA256SUMS"
+check_manifest
 want=$(grep " $asset\$" "$work/SHA256SUMS" | cut -d ' ' -f 1)
 got=$(sha256 "$work/$asset")
 if [ "$want" != "$got" ]; then
