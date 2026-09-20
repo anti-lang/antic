@@ -1,6 +1,15 @@
 # Unit tests link the compiler's code directly. Program tests in
 # tests/programs compile .anti files with antic and run the result.
 
+# llvm-mc of the pinned release, which many tests pass to antic. The
+# search stands above the first of them: a fresh build directory has no
+# cache entry yet, and a value read before find_program writes it is
+# empty. cpu_check_refuses then ran antic with no assembler, and the
+# dry run of the release script found it in an export of the tree.
+find_program(ANTIC_LLVM_MC NAMES llvm-mc
+    HINTS "${ANTIC_LLVM_DIR}/bin"
+    DOC "llvm-mc from LLVM 23.1.1")
+
 add_executable(antic_unit_tests
     unit/test_main.c
     unit/test_target.c
@@ -180,11 +189,6 @@ if(ANTIC_SYSTEM_COMPILER)
 else()
     set(ANTIC_TEST_CXX ${ANTIC_TEST_CC} --driver-mode=g++)
 endif()
-
-# One test per program in tests/programs
-find_program(ANTIC_LLVM_MC NAMES llvm-mc
-    HINTS "${ANTIC_LLVM_DIR}/bin"
-    DOC "llvm-mc from LLVM 23.1.1")
 
 # The runtime archive carries llvm-mc, lld and llvm-ar of LLVM
 # tools/llvm-version, which the build copies to runtime/bin from the
@@ -537,6 +541,12 @@ add_test(NAME package_api
 add_test(NAME line_endings
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_line_endings.cmake")
+
+# A variable of find_program is empty above the call in a fresh build
+# directory, and right in one that a run already filled.
+add_test(NAME find_order
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_find_order.cmake")
 add_test(NAME installer_options
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_installer_options.cmake")

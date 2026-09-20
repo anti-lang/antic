@@ -193,8 +193,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 478 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 477 each, without the `no_paths` test, which needs a
+- 479 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 478 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
