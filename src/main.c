@@ -18,6 +18,8 @@ static int usage(FILE *out)
           "                       assembly or with -c the library, to <file>\n"
           "  -S                   stop after writing the assembly text\n"
           "  -c                   write the library file <file.antl>\n"
+          "  -g                   write the source positions, and keep the\n"
+          "                       debug sections of the link\n"
           "  --dev                compile the module alone into its object,\n"
           "                       and link it when it defines main. The\n"
           "                       input may be a library file instead\n"
@@ -172,6 +174,9 @@ static int run(int argc, char **argv, struct options *o)
             continue;
         } else if (strcmp(arg, "--llvm-ar") == 0) {
             slot = &options.llvm_ar;
+        } else if (strcmp(arg, "-g") == 0) {
+            options.debug = true;
+            continue;
         } else if (strcmp(arg, "--dev") == 0) {
             options.dev = true;
             continue;

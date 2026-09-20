@@ -56,10 +56,11 @@ static void emits_as(const char *source, enum target target, bool one_module,
                                        sizeof error);
             }
         }
-        ok = ok && (one_module ? emit_module(&out, target, &ir, functions, "main",
-                                         error, sizeof error)
-                           : emit_program(&out, target, &ir, functions, "main",
-                                          error, sizeof error));
+        ok = ok && (one_module
+                        ? emit_module(&out, target, &ir, functions, "main",
+                                      false, error, sizeof error)
+                        : emit_program(&out, target, &ir, functions, "main",
+                                       false, error, sizeof error));
         if (!ok) {
             text_append(&out, error);
         }
@@ -130,8 +131,8 @@ static void page_offsets(void)
         CHECK(regalloc_function(TARGET_MACOS_ARM64, functions[i], error,
                                 sizeof error));
     }
-    CHECK(emit_program(&out, TARGET_MACOS_ARM64, &m, functions, "main", error,
-                       sizeof error));
+    CHECK(emit_program(&out, TARGET_MACOS_ARM64, &m, functions, "main", false,
+                       error, sizeof error));
     CHECK_STR(text_cstr(&out), "    .build_version macos, 11, 0\n"
                                "    .text\n"
                                "    .p2align 2\n"
@@ -177,7 +178,7 @@ static void data_section(enum target target, const char *expected)
     ir_ret(f, f->blocks[0], IR_PTR, ir_temp_op(f, address));
     CHECK(select_module(target, &m, functions, error, sizeof error));
     CHECK(regalloc_function(target, functions[0], error, sizeof error));
-    if (!emit_program(&out, target, &m, functions, "main", error,
+    if (!emit_program(&out, target, &m, functions, "main", false, error,
                       sizeof error)) {
         text_append(&out, error);
     }
@@ -207,7 +208,7 @@ static void data_relocation(void)
     ir_global_add(&m, "main", "0", hi, sizeof hi, 1);
     table = ir_global_add(&m, "main", "1", zero, sizeof zero, 8);
     ir_global_reloc(&m, table, 0, 0);
-    CHECK(emit_program(&out, TARGET_LINUX_ARM64, &m, functions, "main",
+    CHECK(emit_program(&out, TARGET_LINUX_ARM64, &m, functions, "main", false,
                        error, sizeof error));
     CHECK_STR(text_cstr(&out), "    .text\n"
                                "    .section .rodata\n"
@@ -240,8 +241,8 @@ static void data_relocation_past_end(void)
     ir_module_init(&m, &arena, "main");
     table = ir_global_add(&m, "main", "0", zero, sizeof zero, 8);
     ir_global_reloc(&m, table, 4, 0);
-    CHECK(!emit_program(&out, TARGET_LINUX_ARM64, &m, functions, "main",
-                        error, sizeof error));
+    CHECK(!emit_program(&out, TARGET_LINUX_ARM64, &m, functions, "main", false,
+                       error, sizeof error));
     CHECK_STR(error, "the address at 4 of `main.0` ends past its 8 bytes");
     text_free(&out);
     ir_module_free(&m);

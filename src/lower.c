@@ -63,6 +63,7 @@ struct try_scope {
 struct lowerer {
     struct ir_module *m;
     const char *file;           /* the source path, for an assertion */
+    uint32_t file_index;        /* the same path in the module's table */
     struct diagnostics *diags;
     const char *module_name;
     struct ir_function *f;
@@ -5132,10 +5133,17 @@ static void assert_branch(struct lowerer *l, struct ir_operand cond,
     l->b = rest;
 }
 
+/* DESIGN: the cursor moves to the line of the statement before anything
+   of it is emitted, so `-g` writes one `.loc` per statement. A statement
+   that holds a block leaves the cursor on the last line of the block.
+   That is where the code after the block comes from. */
 static void lower_stmt(struct lowerer *l, const struct stmt *s)
 {
     struct ir_operand v;
 
+    if (s->pos.line > 0) {
+        l->f->at_line = (uint32_t)s->pos.line;
+    }
     switch (s->kind) {
     case STMT_LET:
         lower_let(l, s);
@@ -5478,6 +5486,7 @@ static void lower_function(struct lowerer *l, struct item *it)
     size_t i;
 
     l->f = l->m->functions[it->symbol->ir];
+    l->f->decl_line = (uint32_t)it->pos.line;
     l->loop = NULL;
     entry = new_block(l);
     /* DESIGN: `self` is the first IR parameter of a member function
@@ -5956,6 +5965,9 @@ bool lower_module(struct module *module, const char *module_name,
                   unsigned options)
 {
     struct lowerer l;
+    /* Every function of the module sits past the ones the library files
+       brought, so one pass at the end gives them their source. */
+    size_t first = out->function_count;
     bool ok = true;
     size_t i;
 
@@ -5964,6 +5976,7 @@ bool lower_module(struct module *module, const char *module_name,
     l.diags = diags;
     l.module_name = module_name;
     l.file = module->file != NULL ? module->file : module_name;
+    l.file_index = ir_file_add(out, l.file);
     l.no_reflect = (options & LOWER_NO_REFLECT) != 0;
     l.dev = (options & LOWER_DEV) != 0;
     /* A function of a struct body is a function of the module with one
@@ -6039,6 +6052,13 @@ bool lower_module(struct module *module, const char *module_name,
             }
         }
         ok = ok && !l.failed;
+    }
+    for (i = first; i < out->function_count; i++) {
+        struct ir_function *f = out->functions[i];
+        if (!f->is_extern && f->module != NULL &&
+            strcmp(f->module, module_name) == 0) {
+            f->file = l.file_index;
+        }
     }
     return ok;
 }

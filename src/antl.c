@@ -505,6 +505,7 @@ static void put_inst(struct writer *w, const struct ir_inst *inst)
 
     put_u8(w, (uint8_t)inst->op);
     put_u8(w, (uint8_t)inst->type);
+    put_u32(w, inst->line);
     put_u32(w, inst->result);
     put_operand(w, &inst->a);
     put_operand(w, &inst->b);
@@ -523,6 +524,13 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
     size_t j;
     size_t k;
 
+    /* The source files of the module, which its functions name by index.
+       A path comes from the search root, so the bytes are the same on
+       every host. */
+    put_u32(w, (uint32_t)ir->file_count);
+    for (i = 0; i < ir->file_count; i++) {
+        put_str(w, ir->files[i]);
+    }
     put_u32(w, (uint32_t)ir->sym_count);
     for (i = 0; i < ir->sym_count; i++) {
         const struct ir_sym *sym = &ir->syms[i];
@@ -587,6 +595,8 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         put_str(w, f->name);
         put_u8(w, (uint8_t)f->result);
         put_u32(w, f->result_agg);
+        put_u32(w, f->file);
+        put_u32(w, f->decl_line);
         put_u32(w, (uint32_t)f->param_count);
         for (j = 0; j < f->param_count; j++) {
             put_u8(w, (uint8_t)f->params[j].type);
@@ -1468,6 +1478,8 @@ static bool valid_type(uint8_t type)
 /* Where each function, global, aggregate and symbolic value of the file
    went in the program. */
 struct ir_maps {
+    uint32_t *files;                /* the program's index of each file */
+    uint32_t file_count;
     uint32_t *functions;
     uint32_t function_count;
     uint32_t *globals;
@@ -1640,6 +1652,14 @@ static void read_tables(struct reader *r, struct ir_module *program,
     uint32_t j;
     uint32_t a = 0;
 
+    maps->file_count = get_count(r, 4);
+    maps->files = allocate(r, maps->file_count, sizeof *maps->files);
+    for (i = 0; i < maps->file_count && !r->failed; i++) {
+        const char *path = get_cstr(r);
+        if (!r->failed) {
+            maps->files[i] = ir_file_add(program, path);
+        }
+    }
     maps->sym_count = get_count(r, 27);
     maps->syms = allocate(r, maps->sym_count, sizeof *maps->syms);
     maps->sym_map = allocate(r, maps->sym_count, sizeof *maps->sym_map);
@@ -1932,13 +1952,14 @@ static void read_body(struct reader *r, struct ir_module *program,
     for (i = 0; i < blocks && !r->failed; i++) {
         uint32_t count;
         f->blocks[i]->fail = (enum ir_fail)get_u8(r);
-        count = get_count(r, 46);
+        count = get_count(r, 50);
         for (j = 0; j < count && !r->failed; j++) {
             struct ir_inst inst;
             struct ir_operand *args;
             uint8_t op = get_u8(r);
             uint8_t type = get_u8(r);
             memset(&inst, 0, sizeof inst);
+            inst.line = get_u32(r);
             inst.result = get_u32(r);
             inst.op = (enum ir_op)op;
             inst.type = (enum ir_type)type;
@@ -1987,6 +2008,8 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     const char *name = get_cstr(r);
     uint8_t result = get_u8(r);
     uint32_t result_agg = read_agg_ref(r, program, maps, result);
+    uint32_t file = get_u32(r);
+    uint32_t decl_line = get_u32(r);
     uint32_t param_count = get_count(r, 6);
     struct ir_function *f = NULL;
     size_t i;
@@ -2019,6 +2042,10 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         fail(r, "defines `%s.%s`, which another library defines", module, name);
         return 0;
     }
+    if (file != IR_NO_INDEX && file >= maps->file_count) {
+        damaged(r);
+        return 0;
+    }
     if (f == NULL) {
         if ((flags & 1) == 0) {
             f = ir_function_add(program, module, name, (enum ir_type)result,
@@ -2033,6 +2060,8 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         }
         f->exported = (flags & 4) != 0;
         f->worker = (flags & 8) != 0;
+        f->file = file == IR_NO_INDEX ? IR_NO_INDEX : maps->files[file];
+        f->decl_line = decl_line;
         for (i = 0; i < param_count && !r->failed; i++) {
             uint8_t type = get_u8(r);
             uint8_t ext = get_u8(r);

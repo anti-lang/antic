@@ -44,6 +44,10 @@ struct link_inputs {
     const char *lld_dir;        /* lld: its directory, or NULL for PATH */
     const char *const *frameworks; /* macOS: -framework */
     size_t framework_count;
+    /* DESIGN: -g keeps the debug sections. Without it every link strips
+       them, because the only source of them would be the C library of the
+       target. No line of Anti would be in them. */
+    bool debug;
 };
 
 /* The suffixes of the object files and archives that antic passes to the

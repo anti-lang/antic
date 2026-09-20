@@ -46,6 +46,7 @@ struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,
 {
     struct mach_inst *inst = mach_append(s->b);
 
+    inst->line = s->line;
     inst->op = op;
     inst->count = (uint8_t)count;
     /* An instruction without operands may pass no array, and memcpy takes
@@ -439,6 +440,7 @@ static void select_function(struct selector *s)
 {
     const struct ir_function *f = s->f;
     size_t b;
+    size_t first;
     size_t i;
     size_t k;
     uint32_t v;
@@ -464,6 +466,9 @@ static void select_function(struct selector *s)
         for (i = 0; i < block->count && !s->failed; i++) {
             const struct ir_inst *inst = &block->insts[i];
             const struct pattern *p;
+            /* Every instruction the pattern emits carries the line of
+               the IR instruction it came from. */
+            s->line = inst->line;
             if (fuses(s, block, i)) {
                 s->fused = inst;
                 continue;
@@ -478,7 +483,18 @@ static void select_function(struct selector *s)
                 select_refuse(s, s->fused != NULL ? s->fused : inst);
                 break;
             }
+            first = s->b->count;
             p->emit(s, inst);
+            /* A pattern reaches its target's own helpers for a move or an
+               immediate, and those append to the block without the
+               selector. Every instruction of the pattern belongs to the
+               statement of inst, so the ones that carry no line take
+               its line. */
+            for (k = first; k < s->b->count; k++) {
+                if (s->b->insts[k].line == 0) {
+                    s->b->insts[k].line = inst->line;
+                }
+            }
             /* A branch on overflow reads the flags of the operation
                right before it, which the verifier keeps adjacent. */
             s->overflow = select_is_overflow(inst->op) ? inst : NULL;

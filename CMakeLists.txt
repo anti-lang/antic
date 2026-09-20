@@ -67,6 +67,7 @@ add_library(antic_core STATIC
     src/arm64.c
     src/arena.c
     src/ast_dump.c
+    src/debug.c
     src/diagnostic.c
     src/driver.c
     src/emit.c

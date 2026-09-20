@@ -90,7 +90,9 @@ static void macos_start(struct link_command *c, enum target t,
     if (dylib) {
         add(c, "-dylib");
     }
-    add(c, "-S");
+    if (!in->debug) {
+        add(c, "-S");
+    }
     add(c, "-arch");
     add(c, target_info(t)->arch == ARCH_ARM64 ? "arm64" : "x86_64");
     add(c, "-platform_version");
@@ -150,7 +152,9 @@ static void linux_lld(struct link_command *c, enum target t,
     add(c, "-static");
     add(c, "-pie");
     add(c, "--no-dynamic-linker");
-    add(c, "--strip-debug");
+    if (!in->debug) {
+        add(c, "--strip-debug");
+    }
     add(c, "-o");
     add(c, in->executable);
     for (i = 0; i < 2; i++) {
@@ -212,7 +216,9 @@ static void linux_ld(struct link_command *c, enum target t,
     text_appendf(crtn, "%s/crtn.o", in->crt_dir);
     add(c, "ld");
     add(c, "-pie");
-    add(c, "--strip-debug");
+    if (!in->debug) {
+        add(c, "--strip-debug");
+    }
     add(c, text_cstr(interpreter));
     add(c, "-o");
     add(c, in->executable);
@@ -242,7 +248,7 @@ static void windows(struct link_command *c, enum target t,
     link_runtime_library(library, in->runtime, t);
     add(c, linker);
     add(c, "/NOLOGO");
-    add(c, "/debug:none");
+    add(c, in->debug ? "/DEBUG" : "/debug:none");
     add(c, "/SUBSYSTEM:CONSOLE");
     add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                               : "/MACHINE:X64");
@@ -356,7 +362,9 @@ void link_shared_command(struct link_command *c, enum target t,
         text_appendf(search, "-L%s", in->crt_dir);
         add(c, linker);
         add(c, "-shared");
-        add(c, "--strip-debug");
+        if (!in->debug) {
+            add(c, "--strip-debug");
+        }
         add(c, "-o");
         add(c, in->executable);
         if (s->major != NULL) {
@@ -379,7 +387,7 @@ void link_shared_command(struct link_command *c, enum target t,
         text_appendf(def, "/DEF:%s", s->def_file != NULL ? s->def_file : "");
         add(c, linker);
         add(c, "/NOLOGO");
-        add(c, "/debug:none");
+        add(c, in->debug ? "/DEBUG" : "/debug:none");
         add(c, "/DLL");
         add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                                   : "/MACHINE:X64");

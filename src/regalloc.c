@@ -721,12 +721,16 @@ static uint32_t place(struct rewrite *rw, struct spill_map *map, uint32_t vreg,
 }
 
 /* Replace the virtual registers of inst, drop a move of a register into
-   itself and add the epilogue before a return. */
+   itself and add the epilogue before a return. Every instruction this
+   writes belongs to the statement of inst, the loads of its spilled
+   operands among them. Each one that carries no line takes the line of
+   inst. */
 static void rewrite_inst(struct rewrite *rw, const struct mach_inst *inst)
 {
     struct alloc *a = rw->a;
     const struct mach_opcode *op = &a->target->opcodes[inst->op];
     struct mach_inst copy = *inst;
+    size_t first = rw->out.count;
     struct spill_map map;
     size_t i;
     int k;
@@ -780,6 +784,11 @@ static void rewrite_inst(struct rewrite *rw, const struct mach_inst *inst)
             a->target->store_spill(
                 &rw->out, map.scratch[k],
                 a->f->slots[a->intervals[o->reg].slot].offset);
+        }
+    }
+    for (i = first; i < rw->out.count; i++) {
+        if (rw->out.insts[i].line == 0) {
+            rw->out.insts[i].line = inst->line;
         }
     }
 }

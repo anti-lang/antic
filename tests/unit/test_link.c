@@ -11,33 +11,33 @@ static const char *const extra_windows[] = {"shapes.obj"};
 
 static const struct link_inputs unix_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/x86_64-linux-gnu",
-    NULL, 0, LINKER_PLATFORM, NULL, NULL, NULL, 0
+    NULL, 0, LINKER_PLATFORM, NULL, NULL, NULL, 0, false
 };
 
 static const struct link_inputs windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, NULL, 0,
-    LINKER_PLATFORM, NULL, NULL, NULL, 0
+    LINKER_PLATFORM, NULL, NULL, NULL, 0, false
 };
 
 static const struct link_inputs extra_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/aarch64-linux-gnu",
-    extra_unix, 2, LINKER_PLATFORM, NULL, NULL, NULL, 0
+    extra_unix, 2, LINKER_PLATFORM, NULL, NULL, NULL, 0, false
 };
 
 static const struct link_inputs extra_windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, extra_windows, 1,
-    LINKER_PLATFORM, NULL, NULL, NULL, 0
+    LINKER_PLATFORM, NULL, NULL, NULL, 0, false
 };
 
 /* lld of the runtime archive with the sysroot of the target. */
 static const struct link_inputs lld_inputs = {
     "prog.o", "prog", "/rt", NULL, "26.5", NULL, extra_unix, 1, LINKER_LLD,
-    "/rt/sysroot/t", "/rt/bin", NULL, 0
+    "/rt/sysroot/t", "/rt/bin", NULL, 0, false
 };
 
 static const struct link_inputs lld_windows_inputs = {
     "prog.obj", "prog.exe", "/rt", NULL, NULL, NULL, NULL, 0, LINKER_LLD,
-    "/rt/sysroot/t", "/rt/bin", NULL, 0
+    "/rt/sysroot/t", "/rt/bin", NULL, 0, false
 };
 
 /* Build the command line of target t and compare it, joined by spaces. */
@@ -59,9 +59,9 @@ static void links(enum target t, const struct link_inputs *in,
 }
 
 /* DESIGN: an Anti executable and an Anti shared library carry no debug
-   information on any target. antic writes none of its own, and the only
-   source of it is the C library of the target. Each format spells the
-   flag differently, and every link line carries its spelling. */
+   information unless the build asked for it with -g. Each format spells
+   the flag that strips it differently, and every link line without -g
+   carries its spelling. */
 static void strips_debug(void)
 {
     static const enum target targets[] = {
@@ -95,6 +95,33 @@ static void strips_debug(void)
             found = found || strcmp(c.argv[j], want) == 0;
         }
         CHECK(found);
+        link_command_free(&c);
+
+        /* -g keeps the debug sections, so the flag goes. COFF names the
+           debug directory instead, which lld-link writes into the PDB. */
+        in.debug = true;
+        link_command(&c, t, &in);
+        found = false;
+        for (j = 0; j < c.argc; j++) {
+            found = found || strcmp(c.argv[j], want) == 0;
+            CHECK(strcmp(c.argv[j], "/debug:none") != 0);
+        }
+        CHECK(!found);
+        if (windows) {
+            found = false;
+            for (j = 0; j < c.argc; j++) {
+                found = found || strcmp(c.argv[j], "/DEBUG") == 0;
+            }
+            CHECK(found);
+        }
+        link_command_free(&c);
+
+        link_shared_command(&c, t, &in, &none);
+        found = false;
+        for (j = 0; j < c.argc; j++) {
+            found = found || strcmp(c.argv[j], want) == 0;
+        }
+        CHECK(!found);
         link_command_free(&c);
     }
 }

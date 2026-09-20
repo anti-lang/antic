@@ -165,8 +165,8 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 17. Inline atomic instruction sequences, which are runtime calls today.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
-nullable pointers are built. Dev-mode checks, debug information, and tests and
-fixtures come before the first public release. After it, the wrapping and saturating operators
+nullable pointers, the dev-mode checks and the lines of `-g` are built. The
+variables of `-g` and tests and fixtures come before the first public release. After it, the wrapping and saturating operators
 with `Flags`, then sum types, then locking and channels. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. Then
 generics and closures.
@@ -192,9 +192,12 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 454 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 453 each, without the `no_paths` test, which needs a
+- 462 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 461 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
+- `antic -g` writes the line of every statement, and the link then keeps the
+  debug sections. lldb and gdb stop by file and line and print a backtrace of
+  Anti function names. Variables are the next step. See `docs/notes/debug.md`.
 - `*T` never holds `none` and `?*T` may, and a function value follows the same
   rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer

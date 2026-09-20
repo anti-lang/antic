@@ -610,7 +610,7 @@ trace class Renderer { }
 
 `trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest.
 
-Built: the checks, with `--checks` and `--no-checks`. Not built yet: `-g`, `trace`.
+Built: the checks, with `--checks` and `--no-checks`, and `-g`, which writes the line of every statement and keeps the debug sections of the link. Not built yet: the variables of `-g`, `trace`.
 
 ## Wire formats
 

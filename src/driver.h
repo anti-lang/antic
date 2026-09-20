@@ -23,6 +23,10 @@ struct options {
     bool dev;                   /* --dev, one module into its own object. */
     bool no_reflect;            /* --no-reflect, no field list in a
                                    class descriptor. */
+    /* DESIGN: -g writes the source positions of the program and keeps the
+       debug sections of the link. anti build passes it in dev mode, and
+       release mode never does. */
+    bool debug;
     /* DESIGN: dev mode keeps assertions and release mode drops them,
        because dev compiles one module and release the whole program.
        --asserts and --no-asserts decide instead of the mode. */

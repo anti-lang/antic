@@ -694,7 +694,10 @@ add_test(NAME antl_scale
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antl.cmake")
 set_tests_properties(antl_scale PROPERTIES FIXTURES_SETUP scale_antl)
 
-# The line form and the block form of the doc comments write one file.
+# The line form and the block form of the doc comments write one file. The
+# two sources put every item on the same line, with blank lines where the
+# other form needs more, because a library file records the line of every
+# statement.
 add_test(NAME antl_docs_lines
     COMMAND antic -c -I "${MODULES}/lines" -o "${LIBS}/lines.antl"
             "${MODULES}/lines/com/example/geo.anti")
@@ -906,6 +909,33 @@ if(ANTIC_LLVM_MC AND ANTIC_STRINGS)
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks"
             "-DSTRINGS=${ANTIC_STRINGS}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_checks.cmake")
+endif()
+
+# The debug information of -g, read by the debugger of the host: lldb on
+# macOS and gdb on Linux. A breakpoint by file and line in an imported
+# module and a backtrace of Anti function names.
+find_program(ANTIC_LLDB NAMES lldb DOC "the debugger of macOS")
+find_program(ANTIC_GDB NAMES gdb DOC "the debugger of Linux")
+if(ANTIC_LLVM_MC AND (ANTIC_LLDB OR ANTIC_GDB))
+    if(APPLE AND ANTIC_LLDB)
+        set(debugger "${ANTIC_LLDB}")
+        set(debugger_kind lldb)
+    elseif(ANTIC_GDB)
+        set(debugger "${ANTIC_GDB}")
+        set(debugger_kind gdb)
+    else()
+        set(debugger "${ANTIC_LLDB}")
+        set(debugger_kind lldb)
+    endif()
+    add_test(NAME debug_info
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/debug"
+            "-DDEBUGGER=${debugger}"
+            "-DKIND=${debugger_kind}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_debug.cmake")
 endif()
 
 # A zero table traps with the name of the class.
@@ -1298,6 +1328,18 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
     endforeach()
+    # The directives of the debug information, for the DWARF of ELF and
+    # Mach-O and the CodeView of COFF.
+    add_test(NAME asm_debug_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DTARGET=${target}"
+            "-DTRIPLE=${triple}"
+            "-DOPTIONS=-g"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-debug"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
     # A shared library for C, with the constructor section of the target.
     add_test(NAME asm_clib_${target}
         COMMAND "${CMAKE_COMMAND}"

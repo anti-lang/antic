@@ -74,6 +74,8 @@ struct mach_inst {
     struct mach_operand operands[MACH_MAX_OPERANDS];
     uint64_t uses;                  /* physical registers read implicitly */
     uint64_t defs;                  /* physical registers written implicitly */
+    /* The line of its IR instruction, or 0 for a prologue or a spill. */
+    uint32_t line;
 };
 
 struct mach_block {

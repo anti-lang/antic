@@ -332,6 +332,7 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
 
     memset(f, 0, sizeof *f);
     in->linker = o->linker;
+    in->debug = o->debug;
     if (o->linker == LINKER_PLATFORM) {
         if (os == OS_MACOS) {
             if (!xcrun("--show-sdk-path", &f->sdk_path) ||
@@ -650,9 +651,9 @@ static int back_end(const struct options *o, struct module *tree,
         status = 2;
     } else if (ok) {
         ok = o->dev ? emit_module(assembly, o->target, program, functions,
-                                  module, error, sizeof error)
+                                  module, o->debug, error, sizeof error)
                     : emit_program(assembly, o->target, program, functions,
-                                   module, error, sizeof error);
+                                   module, o->debug, error, sizeof error);
         if (ok && o->dev && !has_main(program, module)) {
             status = 3;
         }

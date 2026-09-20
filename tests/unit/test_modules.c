@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 27, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 28, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -287,6 +287,8 @@ static const uint8_t scale_antl[] = {
     0, 6, 0, 0, 0, 0, 0, 0, 0,                      /* const SCALE = 6 */
     3, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e', 1, 0, 0, 0, 0, 0, 0, 0, 0,
     1, 0, 0, 0, 'x',                                /* fn scale(x) */
+    1, 0, 0, 0,                                     /* source files */
+    5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* the one file */
     0, 0, 0, 0,                                     /* symbolic values */
     0, 0, 0, 0,                                     /* aggregates */
     0, 0, 0, 0,                                     /* globals */
@@ -294,18 +296,19 @@ static const uint8_t scale_antl[] = {
     0, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* scale.scale */
     4, 255, 255, 255, 255,                          /* -> i64 */
+    0, 0, 0, 0, 2, 0, 0, 0,                         /* file 0, line 2 */
     1, 0, 0, 0, 4, 0, 255, 255, 255, 255,           /* one i64 parameter */
     2, 0, 0, 0, 4, 4,                               /* temporaries */
     1, 0, 0, 0,                                     /* blocks */
     0,                                              /* not an assert arm */
     2, 0, 0, 0,                                     /* instructions */
-    2, 4, 1, 0, 0, 0,                               /* %1 = mul i64 */
+    2, 4, 3, 0, 0, 0, 1, 0, 0, 0,                   /* line 3: %1 = mul i64 */
     1, 4, 0, 0, 0, 0, 0, 0, 0, 0,                   /* %0 */
     2, 4, 6, 0, 0, 0, 0, 0, 0, 0,                   /* 6 */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 255, 255, 255, 255, 0, 0, 0, 0,              /* no type, field 0 */
     0, 0, 0, 0,                                     /* no arguments */
-    61, 4, 255, 255, 255, 255,                      /* ret i64 */
+    61, 4, 3, 0, 0, 0, 255, 255, 255, 255,          /* line 3: ret i64 */
     1, 4, 1, 0, 0, 0, 0, 0, 0, 0,                   /* %1 */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -673,22 +676,30 @@ static void write_with(struct session *s, const char *source,
     ir_module_free(&ir);
 }
 
+/* DESIGN: the three sources below put every item on the same line,
+   because a library file records the line of every statement. The blank
+   lines are what makes the files comparable byte for byte: what is
+   compared is then the doc text alone. */
 static const char line_docs[] =
-    "//! Plane geometry.\n"
-    "//#! Built for the tests.\n"
-    "/// A point.\n"
-    "///\n"
-    "///     Two fields.\n"
-    "pub struct Point {\n"
-    "    /// Across.\n"
-    "    x: f64,\n"
-    "    y: f64,\n"
-    "}\n"
-    "/// Dot product.\n"
-    "//# Not a note in the file.\n"
+    "//! Plane geometry.\n"                            /* 1 */
+    "//#! Built for the tests.\n"                      /* 2 */
+    "\n\n\n\n\n\n"                                     /* 3 to 8 */
+    "/// A point.\n"                                   /* 9 */
+    "///\n"                                            /* 10 */
+    "///     Two fields.\n"                            /* 11 */
+    "pub struct Point {\n"                             /* 12 */
+    "\n\n"                                             /* 13, 14 */
+    "    /// Across.\n"                                /* 15 */
+    "    x: f64,\n"                                    /* 16 */
+    "    y: f64,\n"                                    /* 17 */
+    "}\n"                                              /* 18 */
+    "\n\n\n\n"                                         /* 19 to 22 */
+    "/// Dot product.\n"                               /* 23 */
+    "//# Not a note in the file.\n"                    /* 24 */
     "pub fn dot(a: Point, b: Point) -> f64 { return a.x * b.x + a.y * b.y; }\n"
-    "/// Private, not in the file.\n"
-    "fn hidden() -> f64 { return 1.0; }\n";
+    "\n\n"                                             /* 26, 27 */
+    "/// Private, not in the file.\n"                  /* 28 */
+    "fn hidden() -> f64 { return 1.0; }\n";            /* 29 */
 
 static const char block_docs[] =
     "/" "*!\n"
@@ -722,12 +733,16 @@ static const char block_docs[] =
     "fn hidden() -> f64 { return 1.0; }\n";
 
 static const char no_docs[] =
-    "pub struct Point {\n"
-    "    x: f64,\n"
-    "    y: f64,\n"
-    "}\n"
+    "\n\n\n\n\n\n\n\n\n\n\n"                              /* 1 to 11 */
+    "pub struct Point {\n"                             /* 12 */
+    "\n\n\n"                                           /* 13 to 15 */
+    "    x: f64,\n"                                    /* 16 */
+    "    y: f64,\n"                                    /* 17 */
+    "}\n"                                              /* 18 */
+    "\n\n\n\n\n\n"                                     /* 19 to 24 */
     "pub fn dot(a: Point, b: Point) -> f64 { return a.x * b.x + a.y * b.y; }\n"
-    "fn hidden() -> f64 { return 1.0; }\n";
+    "\n\n\n"                                           /* 26 to 28 */
+    "fn hidden() -> f64 { return 1.0; }\n";            /* 29 */
 
 /* The package header and the doc text of the public interface. The line
    and the block form of the comments write the same bytes. Without doc
@@ -1212,13 +1227,23 @@ static void refuses_file(const uint8_t *data, size_t size,
 
 static void damaged_files(void)
 {
+    /* Where the fields a poke below reaches sit, counted back from the end
+       of the file: the classes, two instructions of 53 bytes each and the
+       15 bytes that open the body, then the one parameter of the
+       signature, its count, the source of the function and its result. */
+    enum {
+        TAIL = 4 + 2 * 53 + 15,
+        MUL_OPERAND = 4 + 2 * 53 - 12,
+        PARAM_EXT = TAIL + 4 + 1,
+        RESULT_AGG = TAIL + 6 + 4 + 8 + 4
+    };
     uint8_t copy[sizeof scale_antl];
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 28;
+    copy[4] = 29;
     refuses_file(copy, sizeof copy,
-                 "has format version 28, and antic reads version 27");
+                 "has format version 29, and antic reads version 28");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1228,15 +1253,15 @@ static void damaged_files(void)
     }
     /* The result type agg needs an aggregate of the type table. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[sizeof copy - 4 - 2 * 49 - 14 - 10 - 5] = IR_AGG;
+    copy[sizeof copy - RESULT_AGG] = IR_AGG;
     refuses_file(copy, sizeof copy, NULL);
     /* Only a parameter of 8 or 16 bits extends. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[sizeof copy - 4 - 2 * 49 - 14 - 10 + 5] = IR_EXT_SIGN;
+    copy[sizeof copy - PARAM_EXT] = IR_EXT_SIGN;
     refuses_file(copy, sizeof copy, NULL);
     /* The temporary of the mul instruction points past the temporaries. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[sizeof copy - 4 - 2 * 49 + 8] = 9;
+    copy[sizeof copy - MUL_OPERAND] = 9;
     refuses_file(copy, sizeof copy, NULL);
 }
 

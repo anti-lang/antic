@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "debug.h"
 #include "select.h"
 
 /* DESIGN: one assembly file holds the whole program. Every Anti function
@@ -11,7 +12,8 @@
 
 static void emit_function(struct text *out, enum target t,
                           const struct ir_module *m,
-                          const struct mach_function *f, bool module)
+                          const struct mach_function *f, bool module,
+                          struct debug *debug)
 {
     const struct target_desc *desc = target_desc(t);
     struct text symbol = {0};
@@ -46,15 +48,18 @@ static void emit_function(struct text *out, enum target t,
     if (f->unwind) {
         text_appendf(out, "    .seh_proc %s\n", text_cstr(&symbol));
     }
+    debug_open(debug, out, f->ir);
     for (b = 0; b < f->block_count; b++) {
         block_label(out, t, text_cstr(&symbol), b);
         text_append(out, ":\n");
         for (i = 0; i < f->blocks[b].count; i++) {
+            debug_at(debug, out, f->blocks[b].insts[i].line);
             text_append(out, "    ");
             desc->print(out, m, &f->blocks[b].insts[i], &names);
             text_append(out, "\n");
         }
     }
+    debug_close(debug, out);
     if (f->unwind) {
         text_append(out, "    .seh_endproc\n");
     }
@@ -249,11 +254,15 @@ static void emit_data(struct text *out, enum target t,
 
 static bool emit(struct text *out, enum target t, const struct ir_module *m,
                  struct mach_function **functions, const char *module,
-                 bool one_module, char *error, size_t error_size)
+                 bool one_module, bool debug_info, char *error,
+                 size_t error_size)
 {
     const struct target_info *info = target_info(t);
+    struct debug debug;
     size_t i;
     size_t j;
+
+    debug_init(&debug, t, m, module, debug_info);
 
     /* An address takes the eight bytes at its offset, so it lies inside
        the data that holds it. A library file read from disk is the one
@@ -276,11 +285,15 @@ static bool emit(struct text *out, enum target t, const struct ir_module *m,
     }
     text_append(out, "    .text\n");
     emit_entry(out, t, m, module);
+    debug_files(&debug, out);
     for (i = 0; i < m->function_count; i++) {
         if (functions[i] != NULL) {
-            emit_function(out, t, m, functions[i], one_module);
+            emit_function(out, t, m, functions[i], one_module, &debug);
         }
     }
+    /* The debug information ends the text section, because the range of
+       the code is the range of the functions written above it. */
+    debug_sections(&debug, out, functions);
     if (m->global_count > 0) {
         emit_data(out, t, m, one_module);
     }
@@ -293,16 +306,18 @@ static bool emit(struct text *out, enum target t, const struct ir_module *m,
 
 bool emit_program(struct text *out, enum target t, const struct ir_module *m,
                   struct mach_function **functions, const char *module,
-                  char *error, size_t error_size)
+                  bool debug_info, char *error, size_t error_size)
 {
-    return emit(out, t, m, functions, module, false, error, error_size);
+    return emit(out, t, m, functions, module, false, debug_info, error,
+                error_size);
 }
 
 bool emit_module(struct text *out, enum target t, const struct ir_module *m,
                  struct mach_function **functions, const char *module,
-                 char *error, size_t error_size)
+                 bool debug_info, char *error, size_t error_size)
 {
-    return emit(out, t, m, functions, module, true, error, error_size);
+    return emit(out, t, m, functions, module, true, debug_info, error,
+                error_size);
 }
 
 /* DESIGN: a shared library initialises the runtime in a constructor. The

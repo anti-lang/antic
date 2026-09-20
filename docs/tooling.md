@@ -72,6 +72,10 @@ shows none of its code.
 | `anti completions bash\|zsh\|fish` | Print a completion script for the shell |
 | `anti syntax vim\|textmate\|pygments` | Print a syntax definition for the editor family |
 
+`anti build` passes `antic -g` in dev mode and never in release. A dev build then carries
+the line of every statement, and a debugger stops by file and line. `docs/decisions.md`
+holds the shape of that information under "Debug information".
+
 `antic` keeps working without a manifest:
 `antic main.anti ../libs/com/niese/anti/geometry.antl`. In that mode nothing is fetched
 and every transitive dependency must be on the command line.

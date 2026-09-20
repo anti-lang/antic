@@ -164,6 +164,7 @@ struct ir_operand {
 struct ir_inst {
     enum ir_op op;
     enum ir_type type;              /* the result type, or the stored type */
+    uint32_t line;                  /* the source line, or 0 for none */
     uint32_t result;                /* a temporary, or IR_NO_RESULT */
     struct ir_operand a;
     struct ir_operand b;
@@ -202,8 +203,17 @@ struct ir_param {
     uint32_t temp;
 };
 
+/* DESIGN: a source position is one line and one file per function. The
+   file is an index into the module's table, so a function names its
+   source in four bytes and the IR holds each path once. at_line is the
+   cursor that lowering moves from statement to statement, and every
+   instruction the appenders add takes it. A pass that adds an
+   instruction of its own leaves it at 0, and no `.loc` names it. */
 struct ir_function {
     uint32_t index;
+    uint32_t file;                  /* the source, or IR_NO_INDEX */
+    uint32_t decl_line;             /* the line of `fn`, or 0 */
+    uint32_t at_line;               /* the line the appenders stamp */
     const char *module;             /* NULL for a C function */
     const char *name;
     struct ir_param *params;
@@ -324,6 +334,12 @@ struct ir_class {
 struct ir_module {
     struct arena *arena;
     const char *name;
+    /* The source files of the module, each once. A path is the one the
+       search root gives, so a library file holds the same bytes on every
+       host. `-g` writes a `.file` directive per entry. */
+    const char **files;
+    size_t file_count;
+    size_t file_capacity;
     struct ir_aggtype **aggs;
     size_t agg_count;
     size_t agg_capacity;
@@ -352,6 +368,10 @@ void ir_function_free(struct ir_function *f);
 
 struct ir_vtype ir_scalar(enum ir_type type);
 struct ir_vtype ir_aggregate(uint32_t agg);
+
+/* Add a source file to the module's table, or find the one of that path.
+   Returns its index. */
+uint32_t ir_file_add(struct ir_module *m, const char *path);
 
 /* Add a struct or union to the type table, or find the one of that name.
    Returns its index. */

@@ -157,6 +157,39 @@ static void memory(void)
     arena_free(&arena);
 }
 
+/* The file table holds each path once, and every instruction carries the
+   line of the statement the function's cursor stands on. */
+static void positions(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block *b0;
+    uint32_t x;
+    uint32_t product;
+
+    ir_module_init(&m, &arena, "main");
+    CHECK(ir_file_add(&m, "com/example/scale.anti") == 0);
+    CHECK(ir_file_add(&m, "com/example/scale.anti") == 0);
+    CHECK(ir_file_add(&m, "main.anti") == 1);
+    CHECK(m.file_count == 2);
+    f = ir_function_add(&m, "main", "scale", IR_I64, IR_NO_AGG);
+    CHECK(f->file == IR_NO_INDEX);
+    f->file = 0;
+    f->decl_line = 3;
+    x = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    f->at_line = 5;
+    product = ir_binary(f, b0, IR_MUL, IR_I64, ir_temp_op(f, x),
+                        ir_int_op(IR_I64, 6));
+    f->at_line = 6;
+    ir_ret(f, b0, IR_I64, ir_temp_op(f, product));
+    CHECK(b0->insts[0].line == 5);
+    CHECK(b0->insts[1].line == 6);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* Symbolic values name sizes and offsets and combine with operations.
    Equal values share one entry, and an entry for a number is an integer
    operand. */
@@ -300,6 +333,7 @@ void test_ir(void)
     scale();
     loop();
     memory();
+    positions();
     symbolic();
     verifier();
 }

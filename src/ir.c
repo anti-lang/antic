@@ -92,6 +92,7 @@ void ir_module_free(struct ir_module *m)
     free(m->globals);
     free(m->aggs);
     free(m->syms);
+    free(m->files);
     memset(m, 0, sizeof *m);
 }
 
@@ -151,6 +152,21 @@ static uint32_t add_agg(struct ir_module *m, const struct ir_aggtype *key,
     m->aggs = grow(m->aggs, &m->agg_capacity, m->agg_count, sizeof *m->aggs);
     m->aggs[m->agg_count] = t;
     return (uint32_t)m->agg_count++;
+}
+
+uint32_t ir_file_add(struct ir_module *m, const char *path)
+{
+    size_t i;
+
+    for (i = 0; i < m->file_count; i++) {
+        if (strcmp(m->files[i], path) == 0) {
+            return (uint32_t)i;
+        }
+    }
+    m->files = grow(m->files, &m->file_capacity, m->file_count,
+                    sizeof *m->files);
+    m->files[m->file_count] = keep(m->arena, path);
+    return (uint32_t)m->file_count++;
 }
 
 uint32_t ir_struct_add(struct ir_module *m, enum ir_agg_kind kind,
@@ -273,6 +289,7 @@ static struct ir_function *new_function(struct ir_module *m,
     m->functions = grow(m->functions, &m->function_capacity,
                         m->function_count, sizeof *m->functions);
     f->index = (uint32_t)m->function_count;
+    f->file = IR_NO_INDEX;
     f->module = keep(m->arena, module);
     f->name = keep(m->arena, name);
     f->result = result;
@@ -568,7 +585,10 @@ struct ir_operand ir_global_op(const struct ir_global *g)
     return o;
 }
 
-static struct ir_inst *append(struct ir_block *b, enum ir_op op,
+/* Append an instruction of f to b and give it the line that f stands on.
+   f is NULL for a copy of an instruction that carries its own line. */
+static struct ir_inst *append(const struct ir_function *f,
+                              struct ir_block *b, enum ir_op op,
                               enum ir_type type, uint32_t result)
 {
     struct ir_inst *inst;
@@ -580,12 +600,14 @@ static struct ir_inst *append(struct ir_block *b, enum ir_op op,
     inst->op = op;
     inst->type = type;
     inst->result = result;
+    inst->line = f != NULL ? f->at_line : 0;
     return inst;
 }
 
 void ir_inst_add(struct ir_block *b, const struct ir_inst *inst)
 {
-    struct ir_inst *copy = append(b, inst->op, inst->type, inst->result);
+    struct ir_inst *copy = append(NULL, b, inst->op, inst->type,
+                                  inst->result);
 
     *copy = *inst;
     copy->args = NULL;
@@ -604,7 +626,7 @@ uint32_t ir_binary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                    struct ir_operand y)
 {
     uint32_t result = ir_temp(f, type);
-    struct ir_inst *inst = append(b, op, type, result);
+    struct ir_inst *inst = append(f, b, op, type, result);
 
     inst->a = x;
     inst->b = y;
@@ -615,14 +637,14 @@ uint32_t ir_unary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                   enum ir_type type, struct ir_operand x)
 {
     uint32_t result = ir_temp(f, type);
-    append(b, op, type, result)->a = x;
+    append(f, b, op, type, result)->a = x;
     return result;
 }
 
 void ir_assign(struct ir_function *f, struct ir_block *b, uint32_t dst,
                struct ir_operand src)
 {
-    append(b, IR_COPY, f->temps[dst], dst)->a = src;
+    append(f, b, IR_COPY, f->temps[dst], dst)->a = src;
 }
 
 uint32_t ir_entry_slot(struct ir_function *f, struct ir_vtype of)
@@ -653,7 +675,7 @@ uint32_t ir_slot(struct ir_function *f, struct ir_block *b,
 {
     uint32_t result = ir_temp(f, IR_PTR);
 
-    append(b, IR_SLOT, IR_PTR, result)->of = of;
+    append(f, b, IR_SLOT, IR_PTR, result)->of = of;
     return result;
 }
 
@@ -661,16 +683,15 @@ uint32_t ir_load(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand pointer)
 {
     uint32_t result = ir_temp(f, type);
-    append(b, IR_LOAD, type, result)->a = pointer;
+    append(f, b, IR_LOAD, type, result)->a = pointer;
     return result;
 }
 
 void ir_store(struct ir_function *f, struct ir_block *b, enum ir_type type,
               struct ir_operand value, struct ir_operand pointer)
 {
-    struct ir_inst *inst = append(b, IR_STORE, type, IR_NO_RESULT);
+    struct ir_inst *inst = append(f, b, IR_STORE, type, IR_NO_RESULT);
 
-    (void)f;
     inst->a = value;
     inst->b = pointer;
 }
@@ -685,9 +706,8 @@ void ir_memcopy(struct ir_function *f, struct ir_block *b,
                 struct ir_operand dst, struct ir_operand src,
                 struct ir_vtype of)
 {
-    struct ir_inst *inst = append(b, IR_MEMCOPY, IR_VOID, IR_NO_RESULT);
+    struct ir_inst *inst = append(f, b, IR_MEMCOPY, IR_VOID, IR_NO_RESULT);
 
-    (void)f;
     inst->a = dst;
     inst->b = src;
     inst->of = of;
@@ -704,7 +724,7 @@ uint32_t ir_bitload(struct ir_function *f, struct ir_block *b,
                     uint32_t field)
 {
     uint32_t result = ir_temp(f, type);
-    struct ir_inst *inst = append(b, IR_BITLOAD, type, result);
+    struct ir_inst *inst = append(f, b, IR_BITLOAD, type, result);
 
     inst->a = pointer;
     inst->of = ir_aggregate(agg);
@@ -716,9 +736,8 @@ void ir_bitstore(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand value, struct ir_operand pointer,
                  uint32_t agg, uint32_t field)
 {
-    struct ir_inst *inst = append(b, IR_BITSTORE, type, IR_NO_RESULT);
+    struct ir_inst *inst = append(f, b, IR_BITSTORE, type, IR_NO_RESULT);
 
-    (void)f;
     inst->a = value;
     inst->b = pointer;
     inst->of = ir_aggregate(agg);
@@ -732,7 +751,7 @@ uint32_t ir_call(struct ir_function *f, struct ir_block *b, enum ir_type type,
     uint32_t result = type == IR_VOID ? IR_NO_RESULT
                                       : ir_temp(f, type == IR_AGG ? IR_PTR
                                                                   : type);
-    struct ir_inst *inst = append(b, IR_CALL, type, result);
+    struct ir_inst *inst = append(f, b, IR_CALL, type, result);
 
     inst->a = callee;
     inst->arg_count = arg_count;
@@ -761,17 +780,15 @@ uint32_t ir_call_indirect(struct ir_function *f, struct ir_block *b,
 void ir_jump(struct ir_function *f, struct ir_block *b,
              const struct ir_block *target)
 {
-    (void)f;
-    append(b, IR_JUMP, IR_VOID, IR_NO_RESULT)->a = ir_block_op(target);
+    append(f, b, IR_JUMP, IR_VOID, IR_NO_RESULT)->a = ir_block_op(target);
 }
 
 void ir_branch(struct ir_function *f, struct ir_block *b,
                struct ir_operand cond, const struct ir_block *then_block,
                const struct ir_block *else_block)
 {
-    struct ir_inst *inst = append(b, IR_BRANCH, IR_VOID, IR_NO_RESULT);
+    struct ir_inst *inst = append(f, b, IR_BRANCH, IR_VOID, IR_NO_RESULT);
 
-    (void)f;
     inst->a = cond;
     inst->b = ir_block_op(then_block);
     inst->c = ir_block_op(else_block);
@@ -781,9 +798,8 @@ void ir_branch_ov(struct ir_function *f, struct ir_block *b,
                   struct ir_operand value, const struct ir_block *then_block,
                   const struct ir_block *else_block)
 {
-    struct ir_inst *inst = append(b, IR_BRANCH_OV, IR_VOID, IR_NO_RESULT);
+    struct ir_inst *inst = append(f, b, IR_BRANCH_OV, IR_VOID, IR_NO_RESULT);
 
-    (void)f;
     inst->a = value;
     inst->b = ir_block_op(then_block);
     inst->c = ir_block_op(else_block);
@@ -792,6 +808,5 @@ void ir_branch_ov(struct ir_function *f, struct ir_block *b,
 void ir_ret(struct ir_function *f, struct ir_block *b, enum ir_type type,
             struct ir_operand value)
 {
-    (void)f;
-    append(b, IR_RET, type, IR_NO_RESULT)->a = value;
+    append(f, b, IR_RET, type, IR_NO_RESULT)->a = value;
 }
