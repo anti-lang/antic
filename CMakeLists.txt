@@ -159,6 +159,10 @@ target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
 target_compile_definitions(antic_core PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
+# anti prints the same version as antic, which step 10 of a release
+# reads from a fresh install. tools/pack-anti.cmake defines it for both.
+target_compile_definitions(anti PRIVATE
+    ANTIC_VERSION="${PROJECT_VERSION}")
 
 # DESIGN: the levels of tools/cpu-levels are the table src/cpu.c holds, and
 # the test cpu_levels_pin compares the two. The build reads the file rather

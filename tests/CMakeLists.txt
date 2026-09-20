@@ -169,10 +169,14 @@ add_test(NAME workflows_dispatch_only
         "-DWORKFLOWS=${PROJECT_SOURCE_DIR}/.github/workflows"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_workflows.cmake")
 
-# The version stands in tools/version alone, and antic prints that one.
+# The version stands in tools/version alone, and both programs print
+# that one. Step 10 of the release reads them from a fresh install.
 add_test(NAME antic_version COMMAND antic --version)
 set_tests_properties(antic_version PROPERTIES
     PASS_REGULAR_EXPRESSION "^antic ${PROJECT_VERSION}\n")
+add_test(NAME anti_version COMMAND anti --version)
+set_tests_properties(anti_version PROPERTIES
+    PASS_REGULAR_EXPRESSION "^anti ${PROJECT_VERSION}\n")
 
 # The host target name has two spellings: ANTIC_HOST_TARGET here and the
 # detection in src/target.c. This test fails when they disagree.

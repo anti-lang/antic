@@ -87,6 +87,13 @@ int main(int argc, char **argv)
     if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
         return usage(stdout);
     }
+    /* The version of the tool is the version of Anti, which the build
+       takes from tools/version. Step 10 of a release reads it from a
+       fresh install, beside the one antic prints. */
+    if (argc == 2 && strcmp(argv[1], "--version") == 0) {
+        printf("anti %s\n", ANTIC_VERSION);
+        return 0;
+    }
     if (argc >= 2 && strcmp(argv[1], "test") == 0) {
         const char **sources = malloc((size_t)argc * sizeof *sources);
         const char **roots = malloc((size_t)argc * sizeof *roots);
