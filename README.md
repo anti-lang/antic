@@ -59,6 +59,14 @@ host. A program that names a framework needs the bundle that `anti sdk export` w
 a Mac you own, and `anti sdk import` installs. Apple's licence governs where that bundle
 may be used, and it is yours to read.
 
+## Releasing
+
+`./r` makes a release, and `docs/work-order-release-script.md` holds its eleven
+steps. `./r --dry-run` runs the first five and prints a plan for the rest. Step 9
+writes `downloads/index.toml` of anti-lang.com, so `ANTI_SITE` holds the path to a
+clone of that site's repository, and the step refuses without it. `RELEASE_KEY`
+names the encrypted private key that signs `SHA256SUMS`.
+
 ## Documents
 
 | File | Contents |
