@@ -166,6 +166,10 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 17. Inline atomic instruction sequences, which are runtime calls today.
 18. Done. The one manifest of a release, and the installers that read its
     signature. `docs/reports/2026-09-20-one-manifest.md` reports both.
+19. Windows symbols archives hold the PDB. The packer passes `/DEBUG` with
+    `/PDBALTPATH:%_PDB%` for Windows release builds, step 4 puts `prog.pdb`
+    beside the map, `no_paths` still passes, and the CodeView GUID in the
+    executable is checked to match the PDB.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures

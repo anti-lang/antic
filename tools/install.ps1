@@ -175,7 +175,7 @@ try {
     if ($signed) {
         $openssl = Find-AntiOpenssl
         if (-not $openssl) {
-            Fail "openssl is missing, and without it SHA256SUMS.sig is no signature of anything. Git for Windows carries one."
+            Fail "openssl is missing, and without it SHA256SUMS.sig is no signature of anything. Install Git for Windows, which carries one."
         }
         if (-not (Test-AntiSignature $openssl "$work\SHA256SUMS" "$work\SHA256SUMS.sig")) {
             Fail "SHA256SUMS of $version carries no signature of the key of Anti"
