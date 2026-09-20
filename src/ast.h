@@ -418,6 +418,10 @@ enum item_kind {
 /* A function of a struct body against the contracts of its chain. */
 enum fn_contract { FN_PLAIN, FN_ABSTRACT, FN_CONCRETE };
 
+/* The module-level block an ITEM_FN was written in. `anti test`
+   compiles both, and every other build drops them. */
+enum fn_block { BLOCK_NONE, BLOCK_TESTS, BLOCK_FIXTURES };
+
 struct item {
     enum item_kind kind;
     struct pos pos;
@@ -441,6 +445,7 @@ struct item {
     struct item **members;          /* the functions and constants of a body */
     size_t member_count;
     enum fn_contract contract;      /* ITEM_FN */
+    enum fn_block block;            /* ITEM_FN: `tests` or `fixtures` */
     bool has_self;                  /* ITEM_FN: self is its first parameter */
     struct symbol *self;            /* ITEM_FN: the symbol of self */
     const char *runtime;            /* ITEM_FN of the root: its C symbol */

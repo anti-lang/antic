@@ -101,14 +101,16 @@ add_executable(antic
 target_link_libraries(antic PRIVATE antic_core)
 
 # DESIGN: anti is the user-facing command. docs/tooling.md places it in
-# tools/anti/, linked against antic_core. Its only commands are sdk export
-# and sdk import, which move the stubs of Apple's SDK from a Mac to a host
-# that links a program naming a framework.
+# tools/anti/, linked against antic_core. Its commands are sdk export and
+# sdk import, which move the stubs of Apple's SDK from a Mac to a host
+# that links a program naming a framework, and test, which runs the
+# `tests` and `fixtures` blocks of a module.
 add_executable(anti
     tools/anti/main.c
     tools/anti/files.c
     tools/anti/sdk.c
-    tools/anti/sha256.c)
+    tools/anti/sha256.c
+    tools/anti/test.c)
 target_link_libraries(anti PRIVATE antic_core)
 
 target_compile_definitions(antic PRIVATE

@@ -367,6 +367,18 @@ add_test(NAME raw_output
             "-DC_PROGRAM=$<TARGET_FILE:raw_bytes_c>"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/raw"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_raw_output.cmake")
+# The `tests` and `fixtures` blocks, the runner of `anti test` and the
+# proof that every other build drops both blocks.
+add_test(NAME anti_test
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test.cmake")
+
 add_test(NAME anti_sdk
     COMMAND "${CMAKE_COMMAND}" "-DANTI=$<TARGET_FILE:anti>"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti_sdk"

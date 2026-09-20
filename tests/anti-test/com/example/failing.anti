@@ -1,0 +1,27 @@
+//! A module whose second test fails, to show the report of an assertion.
+//!
+//! The runtime names the test before it prints the position the compiler
+//! built, so the two lines together name the test, the file and the line.
+
+fixtures
+{
+	fn two() -> int
+	{
+		return 2;
+	}
+}
+
+tests
+{
+	fn two_is_two()
+	{
+		let n = two();
+		assert(n == 2);
+	}
+
+	fn two_is_three()
+	{
+		let n = two();
+		assert(n == 3);
+	}
+}

@@ -1,0 +1,69 @@
+//! A module with both blocks, whose two tests share one fixture.
+
+pub class Stack
+{
+	items: [8]int,
+	count: int = 0,
+
+	pub fn new() -> Stack
+	{
+		return Stack { items: [0; 8], count: 0 };
+	}
+
+	pub fn push(self, v: int)
+	{
+		self.items[self.count] = v;
+		self.count += 1;
+	}
+
+	pub fn top(self) -> int
+	{
+		return self.items[self.count - 1];
+	}
+
+	pub fn len(self) -> int
+	{
+		return self.count;
+	}
+}
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fixtures
+{
+	/// The fixture both tests take, with two values pushed.
+	fn full_stack() -> Stack
+	{
+		let s = Stack.new();
+		s.push(1);
+		s.push(2);
+		return s;
+	}
+
+	fn setup()
+	{
+		printf("setup\n".ptr);
+	}
+
+	fn teardown()
+	{
+		printf("teardown\n".ptr);
+	}
+}
+
+tests
+{
+	fn push_grows()
+	{
+		let s = full_stack();
+		let n = s.len();
+		assert(n == 2);
+	}
+
+	fn top_is_last()
+	{
+		let s = full_stack();
+		let v = s.top();
+		assert(v == 2);
+	}
+}

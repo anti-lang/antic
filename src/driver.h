@@ -27,6 +27,10 @@ struct options {
        debug sections of the link. anti build passes it in dev mode, and
        release mode never does. */
     bool debug;
+    /* DESIGN: --tests keeps the `tests` and `fixtures` blocks and is what
+       `anti test` passes. Every other build drops them after parsing, so
+       no later pass sees them and no object or `.antl` carries them. */
+    bool tests;
     /* DESIGN: dev mode keeps assertions and release mode drops them,
        because dev compiles one module and release the whole program.
        --asserts and --no-asserts decide instead of the mode. */

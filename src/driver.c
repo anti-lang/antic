@@ -141,6 +141,38 @@ static bool write_file(const char *path, const struct text *content)
    DESIGN: antic -c refuses a library under the anti root without
    --anti-internal. It warns on a path of one segment, which is for a
    program's own files. No compilation may define the runtime's module. */
+/* DESIGN: the two blocks are compiled only by `anti test`. Their functions
+   are ordinary module functions by now, each carrying its own block, so
+   dropping them here is one pass over the item list. Every pass
+   after this one reads a module that never held them. No object, no
+   `.antl` and no header can carry one. */
+static void drop_test_blocks(struct module *tree, bool keep)
+{
+    size_t kept = 0;
+    size_t i;
+
+    /* DESIGN: under `--tests` the two blocks stay and their functions are
+       public, so the runner module that `anti test` writes calls them by
+       name. Nothing else compiles them, so the name reaches no other
+       build. */
+    if (keep) {
+        for (i = 0; i < tree->item_count; i++) {
+            struct item *it = tree->items[i];
+            if (it->block != BLOCK_NONE) {
+                it->pub = true;
+                it->vis = VIS_PUB;
+            }
+        }
+        return;
+    }
+    for (i = 0; i < tree->item_count; i++) {
+        if (tree->items[i]->block == BLOCK_NONE) {
+            tree->items[kept++] = tree->items[i];
+        }
+    }
+    tree->item_count = kept;
+}
+
 static bool module_name(const struct options *o, struct text *out)
 {
     char error[200];
@@ -1164,6 +1196,7 @@ static int compile(const struct options *o, struct text *source,
         print_diagnostics(o->input, &diags);
         goto done;
     }
+    drop_test_blocks(tree, o->tests);
     if (o->dump_ast) {
         struct text dump = {0};
         ast_dump(&dump, tree);

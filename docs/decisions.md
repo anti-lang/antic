@@ -462,6 +462,17 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The IR carries one file table per module and one line per instruction, and a function names its file by index and its declaration line. A library file holds all three, so a breakpoint in a module that came from an `.antl` resolves. Reason: the position belongs to the instruction, and the back end writes a directive only where the line changes.
 - The line of an instruction is the line of the statement that lowering stands on when it emits the instruction. An instruction of no statement carries no line and keeps the position of the one before it. Those are the prologue, the epilogue, a spill and the code of a compiler-written function. The first position of a function is the line of its declaration, which its prologue belongs to.
 
+## Tests and fixtures
+
+- The two blocks are dropped after parsing and before checking, in every build but `anti test`. Their functions are ordinary module functions by then, each carrying the block it came from, so the drop is one pass over the item list. Reason: every pass after it reads a module that never held them. A dev build, a release build and a `.antl` are then free of both by construction, rather than by a filter in each writer. `antic --tests` keeps them.
+- [provisional] Under `--tests` the functions of both blocks are public, so the runner reaches them. Reason: the specification says both blocks see every private item of the module, and says nothing about who sees the blocks. A runner in another module is the smallest way to call them, and a name that no other build compiles reaches nothing else.
+- [provisional] `anti test` writes the runner as Anti source, one per module, at `anti/test/<module>.anti` under the work directory. The module path of a runner is `anti.test.<module>`, where each dot of the module becomes an `_`. Reason: the runner needs an import of the module under test, and Anti source is the one form that needs no second code path. The reserved `anti.` root keeps it clear of any name a module could take.
+- [provisional] The runner names each test to the runtime before it calls it, with `anti_rt_test_running`. A failed assertion prints `FAIL <module>.<test>` and then the position the compiler built into the message. Reason: a failed assertion aborts, so nothing after it can name the test. The name is one pointer that the assertion reads on the path that was ending anyway.
+- [provisional] A test that returned prints `ok <module>.<test>`, and the run of a module stops at its first failed assertion. Reason: the specification names the first failed assert and the runtime ends the process there. Running the rest would need a jump out of a test, which no other part of the language has.
+- [provisional] `anti test` runs one process per module and reports the count of modules that failed. Reason: antic compiles one module per call, and a runner per module needs no cross-module name at all.
+- [provisional] `anti test` takes `.anti` files and `-I` roots rather than a package. Reason: no manifest and no package layout are built, and `docs/tooling.md` describes an `anti` that does not exist yet. The files and the roots are what antic already takes.
+- `anti test --release` compiles the runner and the module as a whole program with the assertions and the dev-mode checks off. Reason: the specification runs the tests again that way, and release mode is the absence of `--dev`.
+
 ## Open
 
 - Nothing.

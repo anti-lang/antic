@@ -165,8 +165,9 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 17. Inline atomic instruction sequences, which are runtime calls today.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
-nullable pointers, the dev-mode checks and the lines of `-g` are built. The
-variables of `-g` and tests and fixtures come before the first public release. After it, the wrapping and saturating operators
+nullable pointers, the dev-mode checks, the lines of `-g` and tests and
+fixtures are built. The variables of `-g` come before the first public
+release. After it, the wrapping and saturating operators
 with `Flags`, then sum types, then locking and channels. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. Then
 generics and closures.
@@ -206,5 +207,8 @@ reports what it finished.
   `downloads/resources/anti/0.1.0/` of anti-lang.com. See `docs/distribution.md`.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
   only. It has never run.
-- The `anti` tool is not written. `tools/scripts/format_anti.py` stands in for
-  `anti fmt`.
+- The `anti` tool holds `sdk export`, `sdk import` and `test`, and nothing else
+  of `docs/tooling.md`. `tools/scripts/format_anti.py` stands in for `anti fmt`.
+- `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
+  `anti test` writes the runner, links it and runs it. Every other build drops
+  both blocks after parsing.

@@ -23,6 +23,8 @@ static int usage(FILE *out)
           "  --dev                compile the module alone into its object,\n"
           "                       and link it when it defines main. The\n"
           "                       input may be a library file instead\n"
+          "  --tests              keep the `tests` and `fixtures` blocks,\n"
+          "                       which every other build drops\n"
           "  --lib static|shared  write a library for C and its header\n"
           "  --bundle-runtime     put the runtime into the static library\n"
           "  --soname             give the shared library the major version\n"
@@ -179,6 +181,9 @@ static int run(int argc, char **argv, struct options *o)
             continue;
         } else if (strcmp(arg, "--dev") == 0) {
             options.dev = true;
+            continue;
+        } else if (strcmp(arg, "--tests") == 0) {
+            options.tests = true;
             continue;
         } else if (strcmp(arg, "--no-reflect") == 0) {
             options.no_reflect = true;

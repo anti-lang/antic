@@ -22,6 +22,10 @@ void anti_rt_exit(int32_t status);
    compiler built the text, so this adds only a newline. */
 void anti_rt_assert_failed(const unsigned char *text, int64_t length);
 
+/* Name the test that is running, which a failed assertion reports before
+   its position. The runner of `anti test` is the one caller. */
+void anti_rt_test_running(const unsigned char *name, int64_t length);
+
 /* Which values a failed dev-mode check prints after its text. The
    compiler names the file, the line and the operation. The kind names
    the labels of the values. */

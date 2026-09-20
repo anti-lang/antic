@@ -1,0 +1,40 @@
+//! The `tests` and `fixtures` blocks are compiled only by `anti test`.
+//! Every other build drops them, so this program holds neither the
+//! functions they declare nor anything they name. The run prints what
+//! `main` prints and nothing of the blocks.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fixtures
+{
+	fn base() -> int
+	{
+		printf("fixture ran\n".ptr);
+		return 21;
+	}
+
+	fn setup()
+	{
+		printf("setup ran\n".ptr);
+	}
+}
+
+tests
+{
+	fn twice_of_base()
+	{
+		let n = twice(base());
+		assert(n == 42);
+	}
+}
+
+fn main() -> int
+{
+	printf("twice %d\n".ptr, twice(21) as c_int);
+	return 0;
+}

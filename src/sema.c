@@ -5572,6 +5572,28 @@ static void check_main(struct checker *c, struct item *it)
     }
 }
 
+/* DESIGN: every `fn` in `tests` is a test, so it takes no parameters and
+   returns nothing: the runner calls it and reads its asserts. A `fn` in
+   `fixtures` may take and return anything and is never run by itself.
+   `setup` and `teardown` run before and after every test of the module,
+   which only `fixtures` declares. */
+static void check_test_block(struct checker *c, struct item *it)
+{
+    struct type *t = it->symbol->type;
+
+    if (it->block == BLOCK_TESTS &&
+        (t->param_count != 0 || t->result->kind != TYPE_VOID)) {
+        error_at(c, it->name_pos, "a `tests` function takes no parameters "
+                 "and returns nothing, because the runner calls it");
+        return;
+    }
+    if (it->block == BLOCK_TESTS &&
+        (name_is(&it->name, "setup") || name_is(&it->name, "teardown"))) {
+        error_at(c, it->name_pos, "`setup` and `teardown` belong to "
+                 "`fixtures`, which runs them around every test");
+    }
+}
+
 static enum symbol_kind item_symbol_kind(enum item_kind kind)
 {
     switch (kind) {
@@ -5998,6 +6020,9 @@ bool sema_check(struct module *module, const char *module_name,
         check_function(&c, it);
         if (name_is(&it->name, "main") && !is_error(it->symbol->type)) {
             check_main(&c, it);
+        }
+        if (it->block != BLOCK_NONE && !is_error(it->symbol->type)) {
+            check_test_block(&c, it);
         }
     }
     /* DESIGN: `implements name: I` places a sub-object of the abstract

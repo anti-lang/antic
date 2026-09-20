@@ -1869,6 +1869,36 @@ static bool module_path(struct parser *p, struct name *out)
     return true;
 }
 
+/* DESIGN: `tests { }` and `fixtures { }` hold functions and nothing else.
+   Each one becomes an ordinary module function carrying the block it was
+   written in, so every pass after this one reads a module of functions.
+   The build that is not `anti test` drops them before checking, which is
+   how a dev build, a release build and a `.antl` contain none of it. */
+static bool test_block(struct parser *p, struct list *items,
+                       enum fn_block which)
+{
+    next(p);
+    if (!expect(p, TOKEN_LBRACE)) {
+        return false;
+    }
+    while (!check(p, TOKEN_RBRACE) && !check(p, TOKEN_EOF)) {
+        struct item *it = item(p);
+        if (it == NULL) {
+            return false;
+        }
+        if (it->kind != ITEM_FN) {
+            diagnostics_add(p->diags, it->pos.line, it->pos.column,
+                            "`%s` holds functions and nothing else",
+                            which == BLOCK_TESTS ? "tests" : "fixtures");
+            p->ok = false;
+            return false;
+        }
+        it->block = which;
+        list_push(items, &it);
+    }
+    return expect(p, TOKEN_RBRACE);
+}
+
 bool parse(const char *source, const struct token_list *tokens,
            struct arena *arena, struct diagnostics *diags,
            struct module **out)
@@ -1884,6 +1914,8 @@ bool parse(const char *source, const struct token_list *tokens,
     bool *taken = calloc(tokens->count, sizeof *taken);
     size_t count = 0;
     size_t i;
+    bool saw_tests = false;
+    bool saw_fixtures = false;
 
     if (kept == NULL || origin == NULL || taken == NULL) {
         fputs("antic: out of memory\n", stderr);
@@ -1919,7 +1951,27 @@ bool parse(const char *source, const struct token_list *tokens,
     }
     while (!check(&p, TOKEN_EOF)) {
         size_t before = p.pos;
-        struct item *it = item(&p);
+        struct item *it;
+        if (check(&p, TOKEN_TESTS) || check(&p, TOKEN_FIXTURES)) {
+            bool is_tests = check(&p, TOKEN_TESTS);
+            bool *seen = is_tests ? &saw_tests : &saw_fixtures;
+            if (*seen) {
+                diagnostics_add(diags, peek(&p)->line, peek(&p)->column,
+                                "a module has at most one `%s` block",
+                                is_tests ? "tests" : "fixtures");
+                p.ok = false;
+            }
+            *seen = true;
+            if (!test_block(&p, &items,
+                            is_tests ? BLOCK_TESTS : BLOCK_FIXTURES)) {
+                if (p.pos == before) {
+                    next(&p);
+                }
+                sync_item(&p);
+            }
+            continue;
+        }
+        it = item(&p);
         if (it != NULL) {
             list_push(&items, &it);
         } else {
