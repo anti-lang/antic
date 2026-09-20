@@ -6,9 +6,16 @@
 #   LIBRARY   the static library of the target
 #   TARGET    the antic target name
 #   LEVEL     the level it is built for, for the message
+#   HOST_BUILD yes when the library is the one this build compiled
 #   USES      mnemonics the library must hold, separated by |
 #   AVOIDS    mnemonics it must not hold, separated by |
 
+if(HOST_BUILD STREQUAL "yes")
+    message("SKIP: the ${TARGET} library is the one of this build, at the "
+            "optimisation of this build, and not the cross build the "
+            "archive ships")
+    return()
+endif()
 if(NOT EXISTS "${LIBRARY}" OR NOT EXISTS "${OBJDUMP}")
     message("SKIP: no runtime library or llvm-objdump for ${TARGET}")
     return()

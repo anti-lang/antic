@@ -117,12 +117,25 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
     else()
         set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/libanti_rt.a")
     endif()
+    # DESIGN: the library of the host target is the one this build
+    # compiled, at the optimisation of this build. A Debug build writes a
+    # call to the runtime's own helper where a release writes the
+    # exclusive loop, so the mnemonics of a level are not in it. The
+    # check is of what the archive ships, which is a cross build, and it
+    # skips the host's own library. The Mac builds no host library, so
+    # all three targets are cross builds there.
+    set(cpu_host_build no)
+    if(target STREQUAL "${ANTIC_HOST_TARGET}"
+       AND NOT ANTIC_HOST_OS STREQUAL "macos")
+        set(cpu_host_build yes)
+    endif()
     add_test(NAME cpu_level_${level}
         COMMAND "${CMAKE_COMMAND}"
             "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
             "-DLIBRARY=${library}"
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
+            "-DHOST_BUILD=${cpu_host_build}"
             "-DUSES=${uses}"
             "-DAVOIDS=${avoids}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_runtime.cmake")
