@@ -179,6 +179,16 @@ preflight() {
         value=$(cached "$name")
         [ -n "$value" ] || die "build/CMakeCache.txt names no $name"
     done
+    # DESIGN: a release is of one commit. The state names the commit its
+    # steps ran on. A run on another one starts over, rather than
+    # publishing a package of one commit beside a suite of another.
+    if [ -f "$state/head" ] && [ "$(cat "$state/head")" != "$head" ]; then
+        say "the state is of $(cut -c1-7 < "$state/head"), so the steps run again"
+        rm -rf "$state" "$logs" "$packages" "$symbols" "$work" "$export_tree"
+    fi
+    mkdir -p "$state"
+    echo "$head" > "$state/head"
+
     clang_dir=$(cached ANTIC_CLANG_DIR)
     llvm_dir=$(cached ANTIC_LLVM_DIR)
     sysroot_dir=$(cached ANTIC_SYSROOT_DIR)
@@ -744,7 +754,7 @@ report() {
         printf '# Release %s\n\n' "$version"
         printf 'Made by `./r` on %s.\n\n' "$(date -u '+%Y-%m-%d')"
         printf '## Steps\n\n'
-        for stamp in "$state"/*; do
+        for stamp in "$state"/[0-9]*; do
             printf -- '- %s, at %s\n' "$(basename "$stamp")" "$(cat "$stamp")"
         done
         printf '\n## Counts\n\n'
