@@ -15,11 +15,6 @@
 import anti.error as failure;
 import anti.text;
 
-/* [AI AGENT] The result of a `try` is bound to a local before it reaches
-   `*out`. Writing `*out = try f();` in one statement compiles and then
-   reads a null pointer at run time, which is a defect of the compiler and
-   not of this module. The report of 2026-09-20 holds the case. */
-
 extern fn anti_rt_on_signal(sig: int, f: fn(int));
 extern fn anti_rt_signal_pending() -> int;
 extern fn anti_rt_is_windows() -> int;
@@ -135,8 +130,7 @@ fn unix_dir(name: str, fallback: str, app: str, out: *str) -> ?*failure.Error
 	}
 	b.append("/");
 	b.append(app);
-	let made = try owned(&b);
-	*out = made;
+	*out = try owned(&b);
 	return none;
 }
 
@@ -157,8 +151,7 @@ fn windows_dir(app: str, tail: str, out: *str) -> ?*failure.Error
 		b.append("\\");
 		b.append(tail);
 	}
-	let made = try owned(&b);
-	*out = made;
+	*out = try owned(&b);
 	return none;
 }
 
@@ -171,12 +164,10 @@ fn windows_dir(app: str, tail: str, out: *str) -> ?*failure.Error
 pub fn user_config_dir(app: str, out: *str) -> ?*failure.Error
 {
 	if windows() {
-		let made = try windows_dir(app, "config");
-		*out = made;
+		*out = try windows_dir(app, "config");
 		return none;
 	}
-	let made = try unix_dir("XDG_CONFIG_HOME", ".config", app);
-	*out = made;
+	*out = try unix_dir("XDG_CONFIG_HOME", ".config", app);
 	return none;
 }
 
@@ -188,12 +179,10 @@ pub fn user_config_dir(app: str, out: *str) -> ?*failure.Error
 pub fn user_data_dir(app: str, out: *str) -> ?*failure.Error
 {
 	if windows() {
-		let made = try windows_dir(app, "");
-		*out = made;
+		*out = try windows_dir(app, "");
 		return none;
 	}
-	let made = try unix_dir("XDG_DATA_HOME", ".local/share", app);
-	*out = made;
+	*out = try unix_dir("XDG_DATA_HOME", ".local/share", app);
 	return none;
 }
 
@@ -205,11 +194,9 @@ pub fn user_data_dir(app: str, out: *str) -> ?*failure.Error
 pub fn user_cache_dir(app: str, out: *str) -> ?*failure.Error
 {
 	if windows() {
-		let made = try windows_dir(app, "cache");
-		*out = made;
+		*out = try windows_dir(app, "cache");
 		return none;
 	}
-	let made = try unix_dir("XDG_CACHE_HOME", ".cache", app);
-	*out = made;
+	*out = try unix_dir("XDG_CACHE_HOME", ".cache", app);
 	return none;
 }
