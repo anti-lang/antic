@@ -22,13 +22,21 @@ file(WRITE "${root}/com/example/step.anti"
      "\tlet m = n + 1;\n"
      "\treturn m * 2;\n"
      "}\n")
-# Line 5 holds the call and line 6 the subtraction.
+# Line 5 holds the call of the imported module, line 10 the call of the
+# function that holds it and line 11 the subtraction. main calls through
+# helper so that the frame below the breakpoint is a function of the
+# program and not the runtime entry, which shares its address with main.
 file(WRITE "${root}/app.anti"
      "import com.example.step;\n"
      "\n"
+     "fn helper() -> int\n"
+     "{\n"
+     "\treturn step.step(3);\n"
+     "}\n"
+     "\n"
      "fn main() -> int\n"
      "{\n"
-     "\tlet v = step.step(3);\n"
+     "\tlet v = helper();\n"
      "\treturn v - 8;\n"
      "}\n")
 
@@ -59,7 +67,8 @@ build(plain)
 # every statement.
 file(READ "${WORK}/app.s" assembly)
 foreach(wanted "\.file 1 \"com/example/step\.anti\"" "\.file 2 \"app\.anti\""
-        "\.loc 1 3 0" "\.loc 1 4 0" "\.loc 2 5 0" "\.loc 2 6 0")
+        "\.loc 1 3 0" "\.loc 1 4 0" "\.loc 2 5 0" "\.loc 2 10 0"
+        "\.loc 2 11 0")
     if(NOT assembly MATCHES "${wanted}")
         message(FATAL_ERROR "the assembly of -g holds no `${wanted}`")
     endif()
@@ -81,24 +90,51 @@ foreach(name app plain)
     endif()
 endforeach()
 
-# One breakpoint by file and line, then a backtrace. The frame of the
-# breakpoint names the function of the imported module and its line, and
-# the frame below it names main and the line of the call.
-if(KIND STREQUAL "lldb")
-    set(command "${DEBUGGER}" -b -o "breakpoint set -f step.anti -l 4"
-        -o "run" -o "bt" -o "quit" "${WORK}/app")
-else()
-    set(command "${DEBUGGER}" -batch -ex "break step.anti:4" -ex "run"
-        -ex "bt" "${WORK}/app")
-endif()
-execute_process(COMMAND ${command} WORKING_DIRECTORY "${root}"
-                OUTPUT_VARIABLE session ERROR_VARIABLE session_err
-                RESULT_VARIABLE status ENCODING NONE)
-set(session "${session}${session_err}")
-foreach(frame "com\.example\.step\.step[^\n]*step\.anti:4"
-        "app\.main[^\n]*app\.anti:5")
-    if(NOT session MATCHES "${frame}")
-        message(FATAL_ERROR
-                "${KIND} printed no frame matching `${frame}`\n${session}")
+# A breakpoint by file and line, then a backtrace. The frame that stops
+# names its Anti function and the position, and the frames below it name
+# the Anti functions that called it.
+#
+# The two debuggers spell the name of a function differently. lldb prints
+# the symbol, `com.example.step.step`, and gdb writes the last segment in
+# brackets, `com.example.step[step]`. The character before the segment is
+# left open for both.
+#
+# gdb reads a position for every frame. lldb reads one for the frame that
+# stops and names the function alone below it, because the compile unit
+# describes no function of its own yet. The step that adds variables adds
+# those descriptions, and this test tightens with it.
+function(session file line)
+    if(KIND STREQUAL "lldb")
+        set(command "${DEBUGGER}" -b -o "breakpoint set -f ${file} -l ${line}"
+            -o "run" -o "bt" -o "quit" "${WORK}/app")
+    else()
+        set(command "${DEBUGGER}" -batch -ex "break ${file}:${line}"
+            -ex "run" -ex "bt" "${WORK}/app")
     endif()
-endforeach()
+    execute_process(COMMAND ${command} WORKING_DIRECTORY "${root}"
+                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+    set(session "${out}${err}" PARENT_SCOPE)
+endfunction()
+
+function(holds session wanted)
+    if(NOT session MATCHES "${wanted}")
+        message(FATAL_ERROR
+                "${KIND} printed nothing matching `${wanted}`\n${session}")
+    endif()
+endfunction()
+
+# A breakpoint in the module that came from a library file. The backtrace
+# holds all three Anti functions. main shares its address with the symbol
+# of the runtime entry, and a debugger prints one of the two names.
+session(step.anti 4)
+holds("${session}" "com\\.example\\.step.step[^\n]*step\\.anti:4")
+holds("${session}" "app.helper")
+holds("${session}" "app.main|anti\\.rt.main")
+if(NOT KIND STREQUAL "lldb")
+    holds("${session}" "app.helper[^\n]*app\\.anti:5")
+    holds("${session}" "(app.main|anti\\.rt.main)[^\n]*app\\.anti:10")
+endif()
+
+# A breakpoint in the program's own file resolves as well.
+session(app.anti 5)
+holds("${session}" "app.helper[^\n]*app\\.anti:5")

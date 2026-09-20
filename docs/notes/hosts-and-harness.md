@@ -23,9 +23,12 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 439 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export` |
-| Linux VM | 385 | ASan, UBSan | glibc sysroot, linux-arm64 programs |
+| Mac | 462 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
+| Linux VM | 404 | ASan, UBSan | glibc sysroot, linux-arm64 programs, gdb |
 | Windows VM | 368 | none | windows-arm64 programs, the Win32 expected files |
+
+`debug_info` runs the debugger of the host, lldb on the Mac and gdb on Linux, and takes
+neither from the other. No host here debugs a Windows program.
 
 No machine here runs linux-x86_64 or windows-x86_64 programs. Only the CI runners do,
 when started by hand.
@@ -51,6 +54,14 @@ when started by hand.
   takes a minute on the Mac.
 - The MSVC branch of `tests/binary_stdio.h` has never compiled. No host here builds with
   `cl`.
+- The two debuggers read the debug information of `-g` differently. gdb gives a position to
+  every frame of a backtrace. Apple's lldb gives one to the frame that stops and names the
+  function alone below it, because the compile unit describes no function of its own yet.
+  Neither reaches `main` by its Anti name: it shares its address with the symbol of the
+  runtime entry, so lldb prints `app.main` and gdb `anti.rt[main]` for the same frame.
+- gdb writes the last segment of a dotted symbol in brackets. `com.example.step.step` prints
+  as `com.example.step[step]`, and a test that matches a function name leaves the character
+  before the segment open.
 
 ## For the next session
 
@@ -59,6 +70,13 @@ when started by hand.
 - Both VMs ran the suite after item 13 of "First sessions". Linux passed 385 of 385 at
   `03d1064`. Windows passed 367 at `03d1064` and skipped `sysroot_digest`, which a
   Windows host always skips. `emit_identity` passed on both.
+- Linux ran the suite again after the debug information, at `d32dd31` with the tree in
+  `~/antic-check`. It passed 403 of 404, `debug_info` with gdb among them. `std_toml`
+  fails there with a segmentation fault in `anti_rt_toml_free` of `rt/toml.c:350`, which
+  `anti.toml.Document.destruct` reaches from the error path of `Document.read`. The Mac
+  passes that test, under both sanitizers as well. The failure predates the debug
+  information: the same build of `ae83536` fails the same way. Nothing of it is fixed.
+- Windows has not run since `03d1064`.
 - On Windows, `%USERPROFILE%\main-suite.cmd` extracts `%USERPROFILE%\tree.tar` into the
   tree, then configures, builds and runs the suite into `main-*.log` there.
 - The next session starts at item 14 of "First sessions" in `CLAUDE.md`.

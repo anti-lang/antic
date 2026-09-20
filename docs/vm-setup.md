@@ -19,17 +19,17 @@ Run these commands in the VM once. The tools go to `~/anti`, outside the tree th
 ```sh
 sudo apt update
 sudo apt install -y build-essential cmake git curl xz-utils
-git -C /tmp clone --depth 1 https://github.com/FoundingFuture/book-writing-a-compiler book
-cmake -DDEST=$HOME/anti/clang -P /tmp/book/tools/get-clang.cmake
-cmake -DDEST=$HOME/anti/toolchain -P /tmp/book/tools/get-llvm.cmake
+git -C /tmp clone --depth 1 git@github.com:anti-lang/antic.git antic
+cmake -DDEST=$HOME/anti/clang -P /tmp/antic/tools/get-clang.cmake
+cmake -DDEST=$HOME/anti/toolchain -P /tmp/antic/tools/get-llvm.cmake
 cmake -DDEST=$HOME/anti/sysroot -DLLVM_BIN=$HOME/anti/toolchain/bin \
   -DCLANG_DIR=$HOME/anti/clang -DACCEPT_LICENSE=yes \
   -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
-  -P /tmp/book/tools/get-sysroot.cmake
-cmake -DDEST=$HOME/anti/raylib -P /tmp/book/tools/get-raylib.cmake
+  -P /tmp/antic/tools/get-sysroot.cmake
+cmake -DDEST=$HOME/anti/raylib -P /tmp/antic/tools/get-raylib.cmake
 ```
 
-The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/book/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. `-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK that xwin downloads.
+The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/antic/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. `-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK that xwin downloads.
 
 A program that names a framework also needs the stubs of Apple's SDK. On the Mac, `build/anti sdk export` writes `apple-sdk-<version>.tar.xz`. Copy it to the VM and install it with `anti sdk import <bundle> --sysroot $HOME/anti/sysroot`. A copy of the SDK itself works too, as `-DAPPLE_SDK=<MacOSX.sdk>` of `get-sysroot.cmake`.
 
@@ -48,7 +48,7 @@ Host anti-linux
 Run this command in the repository on the Mac. It exports `HEAD`, builds it and runs every test.
 
 ```sh
-git archive HEAD | ssh anti-linux 'rm -rf book && mkdir book && tar -x -f - -C book && cd book &&
+git archive HEAD | ssh anti-linux 'rm -rf antic-check && mkdir antic-check && tar -x -f - -C antic-check && cd antic-check &&
   cmake -S . -B build -DANTIC_CLANG_DIR="$HOME/anti/clang" \
     -DANTIC_LLVM_DIR="$HOME/anti/toolchain" \
     -DANTIC_SYSROOT_DIR="$HOME/anti/sysroot" \
@@ -97,27 +97,27 @@ winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--quie
 The test `program_abi_raymath` compiles a raymath binding, so the VM needs the pinned raylib release. One command downloads it, and `C:\anti\test.cmd` below passes the directory.
 
 ```powershell
-cmake -DDEST=C:\anti\raylib -P C:\anti\book\tools\get-raylib.cmake
+cmake -DDEST=C:\anti\raylib -P C:\anti\antic-check\tools\get-raylib.cmake
 ```
 
 The same commands install the pinned clang and LLVM tools, which `tools/clang-pin` and `tools/llvm-pin` name for Windows on ARM64.
 
 ```powershell
-cmake -DDEST=C:\anti\clang -P C:\anti\book\tools\get-clang.cmake
-cmake -DDEST=C:\anti\toolchain -P C:\anti\book\tools\get-llvm.cmake
+cmake -DDEST=C:\anti\clang -P C:\anti\antic-check\tools\get-clang.cmake
+cmake -DDEST=C:\anti\toolchain -P C:\anti\antic-check\tools\get-llvm.cmake
 ```
 
 One command installs the sysroots of all six targets. The Windows ones come from the Build Tools of the VM, and the macOS ones from Zig. A program that names a framework takes Apple's SDK as on the Linux VM.
 
 ```powershell
-cmake -DDEST=C:\anti\sysroot -DLLVM_BIN=C:\anti\toolchain\bin -DCLANG_DIR=C:\anti\clang -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" -P C:\anti\book\tools\get-sysroot.cmake
+cmake -DDEST=C:\anti\sysroot -DLLVM_BIN=C:\anti\toolchain\bin -DCLANG_DIR=C:\anti\clang -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" -P C:\anti\antic-check\tools\get-sysroot.cmake
 ```
 
 Create `C:\anti\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment, including the variable `LIB` that lld-link reads, and puts the Ninja of Visual Studio on the path. The pinned clang needs Ninja, because the Visual Studio generator takes the compiler of its own toolset.
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" arm64
-cd /d C:\anti\book
+cd /d C:\anti\antic-check
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=C:/anti/clang -DANTIC_LLVM_DIR=C:/anti/toolchain -DANTIC_SYSROOT_DIR=C:/anti/sysroot -DANTIC_RAYLIB_DIR=C:/anti/raylib/raylib-6.0
 cmake --build build
 ctest --test-dir build --output-on-failure
@@ -138,10 +138,10 @@ Host anti-windows
 
 ### Test run
 
-Run these commands in the repository on the Mac. The first one replaces `C:\anti\book` with the export of `HEAD`, and the second one runs the build and the tests.
+Run these commands in the repository on the Mac. The first one replaces `C:\anti\antic-check` with the export of `HEAD`, and the second one runs the build and the tests.
 
 ```sh
-git archive HEAD | ssh anti-windows "rmdir /s /q C:\anti\book & mkdir C:\anti\book && tar -x -f - -C C:\anti\book"
+git archive HEAD | ssh anti-windows "rmdir /s /q C:\anti\antic-check & mkdir C:\anti\antic-check && tar -x -f - -C C:\anti\antic-check"
 ssh anti-windows C:\anti\test.cmd
 ```
 

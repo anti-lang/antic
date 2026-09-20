@@ -53,7 +53,8 @@ On COFF the same shape is `.cv_file`, `.cv_func_id`, `.cv_loc` and a
   llvm-mc, which covers the DWARF of ELF and Mach-O and the CodeView of COFF.
 - Unit tests: `positions` in `test_ir.c` for the file table and the cursor, and
   `strips_debug` in `test_link.c` now checks both ways for all six targets.
-- 462 tests pass on the Mac, 461 under ASan and 461 under UBSan.
+- 462 tests pass on the Mac, 461 under ASan and 461 under UBSan. The Linux VM
+  ran `debug_info` with gdb and then the whole suite, and passed 403 of 404.
 
 Checked by hand and not as tests: all 54 programs of `tests/programs/` build
 with `-g` and print what they print without it. lldb stops in a dev-mode build
@@ -66,17 +67,41 @@ block form of the doc comments in `tests/modules/`, and `package_and_docs` in
 `test_modules.c`. `tests/modules/scale.antl.hex` and the golden bytes in
 `test_modules.c` were regenerated for version 28.
 
-## Questions
+## What the Linux VM said
 
-1. **`anti build` passes `-g` in dev mode** is not implemented. `tools/anti/`
-   holds `sdk export` and `sdk import` alone, and there is no `anti build` to
-   change. `docs/tooling.md` records the rule and `docs/decisions.md` carries it
-   as the one open item. Nothing else was substituted.
-2. **gdb on the Linux VM has not run.** The VM is not reachable from this
-   session: `~/.ssh/config` holds no `anti-linux` host and UTM is not running.
-   The gdb half of `debug_info` is written and selects itself on Linux, but only
-   the lldb half has been executed. It needs a run on the VM.
-3. The three provisional entries are ready for review: the compile unit, the
-   language code and `DW_AT_comp_dir`.
-4. Pre-existing docs-style findings in `src/ir.h` and `src/regalloc.c`, outside
-   the lines this session touched, were left alone.
+gdb stops by file and line and prints a backtrace of Anti function names. It
+reads more than lldb does: a position for every frame. lldb gives one to the
+frame that stops and names the function alone below it. The reason is that the
+compile unit describes no function of its own, and the step that adds variables
+adds those descriptions. `debug_info` therefore asks each debugger
+for what it gives, and the gdb run checks the position of every frame.
+
+Two spellings differ and the test leaves both open. gdb writes the last segment
+of a dotted symbol in brackets, `com.example.step[step]`. And `main` shares its
+address with the symbol of the runtime entry, so lldb names that frame
+`app.main` and gdb `anti.rt[main]`.
+
+## Two things to settle
+
+1. **`std_toml` fails on Linux and did so before this work.** The program dies
+   with a segmentation fault in `anti_rt_toml_free` of `rt/toml.c:350`, reached
+   by `anti.toml.Document.destruct` from the error path of `Document.read`. The
+   same build of `ae83536` fails the same way, so the debug information is not
+   the cause. The Mac passes the test under both sanitizers. `-g` found the
+   frame, which is the first thing it has been useful for. Nothing of it was
+   touched here, because it is another task.
+2. **`anti build` passes `-g` in dev mode** is still a rule without an
+   implementation, as `docs/tooling.md` records it.
+
+## Two things this session got wrong
+
+- `docs/vm-setup.md` still named the export directory `book`, from the book
+  repository, and the tools it clones came from there too. The session followed
+  it. The names are now `antic-check` for the tree of a run, which
+  `docs/notes/hosts-and-harness.md` already used, and `/tmp/antic` for the
+  clone of the scripts.
+- The address of the Linux VM is in `docs/notes/hosts-and-harness.md`, which the
+  session did not read before reporting the machine unreachable. Reaching the
+  test machines belongs in what a session reads when it needs a machine.
+- Pre-existing docs-style findings in `src/ir.h` and `src/regalloc.c`, outside
+  the lines this session touched, were left alone.

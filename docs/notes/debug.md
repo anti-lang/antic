@@ -89,6 +89,22 @@ The unit carries no `DW_AT_comp_dir`, so a debugger resolves a relative path
 against its own working directory. A reader who debugs from the root of the
 project finds every source.
 
+## What the two debuggers make of it
+
+gdb gives a position to every frame of a backtrace. Apple's lldb gives one to
+the frame that stops and names the function alone below it. A compile unit with
+no `DW_TAG_subprogram` is the reason, and the step that describes variables
+describes the functions as well, because a variable lives inside one.
+
+Neither debugger reaches `main` by its Anti name. `emit_entry` gives the
+runtime entry a second global name at the same address with `.set`, so the two
+symbols share it, and a debugger prints whichever it picked: lldb `app.main`
+and gdb `anti.rt[main]`.
+
+gdb writes the last segment of a dotted symbol in brackets, so
+`com.example.step.step` prints as `com.example.step[step]`. A test that matches
+a function name leaves the character before the last segment open.
+
 ## The library file
 
 A library file holds the file table of its module, the file and the
