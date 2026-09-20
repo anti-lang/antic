@@ -491,6 +491,22 @@ digests() {
     rm -f "$dist/SHA256SUMS.new"
     say "SHA256SUMS holds $(wc -l < "$dist/SHA256SUMS" | tr -d ' ') files"
 
+    # A signature made by hand, after an earlier run stopped without the
+    # key, is taken when it verifies against the manifest of this run.
+    if [ -f "$dist/SHA256SUMS.sig" ]; then
+        openssl dgst -sha256 -binary -out "$dist/SHA256SUMS.sha256" \
+            "$dist/SHA256SUMS"
+        if openssl pkeyutl -verify -pubin -inkey "$root/keys/release.pem" \
+            -in "$dist/SHA256SUMS.sha256" -sigfile "$dist/SHA256SUMS.sig" \
+            > /dev/null 2>&1; then
+            say "the signature beside the manifest verifies against keys/release.pem"
+            finished 06 digests
+            return 0
+        fi
+        rm -f "$dist/SHA256SUMS.sig"
+        say "the signature beside the manifest is of another manifest, so it goes"
+    fi
+
     key=${RELEASE_KEY:-}
     if [ -z "$key" ] || [ ! -f "$key" ]; then
         printf 'r: the release key is missing, so the run stops before the tag\n'
@@ -580,7 +596,8 @@ matrix() {
         die "step 8: the workflow did not start"
     sleep 20
     id=$(gh run list --repo "$(repository)" --workflow test.yml \
-        --limit 1 --json databaseId --jq '.[0].databaseId')
+        --branch "$tag" --limit 1 --json databaseId --jq '.[0].databaseId')
+    [ -n "$id" ] || die "step 8: no run of test.yml on $tag"
     say "the run is $id"
     echo "$id" > "$dist/matrix-run"
     if gh run watch "$id" --repo "$(repository)" --exit-status > "$logs/matrix.log" 2>&1; then
