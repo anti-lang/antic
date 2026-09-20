@@ -149,8 +149,9 @@ add_test(NAME program_delete_owned_no_reflect
 file(STRINGS "${CMAKE_SOURCE_DIR}/tools/raylib-pin" raylib_version
      REGEX "^RAYLIB_VERSION=")
 string(REGEX REPLACE "^RAYLIB_VERSION=" "" raylib_version "${raylib_version}")
-set(ANTIC_RAYLIB_DIR "${CMAKE_BINARY_DIR}/raylib/raylib-${raylib_version}"
-    CACHE PATH "raylib release source from tools/get-raylib.cmake")
+antic_shared_path(ANTIC_RAYLIB_DIR
+    "${CMAKE_BINARY_DIR}/raylib/raylib-${raylib_version}"
+    "raylib release source from tools/get-raylib.cmake")
 
 # DESIGN: the output of program_abi_wchar follows the width and signedness
 # of wchar_t, never the host. The C compiler that builds wchar.c names the
@@ -358,6 +359,18 @@ add_test(NAME sysroot_digest
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_digest"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_digest.cmake")
 set_tests_properties(sysroot_digest PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# A Linux program of a release names no glibc symbol above the pinned
+# 2.35, which tools/pack-anti.cmake reads before it writes a package
+add_test(NAME linux_libc
+    COMMAND "${CMAKE_COMMAND}"
+        "-DCLANG=${CMAKE_C_COMPILER}"
+        "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+        "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
+        "-DCHECK=${CMAKE_SOURCE_DIR}/tools/check-libc.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/linux-libc"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_linux_libc.cmake")
+set_tests_properties(linux_libc PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 add_executable(raw_bytes_c raw/raw_bytes.c)
 add_test(NAME raw_output
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
@@ -404,6 +417,8 @@ if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND
                 "-DANTIC=$<TARGET_FILE:antic>" "-DANTI=$<TARGET_FILE:anti>"
                 "-DHOST=${ANTIC_HOST_TARGET}"
                 "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DCLANG=${CMAKE_C_COMPILER}"
+                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package.cmake")
 endif()

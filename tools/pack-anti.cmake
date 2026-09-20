@@ -94,6 +94,23 @@ function(triple_of host out)
     message(FATAL_ERROR "unknown host ${host}")
 endfunction()
 
+# DESIGN: a Linux program of a release links the pinned sysroot and never
+# the libc of the machine that packed it, so it starts on any Linux from
+# Ubuntu 22.04 on. Only the binary says which libc it reached, so it is
+# read here, before the package is written. A program ANTIC or ANTI named
+# was built by something else, which is the case this guards hardest: a
+# build of the machine carries the versions of the machine.
+function(check_libc host binary program)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" "-DBINARY=${binary}"
+                "-DREADOBJ=${LLVM_BIN}/llvm-readobj"
+                -P "${root}/tools/check-libc.cmake"
+        RESULT_VARIABLE refused)
+    if(refused)
+        message(FATAL_ERROR "${host}: ${program} links the wrong libc")
+    endif()
+endfunction()
+
 # Compile and link antic or anti for one host. Each family of targets reads
 # its headers from a different place: the SDK of this Mac, the musl
 # sysroot, or the Microsoft headers that xwin wrote. anti takes the sources
@@ -164,7 +181,15 @@ function(build_program host output program)
     if(failed)
         message(FATAL_ERROR "${host}: ${program} did not link")
     endif()
+    # DESIGN: a Linux program of a release links the pinned sysroot and
+    # never the libc of the machine that packed it, so it starts on any
+    # Linux from Ubuntu 22.04 on. Only the binary says which libc it
+    # reached, so it is read here, before the package is written.
+    if(host MATCHES "^linux-")
+        check_libc("${host}" "${output}" "${program}")
+    endif()
 endfunction()
+
 
 set(sums "")
 foreach(host IN LISTS HOSTS)
@@ -180,6 +205,10 @@ foreach(host IN LISTS HOSTS)
     if(DEFINED ANTIC)
         file(COPY_FILE "${ANTIC}" "${tree}/bin/antic${suffix}")
         file(COPY_FILE "${ANTI}" "${tree}/bin/anti${suffix}")
+        if(host MATCHES "^linux-")
+            check_libc("${host}" "${tree}/bin/antic${suffix}" antic)
+            check_libc("${host}" "${tree}/bin/anti${suffix}" anti)
+        endif()
     else()
         build_program("${host}" "${tree}/bin/antic${suffix}" antic)
         build_program("${host}" "${tree}/bin/anti${suffix}" anti)

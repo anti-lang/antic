@@ -17,6 +17,42 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
+# DESIGN: the sysroots and the raylib source are downloads, and every
+# build directory of a checkout reads the same copy. A host may keep them
+# outside the tree, which the default build records in its cache. A second
+# build directory takes the path from there when its own default is not on
+# disk, as the one a sanitizer preset makes does. A preset then names no
+# path of one machine. Naming one is what broke them on the Linux VM
+set(ANTIC_SHARED_LINES "")
+if(NOT CMAKE_BINARY_DIR STREQUAL "${CMAKE_SOURCE_DIR}/build"
+   AND EXISTS "${CMAKE_SOURCE_DIR}/build/CMakeCache.txt")
+    file(STRINGS "${CMAKE_SOURCE_DIR}/build/CMakeCache.txt" ANTIC_SHARED_LINES
+         REGEX "^ANTIC_[A-Z_]+:[A-Z]+=")
+endif()
+
+# Declare a download path as a cache entry. It keeps a value the command
+# line gave. Otherwise it takes the default, or the path the default build
+# recorded when that default is not on disk
+macro(antic_shared_path name default doc)
+    if(NOT DEFINED ${name})
+        set(antic_shared_value "${default}")
+        if(NOT EXISTS "${antic_shared_value}")
+            foreach(antic_shared_line IN LISTS ANTIC_SHARED_LINES)
+                # CMake expands the condition before it evaluates it, so
+                # CMAKE_MATCH_1 of this line is read inside the branch and
+                # never beside the MATCHES that sets it.
+                if(antic_shared_line MATCHES "^${name}:[A-Z]+=(.+)$")
+                    set(antic_shared_found "${CMAKE_MATCH_1}")
+                    if(EXISTS "${antic_shared_found}")
+                        set(antic_shared_value "${antic_shared_found}")
+                    endif()
+                endif()
+            endforeach()
+        endif()
+        set(${name} "${antic_shared_value}" CACHE PATH "${doc}")
+    endif()
+endmacro()
+
 # One warning set for clang, gcc and MSVC. Warnings are errors so that
 # the code in the book compiles without noise on every platform.
 # DESIGN: the C runtime of Microsoft deprecates fopen, getenv and the other
@@ -170,7 +206,7 @@ configure_file(rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
 # The sysroot of each target that lld links against, which
 # tools/get-sysroot.cmake installs, goes to sysroot/<target> of the runtime
 # archive with the licences of its components.
-set(ANTIC_SYSROOT_DIR "${CMAKE_SOURCE_DIR}/build/sysroot" CACHE PATH
+antic_shared_path(ANTIC_SYSROOT_DIR "${CMAKE_SOURCE_DIR}/build/sysroot"
     "sysroots from tools/get-sysroot.cmake")
 # The LLVM tools of this host lie in bin/ of ANTIC_LLVM_DIR, which
 # tools/pinned-compiler.cmake names and fills.

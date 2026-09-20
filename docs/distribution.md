@@ -77,6 +77,14 @@ tree, and one less level is one less path to get wrong.
 | `raylib`, `pcre2`, `mbedtls`, `miniaudio` | The static library per target, with headers | The CMake build in `libs/` |
 | `musl` | The Linux sysroot per processor | `tools/get-sysroot.cmake` |
 
+A Linux program of a release links the pinned sysroot and never the libc of the machine
+that packed it: musl for the static form, glibc 2.35 and the kernel headers of Ubuntu
+22.04 for the dynamic one. The shipped antic then runs on any Linux from Ubuntu 22.04 on.
+`tools/pack-anti.cmake` reads the versioned symbols of each Linux program it packs with
+`tools/check-libc.cmake` and refuses one that names a glibc above 2.35. The test
+`linux_libc` reads a program linked by that same recipe, and `package_keys` packs a real
+one on a Linux host.
+
 A file we build carries the prefix `anti-`, as in `anti-raylib-6.0-linux-x86_64.tar.xz`.
 A mirror of an untouched upstream file keeps its own name, as in `raylib-6.0.tar.gz`. A
 variant, should one appear, follows the target in the name.

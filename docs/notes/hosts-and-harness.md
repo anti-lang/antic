@@ -5,10 +5,13 @@ file does.
 
 ## Reaching the machines
 
-- Linux ARM64 VM: `eddie@192.168.60.131`. Windows 11 ARM64 VM: `eddie@192.168.60.132`.
-- Pass `-o BatchMode=yes -o UserKnownHostsFile=<llvm-tools>/build/vm_known_hosts` to every
-  `ssh` and `scp`. Change no SSH configuration. Use `ssh -n` inside a script, since `ssh`
-  otherwise eats the input of the script.
+- The Linux ARM64 VM is `anti-linux` and the Windows 11 ARM64 VM is `anti-windows`, both
+  in `~/.ssh/config` on the Mac with the user and the address. Name them and nothing else
+  in a command or a document, so an address that changes is one edit in one file.
+  `docs/vm-setup.md` gives the entry.
+- Pass `-o BatchMode=yes` to every `ssh` and `scp`, so a missing key fails rather than
+  asking. Use `ssh -n` inside a script, since `ssh` otherwise eats the input of the
+  script.
 - Linux holds the tools in `~/anti` and a tree in `~/antic-check`. Windows holds the tools in
   `%USERPROFILE%\anti3` and a tree in `%USERPROFILE%\antic-check`, built with Ninja.
 - Send a tree as `git ls-files -z | xargs -0 tar cf tree.tar` and extract it with
@@ -23,17 +26,18 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 467 | ASan, UBSan | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
-| Linux VM | 407 | see below | glibc sysroot, linux-arm64 programs, gdb |
-| Windows VM | 387 | none | windows-arm64 programs, the Win32 expected files |
+| Mac | 468 | ASan, UBSan, 467 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
+| Linux VM | 408 | ASan, UBSan, 407 each | glibc sysroot, linux-arm64 programs, gdb |
+| Windows VM | 388 | none | windows-arm64 programs, the Win32 expected files |
 
 `debug_info` runs the debugger of the host, lldb on the Mac and gdb on Linux, and takes
 neither from the other. No host here debugs a Windows program.
 
-The sanitizer presets read the sysroot from `build/sysroot`, which the Mac has and the
-Linux VM does not. Its own build installed the sysroot into `build/runtime/sysroot`
-instead, so `cmake --preset asan` there builds a runtime with no sysroot and 102 programs
-fail to link. The plain suite covers that host today. Nothing is fixed.
+A sanitizer preset names no path of one machine. It takes the sysroot and the raylib
+source of the default build, from the cache of `build/`, when its own default is not on
+disk. That is the `antic_shared_path` macro of `CMakeLists.txt`. The presets held the
+Mac's `build/sysroot` before, and `cmake --preset asan` on the Linux VM, whose downloads
+live in `~/anti`, then built a runtime with no sysroot and failed to link 102 programs.
 
 No machine here runs linux-x86_64 or windows-x86_64 programs. Only the CI runners do,
 when started by hand.
@@ -72,18 +76,19 @@ when started by hand.
 
 - The toolchain is frozen at `23.1.1-anti.3`. A toolchain change goes to
   `docs/toolchain-later.md` as one line.
-- Both VMs ran the suite at `928baa3`. Linux passed 407 of 407, `std_toml` and
-  `debug_info` among them. Windows passed 386 of 387 and skipped `sysroot_digest`, which
-  a Windows host always skips. `emit_identity` passed on both.
+- Both VMs ran the suite after the libc check. Linux passed 408 of 408, and both
+  sanitizer suites 407 of 407 with `cmake --preset asan` and `ubsan` and no other option.
+  Windows passed 388 of 388 and skipped `sysroot_digest`, which a Windows host always
+  skips. `emit_identity` passed on both.
 - The `std_toml` segmentation fault of `d32dd31` is fixed. It was never the error path:
   antic supplied the out pointer of a `catch` binding over stack storage it never zeroed,
   and the `=` in `Document.read` tore down whatever the frame held. `docs/decisions.md`
   holds it under "Object model", and `program_out_slot` pins it on every host.
-- `table_unset` fails on Windows and nowhere else. Its release check reads the assembly
-  between `table.run:` and `table.main:`, and a Windows host mangles those to
-  `_A5table_run:` and `_A5table_main:`, so the match is empty and the test reports that
-  release mode checks a table. The check is newer than `03d1064`, the last Windows run
-  before this one, so it has never passed there. Nothing of it is fixed.
+- `table_unset` reads the two labels with `table[._]run:` and `table[._]main:`. Each host
+  spells them its own way: `table.run:` on ELF, `_table.run:` on Mach-O and
+  `_A5table_run:` on COFF, which writes the last segment of a dotted name after an `_`.
+  The pattern held the dotted form alone, so the match was empty on Windows and the test
+  reported that release mode checks a table in a dispatch.
 - Windows has no debugger test. The CodeView line table of a `-g` build was read instead,
   with `build\runtime\bin\llvm-readobj.exe --codeview` on the object of the two sources
   that `tests/run_debug.cmake` writes. It names `com/example/step.anti` and `app.anti` in

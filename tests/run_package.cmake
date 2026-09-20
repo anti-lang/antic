@@ -6,8 +6,8 @@
 # machine is refused.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DHOST=<host>
-#         -DSYSROOT=<dir> -DRUNTIME=<dir> -DWORK=<dir>
-#         -P tests/run_package.cmake
+#         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
+#         -DWORK=<dir> -P tests/run_package.cmake
 
 file(REMOVE_RECURSE "${WORK}")
 # The sysroots that a package carries, and an SDK of Apple beside the
@@ -17,8 +17,19 @@ foreach(name linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 licenses)
 endforeach()
 file(WRITE "${WORK}/sysroot/macos-arm64/sdk/sdk-version" "26.5\n")
 file(WRITE "${WORK}/sysroot/macos-arm64/sdk/usr/lib/libSystem.tbd" "Apple's\n")
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/out" "-DANTIC=${ANTIC}"
-                        "-DANTI=${ANTI}" "-DHOSTS=${HOST}"
+# DESIGN: the antic of this build links the libc of the machine, which is
+# right for a host build and wrong for a package. On Linux that binary
+# names the glibc of the builder, and tools/pack-anti.cmake refuses it, so
+# the packer compiles the two programs against the pinned sysroot instead.
+# That takes a few seconds and is the recipe a release runs. Every other
+# host takes the faster path, where the machine's libc is the one the
+# package ships.
+set(programs "-DANTIC=${ANTIC}" "-DANTI=${ANTI}")
+if(HOST MATCHES "^linux-")
+    set(programs "-DCLANG=${CLANG}" "-DLLVM_BIN=${LLVM_BIN}")
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/out" ${programs}
+                        "-DHOSTS=${HOST}"
                         "-DSYSROOT=${WORK}/sysroot" "-DRUNTIME=${RUNTIME}"
                         -P "${ROOT}/tools/pack-anti.cmake"
                 RESULT_VARIABLE packed)

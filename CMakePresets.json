@@ -15,9 +15,7 @@
             "binaryDir": "${sourceDir}/build-asan",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_FLAGS": "-fsanitize=address -g",
-                "ANTIC_SYSROOT_DIR": "${sourceDir}/build/sysroot",
-                "ANTIC_RAYLIB_DIR": "${sourceDir}/build/raylib/raylib-6.0"
+                "CMAKE_C_FLAGS": "-fsanitize=address -g"
             }
         },
         {
@@ -27,9 +25,7 @@
             "binaryDir": "${sourceDir}/build-ubsan",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all",
-                "ANTIC_SYSROOT_DIR": "${sourceDir}/build/sysroot",
-                "ANTIC_RAYLIB_DIR": "${sourceDir}/build/raylib/raylib-6.0"
+                "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all"
             }
         }
     ],

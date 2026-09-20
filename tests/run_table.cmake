@@ -51,8 +51,13 @@ execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" -S
                 RESULT_VARIABLE status)
 # The function run holds the dispatch, `is` and `as`. The teardown and
 # the copy of Holder, which follow it, check in every mode.
+#
+# Each host spells the two labels its own way: `table.run:` on ELF,
+# `_table.run:` on Mach-O and `_A5table_run:` on COFF, which writes the
+# last segment of a dotted name after an `_`. The character class takes
+# the dot and the underscore, so one pattern reads every host.
 file(READ "${WORK}/release.s" release)
-string(REGEX MATCH "table\\.run:.*table\\.main:" run "${release}")
+string(REGEX MATCH "table[._]run:.*table[._]main:" run "${release}")
 if(NOT status EQUAL 0 OR run STREQUAL "" OR
    run MATCHES "anti_rt_table_unset")
     message(FATAL_ERROR "release mode checks a table in a dispatch")

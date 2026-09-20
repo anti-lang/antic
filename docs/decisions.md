@@ -473,6 +473,13 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] `anti test` takes `.anti` files and `-I` roots rather than a package. Reason: no manifest and no package layout are built, and `docs/tooling.md` describes an `anti` that does not exist yet. The files and the roots are what antic already takes.
 - `anti test --release` compiles the runner and the module as a whole program with the assertions and the dev-mode checks off. Reason: the specification runs the tests again that way, and release mode is the absence of `--dev`.
 
+## Builds of a host and builds of a release
+
+- A build for the host links the libc of the machine. The plain preset and the two sanitizer presets are all that kind. A build for a release links the pinned sysroot and never the builder's libc. Linux takes musl for the static form, and glibc 2.35 with the kernel headers of Ubuntu 22.04 for the dynamic one. The shipped antic then starts on any Linux from Ubuntu 22.04 on.
+- `tools/pack-anti.cmake` reads the versioned symbols of every Linux program it packs, with `tools/check-libc.cmake`, and refuses one that names a glibc above 2.35. Reason: a program linked against the builder's glibc names the versions of that machine. It then refuses to start on an older one, with a message about a version the library does not have. Nothing about the build says so, and the tarball is published by then. The binary itself says it, in its dynamic section.
+- On a Linux host `package_keys` lets the packer build the two programs against the sysroot, rather than handing it the antic of the build. Reason: that antic links the machine's libc, which the check refuses and should refuse. The packer's own recipe takes about fifteen seconds and is the one a release runs, so the test covers it instead of going around it.
+- A sanitizer preset names no path of one machine. `antic_shared_path` of `CMakeLists.txt` gives `ANTIC_SYSROOT_DIR` and `ANTIC_RAYLIB_DIR` the value the default build recorded in `build/CMakeCache.txt`, when the preset's own default is not on disk. Reason: the presets held the Mac's `build/sysroot`, and the Linux VM keeps its downloads in `~/anti`. `cmake --preset asan` there built a runtime with no sysroot, and 102 programs failed to link. A download is shared between the build directories of a checkout, and the default build is the one that resolved where it is.
+
 ## Open
 
 - Nothing.
