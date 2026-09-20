@@ -1,11 +1,14 @@
 # Build the package that a user installs, one per host.
 #
 #   cmake -DDEST=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir> -DSYSROOT=<dir>
-#         -DRUNTIME=<dir> -DHOSTS=<host>[;<host>] -P tools/pack-anti.cmake
+#         -DRUNTIME=<dir> -DHOSTS=<host>[;<host>] [-DSYMBOLS=<dir>]
+#         -P tools/pack-anti.cmake
 #
 # CLANG is the pinned clang of build/clang, LLVM_BIN its tools, SYSROOT
 # the directory of tools/get-sysroot.cmake and RUNTIME the runtime that the
-# CMake build wrote. For each host it compiles antic and anti for that host
+# CMake build wrote. SYMBOLS is where the PDB of a Windows program goes,
+# which is outside the package and is needed when a Windows host is
+# compiled here. For each host it compiles antic and anti for that host
 # and lays the package out around them. ANTIC and ANTI name the programs
 # already built for the one host of HOSTS, which the package takes
 # instead, and then CLANG and LLVM_BIN are not needed:
@@ -151,6 +154,22 @@ function(build_program host output program)
         set(link -fuse-ld=lld -B "${LLVM_BIN}"
                  -L "${win}/crt/lib/${arch}" -L "${win}/sdk/lib/ucrt/${arch}"
                  -L "${win}/sdk/lib/um/${arch}")
+        # DESIGN: a Windows program carries no symbol table, so what names
+        # a frame of a report from a user is the PDB that lld-link writes
+        # with /DEBUG. It stands in SYMBOLS, outside the package, and step
+        # 4 of the release folds it into the symbols archive of the host.
+        # /PDBALTPATH:%_PDB% keeps the CodeView record of the executable
+        # to the file name of the PDB, so the path of this machine does
+        # not ship. /ignore:4099 drops the warning that the objects of the
+        # Microsoft C runtime name PDBs no machine here holds.
+        if(NOT DEFINED SYMBOLS)
+            message(FATAL_ERROR "${host}: a Windows program is linked with "
+                                "/DEBUG, and SYMBOLS names the directory its "
+                                "PDB goes in")
+        endif()
+        file(MAKE_DIRECTORY "${SYMBOLS}/${host}")
+        list(APPEND link -Wl,/DEBUG "-Wl,/PDBALTPATH:%_PDB%" -Wl,/ignore:4099
+             "-Wl,/PDB:${SYMBOLS}/${host}/${program}.pdb")
     endif()
     if(host MATCHES "^linux-")
         # The clang driver looks for the start files of gcc on Linux, so

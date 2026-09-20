@@ -727,6 +727,25 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
     endforeach()
 endforeach()
 
+# A Windows executable carries the CodeView record of the PDB that
+# lld-link wrote beside it. It holds no path of the machine that linked it
+# either, because the link passes /PDBALTPATH:%_PDB%.
+foreach(target windows-x86_64 windows-arm64)
+    add_test(NAME pdb_guid_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DREADOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj"
+            "-DCHECK=${CMAKE_SOURCE_DIR}/tools/check-pdb.cmake"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb"
+            "-DTARGET=${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pdb_guid.cmake")
+    set_tests_properties(pdb_guid_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # antic writes the same assembly for every test program on every host.
 add_test(NAME emit_identity
     COMMAND "${CMAKE_COMMAND}"

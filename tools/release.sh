@@ -64,6 +64,10 @@ logs=$dist/logs
 # beside the twelve is a file a user takes for part of the release.
 packages=$dist/packages
 work=$dist/work
+# DESIGN: the PDB of a Windows program stands outside the package, because
+# a package carries no symbols archive of its own. The packer writes it
+# here and step 4 folds it into the symbols archive of its host.
+symbols=$dist/symbols
 export_tree=$dist/export
 
 die() {
@@ -263,9 +267,11 @@ build_packages() {
     starts 03 packages "the six packages" || return 0
     mkdir -p "$packages" "$work"
     list=$(echo "$hosts" | tr ' ' ';')
+    rm -rf "$symbols"
     cmake -DDEST="$packages" -DCLANG="$clang_dir/bin/clang" \
         -DLLVM_BIN="$llvm_bin" -DSYSROOT="$sysroot_dir" \
         -DRUNTIME="$export_tree/build/runtime" -DHOSTS="$list" \
+        -DSYMBOLS="$symbols" \
         -P "$root/tools/pack-anti.cmake" > "$logs/pack.log" 2>&1 ||
         die "step 3: the packer failed, see $logs/pack.log"
 
@@ -307,6 +313,14 @@ build_packages() {
 # name __libc_malloc and tsd_used and no source of antic. The first dry
 # run stopped on them. What the archive needs is a symbol table with
 # entries, and that is what the step reads.
+#
+# DESIGN: a Windows program has no symbol table at all, so the map of its
+# sections goes in and its PDB with it. The packer linked that PDB with
+# /DEBUG and left it in $symbols. What ties the two together is the
+# CodeView record of the executable, which tools/check-pdb.cmake reads
+# against the GUID the PDB carries. A record that names a path rather
+# than a file name is refused there as well, because it would be the path
+# of this machine.
 build_symbols() {
     starts 04 symbols "the symbols of the twelve programs" || return 0
     mkdir -p "$packages" "$work"
@@ -327,20 +341,37 @@ build_symbols() {
             # way, so the count is of the rows below the heading.
             rows=$(sed -n '/^SYMBOL TABLE:/,$p' "$table" | grep -c .)
             if [ "$rows" -le 1 ]; then
-                # DESIGN: lld-link writes the symbols of a program to
-                # a PDB. The packer asks for none, so a shipped .exe
-                # carries a table of no rows. The archive then holds the
-                # map of the sections, which is what the binary has. A
-                # PDB per Windows host is a question for the owner. It
-                # changes what a release build emits.
+                # lld-link writes the symbols of a program to a PDB, so a
+                # shipped .exe carries a table of no rows. The archive
+                # then holds the map of the sections, which is what the
+                # binary itself has, and the PDB below.
                 "$llvm_bin/llvm-objdump" --section-headers "$binary" > "$table" ||
                     die "step 4: $host: llvm-objdump read no section of $program"
                 say "$host: $program has no symbol table, so its sections go in"
             fi
+            case $host in
+            windows-*)
+                pdb=$symbols/$host/${program%.exe}.pdb
+                [ -f "$pdb" ] ||
+                    die "step 4: $host: the packer left no PDB of $program at $pdb"
+                cmake -DBINARY="$binary" -DPDB="$pdb" \
+                    -DREADOBJ="$llvm_bin/llvm-readobj" \
+                    -P "$root/tools/check-pdb.cmake" > /dev/null ||
+                    die "step 4: $host: $program does not name the PDB beside it"
+                cp "$pdb" "$work/$host/syms/" ||
+                    die "step 4: $host: $pdb did not copy"
+                ;;
+            esac
         done
+        case $host in
+        windows-*) contents='./*.syms ./*.pdb' ;;
+        *) contents='./*.syms' ;;
+        esac
         archive=$packages/$(symbols_name "$host")
         rm -f "$archive"
-        (cd "$work/$host/syms" && zip -q -j "$archive" ./*.syms) ||
+        # The globs expand in the directory of the archive, which is why
+        # they stay unquoted here.
+        (cd "$work/$host/syms" && zip -q -j "$archive" $contents) ||
             die "step 4: $host: zip wrote no symbols archive"
         say "$(symbols_name "$host"), $(digest_of "$archive" | cut -c1-12)"
     done

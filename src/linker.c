@@ -174,6 +174,27 @@ static void linux_lld(struct link_command *c, enum target t,
     }
 }
 
+/* DESIGN: every Windows link passes /DEBUG, with -g and without it.
+   lld-link writes the debug information of a program to a PDB rather than
+   into the executable, so the flag adds no section to what ships. What it
+   adds is the CodeView record of the debug directory. That record holds
+   the GUID of the PDB and its file name. That GUID is the Windows form of the
+   build id. It is the one thing that ties a shipped program to the
+   symbols of its own build. Those symbols are what the archive of a
+   release carries. /PDBALTPATH:%_PDB% keeps the record to the file name,
+   so no path of the machine that linked the program goes out with it.
+
+   The objects of the Microsoft C runtime name PDBs that no machine here
+   holds, and lld-link warns once per object when it cannot read one.
+   /ignore:4099 drops that warning, which says nothing about the program
+   being linked. */
+static void windows_debug(struct link_command *c)
+{
+    add(c, "/DEBUG");
+    add(c, "/PDBALTPATH:%_PDB%");
+    add(c, "/ignore:4099");
+}
+
 /* The library directories of lld-link: the CRT and the SDK that xwin
    writes into the sysroot. Without a sysroot lld-link reads LIB, as
    link.exe does. */
@@ -251,7 +272,7 @@ static void windows(struct link_command *c, enum target t,
     link_runtime_library(library, in->runtime, t, in->cpu);
     add(c, linker);
     add(c, "/NOLOGO");
-    add(c, in->debug ? "/DEBUG" : "/debug:none");
+    windows_debug(c);
     add(c, "/SUBSYSTEM:CONSOLE");
     add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                               : "/MACHINE:X64");
@@ -390,7 +411,7 @@ void link_shared_command(struct link_command *c, enum target t,
         text_appendf(def, "/DEF:%s", s->def_file != NULL ? s->def_file : "");
         add(c, linker);
         add(c, "/NOLOGO");
-        add(c, in->debug ? "/DEBUG" : "/debug:none");
+        windows_debug(c);
         add(c, "/DLL");
         add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                                   : "/MACHINE:X64");

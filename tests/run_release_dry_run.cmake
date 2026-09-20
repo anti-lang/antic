@@ -70,14 +70,57 @@ foreach(program antic anti)
     endif()
 endforeach()
 
+# The two programs of a Windows host are real COFF executables with a PDB
+# beside each. Step 4 reads the map of the sections of a binary with no
+# symbol table and checks the CodeView record of the executable against
+# the GUID of its PDB, and a Mach-O file under the name antic.exe would
+# reach neither. They link nothing of the Microsoft C runtime, carry one
+# function and never run.
+file(WRITE "${WORK}/fixture/windows.c"
+     "int mainCRTStartup(void) { return 0; }\n")
+foreach(pair "windows-x86_64=x86_64-pc-windows-msvc=X64"
+        "windows-arm64=aarch64-pc-windows-msvc=ARM64")
+    string(REPLACE "=" ";" parts "${pair}")
+    list(GET parts 0 host)
+    list(GET parts 1 triple)
+    list(GET parts 2 machine)
+    file(MAKE_DIRECTORY "${WORK}/fixture/${host}")
+    execute_process(COMMAND "${CC}" "--target=${triple}" -c
+                            -o "${WORK}/fixture/${host}/windows.obj"
+                            "${WORK}/fixture/windows.c"
+                    RESULT_VARIABLE failed OUTPUT_QUIET ERROR_QUIET)
+    if(NOT failed EQUAL 0)
+        message("SKIP: this machine compiles nothing for ${triple}")
+        return()
+    endif()
+    foreach(program antic anti)
+        execute_process(
+            COMMAND "${LLVM_BIN}/lld-link" /NOLOGO /DEBUG "/PDBALTPATH:%_PDB%"
+                    /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE /NODEFAULTLIB
+                    "/MACHINE:${machine}"
+                    "/OUT:${WORK}/fixture/${host}/${program}.exe"
+                    "/PDB:${WORK}/fixture/${host}/${program}.pdb"
+                    "${WORK}/fixture/${host}/windows.obj"
+            RESULT_VARIABLE failed OUTPUT_QUIET ERROR_QUIET)
+        if(NOT failed EQUAL 0)
+            message("SKIP: lld-link links nothing for ${host}")
+            return()
+        endif()
+    endforeach()
+endforeach()
+
 # The stand-in for cmake. It writes what each call of the release script
 # writes: the cache the script reads its download paths from, the runtime
-# of a build, and the six packages of the packer. A call that checks a
-# package passes, because the tests linux_libc and cpu_archive_levels
-# cover those two scripts.
+# of a build, the six packages of the packer and the PDB of every Windows
+# program. A call that checks a package passes, because the tests
+# linux_libc, cpu_archive_levels and pdb_guid cover those three scripts.
+# What this test reads of step 4 is therefore the wiring: that the packer
+# leaves a PDB per Windows program, that the step finds it and that it
+# goes into the archive of its host.
 file(WRITE "${WORK}/bin/cmake" "#!/bin/sh
 set -e
 dest=\"\"
+symbols=\"\"
 hosts=\"\"
 build=\"\"
 source=\"\"
@@ -92,6 +135,7 @@ for word in \"\$@\"; do
     --preset) previous=preset ;;
     --build) previous=build ;;
     -DDEST=*) dest=\${word#-DDEST=} ;;
+    -DSYMBOLS=*) symbols=\${word#-DSYMBOLS=} ;;
     -DHOSTS=*) hosts=\$(echo \"\${word#-DHOSTS=}\" | tr ';' ' ') ;;
     *)
         case \$previous in
@@ -133,11 +177,22 @@ if [ -n \"\$script\" ]; then
             case \$host in windows-*) suffix=.exe ;; esac
             fixture=${WORK}/fixture
             case \$host in
+            windows-*) antic=\$fixture/\$host/antic.exe; anti=\$fixture/\$host/anti.exe ;;
             *-x86_64) antic=\$fixture/antic-x86_64; anti=\$fixture/anti-x86_64 ;;
             *) antic=\$fixture/antic; anti=\$fixture/anti ;;
             esac
             cp \"\$antic\" \"\$tree/anti/bin/antic\$suffix\"
             cp \"\$anti\" \"\$tree/anti/bin/anti\$suffix\"
+            # The packer leaves the PDB of a Windows program outside the
+            # package, and step 4 folds it into the symbols archive.
+            case \$host in
+            windows-*)
+                [ -n \"\$symbols\" ] || exit 1
+                mkdir -p \"\$symbols/\$host\"
+                cp \"\$fixture/\$host/antic.pdb\" \"\$symbols/\$host/antic.pdb\"
+                cp \"\$fixture/\$host/anti.pdb\" \"\$symbols/\$host/anti.pdb\"
+                ;;
+            esac
             for target in ${host_words}; do
                 case \$target in
                 *-arm64) levels='armv8.0 armv8.2 armv8.5' ;;
@@ -284,6 +339,26 @@ foreach(name IN LISTS beside)
         message(FATAL_ERROR "${name} stands beside the twelve files of the "
                             "release, and SHA256SUMS does not name it")
     endif()
+endforeach()
+
+# DESIGN: a Windows program has no symbol table, so its archive holds the
+# map of its sections and the PDB that lld-link wrote beside it. Step 4
+# reads the CodeView record of the executable against the GUID of that
+# PDB before either goes in, and refuses a record that names a path.
+foreach(host windows-x86_64 windows-arm64)
+    set(archive "${dist}/packages/anti-${version}-${host}-symbols.zip")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E tar tf "${archive}"
+                    RESULT_VARIABLE listed OUTPUT_VARIABLE entries
+                    ERROR_VARIABLE listed_err ENCODING NONE)
+    if(NOT listed EQUAL 0)
+        message(FATAL_ERROR "${archive} does not list\n${entries}${listed_err}")
+    endif()
+    string(APPEND entries "${listed_err}")
+    foreach(name antic.exe.syms anti.exe.syms antic.pdb anti.pdb)
+        if(NOT entries MATCHES "${name}")
+            message(FATAL_ERROR "${archive} holds no ${name}\n${entries}")
+        endif()
+    endforeach()
 endforeach()
 
 # Nothing is signed, tagged or uploaded, and the run says what it would do.

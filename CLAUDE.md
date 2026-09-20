@@ -166,10 +166,11 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 17. Inline atomic instruction sequences, which are runtime calls today.
 18. Done. The one manifest of a release, and the installers that read its
     signature. `docs/reports/2026-09-20-one-manifest.md` reports both.
-19. Windows symbols archives hold the PDB. The packer passes `/DEBUG` with
-    `/PDBALTPATH:%_PDB%` for Windows release builds, step 4 puts `prog.pdb`
-    beside the map, `no_paths` still passes, and the CodeView GUID in the
-    executable is checked to match the PDB.
+19. Done. Every Windows link passes `/DEBUG` with `/PDBALTPATH:%_PDB%`, the
+    packer leaves the PDB of each Windows program in `build/dist/symbols/`,
+    and step 4 puts it in the symbols archive beside the map of the sections.
+    `tools/check-pdb.cmake` reads the CodeView record of an executable
+    against the GUID of its PDB, in step 4 and in the test `pdb_guid`.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
@@ -200,8 +201,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 480 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 479 each, without the `no_paths` test, which needs a
+- 484 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 483 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of

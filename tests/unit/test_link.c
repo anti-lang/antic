@@ -63,10 +63,30 @@ static void links(enum target t, const struct link_inputs *in,
     link_command_free(&c);
 }
 
+/* Answer whether the command line holds the argument. */
+static bool holds(const struct link_command *c, const char *argument)
+{
+    size_t i;
+
+    for (i = 0; i < c->argc; i++) {
+        if (strcmp(c->argv[i], argument) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* DESIGN: an Anti executable and an Anti shared library carry no debug
-   information unless the build asked for it with -g. Each format spells
-   the flag that strips it differently, and every link line without -g
-   carries its spelling. */
+   information unless the build asked for it with -g. ELF and Mach-O spell
+   the flag that strips it differently, and every link line of those four
+   targets without -g carries its spelling.
+
+   COFF is the exception. Every Windows link passes /DEBUG, with -g and
+   without it. lld-link writes the PDB of the symbols archive from
+   it. What the executable then carries is the CodeView record of the
+   debug directory. That record is the build id of a Windows program, and
+   it is no debug information. /PDBALTPATH:%_PDB% keeps the path of the machine
+   that linked it out of that record. */
 static void strips_debug(void)
 {
     static const enum target targets[] = {
@@ -78,55 +98,54 @@ static void strips_debug(void)
 
     for (i = 0; i < sizeof targets / sizeof targets[0]; i++) {
         enum target t = targets[i];
-        const char *want = target_info(t)->format == FORMAT_ELF ? "--strip-debug"
-                           : target_info(t)->format == FORMAT_MACHO ? "-S"
-                                                                    : "/debug:none";
         bool windows = target_info(t)->format == FORMAT_COFF;
+        const char *want = target_info(t)->format == FORMAT_ELF ? "--strip-debug"
+                                                                : "-S";
         struct link_inputs in = windows ? lld_windows_inputs : lld_inputs;
         struct link_command c;
-        bool found = false;
-        size_t j;
 
         link_command(&c, t, &in);
-        for (j = 0; j < c.argc; j++) {
-            found = found || strcmp(c.argv[j], want) == 0;
+        if (windows) {
+            CHECK(holds(&c, "/DEBUG"));
+            CHECK(holds(&c, "/PDBALTPATH:%_PDB%"));
+            CHECK(!holds(&c, "/debug:none"));
+        } else {
+            CHECK(holds(&c, want));
         }
-        CHECK(found);
         link_command_free(&c);
 
-        found = false;
         link_shared_command(&c, t, &in, &none);
-        for (j = 0; j < c.argc; j++) {
-            found = found || strcmp(c.argv[j], want) == 0;
+        if (windows) {
+            CHECK(holds(&c, "/DEBUG"));
+            CHECK(holds(&c, "/PDBALTPATH:%_PDB%"));
+            CHECK(!holds(&c, "/debug:none"));
+        } else {
+            CHECK(holds(&c, want));
         }
-        CHECK(found);
         link_command_free(&c);
 
-        /* -g keeps the debug sections, so the flag goes. COFF names the
-           debug directory instead, which lld-link writes into the PDB. */
+        /* -g keeps the debug sections, so the flag goes. The two flags of
+           a Windows link do not move, because the PDB stands whether the
+           objects carry a line of Anti or not. */
         in.debug = true;
         link_command(&c, t, &in);
-        found = false;
-        for (j = 0; j < c.argc; j++) {
-            found = found || strcmp(c.argv[j], want) == 0;
-            CHECK(strcmp(c.argv[j], "/debug:none") != 0);
-        }
-        CHECK(!found);
         if (windows) {
-            found = false;
-            for (j = 0; j < c.argc; j++) {
-                found = found || strcmp(c.argv[j], "/DEBUG") == 0;
-            }
-            CHECK(found);
+            CHECK(holds(&c, "/DEBUG"));
+            CHECK(holds(&c, "/PDBALTPATH:%_PDB%"));
+            CHECK(!holds(&c, "/debug:none"));
+        } else {
+            CHECK(!holds(&c, want));
         }
         link_command_free(&c);
 
         link_shared_command(&c, t, &in, &none);
-        found = false;
-        for (j = 0; j < c.argc; j++) {
-            found = found || strcmp(c.argv[j], want) == 0;
+        if (windows) {
+            CHECK(holds(&c, "/DEBUG"));
+            CHECK(holds(&c, "/PDBALTPATH:%_PDB%"));
+            CHECK(!holds(&c, "/debug:none"));
+        } else {
+            CHECK(!holds(&c, want));
         }
-        CHECK(!found);
         link_command_free(&c);
     }
 }
@@ -288,7 +307,7 @@ static void libraries(void)
     win.object = "geo.obj";
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
-           "link.exe /NOLOGO /debug:none /DLL /MACHINE:ARM64 /OUT:geo.dll "
+           "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /DLL /MACHINE:ARM64 /OUT:geo.dll "
            "/DEF:geo.def "
            "geo.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
            "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
@@ -324,7 +343,7 @@ static void libraries(void)
     win.object = "geo.obj";
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
-           "/rt/bin/lld-link /NOLOGO /debug:none /DLL /MACHINE:ARM64 "
+           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /DLL /MACHINE:ARM64 "
            "/OUT:geo.dll "
            "/DEF:geo.def /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
@@ -428,11 +447,11 @@ void test_link(void)
           "prog.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "-L/usr/lib/x86_64-linux-gnu -lc /usr/lib/x86_64-linux-gnu/crtn.o");
     links(TARGET_WINDOWS_X86_64, &windows_inputs,
-          "link.exe /NOLOGO /debug:none /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
           "prog.obj C:/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
     links(TARGET_WINDOWS_ARM64, &windows_inputs,
-          "link.exe /NOLOGO /debug:none /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
           "/OUT:prog.exe "
           "prog.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
@@ -454,7 +473,7 @@ void test_link(void)
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
     links(TARGET_WINDOWS_X86_64, &lld_windows_inputs,
-          "/rt/bin/lld-link /NOLOGO /debug:none /SUBSYSTEM:CONSOLE "
+          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE "
           "/MACHINE:X64 "
           "/OUT:prog.exe /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
@@ -466,7 +485,7 @@ void test_link(void)
         no_sysroot.sysroot = NULL;
         no_sysroot.lld_dir = NULL;
         links(TARGET_WINDOWS_ARM64, &no_sysroot,
-              "lld-link /NOLOGO /debug:none /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
+              "lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
               "/OUT:prog.exe prog.obj /rt/lib/windows-arm64/armv8.2/anti_rt.lib "
               "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
     }
@@ -483,7 +502,7 @@ void test_link(void)
           "prog.o shapes.o libm.a /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "-L/usr/lib/aarch64-linux-gnu -lc /usr/lib/aarch64-linux-gnu/crtn.o");
     links(TARGET_WINDOWS_ARM64, &extra_windows_inputs,
-          "link.exe /NOLOGO /debug:none /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
           "prog.obj shapes.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
