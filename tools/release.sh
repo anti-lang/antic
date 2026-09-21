@@ -181,13 +181,26 @@ preflight() {
     *) die "tools/version holds '$version', which is no version" ;;
     esac
 
-    if git -C "$root" rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
-        die "$tag is a tag of this checkout already, and a published version is never rebuilt"
+    # DESIGN: a release that stopped after step 7 holds a tag of its own,
+    # and its rerun has to go on at the step that failed. The stamp of
+    # step 7 in the state of this commit is what tells that tag from a
+    # published version. A tag without it is a version that is out.
+    own_tag=no
+    if [ -f "$state/07-release" ] &&
+        [ "$(cat "$state/head" 2> /dev/null)" = "$(git -C "$root" rev-parse HEAD)" ]; then
+        own_tag=yes
     fi
-    if [ -n "$(git -C "$root" ls-remote --tags origin "refs/tags/$tag")" ]; then
-        die "origin holds the tag $tag already, and a published version is never rebuilt"
+    if [ "$own_tag" = no ]; then
+        if git -C "$root" rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            die "$tag is a tag of this checkout already, and a published version is never rebuilt"
+        fi
+        if [ -n "$(git -C "$root" ls-remote --tags origin "refs/tags/$tag")" ]; then
+            die "origin holds the tag $tag already, and a published version is never rebuilt"
+        fi
+        say "$version is no tag here and none on origin"
+    else
+        say "$tag is the tag that step 7 of this run made, and the run goes on"
     fi
-    say "$version is no tag here and none on origin"
 
     [ -f "$root/CHANGELOG.md" ] || die "CHANGELOG.md is missing"
     entry=$(changelog_entry)

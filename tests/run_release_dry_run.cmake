@@ -519,6 +519,27 @@ if(refused EQUAL 0 OR NOT "${out}${err}" MATCHES "v${version}")
 endif()
 run("the tag did not go" "${GIT}" -C "${copy}" tag -d "v${version}")
 
+# A release that stopped after step 7 holds a tag of its own, and its
+# rerun goes on rather than refusing it. The stamp of step 7 in the state
+# of this commit is what tells that tag from a published version.
+run("the tag failed" "${GIT}" -C "${copy}" tag "v${version}")
+execute_process(COMMAND "${GIT}" -C "${copy}" rev-parse HEAD
+                OUTPUT_VARIABLE resumed_head
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+file(WRITE "${dist}/state/head" "${resumed_head}\n")
+file(WRITE "${dist}/state/07-release" "2026-09-21T00:00:00Z\n")
+set(ENV{PATH} "${WORK}/bin:${saved_path}")
+execute_process(COMMAND "${copy}/r" --dry-run WORKING_DIRECTORY "${copy}"
+                RESULT_VARIABLE resumed OUTPUT_VARIABLE out
+                ERROR_VARIABLE err ENCODING NONE)
+set(ENV{PATH} "${saved_path}")
+if(NOT resumed EQUAL 0 OR NOT "${out}" MATCHES "step 7 of this run made")
+    message(FATAL_ERROR "./r refuses the tag of the release it is resuming\n"
+                        "${out}${err}")
+endif()
+file(REMOVE "${dist}/state/07-release")
+run("the tag did not go" "${GIT}" -C "${copy}" tag -d "v${version}")
+
 # An uncommitted change is refused, since a release names a commit that
 # origin holds.
 file(APPEND "${copy}/CHANGELOG.md" "\n")
