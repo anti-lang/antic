@@ -508,6 +508,10 @@ add_test(NAME pinned_compiler
 add_test(NAME release_key
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_key.cmake")
+# The permissions of the text step 9 publishes on anti-lang.com.
+add_test(NAME release_site
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_site.cmake")
 add_test(NAME sysroot_digest
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_digest"

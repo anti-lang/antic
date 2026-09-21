@@ -977,10 +977,20 @@ site() {
     # own. The signature of every release then stays fetchable, and an
     # installer of an older version keeps working. openrsync has no
     # --mkpath, so the directory is made over ssh first.
+    #
+    # DESIGN: the webroot is setgid. A file the server reads carries the
+    # group it inherits there. A directory made below it keeps that group
+    # only while every directory on the way is setgid too. The two the
+    # signature stands in are set after they are made. The 0.1.0
+    # directory of the first release was not. Its file fell to the group
+    # of the user that rsynced it, and anti-lang.com answered 403 for a
+    # signature that stood in place.
     site_host=${destination%%:*}
     site_root=${destination#*:}
+    signature_directory=$site_root/$(dirname "$signature_path")
     ssh -n -o BatchMode=yes "$site_host" \
-        "mkdir -p '$site_root/$(dirname "$signature_path")'" ||
+        "mkdir -p '$signature_directory' &&
+         chmod g+s '$signature_directory' '$(dirname "$signature_directory")'" ||
         die "step 9: $site_host made no directory for the signature"
     rsync --chmod=u=rw,g=r,o= "$signature" "$destination/$signature_path" ||
         die "step 9: SHA256SUMS.sig did not reach $destination"
