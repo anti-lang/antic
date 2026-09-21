@@ -1434,6 +1434,7 @@ static struct block *block(struct parser *p)
         }
     }
     b->stmts = list_finish(p, &stmts, &b->count);
+    b->end = pos_of(peek(p));
     return expect(p, TOKEN_RBRACE) ? b : NULL;
 }
 

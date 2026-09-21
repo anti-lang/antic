@@ -63,14 +63,13 @@ final class Circle
 
 	r: f32,
 
-	fn construct(self, r: f32) -> ?*lang.Error
+	fn construct(self, r: f32) may fail
 	{
 		if r <= 0.0 {
-			return lang.Error.new(1, "radius must be positive");
+			fail lang.Error.new(1, "radius must be positive");
 		}
 		self.kind = Kind.Circle;
 		self.r = r;
-		return none;
 	}
 
 	concrete fn area(self) -> f32

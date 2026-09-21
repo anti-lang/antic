@@ -74,7 +74,7 @@ class Circle
 	const MAX_R: f32 = 1000.0;
 	static atomic count: int = 0;
 
-	fn construct(self, r: f32) -> ?*Error { }
+	fn construct(self, r: f32) may fail { }
 	fn destruct(self) { }
 	pub fn area(self) -> f32 { }
 	concrete fn Serializable::serialize(self, out: *text.Builder) { }
@@ -115,7 +115,7 @@ class Circle
 - `concrete fn` marks a function that replaces an inherited entry. See [Tables and dispatch](#tables-and-dispatch).
 - `final fn` forbids replacement in any derived class.
 - `operator fn` marks a function that an operator calls. See [Operators](#operators).
-- `fn construct(self, args...) -> ?*Error` and `fn destruct(self)` are the constructor and destructor. See [Literals and construction](#literals-and-construction) and [Destruction](#destruction).
+- `fn construct(self, args...) may fail` and `fn destruct(self)` are the constructor and destructor. See [Literals and construction](#literals-and-construction) and [Destruction](#destruction).
 - `v.f(args)` resolves in the class first, then its base chain, then its `use` fields, then the module. A field wins over a function. `Class.f(&v, args)` calls the same function without the sugar.
 - `self.super.f(args)` calls the base class's entry for `f`, found in the base's table at compile time. It is a direct call.
 - `let f = c.area;` is a bound function, a value of two words, object and entry, with the function type of `area` without `self`. `f()` calls it. No captures.
@@ -170,8 +170,10 @@ Four levels, and each applies where it makes sense:
 - An inline class field without a default defaults to `T { }` when every field of `T` has a default or `T` has none, and `construct` runs on it. Otherwise the field is required in the literal, like any field without a default. A zero table in an inline field never happens for a constructed object.
 - A literal sets the table pointers of the class and of every interface sub-object, writes every default, then runs `construct`. Lowering may copy a read-only prototype and store only the named fields.
 - `fn construct(self)` runs after every literal and every `alloc` of the class, base first down the chain. It takes no arguments in this form and cannot fail.
-- `fn construct(self, args...) -> ?*Error` takes arguments and may fail. The class is then created with `alloc Circle(10.0)` on the heap or `Circle(10.0)` as a value. Defaults are applied, then `construct` runs with the arguments. On an error the heap object is freed, or the value is discarded, and the error is handed to the caller. See [Errors](#errors). A base `construct` with arguments is called by name from the derived one, `self.super.construct(x)`, at the top of its body.
-- In a `construct`, every field that has no default and is not set by the literal must be assigned on every path before `return none;`. The compiler refuses the construct and names the field otherwise. It is definite assignment, as a local has it, applied to the fields of `self`.
+- `fn construct(self, args...) may fail` takes arguments and may fail. It leaves with `fail` on the error path and succeeds by reaching its end or at `return;`. It names no result, and `-> ?*Error` written by hand is refused. The class is then created with `alloc Circle(10.0)` on the heap or `Circle(10.0)` as a value, which carry the error of `construct` and take a handler like any failing call. Defaults are applied, then `construct` runs with the arguments. On an error the heap object is freed, or the value is discarded, and the error is handed to the caller. See [Errors](#errors).
+- A `construct` with arguments is the one its class declares. A class that declares none is built by a literal, whatever its base declares.
+- The compiler cannot know the arguments of a base's `construct`, so a derived `construct` that wants the base initialised calls `self.super.construct(args)` itself, as the first statement of its body. It handles the base's error the normal way: `try self.super.construct(args);` forwards it, so a failed base `construct` aborts the derived one through the error path and the object is not created. A call of `self.super.construct` anywhere else is refused. A derived `construct` that does not call it leaves the base's fields at their defaults, as a literal of the derived class leaves them.
+- In a `construct`, every field that has no default and is not set by the literal must be assigned on every path that succeeds. Those paths end at `return;` or at the closing brace. A path that fails needs nothing. The compiler refuses the construct and names the field otherwise. It is definite assignment, as a local has it, applied to the fields of `self`.
 - One `construct` per class. Every alternative constructor is a static function with a name: `Circle.from_points(a, b)`.
 - `alloc Circle { r: 2.0 }` allocates one object on the heap, writes the literal into it, runs `construct`, and returns `*Circle`. `alloc(T, n)` stays the raw form for any type. For a class it fills the memory with zeros, so an element not filled yet has a zero table, and for a struct or a primitive it stays `malloc` and returns uninitialised memory.
 - `[&c, &s]` has type `[2]*Shape` only when the context gives that type. Without context each element keeps its own pointer type.
@@ -185,7 +187,7 @@ Four levels, and each applies where it makes sense:
 - A local of array type whose element type has `destruct` or `own` fields is destroyed element by element at the end of its block, last to first.
 - An `own` slice of class values destroys its elements last to first before its buffer is freed. Every sequence of class values has that one order.
 - A direct call `c.destruct()` is refused.
-- `destruct` does not run on an object whose `construct` failed. A `construct` that fails after acquiring something frees it before returning.
+- `destruct` does not run on an object whose `construct` failed. A `construct` that fails after acquiring something frees it on the fail path, which `undo` writes.
 - The memory model stays C's for heap objects. Nothing frees a heap object but `delete`.
 
 ## Ownership and copies
@@ -292,7 +294,7 @@ Four levels, and each applies where it makes sense:
 - `try { ... } catch e { ... }` handles every unhandled failing call in the block. The first error abandons the rest of the block and runs `defer` statements on the way out. Then the handler runs, and execution continues after the block unless the handler left the function. Nothing crosses a function boundary, so nothing is unwound. Nested blocks bind inward.
 - The name after `catch` is any identifier, scoped to the handler. It shadows an outer name, and `anti check` warns when it does.
 - An error bound by `catch e` is deleted when the handler exits, by `yield`, by falling off the end, by `break` or `continue`. `return e` and `try` pass it to the caller instead. `catch { }` deletes it at once. A handler that keeps the error writes `dup(e)`, and a bare `e` stored into anything is refused.
-- `construct` with an error return uses the same forms: `let c = alloc Circle(10.0) catch fatal;`.
+- A `construct` that may fail uses the same forms: `let c = alloc Circle(10.0) catch fatal;`.
 
 ## The C view
 
@@ -300,7 +302,7 @@ Four levels, and each applies where it makes sense:
 - It declares the table type per class and per interface, `struct Shape_vtable` and `struct Serializable_vtable`, with the descriptor pointer first and one function pointer per `pub` function of the chain. It declares one `extern const` table per concrete class per table, `anti_Circle_vtable` and `anti_Circle_Serializable_vtable`, and each descriptor as `extern const`.
 - An abstract class gets layout and table type, no table symbol and no init, with a comment saying why.
 - It declares a prototype per `pub` function, `float Circle_area(struct Circle *self);`, and per static function, `struct Circle Circle_new(float r);`. Private and protected functions do not appear. Static atomic fields appear as `_Atomic` globals under the `anti_` prefix.
-- Every generated helper is under the `anti_` prefix and never collides with a user function: `anti_Circle_init(c)` sets every table pointer and writes every default, then runs `construct` when it takes no arguments. `anti_Circle_construct(c, args...)` runs a `construct` with arguments and returns `struct anti_Error *`. `anti_Circle_delete(c)` runs the `destruct` chain, frees `own` fields and the object. `anti_Circle_destroy(c)` runs the chain without the free. `anti_Shape_area(s)` is a `static inline` dispatch wrapper through the table, beside the direct `Shape_area`. `anti_Circle_as_Serializable(c)` returns the interface pointer.
+- Every generated helper is under the `anti_` prefix and never collides with a user function: `anti_Circle_init(c)` sets every table pointer and writes every default, then runs `construct` when it takes no arguments. `anti_Circle_construct(c, args...)` is the counterpart of `Circle(args)`: it prepares `c` as `anti_Circle_init` does, runs a `construct` with arguments on it and returns `struct anti_Error *` when that `construct` may fail. `anti_Circle_delete(c)` runs the `destruct` chain, frees `own` fields and the object. `anti_Circle_destroy(c)` runs the chain without the free. `anti_Shape_area(s)` is a `static inline` dispatch wrapper through the table, beside the direct `Shape_area`. `anti_Circle_as_Serializable(c)` returns the interface pointer.
 - The header compiles as C11 and as C++17. Names that are keywords in either get a trailing `_`. No generated struct is named `class`.
 - A bound function crosses as a struct of two pointers. A class is exportable when every `pub` function follows the export signature rule. `anti bind --header` writes all of the above from the `.antl`.
 - A bound struct is never a class. A C library's struct has no table pointer and gets none.
@@ -327,6 +329,9 @@ Four levels, and each applies where it makes sense:
 - `` `title` is `mutable` in singleton `Config` and `worker fn render` reaches it ``
 - `` `Circle` has `own` fields, use `dup` instead of `=` ``
 - `` `construct` of `Circle` returns `none` before it sets `r` ``
+- `` `construct` returns nothing, and one that can fail is written `may fail` ``
+- `` `self.super.construct` is called at the top of the body of `construct` ``
+- `` `destruct` cannot fail ``
 - `` the error of `parse_int` is not handled ``
 - `` `e` outlives its `catch`, use `dup` ``
 - `` `[]Shape` holds no complete values, use `[]*Shape` ``
@@ -409,14 +414,13 @@ final class Circle
 
 	r: f32,
 
-	fn construct(self, r: f32) -> ?*lang.Error
+	fn construct(self, r: f32) may fail
 	{
 		if r <= 0.0 {
-			return lang.Error.new(1, "radius must be positive");
+			fail lang.Error.new(1, "radius must be positive");
 		}
 		self.kind = Kind.Circle;
 		self.r = r;
-		return none;
 	}
 
 	concrete fn area(self) -> f32

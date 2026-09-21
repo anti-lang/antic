@@ -42,13 +42,12 @@ pub class Pet
 {
 	pub owner: int = 0,
 
-	fn construct(self, owner: int) -> ?*lang.Error
+	fn construct(self, owner: int) may fail
 	{
 		if owner < 0 {
-			return lang.Error.new(6, "a pet has an owner");
+			fail lang.Error.new(6, "a pet has an owner");
 		}
 		self.owner = owner;
 		printf("pet %d\n".ptr, owner as c_int);
-		return none;
 	}
 }

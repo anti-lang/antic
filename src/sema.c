@@ -58,6 +58,7 @@ struct checker {
     struct block *try_block;    /* the body of the enclosing `try` block */
     struct type *error_type;    /* `*Error` of the first failing call */
     bool saw_fail;              /* the body holds a `fail` or a `try` */
+    const struct expr *top_call; /* the first statement's call, or NULL */
     int quiet;                  /* above 0, errors are not reported */
     bool ok;
 };
@@ -674,17 +675,27 @@ static struct type *function_type(struct checker *c, struct item *it)
     if (it->result != NULL && is_error(result = resolve_type(c, it->result))) {
         return result;
     }
+    /* DESIGN: `construct` and `destruct` keep the forms the object model
+       gives them. A `construct` with arguments that can fail is written
+       `may fail` and names no result, so `-> ?*Error` written by hand is
+       refused. A `construct` without arguments runs after every literal
+       and cannot fail. `destruct` has no error channel at all. */
+    if (it->has_self && name_is(&it->name, "construct") &&
+        it->param_count > 0 && it->result != NULL) {
+        error_at(c, it->result->pos, "`construct` returns nothing, and one "
+                 "that can fail is written `may fail`");
+        return builtin(c, TYPE_ERROR);
+    }
     if (it->may_fail) {
         struct type *error;
-        /* DESIGN: `construct` and `destruct` keep the forms the object
-           model gives them. `construct` already reports an error with
-           `-> ?*Error`, and the definite-assignment check of its fields
-           reads that form, so `may fail` adds nothing and would hide it.
-           `destruct` has no error channel at all. */
-        if (it->has_self && (name_is(&it->name, "construct") ||
-                             name_is(&it->name, "destruct"))) {
-            error_at(c, it->may_fail_pos, "`%.*s` writes `-> ?*Error` rather "
-                     "than `may fail`", (int)it->name.length, it->name.text);
+        if (it->has_self && name_is(&it->name, "construct") &&
+            it->param_count == 0) {
+            error_at(c, it->may_fail_pos, "a `construct` without arguments "
+                     "cannot fail and returns nothing");
+            return builtin(c, TYPE_ERROR);
+        }
+        if (it->has_self && name_is(&it->name, "destruct")) {
+            error_at(c, it->may_fail_pos, "`destruct` cannot fail");
             return builtin(c, TYPE_ERROR);
         }
         error = error_class(c, it->may_fail_pos);
@@ -2470,6 +2481,18 @@ static bool method_call(struct checker *c, struct expr *call)
                  "`alloc`, and is not called directly");
         return false;
     }
+    /* DESIGN: the `construct` below calls the one of its base at the top
+       of its body, as the first statement. The compiler cannot know the
+       arguments. The base part is then complete before the body below
+       reads it, and a base that fails stops the body there. A call
+       anywhere else, or in any other function, is refused. */
+    if (member != NULL && name_is(&field->as.field.name, "construct") &&
+        (call != c->top_call || c->function == NULL ||
+         !name_is(&c->function->name, "construct"))) {
+        error_at(c, field->pos, "`self.super.construct` is called at the "
+                 "top of the body of `construct`");
+        return false;
+    }
     /* DESIGN: a call on a class reached through a pointer goes through
        the table. The object may be of a class below the static type. A
        `final` function and a `final` class have no class below them, so
@@ -2776,15 +2799,24 @@ static struct type *check_handled(struct checker *c, struct expr *e,
    class with those arguments. The defaults are written first, so the
    body sees a complete object. A `construct` that can fail makes the
    whole expression a failing call, which needs a handler like any
-   other. */
+   other. The `construct` is the one the class declares. It runs one
+   body per level, so a class that declares none has no `construct`
+   with arguments, whatever its base declares, and a literal builds
+   it. */
 static struct type *check_construct(struct checker *c, struct expr *e,
                                     struct type *t, struct type *expected)
 {
     static const struct name construct_name = {"construct", 9};
-    struct item *m = find_member(t, &construct_name);
+    struct item *m = NULL;
     struct type *fn;
     size_t i;
     bool ok = true;
+
+    for (i = 0; i < t->member_count; i++) {
+        if (same_name(&t->members[i]->name, &construct_name)) {
+            m = t->members[i];
+        }
+    }
 
     if (m == NULL || m->kind != ITEM_FN || m->symbol == NULL ||
         m->param_count == 0) {
@@ -5559,13 +5591,14 @@ static void check_block_narrowing(struct checker *c, struct block *b,
 }
 
 /* DESIGN: a `construct` with arguments makes the object without a
-   literal, so it sets every field that has no default. Each path to
-   `return none` assigns each such field of the chain, or calls the
-   `construct` of a base, which sets the fields from that base up. The
-   checker refuses the construct and names the field otherwise. A path
-   that returns an error leaves no object behind and needs nothing. It is
-   definite assignment, as a local has it, applied to the fields of self.
-   A loop body may not run, so what it assigns counts only inside it. */
+   literal, so it sets every field that has no default. A path that
+   succeeds ends at a `return;` or at the closing brace. Each such path
+   assigns each such field of the chain, or calls the `construct` of a
+   base, which sets the fields from that base up. The checker refuses
+   the construct and names the field otherwise. A path that fails leaves
+   no object behind and needs nothing. It is definite assignment, as a
+   local has it, applied to the fields of self. A loop body may not run,
+   so what it assigns counts only inside it. */
 struct required {
     const struct item *fn;
     const struct type *owner;
@@ -5578,6 +5611,22 @@ static bool sets_block(struct checker *c, const struct required *r,
                        const struct block *b, bool *set);
 static bool sets_stmt(struct checker *c, const struct required *r,
                       const struct stmt *s, bool *set);
+
+/* Report the first field that a path which succeeds at pos leaves
+   unset. */
+static void require_set(struct checker *c, const struct required *r,
+                        const bool *set, struct pos pos)
+{
+    size_t i;
+
+    for (i = 0; i < r->count && set[i]; i++) {
+    }
+    if (i < r->count) {
+        error_at(c, pos, "`construct` of `%s` returns `none` before it sets "
+                 "`%.*s`", tn((struct type *)r->owner),
+                 (int)r->fields[i]->name.length, r->fields[i]->name.text);
+    }
+}
 
 /* Mark the field that the target of `=` names on self. */
 static void set_target(const struct required *r, const struct expr *target,
@@ -5735,18 +5784,11 @@ static bool sets_stmt(struct checker *c, const struct required *r,
     case STMT_BLOCK:
         return sets_block(c, r, s->as.block, set);
     case STMT_RETURN:
-        if (s->as.return_value != NULL &&
-            s->as.return_value->kind == EXPR_NONE) {
-            for (i = 0; i < r->count && set[i]; i++) {
-            }
-            if (i < r->count) {
-                error_at(c, s->pos, "`construct` of `%s` returns `none` "
-                         "before it sets `%.*s`", tn((struct type *)r->owner),
-                         (int)r->fields[i]->name.length,
-                         r->fields[i]->name.text);
-            }
+        if (s->as.return_value == NULL) {
+            require_set(c, r, set, s->pos);
         }
         return false;
+    case STMT_FAIL:
     case STMT_BREAK:
     case STMT_CONTINUE:
     case STMT_YIELD:
@@ -5814,7 +5856,9 @@ static void check_construct_sets(struct checker *c, const struct item *it)
     }
     set = arena_alloc(c->arena, r.count + 1);
     memset(set, 0, r.count);
-    sets_block(c, &r, it->body, set);
+    if (sets_block(c, &r, it->body, set)) {
+        require_set(c, &r, set, it->body->end);
+    }
 }
 
 static void check_function(struct checker *c, struct item *it)
@@ -5847,6 +5891,12 @@ static void check_function(struct checker *c, struct item *it)
         }
     }
     c->saw_fail = false;
+    c->top_call = NULL;
+    if (it->body != NULL && it->body->count > 0 &&
+        it->body->stmts[0]->kind == STMT_EXPR &&
+        it->body->stmts[0]->as.expr->kind == EXPR_CALL) {
+        c->top_call = it->body->stmts[0]->as.expr;
+    }
     check_block(c, it->body);
     check_construct_sets(c, it);
     leave_scope(c, &params);
@@ -6926,7 +6976,9 @@ static void check_export(struct checker *c, struct item *it)
     /* DESIGN: an export class crosses as its layout, its table type and
        one prototype per public function. Every field and every public
        signature therefore follows the export rule, and the base and the
-       table pointer are the compiler's own and always cross. */
+       table pointer are the compiler's own and always cross. A
+       `construct` with arguments crosses as `anti_<Class>_construct`
+       whatever its level, so its parameters follow the rule as well. */
     case ITEM_CLASS:
         for (i = 0; i < t->field_count; i++) {
             if (t->fields[i].form == FIELD_BASE ||
@@ -6942,7 +6994,9 @@ static void check_export(struct checker *c, struct item *it)
         for (i = 0; i < it->member_count; i++) {
             const struct item *m = it->members[i];
             const struct type *ft = m->symbol != NULL ? m->symbol->type : NULL;
-            if (m->kind != ITEM_FN || !m->pub || ft == NULL ||
+            bool made = m->has_self && m->param_count > 0 &&
+                        name_is(&m->name, "construct");
+            if (m->kind != ITEM_FN || (!m->pub && !made) || ft == NULL ||
                 ft->kind != TYPE_FN) {
                 continue;
             }

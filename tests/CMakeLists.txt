@@ -406,7 +406,7 @@ foreach(source IN LISTS std_sources)
 endforeach()
 
 # Every failing function of std/ is written with `may fail`, apart from
-# the forms that refuse it.
+# a binding, which refuses it.
 add_test(NAME std_may_fail_only
     COMMAND "${CMAKE_COMMAND}"
         "-DSTD=${ANTIC_STD_SOURCE_DIR}"
@@ -1501,6 +1501,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "own_copy|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_copy.s,own_copy.anti"
         "inline_required|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/inline_required.s,inline_required.anti"
         "construct_sets|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/construct_sets.s,construct_sets.anti"
+        "construct_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/construct_forms.s,construct_forms.anti"
         "catch_place|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_place.s,catch_place.anti"
         "failing|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/failing.s,failing.anti"
         "fail_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_forms.s,fail_forms.anti"

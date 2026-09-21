@@ -262,7 +262,7 @@ A handler ends with `yield v` or leaves the block. The name after `catch` is any
 
 The ABI is the hand-written convention, `?*Error f(args, R *out)`, with the result through an out pointer. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. A function written by hand in that form stays legal, and bindings produce it.
 
-Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`, and the tests of `anti.lang` and `anti.error` use `may fail`. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. The three user directories of `anti.os` may fail, and so does every function of `anti.fs`: `open`, `read`, `write`, `size`, `close`, `list`, `remove` and `rename`. `toml.Document.read`, `log.FileSink.new`, `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may fail, and no function of the standard library writes the hand-written form. `try` stands wherever the call stands, after `return` and inside an expression as well. Not built yet: the origin and the frames, `SourceLocation` and `StackTrace`.
+Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, `may fail` on a `construct` with arguments, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`, and the tests of `anti.lang` and `anti.error` use `may fail`. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. The three user directories of `anti.os` may fail, and so does every function of `anti.fs`: `open`, `read`, `write`, `size`, `close`, `list`, `remove` and `rename`. `toml.Document.read`, `log.FileSink.new`, `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may fail, and no function of the standard library writes the hand-written form. `try` stands wherever the call stands, after `return` and inside an expression as well. Not built yet: the origin and the frames, `SourceLocation` and `StackTrace`.
 
 ## Structs
 
@@ -365,11 +365,10 @@ final class Circle
 	inherits Shape,
 	r: f32,
 
-	fn construct(self, r: f32) -> ?*Error
+	fn construct(self, r: f32) may fail
 	{
-		if r <= 0.0 { return Error.new(1, "radius"); }
+		if r <= 0.0 { fail Error.new(1, "radius"); }
 		self.r = r;
-		return none;
 	}
 
 	concrete fn area(self) -> f32 { return 3.14 * self.r * self.r; }
@@ -388,7 +387,8 @@ c.move(1.0, 1.0);
 - `abstract class` is required when any function has no body. `final class` and `final fn` forbid inheritance and replacement.
 - `concrete fn` replaces an inherited entry, `concrete fn Base::f` documents which, `concrete fn Iface::f` fills one interface's table only.
 - Fields are private unless `pub` or `protected`. A literal outside the class names `pub` fields only. Defaults fill the rest, then `construct` runs. An inline class field without a default takes `T { }` when every field of `T` has a default or `T` has none, and `construct` runs on it. Otherwise the literal must name it.
-- `alloc T { fields }` and `alloc T(args)` create on the heap and return `*T`. `T { fields }` and `T(args)` are values. `construct` with arguments may fail, and it assigns every field without a default on every path to `return none`, which the compiler checks.
+- `alloc T { fields }` and `alloc T(args)` create on the heap and return `*T`. `T { fields }` and `T(args)` are values. A `construct` with arguments that can fail is written `may fail`, leaves with `fail` and succeeds at its end. Every path that succeeds assigns every field without a default, which the compiler checks. `T(args)` carries the error of `construct` to the handler at the call, and a failed `alloc` frees the object.
+- A `construct` below that wants its base initialised calls `self.super.construct(args)` as the first statement of its body, and `try` forwards a failure of the base. One that leaves the call out keeps the defaults of the base's fields.
 - `delete(p)` runs `destruct` up the chain, frees owned fields, frees the object. `destroy(&v)` does the same without the free. A value is destroyed at the end of its block, and so is each element of a local array of them, last to first.
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
 - `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
@@ -634,7 +634,7 @@ export struct Vec2 { x: c_int, y: c_int }
 link framework "CoreAudio";
 ```
 
-`anti bind raylib_api.json` and `anti bind --clang header.h` generate bindings. `anti build --lib static|shared` builds a library with a header. A class is exported with its layout, tables, `anti_<Class>_init` and the dispatch wrappers. `embed("file")` puts a file's bytes in the binary.
+`anti bind raylib_api.json` and `anti bind --clang header.h` generate bindings. `anti build --lib static|shared` builds a library with a header. A class is exported with its layout, tables, `anti_<Class>_init`, `anti_<Class>_construct` for a `construct` with arguments, and the dispatch wrappers. `embed("file")` puts a file's bytes in the binary.
 
 Built: `extern`, `export`, static and shared libraries, the header. Not built yet: `anti bind`, `link framework`, `embed`.
 

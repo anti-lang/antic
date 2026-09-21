@@ -1,0 +1,7 @@
+construct_forms.anti:12:32: error: `construct` returns nothing, and one that can fail is written `may fail`
+construct_forms.anti:23:21: error: a `construct` without arguments cannot fail and returns nothing
+construct_forms.anti:75:20: error: `destruct` cannot fail
+construct_forms.anti:87:10: error: `Heir` has no `construct` with arguments, so a literal builds it
+construct_forms.anti:52:7: error: `self.super.construct` is called at the top of the body of `construct`
+construct_forms.anti:63:7: error: `self.super.construct` is called at the top of the body of `construct`
+construct_forms.anti:68:7: error: `self.super.construct` is called at the top of the body of `construct`

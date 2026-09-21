@@ -1,8 +1,9 @@
 # No failing function of the standard library writes the out-pointer
 # convention by hand, since the standard library uses `may fail`
-# throughout. A binding and `construct` keep the hand-written form,
-# because both refuse `may fail`. Run with cmake -P and STD, the
-# directory that holds the modules.
+# throughout. A binding keeps the hand-written form, because it refuses
+# `may fail`. A `construct` that fails is written `may fail` like any
+# other function. Run with cmake -P and STD, the directory that holds
+# the modules.
 
 file(GLOB sources "${STD}/*.anti")
 if(NOT sources)
@@ -15,8 +16,7 @@ foreach(source IN LISTS sources)
         "(extern )?fn [A-Za-z_0-9]+\\([^)]*\\)[ \t\r\n]*-> \\?\\*[A-Za-z_.]*Error"
         found "${content}")
     foreach(declaration IN LISTS found)
-        if(declaration MATCHES "^extern " OR
-                declaration MATCHES "^fn construct\\(")
+        if(declaration MATCHES "^extern ")
             continue()
         endif()
         string(REGEX MATCH "^fn [A-Za-z_0-9]+" name "${declaration}")

@@ -1,6 +1,7 @@
 /* A C program that calls the two functions of the library failing that
-   may fail. It takes the path that succeeds and the path that reports an
-   error. The error is a pointer C passes on and never reads. */
+   may fail, and the `construct` of its class. It takes the path that
+   succeeds and the path that reports an error. The error is a pointer C
+   passes on and never reads. */
 #include "../binary_stdio.h"
 #include <stdio.h>
 
@@ -9,6 +10,7 @@
 int main(void)
 {
     Counter c = {1};
+    Gauge g;
     int32_t half = 0;
     struct anti_Error *e;
 
@@ -21,5 +23,11 @@ int main(void)
     e = failing_step(&c, 2);
     printf("%d %d\n", e == NULL, c.n);
     printf("%d\n", failing_twice(21));
+    /* The helper writes the tables and the defaults, then runs
+       `construct` with the arguments. */
+    e = anti_Gauge_construct(&g, 5);
+    printf("%d %d %d\n", e == NULL, g.limit, g.level);
+    e = anti_Gauge_construct(&g, 0);
+    printf("%d\n", e == NULL);
     return 0;
 }

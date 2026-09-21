@@ -265,6 +265,7 @@ struct stmt;
 
 struct block {
     struct pos pos;
+    struct pos end;             /* the closing brace */
     struct stmt **stmts;
     size_t count;
 };

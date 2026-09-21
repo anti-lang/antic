@@ -1,0 +1,77 @@
+//! A derived `construct` initialises its base with
+//! `self.super.construct(args)` at the top of its body. `try` forwards
+//! the error of the base, so the derived body stops there and no object
+//! is made. A derived `construct` that leaves the call out keeps the
+//! defaults of the base's fields.
+import anti.io;
+import anti.lang;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+class Account
+{
+	pub balance: int = 0,
+	pub owner: str = "nobody",
+
+	fn construct(self, balance: int) may fail
+	{
+		if balance < 0 {
+			fail lang.Error.new(2, "a negative balance");
+		}
+		self.balance = balance;
+		self.owner = "base";
+	}
+}
+
+class Savings
+{
+	inherits Account,
+	pub rate: int = 1,
+
+	fn construct(self, balance: int, rate: int) may fail
+	{
+		try self.super.construct(balance);
+		printf("savings body %d\n".ptr, balance as c_int);
+		self.rate = rate;
+	}
+}
+
+class Blank
+{
+	inherits Account,
+	pub note: int = 0,
+
+	fn construct(self, note: int) may fail
+	{
+		if note < 0 {
+			fail "a negative note";
+		}
+		self.note = note;
+	}
+}
+
+fn main() -> int
+{
+	let s = alloc Savings(100, 3) catch fatal;
+	printf("savings %d %d\n".ptr, s.balance as c_int, s.rate as c_int);
+	io.println(s.owner);
+	delete(s);
+	let failed: ?*Savings = alloc Savings(-5, 3) catch e {
+		printf("refused %d\n".ptr, e.code as c_int);
+		io.println(e.message);
+		yield none;
+	};
+	if failed != none {
+		return 1;
+	}
+	let v = Savings(-1, 2) catch e {
+		printf("value refused %d\n".ptr, e.code as c_int);
+		yield Savings { rate: 9 };
+	};
+	printf("value %d %d\n".ptr, v.balance as c_int, v.rate as c_int);
+	let b = alloc Blank(4) catch fatal;
+	printf("blank %d %d\n".ptr, b.balance as c_int, b.note as c_int);
+	io.println(b.owner);
+	delete(b);
+	return 0;
+}

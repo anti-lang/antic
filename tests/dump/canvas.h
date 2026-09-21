@@ -14,6 +14,10 @@ extern "C" {
 #define ANTI_ALIGNAS(n) _Alignas(n)
 #endif
 
+/* An Anti error. A function that may fail returns a pointer to one,
+   or NULL on success. C passes it on and never reads its layout. */
+struct anti_Error;
+
 /* The root of every class chain, and the record at entry 0 of
    every table. A C program reads the layout and never builds one. */
 typedef struct anti_descriptor anti_descriptor;
@@ -183,6 +187,61 @@ static inline void anti_Square_move(Square *self, int32_t dx, int32_t dy)
 static inline int32_t anti_Square_colour(Square *self)
 {
     return ((const Square_vtable *)self->base.base.vtable)->colour(self);
+}
+
+typedef struct Circle Circle;
+typedef struct Circle_vtable {
+    const void *descriptor;
+    /* The seven functions of anti.rt.Object. They take and give Anti
+       values, so C reads their slots and does not call them. */
+    void *type_name;
+    void *to_text;
+    void *equals;
+    void *hash;
+    void *serialize;
+    void *destruct;
+    void *copy;
+    int32_t (*area)(Circle *self);
+    void (*move)(Circle *self, int32_t dx, int32_t dy);
+} Circle_vtable;
+
+/** A circle of a positive radius. */
+struct Circle {
+    Shape base;
+    int32_t radius;   /* private */
+};
+
+extern const anti_descriptor anti_Circle_descriptor;
+extern const Circle_vtable anti_Circle_vtable;
+void anti_Circle_init(Circle *self);
+/** Take the radius, or fail when it is not positive. */
+/* Prepares self as anti_Circle_init does, then runs construct. */
+/* May fail: NULL on success, an error otherwise. */
+struct anti_Error *anti_Circle_construct(Circle *self, int32_t radius);
+static inline void anti_Circle_delete(Circle *self)
+{
+    anti_rt_delete(self, &anti_Circle_descriptor);
+}
+static inline void anti_Circle_destroy(Circle *self)
+{
+    anti_rt_destroy(self, &anti_Circle_descriptor);
+}
+static inline Circle *anti_Circle_dup(Circle *self)
+{
+    return (Circle *)anti_rt_dup(self, &anti_Circle_descriptor);
+}
+
+int32_t Circle_area(Circle *self);
+/** Move the shape by dx and dy. */
+void Circle_move(Circle *self, int32_t dx, int32_t dy);
+
+static inline int32_t anti_Circle_area(Circle *self)
+{
+    return ((const Circle_vtable *)self->base.base.vtable)->area(self);
+}
+static inline void anti_Circle_move(Circle *self, int32_t dx, int32_t dy)
+{
+     ((const Circle_vtable *)self->base.base.vtable)->move(self, dx, dy);
 }
 
 #ifdef __cplusplus

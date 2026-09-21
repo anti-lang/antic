@@ -27,16 +27,6 @@ fn bad_value() -> int may fail
 	fail 7;
 }
 
-class Box
-{
-	pub n: int = 0,
-
-	fn construct(self, n: int) may fail
-	{
-		self.n = n;
-	}
-}
-
 fn main() -> int
 {
 	return dropped() + outside() + failing_outside() + bad_value();

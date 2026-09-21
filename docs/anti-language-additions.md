@@ -72,7 +72,8 @@ The round-three small items and the simd structs stay where the small things are
 - `undo` runs on the `fail` path and not on `return`.
 - A `may fail` function with no `fail` and no `try` is a warning from `anti check`, not an error, since an interface function may fail in one implementation and not another.
 - The ABI is the old convention: `?*Error f(args, R *out)`, with `out` absent for a function without a result. The header writes that form and the doc comment says the function may fail. A `.antl` records the flag, so a caller in another module handles it.
-- A function written by hand as `-> ?*Error` with out pointers stays legal and is called the same way. Bindings produce that form. The standard library uses `may fail` everywhere, and the rewrite of its signatures is one session when the parser has the form.
+- A `construct` that can fail takes the same form, `fn construct(self, args...) may fail`, and `alloc T(args)` and `T(args)` carry its error. "Literals and construction" in `docs/anti-object-model.md` gives the rules, the call of a base's `construct` among them.
+- A function written by hand as `-> ?*Error` with out pointers stays legal and is called the same way, apart from a `construct`. Bindings produce that form. The standard library uses `may fail` everywhere, and the rewrite of its signatures is one session when the parser has the form.
 
 ```anti
 fn divide(a: int, b: int) -> (int, int) may fail
@@ -409,7 +410,7 @@ Rules:
 - Paths: a bare name resolves from the innermost group outward. A qualified name is a path from a named group, `body.header_length`, or from the format, `NetworkPacket.packet_length`. A bare name that matches at two levels is refused with both paths. A field may reference only fields that come before it in the byte stream.
 - Bit containers: an integer field followed by `{ }` with one line per bit field. Each names its bits in the assembled value, `bit 0`, `bits 2..6`, or a comma-separated list of pieces from most to least significant, `bits 2..4, bit 15, bit 12`. Bit 0 is the least significant. Ranges are half-open. Every bit of the container is named exactly once, by a field or by `_`, and an unaccounted or doubly named bit is an error naming the bits. A one-bit field is a `bool` in the generated class and a wider one the smallest unsigned type. The sequence form, `msb` or `lsb` after the container and fields with a width only, is allowed as an alternative and never mixed with positions in one container.
 - Padding: `pad: 3 bytes` and `align 4`. Both write zero.
-- The generated module holds one class per group, all at module level. The format's class has `fn construct(self, data: []byte) -> ?*Error`, so `alloc NetworkPacket(data) catch e { }` parses a buffer, and a static `parse(r: *binary.Reader)` for a packet inside a stream. `write(self, w: *binary.Writer)` and `size(self) -> int` are generated. Length and count fields are computed on write and are not fields of the class.
+- The generated module holds one class per group, all at module level. The format's class has `fn construct(self, data: []byte) may fail`, so `alloc NetworkPacket(data) catch e { }` parses a buffer, and a static `parse(r: *binary.Reader)` for a packet inside a stream. `write(self, w: *binary.Writer)` and `size(self) -> int` are generated. Length and count fields are computed on write and are not fields of the class.
 - `str` and `[]byte` fields are slices into the buffer, so the object is valid while the buffer is. `format Name endian big copy { }` makes them `own` copies instead.
 - Conditions, `if version >= 2 { }`, are the second version.
 

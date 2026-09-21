@@ -11,13 +11,13 @@ class Box
 	pub part: Needs,
 	pub label: str = "",
 
-	fn construct(self, w: int) -> ?*lang.Error
+	fn construct(self, w: int) may fail
 	{
 		if w < 0 {
-			return lang.Error.new(1, "negative");
+			fail lang.Error.new(1, "negative");
 		}
 		self.w = w;
-		return none;
+		return;
 	}
 }
 
@@ -25,12 +25,14 @@ class Branches
 {
 	pub a: int,
 
-	fn construct(self, x: int) -> ?*lang.Error
+	fn construct(self, x: int) may fail
 	{
+		if x < 0 {
+			fail "negative";
+		}
 		if x > 0 {
 			self.a = x;
 		}
-		return none;
 	}
 }
 
@@ -38,12 +40,14 @@ class Loop
 {
 	pub a: int,
 
-	fn construct(self, x: int) -> ?*lang.Error
+	fn construct(self, x: int) may fail
 	{
+		if x < 0 {
+			fail "negative";
+		}
 		for i in 0..x {
 			self.a = i;
 		}
-		return none;
 	}
 }
 
@@ -51,10 +55,12 @@ class Base
 {
 	pub b: int,
 
-	fn construct(self, b: int) -> ?*lang.Error
+	fn construct(self, b: int) may fail
 	{
+		if b < 0 {
+			fail "negative";
+		}
 		self.b = b;
-		return none;
 	}
 }
 
@@ -63,10 +69,24 @@ class Orphan
 	inherits Base,
 	pub d: int,
 
-	fn construct(self, x: int) -> ?*lang.Error
+	fn construct(self, x: int) may fail
 	{
+		if x < 0 {
+			fail "negative";
+		}
 		self.d = x;
-		return none;
+	}
+}
+
+class Quiet
+{
+	pub q: int,
+
+	fn construct(self, x: int)
+	{
+		if x > 0 {
+			self.q = x;
+		}
 	}
 }
 
@@ -75,10 +95,10 @@ class Good
 	pub a: int,
 	pub part: Needs,
 
-	fn construct(self, x: int) -> ?*lang.Error
+	fn construct(self, x: int) may fail
 	{
 		if x < 0 {
-			return lang.Error.new(1, "negative");
+			fail lang.Error.new(1, "negative");
 		}
 		if x > 0 {
 			self.a = x;
@@ -86,7 +106,6 @@ class Good
 			self.a = 0;
 		}
 		self.part = Needs { v: x };
-		return none;
 	}
 }
 
@@ -95,14 +114,13 @@ class Derived
 	inherits Base,
 	pub d: int,
 
-	fn construct(self, x: int) -> ?*lang.Error
+	fn construct(self, x: int) may fail
 	{
 		try self.super.construct(x);
 		switch x {
 			0 => self.d = 1,
 			else => self.d = x,
 		}
-		return none;
 	}
 }
 

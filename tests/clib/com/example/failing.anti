@@ -27,3 +27,17 @@ export fn failing_twice(n: c_int) -> c_int
 {
 	return n * 2;
 }
+
+/// A gauge whose limit must be positive.
+export class Gauge
+{
+	pub limit: c_int = 0,
+	pub level: c_int = 1,
+
+	/// Take the limit, or fail when it is not positive.
+	fn construct(self, limit: c_int) may fail
+	{
+		if limit <= 0 { fail "the limit must be positive"; }
+		self.limit = limit;
+	}
+}

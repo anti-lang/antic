@@ -5074,6 +5074,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
     struct ir_operand *args;
     const struct item *m = NULL;
     uint32_t result;
+    bool fails;
     size_t i;
 
     ir_store(l->f, l->b, IR_PTR,
@@ -5116,12 +5117,14 @@ static struct ir_operand lower_construct(struct lowerer *l,
         free(args);
         return none();
     }
-    result = ir_call(l->f, l->b,
-                     m->result != NULL ? IR_PTR : IR_VOID,
+    /* A `construct` that may fail returns `?*Error`, which the checker
+       gave its type. One that cannot fail returns nothing. */
+    fails = m->symbol->type->result->kind != TYPE_VOID;
+    result = ir_call(l->f, l->b, fails ? IR_PTR : IR_VOID,
                      ir_func_op(callee_function(l, m->symbol)), args,
                      e->as.call.arg_count + 1);
     free(args);
-    return m->result != NULL ? temp(l, result) : none();
+    return fails ? temp(l, result) : none();
 }
 
 /* Whether the expression is a call whose error a handler takes. */
@@ -6083,6 +6086,68 @@ static void class_init(struct lowerer *l, const struct item *it)
     ir_ret(l->f, l->b, IR_VOID, none());
 }
 
+/* DESIGN: an export class whose `construct` takes arguments gives C
+   `anti_<Class>_construct(self, args...)`, the counterpart of
+   `Class(args)`. It prepares self as the init of the class does, then
+   runs `construct` with the arguments and returns what that returns: the
+   error of one that may fail, and nothing otherwise. C then needs no
+   call of the init first, and cannot forget one. */
+static void class_construct(struct lowerer *l, const struct item *it)
+{
+    static const struct name construct_name = {"construct", 9};
+    const struct type *t = it->symbol->type;
+    const struct item *m = NULL;
+    const struct type *sig;
+    struct ir_function *target;
+    struct ir_function *f;
+    struct ir_operand *args;
+    struct ir_operand self;
+    uint32_t value;
+    char name[160];
+    size_t i;
+
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *c = t->members[i];
+        if (c->kind == ITEM_FN && same_name(&c->name, &construct_name) &&
+            c->symbol != NULL && has_body(c) && c->param_count > 0) {
+            m = c;
+        }
+    }
+    if (m == NULL) {
+        return;
+    }
+    sig = m->symbol->type;
+    target = callee_function(l, m->symbol);
+    snprintf(name, sizeof name, "anti_%.*s_construct", (int)t->name.length,
+             t->name.text);
+    f = ir_function_add(l->m, l->module_name, name, ir_type_of(sig->result),
+                        IR_NO_AGG);
+    f->exported = true;
+    for (i = 0; i < sig->param_count; i++) {
+        add_param(l, f, sig->params[i]);
+    }
+    l->f = f;
+    l->b = ir_block_add(f);
+    self = temp(l, f->params[0].temp);
+    ir_call(l->f, l->b, IR_VOID, ir_func_op(init_function(l, t)), &self, 1);
+    args = malloc(sig->param_count * sizeof *args);
+    if (args == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    for (i = 0; i < sig->param_count; i++) {
+        args[i] = temp(l, f->params[i].temp);
+    }
+    value = ir_call(l->f, l->b, ir_type_of(sig->result), ir_func_op(target),
+                    args, sig->param_count);
+    free(args);
+    if (sig->result->kind == TYPE_VOID) {
+        ir_ret(l->f, l->b, IR_VOID, none());
+    } else {
+        ir_ret(l->f, l->b, IR_PTR, temp(l, value));
+    }
+}
+
 /* Branch to a new block when the class value at p has a table, and give
    the block after it, where both paths meet. A place that `=` fills has a
    zero table when it is an element of `alloc(T, n)` never filled. It
@@ -6437,6 +6502,9 @@ bool lower_module(struct module *module, const char *module_name,
             }
             if (it->exported || !it->is_singleton) {
                 class_init(&l, it);
+            }
+            if (it->exported) {
+                class_construct(&l, it);
             }
             class_teardown(&l, t);
             if (declared_copy(t) == NULL) {

@@ -98,10 +98,14 @@ static bool is_error_class(const struct type *t)
     return types_is_lang_error(t);
 }
 
+static const struct item *construct_with_arguments(const struct type *t);
+
 /* Whether a signature names the error class, which the header then
-   declares once. A class is asked about the functions of its body. */
+   declares once. A class is asked about the functions of its body, and
+   about a `construct` with arguments, which C calls through a helper. */
 static bool type_names_error(const struct type *t)
 {
+    const struct item *made;
     size_t i;
 
     if (t == NULL) {
@@ -115,7 +119,8 @@ static bool type_names_error(const struct type *t)
                 return true;
             }
         }
-        return false;
+        made = t->has_abstract ? NULL : construct_with_arguments(t);
+        return made != NULL && type_names_error(made->symbol->type);
     }
     if (t->kind != TYPE_FN) {
         return false;
@@ -549,6 +554,22 @@ static void member_signature(struct text *out, const struct type *owner,
     text_free(&decl);
 }
 
+/* The `construct` of t that takes arguments, or NULL. */
+static const struct item *construct_with_arguments(const struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind == ITEM_FN && m->has_self && m->symbol != NULL &&
+            m->name.length == 9 && memcmp(m->name.text, "construct", 9) == 0 &&
+            m->symbol->type->param_count > 1) {
+            return m;
+        }
+    }
+    return NULL;
+}
+
 /* DESIGN: an export class becomes the nested layout and a table type. It
    also becomes an extern table and descriptor, one prototype per public
    function, and the helpers under the `anti_` prefix. An abstract class
@@ -561,6 +582,7 @@ static void class_view(struct text *out, const struct symbol *sym)
     const char *name_text = t->name.text;
     size_t count = chain_functions(t, entries, 64);
     struct text to_root = {0};
+    const struct item *made;
     const struct type *up;
     size_t i;
     size_t j;
@@ -633,6 +655,18 @@ static void class_view(struct text *out, const struct symbol *sym)
                           "void anti_%.*s_init(%.*s *self);\n",
                      name_length, name_text, name_length, name_text,
                      name_length, name_text, name_length, name_text);
+        /* The counterpart of `Class(args)`, which prepares self as the
+           init does and then runs `construct` with the arguments. */
+        made = construct_with_arguments(t);
+        if (made != NULL) {
+            doc_comment(out, &made->doc, "");
+            text_appendf(out, "/* Prepares self as anti_%.*s_init does, then "
+                              "runs construct. */\n",
+                         name_length, name_text);
+            may_fail_note(out, made->symbol, "");
+            member_signature(out, t, made, "anti_", false);
+            text_append(out, ";\n");
+        }
     }
     text_appendf(out,
                  "static inline void anti_%.*s_delete(%.*s *self)\n"

@@ -11,6 +11,8 @@ int main(void)
 {
     Square *s = (Square *)malloc(sizeof *s);
     Shape *base;
+    Circle c;
+    struct anti_Error *e;
 
     anti_Square_init(s);
     s->side = 4;
@@ -23,5 +25,11 @@ int main(void)
        calls through the table that belongs to it. */
     printf("%d\n", anti_Ink_colour(anti_Square_as_Ink(s)));
     anti_Square_delete(s);
+    /* A class whose `construct` takes arguments is made in one call,
+       which reports the error of a `construct` that fails. */
+    e = anti_Circle_construct(&c, 2);
+    printf("%d %d\n", e == NULL, anti_Shape_area(&c.base));
+    e = anti_Circle_construct(&c, 0);
+    printf("%d\n", e == NULL);
     return 0;
 }

@@ -2,6 +2,8 @@
 //! table pointer first, so C reads the layout as nested structs and calls
 //! the entry through the table.
 
+import anti.lang;
+
 /// What a shape can be drawn with.
 export abstract class Ink
 {
@@ -44,5 +46,24 @@ export class Square
 	concrete fn colour(self) -> c_int
 	{
 		return 7;
+	}
+}
+
+/// A circle of a positive radius.
+export class Circle
+{
+	inherits Shape,
+	radius: c_int = 1,
+
+	/// Take the radius, or fail when it is not positive.
+	fn construct(self, radius: c_int) may fail
+	{
+		if radius <= 0 { fail "the radius must be positive"; }
+		self.radius = radius;
+	}
+
+	concrete fn area(self) -> c_int
+	{
+		return 3 * self.radius * self.radius;
 	}
 }

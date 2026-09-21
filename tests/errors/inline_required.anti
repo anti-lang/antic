@@ -9,10 +9,10 @@ class Sized
 {
 	pub w: int = 0,
 
-	fn construct(self, w: int) -> ?*lang.Error
+	fn construct(self, w: int) may fail
 	{
+		if w < 0 { fail "negative"; }
 		self.w = w;
-		return none;
 	}
 }
 

@@ -1,0 +1,89 @@
+//! The forms of `construct` the checker refuses. A `construct` that can
+//! fail is written `may fail`, one without arguments cannot fail, and the
+//! base's `construct` is called at the top of the body of the one below.
+//! A class that declares no `construct` is built by a literal, although
+//! its base declares one with arguments.
+import anti.lang;
+
+class Written
+{
+	pub n: int = 0,
+
+	fn construct(self, n: int) -> ?*lang.Error
+	{
+		self.n = n;
+		return none;
+	}
+}
+
+class Idle
+{
+	pub n: int = 0,
+
+	fn construct(self) may fail
+	{
+		self.n = 1;
+	}
+}
+
+class Base
+{
+	pub n: int = 0,
+
+	fn construct(self, n: int) may fail
+	{
+		if n < 0 {
+			fail "negative";
+		}
+		self.n = n;
+	}
+}
+
+class Late
+{
+	inherits Base,
+	pub m: int = 0,
+
+	fn construct(self, n: int) may fail
+	{
+		if n > 9 {
+			fail "large";
+		}
+		try self.super.construct(n);
+	}
+}
+
+class Again
+{
+	inherits Base,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		try self.super.construct(n + 1);
+	}
+
+	fn reset(self) may fail
+	{
+		try self.super.construct(0);
+		fail "reset";
+	}
+}
+
+class Gone
+{
+	fn destruct(self) may fail
+	{
+	}
+}
+
+class Heir
+{
+	inherits Base,
+}
+
+fn main() -> int
+{
+	let h = Heir(3) catch fatal;
+	return h.n;
+}
