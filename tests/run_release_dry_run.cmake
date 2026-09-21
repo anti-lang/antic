@@ -525,7 +525,7 @@ run("the tag did not go" "${GIT}" -C "${copy}" tag -d "v${version}")
 run("the tag failed" "${GIT}" -C "${copy}" tag "v${version}")
 execute_process(COMMAND "${GIT}" -C "${copy}" rev-parse HEAD
                 OUTPUT_VARIABLE resumed_head
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
+                OUTPUT_STRIP_TRAILING_WHITESPACE ENCODING NONE)
 file(WRITE "${dist}/state/head" "${resumed_head}\n")
 file(WRITE "${dist}/state/07-release" "2026-09-21T00:00:00Z\n")
 set(ENV{PATH} "${WORK}/bin:${saved_path}")
