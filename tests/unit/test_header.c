@@ -147,6 +147,63 @@ void test_header(void)
               "#endif\n"
               "\n"
               "#endif\n");
+    /* A tuple has no name of its own, so the header writes one struct
+       per distinct tuple of an exported signature, named after its
+       elements. */
+    header_of("com.example.geo",
+              "export struct Vec2 { x: c_int, y: c_int }\n"
+              "/// Both answers of a division.\n"
+              "export fn divmod(a: int, b: int) -> (int, int) {\n"
+              "    return (a / b, a % b);\n"
+              "}\n"
+              "export fn scaled(v: Vec2, k: f32) -> (Vec2, f32) {\n"
+              "    return (v, k);\n"
+              "}\n"
+              "export fn first(p: (int, int)) -> int { return p.0; }\n",
+              false,
+              "/* geo.h, the C interface of com.example.geo, written by antic.\n"
+              "   Do not edit. A failure that Anti cannot report calls abort(). */\n"
+              "#ifndef GEO_H\n"
+              "#define GEO_H\n"
+              "\n"
+              "#include <stdbool.h>\n"
+              "#include <stddef.h>\n"
+              "#include <stdint.h>\n"
+              "\n"
+              "#ifdef __cplusplus\n"
+              "#define ANTI_ALIGNAS(n) alignas(n)\n"
+              "extern \"C\" {\n"
+              "#else\n"
+              "#define ANTI_ALIGNAS(n) _Alignas(n)\n"
+              "#endif\n"
+              "\n"
+              "typedef struct Vec2 {\n"
+              "    int32_t x;\n"
+              "    int32_t y;\n"
+              "} Vec2;\n"
+              "\n"
+              "/* The tuple (int, int). */\n"
+              "struct anti_tuple_int_int {\n"
+              "    int64_t _0;\n"
+              "    int64_t _1;\n"
+              "};\n"
+              "\n"
+              "/* The tuple (Vec2, f32). */\n"
+              "struct anti_tuple_Vec2_f32 {\n"
+              "    Vec2 _0;\n"
+              "    float _1;\n"
+              "};\n"
+              "\n"
+              "/** Both answers of a division. */\n"
+              "struct anti_tuple_int_int divmod(int64_t a, int64_t b);\n"
+              "struct anti_tuple_Vec2_f32 scaled(Vec2 v, float k);\n"
+              "int64_t first(struct anti_tuple_int_int p);\n"
+              "\n"
+              "#ifdef __cplusplus\n"
+              "}\n"
+              "#endif\n"
+              "\n"
+              "#endif\n");
     /* A bundled archive carries the runtime, and two in one program
        define it twice. */
     header_of("com.example.geo", "export fn one() -> int { return 1; }\n", true,

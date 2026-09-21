@@ -223,6 +223,13 @@ static void visit_type(struct writer *w, const struct type *t)
         }
         visit_type(w, t->result);
         break;
+    /* A tuple is its elements in order, and nothing else, because two
+       tuples of the same elements are one type. */
+    case TYPE_TUPLE:
+        for (i = 0; i < t->param_count; i++) {
+            visit_type(w, t->params[i]);
+        }
+        break;
     case TYPE_STRUCT:
     case TYPE_CLASS:
         add_type(w, t);
@@ -312,6 +319,12 @@ static void put_type(struct writer *w, const struct type *t)
             put_type_ref(w, t->params[i]);
         }
         put_type_ref(w, t->result);
+        break;
+    case TYPE_TUPLE:
+        put_u32(w, (uint32_t)t->param_count);
+        for (i = 0; i < t->param_count; i++) {
+            put_type_ref(w, t->params[i]);
+        }
         break;
     /* DESIGN: a class is written like a struct, with the form and the
        own bit of each field. Its base is the type of field 0, so the
@@ -1133,6 +1146,23 @@ static void read_types(struct reader *r)
             t = type_ref(r, i);
             if (!r->failed) {
                 t = types_fn(r->types, params, n, t);
+            }
+            break;
+        }
+        /* The elements name types written before them, so the tuple this
+           module reads is the one every other module of the program
+           interns. */
+        case TYPE_TUPLE: {
+            uint32_t n = get_count(r, 4);
+            struct type **elements = allocate(r, n, sizeof *elements);
+            for (j = 0; j < n && !r->failed; j++) {
+                elements[j] = type_ref(r, i);
+            }
+            if (n < 2) {
+                damaged(r);
+            }
+            if (!r->failed) {
+                t = types_tuple(r->types, elements, n);
             }
             break;
         }

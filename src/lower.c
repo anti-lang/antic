@@ -132,6 +132,7 @@ static enum ir_type ir_type_of(const struct type *t)
         return IR_PTR;
     case TYPE_STRUCT:
     case TYPE_CLASS:
+    case TYPE_TUPLE:
     case TYPE_ARRAY:
     case TYPE_STR:
     case TYPE_SLICE:
@@ -1672,6 +1673,9 @@ static uint64_t type_id_of(const struct type *t)
     case TYPE_SLICE: return TYPE_ID_SLICE;
     case TYPE_ARRAY: return TYPE_ID_ARRAY;
     case TYPE_STRUCT: return t->is_union ? TYPE_ID_UNION : TYPE_ID_STRUCT;
+    /* A tuple is an anonymous struct, and no module declares it, so it
+       has the id of a struct and no descriptor of its own. */
+    case TYPE_TUPLE: return TYPE_ID_STRUCT;
     case TYPE_ENUM: return TYPE_ID_ENUM;
     case TYPE_CLASS: return TYPE_ID_CLASS;
     default:
@@ -2777,6 +2781,15 @@ static void build_into(struct lowerer *l, const struct expr *e,
             store_value(l, t->element, e->as.array_lit.elements[i],
                         offset_address(l, dest,
                                        element_offset(l, t->element, i)));
+        }
+        break;
+    /* `(a, b)` writes one element per field, which is what a struct
+       literal of the same types writes. */
+    case EXPR_TUPLE:
+        for (i = 0; i < e->as.tuple.count && !l->failed; i++) {
+            store_value(l, t->fields[i].type, e->as.tuple.elements[i],
+                        offset_address(l, dest,
+                                       field_offset(l, t, &t->fields[i].name)));
         }
         break;
     case EXPR_ARRAY_REPEAT:
@@ -4453,7 +4466,12 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
    loop would never end. */
 static void lower_for(struct lowerer *l, const struct stmt *s)
 {
-    struct symbol *sym = s->as.for_loop.symbol;
+    size_t names = s->as.for_loop.name_count;
+    /* The element is the last of the names, and `for i, x in items`
+       names the index before it. */
+    struct symbol *sym = names > 0 ? s->as.for_loop.names[names - 1].symbol
+                                   : NULL;
+    struct symbol *index = names > 1 ? s->as.for_loop.names[0].symbol : NULL;
     const struct expr *over = s->as.for_loop.over;
     struct ir_block *test = new_block(l);
     struct ir_block *body = new_block(l);
@@ -4574,6 +4592,14 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
                                                 temp(l, counter),
                                                 size_operand(l,
                                                              seq->element)))));
+        /* DESIGN: `for i, x in items` destructures the `(int, T)` of
+           each element. The index is the counter the loop already has,
+           and the element is the value at it. The two names take their
+           values from where they stand, and no pair is built. */
+        if (index != NULL) {
+            index->ir = ir_unary(l->f, l->b, IR_COPY, IR_I64,
+                                 temp(l, counter));
+        }
         if (s->as.for_loop.by_pointer) {
             sym->ir = ir_unary(l->f, l->b, IR_COPY, IR_PTR, at);
         } else if (is_aggregate(sym->type)) {
@@ -5124,7 +5150,40 @@ static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
     l->b = join;
 }
 
-static void lower_let(struct lowerer *l, const struct stmt *s)
+/* `let (a, b) = e;`. The value stands in the place of the statement,
+   and every name takes the element that stands for it. */
+static void destructure(struct lowerer *l, const struct stmt *s)
+{
+    const struct symbol *value = s->as.let.symbol;
+    const struct type *t = value->type;
+    size_t i;
+
+    for (i = 0; i < s->as.let.name_count && !l->failed; i++) {
+        const struct symbol *bound = s->as.let.names[i].symbol;
+        struct ir_operand at =
+            offset_address(l, temp(l, value->ir),
+                           field_offset(l, t, &t->fields[i].name));
+        if (bound == NULL) {
+            return;
+        }
+        if (is_aggregate(bound->type)) {
+            ir_memcopy(l->f, l->b, temp(l, bound->ir), at,
+                       vtype_of(l, bound->type));
+        } else if (bound->address_taken) {
+            ir_store(l->f, l->b, ir_type_of(bound->type),
+                     temp(l, ir_load(l->f, l->b, ir_type_of(bound->type), at)),
+                     temp(l, bound->ir));
+        } else {
+            ((struct symbol *)bound)->ir =
+                ir_load(l->f, l->b, ir_type_of(bound->type), at);
+        }
+        if (local_needs_teardown(bound->type)) {
+            push_exit_action(l, NULL, bound, false);
+        }
+    }
+}
+
+static void lower_let_value(struct lowerer *l, const struct stmt *s)
 {
     struct symbol *sym = s->as.let.symbol;
     struct ir_operand v;
@@ -5231,6 +5290,14 @@ static void lower_let(struct lowerer *l, const struct stmt *s)
             ir_jump(l->f, l->b, rest);
         }
         l->b = rest;
+    }
+}
+
+static void lower_let(struct lowerer *l, const struct stmt *s)
+{
+    lower_let_value(l, s);
+    if (s->as.let.name_count > 0 && !l->failed && l->b != NULL) {
+        destructure(l, s);
     }
 }
 
@@ -5630,6 +5697,15 @@ static void reserve_slots(struct lowerer *l, struct ir_block *entry,
             if (sym->address_taken || is_aggregate(sym->type)) {
                 sym->ir = ir_slot(l->f, entry, vtype_of(l, sym->type));
             }
+            /* The names of `let (a, b) = e;` are locals like any other,
+               and the value they come from is the symbol above. */
+            for (j = 0; j < s->as.let.name_count; j++) {
+                struct symbol *bound = s->as.let.names[j].symbol;
+                if (bound != NULL &&
+                    (bound->address_taken || is_aggregate(bound->type))) {
+                    bound->ir = ir_slot(l->f, entry, vtype_of(l, bound->type));
+                }
+            }
             break;
         case STMT_IF:
             for (j = 0; j < s->as.if_chain.count; j++) {
@@ -5644,6 +5720,15 @@ static void reserve_slots(struct lowerer *l, struct ir_block *entry,
             reserve_slots(l, entry, s->as.loop.body);
             break;
         case STMT_FOR:
+            /* The element of a `for` over an array or a slice is copied
+               into a place of its own when it is an aggregate. */
+            sym = s->as.for_loop.name_count > 0
+                      ? s->as.for_loop
+                            .names[s->as.for_loop.name_count - 1].symbol
+                      : NULL;
+            if (sym != NULL && (sym->address_taken || is_aggregate(sym->type))) {
+                sym->ir = ir_slot(l->f, entry, vtype_of(l, sym->type));
+            }
             reserve_slots(l, entry, s->as.for_loop.body);
             break;
         case STMT_BLOCK:

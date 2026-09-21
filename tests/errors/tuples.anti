@@ -1,0 +1,17 @@
+fn pair() -> (int, int)
+{
+	return (1, 2);
+}
+
+fn main() -> int
+{
+	let (a, b) = 5;
+	let (c, d, e) = pair();
+	let t = pair();
+	let n = t.5;
+	let k = 3;
+	let m = k.0;
+	for i, x in 0..10 {
+	}
+	return a + b + c + d + e + n + m;
+}

@@ -655,4 +655,43 @@ void test_sema(void)
             "class Cat { inherits Pet, pub fn tag() -> int "
             "{ return 1; } }\n", 2, 34,
             "`Pet` already has `tag`");
+
+    /* Tuples. The type stands wherever a type stands, the elements are
+       `t.0` upwards, and `let (a, b) = e;` and `for i, x in items` are
+       the two forms that take one apart. */
+    accepts("fn pair(n: int) -> (int, str) { return (n, \"two\"); }\n"
+            "fn add(p: (int, int)) -> int { return p.0 + p.1; }\n"
+            "fn f(items: []int) -> int {\n"
+            "    let t = pair(1);\n"
+            "    let (n, word) = t;\n"
+            "    let sum = add((n, word.len));\n"
+            "    for i, x in items { sum = sum + i + x; }\n"
+            "    for i, p in &items { sum = sum + i + *p; }\n"
+            "    return sum + t.0;\n"
+            "}\n");
+    /* Two tuples of the same elements in the same order are one type. */
+    accepts("fn pair() -> (int, int) { return (1, 2); }\n"
+            "fn f() -> (int, int) { let t = pair(); return t; }\n");
+    rejects("fn f() { let (a, b) = 5; }\n", 1, 14,
+            "a destructuring takes a tuple, found `int`");
+    rejects("fn pair() -> (int, int) { return (1, 2); }\n"
+            "fn f() { let (a, b, c) = pair(); }\n", 2, 14,
+            "`(int, int)` has 2 elements, and the destructuring names 3");
+    rejects("fn pair() -> (int, int) { return (1, 2); }\n"
+            "fn f() -> int { let t = pair(); return t.5; }\n", 2, 40,
+            "`(int, int)` has 2 elements, and `5` is none of them");
+    rejects("fn f() -> int { let n = 1; return n.0; }\n", 1, 35,
+            "`int` is not a tuple, so it has no element `0`");
+    rejects("fn f() { for i, x in 0..10 { } }\n", 1, 14,
+            "`for i, x` binds the index and the element of a slice or an "
+            "array");
+    /* A tuple crosses to C as the struct the header writes for it, so it
+       crosses when every element does. */
+    accepts("export fn divmod(a: int, b: int) -> (int, int) {\n"
+            "    return (a / b, a % b);\n"
+            "}\n");
+    rejects("export fn bad(n: int) -> (int, str) { return (n, \"x\"); }\n",
+            1, 26,
+            "the result of export fn `bad` has type `(int, str)`, which C "
+            "cannot represent");
 }

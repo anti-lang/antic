@@ -134,6 +134,50 @@ static bool type_names_error(const struct type *t)
     return false;
 }
 
+/* DESIGN: a tuple has no name of its own, so the header makes one from
+   its elements: `(int, str)` becomes `anti_tuple_int_str`. A pointer
+   writes `ptr_` before what it points at and a nullable pointer `optr_`,
+   an array its length, and a tuple its own elements. Two tuples of the
+   same elements are one type, so one name stands for one type. */
+static void element_c_name(struct text *out, const struct type *t)
+{
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_POINTER:
+        text_append(out, t->nullable ? "optr_" : "ptr_");
+        element_c_name(out, t->element);
+        return;
+    case TYPE_ARRAY:
+        text_appendf(out, "a%" PRIu64 "_", t->length);
+        element_c_name(out, t->element);
+        return;
+    case TYPE_SLICE:
+        text_append(out, "slice_");
+        element_c_name(out, t->element);
+        return;
+    case TYPE_FN:
+        text_append(out, "fn");
+        return;
+    case TYPE_TUPLE:
+        text_append(out, "tuple");
+        for (i = 0; i < t->param_count; i++) {
+            text_append(out, "_");
+            element_c_name(out, t->params[i]);
+        }
+        return;
+    default:
+        type_name(out, t);
+        return;
+    }
+}
+
+static void tuple_c_name(struct text *out, const struct type *t)
+{
+    text_append(out, "anti_");
+    element_c_name(out, t);
+}
+
 /* Append the C declaration of name with type t. owner is the aggregate
    whose definition holds the declaration, which names itself with its
    tag. */
@@ -184,6 +228,11 @@ static void declaration(struct text *out, const struct type *t,
         }
         text_appendf(out, "%s%s", name[0] != '\0' ? " " : "", name);
         break;
+    case TYPE_TUPLE:
+        text_append(out, "struct ");
+        tuple_c_name(out, t);
+        text_appendf(out, "%s%s", name[0] != '\0' ? " " : "", name);
+        break;
     case TYPE_ENUM:
         text_appendf(out, "%.*s%s%s", (int)t->name.length, t->name.text,
                      name[0] != '\0' ? " " : "", name);
@@ -224,6 +273,7 @@ static void doc_comment(struct text *out, const struct doc_text *doc,
 struct emitted {
     const struct type **items;
     size_t count;
+    size_t capacity;
 };
 
 static bool was_emitted(const struct emitted *e, const struct type *t)
@@ -238,9 +288,31 @@ static bool was_emitted(const struct emitted *e, const struct type *t)
     return false;
 }
 
+/* A type is written once. The list grows, because the tuples of a
+   signature are as many as its elements and no count of the items
+   bounds them. */
+static void mark_emitted(struct emitted *e, const struct type *t)
+{
+    if (e->count == e->capacity) {
+        size_t capacity = e->capacity == 0 ? 16 : e->capacity * 2;
+        const struct type **items =
+            realloc((void *)e->items, capacity * sizeof *items);
+        if (items == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        e->items = items;
+        e->capacity = capacity;
+    }
+    e->items[e->count++] = t;
+}
+
 static void aggregate(struct text *out, const struct symbol *sym,
                       const struct interface *const *ifaces, size_t count,
                       struct emitted *done);
+static void emit_tuples(struct text *out, const struct type *t,
+                        const struct interface *const *ifaces, size_t count,
+                        struct emitted *done);
 
 /* The export aggregate that type t holds by value, emitted first. */
 static void emit_uses(struct text *out, const struct type *t,
@@ -253,6 +325,10 @@ static void emit_uses(struct text *out, const struct type *t,
     while (t->kind == TYPE_ARRAY) {
         t = t->element;
     }
+    if (t->kind == TYPE_TUPLE) {
+        emit_tuples(out, t, ifaces, count, done);
+        return;
+    }
     if (t->kind != TYPE_STRUCT || was_emitted(done, t)) {
         return;
     }
@@ -262,6 +338,76 @@ static void emit_uses(struct text *out, const struct type *t,
                 aggregate(out, ifaces[i]->items[j], ifaces, count, done);
             }
         }
+    }
+}
+
+/* DESIGN: the header writes one struct per distinct tuple of an
+   exported signature, because C has no anonymous struct that two
+   translation units agree on. What an element holds by value is written
+   before it, so the definition stands complete. */
+static void tuple_view(struct text *out, const struct type *t,
+                       const struct interface *const *ifaces, size_t count,
+                       struct emitted *done)
+{
+    struct text tag = {0};
+    struct text written = {0};
+    size_t i;
+
+    if (was_emitted(done, t)) {
+        return;
+    }
+    mark_emitted(done, t);
+    for (i = 0; i < t->param_count; i++) {
+        emit_uses(out, t->params[i], ifaces, count, done);
+    }
+    tuple_c_name(&tag, t);
+    type_name(&written, t);
+    text_appendf(out, "/* The tuple %s. */\nstruct %s {\n",
+                 text_cstr(&written), text_cstr(&tag));
+    for (i = 0; i < t->field_count; i++) {
+        struct text field = {0};
+        char buffer[128];
+        c_name(buffer, sizeof buffer, &t->fields[i].name);
+        text_append(out, "    ");
+        declaration(&field, t->fields[i].type, buffer, t);
+        text_appendf(out, "%s;\n", text_cstr(&field));
+        text_free(&field);
+    }
+    text_append(out, "};\n\n");
+    text_free(&written);
+    text_free(&tag);
+}
+
+/* Every tuple that type t names, the ones inside it included. */
+static void emit_tuples(struct text *out, const struct type *t,
+                        const struct interface *const *ifaces, size_t count,
+                        struct emitted *done)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return;
+    }
+    switch (t->kind) {
+    case TYPE_POINTER:
+    case TYPE_ARRAY:
+    case TYPE_SLICE:
+        emit_tuples(out, t->element, ifaces, count, done);
+        return;
+    case TYPE_FN:
+        for (i = 0; i < t->param_count; i++) {
+            emit_tuples(out, t->params[i], ifaces, count, done);
+        }
+        emit_tuples(out, t->result, ifaces, count, done);
+        return;
+    case TYPE_TUPLE:
+        for (i = 0; i < t->param_count; i++) {
+            emit_tuples(out, t->params[i], ifaces, count, done);
+        }
+        tuple_view(out, t, ifaces, count, done);
+        return;
+    default:
+        return;
     }
 }
 
@@ -279,7 +425,7 @@ static void aggregate(struct text *out, const struct symbol *sym,
     if (was_emitted(done, t)) {
         return;
     }
-    done->items[done->count++] = t;
+    mark_emitted(done, t);
     for (i = 0; i < t->field_count; i++) {
         emit_uses(out, t->fields[i].type, ifaces, count, done);
     }
@@ -647,15 +793,10 @@ void header_write(struct text *out, const char *name,
                   bool bundled)
 {
     struct emitted done = {0};
-    size_t total = 0;
     size_t i;
     size_t j;
     bool any;
 
-    for (i = 0; i < count; i++) {
-        total += ifaces[i]->item_count;
-    }
-    done.items = calloc(total + 1, sizeof *done.items);
     text_appendf(out, "/* %s.h, the C interface of %s, written by antic.\n"
                       "   Do not edit. A failure that Anti cannot report calls "
                       "abort().%s */\n",
@@ -747,6 +888,21 @@ void header_write(struct text *out, const char *name,
                     aggregate(out, sym, ifaces, count, &done);
                 }
             }
+        }
+    }
+    /* One struct per distinct tuple of an exported signature, after the
+       aggregates an element may hold by value. */
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < ifaces[i]->item_count; j++) {
+            const struct symbol *sym = ifaces[i]->items[j];
+            size_t k;
+            if (!sym->exported || sym->kind != SYMBOL_FN) {
+                continue;
+            }
+            for (k = 0; k < sym->type->param_count; k++) {
+                emit_tuples(out, sym->type->params[k], ifaces, count, &done);
+            }
+            emit_tuples(out, sym->type->result, ifaces, count, &done);
         }
     }
     for (i = 0, any = false; i < count; i++) {

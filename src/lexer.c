@@ -715,11 +715,23 @@ static void number_error(struct lexer *lx, size_t start, int line,
     push(lx, TOKEN_ERROR, start, line, column);
 }
 
+/* DESIGN: `t.0.1` reads element 1 of element 0, so a number that stands
+   right after a `.` takes no fraction of its own. Nothing else puts a
+   number there: a float literal starts with a digit, and a range writes
+   `..`, which is one token. */
+static bool after_dot(const struct lexer *lx)
+{
+    const struct token_list *list = lx->out;
+
+    return list->count > 0 && list->items[list->count - 1].kind == TOKEN_DOT;
+}
+
 static void number(struct lexer *lx, size_t start, int line, int column)
 {
     struct text digits = {0};
     uint64_t value = 0;
     bool hex = at(lx, 0) == '0' && at(lx, 1) == 'x';
+    bool element = after_dot(lx);
     size_t i;
 
     if (hex) {
@@ -742,7 +754,7 @@ static void number(struct lexer *lx, size_t start, int line, int column)
         goto done;
     }
 
-    if (!hex && at(lx, 0) == '.' && is_digit(at(lx, 1))) {
+    if (!hex && !element && at(lx, 0) == '.' && is_digit(at(lx, 1))) {
         text_append(&digits, ".");
         advance(lx);
         if (!digit_run(lx, false, &digits)) {

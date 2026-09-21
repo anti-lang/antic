@@ -139,6 +139,13 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
             dump_type(d, depth + 2, t->result);
         }
         break;
+    case TYPEX_TUPLE:
+        text_append(d->out, "type tuple");
+        end(d, start, NULL);
+        for (i = 0; i < t->param_count; i++) {
+            dump_type(d, depth + 1, t->params[i]);
+        }
+        break;
     }
 }
 
@@ -289,6 +296,13 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
             dump_expr(d, depth + 1, e->as.array_lit.elements[i]);
         }
         break;
+    case EXPR_TUPLE:
+        text_append(d->out, "tuple");
+        end(d, start, type);
+        for (i = 0; i < e->as.tuple.count; i++) {
+            dump_expr(d, depth + 1, e->as.tuple.elements[i]);
+        }
+        break;
     case EXPR_ARRAY_REPEAT:
         text_append(d->out, "array_lit ;");
         end(d, start, type);
@@ -392,8 +406,44 @@ static void dump_handler(struct dumper *d, int depth,
     }
 }
 
+/* The name a `for` gives its element, empty when it gives none. The
+   element is the last of the names, so `for i, x in items` binds x. */
+static struct name loop_name(const struct stmt *s)
+{
+    struct name empty = {NULL, 0};
+
+    return s->as.for_loop.name_count > 0
+               ? s->as.for_loop.names[s->as.for_loop.name_count - 1].name
+               : empty;
+}
+
+/* The type of that element, or NULL before the checker ran. */
+static const struct type *loop_element(const struct stmt *s)
+{
+    const struct symbol *sym =
+        s->as.for_loop.name_count > 0
+            ? s->as.for_loop.names[s->as.for_loop.name_count - 1].symbol
+            : NULL;
+
+    return sym != NULL ? sym->type : NULL;
+}
+
+/* The names of a destructuring, one line each. */
+static void dump_bindings(struct dumper *d, int depth,
+                          const struct binding *names, size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        size_t start = begin(d, depth);
+        label_name(d, "name", NULL, &names[i].name);
+        end(d, start, names[i].symbol != NULL ? names[i].symbol->type : NULL);
+    }
+}
+
 static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
 {
+    struct name element;
     size_t start;
     size_t i;
 
@@ -412,9 +462,16 @@ static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
     case STMT_LET:
     case STMT_CONST:
         start = begin(d, depth);
-        label_name(d, s->kind == STMT_LET ? "let_stmt" : "const_decl", NULL,
-                   &s->as.let.name);
+        /* A destructuring binds no name of its own, so the line carries
+           the statement alone and the names stand below it. */
+        if (s->as.let.name_count > 0) {
+            text_append(d->out, "let_stmt");
+        } else {
+            label_name(d, s->kind == STMT_LET ? "let_stmt" : "const_decl",
+                       NULL, &s->as.let.name);
+        }
         end(d, start, s->as.let.symbol != NULL ? s->as.let.symbol->type : NULL);
+        dump_bindings(d, depth + 1, s->as.let.names, s->as.let.name_count);
         if (s->as.let.type != NULL) {
             dump_type(d, depth + 1, s->as.let.type);
         }
@@ -422,10 +479,11 @@ static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
         break;
     case STMT_FOR:
         start = begin(d, depth);
-        label_name(d, "for_stmt", NULL, &s->as.for_loop.name);
-        end(d, start, s->as.for_loop.symbol != NULL
-                          ? s->as.for_loop.symbol->type
-                          : NULL);
+        element = loop_name(s);
+        label_name(d, "for_stmt", NULL, &element);
+        end(d, start, loop_element(s));
+        dump_bindings(d, depth + 1, s->as.for_loop.names,
+                      s->as.for_loop.name_count - (element.length > 0 ? 1 : 0));
         if (s->as.for_loop.over != NULL) {
             simple(d, depth + 1,
                    s->as.for_loop.by_pointer ? "over_pointer" : "over", NULL);

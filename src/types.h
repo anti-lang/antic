@@ -40,7 +40,13 @@ enum type_kind {
     TYPE_FN,
     TYPE_STRUCT,
     TYPE_ENUM,      /* a named integer type with its own namespace */
-    TYPE_CLASS      /* a table pointer, a base at offset 0, then fields */
+    TYPE_CLASS,     /* a table pointer, a base at offset 0, then fields. */
+    /* DESIGN: a tuple is an anonymous struct with C layout. It is a type
+       with fields, and every rule of layout, passing and returning is
+       the struct's. It carries no module and no name. Two tuples of the
+       same elements in the same order are one type, so the elements
+       intern it. */
+    TYPE_TUPLE
 };
 
 struct struct_field {
@@ -50,11 +56,11 @@ struct struct_field {
     uint8_t bits;                   /* the width of a bitfield, or 0 */
     struct doc_text doc;            /* the /// text */
     enum field_form form;           /* plain, use, base, table or impl */
-    enum visibility vis;            /* the level the declaration gave it */
+    enum visibility vis;            /* the level the declaration gave it. */
     const struct type *home;        /* the struct or class that declares it */
     bool owned;                     /* `own`: the object frees the memory */
     bool atomic;                    /* `atomic`: read and written by calls */
-    bool writable;                  /* `mutable`: a singleton field to write */
+    bool writable;                  /* `mutable`: a singleton field to write. */
     const struct expr *value;       /* a field default or an enum value */
     /* DESIGN: the value of a field default, which the checker evaluates.
        A library file carries it, so a module that builds a class of
@@ -184,6 +190,10 @@ struct type *types_object(struct types *types);
    result type is a distinct type from a Job of another, and every one
    has the layout of one pointer. */
 struct type *types_job(struct types *types, struct type *result);
+/* The tuple of the element types, interned. Its fields are `_0`, `_1`
+   and on, in the order the elements were written. */
+struct type *types_tuple(struct types *types, struct type **elements,
+                         size_t count);
 struct type *types_struct(struct types *types, struct name module,
                           struct name name);
 /* A named integer type over base. Each call returns a distinct type. */

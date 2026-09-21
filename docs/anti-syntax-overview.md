@@ -86,7 +86,7 @@ let t: (int, str) = (1, "one");
 let h: f16 = 1.5 as f16;
 ```
 
-Not built yet: tuples, `f16`.
+Not built yet: `f16`.
 
 ## Literals
 
@@ -192,7 +192,7 @@ outer: for a in xs {
 
 `by` takes a constant expression. `by -k` visits the same values as `by k` in reverse order. `by 0` is a compile error, the Heederik guardrail.
 
-Not built yet: labels, `for i, x`.
+Not built yet: labels.
 
 ## Functions
 
@@ -227,7 +227,7 @@ for i, x in items { }
 
 Elements are `t.0`, `t.1` and on. Destructuring is `let (a, b) = e;` and `for i, x in items`, and nowhere else: not in a parameter list and not nested. Two tuple types are the same when their element types are the same in order. A tuple of more than three elements, or one that crosses a module boundary, is a struct that has not been named yet.
 
-Not built yet.
+Built.
 
 ## Errors
 

@@ -599,6 +599,17 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
                                               t->param_count, result))
                    : types_fn(c->types, params, t->param_count, result);
     }
+    case TYPEX_TUPLE: {
+        struct type **elements =
+            arena_alloc(c->arena, t->param_count * sizeof *elements);
+        for (i = 0; i < t->param_count; i++) {
+            elements[i] = resolve_type(c, t->params[i]);
+            if (is_error(elements[i])) {
+                return elements[i];
+            }
+        }
+        return types_tuple(c->types, elements, t->param_count);
+    }
     }
     return builtin(c, TYPE_ERROR);
 }
@@ -3082,7 +3093,21 @@ static struct type *check_field(struct checker *c, struct expr *e)
     }
     base = usable_pointer(c, e->as.field.base, base);
     if ((s = struct_of(base)) != NULL) {
-        if ((f = find_field(s, name)) == NULL) {
+        if ((f = find_field(s, name)) == NULL && e->as.field.element) {
+            /* `t.0` names the element `_0`, so the message names the
+               number the program wrote. */
+            if (s->kind != TYPE_TUPLE) {
+                error_at(c, e->pos, "`%s` is not a tuple, so it has no "
+                         "element `%.*s`", tn(s), (int)name->length - 1,
+                         name->text + 1);
+            } else {
+                error_at(c, e->pos, "`%s` has %d elements, and `%.*s` is "
+                         "none of them", tn(s), (int)s->field_count,
+                         (int)name->length - 1, name->text + 1);
+            }
+            return builtin(c, TYPE_ERROR);
+        }
+        if (f == NULL) {
             const struct item *m = find_member(s, name);
             bool ambiguous = false;
             const struct struct_field *through =
@@ -3152,6 +3177,11 @@ static struct type *check_field(struct checker *c, struct expr *e)
     }
     if (name_is(name, "ptr") && base->kind == TYPE_SLICE) {
         return types_pointer_nullable(c->types, base->element);
+    }
+    if (e->as.field.element) {
+        error_at(c, e->pos, "`%s` is not a tuple, so it has no element "
+                 "`%.*s`", tn(base), (int)name->length - 1, name->text + 1);
+        return builtin(c, TYPE_ERROR);
     }
     error_at(c, e->pos, "`%s` has no field `%.*s`", tn(base),
              (int)name->length, name->text);
@@ -3676,6 +3706,36 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             return builtin(c, TYPE_ERROR);
         }
         return types_array(c->types, element, e->as.array_lit.count);
+    }
+    /* `(a, b)` builds a tuple of the types of its elements. A context
+       that names a tuple of the same count gives each element its type.
+       An integer literal in a tuple so takes the type it is written
+       into. */
+    case EXPR_TUPLE: {
+        struct type **elements =
+            arena_alloc(c->arena, e->as.tuple.count * sizeof *elements);
+        const struct type *want =
+            expected != NULL && expected->kind == TYPE_TUPLE &&
+                    expected->param_count == e->as.tuple.count
+                ? expected
+                : NULL;
+        bool ok = true;
+        for (i = 0; i < e->as.tuple.count; i++) {
+            struct expr *item = e->as.tuple.elements[i];
+            struct type *element =
+                want != NULL ? want->params[i] : NULL;
+            elements[i] = check_expr(c, item, element);
+            if (element != NULL) {
+                ok = require(c, item, elements[i], element) && ok;
+                elements[i] = element;
+            }
+            refuse_owned_copy(c, item, elements[i]);
+            ok = ok && !is_error(elements[i]);
+        }
+        if (!ok) {
+            return builtin(c, TYPE_ERROR);
+        }
+        return types_tuple(c->types, elements, e->as.tuple.count);
     }
     case EXPR_ARRAY_REPEAT: {
         struct type *element = expected != NULL && expected->kind == TYPE_ARRAY
@@ -4325,6 +4385,20 @@ static bool eval_const(struct checker *c, struct expr *e,
             }
         }
         return true;
+    /* A tuple is a struct, so a constant one is the constant struct of
+       its elements. */
+    case EXPR_TUPLE:
+        out->kind = CONST_STRUCT;
+        out->as.aggregate.count = e->as.tuple.count;
+        out->as.aggregate.items = arena_alloc(
+            c->arena, e->as.tuple.count * sizeof *out->as.aggregate.items);
+        for (i = 0; i < e->as.tuple.count; i++) {
+            if (!eval_const(c, e->as.tuple.elements[i],
+                            &out->as.aggregate.items[i])) {
+                return false;
+            }
+        }
+        return true;
     case EXPR_ARRAY_REPEAT:
         if (e->type->length_of != NULL) {
             return fail_const(c, e, "an array with a length from `size_of`");
@@ -4958,6 +5032,74 @@ static struct type *declared_result(struct checker *c)
                : builtin(c, TYPE_VOID);
 }
 
+/* DESIGN: `let (a, b) = e;` and `for i, x in items` are one rule. The
+   names take the elements of a tuple in order and each becomes a local
+   of the type of its element. Nothing else destructures: not a parameter
+   list, and not a name inside another pair of parentheses. read_only
+   marks the names of a `for`, which its body may not write. */
+static void bind_elements(struct checker *c, struct binding *names,
+                          size_t count, struct type *t, struct pos pos,
+                          bool read_only)
+{
+    size_t i;
+
+    if (!is_error(t) && t->kind != TYPE_TUPLE) {
+        error_at(c, pos, "a destructuring takes a tuple, found `%s`", tn(t));
+        t = builtin(c, TYPE_ERROR);
+    } else if (!is_error(t) && t->param_count != count) {
+        error_at(c, pos, "`%s` has %d elements, and the destructuring names "
+                 "%d", tn(t), (int)t->param_count, (int)count);
+        t = builtin(c, TYPE_ERROR);
+    }
+    for (i = 0; i < count; i++) {
+        struct type *element = is_error(t) ? t : t->fields[i].type;
+        struct symbol *sym =
+            declare(c, SYMBOL_LOCAL, &names[i].name, names[i].pos,
+                    "`%.*s` is already declared in this block");
+        if (refuse_abstract_value(c, names[i].pos, "this local", element)) {
+            element = builtin(c, TYPE_ERROR);
+        }
+        if (sym != NULL) {
+            sym->type = element;
+            sym->read_only = read_only;
+            names[i].symbol = sym;
+        }
+    }
+}
+
+/* `let (a, b) = e;`. The value goes into a place of its own, which the
+   statement's own symbol names and no scope holds. The names take the
+   elements from there. */
+static void check_destructuring_let(struct checker *c, struct stmt *s)
+{
+    struct symbol *value;
+    struct type *t;
+
+    c->target_sized = true;
+    t = check_expr(c, s->as.let.value, NULL);
+    c->target_sized = false;
+    if (s->as.let.guard.kind != HANDLE_NONE) {
+        t = check_pointer_guard(c, s, t);
+    }
+    refuse_escaping_error(c, s->as.let.value);
+    if (!is_error(t) && t->kind == TYPE_VOID) {
+        error_at(c, s->as.let.value->pos,
+                 "a destructuring takes a tuple, found `%s`", tn(t));
+        t = builtin(c, TYPE_ERROR);
+    } else {
+        refuse_owned_copy(c, s->as.let.value, t);
+    }
+    value = arena_alloc(c->arena, sizeof *value);
+    memset(value, 0, sizeof *value);
+    value->kind = SYMBOL_LOCAL;
+    value->pos = s->as.let.name_pos;
+    value->type = t;
+    value->address_taken = true;
+    s->as.let.symbol = value;
+    bind_elements(c, s->as.let.names, s->as.let.name_count, t,
+                  s->as.let.name_pos, false);
+}
+
 static void check_stmt(struct checker *c, struct stmt *s)
 {
     struct type *t;
@@ -4968,6 +5110,10 @@ static void check_stmt(struct checker *c, struct stmt *s)
     switch (s->kind) {
     case STMT_LET: {
         struct type *declared;
+        if (s->as.let.name_count > 0) {
+            check_destructuring_let(c, s);
+            return;
+        }
         c->target_sized = true;
         declared = s->as.let.type != NULL ? resolve_type(c, s->as.let.type)
                                           : NULL;
@@ -5187,12 +5333,13 @@ static void check_stmt(struct checker *c, struct stmt *s)
         struct scope for_scope;
         struct type *element = NULL;
         struct symbol *loop_var;
+        size_t names = s->as.for_loop.name_count;
         enter_scope(c, &for_scope);
         if (s->as.for_loop.over != NULL) {
             struct type *over = check_expr(c, s->as.for_loop.over, NULL);
             /* A range without a name repeats its block. A slice has an
                element to read, so it names one. */
-            if (s->as.for_loop.name.length == 0) {
+            if (names == 0) {
                 error_at(c, s->pos, "a `for` over a slice names its element");
             }
             if (!is_error(over) && over->kind != TYPE_SLICE &&
@@ -5228,16 +5375,36 @@ static void check_stmt(struct checker *c, struct stmt *s)
         if (s->as.for_loop.step != NULL) {
             check_step(c, s, element);
         }
-        /* A range without a name repeats its block and counts in a
-           temporary that no body can read. */
-        if (s->as.for_loop.name.length > 0) {
-            loop_var = declare(c, SYMBOL_LOCAL, &s->as.for_loop.name,
-                               s->as.for_loop.name_pos,
+        /* DESIGN: `for i, x in items` is the destructuring of the
+           `(int, T)` of each element, and `for i, x in &items` of an
+           `(int, *T)`, so the two names follow the rule that
+           `let (a, b) = e;` follows and bind_elements gives both. One
+           name binds the element itself, and a range without a name
+           repeats its block and counts in a temporary that no body can
+           read. */
+        if (names > 1) {
+            struct type *pair[2];
+            if (names > 2 || s->as.for_loop.over == NULL) {
+                error_at(c, s->as.for_loop.names[0].pos,
+                         "`for i, x` binds the index and the element of a "
+                         "slice or an array");
+                element = builtin(c, TYPE_ERROR);
+            }
+            pair[0] = builtin(c, TYPE_I64);
+            pair[1] = element;
+            bind_elements(c, s->as.for_loop.names, names,
+                          is_error(element)
+                              ? element
+                              : types_tuple(c->types, pair, 2),
+                          s->pos, true);
+        } else if (names == 1) {
+            loop_var = declare(c, SYMBOL_LOCAL, &s->as.for_loop.names[0].name,
+                               s->as.for_loop.names[0].pos,
                                "`%.*s` is already declared in this block");
             if (loop_var != NULL) {
                 loop_var->type = element;
                 loop_var->read_only = true;
-                s->as.for_loop.symbol = loop_var;
+                s->as.for_loop.names[0].symbol = loop_var;
             }
         }
         c->loop_depth++;
@@ -6576,6 +6743,16 @@ static bool c_representable(const struct type *t, bool field,
         }
         *hidden = t;
         return false;
+    /* A tuple crosses as the named struct the header writes for it, so
+       it crosses when every element does. Its elements are fields of
+       that struct, which is why an array among them is allowed. */
+    case TYPE_TUPLE:
+        for (i = 0; i < t->param_count; i++) {
+            if (!c_representable(t->params[i], true, hidden)) {
+                return false;
+            }
+        }
+        return true;
     /* An enum is its underlying integer, which the header writes as an
        enum of the same name. */
     case TYPE_ENUM:

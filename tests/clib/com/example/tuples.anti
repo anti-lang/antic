@@ -1,0 +1,21 @@
+//! A library for C whose signatures name tuples. A tuple crosses as the
+//! struct the header writes for it, one per distinct tuple of an
+//! exported signature.
+
+/// Both answers of a division.
+export fn tuples_divmod(a: int, b: int) -> (int, int)
+{
+	return (a / b, a % b);
+}
+
+/// The sum of the elements of a pair.
+export fn tuples_sum(p: (int, int)) -> int
+{
+	return p.0 + p.1;
+}
+
+/// A pair of two types.
+export fn tuples_scaled(n: int, k: f32) -> (int, f32)
+{
+	return (n * 2, k);
+}

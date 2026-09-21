@@ -69,6 +69,35 @@ void test_types(void)
           "fn()");
 
 
+    /* A tuple is interned by its elements, so two tuples of the same
+       elements in the same order are one type. Its fields are `_0`
+       upwards, which is what `t.0` names. */
+    {
+        struct type *elements[3];
+        struct type *pair;
+        elements[0] = i64;
+        elements[1] = str;
+        elements[2] = f32;
+        pair = types_tuple(&types, elements, 2);
+        CHECK(pair == types_tuple(&types, elements, 2));
+        CHECK(pair != types_tuple(&types, elements, 3));
+        elements[0] = str;
+        elements[1] = i64;
+        CHECK(pair != types_tuple(&types, elements, 2));
+        CHECK(type_has_fields(pair) && pair->field_count == 2);
+        CHECK(pair->fields[0].type == i64 && pair->fields[1].type == str);
+        CHECK(pair->fields[0].name.length == 2 &&
+              memcmp(pair->fields[0].name.text, "_0", 2) == 0);
+        CHECK(pair->fields[1].name.length == 2 &&
+              memcmp(pair->fields[1].name.text, "_1", 2) == 0);
+        named(pair, "(int, str)");
+        elements[0] = types_pointer(&types, i64);
+        elements[1] = pair;
+        named(types_tuple(&types, elements, 2), "(*int, (int, str))");
+        CHECK(type_pointer_free(pair));
+        CHECK(!type_pointer_free(types_tuple(&types, elements, 2)));
+    }
+
     /* struct Pixel { tag: u8, value: i32, flag: u8 } from chapter 2 */
     pixel = types_struct(&types, name_of("main"), name_of("Pixel"));
     named(pixel, "Pixel");

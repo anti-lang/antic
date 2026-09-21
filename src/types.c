@@ -1,5 +1,6 @@
 #include "types.h"
 
+#include <stdio.h>
 #include <string.h>
 
 void types_init(struct types *types, struct arena *arena)
@@ -325,6 +326,59 @@ struct type *types_job(struct types *types, struct type *result)
     return t;
 }
 
+/* The name of element i of a tuple, `_0` upwards, in the memory pool of
+   the compilation. */
+static struct name element_name(struct types *types, size_t i)
+{
+    char digits[24];
+    struct name name;
+    int n = snprintf(digits, sizeof digits, "_%zu", i);
+    char *text = arena_alloc(types->arena, (size_t)n + 1);
+
+    memcpy(text, digits, (size_t)n + 1);
+    name.text = text;
+    name.length = (size_t)n;
+    return name;
+}
+
+struct type *types_tuple(struct types *types, struct type **elements,
+                         size_t count)
+{
+    struct struct_field *fields;
+    struct type key = {0};
+    struct type *t;
+    size_t i;
+
+    key.kind = TYPE_TUPLE;
+    key.params = elements;
+    key.param_count = count;
+    for (t = types->derived; t != NULL; t = t->next) {
+        if (t->kind != TYPE_TUPLE || t->param_count != count) {
+            continue;
+        }
+        for (i = 0; i < count && t->params[i] == elements[i]; i++) {
+        }
+        if (i == count) {
+            return t;
+        }
+    }
+    t = arena_alloc(types->arena, sizeof *t);
+    *t = key;
+    t->params = arena_alloc(types->arena, count * sizeof *t->params);
+    memcpy(t->params, elements, count * sizeof *t->params);
+    fields = arena_alloc(types->arena, count * sizeof *fields);
+    memset(fields, 0, count * sizeof *fields);
+    for (i = 0; i < count; i++) {
+        fields[i].name = element_name(types, i);
+        fields[i].type = elements[i];
+        fields[i].vis = VIS_PUB;
+    }
+    t->next = types->derived;
+    types->derived = t;
+    types_set_fields(types, t, fields, count);
+    return t;
+}
+
 struct type *types_struct(struct types *types, struct name module,
                           struct name name)
 {
@@ -480,6 +534,14 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
             print_type(out, t->result, qualified);
         }
         return;
+    case TYPE_TUPLE:
+        text_append(out, "(");
+        for (i = 0; i < t->param_count; i++) {
+            text_append(out, i > 0 ? ", " : "");
+            print_type(out, t->params[i], qualified);
+        }
+        text_append(out, ")");
+        return;
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_ENUM:
@@ -501,7 +563,8 @@ bool type_is_integer(const struct type *t)
 
 bool type_has_fields(const struct type *t)
 {
-    return t != NULL && (t->kind == TYPE_STRUCT || t->kind == TYPE_CLASS);
+    return t != NULL && (t->kind == TYPE_STRUCT || t->kind == TYPE_CLASS ||
+                         t->kind == TYPE_TUPLE);
 }
 
 bool type_field_is_unit_break(const struct struct_field *f)
@@ -563,6 +626,7 @@ bool type_pointer_free(const struct type *t)
         return type_pointer_free(t->element);
     case TYPE_STRUCT:
     case TYPE_CLASS:
+    case TYPE_TUPLE:
         /* DESIGN: the pointer-free test of `parallel` exempts the table
            pointer and the `own` fields of a class. The table is read-only
            data that every object of the class shares, and an `own` field

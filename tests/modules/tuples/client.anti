@@ -1,0 +1,32 @@
+//! A program that takes apart the tuples of another module. The type
+//! comes from the library file, so the two modules name one type.
+
+import anti.error;
+import com.example.pairs;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The tuple of another module, given on this module's result channel.
+fn halved(a: int, b: int) -> (int, int) may fail
+{
+	let (q, r) = try pairs.divide(a, b);
+	return (q / 2, r);
+}
+
+fn main() -> int
+{
+	let (q, r) = pairs.divmod(17, 5);
+	printf("divmod %d %d\n".ptr, q as c_int, r as c_int);
+	let t = pairs.divmod(9, 4);
+	printf("elements %d %d\n".ptr, t.0 as c_int, t.1 as c_int);
+	let (a, b) = pairs.divide(8, 3) catch fatal;
+	printf("divide %d %d\n".ptr, a as c_int, b as c_int);
+	let (c, d) = pairs.divide(8, 0) catch e {
+		printf("caught %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield (0, 0);
+	};
+	printf("yield %d %d\n".ptr, c as c_int, d as c_int);
+	let (m, n) = halved(12, 5) catch fatal;
+	printf("halved %d %d\n".ptr, m as c_int, n as c_int);
+	return 0;
+}

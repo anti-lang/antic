@@ -201,8 +201,8 @@ reports what it finished.
 - `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
   `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
   `anti.args`, `anti.json` and `anti.log`.
-- 506 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 505 each, without the `no_paths` test, which needs a
+- 514 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 513 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -213,6 +213,11 @@ reports what it finished.
   `may fail` function, and `undo` runs on the fail path. The header writes the
   ABI and the `.antl` records the flag. The standard library still writes the
   form by hand.
+- Tuples are built. `(int, str)` is an anonymous struct with C layout, `(a, b)`
+  builds one, `t.0` reads an element, and `let (a, b) = e;` and
+  `for i, x in items` are the two forms that take one apart. The header writes
+  one struct per distinct tuple of an exported signature, and the `.antl`
+  carries the elements.
 - `*T` never holds `none` and `?*T` may, and a function value follows the same
   rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer

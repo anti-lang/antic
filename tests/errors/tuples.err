@@ -1,0 +1,5 @@
+tuples.anti:8:6: error: a destructuring takes a tuple, found `int`
+tuples.anti:9:6: error: `(int, int)` has 2 elements, and the destructuring names 3
+tuples.anti:11:10: error: `(int, int)` has 2 elements, and `5` is none of them
+tuples.anti:13:10: error: `int` is not a tuple, so it has no element `0`
+tuples.anti:14:6: error: `for i, x` binds the index and the element of a slice or an array

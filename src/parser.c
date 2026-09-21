@@ -314,6 +314,32 @@ static struct type_expr *type(struct parser *p)
         if ((ty->element = type(p)) == NULL) {
             return NULL;
         }
+    } else if (accept(p, TOKEN_LPAREN)) {
+        /* `(int, str)`, an anonymous struct with C layout. Two elements
+           are the fewest that have no name of their own, so `()` and
+           `(T)` are refused. */
+        struct list elements = {NULL, 0, 0, sizeof(struct type_expr *)};
+
+        ty->kind = TYPEX_TUPLE;
+        while (!check(p, TOKEN_RPAREN)) {
+            struct type_expr *element = type(p);
+            if (element == NULL) {
+                free(elements.data);
+                return NULL;
+            }
+            list_push(&elements, &element);
+            if (!accept(p, TOKEN_COMMA)) {
+                break;
+            }
+        }
+        ty->params = list_finish(p, &elements, &ty->param_count);
+        if (ty->param_count < 2) {
+            error_here(p, "a tuple has two or more elements");
+            return NULL;
+        }
+        if (!expect(p, TOKEN_RPAREN)) {
+            return NULL;
+        }
     } else if (check(p, TOKEN_FN) ||
                (check(p, TOKEN_QUESTION) && peek_at(p, 1)->kind == TOKEN_FN)) {
         struct list params = {NULL, 0, 0, sizeof(struct type_expr *)};
@@ -486,11 +512,30 @@ static struct expr *primary(struct parser *p)
     }
     case TOKEN_LPAREN: {
         bool saved = p->no_struct_literal;
+        struct expr *first;
         next(p);
         p->no_struct_literal = false;
-        e = expression(p);
+        first = expression(p);
+        /* `(a)` groups and `(a, b)` builds a tuple. */
+        if (first != NULL && check(p, TOKEN_COMMA)) {
+            struct list elements = {NULL, 0, 0, sizeof(struct expr *)};
+            e = new_expr(p, EXPR_TUPLE, t);
+            list_push(&elements, &first);
+            while (accept(p, TOKEN_COMMA)) {
+                struct expr *element = expression(p);
+                if (element == NULL) {
+                    free(elements.data);
+                    return NULL;
+                }
+                list_push(&elements, &element);
+            }
+            e->as.tuple.elements =
+                list_finish(p, &elements, &e->as.tuple.count);
+            p->no_struct_literal = saved;
+            return expect(p, TOKEN_RPAREN) ? e : NULL;
+        }
         p->no_struct_literal = saved;
-        return e != NULL && expect(p, TOKEN_RPAREN) ? e : NULL;
+        return first != NULL && expect(p, TOKEN_RPAREN) ? first : NULL;
     }
     case TOKEN_LBRACKET:
         if (peek_at(p, 1)->kind == TOKEN_RBRACKET) {
@@ -642,6 +687,30 @@ static struct expr *primary(struct parser *p)
     return NULL;
 }
 
+/* The field name of a tuple element: `_` and the digits of the number,
+   which is the name types.c gives the element. */
+static bool element_name(struct parser *p, struct name *out)
+{
+    const struct token *t = peek(p);
+    const char *digits = p->source + t->offset;
+    char *text;
+    size_t i;
+
+    for (i = 0; i < t->length; i++) {
+        if (digits[i] < '0' || digits[i] > '9') {
+            error_here(p, "an element of a tuple is a decimal number");
+            return false;
+        }
+    }
+    text = arena_alloc(p->arena, t->length + 1);
+    text[0] = '_';
+    memcpy(text + 1, digits, t->length);
+    out->text = text;
+    out->length = t->length + 1;
+    next(p);
+    return true;
+}
+
 static struct expr *postfix(struct parser *p)
 {
     struct expr *e = primary(p);
@@ -686,10 +755,14 @@ static struct expr *postfix(struct parser *p)
             outer = new_expr(p, EXPR_FIELD, t);
             outer->pos = e->pos;
             outer->as.field.base = e;
-            /* `super` is the base part of a class and a keyword, so no
-               declared field carries that name. It is read here as the
-               one field name that a keyword spells. */
-            if (check(p, TOKEN_SUPER)) {
+            /* An element of a tuple is its number, and the field it
+               names is `_0` upwards. */
+            if (check(p, TOKEN_INT)) {
+                outer->as.field.element = true;
+                if (!element_name(p, &outer->as.field.name)) {
+                    return NULL;
+                }
+            } else if (check(p, TOKEN_SUPER)) {
                 outer->as.field.name.text = p->source + peek(p)->offset;
                 outer->as.field.name.length = peek(p)->length;
                 accept(p, TOKEN_SUPER);
@@ -854,6 +927,37 @@ static struct stmt *new_stmt(struct parser *p, enum stmt_kind kind,
 static bool read_handler(struct parser *p, struct handler *out,
                          bool required);
 
+/* The names of a destructuring, `(a, b)`. The opening parenthesis is
+   read, and the list holds two names or more. */
+static struct binding *bindings(struct parser *p, size_t *count)
+{
+    struct list names = {NULL, 0, 0, sizeof(struct binding)};
+
+    while (!check(p, TOKEN_RPAREN)) {
+        struct binding b;
+        memset(&b, 0, sizeof b);
+        b.pos = pos_of(peek(p));
+        if (!expect_name(p, &b.name)) {
+            free(names.data);
+            return NULL;
+        }
+        list_push(&names, &b);
+        if (!accept(p, TOKEN_COMMA)) {
+            break;
+        }
+    }
+    if (names.count < 2) {
+        error_here(p, "a destructuring names two elements or more");
+        free(names.data);
+        return NULL;
+    }
+    if (!expect(p, TOKEN_RPAREN)) {
+        free(names.data);
+        return NULL;
+    }
+    return list_finish(p, &names, count);
+}
+
 static struct stmt *let_or_const(struct parser *p)
 {
     const struct token *t = next(p);
@@ -861,6 +965,26 @@ static struct stmt *let_or_const(struct parser *p)
                               t);
 
     s->as.let.name_pos = pos_of(peek(p));
+    /* `let (a, b) = e;` takes a tuple apart. It binds no name of its
+       own, and the type after a name is therefore the one-name form's. */
+    if (t->kind == TOKEN_LET && accept(p, TOKEN_LPAREN)) {
+        s->as.let.names = bindings(p, &s->as.let.name_count);
+        if (s->as.let.names == NULL) {
+            return NULL;
+        }
+        if (!expect(p, TOKEN_ASSIGN) ||
+            (s->as.let.value = expression(p)) == NULL) {
+            return NULL;
+        }
+        if (check(p, TOKEN_CATCH) &&
+            !read_handler(p, s->as.let.value->kind == EXPR_CALL
+                                 ? &s->as.let.value->as.call.handler
+                                 : &s->as.let.guard,
+                          false)) {
+            return NULL;
+        }
+        return expect(p, TOKEN_SEMICOLON) ? s : NULL;
+    }
     if (!expect_name(p, &s->as.let.name)) {
         return NULL;
     }
@@ -1013,20 +1137,34 @@ static struct stmt *statement(struct parser *p)
         return s;
     /* DESIGN: `for i in lo..hi` and `for x in slice` read one variable,
        a range or a sequence, and a block. The checker and lowering give
-       them the loop that the core would have written. */
+       them the loop that the core would have written. `for i, x in items`
+       names two, which is the destructuring of the `(int, T)` of each
+       element. */
     case TOKEN_FOR: {
         /* DESIGN: the binding is optional over a range, because a loop
            that repeats a block needs no counter. A name and `in` open the
            bound form, and anything else is the range itself. */
         bool bound = peek_at(p, 1)->kind == TOKEN_IDENT &&
-                     is_word(p, peek_at(p, 2), "in");
+                     (is_word(p, peek_at(p, 2), "in") ||
+                      (peek_at(p, 2)->kind == TOKEN_COMMA &&
+                       peek_at(p, 3)->kind == TOKEN_IDENT &&
+                       is_word(p, peek_at(p, 4), "in")));
         next(p);
         s = new_stmt(p, STMT_FOR, t);
         if (bound) {
-            s->as.for_loop.name_pos = pos_of(peek(p));
-            if (!expect_name(p, &s->as.for_loop.name)) {
-                return NULL;
-            }
+            struct list names = {NULL, 0, 0, sizeof(struct binding)};
+            do {
+                struct binding b;
+                memset(&b, 0, sizeof b);
+                b.pos = pos_of(peek(p));
+                if (!expect_name(p, &b.name)) {
+                    free(names.data);
+                    return NULL;
+                }
+                list_push(&names, &b);
+            } while (accept(p, TOKEN_COMMA));
+            s->as.for_loop.names =
+                list_finish(p, &names, &s->as.for_loop.name_count);
             /* DESIGN: `in` is a contextual word, as `packed` and `align`
                are. The decision adds four keywords and `in` is not among
                them, so a program may still name a variable `in`. */

@@ -1,0 +1,18 @@
+//! A library whose functions give tuples. The library file carries the
+//! tuple of each signature, so a program that imports this module takes
+//! the elements apart without seeing this source.
+
+import anti.error;
+
+/// Both answers of a division.
+pub fn divmod(a: int, b: int) -> (int, int)
+{
+	return (a / b, a % b);
+}
+
+/// The same, and the error channel when b is zero.
+pub fn divide(a: int, b: int) -> (int, int) may fail
+{
+	if b == 0 { fail "division by zero"; }
+	return (a / b, a % b);
+}

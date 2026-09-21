@@ -33,7 +33,8 @@ enum type_expr_kind {
     TYPEX_POINTER,  /* *T */
     TYPEX_ARRAY,    /* [N]T */
     TYPEX_SLICE,    /* []T */
-    TYPEX_FN        /* fn(T, U) -> R */
+    TYPEX_FN,       /* fn(T, U) -> R */
+    TYPEX_TUPLE     /* (int, str) */
 };
 
 struct type_expr {
@@ -45,7 +46,7 @@ struct type_expr {
     struct type_expr *element;      /* TYPEX_POINTER, TYPEX_ARRAY, TYPEX_SLICE */
     bool nullable;                  /* TYPEX_POINTER: `?*T` */
     struct expr *length;            /* TYPEX_ARRAY */
-    struct type_expr **params;      /* TYPEX_FN */
+    struct type_expr **params;      /* TYPEX_FN, TYPEX_TUPLE */
     size_t param_count;
     struct type_expr *result;       /* TYPEX_FN, NULL without a result */
     struct type *type;              /* set by semantic analysis */
@@ -81,6 +82,7 @@ enum expr_kind {
     EXPR_SLICE,
     EXPR_FIELD,
     EXPR_STRUCT_LIT,
+    EXPR_TUPLE,                     /* (a, b) */
     EXPR_SLICE_LIT,
     EXPR_ARRAY_LIT,
     EXPR_ARRAY_REPEAT,
@@ -191,6 +193,7 @@ struct expr {
             struct name name;
             uint32_t enum_value;    /* the index of an enum value, plus 1 */
             bool promoted;          /* the checker wrote it, not the program */
+            bool element;           /* `t.0`, which names the field `_0` */
         } field;
         struct {
             struct name module;     /* empty when unqualified */
@@ -207,6 +210,10 @@ struct expr {
             struct expr **elements;
             size_t count;
         } array_lit;
+        struct {
+            struct expr **elements;
+            size_t count;
+        } tuple;                    /* EXPR_TUPLE */
         struct {
             struct expr *value;
             struct expr *count;
@@ -242,6 +249,16 @@ struct expr {
             struct expr *call;      /* the worker, called or named */
         } dispatch;
     } as;
+};
+
+/* DESIGN: one name of a destructuring. `let (a, b) = e;` and
+   `for i, x in items` are the two places a program writes one. Both take
+   the elements of a tuple in order, so both carry this list and the
+   checker binds them by one rule. */
+struct binding {
+    struct name name;
+    struct pos pos;
+    struct symbol *symbol;
 };
 
 struct stmt;
@@ -313,6 +330,13 @@ struct stmt {
             /* `anti.error.NoneDereference.make`, which the guard calls to
                build the error it hands the handler. */
             struct symbol *guard_make;
+            /* `let (a, b) = e;`: the names that take the elements of the
+               tuple apart. The list is empty in the one-name form, and
+               the `let` then binds `name` itself. A destructuring binds
+               no name of its own, so `symbol` is the value the names
+               come from and stands in no scope. */
+            struct binding *names;
+            size_t name_count;
         } let;                      /* STMT_LET, STMT_CONST */
         struct expr *expr;          /* STMT_EXPR */
         struct {
@@ -334,8 +358,12 @@ struct stmt {
            is optional in the range form, and step holds the constant of
            `by k`, which walks the set backwards when it is negative. */
         struct {
-            struct name name;
-            struct pos name_pos;
+            /* The names the loop binds, the element last. A range names
+               its counter or nothing, `for x in items` names its element,
+               and `for i, x in items` destructures the `(int, T)` of each
+               element into the index and the element. */
+            struct binding *names;
+            size_t name_count;
             struct expr *low;
             struct expr *high;
             struct expr *over;
@@ -344,7 +372,6 @@ struct stmt {
             int64_t step_value;         /* the folded `by k`, or 1 */
             bool by_pointer;
             struct block *body;
-            struct symbol *symbol;
         } for_loop;
         struct stmt *deferred;      /* STMT_DEFER, STMT_UNDO */
         /* `fail e;` and `fail "text";`. The second form names the

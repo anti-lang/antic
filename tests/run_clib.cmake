@@ -8,8 +8,8 @@
 #   SOURCES   tests/clib
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
-#   CASE      static, shared, exports, two, loader, header, bundle, classes
-#             or failing
+#   CASE      static, shared, exports, two, loader, header, bundle,
+#             classes, failing or tuples
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 
@@ -113,6 +113,16 @@ elseif(CASE STREQUAL "failing")
     run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/failing.c"
         "${dir}/libfailing.a" "${runtime_library}" -o "${dir}/failing")
     expect_output("${dir}/failing" "${SOURCES}/failing.expected")
+elseif(CASE STREQUAL "tuples")
+    # A tuple of an exported signature crosses as the struct the header
+    # writes for it, one per distinct tuple, and C builds one of its own.
+    library(tuples static "${dir}")
+    expect_header("${dir}/tuples.h" tuples.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/tuples.c"
+        "${dir}/libtuples.a" "${runtime_library}" -o "${dir}/tuples")
+    expect_output("${dir}/tuples" "${SOURCES}/tuples.expected")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
     run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c"

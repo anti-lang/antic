@@ -1,0 +1,88 @@
+//! Tuples. A tuple type is an anonymous struct with C layout, a tuple
+//! value is `(a, b)`, its elements are `t.0` and `t.1`, and the two forms
+//! that destructure one are `let (a, b) = e;` and `for i, x in items`.
+//! A `may fail` function gives its tuple through the out pointer, which
+//! `catch`, `try` and `yield` reach as they reach any other result.
+
+import anti.error;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Two answers and no name for the pair.
+fn divmod(a: int, b: int) -> (int, int)
+{
+	return (a / b, a % b);
+}
+
+/// A tuple parameter, passed by value under the struct rules.
+fn add_up(p: (int, int)) -> int
+{
+	return p.0 + p.1;
+}
+
+/// The result through the out pointer of a failing function.
+fn divide(a: int, b: int) -> (int, int) may fail
+{
+	if b == 0 { fail "division by zero"; }
+	return (a / b, a % b);
+}
+
+/// `try` forwards the error of a call that gives a tuple.
+fn doubled(a: int, b: int) -> (int, int) may fail
+{
+	let (q, r) = try divide(a, b);
+	return (q * 2, r * 2);
+}
+
+/// Two element types, one of them a `str`.
+fn counted(n: int) -> (int, str)
+{
+	return (n, "two");
+}
+
+fn main() -> int
+{
+	let t = divmod(7, 2);
+	printf("elements %d %d\n".ptr, t.0 as c_int, t.1 as c_int);
+	printf("call %d\n".ptr, divmod(9, 4).1 as c_int);
+	printf("parameter %d\n".ptr, add_up(t) as c_int);
+
+	let (q, r) = divmod(9, 4);
+	printf("let %d %d\n".ptr, q as c_int, r as c_int);
+
+	let pair = counted(2);
+	printf("mixed %d %.*s\n".ptr, pair.0 as c_int, pair.1.len as c_int,
+	       pair.1.ptr);
+	let (n, word) = counted(3);
+	printf("mixed let %d %.*s\n".ptr, n as c_int, word.len as c_int, word.ptr);
+
+	let (a, b) = divide(7, 2) catch fatal;
+	printf("catch %d %d\n".ptr, a as c_int, b as c_int);
+
+	let (c, d) = divide(7, 0) catch e {
+		printf("caught %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield (0, 0);
+	};
+	printf("yield %d %d\n".ptr, c as c_int, d as c_int);
+
+	let (m, k) = doubled(8, 3) catch fatal;
+	printf("try %d %d\n".ptr, m as c_int, k as c_int);
+	let (u, v) = doubled(8, 0) catch e {
+		printf("forwarded %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield (-1, -1);
+	};
+	printf("forwarded %d %d\n".ptr, u as c_int, v as c_int);
+
+	let items = [10, 20, 30];
+	for i, x in items {
+		printf("at %d %d\n".ptr, i as c_int, x as c_int);
+	}
+	for i, p in &items {
+		*p = *p + i;
+	}
+	let s = items[0..3];
+	for i, x in s {
+		printf("after %d %d\n".ptr, i as c_int, x as c_int);
+	}
+	return 0;
+}

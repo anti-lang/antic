@@ -477,6 +477,62 @@ void test_parser(void)
          "        ident x\n"
          "        ident x\n");
 
+    /* Tuples: the type, the value, the element and the two forms that
+       destructure one. */
+    tree("fn f(p: (int, str)) -> (int, int)\n"
+         "{\n"
+         "    let t = (1, p.0);\n"
+         "    let (a, b) = t;\n"
+         "    for i, x in items {\n"
+         "        b = i + x;\n"
+         "    }\n"
+         "    return (a, b);\n"
+         "}\n",
+         "function f\n"
+         "  param p\n"
+         "    type tuple\n"
+         "      type int\n"
+         "      type str\n"
+         "  result\n"
+         "    type tuple\n"
+         "      type int\n"
+         "      type int\n"
+         "  block\n"
+         "    let_stmt t\n"
+         "      tuple\n"
+         "        int_lit 1\n"
+         "        field _0\n"
+         "          ident p\n"
+         "    let_stmt\n"
+         "      name a\n"
+         "      name b\n"
+         "      ident t\n"
+         "    for_stmt x\n"
+         "      name i\n"
+         "      over\n"
+         "        ident items\n"
+         "      block\n"
+         "        simple_stmt =\n"
+         "          ident b\n"
+         "          additive +\n"
+         "            ident i\n"
+         "            ident x\n"
+         "    return_stmt\n"
+         "      tuple\n"
+         "        ident a\n"
+         "        ident b\n");
+    /* `(a)` groups and names no tuple, and a tuple of one element is a
+       value that has a name already. */
+    {
+        static const struct expected_error e[] = {
+            {1, 15, "a tuple has two or more elements"}};
+        errors("fn f() -> (int) { return 1; }\n", e, 1);
+    }
+    {
+        static const struct expected_error e[] = {
+            {1, 16, "a destructuring names two elements or more"}};
+        errors("fn f() { let (a) = t; }\n", e, 1);
+    }
     {
         static const struct expected_error e[] = {{3, 1, "expected `;`"}};
         errors("fn main() -> int {\n    return 42\n}\n", e, 1);
@@ -528,9 +584,9 @@ void test_parser(void)
         errors("fn f() { let x: int = 1 as 5; }", e, 1);
     }
 
-    /* A class body opens with its base and the interfaces it implements,
-       then the fields with their visibility and defaults, then the
-       constants and the functions. */
+    /* A class body opens with its base and the interfaces it
+       implements. Then come the fields with their visibility and
+       defaults, then the constants and the functions. */
     tree("class Circle\n"
          "{\n"
          "    inherits Shape,\n"
