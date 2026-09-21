@@ -321,6 +321,7 @@ These decisions are the language's, not the book's. They are recorded here and d
 - Refused: an iterator protocol on the root, a general event loop, a universal base for structs.
 
 - [provisional] An error of `anti.args` points its message at a builder the parser owns, so the parser outlives every error it gave. Reason: `Error` keeps the `str` it is handed rather than a copy of the bytes. A message that names the offending argument is worth more than one that does not.
+- [provisional] `text.parse_int(s) -> int may fail` replaces `text.to_int(s, fallback)`. It reads an optional `+` or `-` and the digits, and fails with code 0 on a text without a digit, on any other byte and on a value outside the range of `int`. `toml.Document.int_of` and `args.Parser.int_of` keep their `fallback` and yield it from a `catch`. Reason: the syntax overview writes the conversion as `text.parse_int(s)` under `catch`, and a fallback gave the failure as a value. A text past the range spells no `int`, and a dev build would stop on the overflow check inside the library.
 
 ## Build tool and distribution
 

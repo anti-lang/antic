@@ -1,5 +1,6 @@
-//! A document of the TOML subset gives its keys in order, finds a value
-//! under a dotted path and numbers the entries of a repeated table.
+//! A document of the TOML subset gives its keys in order and finds a value
+//! under a dotted path. It numbers the entries of a repeated table, and a
+//! value that is no integer gives the fallback of `int_of`.
 import anti.io;
 import anti.toml;
 
@@ -22,7 +23,7 @@ fn main() -> int
 	if doc.int_of("limits.depth", 0) != 32 {
 		return 2;
 	}
-	if doc.int_of("missing", 7) != 7 {
+	if doc.int_of("missing", 7) != 7 || doc.int_of("name", 5) != 5 {
 		return 3;
 	}
 	if doc.bool_of("quiet", true) {

@@ -75,7 +75,9 @@ pub class Document
 		if at < 0 {
 			return fallback;
 		}
-		return text.to_int(anti_rt_toml_value(self.handle, at), fallback);
+		let v = anti_rt_toml_value(self.handle, at);
+		let n = text.parse_int(v) catch e { yield fallback; };
+		return n;
 	}
 
 	/// The boolean under `path`, or `fallback` for anything else.

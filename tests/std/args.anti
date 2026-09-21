@@ -22,7 +22,7 @@ fn main(argv: []str, env: []str) -> int
 		return 3;
 	}
 	io.println(p.text_of("output"));
-	if p.int_of("jobs", 0) != 8 {
+	if p.int_of("jobs", 0) != 8 || p.int_of("output", 3) != 3 {
 		return 4;
 	}
 	for i in 0..p.len() {

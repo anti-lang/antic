@@ -1,5 +1,28 @@
+//! The lengths and the comparison of a `str`, and `parse_int`, which may
+//! fail: a text that spells no `int` leaves on the error channel, and a
+//! caller handles it with `catch` or forwards it with `try`.
 import anti.io;
+import anti.lang;
 import anti.text;
+
+/// The sum of the integers `a` and `b` spell, or the error of the first
+/// that spells none.
+fn sum(a: str, b: str) -> int may fail
+{
+	let x = try text.parse_int(a);
+	let y = try text.parse_int(b);
+	return x + y;
+}
+
+/// Print the message of the error that parsing `s` gives, or `ok`.
+fn show(s: str)
+{
+	let n = text.parse_int(s) catch e {
+		io.println(e.message);
+		return;
+	};
+	io.println("ok");
+}
 
 fn main() -> int
 {
@@ -11,5 +34,41 @@ fn main() -> int
 		return 2;
 	}
 	io.println(s);
+
+	let a = text.parse_int("42") catch fatal;
+	let b = text.parse_int("-17") catch fatal;
+	let c = text.parse_int("+5") catch fatal;
+	if a != 42 || b != -17 || c != 5 {
+		return 3;
+	}
+	let highest = text.parse_int("9223372036854775807") catch fatal;
+	let lowest = text.parse_int("-9223372036854775808") catch fatal;
+	if highest != 9223372036854775807 || lowest != -9223372036854775807 - 1 {
+		return 4;
+	}
+	let fallback = text.parse_int("4x2") catch e { yield 9; };
+	if fallback != 9 {
+		return 5;
+	}
+	show("0");
+	show("");
+	show("-");
+	show("4x2");
+	show(" 1");
+	show("9223372036854775808");
+	show("-9223372036854775809");
+	show("99999999999999999999");
+
+	let total = sum("40", "2") catch fatal;
+	if total != 42 {
+		return 6;
+	}
+	let code = sum("40", "two") catch e {
+		io.println(e.message);
+		yield e.code + 100;
+	};
+	if code != 100 {
+		return 7;
+	}
 	return text.byte_count(s) * 10 + text.char_count(s);
 }

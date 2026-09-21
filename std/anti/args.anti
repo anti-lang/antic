@@ -113,7 +113,8 @@ pub class Parser
 	/// A value that spells no integer gives `fallback`.
 	pub fn int_of(self, name: str, fallback: int) -> int
 	{
-		return text.to_int(self.text_of(name), fallback);
+		let n = text.parse_int(self.text_of(name)) catch e { yield fallback; };
+		return n;
 	}
 
 	/// The number of arguments that are no option.
