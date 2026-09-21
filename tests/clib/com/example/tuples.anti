@@ -1,6 +1,9 @@
 //! A library for C whose signatures name tuples. A tuple crosses as the
 //! struct the header writes for it, one per distinct tuple of an
-//! exported signature.
+//! exported signature. A function that may fail gives its tuple through
+//! one out pointer, the last parameter, and not one per element.
+
+import anti.lang;
 
 /// Both answers of a division.
 export fn tuples_divmod(a: int, b: int) -> (int, int)
@@ -18,4 +21,13 @@ export fn tuples_sum(p: (int, int)) -> int
 export fn tuples_scaled(n: int, k: f32) -> (int, f32)
 {
 	return (n * 2, k);
+}
+
+/// Both answers of a division, or a failure when `b` is zero.
+export fn tuples_divide(a: int, b: int) -> (int, int) may fail
+{
+	if b == 0 {
+		fail "division by zero";
+	}
+	return (a / b, a % b);
 }

@@ -183,10 +183,9 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 22. Done. `for i in 0..10 by -3` gives `9 6 3 0`, and lowering follows
     the rule already. `programs/by_reverse.anti` pins it with constant
     bounds and bounds read at run time.
-23. Verify the out pointer of a `may fail` function that returns a tuple.
-    It takes one out pointer, the last parameter that the result rule under
-    "Object model" names, and not one per element. A test pins the
-    signature in the IR and in the generated header.
+23. Done. A `may fail` function that returns a tuple takes one out
+    pointer. `ir_tuple_out` pins the signature in the IR, and
+    `clib_tuples` pins it in the header and calls it from C.
 24. Verify the entry on `Object.deserialize` under "Object model" that a
     field `serialize` writes as `null` keeps its default. Fields carry type
     ids now, so check what the default `serialize` writes for each kind,

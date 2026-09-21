@@ -14,6 +14,10 @@ extern "C" {
 #define ANTI_ALIGNAS(n) _Alignas(n)
 #endif
 
+/* An Anti error. A function that may fail returns a pointer to one,
+   or NULL on success. C passes it on and never reads its layout. */
+struct anti_Error;
+
 /* The tuple (int, int). */
 struct anti_tuple_int_int {
     int64_t _0;
@@ -32,6 +36,9 @@ struct anti_tuple_int_int tuples_divmod(int64_t a, int64_t b);
 int64_t tuples_sum(struct anti_tuple_int_int p);
 /** A pair of two types. */
 struct anti_tuple_int_f32 tuples_scaled(int64_t n, float k);
+/** Both answers of a division, or a failure when `b` is zero. */
+/* May fail: NULL on success, an error otherwise. */
+struct anti_Error *tuples_divide(int64_t a, int64_t b, struct anti_tuple_int_int * /* non-null */ out);
 
 #ifdef __cplusplus
 }

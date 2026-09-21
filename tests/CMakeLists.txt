@@ -1511,6 +1511,16 @@ if(NOT WIN32 AND ANTIC_LLVM_AR)
     endforeach()
 endif()
 
+# A function that may fail and returns a tuple takes one out pointer, the
+# last parameter, and not one per element. The header of clib_tuples
+# pins the same signature on the C side.
+add_test(NAME ir_tuple_out
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/tuples.anti"
+        "-DLINE=export fn com.example.tuples.tuples_divide(%0: i64, %1: i64, %2: ptr) -> ptr {"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_ir_line.cmake")
+
 # The Windows unwind data of chapter 16, decoded by llvm-readobj from the
 # object that llvm-mc writes.
 if(ANTIC_LLVM_MC)
