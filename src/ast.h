@@ -96,7 +96,8 @@ enum expr_kind {
     EXPR_JOIN,                      /* join(job) and join_all(jobs) */
     EXPR_HERE,                      /* `here`, the position it stands at */
     EXPR_FORMAT,                    /* `f"..."` and `rf"..."` */
-    EXPR_IN                         /* `x in lo..hi` */
+    EXPR_IN,                        /* `x in lo..hi` */
+    EXPR_OPTIONAL                   /* `p?.x` and `p?.f(args)`, checked */
 };
 
 /* The format specification after the colon of an `{expr}`, as the
@@ -208,6 +209,9 @@ struct expr {
             /* The call cannot fail and gives a `?*T`, so its `catch`
                guards the pointer and the `let` takes it over. */
             bool guards_pointer;
+            /* The call stands after `?.`, which gives a `?*T` whatever
+               the call gives, so a `catch` may guard that. */
+            bool optional;
         } call;
         struct {
             struct expr *base;
@@ -224,6 +228,7 @@ struct expr {
             uint32_t enum_value;    /* the index of an enum value, plus 1 */
             bool promoted;          /* the checker wrote it, not the program */
             bool element;           /* `t.0`, which names the field `_0` */
+            bool optional;          /* `p?.x`, until the checker reads it */
         } field;
         struct {
             struct name module;     /* empty when unqualified */
@@ -299,6 +304,14 @@ struct expr {
             struct symbol *bound;
             struct expr *test;
         } in;                       /* EXPR_IN */
+        /* The checker's form of `p?.x` and `p?.f(args)`. bound holds the
+           value of base, and access is the field or the call that reads
+           it when it is not `none`. */
+        struct {
+            struct expr *base;
+            struct symbol *bound;
+            struct expr *access;
+        } optional;                 /* EXPR_OPTIONAL */
     } as;
 };
 

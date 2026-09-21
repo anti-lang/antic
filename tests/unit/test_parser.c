@@ -578,6 +578,32 @@ void test_parser(void)
          "          int_lit 0\n"
          "          ident in\n"
          "        true\n");
+    /* `??` binds tighter than the comparisons and groups from the
+       right. `?.` stands where `.` stands, before a field or a call. */
+    tree("fn f() -> bool\n"
+         "{\n"
+         "    return a ?? b ?? c == d && p?.next?.go(1) != none;\n"
+         "}\n",
+         "function f\n"
+         "  result\n"
+         "    type bool\n"
+         "  block\n"
+         "    return_stmt\n"
+         "      and_expr &&\n"
+         "        equality ==\n"
+         "          coalesce ??\n"
+         "            ident a\n"
+         "            coalesce ??\n"
+         "              ident b\n"
+         "              ident c\n"
+         "          ident d\n"
+         "        equality !=\n"
+         "          call\n"
+         "            optional_field go\n"
+         "              optional_field next\n"
+         "                ident p\n"
+         "            int_lit 1\n"
+         "          none\n");
     /* `in` applies to ranges only. */
     {
         static const struct expected_error e[] = {

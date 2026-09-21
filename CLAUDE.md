@@ -207,8 +207,8 @@ reports what it finished.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`.
-- 592 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 591 each, without the `no_paths` test, which needs a
+- 594 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 593 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -251,8 +251,8 @@ reports what it finished.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer
   of an `extern fn` is `?*T`. A failing function returns `?*Error`.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
-  `anti.text.equal`, and `x in lo..hi`. See "Small things" in
-  `docs/decisions.md`.
+  `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
+  See "Small things" in `docs/decisions.md`.
 - Anti 0.1.0 installs with one command. The six packages, the six symbols archives and
   `SHA256SUMS` are assets of the GitHub release of the tag, which `tools/release-base`
   names. anti-lang.com serves text alone: the two installers, the downloads page,

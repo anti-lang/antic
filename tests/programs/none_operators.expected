@@ -1,0 +1,30 @@
+exit 0
+coalesce 1 99
+none
+chain 3
+once 1 1 0
+taken 2 2 1
+same
+2
+3
+none
+none
+none
+99
+2
+none
+calls 1
+2
+counts 1
+2
+none
+fn 15 10
+guard 99
+guard 3
+1
+caught negative
+99
+none
+1
+forwarded negative
+none

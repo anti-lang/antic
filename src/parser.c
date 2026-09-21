@@ -871,10 +871,11 @@ static struct expr *postfix(struct parser *p)
             if (p->panic || !expect(p, TOKEN_RBRACKET)) {
                 return NULL;
             }
-        } else if (accept(p, TOKEN_DOT)) {
+        } else if (accept(p, TOKEN_DOT) || accept(p, TOKEN_QUESTION_DOT)) {
             outer = new_expr(p, EXPR_FIELD, t);
             outer->pos = e->pos;
             outer->as.field.base = e;
+            outer->as.field.optional = t->kind == TOKEN_QUESTION_DOT;
             /* An element of a tuple is its number, and the field it
                names is `_0` upwards. */
             if (check(p, TOKEN_INT)) {
@@ -960,7 +961,7 @@ static struct expr *cast(struct parser *p)
     return e;
 }
 
-/* The precedence of a binary operator, from 1 for || to 10 for * / %.
+/* The precedence of a binary operator, from 1 for || to 11 for * / %.
    0 means the token is no binary operator. */
 static int precedence(enum token_kind kind)
 {
@@ -976,13 +977,17 @@ static int precedence(enum token_kind kind)
     case TOKEN_LE:
     case TOKEN_GT:
     case TOKEN_GE: return 7;
+    /* DESIGN: `??` binds tighter than the comparisons, so `p ?? q == r`
+       compares the pointer it gives. Its operands are pointers, which
+       take none of the operators that bind tighter. */
+    case TOKEN_QUESTION_QUESTION: return 8;
     case TOKEN_SHL:
-    case TOKEN_SHR: return 8;
+    case TOKEN_SHR: return 9;
     case TOKEN_PLUS:
-    case TOKEN_MINUS: return 9;
+    case TOKEN_MINUS: return 10;
     case TOKEN_STAR:
     case TOKEN_SLASH:
-    case TOKEN_PERCENT: return 10;
+    case TOKEN_PERCENT: return 11;
     default: return 0;
     }
 }
@@ -1013,7 +1018,9 @@ static struct expr *in_range(struct parser *p, struct expr *value)
 
 /* Precedence climbing: parse operands and every operator that binds at
    least as tightly as min. The right operand only takes operators that
-   bind tighter, which makes each level group from left to right. */
+   bind tighter, which makes each level group from left to right. `??`
+   groups from the right, so `a ?? b ?? c` is `a ?? (b ?? c)` and each
+   operand but the last is a `?*T`. */
 static struct expr *binary(struct parser *p, int min)
 {
     struct expr *left = cast(p);
@@ -1038,7 +1045,9 @@ static struct expr *binary(struct parser *p, int min)
         e->pos = left->pos;
         e->as.binary.op = op->kind;
         e->as.binary.left = left;
-        e->as.binary.right = binary(p, precedence(op->kind) + 1);
+        e->as.binary.right =
+            binary(p, precedence(op->kind) +
+                          (op->kind == TOKEN_QUESTION_QUESTION ? 0 : 1));
         if (e->as.binary.right == NULL) {
             return NULL;
         }

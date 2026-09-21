@@ -1367,6 +1367,10 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
         walk_expr(w, e->as.in.value);
         walk_expr(w, e->as.in.test);
         return;
+    case EXPR_OPTIONAL:
+        walk_expr(w, e->as.optional.base);
+        walk_expr(w, e->as.optional.access);
+        return;
     default:
         return;
     }
@@ -1699,6 +1703,9 @@ static bool comparable_pointers(const struct type *a, const struct type *b)
            (a->element->kind == TYPE_CLASS && b->element->kind == TYPE_CLASS);
 }
 
+static struct type *check_coalesce(struct checker *c, struct expr *e,
+                                   struct type *expected);
+
 static struct type *check_binary(struct checker *c, struct expr *e,
                                  struct type *expected)
 {
@@ -1710,6 +1717,8 @@ static struct type *check_binary(struct checker *c, struct expr *e,
     const char *called = operator_name(op);
 
     switch (op) {
+    case TOKEN_QUESTION_QUESTION:
+        return check_coalesce(c, e, expected);
     case TOKEN_AND_AND:
     case TOKEN_OR_OR: {
         /* The right operand runs only where the left one decided it,
@@ -3327,7 +3336,11 @@ static struct type *check_call(struct checker *c, struct expr *e,
        it guards the pointer rather than an error. The `let` that holds
        it takes the handler over, so the two forms read alike. */
     if (e->as.call.handler.kind != HANDLE_NONE) {
-        if (!type_is_nullable(fn->result)) {
+        bool after_optional =
+            e->as.call.optional &&
+            (e->as.call.handler.kind == HANDLE_BLOCK ||
+             e->as.call.handler.kind == HANDLE_FATAL);
+        if (!type_is_nullable(fn->result) && !after_optional) {
             error_at(c, e->as.call.handler.pos,
                      "this call cannot fail, so it has no error to handle");
             return builtin(c, TYPE_ERROR);
@@ -3840,6 +3853,7 @@ static struct type *check_join(struct checker *c, struct expr *e)
 static const struct name hidden_module = {"<text>", 6};
 static const struct name hidden_builder = {"<builder>", 9};
 static const struct name hidden_value = {"<value>", 7};
+static const struct name hidden_object = {"<object>", 8};
 
 /* The name of the literal in a message. */
 static const char *format_name(const struct expr *e)
@@ -4208,6 +4222,110 @@ static struct type *check_in(struct checker *c, struct expr *e)
     return builtin(c, TYPE_BOOL);
 }
 
+/* DESIGN: `p ?? q` gives p as `*T` when it is not `none` and q
+   otherwise. q converts to the element of p as any pointer does, and
+   the result is `?*T` when q may be `none` as well. A function value
+   follows the pointer rule. */
+static struct type *check_coalesce(struct checker *c, struct expr *e,
+                                   struct type *expected)
+{
+    struct expr *right = e->as.binary.right;
+    struct type *hint = NULL;
+    struct type *left;
+    struct type *got;
+
+    if (expected != NULL && (expected->kind == TYPE_POINTER ||
+                             (expected->kind == TYPE_FN && !expected->bound))) {
+        hint = types_with_none(c->types, expected);
+    }
+    left = check_expr(c, e->as.binary.left, hint);
+    if (!is_error(left) && !type_is_nullable(left)) {
+        error_at(c, e->pos, "`??` follows a value of type `?*T`, found `%s`",
+                 tn(left));
+        left = builtin(c, TYPE_ERROR);
+    }
+    if (is_error(left)) {
+        check_expr(c, right, NULL);
+        return left;
+    }
+    got = check_expr(c, right, left);
+    if (!require(c, right, got, left)) {
+        return builtin(c, TYPE_ERROR);
+    }
+    return type_is_nullable(got) ? left : types_without_none(c->types, left);
+}
+
+/* DESIGN: `p?.x` and `p?.f(args)` give `none` when p is `none` and the
+   field or the call otherwise. The checker binds p to a local of type
+   `*T` in a scope of its own and checks the field or the call on it, so
+   every rule of `.` applies unchanged. The result is the `?*U` of a
+   pointer field or result, and anything else is refused, since Anti has
+   no optional values. A function value follows the pointer rule. A
+   chain `p?.a?.b` checks each `?.` on the `?*U` the one before gave. */
+static struct type *check_optional(struct checker *c, struct expr *e)
+{
+    struct expr *access = new_node(c, e->kind, e->pos);
+    struct expr *field = e->kind == EXPR_CALL ? e->as.call.callee : e;
+    struct expr *base = field->as.field.base;
+    struct type *t = check_expr(c, base, NULL);
+    struct expr *read;
+    struct symbol *bound;
+    struct type *result;
+    struct scope scope;
+
+    if (is_error(t)) {
+        return t;
+    }
+    if (t->kind != TYPE_POINTER || !t->nullable) {
+        error_at(c, base->pos, "`?.` follows a value of type `?*T`, found "
+                 "`%s`", tn(t));
+        return builtin(c, TYPE_ERROR);
+    }
+    *access = *e;
+    if (e->kind == EXPR_CALL) {
+        field = new_node(c, EXPR_FIELD, field->pos);
+        *field = *e->as.call.callee;
+        access->as.call.callee = field;
+        access->as.call.optional = true;
+    } else {
+        field = access;
+    }
+    read = new_node(c, EXPR_NAME, base->pos);
+    read->as.name = hidden_object;
+    field->as.field.base = read;
+    field->as.field.optional = false;
+    enter_scope(c, &scope);
+    bound = declare(c, SYMBOL_LOCAL, &hidden_object, base->pos,
+                    "`%.*s` is already declared");
+    if (bound == NULL) {
+        leave_scope(c, &scope);
+        return builtin(c, TYPE_ERROR);
+    }
+    bound->type = types_without_none(c->types, t);
+    result = check_expr(c, access, NULL);
+    leave_scope(c, &scope);
+    if (is_error(result)) {
+        return result;
+    }
+    if (result->kind == TYPE_VOID) {
+        error_at(c, e->pos, "`?.` needs a field or a result that is a "
+                 "pointer, and the call returns no value");
+        return builtin(c, TYPE_ERROR);
+    }
+    if (result->kind != TYPE_POINTER &&
+        (result->kind != TYPE_FN || result->bound)) {
+        error_at(c, e->pos, "`?.` needs a field or a result that is a "
+                 "pointer, found `%s`", tn(result));
+        return builtin(c, TYPE_ERROR);
+    }
+    memset(&e->as, 0, sizeof e->as);
+    e->kind = EXPR_OPTIONAL;
+    e->as.optional.base = base;
+    e->as.optional.bound = bound;
+    e->as.optional.access = access;
+    return types_with_none(c->types, result);
+}
+
 static struct type *check_expr_inner(struct checker *c, struct expr *e,
                                      struct type *expected)
 {
@@ -4288,6 +4406,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_CAST:
         return check_cast(c, e);
     case EXPR_CALL:
+        if (e->as.call.callee->kind == EXPR_FIELD &&
+            e->as.call.callee->as.field.optional) {
+            return check_optional(c, e);
+        }
         return check_call(c, e, expected);
     case EXPR_PARALLEL:
         return check_parallel(c, e);
@@ -4350,7 +4472,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return builtin(c, TYPE_ERROR);
     }
     case EXPR_FIELD:
+        if (e->as.field.optional) {
+            return check_optional(c, e);
+        }
         return check_field(c, e);
+    case EXPR_OPTIONAL:
+        return e->type;
     case EXPR_STRUCT_LIT: {
         struct name *name = &e->as.struct_lit.name;
         if (e->as.struct_lit.module.length > 0) {
@@ -5035,6 +5162,11 @@ static bool eval_const(struct checker *c, struct expr *e,
         if (!eval_const(c, e->as.binary.left, &a)) {
             return false;
         }
+        /* A constant pointer is `none`, so `??` gives its right side. */
+        if (op == TOKEN_QUESTION_QUESTION) {
+            return a.kind == CONST_NULL ? eval_const(c, e->as.binary.right, out)
+                                        : fail_const(c, e, "`??`");
+        }
         if (op == TOKEN_AND_AND || op == TOKEN_OR_OR) {
             if (a.kind != CONST_SYMBOLIC &&
                 a.as.boolean == (op == TOKEN_OR_OR)) {
@@ -5314,6 +5446,9 @@ static bool eval_const(struct checker *c, struct expr *e,
         sides[2]->as.binary.right = sides[1];
         return eval_const(c, sides[2], out);
     }
+    /* The field or the call reads through a pointer. */
+    case EXPR_OPTIONAL:
+        return fail_const(c, e, "`?.`");
     }
     return false;
 }
@@ -5779,6 +5914,9 @@ static bool expr_calls(const struct expr *e)
         return expr_calls(e->as.cast.operand);
     case EXPR_IN:
         return expr_calls(e->as.in.value) || expr_calls(e->as.in.test);
+    case EXPR_OPTIONAL:
+        return expr_calls(e->as.optional.base) ||
+               expr_calls(e->as.optional.access);
     case EXPR_FIELD:
         return expr_calls(e->as.field.base);
     case EXPR_INDEX:
@@ -6001,13 +6139,19 @@ static void check_stmt(struct checker *c, struct stmt *s)
         c->target_sized = false;
         /* `let m = p catch fatal` and `let m = p catch e { }` guard the
            pointer with the error forms. A call that gives a `?*T` keeps
-           its handler, and the `let` takes it over here. */
-        if (s->as.let.guard.kind == HANDLE_NONE &&
-            s->as.let.value->kind == EXPR_CALL &&
-            s->as.let.value->as.call.guards_pointer) {
-            s->as.let.guard = s->as.let.value->as.call.handler;
-            memset(&s->as.let.value->as.call.handler, 0,
-                   sizeof s->as.let.value->as.call.handler);
+           its handler, and the `let` takes it over here. So does the
+           call after a `?.`, which gives a `?*T` in every case. */
+        if (s->as.let.guard.kind == HANDLE_NONE) {
+            struct expr *guarded = s->as.let.value;
+            if (guarded->kind == EXPR_OPTIONAL) {
+                guarded = guarded->as.optional.access;
+            }
+            if (guarded->kind == EXPR_CALL &&
+                guarded->as.call.guards_pointer) {
+                s->as.let.guard = guarded->as.call.handler;
+                memset(&guarded->as.call.handler, 0,
+                       sizeof guarded->as.call.handler);
+            }
         }
         if (s->as.let.guard.kind != HANDLE_NONE) {
             t = check_pointer_guard(c, s, t);
@@ -6565,6 +6709,16 @@ static void set_by_base(const struct required *r, const struct expr *e,
     }
 }
 
+/* The call that carries the handler of a statement: the value itself,
+   or the call after a `?.`. */
+static const struct expr *handled_call(const struct expr *e)
+{
+    if (e->kind == EXPR_OPTIONAL) {
+        e = e->as.optional.access;
+    }
+    return e->kind == EXPR_CALL ? e : NULL;
+}
+
 /* The handler of a failing call runs on a path of its own. What it
    assigns does not count after the call. */
 static void sets_handler(struct checker *c, const struct required *r,
@@ -6608,13 +6762,15 @@ static bool sets_stmt(struct checker *c, const struct required *r,
         return true;
     case STMT_EXPR:
         set_by_base(r, s->as.expr, set);
-        if (s->as.expr->kind == EXPR_CALL) {
-            sets_handler(c, r, &s->as.expr->as.call.handler, set);
+        if (handled_call(s->as.expr) != NULL) {
+            sets_handler(c, r, &handled_call(s->as.expr)->as.call.handler,
+                         set);
         }
         return true;
     case STMT_LET:
-        if (s->as.let.value != NULL && s->as.let.value->kind == EXPR_CALL) {
-            sets_handler(c, r, &s->as.let.value->as.call.handler, set);
+        if (s->as.let.value != NULL && handled_call(s->as.let.value) != NULL) {
+            sets_handler(c, r, &handled_call(s->as.let.value)->as.call.handler,
+                         set);
         }
         return true;
     case STMT_IF:

@@ -323,4 +323,63 @@ void test_nullable(void)
     rejects("extern fn malloc(n: u64) -> *byte;\n"
             "fn f() { let p = malloc(8); free(p); }\n",
             "every pointer of the result of `extern fn malloc` is `?*T`");
+
+    /* `p ?? q` gives p as `*T` when it is not `none` and q otherwise, and
+       the result is `?*T` when q may be `none`. It binds tighter than
+       `==` and groups from the right. */
+    body_accepts("    let n = 1;\n    take(maybe() ?? &n);");
+    body_accepts("    let n = 1;\n    take(maybe() ?? maybe() ?? &n);");
+    body_accepts("    let n = 1;\n    let same: bool = maybe() ?? &n == &n;");
+    body_accepts("    let p: ?*int = maybe() ?? maybe();");
+    body_rejects("    let q = maybe() ?? maybe();\n    take(q);",
+                 "`q` may be `none`, check it or use `?*T`");
+    body_rejects("    let n = 1;\n    let p = &n;\n    take(p ?? &n);",
+                 "`??` follows a value of type `?*T`, found `*int`");
+    body_rejects("    let p = maybe();\n"
+                 "    if p != none {\n        take(p ?? p);\n    }",
+                 "`??` follows a value of type `?*T`, found `*int`");
+    body_rejects("    let b = true;\n    take(maybe() ?? &b);",
+                 "expected `?*int`, found `*bool`");
+    /* A function value follows the pointer rule. */
+    accepts("fn g(f: ?fn(int) -> int, h: fn(int) -> int) -> int {\n"
+            "    let k = f ?? h;\n"
+            "    return k(1);\n"
+            "}\n");
+
+    /* `p?.x` and `p?.f(args)` give `none` when p is `none` and the field
+       or the call otherwise. The result is `?*U`, and a field or result
+       that is no pointer is refused. */
+    accepts("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: ?*Node) -> ?*Node { return p?.next?.next; }\n");
+    accepts("struct Node { value: int, next: ?*Node }\n"
+            "fn after(n: *Node, k: int) -> ?*Node { return n.next; }\n"
+            "fn f(p: ?*Node) -> ?*Node { return p?.after(1); }\n");
+    accepts("struct Node { value: int, next: ?*Node }\n"
+            "struct Tag { owner: *Node }\n"
+            "fn f(t: ?*Tag) -> ?*Node { return t?.owner; }\n");
+    accepts("struct Hooks { done: fn(int) -> int }\n"
+            "fn f(h: ?*Hooks) -> ?fn(int) -> int { return h?.done; }\n");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: ?*Node) -> int { let v = p?.value; return 0; }\n",
+            "`?.` needs a field or a result that is a pointer, found `int`");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn touch(n: *Node) { }\n"
+            "fn f(p: ?*Node) { p?.touch(); }\n",
+            "`?.` needs a field or a result that is a pointer, and the call "
+            "returns no value");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: *Node) -> ?*Node { return p?.next; }\n",
+            "`?.` follows a value of type `?*T`, found `*Node`");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: ?*Node) -> ?*Node {\n"
+            "    if p != none { return p?.next; }\n"
+            "    return none;\n"
+            "}\n",
+            "`?.` follows a value of type `?*T`, found `*Node`");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: ?*Node) -> *Node { return p?.next; }\n",
+            "the value may be `none`, check it or use `?*T`");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: ?*Node) -> int { return p?.next.value; }\n",
+            "the value may be `none`, check it or use `?*T`");
 }

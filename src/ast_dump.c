@@ -164,6 +164,7 @@ static const char *binary_rule(enum token_kind op)
     case TOKEN_LE:
     case TOKEN_GT:
     case TOKEN_GE: return "relation";
+    case TOKEN_QUESTION_QUESTION: return "coalesce";
     case TOKEN_SHL:
     case TOKEN_SHR: return "shift";
     case TOKEN_PLUS:
@@ -288,9 +289,18 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         dump_expr(d, depth + 1, e->as.slice.high);
         break;
     case EXPR_FIELD:
-        label_name(d, "field", NULL, &e->as.field.name);
+        label_name(d, e->as.field.optional ? "optional_field" : "field", NULL,
+                   &e->as.field.name);
         end(d, start, type);
         dump_expr(d, depth + 1, e->as.field.base);
+        break;
+    /* The checked form of `?.`: the value, then the field or the call
+       that reads it. */
+    case EXPR_OPTIONAL:
+        text_append(d->out, "optional");
+        end(d, start, type);
+        dump_expr(d, depth + 1, e->as.optional.base);
+        dump_expr(d, depth + 1, e->as.optional.access);
         break;
     case EXPR_STRUCT_LIT:
         label_name(d, "struct_lit", &e->as.struct_lit.module,

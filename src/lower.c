@@ -3208,6 +3208,77 @@ static struct ir_operand short_circuit(struct lowerer *l, const struct expr *e)
     return temp(l, result);
 }
 
+/* p ?? q as a value. The result is p when it is not `none`, and q
+   otherwise, which runs only then. */
+static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
+{
+    enum ir_type type = ir_type_of(e->type);
+    struct ir_operand left = lower_expr(l, e->as.binary.left);
+    struct ir_operand right;
+    struct ir_operand is_none;
+    struct ir_block *rest;
+    struct ir_block *join;
+    uint32_t result;
+
+    if (l->failed) {
+        return none();
+    }
+    result = ir_unary(l->f, l->b, IR_COPY, type, left);
+    is_none = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, left,
+                                ir_int_op(type, 0)));
+    rest = new_block(l);
+    join = new_block(l);
+    ir_branch(l->f, l->b, is_none, rest, join);
+    l->b = rest;
+    right = lower_expr(l, e->as.binary.right);
+    if (l->failed) {
+        return none();
+    }
+    if (l->b != NULL) {
+        ir_assign(l->f, l->b, result, right);
+        ir_jump(l->f, l->b, join);
+    }
+    l->b = join;
+    return temp(l, result);
+}
+
+/* p?.x and p?.f(args) as a value. The field or the call reads the local
+   the checker bound to p, and runs only when p is not `none`. The result
+   is `none` otherwise. */
+static struct ir_operand lower_optional(struct lowerer *l,
+                                        const struct expr *e)
+{
+    enum ir_type type = ir_type_of(e->type);
+    struct ir_operand p = lower_expr(l, e->as.optional.base);
+    struct ir_operand v;
+    struct ir_operand is_none;
+    struct ir_block *rest;
+    struct ir_block *join;
+    uint32_t result;
+
+    if (l->failed) {
+        return none();
+    }
+    bind_value(l, e->as.optional.bound, p);
+    result = ir_unary(l->f, l->b, IR_COPY, type, ir_int_op(type, 0));
+    is_none = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, p,
+                                ir_int_op(IR_PTR, 0)));
+    rest = new_block(l);
+    join = new_block(l);
+    ir_branch(l->f, l->b, is_none, join, rest);
+    l->b = rest;
+    v = lower_expr(l, e->as.optional.access);
+    if (l->failed) {
+        return none();
+    }
+    if (l->b != NULL) {
+        ir_assign(l->f, l->b, result, v);
+        ir_jump(l->f, l->b, join);
+    }
+    l->b = join;
+    return temp(l, result);
+}
+
 static struct ir_function *rt_function(struct lowerer *l, const char *name,
                                        const enum ir_type *params,
                                        size_t count);
@@ -3247,6 +3318,9 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
 
     if (op == TOKEN_AND_AND || op == TOKEN_OR_OR) {
         return short_circuit(l, e);
+    }
+    if (op == TOKEN_QUESTION_QUESTION) {
+        return coalesce(l, e);
     }
     left = lower_expr(l, e->as.binary.left);
     right = lower_expr(l, e->as.binary.right);
@@ -4466,6 +4540,8 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
     }
     case EXPR_SIZE_OF:
         return size_operand(l, e->as.size_of->type);
+    case EXPR_OPTIONAL:
+        return lower_optional(l, e);
     /* The value once, then the test the checker wrote over it. */
     case EXPR_IN:
         v = lower_expr(l, e->as.in.value);
@@ -6008,6 +6084,9 @@ static void reserve_call_handler(struct lowerer *l, struct ir_block *entry,
     }
     if (e->kind == EXPR_ALLOC && e->as.alloc.value != NULL) {
         e = e->as.alloc.value;
+    }
+    if (e->kind == EXPR_OPTIONAL) {
+        e = e->as.optional.access;
     }
     if (e->kind == EXPR_CALL) {
         reserve_handler(l, entry, &e->as.call.handler);

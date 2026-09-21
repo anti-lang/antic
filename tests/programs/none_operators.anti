@@ -1,0 +1,172 @@
+//! `p ?? q` gives `p` as `*T` when it is not `none` and `q` otherwise.
+//! `p?.x` and `p?.f(args)` give `none` when `p` is `none`, and the field
+//! or the call otherwise. Each computes `p` once, and what stands right
+//! of the operator runs only when the answer needs it. A function value
+//! follows the pointer rule.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub value: int = 0,
+	pub next: ?*Node = none,
+
+	/// The node `steps` links on, or `none`.
+	pub fn after(self, steps: int) -> ?*Node
+	{
+		let at: ?*Node = self;
+		for 0..steps {
+			at = at?.next;
+		}
+		return at;
+	}
+
+	pub fn itself(self) -> *Node
+	{
+		return self;
+	}
+
+	pub fn checked(self, n: int) -> *Node may fail
+	{
+		if n < 0 {
+			fail "negative";
+		}
+		return self;
+	}
+}
+
+class Tag
+{
+	pub owner: *Node,
+}
+
+struct Handlers
+{
+	on_done: ?fn(int) -> int,
+}
+
+/// p, counting each call in `count`.
+fn counted(p: ?*Node, count: *int) -> ?*Node
+{
+	*count = *count + 1;
+	return p;
+}
+
+/// 1, counting each call in `count`.
+fn bump(count: *int) -> int
+{
+	*count = *count + 1;
+	return 1;
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn show(p: ?*Node)
+{
+	if p == none {
+		printf("none\n".ptr);
+	} else {
+		printf("%d\n".ptr, p.value as c_int);
+	}
+}
+
+/// `try` forwards the error of a call after `?.`.
+fn forward(p: ?*Node, n: int) -> ?*Node may fail
+{
+	return try p?.checked(n);
+}
+
+fn main() -> int
+{
+	let c = Node { value: 3 };
+	let b = Node { value: 2, next: &c };
+	let a = Node { value: 1, next: &b };
+	let fallback = Node { value: 99 };
+	let head: ?*Node = &a;
+	let empty: ?*Node = none;
+
+	let first = head ?? &fallback;
+	let other = empty ?? &fallback;
+	printf("coalesce %d %d\n".ptr, first.value as c_int, other.value as c_int);
+	show(empty ?? empty);
+	let chained = empty ?? empty ?? &c;
+	printf("chain %d\n".ptr, chained.value as c_int);
+	let left = 0;
+	let right = 0;
+	let once = counted(head, &left) ?? counted(&b, &right) ?? &fallback;
+	printf("once %d %d %d\n".ptr, once.value as c_int, left as c_int,
+		right as c_int);
+	let taken = counted(empty, &left) ?? counted(&b, &right) ?? &fallback;
+	printf("taken %d %d %d\n".ptr, taken.value as c_int, left as c_int,
+		right as c_int);
+	if head ?? &fallback == &a {
+		printf("same\n".ptr);
+	}
+
+	show(head?.next);
+	show(head?.next?.next);
+	show(head?.next?.next?.next);
+	show(empty?.next);
+	show(empty?.next?.next);
+	show(empty?.next ?? &fallback);
+	let calls = 0;
+	show(head?.after(bump(&calls)));
+	show(empty?.after(bump(&calls)));
+	printf("calls %d\n".ptr, calls as c_int);
+	let counts = 0;
+	show(counted(head, &counts)?.next);
+	printf("counts %d\n".ptr, counts as c_int);
+
+	let tag = Tag { owner: &b };
+	let some_tag: ?*Tag = &tag;
+	let no_tag: ?*Tag = none;
+	show(some_tag?.owner);
+	show(no_tag?.owner);
+
+	let h = Handlers { on_done: thrice };
+	let with: ?*Handlers = &h;
+	let without: ?*Handlers = none;
+	let f = with?.on_done ?? twice;
+	let g = without?.on_done ?? twice;
+	printf("fn %d %d\n".ptr, f(5) as c_int, g(5) as c_int);
+
+	let found = empty?.after(0) catch {
+		yield &fallback;
+	};
+	printf("guard %d\n".ptr, found.value as c_int);
+	let own = empty?.itself() catch {
+		yield &c;
+	};
+	printf("guard %d\n".ptr, own.value as c_int);
+	let ok = head?.checked(1) catch {
+		yield &fallback;
+	};
+	show(ok);
+	let failed = head?.checked(-1) catch e {
+		printf("caught %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield &fallback;
+	};
+	show(failed);
+	let skipped = empty?.checked(-1) catch {
+		yield &fallback;
+	};
+	show(skipped);
+	let passed = forward(head, 1) catch fatal;
+	show(passed);
+	let forwarded = forward(head, -1) catch e {
+		printf("forwarded %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield none;
+	};
+	show(forwarded);
+	return 0;
+}

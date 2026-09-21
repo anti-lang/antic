@@ -136,6 +136,10 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
        longest match takes `?*` whenever the two are written together,
        which is how the nullable type is spelled. */
     [TOKEN_QUESTION_STAR] = {"?*", CAT_SYMBOL},
+    /* `p ?? q` and `p?.x` on a `?*T`. The longest match reads either
+       pair as one token, so `??` never stands for two `?`. */
+    [TOKEN_QUESTION_QUESTION] = {"??", CAT_SYMBOL},
+    [TOKEN_QUESTION_DOT] = {"?.", CAT_SYMBOL},
     [TOKEN_ATOMIC] = {"atomic", CAT_KEYWORD},
     [TOKEN_DISPATCH] = {"dispatch", CAT_KEYWORD},
     [TOKEN_JOIN] = {"join", CAT_KEYWORD},

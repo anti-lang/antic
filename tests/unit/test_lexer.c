@@ -246,6 +246,15 @@ void test_lexer(void)
               "|| | |= ^ ^= ~ + += * *= / /= % %= , :: : ; [ ] ( ) { }",
               k, sizeof k / sizeof k[0]);
     }
+    /* `??` and `?.` are one token each, as `?*` is, and a lone `?`
+       stays one. */
+    {
+        static const enum token_kind k[] = {
+            TOKEN_IDENT, TOKEN_QUESTION_QUESTION, TOKEN_IDENT,
+            TOKEN_QUESTION_DOT, TOKEN_IDENT, TOKEN_QUESTION_STAR, TOKEN_IDENT,
+            TOKEN_AS, TOKEN_QUESTION, TOKEN_STAR, TOKEN_IDENT};
+        kinds("a ?? b?.c ?*d as? *e", k, sizeof k / sizeof k[0]);
+    }
     {
         static const enum token_kind k[] = {
             TOKEN_AS, TOKEN_BREAK, TOKEN_CONST, TOKEN_CONTINUE, TOKEN_DO,

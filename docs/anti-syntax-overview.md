@@ -136,7 +136,7 @@ if f.carry { }
 
 `let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. A carry in is `a + b + f.carry`.
 
-Built: `x in lo..hi`. Not built yet: wrapping and saturating operators, `Flags`, `??`, `?.`.
+Built: `x in lo..hi`, `??` and `?.`. Not built yet: wrapping and saturating operators and `Flags`.
 
 ## Statements
 
@@ -462,7 +462,7 @@ let k = n ?? &default_node;
 
 `alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing. A function value follows the same rule: `fn(...)` never holds `none` and `?fn(...)` may.
 
-Built. Not built yet: `??`.
+Built.
 
 ## Reflection
 
