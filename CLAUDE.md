@@ -179,6 +179,16 @@ openssl checks their signature. Windows configures with `-G Ninja`.
     alone today, so the other three exits leak it. The fix comes with a test
     that takes each exit under a leak check. "Object model" in
     `docs/decisions.md` holds the corrected rule.
+21. A failing function is written `may fail` and nothing else. `is_failing`
+    in `src/sema.c` keys on the `may fail` marking alone and never on the
+    result type. Today it reads any pointer to `Error` or a subclass,
+    `*Error` or `?*Error`, as a failing result. A function that returns an
+    error as an ordinary value, such as `Error.new` or one that returns a
+    stored error, is then no failing function. The `makes_error` exemption
+    for the statics of `Error` has nothing left to exempt and goes with it,
+    and so does the provisional entry on `Error.new` under "Object model".
+    The fix comes with tests that a `may fail` function must be handled and
+    that an ordinary function returning `*Error` or `?*Error` must not.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
