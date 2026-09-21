@@ -2,7 +2,7 @@
 //! records the flag, so the program that imports it handles the error
 //! without seeing this source.
 
-import anti.error;
+import anti.lang;
 
 /// Halve n, or fail when n is odd.
 pub fn half(n: int) -> int may fail
@@ -21,7 +21,7 @@ pub class Counter
 	pub fn step(self) may fail
 	{
 		if self.n >= self.limit {
-			fail error.Error.new(5, "the counter is at its limit");
+			fail lang.Error.new(5, "the counter is at its limit");
 		}
 		self.n += 1;
 	}

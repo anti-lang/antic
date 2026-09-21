@@ -1,17 +1,17 @@
 //! A `construct` with arguments may fail. `alloc T(args)` runs it on
 //! the heap and frees the object when it fails, and a handler may put
 //! another pointer in its place.
-import anti.error;
 import anti.io;
+import anti.lang;
 
 class Circle
 {
 	pub r: f32 = 0.0,
 
-	fn construct(self, r: f32) -> ?*error.Error
+	fn construct(self, r: f32) -> ?*lang.Error
 	{
 		if r <= 0.0 {
-			return error.Error.new(1, "radius must be positive");
+			return lang.Error.new(1, "radius must be positive");
 		}
 		self.r = r;
 		return none;

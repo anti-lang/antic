@@ -4,17 +4,17 @@
 //! where the program asked. Binding the result to a local first is the
 //! same program and was the only form that ran.
 
-import anti.error;
+import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-fn inner(out: *int) -> ?*error.Error
+fn inner(out: *int) -> ?*lang.Error
 {
 	*out = 42;
 	return none;
 }
 
-fn outer(out: *int) -> ?*error.Error
+fn outer(out: *int) -> ?*lang.Error
 {
 	*out = try inner();
 	return none;

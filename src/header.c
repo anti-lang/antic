@@ -90,14 +90,12 @@ static void c_name(char *out, size_t size, const struct name *name)
              reserved ? "_" : "");
 }
 
-/* DESIGN: `anti.error.Error` crosses to C as `struct anti_Error *`, the
+/* DESIGN: `anti.lang.Error` crosses to C as `struct anti_Error *`, the
    type the object model gives the generated helpers. C never reads the
    layout, so the header declares the tag and nothing else. */
 static bool is_error_class(const struct type *t)
 {
-    return t->kind == TYPE_CLASS && t->name.length == 5 &&
-           memcmp(t->name.text, "Error", 5) == 0 && t->module.length == 10 &&
-           memcmp(t->module.text, "anti.error", 10) == 0;
+    return types_is_lang_error(t);
 }
 
 /* Whether a signature names the error class, which the header then

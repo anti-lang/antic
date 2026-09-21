@@ -198,11 +198,14 @@ reports what it finished.
 - A pass over the whole program's IR runs after lowering. In dev mode it runs
   for the module that links. It holds release devirtualisation, the class
   registry, the singleton check and the used-slot bitmaps.
-- `std/` holds `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`,
-  `anti.os`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`,
-  `anti.args`, `anti.json` and `anti.log`.
-- 514 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 513 each, without the `no_paths` test, which needs a
+- `std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
+  `anti.error`, `anti.time`, `anti.os`, `anti.reflect`, `anti.random`,
+  `anti.collection`, `anti.toml`, `anti.args`, `anti.json` and `anti.log`.
+  `anti.lang` is the root and imports nothing. It holds `Error` and
+  `NoneDereference`, and `anti.error` holds `SystemError`, `on_fatal` and
+  `check`.
+- 519 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 518 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -211,8 +214,8 @@ reports what it finished.
   `?*Error` and writes its result through an out pointer. `fail` leaves on the
   error channel, with an error or with a text, `try` forwards inside another
   `may fail` function, and `undo` runs on the fail path. The header writes the
-  ABI and the `.antl` records the flag. The standard library still writes the
-  form by hand outside `anti.error`.
+  ABI and the `.antl` records the flag. The modules of the standard library
+  other than `anti.lang` and `anti.error` still write the form by hand.
 - Tuples are built. `(int, str)` is an anonymous struct with C layout, `(a, b)`
   builds one, `t.0` reads an element, and `let (a, b) = e;` and
   `for i, x in items` are the two forms that take one apart. The header writes

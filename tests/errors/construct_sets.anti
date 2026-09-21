@@ -1,4 +1,4 @@
-import anti.error;
+import anti.lang;
 
 class Needs
 {
@@ -11,10 +11,10 @@ class Box
 	pub part: Needs,
 	pub label: str = "",
 
-	fn construct(self, w: int) -> ?*error.Error
+	fn construct(self, w: int) -> ?*lang.Error
 	{
 		if w < 0 {
-			return error.Error.new(1, "negative");
+			return lang.Error.new(1, "negative");
 		}
 		self.w = w;
 		return none;
@@ -25,7 +25,7 @@ class Branches
 {
 	pub a: int,
 
-	fn construct(self, x: int) -> ?*error.Error
+	fn construct(self, x: int) -> ?*lang.Error
 	{
 		if x > 0 {
 			self.a = x;
@@ -38,7 +38,7 @@ class Loop
 {
 	pub a: int,
 
-	fn construct(self, x: int) -> ?*error.Error
+	fn construct(self, x: int) -> ?*lang.Error
 	{
 		for i in 0..x {
 			self.a = i;
@@ -51,7 +51,7 @@ class Base
 {
 	pub b: int,
 
-	fn construct(self, b: int) -> ?*error.Error
+	fn construct(self, b: int) -> ?*lang.Error
 	{
 		self.b = b;
 		return none;
@@ -63,7 +63,7 @@ class Orphan
 	inherits Base,
 	pub d: int,
 
-	fn construct(self, x: int) -> ?*error.Error
+	fn construct(self, x: int) -> ?*lang.Error
 	{
 		self.d = x;
 		return none;
@@ -75,10 +75,10 @@ class Good
 	pub a: int,
 	pub part: Needs,
 
-	fn construct(self, x: int) -> ?*error.Error
+	fn construct(self, x: int) -> ?*lang.Error
 	{
 		if x < 0 {
-			return error.Error.new(1, "negative");
+			return lang.Error.new(1, "negative");
 		}
 		if x > 0 {
 			self.a = x;
@@ -95,7 +95,7 @@ class Derived
 	inherits Base,
 	pub d: int,
 
-	fn construct(self, x: int) -> ?*error.Error
+	fn construct(self, x: int) -> ?*lang.Error
 	{
 		try self.super.construct(x);
 		switch x {

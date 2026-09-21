@@ -12,7 +12,7 @@
 //! is among them. Each of them fails when the environment names no home,
 //! and the message names the variable that is absent.
 
-import anti.error as failure;
+import anti.lang;
 import anti.text;
 
 extern fn anti_rt_on_signal(sig: int, f: fn(int));
@@ -61,7 +61,7 @@ fn variable(name: str) -> str
 ///
 /// The three directory functions give memory the caller owns, so the
 /// text of a builder, which the builder frees, does not leave here.
-fn owned(b: *text.Builder, out: *str) -> ?*failure.Error
+fn owned(b: *text.Builder, out: *str) -> ?*lang.Error
 {
 	let s = b.text();
 	let from = s.ptr else {
@@ -69,7 +69,7 @@ fn owned(b: *text.Builder, out: *str) -> ?*failure.Error
 		return none;
 	};
 	let room = alloc(byte, s.len + 1) else {
-		return failure.Error.new(1, "out of memory");
+		return lang.Error.new(1, "out of memory");
 	};
 	let i = 0;
 	while i < s.len do {
@@ -113,7 +113,7 @@ fn xdg(name: str) -> str
 /// `<root>/<app>` under the XDG root `name`, or `$HOME/<fallback>/<app>`.
 ///
 /// Fails when neither the XDG root nor `HOME` names a directory.
-fn unix_dir(name: str, fallback: str, app: str, out: *str) -> ?*failure.Error
+fn unix_dir(name: str, fallback: str, app: str, out: *str) -> ?*lang.Error
 {
 	let b = text.Builder.new();
 	let root = xdg(name);
@@ -122,7 +122,7 @@ fn unix_dir(name: str, fallback: str, app: str, out: *str) -> ?*failure.Error
 	} else {
 		let home = variable("HOME");
 		if text.byte_count(home) == 0 {
-			return failure.Error.new(1, "the environment names no HOME");
+			return lang.Error.new(1, "the environment names no HOME");
 		}
 		b.append(home);
 		b.append("/");
@@ -137,12 +137,12 @@ fn unix_dir(name: str, fallback: str, app: str, out: *str) -> ?*failure.Error
 /// `%LOCALAPPDATA%\<app>` with `tail` below it, which may be empty.
 ///
 /// Fails when `LOCALAPPDATA` names no directory.
-fn windows_dir(app: str, tail: str, out: *str) -> ?*failure.Error
+fn windows_dir(app: str, tail: str, out: *str) -> ?*lang.Error
 {
 	let b = text.Builder.new();
 	let local = variable("LOCALAPPDATA");
 	if text.byte_count(local) == 0 {
-		return failure.Error.new(1, "the environment names no LOCALAPPDATA");
+		return lang.Error.new(1, "the environment names no LOCALAPPDATA");
 	}
 	b.append(local);
 	b.append("\\");
@@ -161,7 +161,7 @@ fn windows_dir(app: str, tail: str, out: *str) -> ?*failure.Error
 /// `~/.config/<app>`, and `config\` of `%LOCALAPPDATA%\<app>` on
 /// Windows. It fails when the environment names no home, and the message
 /// names the variable that is absent.
-pub fn user_config_dir(app: str, out: *str) -> ?*failure.Error
+pub fn user_config_dir(app: str, out: *str) -> ?*lang.Error
 {
 	if windows() {
 		*out = try windows_dir(app, "config");
@@ -176,7 +176,7 @@ pub fn user_config_dir(app: str, out: *str) -> ?*failure.Error
 /// `$XDG_DATA_HOME/<app>` on Linux and macOS, which falls back to
 /// `~/.local/share/<app>`, and `%LOCALAPPDATA%\<app>` on Windows. It
 /// fails as `user_config_dir` does.
-pub fn user_data_dir(app: str, out: *str) -> ?*failure.Error
+pub fn user_data_dir(app: str, out: *str) -> ?*lang.Error
 {
 	if windows() {
 		*out = try windows_dir(app, "");
@@ -191,7 +191,7 @@ pub fn user_data_dir(app: str, out: *str) -> ?*failure.Error
 /// `$XDG_CACHE_HOME/<app>` on Linux and macOS, which falls back to
 /// `~/.cache/<app>`, and `cache\` of `%LOCALAPPDATA%\<app>` on Windows.
 /// It fails as `user_config_dir` does.
-pub fn user_cache_dir(app: str, out: *str) -> ?*failure.Error
+pub fn user_cache_dir(app: str, out: *str) -> ?*lang.Error
 {
 	if windows() {
 		*out = try windows_dir(app, "cache");

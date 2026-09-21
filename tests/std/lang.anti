@@ -1,0 +1,81 @@
+//! `anti.lang` is the root of the standard library and imports nothing.
+//! `Error` gives its text with the code and every cause below it, keeps
+//! the bytes until it is deleted, and leaves them out of `dup`, `equals`,
+//! `hash` and `serialize`. `NoneDereference` is the error of a `catch` on
+//! a `none` pointer.
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn one_digit(s: str) -> int may fail
+{
+	if s.len != 1 {
+		fail "not one digit";
+	}
+	return 4;
+}
+
+fn main() -> int
+{
+	let below = lang.Error.new(2, "no such file");
+	let e = lang.Error.wrap(3, "cannot read the configuration", below);
+	let first = e.text();
+	io.println(first);
+	if e.text().ptr != first.ptr {
+		return 1;
+	}
+
+	/* The copy formats a text of its own. */
+	let copy = dup(e);
+	let copied = copy.text();
+	if copied.ptr == first.ptr || !text.equal(copied, first) {
+		return 2;
+	}
+
+	/* Two errors are equal whether or not one of them has its text. */
+	let a = lang.Error.new(5, "same");
+	let b = lang.Error.new(5, "same");
+	io.println(a.text());
+	if !a.equals(b) || a.hash() != b.hash() {
+		return 3;
+	}
+	let out = text.Builder.new();
+	a.serialize(&out);
+	io.println(out.text());
+
+	let n = one_digit("12") catch f {
+		io.println(f.text());
+		yield 0;
+	};
+	if n != 0 {
+		return 4;
+	}
+
+	let low = lang.Error.new(-12, "below zero");
+	io.println(low.text());
+	let lowest = lang.Error.new(-9223372036854775807 - 1, "lowest");
+	io.println(lowest.text());
+	let highest = lang.Error.new(9223372036854775807, "highest");
+	io.println(highest.text());
+
+	let missing: ?*lang.Error = none;
+	let found = missing catch m {
+		if !(m is *lang.NoneDereference) {
+			return 5;
+		}
+		io.println(m.text());
+		yield a;
+	};
+	if found != a {
+		return 6;
+	}
+
+	delete(highest);
+	delete(lowest);
+	delete(low);
+	delete(b);
+	delete(a);
+	delete(copy);
+	delete(e);
+	return 0;
+}

@@ -4,7 +4,7 @@
 //! calls the `construct` of its base in another module with an argument,
 //! through `self.super`, and passes its error on.
 
-import anti.error;
+import anti.lang;
 import com.example.animal;
 import com.example.dog;
 
@@ -31,7 +31,7 @@ class Cat
 	inherits animal.Pet,
 	pub lives: int = 9,
 
-	fn construct(self, owner: int) -> ?*error.Error
+	fn construct(self, owner: int) -> ?*lang.Error
 	{
 		try self.super.construct(owner * 2);
 		printf("cat %d %d\n".ptr, self.owner as c_int, self.lives as c_int);

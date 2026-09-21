@@ -428,7 +428,7 @@ endif()
 
 # The standard library in std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
-set(ANTIC_STD_MODULES io text license error time os reflect random collection toml args json log)
+set(ANTIC_STD_MODULES lang io text license error time os reflect random collection toml args json log)
 set(std_files "")
 foreach(module IN LISTS ANTIC_STD_MODULES)
     set(output "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")

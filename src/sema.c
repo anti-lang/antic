@@ -622,25 +622,25 @@ static struct type *resolve_type(struct checker *c, struct type_expr *t)
 }
 
 /* DESIGN: `may fail` gives a function the convention a program used to
-   write by hand: `?*error.Error` as the result and an out pointer for
+   write by hand: `?*lang.Error` as the result and an out pointer for
    what it computes. The class is an ordinary imported one, so a module
-   that writes the form imports `anti.error` as it does for every error
-   it names. */
+   that writes the form imports `anti.lang` as it does for every error it
+   names. */
 static struct type *error_class(struct checker *c, struct pos pos)
 {
-    static const struct name module = {"anti.error", 10};
-    static const struct name class_name = {"Error", 5};
+    static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
+    static const struct name class_name = {LANG_ERROR, sizeof LANG_ERROR - 1};
     const struct interface *lib = find_library(c, &module);
     struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
 
-    /* `anti.error` declares the class itself rather than importing it. */
-    if (sym == NULL && name_is(&c->module_name, "anti.error")) {
+    /* `anti.lang` declares the class itself rather than importing it. */
+    if (sym == NULL && name_is(&c->module_name, LANG_MODULE)) {
         sym = lookup(c, &class_name);
     }
     if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
         sym->type->kind != TYPE_CLASS) {
-        error_at(c, pos, "`may fail` gives `?*anti.error.Error`, so the "
-                 "module imports `anti.error`");
+        error_at(c, pos, "`may fail` gives `?*" LANG_MODULE "." LANG_ERROR
+                 "`, so the module imports `" LANG_MODULE "`");
         return NULL;
     }
     return sym->type;
@@ -1422,7 +1422,9 @@ static void declare_get(struct checker *c, struct item *it)
     struct item **members;
     struct item *m = arena_alloc(c->arena, sizeof *m);
     struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
+    struct text qualified = {0};
     struct name name;
+    char *text;
     size_t i;
 
     name.text = get_text;
@@ -1430,6 +1432,13 @@ static void declare_get(struct checker *c, struct item *it)
     if (find_member(t, &name) != NULL) {
         return;
     }
+    /* The symbol is `T.get`, as for every function of a body, so the
+       module defines `module.T.get` and another module calls that. */
+    text_appendf(&qualified, "%.*s.%s", (int)it->name.length, it->name.text,
+                 get_text);
+    text = arena_alloc(c->arena, qualified.length + 1);
+    memcpy(text, qualified.data, qualified.length + 1);
+    text_free(&qualified);
     memset(m, 0, sizeof *m);
     memset(sym, 0, sizeof *sym);
     m->kind = ITEM_FN;
@@ -1441,7 +1450,8 @@ static void declare_get(struct checker *c, struct item *it)
     m->symbol = sym;
     m->singleton_get = true;
     sym->kind = SYMBOL_FN;
-    sym->name = name;
+    sym->name.text = text;
+    sym->name.length = strlen(text);
     sym->item = m;
     sym->type = types_fn(c->types, NULL, 0, types_pointer(c->types, t));
     members = arena_alloc(c->arena, (it->member_count + 1) * sizeof *members);
@@ -2512,18 +2522,19 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
 static bool const_symbol(struct checker *c, struct symbol *sym,
                          struct pos use);
 
-/* DESIGN: a function that can fail returns a pointer to `anti.error`'s
+/* DESIGN: a function that can fail returns a pointer to `anti.lang`'s
    `Error` or to a class below it. The compiler knows the convention by
    the module path and the class name, and nothing else of the standard
    library reaches the checker. */
 /* DESIGN: `p catch fatal` and `p catch e { }` on a `?*T` follow the
-   error forms, and the error is `anti.error.NoneDereference`. The class is
+   error forms, and the error is `anti.lang.NoneDereference`. The class is
    an ordinary imported one, so the module that writes the form imports
-   `anti.error` as it does for every other error it names. */
+   `anti.lang` as it does for every other error it names. */
 static struct symbol *null_pointer_maker(struct checker *c, struct pos pos)
 {
-    static const struct name module = {"anti.error", 10};
-    static const struct name class_name = {"NoneDereference", 15};
+    static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
+    static const struct name class_name = {
+        LANG_NONE_DEREFERENCE, sizeof LANG_NONE_DEREFERENCE - 1};
     static const struct name maker = {"new", 3};
     const struct interface *lib = find_library(c, &module);
     struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
@@ -2533,9 +2544,9 @@ static struct symbol *null_pointer_maker(struct checker *c, struct pos pos)
             : NULL;
 
     if (m == NULL || m->symbol == NULL || m->symbol->type == NULL) {
-        error_at(c, pos, "`catch` on a `?*T` gives an "
-                 "`anti.error.NoneDereference`, so the module imports "
-                 "`anti.error`");
+        error_at(c, pos, "`catch` on a `?*T` gives an `" LANG_MODULE "."
+                 LANG_NONE_DEREFERENCE "`, so the module imports `"
+                 LANG_MODULE "`");
         return NULL;
     }
     return m->symbol;
@@ -2553,8 +2564,8 @@ static struct symbol *error_maker(struct checker *c, struct pos pos)
 
     if (m == NULL || m->symbol == NULL || m->symbol->type == NULL ||
         m->symbol->type->param_count != 2) {
-        error_at(c, pos, "`fail \"text\"` calls `anti.error.Error.new`, "
-                 "which takes a code and a message");
+        error_at(c, pos, "`fail \"text\"` calls `" LANG_MODULE "." LANG_ERROR
+                 ".new`, which takes a code and a message");
         return NULL;
     }
     return m->symbol;
@@ -2577,8 +2588,7 @@ static bool is_failing(const struct checker *c, const struct type *t)
         return false;
     }
     for (t = t->element; t != NULL; t = t->base) {
-        if (name_is(&t->name, "Error") && t->module.length == 10 &&
-            memcmp(t->module.text, "anti.error", 10) == 0) {
+        if (types_is_lang_error(t)) {
             return true;
         }
     }
@@ -2655,8 +2665,7 @@ static bool returns_error(const struct block *b, const struct symbol *sym)
 static bool makes_error(const struct type *owner)
 {
     for (; owner != NULL; owner = owner->base) {
-        if (name_is(&owner->name, "Error") && owner->module.length == 10 &&
-            memcmp(owner->module.text, "anti.error", 10) == 0) {
+        if (types_is_lang_error(owner)) {
             return true;
         }
     }
@@ -4971,7 +4980,7 @@ static void check_step(struct checker *c, struct stmt *s, struct type *element)
 
 /* Check the `catch` that guards a `?*T` in a `let`, and give the type
    the binding holds. The handler runs when the pointer is `none`, with
-   an `anti.error.NoneDereference` in hand, and it leaves the block or ends
+   an `anti.lang.NoneDereference` in hand, and it leaves the block or ends
    with `yield`, as every handler does. */
 static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
                                         struct type *value)
@@ -6720,16 +6729,14 @@ static const char *keep_name(struct arena *arena, const char *text,
     return copy;
 }
 
-/* DESIGN: `anti.error.Error` crosses to C as `struct anti_Error *`, the
+/* DESIGN: `anti.lang.Error` crosses to C as `struct anti_Error *`, the
    type the object model gives the generated helpers. The header declares
    the tag itself and C never reads the layout, so an export signature
    names the class without it being an `export class`. A class below it
    has no C name and stays out. */
 static bool is_error_class(const struct type *t)
 {
-    return t->kind == TYPE_CLASS && name_is(&t->name, "Error") &&
-           t->module.length == 10 &&
-           memcmp(t->module.text, "anti.error", 10) == 0;
+    return types_is_lang_error(t);
 }
 
 /* Whether a value of type t has a C representation. That is a scalar

@@ -3,7 +3,7 @@
 //! is handled where it stands. The ABI is `?*Error f(self, R *out)`, so the
 //! entry has the shape every other failing function has.
 
-import anti.error;
+import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -31,7 +31,7 @@ final class Refuser
 
 	concrete fn read(self, n: int) -> int may fail
 	{
-		fail error.Error.new(self.code, "the source refuses");
+		fail lang.Error.new(self.code, "the source refuses");
 	}
 }
 

@@ -18,7 +18,7 @@
 //! code of an error names the reason. `--no-reflect` drops the function
 //! lists, and every `call` then gives the error `BAD_INDEX`.
 
-import anti.error;
+import anti.lang;
 import anti.text;
 
 extern fn anti_rt_descriptor(object: ?*byte) -> ?*byte;
@@ -142,19 +142,19 @@ pub fn get(object: *byte, d: *byte, index: int) -> Value
 /// integer or a float narrows to the field's type. An index out of range,
 /// a field that no `Value` carries and a value of another kind each give
 /// an error with the code that names the reason, and write nothing.
-pub fn set(object: *byte, d: *byte, index: int, value: Value) -> ?*error.Error
+pub fn set(object: *byte, d: *byte, index: int, value: Value) -> ?*lang.Error
 {
 	let v = value;
 	let reason = anti_rt_reflect_set(object, d, index, &v);
 	if reason == BAD_INDEX {
-		return error.Error.new(BAD_INDEX, "the class has no field at this index");
+		return lang.Error.new(BAD_INDEX, "the class has no field at this index");
 	}
 	if reason == NOT_CARRIED {
-		return error.Error.new(NOT_CARRIED,
+		return lang.Error.new(NOT_CARRIED,
 			"no Value carries the type of this field");
 	}
 	if reason == WRONG_KIND {
-		return error.Error.new(WRONG_KIND,
+		return lang.Error.new(WRONG_KIND,
 			"the value is of another kind than the field takes");
 	}
 	return none;
@@ -266,24 +266,24 @@ pub fn of_ptr(v: *byte) -> Value
 /// with `NOT_CARRIED`. Arguments of another count give `WRONG_COUNT`, and
 /// of another kind `WRONG_KIND`.
 pub fn call(object: *Object, index: int, args: []Value, out: *Value)
-	-> ?*error.Error
+	-> ?*lang.Error
 {
 	*out = nothing();
 	let reason = anti_rt_reflect_call(object, index, args.ptr, args.len, out);
 	if reason == BAD_INDEX {
-		return error.Error.new(BAD_INDEX,
+		return lang.Error.new(BAD_INDEX,
 			"the class has no public function at this index");
 	}
 	if reason == NOT_CARRIED {
-		return error.Error.new(NOT_CARRIED,
+		return lang.Error.new(NOT_CARRIED,
 			"no Value carries a type of this function");
 	}
 	if reason == WRONG_COUNT {
-		return error.Error.new(WRONG_COUNT,
+		return lang.Error.new(WRONG_COUNT,
 			"the function takes another number of arguments");
 	}
 	if reason == WRONG_KIND {
-		return error.Error.new(WRONG_KIND,
+		return lang.Error.new(WRONG_KIND,
 			"an argument is of another kind than its parameter takes");
 	}
 	return none;

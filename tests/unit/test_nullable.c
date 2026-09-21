@@ -261,11 +261,11 @@ void test_nullable(void)
                  "found `int`");
 
     /* `p catch fatal` and `p catch e { }` follow the error forms, with
-       the error `anti.error.NoneDereference`. The class is an ordinary
+       the error `anti.lang.NoneDereference`. The class is an ordinary
        imported one, so a module that writes the form imports it. */
     body_rejects("    let p = maybe();\n    let m = p catch fatal;",
-                 "`catch` on a `?*T` gives an `anti.error.NoneDereference`, so "
-                 "the module imports `anti.error`");
+                 "`catch` on a `?*T` gives an `anti.lang.NoneDereference`, so "
+                 "the module imports `anti.lang`");
     body_rejects("    let n = 1 catch fatal;",
                  "`catch` here guards a `?*T`, found `int`");
 

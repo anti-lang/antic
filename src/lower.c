@@ -5094,7 +5094,7 @@ static bool is_handled_call(const struct expr *e)
 }
 
 /* `let m = p catch fatal` and `let m = p catch e { }`. The handler runs
-   when p is `none`, with an `anti.error.NoneDereference` in hand, and it
+   when p is `none`, with an `anti.lang.NoneDereference` in hand, and it
    leaves the block or gives the binding a pointer with `yield`. */
 static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
 {

@@ -1,4 +1,4 @@
-import anti.error;
+import anti.lang;
 
 fn close_it(n: int) may fail
 {

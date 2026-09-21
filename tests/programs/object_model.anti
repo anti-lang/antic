@@ -2,7 +2,7 @@
 //! of the object model at once.
 import anti.io;
 import anti.text;
-import anti.error;
+import anti.lang;
 
 const PI: f32 = 3.14159;
 
@@ -63,10 +63,10 @@ final class Circle
 
 	r: f32,
 
-	fn construct(self, r: f32) -> ?*error.Error
+	fn construct(self, r: f32) -> ?*lang.Error
 	{
 		if r <= 0.0 {
-			return error.Error.new(1, "radius must be positive");
+			return lang.Error.new(1, "radius must be positive");
 		}
 		self.kind = Kind.Circle;
 		self.r = r;

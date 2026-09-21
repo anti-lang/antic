@@ -1,133 +1,49 @@
-//! The error convention of the language.
+//! The conveniences of the error convention.
 //!
-//! A function that can fail is declared `-> R may fail`, or `may fail`
-//! when it has no result. It returns its result with `return`, and it
-//! leaves on the error channel with `fail e;` or with `fail "text";`,
-//! which builds an `Error` of code 0. Two answers come back as a tuple.
-//! The compiler gives it the ABI `?*Error f(args, R *out)`: `none` on
-//! success, with the result written through `out`. A binding writes that
-//! form by hand, and a call handles it the same way.
-//!
-//! A function that cannot fail returns its value. A function whose only
-//! failure is "not present" returns `?*T` or `bool`. The error a handler
-//! binds is deleted when the handler exits, unless the handler returns it.
+//! `Error` and the convention itself live in `anti.lang`, the root of the
+//! standard library. `anti.error` adds `SystemError`, the error of a
+//! failing system call, `on_fatal`, which registers the function that
+//! runs before `fatal` ends the program, and `check`.
 
-import anti.io;
-import anti.text;
+import anti.lang;
 
 extern fn anti_rt_errno() -> c_int;
 extern fn anti_rt_errno_text(code: c_int) -> ?*byte;
 extern fn anti_rt_last_error() -> c_int;
 extern fn anti_rt_last_error_text(code: c_int) -> ?*byte;
+extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
 
-/// A failure, with a code, a message and the error that caused it.
-pub class Error
+/// The error of a failing system call, with the number the system gave.
+pub class SystemError
 {
-	/// The code of the failure, which the caller may switch on.
-	pub code: int = 0,
-	/// One line, without a trailing newline.
-	pub message: str = "",
-	/// The error below this one, or `none`.
-	protected own cause: ?*Error = none,
-
-	/// An error with a code and a message and no cause.
-	pub fn new(code: int, message: str) -> *Error
-	{
-		return alloc Error { code: code, message: message, cause: none };
-	}
-
-	/// An error that wraps the one below it.
-	pub fn wrap(code: int, message: str, cause: *Error) -> *Error
-	{
-		return alloc Error { code: code, message: message, cause: cause };
-	}
+	inherits lang.Error,
+	/// The number of the failure: `errno`, or the Win32 error code. The
+	/// code of the error holds it as well.
+	pub errno: int = 0,
 
 	/// The error of the last failing C call, from `errno`.
-	pub fn from_errno() -> *Error
+	pub fn from_errno() -> *SystemError
 	{
-		let code = anti_rt_errno() as int;
-		return Error.new(code, text.from_c(anti_rt_errno_text(code as c_int)));
+		let number = anti_rt_errno() as int;
+		let e = alloc SystemError { errno: number };
+		e.code = number;
+		e.message = anti_rt_text_from_c(anti_rt_errno_text(number as c_int));
+		return e;
 	}
 
 	/// The error of the last failing Win32 call.
 	///
 	/// Every other system gives an error with code 0 and an empty
 	/// message, because it has no Win32 to ask.
-	pub fn from_win32() -> *Error
+	pub fn from_win32() -> *SystemError
 	{
-		let code = anti_rt_last_error() as int;
-		return Error.new(code, text.from_c(anti_rt_last_error_text(code as c_int)));
-	}
-
-	/// Write this error and every cause below it to standard error.
-	pub fn print(self)
-	{
-		io.eprint(self.message);
-		io.eprint("\n");
-		let below = self.cause;
-		while below != none do {
-			io.eprint("  caused by: ");
-			io.eprint(below.message);
-			io.eprint("\n");
-			below = below.cause;
-		}
-	}
-
-	/// This error and every cause below it, in one text.
-	///
-	/// The builder owns the bytes, so the caller keeps it alive as long
-	/// as it reads the text.
-	pub fn text(self, out: *text.Builder)
-	{
-		out.append(self.message);
-		let below = self.cause;
-		while below != none do {
-			out.append("\n  caused by: ");
-			out.append(below.message);
-			below = below.cause;
-		}
-	}
-
-	/// Print this error and end the program with its code, or with 1.
-	///
-	/// The function that `on_fatal` registered runs first.
-	pub fn fatal(self)
-	{
-		let last = Fatal.get().hook.load();
-		if last != none {
-			last();
-		}
-		self.print();
-		if self.code != 0 {
-			io.exit(self.code);
-		}
-		io.exit(1);
-	}
-}
-
-/// The error of a `?*T` that held `none` where a pointer was needed.
-///
-/// `p catch fatal` and `p catch e { }` on a `?*T` give one of these. It
-/// is an `Error` like any other, so a handler that takes an `*Error`
-/// takes it too.
-pub class NoneDereference
-{
-	inherits Error,
-
-	/// The error a `catch` on a `none` pointer gives.
-	pub fn new() -> *NoneDereference
-	{
-		let e = alloc NoneDereference { };
-		e.code = 1;
-		e.message = "the pointer is none";
+		let number = anti_rt_last_error() as int;
+		let e = alloc SystemError { errno: number };
+		e.code = number;
+		e.message =
+			anti_rt_text_from_c(anti_rt_last_error_text(number as c_int));
 		return e;
 	}
-}
-
-/// The one function that runs before `fatal` ends the program.
-singleton class Fatal
-{
-	atomic hook: ?fn() = none,
 }
 
 /// Register the function that runs before `fatal` ends the program.
@@ -136,7 +52,11 @@ singleton class Fatal
 /// one before it.
 pub fn on_fatal(f: fn())
 {
-	Fatal.get().hook.store(f);
+	/* The singleton is bound to a local first. The checker refuses the
+	   chained `lang.Fatal.get().hook.store(f)` across modules, a defect
+	   that docs/reports/2026-09-21-anti-lang-error.md reports. */
+	let fatal = lang.Fatal.get();
+	fatal.hook.store(f);
 }
 
 /// Call `fatal` on an error, and return on `none`.
@@ -144,7 +64,7 @@ pub fn on_fatal(f: fn())
 /// It takes the result of a function written by hand as `-> ?*Error`,
 /// such as a binding. A call of a `may fail` function writes
 /// `catch fatal` instead.
-pub fn check(e: ?*Error)
+pub fn check(e: ?*lang.Error)
 {
 	if e != none {
 		e.fatal();

@@ -53,7 +53,7 @@ The round-three small items and the simd structs stay where the small things are
 - A function value follows the same rule. `fn(...)` never holds `none`, `?fn(...)` may, and it is called only after the program has checked it. Narrowing works on it as it does on a pointer.
 - Narrowing is per block. Inside `if p != none { }` the name `p` has type `*T`. After `if p == none { return; }` it has type `*T` for the rest of the enclosing block. After the block that narrowed it, `p` is `?*T` again. Assigning to `p` inside a narrowed block ends the narrowing for that block.
 - Narrowing follows `&&` and `||`. In `p != none && p.n > 0` the right operand reads `p` as `*T`, and so does the body of the `if`. In `p == none || p.n > 0` the right operand reads it as `*T` and the body does not, because either side may have decided the chain.
-- `let m = p else { leave };` binds `m` as `*T`, and the `else` block must leave the enclosing block. `p catch fatal` and `p catch e { yield q; }` follow the error forms, with the error `anti.error.NoneDereference`.
+- `let m = p else { leave };` binds `m` as `*T`, and the `else` block must leave the enclosing block. `p catch fatal` and `p catch e { yield q; }` follow the error forms, with the error `anti.lang.NoneDereference`.
 - `alloc T { }` and `alloc T(args)` return `*T`. Out of memory is fatal. `alloc(T, n)` returns `?*T`, because `malloc` does.
 - `p as *T` returns `*T` and traps. `p as? *T` returns `?*T`. `dup(p)` returns the type of `p`. `is` works on both.
 - A class field of type `*T` without a default must be set in every literal or in `construct`. A field of type `?*T` may default to `none`.
@@ -97,15 +97,15 @@ let (q, r) = divide(7, 0) catch e { yield (0, 0); };
 
 - `Error` gains `pub at: SourceLocation`, set by `fail` at the position of the `fail` statement when the error has no location yet. The first `fail` wins, so an error forwarded through `try` keeps its origin, and the `cause` chain shows the path it took.
 - `Error` gains `own frames: ?*StackTrace`, captured by the same `fail` when backtraces are on. On in dev mode, off in release. `--anti.backtrace` and `backtrace = true` in the runtime configuration turn it on for a release build. When off the field is `none` and `fail` costs what it costs today.
-- `e.text()` prints `file:line:column: message`, then the cause chain, then the trace when there is one. `print` and `fatal` inherit it.
+- `e.text()` prints `file:line:column: ` and the error, then the cause chain, then the trace when there is one. The error is `error N: message`, or the message alone when its code is 0. `print` and `fatal` inherit it.
 - `Error.new` takes no location. `fail` supplies it.
-- `anti.debug.StackTrace`: `StackTrace.capture(skip: int = 0) -> *StackTrace` walks frame pointers and stores the return addresses with, per frame, the module the address is in, that module's build id and its load base. `t.frames` is the raw form. `t.text()` prints one address per line with the modules on top. `t.symbolize() -> []Frame` fills `Frame { address, function: str, file: str, line: int }` from the symbol table for the function and from the line table for file and line, so a release build gives functions and a `-g` build gives everything. Symbolising is lazy and never runs for an error that was handled.
+- `anti.lang.StackTrace`: `StackTrace.capture(skip: int = 0) -> *StackTrace` walks frame pointers and stores the return addresses with, per frame, the module the address is in, that module's build id and its load base. `t.frames` is the raw form. `t.text()` prints one address per line with the modules on top. `t.symbolize() -> []Frame` fills `Frame { address, function: str, file: str, line: int }` from the symbol table for the function and from the line table for file and line, so a release build gives functions and a `-g` build gives everything. Symbolising is lazy and never runs for an error that was handled.
 - `anti.debug.backtrace(n)` is the short form returning a `StackTrace`.
 - Every Anti executable and shared library carries a build id, the digest of its code, in `anti_licenses` beside the version.
 
 ## Source locations
 
-- `here` is a keyword whose value is a `SourceLocation` for the position it is written at: `file`, `line`, `column`, `function`, `module`. `file` is the root-relative path the checks use. `function` is the full name, `module.Class.f`. The value is constant data, so it costs the loads.
+- `here` is a keyword whose value is an `anti.lang.SourceLocation` for the position it is written at: `file`, `line`, `column`, `function`, `module`. `file` is the root-relative path the checks use. `function` is the full name, `module.Class.f`. The value is constant data, so it costs the loads.
 - `here` as a default parameter value is evaluated at the call site, so `fn log(level: Level, msg: str, at: SourceLocation = here)` sees the caller's position. That is how a logger, `show` and a traced error get the caller's line without a macro.
 - `here` in an ordinary expression gives the position of that expression, which is rarely what a message wants. The site says so.
 
@@ -143,7 +143,7 @@ The switch is the one `assert` uses: emitted in dev mode, absent in release, dec
 let (lo, f) = a.lo + b.lo;
 let (hi, f) = a.hi + b.hi + f.carry;
 if f.overflow {
-	fail error.Error.new(1, "sum does not fit");
+	fail lang.Error.new(1, "sum does not fit");
 }
 ```
 
@@ -211,7 +211,7 @@ tests
 
 ## Locking and channels
 
-- `anti.rt.Mutex` is a struct wrapping the platform's mutex, created with `Mutex.new()` and released with `m.destroy()`.
+- `anti.lang.Mutex` is a struct wrapping the platform's mutex, created with `Mutex.new()` and released with `m.destroy()`.
 - `sync m { }` locks `m` for the block and unlocks it on every exit, including `return`, `break`, `continue` and the error forms. Nested `sync` on the same mutex is a compile error when both are in one function and a run-time deadlock otherwise, which the chapter states.
 - A field written inside a `sync` block and read outside any `sync` is a warning from the whole-program analysis. The warning fires when both sites are in functions a worker reaches.
 - `chan T` is a bounded queue of `T` values, `T` pointer-free by the `parallel` rule. `let c = chan int(16);` creates one. `send(c, v)` blocks when full, `recv(c) -> ?T` blocks when empty and returns `none` after `close(c)`. `select` waits on more than one channel and is written like `switch` over the channels. `chan`, `send`, `recv`, `select` and `sync` were reserved from chapter 2.
@@ -239,9 +239,10 @@ The release binary carries no symbol data. Every deliverable ships a symbols arc
 
 ## Namespaces
 
-- `anti.lang` holds every type the compiler knows by name: `Object`, `Error`, `NoneDereference`, `Flags`, `Job`, `Mutex`, `Trace`, `TraceHandler`. `anti.rt` is the C runtime and holds no Anti module a program imports. Everything that only helps lives elsewhere: `anti.error` for error conveniences, `anti.trace` for the stock handlers, `anti.log`, `anti.time` and the rest.
+- `anti.lang` holds every type the compiler knows by name: `Object`, `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `Flags`, `Job`, `Mutex`, `Trace`, `TraceHandler`. `anti.rt` is the C runtime and holds no Anti module a program imports. Everything that only helps lives elsewhere: `anti.error` for error conveniences, `anti.trace` for the stock handlers, `anti.log`, `anti.time` and the rest.
 - The rule for a reader: if the compiler needs it, it is in `anti.lang`. If it only helps, it is not.
-- `docs/anti-object-model.md` names `anti.rt.Object` and `anti.error.Error`. Both are `anti.lang` under this rule, and the object model document is corrected when it is next edited.
+- `anti.lang` is the root of the standard library and imports nothing. Every other module imports it and names `*anti.lang.Error`, so no import cycle forms. `anti.error` imports `anti.lang` and holds `SystemError`, `on_fatal` and `check`.
+- `std/anti/lang.anti` holds `Error`, `NoneDereference` and the hook that `fatal` reads. The compiler declares `Object` and `Job` itself and still names them under `anti.rt`, by a `[provisional]` entry in `docs/decisions.md`. `SourceLocation` and `StackTrace` come into the code with error origins and stack traces, and `Flags` and `Mutex` with their own steps.
 
 ## Hooks and tracing
 

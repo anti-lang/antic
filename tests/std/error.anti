@@ -2,8 +2,12 @@
 //! and every call of one handles the error. `catch` handles it at the
 //! call, `try` hands it to the caller, and a `try` block gives one handler
 //! to a whole block. `fail "text";` builds an `Error` with code 0.
+//!
+//! `Error` lives in `anti.lang`. `anti.error` adds `SystemError`, the
+//! error of a failing system call, and `check` for a hand-written result.
 import anti.error;
 import anti.io;
+import anti.lang;
 import anti.text;
 
 extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
@@ -11,7 +15,7 @@ extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
 fn open_missing(path: str) may fail
 {
 	if fopen(path.ptr, "r".ptr) == none {
-		fail error.Error.from_errno();
+		fail error.SystemError.from_errno();
 	}
 }
 
@@ -23,7 +27,7 @@ fn read_config() may fail
 fn size_of_file(path: str) -> int may fail
 {
 	if fopen(path.ptr, "r".ptr) == none {
-		fail error.Error.new(7, "no such file");
+		fail lang.Error.new(7, "no such file");
 	}
 	return 1;
 }
@@ -36,7 +40,7 @@ fn first_line(path: str) -> ?*byte may fail
 {
 	let file = fopen(path.ptr, "r".ptr);
 	if file == none {
-		fail error.Error.new(8, "no such file");
+		fail lang.Error.new(8, "no such file");
 	}
 	return file;
 }
@@ -90,8 +94,26 @@ fn main() -> int
 	}
 
 	read_config() catch e {
+		if !(e is *error.SystemError) {
+			return 9;
+		}
 		e.print();
 	};
+
+	/* A copy of an error from another module leaves the text of the
+	   original alone, so both are deleted once each. */
+	if fopen("/nonexistent/anti/copy".ptr, "r".ptr) != none {
+		return 10;
+	}
+	let s = error.SystemError.from_errno();
+	let said = s.text();
+	let copy = dup(s);
+	if copy.errno != s.errno || copy.code != s.errno ||
+		!text.equal(copy.text(), said) || copy.text().ptr == said.ptr {
+		return 11;
+	}
+	delete(copy);
+	delete(s);
 
 	try {
 		open_missing("/nonexistent/anti/one");
@@ -106,7 +128,10 @@ fn main() -> int
 	if fopen("/nonexistent/anti/win32".ptr, "r".ptr) != none {
 		return 5;
 	}
-	let v = error.Error.from_win32();
+	let v = error.SystemError.from_win32();
+	if v.errno != v.code {
+		return 12;
+	}
 	if v.code == 0 && text.byte_count(v.message) == 0 {
 		io.println("no win32 error");
 	} else if v.code == 3 && text.byte_count(v.message) > 0 {

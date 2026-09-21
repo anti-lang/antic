@@ -3,8 +3,8 @@
 //! `*T` never holds `none` and `?*T` may. The checks below are the ones
 //! this program wrote, and nothing else is emitted for the difference.
 
-import anti.error;
 import anti.io;
+import anti.lang;
 import anti.text;
 
 extern fn getenv(name: ?*byte) -> ?*byte;
@@ -104,7 +104,7 @@ fn main() -> int
 	}
 
 	/* `p catch e { }` follows the error forms, with the error
-	   `anti.error.NoneDereference`. The handler gives the binding a
+	   `anti.lang.NoneDereference`. The handler gives the binding a
 	   pointer with `yield`. */
 	let spare = alloc(byte, 4) else { return 5; };
 	let fallback = shape(false) catch e {

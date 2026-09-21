@@ -3,8 +3,8 @@
 //! LOCALAPPDATA, so one expected output stands on every host of a family.
 //! The test std_userdirs_no_home unsets them and reads the failure, whose
 //! message names the variable that is absent.
-import anti.error as failure;
 import anti.io;
+import anti.lang;
 import anti.os;
 import anti.text;
 
@@ -19,7 +19,7 @@ fn show(dir: str)
 }
 
 /// Print the message of `e` and give the empty text.
-fn failed(e: *failure.Error) -> str
+fn failed(e: *lang.Error) -> str
 {
 	io.print("failed: ");
 	io.print(e.message);

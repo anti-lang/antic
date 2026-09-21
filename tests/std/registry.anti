@@ -1,8 +1,8 @@
 //! The link step writes a registry of every class of the program.
 //! `reflect.new` builds an object of a class it names, and
 //! `Object.deserialize` builds one from the JSON that `serialize` writes.
-import anti.error;
 import anti.io;
+import anti.lang;
 import anti.reflect;
 import anti.text;
 
@@ -33,7 +33,7 @@ class Sized
 {
 	pub n: int = 0,
 
-	fn construct(self, n: int) -> ?*error.Error
+	fn construct(self, n: int) -> ?*lang.Error
 	{
 		self.n = n;
 		return none;

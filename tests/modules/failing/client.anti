@@ -2,7 +2,7 @@
 //! comes from the library file, so the call needs a handler here and
 //! `try` forwards inside a `may fail` function of this module.
 
-import anti.error;
+import anti.lang;
 import com.example.counter;
 
 extern fn printf(format: ?*byte, ...) -> c_int;

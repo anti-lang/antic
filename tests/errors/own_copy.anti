@@ -1,4 +1,4 @@
-import anti.error;
+import anti.lang;
 
 class Leaf
 {
@@ -10,7 +10,7 @@ class Item
 	pub n: int = 0,
 	pub own leaf: ?*Leaf = none,
 
-	fn construct(self, n: int) -> ?*error.Error
+	fn construct(self, n: int) -> ?*lang.Error
 	{
 		self.n = n;
 		return none;

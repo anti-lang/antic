@@ -1,4 +1,4 @@
-import anti.error;
+import anti.lang;
 
 fn risky() -> int may fail
 {

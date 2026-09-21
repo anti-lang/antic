@@ -1,0 +1,215 @@
+//! The root of the standard library, which imports nothing.
+//!
+//! It holds the types the compiler knows by name, so every other module
+//! can name them without an import cycle. `Object` and `Job` are declared
+//! by the compiler itself, under `anti.rt` for now.
+//!
+//! `Error` is the error convention of the language. A function that can
+//! fail is declared `-> R may fail`, or `may fail` when it has no result.
+//! It returns its result with `return`, and it leaves on the error channel
+//! with `fail e;` or with `fail "text";`, which builds an `Error` of code
+//! 0. Two answers come back as a tuple. The compiler gives it the ABI
+//! `?*Error f(args, R *out)`: `none` on success, with the result written
+//! through `out`. A binding writes that form by hand, and a call handles
+//! it the same way.
+//!
+//! A function that cannot fail returns its value. A function whose only
+//! failure is "not present" returns `?*T` or `bool`. The error a handler
+//! binds is deleted when the handler exits, unless the handler returns it.
+
+extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
+extern fn anti_rt_exit(status: c_int);
+extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
+
+/// A failure, with a code, a message and the error that caused it.
+pub class Error
+{
+	/// The code of the failure, which the caller may switch on.
+	pub code: int = 0,
+	/// One line, without a trailing newline.
+	pub message: str = "",
+	/// The error below this one, or `none`.
+	protected own cause: ?*Error = none,
+	/// The bytes `text` gave, ended by a NUL. `dup` leaves the copy
+	/// without them, and it formats its own.
+	transient text_cache: ?*byte = none,
+
+	/// An error with a code and a message and no cause.
+	pub fn new(code: int, message: str) -> *Error
+	{
+		return alloc Error { code: code, message: message, cause: none };
+	}
+
+	/// An error that wraps the one below it.
+	pub fn wrap(code: int, message: str, cause: *Error) -> *Error
+	{
+		return alloc Error { code: code, message: message, cause: cause };
+	}
+
+	/// This error and every cause below it, in one text.
+	///
+	/// Each error is `error N: message`, or the message alone when its
+	/// code is 0. Every cause follows on a line of its own after
+	/// `  caused by: `. The text is formed at the first call, and the
+	/// error keeps its bytes until it is deleted. When the memory for
+	/// them runs out, the text is the message alone.
+	pub fn text(self) -> str
+	{
+		let made = self.text_cache;
+		if made != none {
+			return anti_rt_text_from_c(made);
+		}
+		let caused_by = "\n  caused by: ";
+		let length = line_length(self.code, self.message);
+		let below = self.cause;
+		while below != none do {
+			length += caused_by.len + line_length(below.code, below.message);
+			below = below.cause;
+		}
+		let room = alloc(byte, length + 1) else {
+			return self.message;
+		};
+		let at = put_line(room, 0, self.code, self.message);
+		below = self.cause;
+		while below != none do {
+			at = put_text(room, at, caused_by);
+			at = put_line(room, at, below.code, below.message);
+			below = below.cause;
+		}
+		room[at] = 0;
+		self.text_cache = room;
+		return anti_rt_text_from_c(room);
+	}
+
+	/// Write the text of this error and a newline to standard error.
+	pub fn print(self)
+	{
+		let said = self.text();
+		anti_rt_write(2, said.ptr, said.len as c_size_t);
+		anti_rt_write(2, "\n".ptr, 1);
+	}
+
+	/// Print this error and end the program with its code, or with 1.
+	///
+	/// The function that `error.on_fatal` registered runs first.
+	pub fn fatal(self)
+	{
+		let last = Fatal.get().hook.load();
+		if last != none {
+			last();
+		}
+		self.print();
+		if self.code != 0 {
+			anti_rt_exit(self.code as c_int);
+		}
+		anti_rt_exit(1);
+	}
+
+	concrete fn destruct(self)
+	{
+		free(self.text_cache);
+	}
+}
+
+/// The error of a `?*T` that held `none` where a pointer was needed.
+///
+/// `p catch fatal` and `p catch e { }` on a `?*T` give one of these. It
+/// is an `Error` like any other, so a handler that takes an `*Error`
+/// takes it too.
+pub class NoneDereference
+{
+	inherits Error,
+
+	/// The error a `catch` on a `none` pointer gives.
+	pub fn new() -> *NoneDereference
+	{
+		let e = alloc NoneDereference { };
+		e.code = 1;
+		e.message = "the pointer is none";
+		return e;
+	}
+}
+
+/// The one function that runs before `fatal` ends the program.
+///
+/// `error.on_fatal` stores it. The hook is an atomic field, so a program
+/// replaces it without a data race.
+internal singleton class Fatal
+{
+	pub atomic hook: ?fn() = none,
+}
+
+/// The number of bytes `put_line` writes for one error of a chain.
+fn line_length(code: int, message: str) -> int
+{
+	if code == 0 {
+		return message.len;
+	}
+	return 6 + digits_of(code) + 2 + message.len;
+}
+
+/// Write one error of a chain at `at`, and give the index after it.
+fn put_line(room: *byte, at: int, code: int, message: str) -> int
+{
+	if code == 0 {
+		return put_text(room, at, message);
+	}
+	let next = put_text(room, at, "error ");
+	next = put_int(room, next, code);
+	next = put_text(room, next, ": ");
+	return put_text(room, next, message);
+}
+
+/// Copy the bytes of `s` to `room` at `at`, and give the index after them.
+fn put_text(room: *byte, at: int, s: str) -> int
+{
+	let i = 0;
+	while i < s.len do {
+		room[at + i] = s[i];
+		i += 1;
+	}
+	return at + s.len;
+}
+
+/// The number of bytes of `n` in decimal, with its sign.
+fn digits_of(n: int) -> int
+{
+	let count = 1;
+	let rest = n / 10;
+	while rest != 0 do {
+		count += 1;
+		rest = rest / 10;
+	}
+	if n < 0 {
+		count += 1;
+	}
+	return count;
+}
+
+/// Write `n` in decimal at `at`, and give the index after it.
+///
+/// The digits come from the remainders of `n` itself and never from its
+/// negation, so the lowest `int` is written as it is.
+fn put_int(room: *byte, at: int, n: int) -> int
+{
+	let end = at + digits_of(n);
+	let first = at;
+	if n < 0 {
+		/* A character literal is a Unicode scalar, so `-` and the digits
+		   stand here as their values. */
+		room[at] = 0x2D;
+		first = at + 1;
+	}
+	let i = end;
+	let rest = n;
+	while i > first do {
+		i -= 1;
+		let digit = rest % 10;
+		if digit < 0 {
+			digit = -digit;
+		}
+		room[i] = (0x30 + digit) as byte;
+		rest = rest / 10;
+	}
+	return end;
+}

@@ -1,6 +1,6 @@
-import anti.error;
+import anti.lang;
 
-fn risky(out: *int) -> ?*error.Error
+fn risky(out: *int) -> ?*lang.Error
 {
 	*out = 1;
 	return none;

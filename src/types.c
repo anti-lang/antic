@@ -265,6 +265,15 @@ struct type *types_bound_fn(struct types *types, struct type **params,
    compiler declares it, because no compilation may define the module
    `anti.rt`. Its one field is the table pointer, which no program names
    and which every class carries at offset 0 through its base. */
+bool types_is_lang_error(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_CLASS &&
+           t->name.length == sizeof LANG_ERROR - 1 &&
+           memcmp(t->name.text, LANG_ERROR, sizeof LANG_ERROR - 1) == 0 &&
+           t->module.length == sizeof LANG_MODULE - 1 &&
+           memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
+}
+
 struct type *types_object(struct types *types)
 {
     static const char module_text[] = "anti.rt";

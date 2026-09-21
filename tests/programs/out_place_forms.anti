@@ -8,7 +8,7 @@
 //! and a `catch` handler takes it here, where `yield` puts a value of
 //! its own in the place.
 
-import anti.error;
+import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -24,22 +24,22 @@ struct Pair
 	right: int,
 }
 
-fn value(n: int, out: *int) -> ?*error.Error
+fn value(n: int, out: *int) -> ?*lang.Error
 {
 	if n < 0 {
-		return error.Error.new(1, "n is negative");
+		return lang.Error.new(1, "n is negative");
 	}
 	*out = n;
 	return none;
 }
 
-fn small(out: *u32) -> ?*error.Error
+fn small(out: *u32) -> ?*lang.Error
 {
 	*out = 9;
 	return none;
 }
 
-fn places(out: *int) -> ?*error.Error
+fn places(out: *int) -> ?*lang.Error
 {
 	let n = 0;
 	let numbers: [4]int = [0; 4];
@@ -58,7 +58,7 @@ fn places(out: *int) -> ?*error.Error
 }
 
 /// The error of a call in assignment position reaches the caller.
-fn fails(out: *int) -> ?*error.Error
+fn fails(out: *int) -> ?*lang.Error
 {
 	let n = 0;
 	n = try value(-1);
@@ -66,14 +66,14 @@ fn fails(out: *int) -> ?*error.Error
 	return none;
 }
 
-fn made(out: *Pair) -> ?*error.Error
+fn made(out: *Pair) -> ?*lang.Error
 {
 	*out = Pair { left: 3, right: 4 };
 	return none;
 }
 
 /// A value of an aggregate type through `*out`, the form anti.os writes.
-fn passed_on(out: *Pair) -> ?*error.Error
+fn passed_on(out: *Pair) -> ?*lang.Error
 {
 	*out = try made();
 	return none;

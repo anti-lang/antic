@@ -35,7 +35,7 @@ const unsigned char *anti_rt_errno_text(int32_t code)
 /* DESIGN: Win32 keeps its own error apart from errno, and the message
    for it comes from FormatMessage. Every other system has no Win32 to
    ask, so the code is 0 and the message is empty. That keeps
-   `Error.from_win32` one function with one meaning everywhere. */
+   `SystemError.from_win32` one function with one meaning everywhere. */
 int32_t anti_rt_last_error(void)
 {
 #if defined(_WIN32)

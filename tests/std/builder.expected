@@ -1,4 +1,4 @@
 exit 0
 one two!
-cannot read the configuration
-  caused by: no such file
+error 3: cannot read the configuration
+  caused by: error 2: no such file

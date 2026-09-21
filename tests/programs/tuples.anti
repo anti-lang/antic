@@ -4,7 +4,7 @@
 //! A `may fail` function gives its tuple through the out pointer, which
 //! `catch`, `try` and `yield` reach as they reach any other result.
 
-import anti.error;
+import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

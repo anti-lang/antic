@@ -325,9 +325,9 @@ struct stmt {
             struct block *otherwise;
             /* `let m = p catch fatal` and `let m = p catch e { }`: the
                handler that runs when p is `none`, with the error
-               `anti.error.NoneDereference`. */
+               `anti.lang.NoneDereference`. */
             struct handler guard;
-            /* `anti.error.NoneDereference.make`, which the guard calls to
+            /* `anti.lang.NoneDereference.new`, which the guard calls to
                build the error it hands the handler. */
             struct symbol *guard_make;
             /* `let (a, b) = e;`: the names that take the elements of the
@@ -375,7 +375,7 @@ struct stmt {
         } for_loop;
         struct stmt *deferred;      /* STMT_DEFER, STMT_UNDO */
         /* `fail e;` and `fail "text";`. The second form names the
-           `anti.error.Error.new` that builds the error from the text,
+           `anti.lang.Error.new` that builds the error from the text,
            and value is then the text. */
         struct {
             struct expr *value;

@@ -1,6 +1,6 @@
 //! A library for C whose functions may fail.
 
-import anti.error;
+import anti.lang;
 
 /// A count that must stay positive.
 export struct Counter
@@ -18,7 +18,7 @@ export fn failing_half(n: c_int) -> c_int may fail
 /// Add one to the counter, or fail when it would pass the limit.
 export fn failing_step(c: *Counter, limit: c_int) may fail
 {
-	if c.n >= limit { fail error.Error.new(1, "the counter is at its limit"); }
+	if c.n >= limit { fail lang.Error.new(1, "the counter is at its limit"); }
 	c.n += 1;
 }
 

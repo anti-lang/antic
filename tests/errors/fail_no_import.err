@@ -1,1 +1,1 @@
-fail_no_import.anti:1:19: error: `may fail` gives `?*anti.error.Error`, so the module imports `anti.error`
+fail_no_import.anti:1:19: error: `may fail` gives `?*anti.lang.Error`, so the module imports `anti.lang`

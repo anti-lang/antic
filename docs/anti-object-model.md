@@ -85,7 +85,7 @@ class Circle
 ```
 
 - `class Name { }` declares a class. The body holds, in this order by convention and in any order by grammar: one `inherits` line, `implements` lines, `use` lines, fields, constants, static fields, functions.
-- `inherits Base,` names the base class. At most one. Without it the class inherits `anti.rt.Object`, the root. The base is nested whole at offset 0, trailing padding included, and the class's own fields follow at `size_of(Base)`. The base part is reached as `self.super`.
+- `inherits Base,` names the base class. At most one. Without it the class inherits `anti.lang.Object`, the root. The base is nested whole at offset 0, trailing padding included, and the class's own fields follow at `size_of(Base)`. The base part is reached as `self.super`.
 - `implements name: Interface,` places an interface sub-object in the class at a named field. Any number. See [Interfaces](#interfaces).
 - `use name: T,` is a field with promotion. See [Composition](#composition).
 - `abstract class Name { }` is required for a class with any function that has no body, own or inherited. A class with an open function and no `abstract` is refused, naming the open functions.
@@ -139,7 +139,7 @@ Four levels, and each applies where it makes sense:
 
 ## Inheritance
 
-- One base per class, named by `inherits`. The chain ends at `anti.rt.Object`.
+- One base per class, named by `inherits`. The chain ends at `anti.lang.Object`.
 - The derived class adds fields after the base's. It cannot remove, reorder or retype a base field. A pointer to the derived class is a pointer to the base at the same address.
 - A derived class inherits every table entry and every non-private function of its base. It replaces an entry with `concrete fn`. It reaches the replaced body with `self.super.f()`.
 - `final class` stops the chain. `` `Circle` cannot inherit `final` class `Dot` `` is the message.
@@ -199,7 +199,7 @@ Four levels, and each applies where it makes sense:
 ## Pointers and conversions
 
 - `none` is the pointer that points to no value. It is a concept of the language, and zero is today's encoding of it.
-- `&d` converts implicitly to `*B` for every `B` in `d`'s base chain, `*anti.rt.Object` included, and to `*I` for every interface `d` implements. A base conversion is the same address. An interface conversion adds the sub-object's offset. A conversion with two paths, an interface reached through two sub-objects, is refused, and the program names the path: `&c.ser as *Closable`.
+- `&d` converts implicitly to `*B` for every `B` in `d`'s base chain, `*anti.lang.Object` included, and to `*I` for every interface `d` implements. A base conversion is the same address. An interface conversion adds the sub-object's offset. A conversion with two paths, an interface reached through two sub-objects, is refused, and the program names the path: `&c.ser as *Closable`.
 - Values never convert. Passing a `Circle` where a `Shape` is expected is an error, and `c.super` is the explicit base part.
 - `p is *T` gives a `bool`. `p as *T` on a class pointer is checked and traps on a mismatch. `p as? *T` gives `none` instead. All three work from any base or interface pointer, because every table's descriptor records the offset to the enclosing object.
 - `==` and `!=` on class pointers compare object identity: each pointer is adjusted by its offset to the enclosing object, then the addresses are compared. So a `*Serializable` and a `*Drawable` taken from one circle are equal. Pointers of two unrelated class types are a type error. Struct pointers compare addresses.
@@ -232,7 +232,7 @@ Four levels, and each applies where it makes sense:
 
 ## The root class
 
-- `anti.rt.Object` is the base of every class without `inherits`. It has no fields beyond the table pointer.
+- `anti.lang.Object` is the base of every class without `inherits`. It has no fields beyond the table pointer.
 - It declares seven `pub` functions with default bodies over the descriptor: `type_name(self) -> str`, `to_text(self) -> str`, `equals(self, other: *Object) -> bool`, `hash(self) -> u64`, `serialize(self, out: *text.Builder)`, `copy(self) -> *Object`, and `destruct(self)`, which is empty. A static `Object.deserialize` is the counterpart of `serialize`, in the format `anti.json` defines.
 - A class may replace any of them with `concrete fn`. Replacing `equals` without `hash`, or the reverse, is a warning. The default bodies walk the field list and are slow by design.
 - Every table starts with these seven entries after the descriptor pointer. A C program that has the header of one class knows the head of every table.
@@ -281,7 +281,10 @@ Four levels, and each applies where it makes sense:
 
 ## Errors
 
-- `anti.error.Error` is a class with `pub code: int`, `pub message: str`, `own cause: ?*Error = none`, `pub at: SourceLocation` and `own frames: ?*StackTrace`. The last two are the origin and the trace, which `fail` fills. See "Error origin and stack traces" in `docs/anti-language-additions.md`. `anti.error.NoneDereference` inherits it and is the error of a `catch` on a `?*T`. The runtime owns `anti.rt`, so the class lives in the standard library's `anti.error` module. Libraries subclass it. `Error.new(code, message)`, `Error.from_errno()` and `Error.from_win32()` build one. `e.text()` gives the origin, the code, the message and the cause chain, and the trace when there is one. `e.print()` writes it to stderr. `e.fatal()` prints and exits with `e.code`, or 1 when the code is 0. `error.on_fatal(f)` registers one function that runs before `fatal` exits.
+- `anti.lang.Error` is a class with `pub code: int`, `pub message: str`, `protected own cause: ?*Error = none`, `transient text_cache: ?*byte = none`, `pub at: SourceLocation` and `own frames: ?*StackTrace`. The last two are the origin and the trace, which `fail` fills. See "Error origin and stack traces" in `docs/anti-language-additions.md`. `anti.lang.NoneDereference` inherits it and is the error of a `catch` on a `?*T`. The class lives in `anti.lang`, the root of the standard library, which imports nothing, so every module names it without an import cycle. Libraries subclass it. `Error.new(code, message)` and `Error.wrap(code, message, cause)` build one.
+- `text_cache` is private and holds the text of the error. `e.text()` forms it at the first call, ends it with a NUL and keeps it, and later calls give the same bytes. The `str` it returns is valid for the life of the error, and `destruct` frees the buffer. The field is `transient`, so `dup` leaves the copy without it and the copy forms its own, and the default `equals`, `hash` and `serialize` pass over it.
+- `e.text()` gives the origin, the code, the message and the cause chain, and the trace when there is one. Each error of the chain is `error N: message`, or the message alone when its code is 0, and each cause follows on its own line after `  caused by: `. `e.print()` writes the text and a newline to stderr. `e.fatal()` prints and exits with `e.code`, or 1 when the code is 0.
+- `anti.error` holds the conveniences. `error.SystemError` inherits `Error` and adds `pub errno: int`, the number the system gave. `SystemError.from_errno()` and `SystemError.from_win32()` build one, with the number in both `errno` and `code`. `error.on_fatal(f)` registers one function that runs before `fatal` exits. It stores the function in an `internal` singleton of `anti.lang`, which `fatal` reads. `error.check(e)` calls `fatal` on an error that is not `none`.
 - A function that can fail is written with `may fail`, which "Failing functions" in `docs/anti-language-additions.md` gives. A function that cannot fail returns its value. A function whose only failure is "not present" may return `bool`.
 - A call to a failing function must handle the error. A bare call that drops it is a compile error.
 - `let n = f(args) catch e { ... };` handles it at the call. The compiler supplies the out pointer for `n`, over storage whose table it zeroes first, so the `=` the callee writes destroys nothing. The handler either leaves the enclosing block or ends with `yield v`, a value of `n`'s type that takes the place of the result. `n` is a local of its type and is destroyed at the end of its block, as any other is. A handler that leaves the block instead passes over it, since the call wrote nothing there. `catch { }` binds no name. `catch fatal` prints and exits.
@@ -344,8 +347,8 @@ Multiple concrete bases and virtual bases. An `interface` keyword. `virtual` and
 
 ```anti
 import anti.io;
+import anti.lang;
 import anti.text;
-import anti.error;
 
 const PI: f32 = 3.14159;
 
@@ -406,10 +409,10 @@ final class Circle
 
 	r: f32,
 
-	fn construct(self, r: f32) -> ?*error.Error
+	fn construct(self, r: f32) -> ?*lang.Error
 	{
 		if r <= 0.0 {
-			return error.Error.new(1, "radius must be positive");
+			return lang.Error.new(1, "radius must be positive");
 		}
 		self.kind = Kind.Circle;
 		self.r = r;

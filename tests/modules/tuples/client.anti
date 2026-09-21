@@ -1,7 +1,7 @@
 //! A program that takes apart the tuples of another module. The type
 //! comes from the library file, so the two modules name one type.
 
-import anti.error;
+import anti.lang;
 import com.example.pairs;
 
 extern fn printf(format: ?*byte, ...) -> c_int;

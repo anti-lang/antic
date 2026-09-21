@@ -1,7 +1,7 @@
-//! `text.Builder` collects bytes and gives the `str` of them, and
-//! `Error.text` writes an error and its causes into one.
+//! `text.Builder` collects bytes and gives the `str` of them.
 import anti.error;
 import anti.io;
+import anti.lang;
 import anti.text;
 
 fn shutting_down()
@@ -21,10 +21,10 @@ fn main() -> int
 		return 1;
 	}
 
-	let below = error.Error.new(2, "no such file");
-	let e = error.Error.wrap(3, "cannot read the configuration", below);
+	let below = lang.Error.new(2, "no such file");
+	let e = lang.Error.wrap(3, "cannot read the configuration", below);
 	let out = text.Builder.new();
-	e.text(&out);
+	out.append(e.text());
 	io.println(out.text());
 	delete(e);
 	return 0;

@@ -4,7 +4,7 @@
 //! leave on the error channel, `try` forwards inside another `may fail`
 //! function, and `undo` runs on the fail path and not on `return`.
 
-import anti.error;
+import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -24,14 +24,14 @@ fn halve(n: int) -> int may fail
 /// An aggregate result through the out pointer.
 fn split(n: int) -> Pair may fail
 {
-	if n < 0 { fail error.Error.new(3, "n is negative"); }
+	if n < 0 { fail lang.Error.new(3, "n is negative"); }
 	return Pair { a: n / 2, b: n - n / 2 };
 }
 
 /// No result: success at the closing brace, and the error form with a code.
 fn ensure_even(n: int) may fail
 {
-	if n % 2 != 0 { fail error.Error.new(4, "n is odd"); }
+	if n % 2 != 0 { fail lang.Error.new(4, "n is odd"); }
 	printf("even %d\n".ptr, n as c_int);
 }
 

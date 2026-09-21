@@ -8,7 +8,7 @@
 //! dot between the parts. A repeated `[[sink]]` numbers its entries, so
 //! the first holds `sink.0.kind`.
 
-import anti.error;
+import anti.lang;
 import anti.text;
 
 extern fn anti_rt_toml_read(bytes: ?*byte, len: int) -> ?*byte;
@@ -104,11 +104,11 @@ pub class Document
 	/// Read `source` as a TOML document.
 	///
 	/// A text outside the subset gives an error with code 1.
-	pub fn read(source: str, out: *Document) -> ?*error.Error
+	pub fn read(source: str, out: *Document) -> ?*lang.Error
 	{
 		let handle = anti_rt_toml_read(source.ptr, source.len);
 		if handle == none {
-			return error.Error.new(1, "the text is not the TOML subset");
+			return lang.Error.new(1, "the text is not the TOML subset");
 		}
 		*out = Document { handle: handle };
 		return none;

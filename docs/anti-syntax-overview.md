@@ -256,11 +256,11 @@ try {
 }
 ```
 
-A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and the error is deleted when the handler exits unless returned. `fail "text"` is `fail Error.new(0, "text")`. `try` forwards the error and is refused outside a function that may fail. `undo` runs on the `fail` path and not on `return`. `Error` has `code`, `message`, an owned `cause`, the origin `at` that `fail` fills, and the frames of a trace when backtraces are on. Libraries subclass it and callers test with `is`.
+A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and the error is deleted when the handler exits unless returned. `fail "text"` is `fail Error.new(0, "text")`. `try` forwards the error and is refused outside a function that may fail. `undo` runs on the `fail` path and not on `return`. `Error` has `code`, `message`, an owned `cause`, the origin `at` that `fail` fills, and the frames of a trace when backtraces are on. It lives in `anti.lang`, the root of the standard library, which imports nothing. `e.text()` gives `error N: message`, or the message alone for code 0, with each cause on a line of its own, and the error keeps those bytes until it is deleted. Libraries subclass it and callers test with `is`. `anti.error` adds `SystemError`, with `from_errno()` and `from_win32()`, and `on_fatal` and `check`.
 
 The ABI is the hand-written convention, `?*Error f(args, R *out)`, with the result through an out pointer. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. A function written by hand in that form stays legal, and bindings produce it.
 
-Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, and `undo` on the fail path. `anti.error` and its test use `may fail`. Not built yet: the origin and the frames, and `may fail` in the other modules of the standard library.
+Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`, and the tests of `anti.lang` and `anti.error` use `may fail`. Not built yet: the origin and the frames, `SourceLocation` and `StackTrace`, and `may fail` in the other modules of the standard library.
 
 ## Structs
 
@@ -391,7 +391,7 @@ c.move(1.0, 1.0);
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
 - `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
 
-Built. The root is `anti.rt.Object` until the namespaces move under `anti.lang`.
+Built. The compiler still names the root `anti.rt.Object`, and the rename to `anti.lang.Object` follows.
 
 ## Interfaces
 
@@ -454,7 +454,7 @@ if n != none {
 	n.value = 1;          // n is *Node here
 }
 let m = n else { return 1; };
-let g = n catch fatal;    // an anti.error.NoneDereference on none
+let g = n catch fatal;    // an anti.lang.NoneDereference on none
 let k = n ?? &default_node;
 ```
 

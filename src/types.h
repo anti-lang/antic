@@ -186,6 +186,18 @@ struct type *types_bound_fn(struct types *types, struct type **params,
 /* A new struct type without fields. Each call returns a distinct type. */
 struct type *types_object(struct types *types);
 
+/* DESIGN: `anti.lang` is the root of the standard library and imports
+   nothing, so every module can name its classes without a cycle. The
+   compiler knows two of them by name: `Error`, which a failing function
+   returns, and `NoneDereference`, the error of a `catch` on a `?*T`. The
+   names are defined here and nowhere else. */
+#define LANG_MODULE "anti.lang"
+#define LANG_ERROR "Error"
+#define LANG_NONE_DEREFERENCE "NoneDereference"
+
+/* Whether t is the class `anti.lang.Error` itself. */
+bool types_is_lang_error(const struct type *t);
+
 /* DESIGN: `dispatch` gives a Job back, and `join` of it gives the result
    of the worker. The result therefore belongs to the type. A Job of one
    result type is a distinct type from a Job of another, and every one

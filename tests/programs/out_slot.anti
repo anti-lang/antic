@@ -8,7 +8,7 @@
 //! block. On the error path the callee writes nothing, the handler leaves
 //! the block, and the zero table it leaves behind reaches no teardown.
 
-import anti.error;
+import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -33,10 +33,10 @@ class Box
 	}
 
 	/// Write a box through `out`, or fail when `n` is negative.
-	pub fn make(n: int, out: *Box) -> ?*error.Error
+	pub fn make(n: int, out: *Box) -> ?*lang.Error
 	{
 		if n < 0 {
-			return error.Error.new(1, "n is negative");
+			return lang.Error.new(1, "n is negative");
 		}
 		*out = Box { n: n, leaf: alloc Leaf { n: n * 10 } };
 		return none;
