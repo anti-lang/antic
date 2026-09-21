@@ -101,6 +101,7 @@ class Circle
 - A field is private unless marked. `pub name: T` is visible everywhere. `protected name: T` is visible to the class and every class in its chain below. A field without a marker is visible to the class only. See [Visibility](#visibility).
 - `own name: *T`, `own name: []T` and `own name: []byte` mark a pointer or slice field as owned. See [Ownership and copies](#ownership-and-copies).
 - A field of class or struct type is inline and owned by definition. `own` on it is refused as redundant.
+- A class field may be a bitfield, `flags: u32 : 3`, as a struct field may.
 - `transient name: ?*T` marks derived state, such as a cache the class builds from its other fields. See [Ownership and copies](#ownership-and-copies).
 - `atomic name: T` declares an atomic field. See [Static fields and singletons](#static-fields-and-singletons).
 - `const NAME: T = e;` declares a constant of the class, reached as `Name.NAME`. `self.NAME` is refused.
