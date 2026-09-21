@@ -415,6 +415,27 @@ void test_arm64(void)
           "    cmn w0, #5\n"
           "    cset w0, gt\n"
           "    ret\n");
+    /* The lowest 64-bit value has no negation. An add of it stays an add
+       and a comparison with it stays a cmp, each over a register. */
+    emits("const LOWEST: int = -9223372036854775807 - 1;\n"
+          "fn plus(a: uint) -> uint {\n"
+          "    return a + 0x8000000000000000;\n"
+          "}\n"
+          "fn lowest(a: int) -> bool {\n"
+          "    return a == LOWEST;\n"
+          "}\n",
+          TARGET_LINUX_ARM64,
+          "main.plus:\n"
+          "b0:\n"
+          "    movz x9, #32768, lsl #48\n"
+          "    add x0, x0, x9\n"
+          "    ret\n"
+          "main.lowest:\n"
+          "b0:\n"
+          "    movz x9, #32768, lsl #48\n"
+          "    cmp x0, x9\n"
+          "    cset w0, eq\n"
+          "    ret\n");
     /* sdiv and udiv leave the quotient, and msub computes the remainder
        a - q * b. */
     emits("fn divs(a: int, b: int) -> int {\n"

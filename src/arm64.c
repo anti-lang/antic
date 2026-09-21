@@ -408,7 +408,9 @@ static void emit_copy(struct selector *s, const struct ir_inst *inst)
     }
 }
 
-/* A negative immediate turns add into sub and sub into add. */
+/* A negative immediate turns add into sub and sub into add. The lowest
+   value has no negation in int64_t and fits no immediate, so it takes
+   the register form. */
 static void emit_add_sub(struct selector *s, const struct ir_inst *inst)
 {
     struct mach_operand ops[4];
@@ -422,7 +424,8 @@ static void emit_add_sub(struct selector *s, const struct ir_inst *inst)
     ops[1] = select_reg(s, &inst->a);
     if (inst->b.kind == IR_INT && fits_imm12(v)) {
         emit_imm12(s, op, 2, ops, v);
-    } else if (inst->b.kind == IR_INT && v < 0 && fits_imm12(-v)) {
+    } else if (inst->b.kind == IR_INT && v < 0 && v != INT64_MIN &&
+               fits_imm12(-v)) {
         emit_imm12(s, other, 2, ops, -v);
     } else {
         emit3(s, op, ops[0], ops[1], select_reg(s, &inst->b));
@@ -872,7 +875,7 @@ static void compare(struct selector *s, const struct ir_inst *inst)
         ops[0] = a;
         if (fits_imm12(v)) {
             emit_imm12(s, A64_CMP, 1, ops, v);
-        } else if (v < 0 && fits_imm12(-v)) {
+        } else if (v < 0 && v != INT64_MIN && fits_imm12(-v)) {
             emit_imm12(s, A64_CMN, 1, ops, -v);
         } else {
             struct mach_operand b = select_new_vreg(s, a.width);
