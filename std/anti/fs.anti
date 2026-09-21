@@ -1,0 +1,140 @@
+//! Files and directories.
+//!
+//! `open` gives a `File`, which `read`, `write` and `size` take and
+//! `close` ends. `list` gives the names of a directory, and `remove` and
+//! `rename` change what a directory holds. Every function of the module
+//! may fail, and the error is a `SystemError` with the number the system
+//! gave. A path goes to the system as the program wrote it, and Windows
+//! takes `/` as well as `\`.
+
+import anti.error;
+import anti.lang;
+
+extern fn anti_rt_fs_open(path: ?*byte, len: int, writing: c_int) -> ?*byte;
+extern fn anti_rt_fs_size(file: ?*byte) -> int;
+extern fn anti_rt_fs_list(path: ?*byte, len: int, count: ?*int) -> ?*str;
+extern fn anti_rt_fs_remove(path: ?*byte, len: int) -> c_int;
+extern fn anti_rt_fs_rename(from: ?*byte, from_len: int, to: ?*byte,
+	to_len: int) -> c_int;
+extern fn fread(into: ?*byte, size: c_size_t, count: c_size_t,
+	file: ?*byte) -> c_size_t;
+extern fn fwrite(bytes: ?*byte, size: c_size_t, count: c_size_t,
+	file: ?*byte) -> c_size_t;
+extern fn ferror(file: ?*byte) -> c_int;
+extern fn fclose(file: ?*byte) -> c_int;
+
+/// How `open` opens a file.
+///
+/// `Read` reads from the first byte. `Write` writes into a file that it
+/// creates, or empties when the file is there already.
+pub enum Mode: u8 { Read, Write }
+
+/// An open file, which `open` gives and `close` frees.
+///
+/// Both modes are binary, so no byte is translated on Windows.
+pub struct File
+{
+	/// The C stream of the file.
+	handle: ?*byte,
+}
+
+/// Open the file at `path` in `mode`.
+pub fn open(path: str, mode: Mode) -> *File may fail
+{
+	let writing: c_int = 0;
+	if mode == Mode.Write {
+		writing = 1;
+	}
+	let handle = anti_rt_fs_open(path.ptr, path.len, writing);
+	if handle == none {
+		fail error.SystemError.from_errno();
+	}
+	return alloc File { handle: handle };
+}
+
+/// Read up to `into.len` bytes of `f` into `into`, and give their count.
+///
+/// The count is below `into.len` only at the end of the file, and it is
+/// 0 once nothing is left.
+pub fn read(f: *File, into: []byte) -> int may fail
+{
+	let count = fread(into.ptr, 1 as c_size_t, into.len as c_size_t,
+		f.handle) as int;
+	if count < into.len && ferror(f.handle) != 0 {
+		fail error.SystemError.from_errno();
+	}
+	return count;
+}
+
+/// Write every byte of `bytes` to `f`.
+///
+/// The bytes may wait in a buffer until `close`, which is where a
+/// failure to store them shows.
+pub fn write(f: *File, bytes: []byte) may fail
+{
+	let count = fwrite(bytes.ptr, 1 as c_size_t, bytes.len as c_size_t,
+		f.handle) as int;
+	if count < bytes.len {
+		fail error.SystemError.from_errno();
+	}
+}
+
+/// The size of `f` in bytes, with every byte written to it so far.
+///
+/// It fails for a stream without an end, such as a pipe.
+pub fn size(f: *File) -> int may fail
+{
+	let n = anti_rt_fs_size(f.handle);
+	if n < 0 {
+		fail error.SystemError.from_errno();
+	}
+	return n;
+}
+
+/// Close `f` and free it.
+///
+/// It fails when the bytes written to `f` could not all be stored. `f` is
+/// closed and freed either way, and must not be used again.
+pub fn close(f: *File) may fail
+{
+	if fclose(f.handle) != 0 {
+		let e = error.SystemError.from_errno();
+		free(f);
+		fail e;
+	}
+	free(f);
+}
+
+/// The names of the entries of the directory `path`.
+///
+/// The names leave out `.` and `..` and come in the order the system
+/// gives. The slice and its names are one block, which the caller frees
+/// with `free(names.ptr)`.
+pub fn list(path: str) -> []str may fail
+{
+	let count = 0;
+	let names = anti_rt_fs_list(path.ptr, path.len, &count);
+	if names == none {
+		fail error.SystemError.from_errno();
+	}
+	return []str { ptr: names, len: count };
+}
+
+/// Remove the file at `path`.
+pub fn remove(path: str) may fail
+{
+	if anti_rt_fs_remove(path.ptr, path.len) != 0 {
+		fail error.SystemError.from_errno();
+	}
+}
+
+/// Give the file at `from` the path `to`.
+///
+/// This is `rename` of the C library. A file already at `to` is replaced
+/// on Linux and macOS, and Windows refuses the call.
+pub fn rename(from: str, to: str) may fail
+{
+	if anti_rt_fs_rename(from.ptr, from.len, to.ptr, to.len) != 0 {
+		fail error.SystemError.from_errno();
+	}
+}

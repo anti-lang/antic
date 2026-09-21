@@ -199,13 +199,14 @@ reports what it finished.
   for the module that links. It holds release devirtualisation, the class
   registry, the singleton check and the used-slot bitmaps.
 - `std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
-  `anti.error`, `anti.time`, `anti.os`, `anti.reflect`, `anti.random`,
-  `anti.collection`, `anti.toml`, `anti.args`, `anti.json` and `anti.log`.
+  `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
+  `anti.random`, `anti.collection`, `anti.toml`, `anti.args`, `anti.json`
+  and `anti.log`.
   `anti.lang` is the root and imports nothing. It holds `Error` and
   `NoneDereference`, and `anti.error` holds `SystemError`, `on_fatal` and
   `check`.
-- 519 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 518 each, without the `no_paths` test, which needs a
+- 524 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 523 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -214,10 +215,10 @@ reports what it finished.
   `?*Error` and writes its result through an out pointer. `fail` leaves on the
   error channel, with an error or with a text, `try` forwards inside another
   `may fail` function, and `undo` runs on the fail path. The header writes the
-  ABI and the `.antl` records the flag. anti.lang, anti.error, anti.io and
-  anti.text follow the form: `text.parse_int` may fail, and nothing else of
-  anti.io and anti.text fails. The other modules of the standard library
-  still write it by hand.
+  ABI and the `.antl` records the flag. anti.lang, anti.error, anti.io,
+  anti.text, anti.os and anti.fs follow the form: `text.parse_int`, the three
+  user directories of anti.os and every function of anti.fs may fail. The
+  other modules of the standard library still write it by hand.
 - Tuples are built. `(int, str)` is an anonymous struct with C layout, `(a, b)`
   builds one, `t.0` reads an element, and `let (a, b) = e;` and
   `for i, x in items` are the two forms that take one apart. The header writes

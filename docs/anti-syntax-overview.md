@@ -157,8 +157,8 @@ switch kind {
 	else => { },
 }
 
-defer fs.close(f);
-undo fs.remove(path);
+defer fs.close(f) catch fatal;
+undo fs.remove(path) catch e { e.print(); };
 assert(n > 0, "n must be positive");
 let v = show(compute(x));
 ```
@@ -243,14 +243,16 @@ let m = text.parse_int(t) catch fatal;
 
 fn load(path: str) -> Config may fail
 {
-	let f = try fs.open(path);
-	if f.size == 0 { fail "empty configuration"; }
+	let f = try fs.open(path, fs.Mode.Read);
+	defer fs.close(f) catch fatal;
+	if try f.size() == 0 { fail "empty configuration"; }
 	return parse(f);
 }
 
 try {
-	let f = fs.open(path);
+	let f = fs.open(path, fs.Mode.Read);
 	process(f);
+	fs.close(f);
 } catch e {
 	e.print();
 }
@@ -260,7 +262,7 @@ A handler ends with `yield v` or leaves the block. The name after `catch` is any
 
 The ABI is the hand-written convention, `?*Error f(args, R *out)`, with the result through an out pointer. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. A function written by hand in that form stays legal, and bindings produce it.
 
-Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`, and the tests of `anti.lang` and `anti.error` use `may fail`. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. Not built yet: the origin and the frames, `SourceLocation` and `StackTrace`, and `may fail` in the other modules of the standard library.
+Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`, and the tests of `anti.lang` and `anti.error` use `may fail`. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. The three user directories of `anti.os` may fail, and so does every function of `anti.fs`: `open`, `read`, `write`, `size`, `close`, `list`, `remove` and `rename`. `try` stands wherever the call stands, after `return` and inside an expression as well. Not built yet: the origin and the frames, `SourceLocation` and `StackTrace`, and `may fail` in the other modules of the standard library.
 
 ## Structs
 

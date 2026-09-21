@@ -2,7 +2,8 @@
 //! install of Anti uses. The test of the suite sets the XDG variables and
 //! LOCALAPPDATA, so one expected output stands on every host of a family.
 //! The test std_userdirs_no_home unsets them and reads the failure, whose
-//! message names the variable that is absent.
+//! message names the variable that is absent. Each function may fail,
+//! and the last call forwards the error with `try`.
 import anti.io;
 import anti.lang;
 import anti.os;
@@ -27,6 +28,13 @@ fn failed(e: *lang.Error) -> str
 	return "";
 }
 
+/// The configuration directory of `app`, whose error goes to the caller.
+fn forwarded(app: str) -> str may fail
+{
+	let dir = try os.user_config_dir(app);
+	return dir;
+}
+
 fn main() -> int
 {
 	let config = os.user_config_dir("anti") catch e { yield failed(e); };
@@ -37,5 +45,7 @@ fn main() -> int
 	show(cache);
 	let other = os.user_data_dir("anti-x86_64") catch e { yield failed(e); };
 	show(other);
+	let through = forwarded("anti-try") catch e { yield failed(e); };
+	show(through);
 	return 0;
 }

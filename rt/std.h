@@ -94,3 +94,25 @@ int64_t anti_rt_wall(void);
 /* Wait for the given nanoseconds, or return at once for a count that is
    not positive. */
 void anti_rt_sleep(int64_t nanoseconds);
+
+/* The C side of anti.fs, in rt/fs.c. A path is the bytes of a str and
+   their count. Every function reports a failure through errno. */
+
+/* The C stream of the file, opened for reading, or for writing when
+   writing is not 0, or NULL. */
+void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing);
+
+/* The size in bytes of the file of the stream, or -1. */
+int64_t anti_rt_fs_size(void *file);
+
+/* The names of the directory, without `.` and `..`, in one block that the
+   caller frees, with their number in count, or NULL. */
+struct anti_text *anti_rt_fs_list(const unsigned char *path, int64_t len,
+                                  int64_t *count);
+
+/* Remove the file, and give 0 or -1. */
+int32_t anti_rt_fs_remove(const unsigned char *path, int64_t len);
+
+/* Give the file at from the path to, and give 0 or -1. */
+int32_t anti_rt_fs_rename(const unsigned char *from, int64_t from_len,
+                          const unsigned char *to, int64_t to_len);

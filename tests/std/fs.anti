@@ -1,0 +1,180 @@
+//! Files and directories. A file is written, read back four bytes at a
+//! time, measured, found in the listing of its directory, renamed and
+//! removed. Every function of `anti.fs` may fail, and the calls that must
+//! fail read a `SystemError` with the number of a missing file, which is
+//! 2 on every system.
+//!
+//! The test runs in the build directory of the suite and leaves nothing
+//! there when it passes.
+import anti.error;
+import anti.fs;
+import anti.io;
+import anti.json;
+import anti.lang;
+import anti.text;
+
+const FIRST: str = "fs-test-first.txt";
+const SECOND: str = "fs-test-second.txt";
+const GROWING: str = "fs-test-growing.txt";
+const MISSING: str = "fs-test-missing.txt";
+const TEXT: str = "hello, file\n";
+
+/// Print `label` and `n` on one line.
+fn number(label: str, n: int)
+{
+	let b = text.Builder.new();
+	b.append(label);
+	b.append(" ");
+	json.write_int(n, &b);
+	io.println(b.text());
+}
+
+/// The bytes of `s`, which share its memory.
+fn bytes_of(s: str) -> []byte
+{
+	return []byte { ptr: s.ptr, len: s.len };
+}
+
+/// Whether `names` holds `name`.
+fn holds(names: []str, name: str) -> bool
+{
+	for n in names {
+		if text.equal(n, name) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/// Whether the working directory holds an entry named `name`.
+fn listed(name: str) -> bool may fail
+{
+	let names = try fs.list(".");
+	let found = holds(names, name);
+	free(names.ptr);
+	return found;
+}
+
+/// Write `what` to a new file at `path`.
+fn write_file(path: str, what: str) may fail
+{
+	let f = try fs.open(path, fs.Mode.Write);
+	defer fs.close(f) catch fatal;
+	try fs.write(f, bytes_of(what));
+}
+
+/// Print the file at `path`, read four bytes at a time.
+fn print_file(path: str) may fail
+{
+	let f = try fs.open(path, fs.Mode.Read);
+	defer fs.close(f) catch fatal;
+	let room: [4]byte = [0; 4];
+	let seen = text.Builder.new();
+	let count = try fs.read(f, room[0..4]);
+	while count > 0 do {
+		for i in 0..count {
+			seen.append_byte(room[i]);
+		}
+		count = try fs.read(f, room[0..4]);
+	}
+	io.print(seen.text());
+}
+
+/// Print the number of `e` when it is a `SystemError`.
+fn system_number(what: str, e: *lang.Error)
+{
+	if e is *error.SystemError {
+		number(what, e.code);
+	} else {
+		io.println("not a system error");
+	}
+}
+
+fn run() may fail
+{
+	try write_file(FIRST, TEXT);
+	try print_file(FIRST);
+
+	let f = try fs.open(FIRST, fs.Mode.Read);
+	let size = try fs.size(f);
+	try fs.close(f);
+	number("size", size);
+
+	/* The size counts what was written and not yet flushed. */
+	let g = try fs.open(GROWING, fs.Mode.Write);
+	try g.write(bytes_of("abc"));
+	let growing = try g.size();
+	number("size while writing", growing);
+	let room: [4]byte = [0; 4];
+	let wrong = true;
+	g.read(room[0..4]) catch e {
+		wrong = false;
+		yield 0;
+	};
+	if wrong {
+		fail "a file opened for writing was read";
+	}
+	try g.close();
+	try fs.remove(GROWING);
+
+	let names = try fs.list(".");
+	if holds(names, FIRST) {
+		io.println("listed");
+	}
+	if !holds(names, ".") && !holds(names, "..") {
+		io.println("no dot entries");
+	}
+	free(names.ptr);
+
+	try fs.rename(FIRST, SECOND);
+	let first = try listed(FIRST);
+	let second = try listed(SECOND);
+	if !first && second {
+		io.println("renamed");
+	}
+	try print_file(SECOND);
+
+	let h = try fs.open(SECOND, fs.Mode.Read);
+	let refused = false;
+	h.write(bytes_of("more")) catch e {
+		refused = true;
+	};
+	try h.close();
+	if refused {
+		io.println("a file opened for reading takes no write");
+	}
+
+	try fs.remove(SECOND);
+	let gone = try listed(SECOND);
+	if !gone {
+		io.println("removed");
+	}
+
+	let m: ?*fs.File = fs.open(MISSING, fs.Mode.Read) catch e {
+		system_number("open", e);
+		yield none;
+	};
+	if m != none {
+		fail "a missing file opened";
+	}
+	fs.remove(MISSING) catch e {
+		system_number("remove", e);
+	};
+	fs.rename(MISSING, SECOND) catch e {
+		system_number("rename", e);
+	};
+	let absent = fs.list("fs-test-missing.dir") catch e {
+		system_number("list", e);
+		yield []str { ptr: none, len: 0 };
+	};
+	number("entries of a missing directory", absent.len);
+}
+
+fn main() -> int
+{
+	run() catch e {
+		e.print();
+		return 1;
+	};
+	return 0;
+}

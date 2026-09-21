@@ -222,7 +222,7 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # DESIGN: one list of runtime sources. The host library and the cross
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
-set(ANTIC_RUNTIME_SOURCES assert atomic call cast check cpu errno init io
+set(ANTIC_RUNTIME_SOURCES assert atomic call cast check cpu errno fs init io
     license object platform reflect registry signal start text threads time
     toml utf)
 set(anti_rt_files "")
@@ -428,7 +428,7 @@ endif()
 
 # The standard library in std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
-set(ANTIC_STD_MODULES lang io text license error time os reflect random collection toml args json log)
+set(ANTIC_STD_MODULES lang io text license error time os fs reflect random collection toml args json log)
 set(std_files "")
 foreach(module IN LISTS ANTIC_STD_MODULES)
     set(output "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
