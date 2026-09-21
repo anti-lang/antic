@@ -200,17 +200,23 @@ reports what it finished.
   registry, the singleton check and the used-slot bitmaps.
 - `std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
-  `anti.random`, `anti.collection`, `anti.toml`, `anti.args`, `anti.json`
-  and `anti.log`.
-  `anti.lang` is the root and imports nothing. It holds `Error` and
-  `NoneDereference`, and `anti.error` holds `SystemError`, `on_fatal` and
-  `check`.
-- 529 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 528 each, without the `no_paths` test, which needs a
+  `anti.random`, `anti.collection`, `anti.toml`, `anti.args`, `anti.json`,
+  `anti.log` and `anti.debug`.
+  `anti.lang` is the root and imports nothing. It holds `Error`,
+  `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
+  holds `SystemError`, `on_fatal` and `check`.
+- 552 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 551 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
   Anti function names. Variables are the next step. See `docs/notes/debug.md`.
+- Error origins and stack traces are built. The first `fail` of an error
+  writes `at` and, when backtraces are on, `frames`. `e.text()` names the
+  position, the causes and the trace. `StackTrace` has `capture`, `frames`,
+  `text` and `symbolize`. Backtraces are on in dev mode, and
+  `--anti.backtrace` turns them on in release. See `docs/notes/traces.md`.
+  `here` and default parameter values are built.
 - `may fail` and `fail` are built. A function declared `may fail` returns
   `?*Error` and writes its result through an out pointer. `fail` leaves on the
   error channel, with an error or with a text, `try` forwards inside another
