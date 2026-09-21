@@ -1,0 +1,35 @@
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn puts(text: ?*byte, count: c_int = 1) -> c_int;
+
+fn compute() -> int
+{
+	return 1;
+}
+
+fn late(a: int = 1, b: int)
+{
+	printf("%d %d\n".ptr, a as c_int, b as c_int);
+}
+
+fn wrong(a: int = "text")
+{
+	printf("%d\n".ptr, a as c_int);
+}
+
+fn called(a: int = compute())
+{
+	printf("%d\n".ptr, a as c_int);
+}
+
+fn pair(a: int, b: int = 2)
+{
+	printf("%d %d\n".ptr, a as c_int, b as c_int);
+}
+
+fn main() -> int
+{
+	pair();
+	pair(1, 2, 3);
+	let p = here;
+	return 0;
+}

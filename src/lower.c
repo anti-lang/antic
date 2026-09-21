@@ -1192,6 +1192,65 @@ static struct ir_operand const_address(struct lowerer *l,
                     ir_global_add_value(m, l->module_name, name, value))));
 }
 
+/* The bytes of s as the text of a constant, kept in the module's memory. */
+static void text_constant(struct lowerer *l, struct const_value *v,
+                          const char *s)
+{
+    size_t n = strlen(s);
+    char *bytes = arena_alloc(l->m->arena, n + 1);
+
+    memcpy(bytes, s, n + 1);
+    v->kind = CONST_TEXT;
+    v->as.text.bytes = bytes;
+    v->as.text.length = n;
+}
+
+/* DESIGN: `here` is constant data of the module. It holds the path that
+   a failed check names, the line and the column, the function around the
+   position and the module. Lowering builds it, because the path and the
+   function are what lowering records. The fields are found by name, so
+   the order `anti.lang` gives them is its own. */
+static const struct const_value *location_value(struct lowerer *l,
+                                                struct pos pos,
+                                                const struct type *t)
+{
+    struct const_value *v = arena_alloc(l->m->arena, sizeof *v);
+    struct text function = {0};
+    size_t i;
+
+    memset(v, 0, sizeof *v);
+    v->kind = CONST_STRUCT;
+    v->type = (struct type *)t;
+    v->as.aggregate.count = t->field_count;
+    v->as.aggregate.items =
+        arena_alloc(l->m->arena, (t->field_count + 1) * sizeof *v);
+    if (l->f != NULL) {
+        text_appendf(&function, "%s.%s", l->module_name, l->f->name);
+    }
+    for (i = 0; i < t->field_count; i++) {
+        struct const_value *item = &v->as.aggregate.items[i];
+        const struct name *name = &t->fields[i].name;
+        memset(item, 0, sizeof *item);
+        item->type = t->fields[i].type;
+        item->kind = item->type->kind == TYPE_STR ? CONST_TEXT : CONST_INT;
+        if (name_is(name, LANG_LOCATION_FILE)) {
+            text_constant(l, item, l->file);
+        } else if (name_is(name, LANG_LOCATION_FUNCTION)) {
+            text_constant(l, item, text_cstr(&function));
+        } else if (name_is(name, LANG_LOCATION_MODULE)) {
+            text_constant(l, item, l->module_name);
+        } else if (name_is(name, LANG_LOCATION_LINE)) {
+            item->as.integer = (uint64_t)pos.line;
+        } else if (name_is(name, LANG_LOCATION_COLUMN)) {
+            item->as.integer = (uint64_t)pos.column;
+        } else if (item->kind == CONST_TEXT) {
+            text_constant(l, item, "");
+        }
+    }
+    text_free(&function);
+    return v;
+}
+
 /* The aggregate of a table of n entries: an array of n pointers. Every
    class of one length shares it, as any two equal array types do. */
 static uint32_t table_agg(struct lowerer *l, size_t n)
@@ -2947,6 +3006,8 @@ static struct ir_operand lower_address(struct lowerer *l,
         return lower_dispatch(l, e);
     case EXPR_JOIN:
         return lower_join(l, e);
+    case EXPR_HERE:
+        return const_address(l, location_value(l, e->pos, e->type), e->type);
     default:
         slot = ir_entry_slot(l->f, vtype_of(l, e->type));
         build_into(l, e, temp(l, slot));

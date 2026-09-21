@@ -66,7 +66,7 @@ fn write_file(path: str, what: str) may fail
 /// Print the file at `path`, read four bytes at a time.
 fn print_file(path: str) may fail
 {
-	let f = try fs.open(path, fs.Mode.Read);
+	let f = try fs.open(path);
 	defer fs.close(f) catch fatal;
 	let room: [4]byte = [0; 4];
 	let seen = text.Builder.new();

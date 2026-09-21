@@ -1,0 +1,96 @@
+//! Default values of parameters. A call leaves out the parameters at the
+//! end that have a default, and each default fills its parameter. The
+//! default is a constant expression.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Mode { Read, Write }
+
+const LIMIT: int = 10;
+
+/// Every kind of constant as a default.
+fn open(path: str, mode: Mode = Mode.Write, retries: int = LIMIT * 2,
+        loud: bool = true, ratio: f64 = 0.5, tag: str = "plain")
+{
+	printf("%.*s %d %d %d %.2f %.*s\n".ptr, path.len as c_int, path.ptr,
+	       mode as c_int, retries as c_int, loud as c_int, ratio,
+	       tag.len as c_int, tag.ptr);
+}
+
+/// A default of a function that may fail, which has an out parameter
+/// after the ones it writes.
+fn bounded(n: int, limit: int = 4) -> int may fail
+{
+	if n > limit { fail "n is over the limit"; }
+	return n * 2;
+}
+
+/// A default of a function without a result that may fail.
+fn checked(n: int, limit: int = 3) may fail
+{
+	if n > limit { fail lang.Error.new(7, "checked over the limit"); }
+	printf("checked %d\n".ptr, n as c_int);
+}
+
+class Counter
+{
+	pub count: int = 0,
+
+	/// Add n, one when the call leaves it out.
+	pub fn add(self, n: int = 1)
+	{
+		self.count += n;
+	}
+
+	/// A function of the body without self.
+	pub fn starting(at: int = 5) -> Counter
+	{
+		return Counter { count: at };
+	}
+}
+
+class Circle
+{
+	pub r: int = 0,
+
+	/// The default of an argument of `construct`.
+	fn construct(self, r: int = 3) may fail
+	{
+		if r < 0 { fail "a negative radius"; }
+		self.r = r;
+	}
+}
+
+fn main() -> int
+{
+	open("a");
+	open("b", Mode.Read);
+	open("c", Mode.Read, 1);
+	open("d", Mode.Read, 1, false, 1.25, "given");
+	let b = bounded(3) catch fatal;
+	printf("bounded %d\n".ptr, b as c_int);
+	let over = bounded(5) catch e {
+		printf("over %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield -1;
+	};
+	printf("over %d\n".ptr, over as c_int);
+	let wide = bounded(5, 10) catch fatal;
+	printf("wide %d\n".ptr, wide as c_int);
+	checked(2) catch fatal;
+	checked(4) catch e {
+		printf("checked %d\n".ptr, e.code as c_int);
+	};
+	let c = Counter { };
+	c.add();
+	c.add(4);
+	printf("count %d\n".ptr, c.count as c_int);
+	let s = Counter.starting();
+	printf("starting %d\n".ptr, s.count as c_int);
+	let circle = Circle() catch fatal;
+	printf("circle %d\n".ptr, circle.r as c_int);
+	let given = Circle(7) catch fatal;
+	printf("circle %d\n".ptr, given.r as c_int);
+	return 0;
+}

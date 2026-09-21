@@ -1,0 +1,8 @@
+exit 0
+plain location.anti:44:15 location.main location
+let location.anti:45:10 location.main location
+default location.anti:47:2 location.main location
+given location.anti:48:16 location.main location
+method location.anti:31:10 location.Probe.position location
+member location.anti:51:2 location.main location
+marks 1

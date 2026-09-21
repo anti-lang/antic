@@ -93,7 +93,8 @@ enum expr_kind {
     EXPR_SIZE_OF,
     EXPR_PARALLEL,
     EXPR_DISPATCH,                  /* dispatch obj -> f(args) */
-    EXPR_JOIN                       /* join(job) and join_all(jobs) */
+    EXPR_JOIN,                      /* join(job) and join_all(jobs) */
+    EXPR_HERE                       /* `here`, the position it stands at */
 };
 
 /* name: value inside a struct or slice literal. */
@@ -440,7 +441,8 @@ struct param {
     struct doc_text doc;            /* fields only */
     struct doc_text note;           /* fields only */
     struct expr *bits;              /* the width of a bitfield, or NULL */
-    struct expr *value;             /* a field default or an enum value. */
+    /* A field default, an enum value or the default of a parameter. */
+    struct expr *value;
     enum field_form form;           /* fields only */
     enum visibility vis;            /* fields only */
     bool owned;                     /* `own`: the object frees the memory */

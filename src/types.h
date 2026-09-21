@@ -188,12 +188,19 @@ struct type *types_object(struct types *types);
 
 /* DESIGN: `anti.lang` is the root of the standard library and imports
    nothing, so every module can name its classes without a cycle. The
-   compiler knows two of them by name: `Error`, which a failing function
-   returns, and `NoneDereference`, the error of a `catch` on a `?*T`. The
-   names are defined here and nowhere else. */
+   compiler knows these of them by name: `Error`, which a failing function
+   returns, `NoneDereference`, the error of a `catch` on a `?*T`, and
+   `SourceLocation`, the value of `here`. The names are defined here and
+   nowhere else, and so are the fields of them that the compiler writes. */
 #define LANG_MODULE "anti.lang"
 #define LANG_ERROR "Error"
 #define LANG_NONE_DEREFERENCE "NoneDereference"
+#define LANG_SOURCE_LOCATION "SourceLocation"
+#define LANG_LOCATION_FILE "file"
+#define LANG_LOCATION_LINE "line"
+#define LANG_LOCATION_COLUMN "column"
+#define LANG_LOCATION_FUNCTION "function"
+#define LANG_LOCATION_MODULE "module"
 
 /* Whether t is the class `anti.lang.Error` itself. */
 bool types_is_lang_error(const struct type *t);

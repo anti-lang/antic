@@ -480,6 +480,9 @@ static struct expr *primary(struct parser *p)
     case TOKEN_NONE:
         next(p);
         return new_expr(p, EXPR_NONE, t);
+    case TOKEN_HERE:
+        next(p);
+        return new_expr(p, EXPR_HERE, t);
     /* `self` is the receiver of a function of a struct body. It reads as
        a name, and the checker gives it the type *T. */
     case TOKEN_SELF:
@@ -1440,8 +1443,9 @@ static struct block *block(struct parser *p)
 
 /* Items */
 
-/* A parenthesised list of name: type pairs. When allow_variadic is set,
-   an ellipsis token may end the list. */
+/* A parenthesised list of name: type pairs, each with an optional
+   `= value`. When allow_variadic is set, an ellipsis token may end the
+   list. */
 /* DESIGN: `self` is written as the first parameter and carries no type,
    because its type is always a pointer to the struct that declares the
    function. It reaches the parameter list as has_self, not as a param. */
@@ -1472,6 +1476,12 @@ static struct param *params(struct parser *p, bool allow_variadic,
         param.pos = pos_of(peek(p));
         if (!expect_name(p, &param.name) || !expect(p, TOKEN_COLON) ||
             (param.type = type(p)) == NULL) {
+            free(list.data);
+            return NULL;
+        }
+        /* `name: T = value`: the default that a call which leaves the
+           parameter out passes. */
+        if (accept(p, TOKEN_ASSIGN) && (param.value = expression(p)) == NULL) {
             free(list.data);
             return NULL;
         }

@@ -1,0 +1,31 @@
+//! Functions whose parameters have default values. The library file
+//! carries each default, so a call from another module leaves them out,
+//! and `here` is the position of that call.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Greet `name` a number of times, and name the line of the call.
+pub fn greet(name: str, times: int = 2, at: lang.SourceLocation = here)
+{
+	let i = 0;
+	while i < times do {
+		printf("hello %.*s from %.*s:%d %.*s\n".ptr, name.len as c_int,
+		       name.ptr, at.file.len as c_int, at.file.ptr, at.line as c_int,
+		       at.function.len as c_int, at.function.ptr);
+		i += 1;
+	}
+}
+
+/// A total whose step has a default.
+pub class Tally
+{
+	pub total: int = 0,
+
+	/// Add `n`, or one when the call leaves it out.
+	pub fn add(self, n: int = 1)
+	{
+		self.total += n;
+	}
+}

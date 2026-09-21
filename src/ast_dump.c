@@ -220,6 +220,10 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         text_append(d->out, "none");
         end(d, start, type);
         break;
+    case EXPR_HERE:
+        text_append(d->out, "here");
+        end(d, start, type);
+        break;
     case EXPR_NAME:
         label_name(d, "ident", NULL, &e->as.name);
         end(d, start, type);

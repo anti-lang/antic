@@ -21,6 +21,21 @@ extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
 extern fn anti_rt_exit(status: c_int);
 extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
 
+/// A position in the source, which `here` gives.
+///
+/// `file` is the path under the search root that holds the source, the
+/// one a failed check names. `function` is the full name of the function
+/// the position stands in, `module.Class.f`. A location that no `here`
+/// wrote has line 0.
+pub struct SourceLocation
+{
+	file: str,
+	line: int,
+	column: int,
+	function: str,
+	module: str,
+}
+
 /// A failure, with a code, a message and the error that caused it.
 pub class Error
 {

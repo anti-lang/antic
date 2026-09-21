@@ -14,7 +14,7 @@ _Static_assert(TYPE_STRUCT == 23, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
-_Static_assert(TOKEN_KIND_COUNT == 149, "raise ANTL_VERSION, then update this");
+_Static_assert(TOKEN_KIND_COUNT == 150, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_RET == 61, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
@@ -201,6 +201,18 @@ static void visit_value(struct writer *w, const struct const_value *v)
     }
 }
 
+/* The types the constant defaults of a function's parameters name. */
+static void visit_defaults(struct writer *w, const struct symbol *sym)
+{
+    size_t i;
+
+    for (i = 0; sym->defaults != NULL && i < sym->default_count; i++) {
+        if (sym->defaults[i].value != NULL) {
+            visit_value(w, sym->defaults[i].value);
+        }
+    }
+}
+
 static void visit_type(struct writer *w, const struct type *t)
 {
     size_t i;
@@ -244,6 +256,7 @@ static void visit_type(struct writer *w, const struct type *t)
                 const struct item *m = t->members[i];
                 if (carried_member(m)) {
                     visit_type(w, m->symbol->type);
+                    visit_defaults(w, m->symbol);
                 }
             }
         }
@@ -428,6 +441,24 @@ static void put_value(struct writer *w, const struct const_value *v)
     }
 }
 
+/* DESIGN: the defaults of a function's parameters follow its type. A
+   count gives the parameters, `self` included, and is 0 when none has a
+   default. Each parameter then has a byte: 0 without a default, 1 before
+   a constant and 2 for `here`, which the call fills with its position. */
+static void put_param_defaults(struct writer *w, const struct symbol *sym)
+{
+    size_t i;
+
+    put_u32(w, (uint32_t)(sym->defaults != NULL ? sym->default_count : 0));
+    for (i = 0; sym->defaults != NULL && i < sym->default_count; i++) {
+        const struct param_default *d = &sym->defaults[i];
+        put_u8(w, d->here ? 2 : d->value != NULL ? 1 : 0);
+        if (!d->here && d->value != NULL) {
+            put_value(w, d->value);
+        }
+    }
+}
+
 /* DESIGN: the defaults of the fields follow the type table. The reader
    reads a value against the type of its field, and it resolves that type
    once the whole table is in. Each field of a struct that the file
@@ -443,6 +474,13 @@ static void put_defaults(struct writer *w, const struct type *t)
         put_u8(w, t->fields[i].constant != NULL);
         if (t->fields[i].constant != NULL) {
             put_value(w, t->fields[i].constant);
+        }
+    }
+    /* The functions of the body, in the order the type carries them, so
+       the reader has their types in place. */
+    for (i = 0; i < t->member_count; i++) {
+        if (carried_member(t->members[i])) {
+            put_param_defaults(w, t->members[i]->symbol);
         }
     }
 }
@@ -719,6 +757,7 @@ void antl_write(struct text *out, const struct interface *iface,
         if (iface->items[i]->kind == SYMBOL_CONST) {
             visit_value(&w, iface->items[i]->value);
         }
+        visit_defaults(&w, iface->items[i]);
     }
     put_header(&w, iface);
     put_u32(&w, (uint32_t)w.type_count);
@@ -746,6 +785,7 @@ void antl_write(struct text *out, const struct interface *iface,
             for (j = 0; j < sym->type->param_count; j++) {
                 put_bytes(&w, sym->params[j].text, sym->params[j].length);
             }
+            put_param_defaults(&w, sym);
         }
         if (sym->kind == SYMBOL_EXTERN_FN) {
             put_u8(&w, sym->variadic);
@@ -1092,6 +1132,44 @@ struct field_refs {
 static bool read_value(struct reader *r, struct type *t, struct const_value *v,
                        int depth);
 
+/* The defaults of the parameters of sym, whose type is in place. */
+static void read_param_defaults(struct reader *r, struct symbol *sym)
+{
+    uint32_t count = get_u32(r);
+    struct param_default *list;
+    uint32_t i;
+
+    if (r->failed || count == 0) {
+        return;
+    }
+    if (sym->type == NULL || sym->type->kind != TYPE_FN ||
+        count > sym->type->param_count) {
+        damaged(r);
+        return;
+    }
+    list = allocate(r, count, sizeof *list);
+    for (i = 0; i < count && !r->failed; i++) {
+        uint8_t kind = get_u8(r);
+        struct const_value *v;
+        memset(&list[i], 0, sizeof list[i]);
+        if (kind == 2) {
+            list[i].here = true;
+        } else if (kind == 1) {
+            v = allocate(r, 1, sizeof *v);
+            if (!read_value(r, sym->type->params[i], v, 0)) {
+                damaged(r);
+                return;
+            }
+            list[i].value = v;
+        } else if (kind != 0) {
+            damaged(r);
+            return;
+        }
+    }
+    sym->defaults = list;
+    sym->default_count = count;
+}
+
 static void read_types(struct reader *r)
 {
     uint32_t count = get_count(r, 1);
@@ -1360,6 +1438,9 @@ static void read_types(struct reader *r)
             }
             t->fields[j].constant = v;
         }
+        for (j = 0; j < structs[i].member_count && !r->failed; j++) {
+            read_param_defaults(r, structs[i].members[j]->symbol);
+        }
     }
     for (i = 0; i < struct_count && !r->failed; i++) {
         if (types_find_cycle(structs[i].s) != NULL) {
@@ -1481,6 +1562,7 @@ static void read_items(struct reader *r)
                     names[j] = get_name(r);
                 }
                 sym->params = names;
+                read_param_defaults(r, sym);
             }
             if (kind == SYMBOL_EXTERN_FN) {
                 sym->variadic = get_u8(r) != 0;

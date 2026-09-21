@@ -20,14 +20,14 @@ class Bin
 fn main() -> int
 {
 	let made = points.make(3);
-	let here = alloc points.Point { x: 3 };
+	let local = alloc points.Point { x: 3 };
 	let o: *Object = made;
 	let same: *Object = made;
 
 	printf("%d %d\n".ptr, (o is *points.Point) as c_int,
-		points.is_point(here) as c_int);
-	printf("%d %d %d\n".ptr, (o == same) as c_int, (o == here) as c_int,
-		made.equals(here) as c_int);
+		points.is_point(local) as c_int);
+	printf("%d %d %d\n".ptr, (o == same) as c_int, (o == local) as c_int,
+		made.equals(local) as c_int);
 	let built = reflect.new("com.example.points.Point");
 	if built == none {
 		return 1;
@@ -60,7 +60,7 @@ fn main() -> int
 	delete(bin);
 	delete(crate);
 	delete(made);
-	delete(here);
+	delete(local);
 	delete(built);
 	return 0;
 }

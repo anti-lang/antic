@@ -75,6 +75,13 @@ struct package {
     size_t attribution_count;
 };
 
+/* The default of one parameter: a constant, `here`, or neither when the
+   parameter has none. */
+struct param_default {
+    const struct const_value *value;
+    bool here;                      /* the position of each call */
+};
+
 struct symbol {
     enum symbol_kind kind;
     struct name name;
@@ -92,6 +99,13 @@ struct symbol {
     bool internal;                  /* `internal`: the package alone sees it */
     bool caught;                    /* the error a `catch` binds */
     const struct name *params;      /* a function of an interface */
+    /* DESIGN: the defaults of a function's parameters, one per parameter
+       the program writes, `self` included, in the order of the type.
+       NULL when no parameter has one. They belong to the function and
+       not to its type, so a call through a function value passes every
+       argument. */
+    const struct param_default *defaults;
+    size_t default_count;
 
     /* An export item, whose function has the C symbol of its name. */
     bool exported;

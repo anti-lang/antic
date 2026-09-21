@@ -647,6 +647,29 @@ static struct type *error_class(struct checker *c, struct pos pos)
     return sym->type;
 }
 
+/* The struct `anti.lang.SourceLocation`, which `here` gives, or NULL
+   after an error at pos. */
+static struct type *location_type(struct checker *c, struct pos pos)
+{
+    static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
+    static const struct name type_name = {
+        LANG_SOURCE_LOCATION, sizeof LANG_SOURCE_LOCATION - 1};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *sym = lib != NULL ? library_item(c, lib, &type_name) : NULL;
+
+    if (sym == NULL && name_is(&c->module_name, LANG_MODULE)) {
+        sym = lookup(c, &type_name);
+    }
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
+        sym->type->kind != TYPE_STRUCT) {
+        error_at(c, pos, "`here` gives an `" LANG_MODULE "."
+                 LANG_SOURCE_LOCATION "`, so the module imports `"
+                 LANG_MODULE "`");
+        return NULL;
+    }
+    return sym->type;
+}
+
 /* The type of a function item, fn(params) -> result. A function of a
    struct body that takes self has a first parameter of type *T. */
 static struct type *function_type(struct checker *c, struct item *it)
@@ -2803,12 +2826,94 @@ static struct type *check_handled(struct checker *c, struct expr *e,
    body per level, so a class that declares none has no `construct`
    with arguments, whatever its base declares, and a literal builds
    it. */
+/* The fewest parameters of the type that a call of sym gives, which is
+   every parameter before the first with a default. */
+static size_t required_params(const struct symbol *sym, size_t count)
+{
+    size_t i;
+
+    for (i = 0; sym != NULL && sym->defaults != NULL &&
+                i < sym->default_count; i++) {
+        if (sym->defaults[i].value != NULL || sym->defaults[i].here) {
+            return i;
+        }
+    }
+    return count;
+}
+
+/* How many parameters after the first `given` the defaults of sym fill,
+   when every one after them has a default. The count is in the
+   parameters of the type, `self` included. */
+static size_t filled_by_defaults(const struct symbol *sym, size_t given)
+{
+    size_t i;
+
+    if (sym == NULL || sym->defaults == NULL || given >= sym->default_count) {
+        return 0;
+    }
+    for (i = given; i < sym->default_count; i++) {
+        if (sym->defaults[i].value == NULL && !sym->defaults[i].here) {
+            return 0;
+        }
+    }
+    return sym->default_count - given;
+}
+
+/* The argument of a parameter that the call leaves out. A constant reads
+   as a name of it, and `here` is the position of the call. Both carry
+   their type already, so neither is checked again. */
+static struct expr *default_argument(struct checker *c, const struct expr *call,
+                                     const struct param_default *d,
+                                     struct type *t)
+{
+    struct expr *arg = new_node(c, d->here ? EXPR_HERE : EXPR_NAME,
+                                call->pos);
+    struct symbol *value;
+
+    arg->type = t;
+    if (d->here) {
+        return arg;
+    }
+    value = arena_alloc(c->arena, sizeof *value);
+    memset(value, 0, sizeof *value);
+    value->kind = SYMBOL_CONST;
+    value->type = t;
+    value->value = (struct const_value *)d->value;
+    value->state = EVAL_DONE;
+    arg->symbol = value;
+    return arg;
+}
+
+/* Append the arguments of the `filled` parameters after the first
+   `given`, which count in the parameters of the type. */
+static void append_defaults(struct checker *c, struct expr *e,
+                            const struct symbol *sym, const struct type *fn,
+                            size_t given, size_t filled)
+{
+    size_t have = e->as.call.arg_count;
+    struct expr **args =
+        arena_alloc(c->arena, (have + filled) * sizeof *args);
+    size_t i;
+
+    if (have > 0) {
+        memcpy(args, e->as.call.args, have * sizeof *args);
+    }
+    for (i = 0; i < filled; i++) {
+        args[have + i] = default_argument(c, e, &sym->defaults[given + i],
+                                          fn->params[given + i]);
+    }
+    e->as.call.args = args;
+    e->as.call.arg_count = have + filled;
+}
+
 static struct type *check_construct(struct checker *c, struct expr *e,
                                     struct type *t, struct type *expected)
 {
     static const struct name construct_name = {"construct", 9};
     struct item *m = NULL;
     struct type *fn;
+    size_t given;
+    size_t filled;
     size_t i;
     bool ok = true;
 
@@ -2831,19 +2936,29 @@ static struct type *check_construct(struct checker *c, struct expr *e,
     e->as.call.builds = t;
     e->as.call.callee->symbol = m->symbol;
     e->as.call.callee->type = fn;
-    if (e->as.call.arg_count + 1 != fn->param_count) {
-        error_at(c, e->pos, "`%s.construct` takes %zu argument%s, found %zu",
-                 tn(t), fn->param_count - 1,
-                 fn->param_count == 2 ? "" : "s", e->as.call.arg_count);
+    given = e->as.call.arg_count;
+    filled = filled_by_defaults(m->symbol, given + 1);
+    if (given + filled + 1 != fn->param_count) {
+        size_t least = required_params(m->symbol, fn->param_count) - 1;
+        size_t n = given < least ? least : fn->param_count - 1;
+        error_at(c, e->pos, "`%s.construct` takes %s%zu argument%s, found %zu",
+                 tn(t),
+                 least == fn->param_count - 1 ? ""
+                 : given < least              ? "at least "
+                                              : "at most ",
+                 n, n == 1 ? "" : "s", given);
         return builtin(c, TYPE_ERROR);
     }
-    for (i = 0; i < e->as.call.arg_count; i++) {
+    for (i = 0; i < given; i++) {
         struct expr *arg = e->as.call.args[i];
         ok = require(c, arg, check_expr(c, arg, fn->params[i + 1]),
                      fn->params[i + 1]) && ok;
     }
     if (!ok) {
         return builtin(c, TYPE_ERROR);
+    }
+    if (filled > 0) {
+        append_defaults(c, e, m->symbol, fn, given + 1, filled);
     }
     if (is_failing(c, fn->result)) {
         return check_handled(c, e, fn, expected);
@@ -2859,6 +2974,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
     struct symbol *sym;
     bool variadic = false;
     size_t fixed;
+    size_t given;
+    size_t filled;
     size_t i;
     bool ok = true;
     const struct symbol *module;
@@ -2976,33 +3093,44 @@ static struct type *check_call(struct checker *c, struct expr *e,
     /* A `?fn(...)` holds no function until the program has checked it. */
     fn = usable_pointer(c, callee, fn);
     sym = function_symbol(callee);
+    /* The parameters at the end that the call leaves out take their
+       defaults, which are appended once the given ones are checked. */
+    given = e->as.call.arg_count;
+    filled = variadic ? 0 : filled_by_defaults(sym, given);
     /* DESIGN: a function that can fail returns `*Error` and writes its
        result through the last parameter. A call that gives one argument
        fewer than the function takes leaves that place to the compiler.
        The compiler passes the address of what the `let` declares. */
     if (is_failing(c, fn->result) && !variadic &&
-        e->as.call.arg_count + 1 == fn->param_count &&
+        given + filled + 1 == fn->param_count &&
         fn->params[fn->param_count - 1]->kind == TYPE_POINTER) {
         e->as.call.out = e;
     }
     if (e->as.call.out != NULL) {
         /* The out parameter is not written at the call, so the count of
            arguments the program gave is one less. */
-    } else if (variadic ? e->as.call.arg_count < fn->param_count
-                 : e->as.call.arg_count != fn->param_count) {
-        size_t n = fn->param_count - fixed;
+    } else if (variadic ? given < fn->param_count
+                 : given + filled != fn->param_count) {
+        size_t least = required_params(sym, fn->param_count);
+        size_t most = sym != NULL && sym->defaults != NULL
+                          ? sym->default_count
+                          : fn->param_count;
+        size_t n = (given < least ? least : most) - fixed;
+        const char *bound = variadic || (least < most && given < least)
+                                ? "at least "
+                            : least < most ? "at most "
+                                           : "";
         if (sym != NULL) {
             error_at(c, e->pos, "`%.*s` takes %s%zu argument%s, found %zu",
-                     (int)sym->name.length, sym->name.text,
-                     variadic ? "at least " : "", n, n == 1 ? "" : "s",
-                     e->as.call.arg_count - fixed);
+                     (int)sym->name.length, sym->name.text, bound, n,
+                     n == 1 ? "" : "s", given - fixed);
         } else {
             error_at(c, e->pos, "the call takes %zu argument%s, found %zu", n,
-                     n == 1 ? "" : "s", e->as.call.arg_count - fixed);
+                     n == 1 ? "" : "s", given - fixed);
         }
         return builtin(c, TYPE_ERROR);
     }
-    for (i = fixed; i < e->as.call.arg_count; i++) {
+    for (i = fixed; i < given; i++) {
         struct expr *arg = e->as.call.args[i];
         if (i < fn->param_count) {
             ok = require(c, arg, check_expr(c, arg, fn->params[i]),
@@ -3018,6 +3146,9 @@ static struct type *check_call(struct checker *c, struct expr *e,
     }
     if (!ok) {
         return builtin(c, TYPE_ERROR);
+    }
+    if (filled > 0) {
+        append_defaults(c, e, sym, fn, given, filled);
     }
     if (is_failing(c, fn->result) && !makes_error(owner_type)) {
         return check_handled(c, e, fn, expected);
@@ -3610,6 +3741,9 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return check_dispatch(c, e);
     case EXPR_JOIN:
         return check_join(c, e);
+    case EXPR_HERE:
+        t = location_type(c, e->pos);
+        return t != NULL ? t : builtin(c, TYPE_ERROR);
     case EXPR_INDEX:
         t = check_expr(c, e->as.index.base, NULL);
         if (!require(c, e->as.index.index,
@@ -4560,6 +4694,10 @@ static bool eval_const(struct checker *c, struct expr *e,
     case EXPR_SLICE:
     case EXPR_SLICE_LIT:
         return fail_const(c, e, "a slice");
+    /* The position is data of the call or of the function around it.
+       It is a default of a parameter and never a constant. */
+    case EXPR_HERE:
+        return fail_const(c, e, "`here`");
     }
     return false;
 }
@@ -5957,6 +6095,65 @@ static void check_test_block(struct checker *c, struct item *it)
     }
 }
 
+/* DESIGN: the default of a parameter is a constant expression, which the
+   checker evaluates once, or `here`, which each call fills with its own
+   position. The parameters with a default end the list, because a call
+   gives the others in order and leaves out only the last ones. An
+   `extern fn` declares what C declares, and C has no default values. */
+static void check_defaults(struct checker *c, struct item *it)
+{
+    const struct type *fn = it->symbol != NULL ? it->symbol->type : NULL;
+    size_t extra = it->has_self ? 1 : 0;
+    size_t count = it->param_count + extra;
+    struct param_default *list = NULL;
+    const struct param *first = NULL;
+    size_t i;
+
+    if (fn == NULL || is_error(fn) || fn->kind != TYPE_FN ||
+        fn->param_count < count) {
+        return;
+    }
+    for (i = 0; i < it->param_count; i++) {
+        struct param *p = &it->params[i];
+        struct type *t = fn->params[i + extra];
+        struct const_value *v;
+        if (p->value == NULL) {
+            if (first != NULL) {
+                error_at(c, p->pos, "`%.*s` has no default and follows "
+                         "`%.*s`, which has one", (int)p->name.length,
+                         p->name.text, (int)first->name.length,
+                         first->name.text);
+            }
+            continue;
+        }
+        if (first == NULL) {
+            first = p;
+        }
+        if (it->kind == ITEM_EXTERN_FN) {
+            error_at(c, p->value->pos, "an `extern fn` declares what C "
+                     "declares, and C has no default values");
+            continue;
+        }
+        if (!require(c, p->value, check_expr(c, p->value, t), t)) {
+            continue;
+        }
+        if (list == NULL) {
+            list = arena_alloc(c->arena, count * sizeof *list);
+            memset(list, 0, count * sizeof *list);
+        }
+        if (p->value->kind == EXPR_HERE) {
+            list[i + extra].here = true;
+            continue;
+        }
+        v = arena_alloc(c->arena, sizeof *v);
+        if (eval_const(c, p->value, v)) {
+            list[i + extra].value = v;
+        }
+    }
+    it->symbol->defaults = list;
+    it->symbol->default_count = list != NULL ? count : 0;
+}
+
 static enum symbol_kind item_symbol_kind(enum item_kind kind)
 {
     switch (kind) {
@@ -6390,6 +6587,19 @@ bool sema_check(struct module *module, const char *module_name,
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_CONST) {
             const_symbol(&c, it->symbol, it->name_pos);
+        }
+    }
+    /* Every body calls with the defaults, so they are known before the
+       first body is checked. */
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {
+            check_defaults(&c, it);
+        }
+        for (j = 0; it->symbol != NULL && j < it->member_count; j++) {
+            if (it->members[j]->kind == ITEM_FN) {
+                check_defaults(&c, it->members[j]);
+            }
         }
     }
     /* DESIGN: a singleton has one instance, which `Config.get()` makes

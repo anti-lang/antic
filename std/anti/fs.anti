@@ -38,8 +38,9 @@ pub struct File
 	handle: ?*byte,
 }
 
-/// Open the file at `path` in `mode`.
-pub fn open(path: str, mode: Mode) -> *File may fail
+/// Open the file at `path` in `mode`, which reads when the call leaves it
+/// out.
+pub fn open(path: str, mode: Mode = Mode.Read) -> *File may fail
 {
 	let writing: c_int = 0;
 	if mode == Mode.Write {

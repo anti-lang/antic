@@ -1,0 +1,18 @@
+//! A program that calls functions of another module and leaves out the
+//! parameters that have a default. The position a default `here` gives is
+//! the call in this file.
+
+import com.example.greeter;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	greeter.greet("one");
+	greeter.greet("two", 1);
+	let t = greeter.Tally { };
+	t.add();
+	t.add(5);
+	printf("total %d\n".ptr, t.total as c_int);
+	return 0;
+}

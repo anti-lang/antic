@@ -210,7 +210,7 @@ let n = g();
 
 Positional arguments first, named ones after in any order. No overloading by signature.
 
-Not built yet: default values and named arguments.
+Built: default values, a constant expression or `here`, over a module boundary as well. Not built yet: named arguments.
 
 ## Tuples
 
@@ -668,7 +668,7 @@ let p = here;               // the position of this expression
 
 The value is constant data. `here` in an ordinary expression gives the position of that expression, which is rarely what a message wants.
 
-Not built yet.
+Built: `here`, in an expression and as the default of a parameter, and `SourceLocation` in `anti.lang`.
 
 ## Checks and debugging
 

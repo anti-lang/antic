@@ -1,0 +1,54 @@
+//! `here` is the position it is written at, as an
+//! `anti.lang.SourceLocation`. As the default value of a parameter it is
+//! the position of the call, so a function reads the line of its caller.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Print one position after a label.
+fn put(label: str, at: lang.SourceLocation)
+{
+	printf("%.*s %.*s:%d:%d %.*s %.*s\n".ptr, label.len as c_int, label.ptr,
+	       at.file.len as c_int, at.file.ptr, at.line as c_int,
+	       at.column as c_int, at.function.len as c_int, at.function.ptr,
+	       at.module.len as c_int, at.module.ptr);
+}
+
+/// The position of the call, which the default fills.
+fn warn(message: str, at: lang.SourceLocation = here)
+{
+	put(message, at);
+}
+
+class Probe
+{
+	pub marks: int = 0,
+
+	/// The position inside a function of a class body.
+	pub fn position(self) -> lang.SourceLocation
+	{
+		return here;
+	}
+
+	/// A default of a function of a class body.
+	pub fn note(self, message: str, at: lang.SourceLocation = here)
+	{
+		self.marks += 1;
+		put(message, at);
+	}
+}
+
+fn main() -> int
+{
+	put("plain", here);
+	let p = here;
+	put("let", p);
+	warn("default");
+	warn("given", here);
+	let probe = Probe { };
+	put("method", probe.position());
+	probe.note("member");
+	printf("marks %d\n".ptr, probe.marks as c_int);
+	return 0;
+}

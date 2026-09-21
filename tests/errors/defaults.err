@@ -1,0 +1,7 @@
+defaults.anti:2:45: error: an `extern fn` declares what C declares, and C has no default values
+defaults.anti:9:21: error: `b` has no default and follows `a`, which has one
+defaults.anti:14:19: error: expected `int`, found `str`
+defaults.anti:19:20: error: a call is not a constant expression
+defaults.anti:31:2: error: `pair` takes at least 1 argument, found 0
+defaults.anti:32:2: error: `pair` takes at most 2 arguments, found 3
+defaults.anti:33:10: error: `here` gives an `anti.lang.SourceLocation`, so the module imports `anti.lang`

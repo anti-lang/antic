@@ -1104,6 +1104,27 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# Default values over a module boundary: the library file carries the
+# default of each parameter, and `here` is the position of the call in the
+# program.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME default_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/defaults"
+            "-DLIBRARIES=greeter"
+            "-DSTD=lang"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/defaults-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # A tuple over a module boundary: the library file carries the tuple of
 # each signature, so the two modules name one type and the program takes
 # the elements apart.
@@ -1516,6 +1537,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "failing|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/failing.s,failing.anti"
         "fail_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_forms.s,fail_forms.anti"
         "fail_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_no_import.s,fail_no_import.anti"
+        "defaults|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/defaults.s,defaults.anti"
         "tuples|-S,-o,${LISTINGS}/tuples.s,tuples.anti"
         "transient|-S,-o,${LISTINGS}/transient.s,transient.anti")
     string(REPLACE "|" ";" parts "${case}")
