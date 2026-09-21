@@ -444,14 +444,15 @@ add_test(NAME std_may_fail_only
         "-DROOT=${ANTIC_STD_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_may_fail_only.cmake")
 
-# So is every failing function of the test programs, apart from two
-# that write the hand-written form on purpose. The listing refuses it on
-# a `construct`, and out_slot reads the `=` of a callee into the storage
-# a `catch` binding supplies, which a `may fail` function never writes.
+# So is every failing function of the test programs. The functions the
+# listing skips write the form on purpose: construct_forms refuses it on
+# a `construct`, failing and error_values check that a function written
+# so is ordinary, whose error is a value, and catch_exits returns the
+# error of a handler as one.
 add_test(NAME tests_may_fail_only
     COMMAND "${CMAKE_COMMAND}"
         "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
-        "-DSKIP=errors/construct_forms.anti:construct,programs/out_slot.anti:make"
+        "-DSKIP=errors/construct_forms.anti:construct,errors/failing.anti:by_hand,errors/failing.anti:fail_by_hand,programs/error_values.anti:stored,programs/error_values.anti:maybe,programs/error_values.anti:caught,programs/catch_exits.anti:passed"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_may_fail_only.cmake")
 
 # The file of the logger that tests/std/log.anti writes. The environment

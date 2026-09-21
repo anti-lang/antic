@@ -28,6 +28,9 @@ try return live 0
 deleted 9
 unnamed break 1
 unnamed break live 0
+passed 10
+deleted 10
+return e live 0
 failed again 11
 deleted 11
 fail e live 0

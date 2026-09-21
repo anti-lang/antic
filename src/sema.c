@@ -2814,19 +2814,20 @@ static struct type *caught_error(struct checker *c, struct type *result)
                : result;
 }
 
-static bool is_failing(const struct checker *c, const struct type *t)
+/* DESIGN: a function fails when it is written `may fail`, and never
+   because of its result type. A function that returns `*Error` or
+   `?*Error` without the marking gives an error as a value, and its call
+   needs no handler. A call through a function value names no function,
+   so it is ordinary. */
+static bool is_failing(const struct symbol *sym)
 {
-    (void)c;
-    if (t == NULL || t->kind != TYPE_POINTER ||
-        t->element->kind != TYPE_CLASS) {
-        return false;
-    }
-    for (t = t->element; t != NULL; t = t->base) {
-        if (types_is_lang_error(t)) {
-            return true;
-        }
-    }
-    return false;
+    return sym != NULL && sym->kind == SYMBOL_FN && sym->may_fail;
+}
+
+/* Whether the function whose body is checked may fail. */
+static bool in_failing_function(const struct checker *c)
+{
+    return c->function != NULL && c->function->may_fail;
 }
 
 /* DESIGN: the error a `catch` binds belongs to the handler, which ends
@@ -2839,19 +2840,6 @@ static void refuse_escaping_error(struct checker *c, const struct expr *e)
         error_at(c, e->pos, "`%.*s` outlives its `catch`, use `dup`",
                  (int)e->as.name.length, e->as.name.text);
     }
-}
-
-/* DESIGN: a static function of the error class itself builds an error
-   rather than reporting one, so `Error.new` gives a value like any other
-   call. Every other function that returns `*Error` reports a failure. */
-static bool makes_error(const struct type *owner)
-{
-    for (; owner != NULL; owner = owner->base) {
-        if (types_is_lang_error(owner)) {
-            return true;
-        }
-    }
-    return false;
 }
 
 /* The value a handled call gives: what the out parameter points at, or
@@ -2912,10 +2900,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
         }
         return builtin(c, TYPE_ERROR);
     case HANDLE_TRY:
-        if (c->function == NULL || !is_failing(c, c->function->symbol == NULL
-                                                      ? NULL
-                                                      : c->function->symbol
-                                                            ->type->result)) {
+        if (!in_failing_function(c)) {
             error_at(c, h->pos, "`try` outside a function that may fail");
             return builtin(c, TYPE_ERROR);
         }
@@ -3095,7 +3080,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
     if (filled > 0) {
         append_defaults(c, e, m->symbol, fn, given + 1, filled);
     }
-    if (is_failing(c, fn->result)) {
+    if (m->may_fail) {
         return check_handled(c, e, fn, expected);
     }
     return handled_result(c, e, fn);
@@ -3114,7 +3099,6 @@ static struct type *check_call(struct checker *c, struct expr *e,
     size_t i;
     bool ok = true;
     const struct symbol *module;
-    const struct type *owner_type = NULL;
 
     /* An operation on an atomic field becomes one node of its own. */
     if (atomic_call(c, e, &fn)) {
@@ -3134,7 +3118,6 @@ static struct type *check_call(struct checker *c, struct expr *e,
                sym->kind == SYMBOL_STRUCT) {
         /* T.f(args) calls a function of the body of T, which takes no
            self. An enum value is not callable. */
-        owner_type = sym->type;
         fn = check_type_member(c, callee, sym->type);
         callee->type = fn;
         if (is_error(fn)) {
@@ -3151,7 +3134,6 @@ static struct type *check_call(struct checker *c, struct expr *e,
                name_is(&callee->as.field.base->as.name, "Object")) {
         /* `Object.f(args)` calls a static function of the root. */
         struct type *root = types_object(c->types);
-        owner_type = root;
         fn = check_type_member(c, callee, root);
         callee->type = fn;
         if (is_error(fn)) {
@@ -3166,7 +3148,6 @@ static struct type *check_call(struct checker *c, struct expr *e,
                sym->kind == SYMBOL_STRUCT) {
         /* `m.T.f(args)` calls a function of the body of a type of
            another module, which takes no self. */
-        owner_type = sym->type;
         fn = check_type_member(c, callee, sym->type);
         callee->type = fn;
         if (is_error(fn)) {
@@ -3236,7 +3217,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
        result through the last parameter. A call that gives one argument
        fewer than the function takes leaves that place to the compiler.
        The compiler passes the address of what the `let` declares. */
-    if (is_failing(c, fn->result) && !variadic &&
+    if (is_failing(sym) && !variadic &&
         given + filled + 1 == fn->param_count &&
         fn->params[fn->param_count - 1]->kind == TYPE_POINTER) {
         e->as.call.out = e;
@@ -3285,7 +3266,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
     if (filled > 0) {
         append_defaults(c, e, sym, fn, given, filled);
     }
-    if (is_failing(c, fn->result) && !makes_error(owner_type)) {
+    if (is_failing(sym)) {
         return check_handled(c, e, fn, expected);
     }
     /* A call that cannot fail may still give a `?*T`, and a `catch` on
@@ -6495,8 +6476,8 @@ static void check_stmt(struct checker *c, struct stmt *s)
         check_stmt(c, s->as.deferred);
         return;
     case STMT_FAIL: {
-        struct type *error = c->function->symbol->type->result;
-        if (!is_failing(c, error)) {
+        struct type *error;
+        if (!in_failing_function(c)) {
             error_at(c, s->pos, "`fail` outside a function that may fail");
             check_expr(c, s->as.fail.value, NULL);
             return;
@@ -6513,6 +6494,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
                     check_expr(c, s->as.fail.value, t), t);
             return;
         }
+        error = c->function->symbol->type->result;
         t = caught_error(c, error);
         require(c, s->as.fail.value, check_expr(c, s->as.fail.value, t), t);
         return;
@@ -6540,14 +6522,6 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         require(c, s->as.return_value,
                 check_expr(c, s->as.return_value, result), result);
-        /* A function written by hand as `-> ?*Error` leaves through an
-           error when it returns one, which is what `undo` runs on.
-           `return none;` is the success path and runs no `undo`. */
-        if (is_failing(c, result) && s->as.return_value->type != NULL &&
-            s->as.return_value->type->kind == TYPE_POINTER &&
-            !s->as.return_value->type->nullable) {
-            s->error_exit = true;
-        }
         return;
     case STMT_BLOCK:
         check_block(c, s->as.block);

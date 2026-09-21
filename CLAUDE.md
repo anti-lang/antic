@@ -176,20 +176,10 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 20. Done. The error a `catch e` binds is deleted on every exit of its
     handler, and `programs/catch_exits.anti` takes each exit under a leak
     check. `fail e` hands it on as `return e` does.
-21. A failing function is written `may fail` and nothing else. `is_failing`
-    in `src/sema.c` keys on the `may fail` marking alone and never on the
-    result type. Today it reads any pointer to `Error` or a subclass,
-    `*Error` or `?*Error`, as a failing result. A function that returns an
-    error as an ordinary value, such as `Error.new` or one that returns a
-    stored error, is then no failing function. The `makes_error` exemption
-    for the statics of `Error` has nothing left to exempt and goes with it,
-    and so does the provisional entry on `Error.new` under "Object model".
-    The fix comes with tests that a `may fail` function must be handled and
-    that an ordinary function returning `*Error` or `?*Error` must not.
-    `std_may_fail_only` and `tests_may_fail_only` then check that every
-    `extern fn` is ordinary, and `Box.make` of `programs/out_slot.anti` stops
-    being a failing function, which leaves the zeroed out slot of a `catch`
-    binding without the test that pinned it.
+21. Done. `is_failing` keys on the `may fail` marking alone, and a
+    function that returns `*Error` or `?*Error` without it is ordinary.
+    `programs/error_values.anti` and `errors/failing.anti` check both
+    sides, and `makes_error` is gone.
 22. Verify `by -k`. `for i in 0..10 by -3` must give `9 6 3 0`, the values
     of `by 3` in reverse, and not `7 4 1`. A test pins the output. Code that
     still follows the old procedure, which starts at the high bound, is a
@@ -260,7 +250,9 @@ reports what it finished.
   `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may
   fail. The tests `std_may_fail_only` and `tests_may_fail_only` refuse a
   function of `std/` or `tests/` written by hand as `-> ?*Error`, apart
-  from two tests of that form. A `construct` that can fail is written
+  from the tests of that form. A function fails by its `may fail`
+  marking alone, and one that returns an error without it is ordinary.
+  A `construct` that can fail is written
   `may fail`, a derived one calls `self.super.construct(args)` as its
   first statement, and C makes an object with `anti_<Class>_construct`.
 - Tuples are built. `(int, str)` is an anonymous struct with C layout, `(a, b)`

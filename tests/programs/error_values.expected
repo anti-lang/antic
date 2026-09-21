@@ -1,0 +1,8 @@
+exit 0
+make 1
+maybe 2
+stored 3
+caught 4 risky
+value 5
+error 7: wrapped
+  caused by: error 8: below

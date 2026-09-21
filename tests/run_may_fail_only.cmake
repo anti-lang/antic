@@ -1,8 +1,10 @@
-# No failing function of the standard library or of the test programs
-# writes the out-pointer convention by hand, since both use `may fail`
-# throughout. A binding keeps the hand-written form, because it refuses
-# `may fail`. A `construct` that fails is written `may fail` like any
-# other function. Run with cmake -P and ROOT, the directory whose `.anti`
+# No function of the standard library or of the test programs writes
+# the out-pointer convention by hand, since both use `may fail`
+# throughout. A function written `-> ?*Error` without `may fail` is an
+# ordinary function whose error is a value, and one written so outside a
+# binding is most likely a failing function in the old form. A binding
+# keeps the form, because it refuses `may fail`. A `construct` that fails
+# is written `may fail` like any other function. Run with cmake -P and ROOT, the directory whose `.anti`
 # files are read at every depth. SKIP lists the declarations that write
 # the form on purpose, each as `<path under ROOT>:<function>`, separated
 # by commas.

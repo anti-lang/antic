@@ -1,0 +1,84 @@
+//! A function is failing when it is written `may fail`, and never by its
+//! result type. A function that returns `*Error` or `?*Error` without the
+//! marking is an ordinary function. Its call needs no handler, and the
+//! error it gives is a value like any other, which the caller owns. A
+//! handler in such a function hands its error to the caller with
+//! `return e`, and nothing deletes it on the way.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Store
+{
+	pub own last: ?*lang.Error = none,
+
+	/// The error the store keeps, which it still owns.
+	pub fn stored(self) -> ?*lang.Error
+	{
+		return self.last;
+	}
+}
+
+fn make(code: int) -> *lang.Error
+{
+	return lang.Error.new(code, "made");
+}
+
+fn maybe(code: int) -> ?*lang.Error
+{
+	if code == 0 {
+		return none;
+	}
+	return lang.Error.new(code, "maybe");
+}
+
+fn risky(code: int) -> int may fail
+{
+	if code != 0 {
+		fail lang.Error.new(code, "risky");
+	}
+	return 5;
+}
+
+/// The error of the failing call, as a value.
+fn caught(code: int) -> ?*lang.Error
+{
+	let v = risky(code) catch e {
+		return e;
+	};
+	printf("value %d\n".ptr, v as c_int);
+	return none;
+}
+
+fn main() -> int
+{
+	let e = make(1);
+	printf("make %d\n".ptr, e.code as c_int);
+	delete(e);
+	let m = maybe(2) else {
+		return 1;
+	};
+	printf("maybe %d\n".ptr, m.code as c_int);
+	delete(m);
+	if maybe(0) != none {
+		return 2;
+	}
+	let s = Store { last: make(3) };
+	let kept = s.stored() else {
+		return 3;
+	};
+	printf("stored %d\n".ptr, kept.code as c_int);
+	let c = caught(4) else {
+		return 4;
+	};
+	printf("caught %d %s\n".ptr, c.code as c_int, c.message.ptr);
+	delete(c);
+	if caught(0) != none {
+		return 5;
+	}
+	let w = lang.Error.wrap(7, "wrapped", lang.Error.new(8, "below"));
+	printf("%s\n".ptr, w.text().ptr);
+	delete(w);
+	return 0;
+}

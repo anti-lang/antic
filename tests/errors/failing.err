@@ -2,4 +2,8 @@ failing.anti:10:2: error: `risky` may fail and its error is not handled
 failing.anti:16:10: error: `try` outside a function that may fail
 failing.anti:22:2: error: `fail` outside a function that may fail
 failing.anti:27:7: error: expected `*Error`, found an integer literal
-failing.anti:32:53: error: `bad_value` may fail and its error is not handled
+failing.anti:34:10: error: `try` outside a function that may fail
+failing.anti:40:2: error: `fail` outside a function that may fail
+failing.anti:60:2: error: `Store.get` may fail and its error is not handled
+failing.anti:61:2: error: `Store.open` may fail and its error is not handled
+failing.anti:67:53: error: `bad_value` may fail and its error is not handled

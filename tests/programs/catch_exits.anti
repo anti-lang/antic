@@ -1,10 +1,10 @@
 //! The error a handler binds is deleted once on every exit of the
 //! handler: `yield`, the end of the handler, `break`, `continue` and a
-//! `return` of another value. `fail e` hands it on, and the handler
-//! leaves it alone. Each exit runs under a leak check, the count of the
-//! errors alive, which `Counted` keeps. The handler of a call, the handler
-//! of a `try` block and a handler without a name each take the exits that
-//! can leave them.
+//! `return` of another value. `return e` and `fail e` hand it on, and
+//! the handler leaves it alone. Each exit runs under a leak check, the
+//! count of the errors alive, which `Counted` keeps. The handler of a
+//! call, the handler of a `try` block and a handler without a name each
+//! take the exits that can leave them.
 
 import anti.lang;
 
@@ -148,6 +148,15 @@ fn unnamed_break() -> int
 	return n;
 }
 
+/// `return e` hands the error to the caller as a value.
+fn passed(code: int) -> ?*lang.Error
+{
+	plain(code) catch e {
+		return e;
+	};
+	return none;
+}
+
 /// `fail e` hands it on through the error channel.
 fn failed_again(code: int) may fail
 {
@@ -187,6 +196,12 @@ fn main() -> int
 	check("try return");
 	printf("unnamed break %d\n".ptr, unnamed_break() as c_int);
 	check("unnamed break");
+	let p = passed(10) else {
+		return 1;
+	};
+	printf("passed %d\n".ptr, p.code as c_int);
+	delete(p);
+	check("return e");
 	failed_again(11) catch e {
 		printf("failed again %d\n".ptr, e.code as c_int);
 	};
