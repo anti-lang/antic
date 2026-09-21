@@ -59,6 +59,7 @@ struct struct_field {
     enum visibility vis;            /* the level the declaration gave it. */
     const struct type *home;        /* the struct or class that declares it */
     bool owned;                     /* `own`: the object frees the memory */
+    bool transient;                 /* `transient`: derived state */
     bool atomic;                    /* `atomic`: read and written by calls */
     bool writable;                  /* `mutable`: a singleton field to write. */
     const struct expr *value;       /* a field default or an enum value */

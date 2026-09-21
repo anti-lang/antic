@@ -101,6 +101,7 @@ class Circle
 - A field is private unless marked. `pub name: T` is visible everywhere. `protected name: T` is visible to the class and every class in its chain below. A field without a marker is visible to the class only. See [Visibility](#visibility).
 - `own name: *T`, `own name: []T` and `own name: []byte` mark a pointer or slice field as owned. See [Ownership and copies](#ownership-and-copies).
 - A field of class or struct type is inline and owned by definition. `own` on it is refused as redundant.
+- `transient name: ?*T` marks derived state, such as a cache the class builds from its other fields. See [Ownership and copies](#ownership-and-copies).
 - `atomic name: T` declares an atomic field. See [Static fields and singletons](#static-fields-and-singletons).
 - `const NAME: T = e;` declares a constant of the class, reached as `Name.NAME`. `self.NAME` is refused.
 
@@ -193,6 +194,7 @@ Four levels, and each applies where it makes sense:
 - `dup(p)` allocates the object's concrete size from the descriptor and copies it. Value fields copy. `own` fields and inline class fields get fresh memory and a copy of their contents, recursively. Other pointer fields copy the address. `Object.copy` is the function behind it, and a class may replace it with `concrete fn copy`. `dup` returns a pointer of the same static type as `p`.
 - `=` between two values of a class with `own` fields anywhere in its chain is refused, because a byte copy would give two owners. `dup` is the way, and the message says so. The refusal applies to copying an existing value. A fresh value on the right, a literal, `T(args)` or the result of `dup`, is a move and stays allowed, so `shelf.items[0] = Item { ... }` compiles. `=` into a place that holds an owning value destroys the old value first, then moves the new one in. A place whose table is zero, an unfilled element of `alloc(T, n)`, holds no value, and nothing is destroyed. The zero-table trap stays for use, not for assignment into. Every place a program can assign into before it holds a value has a zero table there: `alloc(T, n)` zeroes its elements, and the compiler zeroes the storage it supplies for the out pointer of a `catch` binding before the call. `=` between values without `own` fields copies bytes, table pointers included.
 - `serialize` follows `own` fields and writes other pointers as addresses. `equals` compares the contents of `own` fields and the addresses of others. `destruct` frees `own` fields.
+- `transient` before a `?*T` or a `?fn(...)` field marks derived state, which the class rebuilds from its other fields. `dup` writes `none` into the copy, which derives its own. The field list of the descriptor leaves the field out, so the default `equals`, `hash` and `serialize` pass over it. The class frees what the field holds in its own `destruct`, and `own` on a transient field is refused.
 
 ## Pointers and conversions
 
@@ -225,7 +227,7 @@ Four levels, and each applies where it makes sense:
 - A struct that appears in a class or is exported has a descriptor too, unreferenced by the struct. `type_of(T)` gives any type's descriptor.
 - `anti.reflect` reads descriptors: `describe(obj)`, `fields(d)`, `get(obj, field) -> Value`, `set(obj, field, value)`, `functions(d)`, `call(obj, function, args: []Value) -> Value`, `new(name: str) -> *Object`. `Value` is a tagged union of the primitive types, `str` and pointers.
 - `call` goes through the table like any dispatch. The compiler emits one trampoline per distinct signature in the program that unpacks a `[]Value` into a call. `new` reads a registry of every class descriptor that the link step writes, allocates, applies defaults and runs `construct`.
-- Reflection reaches every field, private ones included, because the descriptor is the class's own data.
+- Reflection reaches every field, private ones included, because the descriptor is the class's own data. A `transient` field has no record in the list and is the one exception.
 - `--no-reflect` drops the field list, the function list, the trampolines and the registry. It keeps the name, the parent, the size and the ancestors, so `is` and `as` still work.
 
 ## The root class
@@ -331,7 +333,7 @@ Four levels, and each applies where it makes sense:
 ## Keywords
 
 - Keywords: `class`, `self`, `super`, `abstract`, `concrete`, `enum`, `use`, `inherits`, `implements`, `is`, `dup`, `delete`, `destroy`, `static`, `singleton`, `internal`, `protected`, `catch`, `try`, `yield`. `atomic`, `dispatch`, `join` and `yield` were reserved already.
-- Contextual words: `final`, `own`, `operator`, `mutable`. They join `packed`, `align`, `by`, `in` after a `for` binding and `fatal` after `catch`.
+- Contextual words: `final`, `own`, `transient`, `operator`, `mutable`. They join `packed`, `align`, `by`, `in` after a `for` binding and `fatal` after `catch`.
 - Tokens: `::` in a `concrete fn` qualifier, `as?`, `=>` in `switch`.
 
 ## Not in the language

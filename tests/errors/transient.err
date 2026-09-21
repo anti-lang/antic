@@ -1,0 +1,4 @@
+transient.anti:8:2: error: `transient` needs a `?*T` or a `?fn(...)`, and `count` has type `int`
+transient.anti:9:2: error: `transient` needs a `?*T` or a `?fn(...)`, and `leaf` has type `Leaf`
+transient.anti:10:2: error: `transient` needs a `?*T` or a `?fn(...)`, and `always` has type `*Leaf`
+transient.anti:11:2: error: `spare` is `transient`, so its class frees it in `destruct` and it is not `own`

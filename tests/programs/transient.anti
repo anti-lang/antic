@@ -1,0 +1,68 @@
+//! A `transient` field is derived state. `dup` leaves it `none` in the
+//! copy, and the default `equals`, `hash` and `serialize` pass over it.
+//! The class frees what it holds in its own `destruct`.
+import anti.io;
+import anti.text;
+
+class Named
+{
+	pub id: int = 0,
+	transient cache: ?*byte = none,
+
+	/// Give the cache a buffer, once.
+	pub fn fill(self)
+	{
+		if self.cache == none {
+			self.cache = alloc(byte, 64);
+		}
+	}
+
+	/// Whether the cache holds a buffer.
+	pub fn cached(self) -> bool
+	{
+		return self.cache != none;
+	}
+
+	concrete fn destruct(self)
+	{
+		free(self.cache);
+	}
+}
+
+/// A class below one with a transient field copies it as `none` too.
+class Tagged
+{
+	inherits Named,
+	pub tag: int = 0,
+}
+
+fn main() -> int
+{
+	let a = alloc Named { id: 7 };
+	let b = alloc Named { id: 7 };
+	a.fill();
+	let c = dup(a);
+	if !a.cached() || c.cached() {
+		return 1;
+	}
+	if !a.equals(b) || a.hash() != b.hash() {
+		return 2;
+	}
+	let out = text.Builder.new();
+	a.serialize(&out);
+	io.println(out.text());
+
+	let t = alloc Tagged { tag: 3 };
+	t.fill();
+	let u = dup(t);
+	if u.cached() || u.tag != 3 {
+		return 3;
+	}
+	c.fill();
+	delete(u);
+	delete(t);
+	delete(c);
+	delete(b);
+	delete(a);
+	return 0;
+}

@@ -1789,8 +1789,15 @@ static struct item *class_item(struct parser *p, struct item *it)
                 field.vis = VIS_PROTECTED;
             }
         }
-        /* `own`, `atomic` and `mutable` are contextual words before a
-           field name, so a field may still carry one of those names. */
+        /* `transient`, `own`, `atomic` and `mutable` are contextual
+           words before a field name, so a field may still carry one of
+           those names. */
+        if (is_word(p, peek(p), "transient") &&
+            (peek_at(p, 1)->kind == TOKEN_IDENT ||
+             peek_at(p, 1)->kind == TOKEN_ATOMIC)) {
+            next(p);
+            field.transient = true;
+        }
         if (is_word(p, peek(p), "own") && peek_at(p, 1)->kind == TOKEN_IDENT) {
             next(p);
             field.owned = true;

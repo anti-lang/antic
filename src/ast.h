@@ -443,6 +443,7 @@ struct param {
     enum field_form form;           /* fields only */
     enum visibility vis;            /* fields only */
     bool owned;                     /* `own`: the object frees the memory */
+    bool transient;                 /* `transient`: derived state */
     bool atomic;                    /* `atomic`: read and written by calls */
     bool writable;                  /* `mutable`: a singleton field to write */
 };

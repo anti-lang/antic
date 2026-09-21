@@ -347,7 +347,8 @@ static void put_type(struct writer *w, const struct type *t)
                 put_u8(w, (uint8_t)((unsigned)t->fields[i].form |
                                     (unsigned)t->fields[i].owned << 4 |
                                     (unsigned)t->fields[i].atomic << 5 |
-                                    (unsigned)t->fields[i].writable << 6));
+                                    (unsigned)t->fields[i].writable << 6 |
+                                    (unsigned)t->fields[i].transient << 7));
                 put_u8(w, (uint8_t)t->fields[i].vis);
                 /* DESIGN: /// on a private item is never stored, and
                    the fields of a private struct are private items. */
@@ -1205,6 +1206,7 @@ static void read_types(struct reader *r)
                 s->fields[j].owned = (form >> 4 & 1) != 0;
                 s->fields[j].atomic = (form >> 5 & 1) != 0;
                 s->fields[j].writable = (form >> 6 & 1) != 0;
+                s->fields[j].transient = (form >> 7 & 1) != 0;
                 s->fields[j].vis = (enum visibility)get_u8(r);
                 if ((form & 15) > FIELD_IMPL || s->fields[j].vis > VIS_PUB) {
                     damaged(r);

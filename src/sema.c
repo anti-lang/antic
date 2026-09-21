@@ -6155,6 +6155,7 @@ bool sema_check(struct module *module, const char *module_name,
             fields[j].form = it->params[j].form;
             fields[j].vis = it->params[j].vis;
             fields[j].owned = it->params[j].owned;
+            fields[j].transient = it->params[j].transient;
             fields[j].atomic = it->params[j].atomic;
             fields[j].writable = it->params[j].writable;
 
@@ -6195,6 +6196,30 @@ bool sema_check(struct module *module, const char *module_name,
                          "slice, and `%.*s` has type `%s`",
                          (int)fields[j].name.length, fields[j].name.text,
                          tn(ft));
+            }
+        }
+        /* DESIGN: a `transient` field holds derived state, such as a
+           cache. The copy of the object writes `none` into it, and the
+           field list leaves it out, so the default `equals`, `hash` and
+           `serialize` pass over it. `none` is the value the copy writes,
+           so the field is a `?*T` or a `?fn(...)`. The class frees what
+           it holds in its own `destruct`, and `own` would free it a
+           second time. */
+        for (j = 0; j < it->param_count; j++) {
+            const struct type *ft = fields[j].type;
+            if (!fields[j].transient || is_error(ft)) {
+                continue;
+            }
+            if ((ft->kind != TYPE_POINTER && ft->kind != TYPE_FN) ||
+                !type_is_nullable(ft) || ft->bound) {
+                error_at(&c, fields[j].pos, "`transient` needs a `?*T` or a "
+                         "`?fn(...)`, and `%.*s` has type `%s`",
+                         (int)fields[j].name.length, fields[j].name.text,
+                         tn(ft));
+            } else if (fields[j].owned) {
+                error_at(&c, fields[j].pos, "`%.*s` is `transient`, so its "
+                         "class frees it in `destruct` and it is not `own`",
+                         (int)fields[j].name.length, fields[j].name.text);
             }
         }
         /* A default is checked against the type of its field, so the

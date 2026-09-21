@@ -1,0 +1,19 @@
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	transient count: int = 0,
+	transient leaf: Leaf,
+	transient always: *Leaf,
+	transient own spare: ?*Leaf = none,
+	transient hook: ?fn() = none,
+	transient cache: ?*byte = none,
+}
+
+fn main() -> int
+{
+	return 0;
+}

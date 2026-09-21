@@ -1628,14 +1628,21 @@ static struct ir_global *struct_global(struct lowerer *l,
 /* The count of fields a descriptor lists: the class's own fields, with
    the base and the table pointer left out. Each class lists its own, and
    the parent descriptor holds the rest of the chain. */
+/* Whether the field list of a descriptor carries a record of the field.
+   The base and the table pointer have none, and neither has a
+   `transient` field, which no walk of the list reads. */
+static bool listed_field(const struct struct_field *f)
+{
+    return f->form != FIELD_BASE && f->form != FIELD_TABLE && !f->transient;
+}
+
 static size_t own_fields(const struct type *t)
 {
     size_t count = 0;
     size_t i;
 
     for (i = 0; i < t->field_count; i++) {
-        if (t->fields[i].form != FIELD_BASE &&
-            t->fields[i].form != FIELD_TABLE) {
+        if (listed_field(&t->fields[i])) {
             count++;
         }
     }
@@ -1754,7 +1761,7 @@ static struct ir_global *class_fields(struct lowerer *l,
         const struct struct_field *f = &t->fields[i];
         const struct ir_global *descriptor;
         struct ir_const *item;
-        if (f->form == FIELD_BASE || f->form == FIELD_TABLE) {
+        if (!listed_field(f)) {
             continue;
         }
         item = ir_const_agg(l->m, ir_aggregate(field_agg(l)), 6);
@@ -6117,6 +6124,14 @@ static void copy_field(struct lowerer *l, const struct type *up,
     struct ir_operand args[4];
 
     if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
+        return;
+    }
+    /* A `transient` field is derived state, and the copy derives its
+       own. */
+    if (f->transient) {
+        offset = field_offset(l, up, &f->name);
+        into = offset_address(l, to, offset);
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), into);
         return;
     }
     if (!f->owned && f->type->kind != TYPE_CLASS) {
