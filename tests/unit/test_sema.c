@@ -704,6 +704,26 @@ void test_sema(void)
     rejects("fn f() { for i, x in 0..10 { } }\n", 1, 14,
             "`for i, x` binds the index and the element of a slice or an "
             "array");
+    /* The index is an `int` and the element has the element's type, a
+       `*T` over `&items`. Both are read-only, as the variable of every
+       `for` is. */
+    accepts("fn f(items: []u8) -> u8 {\n"
+            "    let n: u8 = 0;\n"
+            "    for i, x in items { n = n + x; }\n"
+            "    for i, p in &items { *p = 0; }\n"
+            "    return n;\n"
+            "}\n");
+    rejects("fn f(items: []u8) -> u8 {\n"
+            "    let n: u8 = 0;\n"
+            "    for i, x in items { n = n + i; }\n"
+            "    return n;\n"
+            "}\n", 3, 29, "the operands of `+` have the types `byte` and `int`");
+    rejects("fn f(items: []int) { for i, x in items { i = 0; } }\n", 1, 42,
+            "`i` is the variable of a `for` and is read-only");
+    rejects("fn f(items: []int) { for i, x in items { x = 0; } }\n", 1, 42,
+            "`x` is the variable of a `for` and is read-only");
+    rejects("fn f(items: []int) { for i, p in &items { p = &items[0]; } }\n",
+            1, 43, "`p` is the variable of a `for` and is read-only");
     /* A tuple crosses to C as the struct the header writes for it, so it
        crosses when every element does. */
     accepts("export fn divmod(a: int, b: int) -> (int, int) {\n"
