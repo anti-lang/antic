@@ -1,0 +1,57 @@
+//! `by -k` walks the values of `by k` in reverse. `for i in 0..10 by -3`
+//! gives `9 6 3 0`, the values of `by 3` from the last, and not `7 4 1`,
+//! which a walk down from the high bound would give. Each range runs with
+//! constant bounds and again with bounds the loop reads at run time.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Print the values of `lo..hi by -k` for the constant k of each call.
+fn down3(name: str, lo: int, hi: int)
+{
+	printf("%s:".ptr, name.ptr);
+	for i in lo..hi by -3 {
+		printf(" %d".ptr, i as c_int);
+	}
+	printf("\n".ptr);
+}
+
+fn down4(name: str, lo: int, hi: int)
+{
+	printf("%s:".ptr, name.ptr);
+	for i in lo..hi by -4 {
+		printf(" %d".ptr, i as c_int);
+	}
+	printf("\n".ptr);
+}
+
+fn down5(name: str, lo: int, hi: int)
+{
+	printf("%s:".ptr, name.ptr);
+	for i in lo..hi by -5 {
+		printf(" %d".ptr, i as c_int);
+	}
+	printf("\n".ptr);
+}
+
+fn main() -> int
+{
+	printf("constant:".ptr);
+	for i in 0..10 by -3 {
+		printf(" %d".ptr, i as c_int);
+	}
+	printf("\n".ptr);
+	printf("forward:".ptr);
+	for i in 0..10 by 3 {
+		printf(" %d".ptr, i as c_int);
+	}
+	printf("\n".ptr);
+	down3("span 10", 0, 10);
+	down3("span 9", 0, 9);
+	down3("span 1", 4, 5);
+	down3("empty", 5, 5);
+	down3("reversed", 7, 3);
+	down4("offset", 1, 10);
+	down4("negative", -10, -1);
+	down5("short", 0, 2);
+	return 0;
+}

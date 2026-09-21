@@ -1,0 +1,11 @@
+exit 0
+constant: 9 6 3 0
+forward: 0 3 6 9
+span 10: 9 6 3 0
+span 9: 6 3 0
+span 1: 4
+empty:
+reversed:
+offset: 9 5 1
+negative: -2 -6 -10
+short: 0

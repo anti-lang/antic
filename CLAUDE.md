@@ -180,10 +180,9 @@ openssl checks their signature. Windows configures with `-G Ninja`.
     function that returns `*Error` or `?*Error` without it is ordinary.
     `programs/error_values.anti` and `errors/failing.anti` check both
     sides, and `makes_error` is gone.
-22. Verify `by -k`. `for i in 0..10 by -3` must give `9 6 3 0`, the values
-    of `by 3` in reverse, and not `7 4 1`. A test pins the output. Code that
-    still follows the old procedure, which starts at the high bound, is a
-    bug to fix. "Core language" in `docs/decisions.md` holds the rule.
+22. Done. `for i in 0..10 by -3` gives `9 6 3 0`, and lowering follows
+    the rule already. `programs/by_reverse.anti` pins it with constant
+    bounds and bounds read at run time.
 23. Verify the out pointer of a `may fail` function that returns a tuple.
     It takes one out pointer, the last parameter that the result rule under
     "Object model" names, and not one per element. A test pins the
