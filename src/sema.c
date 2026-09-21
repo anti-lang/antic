@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../rt/f16.h"
+
 /* DESIGN: one pass over the syntax tree per module, after every
    module-level name is declared, so an item can be used before its
    declaration. Each expression is checked with the type its context
@@ -365,6 +367,7 @@ static struct type *builtin_of_token(struct checker *c, enum token_kind k)
     case TOKEN_C_LONG: return builtin(c, TYPE_CLONG);
     case TOKEN_C_ULONG: return builtin(c, TYPE_CULONG);
     case TOKEN_C_WCHAR: return builtin(c, TYPE_CWCHAR);
+    case TOKEN_F16: return builtin(c, TYPE_F16);
     case TOKEN_F32:
     case TOKEN_C_FLOAT: return builtin(c, TYPE_F32);
     case TOKEN_F64:
@@ -377,6 +380,7 @@ static struct type *builtin_of_token(struct checker *c, enum token_kind k)
 
 static struct type *check_expr(struct checker *c, struct expr *e,
                                struct type *expected);
+static struct type *check_storage(struct checker *c, struct expr *e);
 static bool eval_const(struct checker *c, struct expr *e,
                        struct const_value *out);
 static bool undefined_on_constants(struct checker *c, struct expr *e,
@@ -545,6 +549,32 @@ static struct type *imported_struct(struct checker *c,
     return sym->type;
 }
 
+/* DESIGN: f16 is storage: sixteen bits in a field, an array, a slice or
+   a variable. What a function takes and gives is a value. The value of
+   an f16 is the f32 that a read gives, so neither a parameter nor a
+   result is f16. C's __fp16 follows the same rule. */
+static bool refuses_half_value(struct checker *c, struct pos pos,
+                               const struct type *t, const char *what)
+{
+    if (t->kind != TYPE_F16) {
+        return false;
+    }
+    error_at(c, pos, "%s cannot be `f16`, which is storage only", what);
+    return true;
+}
+
+/* An operator on an f16. A read of one is an f32 already, so the operand
+   is an `as f16`, which the program converts back itself. */
+static bool refuses_half(struct checker *c, struct pos pos,
+                         const struct type *t)
+{
+    if (t->kind != TYPE_F16) {
+        return false;
+    }
+    error_at(c, pos, "`f16` has no arithmetic, convert with `as f32`");
+    return true;
+}
+
 static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
 {
     struct type *element;
@@ -591,9 +621,17 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
             if (is_error(params[i])) {
                 return params[i];
             }
+            if (refuses_half_value(c, t->params[i]->pos, params[i],
+                                   "a parameter")) {
+                return builtin(c, TYPE_ERROR);
+            }
         }
         if (t->result != NULL && is_error(result = resolve_type(c, t->result))) {
             return result;
+        }
+        if (t->result != NULL &&
+            refuses_half_value(c, t->result->pos, result, "a result")) {
+            return builtin(c, TYPE_ERROR);
         }
         return t->nullable
                    ? types_with_none(c->types,
@@ -695,9 +733,17 @@ static struct type *function_type(struct checker *c, struct item *it)
         if (is_error(params[i + extra])) {
             return params[i + extra];
         }
+        if (refuses_half_value(c, it->params[i].type->pos, params[i + extra],
+                               "a parameter")) {
+            return builtin(c, TYPE_ERROR);
+        }
     }
     if (it->result != NULL && is_error(result = resolve_type(c, it->result))) {
         return result;
+    }
+    if (it->result != NULL &&
+        refuses_half_value(c, it->result->pos, result, "a result")) {
+        return builtin(c, TYPE_ERROR);
     }
     /* DESIGN: `construct` and `destruct` keep the forms the object model
        gives them. A `construct` with arguments that can fail is written
@@ -1092,6 +1138,9 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             return float_literal(c, e, operand, true, expected);
         }
         t = check_expr(c, operand, expected);
+        if (refuses_half(c, e->pos, t)) {
+            return builtin(c, TYPE_ERROR);
+        }
         if (!is_error(t) && !type_is_signed(t) && !type_is_float(t)) {
             error_at(c, e->pos,
                      "unary `-` needs a signed integer or a float, found `%s`",
@@ -1124,7 +1173,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         }
         return usable_pointer(c, operand, t)->element;
     case TOKEN_AMP:
-        t = check_expr(c, operand, NULL);
+        t = check_storage(c, operand);
         if (is_error(t)) {
             return t;
         }
@@ -1173,12 +1222,21 @@ static bool binary_operands(struct checker *c, struct expr *e,
             return !is_error(*left) && !is_error(*right);
         }
     }
+    /* A literal beside an f16 takes no type from it, so the refusal of
+       the f16 is the one message. */
     if (is_untyped(l) && !is_untyped(r)) {
         *right = check_expr(c, r, outer);
-        *left = check_expr(c, l, is_error(*right) ? outer : *right);
+        *left = check_expr(c, l, (*right)->kind == TYPE_F16 ? NULL
+                                 : is_error(*right)          ? outer
+                                                             : *right);
     } else {
         *left = check_expr(c, l, outer);
-        *right = check_expr(c, r, is_error(*left) ? outer : *left);
+        *right = check_expr(c, r, (*left)->kind == TYPE_F16 ? NULL
+                                  : is_error(*left)          ? outer
+                                                             : *left);
+    }
+    if (refuses_half(c, e->pos, *left) || refuses_half(c, e->pos, *right)) {
+        return false;
     }
     return !is_error(*left) && !is_error(*right);
 }
@@ -1750,6 +1808,12 @@ static struct type *check_binary(struct checker *c, struct expr *e,
 /* The conversion table of chapter 2. */
 static bool can_convert(const struct type *from, const struct type *to)
 {
+    /* An f16 is made from an f32 and read as one, and it converts to
+       nothing else. */
+    if (from->kind == TYPE_F16 || to->kind == TYPE_F16) {
+        return (from->kind == TYPE_F16 || from->kind == TYPE_F32) &&
+               (to->kind == TYPE_F16 || to->kind == TYPE_F32);
+    }
     /* DESIGN: an enum converts to and from its underlying type and to
        any other numeric type, as a C enum does. Its values carry no
        other meaning to the compiler. */
@@ -1825,9 +1889,27 @@ static struct type *check_class_cast(struct checker *c, struct expr *e,
     return e->as.cast.test ? builtin(c, TYPE_BOOL) : to;
 }
 
+/* A float literal, alone or after unary `-`. */
+static bool is_float_literal(const struct expr *e)
+{
+    if (e->kind == EXPR_UNARY && e->as.unary.op == TOKEN_MINUS) {
+        e = e->as.unary.operand;
+    }
+    return e->kind == EXPR_FLOAT;
+}
+
 static struct type *check_cast(struct checker *c, struct expr *e)
 {
-    struct type *from = check_expr(c, e->as.cast.operand, NULL);
+    const struct type_expr *target = e->as.cast.type;
+    struct expr *operand = e->as.cast.operand;
+    /* A float literal before `as f16` is an f32, the one type an f16 is
+       made from. The read the checker wrote converts the f16 itself. */
+    struct type *from =
+        e->as.cast.promoted ? check_storage(c, operand)
+        : target->kind == TYPEX_BUILTIN && target->builtin == TOKEN_F16 &&
+                is_float_literal(operand)
+            ? check_expr(c, operand, builtin(c, TYPE_F32))
+            : check_expr(c, operand, NULL);
     struct type *to = resolve_type(c, e->as.cast.type);
 
     if (is_error(from) || is_error(to)) {
@@ -2373,7 +2455,8 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
     place = callee->as.field.base;
     c->atomic_place = true;
     c->quiet++;
-    t = check_expr(c, place, NULL);
+    /* The place is storage, so an f16 there stays an f16. */
+    t = check_storage(c, place);
     c->quiet--;
     c->atomic_place = false;
     if (t == NULL || is_error(t)) {
@@ -2390,6 +2473,13 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
         if ((int)e->as.call.arg_count != atomic_ops[i].args) {
             error_at(c, e->pos, "`%s` takes %d argument%s", atomic_ops[i].name,
                      atomic_ops[i].args, atomic_ops[i].args == 1 ? "" : "s");
+            *out = builtin(c, TYPE_ERROR);
+            return true;
+        }
+        /* An f16 has its bits exchanged and compared, and no arithmetic. */
+        if ((atomic_ops[i].op == ATOMIC_ADD || atomic_ops[i].op == ATOMIC_SUB ||
+             atomic_ops[i].op == ATOMIC_AND || atomic_ops[i].op == ATOMIC_OR) &&
+            refuses_half(c, e->pos, t)) {
             *out = builtin(c, TYPE_ERROR);
             return true;
         }
@@ -4396,10 +4486,36 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     return builtin(c, TYPE_ERROR);
 }
 
+/* DESIGN: a read of an f16 gives an f32. The checker writes it as an
+   `as f32` of the f16, marked promoted, so that lowering converts it
+   where it converts every other `as`. An `as f16` stays f16, because it
+   is the value that a write takes. */
 static struct type *check_expr(struct checker *c, struct expr *e,
                                struct type *expected)
 {
     struct type *t = check_expr_inner(c, e, expected);
+    struct expr *read;
+    struct expr *cast;
+
+    e->type = t;
+    if (t->kind != TYPE_F16 || e->kind == EXPR_CAST) {
+        return t;
+    }
+    read = new_node(c, e->kind, e->pos);
+    *read = *e;
+    cast = format_cast(c, read, TOKEN_F32);
+    cast->as.cast.promoted = true;
+    cast->type = builtin(c, TYPE_F32);
+    cast->as.cast.type->type = cast->type;
+    *e = *cast;
+    return e->type;
+}
+
+/* e where it names storage: the target of an assignment and the operand
+   of `&`. A read of an f16 there stays an f16. */
+static struct type *check_storage(struct checker *c, struct expr *e)
+{
+    struct type *t = check_expr_inner(c, e, NULL);
     e->type = t;
     return t;
 }
@@ -4757,7 +4873,13 @@ static bool eval_const(struct checker *c, struct expr *e,
             }
             return symbolic_value(c, out, SYMBOLIC_CAST, TOKEN_AS, &a, NULL);
         }
-        if (type_is_float(e->type)) {
+        if (e->type->kind == TYPE_F16) {
+            /* The runtime's own rounding, so a constant and a computed
+               value of one f32 are the same sixteen bits. */
+            out->kind = CONST_FLOAT;
+            out->as.floating =
+                anti_f16_widen(anti_f16_narrow((float)a.as.floating));
+        } else if (type_is_float(e->type)) {
             out->kind = CONST_FLOAT;
             out->as.floating = a.kind == CONST_FLOAT ? a.as.floating
                                : type_is_signed(a.type)
@@ -5341,7 +5463,7 @@ static void refuse_owned_copy(struct checker *c, const struct expr *value,
 static void check_assign(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
-    struct type *t = check_expr(c, target, NULL);
+    struct type *t = check_storage(c, target);
     struct type *v;
     enum token_kind op = s->as.assign.op;
 
@@ -5388,6 +5510,10 @@ static void check_assign(struct checker *c, struct stmt *s)
         (target->kind == EXPR_INDEX &&
          target->as.index.base->type->kind == TYPE_STR)) {
         error_at(c, target->pos, "cannot assign to this expression");
+        return;
+    }
+    if (op != TOKEN_ASSIGN && refuses_half(c, s->pos, t)) {
+        check_expr(c, s->as.assign.value, NULL);
         return;
     }
     v = check_expr(c, s->as.assign.value, t);

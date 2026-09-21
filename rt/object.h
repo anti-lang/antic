@@ -40,7 +40,8 @@ enum anti_type {
     ANTI_TYPE_STRUCT,
     ANTI_TYPE_UNION,
     ANTI_TYPE_ENUM,
-    ANTI_TYPE_CLASS
+    ANTI_TYPE_CLASS,
+    ANTI_TYPE_F16       /* last, so the ids before it stay as they were */
 };
 
 /* The type a type id names, and the type it is built on. An enum in the

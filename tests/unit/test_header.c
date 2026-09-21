@@ -232,4 +232,35 @@ void test_header(void)
               "#endif\n"
               "\n"
               "#endif\n");
+    /* C has no half type on every compiler it runs on, so an f16 field
+       is its sixteen bits, as uint16_t. */
+    header_of("com.example.geo",
+              "export struct Texel { u: f16, v: f16 }\n",
+              false,
+              "/* geo.h, the C interface of com.example.geo, written by antic.\n"
+              "   Do not edit. A failure that Anti cannot report calls abort(). */\n"
+              "#ifndef GEO_H\n"
+              "#define GEO_H\n"
+              "\n"
+              "#include <stdbool.h>\n"
+              "#include <stddef.h>\n"
+              "#include <stdint.h>\n"
+              "\n"
+              "#ifdef __cplusplus\n"
+              "#define ANTI_ALIGNAS(n) alignas(n)\n"
+              "extern \"C\" {\n"
+              "#else\n"
+              "#define ANTI_ALIGNAS(n) _Alignas(n)\n"
+              "#endif\n"
+              "\n"
+              "typedef struct Texel {\n"
+              "    uint16_t u;\n"
+              "    uint16_t v;\n"
+              "} Texel;\n"
+              "\n"
+              "#ifdef __cplusplus\n"
+              "}\n"
+              "#endif\n"
+              "\n"
+              "#endif\n");
 }

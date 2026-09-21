@@ -33,6 +33,7 @@ class Every
 	pub h: u64 = 18446744073709551615,
 	pub x: f32 = 1.5,
 	pub y: f64 = -0.25,
+	pub half: f16 = 0.1 as f16,
 	pub on: bool = true,
 	pub letter: char = 'é',
 	pub name: str = "a \"quoted\"\tline\n",
@@ -88,7 +89,7 @@ fn main() -> int
 	if e.letter != 'é' || e.counts.len != 3 || e.counts[1] != -2 ||
 		e.size.h != 4.5 || e.tag.weight != 7 || e.mode != Mode.Fast ||
 		e_spot.w != 1 || !text.equal(e.words[1], "tw\"o") ||
-		e.sizes[0].h != 0.5 {
+		e.sizes[0].h != 0.5 || *(&e.half as *u16) != 0x2E66 {
 		return 3;
 	}
 	delete(e);

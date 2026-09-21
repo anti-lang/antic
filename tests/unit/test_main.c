@@ -5,6 +5,7 @@ int check_failures = 0;
 
 void test_target(void);
 void test_cpu(void);
+void test_f16(void);
 void test_text(void);
 void test_host_target(void);
 void test_lexer(void);
@@ -35,6 +36,7 @@ int main(void)
 {
     test_target();
     test_cpu();
+    test_f16();
     test_text();
     test_host_target();
     test_lexer();

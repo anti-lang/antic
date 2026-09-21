@@ -47,7 +47,8 @@ extern fn anti_rt_reflect_call(object: ?*Object, index: int, args: ?*Value,
 /// on. `None` is a bitfield, which no walk reads.
 pub enum TypeId: u8 {
 	None, Bool, Char, I8, I16, I32, I64, CLong, U8, U16, U32, U64, CULong,
-	CWchar, F32, F64, Str, Ptr, Fn, Slice, Array, Struct, Union, Enum, Class
+	CWchar, F32, F64, Str, Ptr, Fn, Slice, Array, Struct, Union, Enum, Class,
+	F16
 }
 
 /// The code of the error of an index that names no field or function.
@@ -139,7 +140,8 @@ pub fn get(object: *byte, d: *byte, index: int) -> Value
 /// Write `value` into the field at `index`, which may fail.
 ///
 /// The value is of the kind that `get` gives for the field, and an
-/// integer or a float narrows to the field's type. An index out of range,
+/// integer or a float narrows to the field's type. A float narrows to an
+/// `f16` field through `f32`, as `as f16` takes one. An index out of range,
 /// a field that no `Value` carries and a value of another kind each fail
 /// with the code that names the reason, and write nothing.
 pub fn set(object: *byte, d: *byte, index: int, value: Value) may fail
@@ -182,8 +184,8 @@ pub fn new(name: str) -> ?*Object
 /// The kind of value that a `Value` holds.
 ///
 /// A signed integer of any width is an `Int`, an unsigned one a `Uint`,
-/// and `f32` and `f64` are a `Float`. A function without a result gives
-/// `None`.
+/// and `f16`, `f32` and `f64` are a `Float`. A function without a result
+/// gives `None`.
 pub enum ValueKind: u8 { None, Int, Uint, Float, Bool, Char, Str, Ptr }
 
 /// The bytes of a `Value`, read through the field its kind names.

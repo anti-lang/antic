@@ -255,7 +255,7 @@ void test_lexer(void)
             TOKEN_UNION,
             TOKEN_TRUE, TOKEN_FALSE, TOKEN_NONE, TOKEN_ALLOC, TOKEN_FREE,
             TOKEN_SIZE_OF, TOKEN_BOOL_TYPE, TOKEN_BYTE_TYPE, TOKEN_CHAR_TYPE,
-            TOKEN_F32, TOKEN_F64, TOKEN_FLOAT_TYPE, TOKEN_I8, TOKEN_I16,
+            TOKEN_F16, TOKEN_F32, TOKEN_F64, TOKEN_FLOAT_TYPE, TOKEN_I8, TOKEN_I16,
             TOKEN_I32, TOKEN_I64, TOKEN_INT_TYPE, TOKEN_STR_TYPE, TOKEN_U8,
             TOKEN_U16, TOKEN_U32, TOKEN_U64, TOKEN_UINT_TYPE, TOKEN_C_CHAR,
             TOKEN_C_DOUBLE, TOKEN_C_FLOAT, TOKEN_C_INT, TOKEN_C_LONGLONG,
@@ -272,7 +272,7 @@ void test_lexer(void)
             TOKEN_IDENT};
         kinds("as break const continue do else export extern fn if import let pub "
               "return struct while union true false none alloc free size_of bool "
-              "byte char f32 f64 float i8 i16 i32 i64 int str u8 u16 u32 u64 "
+              "byte char f16 f32 f64 float i8 i16 i32 i64 int str u8 u16 u32 u64 "
               "uint c_char c_double c_float c_int c_longlong c_short c_size_t "
               "c_uchar c_uint c_ulonglong c_ushort c_long c_ulong c_wchar "
               "worker parallel self abstract concrete enum use inherits "

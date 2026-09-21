@@ -207,8 +207,8 @@ reports what it finished.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`.
-- 567 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 566 each, without the `no_paths` test, which needs a
+- 586 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 585 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -242,6 +242,10 @@ reports what it finished.
   the arguments of the call, and the text is memory of its own that the
   program frees with `free(s.ptr)`. See "Interpolation" in
   `docs/decisions.md`.
+- `f16` is built: sixteen bits in a field, an array, a slice or a variable.
+  A read gives an `f32`, a write takes `as f16`, and no operator takes one.
+  ARM64 and x86-64-v3 convert in one instruction, and `v1` and `v2` call the
+  runtime. See "`f16`" in `docs/decisions.md`.
 - `*T` never holds `none` and `?*T` may, and a function value follows the same
   rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer

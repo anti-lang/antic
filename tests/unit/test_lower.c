@@ -392,6 +392,8 @@ static void records_type_ids(void)
         {ANTI_TYPE_SLICE | ANTI_TYPE_STRUCT << 8, "Size.descriptor"},
         {ANTI_TYPE_PTR | ANTI_TYPE_CLASS << 8, "Inner.descriptor"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_U8 << 8, "(none)"},
+        {ANTI_TYPE_F16, "(none)"},
+        {ANTI_TYPE_SLICE | ANTI_TYPE_F16 << 8, "(none)"},
     };
     static const struct field_expect size[] = {
         {ANTI_TYPE_I32, "(none)"},
@@ -411,6 +413,7 @@ static void records_type_ids(void)
         "    n: f32, o: f64, p: str, q: *i32, r: fn(i32) -> i32,\n"
         "    s: []u16, t: [4]i8, u: Size, v: Bits, w: Mode, x: Inner,\n"
         "    y: *Size, z: []Size, own next: *Inner, modes: []Mode,\n"
+        "    half: f16, halves: []f16,\n"
         "}\n");
     CHECK(l.ok);
     check_field_records(&l.ir, "Holder.fields", holder,
@@ -854,6 +857,21 @@ void test_lower(void)
            "    %2 = fext f64 %1\n"
            "    %3 = fadd f64 %2, 0.5\n"
            "    ret f64 %3\n"
+           "}\n");
+
+    /* An f16 in memory is sixteen bits. A read widens them to an f32 and
+       `as f16` narrows an f32 to them, each one operation of the IR. */
+    lowers("fn h(p: *f16, x: f32) -> f32 {\n"
+           "    *p = x as f16;\n"
+           "    return *p;\n"
+           "}\n",
+           "fn main.h(%0: ptr, %1: f32) -> f32 {\n"
+           "b0:\n"
+           "    %2 = htrunc i16 %1\n"
+           "    store i16 %2, %0\n"
+           "    %3 = load i16 %0\n"
+           "    %4 = hext f32 %3\n"
+           "    ret f32 %4\n"
            "}\n");
 
     /* A function without a result returns at its end. */

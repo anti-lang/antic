@@ -43,7 +43,8 @@ static void run(const char *source, enum target target, struct text *out)
     } else {
         ir_optimize(&ir, "main");
         functions = calloc(ir.function_count + 1, sizeof *functions);
-        ok = select_module(target, &ir, functions, error, sizeof error);
+        ok = select_module(target, cpu_default(target), &ir, functions, error,
+                           sizeof error);
         for (i = 0; ok && i < ir.function_count; i++) {
             if (functions[i] != NULL) {
                 ok = regalloc_function(target, functions[i], error,

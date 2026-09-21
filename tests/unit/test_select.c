@@ -15,8 +15,9 @@
 #include "sema.h"
 #include "types.h"
 
-/* Compile source as module main, optimize it and select code for target.
-   Returns the printed machine code of all functions, or the error. */
+/* Compile source as module main, run the optimizer passes on it and
+   select code for target. Returns the printed machine code of all
+   functions, or the error. */
 static void run(const char *source, enum target target, struct text *out)
 {
     struct arena arena = {0};
@@ -41,7 +42,8 @@ static void run(const char *source, enum target target, struct text *out)
     } else {
         ir_optimize(&ir, "main");
         functions = calloc(ir.function_count + 1, sizeof *functions);
-        if (select_module(target, &ir, functions, error, sizeof error)) {
+        if (select_module(target, cpu_default(target), &ir, functions, error,
+                          sizeof error)) {
             for (i = 0; i < ir.function_count; i++) {
                 if (functions[i] != NULL) {
                     mach_print(out, target_desc(target), cpu_default(target), &ir,
@@ -101,7 +103,8 @@ static void data(const char *source, enum target target, struct text *out)
                 diags.count > 0 ? diags.items[0].message : "", source);
     } else {
         functions = calloc(ir.function_count + 1, sizeof *functions);
-        if (!select_module(target, &ir, functions, error, sizeof error)) {
+        if (!select_module(target, cpu_default(target), &ir, functions, error,
+                           sizeof error)) {
             text_append(out, error);
         }
         for (i = 0; i < ir.global_count; i++) {

@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "f16.h"
 #include "object.h"
 #include "reflect.h"
 
@@ -126,6 +127,7 @@ static enum anti_value_kind value_kind(int64_t type)
     switch (t) {
     case ANTI_TYPE_BOOL: return ANTI_VALUE_BOOL;
     case ANTI_TYPE_CHAR: return ANTI_VALUE_CHAR;
+    case ANTI_TYPE_F16:
     case ANTI_TYPE_F32:
     case ANTI_TYPE_F64: return ANTI_VALUE_FLOAT;
     case ANTI_TYPE_STR: return ANTI_VALUE_STR;
@@ -171,7 +173,11 @@ void anti_rt_reflect_get(void *object, const struct anti_descriptor *d,
         memcpy(&out->data.c, at, sizeof out->data.c);
         return;
     case ANTI_VALUE_FLOAT:
-        if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F32) {
+        if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F16) {
+            uint16_t half;
+            memcpy(&half, at, sizeof half);
+            out->data.f = anti_f16_widen(half);
+        } else if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F32) {
             float narrow;
             memcpy(&narrow, at, sizeof narrow);
             out->data.f = narrow;
@@ -217,7 +223,11 @@ int64_t anti_rt_reflect_set(void *object, const struct anti_descriptor *d,
         memcpy(at, &value->data.c, sizeof value->data.c);
         break;
     case ANTI_VALUE_FLOAT:
-        if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F32) {
+        /* An f16 takes the float through f32, as `as f16` takes one. */
+        if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F16) {
+            uint16_t half = anti_f16_narrow((float)value->data.f);
+            memcpy(at, &half, sizeof half);
+        } else if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F32) {
             float narrow = (float)value->data.f;
             memcpy(at, &narrow, sizeof narrow);
         } else {

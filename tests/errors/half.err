@@ -1,0 +1,13 @@
+half.anti:14:12: error: a parameter cannot be `f16`, which is storage only
+half.anti:18:14: error: a result cannot be `f16`, which is storage only
+half.anti:27:13: error: `f16` has no arithmetic, convert with `as f32`
+half.anti:28:16: error: `f16` has no arithmetic, convert with `as f32`
+half.anti:29:17: error: `f16` has no arithmetic, convert with `as f32`
+half.anti:30:14: error: `f16` has no arithmetic, convert with `as f32`
+half.anti:31:2: error: `f16` has no arithmetic, convert with `as f32`
+half.anti:32:8: error: expected `f16`, found `f32`
+half.anti:33:8: error: expected `f16`, found a float literal
+half.anti:34:13: error: cannot convert `float` to `f16`
+half.anti:35:14: error: cannot convert `int` to `f16`
+half.anti:36:15: error: expected `f16`, found `f32`
+half.anti:38:2: error: `f16` has no arithmetic, convert with `as f32`

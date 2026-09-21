@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "f16.h"
 #include "registry.h"
 #include "utf.h"
 
@@ -560,6 +561,7 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
     }
     case ANTI_TYPE_CHAR:
         return read_char(r, bytes);
+    case ANTI_TYPE_F16:
     case ANTI_TYPE_F32:
     case ANTI_TYPE_F64: {
         double value;
@@ -570,7 +572,10 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
         if (*end != '\0') {
             return false;
         }
-        if (t == ANTI_TYPE_F32) {
+        if (t == ANTI_TYPE_F16) {
+            uint16_t half = anti_f16_narrow((float)value);
+            memcpy(bytes, &half, sizeof half);
+        } else if (t == ANTI_TYPE_F32) {
             float narrow = (float)value;
             memcpy(bytes, &narrow, sizeof narrow);
         } else {

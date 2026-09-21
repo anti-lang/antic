@@ -38,7 +38,9 @@ add_executable(antic_unit_tests
     unit/test_utf.c
     unit/test_whole.c
     unit/test_sha256.c
+    unit/test_f16.c
     ../rt/cpu.c
+    ../rt/f16.c
     ../rt/utf.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core)
 target_include_directories(antic_unit_tests PRIVATE ../rt)
@@ -143,6 +145,35 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_runtime.cmake")
     set_tests_properties(cpu_level_${level} PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# The two conversions of f16. ARM64 and x86-64-v3 have one instruction
+# for each, and v1 and v2, which lack F16C, call the runtime.
+set(f16_call "anti_rt_f16_to_f32|anti_rt_f32_to_f16")
+set(f16_f16c "    vcvtph2ps|    vcvtps2ph")
+set(f16_fcvt "    fcvt s|    fcvt h")
+foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
+        "linux-x86_64,v2,${f16_call},cvtph2ps|cvtps2ph"
+        "linux-x86_64,v3,${f16_f16c},${f16_call}"
+        "windows-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
+        "windows-x86_64,v3,${f16_f16c},${f16_call}"
+        "linux-arm64,armv8.0,${f16_fcvt},${f16_call}"
+        "macos-arm64,armv8.5,${f16_fcvt},${f16_call}")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 target)
+    list(GET parts 1 level)
+    list(GET parts 2 uses)
+    list(GET parts 3 avoids)
+    add_test(NAME f16_${target}_${level}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DTARGET=${target}"
+            "-DLEVEL=${level}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/f16"
+            "-DUSES=${uses}"
+            "-DAVOIDS=${avoids}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_level.cmake")
 endforeach()
 
 # DESIGN: the start-up check on a real machine below the level. Rosetta
@@ -1643,6 +1674,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "tuples|-S,-o,${LISTINGS}/tuples.s,tuples.anti"
         "switch_fallthrough|-S,-o,${LISTINGS}/switch_fallthrough.s,switch_fallthrough.anti"
         "hex_bytes|-S,-o,${LISTINGS}/hex_bytes.s,hex_bytes.anti"
+        "half|-S,-o,${LISTINGS}/half.s,half.anti"
         "format_literal|-S,-o,${LISTINGS}/format_literal.s,format_literal.anti"
         "format_spec|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_spec.s,format_spec.anti"
         "format_types|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_types.s,format_types.anti"
@@ -1784,7 +1816,7 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     list(GET parts 0 target)
     list(GET parts 1 triple)
     foreach(source main loop twice cell spill7 sum args x86 arm64 floatcalls
-            floats structs strings fnptr)
+            floats structs strings fnptr half)
         add_test(NAME asm_${source}_${target}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
@@ -1833,6 +1865,19 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/geo.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
+    # The calls of the runtime that convert f16 below x86-64-v3.
+    if(target MATCHES "x86_64$")
+        add_test(NAME asm_half_v1_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DTARGET=${target}"
+                "-DTRIPLE=${triple}"
+                "-DOPTIONS=--cpu|v1"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-v1"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
+    endif()
 endforeach()
 
 add_test(NAME dump_select_loop_arm64

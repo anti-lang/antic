@@ -183,6 +183,7 @@ struct expr {
             bool checked;           /* `as?`, which gives `none` on a mismatch */
             bool test;              /* `is`, which gives a bool */
             bool from_sub;          /* the source may be a sub-object */
+            bool promoted;          /* the checker's read of an f16 */
             const struct type *target;  /* the class of `is` and `as` */
         } cast;
         struct {

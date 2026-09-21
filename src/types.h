@@ -28,6 +28,10 @@ enum type_kind {
     TYPE_U64,
     TYPE_CULONG,    /* 32 bits on Windows, 64 bits elsewhere */
     TYPE_CWCHAR,    /* 16 bits on Windows, 32 bits elsewhere, unsigned */
+    /* DESIGN: f16 is storage. It is sixteen bits in memory, a read gives
+       an f32 and `as f16` makes one from an f32. It has no arithmetic,
+       so no predicate of the float types holds for it. */
+    TYPE_F16,
     TYPE_F32,
     TYPE_F64,
     TYPE_STR,

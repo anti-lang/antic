@@ -44,6 +44,7 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_BOOL_TYPE] = {"bool", CAT_KEYWORD},
     [TOKEN_BYTE_TYPE] = {"byte", CAT_KEYWORD},
     [TOKEN_CHAR_TYPE] = {"char", CAT_KEYWORD},
+    [TOKEN_F16] = {"f16", CAT_KEYWORD},
     [TOKEN_F32] = {"f32", CAT_KEYWORD},
     [TOKEN_F64] = {"f64", CAT_KEYWORD},
     [TOKEN_FLOAT_TYPE] = {"float", CAT_KEYWORD},

@@ -512,7 +512,7 @@ const struct target_desc *target_desc(enum target t)
                                               : target_desc_x86_64();
 }
 
-bool select_module(enum target t, struct ir_module *m,
+bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
                    struct mach_function **out, char *error,
                    size_t error_size)
 {
@@ -546,6 +546,7 @@ bool select_module(enum target t, struct ir_module *m,
     s.target = target_desc(t);
     s.abi = s.target->abi(target_info(t)->convention);
     s.convention = target_info(t)->convention;
+    s.cpu = cpu;
     s.m = m;
     s.layouts = &layouts;
     s.error = error;

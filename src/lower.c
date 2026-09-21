@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../rt/f16.h"
 #include "sema.h"
 #include "target.h"
 #include "text.h"
@@ -110,6 +111,7 @@ static enum ir_type ir_type_of(const struct type *t)
         return IR_I8;
     case TYPE_I16:
     case TYPE_U16:
+    case TYPE_F16:
         return IR_I16;
     case TYPE_CHAR:
     case TYPE_I32:
@@ -581,7 +583,12 @@ static struct ir_operand constant(struct lowerer *l,
     switch (v->kind) {
     case CONST_SYMBOLIC:
         return ir_sym_operand(l->m, sym_of(l, v->as.symbolic));
+    /* An f16 is its bits. The value is one a half holds exactly, so the
+       rounding changes nothing. */
     case CONST_FLOAT:
+        if (v->type->kind == TYPE_F16) {
+            return ir_int_op(type, anti_f16_narrow((float)v->as.floating));
+        }
         return ir_float_op(type, v->as.floating);
     case CONST_BOOL:
         return ir_int_op(type, v->as.boolean);
@@ -1717,7 +1724,7 @@ enum type_id {
     TYPE_ID_U32, TYPE_ID_U64, TYPE_ID_CULONG, TYPE_ID_CWCHAR, TYPE_ID_F32,
     TYPE_ID_F64, TYPE_ID_STR, TYPE_ID_PTR, TYPE_ID_FN, TYPE_ID_SLICE,
     TYPE_ID_ARRAY, TYPE_ID_STRUCT, TYPE_ID_UNION, TYPE_ID_ENUM,
-    TYPE_ID_CLASS
+    TYPE_ID_CLASS, TYPE_ID_F16
 };
 
 /* The type id of t alone, without the type it is built on. */
@@ -1732,6 +1739,7 @@ static uint64_t type_id_of(const struct type *t)
         [TYPE_U64] = TYPE_ID_U64,       [TYPE_CULONG] = TYPE_ID_CULONG,
         [TYPE_CWCHAR] = TYPE_ID_CWCHAR, [TYPE_F32] = TYPE_ID_F32,
         [TYPE_F64] = TYPE_ID_F64,       [TYPE_STR] = TYPE_ID_STR,
+        [TYPE_F16] = TYPE_ID_F16,
     };
 
     switch (t->kind) {
@@ -3605,6 +3613,14 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
 
     if (l->failed) {
         return none();
+    }
+    /* An f16 converts to and from an f32 alone, and to itself. */
+    if (from->kind == TYPE_F16 || to->kind == TYPE_F16) {
+        if (from->kind == to->kind) {
+            return v;
+        }
+        op = to->kind == TYPE_F16 ? IR_HTRUNC : IR_HEXT;
+        return temp(l, ir_unary(l->f, l->b, op, target, v));
     }
     /* A class test, and a conversion down a chain, which needs a check.
        A conversion up a chain is the same address and needs none. */

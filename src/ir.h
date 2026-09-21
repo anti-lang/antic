@@ -110,6 +110,11 @@ enum ir_op {
     /* result = op a, with the result type named by the instruction */
     IR_TRUNC, IR_SEXT, IR_ZEXT, IR_SITOF, IR_UITOF, IR_FTOSI, IR_FTOUI,
     IR_FEXT, IR_FTRUNC,
+    /* DESIGN: an f16 is its sixteen bits in an i16, since nothing but
+       these two operations reads it as a number. hext widens the bits in a
+       to an f32 and htrunc rounds the f32 in a to the bits, to nearest
+       with ties to even. */
+    IR_HEXT, IR_HTRUNC,
     /* Memory. */
     IR_SLOT,        /* Result ptr: a stack slot for a value of type of. */
     IR_LOAD,        /* Result: load type from a. */
@@ -247,7 +252,7 @@ enum ir_const_kind {
     IR_CONST_INT,       /* an integer, a bitfield among them */
     IR_CONST_FLOAT,
     IR_CONST_SYM,       /* a symbolic value, such as size_of T */
-    IR_CONST_ADDR,      /* the address of another global */
+    IR_CONST_ADDR,      /* the address of another global. */
     IR_CONST_FUNC,      /* the address of a function, as a table entry */
     IR_CONST_AGG        /* a struct, a union or an array */
 };
@@ -282,7 +287,7 @@ struct ir_global {
     size_t reloc_count;
     struct ir_const *value;
     bool mutable;                   /* a static field, which the program
-                                       writes */
+                                       writes. */
     bool exported;                  /* a C symbol that C code reads */
     /* DESIGN: a global the runtime defines, which every module refers to
        and none writes out. The root's descriptor is the one of them, so

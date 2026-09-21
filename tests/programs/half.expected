@@ -1,0 +1,26 @@
+exit 0
+r 0.25 3400
+g 0.0999755859 2e66
+b 65504 7bff
+alpha 1 3c00
+atomic 0.75 2.5 1
+r+g 0.349975586
+2r 0.5 3800
+2b inf 7c00
+tie-even 2048 6800
+tie-up 2052 6802
+below-max 65504 7bff
+max-tie inf 7c00
+tiny 5.96046448e-08 0001
+tiny-tie 0 0000
+tiny-up 5.96046448e-08 0001
+third 0.333251953 3555
+-0 -0 8000
+-1.5 -1.5 be00
+nan 7e80 7fd00000 1
+sum 15.5
+arr1 3.5 4300
+local 5.5
+const 0.5
+back 0.0999755859
+sizes 2 6 8

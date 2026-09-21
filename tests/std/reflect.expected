@@ -26,3 +26,6 @@ none
 x int 1
 8
 sum 8 1
+float 0.5
+float 0.0999756
+2e66

@@ -475,5 +475,5 @@ Rules:
 - String prefixes added: `rf` and `x`.
 - Labels added: an identifier and `:` before `for`, `while` or a block.
 - Tokens added: `?*`, `+% -% *% <<%`, `+| -| *|`, the two-name `let` form `let (a, b) =`.
-- Built-in types added: `Flags`, `Mutex`, `chan T`.
+- Built-in types added: `f16`, `Flags`, `Mutex`, `chan T`.
 - Built-ins added: `mul_high`.

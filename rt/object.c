@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "f16.h"
 #include "object.h"
 #include "std.h"
 #include "utf.h"
@@ -90,7 +91,8 @@ size_t anti_rt_type_size(int64_t type)
     case ANTI_TYPE_I8:
     case ANTI_TYPE_U8: return 1;
     case ANTI_TYPE_I16:
-    case ANTI_TYPE_U16: return 2;
+    case ANTI_TYPE_U16:
+    case ANTI_TYPE_F16: return 2;
     case ANTI_TYPE_CHAR:
     case ANTI_TYPE_I32:
     case ANTI_TYPE_U32:
@@ -366,6 +368,15 @@ static void put_value(struct anti_builder *b, const void *bytes,
         unsigned char utf8[4];
         memcpy(&c, bytes, sizeof c);
         put_text(b, utf8, (int64_t)anti_utf8_encode(c, utf8));
+        return;
+    }
+    /* An f16 is written as the f32 a read gives, which reads back to
+       the same sixteen bits. */
+    case ANTI_TYPE_F16: {
+        uint16_t h;
+        memcpy(&h, bytes, sizeof h);
+        snprintf(number, sizeof number, "%.9g", (double)anti_f16_widen(h));
+        put(b, number);
         return;
     }
     case ANTI_TYPE_F32: {

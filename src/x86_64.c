@@ -25,7 +25,8 @@ enum x64_op {
     X64_MOVZX, X64_MOVS, X64_ADDS, X64_SUBS, X64_MULS, X64_DIVS, X64_UCOMIS,
     X64_CVTSI2S, X64_CVTTS2SI, X64_CVTS2S, X64_MOVQX, X64_XORP, X64_ANDP,
     X64_ANDNP, X64_ORP, X64_MOVUPS, X64_CMOV, X64_MOVL, X64_SEH_PUSHREG,
-    X64_SEH_STACKALLOC, X64_SEH_SAVEREG, X64_SEH_SAVEXMM, X64_SEH_ENDPROLOGUE
+    X64_SEH_STACKALLOC, X64_SEH_SAVEREG, X64_SEH_SAVEXMM, X64_SEH_ENDPROLOGUE,
+    X64_CVTPH2PS, X64_CVTPS2PH
 };
 
 #define USE ROLE_USE
@@ -92,6 +93,11 @@ static const struct mach_opcode opcodes[] = {
     /* A 32-bit move that clears the upper 32 bits, even of its own
        register, so it is no move that register allocation may drop. */
     [X64_MOVL] = {"mov", {DEF, USE}, 0},
+    /* F16C, which x86-64-v3 has and which exists in VEX form alone. The
+       immediate of vcvtps2ph names the rounding, and 4 takes the mode of
+       MXCSR, as every other conversion does. */
+    [X64_CVTPH2PS] = {"vcvtph2ps", {DEF, USE}, 0},
+    [X64_CVTPS2PH] = {"vcvtps2ph", {DEF, USE, 0}, 0},
 };
 
 #define BIT(r) ((uint64_t)1 << (r))
@@ -1371,6 +1377,56 @@ static void call_c(struct selector *s, const char *name,
     call->defs = s->abi->caller_saved;
 }
 
+/* DESIGN: an f16 is its bits in the low sixteen of an integer register.
+   x86-64-v3 has F16C, which converts the low lanes of an xmm register,
+   so the bits cross with movd. v1 and v2 have no instruction for it and
+   call the runtime. Its routines take the half in a 32-bit integer
+   register and the f32 in the first float register. */
+static void emit_half_convert(struct selector *s, const struct ir_inst *inst)
+{
+    bool widen = inst->op == IR_HEXT;
+    struct mach_operand r = select_result(s, inst);
+    struct mach_operand a = select_reg(s, &inst->a);
+    struct mach_operand f;
+    struct mach_operand ops[3];
+    struct mach_inst *call;
+    uint8_t in = widen ? s->abi->int_args[0] : s->abi->fp_args[0];
+
+    if (cpu_has(s->cpu, CPU_F16C)) {
+        struct mach_operand lanes = select_new_fp_vreg(s, 32);
+        if (widen) {
+            emit2(s, X64_MOVQX, lanes, widened(a, 32));
+            emit2(s, X64_CVTPH2PS, r, lanes);
+        } else {
+            ops[0] = lanes;
+            ops[1] = a;
+            ops[2] = mach_imm(4);
+            select_emit(s, (uint16_t)X64_CVTPS2PH, 3, ops);
+            emit2(s, X64_MOVQX, widened(r, 32), lanes);
+        }
+        return;
+    }
+    if (widen) {
+        move(s, mach_preg(in, 32), widened(a, 32));
+    } else {
+        move_float(s, mach_preg(in, 32), a);
+    }
+    if (s->abi->shadow_space > s->out->outgoing) {
+        s->out->outgoing = s->abi->shadow_space;
+    }
+    memset(&f, 0, sizeof f);
+    f.kind = MACH_NAME;
+    f.name = widen ? "anti_rt_f16_to_f32" : "anti_rt_f32_to_f16";
+    call = emit1(s, X64_CALL, f);
+    call->uses = BIT(in);
+    call->defs = s->abi->caller_saved;
+    if (widen) {
+        move_float(s, r, mach_preg(s->abi->fp_result, 32));
+    } else {
+        move(s, r, mach_preg(s->abi->int_result, 16));
+    }
+}
+
 /* DESIGN: a copy of up to 64 bytes moves 8, 4, 2 and 1 bytes at a time
    through an integer register. A larger copy calls memcpy. */
 static void copy_memory(struct selector *s, struct mach_operand dst,
@@ -1498,6 +1554,8 @@ static const struct pattern patterns[] = {
     {IR_FTOUI, NULL, emit_float_convert},
     {IR_FEXT, NULL, emit_float_convert},
     {IR_FTRUNC, NULL, emit_float_convert},
+    {IR_HEXT, NULL, emit_half_convert},
+    {IR_HTRUNC, NULL, emit_half_convert},
     {IR_FEQ, NULL, emit_float_compare},
     {IR_FNE, NULL, emit_float_compare},
     {IR_FLT, NULL, emit_float_compare},
@@ -1805,6 +1863,10 @@ static void print(struct text *out, enum cpu_level cpu,
         break;
     case X64_MOVUPS:
         text_appendf(out, "%s%s", v, opcodes[inst->op].name);
+        break;
+    case X64_CVTPH2PS:
+    case X64_CVTPS2PH:
+        text_append(out, opcodes[inst->op].name);
         break;
     default:
         text_appendf(out, "%s%c", opcodes[inst->op].name, suffix(inst));

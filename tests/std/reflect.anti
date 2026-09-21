@@ -76,6 +76,13 @@ class Kinds
 	v: Bits,
 	w: Level,
 	x: Point,
+	y: f16,
+}
+
+/* An f16 field, which a Value carries as a float. */
+class Tone
+{
+	pub level: f16 = 0.5 as f16,
 }
 
 /// Write `v` into the field at `index`, forwarding the error of `set`.
@@ -134,9 +141,9 @@ fn main() -> int
 		reflect.TypeId.F64, reflect.TypeId.Str, reflect.TypeId.Ptr,
 		reflect.TypeId.Fn, reflect.TypeId.Slice, reflect.TypeId.Array,
 		reflect.TypeId.Struct, reflect.TypeId.Union, reflect.TypeId.Enum,
-		reflect.TypeId.Class];
+		reflect.TypeId.Class, reflect.TypeId.F16];
 	i = 0;
-	while i < 24 do {
+	while i < 25 do {
 		if reflect.field(kinds, i).type_id != expected[i] {
 			printf("type id of field %d\n".ptr, i as c_int);
 			return 1;
@@ -191,6 +198,16 @@ fn main() -> int
 	let last = reflect.function(d, reflect.function_count(d) - 1);
 	printf("%s %d %d\n".ptr, last.name.ptr, last.slot as c_int,
 		last.param_count as c_int);
+
+	/* get widens an f16 field to a float, and set rounds a float to the
+	   sixteen bits as `as f16` rounds an f32. */
+	let tone = alloc Tone { };
+	let td = reflect.describe(tone as *byte) else { return 5; };
+	show(reflect.get(tone as *byte, td, 0));
+	reflect.set(tone as *byte, td, 0, reflect.of_float(0.1)) catch fatal;
+	show(reflect.get(tone as *byte, td, 0));
+	printf("%04x\n".ptr, *(&tone.level as *u16) as c_int);
+	delete(tone);
 	delete(all);
 	delete(p);
 	delete(m);

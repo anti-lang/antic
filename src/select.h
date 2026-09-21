@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#include "cpu.h"
 #include "ir.h"
 #include "layout.h"
 #include "mach.h"
@@ -140,6 +141,7 @@ struct selector {
     const struct target_desc *target;
     const struct abi *abi;
     enum convention convention;
+    enum cpu_level cpu;                 /* the level the code runs at */
     const struct ir_module *m;
     struct layouts *layouts;            /* of every aggregate of m */
     const struct ir_function *f;
@@ -165,9 +167,11 @@ const struct target_desc *target_desc(enum target t);
 /* Select the machine code of every function with a body in m into out,
    one entry per IR function, NULL for an extern function. Selection first
    lays out the aggregates of m for the target and replaces its symbolic
-   values with constants. Returns false and writes a message to error for
-   a layout error or an instruction without a pattern. */
-bool select_module(enum target t, struct ir_module *m,
+   values with constants. cpu is the level of the code, which picks an
+   instruction or a call of the runtime where the levels differ. Returns
+   false and writes a message to error for a layout error or an
+   instruction without a pattern. */
+bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
                    struct mach_function **out, char *error,
                    size_t error_size);
 

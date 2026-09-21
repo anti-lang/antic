@@ -29,7 +29,8 @@ enum cpu_feature {
     CPU_SSE4 = 1u << 1,     /* SSE4.1, SSE4.2 and POPCNT */
     CPU_LSE = 1u << 2,      /* an atomic operation in one instruction */
     CPU_FP16 = 1u << 3,     /* half-precision conversion */
-    CPU_DOTPROD = 1u << 4   /* the dot products */
+    CPU_DOTPROD = 1u << 4,  /* the dot products */
+    CPU_F16C = 1u << 5      /* the F16C conversions */
 };
 
 /* The cap on the size of a simd struct, which the section calls a constant

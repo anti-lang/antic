@@ -43,7 +43,8 @@ static void run(const char *source, enum target target, struct text *out)
     } else {
         ir_optimize(&ir, "main");
         functions = calloc(ir.function_count + 1, sizeof *functions);
-        ok = select_module(target, &ir, functions, error, sizeof error);
+        ok = select_module(target, cpu_default(target), &ir, functions, error,
+                           sizeof error);
         for (i = 0; ok && i < ir.function_count; i++) {
             if (functions[i] != NULL) {
                 ok = regalloc_function(target, functions[i], error,
@@ -120,8 +121,8 @@ static void page_address(void)
     f = ir_function_add(&m, "main", "f", IR_PTR, IR_NO_AGG);
     address = ir_addr(f, ir_block_add(f), ir_func_op(helper));
     ir_ret(f, f->blocks[0], IR_PTR, ir_temp_op(f, address));
-    CHECK(select_module(TARGET_LINUX_ARM64, &m, functions, error,
-                        sizeof error));
+    CHECK(select_module(TARGET_LINUX_ARM64, cpu_default(TARGET_LINUX_ARM64),
+                        &m, functions, error, sizeof error));
     CHECK_STR(error, "");
     for (i = 0; i < 2 && functions[i] != NULL; i++) {
         CHECK(regalloc_function(TARGET_LINUX_ARM64, functions[i], error,

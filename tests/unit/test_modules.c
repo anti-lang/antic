@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 35, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 36, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -281,7 +281,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0,                                     /* module doc */
     2, 0, 0, 0,                                     /* types */
     11,                                             /* 0: uint */
-    22, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,         /* 1: fn(int) -> int */
+    23, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,         /* 1: fn(int) -> int */
     2, 0, 0, 0,                                     /* items */
     2, 5, 0, 0, 0, 'S', 'C', 'A', 'L', 'E', 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 6, 0, 0, 0, 0, 0, 0, 0,                      /* const SCALE = 6 */
@@ -309,7 +309,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 255, 255, 255, 255, 0, 0, 0, 0,              /* no type, field 0 */
     0, 0, 0, 0,                                     /* no arguments */
-    61, 4, 3, 0, 0, 0, 255, 255, 255, 255,          /* line 3: ret i64 */
+    63, 4, 3, 0, 0, 0, 255, 255, 255, 255,          /* line 3: ret i64 */
     1, 4, 1, 0, 0, 0, 0, 0, 0, 0,                   /* %1 */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1020,6 +1020,48 @@ static void keeps_constants(void)
     close_session(&a);
 }
 
+/* An f16 constant and a struct of f16 fields cross a library file. The
+   constant is its value, which the importer writes as its bits. */
+static void keeps_halves(void)
+{
+    struct session a;
+    struct session b;
+    struct text bytes = {0};
+    struct text ir = {0};
+    struct ir_module program;
+    struct module *module;
+    char error[160] = "";
+    bool ok;
+
+    open_session(&a);
+    build_library(&a, "tone",
+                  "pub struct Texel { u: f16, v: f16 }\n"
+                  "pub const ONE: f16 = 1.0 as f16;\n",
+                  &bytes);
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "main");
+    b.libraries[b.library_count++] =
+        antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
+                  &b.types, &b.arena, &program, error, sizeof error);
+    CHECK_STR(error, "");
+    module = check_module(&b, "main",
+                          "import tone;\n"
+                          "fn main() -> int {\n"
+                          "    let t = tone.Texel { u: tone.ONE as f16,"
+                          " v: 0.5 as f16 };\n"
+                          "    return (t.u + t.v) as int;\n"
+                          "}\n",
+                          &ok);
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0));
+    ir_print(&ir, &program);
+    CHECK(strstr(text_cstr(&ir), "hext f32 15360\n") != NULL);
+    text_free(&bytes);
+    text_free(&ir);
+    ir_module_free(&program);
+    close_session(&b);
+    close_session(&a);
+}
+
 /* A call through a function pointer keeps its signature in the library
    file. */
 /* A C function with an aggregate result keeps its aggregate in a library
@@ -1243,9 +1285,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 36;
+    copy[4] = 37;
     refuses_file(copy, sizeof copy,
-                 "has format version 36, and antic reads version 35");
+                 "has format version 37, and antic reads version 36");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1445,6 +1487,7 @@ void test_modules(void)
     keeps_extensions();
     keeps_literals();
     keeps_constants();
+    keeps_halves();
     keeps_signatures();
     keeps_extern_aggregates();
     keeps_classes();

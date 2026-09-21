@@ -556,9 +556,9 @@ static bool whole_checked(const char *input, struct ir_module *program,
 static bool has_main(const struct ir_module *program, const char *module);
 
 /* Lower the module after the loaded libraries and print the whole
-   program, optimized when optimize is set. The optimized program has
-   been through the passes over the whole program where the build runs
-   them. Returns 2, the status of a finished dump, on success. */
+   program, after the optimizer passes when the flag asks for them. That
+   program has been through the passes over the whole program where the
+   build runs them. Returns 2, the status of a finished dump, on success. */
 static int dump_ir(const char *input, const char *file, struct module *tree,
                    const char *module, struct ir_module *program,
                    bool optimize, bool release, struct diagnostics *diags,
@@ -667,10 +667,11 @@ static void identified_notice(struct text *out, const struct text *notice,
     text_append_bytes(out, notice->data + begin, notice->length - begin);
 }
 
-/* Lower and optimize the program and run the back end for the target:
-   instruction selection, register allocation and emission. The dumps
-   print the machine code instead, before allocation for --dump-select.
-   Returns 0 with the assembly, 2 after a dump and 1 after an error. */
+/* Lower the program, run the optimizer passes and run the back end for
+   the target: instruction selection, register allocation and emission.
+   The dumps print the machine code instead, before allocation for
+   --dump-select. Returns 0 with the assembly, 2 after a dump and 1 after
+   an error. */
 static int back_end(const struct options *o, struct module *tree,
                     const char *module, struct ir_module *program,
                     struct diagnostics *diags, struct text *assembly,
@@ -724,7 +725,8 @@ static int back_end(const struct options *o, struct module *tree,
         fputs("antic: out of memory\n", stderr);
         exit(70);
     }
-    ok = select_module(o->target, program, functions, error, sizeof error);
+    ok = select_module(o->target, o->cpu, program, functions, error,
+                       sizeof error);
     for (i = 0; ok && !(o->dump_select && !o->dump_alloc) &&
                 i < program->function_count;
          i++) {

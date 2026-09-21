@@ -4,9 +4,9 @@
    for the processor, and this machine sees the refusal of a lower one.
    The runtime of the archive is compiled without it. */
 
-/* setenv and unsetenv are POSIX, outside the C11 library. The headers of
-   Apple declare them anyway, and musl and glibc hide them under -std=c11,
-   so the Mac compiled this file and the Linux VM did not. */
+/* setenv and unsetenv are POSIX, outside the C11 library. Apple's headers
+   declare them anyway. musl and glibc hide them under -std=c11, so the
+   Linux VM refused the test that the Mac compiled. */
 #define _POSIX_C_SOURCE 200809L
 
 #include "../binary_stdio.h"
@@ -75,6 +75,10 @@ static void features(void)
     CHECK(cpu_has(CPU_V2, CPU_SSE4));
     CHECK(cpu_has(CPU_V3, CPU_AVX));
     CHECK(cpu_has(CPU_V3, CPU_SSE4));
+    /* F16C converts an f16 in one instruction, from v3 on. */
+    CHECK(!cpu_has(CPU_V1, CPU_F16C));
+    CHECK(!cpu_has(CPU_V2, CPU_F16C));
+    CHECK(cpu_has(CPU_V3, CPU_F16C));
     CHECK(!cpu_has(CPU_ARMV8_0, CPU_LSE));
     CHECK(cpu_has(CPU_ARMV8_2, CPU_LSE));
     CHECK(cpu_has(CPU_ARMV8_5, CPU_LSE));

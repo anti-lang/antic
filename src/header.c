@@ -20,6 +20,10 @@ static const char *scalar_name(const struct type *t)
     case TYPE_I64: return "int64_t";
     case TYPE_U8: return "uint8_t";
     case TYPE_U16: return "uint16_t";
+    /* DESIGN: C has no half type that every C compiler reads, so an f16
+       crosses as its sixteen bits. uint16_t also passes an aggregate of
+       them where antic passes it, among the integers. */
+    case TYPE_F16: return "uint16_t";
     case TYPE_U32: return "uint32_t";
     case TYPE_U64: return "uint64_t";
     case TYPE_F32: return "float";

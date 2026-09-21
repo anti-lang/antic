@@ -10,13 +10,13 @@
    of its IEEE 754 bits. No pointer, padding or host byte order reaches the
    file. It stores enum values of types.h, sema.h and ir.h. These checks
    fail when one of them changes, and the version changes with it. */
-_Static_assert(TYPE_STRUCT == 23, "raise ANTL_VERSION, then update this");
+_Static_assert(TYPE_STRUCT == 24, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
-_Static_assert(TOKEN_KIND_COUNT == 152, "raise ANTL_VERSION, then update this");
+_Static_assert(TOKEN_KIND_COUNT == 153, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
-_Static_assert(IR_RET == 61, "raise ANTL_VERSION, then update this");
+_Static_assert(IR_RET == 63, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_SYM == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_EXT_ZERO == 2, "raise ANTL_VERSION, then update this");
@@ -1474,7 +1474,7 @@ static bool read_value(struct reader *r, struct type *t, struct const_value *v,
     case CONST_FLOAT: {
         uint64_t bits = get_u64(r);
         memcpy(&v->as.floating, &bits, sizeof bits);
-        return !r->failed && type_is_float(t);
+        return !r->failed && (type_is_float(t) || t->kind == TYPE_F16);
     }
     case CONST_BOOL:
         v->as.boolean = get_u8(r) != 0;

@@ -34,6 +34,7 @@ const char *ir_op_name(enum ir_op op)
         [IR_TRUNC] = "trunc", [IR_SEXT] = "sext", [IR_ZEXT] = "zext",
         [IR_SITOF] = "sitof", [IR_UITOF] = "uitof", [IR_FTOSI] = "ftosi",
         [IR_FTOUI] = "ftoui", [IR_FEXT] = "fext", [IR_FTRUNC] = "ftrunc",
+        [IR_HEXT] = "hext", [IR_HTRUNC] = "htrunc",
         [IR_SLOT] = "slot", [IR_LOAD] = "load", [IR_STORE] = "store",
         [IR_PTRADD] = "ptradd", [IR_MEMCOPY] = "memcopy", [IR_ADDR] = "addr",
         [IR_BITLOAD] = "bitload", [IR_BITSTORE] = "bitstore",

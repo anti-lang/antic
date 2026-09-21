@@ -1,0 +1,109 @@
+//! `f16` is sixteen bits of storage. A read gives an `f32`, and a write
+//! takes `as f16`. The program keeps values in a field, a field default,
+//! an array, a slice, a variable, a constant and a place behind a pointer.
+//! It prints each value it reads back with the bits that hold it, so the
+//! rounding of every conversion shows: ties go to the even neighbour, a
+//! value past 65504 is infinite, and a NaN keeps its payload.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pixel
+{
+	r: f16,
+	g: f16,
+	b: f16,
+}
+
+class Swatch
+{
+	pub alpha: f16 = 1.0 as f16,
+	pub atomic level: f16 = 0.5 as f16,
+}
+
+const HALF: f16 = 0.5 as f16;
+
+fn bits(p: *f16) -> c_int
+{
+	return *(p as *u16) as c_int;
+}
+
+fn show(label: str, p: *f16)
+{
+	let value = *p;
+	printf("%s %.9g %04x\n".ptr, label.ptr, value as f64, bits(p));
+}
+
+fn scale(p: *Pixel, by: f32)
+{
+	p.r = (p.r * by) as f16;
+	p.g = (p.g * by) as f16;
+	p.b = (p.b * by) as f16;
+}
+
+fn round(label: str, x: f32)
+{
+	let h = x as f16;
+	show(label, &h);
+}
+
+fn main() -> int
+{
+	let px = Pixel { r: 0.25 as f16, g: 0.1 as f16, b: 65504.0 as f16 };
+	show("r", &px.r);
+	show("g", &px.g);
+	show("b", &px.b);
+	let swatch = alloc Swatch { };
+	show("alpha", &swatch.alpha);
+	swatch.level.store(0.75 as f16);
+	let old = swatch.level.swap(1.25 as f16);
+	let swapped = swatch.level.compare_swap(1.25 as f16, 2.5 as f16);
+	printf("atomic %.9g %.9g %d\n".ptr, old as f64,
+		swatch.level.load() as f64, swapped as c_int);
+	delete(swatch);
+	let total = px.r + px.g;
+	printf("r+g %.9g\n".ptr, total as f64);
+	scale(&px, 2.0);
+	show("2r", &px.r);
+	show("2b", &px.b);
+
+	round("tie-even", 2049.0);
+	round("tie-up", 2051.0);
+	round("below-max", 65519.0);
+	round("max-tie", 65520.0);
+	round("tiny", 0.000000059604644775390625);
+	round("tiny-tie", 0.0000000298023223876953125);
+	round("tiny-up", 0.00000004470348358154296875);
+	let third: f32 = 1.0 / 3.0;
+	round("third", third);
+	let negative_zero: f32 = -0.0;
+	round("-0", negative_zero);
+	round("-1.5", -1.5);
+
+	let nan_bits: u32 = 0x7FD00000;
+	let nan = *(&nan_bits as *f32);
+	let h = nan as f16;
+	let back = h;
+	printf("nan %04x %08x %d\n".ptr, bits(&h), *(&back as *u32) as c_int,
+		(back != back) as c_int);
+
+	let arr = [1.5 as f16, 2.5 as f16, 3.5 as f16, 4.5 as f16];
+	let s = arr[1..4];
+	s[0] = (s[0] + 1.0) as f16;
+	let p = &arr[3];
+	*p = 7.0 as f16;
+	let sum: f32 = 0.0;
+	for v in arr {
+		sum += v;
+	}
+	printf("sum %.9g\n".ptr, sum as f64);
+	show("arr1", &arr[1]);
+
+	let local = 2.75 as f16;
+	let doubled = local * 2.0;
+	printf("local %.9g\n".ptr, doubled as f64);
+	printf("const %.9g\n".ptr, HALF as f64);
+	printf("back %.9g\n".ptr, ((0.1 as f16) as f32) as f64);
+	printf("sizes %lld %lld %lld\n".ptr, size_of(f16), size_of(Pixel),
+		size_of([4]f16));
+	return 0;
+}

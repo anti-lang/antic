@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../rt/f16.h"
 #include "target.h"
 
 /* DESIGN: the passes rely on three properties and nothing else.
@@ -302,6 +303,14 @@ static bool fold_conversion(const struct ir_inst *inst, struct ir_operand *out)
     case IR_FEXT:
     case IR_FTRUNC:
         break;
+    /* The runtime's own routines, so a folded conversion rounds as the
+       one a program makes. */
+    case IR_HEXT:
+        *out = ir_float_op(to, anti_f16_widen((uint16_t)v));
+        return true;
+    case IR_HTRUNC:
+        *out = ir_int_op(to, anti_f16_narrow((float)d));
+        return true;
     default:
         return false;
     }
@@ -358,7 +367,8 @@ static bool fold_inst(const struct ir_inst *inst, struct ir_operand *out)
         *out = ir_float_op(inst->type, -inst->a.as.floating);
         return true;
     case IR_TRUNC: case IR_SEXT: case IR_ZEXT: case IR_SITOF: case IR_UITOF:
-    case IR_FTOSI: case IR_FTOUI: case IR_FEXT: case IR_FTRUNC:
+    case IR_FTOSI: case IR_FTOUI: case IR_FEXT: case IR_FTRUNC: case IR_HEXT:
+    case IR_HTRUNC:
         return is_constant(&inst->a) && fold_conversion(inst, out);
     default:
         return false;

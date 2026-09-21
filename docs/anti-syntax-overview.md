@@ -86,7 +86,7 @@ let t: (int, str) = (1, "one");
 let h: f16 = 1.5 as f16;
 ```
 
-Not built yet: `f16`.
+Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of the runtime at `v1` and `v2`.
 
 ## Literals
 

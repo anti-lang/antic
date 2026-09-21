@@ -145,6 +145,18 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
                  ir_type_name(inst->type));
         }
         break;
+    case IR_HEXT:
+        same_type(v, inst, &inst->a, IR_I16);
+        if (inst->type != IR_F32) {
+            fail(v, "hext gives f32, not %s", ir_type_name(inst->type));
+        }
+        break;
+    case IR_HTRUNC:
+        same_type(v, inst, &inst->a, IR_F32);
+        if (inst->type != IR_I16) {
+            fail(v, "htrunc gives i16, not %s", ir_type_name(inst->type));
+        }
+        break;
     case IR_LOAD:
         same_type(v, inst, &inst->a, IR_PTR);
         break;

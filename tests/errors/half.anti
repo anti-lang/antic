@@ -1,0 +1,40 @@
+//! `f16` is storage. A read gives an `f32` and a write takes `as f16` of an
+//! `f32`. The checker refuses each use below that breaks those rules.
+
+struct Pixel
+{
+	r: f16,
+}
+
+class Gauge
+{
+	pub atomic level: f16,
+}
+
+fn take(h: f16)
+{
+}
+
+fn give() -> f16
+{
+	return 1.0 as f16;
+}
+
+fn main() -> int
+{
+	let p = Pixel { r: 0.5 as f16 };
+	let x: f32 = 2.0;
+	let sum = (x as f16) + 1.0;
+	let product = x * p.r as f16;
+	let negative = -(x as f16);
+	let less = (x as f16) < (x as f16);
+	p.r += 1.0;
+	p.r = x;
+	p.r = 1.5;
+	let wide = 1.5 as f64 as f16;
+	let count = 3 as f16;
+	let h: f16 = x;
+	let g = alloc Gauge { level: 0.5 as f16 };
+	g.level.add(1.0 as f16);
+	return 0;
+}

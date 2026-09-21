@@ -784,6 +784,26 @@ static void emit_float_convert(struct selector *s, const struct ir_inst *inst)
     }
 }
 
+/* DESIGN: an f16 is its bits in the low sixteen of a w register. fcvt
+   between an h and an s register is in every ARM64 level, so the
+   conversion is one instruction. fmov of the whole 32 bits carries the
+   bits between the register files. Writing an h register clears the rest
+   of its vector register, so the bits come back with zeros above them. */
+static void emit_half_convert(struct selector *s, const struct ir_inst *inst)
+{
+    struct mach_operand r = select_result(s, inst);
+    struct mach_operand a = select_reg(s, &inst->a);
+    struct mach_operand half = select_new_fp_vreg(s, 32);
+
+    if (inst->op == IR_HEXT) {
+        emit2(s, A64_FMOV, half, widened(a, 32));
+        emit2(s, A64_FCVT, r, widened(half, 16));
+    } else {
+        emit2(s, A64_FCVT, widened(half, 16), a);
+        emit2(s, A64_FMOV, r, half);
+    }
+}
+
 static void emit_float_neg(struct selector *s, const struct ir_inst *inst)
 {
     emit2(s, A64_FNEG, select_result(s, inst), select_reg(s, &inst->a));
@@ -1479,6 +1499,8 @@ static const struct pattern patterns[] = {
     {IR_FTOUI, NULL, emit_float_convert},
     {IR_FEXT, NULL, emit_float_convert},
     {IR_FTRUNC, NULL, emit_float_convert},
+    {IR_HEXT, NULL, emit_half_convert},
+    {IR_HTRUNC, NULL, emit_half_convert},
     {IR_FEQ, NULL, emit_float_compare},
     {IR_FNE, NULL, emit_float_compare},
     {IR_FLT, NULL, emit_float_compare},
@@ -1580,7 +1602,10 @@ static void print_operand(struct text *out, const struct ir_module *m,
         if (o->reg == SP) {
             text_append(out, o->width == 64 ? "sp" : "wsp");
         } else if (o->reg >= V0) {
-            text_appendf(out, "%c%" PRIu32, o->width == 64 ? 'd' : 's',
+            text_appendf(out, "%c%" PRIu32,
+                         o->width == 64   ? 'd'
+                         : o->width == 16 ? 'h'
+                                          : 's',
                          o->reg - V0);
         } else {
             text_appendf(out, "%c%" PRIu32, o->width == 64 ? 'x' : 'w',
