@@ -10,3 +10,4 @@ compile_commands.json
 .cache/
 !tests/dump/*.s
 !writing-a-compiler/*/direct-path/*.s
+drive-features.sh
