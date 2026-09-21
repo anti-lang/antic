@@ -1,0 +1,122 @@
+//! A failing call that is an operand, and not the whole of a `let`, an
+//! assignment or a statement. `try` stands after `return`, as an
+//! argument, inside an operator and as a condition, with a scalar, a
+//! `str` and a tuple for its result, and so does a call inside a `try`
+//! block. The call writes a slot of its own, and its value is read from
+//! there. The `catch` of each result below is the form of a `let`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn number(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "n is negative";
+	}
+	return n * 10;
+}
+
+fn name(n: int) -> str may fail
+{
+	if n < 0 {
+		fail "no name";
+	}
+	return "named";
+}
+
+fn pair(n: int) -> (int, int) may fail
+{
+	if n < 0 {
+		fail "no pair";
+	}
+	return (n, n + 1);
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn returned(n: int) -> int may fail
+{
+	return try number(n);
+}
+
+fn returned_name(n: int) -> str may fail
+{
+	return try name(n);
+}
+
+fn returned_pair(n: int) -> (int, int) may fail
+{
+	return try pair(n);
+}
+
+fn argument(n: int) -> int may fail
+{
+	return twice(try number(n));
+}
+
+fn operand(n: int) -> int may fail
+{
+	let sum = 1 + try number(n);
+	return sum;
+}
+
+fn condition(n: int) -> int may fail
+{
+	if try number(n) > 15 {
+		return 1;
+	}
+	return 0;
+}
+
+fn show(what: str, value: int)
+{
+	printf("%s %lld\n".ptr, what.ptr, value);
+}
+
+fn main() -> int
+{
+	let r = returned(4) catch e { yield -1; };
+	show("return", r);
+	let rf = returned(-4) catch e { yield -1; };
+	show("return failed", rf);
+	let named = returned_name(1) catch e { yield "failed"; };
+	printf("return %s\n".ptr, named.ptr);
+	let unnamed = returned_name(-1) catch e { yield "failed"; };
+	printf("return %s\n".ptr, unnamed.ptr);
+	let (a, b) = returned_pair(5) catch e { yield (0, 0); };
+	show("pair", a * 100 + b);
+	let (c, d) = returned_pair(-5) catch e { yield (0, 0); };
+	show("pair failed", c * 100 + d);
+	let g = argument(3) catch e { yield -1; };
+	show("argument", g);
+	let gf = argument(-3) catch e { yield -1; };
+	show("argument failed", gf);
+	let o = operand(2) catch e { yield -1; };
+	show("operand", o);
+	let of = operand(-2) catch e { yield -1; };
+	show("operand failed", of);
+	let high = condition(2) catch e { yield -1; };
+	show("condition", high);
+	let low = condition(1) catch e { yield -1; };
+	show("condition low", low);
+	let cf = condition(-1) catch e { yield -1; };
+	show("condition failed", cf);
+	let total = 0;
+	try {
+		total = twice(number(7));
+	} catch e {
+		total = -2;
+	}
+	show("try block", total);
+	try {
+		total = twice(number(7)) + twice(number(-7));
+	} catch e {
+		total = -2;
+	}
+	show("try block failed", total);
+	return 0;
+}

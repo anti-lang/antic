@@ -2874,6 +2874,38 @@ static struct ir_operand lower_parallel(struct lowerer *l,
 static struct ir_operand lower_dispatch(struct lowerer *l,
                                         const struct expr *e);
 static struct ir_operand lower_join(struct lowerer *l, const struct expr *e);
+static bool is_handled_call(const struct expr *e);
+static void clear_tables(struct lowerer *l, struct ir_operand base,
+                         const struct type *t);
+
+/* DESIGN: a failing call that is an operand, as in `return try f();` or
+   `g(try f())`, or a call inside a `try` block that is one, has no place
+   of a `let` or an assignment to write into. It writes a slot of the
+   frame, whose tables are zeroed first so that the `=` the callee runs
+   destroys nothing, and the value is read from there. An aggregate is
+   its slot, as the value of any other call is its memory. */
+static struct ir_operand handled_operand(struct lowerer *l,
+                                         const struct expr *e)
+{
+    bool has_out = e->as.call.out != NULL;
+    struct ir_operand out = none();
+    struct ir_operand err;
+
+    if (has_out) {
+        out = temp(l, ir_entry_slot(l->f, vtype_of(l, e->type)));
+        clear_tables(l, out, e->type);
+    }
+    l->out_address = out;
+    err = lower_call(l, e);
+    if (l->failed) {
+        return none();
+    }
+    handle_error(l, e, err, out, has_out, none());
+    if (!has_out || is_aggregate(e->type)) {
+        return out;
+    }
+    return temp(l, ir_load(l->f, l->b, ir_type_of(e->type), out));
+}
 
 /* The address of the memory that holds the aggregate value of e. A
    literal gets a slot of its own, and a constant is read-only data. */
@@ -2905,6 +2937,9 @@ static struct ir_operand lower_address(struct lowerer *l,
     case EXPR_UNARY:
         return lower_expr(l, e->as.unary.operand);
     case EXPR_CALL:
+        if (is_handled_call(e)) {
+            return handled_operand(l, e);
+        }
         return lower_call(l, e);
     case EXPR_PARALLEL:
         return lower_parallel(l, e);
@@ -4151,6 +4186,9 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
     case EXPR_CAST:
         return lower_cast(l, e);
     case EXPR_CALL:
+        if (is_handled_call(e)) {
+            return handled_operand(l, e);
+        }
         return lower_call(l, e);
     case EXPR_PARALLEL:
         return lower_parallel(l, e);

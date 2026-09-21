@@ -1,0 +1,16 @@
+exit 0
+return 40
+return failed -1
+return named
+return failed
+pair 506
+pair failed 0
+argument 60
+argument failed -1
+operand 21
+operand failed -1
+condition 1
+condition low 0
+condition failed -1
+try block 140
+try block failed -2
