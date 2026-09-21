@@ -73,7 +73,7 @@ The round-three small items and the simd structs stay where the small things are
 - A `may fail` function with no `fail` and no `try` is a warning from `anti check`, not an error, since an interface function may fail in one implementation and not another.
 - The ABI is the old convention: `?*Error f(args, R *out)`, with `out` absent for a function without a result. The header writes that form and the doc comment says the function may fail. A `.antl` records the flag, so a caller in another module handles it.
 - A `construct` that can fail takes the same form, `fn construct(self, args...) may fail`, and `alloc T(args)` and `T(args)` carry its error. "Literals and construction" in `docs/anti-object-model.md` gives the rules, the call of a base's `construct` among them.
-- A function written by hand as `-> ?*Error` with out pointers stays legal and is called the same way, apart from a `construct`. Bindings produce that form. The standard library uses `may fail` everywhere, and the rewrite of its signatures is one session when the parser has the form.
+- `may fail` is the one failing form. A C binding returns its error as an ordinary value, a `?*Error` or an integer code, and a `may fail` wrapper in Anti inspects that value and turns it into a `fail`. Bindings produce ordinary functions and never a failing form. The standard library uses `may fail` everywhere, and the rewrite of its signatures is one session when the parser has the form.
 
 ```anti
 fn divide(a: int, b: int) -> (int, int) may fail

@@ -189,6 +189,10 @@ openssl checks their signature. Windows configures with `-G Ninja`.
     and so does the provisional entry on `Error.new` under "Object model".
     The fix comes with tests that a `may fail` function must be handled and
     that an ordinary function returning `*Error` or `?*Error` must not.
+    `std_may_fail_only` and `tests_may_fail_only` then check that every
+    `extern fn` is ordinary, and `Box.make` of `programs/out_slot.anti` stops
+    being a failing function, which leaves the zeroed out slot of a `catch`
+    binding without the test that pinned it.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
