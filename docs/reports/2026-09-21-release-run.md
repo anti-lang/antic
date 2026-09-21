@@ -30,10 +30,32 @@ sysroot it carries.
    It is read in the state of the commit that is checked out.
 4. **The 403 of the signature.** Step 9 rsynced `SHA256SUMS.sig` into a
    directory that `mkdir -p` had made without the setgid bit. The file
-   took the group of the user, and the server could not read it. The
-   directory of a version and the one above it carry the bit now, and the
-   test `release_site` holds it. The group on triton was fixed by hand for
-   0.1.0.
+   took the group of the user, and the server could not read it. The group
+   on triton was fixed by hand for 0.1.0. Step 9 sets the directory above
+   before it makes the directory of the version, and the test
+   `release_site` holds that order.
+
+## The test of the fix on the server
+
+The first fix set the bit on both directories after `mkdir -p` made them,
+and it does not work. Four arms were run against triton with a version
+`0.1.0a`, each with the rsync of step 9 and a fetch over HTTPS.
+
+| arm | what was run | group of the file | answer |
+|---|---|---|---|
+| a | `mkdir -p` alone, the old form | eddie | 403 |
+| b | `mkdir -p`, then the bit on both | eddie | 403 |
+| c | the bit on the directory above, then the directory of the version | www-data | 200 |
+| d | the form of arm b under the `anti` directory fixed by hand | www-data | 200 |
+| e | the text of `tools/release.sh`, on a chain that did not exist | www-data | 200 |
+
+Arm b is the fix as first committed. `chmod g+s` on a directory that
+exists sets no group. The directory of the version kept the group of the
+user, and so did the file below it. Arm d passes only because the
+`anti` directory was repaired by hand, which is the state of the server
+today and not something the script establishes. Arm e is the form that
+stands now. Every test directory was removed afterwards, and the
+signature of 0.1.0 still answers 200.
 
 ## The first tag
 

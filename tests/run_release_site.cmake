@@ -17,6 +17,16 @@ if(setgid EQUAL -1)
                         "the setgid bit, and the server reads no file in it")
 endif()
 
+# The bit on a directory that exists changes no group, so the directory
+# above is set before the directory of the version is made.
+string(FIND "${script}" "chmod g+s '$signature_parent'" parent_set)
+string(FIND "${script}" "mkdir -p '$signature_directory'" version_made)
+if(parent_set EQUAL -1 OR version_made EQUAL -1 OR NOT parent_set LESS version_made)
+    message(FATAL_ERROR "step 9 makes the directory of the version before it "
+                        "sets the one above it. The directory then carries "
+                        "the group of the user who made it")
+endif()
+
 # Nothing step 9 sends is readable by the world. The group of the server
 # is what reads it.
 string(REGEX MATCHALL "rsync --chmod=[^ ]+" modes "${script}")

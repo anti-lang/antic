@@ -979,18 +979,24 @@ site() {
     # --mkpath, so the directory is made over ssh first.
     #
     # DESIGN: the webroot is setgid. A file the server reads carries the
-    # group it inherits there. A directory made below it keeps that group
-    # only while every directory on the way is setgid too. The two the
-    # signature stands in are set after they are made. The 0.1.0
-    # directory of the first release was not. Its file fell to the group
-    # of the user that rsynced it, and anti-lang.com answered 403 for a
-    # signature that stood in place.
+    # group it inherits there. This server hands a new directory the group
+    # of its parent and not the bit. A directory two levels down then
+    # falls to the group of the user. The 0.1.0 directory of the first
+    # release did, and anti-lang.com answered 403 for a signature that
+    # stood in place.
+    #
+    # DESIGN: the bit is set on the directory above before the directory
+    # of the version is made. `chmod g+s` on a directory that exists sets
+    # no group, and a version directory made first keeps the wrong one.
+    # Both orders were run against the server on 2026-09-21. The one that
+    # sets first answers 200 and the other 403.
     site_host=${destination%%:*}
     site_root=${destination#*:}
     signature_directory=$site_root/$(dirname "$signature_path")
+    signature_parent=$(dirname "$signature_directory")
     ssh -n -o BatchMode=yes "$site_host" \
-        "mkdir -p '$signature_directory' &&
-         chmod g+s '$signature_directory' '$(dirname "$signature_directory")'" ||
+        "mkdir -p '$signature_parent' && chmod g+s '$signature_parent' &&
+         mkdir -p '$signature_directory' && chmod g+s '$signature_directory'" ||
         die "step 9: $site_host made no directory for the signature"
     rsync --chmod=u=rw,g=r,o= "$signature" "$destination/$signature_path" ||
         die "step 9: SHA256SUMS.sig did not reach $destination"
