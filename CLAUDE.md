@@ -192,6 +192,7 @@ openssl checks their signature. Windows configures with `-G Ninja`.
     `std/serialize_null.anti` takes every kind through both. A bitfield
     of a class body goes through its unit, which
     `programs/class_bitfields.anti` checks.
+    `docs/reports/2026-09-22-first-sessions-20-to-24.md` reports 20 to 24.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
@@ -226,8 +227,8 @@ reports what it finished.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`.
-- 594 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 593 each, without the `no_paths` test, which needs a
+- 604 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 603 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
