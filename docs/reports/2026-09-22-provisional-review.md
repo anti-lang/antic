@@ -1,12 +1,12 @@
 # Provisional entries for review
 
-`docs/decisions.md` holds 169 `[provisional]` entries at commit `0a81962`. This report sorts them and changes none.
+`docs/decisions.md` holds 169 `[provisional]` entries at commit `6bdfe95`. This report sorts them and changes none.
 
 - A-review, a real choice or a rule a program depends on: 38. This is the list to go through.
 - A-settled, a built detail that agrees with the specifications: 108.
 - B, internal: 23.
 
-The numbers R1 to R38, S1 to S108 and B1 to B23 replace those of the first version of this report, which had 171 entries. The two it flagged are resolved: the handler rule is corrected in `22f2927`, and the refusal of `f"..."` is gone in `0a81962`. Each entry names the line it stands on at that commit. A-review carries the text of each entry. A-settled and B carry the line on what each decides, and the file holds the text.
+The numbers R1 to R38, S1 to S108 and B1 to B23 replace those of the first version of this report, which had 171 entries. The two it flagged are resolved: the handler rule is corrected in `22f2927`, and the refusal of `f"..."` is gone in `0a81962`. Each entry names the line it stands on at that commit. R14 lost the reason that no Windows machine runs the suite in `75ad1fe`. A-review carries the text of each entry. A-settled and B carry the line on what each decides, and the file holds the text.
 
 | Section | A-review | A-settled | B |
 |---|---|---|---|
@@ -35,17 +35,16 @@ The numbers R1 to R38, S1 to S108 and B1 to B23 replace those of the first versi
 | `f16` | 2 | 5 | 1 |
 | Small things | 2 | 7 | 0 |
 
-## Possibly stale
+## Staleness checks
 
-A later step may have overtaken these. Each is marked where it stands as well.
+The first split marked R14 and S2 as possibly stale. R14 lost its false reason in `75ad1fe`. S2 is live, as below, and is marked where it stands.
 
-- S2. Nullable pointers gave a failing function the result `?*Error`. A maker of `Error` returns `*Error` and no longer reads as a failure, so the case this entry settles may be gone.
-- R14. Its reason says no Windows machine runs the suite. The Windows VM ran 399 tests in step 5 of the release dry run.
+- S2. The checker still holds this rule. `is_failing` in `src/sema.c` reads any pointer to `Error` or a subclass as a failing result and ignores whether it is nullable. `makes_error` then exempts the static functions of `Error` and its subclasses, which keeps `Error.new` an ordinary call. The rule is live, and dropping it would make every call of `Error.new` need a handler. The finding under Notes says more.
 
 ## Notes
 
-- The corrected handler rule is not built. Lowering deletes a bound error at `yield` and at the end of the handler alone, as the old entry said, and a code session adds `break`, `continue` and a `return` of another value.
-- One entry outside the provisional set is stale. "The release script" says the version directory of the download area holds the packages, the symbols archives, the manifest and its signature. The entry on the split under "Build tool and distribution" puts the packages, the symbols archives and `SHA256SUMS` on the GitHub release. It puts the signature alone on anti-lang.com. The split is the later decision.
+- The corrected handler rule is not built. Item 20 of the first sessions in `CLAUDE.md` carries the fix and its test.
+- `may fail` is lowered in `function_type` of `src/sema.c` into a `?*Error` result and an out parameter. Every later check of a call reads the result type through `is_failing`, which takes `*Error` as well as `?*Error`. A hand-written `-> *Error` outside the classes of `Error` therefore still reads as a failing function. The additions document gives a failing function the result `?*Error` alone.
 
 ## A-review
 
@@ -105,9 +104,9 @@ A later step may have overtaken these. Each is marked where it stands as well.
 
 > `transient` is a contextual word before a class field of type `?*T` or `?fn(...)`, and it is refused together with `own`. The field list of the descriptor leaves a transient field out rather than carrying a bit in its record, so every walk of the list skips it, reflection included, and the runtime does not change. The library file carries the bit. Reason: `none` is the value the copy writes, and a `*T` has none. A class that frees the field in its `destruct` would free it twice under `own`. Leaving the record out is the smaller of the two forms of a flag.
 
-**R14**, line 146. `SystemError.from_win32` exists on every target and gives code 0 away from Windows. Possibly stale, see above.
+**R14**, line 146. `SystemError.from_win32` exists on every target and gives code 0 away from Windows.
 
-> `SystemError.from_win32` is one function on every target. On Windows it reads `GetLastError` and formats the message, and everywhere else it gives code 0 and an empty message. Reason: no Windows machine here runs the test suite. A function that exists on one target alone would also make a program for six targets fail to compile for five.
+> `SystemError.from_win32` is one function on every target. On Windows it reads `GetLastError` and formats the message, and everywhere else it gives code 0 and an empty message. Reason: a function that exists on one target alone would make a program for six targets fail to compile for five.
 
 ### Numeric types
 
@@ -233,7 +232,7 @@ A later step may have overtaken these. Each is marked where it stands as well.
 
 ### Object model
 
-- **S2**, line 83. A static function of `Error` that returns an error builds one and is not read as a failure. Possibly stale, see above.
+- **S2**, line 83. A static function of `Error` that returns an error builds one and is not read as a failure. Checked for staleness, see above.
 - **S3**, line 86. The checker reports a `delete` and a `mutable` singleton field in worker-reached functions of its module, with the line.
 - **S4**, line 91. `anti.reflect` offers `get`, `set`, `new` and `call` over descriptors.
 - **S5**, line 94. A struct descriptor holds name, size and fields, a union and `Job` have none, and `type_of(T)` does not exist.
