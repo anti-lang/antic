@@ -636,8 +636,6 @@ What antic does that the design above leaves open, as far as a user of the langu
 ## String prefixes
 
 - The prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, and the lexer reads them from one table. `fr` stands in the table as well, refused with `` `fr"` is not a prefix, write `rf"` ``. A word that is not in the table stays an identifier before a quote, so `u"a"` and `rb"a"` are an identifier and a string.
-- [provisional] Until interpolation is built, `f"..."` is refused with `` `f"..."` is not built yet `` at the prefix. Reason: `f` is a prefix of the table, and an identifier `f` followed by a string would be refused later by the parser with a message that names neither.
-- Interpolation is built, so the refusal of the entry above no longer occurs.
 - [provisional] `fr#"..."#` is refused like `fr"..."`, and the literal is then read as an `rf"..."`, so the one mistake gives one message. Reason: the prefix takes hash delimiters as every prefix but `x` does, and a literal read another way would report its content as further errors.
 
 ## Interpolation
