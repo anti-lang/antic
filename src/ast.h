@@ -314,6 +314,9 @@ struct switch_arm {
     struct expr *value;
     struct pos pos;
     struct stmt *body;
+    /* Set by the checker on a `switch` over a `str`: the call of
+       `anti.text.equal` on the value and this arm's. */
+    struct expr *test;
 };
 
 struct if_branch {
@@ -453,6 +456,9 @@ struct stmt {
             size_t count;
             struct stmt *otherwise;
             size_t otherwise_at;
+            /* The local that holds the value of a `switch` on a `str`,
+               which each arm's test reads. Set by the checker. */
+            struct symbol *bound;
         } switch_stmt;
         struct expr *return_value;  /* STMT_RETURN, NULL for return; */
         struct block *block;        /* STMT_BLOCK */

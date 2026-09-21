@@ -5707,24 +5707,38 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         if (l->failed) {
             return;
         }
-        type = ir_type_of(s->as.switch_stmt.value->type);
-        over = temp(l, ir_unary(l->f, l->b, IR_COPY, type, over));
+        /* A `str` is bound by its address, which each arm's call of
+           `text.equal` reads. */
+        if (s->as.switch_stmt.bound != NULL) {
+            s->as.switch_stmt.bound->ir =
+                ir_unary(l->f, l->b, IR_COPY, IR_PTR, over);
+        } else {
+            type = ir_type_of(s->as.switch_stmt.value->type);
+            over = temp(l, ir_unary(l->f, l->b, IR_COPY, type, over));
+        }
         for (i = 0; i < s->as.switch_stmt.count && l->b != NULL; i++) {
             struct ir_block *arm = new_block(l);
             struct ir_block *next_test = new_block(l);
-            const struct stmt *body = s->as.switch_stmt.arms[i].body;
-            struct ir_operand value =
-                lower_expr(l, s->as.switch_stmt.arms[i].value);
+            const struct switch_arm *at = &s->as.switch_stmt.arms[i];
+            const struct stmt *body = at->body;
+            struct ir_operand test;
+            if (at->test != NULL) {
+                test = lower_expr(l, at->test);
+            } else {
+                struct ir_operand value = lower_expr(l, at->value);
+                if (l->failed) {
+                    return;
+                }
+                test = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over,
+                                         value));
+            }
             if (l->failed) {
                 return;
             }
             k = otherwise != NULL && i >= s->as.switch_stmt.otherwise_at
                     ? i + 1
                     : i;
-            ir_branch(l->f, l->b,
-                      temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over,
-                                        value)),
-                      arm, next_test);
+            ir_branch(l->f, l->b, test, arm, next_test);
             l->b = arm;
             entry[k] = arm;
             lower_stmt(l, body);

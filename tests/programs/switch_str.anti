@@ -1,0 +1,72 @@
+//! `switch` on a `str` compares the value with each arm in the order of
+//! the text, through `text.equal`, and runs the first arm that matches.
+//! The value is computed once, an arm may be a constant, and an arm may
+//! end in `fallthrough;` as on an integer.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const QUIT: str = "quit";
+
+/// A word, counting each call in `count`.
+fn next_word(count: *int) -> str
+{
+	*count = *count + 1;
+	return "sub";
+}
+
+fn code(word: str) -> int
+{
+	switch word {
+		"add" => { return 1; },
+		"ad" => { return 2; },
+		"sub" => { return 3; },
+		"" => { return 4; },
+		QUIT => { return 5; },
+		else => { return 0; }
+	}
+	return -1;
+}
+
+fn falls(word: str)
+{
+	switch word {
+		"one" => {
+			printf("one ".ptr);
+			fallthrough;
+		},
+		"two" => {
+			printf("two".ptr);
+		},
+		else => printf("other".ptr)
+	}
+	printf("\n".ptr);
+}
+
+fn main() -> int
+{
+	printf("%d %d %d %d %d %d %d\n".ptr, code("add") as c_int,
+		code("ad") as c_int, code("sub") as c_int, code("") as c_int,
+		code("quit") as c_int, code("mul") as c_int, code("adds") as c_int);
+	let read = 0;
+	switch next_word(&read) {
+		"add" => printf("add".ptr),
+		"sub" => printf("sub".ptr),
+		else => printf("none".ptr)
+	}
+	printf(" read %d\n".ptr, read as c_int);
+	for n in 20..23 {
+		let s = f"{n}";
+		switch s {
+			"20" => printf("twenty\n".ptr),
+			"22" => printf("twenty-two\n".ptr),
+			else => printf("other %d\n".ptr, n as c_int)
+		}
+		free(s.ptr);
+	}
+	falls("one");
+	falls("two");
+	falls("three");
+	return 0;
+}

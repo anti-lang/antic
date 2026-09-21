@@ -231,6 +231,9 @@ struct type *types_object(struct types *types);
 #define TEXT_ALIGN_LEFT "Left"
 #define TEXT_ALIGN_RIGHT "Right"
 #define TEXT_ALIGN_CENTER "Center"
+/* A `switch` on a `str` compares the value with each arm by this
+   function of the same module. */
+#define TEXT_EQUAL "equal"
 #define ROOT_TO_TEXT "to_text"
 
 /* Whether t is the class `anti.lang.Error` itself. */

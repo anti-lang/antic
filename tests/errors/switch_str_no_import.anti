@@ -1,0 +1,11 @@
+//! A `switch` on a `str` calls `anti.text.equal`, which this module does
+//! not import.
+
+fn code(word: str) -> int
+{
+	switch word {
+		"add" => { return 1; },
+		else => { return 0; }
+	}
+	return -1;
+}

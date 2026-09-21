@@ -5571,6 +5571,75 @@ static void check_switch_covers(struct checker *c, const struct stmt *s,
     text_free(&missing);
 }
 
+/* Whether two arms of a `switch` name one value. */
+static bool same_arm_value(const struct const_value *a,
+                           const struct const_value *b)
+{
+    if (a->kind != b->kind) {
+        return false;
+    }
+    if (a->kind == CONST_TEXT) {
+        return a->as.text.length == b->as.text.length &&
+               (a->as.text.length == 0 ||
+                memcmp(a->as.text.bytes, b->as.text.bytes,
+                       a->as.text.length) == 0);
+    }
+    return a->as.integer == b->as.integer;
+}
+
+/* The function `anti.text.equal`, which a `switch` on a `str` calls for
+   each arm, or NULL after the message. */
+static struct symbol *text_equal(struct checker *c, struct pos pos)
+{
+    static const struct name module = {TEXT_MODULE, sizeof TEXT_MODULE - 1};
+    static const struct name name = {TEXT_EQUAL, sizeof TEXT_EQUAL - 1};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *fn = lib != NULL ? library_item(c, lib, &name) : NULL;
+    struct type *str = builtin(c, TYPE_STR);
+
+    if (lib == NULL) {
+        error_at(c, pos, "a `switch` on a `str` compares with `" TEXT_MODULE
+                 "." TEXT_EQUAL "`, so the module imports `" TEXT_MODULE "`");
+        return NULL;
+    }
+    if (fn == NULL || fn->kind != SYMBOL_FN || fn->type == NULL ||
+        fn->type->kind != TYPE_FN || fn->type->param_count != 2 ||
+        fn->type->params[0] != str || fn->type->params[1] != str ||
+        fn->type->result != builtin(c, TYPE_BOOL)) {
+        error_at(c, pos, "a `switch` on a `str` calls `" TEXT_MODULE "."
+                 TEXT_EQUAL "`, which this `" TEXT_MODULE "` lacks");
+        return NULL;
+    }
+    return fn;
+}
+
+/* DESIGN: a `switch` on a `str` is a chain of calls of `text.equal`, one
+   per arm in the order of the text, and not a table. The value is
+   computed once into a local that no scope holds, and each arm's test
+   reads it. */
+static struct expr *equal_test(struct checker *c, struct symbol *equal,
+                               struct symbol *bound, struct expr *value)
+{
+    struct expr *call = new_node(c, EXPR_CALL, value->pos);
+    struct expr *callee = new_node(c, EXPR_NAME, value->pos);
+    struct expr *over = new_node(c, EXPR_NAME, value->pos);
+    struct expr **args = arena_alloc(c->arena, 2 * sizeof *args);
+
+    callee->symbol = equal;
+    callee->type = equal->type;
+    callee->as.name = equal->name;
+    over->symbol = bound;
+    over->type = bound->type;
+    over->as.name = bound->name;
+    args[0] = over;
+    args[1] = value;
+    call->as.call.callee = callee;
+    call->as.call.args = args;
+    call->as.call.arg_count = 2;
+    call->type = equal->type->result;
+    return call;
+}
+
 /* Whether e holds a call anywhere inside it. */
 static bool expr_calls(const struct expr *e)
 {
@@ -6111,15 +6180,29 @@ static void check_stmt(struct checker *c, struct stmt *s)
     case STMT_SWITCH: {
         struct type *over = check_expr(c, s->as.switch_stmt.value, NULL);
         struct stmt *outer = c->fallthrough;
+        struct symbol *equal = NULL;
         size_t arms = s->as.switch_stmt.count +
                       (s->as.switch_stmt.otherwise != NULL ? 1 : 0);
         size_t k;
         size_t j;
-        if (!is_error(over) && !type_is_integer(over) &&
-            over->kind != TYPE_ENUM) {
+        if (!is_error(over) && over->kind == TYPE_STR) {
+            struct symbol *bound;
+            equal = text_equal(c, s->as.switch_stmt.value->pos);
+            if (equal == NULL) {
+                over = builtin(c, TYPE_ERROR);
+            } else {
+                bound = arena_alloc(c->arena, sizeof *bound);
+                bound->kind = SYMBOL_LOCAL;
+                bound->name = hidden_value;
+                bound->pos = s->as.switch_stmt.value->pos;
+                bound->type = over;
+                s->as.switch_stmt.bound = bound;
+            }
+        } else if (!is_error(over) && !type_is_integer(over) &&
+                   over->kind != TYPE_ENUM) {
             error_at(c, s->as.switch_stmt.value->pos,
-                     "`switch` takes an enum or an integer, found `%s`",
-                     tn(over));
+                     "`switch` takes an enum, an integer or a `str`, found "
+                     "`%s`", tn(over));
             over = builtin(c, TYPE_ERROR);
         }
         for (k = 0, i = 0; k < arms; k++) {
@@ -6131,17 +6214,22 @@ static void check_stmt(struct checker *c, struct stmt *s)
             } else {
                 struct switch_arm *arm = &s->as.switch_stmt.arms[i];
                 body = arm->body;
-                require(c, arm->value, check_expr(c, arm->value, over), over);
-                if (!is_error(over) && eval_const(c, arm->value, &v)) {
+                if (require(c, arm->value, check_expr(c, arm->value, over),
+                            over) &&
+                    !is_error(over) && eval_const(c, arm->value, &v)) {
                     for (j = 0; j < i; j++) {
                         struct const_value other;
                         if (eval_const(c, s->as.switch_stmt.arms[j].value,
                                        &other) &&
-                            other.kind == v.kind &&
-                            other.as.integer == v.as.integer) {
+                            same_arm_value(&other, &v)) {
                             error_at(c, arm->pos,
                                      "this value already has an arm");
                         }
+                    }
+                    if (equal != NULL) {
+                        arm->test = equal_test(c, equal,
+                                               s->as.switch_stmt.bound,
+                                               arm->value);
                     }
                 }
                 i++;

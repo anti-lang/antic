@@ -670,6 +670,12 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] Reflection reads an `f16` field as a `Float`, and `set` narrows a float to it through `f32`, as `as f16` takes an `f32`. The type id `F16` follows `Class`, so every earlier id keeps its number. `serialize` writes the `f32` that a read gives, which reads back to the same bits. Reason: `get`, `set`, `serialize` and `deserialize` cover every field kind, and an id at the end changes no existing record.
 - The library format is version 36, since `TYPE_F16`, the keyword `f16` and the two operations move later enum values.
 
+## Small things
+
+- `switch` on a `str` is built. Each arm calls `anti.text.equal` with the value and the arm's, in the order of the text, and the first call that gives `true` runs its arm. The value is computed once. `fallthrough;` works as on an integer.
+- [provisional] A module that writes a `switch` on a `str` imports `anti.text`, and one that does not is refused with `` a `switch` on a `str` compares with `anti.text.equal`, so the module imports `anti.text` ``. Reason: the specification compares with `text.equal`, and an `f"..."` asks the same import for `anti.text.Builder`.
+- [provisional] An arm of a `switch` on a `str` is a constant `str`, a literal or a `const`, and a second arm of the same text is refused with `this value already has an arm`, as on an integer. Reason: the arms of every `switch` are constants, and the chain would never reach the second arm.
+
 ## Open
 
 - The native libraries of `libs/`, which nothing builds yet, are published "under `downloads/resources/<library>/<version>/`" by the entry above them. The site serves text alone since 2026-09-20, so that path no longer exists. They follow the packages onto a GitHub release when step 16 builds them. The entry stays as Eddie wrote it until he says which release holds them. The same question stands for the mirror of the LLVM tools that the site serves today under `downloads/resources/llvm/`.

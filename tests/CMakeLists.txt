@@ -1673,6 +1673,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "defaults|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/defaults.s,defaults.anti"
         "tuples|-S,-o,${LISTINGS}/tuples.s,tuples.anti"
         "switch_fallthrough|-S,-o,${LISTINGS}/switch_fallthrough.s,switch_fallthrough.anti"
+        "switch_str|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/switch_str.s,switch_str.anti"
+        "switch_str_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/switch_str_no_import.s,switch_str_no_import.anti"
         "hex_bytes|-S,-o,${LISTINGS}/hex_bytes.s,hex_bytes.anti"
         "half|-S,-o,${LISTINGS}/half.s,half.anti"
         "format_literal|-S,-o,${LISTINGS}/format_literal.s,format_literal.anti"

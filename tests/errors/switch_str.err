@@ -1,0 +1,4 @@
+switch_str.anti:11:3: error: this value already has an arm
+switch_str.anti:20:3: error: a variable is not a constant expression
+switch_str.anti:29:3: error: expected `str`, found an integer literal
+switch_str.anti:37:9: error: `switch` takes an enum, an integer or a `str`, found `float`

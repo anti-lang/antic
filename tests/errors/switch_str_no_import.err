@@ -1,0 +1,1 @@
+switch_str_no_import.anti:6:9: error: a `switch` on a `str` compares with `anti.text.equal`, so the module imports `anti.text`

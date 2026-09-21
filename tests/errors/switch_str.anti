@@ -1,0 +1,41 @@
+//! The arms of a `switch` on a `str` are constants of type `str`, each
+//! value at most once.
+
+import anti.text;
+
+fn twice(word: str) -> int
+{
+	switch word {
+		"a" => { return 1; },
+		"b" => { return 2; },
+		"a" => { return 3; },
+		else => { return 0; }
+	}
+	return -1;
+}
+
+fn variable(word: str, other: str) -> int
+{
+	switch word {
+		other => { return 1; },
+		else => { return 0; }
+	}
+	return -1;
+}
+
+fn number(word: str) -> int
+{
+	switch word {
+		1 => { return 1; },
+		else => { return 0; }
+	}
+	return -1;
+}
+
+fn floating(x: float) -> int
+{
+	switch x {
+		else => { return 0; }
+	}
+	return -1;
+}
