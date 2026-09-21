@@ -1,0 +1,108 @@
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn last_else(n: int)
+{
+	switch n {
+		0 => printf("zero\n".ptr),
+		else => {
+			fallthrough;
+		}
+	}
+}
+
+fn last_value(n: int)
+{
+	switch n {
+		else => printf("other\n".ptr),
+		1 => {
+			fallthrough;
+		}
+	}
+}
+
+fn early(n: int)
+{
+	switch n {
+		0 => {
+			fallthrough;
+			printf("zero\n".ptr);
+		},
+		else => { }
+	}
+}
+
+fn conditional(n: int)
+{
+	switch n {
+		0 => {
+			if n == 0 {
+				fallthrough;
+			}
+		},
+		else => { }
+	}
+}
+
+fn inner_block(n: int)
+{
+	switch n {
+		0 => {
+			{
+				fallthrough;
+			}
+		},
+		else => { }
+	}
+}
+
+fn deferred(n: int)
+{
+	switch n {
+		0 => {
+			defer fallthrough;
+		},
+		else => { }
+	}
+}
+
+fn outside()
+{
+	fallthrough;
+}
+
+fn loop_body(n: int)
+{
+	switch n {
+		0 => {
+			while n > 0 do {
+				fallthrough;
+			}
+		},
+		else => { }
+	}
+}
+
+struct Cell
+{
+	v: int,
+}
+
+fn narrowed(p: ?*Cell, q: ?*Cell, n: int) -> int
+{
+	if p == none {
+		return 0;
+	}
+	switch n {
+		0 => {
+			return p.v;
+		},
+		else => {
+			p = q;
+			fallthrough;
+		},
+		1 => {
+			return p.v;
+		}
+	}
+	return 0;
+}

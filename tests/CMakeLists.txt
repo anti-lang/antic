@@ -954,6 +954,15 @@ add_test(NAME dump_ast_scale
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.ast"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 
+# `fallthrough;` is a statement of its own in the tree of an arm.
+add_test(NAME dump_ast_switch_fallthrough
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DOPTION=--dump-ast"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.ast"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+
 # Two mistakes produce exactly two messages.
 add_test(NAME error_syntax
     COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/syntax.s"
@@ -1623,6 +1632,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "fail_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_no_import.s,fail_no_import.anti"
         "defaults|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/defaults.s,defaults.anti"
         "tuples|-S,-o,${LISTINGS}/tuples.s,tuples.anti"
+        "switch_fallthrough|-S,-o,${LISTINGS}/switch_fallthrough.s,switch_fallthrough.anti"
         "transient|-S,-o,${LISTINGS}/transient.s,transient.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

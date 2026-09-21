@@ -103,6 +103,7 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_FAIL] = {"fail", CAT_KEYWORD},
     [TOKEN_UNDO] = {"undo", CAT_KEYWORD},
     [TOKEN_HERE] = {"here", CAT_KEYWORD},
+    [TOKEN_FALLTHROUGH] = {"fallthrough", CAT_KEYWORD},
     [TOKEN_LPAREN] = {"(", CAT_SYMBOL},
     [TOKEN_RPAREN] = {")", CAT_SYMBOL},
     [TOKEN_LBRACE] = {"{", CAT_SYMBOL},

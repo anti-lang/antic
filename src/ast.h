@@ -301,6 +301,7 @@ enum stmt_kind {
     STMT_RETURN,
     STMT_YIELD,
     STMT_TRY,
+    STMT_FALLTHROUGH,
     STMT_BLOCK
 };
 
@@ -405,12 +406,14 @@ struct stmt {
             struct token_text text;
         } assertion;
         /* `switch e { A => stmt, else => stmt }`. An arm holds one value
-           and one statement, and the else arm has no value. */
+           and one statement, and the else arm has no value. otherwise_at
+           is the number of arms the text writes before `else`. */
         struct {
             struct expr *value;
             struct switch_arm *arms;
             size_t count;
             struct stmt *otherwise;
+            size_t otherwise_at;
         } switch_stmt;
         struct expr *return_value;  /* STMT_RETURN, NULL for return; */
         struct block *block;        /* STMT_BLOCK */

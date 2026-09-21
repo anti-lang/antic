@@ -165,7 +165,7 @@ let v = show(compute(x));
 
 `switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release. `unreachable` traps in dev and is undefined in release.
 
-Not built yet: `show`, `unreachable`, `switch` on `str`, `fallthrough`.
+Built: `fallthrough`. Not built yet: `show`, `unreachable`, `switch` on `str`.
 
 ## Loops
 
@@ -338,7 +338,7 @@ switch s {
 if let Circle c = s { }
 ```
 
-Not built yet.
+Not built yet. The refusal of `fallthrough` into an arm that binds a case's fields comes with them.
 
 ## Classes
 

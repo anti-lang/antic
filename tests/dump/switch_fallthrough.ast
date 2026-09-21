@@ -1,0 +1,18 @@
+function step
+  param n
+    type int
+  result
+    type int
+  block
+    switch_stmt
+      ident n
+      arm
+        int_lit 0
+        block
+          fallthrough
+      else
+        block
+          return_stmt
+            int_lit 1
+    return_stmt
+      int_lit 0

@@ -5626,12 +5626,26 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         return;
     /* DESIGN: a switch lowers to a chain of comparisons, one block per
        arm and one join. The back end turns a dense chain into a jump
-       table where it pays. */
+       table where it pays. An arm that ends in `fallthrough;` keeps its
+       last block open. Once every arm stands, that block jumps to the
+       first block of the arm the text writes next, which enters its
+       body past its test. The arm's block has closed by then, so its
+       `defer` statements have run. */
     case STMT_SWITCH: {
         struct ir_block *join = NULL;
         struct ir_operand over;
         enum ir_type type;
+        const struct stmt *otherwise = s->as.switch_stmt.otherwise;
+        size_t arms = s->as.switch_stmt.count + (otherwise != NULL ? 1 : 0);
+        struct ir_block **entry =
+            arena_alloc(l->m->arena, (arms + 1) * sizeof *entry);
+        struct ir_block **tail =
+            arena_alloc(l->m->arena, (arms + 1) * sizeof *tail);
+        const struct stmt **falls =
+            arena_alloc(l->m->arena, (arms + 1) * sizeof *falls);
+        uint32_t line;
         size_t i;
+        size_t k;
         over = lower_expr(l, s->as.switch_stmt.value);
         if (l->failed) {
             return;
@@ -5641,27 +5655,53 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         for (i = 0; i < s->as.switch_stmt.count && l->b != NULL; i++) {
             struct ir_block *arm = new_block(l);
             struct ir_block *next_test = new_block(l);
+            const struct stmt *body = s->as.switch_stmt.arms[i].body;
             struct ir_operand value =
                 lower_expr(l, s->as.switch_stmt.arms[i].value);
             if (l->failed) {
                 return;
             }
+            k = otherwise != NULL && i >= s->as.switch_stmt.otherwise_at
+                    ? i + 1
+                    : i;
             ir_branch(l->f, l->b,
                       temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over,
                                         value)),
                       arm, next_test);
             l->b = arm;
-            lower_stmt(l, s->as.switch_stmt.arms[i].body);
-            jump_to_join(l, &join);
+            entry[k] = arm;
+            lower_stmt(l, body);
+            if ((falls[k] = sema_arm_fallthrough(body)) != NULL) {
+                tail[k] = l->b;
+            } else {
+                jump_to_join(l, &join);
+            }
             l->b = next_test;
         }
-        if (l->b != NULL && s->as.switch_stmt.otherwise != NULL) {
-            lower_stmt(l, s->as.switch_stmt.otherwise);
+        if (l->b != NULL && otherwise != NULL) {
+            k = s->as.switch_stmt.otherwise_at;
+            entry[k] = l->b;
+            lower_stmt(l, otherwise);
+            if ((falls[k] = sema_arm_fallthrough(otherwise)) != NULL) {
+                tail[k] = l->b;
+                l->b = NULL;
+            }
         }
         jump_to_join(l, &join);
+        line = l->f->at_line;
+        for (k = 0; k + 1 < arms; k++) {
+            if (tail[k] != NULL && entry[k + 1] != NULL) {
+                l->f->at_line = (uint32_t)falls[k]->pos.line;
+                ir_jump(l->f, tail[k], entry[k + 1]);
+            }
+        }
+        l->f->at_line = line;
         l->b = join;
         return;
     }
+    /* The switch that holds the arm makes the jump. */
+    case STMT_FALLTHROUGH:
+        return;
     /* DESIGN: the text of a failure is built here and lives in the
        read-only data of the module. The back end needs no formatting,
        and a build without assertions drops the whole string. */

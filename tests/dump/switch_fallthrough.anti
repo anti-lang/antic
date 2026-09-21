@@ -1,0 +1,12 @@
+fn step(n: int) -> int
+{
+	switch n {
+		0 => {
+			fallthrough;
+		},
+		else => {
+			return 1;
+		}
+	}
+	return 0;
+}

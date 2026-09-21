@@ -1,0 +1,9 @@
+switch_fallthrough.anti:8:4: error: `fallthrough` in the last arm
+switch_fallthrough.anti:18:4: error: `fallthrough` in the last arm
+switch_fallthrough.anti:27:4: error: `fallthrough` is allowed as the last statement of a `switch` arm only
+switch_fallthrough.anti:39:5: error: `fallthrough` is allowed as the last statement of a `switch` arm only
+switch_fallthrough.anti:51:5: error: `fallthrough` is allowed as the last statement of a `switch` arm only
+switch_fallthrough.anti:62:10: error: `fallthrough` is allowed as the last statement of a `switch` arm only
+switch_fallthrough.anti:70:2: error: `fallthrough` is allowed as the last statement of a `switch` arm only
+switch_fallthrough.anti:78:5: error: `fallthrough` is allowed as the last statement of a `switch` arm only
+switch_fallthrough.anti:104:11: error: `p` may be `none`, check it or use `?*T`

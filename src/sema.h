@@ -138,6 +138,10 @@ bool sema_check(struct module *module, const char *module_name,
                 struct arena *arena, struct diagnostics *diags,
                 bool whole_program);
 
+/* The `fallthrough;` that ends the body of a switch arm, the last
+   statement of its block, or NULL when the arm ends otherwise. */
+struct stmt *sema_arm_fallthrough(const struct stmt *body);
+
 /* Whether a field without a written default takes `T { }`: an inline
    class value whose class a literal may write with no field named. */
 bool sema_field_takes_literal(const struct struct_field *f);

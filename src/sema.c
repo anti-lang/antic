@@ -50,6 +50,7 @@ struct checker {
     struct scope *scope;
     struct item *function;      /* the function whose body is checked */
     int loop_depth;
+    struct stmt *fallthrough;   /* the one that ends the arm checked now */
     bool target_sized;          /* a symbolic array length is allowed */
     bool atomic_place;          /* the place of an atomic operation */
     bool whole_program;         /* release mode: every class is here */
@@ -2190,6 +2191,19 @@ static bool literal_complete(const struct type *t)
         }
     }
     return true;
+}
+
+struct stmt *sema_arm_fallthrough(const struct stmt *body)
+{
+    const struct block *b;
+
+    if (body->kind != STMT_BLOCK) {
+        return NULL;
+    }
+    b = body->as.block;
+    return b->count > 0 && b->stmts[b->count - 1]->kind == STMT_FALLTHROUGH
+               ? b->stmts[b->count - 1]
+               : NULL;
 }
 
 bool sema_field_takes_literal(const struct struct_field *f)
@@ -5647,11 +5661,18 @@ static void check_stmt(struct checker *c, struct stmt *s)
         leave_scope(c, &for_scope);
         return;
     }
-    /* DESIGN: `switch` runs one arm and never falls through. A switch on
-       an enum without `else` covers every value, and the message names
-       the ones it misses. */
+    /* DESIGN: `switch` runs one arm, and it enters the next only where
+       the arm ends in `fallthrough;`. The arms are checked in the order
+       of the text, `else` in its place, so that an assignment that ends
+       a narrowing reaches the arm a `fallthrough` enters. A switch on an
+       enum without `else` covers every value, and the message names the
+       ones it misses. */
     case STMT_SWITCH: {
         struct type *over = check_expr(c, s->as.switch_stmt.value, NULL);
+        struct stmt *outer = c->fallthrough;
+        size_t arms = s->as.switch_stmt.count +
+                      (s->as.switch_stmt.otherwise != NULL ? 1 : 0);
+        size_t k;
         size_t j;
         if (!is_error(over) && !type_is_integer(over) &&
             over->kind != TYPE_ENUM) {
@@ -5660,30 +5681,55 @@ static void check_stmt(struct checker *c, struct stmt *s)
                      tn(over));
             over = builtin(c, TYPE_ERROR);
         }
-        for (i = 0; i < s->as.switch_stmt.count; i++) {
-            struct switch_arm *arm = &s->as.switch_stmt.arms[i];
+        for (k = 0, i = 0; k < arms; k++) {
+            struct stmt *body;
             struct const_value v;
-            require(c, arm->value, check_expr(c, arm->value, over), over);
-            if (!is_error(over) && eval_const(c, arm->value, &v)) {
-                for (j = 0; j < i; j++) {
-                    struct const_value other;
-                    if (eval_const(c, s->as.switch_stmt.arms[j].value,
-                                   &other) &&
-                        other.kind == v.kind &&
-                        other.as.integer == v.as.integer) {
-                        error_at(c, arm->pos, "this value already has an arm");
+            if (s->as.switch_stmt.otherwise != NULL &&
+                k == s->as.switch_stmt.otherwise_at) {
+                body = s->as.switch_stmt.otherwise;
+            } else {
+                struct switch_arm *arm = &s->as.switch_stmt.arms[i];
+                body = arm->body;
+                require(c, arm->value, check_expr(c, arm->value, over), over);
+                if (!is_error(over) && eval_const(c, arm->value, &v)) {
+                    for (j = 0; j < i; j++) {
+                        struct const_value other;
+                        if (eval_const(c, s->as.switch_stmt.arms[j].value,
+                                       &other) &&
+                            other.kind == v.kind &&
+                            other.as.integer == v.as.integer) {
+                            error_at(c, arm->pos,
+                                     "this value already has an arm");
+                        }
                     }
                 }
+                i++;
             }
-            check_stmt(c, arm->body);
+            c->fallthrough = sema_arm_fallthrough(body);
+            if (c->fallthrough != NULL && k + 1 == arms) {
+                error_at(c, c->fallthrough->pos,
+                         "`fallthrough` in the last arm");
+            }
+            check_stmt(c, body);
         }
-        if (s->as.switch_stmt.otherwise != NULL) {
-            check_stmt(c, s->as.switch_stmt.otherwise);
-        } else if (!is_error(over) && over->kind == TYPE_ENUM) {
+        c->fallthrough = outer;
+        if (s->as.switch_stmt.otherwise == NULL && !is_error(over) &&
+            over->kind == TYPE_ENUM) {
             check_switch_covers(c, s, over);
         }
         return;
     }
+    /* DESIGN: the switch above names the one `fallthrough;` of each arm
+       that stands where the rule allows it, the last statement of the
+       arm's block. Every other one is refused here, inside a nested
+       block, an `if`, a loop or a `defer` as well. No arm binds a
+       variant's fields yet, so there is no such arm to refuse it into. */
+    case STMT_FALLTHROUGH:
+        if (s != c->fallthrough) {
+            error_at(c, s->pos, "`fallthrough` is allowed as the last "
+                     "statement of a `switch` arm only");
+        }
+        return;
     /* DESIGN: a release build removes the whole statement, so a call in
        the condition does not run there. The warning says so, because the
        program would behave differently in the two builds. */
@@ -5942,16 +5988,22 @@ static bool sets_stmt(struct checker *c, const struct required *r,
             meet(r, out, copy, &any);
         }
         break;
+    /* An arm that ends in `fallthrough;` goes on into the next arm and
+       not past the switch. The next arm starts from what the switch
+       started from, since its test reaches it with that much set. */
     case STMT_SWITCH:
         for (i = 0; i < s->as.switch_stmt.count; i++) {
+            const struct stmt *body = s->as.switch_stmt.arms[i].body;
             memcpy(copy, set, r->count);
-            if (sets_stmt(c, r, s->as.switch_stmt.arms[i].body, copy)) {
+            if (sets_stmt(c, r, body, copy) &&
+                sema_arm_fallthrough(body) == NULL) {
                 meet(r, out, copy, &any);
             }
         }
         memcpy(copy, set, r->count);
         if (s->as.switch_stmt.otherwise == NULL ||
-            sets_stmt(c, r, s->as.switch_stmt.otherwise, copy)) {
+            (sets_stmt(c, r, s->as.switch_stmt.otherwise, copy) &&
+             sema_arm_fallthrough(s->as.switch_stmt.otherwise) == NULL)) {
             meet(r, out, copy, &any);
         }
         break;

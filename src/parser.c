@@ -1242,8 +1242,10 @@ static struct stmt *statement(struct parser *p)
                                                                      : NULL;
     }
     /* DESIGN: `switch e { A => stmt, else => stmt }` names one value per
-       arm and runs one statement. There is no fallthrough, so no arm
-       needs a break, and `else` takes the rest. */
+       arm and runs one statement. An arm falls through only where it
+       ends in `fallthrough;`, so no arm needs a break, and `else` takes
+       the rest. The switch keeps the place the text gives `else`, since
+       the arm after it is the one its `fallthrough` enters. */
     case TOKEN_SWITCH: {
         struct list arms = {NULL, 0, 0, sizeof(struct switch_arm)};
         next(p);
@@ -1264,6 +1266,7 @@ static struct stmt *statement(struct parser *p)
                     free(arms.data);
                     return NULL;
                 }
+                s->as.switch_stmt.otherwise_at = arms.count;
                 if (!expect(p, TOKEN_FAT_ARROW) ||
                     (s->as.switch_stmt.otherwise = arm_body(p)) == NULL) {
                     free(arms.data);
@@ -1328,6 +1331,12 @@ static struct stmt *statement(struct parser *p)
     case TOKEN_CONTINUE:
         next(p);
         s = new_stmt(p, t->kind == TOKEN_BREAK ? STMT_BREAK : STMT_CONTINUE, t);
+        return expect(p, TOKEN_SEMICOLON) ? s : NULL;
+    /* The checker decides where `fallthrough;` may stand, since the
+       grammar of a block does not know that the block is an arm. */
+    case TOKEN_FALLTHROUGH:
+        next(p);
+        s = new_stmt(p, STMT_FALLTHROUGH, t);
         return expect(p, TOKEN_SEMICOLON) ? s : NULL;
     case TOKEN_RETURN:
         next(p);

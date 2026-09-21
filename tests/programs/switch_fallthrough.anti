@@ -1,0 +1,120 @@
+//! `fallthrough;` as the last statement of an arm enters the next arm's
+//! body without testing its values. The next arm is the one the text
+//! writes next, `else` included. The arm's `defer` runs before the next
+//! body, and a `construct` counts what the next arm assigns.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Level: u8 { Low, Mid, High }
+
+class Tally
+{
+	pub v: int,
+
+	fn construct(self, k: int)
+	{
+		switch k {
+			0 => {
+				fallthrough;
+			},
+			1 => {
+				self.v = 10;
+			},
+			else => {
+				self.v = k;
+			}
+		}
+	}
+}
+
+fn note(n: int)
+{
+	printf("[%d]".ptr, n as c_int);
+}
+
+fn steps(n: int)
+{
+	switch n {
+		0 => {
+			note(0);
+			fallthrough;
+		},
+		1 => {
+			note(1);
+			fallthrough;
+		},
+		2 => note(2),
+		3 => {
+			note(3);
+			fallthrough;
+		},
+		else => note(9)
+	}
+	printf("\n".ptr);
+}
+
+fn middle(n: int)
+{
+	switch n {
+		0 => {
+			note(0);
+			fallthrough;
+		},
+		else => {
+			note(9);
+			fallthrough;
+		},
+		5 => note(5)
+	}
+	printf("\n".ptr);
+}
+
+fn deferred(n: int)
+{
+	switch n {
+		0 => {
+			defer note(100);
+			note(0);
+			fallthrough;
+		},
+		1 => note(1),
+		else => { }
+	}
+	printf("\n".ptr);
+}
+
+fn level(l: Level) -> int
+{
+	let score = 0;
+	switch l {
+		Level.High => {
+			score += 100;
+			fallthrough;
+		},
+		Level.Mid => {
+			score += 10;
+			fallthrough;
+		},
+		Level.Low => score += 1
+	}
+	return score;
+}
+
+fn main() -> int
+{
+	for n in 0..5 {
+		steps(n);
+	}
+	middle(0);
+	middle(5);
+	middle(7);
+	deferred(0);
+	deferred(1);
+	printf("%d %d %d\n".ptr, level(Level.High) as c_int,
+		level(Level.Mid) as c_int, level(Level.Low) as c_int);
+	let a = Tally(0);
+	let b = Tally(1);
+	let c = Tally(7);
+	printf("%d %d %d\n".ptr, a.v as c_int, b.v as c_int, c.v as c_int);
+	return 0;
+}

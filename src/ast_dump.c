@@ -569,6 +569,9 @@ static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
     case STMT_CONTINUE:
         simple(d, depth, "continue", NULL);
         break;
+    case STMT_FALLTHROUGH:
+        simple(d, depth, "fallthrough", NULL);
+        break;
     case STMT_RETURN:
         simple(d, depth, "return_stmt", NULL);
         if (s->as.return_value != NULL) {
