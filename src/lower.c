@@ -1018,8 +1018,10 @@ static struct ir_operand element_address(struct lowerer *l,
     return temp(l, ir_ptradd(l->f, l->b, base, temp(l, offset)));
 }
 
-/* The struct field that e reads when it is a bitfield, or NULL. */
-static const struct struct_field *bitfield_of(const struct expr *e)
+/* The field that e reads when it is a bitfield, or NULL. owner gets
+   the struct, or the class of the chain, that declares it. */
+static const struct struct_field *bitfield_of(const struct expr *e,
+                                              const struct type **owner)
 {
     const struct type *s;
     const struct struct_field *f;
@@ -1029,10 +1031,12 @@ static const struct struct_field *bitfield_of(const struct expr *e)
     }
     s = e->as.field.base->type;
     s = s->kind == TYPE_POINTER ? s->element : s;
-    if (s->kind != TYPE_STRUCT) {
+    if (s->kind != TYPE_STRUCT && s->kind != TYPE_CLASS) {
         return NULL;
     }
+    s = field_owner(s, &e->as.field.name);
     f = field_of(s, &e->as.field.name);
+    *owner = s;
     return f != NULL && f->bits != 0 ? f : NULL;
 }
 
@@ -1071,6 +1075,8 @@ static bool lower_place(struct lowerer *l, const struct expr *e,
                         struct place *p)
 {
     const struct symbol *sym = e->symbol;
+    const struct struct_field *bits;
+    const struct type *owner = NULL;
 
     p->bitfield = false;
     p->in_temp = false;
@@ -1094,14 +1100,14 @@ static bool lower_place(struct lowerer *l, const struct expr *e,
                                          ir_global_op(static_global(l, sym))));
             return !l->failed;
         }
-        if (bitfield_of(e) != NULL) {
+        bits = bitfield_of(e, &owner);
+        if (bits != NULL) {
             const struct expr *base = e->as.field.base;
-            const struct type *s = base->type->kind == TYPE_POINTER
-                                       ? base->type->element
-                                       : base->type;
+            /* Every class of a chain starts at the address of the
+               object, so the unit is found from there. */
             p->bitfield = true;
-            p->agg = agg_of(l, s);
-            p->field = (uint32_t)(field_of(s, &e->as.field.name) - s->fields);
+            p->agg = agg_of(l, owner);
+            p->field = (uint32_t)(bits - owner->fields);
             p->address = base->type->kind == TYPE_POINTER
                              ? lower_expr(l, base)
                              : lower_address(l, base);
@@ -2686,6 +2692,27 @@ static void store_default(struct lowerer *l, const struct struct_field *field,
     ir_store(l->f, l->b, ir_type_of(field->type), v, address);
 }
 
+/* Put the default of field i of owner into the object at object. A
+   bitfield goes into its unit and every other field to its offset. The
+   object's address is the address of every class of its chain. */
+static void store_field_default(struct lowerer *l, const struct type *owner,
+                                size_t i, struct ir_operand object)
+{
+    const struct struct_field *field = &owner->fields[i];
+
+    if (field->bits != 0) {
+        struct ir_operand v = default_scalar(l, field);
+        if (!l->failed) {
+            ir_bitstore(l->f, l->b, ir_type_of(field->type), v, object,
+                        agg_of(l, owner), (uint32_t)i);
+        }
+        return;
+    }
+    store_default(l, field,
+                  offset_address(l, object,
+                                 field_offset(l, owner, &field->name)));
+}
+
 /* The repeat form of an array literal computes its value once, then
    fills every element in a loop. */
 static void fill_array(struct lowerer *l, const struct expr *e,
@@ -2840,17 +2867,7 @@ static void build_into(struct lowerer *l, const struct expr *e,
             if (given) {
                 continue;
             }
-            if (field->bits != 0) {
-                struct ir_operand v = default_scalar(l, field);
-                if (!l->failed) {
-                    ir_bitstore(l->f, l->b, ir_type_of(field->type), v, dest,
-                                agg_of(l, owner), (uint32_t)i);
-                }
-                continue;
-            }
-            store_default(l, field,
-                          offset_address(l, dest,
-                                         field_offset(l, owner, &field->name)));
+            store_field_default(l, owner, i, dest);
         }
         }
         run_construct(l, t, dest);
@@ -5353,9 +5370,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
             if (!has_default(field)) {
                 continue;
             }
-            store_default(l, field,
-                          offset_address(l, dest,
-                                         field_offset(l, up, &field->name)));
+            store_field_default(l, up, i, dest);
         }
     }
     if (t->base != NULL) {
@@ -6457,9 +6472,7 @@ static void class_init(struct lowerer *l, const struct item *it)
             if (!has_default(field)) {
                 continue;
             }
-            store_default(l, field,
-                          offset_address(l, self,
-                                         field_offset(l, up, &field->name)));
+            store_field_default(l, up, i, self);
         }
     }
     run_construct(l, t, self);

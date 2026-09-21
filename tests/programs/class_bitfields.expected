@@ -1,0 +1,5 @@
+exit 0
+literal 5 1 4 -2
+assigned 0 1 4 3
+construct 5 1 12 -2
+compound 5 0 13 -2

@@ -1,0 +1,48 @@
+//! A bitfield of a class body sits in a unit with its neighbours, as in
+//! a struct. A read masks and shifts it out of the unit, and a write
+//! leaves the other bitfields of the unit alone. So does every writer of
+//! a default: a literal, the preparation that `alloc` and `reflect.new`
+//! share, and `T(args)`. A bitfield of a base class is reached from the
+//! object, where every class of the chain starts.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Base
+{
+	pub low: u8 : 3 = 5,
+	pub flag: u8 : 1 = 1,
+}
+
+class Packed
+{
+	inherits Base,
+
+	pub high: u8 : 4 = 9,
+	pub mid: i8 : 3 = -2,
+
+	fn construct(self, high: u8)
+	{
+		self.high = high;
+	}
+}
+
+fn show(name: str, p: *Packed)
+{
+	printf("%s %d %d %d %d\n".ptr, name.ptr, p.low as c_int,
+		p.flag as c_int, p.high as c_int, p.mid as c_int);
+}
+
+fn main() -> int
+{
+	let literal = Packed { high: 4 };
+	show("literal", &literal);
+	literal.mid = 3;
+	literal.low = 0;
+	show("assigned", &literal);
+	let made = Packed(12);
+	show("construct", &made);
+	made.flag = 0;
+	made.high += 1;
+	show("compound", &made);
+	return 0;
+}
