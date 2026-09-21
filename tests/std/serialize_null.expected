@@ -1,0 +1,6 @@
+exit 0
+bits 2 3 1 arr 7 8 9 word 42
+slices 1 1 0 pointers 1 1 1 name ""
+{"type":"Kinds","low":null,"high":null,"mid":null,"arr":null,"word":null,"tags":null,"rows":null,"other":null,"spot":null,"f":null,"counts":null,"name":""}
+bits 5 9 -2 arr 1 2 3 word 0
+slices 0 0 0 pointers 1 1 1 name ""

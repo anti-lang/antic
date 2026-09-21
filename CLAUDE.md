@@ -186,12 +186,12 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 23. Done. A `may fail` function that returns a tuple takes one out
     pointer. `ir_tuple_out` pins the signature in the IR, and
     `clib_tuples` pins it in the header and calls it from C.
-24. Verify the entry on `Object.deserialize` under "Object model" that a
-    field `serialize` writes as `null` keeps its default. Fields carry type
-    ids now, so check what the default `serialize` writes for each kind,
-    a `str` among them. A test takes each such field through `serialize`
-    and `deserialize`. When `serialize` no longer writes `null` for a
-    `str`, the entry is updated to match.
+24. Done. A field that `serialize` cannot write keeps its default, and a
+    pointer, a function pointer or an empty `own` slice written as `null`
+    comes back as that value. The entry under "Object model" says so, and
+    `std/serialize_null.anti` takes every kind through both. A bitfield
+    of a class body goes through its unit, which
+    `programs/class_bitfields.anti` checks.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures

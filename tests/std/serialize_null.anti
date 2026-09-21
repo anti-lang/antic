@@ -1,0 +1,98 @@
+//! A field that the default `serialize` cannot write is `null`, and
+//! `Object.deserialize` leaves it at its default: a bitfield, an array, a
+//! union, and an `own` slice of class values or of slices. A pointer, a
+//! function pointer and an `own` slice without elements are `null` too,
+//! and that `null` is their value, so they come back as `none` or empty
+//! whatever their default is. A `str` is always a string, the empty one
+//! included. Every field below holds a value other than its default
+//! before the object is written.
+import anti.io;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+union Word
+{
+	i: i32,
+	f: f32,
+}
+
+class Tag
+{
+	pub label: str = "t",
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+class Base
+{
+	pub low: u8 : 3 = 5,
+}
+
+class Kinds
+{
+	inherits Base,
+
+	pub high: u8 : 4 = 9,
+	pub mid: i8 : 3 = -2,
+	pub arr: [3]i32 = [1, 2, 3],
+	pub word: Word,
+	pub own tags: []Tag,
+	pub own rows: [][]i32,
+	pub other: ?*Tag = none,
+	pub own spot: ?*Tag = none,
+	pub f: ?fn(int) -> int = twice,
+	pub own counts: []i32,
+	pub name: str = "default",
+}
+
+fn show(k: *Kinds)
+{
+	printf("bits %d %d %d arr %d %d %d word %d\n".ptr, k.low as c_int,
+		k.high as c_int, k.mid as c_int, k.arr[0] as c_int,
+		k.arr[1] as c_int, k.arr[2] as c_int, k.word.i as c_int);
+	printf("slices %d %d %d pointers %d %d %d name \"%s\"\n".ptr,
+		k.tags.len as c_int, k.rows.len as c_int, k.counts.len as c_int,
+		(k.other == none) as c_int, (k.spot == none) as c_int,
+		(k.f == none) as c_int, k.name.ptr);
+}
+
+fn main() -> int
+{
+	let tags = alloc(Tag, 1) else {
+		return 1;
+	};
+	tags[0] = Tag { label: "only" };
+	let rows = alloc([]i32, 1) else {
+		return 1;
+	};
+	rows[0] = []i32 { ptr: none, len: 0 };
+	let k = alloc Kinds {
+		word: Word { i: 42 },
+		tags: []Tag { ptr: tags, len: 1 },
+		rows: [][]i32 { ptr: rows, len: 1 },
+		counts: []i32 { ptr: none, len: 0 },
+		name: "",
+	};
+	k.low = 2;
+	k.high = 3;
+	k.mid = 1;
+	k.arr = [7, 8, 9];
+	k.f = none;
+	show(k);
+	let b = text.Builder.new();
+	k.serialize(&b);
+	io.println(b.text());
+	let back = Object.deserialize(b.text());
+	if back == none || !(back is *Kinds) {
+		return 2;
+	}
+	let e = back as *Kinds;
+	show(e);
+	delete(e);
+	delete(k);
+	return 0;
+}
