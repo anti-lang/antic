@@ -1,12 +1,12 @@
 # Provisional entries for review
 
-`docs/decisions.md` holds 169 `[provisional]` entries at commit `6bdfe95`. This report sorts them and changes none.
+`docs/decisions.md` holds 165 `[provisional]` entries at commit `93688c5`. This report sorts them and changes none.
 
 - A-review, a real choice or a rule a program depends on: 38. This is the list to go through.
-- A-settled, a built detail that agrees with the specifications: 108.
-- B, internal: 23.
+- A-settled, a built detail that agrees with the specifications: 106.
+- B, internal: 21.
 
-The numbers R1 to R38, S1 to S108 and B1 to B23 replace those of the first version of this report, which had 171 entries. The two it flagged are resolved: the handler rule is corrected in `22f2927`, and the refusal of `f"..."` is gone in `0a81962`. Each entry names the line it stands on at that commit. R14 lost the reason that no Windows machine runs the suite in `75ad1fe`. A-review carries the text of each entry. A-settled and B carry the line on what each decides, and the file holds the text.
+The numbers R1 to R38, S1 to S108 and B1 to B23 replace those of the first version of this report, which had 171 entries. The two it flagged are resolved: the handler rule is corrected in `22f2927`, and the refusal of `f"..."` is gone in `0a81962`. Four entries left the provisional set in `93688c5`, when `may fail` became the one failing form: two of A-settled and two of B. They keep their numbers and are marked answered, so no other number moves. Each entry names the line it stands on at that commit. R14 lost the reason that no Windows machine runs the suite in `75ad1fe`. A-review carries the text of each entry. A-settled and B carry the line on what each decides, and the file holds the text.
 
 | Section | A-review | A-settled | B |
 |---|---|---|---|
@@ -18,11 +18,11 @@ The numbers R1 to R38, S1 to S108 and B1 to B23 replace those of the first versi
 | Lexical rules | 0 | 2 | 0 |
 | Libraries and runtime | 3 | 6 | 2 |
 | Threading | 1 | 2 | 0 |
-| Standard library phase | 7 | 5 | 2 |
+| Standard library phase | 7 | 5 | 1 |
 | Build tool and distribution | 0 | 8 | 2 |
 | Compiler behaviour | 0 | 5 | 4 |
 | Nullable pointers | 2 | 1 | 1 |
-| Failing functions | 0 | 8 | 1 |
+| Failing functions | 0 | 6 | 0 |
 | Tuples | 0 | 5 | 1 |
 | Default values and source locations | 0 | 5 | 0 |
 | Error origins and stack traces | 0 | 10 | 1 |
@@ -37,14 +37,14 @@ The numbers R1 to R38, S1 to S108 and B1 to B23 replace those of the first versi
 
 ## Staleness checks
 
-The first split marked R14 and S2 as possibly stale. R14 lost its false reason in `75ad1fe`. S2 is live, as below, and is marked where it stands.
+The first split marked R14 and S2 as possibly stale. R14 lost its false reason in `75ad1fe`. S2 is superseded, as below, and is marked where it stands.
 
-- S2. The checker still holds this rule. `is_failing` in `src/sema.c` reads any pointer to `Error` or a subclass as a failing result and ignores whether it is nullable. `makes_error` then exempts the static functions of `Error` and its subclasses, which keeps `Error.new` an ordinary call. The rule is live, and dropping it would make every call of `Error.new` need a handler. The finding under Notes says more.
+- S2. Superseded, not settled. A failing function is written `may fail` and nothing else, so returning an `Error` no longer marks a function as failing, and `Error.new` needs no exemption. The `makes_error` exemption in `src/sema.c` goes with item 21 of the first sessions, and this entry goes with it.
 
 ## Notes
 
 - The corrected handler rule is not built. Item 20 of the first sessions in `CLAUDE.md` carries the fix and its test.
-- `may fail` is lowered in `function_type` of `src/sema.c` into a `?*Error` result and an out parameter. Every later check of a call reads the result type through `is_failing`, which takes `*Error` as well as `?*Error`. A hand-written `-> *Error` outside the classes of `Error` therefore still reads as a failing function. The additions document gives a failing function the result `?*Error` alone.
+- A failing function is written `may fail` and nothing else, as `93688c5` records. `is_failing` in `src/sema.c` still reads any pointer to `Error` as a failing result, and item 21 of the first sessions keys it on the marking alone.
 
 ## A-review
 
@@ -232,7 +232,7 @@ The first split marked R14 and S2 as possibly stale. R14 lost its false reason i
 
 ### Object model
 
-- **S2**, line 83. A static function of `Error` that returns an error builds one and is not read as a failure. Checked for staleness, see above.
+- **S2**, line 83. A static function of `Error` that returns an error builds one and is not read as a failure. Superseded, see above.
 - **S3**, line 86. The checker reports a `delete` and a `mutable` singleton field in worker-reached functions of its module, with the line.
 - **S4**, line 91. `anti.reflect` offers `get`, `set`, `new` and `call` over descriptors.
 - **S5**, line 94. A struct descriptor holds name, size and fields, a union and `Job` have none, and `type_of(T)` does not exist.
@@ -312,11 +312,11 @@ The first split marked R14 and S2 as possibly stale. R14 lost its false reason i
 
 ### Failing functions
 
-- **S52**, line 486. `undo` runs on `fail`, a forwarding `try` and a `return` of an `*Error`, and not on `return none`.
+- **S52**. Answered in `93688c5`: `undo` runs on `fail`, a forwarding `try` and a `return` of an `*Error`, and not on `return none`.
 - **S53**, line 487. Every `undo` of a block runs, last first, before its `defer` statements and teardowns.
 - **S54**, line 489. A `construct` with arguments names no result, and a plain `construct` or a `destruct` cannot be `may fail`.
 - **S55**, line 490. An export class with a `construct` that takes arguments gives C `anti_<Class>_construct`, with an error only when it may fail.
-- **S56**, line 491. `may fail` is refused on an `extern fn`.
+- **S56**. Answered in `93688c5`: `may fail` is refused on an `extern fn`.
 - **S57**, line 492. The out parameter of a `may fail` function is named `out` in the interface and the header.
 - **S58**, line 493. An export signature may name `anti.lang.Error`, written as an opaque `struct anti_Error *`.
 - **S59**, line 494. The C prototype of a failing function carries the comment `May fail: NULL on success, an error otherwise.`
@@ -425,7 +425,7 @@ The first split marked R14 and S2 as possibly stale. R14 lost its false reason i
 ### Standard library phase
 
 - **B9**, line 308. The C functions of the runtime that the standard library calls.
-- **B10**, line 331. The test `std_may_fail_only` refuses a hand-written `?*Error` result in `std/anti`.
+- **B10**. Answered in `93688c5`: The test `std_may_fail_only` refuses a hand-written `?*Error` result in `std/anti`.
 
 ### Build tool and distribution
 
@@ -445,7 +445,7 @@ The first split marked R14 and S2 as possibly stale. R14 lost its false reason i
 
 ### Failing functions
 
-- **B18**, line 497. The test `tests_may_fail_only` refuses a hand-written `?*Error` result in `tests/`, with two named exceptions.
+- **B18**. Answered in `93688c5`: The test `tests_may_fail_only` refuses a hand-written `?*Error` result in `tests/`, with two named exceptions.
 
 ### Tuples
 
