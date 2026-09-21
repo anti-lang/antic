@@ -361,12 +361,18 @@ void test_nullable(void)
             "fn f(h: ?*Hooks) -> ?fn(int) -> int { return h?.done; }\n");
     rejects("struct Node { value: int, next: ?*Node }\n"
             "fn f(p: ?*Node) -> int { let v = p?.value; return 0; }\n",
-            "`?.` needs a field or a result that is a pointer, found `int`");
+            "`?.` on `p.value`, which is not a pointer");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: ?*Node) -> int { let v = p?.next?.value; return 0; }\n",
+            "`?.` on `p?.next.value`, which is not a pointer");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn get(n: *Node, k: int) -> int { return n.value; }\n"
+            "fn f(p: ?*Node) -> int { let v = p?.get(1); return 0; }\n",
+            "`?.` on `p.get(...)`, which is not a pointer");
     rejects("struct Node { value: int, next: ?*Node }\n"
             "fn touch(n: *Node) { }\n"
             "fn f(p: ?*Node) { p?.touch(); }\n",
-            "`?.` needs a field or a result that is a pointer, and the call "
-            "returns no value");
+            "`?.` on `p.touch()`, which is not a pointer");
     rejects("struct Node { value: int, next: ?*Node }\n"
             "fn f(p: *Node) -> ?*Node { return p?.next; }\n",
             "`?.` follows a value of type `?*T`, found `*Node`");
@@ -378,8 +384,8 @@ void test_nullable(void)
             "`?.` follows a value of type `?*T`, found `*Node`");
     rejects("struct Node { value: int, next: ?*Node }\n"
             "fn f(p: ?*Node) -> *Node { return p?.next; }\n",
-            "the value may be `none`, check it or use `?*T`");
+            "`p?.next` may be `none`, check it or use `?*T`");
     rejects("struct Node { value: int, next: ?*Node }\n"
             "fn f(p: ?*Node) -> int { return p?.next.value; }\n",
-            "the value may be `none`, check it or use `?*T`");
+            "`p?.next` may be `none`, check it or use `?*T`");
 }

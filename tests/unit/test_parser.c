@@ -607,7 +607,7 @@ void test_parser(void)
     /* `in` applies to ranges only. */
     {
         static const struct expected_error e[] = {
-            {1, 47, "`in` takes a range, as in `x in lo..hi`"}};
+            {1, 47, "`in` takes a range"}};
         errors("fn f(x: int, s: []int) -> bool { return x in s; }\n", e, 1);
     }
     {

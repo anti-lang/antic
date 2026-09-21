@@ -1009,7 +1009,7 @@ static struct expr *in_range(struct parser *p, struct expr *value)
         return NULL;
     }
     if (!accept(p, TOKEN_DOT_DOT)) {
-        error_here(p, "`in` takes a range, as in `x in lo..hi`");
+        error_here(p, "`in` takes a range");
         return NULL;
     }
     e->as.in.high = binary(p, bound);

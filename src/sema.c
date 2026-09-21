@@ -999,6 +999,15 @@ static bool spell(struct text *out, const struct expr *e)
                      e->as.field.name.text);
         return true;
     }
+    /* `p?.x`, which the checker holds as the field it reads on p. */
+    if (e->kind == EXPR_OPTIONAL &&
+        e->as.optional.access->kind == EXPR_FIELD &&
+        spell(out, e->as.optional.base)) {
+        text_appendf(out, "?.%.*s",
+                     (int)e->as.optional.access->as.field.name.length,
+                     e->as.optional.access->as.field.name.text);
+        return true;
+    }
     return false;
 }
 
@@ -4267,6 +4276,10 @@ static struct type *check_optional(struct checker *c, struct expr *e)
     struct expr *access = new_node(c, e->kind, e->pos);
     struct expr *field = e->kind == EXPR_CALL ? e->as.call.callee : e;
     struct expr *base = field->as.field.base;
+    struct name name = field->as.field.name;
+    const char *call = e->kind != EXPR_CALL        ? ""
+                       : e->as.call.arg_count == 0 ? "()"
+                                                   : "(...)";
     struct type *t = check_expr(c, base, NULL);
     struct expr *read;
     struct symbol *bound;
@@ -4307,15 +4320,17 @@ static struct type *check_optional(struct checker *c, struct expr *e)
     if (is_error(result)) {
         return result;
     }
-    if (result->kind == TYPE_VOID) {
-        error_at(c, e->pos, "`?.` needs a field or a result that is a "
-                 "pointer, and the call returns no value");
-        return builtin(c, TYPE_ERROR);
-    }
+    /* The message spells the field or the call as `.` reads it. */
     if (result->kind != TYPE_POINTER &&
         (result->kind != TYPE_FN || result->bound)) {
-        error_at(c, e->pos, "`?.` needs a field or a result that is a "
-                 "pointer, found `%s`", tn(result));
+        struct text spelling = {0};
+        if (spell(&spelling, base)) {
+            text_append(&spelling, ".");
+        }
+        text_appendf(&spelling, "%.*s%s", (int)name.length, name.text, call);
+        error_at(c, e->pos, "`?.` on `%s`, which is not a pointer",
+                 text_cstr(&spelling));
+        text_free(&spelling);
         return builtin(c, TYPE_ERROR);
     }
     memset(&e->as, 0, sizeof e->as);
