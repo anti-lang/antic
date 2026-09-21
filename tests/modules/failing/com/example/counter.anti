@@ -1,0 +1,35 @@
+//! A library whose functions are written `may fail`. The library file
+//! records the flag, so the program that imports it handles the error
+//! without seeing this source.
+
+import anti.error;
+
+/// Halve n, or fail when n is odd.
+pub fn half(n: int) -> int may fail
+{
+	if n % 2 != 0 { fail "n is odd"; }
+	return n / 2;
+}
+
+/// A counter with a limit.
+pub class Counter
+{
+	pub n: int = 0,
+	pub limit: int = 2,
+
+	/// Add one, or fail at the limit.
+	pub fn step(self) may fail
+	{
+		if self.n >= self.limit {
+			fail error.Error.new(5, "the counter is at its limit");
+		}
+		self.n += 1;
+	}
+
+	/// Add one twice, forwarding the first failure.
+	pub fn twice(self) may fail
+	{
+		try self.step();
+		try self.step();
+	}
+}

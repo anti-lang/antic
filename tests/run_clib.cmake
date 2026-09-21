@@ -8,7 +8,8 @@
 #   SOURCES   tests/clib
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
-#   CASE      static, shared, exports, two, loader, header or bundle
+#   CASE      static, shared, exports, two, loader, header, bundle, classes
+#             or failing
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 
@@ -102,6 +103,16 @@ elseif(CASE STREQUAL "classes")
     run(${CXX} -std=c++17 -I "${dir}" -I "${SOURCES}" "${dir}/canvas.cpp" "${dir}/libcanvas.a"
         "${runtime_library}" -o "${dir}/canvaspp")
     expect_output("${dir}/canvaspp" "${SOURCES}/canvas.expected")
+elseif(CASE STREQUAL "failing")
+    # Two `may fail` functions cross to C as `?*Error f(args, R *out)`, and
+    # the header says in a comment that each may fail.
+    library(failing static "${dir}")
+    expect_header("${dir}/failing.h" failing.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/failing.c"
+        "${dir}/libfailing.a" "${runtime_library}" -o "${dir}/failing")
+    expect_output("${dir}/failing" "${SOURCES}/failing.expected")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
     run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c"

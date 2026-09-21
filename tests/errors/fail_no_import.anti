@@ -1,0 +1,10 @@
+fn risky() -> int may fail
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	let n = risky() catch fatal;
+	return n;
+}

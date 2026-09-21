@@ -27,11 +27,12 @@ struct loop {
    every exit of it, in reverse order of declaration. A `return` runs the
    scopes of the whole function, and `break` or `continue` those the loop
    encloses. Nothing unwinds. */
-/* One exit action of a block: a deferred statement, or the end of a
-   local whose class has to be torn down. */
+/* One exit action of a block: a deferred statement, the statement of an
+   `undo`, or the end of a local whose class has to be torn down. */
 struct exit_action {
     const struct stmt *stmt;
     const struct symbol *local;
+    bool undo;                  /* `undo`: the error exits alone run it */
 };
 
 struct defers {
@@ -74,7 +75,11 @@ struct lowerer {
     struct handling *handling;  /* the handler being lowered */
     struct try_scope *try_scope;
     struct ir_operand out_address;  /* the out parameter of a failing call */
+    /* The out parameter of the `may fail` function being lowered, where
+       `return v` puts what the function computed. */
+    struct ir_operand result_out;
     const struct symbol *moved;     /* the local a `return` hands over */
+    bool may_fail;              /* the function was written `may fail` */
     bool no_reflect;            /* --no-reflect: no field list */
     bool dev;                   /* --dev: every dispatch checks its table */
     bool failed;
@@ -4312,7 +4317,8 @@ static void lower_branch(struct lowerer *l, const struct expr *e,
 /* Statements */
 
 static void lower_block(struct lowerer *l, const struct block *b);
-static void run_defers_to(struct lowerer *l, const struct defers *stop);
+static void run_defers_to(struct lowerer *l, const struct defers *stop,
+                          bool failing);
 
 /* Whether any block the function is inside has a statement to run. */
 static bool has_defers(const struct lowerer *l)
@@ -4343,6 +4349,21 @@ static struct exit_action *grow_defers(struct defers *scope)
     }
     scope->items = items;
     return items;
+}
+
+/* Record one exit action of the innermost block. Every field is written
+   here, because `realloc` leaves the new elements with the bytes of
+   whatever stood there. */
+static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
+                             const struct symbol *local, bool undo)
+{
+    struct exit_action *action;
+
+    l->defers->items = grow_defers(l->defers);
+    action = &l->defers->items[l->defers->count++];
+    action->stmt = stmt;
+    action->local = local;
+    action->undo = undo;
 }
 
 static void jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -4919,7 +4940,7 @@ static void handle_error(struct lowerer *l, const struct expr *call,
         }
         break;
     case HANDLE_TRY:
-        run_defers_to(l, NULL);
+        run_defers_to(l, NULL, true);
         if (l->b != NULL) {
             ir_ret(l->f, l->b, IR_PTR, err);
         }
@@ -5161,18 +5182,14 @@ static void lower_let(struct lowerer *l, const struct stmt *s)
            runs on the way out leave the slot alone. The zero table of a
            call that wrote nothing so reaches no teardown. */
         if (has_out && local_needs_teardown(sym->type)) {
-            l->defers->items = grow_defers(l->defers);
-            l->defers->items[l->defers->count].stmt = NULL;
-            l->defers->items[l->defers->count++].local = sym;
+            push_exit_action(l, NULL, sym, false);
         }
         return;
     }
     if (is_aggregate(sym->type)) {
         build_into(l, s->as.let.value, temp(l, sym->ir));
         if (local_needs_teardown(sym->type)) {
-            l->defers->items = grow_defers(l->defers);
-            l->defers->items[l->defers->count].stmt = NULL;
-            l->defers->items[l->defers->count++].local = sym;
+            push_exit_action(l, NULL, sym, false);
         }
         return;
     }
@@ -5239,6 +5256,38 @@ static void assert_branch(struct lowerer *l, struct ir_operand cond,
             args, 2);
     ir_jump(l->f, l->b, rest);
     l->b = rest;
+}
+
+/* `fail e;` and `fail "text";` leave on the error channel. The error is
+   built before the deferred statements of the block run, so an `undo` or
+   a `defer` cannot change what the function reports. */
+static void lower_fail(struct lowerer *l, const struct stmt *s)
+{
+    struct ir_operand err;
+
+    if (s->as.fail.make != NULL) {
+        struct ir_operand args[2];
+        struct ir_function *maker = callee_function(l, s->as.fail.make);
+        args[0] = ir_int_op(IR_I64, 0);
+        args[1] = lower_expr(l, s->as.fail.value);
+        if (l->failed) {
+            return;
+        }
+        err = temp(l, ir_call(l->f, l->b, IR_PTR, ir_func_op(maker), args, 2));
+    } else {
+        err = lower_expr(l, s->as.fail.value);
+    }
+    if (l->failed) {
+        return;
+    }
+    if (has_defers(l)) {
+        err = temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, err));
+    }
+    run_defers_to(l, NULL, true);
+    if (l->b != NULL) {
+        ir_ret(l->f, l->b, IR_PTR, err);
+    }
+    l->b = NULL;
 }
 
 /* DESIGN: the cursor moves to the line of the statement before anything
@@ -5407,31 +5456,61 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         return;
     }
     case STMT_DEFER:
-        l->defers->items = grow_defers(l->defers);
-        l->defers->items[l->defers->count].stmt = s->as.deferred;
-        l->defers->items[l->defers->count++].local = NULL;
+    case STMT_UNDO:
+        push_exit_action(l, s->as.deferred, NULL, s->kind == STMT_UNDO);
+        return;
+    case STMT_FAIL:
+        lower_fail(l, s);
         return;
     case STMT_BREAK:
-        run_defers_to(l, l->loop->defers_at);
+        run_defers_to(l, l->loop->defers_at, false);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, l->loop->break_to);
         }
         l->b = NULL;
         return;
     case STMT_CONTINUE:
-        run_defers_to(l, l->loop->defers_at);
+        run_defers_to(l, l->loop->defers_at, false);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, l->loop->continue_to);
         }
         l->b = NULL;
         return;
     case STMT_RETURN:
+        /* DESIGN: a `may fail` function puts what it computed through
+           its out pointer and returns `none` on the error channel, which
+           is the convention its callers already read. The value is
+           written before the deferred statements run, as it is for an
+           ordinary `return`. */
+        if (l->result_out.kind != IR_NONE && s->as.return_value != NULL) {
+            store_value(l, s->as.return_value->type, s->as.return_value,
+                        l->result_out);
+            if (l->failed) {
+                return;
+            }
+            if (s->as.return_value->kind == EXPR_NAME) {
+                l->moved = s->as.return_value->symbol;
+            }
+            run_defers_to(l, NULL, false);
+            l->moved = NULL;
+            if (l->b != NULL) {
+                ir_ret(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0));
+            }
+            l->b = NULL;
+            return;
+        }
         if (s->as.return_value == NULL) {
-            run_defers_to(l, NULL);
+            run_defers_to(l, NULL, false);
             if (l->b == NULL) {
                 return;
             }
-            ir_ret(l->f, l->b, IR_VOID, none());
+            /* A `may fail` function without a result reports success at
+               its closing brace and at every `return`. */
+            if (l->may_fail) {
+                ir_ret(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0));
+            } else {
+                ir_ret(l->f, l->b, IR_VOID, none());
+            }
         } else {
             v = lower_expr(l, s->as.return_value);
             if (l->failed) {
@@ -5451,7 +5530,7 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
             if (s->as.return_value->kind == EXPR_NAME) {
                 l->moved = s->as.return_value->symbol;
             }
-            run_defers_to(l, NULL);
+            run_defers_to(l, NULL, s->error_exit);
             l->moved = NULL;
             if (l->b == NULL) {
                 return;
@@ -5472,12 +5551,28 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
 /* Run the statements of one block scope, last declared first. */
 static void destroy_local(struct lowerer *l, const struct symbol *sym);
 
-static void run_defers(struct lowerer *l, const struct defers *scope)
+/* DESIGN: the statements of `undo` run before the `defer` statements of
+   the same block, so the block undoes what it did while its locals are
+   still there. One reverse pass takes the `undo` actions and a second
+   takes the rest, which is the order the specification gives. */
+static void run_defers(struct lowerer *l, const struct defers *scope,
+                       bool failing)
 {
     size_t i;
 
+    if (failing) {
+        for (i = scope->count; i > 0 && l->b != NULL && !l->failed; i--) {
+            const struct exit_action *action = &scope->items[i - 1];
+            if (action->undo) {
+                lower_stmt(l, action->stmt);
+            }
+        }
+    }
     for (i = scope->count; i > 0 && l->b != NULL && !l->failed; i--) {
         const struct exit_action *action = &scope->items[i - 1];
+        if (action->undo) {
+            continue;
+        }
         if (action->stmt != NULL) {
             lower_stmt(l, action->stmt);
         } else if (action->local != l->moved) {
@@ -5487,12 +5582,13 @@ static void run_defers(struct lowerer *l, const struct defers *scope)
 }
 
 /* Run every scope from the innermost out to stop, which is not run. */
-static void run_defers_to(struct lowerer *l, const struct defers *stop)
+static void run_defers_to(struct lowerer *l, const struct defers *stop,
+                          bool failing)
 {
     const struct defers *scope;
 
     for (scope = l->defers; scope != stop; scope = scope->outer) {
-        run_defers(l, scope);
+        run_defers(l, scope, failing);
     }
 }
 
@@ -5507,8 +5603,8 @@ static void lower_block(struct lowerer *l, const struct block *b)
     for (i = 0; i < b->count && l->b != NULL && !l->failed; i++) {
         lower_stmt(l, b->stmts[i]);
     }
-    /* The closing brace is an exit of the block. */
-    run_defers(l, &scope);
+    /* The closing brace is an exit of the block, and never an error. */
+    run_defers(l, &scope, false);
     l->defers = scope.outer;
     free(scope.items);
 }
@@ -5596,6 +5692,8 @@ static void lower_function(struct lowerer *l, struct item *it)
     l->f = l->m->functions[it->symbol->ir];
     l->f->decl_line = (uint32_t)it->pos.line;
     l->loop = NULL;
+    l->may_fail = it->may_fail;
+    l->result_out = none();
     entry = new_block(l);
     /* DESIGN: `self` is the first IR parameter of a member function
        and has no entry in the declared list. Every declared parameter
@@ -5619,12 +5717,23 @@ static void lower_function(struct lowerer *l, struct item *it)
                      temp(l, l->f->params[i + first].temp), temp(l, sym->ir));
         }
     }
+    /* The out pointer of a `may fail` function with a result follows the
+       parameters the declaration wrote, which is the ABI its callers
+       already pass. */
+    if (it->may_fail && it->param_count + first < l->f->param_count) {
+        l->result_out = temp(l, l->f->params[it->param_count + first].temp);
+    }
     l->b = entry;
     lower_block(l, it->body);
     /* Semantic analysis rejects a function with a result that can reach
-       its end, so only a function without one gets here. */
+       its end, so only a function without one gets here. A `may fail`
+       function reports success there. */
     if (l->b != NULL && !l->failed) {
-        ir_ret(l->f, l->b, IR_VOID, none());
+        if (it->may_fail) {
+            ir_ret(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0));
+        } else {
+            ir_ret(l->f, l->b, IR_VOID, none());
+        }
     }
 }
 

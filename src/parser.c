@@ -1158,6 +1158,31 @@ static struct stmt *statement(struct parser *p)
             return NULL;
         }
         return s;
+    /* DESIGN: `undo stmt;` records a statement that runs only when the
+       enclosing block leaves through an error, before the `defer`
+       statements of the same block. `defer` is always, `undo` is only if
+       this block fails. */
+    case TOKEN_UNDO:
+        next(p);
+        s = new_stmt(p, STMT_UNDO, t);
+        if ((s->as.deferred = statement(p)) == NULL) {
+            return NULL;
+        }
+        if (s->as.deferred->kind == STMT_UNDO) {
+            error_here(p, "an `undo` holds one statement, not another "
+                          "`undo`");
+            return NULL;
+        }
+        return s;
+    /* `fail e;` leaves on the error channel, and `fail "text";` is
+       `fail Error.new(0, "text");`. */
+    case TOKEN_FAIL:
+        next(p);
+        s = new_stmt(p, STMT_FAIL, t);
+        if ((s->as.fail.value = expression(p)) == NULL) {
+            return NULL;
+        }
+        return expect(p, TOKEN_SEMICOLON) ? s : NULL;
     case TOKEN_BREAK:
     case TOKEN_CONTINUE:
         next(p);
@@ -1331,6 +1356,21 @@ static bool is_word(const struct parser *p, const struct token *t,
            memcmp(p->source + t->offset, word, t->length) == 0;
 }
 
+/* DESIGN: `may fail` is two contextual words after a signature, not a
+   keyword pair, so `may` stays an identifier everywhere else. The
+   function then returns `?*Error` and writes its result through an out
+   pointer, which is the convention a program used to write by hand. */
+static void may_fail_after(struct parser *p, struct item *it)
+{
+    if (!is_word(p, peek(p), "may") || peek_at(p, 1)->kind != TOKEN_FAIL) {
+        return;
+    }
+    it->may_fail_pos = pos_of(peek(p));
+    next(p);
+    next(p);
+    it->may_fail = true;
+}
+
 /* Whether the next token opens a function or a constant of a body.
    DESIGN: `pub` and `protected` stand before a field as well as before a
    function, so the test looks past the marker. A field is a name and a
@@ -1478,6 +1518,7 @@ static struct item *member(struct parser *p, const struct item *owner)
         (accept(p, TOKEN_ARROW) && (m->result = type(p)) == NULL)) {
         return NULL;
     }
+    may_fail_after(p, m);
     if (m->contract == FN_ABSTRACT) {
         return expect(p, TOKEN_SEMICOLON) ? m : NULL;
     }
@@ -1726,8 +1767,11 @@ static struct item *item(struct parser *p)
         it->params = params(p, false, &it->variadic, NULL,
                             &it->param_count);
         if (p->panic ||
-            (accept(p, TOKEN_ARROW) && (it->result = type(p)) == NULL) ||
-            (it->body = block(p)) == NULL) {
+            (accept(p, TOKEN_ARROW) && (it->result = type(p)) == NULL)) {
+            return NULL;
+        }
+        may_fail_after(p, it);
+        if (p->panic || (it->body = block(p)) == NULL) {
             return NULL;
         }
         return it;
@@ -1740,8 +1784,18 @@ static struct item *item(struct parser *p)
         it->params = params(p, true, &it->variadic, NULL,
                             &it->param_count);
         if (p->panic ||
-            (accept(p, TOKEN_ARROW) && (it->result = type(p)) == NULL) ||
-            !expect(p, TOKEN_SEMICOLON)) {
+            (accept(p, TOKEN_ARROW) && (it->result = type(p)) == NULL)) {
+            return NULL;
+        }
+        /* A binding declares what C declares, and C has no error
+           channel. A C function that reports one returns `?*Error` by
+           hand. */
+        if (is_word(p, peek(p), "may") && peek_at(p, 1)->kind == TOKEN_FAIL) {
+            error_here(p, "`may fail` belongs to an Anti function, and an "
+                          "`extern fn` writes `-> ?*Error` by hand");
+            return NULL;
+        }
+        if (!expect(p, TOKEN_SEMICOLON)) {
             return NULL;
         }
         return it;

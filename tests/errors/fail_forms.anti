@@ -1,0 +1,6 @@
+extern fn open(path: ?*byte) -> ?*byte may fail;
+
+fn main() -> int
+{
+	return 0;
+}

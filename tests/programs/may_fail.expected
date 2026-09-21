@@ -1,0 +1,28 @@
+exit 0
+h 4
+odd 0 n is odd
+odd -1
+p 4 5
+even 4
+ensure 4
+defer
+g 3
+undo second
+undo first
+defer
+guarded n is odd
+bad -2
+inner 2
+n 4
+inner undo
+outer undo
+nested n is odd
+m -3
+even 8
+f 44
+neg 3
+neg -4
+five 4
+five -5
+block 5
+block caught n is odd

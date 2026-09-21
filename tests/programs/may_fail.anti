@@ -1,0 +1,125 @@
+//! `may fail` and `fail`. A function declared `may fail` returns `?*Error`
+//! and writes what it computed through an out pointer, which is the
+//! convention a program used to write by hand. `fail e;` and `fail "text";`
+//! leave on the error channel, `try` forwards inside another `may fail`
+//! function, and `undo` runs on the fail path and not on `return`.
+
+import anti.error;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+/// A result through the out pointer, and the text form of `fail`.
+fn halve(n: int) -> int may fail
+{
+	if n % 2 != 0 { fail "n is odd"; }
+	return n / 2;
+}
+
+/// An aggregate result through the out pointer.
+fn split(n: int) -> Pair may fail
+{
+	if n < 0 { fail error.Error.new(3, "n is negative"); }
+	return Pair { a: n / 2, b: n - n / 2 };
+}
+
+/// No result: success at the closing brace, and the error form with a code.
+fn ensure_even(n: int) may fail
+{
+	if n % 2 != 0 { fail error.Error.new(4, "n is odd"); }
+	printf("even %d\n".ptr, n as c_int);
+}
+
+/// `undo` runs in reverse order of declaration, before the `defer` of the
+/// same block, and only when the block leaves through an error.
+fn guarded(n: int) -> int may fail
+{
+	undo printf("undo first\n".ptr);
+	undo printf("undo second\n".ptr);
+	defer printf("defer\n".ptr);
+	let h = try halve(n);
+	return h;
+}
+
+/// An `undo` of an inner block runs before the one of the block outside it.
+fn nested(n: int) -> int may fail
+{
+	undo printf("outer undo\n".ptr);
+	{
+		undo printf("inner undo\n".ptr);
+		let h = try halve(n);
+		printf("inner %d\n".ptr, h as c_int);
+	}
+	return n;
+}
+
+/// `try` forwards the error of a call, and the error a handler binds is
+/// handed on with `fail`.
+fn forwarded(n: int) -> int may fail
+{
+	let p = split(n) catch e {
+		fail e;
+	};
+	try ensure_even(p.a + p.b);
+	return p.a * 10 + p.b;
+}
+
+fn main() -> int
+{
+	let h = halve(8) catch fatal;
+	printf("h %d\n".ptr, h as c_int);
+	let odd = halve(7) catch e {
+		printf("odd %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
+		       e.message.ptr);
+		yield -1;
+	};
+	printf("odd %d\n".ptr, odd as c_int);
+	let p = split(9) catch fatal;
+	printf("p %d %d\n".ptr, p.a as c_int, p.b as c_int);
+	ensure_even(4) catch fatal;
+	ensure_even(3) catch e {
+		printf("ensure %d\n".ptr, e.code as c_int);
+	};
+	let g = guarded(6) catch fatal;
+	printf("g %d\n".ptr, g as c_int);
+	let bad = guarded(5) catch e {
+		printf("guarded %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield -2;
+	};
+	printf("bad %d\n".ptr, bad as c_int);
+	let n = nested(4) catch fatal;
+	printf("n %d\n".ptr, n as c_int);
+	let m = nested(3) catch e {
+		printf("nested %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield -3;
+	};
+	printf("m %d\n".ptr, m as c_int);
+	let f = forwarded(8) catch fatal;
+	printf("f %d\n".ptr, f as c_int);
+	let neg = forwarded(-1) catch e {
+		printf("neg %d\n".ptr, e.code as c_int);
+		yield -4;
+	};
+	printf("neg %d\n".ptr, neg as c_int);
+	let five = forwarded(5) catch e {
+		printf("five %d\n".ptr, e.code as c_int);
+		yield -5;
+	};
+	printf("five %d\n".ptr, five as c_int);
+	/* A `try` block takes the error of every call inside it. */
+	try {
+		let a = halve(10);
+		printf("block %d\n".ptr, a as c_int);
+		let b = halve(3);
+		printf("unreached %d\n".ptr, b as c_int);
+	} catch e {
+		printf("block caught %.*s\n".ptr, e.message.len as c_int,
+		       e.message.ptr);
+	}
+	return 0;
+}

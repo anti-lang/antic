@@ -1,0 +1,67 @@
+//! A `may fail` function through a table entry. An abstract entry carries
+//! the flag, every replacement declares it, and a call through the pointer
+//! is handled where it stands. The ABI is `?*Error f(self, R *out)`, so the
+//! entry has the shape every other failing function has.
+
+import anti.error;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Source
+{
+	/// The next value, or a failure.
+	abstract fn read(self, n: int) -> int may fail;
+}
+
+final class Doubler
+{
+	inherits Source,
+
+	concrete fn read(self, n: int) -> int may fail
+	{
+		if n < 0 { fail "n is negative"; }
+		return n * 2;
+	}
+}
+
+final class Refuser
+{
+	inherits Source,
+	pub code: int = 9,
+
+	concrete fn read(self, n: int) -> int may fail
+	{
+		fail error.Error.new(self.code, "the source refuses");
+	}
+}
+
+/// Read through the pointer and forward the failure of the entry.
+fn twice(s: *Source, n: int) -> int may fail
+{
+	undo printf("rolled back\n".ptr);
+	let v = try s.read(n);
+	return v + v;
+}
+
+fn main() -> int
+{
+	let d = alloc Doubler { };
+	defer delete(d);
+	let r = alloc Refuser { code: 12 };
+	defer delete(r);
+	let a = twice(d, 3) catch fatal;
+	printf("a %d\n".ptr, a as c_int);
+	let b = twice(d, -1) catch e {
+		printf("b %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
+		       e.message.ptr);
+		yield -1;
+	};
+	printf("b %d\n".ptr, b as c_int);
+	let c = twice(r, 1) catch e {
+		printf("c %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
+		       e.message.ptr);
+		yield -2;
+	};
+	printf("c %d\n".ptr, c as c_int);
+	return 0;
+}

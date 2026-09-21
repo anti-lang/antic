@@ -702,6 +702,16 @@ add_test(NAME antl_internal
             -o "${CMAKE_CURRENT_BINARY_DIR}/anti_text.antl"
             "${CMAKE_CURRENT_SOURCE_DIR}/modules/anti/text.anti")
 
+# A `may fail` function without a `fail` and without a `try` is a warning,
+# not an error, because an interface function may fail in one
+# implementation and not in another.
+add_test(NAME warning_never_fails
+    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/never_fails.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.anti")
+set_tests_properties(warning_never_fails PROPERTIES
+    PASS_REGULAR_EXPRESSION "never_fails.anti:3:21: warning: `close_it` may fail and never does")
+
 # Doc warnings come only with --doc-warnings, which anti check passes.
 add_test(NAME warning_note
     COMMAND antic --doc-warnings -S -o "${CMAKE_CURRENT_BINARY_DIR}/note.s"
@@ -1056,6 +1066,27 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# `may fail` over a module boundary: the library file records the flag, so
+# the program handles the error, `try` forwards it and `undo` runs on the
+# fail path alone.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME failing_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/failing"
+            "-DLIBRARIES=counter"
+            "-DSTD=io,text,error"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/failing-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # The internal level: a module of the same package sees an internal item
 # of a library, and a module of another package does not.
 add_test(NAME internal_package
@@ -1269,7 +1300,8 @@ find_program(ANTIC_LLVM_AR NAMES llvm-ar
     HINTS "${ANTIC_LLVM_DIR}/bin"
     DOC "llvm-ar from LLVM 23.1.1")
 if(NOT WIN32 AND ANTIC_LLVM_AR)
-    foreach(case static shared exports two loader header bundle classes)
+    foreach(case static shared exports two loader header bundle classes
+            failing)
         add_test(NAME clib_${case}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
@@ -1441,7 +1473,10 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "own_copy|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_copy.s,own_copy.anti"
         "inline_required|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/inline_required.s,inline_required.anti"
         "construct_sets|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/construct_sets.s,construct_sets.anti"
-        "catch_place|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_place.s,catch_place.anti")
+        "catch_place|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_place.s,catch_place.anti"
+        "failing|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/failing.s,failing.anti"
+        "fail_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_forms.s,fail_forms.anti"
+        "fail_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_no_import.s,fail_no_import.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

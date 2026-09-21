@@ -1,0 +1,6 @@
+failing.anti:34:29: error: `construct` writes `-> ?*Error` rather than `may fail`
+failing.anti:10:2: error: `risky` may fail and its error is not handled
+failing.anti:16:10: error: `try` outside a function that may fail
+failing.anti:22:2: error: `fail` outside a function that may fail
+failing.anti:27:7: error: expected `*Error`, found an integer literal
+failing.anti:42:53: error: `bad_value` may fail and its error is not handled

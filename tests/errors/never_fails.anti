@@ -1,0 +1,12 @@
+import anti.error;
+
+fn close_it(n: int) may fail
+{
+	if n < 0 { return; }
+}
+
+fn main() -> int
+{
+	close_it(1) catch fatal;
+	return 0;
+}

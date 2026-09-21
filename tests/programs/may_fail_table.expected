@@ -1,0 +1,8 @@
+exit 0
+a 12
+rolled back
+b 0 n is negative
+b -1
+rolled back
+c 12 the source refuses
+c -2

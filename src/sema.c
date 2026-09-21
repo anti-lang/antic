@@ -57,6 +57,7 @@ struct checker {
     int handler_depth;          /* above 0, a `yield` has a place to go */
     struct block *try_block;    /* the body of the enclosing `try` block */
     struct type *error_type;    /* `*Error` of the first failing call */
+    bool saw_fail;              /* the body holds a `fail` or a `try` */
     int quiet;                  /* above 0, errors are not reported */
     bool ok;
 };
@@ -609,13 +610,39 @@ static struct type *resolve_type(struct checker *c, struct type_expr *t)
     return t->type;
 }
 
+/* DESIGN: `may fail` gives a function the convention a program used to
+   write by hand: `?*error.Error` as the result and an out pointer for
+   what it computes. The class is an ordinary imported one, so a module
+   that writes the form imports `anti.error` as it does for every error
+   it names. */
+static struct type *error_class(struct checker *c, struct pos pos)
+{
+    static const struct name module = {"anti.error", 10};
+    static const struct name class_name = {"Error", 5};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+
+    /* `anti.error` declares the class itself rather than importing it. */
+    if (sym == NULL && name_is(&c->module_name, "anti.error")) {
+        sym = lookup(c, &class_name);
+    }
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
+        sym->type->kind != TYPE_CLASS) {
+        error_at(c, pos, "`may fail` gives `?*anti.error.Error`, so the "
+                 "module imports `anti.error`");
+        return NULL;
+    }
+    return sym->type;
+}
+
 /* The type of a function item, fn(params) -> result. A function of a
    struct body that takes self has a first parameter of type *T. */
 static struct type *function_type(struct checker *c, struct item *it)
 {
     size_t extra = it->has_self ? 1 : 0;
-    struct type **params =
-        arena_alloc(c->arena, (it->param_count + extra + 1) * sizeof *params);
+    size_t out = it->may_fail && it->result != NULL ? 1 : 0;
+    struct type **params = arena_alloc(
+        c->arena, (it->param_count + extra + out + 1) * sizeof *params);
     struct type *result = builtin(c, TYPE_VOID);
     size_t i;
 
@@ -635,6 +662,29 @@ static struct type *function_type(struct checker *c, struct item *it)
     }
     if (it->result != NULL && is_error(result = resolve_type(c, it->result))) {
         return result;
+    }
+    if (it->may_fail) {
+        struct type *error;
+        /* DESIGN: `construct` and `destruct` keep the forms the object
+           model gives them. `construct` already reports an error with
+           `-> ?*Error`, and the definite-assignment check of its fields
+           reads that form, so `may fail` adds nothing and would hide it.
+           `destruct` has no error channel at all. */
+        if (it->has_self && (name_is(&it->name, "construct") ||
+                             name_is(&it->name, "destruct"))) {
+            error_at(c, it->may_fail_pos, "`%.*s` writes `-> ?*Error` rather "
+                     "than `may fail`", (int)it->name.length, it->name.text);
+            return builtin(c, TYPE_ERROR);
+        }
+        error = error_class(c, it->may_fail_pos);
+        if (error == NULL) {
+            return builtin(c, TYPE_ERROR);
+        }
+        if (out == 1) {
+            params[it->param_count + extra] = types_pointer(c->types, result);
+        }
+        return types_fn(c->types, params, it->param_count + extra + out,
+                        types_pointer_nullable(c->types, error));
     }
     return types_fn(c->types, params, it->param_count + extra, result);
 }
@@ -1243,7 +1293,11 @@ static void walk_stmt(struct worker_walk *w, const struct stmt *s)
         walk_block(w, s->as.for_loop.body);
         return;
     case STMT_DEFER:
+    case STMT_UNDO:
         walk_stmt(w, s->as.deferred);
+        return;
+    case STMT_FAIL:
+        walk_expr(w, s->as.fail.value);
         return;
     case STMT_RETURN:
         walk_expr(w, s->as.return_value);
@@ -2476,6 +2530,25 @@ static struct symbol *null_pointer_maker(struct checker *c, struct pos pos)
     return m->symbol;
 }
 
+/* DESIGN: `fail "text";` is `fail Error.new(0, "text");`. Code zero means
+   "no code", and `fatal` turns it into exit status 1. The statement keeps
+   the maker rather than a rewritten call, as the pointer guard does.
+   Lowering then emits one direct call and the checker resolves one name. */
+static struct symbol *error_maker(struct checker *c, struct pos pos)
+{
+    static const struct name maker = {"new", 3};
+    struct type *t = error_class(c, pos);
+    const struct item *m = t != NULL ? find_member(t, &maker) : NULL;
+
+    if (m == NULL || m->symbol == NULL || m->symbol->type == NULL ||
+        m->symbol->type->param_count != 2) {
+        error_at(c, pos, "`fail \"text\"` calls `anti.error.Error.new`, "
+                 "which takes a code and a message");
+        return NULL;
+    }
+    return m->symbol;
+}
+
 /* The `*Error` a handler binds, from the `?*Error` a failing function
    returns. */
 static struct type *caught_error(struct checker *c, struct type *result)
@@ -2529,6 +2602,10 @@ static bool stmt_returns_error(const struct stmt *s, const struct symbol *sym)
         return s->as.return_value != NULL &&
                s->as.return_value->kind == EXPR_NAME &&
                s->as.return_value->symbol == sym;
+    case STMT_FAIL:
+        return s->as.fail.value != NULL &&
+               s->as.fail.value->kind == EXPR_NAME &&
+               s->as.fail.value->symbol == sym;
     case STMT_BLOCK:
         return returns_error(s->as.block, sym);
     case STMT_IF:
@@ -2625,10 +2702,11 @@ static struct type *check_handled(struct checker *c, struct expr *e,
         return result;
     case HANDLE_NONE:
         if (callee != NULL) {
-            error_at(c, e->pos, "the error of `%.*s` is not handled",
+            error_at(c, e->pos, "`%.*s` may fail and its error is not handled",
                      (int)callee->name.length, callee->name.text);
         } else {
-            error_at(c, e->pos, "the error of this call is not handled");
+            error_at(c, e->pos, "this call may fail and its error is not "
+                     "handled");
         }
         return builtin(c, TYPE_ERROR);
     case HANDLE_TRY:
@@ -2636,10 +2714,12 @@ static struct type *check_handled(struct checker *c, struct expr *e,
                                                       ? NULL
                                                       : c->function->symbol
                                                             ->type->result)) {
-            error_at(c, h->pos, "`try` stands in a function that returns "
-                     "`*Error`");
+            error_at(c, h->pos, "`try` outside a function that may fail");
             return builtin(c, TYPE_ERROR);
         }
+        /* `try` forwards the error, so the function does fail and the
+           `may fail` warning has its answer. */
+        c->saw_fail = true;
         return result;
     case HANDLE_FATAL:
         return result;
@@ -4422,7 +4502,7 @@ static bool stmt_returns(const struct stmt *s)
 {
     size_t i;
 
-    if (s->kind == STMT_RETURN) {
+    if (s->kind == STMT_RETURN || s->kind == STMT_FAIL) {
         return true;
     }
     if (s->kind == STMT_IF && s->as.if_chain.else_body != NULL) {
@@ -4454,6 +4534,7 @@ static bool stmt_leaves(const struct stmt *s)
 
     switch (s->kind) {
     case STMT_RETURN:
+    case STMT_FAIL:
     case STMT_BREAK:
     case STMT_CONTINUE:
     case STMT_YIELD:
@@ -4862,12 +4943,27 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     return types_without_none(c->types, value);
 }
 
+/* DESIGN: a `may fail` function writes what it computes through its out
+   pointer and keeps `?*Error` for the error channel. `return` therefore
+   names the declared result and not the result of the ABI. */
+static struct type *declared_result(struct checker *c)
+{
+    const struct item *it = c->function;
+
+    if (!it->may_fail) {
+        return it->symbol->type->result;
+    }
+    return it->result != NULL && it->result->type != NULL
+               ? it->result->type
+               : builtin(c, TYPE_VOID);
+}
+
 static void check_stmt(struct checker *c, struct stmt *s)
 {
     struct type *t;
     struct symbol *sym;
     size_t i;
-    struct type *result = c->function->symbol->type->result;
+    struct type *result = declared_result(c);
 
     switch (s->kind) {
     case STMT_LET: {
@@ -5202,8 +5298,31 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         return;
     case STMT_DEFER:
+    case STMT_UNDO:
         check_stmt(c, s->as.deferred);
         return;
+    case STMT_FAIL: {
+        struct type *error = c->function->symbol->type->result;
+        if (!is_failing(c, error)) {
+            error_at(c, s->pos, "`fail` outside a function that may fail");
+            check_expr(c, s->as.fail.value, NULL);
+            return;
+        }
+        s->error_exit = true;
+        c->saw_fail = true;
+        /* `fail "text";` builds the error from the text. Every other
+           value is an error the program has in hand. */
+        if (s->as.fail.value->kind == EXPR_STRING) {
+            s->as.fail.make = error_maker(c, s->pos);
+            t = builtin(c, TYPE_STR);
+            require(c, s->as.fail.value,
+                    check_expr(c, s->as.fail.value, t), t);
+            return;
+        }
+        t = caught_error(c, error);
+        require(c, s->as.fail.value, check_expr(c, s->as.fail.value, t), t);
+        return;
+    }
     case STMT_BREAK:
     case STMT_CONTINUE:
         if (c->loop_depth == 0) {
@@ -5227,6 +5346,14 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         require(c, s->as.return_value,
                 check_expr(c, s->as.return_value, result), result);
+        /* A function written by hand as `-> ?*Error` leaves through an
+           error when it returns one, which is what `undo` runs on.
+           `return none;` is the success path and runs no `undo`. */
+        if (is_failing(c, result) && s->as.return_value->type != NULL &&
+            s->as.return_value->type->kind == TYPE_POINTER &&
+            !s->as.return_value->type->nullable) {
+            s->error_exit = true;
+        }
         return;
     case STMT_BLOCK:
         check_block(c, s->as.block);
@@ -5543,14 +5670,24 @@ static void check_function(struct checker *c, struct item *it)
             it->params[i].symbol = sym;
         }
     }
+    c->saw_fail = false;
     check_block(c, it->body);
     check_construct_sets(c, it);
     leave_scope(c, &params);
-    if (it->symbol->type->result->kind != TYPE_VOID &&
-        !block_returns(it->body)) {
+    if (declared_result(c)->kind != TYPE_VOID && !block_returns(it->body)) {
         error_at(c, it->name_pos, "`%.*s` can reach its end without `return`",
                  (int)it->name.length, it->name.text);
     }
+    /* DESIGN: a `may fail` function without a `fail` and without a
+       `try` is a warning and not an error. An interface function may
+       fail in one implementation and not in another. */
+    if (it->may_fail && !c->saw_fail && !is_error(it->symbol->type)) {
+        diagnostics_warn(c->diags, it->may_fail_pos.line,
+                         it->may_fail_pos.column,
+                         "`%.*s` may fail and never does",
+                         (int)it->name.length, it->name.text);
+    }
+    c->saw_fail = false;
     c->function = NULL;
 }
 
@@ -5698,6 +5835,7 @@ bool sema_check(struct module *module, const char *module_name,
         it->symbol->item = it;
         it->symbol->variadic = it->variadic;
         it->symbol->worker = it->worker;
+        it->symbol->may_fail = it->may_fail;
         it->symbol->exported = it->exported;
         it->symbol->doc = it->doc;
         if (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION) {
@@ -5980,6 +6118,7 @@ bool sema_check(struct module *module, const char *module_name,
             sym->pos = m->name_pos;
             sym->item = m;
             sym->exported = m->exported;
+            sym->may_fail = m->may_fail;
             sym->doc = m->doc;
 
             m->symbol = sym;
@@ -6389,6 +6528,18 @@ static const char *keep_name(struct arena *arena, const char *text,
     return copy;
 }
 
+/* DESIGN: `anti.error.Error` crosses to C as `struct anti_Error *`, the
+   type the object model gives the generated helpers. The header declares
+   the tag itself and C never reads the layout, so an export signature
+   names the class without it being an `export class`. A class below it
+   has no C name and stays out. */
+static bool is_error_class(const struct type *t)
+{
+    return t->kind == TYPE_CLASS && name_is(&t->name, "Error") &&
+           t->module.length == 10 &&
+           memcmp(t->module.text, "anti.error", 10) == 0;
+}
+
 /* Whether a value of type t has a C representation. That is a scalar
    other than char, a pointer to such a type, an exported struct or union,
    or a function pointer of such types. A struct field may also be a
@@ -6420,7 +6571,7 @@ static bool c_representable(const struct type *t, bool field,
                c_representable(t->result, false, hidden);
     case TYPE_STRUCT:
     case TYPE_CLASS:
-        if (t->item_exported) {
+        if (t->item_exported || is_error_class(t)) {
             return true;
         }
         *hidden = t;
@@ -6699,13 +6850,24 @@ void sema_interface(const struct module *module, const char *module_name,
         /* DESIGN: an interface keeps the parameter names of a function,
            which the generated header and anti doc print. */
         if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {
+            /* A `may fail` function has one parameter more than the
+               declaration wrote, the out pointer the ABI names `out`. */
+            size_t total = sym->type != NULL &&
+                                   sym->type->kind == TYPE_FN &&
+                                   sym->type->param_count > it->param_count
+                               ? sym->type->param_count
+                               : it->param_count;
             struct name *names =
-                arena_alloc(arena, (it->param_count + 1) * sizeof *names);
+                arena_alloc(arena, (total + 1) * sizeof *names);
             size_t j;
-            for (j = 0; j < it->param_count; j++) {
+            for (j = 0; j < it->param_count && j < total; j++) {
                 names[j].text = keep_name(arena, it->params[j].name.text,
                                           it->params[j].name.length);
                 names[j].length = it->params[j].name.length;
+            }
+            for (; j < total; j++) {
+                names[j].text = keep_name(arena, "out", 3);
+                names[j].length = 3;
             }
             sym->params = names;
         }

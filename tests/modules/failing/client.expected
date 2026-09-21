@@ -1,0 +1,9 @@
+always
+q 2
+undone
+always
+caught 0 n is odd
+r -1
+n 2
+limit 5 the counter is at its limit
+n 3

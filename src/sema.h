@@ -88,6 +88,7 @@ struct symbol {
     bool read_only;                 /* the variable of a `for` */
     bool variadic;                  /* SYMBOL_EXTERN_FN */
     bool worker;                    /* SYMBOL_FN written `worker fn` */
+    bool may_fail;                  /* SYMBOL_FN written `may fail` */
     bool internal;                  /* `internal`: the package alone sees it */
     bool caught;                    /* the error a `catch` binds */
     const struct name *params;      /* a function of an interface */

@@ -165,7 +165,7 @@ let v = show(compute(x));
 
 `switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release. `unreachable` traps in dev and is undefined in release.
 
-Not built yet: `undo`, `show`, `unreachable`, `switch` on `str`, `fallthrough`.
+Not built yet: `show`, `unreachable`, `switch` on `str`, `fallthrough`.
 
 ## Loops
 
@@ -260,7 +260,7 @@ A handler ends with `yield v` or leaves the block. The name after `catch` is any
 
 The ABI is the hand-written convention, `?*Error f(args, R *out)`, with the result through an out pointer. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. A function written by hand in that form stays legal, and bindings produce it.
 
-Built: `catch`, `try`, the `try` block and `catch fatal` over the hand-written form. Not built yet: `may fail`, `fail`, the origin and the frames.
+Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, and `undo` on the fail path. Not built yet: the origin and the frames.
 
 ## Structs
 

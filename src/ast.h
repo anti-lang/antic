@@ -273,6 +273,8 @@ enum stmt_kind {
     STMT_DO_WHILE,
     STMT_FOR,
     STMT_DEFER,
+    STMT_UNDO,
+    STMT_FAIL,
     STMT_SWITCH,
     STMT_ASSERT,
     STMT_BREAK,
@@ -288,6 +290,12 @@ enum stmt_kind {
 struct stmt {
     enum stmt_kind kind;
     struct pos pos;
+    /* DESIGN: whether the statement leaves the enclosing blocks through
+       an error, which is what `undo` runs on. `fail` always does, and so
+       does a `return` of an `*Error` in a function that returns
+       `?*Error`. The checker knows the types and decides it once, so
+       lowering reads one flag. */
+    bool error_exit;
     union {
         struct {
             struct name name;
@@ -338,7 +346,14 @@ struct stmt {
             struct block *body;
             struct symbol *symbol;
         } for_loop;
-        struct stmt *deferred;      /* STMT_DEFER */
+        struct stmt *deferred;      /* STMT_DEFER, STMT_UNDO */
+        /* `fail e;` and `fail "text";`. The second form names the
+           `anti.error.Error.new` that builds the error from the text,
+           and value is then the text. */
+        struct {
+            struct expr *value;
+            struct symbol *make;
+        } fail;
         struct expr *yielded;       /* STMT_YIELD, NULL without a value */
         /* `try { } catch e { }`: every failing call of the body reaches
            the handler, and the first error abandons the rest. */
@@ -434,6 +449,10 @@ struct item {
     bool variadic;                  /* ITEM_EXTERN_FN */
     bool worker;                    /* ITEM_FN, may run on a worker */
     struct type_expr *result;       /* NULL without a result */
+    /* `may fail` after the signature. The ABI is then `?*Error f(args,
+       R *out)`, with `out` absent without a result. */
+    bool may_fail;
+    struct pos may_fail_pos;
     struct block *body;             /* ITEM_FN */
     struct type_expr *type;         /* ITEM_CONST */
     struct expr *value;             /* ITEM_CONST */

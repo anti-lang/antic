@@ -14,7 +14,7 @@ _Static_assert(TYPE_STRUCT == 23, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
-_Static_assert(TOKEN_KIND_COUNT == 147, "raise ANTL_VERSION, then update this");
+_Static_assert(TOKEN_KIND_COUNT == 149, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_RET == 61, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
@@ -353,7 +353,8 @@ static void put_type(struct writer *w, const struct type *t)
                 put_type_ref(w, m->symbol->type);
                 put_u8(w, (uint8_t)((unsigned)m->contract |
                                     (unsigned)m->is_final << 4 |
-                                    (unsigned)m->is_operator << 5));
+                                    (unsigned)m->is_operator << 5 |
+                                    (unsigned)m->may_fail << 6));
                 put_u8(w, (uint8_t)m->vis);
                 put_doc(w, m->doc.text, m->doc.length);
             }
@@ -719,8 +720,12 @@ void antl_write(struct text *out, const struct interface *iface,
         put_u8(&w, (uint8_t)sym->kind);
         put_bytes(&w, sym->name.text, sym->name.length);
         put_type_ref(&w, sym->type);
+        /* DESIGN: the `may fail` flag is recorded, so a reader of the
+           file sees the form the declaration wrote. The type alone gives
+           the `?*Error` of the ABI and never the form. */
         put_u8(&w, (uint8_t)((unsigned)sym->exported |
-                             (unsigned)sym->internal << 1));
+                             (unsigned)sym->internal << 1 |
+                             (unsigned)sym->may_fail << 2));
         put_doc(&w, sym->doc.text, sym->doc.length);
         if (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN) {
             size_t j;
@@ -1198,6 +1203,7 @@ static void read_types(struct reader *r)
                 m->contract = (enum fn_contract)(marks & 15);
                 m->is_final = (marks >> 4 & 1) != 0;
                 m->is_operator = (marks >> 5 & 1) != 0;
+                m->may_fail = (marks >> 6 & 1) != 0;
                 m->vis = (enum visibility)get_u8(r);
                 if ((marks & 15) > FN_CONCRETE || m->vis > VIS_PUB) {
                     damaged(r);
@@ -1212,6 +1218,7 @@ static void read_types(struct reader *r)
                 sym->kind = SYMBOL_FN;
                 sym->item = m;
                 sym->home = r->iface;
+                sym->may_fail = m->may_fail;
                 sym->doc = m->doc;
                 s->members[j] = m;
             }
@@ -1414,6 +1421,7 @@ static void read_items(struct reader *r)
             uint8_t marks = get_u8(r);
             sym->exported = (marks & 1) != 0;
             sym->internal = (marks >> 1 & 1) != 0;
+            sym->may_fail = (marks >> 2 & 1) != 0;
         }
         {
             struct name doc = get_name(r);

@@ -1,0 +1,40 @@
+//! A program that calls `may fail` functions of another module. The flag
+//! comes from the library file, so the call needs a handler here and
+//! `try` forwards inside a `may fail` function of this module.
+
+import anti.error;
+import com.example.counter;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Halve n twice, forwarding the failure of either step.
+fn quarter(n: int) -> int may fail
+{
+	undo printf("undone\n".ptr);
+	defer printf("always\n".ptr);
+	let a = try counter.half(n);
+	let b = try counter.half(a);
+	return b;
+}
+
+fn main() -> int
+{
+	let c = alloc counter.Counter { limit: 3 };
+	defer delete(c);
+	let q = quarter(8) catch fatal;
+	printf("q %d\n".ptr, q as c_int);
+	let r = quarter(6) catch e {
+		printf("caught %d %.*s\n".ptr, e.code as c_int,
+		       e.message.len as c_int, e.message.ptr);
+		yield -1;
+	};
+	printf("r %d\n".ptr, r as c_int);
+	c.twice() catch fatal;
+	printf("n %d\n".ptr, c.n as c_int);
+	c.twice() catch e {
+		printf("limit %d %.*s\n".ptr, e.code as c_int,
+		       e.message.len as c_int, e.message.ptr);
+	};
+	printf("n %d\n".ptr, c.n as c_int);
+	return 0;
+}

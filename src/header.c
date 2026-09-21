@@ -90,6 +90,50 @@ static void c_name(char *out, size_t size, const struct name *name)
              reserved ? "_" : "");
 }
 
+/* DESIGN: `anti.error.Error` crosses to C as `struct anti_Error *`, the
+   type the object model gives the generated helpers. C never reads the
+   layout, so the header declares the tag and nothing else. */
+static bool is_error_class(const struct type *t)
+{
+    return t->kind == TYPE_CLASS && t->name.length == 5 &&
+           memcmp(t->name.text, "Error", 5) == 0 && t->module.length == 10 &&
+           memcmp(t->module.text, "anti.error", 10) == 0;
+}
+
+/* Whether a signature names the error class, which the header then
+   declares once. A class is asked about the functions of its body. */
+static bool type_names_error(const struct type *t)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return false;
+    }
+    if (t->kind == TYPE_CLASS) {
+        for (i = 0; i < t->member_count; i++) {
+            const struct item *m = t->members[i];
+            if (m->kind == ITEM_FN && m->pub && m->symbol != NULL &&
+                type_names_error(m->symbol->type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (t->kind != TYPE_FN) {
+        return false;
+    }
+    if (t->result->kind == TYPE_POINTER && is_error_class(t->result->element)) {
+        return true;
+    }
+    for (i = 0; i < t->param_count; i++) {
+        if (t->params[i]->kind == TYPE_POINTER &&
+            is_error_class(t->params[i]->element)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* Append the C declaration of name with type t. owner is the aggregate
    whose definition holds the declaration, which names itself with its
    tag. */
@@ -130,7 +174,9 @@ static void declaration(struct text *out, const struct type *t,
         break;
     case TYPE_STRUCT:
     case TYPE_CLASS:
-        if (t == owner) {
+        if (is_error_class(t)) {
+            text_append(out, "struct anti_Error");
+        } else if (t == owner) {
             text_appendf(out, "%s %.*s", t->is_union ? "union" : "struct",
                          (int)t->name.length, t->name.text);
         } else {
@@ -302,6 +348,17 @@ static size_t chain_functions(const struct type *t, const struct item **out,
         }
     }
     return count;
+}
+
+/* The doc comment says that a function may fail, because the C signature
+   alone does not: `?*Error` and a pointer parameter are one type each. */
+static void may_fail_note(struct text *out, const struct symbol *sym,
+                          const char *indent)
+{
+    if (sym->may_fail) {
+        text_appendf(out, "%s/* May fail: NULL on success, an error "
+                     "otherwise. */\n", indent);
+    }
 }
 
 /* One prototype of a table entry or of a function of a class, with self
@@ -479,6 +536,7 @@ static void class_view(struct text *out, const struct symbol *sym)
             continue;
         }
         doc_comment(out, &entries[i]->doc, "");
+        may_fail_note(out, entries[i]->symbol, "");
         member_signature(out, t, entries[i], "", false);
         text_append(out, ";\n");
     }
@@ -567,6 +625,7 @@ static void prototype(struct text *out, const struct symbol *sym)
     size_t i;
 
     doc_comment(out, &sym->doc, "");
+    may_fail_note(out, sym, "");
     text_appendf(&inner, "%.*s(", (int)sym->name.length, sym->name.text);
     for (i = 0; i < t->param_count; i++) {
         struct text param = {0};
@@ -633,6 +692,24 @@ void header_write(struct text *out, const char *name,
                      "#else\n"
                      "#define ANTI_ALIGNAS(n) _Alignas(n)\n"
                      "#endif\n\n");
+    /* The error class, declared once when an exported signature names
+       it. A C caller passes the pointer on and never reads it. */
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < ifaces[i]->item_count; j++) {
+            const struct symbol *sym = ifaces[i]->items[j];
+            if (sym->exported &&
+                (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_STRUCT) &&
+                type_names_error(sym->type)) {
+                text_append(out,
+                    "/* An Anti error. A function that may fail returns a "
+                    "pointer to one,\n   or NULL on success. C passes it on "
+                    "and never reads its layout. */\n"
+                    "struct anti_Error;\n\n");
+                i = count;
+                break;
+            }
+        }
+    }
     /* The root of every class chain, which the base of a class nests. */
     for (i = 0; i < count; i++) {
         for (j = 0; j < ifaces[i]->item_count; j++) {

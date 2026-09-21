@@ -459,6 +459,14 @@ static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
         simple(d, depth, "defer_stmt", NULL);
         dump_stmt(d, depth + 1, s->as.deferred);
         break;
+    case STMT_UNDO:
+        simple(d, depth, "undo_stmt", NULL);
+        dump_stmt(d, depth + 1, s->as.deferred);
+        break;
+    case STMT_FAIL:
+        simple(d, depth, "fail_stmt", NULL);
+        dump_expr(d, depth + 1, s->as.fail.value);
+        break;
     case STMT_EXPR:
         simple(d, depth, "simple_stmt", NULL);
         dump_expr(d, depth + 1, s->as.expr);
@@ -613,6 +621,9 @@ static void dump_members(struct dumper *d, const struct item *it)
             simple(d, 2, "result", NULL);
             dump_type(d, 3, m->result);
         }
+        if (m->may_fail) {
+            simple(d, 2, "may_fail", NULL);
+        }
         if (m->body != NULL) {
             dump_block(d, 2, m->body);
         }
@@ -685,6 +696,9 @@ static void dump_module(struct dumper *d, const struct module *module)
             if (it->result != NULL) {
                 simple(d, 1, "result", NULL);
                 dump_type(d, 2, it->result);
+            }
+            if (it->may_fail) {
+                simple(d, 1, "may_fail", NULL);
             }
             if (it->body != NULL) {
                 dump_block(d, 1, it->body);
