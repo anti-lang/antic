@@ -23,7 +23,7 @@ fn forwarded(n: int) -> int may fail
 fn wrapped(n: int) -> int may fail
 {
 	let v = deep(n) catch e {
-		fail lang.Error.wrap(2, "wrapped", e);
+		fail lang.Error.wrap(2, "wrapped", dup(e));
 	};
 	return v;
 }

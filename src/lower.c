@@ -29,11 +29,15 @@ struct loop {
    scopes of the whole function, and `break` or `continue` those the loop
    encloses. Nothing unwinds. */
 /* One exit action of a block: a deferred statement, the statement of an
-   `undo`, or the end of a local whose class has to be torn down. */
+   `undo`, the end of a local whose class has to be torn down, or the
+   delete of the error a handler binds. */
 struct exit_action {
     const struct stmt *stmt;
-    const struct symbol *local;
+    const struct symbol *local; /* the local, or the name of the error */
     bool undo;                  /* `undo`: the error exits alone run it */
+    bool error;                 /* delete the error in error_temp */
+    uint32_t error_temp;
+    const struct type *error_type;
 };
 
 struct defers {
@@ -50,7 +54,7 @@ struct handling {
     uint32_t error;             /* the error the handler binds */
     const struct type *error_type;  /* its class, or NULL */
     bool has_out;
-    bool passes;                /* a `return e` hands the error on */
+    const struct defers *defers_at; /* the scope around the handler */
     struct handling *outer;
 };
 
@@ -4595,6 +4599,8 @@ static void lower_branch(struct lowerer *l, const struct expr *e,
 static void lower_block(struct lowerer *l, const struct block *b);
 static void run_defers_to(struct lowerer *l, const struct defers *stop,
                           bool failing);
+static void run_defers(struct lowerer *l, const struct defers *scope,
+                       bool failing);
 
 /* Whether any block the function is inside has a statement to run. */
 static bool has_defers(const struct lowerer *l)
@@ -4640,6 +4646,26 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->stmt = stmt;
     action->local = local;
     action->undo = undo;
+    action->error = false;
+    action->error_temp = 0;
+    action->error_type = NULL;
+}
+
+/* Record the delete of the error a handler binds, whose name is sym or
+   which has none. */
+static void push_error_action(struct lowerer *l, const struct symbol *sym,
+                              uint32_t error, const struct type *error_type)
+{
+    struct exit_action *action;
+
+    l->defers->items = grow_defers(l->defers);
+    action = &l->defers->items[l->defers->count++];
+    action->stmt = NULL;
+    action->local = sym;
+    action->undo = false;
+    action->error = true;
+    action->error_temp = error;
+    action->error_type = error_type;
 }
 
 static void jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -5192,6 +5218,38 @@ static void destroy_local(struct lowerer *l, const struct symbol *sym)
     destroy_value(l, temp(l, sym->ir), sym->type, false);
 }
 
+/* DESIGN: the error a handler binds is the exit action of a scope around
+   the handler, so every exit of the handler deletes it: `yield`, the
+   closing brace, `break`, `continue`, `return` and `fail`. `return e` and
+   `fail e` hand it to the caller, which skips it as `return` skips the
+   local it hands on. A handler with a result to give takes handling,
+   which `yield` reads. */
+static void lower_handler(struct lowerer *l, const struct handler *h,
+                          uint32_t error, const struct type *error_type,
+                          struct handling *handling)
+{
+    struct defers scope;
+
+    memset(&scope, 0, sizeof scope);
+    scope.outer = l->defers;
+    l->defers = &scope;
+    push_error_action(l, h->symbol, error, error_type);
+    if (handling != NULL) {
+        handling->defers_at = scope.outer;
+        handling->outer = l->handling;
+        l->handling = handling;
+    }
+    if (h->kind == HANDLE_BLOCK) {
+        lower_block(l, h->body);
+    }
+    if (handling != NULL) {
+        l->handling = handling->outer;
+    }
+    run_defers(l, &scope, false);
+    l->defers = scope.outer;
+    free(scope.items);
+}
+
 /* DESIGN: a call that can fail gives a pointer. A pointer of `none` is
    success, so the branch after the call is the whole of the error
    machinery. It is one compare and one branch, and nothing unwinds. */
@@ -5259,17 +5317,7 @@ static void handle_error(struct lowerer *l, const struct expr *call,
         scope.has_out = has_out;
         scope.error = error;
         scope.error_type = call->as.call.callee->type->result;
-        scope.passes = h->passes;
-        scope.outer = l->handling;
-        l->handling = &scope;
-        lower_block(l, h->body);
-        l->handling = scope.outer;
-        /* The error belongs to the handler, which ends it, unless the
-           handler hands it to the caller with `return e`. */
-        if (l->b != NULL && !h->passes) {
-            object_call(l, "anti_rt_delete", temp(l, error),
-                        scope.error_type);
-        }
+        lower_handler(l, h, error, scope.error_type, &scope);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, join);
         }
@@ -5404,13 +5452,8 @@ static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
     scope.has_out = true;
     scope.error = error;
     scope.error_type = error_type;
-    scope.passes = h->passes;
-    scope.outer = l->handling;
-    l->handling = &scope;
-    lower_block(l, h->body);
-    l->handling = scope.outer;
+    lower_handler(l, h, error, error_type, &scope);
     if (l->b != NULL) {
-        object_call(l, "anti_rt_delete", temp(l, error), error_type);
         ir_jump(l->f, l->b, join);
     }
     l->b = join;
@@ -5674,7 +5717,12 @@ static void lower_fail(struct lowerer *l, const struct stmt *s)
     if (has_defers(l)) {
         err = temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, err));
     }
+    /* `fail e` hands the error a handler binds to the caller. */
+    if (s->as.fail.value->kind == EXPR_NAME) {
+        l->moved = s->as.fail.value->symbol;
+    }
     run_defers_to(l, NULL, true);
+    l->moved = NULL;
     if (l->b != NULL) {
         ir_ret(l->f, l->b, IR_PTR, err);
     }
@@ -5708,10 +5756,10 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         } else if (s->as.yielded != NULL) {
             lower_expr(l, s->as.yielded);
         }
-        /* `yield` is an exit of the handler, so the error ends here. */
-        if (l->b != NULL && !h->passes) {
-            object_call(l, "anti_rt_delete", temp(l, h->error),
-                        h->error_type);
+        /* `yield` is an exit of the handler and of every block inside
+           it, so the error ends here with their locals. */
+        if (l->b != NULL) {
+            run_defers_to(l, h->defers_at, false);
         }
         if (l->b != NULL) {
             ir_jump(l->f, l->b, h->join);
@@ -5741,13 +5789,8 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         if (h->symbol != NULL) {
             ((struct symbol *)h->symbol)->ir = scope.error;
         }
-        if (h->kind == HANDLE_BLOCK) {
-            lower_block(l, h->body);
-        }
-        if (l->b != NULL && !h->passes) {
-            object_call(l, "anti_rt_delete", temp(l, scope.error),
-                        h->symbol != NULL ? h->symbol->type : NULL);
-        }
+        lower_handler(l, h, scope.error,
+                      h->symbol != NULL ? h->symbol->type : NULL, NULL);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, join);
         }
@@ -6017,7 +6060,12 @@ static void run_defers(struct lowerer *l, const struct defers *scope,
         if (action->undo) {
             continue;
         }
-        if (action->stmt != NULL) {
+        if (action->error) {
+            if (action->local == NULL || action->local != l->moved) {
+                object_call(l, "anti_rt_delete", temp(l, action->error_temp),
+                            action->error_type);
+            }
+        } else if (action->stmt != NULL) {
             lower_stmt(l, action->stmt);
         } else if (action->local != l->moved) {
             destroy_local(l, action->local);

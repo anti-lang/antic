@@ -2841,58 +2841,6 @@ static void refuse_escaping_error(struct checker *c, const struct expr *e)
     }
 }
 
-/* Whether the block hands the error `sym` to its caller with `return`.
-   The handler then keeps its hands off it, because the caller owns it. */
-static bool returns_error(const struct block *b, const struct symbol *sym);
-
-static bool stmt_returns_error(const struct stmt *s, const struct symbol *sym)
-{
-    size_t i;
-
-    if (s == NULL || sym == NULL) {
-        return false;
-    }
-    switch (s->kind) {
-    case STMT_RETURN:
-        return s->as.return_value != NULL &&
-               s->as.return_value->kind == EXPR_NAME &&
-               s->as.return_value->symbol == sym;
-    case STMT_FAIL:
-        return s->as.fail.value != NULL &&
-               s->as.fail.value->kind == EXPR_NAME &&
-               s->as.fail.value->symbol == sym;
-    case STMT_BLOCK:
-        return returns_error(s->as.block, sym);
-    case STMT_IF:
-        for (i = 0; i < s->as.if_chain.count; i++) {
-            if (returns_error(s->as.if_chain.branches[i].body, sym)) {
-                return true;
-            }
-        }
-        return s->as.if_chain.else_body != NULL &&
-               returns_error(s->as.if_chain.else_body, sym);
-    case STMT_WHILE:
-    case STMT_DO_WHILE:
-        return returns_error(s->as.loop.body, sym);
-    case STMT_FOR:
-        return returns_error(s->as.for_loop.body, sym);
-    default:
-        return false;
-    }
-}
-
-static bool returns_error(const struct block *b, const struct symbol *sym)
-{
-    size_t i;
-
-    for (i = 0; b != NULL && i < b->count; i++) {
-        if (stmt_returns_error(b->stmts[i], sym)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /* DESIGN: a static function of the error class itself builds an error
    rather than reporting one, so `Error.new` gives a value like any other
    call. Every other function that returns `*Error` reports a failure. */
@@ -2999,7 +2947,6 @@ static struct type *check_handled(struct checker *c, struct expr *e,
         check_block(c, h->body);
         c->handler_depth = outer_depth;
         c->yields = outer_yield;
-        h->passes = returns_error(h->body, h->symbol);
         leave_scope(c, &scope);
         return result;
     }
@@ -6036,7 +5983,6 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     check_block(c, h->body);
     c->handler_depth = outer_depth;
     c->yields = outer_yield;
-    h->passes = false;
     leave_scope(c, &scope);
     return types_without_none(c->types, value);
 }
@@ -6354,7 +6300,6 @@ static void check_stmt(struct checker *c, struct stmt *s)
             }
         }
         check_block(c, h->body);
-        h->passes = returns_error(h->body, h->symbol);
         leave_scope(c, &try_scope);
         c->error_type = outer_error;
         return;

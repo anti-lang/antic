@@ -150,7 +150,6 @@ struct handler {
     struct pos pos;
     struct block *body;             /* HANDLE_BLOCK */
     struct symbol *symbol;          /* the error the handler binds */
-    bool passes;                    /* a `return e` hands the error on */
 };
 
 struct expr {

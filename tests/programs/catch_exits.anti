@@ -1,0 +1,202 @@
+//! The error a handler binds is deleted once on every exit of the
+//! handler: `yield`, the end of the handler, `break`, `continue` and a
+//! `return` of another value. `fail e` hands it on, and the handler
+//! leaves it alone. Each exit runs under a leak check, the count of the
+//! errors alive, which `Counted` keeps. The handler of a call, the handler
+//! of a `try` block and a handler without a name each take the exits that
+//! can leave them.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	inherits lang.Error,
+
+	static atomic live: int = 0;
+
+	/// An error that counts itself alive until it is deleted.
+	pub fn make(code: int) -> *Counted
+	{
+		let e = alloc Counted { };
+		e.code = code;
+		e.message = "counted";
+		Counted.live.add(1);
+		return e;
+	}
+
+	concrete fn destruct(self)
+	{
+		Counted.live.sub(1);
+		printf("deleted %d\n".ptr, self.code as c_int);
+	}
+}
+
+fn value(code: int) -> int may fail
+{
+	fail Counted.make(code);
+}
+
+fn plain(code: int) may fail
+{
+	fail Counted.make(code);
+}
+
+/// Report the errors alive after one exit, which is none.
+fn check(name: str)
+{
+	printf("%s live %d\n".ptr, name.ptr, Counted.live.load() as c_int);
+}
+
+fn by_yield() -> int
+{
+	let v = value(1) catch e {
+		yield e.code * 10;
+	};
+	return v;
+}
+
+fn by_end()
+{
+	plain(2) catch e {
+		printf("handled %d\n".ptr, e.code as c_int);
+	};
+}
+
+fn by_break() -> int
+{
+	let n = 0;
+	while n < 5 do {
+		n += 1;
+		plain(3) catch e {
+			break;
+		};
+	}
+	return n;
+}
+
+fn by_continue() -> int
+{
+	let n = 0;
+	while n < 2 do {
+		n += 1;
+		plain(4) catch e {
+			continue;
+		};
+		n += 100;
+	}
+	return n;
+}
+
+fn by_return() -> int
+{
+	plain(5) catch e {
+		return e.code + 10;
+	};
+	return 0;
+}
+
+fn try_break() -> int
+{
+	let n = 0;
+	while n < 5 do {
+		n += 1;
+		try {
+			plain(6);
+		} catch e {
+			break;
+		}
+	}
+	return n;
+}
+
+fn try_continue() -> int
+{
+	let n = 0;
+	while n < 2 do {
+		n += 1;
+		try {
+			plain(7);
+		} catch e {
+			continue;
+		}
+		n += 100;
+	}
+	return n;
+}
+
+fn try_return() -> int
+{
+	try {
+		plain(8);
+	} catch e {
+		return e.code + 10;
+	}
+	return 0;
+}
+
+fn unnamed_break() -> int
+{
+	let n = 0;
+	while n < 5 do {
+		n += 1;
+		plain(9) catch {
+			break;
+		};
+	}
+	return n;
+}
+
+/// `fail e` hands it on through the error channel.
+fn failed_again(code: int) may fail
+{
+	plain(code) catch e {
+		fail e;
+	};
+}
+
+/// A handler that passes the error on one path deletes it on another.
+fn failed_or_kept(code: int) may fail
+{
+	plain(code) catch e {
+		if e.code == 12 {
+			fail e;
+		}
+		printf("kept %d\n".ptr, e.code as c_int);
+	};
+}
+
+fn main() -> int
+{
+	printf("yield %d\n".ptr, by_yield() as c_int);
+	check("yield");
+	by_end();
+	check("end");
+	printf("break %d\n".ptr, by_break() as c_int);
+	check("break");
+	printf("continue %d\n".ptr, by_continue() as c_int);
+	check("continue");
+	printf("return %d\n".ptr, by_return() as c_int);
+	check("return");
+	printf("try break %d\n".ptr, try_break() as c_int);
+	check("try break");
+	printf("try continue %d\n".ptr, try_continue() as c_int);
+	check("try continue");
+	printf("try return %d\n".ptr, try_return() as c_int);
+	check("try return");
+	printf("unnamed break %d\n".ptr, unnamed_break() as c_int);
+	check("unnamed break");
+	failed_again(11) catch e {
+		printf("failed again %d\n".ptr, e.code as c_int);
+	};
+	check("fail e");
+	failed_or_kept(12) catch e {
+		printf("failed %d\n".ptr, e.code as c_int);
+	};
+	failed_or_kept(13) catch e {
+		return 3;
+	};
+	check("either");
+	return 0;
+}

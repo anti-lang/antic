@@ -173,12 +173,9 @@ openssl checks their signature. Windows configures with `-G Ninja`.
     and step 4 puts it in the symbols archive beside the map of the sections.
     `tools/check-pdb.cmake` reads the CodeView record of an executable
     against the GUID of its PDB, in step 4 and in the test `pdb_guid`.
-20. The error a `catch e` binds is deleted on every exit of its handler:
-    `yield`, the end of the handler, `break`, `continue` and a `return` of a
-    value other than the error. Lowering deletes it at `yield` and at the end
-    alone today, so the other three exits leak it. The fix comes with a test
-    that takes each exit under a leak check. "Object model" in
-    `docs/decisions.md` holds the corrected rule.
+20. Done. The error a `catch e` binds is deleted on every exit of its
+    handler, and `programs/catch_exits.anti` takes each exit under a leak
+    check. `fail e` hands it on as `return e` does.
 21. A failing function is written `may fail` and nothing else. `is_failing`
     in `src/sema.c` keys on the `may fail` marking alone and never on the
     result type. Today it reads any pointer to `Error` or a subclass,

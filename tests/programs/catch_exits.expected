@@ -1,0 +1,38 @@
+exit 0
+deleted 1
+yield 10
+yield live 0
+handled 2
+deleted 2
+end live 0
+deleted 3
+break 1
+break live 0
+deleted 4
+deleted 4
+continue 2
+continue live 0
+deleted 5
+return 15
+return live 0
+deleted 6
+try break 1
+try break live 0
+deleted 7
+deleted 7
+try continue 2
+try continue live 0
+deleted 8
+try return 18
+try return live 0
+deleted 9
+unnamed break 1
+unnamed break live 0
+failed again 11
+deleted 11
+fail e live 0
+failed 12
+deleted 12
+kept 13
+deleted 13
+either live 0
