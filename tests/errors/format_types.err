@@ -1,0 +1,9 @@
+format_types.anti:14:23: error: `f"..."` is not a constant expression
+format_types.anti:23:15: error: unknown format `{n:.2}` for `int`
+format_types.anti:24:15: error: unknown format `{n:e}` for `int`
+format_types.anti:25:15: error: unknown format `{name:x}` for `str`
+format_types.anti:26:15: error: unknown format `{x:b}` for `float`
+format_types.anti:27:15: error: unknown format `{true:05}` for `bool`
+format_types.anti:28:15: error: unknown format `{'c':.1}` for `char`
+format_types.anti:29:16: error: `f"..."` cannot write a `Pair`
+format_types.anti:30:17: error: `rf"..."` cannot write a `?*Node`

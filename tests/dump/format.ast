@@ -1,0 +1,12 @@
+function main
+  block
+    let_stmt n
+      int_lit 2
+    let_stmt s
+      format_lit f"{n + 1:>4} and {name(n)}"
+        additive +
+          ident n
+          int_lit 1
+        call
+          ident name
+          ident n

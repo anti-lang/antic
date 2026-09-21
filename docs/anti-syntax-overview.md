@@ -104,7 +104,7 @@ let i = x"00 AB CC";
 let x: i8 = -128;
 ```
 
-Not built yet: `f"..."`, `rf"..."`.
+Built: `f"..."` and `rf"..."`.
 
 ## Variables and constants
 

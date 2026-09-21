@@ -94,7 +94,34 @@ enum expr_kind {
     EXPR_PARALLEL,
     EXPR_DISPATCH,                  /* dispatch obj -> f(args) */
     EXPR_JOIN,                      /* join(job) and join_all(jobs) */
-    EXPR_HERE                       /* `here`, the position it stands at */
+    EXPR_HERE,                      /* `here`, the position it stands at */
+    EXPR_FORMAT                     /* `f"..."` and `rf"..."` */
+};
+
+/* The format specification after the colon of an `{expr}`, as the
+   parser read it. */
+struct format_spec {
+    char align;                     /* '<', '>', '^', or 0 when not written */
+    bool zero;                      /* `0` before the width */
+    int32_t width;                  /* -1 when not written */
+    int32_t precision;              /* -1 when not written */
+    char kind;                      /* 'x', 'X', 'b', 'o', 'e', 'f', or 0 */
+};
+
+/* One `{expr}` of an `f"..."` with the text before it. The last part
+   holds the text after the last `{expr}` and no value. */
+struct format_part {
+    struct token_text text;         /* the bytes before the `{` */
+    struct expr *value;             /* NULL in the last part */
+    struct format_spec spec;
+    struct pos pos;                 /* the `{` */
+    struct token_text source;       /* `{x:q}` as written, for messages */
+    /* Set by the checker. The value is bound to a local of its own.
+       The two calls append the text and then the value to the builder
+       of the literal. */
+    struct symbol *bound;
+    struct expr *text_call;         /* NULL for empty text */
+    struct expr *value_call;        /* NULL in the last part */
 };
 
 /* name: value inside a struct or slice literal. */
@@ -249,6 +276,17 @@ struct expr {
             struct expr *object;    /* the object to submit */
             struct expr *call;      /* the worker, called or named */
         } dispatch;
+        struct {
+            struct format_part *parts;
+            size_t count;
+            bool raw;               /* `rf"..."` */
+            /* Set by the checker: the local `anti.text.Builder` that
+               collects the text, the call that makes it and the call
+               that gives its bytes. */
+            struct symbol *builder;
+            struct expr *start;
+            struct expr *take;
+        } format;                   /* EXPR_FORMAT */
     } as;
 };
 

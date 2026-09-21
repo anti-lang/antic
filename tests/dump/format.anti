@@ -1,0 +1,5 @@
+fn main()
+{
+	let n = 2;
+	let s = f"{n + 1:>4} and {name(n)}";
+}

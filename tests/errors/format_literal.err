@@ -1,0 +1,4 @@
+format_literal.anti:7:10: error: `fr"` is not a prefix, write `rf"`
+format_literal.anti:8:14: error: single `}` in `f"..."`, write `}}`
+format_literal.anti:9:12: error: empty `{}` in `f"..."`
+format_literal.anti:10:13: error: unterminated `{` in `rf"..."`

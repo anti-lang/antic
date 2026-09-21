@@ -19,6 +19,7 @@ enum token_kind {
     TOKEN_CHAR,
     TOKEN_STRING,
     TOKEN_BYTES,
+    TOKEN_FORMAT,       /* `f"..."` and `rf"..."`, in value.format */
 
     /* Doc comments, the text in value.text */
     TOKEN_DOC,
@@ -77,6 +78,8 @@ struct token_text {
     size_t length;
 };
 
+struct format_piece;
+
 struct token {
     enum token_kind kind;
     int line;
@@ -87,7 +90,26 @@ struct token {
         uint64_t integer;       /* TOKEN_INT, the literal's magnitude */
         uint32_t character;     /* TOKEN_CHAR, a Unicode scalar value */
         struct token_text text; /* TOKEN_FLOAT, strings, doc comments */
+        struct {
+            const struct format_piece *pieces;
+            size_t count;
+        } format;               /* TOKEN_FORMAT */
     } value;
+};
+
+/* One `{expr}` of an `f"..."` with the text before it. The last piece
+   holds the text after the last `{expr}` and no tokens. */
+struct format_piece {
+    struct token_text text;     /* the decoded bytes before the `{` */
+    const struct token *tokens; /* the expression, ending in TOKEN_EOF */
+    size_t token_count;         /* 0 in the last piece */
+    /* The bytes after the colon, as written. bytes is NULL without a
+       colon, and an empty specification has length 0. */
+    struct token_text spec;
+    size_t offset;              /* the `{` in the source */
+    size_t length;              /* the source text up to the `}` */
+    int line;
+    int column;
 };
 
 struct token_list {

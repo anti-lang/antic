@@ -1,0 +1,8 @@
+format_spec.anti:11:12: error: unknown format `{x:q}`
+format_spec.anti:12:12: error: unknown format `{n:<08}`
+format_spec.anti:13:12: error: unknown format `{n:}`
+format_spec.anti:14:12: error: unknown format `{n:0}`
+format_spec.anti:15:12: error: unknown format `{x:.f}`
+format_spec.anti:16:12: error: unknown format `{n:1234567890}`
+format_spec.anti:17:12: error: unknown format `{x:8.2f!}`
+format_spec.anti:18:15: error: expected `}` or `:` after the expression

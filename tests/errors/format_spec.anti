@@ -1,0 +1,20 @@
+//! Each specification below is not of the form an `f"..."` reads, and
+//! each is refused with the text of its placeholder. The last placeholder
+//! holds two values.
+
+import anti.text;
+
+fn main() -> int
+{
+	let x = 1.5;
+	let n = 7;
+	let a = f"{x:q}";
+	let b = f"{n:<08}";
+	let c = f"{n:}";
+	let d = f"{n:0}";
+	let e = f"{x:.f}";
+	let g = f"{n:1234567890}";
+	let h = f"{x:8.2f!}";
+	let i = f"{n n}";
+	return 0;
+}

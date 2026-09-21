@@ -1298,6 +1298,12 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
     case EXPR_FREE:
         walk_expr(w, e->as.free_pointer);
         return;
+    case EXPR_FORMAT:
+        for (i = 0; i < e->as.format.count; i++) {
+            walk_expr(w, e->as.format.parts[i].value);
+            walk_expr(w, e->as.format.parts[i].value_call);
+        }
+        return;
     default:
         return;
     }
@@ -1948,7 +1954,7 @@ static void declare_root(struct checker *c)
         int params;             /* besides self */
         enum type_kind result;
     } root[] = {
-        {"type_name", 0, TYPE_STR},   {"to_text", 0, TYPE_STR},
+        {"type_name", 0, TYPE_STR},   {ROOT_TO_TEXT, 0, TYPE_STR},
         {"equals", 1, TYPE_BOOL},     {"hash", 0, TYPE_U64},
         {"serialize", 1, TYPE_VOID},  {"destruct", 0, TYPE_VOID},
         {"copy", 1, TYPE_VOID}
@@ -3723,6 +3729,309 @@ static struct type *check_join(struct checker *c, struct expr *e)
     return e->as.join.all ? builtin(c, TYPE_VOID) : job->result;
 }
 
+/* Interpolation */
+
+/* DESIGN: an `f"..."` is checked as the calls it makes on a local
+   `anti.text.Builder`: `new` makes it, `append` writes each text, one
+   `append_*` of the value's type writes each `{expr}` and `take` gives
+   the `str`. The checker writes those calls as nodes and checks them as
+   it checks any call, so the functions are found, and their arguments
+   converted, by the rules a program's own call follows. The names they
+   use cannot be written in a program: `<text>` is the module, `<builder>`
+   the local and `<value>` the value of one `{expr}`, which is checked
+   once and bound to that local. Each lives in a scope of its own. The
+   module that writes the literal imports `anti.text`, as the one that
+   writes `here` imports `anti.lang`. */
+static const struct name hidden_module = {"<text>", 6};
+static const struct name hidden_builder = {"<builder>", 9};
+static const struct name hidden_value = {"<value>", 7};
+
+/* The name of the literal in a message. */
+static const char *format_name(const struct expr *e)
+{
+    return e->as.format.raw ? "`rf\"...\"`" : "`f\"...\"`";
+}
+
+static struct expr *format_word(struct checker *c, struct pos pos,
+                                const struct name *name)
+{
+    struct expr *e = new_node(c, EXPR_NAME, pos);
+    e->as.name = *name;
+    return e;
+}
+
+static struct expr *format_field(struct checker *c, struct expr *base,
+                                 const char *name)
+{
+    struct expr *e = new_node(c, EXPR_FIELD, base->pos);
+    e->as.field.base = base;
+    e->as.field.name.text = name;
+    e->as.field.name.length = strlen(name);
+    return e;
+}
+
+static struct expr *format_call(struct checker *c, struct expr *callee,
+                                struct expr **args, size_t count)
+{
+    struct expr *e = new_node(c, EXPR_CALL, callee->pos);
+    e->as.call.callee = callee;
+    if (count > 0) {
+        e->as.call.args = arena_alloc(c->arena, count * sizeof *args);
+        memcpy(e->as.call.args, args, count * sizeof *args);
+    }
+    e->as.call.arg_count = count;
+    return e;
+}
+
+/* A call of function name of `anti.text.Builder` on the local builder. */
+static struct expr *builder_call(struct checker *c, struct pos pos,
+                                 const char *name, struct expr **args,
+                                 size_t count)
+{
+    return format_call(
+        c, format_field(c, format_word(c, pos, &hidden_builder), name), args,
+        count);
+}
+
+static struct expr *format_number(struct checker *c, struct pos pos,
+                                  int64_t value)
+{
+    struct expr *e = new_node(c, EXPR_INT, pos);
+    struct expr *minus;
+
+    e->as.integer = (uint64_t)(value < 0 ? -value : value);
+    if (value >= 0) {
+        return e;
+    }
+    minus = new_node(c, EXPR_UNARY, pos);
+    minus->as.unary.op = TOKEN_MINUS;
+    minus->as.unary.operand = e;
+    return minus;
+}
+
+static struct expr *format_truth(struct checker *c, struct pos pos, bool value)
+{
+    struct expr *e = new_node(c, EXPR_BOOL, pos);
+    e->as.boolean = value;
+    return e;
+}
+
+/* `<text>.Align.<name>`. */
+static struct expr *format_align(struct checker *c, struct pos pos,
+                                 char align, const char *fallback)
+{
+    const char *name = align == '<'   ? TEXT_ALIGN_LEFT
+                       : align == '>' ? TEXT_ALIGN_RIGHT
+                       : align == '^' ? TEXT_ALIGN_CENTER
+                                      : fallback;
+    return format_field(
+        c, format_field(c, format_word(c, pos, &hidden_module), TEXT_ALIGN),
+        name);
+}
+
+/* `<value> as T`, for T a builtin type keyword. */
+static struct expr *format_cast(struct checker *c, struct expr *value,
+                                enum token_kind type)
+{
+    struct expr *e = new_node(c, EXPR_CAST, value->pos);
+    struct type_expr *t = arena_alloc(c->arena, sizeof *t);
+
+    t->kind = TYPEX_BUILTIN;
+    t->pos = value->pos;
+    t->builtin = type;
+    e->as.cast.operand = value;
+    e->as.cast.type = t;
+    return e;
+}
+
+/* Whether a value of type t is an object, which `to_text` writes. A
+   `?*T` is refused, since it may hold no object. */
+static bool format_object(const struct type *t)
+{
+    return t->kind == TYPE_CLASS ||
+           (t->kind == TYPE_POINTER && !t->nullable &&
+            t->element->kind == TYPE_CLASS);
+}
+
+/* The call that appends `<value>`, of type t, with the format
+   specification of part, or NULL after an error. An integer goes to
+   `append_int` or `append_uint` as an `int` or a `u64`, a float to
+   `append_float` or `append_f32`, and a `bool`, a `char` and a `str` to
+   their own. An object is written by its `to_text`. Every argument is
+   given, so the defaults of the functions stay out of the literal. */
+static struct expr *format_value_call(struct checker *c,
+                                      const struct expr *e,
+                                      const struct format_part *part,
+                                      struct type *t)
+{
+    const struct format_spec *spec = &part->spec;
+    struct pos pos = part->value->pos;
+    struct expr *value = format_word(c, pos, &hidden_value);
+    int64_t width = spec->width < 0 ? 0 : spec->width;
+    struct expr *args[6];
+    const char *name;
+    bool fits;
+
+    if (type_is_integer(t)) {
+        bool is_signed = type_is_signed(t);
+        fits = spec->precision < 0 && spec->kind != 'e' && spec->kind != 'f';
+        name = is_signed ? TEXT_APPEND_INT : TEXT_APPEND_UINT;
+        args[0] = t->kind == TYPE_I64 || t->kind == TYPE_U64
+                      ? value
+                      : format_cast(c, value,
+                                    is_signed ? TOKEN_INT_TYPE : TOKEN_U64);
+        args[1] = format_number(c, pos,
+                                spec->kind == 'x' || spec->kind == 'X' ? 16
+                                : spec->kind == 'b'                    ? 2
+                                : spec->kind == 'o'                    ? 8
+                                                                       : 10);
+        args[2] = format_truth(c, pos, spec->kind == 'X');
+        args[3] = format_number(c, pos, width);
+        args[4] = format_align(c, pos, spec->align, TEXT_ALIGN_RIGHT);
+        args[5] = format_truth(c, pos, spec->zero);
+    } else if (type_is_float(t)) {
+        fits = spec->kind == 0 || spec->kind == 'e' || spec->kind == 'f';
+        name = t->kind == TYPE_F32 ? TEXT_APPEND_F32 : TEXT_APPEND_FLOAT;
+        args[0] = value;
+        args[1] = format_number(c, pos,
+                                spec->precision >= 0 ? spec->precision
+                                : spec->kind != 0    ? 6
+                                                     : -1);
+        args[2] = format_truth(c, pos, spec->kind == 'e');
+        args[3] = format_number(c, pos, width);
+        args[4] = format_align(c, pos, spec->align, TEXT_ALIGN_RIGHT);
+        args[5] = format_truth(c, pos, spec->zero);
+    } else if (t->kind == TYPE_BOOL || t->kind == TYPE_CHAR ||
+               t->kind == TYPE_STR || format_object(t)) {
+        fits = spec->kind == 0 && spec->precision < 0 && !spec->zero;
+        name = t->kind == TYPE_BOOL   ? TEXT_APPEND_BOOL
+               : t->kind == TYPE_CHAR ? TEXT_APPEND_CHAR
+                                      : TEXT_APPEND_TEXT;
+        args[0] = format_object(t)
+                      ? format_call(c, format_field(c, value, ROOT_TO_TEXT),
+                                    NULL, 0)
+                      : value;
+        args[1] = format_number(c, pos, width);
+        args[2] = format_align(c, pos, spec->align, TEXT_ALIGN_LEFT);
+    } else {
+        error_at(c, pos, "%s cannot write a `%s`", format_name(e), tn(t));
+        return NULL;
+    }
+    if (!fits) {
+        error_at(c, part->pos, "unknown format `%.*s` for `%s`",
+                 (int)part->source.length, part->source.bytes, tn(t));
+        return NULL;
+    }
+    return builder_call(c, pos, name, args,
+                        type_is_integer(t) || type_is_float(t) ? 6 : 3);
+}
+
+/* Check the value of one `{expr}`, bind it to `<value>` in a scope of
+   its own, and check the call that appends it. */
+static bool check_format_value(struct checker *c, const struct expr *e,
+                               struct format_part *part)
+{
+    struct type *t = check_expr(c, part->value, NULL);
+    struct scope scope;
+    bool ok;
+
+    if (is_error(t)) {
+        return false;
+    }
+    enter_scope(c, &scope);
+    part->bound = declare(c, SYMBOL_LOCAL, &hidden_value, part->value->pos,
+                          "`%.*s` is already declared");
+    part->bound->type = t;
+    part->value_call = format_value_call(c, e, part, t);
+    ok = part->value_call != NULL &&
+         !is_error(check_expr(c, part->value_call, NULL));
+    leave_scope(c, &scope);
+    return ok;
+}
+
+/* Whether the class `anti.text.Builder` has every function an `f"..."`
+   calls. A library of another version may lack one, and the message then
+   names it rather than the name only the checker writes. */
+static bool format_api(struct checker *c, const struct expr *e,
+                       const struct type *builder)
+{
+    static const char *const names[] = {
+        TEXT_NEW, TEXT_APPEND, TEXT_APPEND_INT, TEXT_APPEND_UINT,
+        TEXT_APPEND_FLOAT, TEXT_APPEND_F32, TEXT_APPEND_BOOL,
+        TEXT_APPEND_CHAR, TEXT_APPEND_TEXT, TEXT_TAKE
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof names / sizeof names[0]; i++) {
+        struct name name;
+        name.text = names[i];
+        name.length = strlen(names[i]);
+        if (find_member(builder, &name) == NULL) {
+            error_at(c, e->pos, "%s calls `" TEXT_MODULE "." TEXT_BUILDER
+                     ".%s`, which this `" TEXT_MODULE "` lacks",
+                     format_name(e), names[i]);
+            return false;
+        }
+    }
+    return true;
+}
+
+static struct type *check_format(struct checker *c, struct expr *e)
+{
+    static const struct name module = {TEXT_MODULE, sizeof TEXT_MODULE - 1};
+    static const struct name class_name = {TEXT_BUILDER,
+                                           sizeof TEXT_BUILDER - 1};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *builder = lib != NULL ? library_item(c, lib, &class_name)
+                                         : NULL;
+    struct scope scope;
+    struct symbol *home;
+    struct expr *new_callee;
+    bool ok;
+    size_t i;
+
+    if (builder == NULL || builder->kind != SYMBOL_STRUCT ||
+        builder->type == NULL || builder->type->kind != TYPE_CLASS) {
+        error_at(c, e->pos, "%s builds its text with `" TEXT_MODULE "."
+                 TEXT_BUILDER "`, so the module imports `" TEXT_MODULE "`",
+                 format_name(e));
+        return builtin(c, TYPE_ERROR);
+    }
+    if (!format_api(c, e, builder->type)) {
+        return builtin(c, TYPE_ERROR);
+    }
+    enter_scope(c, &scope);
+    home = declare(c, SYMBOL_MODULE, &hidden_module, e->pos,
+                   "`%.*s` is already declared");
+    home->home = lib;
+    e->as.format.builder = declare(c, SYMBOL_LOCAL, &hidden_builder, e->pos,
+                                   "`%.*s` is already declared");
+    e->as.format.builder->type = builder->type;
+    new_callee = format_field(
+        c, format_field(c, format_word(c, e->pos, &hidden_module),
+                        TEXT_BUILDER),
+        TEXT_NEW);
+    e->as.format.start = format_call(c, new_callee, NULL, 0);
+    ok = !is_error(check_expr(c, e->as.format.start, NULL));
+    for (i = 0; i < e->as.format.count; i++) {
+        struct format_part *part = &e->as.format.parts[i];
+        if (part->text.length > 0) {
+            struct expr *text = new_node(c, EXPR_STRING, part->pos);
+            text->as.text = part->text;
+            text->spelling = part->text;
+            part->text_call = builder_call(c, part->pos, TEXT_APPEND, &text, 1);
+            ok = !is_error(check_expr(c, part->text_call, NULL)) && ok;
+        }
+        if (part->value != NULL) {
+            ok = check_format_value(c, e, part) && ok;
+        }
+    }
+    e->as.format.take = builder_call(c, e->pos, TEXT_TAKE, NULL, 0);
+    ok = !is_error(check_expr(c, e->as.format.take, NULL)) && ok;
+    leave_scope(c, &scope);
+    return ok ? builtin(c, TYPE_STR) : builtin(c, TYPE_ERROR);
+}
+
 static struct type *check_expr_inner(struct checker *c, struct expr *e,
                                      struct type *expected)
 {
@@ -3813,6 +4122,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_HERE:
         t = location_type(c, e->pos);
         return t != NULL ? t : builtin(c, TYPE_ERROR);
+    case EXPR_FORMAT:
+        return check_format(c, e);
     case EXPR_INDEX:
         t = check_expr(c, e->as.index.base, NULL);
         if (!require(c, e->as.index.index,
@@ -4767,6 +5078,9 @@ static bool eval_const(struct checker *c, struct expr *e,
        It is a default of a parameter and never a constant. */
     case EXPR_HERE:
         return fail_const(c, e, "`here`");
+    /* The text is built at run time, into memory of its own. */
+    case EXPR_FORMAT:
+        return fail_const(c, e, format_name(e));
     }
     return false;
 }
@@ -5148,6 +5462,7 @@ static bool expr_calls(const struct expr *e)
     case EXPR_PARALLEL:
     case EXPR_DISPATCH:
     case EXPR_JOIN:
+    case EXPR_FORMAT:
         return true;
     case EXPR_UNARY:
         return expr_calls(e->as.unary.operand);

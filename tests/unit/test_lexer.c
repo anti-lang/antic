@@ -122,6 +122,50 @@ static void error(const char *source, int line, int column,
     error_n(source, strlen(source), line, column, message);
 }
 
+/* The pieces of the one interpolated literal in source. Each is written
+   as its text in quotes, then its tokens in parentheses with the text
+   after the colon, as in "a"(x:>4)"b". */
+static void pieces(const char *source, const char *expected)
+{
+    struct lexed l;
+    struct text out = {0};
+    size_t i;
+    size_t k;
+
+    lex_s(&l, source);
+    CHECK(l.ok && l.tokens.count == 2);
+    if (l.ok && l.tokens.count == 2 && l.tokens.items[0].kind == TOKEN_FORMAT) {
+        const struct token *t = &l.tokens.items[0];
+        for (i = 0; i < t->value.format.count; i++) {
+            const struct format_piece *p = &t->value.format.pieces[i];
+            text_append(&out, "\"");
+            text_append_bytes(&out, p->text.bytes, p->text.length);
+            text_append(&out, "\"");
+            if (p->token_count == 0) {
+                continue;
+            }
+            text_append(&out, "(");
+            for (k = 0; p->tokens[k].kind != TOKEN_EOF; k++) {
+                if (k > 0) {
+                    text_append(&out, " ");
+                }
+                text_append_bytes(&out, source + p->tokens[k].offset,
+                                  p->tokens[k].length);
+            }
+            if (p->spec.bytes != NULL) {
+                text_append(&out, ":");
+                text_append_bytes(&out, p->spec.bytes, p->spec.length);
+            }
+            text_append(&out, ")");
+        }
+    } else {
+        check_failures++;
+    }
+    CHECK_STR(text_cstr(&out), expected);
+    text_free(&out);
+    done(&l);
+}
+
 /* The kinds and texts of the doc tokens in source, one per line of out as
    kind:text with newlines written as |. */
 static void docs(const char *source, const char *expected)
@@ -307,15 +351,54 @@ void test_lexer(void)
     string("x\"0\t1\r\n  f F\"", TOKEN_BYTES, "\x01\xFF", 2);
     string("x\"\"", TOKEN_BYTES, "", 0);
 
-    /* The prefixes so far are r, b, br, f and x. Another word before a
+    /* The prefixes are r, b, br, f, rf and x. Another word before a
        quote stays an identifier, and the quote starts a plain string. */
     {
         static const enum token_kind k[] = {TOKEN_IDENT, TOKEN_STRING};
+        static const enum token_kind f[] = {TOKEN_FORMAT, TOKEN_IDENT};
         kinds("rb\"a\"", k, 2);
         kinds("u\"a\"", k, 2);
         kinds("hex\"a\"", k, 2);
         kinds("xr\"a\"", k, 2);
         kinds("bx\"a\"", k, 2);
+        kinds("fx\"a\"", k, 2);
+        kinds("f\"{a}\" b", f, 2);
+        kinds("rf#\"{a}\"# b", f, 2);
+    }
+
+    /* An interpolated literal holds the text before each `{expr}`, the
+       tokens of the expression and the text after its colon. `{{` and
+       `}}` write a brace, and the raw form keeps every backslash. */
+    pieces("f\"a{x}b{y:>10}c\"", "\"a\"(x)\"b\"(y:>10)\"c\"");
+    pieces("f\"{{x}} {{{n}}}\"", "\"{x} {\"(n)\"}\"");
+    pieces("f\"\\t{n}\\u{E9}\"", "\"\t\"(n)\"\xC3\xA9\"");
+    pieces("rf\"C:\\t\\{n}\\n\"", "\"C:\\t\\\"(n)\"\\n\"");
+    pieces("f\"{g(a, b):08.3f}\"", "\"\"(g ( a , b ):08.3f)\"\"");
+    pieces("f\"{p { x: 1 }.x}\"", "\"\"(p { x : 1 } . x)\"\"");
+    pieces("f\"{m::n} {a[i]:x}\"", "\"\"(m :: n)\" \"(a [ i ]:x)\"\"");
+    pieces("f\"{x:{w}}\"", "\"\"(x:{w})\"\"");
+    pieces("f\"{x:}\"", "\"\"(x:)\"\"");
+    pieces("f\"{ n /* a note */ }\"", "\"\"(n)\"\"");
+    pieces("f#\"{g(\"}\")} \"q\"\"#", "\"\"(g ( \"}\" ))\" \"q\"\"");
+    pieces("f\"{b // note\n}\"", "\"\"(b)\"\"");
+    pieces("f\"{'}'}\"", "\"\"('}')\"\"");
+    pieces("f\"\"", "\"\"");
+    pieces("f\"a\r\n{b}\"", "\"a\n\"(b)\"\"");
+    {
+        /* The tokens of an expression carry their positions in the file. */
+        struct lexed l;
+        lex_s(&l, "f\"ab{x}\n{ y }\"");
+        CHECK(l.ok && l.tokens.count == 2);
+        if (l.ok && l.tokens.count == 2) {
+            const struct format_piece *p = l.tokens.items[0].value.format.pieces;
+            CHECK(l.tokens.items[0].value.format.count == 3);
+            CHECK(p[0].line == 1 && p[0].column == 5);
+            CHECK(p[0].tokens[0].line == 1 && p[0].tokens[0].column == 6);
+            CHECK(p[1].line == 2 && p[1].column == 1);
+            CHECK(p[1].tokens[0].line == 2 && p[1].tokens[0].column == 3);
+            CHECK(p[1].length == 5);
+        }
+        done(&l);
     }
 
     error("a \xC3\xA9", 1, 3, "unexpected character outside a literal");
@@ -379,7 +462,34 @@ void test_lexer(void)
           "non-hex character in `x\"...\"` at column 6");
     error("x#\"00\"#", 1, 1, "`x\"...\"` takes no hash delimiters");
     error("x\"00", 1, 1, "unterminated string literal");
-    error("f\"{n}\"", 1, 1, "`f\"...\"` is not built yet");
+    /* `fr` is refused with the prefix it means, and the literal is read
+       as an `rf"..."`, so no second message follows. */
+    error("fr\"a\\{b}\"", 1, 1, "`fr\"` is not a prefix, write `rf\"`");
+    error("fr#\"a\"#", 1, 1, "`fr\"` is not a prefix, write `rf\"`");
+    error("f\"a } b\"", 1, 5, "single `}` in `f\"...\"`, write `}}`");
+    error("rf\"}\"", 1, 4, "single `}` in `rf\"...\"`, write `}}`");
+    error("f\"x {}\"", 1, 5, "empty `{}` in `f\"...\"`");
+    error("f\"{:x}\"", 1, 3, "empty `{}` in `f\"...\"`");
+    error("f\"a {b\"", 1, 5, "unterminated `{` in `f\"...\"`");
+    error("rf\"{b:>4\"", 1, 4, "unterminated `{` in `rf\"...\"`");
+    error("f\"{b // note}\"", 1, 3, "unterminated `{` in `f\"...\"`");
+    error("f\"{m[\"k\"]}\"", 1, 3, "unterminated `{` in `f\"...\"`");
+    error("f\"a\\q{b}\"", 1, 4, "unknown escape `\\q`");
+    error("f\"{b $}\"", 1, 6, "unexpected character `$`");
+    error("f\"{b}", 1, 1, "unterminated string literal");
+    {
+        /* One report for the refused prefix, and the tokens after it
+           still lex. */
+        struct lexed l;
+        lex_s(&l, "fr\"{a}\" b");
+        CHECK(l.diags.count == 1);
+        CHECK(l.tokens.count == 3);
+        if (l.tokens.count == 3) {
+            CHECK(l.tokens.items[0].kind == TOKEN_ERROR);
+            CHECK(l.tokens.items[1].kind == TOKEN_IDENT);
+        }
+        done(&l);
+    }
     {
         /* One report per literal, and the tokens after it still lex. */
         struct lexed l;

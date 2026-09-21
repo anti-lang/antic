@@ -1,0 +1,93 @@
+//! `f"..."` embeds expressions in a text, each with an optional format
+//! specification after a colon, and `rf"..."` does the same without
+//! escapes. Each line below prints one form, between bars where the
+//! width of a field matters.
+
+import anti.io;
+import anti.text;
+
+class Point
+{
+	pub x: int,
+	pub y: int,
+
+	concrete fn to_text(self) -> str
+	{
+		return f"({self.x}, {self.y})";
+	}
+}
+
+/// Count the calls in `counter` and name each one, so the order in which
+/// a literal computes its values shows in the text.
+fn tick(counter: *int, label: str) -> str
+{
+	*counter += 1;
+	return f"{label}{*counter}";
+}
+
+/// Print `s` and give its memory back, which every `f"..."` makes anew.
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let name = "widget";
+	let n = 42;
+	let price = 3.14159;
+	say(f"{name} costs {price:8.2f} for {n} units");
+	say(f"no values");
+	say(f"{{braces}} {{{n}}}");
+	say(f"escapes:\t{name}\u{e9}");
+
+	/* Width and alignment */
+	say(f"|{name:10}|{name:<10}|{name:>10}|{name:^10}|{name:^9}|");
+	say(f"|{n:6}|{n:<6}|{n:>6}|{n:^6}|{name:2}|");
+	say(f#"|{"\u{e9}t\u{e9}":>5}|{'\u{e9}':<3}|{true:>6}|{false:^7}|"#);
+
+	/* Zero padding and the radixes */
+	say(f"|{n:06}|{-n:06}|{n:x}|{n:X}|{n:b}|{n:o}|");
+	say(f"|{255:08x}|{255:>8X}|{-n:x}|{0:b}|");
+	let small: i8 = -128;
+	let tiny: u8 = 255;
+	let wide: u64 = 18446744073709551615;
+	let lowest = -9223372036854775807 - 1;
+	let c: c_int = -7;
+	say(f"{small} {tiny} {tiny:08b} {wide} {wide:X} {lowest} {c}");
+
+	/* Floats: the fewest digits, a precision, and the two forms */
+	let third: f32 = 1.0 / 3.0;
+	say(f"{0.1} {100.0} {1.0e20} {0.0001} {0.00001} {-0.5} {third}");
+	say(f"{price:.2} {price:.0f} {price:f} {price:e} {price:.3e}");
+	say(f"|{price:8.3f}|{-price:08.3f}|{price:<8.1f}|{price:^9.2e}|");
+
+	/* Objects write their `to_text`, by value and through a pointer */
+	let p = Point { x: 3, y: -4 };
+	let q = alloc Point { x: 1, y: 2 };
+	say(f"{p} {q} |{q:>8}|");
+	delete(q);
+
+	/* The values are computed from left to right, each once */
+	let count = 0;
+	say(f#"{tick(&count, "a")} {tick(&count, "b")} {tick(&count, "c")}"#);
+	say(f#"outer {f"<{name}>"} {"quoted"} {count * 10}"#);
+
+	/* The raw form keeps every backslash */
+	say(rf"C:\tools\{name}\n");
+	say(rf#"rf: "{n:x}" {{ }}"#);
+
+	/* A literal in a loop builds a new text each time */
+	for i in 0..3 {
+		say(f"row {i:>2}: {i * i:03}");
+	}
+	let lines = f"two
+lines {n}";
+	io.println(lines);
+	let empty = f"";
+	say(f"empty {empty.len}, lines {lines.len}");
+	free(empty.ptr);
+	free(lines.ptr);
+	return 0;
+}

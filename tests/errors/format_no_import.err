@@ -1,0 +1,1 @@
+format_no_import.anti:5:10: error: `f"..."` builds its text with `anti.text.Builder`, so the module imports `anti.text`

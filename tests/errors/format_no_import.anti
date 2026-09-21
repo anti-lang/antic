@@ -1,0 +1,7 @@
+//! An `f"..."` calls `anti.text`, which this module does not import.
+
+fn main() -> int
+{
+	let s = f"{1}";
+	return s.len;
+}

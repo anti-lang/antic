@@ -1,0 +1,12 @@
+//! Each literal below is refused where the lexer finds the mistake: a
+//! prefix written `fr`, a single `}`, an empty `{}` and a `{` that the
+//! literal closes before its `}`.
+
+fn main() -> int
+{
+	let a = fr"C:\{name}";
+	let b = f"a } b";
+	let c = f"{} and {x}";
+	let d = rf"{x:>4";
+	return 0;
+}

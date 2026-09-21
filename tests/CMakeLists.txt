@@ -963,6 +963,15 @@ add_test(NAME dump_ast_switch_fallthrough
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.ast"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 
+# An `f"..."` is one node, with the value of each `{expr}` below it.
+add_test(NAME dump_ast_format
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DOPTION=--dump-ast"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/format.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/format.ast"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+
 # Two mistakes produce exactly two messages.
 add_test(NAME error_syntax
     COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/syntax.s"
@@ -1634,6 +1643,10 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "tuples|-S,-o,${LISTINGS}/tuples.s,tuples.anti"
         "switch_fallthrough|-S,-o,${LISTINGS}/switch_fallthrough.s,switch_fallthrough.anti"
         "hex_bytes|-S,-o,${LISTINGS}/hex_bytes.s,hex_bytes.anti"
+        "format_literal|-S,-o,${LISTINGS}/format_literal.s,format_literal.anti"
+        "format_spec|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_spec.s,format_spec.anti"
+        "format_types|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_types.s,format_types.anti"
+        "format_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_no_import.s,format_no_import.anti"
         "transient|-S,-o,${LISTINGS}/transient.s,transient.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

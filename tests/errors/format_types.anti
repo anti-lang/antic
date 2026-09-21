@@ -1,0 +1,32 @@
+//! Each value below has a type its specification does not apply to, or
+//! a type an `f"..."` cannot write. A literal is no constant either.
+
+import anti.io;
+import anti.text;
+
+struct Pair { a: int, b: int }
+
+class Node
+{
+	pub v: int,
+}
+
+const GREETING: str = f"hi";
+
+fn main() -> int
+{
+	let x = 1.5;
+	let n = 7;
+	let name = "a";
+	let p = Pair { a: 1, b: 2 };
+	let maybe: ?*Node = none;
+	io.println(f"{n:.2}");
+	io.println(f"{n:e}");
+	io.println(f"{name:x}");
+	io.println(f"{x:b}");
+	io.println(f"{true:05}");
+	io.println(f"{'c':.1}");
+	io.println(f"{p}");
+	io.println(rf"{maybe}");
+	return 0;
+}

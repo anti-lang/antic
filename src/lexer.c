@@ -971,24 +971,35 @@ static void character(struct lexer *lx, size_t start, int line, int column)
 }
 
 /* What the text between the quotes of a string literal means. */
-enum string_form { FORM_ESCAPED, FORM_RAW, FORM_INTERPOLATED, FORM_HEX };
+enum string_form {
+    FORM_ESCAPED,
+    FORM_RAW,
+    FORM_INTERPOLATED,
+    FORM_RAW_INTERPOLATED,
+    FORM_HEX
+};
 
 /* The string prefixes, one meaning each, in the one table that
    docs/anti-language-additions.md asks for. The empty spelling is the
-   literal without a prefix. `rf` joins the table with the interpolation
-   of `f"..."`, and until that is built an `f"..."` is refused. Every form
-   but `x"..."` takes hash delimiters. */
+   literal without a prefix. Every form but `x"..."` takes hash
+   delimiters. `fr` stands in the table to be refused with the message
+   that names `rf`, and its literal is read as an `rf"..."` so that no
+   second message follows. */
 static const struct string_prefix {
     const char *spelling;
     enum string_form form;
     bool bytes;
+    const char *refused;
 } string_prefixes[] = {
-    {"", FORM_ESCAPED, false},
-    {"r", FORM_RAW, false},
-    {"b", FORM_ESCAPED, true},
-    {"br", FORM_RAW, true},
-    {"f", FORM_INTERPOLATED, false},
-    {"x", FORM_HEX, true},
+    {"", FORM_ESCAPED, false, NULL},
+    {"r", FORM_RAW, false, NULL},
+    {"b", FORM_ESCAPED, true, NULL},
+    {"br", FORM_RAW, true, NULL},
+    {"f", FORM_INTERPOLATED, false, NULL},
+    {"rf", FORM_RAW_INTERPOLATED, false, NULL},
+    {"fr", FORM_RAW_INTERPOLATED, false,
+     "`fr\"` is not a prefix, write `rf\"`"},
+    {"x", FORM_HEX, true, NULL},
 };
 
 /* The entry whose letters stand at the current position with any '#'
@@ -1075,9 +1086,6 @@ static void string(struct lexer *lx, const struct string_prefix *prefix,
     if (prefix->form == FORM_HEX && hashes > 0) {
         error_at(lx, line, column, "`x\"...\"` takes no hash delimiters");
         valid = false;
-    } else if (prefix->form == FORM_INTERPOLATED) {
-        error_at(lx, line, column, "`f\"...\"` is not built yet");
-        valid = false;
     }
 
     for (;;) {
@@ -1149,6 +1157,255 @@ static void string(struct lexer *lx, const struct string_prefix *prefix,
     text_free(&bytes);
 }
 
+static void lex_token(struct lexer *lx);
+
+/* The name of an interpolated literal in a message, by its form. */
+static const char *interpolated_name(bool raw)
+{
+    return raw ? "`rf\"...\"`" : "`f\"...\"`";
+}
+
+/* The position of the quote that closes a literal of n hashes. Its
+   content starts at the current position. Returns SIZE_MAX when the
+   source ends first. An escaped form skips the character after a
+   backslash, as its content does. */
+static size_t closing_quote(const struct lexer *lx, size_t hashes, bool raw)
+{
+    size_t i = lx->pos;
+
+    while (i < lx->length) {
+        size_t k = 0;
+        if (lx->src[i] == '\\' && !raw) {
+            i += 2;
+            continue;
+        }
+        if (lx->src[i] == '"') {
+            while (k < hashes && i + 1 + k < lx->length &&
+                   lx->src[i + 1 + k] == '#') {
+                k++;
+            }
+            if (k == hashes) {
+                return i;
+            }
+        }
+        i++;
+    }
+    return SIZE_MAX;
+}
+
+/* A growable list of the pieces of one interpolated literal. */
+struct piece_list {
+    struct format_piece *items;
+    size_t count;
+    size_t capacity;
+};
+
+static struct format_piece *add_piece(struct piece_list *list)
+{
+    struct format_piece *piece;
+
+    if (list->count == list->capacity) {
+        size_t capacity = list->capacity == 0 ? 4 : list->capacity * 2;
+        struct format_piece *items =
+            realloc(list->items, capacity * sizeof *items);
+        if (items == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        list->items = items;
+        list->capacity = capacity;
+    }
+    piece = &list->items[list->count++];
+    memset(piece, 0, sizeof *piece);
+    return piece;
+}
+
+/* DESIGN: the expression of an `{expr}` is lexed where it stands, by the
+   rules of every other token, and ends at the first `}` or `:` outside
+   brackets. Its tokens go into the piece, so the parser reads them as
+   it reads any expression and every position is the one in the file.
+   What follows the colon is kept as written and read by the parser. A
+   `{` in it opens a pair, so `{x:{w}}` is one placeholder that reports
+   one unknown format. */
+static void placeholder(struct lexer *lx, size_t end, bool raw,
+                        struct text *bytes, struct piece_list *pieces,
+                        bool *valid)
+{
+    struct format_piece *piece = add_piece(pieces);
+    struct token_list tokens = {NULL, 0, 0};
+    struct lexer inner = *lx;
+    char message[64];
+    int depth = 0;
+    int c;
+
+    piece->text = keep(lx, bytes);
+    text_free(bytes);
+    piece->offset = lx->pos;
+    piece->line = lx->line;
+    piece->column = lx->column;
+    inner.length = end;
+    inner.out = &tokens;
+    inner.ok = true;
+    advance(&inner); /* the `{` */
+    for (;;) {
+        enum token_kind kind;
+        skip_trivia(&inner);
+        c = at(&inner, 0);
+        if (c == -1 ||
+            (depth == 0 && (c == '}' || (c == ':' && at(&inner, 1) != ':')))) {
+            break;
+        }
+        lex_token(&inner);
+        kind = tokens.items[tokens.count - 1].kind;
+        if (kind == TOKEN_LPAREN || kind == TOKEN_LBRACKET ||
+            kind == TOKEN_LBRACE) {
+            depth++;
+        } else if (depth > 0 && (kind == TOKEN_RPAREN ||
+                                 kind == TOKEN_RBRACKET ||
+                                 kind == TOKEN_RBRACE)) {
+            depth--;
+        }
+    }
+    if (c == ':') {
+        size_t from;
+        advance(&inner);
+        from = inner.pos;
+        depth = 0;
+        while ((c = at(&inner, 0)) != -1 && (c != '}' || depth > 0)) {
+            depth += c == '{' ? 1 : c == '}' ? -1 : 0;
+            advance(&inner);
+        }
+        piece->spec.bytes = lx->src + from;
+        piece->spec.length = inner.pos - from;
+    }
+    if (c == -1) {
+        snprintf(message, sizeof message, "unterminated `{` in %s",
+                 interpolated_name(raw));
+        error_at(lx, piece->line, piece->column, message);
+        *valid = false;
+    } else {
+        if (tokens.count == 0) {
+            snprintf(message, sizeof message, "empty `{}` in %s",
+                     interpolated_name(raw));
+            error_at(lx, piece->line, piece->column, message);
+            *valid = false;
+        }
+        push(&inner, TOKEN_EOF, inner.pos, inner.line, inner.column);
+        advance(&inner); /* the `}` */
+    }
+    if (!inner.ok) {
+        *valid = false;
+    }
+    if (tokens.count > 0) {
+        struct token *copy =
+            arena_alloc(lx->arena, tokens.count * sizeof *copy);
+        memcpy(copy, tokens.items, tokens.count * sizeof *copy);
+        piece->tokens = copy;
+        piece->token_count = tokens.count;
+    }
+    token_list_free(&tokens);
+    lx->pos = inner.pos;
+    lx->line = inner.line;
+    lx->column = inner.column;
+    lx->ok = lx->ok && inner.ok;
+    piece->length = lx->pos - piece->offset;
+}
+
+/* An `f"..."` or an `rf"..."`: text with escapes, or raw, and `{expr}`
+   placeholders, with `{{` and `}}` for a brace. The content ends at the
+   quote that closes the literal, which is found first, so no
+   placeholder reads past it. */
+static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
+                         size_t start, int line, int column)
+{
+    bool raw = prefix->form == FORM_RAW_INTERPOLATED;
+    struct text bytes = {0};
+    struct piece_list pieces = {NULL, 0, 0};
+    struct format_piece *last;
+    struct format_piece *kept;
+    char message[64];
+    size_t hashes = 0;
+    size_t end;
+    bool valid = true;
+    size_t k;
+
+    for (k = 0; prefix->spelling[k] != '\0'; k++) {
+        advance(lx);
+    }
+    while (at(lx, 0) == '#') {
+        hashes++;
+        advance(lx);
+    }
+    advance(lx); /* the opening quote */
+    if (prefix->refused != NULL) {
+        error_at(lx, line, column, prefix->refused);
+        valid = false;
+    }
+    end = closing_quote(lx, hashes, raw);
+    if (end == SIZE_MAX) {
+        error_at(lx, line, column, "unterminated string literal");
+        while (at(lx, 0) != -1) {
+            advance(lx);
+        }
+        push(lx, TOKEN_ERROR, start, line, column);
+        return;
+    }
+
+    while (lx->pos < end) {
+        int c = at(lx, 0);
+
+        if ((c == '{' || c == '}') && at(lx, 1) == c && lx->pos + 1 < end) {
+            append_byte(&bytes, (unsigned char)c);
+            advance(lx);
+            advance(lx);
+        } else if (c == '{') {
+            placeholder(lx, end, raw, &bytes, &pieces, &valid);
+        } else if (c == '}') {
+            snprintf(message, sizeof message, "single `}` in %s, write `}}`",
+                     interpolated_name(raw));
+            error_at(lx, lx->line, lx->column, message);
+            valid = false;
+            advance(lx);
+        } else if (c == '\\' && !raw) {
+            uint32_t value;
+            bool raw_byte;
+            if (escape(lx, MODE_STR, &value, &raw_byte)) {
+                append_utf8(&bytes, value);
+            } else {
+                valid = false;
+            }
+        } else if (c == '\r' && at(lx, 1) == '\n') {
+            append_byte(&bytes, '\n');
+            advance(lx);
+            advance(lx);
+        } else if (c == 0) {
+            error_at(lx, lx->line, lx->column, "NUL is not allowed here");
+            valid = false;
+            advance(lx);
+        } else {
+            append_byte(&bytes, (unsigned char)c);
+            advance(lx);
+        }
+    }
+    for (k = 0; k <= hashes; k++) {
+        advance(lx); /* the closing quote and its hashes */
+    }
+
+    last = add_piece(&pieces);
+    last->text = keep(lx, &bytes);
+    text_free(&bytes);
+    if (valid) {
+        struct token *t = push(lx, TOKEN_FORMAT, start, line, column);
+        kept = arena_alloc(lx->arena, pieces.count * sizeof *kept);
+        memcpy(kept, pieces.items, pieces.count * sizeof *kept);
+        t->value.format.pieces = kept;
+        t->value.format.count = pieces.count;
+    } else {
+        push(lx, TOKEN_ERROR, start, line, column);
+    }
+    free(pieces.items);
+}
+
 static bool symbol(struct lexer *lx, size_t start, int line, int column)
 {
     size_t best_length = 0;
@@ -1178,6 +1435,56 @@ static bool symbol(struct lexer *lx, size_t start, int line, int column)
     return true;
 }
 
+/* Lex the one token at the current position, which follows the trivia
+   before it. */
+static void lex_token(struct lexer *lx)
+{
+    size_t start = lx->pos;
+    int line = lx->line;
+    int column = lx->column;
+    int c = at(lx, 0);
+    enum token_kind doc;
+    size_t marker;
+    const struct string_prefix *prefix;
+
+    doc = doc_marker(lx, 0, &marker);
+    if (doc != TOKEN_EOF && at(lx, 1) == '/') {
+        line_doc(lx, doc, marker);
+    } else if (doc != TOKEN_EOF) {
+        block_doc(lx, doc, marker);
+    } else if ((prefix = string_start(lx)) != NULL) {
+        if (prefix->form == FORM_INTERPOLATED ||
+            prefix->form == FORM_RAW_INTERPOLATED) {
+            interpolated(lx, prefix, start, line, column);
+        } else {
+            string(lx, prefix, start, line, column);
+        }
+    } else if (is_ident_start(c)) {
+        identifier(lx, start, line, column);
+    } else if (is_digit(c)) {
+        number(lx, start, line, column);
+    } else if (c == '\'') {
+        character(lx, start, line, column);
+    } else if (!symbol(lx, start, line, column)) {
+        uint32_t cp;
+        size_t n = utf8_length((const unsigned char *)lx->src + lx->pos,
+                               lx->length - lx->pos, &cp);
+        if (c >= 0x80) {
+            error_at(lx, line, column,
+                     "unexpected character outside a literal");
+        } else {
+            char message[40];
+            snprintf(message, sizeof message, "unexpected character `%c`",
+                     c);
+            error_at(lx, line, column, message);
+        }
+        while (n-- > 0) {
+            advance(lx);
+        }
+        push(lx, TOKEN_ERROR, start, line, column);
+    }
+}
+
 bool lex(const char *source, size_t length, struct arena *arena,
          struct diagnostics *diags, struct token_list *out)
 {
@@ -1194,56 +1501,12 @@ bool lex(const char *source, size_t length, struct arena *arena,
     }
 
     for (;;) {
-        size_t start;
-        int line;
-        int column;
-        int c;
-
-        enum token_kind doc;
-        size_t marker;
-        const struct string_prefix *prefix;
-
         skip_trivia(&lx);
-        start = lx.pos;
-        line = lx.line;
-        column = lx.column;
-        c = at(&lx, 0);
-        if (c == -1) {
-            push(&lx, TOKEN_EOF, start, line, column);
+        if (at(&lx, 0) == -1) {
+            push(&lx, TOKEN_EOF, lx.pos, lx.line, lx.column);
             return lx.ok;
         }
-
-        doc = doc_marker(&lx, 0, &marker);
-        if (doc != TOKEN_EOF && at(&lx, 1) == '/') {
-            line_doc(&lx, doc, marker);
-        } else if (doc != TOKEN_EOF) {
-            block_doc(&lx, doc, marker);
-        } else if ((prefix = string_start(&lx)) != NULL) {
-            string(&lx, prefix, start, line, column);
-        } else if (is_ident_start(c)) {
-            identifier(&lx, start, line, column);
-        } else if (is_digit(c)) {
-            number(&lx, start, line, column);
-        } else if (c == '\'') {
-            character(&lx, start, line, column);
-        } else if (!symbol(&lx, start, line, column)) {
-            uint32_t cp;
-            size_t n = utf8_length((const unsigned char *)source + lx.pos,
-                                   length - lx.pos, &cp);
-            if (c >= 0x80) {
-                error_at(&lx, line, column,
-                         "unexpected character outside a literal");
-            } else {
-                char message[40];
-                snprintf(message, sizeof message, "unexpected character `%c`",
-                         c);
-                error_at(&lx, line, column, message);
-            }
-            while (n-- > 0) {
-                advance(&lx);
-            }
-            push(&lx, TOKEN_ERROR, start, line, column);
-        }
+        lex_token(&lx);
     }
 }
 
@@ -1268,6 +1531,7 @@ const char *token_kind_name(enum token_kind kind)
     case TOKEN_CHAR: return "character literal";
     case TOKEN_STRING: return "string literal";
     case TOKEN_BYTES: return "byte string literal";
+    case TOKEN_FORMAT: return "interpolated string literal";
     case TOKEN_RESERVED: return "reserved word";
     case TOKEN_DOC:
     case TOKEN_MODULE_DOC: return "doc comment";
@@ -1290,7 +1554,8 @@ const char *token_category(enum token_kind kind)
     case TOKEN_FLOAT: return "float_lit";
     case TOKEN_CHAR: return "char_lit";
     case TOKEN_STRING:
-    case TOKEN_BYTES: return "string_lit";
+    case TOKEN_BYTES:
+    case TOKEN_FORMAT: return "string_lit";
     case TOKEN_RESERVED: return "keyword";
     case TOKEN_DOC:
     case TOKEN_MODULE_DOC:

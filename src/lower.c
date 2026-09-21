@@ -1316,7 +1316,8 @@ struct table {
    entries of every table. A class replaces one with a concrete function
    of the same name. */
 static const char *const root_names[] = {
-    "type_name", "to_text", "equals", "hash", "serialize", "destruct", "copy"
+    "type_name", ROOT_TO_TEXT, "equals", "hash", "serialize", "destruct",
+    "copy"
 };
 
 static bool same_name(const struct name *a, const struct name *b)
@@ -2966,6 +2967,44 @@ static struct ir_operand handled_operand(struct lowerer *l,
     return temp(l, ir_load(l->f, l->b, ir_type_of(e->type), out));
 }
 
+/* DESIGN: an `f"..."` is a local `anti.text.Builder` in a slot of the
+   frame, the calls the checker wrote on it, and the `str` its `take`
+   gives. Each value is bound to the local the checker declared for it
+   right before the call that appends it. The values are therefore
+   computed from left to right, each once, between the texts around
+   them. An aggregate is bound by its address, which the call reads at
+   once. */
+static struct ir_operand lower_format(struct lowerer *l, const struct expr *e)
+{
+    struct symbol *builder = e->as.format.builder;
+    size_t i;
+
+    builder->ir = ir_entry_slot(l->f, vtype_of(l, builder->type));
+    build_into(l, e->as.format.start, temp(l, builder->ir));
+    for (i = 0; i < e->as.format.count && !l->failed; i++) {
+        const struct format_part *part = &e->as.format.parts[i];
+        struct ir_operand v;
+        if (part->text_call != NULL) {
+            lower_expr(l, part->text_call);
+        }
+        if (part->value == NULL || l->failed) {
+            continue;
+        }
+        v = lower_expr(l, part->value);
+        if (l->failed) {
+            break;
+        }
+        part->bound->ir =
+            ir_unary(l->f, l->b, IR_COPY,
+                     is_aggregate(part->bound->type)
+                         ? IR_PTR
+                         : ir_type_of(part->bound->type),
+                     v);
+        lower_expr(l, part->value_call);
+    }
+    return l->failed ? none() : lower_address(l, e->as.format.take);
+}
+
 /* The address of the memory that holds the aggregate value of e. A
    literal gets a slot of its own, and a constant is read-only data. */
 static struct ir_operand lower_address(struct lowerer *l,
@@ -3008,6 +3047,8 @@ static struct ir_operand lower_address(struct lowerer *l,
         return lower_join(l, e);
     case EXPR_HERE:
         return const_address(l, location_value(l, e->pos, e->type), e->type);
+    case EXPR_FORMAT:
+        return lower_format(l, e);
     default:
         slot = ir_entry_slot(l->f, vtype_of(l, e->type));
         build_into(l, e, temp(l, slot));

@@ -224,6 +224,17 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         text_append(d->out, "here");
         end(d, start, type);
         break;
+    /* The values of the `{expr}` parts follow as children, in order. */
+    case EXPR_FORMAT:
+        text_appendf(d->out, "format_lit %.*s", (int)e->spelling.length,
+                     e->spelling.bytes);
+        end(d, start, type);
+        for (i = 0; i < e->as.format.count; i++) {
+            if (e->as.format.parts[i].value != NULL) {
+                dump_expr(d, depth + 1, e->as.format.parts[i].value);
+            }
+        }
+        break;
     case EXPR_NAME:
         label_name(d, "ident", NULL, &e->as.name);
         end(d, start, type);

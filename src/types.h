@@ -207,6 +207,28 @@ struct type *types_object(struct types *types);
 #define LANG_LOCATION_FUNCTION "function"
 #define LANG_LOCATION_MODULE "module"
 
+/* DESIGN: an `f"..."` builds its text with `anti.text.Builder`, which
+   the compiler knows by name, with the enum of its alignments and the
+   functions the literal calls. The names are defined here and nowhere
+   else. `to_text` of the root class writes an object. */
+#define TEXT_MODULE "anti.text"
+#define TEXT_BUILDER "Builder"
+#define TEXT_NEW "new"
+#define TEXT_APPEND "append"
+#define TEXT_APPEND_INT "append_int"
+#define TEXT_APPEND_UINT "append_uint"
+#define TEXT_APPEND_FLOAT "append_float"
+#define TEXT_APPEND_F32 "append_f32"
+#define TEXT_APPEND_BOOL "append_bool"
+#define TEXT_APPEND_CHAR "append_char"
+#define TEXT_APPEND_TEXT "append_text"
+#define TEXT_TAKE "take"
+#define TEXT_ALIGN "Align"
+#define TEXT_ALIGN_LEFT "Left"
+#define TEXT_ALIGN_RIGHT "Right"
+#define TEXT_ALIGN_CENTER "Center"
+#define ROOT_TO_TEXT "to_text"
+
 /* Whether t is the class `anti.lang.Error` itself. */
 bool types_is_lang_error(const struct type *t);
 

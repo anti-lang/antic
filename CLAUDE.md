@@ -161,7 +161,9 @@ openssl checks their signature. Windows configures with `-G Ninja`.
     its own module path as a compile-time constant. The check is then one
     comparison against a table read at start. `log.named("http")` may exist
     beside them for a logger per subsystem, not instead of them.
-15. `f"..."` interpolation, which is compiler work over `anti.text`.
+15. Done. `f"..."` and `rf"..."` with their format specifications, as
+    calls of `anti.text.Builder`. `docs/reports/2026-09-21-interpolation.md`
+    reports it, and `docs/notes/interpolation.md` holds its choices.
 16. The native libraries in `libs/`, which nothing builds yet.
 17. Inline atomic instruction sequences, which are runtime calls today.
 18. Done. The one manifest of a release, and the installers that read its
@@ -205,8 +207,8 @@ reports what it finished.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`.
-- 559 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 558 each, without the `no_paths` test, which needs a
+- 567 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 566 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -235,6 +237,11 @@ reports what it finished.
   `for i, x in items` are the two forms that take one apart. The header writes
   one struct per distinct tuple of an exported signature, and the `.antl`
   carries the elements.
+- `f"..."` and `rf"..."` are built. Each text and each `{expr}` is a call
+  on an `anti.text.Builder`, the format specification after a colon gives
+  the arguments of the call, and the text is memory of its own that the
+  program frees with `free(s.ptr)`. See "Interpolation" in
+  `docs/decisions.md`.
 - `*T` never holds `none` and `?*T` may, and a function value follows the same
   rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer

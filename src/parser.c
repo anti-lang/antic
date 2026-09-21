@@ -445,6 +445,121 @@ static struct expr **expressions(struct parser *p, enum token_kind close,
     return list_finish(p, &items, count);
 }
 
+/* Read the format specification of an `{expr}` into out: an alignment
+   `<`, `>` or `^`, a `0` for zero padding, a width, a `.` and a
+   precision, and one of `x X b o e f`, each optional and in that order.
+   Returns false for any other text, an empty one included. A width and a
+   precision take at most nine digits. `0` pads a numeric value of a
+   given width and stands without an alignment. */
+static bool format_spec(struct token_text spec, struct format_spec *out)
+{
+    const char *s = spec.bytes;
+    size_t n = spec.length;
+    size_t i = 0;
+    size_t first;
+
+    out->align = 0;
+    out->zero = false;
+    out->width = -1;
+    out->precision = -1;
+    out->kind = 0;
+    if (i < n && (s[i] == '<' || s[i] == '>' || s[i] == '^')) {
+        out->align = s[i++];
+    }
+    if (i < n && s[i] == '0') {
+        out->zero = true;
+        i++;
+    }
+    for (first = i; i < n && s[i] >= '0' && s[i] <= '9' && i - first < 9;
+         i++) {
+        out->width = (out->width < 0 ? 0 : out->width * 10) + (s[i] - '0');
+    }
+    if (i < n && s[i] == '.') {
+        i++;
+        for (first = i; i < n && s[i] >= '0' && s[i] <= '9' && i - first < 9;
+             i++) {
+            out->precision =
+                (out->precision < 0 ? 0 : out->precision * 10) + (s[i] - '0');
+        }
+        if (i == first) {
+            return false;
+        }
+    }
+    if (i < n && s[i] != '\0' && strchr("xXboef", s[i]) != NULL) {
+        out->kind = s[i++];
+    }
+    if (out->zero && (out->align != 0 || out->width <= 0)) {
+        return false;
+    }
+    return n > 0 && i == n;
+}
+
+/* The expression of one `{expr}`, parsed from the tokens the lexer made
+   for it. The parser reads them as it reads any expression and reports
+   at the positions in the file. */
+static struct expr *placeholder(struct parser *p,
+                                const struct format_piece *piece)
+{
+    struct parser inner = *p;
+    struct expr *e;
+
+    inner.tokens = piece->tokens;
+    inner.all = piece->tokens;
+    inner.origin = NULL;
+    inner.taken = NULL;
+    inner.pos = 0;
+    inner.panic = false;
+    inner.ok = true;
+    inner.no_struct_literal = false;
+    e = expression(&inner);
+    if (inner.ok && !check(&inner, TOKEN_EOF)) {
+        error_here(&inner, "expected `}` or `:` after the expression");
+    }
+    if (!inner.ok) {
+        p->ok = false;
+        return NULL;
+    }
+    return e;
+}
+
+/* `f"..."` and `rf"..."`: the text of each piece, the expression of each
+   `{expr}` and its format specification. */
+static struct expr *format_literal(struct parser *p, const struct token *t)
+{
+    struct expr *e = new_expr(p, EXPR_FORMAT, t);
+    size_t n = t->value.format.count;
+    struct format_part *parts = node(p, n * sizeof *parts);
+    size_t i;
+
+    next(p);
+    e->as.format.raw = p->source[t->offset] == 'r';
+    for (i = 0; i < n; i++) {
+        const struct format_piece *piece = &t->value.format.pieces[i];
+        struct format_part *part = &parts[i];
+        part->text = piece->text;
+        part->pos.line = piece->line;
+        part->pos.column = piece->column;
+        part->source.bytes = p->source + piece->offset;
+        part->source.length = piece->length;
+        part->spec.width = -1;
+        part->spec.precision = -1;
+        if (piece->token_count == 0) {
+            continue;
+        }
+        part->value = placeholder(p, piece);
+        if (piece->spec.bytes != NULL &&
+            !format_spec(piece->spec, &part->spec)) {
+            diagnostics_add(p->diags, piece->line, piece->column,
+                            "unknown format `%.*s`", (int)piece->length,
+                            p->source + piece->offset);
+            p->ok = false;
+        }
+    }
+    e->as.format.parts = parts;
+    e->as.format.count = n;
+    return e;
+}
+
 static struct expr *primary(struct parser *p)
 {
     const struct token *t = peek(p);
@@ -466,6 +581,8 @@ static struct expr *primary(struct parser *p)
                      t);
         e->as.text = t->value.text;
         return e;
+    case TOKEN_FORMAT:
+        return format_literal(p, t);
     case TOKEN_CHAR:
         next(p);
         e = new_expr(p, EXPR_CHAR, t);
