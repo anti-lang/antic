@@ -193,6 +193,20 @@ openssl checks their signature. Windows configures with `-G Ninja`.
     `extern fn` is ordinary, and `Box.make` of `programs/out_slot.anti` stops
     being a failing function, which leaves the zeroed out slot of a `catch`
     binding without the test that pinned it.
+22. Verify `by -k`. `for i in 0..10 by -3` must give `9 6 3 0`, the values
+    of `by 3` in reverse, and not `7 4 1`. A test pins the output. Code that
+    still follows the old procedure, which starts at the high bound, is a
+    bug to fix. "Core language" in `docs/decisions.md` holds the rule.
+23. Verify the out pointer of a `may fail` function that returns a tuple.
+    It takes one out pointer, the last parameter that the result rule under
+    "Object model" names, and not one per element. A test pins the
+    signature in the IR and in the generated header.
+24. Verify the entry on `Object.deserialize` under "Object model" that a
+    field `serialize` writes as `null` keeps its default. Fields carry type
+    ids now, so check what the default `serialize` writes for each kind,
+    a `str` among them. A test takes each such field through `serialize`
+    and `deserialize`. When `serialize` no longer writes `null` for a
+    `str`, the entry is updated to match.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
