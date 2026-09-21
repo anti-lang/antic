@@ -243,7 +243,7 @@ The release binary carries no symbol data. Every deliverable ships a symbols arc
 - `anti.lang` holds every type the compiler knows by name: `Object`, `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `Flags`, `Job`, `Mutex`, `Trace`, `TraceHandler`. `anti.rt` is the C runtime and holds no Anti module a program imports. Everything that only helps lives elsewhere: `anti.error` for error conveniences, `anti.trace` for the stock handlers, `anti.log`, `anti.time` and the rest.
 - The rule for a reader: if the compiler needs it, it is in `anti.lang`. If it only helps, it is not.
 - `anti.lang` is the root of the standard library and imports nothing. Every other module imports it and names `*anti.lang.Error`, so no import cycle forms. `anti.error` imports `anti.lang` and holds `SystemError`, `on_fatal` and `check`.
-- `std/anti/lang.anti` holds `Error`, `NoneDereference` and the hook that `fatal` reads. The compiler declares `Object` and `Job` itself and still names them under `anti.rt`, by a `[provisional]` entry in `docs/decisions.md`. `SourceLocation` and `StackTrace` come into the code with error origins and stack traces, and `Flags` and `Mutex` with their own steps.
+- `std/anti/lang.anti` holds `Error`, `NoneDereference`, `SourceLocation`, `StackTrace` and the hook that `fatal` reads. The compiler declares `Object` and `Job` itself and still names them under `anti.rt`, by a `[provisional]` entry in `docs/decisions.md`. `Flags` and `Mutex` come into the code with their own steps.
 
 ## Hooks and tracing
 

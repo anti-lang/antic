@@ -1340,6 +1340,68 @@ if(NOT WIN32)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_licenses.cmake")
 endif()
 
+# Stack traces. A trace holds addresses that
+# differ from run to run, so run_trace.cmake matches the output against
+# patterns. Each case is a name, the source in tests/trace, the options of
+# antic and the arguments of the program. The pattern files of the output
+# and of the error output follow, then the exit status. A dev build links
+# the object of anti.lang, which it compiles first.
+set(TRACE "${CMAKE_CURRENT_SOURCE_DIR}/trace")
+foreach(case
+        "stack|stack_trace|||stack_trace.pattern||0"
+        "stack_g|stack_trace|-g||stack_trace.g.pattern||0"
+        "stack_dev|stack_trace|--dev||stack_trace.pattern||0")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 source)
+    list(GET parts 2 options)
+    list(GET parts 3 arguments)
+    list(GET parts 4 expected)
+    list(GET parts 5 errors)
+    list(GET parts 6 status)
+    set(error_patterns "")
+    if(NOT errors STREQUAL "")
+        set(error_patterns "-DERRORS=${TRACE}/${errors}")
+    endif()
+    set(std "")
+    if(options MATCHES "--dev")
+        set(std "lang")
+    endif()
+    add_test(NAME trace_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${TRACE}/${source}.anti"
+            "-DOPTIONS=${options}"
+            "-DARGS=${arguments}"
+            "-DEXPECTED=${TRACE}/${expected}"
+            ${error_patterns}
+            "-DSTD=${std}"
+            "-DSTATUS=${status}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/trace-${name}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
+endforeach()
+
+# The readers of the symbol table and the line table, on the binaries
+# that this host links for the other targets.
+add_executable(symbols_probe unit/symbols_probe.c ../rt/symbols.c)
+target_include_directories(symbols_probe PRIVATE ../rt)
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
+    add_test(NAME trace_symbols_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DPROBE=$<TARGET_FILE:symbols_probe>"
+            "-DSOURCE=${TRACE}/symbols.anti"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_symbols.cmake")
+    set_tests_properties(trace_symbols_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # The build id in the notice is the digest of the code. Two builds of one
 # program carry the same id, and another program carries another.
 if(NOT WIN32)

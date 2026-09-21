@@ -20,6 +20,13 @@
 extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
 extern fn anti_rt_exit(status: c_int);
 extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
+extern fn anti_rt_trace_walk(into: ?*u64, room: int, skip: int) -> int;
+extern fn anti_rt_trace_frame(address: u64, out: ?*RawFrame);
+extern fn anti_rt_trace_text(frames: ?*RawFrame, count: int) -> ?*byte;
+extern fn anti_rt_trace_symbolize(frame: ?*RawFrame, out: ?*Frame);
+
+/// The most frames a trace keeps, the innermost ones.
+const TRACE_DEPTH: int = 64;
 
 /// A position in the source, which `here` gives.
 ///
@@ -34,6 +41,123 @@ pub struct SourceLocation
 	column: int,
 	function: str,
 	module: str,
+}
+
+/// One return address of a trace, as the capture took it.
+///
+/// `module` is the path of the executable or the library the address
+/// lies in, `build_id` the build id of that module and `base` the
+/// address it was loaded at. Outside every module both texts are empty
+/// and the base is 0.
+pub struct RawFrame
+{
+	address: u64,
+	module: str,
+	build_id: str,
+	base: u64,
+}
+
+/// One frame of a trace with its names.
+///
+/// `function` comes from the symbol table, which every build carries.
+/// `file` and `line` come from the line table of a `-g` build, and are
+/// empty and 0 without one.
+pub struct Frame
+{
+	address: u64,
+	function: str,
+	file: str,
+	line: int,
+}
+
+/// The return addresses of the calls that lead to a point of a program,
+/// the innermost first.
+///
+/// The capture walks the frames and names nothing. `symbolize` reads the
+/// names when a program asks for them, so a trace that nobody reads costs
+/// the walk alone.
+pub class StackTrace
+{
+	/// The frames as the capture took them, the innermost first.
+	pub own frames: []RawFrame,
+	/// The frames with their names, once `symbolize` ran.
+	own named: []Frame,
+	/// Whether `symbolize` has run.
+	symbolized: bool = false,
+	/// The bytes `text` gave, ended by a NUL.
+	transient text_cache: ?*byte = none,
+
+	/// The trace of the caller and the calls above it, without the `skip`
+	/// innermost frames.
+	pub fn capture(skip: int = 0) -> *StackTrace
+	{
+		let addresses: [64]u64 = [0; 64];
+		let count = anti_rt_trace_walk(&addresses[0], TRACE_DEPTH, skip + 1);
+		let t = alloc StackTrace {
+			frames: []RawFrame { ptr: none, len: 0 },
+			named: []Frame { ptr: none, len: 0 },
+		};
+		if count <= 0 {
+			return t;
+		}
+		let list = alloc(RawFrame, count) else {
+			return t;
+		};
+		let i = 0;
+		while i < count do {
+			anti_rt_trace_frame(addresses[i], &list[i]);
+			i += 1;
+		}
+		t.frames = []RawFrame { ptr: list, len: count };
+		return t;
+	}
+
+	/// The raw form: one line per module, `module <n> <build id> <base>
+	/// <path>`, then one per frame, its address and `<n>+<offset>`.
+	///
+	/// A resolver matches the frames to the symbols of each module by the
+	/// build id. The text is formed at the first call, and the trace keeps
+	/// its bytes until it is deleted.
+	pub fn text(self) -> str
+	{
+		let made = self.text_cache;
+		if made != none {
+			return anti_rt_text_from_c(made);
+		}
+		let room = anti_rt_trace_text(self.frames.ptr, self.frames.len) else {
+			return "";
+		};
+		self.text_cache = room;
+		return anti_rt_text_from_c(room);
+	}
+
+	/// The frames with their functions, and with their files and lines in
+	/// a `-g` build.
+	///
+	/// The names are read at the first call, and the trace keeps them
+	/// until it is deleted.
+	pub fn symbolize(self) -> []Frame
+	{
+		if self.symbolized || self.frames.len == 0 {
+			return self.named;
+		}
+		let list = alloc(Frame, self.frames.len) else {
+			return self.named;
+		};
+		let i = 0;
+		while i < self.frames.len do {
+			anti_rt_trace_symbolize(&self.frames[i], &list[i]);
+			i += 1;
+		}
+		self.named = []Frame { ptr: list, len: self.frames.len };
+		self.symbolized = true;
+		return self.named;
+	}
+
+	concrete fn destruct(self)
+	{
+		free(self.text_cache);
+	}
 }
 
 /// A failure, with a code, a message and the error that caused it.

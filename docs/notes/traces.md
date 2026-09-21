@@ -1,0 +1,70 @@
+# Stack traces and error origins
+
+The choices inside the runtime of `anti.lang.StackTrace`, in `rt/trace.c`
+and `rt/symbols.c`. The rules are in "Error origin and stack traces" of
+`docs/anti-language-additions.md`, and the settled points are in
+`docs/decisions.md` under "Error origins and stack traces".
+
+## The walk
+
+On Linux and macOS the walk follows the chain of frame records from its own
+frame, which antic keeps in every function that calls another. A leaf keeps
+none, and a leaf never stands above another frame. The walk stops at a record
+outside the stack of the thread and at one that does not move up the stack.
+It stops at a return address of 0 as well. The bounds of the stack come from
+`pthread_get_stackaddr_np` on macOS and `pthread_getattr_np` on Linux. A C
+frame without a record then ends the trace rather than the program.
+
+Windows walks with `RtlCaptureStackBackTrace`, over the unwind data that antic
+writes for every function. Clang for the x64 convention of Windows sets `rbp`
+at an offset into the frame, so there is no chain to follow through C code.
+
+## The module of a frame
+
+macOS asks `dladdr`, which gives the path and the header of the image.
+Linux asks `dl_iterate_phdr`, which names the program `/` in a static musl
+program, so the path of the program comes from `/proc/self/exe`. Windows
+asks `GetModuleHandleExW` and `GetModuleFileNameW`.
+
+The build id comes from the notice of the module. macOS reads the symbol
+`anti_licenses` from the symbol table of the image in memory and keeps the
+answer per image. An image of the system cache is never read. Linux takes the
+notice of its own image through a weak reference, and the one of another
+image from the symbol table of its file. Windows takes its own through
+`/alternatename`, which names an empty default when nothing defines the
+notice, and the one of a library through `GetProcAddress`. A static library
+for C has no notice, so none of the three references pulls the licence
+object of the runtime into a C program.
+
+## Symbols and lines
+
+The lookup takes the byte before a return address, which lies in the call
+and on its line.
+
+- Mach-O. The function is the nearest symbol of the first section at or
+  below the address. It is read from `__LINKEDIT` of the image in memory. The line
+  comes from the debug map: the object that an `N_OSO` entry names, the
+  function by its `N_FUN` entries, and the line table of the object at the
+  same offset into the function. The object is read whole once, and its
+  relocations of `__debug_line` are resolved in place.
+- ELF. The function is the nearest symbol of an executable section, and the
+  line comes from `.debug_line`. Both are read from the file of the module.
+  Every build keeps its symbol table there, and a `-g` build its line table.
+- Windows. DbgHelp reads the PDB that every Windows link writes, under one
+  lock, since it serves one thread at a time. The names it gives are kept
+  once each for the life of the program.
+
+The line reader takes DWARF 2 to 5. The file of a row is the name that the
+file table holds, which antic writes as the path under the search root.
+
+A name under `anti.rt.` loses a tie at one address, so the entry of a
+program is named `module.main` and not `anti.rt.main`.
+
+## Tests
+
+`trace_symbols_<target>` links a `-g` program for each ELF and Mach-O target
+and looks its functions up with `symbols_probe`, which compiles
+`rt/symbols.c` for the host. The readers of the Linux runtime therefore run
+on a Mac. The `trace_*` tests run programs in release, in dev mode and with
+`-g`, and match their output against patterns, because a trace holds
+addresses.

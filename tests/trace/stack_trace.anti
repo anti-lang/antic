@@ -1,0 +1,62 @@
+//! `anti.lang.StackTrace` holds the return addresses of the calls that
+//! lead to a point of the program, each with its module, the build id of
+//! the module and its load base. `symbolize` names the function of each
+//! frame from the symbol table. A build with `-g` gives the file and the
+//! line from the line table as well.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The trace of the calls that lead here, the innermost first.
+fn inner() -> *lang.StackTrace
+{
+	return lang.StackTrace.capture();
+}
+
+/// One call more on the trace.
+fn outer() -> *lang.StackTrace
+{
+	return inner();
+}
+
+/// A trace without its innermost frame, the one of this function.
+fn skipped() -> *lang.StackTrace
+{
+	return lang.StackTrace.capture(1);
+}
+
+/// Print the function, the file and the line of one frame.
+fn put(f: lang.Frame)
+{
+	printf("%.*s %.*s:%d\n".ptr, f.function.len as c_int, f.function.ptr,
+	       f.file.len as c_int, f.file.ptr, f.line as c_int);
+}
+
+fn main() -> int
+{
+	let t = outer();
+	defer delete(t);
+	let named = t.symbolize();
+	put(named[0]);
+	put(named[1]);
+	put(named[2]);
+	printf("again %d\n".ptr, (t.symbolize().ptr == named.ptr) as c_int);
+	printf("at least 3 %d\n".ptr, (t.frames.len >= 3) as c_int);
+	let id = t.frames[0].build_id;
+	printf("id %.*s\n".ptr, id.len as c_int, id.ptr);
+	printf("one module %d\n".ptr,
+	       (t.frames[0].base == t.frames[2].base) as c_int);
+	printf("address %d\n".ptr,
+	       (named[0].address == t.frames[0].address) as c_int);
+	let s = skipped();
+	defer delete(s);
+	put(s.symbolize()[0]);
+	let text = t.text();
+	let first = 0;
+	while first < text.len && text[first] != 10 do {
+		first += 1;
+	}
+	printf("%.*s\n".ptr, first as c_int, text.ptr);
+	return 0;
+}

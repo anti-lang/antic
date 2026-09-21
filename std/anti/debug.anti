@@ -1,0 +1,14 @@
+//! Helpers for debugging a program at run time.
+//!
+//! `backtrace` is the short form of `anti.lang.StackTrace.capture`, whose
+//! first frame is the caller of `backtrace`.
+
+import anti.lang;
+
+/// The trace of the caller and the calls above it, without the `skip`
+/// innermost frames.
+pub fn backtrace(skip: int = 0) -> *lang.StackTrace
+{
+	let t = lang.StackTrace.capture(skip + 1);
+	return t;
+}

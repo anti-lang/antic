@@ -1,0 +1,32 @@
+//! `anti.debug.backtrace` is the short form of
+//! `anti.lang.StackTrace.capture`. Its first frame is its caller, and a
+//! skip leaves out that many frames more.
+
+import anti.debug;
+import anti.io;
+import anti.lang;
+
+/// The trace from inside a function, which is its first frame.
+fn inside() -> *lang.StackTrace
+{
+	return debug.backtrace();
+}
+
+/// The trace without the frame of this function.
+fn above() -> *lang.StackTrace
+{
+	return debug.backtrace(1);
+}
+
+fn main() -> int
+{
+	let t = inside();
+	defer delete(t);
+	let named = t.symbolize();
+	io.println(named[0].function);
+	io.println(named[1].function);
+	let u = above();
+	defer delete(u);
+	io.println(u.symbolize()[0].function);
+	return 0;
+}

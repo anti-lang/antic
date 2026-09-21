@@ -1,0 +1,10 @@
+stack_trace\.inner :0
+stack_trace\.outer :0
+stack_trace\.main :0
+again 1
+at least 3 1
+id @BUILD_ID@
+one module 1
+address 1
+stack_trace\.main :0
+module 0 @BUILD_ID@ 0x[0-9a-f]+ .*stack_trace

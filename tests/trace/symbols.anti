@@ -1,0 +1,16 @@
+//! A program whose functions the probe of rt/symbols.c looks up in the
+//! binaries of other targets.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn inner(n: int) -> int
+{
+	let doubled = n * 2;
+	return doubled + 1;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, inner(20) as c_int);
+	return 0;
+}

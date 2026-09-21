@@ -223,8 +223,8 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
 set(ANTIC_RUNTIME_SOURCES assert atomic call cast check cpu errno fs init io
-    license object platform reflect registry signal start text threads time
-    toml utf)
+    license object platform reflect registry signal start symbols text
+    threads time toml trace utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "rt/${source}.c")
@@ -349,7 +349,9 @@ function(anti_cross_runtime_at target triple level root)
                 "${PROJECT_SOURCE_DIR}/rt/cpu_level.h"
                 "${PROJECT_SOURCE_DIR}/rt/reflect.h"
                 "${PROJECT_SOURCE_DIR}/rt/signal.h"
+                "${PROJECT_SOURCE_DIR}/rt/symbols.h"
                 "${PROJECT_SOURCE_DIR}/rt/toml.h"
+                "${PROJECT_SOURCE_DIR}/rt/trace.h"
                 "${PROJECT_SOURCE_DIR}/rt/utf.h"
             VERBATIM)
         list(APPEND objects "${object}")
@@ -428,7 +430,7 @@ endif()
 
 # The standard library in std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
-set(ANTIC_STD_MODULES lang io text license error time os fs reflect random collection toml args json log)
+set(ANTIC_STD_MODULES lang debug io text license error time os fs reflect random collection toml args json log)
 set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/std/anti")
 set(std_files "")
 foreach(module IN LISTS ANTIC_STD_MODULES)
