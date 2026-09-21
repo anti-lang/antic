@@ -126,7 +126,7 @@ struct expr {
     struct pos pos;
     struct token_text spelling;     /* source text of a literal */
     struct type *type;              /* set by semantic analysis */
-    struct symbol *symbol;          /* EXPR_NAME, set by semantic analysis */
+    struct symbol *symbol;          /* EXPR_NAME, set by semantic analysis. */
     /* DESIGN: a pointer to a class converts to a pointer to one of its
        interfaces by adding the offset of the sub-object. The checker
        records the field here and lowering adds the offset, so every
@@ -397,7 +397,7 @@ struct param {
     struct doc_text doc;            /* fields only */
     struct doc_text note;           /* fields only */
     struct expr *bits;              /* the width of a bitfield, or NULL */
-    struct expr *value;             /* a field default or an enum value */
+    struct expr *value;             /* a field default or an enum value. */
     enum field_form form;           /* fields only */
     enum visibility vis;            /* fields only */
     bool owned;                     /* `own`: the object frees the memory */
@@ -448,16 +448,16 @@ struct item {
     enum fn_block block;            /* ITEM_FN: `tests` or `fixtures` */
     bool has_self;                  /* ITEM_FN: self is its first parameter */
     struct symbol *self;            /* ITEM_FN: the symbol of self */
-    const char *runtime;            /* ITEM_FN of the root: its C symbol */
-    const struct item *owner;       /* the class or enum that declares it */
+    const char *runtime;            /* ITEM_FN of the root: its C symbol. */
+    const struct item *owner;       /* the class or enum that declares it. */
     struct type_expr *base;         /* ITEM_ENUM: the underlying type, or NULL */
     struct name base_name;          /* ITEM_CLASS: the base after `inherits` */
     struct name base_module;        /* ITEM_CLASS: the module of the base,
-                                       empty when unqualified */
+                                       empty when unqualified. */
     struct pos base_pos;
     bool is_abstract;               /* ITEM_CLASS, or ITEM_FN in a body */
     bool is_final;                  /* ITEM_CLASS, ITEM_FN */
-    bool is_static;                 /* a static atomic field of a class */
+    bool is_static;                 /* a static atomic field of a class. */
     bool atomic;                    /* ITEM_CONST with is_static */
     bool is_singleton;              /* ITEM_CLASS with one instance */
     bool singleton_get;             /* the generated `get` of a singleton */

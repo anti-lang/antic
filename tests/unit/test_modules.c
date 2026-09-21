@@ -1227,10 +1227,11 @@ static void refuses_file(const uint8_t *data, size_t size,
 
 static void damaged_files(void)
 {
-    /* Where the fields a poke below reaches sit, counted back from the end
-       of the file: the classes, two instructions of 53 bytes each and the
-       15 bytes that open the body, then the one parameter of the
-       signature, its count, the source of the function and its result. */
+    /* Where the fields a poke below reaches sit, counted back from the
+       end of the file. First the classes, two instructions of 53 bytes
+       each and the 15 bytes that open the body. Then the one parameter of
+       the signature, its count, the source of the function and its
+       result. */
     enum {
         TAIL = 4 + 2 * 53 + 15,
         MUL_OPERAND = 4 + 2 * 53 - 12,

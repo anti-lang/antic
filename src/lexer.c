@@ -524,8 +524,8 @@ static bool skip_block(struct lexer *lx, size_t skip)
 }
 
 /* DESIGN: a block doc of one line holds its text between the opener and
-   the closer, the form C programmers write for a short comment. Over
-   several lines the text starts on the line after the opener and ends on
+   the closer, the form C programmers write for a short comment. Over more
+   lines than one the text starts on the line after the opener and ends on
    the line before the closer. A line then holds text or a delimiter, and
    the block form gives the text of the line form. */
 static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
