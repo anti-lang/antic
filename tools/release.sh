@@ -5,10 +5,12 @@
 #   ./r --dry-run
 #   ./r --resume
 #   ./r --skip-vms
+#   ./r --matrix
 #
 # A dry run performs steps 1 to 5 and prints a plan for the rest.
 # --resume starts at the first step whose output is missing.
 # --skip-vms leaves the two VMs out and marks a pre-release.
+# --matrix runs the runner matrix of step 8, which a release leaves out.
 #
 # The version stands in tools/version, with its entry in CHANGELOG.md.
 # Everything a run writes goes under build/dist, and a rerun keeps what
@@ -55,13 +57,15 @@ site_key_path=${key_url#"$site_base/"}
 
 dry_run=no
 skip_vms=no
+run_matrix=no
 for argument in "$@"; do
     case $argument in
     --dry-run) dry_run=yes ;;
     --resume) ;;
     --skip-vms) skip_vms=yes ;;
+    --matrix) run_matrix=yes ;;
     *)
-        echo "usage: ./r [--dry-run] [--resume] [--skip-vms]" >&2
+        echo "usage: ./r [--dry-run] [--resume] [--skip-vms] [--matrix]" >&2
         exit 2
         ;;
     esac
@@ -838,9 +842,19 @@ tag_and_release() {
     finished 07 release
 }
 
-# Step 8. The one workflow run a release is allowed. A failure leaves
-# the release as a pre-release, and the report says so.
+# Step 8. The runner matrix, which is no part of a release and runs when
+# --matrix asks for it. It is then the one workflow run a release is
+# allowed, and a failure leaves the release as a pre-release.
+#
+# DESIGN: a release runs its suite on the Mac and on both VMs, in steps 2
+# and 5, before a package is built. The six hosted runners repeat that on
+# machines nobody here owns, and hosted minutes are limited. Eddie decided
+# on 2026-09-21 that a release does not spend them.
 matrix() {
+    if [ "$run_matrix" = no ]; then
+        printf 'r: step 8, the runner matrix, left out. --matrix runs it.\n'
+        return 0
+    fi
     if [ "$dry_run" = yes ]; then
         printf 'r: step 8, the runner matrix\n'
         say "would run the workflow test.yml on $tag and wait for it"

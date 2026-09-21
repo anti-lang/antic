@@ -378,7 +378,7 @@ foreach(name packages/SHA256SUMS.sig state/06-digests state/07-release)
 endforeach()
 foreach(line "would sign" "would tag v${version}" "would create the release"
         "would upload 13 files" "would upload no SHA256SUMS.sig"
-        "would run the workflow" "would rsync tools/install.sh"
+        "the runner matrix, left out" "would rsync tools/install.sh"
         "would rsync the downloads page" "would rsync SHA256SUMS.sig"
         "keys/release.pem" "would install")
     if(NOT out MATCHES "${line}")
@@ -386,6 +386,12 @@ foreach(line "would sign" "would tag v${version}" "would create the release"
                             "`${line}` is missing\n${out}${err}")
     endif()
 endforeach()
+
+# DESIGN: the runner matrix is no step of a release. --matrix runs it, and
+# a run without the flag names no workflow at all.
+if(out MATCHES "would run the workflow")
+    message(FATAL_ERROR "step 8 runs the runner matrix without --matrix\n${out}")
+endif()
 
 # DESIGN: the assets of the release are the twelve files and the manifest.
 # The signature stands on the site, so the plan of step 7 names it only to
