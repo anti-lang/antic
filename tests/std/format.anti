@@ -1,0 +1,67 @@
+//! The functions of `text.Builder` that write a value into a field of a
+//! width, which an `f"..."` calls, called by a program with the defaults
+//! of their last parameters, and `take`, which hands the bytes over.
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	b.append_int(-255);
+	b.append_byte(0x20);
+	b.append_int(255, 16, true, 6, text.Align.Right, true);
+	b.append_byte(0x20);
+	b.append_int(35, 36);
+	b.append_byte(0x20);
+	b.append_int(7, 99);
+	b.append_byte(0x7C);
+	b.append_uint(9, 10, false, 3, text.Align.Left);
+	b.append_byte(0x7C);
+	io.println(b.text());
+	b.clear();
+
+	let huge = 1.0e308;
+	let infinite = huge * 10.0;
+	b.append_float(2.5);
+	b.append_byte(0x20);
+	b.append_float(2.5, 3);
+	b.append_byte(0x20);
+	b.append_float(2.5, -1, true);
+	b.append_byte(0x20);
+	b.append_float(infinite);
+	b.append_byte(0x20);
+	b.append_float(-infinite, -1, false, 6);
+	b.append_byte(0x20);
+	b.append_float(infinite - infinite);
+	b.append_byte(0x20);
+	b.append_f32(0.1);
+	b.append_byte(0x20);
+	b.append_float((0.1 as f32) as f64);
+	io.println(b.text());
+	b.clear();
+
+	b.append_text("ab", 7, text.Align.Center);
+	b.append_byte(0x7C);
+	b.append_char('\u{20AC}', 3, text.Align.Right);
+	b.append_byte(0x7C);
+	b.append_bool(true, 5);
+	b.append_byte(0x7C);
+	io.println(b.text());
+
+	let taken = b.take();
+	if b.len() != 0 || taken.len != 20 {
+		return 1;
+	}
+	b.append("again");
+	io.println(taken);
+	io.println(b.text());
+	free(taken.ptr);
+	let nothing = b.take();
+	let none_left = b.take();
+	if nothing.len != 5 || none_left.len != 0 {
+		return 2;
+	}
+	free(nothing.ptr);
+	free(none_left.ptr);
+	return 0;
+}

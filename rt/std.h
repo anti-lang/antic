@@ -71,6 +71,22 @@ void anti_rt_builder_append(struct anti_builder *b,
 struct anti_text anti_rt_builder_text(const struct anti_builder *b);
 void anti_rt_builder_clear(struct anti_builder *b);
 
+/* Put count copies of byte at position at, and move what stood there
+   after them. */
+void anti_rt_builder_fill(struct anti_builder *b, int64_t at, int64_t byte,
+                          int64_t count);
+
+/* Hand the bytes to the caller, who frees them, and leave the builder
+   empty. */
+struct anti_text anti_rt_builder_take(struct anti_builder *b);
+
+/* Append value, with precision digits after the point, or with the
+   fewest that read back as the same value when precision is negative. A
+   precision above 100000000 counts as 100000000. exponent writes the
+   form `d.ddde+XX`, and single reads the digits back as a float. */
+void anti_rt_builder_float(struct anti_builder *b, double value,
+                           int64_t precision, int64_t exponent, int64_t single);
+
 /* The lines of anti_licenses between its markers. */
 struct anti_text anti_rt_license_text(void);
 

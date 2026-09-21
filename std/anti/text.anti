@@ -2,9 +2,10 @@
 //!
 //! A `str` holds UTF-8 bytes and their count. `from_c` makes one from a C
 //! string, and `equal` compares two by their bytes. `Builder` collects
-//! bytes and gives the `str` of what it collected. `parse_int` reads the
-//! integer a text spells and may fail, and every other function of the
-//! module cannot.
+//! bytes and gives the `str` of what it collected. It writes numbers,
+//! truth values, characters and texts into fields of a width, which is
+//! what an `f"..."` calls. `parse_int` reads the integer a text spells
+//! and may fail, and every other function of the module cannot.
 
 import anti.lang;
 
@@ -15,6 +16,10 @@ extern fn anti_rt_text_slice(bytes: ?*byte, len: int) -> str;
 extern fn anti_rt_builder_append(b: ?*Builder, bytes: ?*byte, len: int);
 extern fn anti_rt_builder_text(b: ?*Builder) -> str;
 extern fn anti_rt_builder_clear(b: ?*Builder);
+extern fn anti_rt_builder_fill(b: ?*Builder, at: int, value: int, count: int);
+extern fn anti_rt_builder_take(b: ?*Builder) -> str;
+extern fn anti_rt_builder_float(b: ?*Builder, value: f64, precision: int,
+	exponent: int, single: int);
 
 /// Whether `a` and `b` hold the same bytes.
 pub fn equal(a: str, b: str) -> bool
@@ -53,6 +58,9 @@ pub fn char_count(s: str) -> int
 	}
 	return count;
 }
+
+/// Where a value stands in a field wider than its text.
+pub enum Align: u8 { Left, Right, Center }
 
 /// A growing buffer of bytes that gives a `str`.
 ///
@@ -104,6 +112,185 @@ pub class Builder
 	pub fn clear(self)
 	{
 		anti_rt_builder_clear(self);
+	}
+
+	/// The bytes collected so far, which now belong to the caller.
+	///
+	/// The `str` holds memory of its own from the C library, which
+	/// `free(s.ptr)` returns. The builder is empty afterwards and may
+	/// collect again.
+	pub fn take(self) -> str
+	{
+		return anti_rt_builder_take(self);
+	}
+
+	/// Write `value` in base `radix` into a field `width` characters
+	/// wide.
+	///
+	/// A negative value starts with `-`. A radix outside 2 to 36 counts
+	/// as 10, and `upper` writes the digits above 9 as capitals. `zero`
+	/// fills the field with `0` after the sign, and `align` then does
+	/// not apply.
+	pub fn append_int(self, value: int, radix: int = 10, upper: bool = false,
+		width: int = 0, align: Align = Align.Right, zero: bool = false)
+	{
+		let start = self.length;
+		if value < 0 {
+			self.append_byte(0x2D);
+			/* The magnitude of the lowest int lies one past the highest,
+			   so it is taken one step nearer zero and the step is added
+			   back as a u64. */
+			self.put_digits(((-(value + 1)) as u64) + 1, radix, upper);
+		} else {
+			self.put_digits(value as u64, radix, upper);
+		}
+		self.pad(start, width, align, zero);
+	}
+
+	/// Write `value` in base `radix` into a field `width` characters
+	/// wide, as `append_int` does for an `int`.
+	pub fn append_uint(self, value: u64, radix: int = 10,
+		upper: bool = false, width: int = 0, align: Align = Align.Right,
+		zero: bool = false)
+	{
+		let start = self.length;
+		self.put_digits(value, radix, upper);
+		self.pad(start, width, align, zero);
+	}
+
+	/// Write `value` with `precision` digits after the point into a field
+	/// `width` characters wide.
+	///
+	/// A negative `precision` writes the fewest digits that read back as
+	/// the same value. They stand in positional form when the first
+	/// digit is worth 10 to the power -4 up to 15, and in the form
+	/// `d.ddde+XX` otherwise. `exponent` writes that form always. `nan`,
+	/// `inf` and `-inf` stand for the values without digits. `zero`
+	/// fills the field with `0` after the sign, and `align` then does
+	/// not apply.
+	pub fn append_float(self, value: f64, precision: int = -1,
+		exponent: bool = false, width: int = 0, align: Align = Align.Right,
+		zero: bool = false)
+	{
+		let start = self.length;
+		anti_rt_builder_float(self, value, precision, exponent as int, 0);
+		self.pad(start, width, align, zero);
+	}
+
+	/// Write `value` as `append_float` does, where the fewest digits are
+	/// the ones that read back as the same `f32`.
+	pub fn append_f32(self, value: f32, precision: int = -1,
+		exponent: bool = false, width: int = 0, align: Align = Align.Right,
+		zero: bool = false)
+	{
+		let start = self.length;
+		anti_rt_builder_float(self, value as f64, precision, exponent as int,
+			1);
+		self.pad(start, width, align, zero);
+	}
+
+	/// Write `true` or `false` into a field `width` characters wide.
+	pub fn append_bool(self, value: bool, width: int = 0,
+		align: Align = Align.Left)
+	{
+		if value {
+			self.append_text("true", width, align);
+		} else {
+			self.append_text("false", width, align);
+		}
+	}
+
+	/// Write the UTF-8 bytes of `value` into a field `width` characters
+	/// wide.
+	pub fn append_char(self, value: char, width: int = 0,
+		align: Align = Align.Left)
+	{
+		let start = self.length;
+		let code = value as u32;
+		if code < 0x80 {
+			self.append_byte(code as byte);
+		} else if code < 0x800 {
+			self.append_byte((0xC0 | (code >> 6)) as byte);
+			self.append_byte((0x80 | (code & 0x3F)) as byte);
+		} else if code < 0x10000 {
+			self.append_byte((0xE0 | (code >> 12)) as byte);
+			self.append_byte((0x80 | ((code >> 6) & 0x3F)) as byte);
+			self.append_byte((0x80 | (code & 0x3F)) as byte);
+		} else {
+			self.append_byte((0xF0 | (code >> 18)) as byte);
+			self.append_byte((0x80 | ((code >> 12) & 0x3F)) as byte);
+			self.append_byte((0x80 | ((code >> 6) & 0x3F)) as byte);
+			self.append_byte((0x80 | (code & 0x3F)) as byte);
+		}
+		self.pad(start, width, align, false);
+	}
+
+	/// Copy the bytes of `value` into a field `width` characters wide.
+	pub fn append_text(self, value: str, width: int = 0,
+		align: Align = Align.Left)
+	{
+		let start = self.length;
+		self.append(value);
+		self.pad(start, width, align, false);
+	}
+
+	/// The digits of `value` in base `radix`, highest first.
+	fn put_digits(self, value: u64, radix: int, upper: bool)
+	{
+		let base: u64 = 10;
+		if radix >= 2 && radix <= 36 {
+			base = radix as u64;
+		}
+		let letters: byte = 0x61;
+		if upper {
+			letters = 0x41;
+		}
+		/* The digits come out lowest first, so they are gathered from the
+		   end of the array towards its start. */
+		let digits: [64]byte = [0; 64];
+		let at = 64;
+		let n = value;
+		do {
+			let digit = (n % base) as byte;
+			at -= 1;
+			if digit < 10 {
+				digits[at] = 0x30 + digit;
+			} else {
+				digits[at] = letters + digit - 10;
+			}
+			n = n / base;
+		} while n != 0
+		while at < 64 do {
+			self.append_byte(digits[at]);
+			at += 1;
+		}
+	}
+
+	/// Widen the text written since `start` to `width` characters, with
+	/// spaces on the sides `align` names, or with `0` after a leading
+	/// `-` when `zero` is set.
+	fn pad(self, start: int, width: int, align: Align, zero: bool)
+	{
+		let whole = anti_rt_builder_text(self);
+		let missing = width - char_count(slice(whole, start, whole.len));
+		if missing <= 0 {
+			return;
+		}
+		if zero {
+			let at = start;
+			if whole.len > start && whole[start] == 0x2D {
+				at += 1;
+			}
+			anti_rt_builder_fill(self, at, 0x30, missing);
+		} else if align == Align.Left {
+			anti_rt_builder_fill(self, self.length, 0x20, missing);
+		} else if align == Align.Right {
+			anti_rt_builder_fill(self, start, 0x20, missing);
+		} else {
+			anti_rt_builder_fill(self, start, 0x20, missing / 2);
+			anti_rt_builder_fill(self, self.length, 0x20,
+				missing - missing / 2);
+		}
 	}
 }
 
