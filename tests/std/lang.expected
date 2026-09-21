@@ -2,8 +2,8 @@ exit 0
 error 3: cannot read the configuration
   caused by: error 2: no such file
 error 5: same
-{"type":"Error","code":5,"message":"same","cause":null}
-not one digit
+{"type":"Error","code":5,"message":"same","cause":null,"at":{"file":"","line":0,"column":0,"function":"","module":""},"frames":null}
+lang.anti:13:3: not one digit
 error -12: below zero
 error -9223372036854775808: lowest
 error 9223372036854775807: highest

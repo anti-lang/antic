@@ -1,0 +1,69 @@
+//! `fail` writes the position of its statement into the error it gives,
+//! when the error has none yet, and captures the frames there when
+//! backtraces are on. The first `fail` wins, so an error that `try`
+//! forwards or a handler fails again keeps its origin. `e.text()` names
+//! the position, then the cause chain, then the trace.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn deep(n: int) -> int may fail
+{
+	if n < 0 { fail "n is negative"; }
+	return n;
+}
+
+fn forwarded(n: int) -> int may fail
+{
+	let v = try deep(n);
+	return v;
+}
+
+fn wrapped(n: int) -> int may fail
+{
+	let v = deep(n) catch e {
+		fail lang.Error.wrap(2, "wrapped", e);
+	};
+	return v;
+}
+
+fn again(n: int) -> int may fail
+{
+	let v = deep(n) catch e {
+		fail e;
+	};
+	return v;
+}
+
+/// Print the origin of an error and its text.
+fn show(e: *lang.Error)
+{
+	let at = e.at;
+	printf("at %.*s:%d:%d %.*s %.*s\n".ptr, at.file.len as c_int,
+	       at.file.ptr, at.line as c_int, at.column as c_int,
+	       at.function.len as c_int, at.function.ptr, at.module.len as c_int,
+	       at.module.ptr);
+	let t = e.text();
+	printf("%.*s\n".ptr, t.len as c_int, t.ptr);
+}
+
+fn main() -> int
+{
+	let a = forwarded(-1) catch e {
+		show(e);
+		yield 0;
+	};
+	let b = wrapped(-1) catch e {
+		show(e);
+		yield 0;
+	};
+	let c = again(-1) catch e {
+		show(e);
+		yield 0;
+	};
+	let fresh = lang.Error.new(3, "never failed");
+	show(fresh);
+	delete(fresh);
+	return a + b + c;
+}

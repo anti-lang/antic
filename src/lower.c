@@ -5434,6 +5434,60 @@ static void assert_branch(struct lowerer *l, struct ir_operand cond,
     l->b = rest;
 }
 
+/* DESIGN: the first `fail` of an error writes its position and, when
+   backtraces are on, its frames. An error whose `at` holds a line
+   already keeps both, so the one that `try` forwards or a handler fails
+   again names where it began. The test is a load and a branch, and the
+   rest runs once per error. Whether backtraces are on is a call of the
+   runtime, which the program's build and the command line decide. */
+static void write_origin(struct lowerer *l, const struct stmt *s,
+                         struct ir_operand err)
+{
+    static const struct name at_name = {LANG_ERROR_AT,
+                                        sizeof LANG_ERROR_AT - 1};
+    static const struct name frames_name = {LANG_ERROR_FRAMES,
+                                            sizeof LANG_ERROR_FRAMES - 1};
+    static const struct name line_name = {LANG_LOCATION_LINE,
+                                          sizeof LANG_LOCATION_LINE - 1};
+    const struct type *error = s->as.fail.error;
+    const struct type *location = field_of(error, &at_name)->type;
+    struct ir_block *empty = new_block(l);
+    struct ir_block *capture = new_block(l);
+    struct ir_block *rest = new_block(l);
+    struct ir_operand at;
+    struct ir_operand line;
+    struct ir_operand place;
+    struct ir_operand on;
+    struct ir_operand skip;
+    struct ir_operand trace;
+
+    at = offset_address(l, err, field_offset(l, error, &at_name));
+    line = temp(l, ir_load(l->f, l->b, IR_I64,
+                           offset_address(l, at, field_offset(l, location,
+                                                              &line_name))));
+    ir_branch(l->f, l->b,
+              temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, line,
+                                ir_int_op(IR_I64, 0))),
+              empty, rest);
+    l->b = empty;
+    place = const_address(l, location_value(l, s->pos, location), location);
+    ir_memcopy(l->f, l->b, at, place, vtype_of(l, location));
+    on = temp(l, ir_call(l->f, l->b, IR_I8,
+                         ir_func_op(rt_function_giving(
+                             l, "anti_rt_backtrace_on", IR_I8, NULL, 0)),
+                         NULL, 0));
+    ir_branch(l->f, l->b, on, capture, rest);
+    l->b = capture;
+    skip = ir_int_op(IR_I64, 0);
+    trace = temp(l, ir_call(l->f, l->b, IR_PTR,
+                            ir_func_op(callee_function(l, s->as.fail.capture)),
+                            &skip, 1));
+    ir_store(l->f, l->b, IR_PTR, trace,
+             offset_address(l, err, field_offset(l, error, &frames_name)));
+    ir_jump(l->f, l->b, rest);
+    l->b = rest;
+}
+
 /* `fail e;` and `fail "text";` leave on the error channel. The error is
    built before the deferred statements of the block run, so an `undo` or
    a `defer` cannot change what the function reports. */
@@ -5455,6 +5509,10 @@ static void lower_fail(struct lowerer *l, const struct stmt *s)
     }
     if (l->failed) {
         return;
+    }
+    if (s->as.fail.error != NULL && s->as.fail.capture != NULL) {
+        err = temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, err));
+        write_origin(l, s, err);
     }
     if (has_defers(l)) {
         err = temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, err));

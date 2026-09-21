@@ -1340,7 +1340,7 @@ if(NOT WIN32)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_licenses.cmake")
 endif()
 
-# Stack traces. A trace holds addresses that
+# Stack traces and the origin of an error. A trace holds addresses that
 # differ from run to run, so run_trace.cmake matches the output against
 # patterns. Each case is a name, the source in tests/trace, the options of
 # antic and the arguments of the program. The pattern files of the output
@@ -1350,7 +1350,14 @@ set(TRACE "${CMAKE_CURRENT_SOURCE_DIR}/trace")
 foreach(case
         "stack|stack_trace|||stack_trace.pattern||0"
         "stack_g|stack_trace|-g||stack_trace.g.pattern||0"
-        "stack_dev|stack_trace|--dev||stack_trace.pattern||0")
+        "stack_dev|stack_trace|--dev||stack_trace.pattern||0"
+        "origin|origin|||origin.pattern||0"
+        "origin_dev|origin|--dev||origin.trace.pattern||0"
+        "origin_option|origin||--anti.backtrace|origin.trace.pattern||0"
+        "origin_dev_off|origin|--dev|--anti.backtrace=false|origin.pattern||0"
+        "options|options||--anti.backtrace,plain,--anti.backtrace=false,last|options.pattern||0"
+        "options_unknown|options||--anti.nonsense|options.empty.pattern|options.unknown.pattern|70"
+        "options_value|options||--anti.backtrace=maybe|options.empty.pattern|options.value.pattern|70")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 source)

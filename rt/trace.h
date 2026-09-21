@@ -24,6 +24,11 @@ struct anti_frame {
     int64_t line;
 };
 
+/* Whether `fail` captures the frames of the error it gives. The build
+   decides, on in dev mode and off in release, unless the command line
+   named --anti.backtrace. */
+bool anti_rt_backtrace_on(void);
+
 /* The return addresses of the caller and the calls above it, at most
    room of them into into, less the skip innermost. Gives the count. */
 int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip);

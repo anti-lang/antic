@@ -2617,6 +2617,61 @@ static struct symbol *error_maker(struct checker *c, struct pos pos)
     return m->symbol;
 }
 
+/* `anti.lang.StackTrace.capture`, which a `fail` calls with the count of
+   frames to skip, or NULL after an error at pos. */
+static struct symbol *trace_capture(struct checker *c, struct pos pos)
+{
+    static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
+    static const struct name class_name = {LANG_STACK_TRACE,
+                                           sizeof LANG_STACK_TRACE - 1};
+    static const struct name capture = {LANG_TRACE_CAPTURE,
+                                        sizeof LANG_TRACE_CAPTURE - 1};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+    const struct item *m;
+
+    if (sym == NULL && name_is(&c->module_name, LANG_MODULE)) {
+        sym = lookup(c, &class_name);
+    }
+    m = sym != NULL && sym->kind == SYMBOL_STRUCT && sym->type != NULL
+            ? find_member(sym->type, &capture)
+            : NULL;
+    if (m == NULL || m->symbol == NULL || m->symbol->type == NULL ||
+        m->symbol->type->kind != TYPE_FN ||
+        m->symbol->type->param_count != 1) {
+        error_at(c, pos, "`fail` captures the frames with `" LANG_MODULE "."
+                 LANG_STACK_TRACE "." LANG_TRACE_CAPTURE
+                 "`, which takes the count of frames to skip");
+        return NULL;
+    }
+    return m->symbol;
+}
+
+/* Resolve what a `fail` writes into the error it gives: the position in
+   `at` and the frames in `frames` of `anti.lang.Error`. */
+static void resolve_origin(struct checker *c, struct stmt *s)
+{
+    static const struct name at = {LANG_ERROR_AT, sizeof LANG_ERROR_AT - 1};
+    static const struct name frames = {LANG_ERROR_FRAMES,
+                                       sizeof LANG_ERROR_FRAMES - 1};
+    struct type *error = error_class(c, s->pos);
+    const struct struct_field *where =
+        error != NULL ? find_field(error, &at) : NULL;
+
+    if (error == NULL) {
+        return;
+    }
+    if (where == NULL || find_field(error, &frames) == NULL ||
+        where->type != location_type(c, s->pos)) {
+        error_at(c, s->pos, "`fail` writes `" LANG_ERROR_AT "` and `"
+                 LANG_ERROR_FRAMES "` of `" LANG_MODULE "." LANG_ERROR
+                 "`, which this `" LANG_MODULE "` lacks");
+        return;
+    }
+    s->as.fail.error = error;
+    s->as.fail.capture = trace_capture(c, s->pos);
+}
+
 /* The `*Error` a handler binds, from the `?*Error` a failing function
    returns. */
 static struct type *caught_error(struct checker *c, struct type *result)
@@ -5656,6 +5711,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         s->error_exit = true;
         c->saw_fail = true;
+        resolve_origin(c, s);
         /* `fail "text";` builds the error from the text. Every other
            value is an error the program has in hand. */
         if (s->as.fail.value->kind == EXPR_STRING) {

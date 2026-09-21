@@ -382,6 +382,13 @@ struct stmt {
         struct {
             struct expr *value;
             struct symbol *make;
+            /* DESIGN: the class `anti.lang.Error`, whose `at` the
+               statement writes when it holds no position yet, and
+               `StackTrace.capture`, which fills `frames` there when
+               backtraces are on. The checker resolves both, so lowering
+               reads the fields and calls the function directly. */
+            const struct type *error;
+            struct symbol *capture;
         } fail;
         struct expr *yielded;       /* STMT_YIELD, NULL without a value */
         /* `try { } catch e { }`: every failing call of the body reaches

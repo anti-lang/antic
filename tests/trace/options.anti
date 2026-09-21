@@ -1,0 +1,16 @@
+//! The runtime takes every `--anti.` argument before `main` sees them, and
+//! hands the rest on in their order. `--anti.backtrace` turns the frames
+//! of an error on in a release build.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	printf("args %d\n".ptr, args.len as c_int);
+	for i in 1..args.len {
+		printf("%.*s\n".ptr, args[i].len as c_int, args[i].ptr);
+	}
+	return 0;
+}

@@ -161,6 +161,10 @@ pub class StackTrace
 }
 
 /// A failure, with a code, a message and the error that caused it.
+///
+/// The first `fail` of an error writes where it stands into `at`, and
+/// captures the frames there when backtraces are on. They are on in dev
+/// mode, and `--anti.backtrace` turns them on in a release build.
 pub class Error
 {
 	/// The code of the failure, which the caller may switch on.
@@ -169,6 +173,16 @@ pub class Error
 	pub message: str = "",
 	/// The error below this one, or `none`.
 	protected own cause: ?*Error = none,
+	/// The position of the first `fail` of this error, line 0 before it.
+	pub at: SourceLocation = SourceLocation {
+		file: "",
+		line: 0,
+		column: 0,
+		function: "",
+		module: "",
+	},
+	/// The frames at the first `fail` when backtraces are on, or `none`.
+	own frames: ?*StackTrace = none,
 	/// The bytes `text` gave, ended by a NUL. `dup` leaves the copy
 	/// without them, and it formats its own.
 	transient text_cache: ?*byte = none,
@@ -185,13 +199,15 @@ pub class Error
 		return alloc Error { code: code, message: message, cause: cause };
 	}
 
-	/// This error and every cause below it, in one text.
+	/// This error and every cause below it, in one text, and its trace.
 	///
 	/// Each error is `error N: message`, or the message alone when its
-	/// code is 0. Every cause follows on a line of its own after
-	/// `  caused by: `. The text is formed at the first call, and the
-	/// error keeps its bytes until it is deleted. When the memory for
-	/// them runs out, the text is the message alone.
+	/// code is 0, after `file:line:column: ` when a `fail` gave it a
+	/// position. Every cause follows on a line of its own after
+	/// `  caused by: `, and the trace of this error follows the causes
+	/// when it has one. The text is formed at the first call, and the
+	/// error keeps its bytes until it is deleted. When the memory for them
+	/// runs out, the text is the message alone.
 	pub fn text(self) -> str
 	{
 		let made = self.text_cache;
@@ -199,21 +215,34 @@ pub class Error
 			return anti_rt_text_from_c(made);
 		}
 		let caused_by = "\n  caused by: ";
-		let length = line_length(self.code, self.message);
+		let length = line_length(self.at, self.code, self.message);
 		let below = self.cause;
 		while below != none do {
-			length += caused_by.len + line_length(below.code, below.message);
+			length += caused_by.len +
+				line_length(below.at, below.code, below.message);
 			below = below.cause;
+		}
+		let trace = "";
+		let frames = self.frames;
+		if frames != none {
+			trace = frames.text();
+		}
+		if trace.len > 0 {
+			length += 1 + trace.len;
 		}
 		let room = alloc(byte, length + 1) else {
 			return self.message;
 		};
-		let at = put_line(room, 0, self.code, self.message);
+		let at = put_line(room, 0, self.at, self.code, self.message);
 		below = self.cause;
 		while below != none do {
 			at = put_text(room, at, caused_by);
-			at = put_line(room, at, below.code, below.message);
+			at = put_line(room, at, below.at, below.code, below.message);
 			below = below.cause;
+		}
+		if trace.len > 0 {
+			at = put_text(room, at, "\n");
+			at = put_text(room, at, trace);
 		}
 		room[at] = 0;
 		self.text_cache = room;
@@ -279,23 +308,38 @@ internal singleton class Fatal
 }
 
 /// The number of bytes `put_line` writes for one error of a chain.
-fn line_length(code: int, message: str) -> int
+fn line_length(origin: SourceLocation, code: int, message: str) -> int
 {
-	if code == 0 {
-		return message.len;
+	let length = message.len;
+	if origin.line != 0 {
+		length += origin.file.len + 1 + digits_of(origin.line) + 1 +
+			digits_of(origin.column) + 2;
 	}
-	return 6 + digits_of(code) + 2 + message.len;
+	if code != 0 {
+		length += 6 + digits_of(code) + 2;
+	}
+	return length;
 }
 
-/// Write one error of a chain at `at`, and give the index after it.
-fn put_line(room: *byte, at: int, code: int, message: str) -> int
+/// Write one error of a chain at `at`, after its position when it has
+/// one, and give the index after it.
+fn put_line(room: *byte, at: int, origin: SourceLocation, code: int,
+	message: str) -> int
 {
-	if code == 0 {
-		return put_text(room, at, message);
+	let next = at;
+	if origin.line != 0 {
+		next = put_text(room, next, origin.file);
+		next = put_text(room, next, ":");
+		next = put_int(room, next, origin.line);
+		next = put_text(room, next, ":");
+		next = put_int(room, next, origin.column);
+		next = put_text(room, next, ": ");
 	}
-	let next = put_text(room, at, "error ");
-	next = put_int(room, next, code);
-	next = put_text(room, next, ": ");
+	if code != 0 {
+		next = put_text(room, next, "error ");
+		next = put_int(room, next, code);
+		next = put_text(room, next, ": ");
+	}
 	return put_text(room, next, message);
 }
 

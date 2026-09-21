@@ -1,0 +1,18 @@
+at origin\.anti:13:13 origin\.deep origin
+origin\.anti:13:13: n is negative
+module 0 @BUILD_ID@ 0x[0-9a-f]+ .*origin
+* module [0-9]+ [-0-9a-f]+ 0x[0-9a-f]+ .*
++ 0x[0-9a-f]+ ([0-9]+\+0x[0-9a-f]+|-)
+at origin\.anti:26:3 origin\.wrapped origin
+origin\.anti:26:3: error 2: wrapped
+  caused by: origin\.anti:13:13: n is negative
+module 0 @BUILD_ID@ 0x[0-9a-f]+ .*origin
+* module [0-9]+ [-0-9a-f]+ 0x[0-9a-f]+ .*
++ 0x[0-9a-f]+ ([0-9]+\+0x[0-9a-f]+|-)
+at origin\.anti:13:13 origin\.deep origin
+origin\.anti:13:13: n is negative
+module 0 @BUILD_ID@ 0x[0-9a-f]+ .*origin
+* module [0-9]+ [-0-9a-f]+ 0x[0-9a-f]+ .*
++ 0x[0-9a-f]+ ([0-9]+\+0x[0-9a-f]+|-)
+at :0:0  
+error 3: never failed

@@ -550,6 +550,40 @@ static void write_registry(struct ir_module *m, bool reflect)
     free(items);
 }
 
+/* The runtime function that every `fail` asks whether backtraces are
+   on. */
+static bool asks_backtrace(const struct ir_module *m, const struct reach *r)
+{
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        if (r->functions[i] && m->functions[i]->module == NULL &&
+            strcmp(m->functions[i]->name, "anti_rt_backtrace_on") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: backtraces are on in dev mode and off in release. The build
+   of the program decides, whichever build wrote the library file of a
+   `fail`. The pass writes the default as `anti_rt_backtrace_default`
+   into a program that reaches the runtime's reader of it, as it writes
+   the registry. A library for C with the runtime bundled holds that
+   reader and gets the default of its own build. */
+static void write_backtrace_default(struct ir_module *m, bool release)
+{
+    static const char *const names[] = {"on"};
+    static const enum ir_type types[] = {IR_I64};
+    uint32_t agg = struct_agg(m, "anti.rt.BacktraceDefault", names, types, 1);
+    struct ir_const *value = ir_const_agg(m, ir_aggregate(agg), 1);
+    struct ir_global *g;
+
+    const_int(&value->items[0], IR_I64, release ? 0 : 1);
+    g = ir_global_add_value(m, NULL, "anti_rt_backtrace_default", value);
+    g->exported = true;
+}
+
 /* The kinds of anti.reflect.ValueKind, in its order. */
 enum value_kind {
     VALUE_NONE, VALUE_INT, VALUE_UINT, VALUE_FLOAT, VALUE_BOOL, VALUE_CHAR,
@@ -1231,6 +1265,9 @@ bool whole_program(struct ir_module *program,
         write_registry(program, options->reflect);
     } else if (options->bundled) {
         write_registry(program, false);
+    }
+    if (asks_backtrace(program, &reach) || options->bundled) {
+        write_backtrace_default(program, options->release);
     }
     calls = calls_through_reflection(program, &reach);
     if (!options->library) {

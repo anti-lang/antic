@@ -9,4 +9,8 @@ void anti_rt_init(void);
 /* 1 after anti_rt_init, else 0. */
 int anti_rt_ready(void);
 
+/* --anti.backtrace of the command line: 1 on, 0 off and -1 when the
+   command line did not name it. rt/start.c writes it before main. */
+extern int anti_rt_option_backtrace;
+
 #endif
