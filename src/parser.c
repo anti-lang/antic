@@ -987,6 +987,30 @@ static int precedence(enum token_kind kind)
     }
 }
 
+static struct expr *binary(struct parser *p, int min);
+
+/* DESIGN: `x in lo..hi` binds as `<` does, since it is the two
+   comparisons `x >= lo && x < hi`. Each bound takes the operators that
+   bind tighter, so `i + 1 in 0..n * 2` needs no parentheses. A range
+   stands here and after `for`, and nowhere else in an expression. */
+static struct expr *in_range(struct parser *p, struct expr *value)
+{
+    struct expr *e = new_expr(p, EXPR_IN, next(p));
+    int bound = precedence(TOKEN_LT) + 1;
+
+    e->pos = value->pos;
+    e->as.in.value = value;
+    if ((e->as.in.low = binary(p, bound)) == NULL) {
+        return NULL;
+    }
+    if (!accept(p, TOKEN_DOT_DOT)) {
+        error_here(p, "`in` takes a range, as in `x in lo..hi`");
+        return NULL;
+    }
+    e->as.in.high = binary(p, bound);
+    return e->as.in.high != NULL ? e : NULL;
+}
+
 /* Precedence climbing: parse operands and every operator that binds at
    least as tightly as min. The right operand only takes operators that
    bind tighter, which makes each level group from left to right. */
@@ -994,9 +1018,23 @@ static struct expr *binary(struct parser *p, int min)
 {
     struct expr *left = cast(p);
 
-    while (left != NULL && precedence(peek(p)->kind) >= min) {
-        const struct token *op = next(p);
-        struct expr *e = new_expr(p, EXPR_BINARY, op);
+    while (left != NULL) {
+        const struct token *op = peek(p);
+        struct expr *e;
+        /* `in` is a contextual word, as it is after `for`. A name right
+           after an operand can be nothing else. */
+        if (is_word(p, op, "in")) {
+            if (precedence(TOKEN_LT) < min) {
+                break;
+            }
+            left = in_range(p, left);
+            continue;
+        }
+        if (precedence(op->kind) == 0 || precedence(op->kind) < min) {
+            break;
+        }
+        next(p);
+        e = new_expr(p, EXPR_BINARY, op);
         e->pos = left->pos;
         e->as.binary.op = op->kind;
         e->as.binary.left = left;

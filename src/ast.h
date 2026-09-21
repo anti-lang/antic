@@ -95,7 +95,8 @@ enum expr_kind {
     EXPR_DISPATCH,                  /* dispatch obj -> f(args) */
     EXPR_JOIN,                      /* join(job) and join_all(jobs) */
     EXPR_HERE,                      /* `here`, the position it stands at */
-    EXPR_FORMAT                     /* `f"..."` and `rf"..."` */
+    EXPR_FORMAT,                    /* `f"..."` and `rf"..."` */
+    EXPR_IN                         /* `x in lo..hi` */
 };
 
 /* The format specification after the colon of an `{expr}`, as the
@@ -288,6 +289,16 @@ struct expr {
             struct expr *start;
             struct expr *take;
         } format;                   /* EXPR_FORMAT */
+        /* `value in low..high`. The checker binds the value to a local
+           of its own and writes `value >= low && value < high` over
+           it. */
+        struct {
+            struct expr *value;
+            struct expr *low;
+            struct expr *high;
+            struct symbol *bound;
+            struct expr *test;
+        } in;                       /* EXPR_IN */
     } as;
 };
 

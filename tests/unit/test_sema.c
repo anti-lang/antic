@@ -397,6 +397,25 @@ void test_sema(void)
     rejects("fn f(a: bool, b: bool) -> bool { return a < b; }", 1, 41,
             "`<` needs numeric or `char` operands, found `bool`");
 
+    /* `x in lo..hi` is `x >= lo && x < hi`, so the bounds take the type
+       of the value, which the two comparisons take. */
+    accepts("fn f(c: char) -> bool { return c in 'a'..'{'; }");
+    accepts("fn f(x: u8, n: u8) -> bool { return x in 1..n + 1; }");
+    accepts("fn f(x: float) -> bool { return x in 0.0..1.0; }");
+    accepts("fn f(n: u8) -> bool { return 3 in 0..n; }");
+    accepts("const SMALL: bool = 3 in 0..8;");
+    accepts("fn f(in: int) -> bool { return in in 0..in; }");
+    rejects("fn f(x: i32, n: int) -> bool { return x in 0..n; }", 1, 47,
+            "expected `i32`, found `int`");
+    rejects("fn f(x: int) -> bool { return x in 0..2.5; }", 1, 39,
+            "expected `int`, found a float literal");
+    rejects("fn f(b: bool) -> bool { return b in false..true; }", 1, 32,
+            "`in` needs numeric or `char` operands, found `bool`");
+    rejects("fn f(x: int) -> int { return x in 0..2; }", 1, 30,
+            "expected `int`, found `bool`");
+    rejects("fn f(x: int) { const C: bool = x in 0..2; }", 1, 32,
+            "a variable is not a constant expression");
+
     /* Names, scopes and shadowing. */
     accepts("fn f(x: int) -> int { let x = x + 1; return x; }");
     accepts("fn f(x: int) -> int { let t = 0; { let x = x + 1; t += x; } "

@@ -1362,6 +1362,11 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
             walk_expr(w, e->as.format.parts[i].value_call);
         }
         return;
+    /* The test holds both bounds and any `lt` it calls. */
+    case EXPR_IN:
+        walk_expr(w, e->as.in.value);
+        walk_expr(w, e->as.in.test);
+        return;
     default:
         return;
     }
@@ -4122,6 +4127,87 @@ static struct type *check_format(struct checker *c, struct expr *e)
     return ok ? builtin(c, TYPE_STR) : builtin(c, TYPE_ERROR);
 }
 
+/* DESIGN: `x in lo..hi` is `x >= lo && x < hi`. The checker binds x to
+   a local that no scope holds and writes the two comparisons over it.
+   The value is then computed once, and the high bound only when the
+   value reaches the low one. A type with an `lt` operator takes it, as
+   the two comparisons would. The first of the three operands that is no
+   literal names the type, and the literals take it. */
+static struct type *check_in(struct checker *c, struct expr *e)
+{
+    struct expr *operands[3];
+    struct type *types[3];
+    struct expr *sides[2];
+    struct symbol *bound;
+    struct symbol *lt;
+    struct expr *test;
+    size_t first = 0;
+    size_t i;
+    bool ok = true;
+
+    operands[0] = e->as.in.value;
+    operands[1] = e->as.in.low;
+    operands[2] = e->as.in.high;
+    while (first < 3 && is_untyped(operands[first])) {
+        first++;
+    }
+    first = first == 3 ? 0 : first;
+    types[first] = check_expr(c, operands[first], NULL);
+    if (!is_error(types[first]) &&
+        refuses_half(c, e->pos, types[first])) {
+        types[first] = builtin(c, TYPE_ERROR);
+    }
+    for (i = 0; i < 3; i++) {
+        if (i != first) {
+            types[i] = check_expr(c, operands[i],
+                                  is_error(types[first]) ? NULL
+                                                         : types[first]);
+            ok = !is_error(types[first]) &&
+                 require(c, operands[i], types[i], types[first]) && ok;
+        }
+    }
+    if (is_error(types[first]) || !ok) {
+        return builtin(c, TYPE_ERROR);
+    }
+    lt = operator_symbol(c, types[first], "lt");
+    if (lt == NULL && !type_is_numeric(types[first]) &&
+        types[first]->kind != TYPE_CHAR) {
+        error_at(c, e->pos, "`in` needs numeric or `char` operands, found "
+                 "`%s`", tn(types[first]));
+        return builtin(c, TYPE_ERROR);
+    }
+    bound = arena_alloc(c->arena, sizeof *bound);
+    bound->kind = SYMBOL_LOCAL;
+    bound->name = hidden_value;
+    bound->pos = e->as.in.value->pos;
+    bound->type = types[first];
+    e->as.in.bound = bound;
+    for (i = 0; i < 2; i++) {
+        struct expr *read = new_node(c, EXPR_NAME, e->pos);
+        struct expr *side = new_node(c, EXPR_BINARY, e->pos);
+        read->symbol = bound;
+        read->type = bound->type;
+        read->as.name = hidden_value;
+        side->as.binary.op = i == 0 ? TOKEN_GE : TOKEN_LT;
+        side->as.binary.left = read;
+        side->as.binary.right = i == 0 ? e->as.in.low : e->as.in.high;
+        side->type = builtin(c, TYPE_BOOL);
+        if (lt != NULL &&
+            !require(c, side, check_operator(c, side, types[i + 1], lt),
+                     builtin(c, TYPE_BOOL))) {
+            return builtin(c, TYPE_ERROR);
+        }
+        sides[i] = side;
+    }
+    test = new_node(c, EXPR_BINARY, e->pos);
+    test->as.binary.op = TOKEN_AND_AND;
+    test->as.binary.left = sides[0];
+    test->as.binary.right = sides[1];
+    test->type = builtin(c, TYPE_BOOL);
+    e->as.in.test = test;
+    return builtin(c, TYPE_BOOL);
+}
+
 static struct type *check_expr_inner(struct checker *c, struct expr *e,
                                      struct type *expected)
 {
@@ -4214,6 +4300,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return t != NULL ? t : builtin(c, TYPE_ERROR);
     case EXPR_FORMAT:
         return check_format(c, e);
+    case EXPR_IN:
+        return check_in(c, e);
     case EXPR_INDEX:
         t = check_expr(c, e->as.index.base, NULL);
         if (!require(c, e->as.index.index,
@@ -5203,6 +5291,29 @@ static bool eval_const(struct checker *c, struct expr *e,
     /* The text is built at run time, into memory of its own. */
     case EXPR_FORMAT:
         return fail_const(c, e, format_name(e));
+    /* The two comparisons of numbers fold, with the value in both. An
+       `lt` operator is a call and never a constant. */
+    case EXPR_IN: {
+        struct expr *sides[3];
+        const struct type *t = e->as.in.value->type;
+        if (!type_is_numeric(t) && t->kind != TYPE_CHAR) {
+            return fail_const(c, e, "a call");
+        }
+        for (i = 0; i < 3; i++) {
+            sides[i] = new_node(c, EXPR_BINARY, e->pos);
+            sides[i]->type = builtin(c, TYPE_BOOL);
+        }
+        sides[0]->as.binary.op = TOKEN_GE;
+        sides[0]->as.binary.left = e->as.in.value;
+        sides[0]->as.binary.right = e->as.in.low;
+        sides[1]->as.binary.op = TOKEN_LT;
+        sides[1]->as.binary.left = e->as.in.value;
+        sides[1]->as.binary.right = e->as.in.high;
+        sides[2]->as.binary.op = TOKEN_AND_AND;
+        sides[2]->as.binary.left = sides[0];
+        sides[2]->as.binary.right = sides[1];
+        return eval_const(c, sides[2], out);
+    }
     }
     return false;
 }
@@ -5666,6 +5777,8 @@ static bool expr_calls(const struct expr *e)
                expr_calls(e->as.binary.right);
     case EXPR_CAST:
         return expr_calls(e->as.cast.operand);
+    case EXPR_IN:
+        return expr_calls(e->as.in.value) || expr_calls(e->as.in.test);
     case EXPR_FIELD:
         return expr_calls(e->as.field.base);
     case EXPR_INDEX:

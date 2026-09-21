@@ -2975,6 +2975,22 @@ static struct ir_operand handled_operand(struct lowerer *l,
     return temp(l, ir_load(l->f, l->b, ir_type_of(e->type), out));
 }
 
+/* Give sym, a local that the checker wrote and no scope holds, the
+   value v. An aggregate is bound by the address that v is, and a scalar
+   whose address is taken gets a slot of its own. */
+static void bind_value(struct lowerer *l, struct symbol *sym,
+                       struct ir_operand v)
+{
+    if (sym->address_taken && !is_aggregate(sym->type)) {
+        sym->ir = ir_entry_slot(l->f, vtype_of(l, sym->type));
+        ir_store(l->f, l->b, ir_type_of(sym->type), v, temp(l, sym->ir));
+        return;
+    }
+    sym->ir = ir_unary(l->f, l->b, IR_COPY,
+                       is_aggregate(sym->type) ? IR_PTR : ir_type_of(sym->type),
+                       v);
+}
+
 /* DESIGN: an `f"..."` is a local `anti.text.Builder` in a slot of the
    frame, the calls the checker wrote on it, and the `str` its `take`
    gives. Each value is bound to the local the checker declared for it
@@ -4450,6 +4466,14 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
     }
     case EXPR_SIZE_OF:
         return size_operand(l, e->as.size_of->type);
+    /* The value once, then the test the checker wrote over it. */
+    case EXPR_IN:
+        v = lower_expr(l, e->as.in.value);
+        if (l->failed) {
+            return none();
+        }
+        bind_value(l, e->as.in.bound, v);
+        return lower_expr(l, e->as.in.test);
     default:
         /* Literals of aggregates returned their address above. */
         return none();
@@ -5710,8 +5734,7 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         /* A `str` is bound by its address, which each arm's call of
            `text.equal` reads. */
         if (s->as.switch_stmt.bound != NULL) {
-            s->as.switch_stmt.bound->ir =
-                ir_unary(l->f, l->b, IR_COPY, IR_PTR, over);
+            bind_value(l, s->as.switch_stmt.bound, over);
         } else {
             type = ir_type_of(s->as.switch_stmt.value->type);
             over = temp(l, ir_unary(l->f, l->b, IR_COPY, type, over));

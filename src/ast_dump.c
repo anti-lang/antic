@@ -252,6 +252,13 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         dump_expr(d, depth + 1, e->as.binary.left);
         dump_expr(d, depth + 1, e->as.binary.right);
         break;
+    case EXPR_IN:
+        text_append(d->out, "in_expr");
+        end(d, start, type);
+        dump_expr(d, depth + 1, e->as.in.value);
+        dump_expr(d, depth + 1, e->as.in.low);
+        dump_expr(d, depth + 1, e->as.in.high);
+        break;
     case EXPR_CAST:
         text_append(d->out, "cast");
         end(d, start, type);

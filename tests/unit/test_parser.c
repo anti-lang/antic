@@ -533,6 +533,57 @@ void test_parser(void)
             {1, 16, "a destructuring names two elements or more"}};
         errors("fn f() { let (a) = t; }\n", e, 1);
     }
+    /* `x in lo..hi` binds as the comparisons do, and each bound takes
+       the operators that bind tighter. `in` stays a word a program may
+       name a variable with. */
+    tree("fn f(a: int, n: int, b: bool) -> bool\n"
+         "{\n"
+         "    return a + 1 in 0..n * 2 == b;\n"
+         "}\n"
+         "fn g(in: int) -> bool\n"
+         "{\n"
+         "    return in in 0..in && true;\n"
+         "}\n",
+         "function f\n"
+         "  param a\n"
+         "    type int\n"
+         "  param n\n"
+         "    type int\n"
+         "  param b\n"
+         "    type bool\n"
+         "  result\n"
+         "    type bool\n"
+         "  block\n"
+         "    return_stmt\n"
+         "      equality ==\n"
+         "        in_expr\n"
+         "          additive +\n"
+         "            ident a\n"
+         "            int_lit 1\n"
+         "          int_lit 0\n"
+         "          multiplicative *\n"
+         "            ident n\n"
+         "            int_lit 2\n"
+         "        ident b\n"
+         "function g\n"
+         "  param in\n"
+         "    type int\n"
+         "  result\n"
+         "    type bool\n"
+         "  block\n"
+         "    return_stmt\n"
+         "      and_expr &&\n"
+         "        in_expr\n"
+         "          ident in\n"
+         "          int_lit 0\n"
+         "          ident in\n"
+         "        true\n");
+    /* `in` applies to ranges only. */
+    {
+        static const struct expected_error e[] = {
+            {1, 47, "`in` takes a range, as in `x in lo..hi`"}};
+        errors("fn f(x: int, s: []int) -> bool { return x in s; }\n", e, 1);
+    }
     {
         static const struct expected_error e[] = {{3, 1, "expected `;`"}};
         errors("fn main() -> int {\n    return 42\n}\n", e, 1);

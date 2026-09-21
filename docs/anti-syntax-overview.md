@@ -136,7 +136,7 @@ if f.carry { }
 
 `let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. A carry in is `a + b + f.carry`.
 
-Not built yet: wrapping and saturating operators, `Flags`, `??`, `?.`, `in`.
+Built: `x in lo..hi`. Not built yet: wrapping and saturating operators, `Flags`, `??`, `?.`.
 
 ## Statements
 

@@ -1,0 +1,66 @@
+//! `x in lo..hi` is `x >= lo && x < hi`. The value is computed once, the
+//! high bound only when the value reaches the low one, and the form is a
+//! constant when its operands are. A type with an `lt` operator takes it
+//! as the two comparisons do.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const SMALL: bool = 3 in 0..8;
+const FITS: bool = size_of(int) in 1..9;
+
+class Version
+{
+	pub major: int = 0,
+
+	operator fn lt(self, o: Version) -> bool
+	{
+		return self.major < o.major;
+	}
+}
+
+/// n, counting each call in `count`.
+fn counted(n: int, count: *int) -> int
+{
+	*count = *count + 1;
+	return n;
+}
+
+fn lower_case(c: char) -> bool
+{
+	return c in 'a'..'{';
+}
+
+fn main() -> int
+{
+	printf("%d %d %d %d\n".ptr, (0 in 0..10) as c_int, (9 in 0..10) as c_int,
+		(10 in 0..10) as c_int, (-1 in 0..10) as c_int);
+	let small: u8 = 200;
+	printf("%d %d\n".ptr, (small in 100..201) as c_int,
+		(small in 201..255) as c_int);
+	printf("%d %d\n".ptr, (0.5 in 0.0..1.0) as c_int, (1.0 in 0.0..1.0) as c_int);
+	printf("%d %d %d\n".ptr, lower_case('m') as c_int, lower_case('z') as c_int,
+		lower_case('M') as c_int);
+	let once = 0;
+	let inside = counted(4, &once) in 0..10;
+	printf("once %d %d\n".ptr, inside as c_int, once as c_int);
+	let high = 0;
+	let below = -5 in 0..counted(10, &high);
+	printf("below %d %d\n".ptr, below as c_int, high as c_int);
+	let above = 5 in 0..counted(10, &high);
+	printf("above %d %d\n".ptr, above as c_int, high as c_int);
+	let n = 3;
+	let i = 0;
+	while i in 0..n do {
+		i = i + 1;
+	}
+	if i + 1 in 0..n * 2 && i in 3..4 {
+		printf("loop %d\n".ptr, i as c_int);
+	}
+	let v = Version { major: 2 };
+	let from = Version { major: 1 };
+	let to = Version { major: 3 };
+	printf("version %d %d\n".ptr, (v in from..to) as c_int,
+		(to in from..to) as c_int);
+	printf("const %d %d\n".ptr, SMALL as c_int, FITS as c_int);
+	return 0;
+}
