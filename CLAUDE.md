@@ -173,6 +173,12 @@ openssl checks their signature. Windows configures with `-G Ninja`.
     and step 4 puts it in the symbols archive beside the map of the sections.
     `tools/check-pdb.cmake` reads the CodeView record of an executable
     against the GUID of its PDB, in step 4 and in the test `pdb_guid`.
+20. The error a `catch e` binds is deleted on every exit of its handler:
+    `yield`, the end of the handler, `break`, `continue` and a `return` of a
+    value other than the error. Lowering deletes it at `yield` and at the end
+    alone today, so the other three exits leak it. The fix comes with a test
+    that takes each exit under a leak check. "Object model" in
+    `docs/decisions.md` holds the corrected rule.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
