@@ -205,8 +205,8 @@ reports what it finished.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`.
-- 556 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 555 each, without the `no_paths` test, which needs a
+- 559 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 558 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of

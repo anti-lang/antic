@@ -287,8 +287,8 @@ void test_lexer(void)
     string("\"a\\nb\\t\\\\\\\"\"", TOKEN_STRING, "a\nb\t\\\"", 6);
     string("\"\\u{E9}\"", TOKEN_STRING, "\xC3\xA9", 2);
     string("\"\\x41\"", TOKEN_STRING, "A", 1);
-    /* A literal may span lines, and a CRLF in one becomes a single LF, so
-       the bytes do not depend on the line ending of the file. */
+    /* A literal may span lines, and a CRLF in one becomes a single LF.
+       The bytes then do not depend on the line ending of the file. */
     string("\"line\r\nnext\"", TOKEN_STRING, "line\nnext", 9);
     string("\"line\nnext\"", TOKEN_STRING, "line\nnext", 9);
     string("r\"line\r\nnext\"", TOKEN_STRING, "line\nnext", 9);
@@ -300,6 +300,23 @@ void test_lexer(void)
     string("b\"\xC3\xA9\"", TOKEN_BYTES, "\xC3\xA9", 2);
     string("br\"\\x\"", TOKEN_BYTES, "\\x", 2);
     string("b#\"\"\"#", TOKEN_BYTES, "\"", 1);
+    /* `x"..."` holds hex pairs in either case. Whitespace between any two
+       digits is ignored, so a literal may span lines. */
+    string("x\"00 AB CC\"", TOKEN_BYTES, "\x00\xAB\xCC", 3);
+    string("x\"deadBEEF\"", TOKEN_BYTES, "\xDE\xAD\xBE\xEF", 4);
+    string("x\"0\t1\r\n  f F\"", TOKEN_BYTES, "\x01\xFF", 2);
+    string("x\"\"", TOKEN_BYTES, "", 0);
+
+    /* The prefixes so far are r, b, br, f and x. Another word before a
+       quote stays an identifier, and the quote starts a plain string. */
+    {
+        static const enum token_kind k[] = {TOKEN_IDENT, TOKEN_STRING};
+        kinds("rb\"a\"", k, 2);
+        kinds("u\"a\"", k, 2);
+        kinds("hex\"a\"", k, 2);
+        kinds("xr\"a\"", k, 2);
+        kinds("bx\"a\"", k, 2);
+    }
 
     error("a \xC3\xA9", 1, 3, "unexpected character outside a literal");
     error("a \xff", 1, 3, "invalid UTF-8");
@@ -349,4 +366,30 @@ void test_lexer(void)
     error_n("\"a\0b\"", 5, 1, 3, "NUL is not allowed here");
     error("\"open", 1, 1, "unterminated string literal");
     error("r#\"open\"", 1, 1, "unterminated string literal");
+
+    /* An `x"..."` error names the unpaired digit or the first character
+       that is no hex digit. */
+    error("x\"00 AB C\"", 1, 9, "odd digit count in `x\"...\"` at column 9");
+    error("x\"00\n  A\"", 2, 3, "odd digit count in `x\"...\"` at column 3");
+    error("x\"0G\"", 1, 4, "non-hex character `G` in `x\"...\"` at column 4");
+    error("x\"0x41\"", 1, 4, "non-hex character `x` in `x\"...\"` at column 4");
+    error("x\"\\x41\"", 1, 3,
+          "non-hex character `\\` in `x\"...\"` at column 3");
+    error("x\"00 \xC3\xA9\"", 1, 6,
+          "non-hex character in `x\"...\"` at column 6");
+    error("x#\"00\"#", 1, 1, "`x\"...\"` takes no hash delimiters");
+    error("x\"00", 1, 1, "unterminated string literal");
+    error("f\"{n}\"", 1, 1, "`f\"...\"` is not built yet");
+    {
+        /* One report per literal, and the tokens after it still lex. */
+        struct lexed l;
+        lex_s(&l, "x\"G H 0\" a");
+        CHECK(l.diags.count == 1);
+        CHECK(l.tokens.count == 3);
+        if (l.tokens.count == 3) {
+            CHECK(l.tokens.items[0].kind == TOKEN_ERROR);
+            CHECK(l.tokens.items[1].kind == TOKEN_IDENT);
+        }
+        done(&l);
+    }
 }

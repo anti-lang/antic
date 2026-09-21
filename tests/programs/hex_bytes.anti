@@ -1,0 +1,47 @@
+//! `x"..."` is a `[]byte` of hex pairs. It ignores whitespace, so a literal
+//! may span lines, and it holds the bytes that the escapes of `b"..."` write.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn dump(label: str, bytes: []byte)
+{
+	printf("%s %d:".ptr, label.ptr, bytes.len as c_int);
+	let i = 0;
+	while i < bytes.len do {
+		printf(" %02X".ptr, bytes[i] as c_int);
+		i += 1;
+	}
+	printf("\n".ptr);
+}
+
+fn same(a: []byte, b: []byte) -> bool
+{
+	if a.len != b.len {
+		return false;
+	}
+	let i = 0;
+	while i < a.len do {
+		if a[i] != b[i] {
+			return false;
+		}
+		i += 1;
+	}
+	return true;
+}
+
+fn main() -> int
+{
+	let png = x"89 50 4E 47 0D 0A 1A 0A";
+	dump("png", png);
+	dump("empty", x"");
+	dump("case", x"deadBEEF");
+	let lines = x"
+		00 01 02 03
+		fc fd fe ff
+	";
+	dump("lines", lines);
+	if !same(x"00 AB CC", b"\x00\xAB\xCC") {
+		return 1;
+	}
+	return 0;
+}

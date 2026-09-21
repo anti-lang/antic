@@ -1633,6 +1633,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "defaults|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/defaults.s,defaults.anti"
         "tuples|-S,-o,${LISTINGS}/tuples.s,tuples.anti"
         "switch_fallthrough|-S,-o,${LISTINGS}/switch_fallthrough.s,switch_fallthrough.anti"
+        "hex_bytes|-S,-o,${LISTINGS}/hex_bytes.s,hex_bytes.anti"
         "transient|-S,-o,${LISTINGS}/transient.s,transient.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

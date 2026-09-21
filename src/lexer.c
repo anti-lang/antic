@@ -970,23 +970,101 @@ static void character(struct lexer *lx, size_t start, int line, int column)
     push(lx, TOKEN_CHAR, start, line, column)->value.character = value;
 }
 
-/* A string literal: an optional r, b or br prefix, then n '#', a quote,
-   the content and a quote followed by n '#'. */
-static void string(struct lexer *lx, size_t start, int line, int column)
+/* What the text between the quotes of a string literal means. */
+enum string_form { FORM_ESCAPED, FORM_RAW, FORM_INTERPOLATED, FORM_HEX };
+
+/* The string prefixes, one meaning each, in the one table that
+   docs/anti-language-additions.md asks for. The empty spelling is the
+   literal without a prefix. `rf` joins the table with the interpolation
+   of `f"..."`, and until that is built an `f"..."` is refused. Every form
+   but `x"..."` takes hash delimiters. */
+static const struct string_prefix {
+    const char *spelling;
+    enum string_form form;
+    bool bytes;
+} string_prefixes[] = {
+    {"", FORM_ESCAPED, false},
+    {"r", FORM_RAW, false},
+    {"b", FORM_ESCAPED, true},
+    {"br", FORM_RAW, true},
+    {"f", FORM_INTERPOLATED, false},
+    {"x", FORM_HEX, true},
+};
+
+/* The entry whose letters stand at the current position with any '#'
+   and a quote after them, or NULL. A prefix is letters and a '#' or a
+   quote must follow it, so at most one entry matches. */
+static const struct string_prefix *string_start(const struct lexer *lx)
+{
+    size_t k;
+
+    for (k = 0; k < sizeof string_prefixes / sizeof string_prefixes[0];
+         k++) {
+        const char *s = string_prefixes[k].spelling;
+        size_t n = strlen(s);
+        size_t i = n;
+        if (lx->pos + n > lx->length || memcmp(lx->src + lx->pos, s, n) != 0) {
+            continue;
+        }
+        while (at(lx, i) == '#') {
+            i++;
+        }
+        if (at(lx, i) == '"') {
+            return &string_prefixes[k];
+        }
+    }
+    return NULL;
+}
+
+/* One character inside `x"..."`. A digit either fills *pending or pairs
+   with it into a byte. Whitespace is skipped. Any other character is
+   reported, the first one alone, and clears *valid. */
+static void hex_character(struct lexer *lx, int *pending, int *pending_line,
+                          int *pending_column, struct text *bytes, bool *valid)
+{
+    int c = at(lx, 0);
+    char message[80];
+
+    if (is_hex(c)) {
+        if (*pending < 0) {
+            *pending = hex_value(c);
+            *pending_line = lx->line;
+            *pending_column = lx->column;
+        } else {
+            append_byte(bytes, (unsigned char)(*pending * 16 + hex_value(c)));
+            *pending = -1;
+        }
+    } else if (c != ' ' && c != '\t' && c != '\r' && c != '\n' && *valid) {
+        if (c > ' ' && c < 0x7F) {
+            snprintf(message, sizeof message,
+                     "non-hex character `%c` in `x\"...\"` at column %d", c,
+                     lx->column);
+        } else {
+            snprintf(message, sizeof message,
+                     "non-hex character in `x\"...\"` at column %d",
+                     lx->column);
+        }
+        error_at(lx, lx->line, lx->column, message);
+        *valid = false;
+    }
+    advance(lx);
+}
+
+/* A string literal: a prefix from the table, then n '#', a quote, the
+   content and a quote followed by n '#'. */
+static void string(struct lexer *lx, const struct string_prefix *prefix,
+                   size_t start, int line, int column)
 {
     struct text bytes = {0};
-    bool raw = false;
-    bool byte_string = false;
-    enum literal_mode mode;
+    enum literal_mode mode = prefix->bytes ? MODE_BYTES : MODE_STR;
     size_t hashes = 0;
     bool valid = true;
+    int pending = -1;
+    int pending_line = 0;
+    int pending_column = 0;
+    size_t k;
 
-    if (at(lx, 0) == 'b') {
-        byte_string = true;
-        advance(lx);
-    }
-    if (at(lx, 0) == 'r') {
-        raw = true;
+    for (k = 0; prefix->spelling[k] != '\0'; k++) {
         advance(lx);
     }
     while (at(lx, 0) == '#') {
@@ -994,7 +1072,13 @@ static void string(struct lexer *lx, size_t start, int line, int column)
         advance(lx);
     }
     advance(lx); /* the opening quote */
-    mode = byte_string ? MODE_BYTES : MODE_STR;
+    if (prefix->form == FORM_HEX && hashes > 0) {
+        error_at(lx, line, column, "`x\"...\"` takes no hash delimiters");
+        valid = false;
+    } else if (prefix->form == FORM_INTERPOLATED) {
+        error_at(lx, line, column, "`f\"...\"` is not built yet");
+        valid = false;
+    }
 
     for (;;) {
         int c = at(lx, 0);
@@ -1019,7 +1103,10 @@ static void string(struct lexer *lx, size_t start, int line, int column)
             }
             append_byte(&bytes, '"');
             advance(lx);
-        } else if (c == '\\' && !raw) {
+        } else if (prefix->form == FORM_HEX) {
+            hex_character(lx, &pending, &pending_line, &pending_column,
+                          &bytes, &valid);
+        } else if (c == '\\' && prefix->form != FORM_RAW) {
             uint32_t value;
             bool raw_byte;
             if (escape(lx, mode, &value, &raw_byte)) {
@@ -1045,31 +1132,21 @@ static void string(struct lexer *lx, size_t start, int line, int column)
         }
     }
 
+    if (valid && pending >= 0) {
+        char message[80];
+        snprintf(message, sizeof message,
+                 "odd digit count in `x\"...\"` at column %d",
+                 pending_column);
+        error_at(lx, pending_line, pending_column, message);
+        valid = false;
+    }
     if (valid) {
-        push(lx, byte_string ? TOKEN_BYTES : TOKEN_STRING, start, line,
+        push(lx, prefix->bytes ? TOKEN_BYTES : TOKEN_STRING, start, line,
              column)->value.text = keep(lx, &bytes);
     } else {
         push(lx, TOKEN_ERROR, start, line, column);
     }
     text_free(&bytes);
-}
-
-/* A prefix of r, b or br starts a string literal when '#' characters and
-   a quote follow it. A '#' without a prefix does the same. */
-static bool starts_string(const struct lexer *lx)
-{
-    size_t i = 0;
-
-    if (at(lx, i) == 'b') {
-        i++;
-    }
-    if (at(lx, i) == 'r') {
-        i++;
-    }
-    while (at(lx, i) == '#') {
-        i++;
-    }
-    return at(lx, i) == '"';
 }
 
 static bool symbol(struct lexer *lx, size_t start, int line, int column)
@@ -1124,6 +1201,7 @@ bool lex(const char *source, size_t length, struct arena *arena,
 
         enum token_kind doc;
         size_t marker;
+        const struct string_prefix *prefix;
 
         skip_trivia(&lx);
         start = lx.pos;
@@ -1140,9 +1218,8 @@ bool lex(const char *source, size_t length, struct arena *arena,
             line_doc(&lx, doc, marker);
         } else if (doc != TOKEN_EOF) {
             block_doc(&lx, doc, marker);
-        } else if ((c == 'r' || c == 'b' || c == '#' || c == '"') &&
-            starts_string(&lx)) {
-            string(&lx, start, line, column);
+        } else if ((prefix = string_start(&lx)) != NULL) {
+            string(&lx, prefix, start, line, column);
         } else if (is_ident_start(c)) {
             identifier(&lx, start, line, column);
         } else if (is_digit(c)) {

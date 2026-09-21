@@ -1,0 +1,4 @@
+hex_bytes.anti:6:18: error: odd digit count in `x"..."` at column 18
+hex_bytes.anti:7:13: error: non-hex character `G` in `x"..."` at column 13
+hex_bytes.anti:9:6: error: odd digit count in `x"..."` at column 6
+hex_bytes.anti:11:10: error: `x"..."` takes no hash delimiters

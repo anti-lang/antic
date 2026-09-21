@@ -1,0 +1,5 @@
+exit 0
+png 8: 89 50 4E 47 0D 0A 1A 0A
+empty 0:
+case 4: DE AD BE EF
+lines 8: 00 01 02 03 FC FD FE FF

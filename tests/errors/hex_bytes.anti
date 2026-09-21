@@ -1,0 +1,13 @@
+//! Each `x"..."` below is refused at the digit or the character that is
+//! wrong. The last takes hash delimiters, which `x` does not.
+
+fn main() -> int
+{
+	let a = x"00 AB C";
+	let b = x"0G";
+	let c = x"
+		00 1
+	";
+	let d = x#"00"#;
+	return 0;
+}
