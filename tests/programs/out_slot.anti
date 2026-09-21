@@ -4,6 +4,10 @@
 //! binding sits in is dirtied first, because the bytes a previous call
 //! left there are a table the callee would otherwise follow.
 //!
+//! `Box.make` keeps the hand-written form, which stays legal, because its
+//! `*out =` is that `=`. A `may fail` function builds its result in the
+//! storage and destroys nothing there, so it would not read the table.
+//!
 //! The binding is a local of its type and is torn down at the end of its
 //! block. On the error path the callee writes nothing, the handler leaves
 //! the block, and the zero table it leaves behind reaches no teardown.
@@ -56,7 +60,7 @@ fn dirty() -> int
 	return sum;
 }
 
-/// A binding in a frame the dirty pattern just filled.
+/// A binding in the frame that `dirty` filled before the call.
 fn filled() -> int
 {
 	let box = Box.make(1) catch fatal;

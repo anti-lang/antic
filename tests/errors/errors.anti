@@ -1,23 +1,25 @@
 import anti.lang;
 
-fn risky(out: *int) -> ?*lang.Error
+fn risky(n: int) -> int may fail
 {
-	*out = 1;
-	return none;
+	if n < 0 {
+		fail "n is negative";
+	}
+	return n;
 }
 
 fn quiet() -> int
 {
-	risky();
+	risky(1);
 	return 0;
 }
 
 fn keeper() -> int
 {
-	let kept = risky() catch e {
+	let kept = risky(1) catch e {
 		yield 1;
 	};
-	let escaped = risky() catch e {
+	let escaped = risky(1) catch e {
 		let mine = e;
 		yield 2;
 	};

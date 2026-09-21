@@ -205,8 +205,8 @@ reports what it finished.
   `anti.lang` is the root and imports nothing. It holds `Error` and
   `NoneDereference`, and `anti.error` holds `SystemError`, `on_fatal` and
   `check`.
-- 528 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 527 each, without the `no_paths` test, which needs a
+- 529 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 528 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
@@ -219,8 +219,9 @@ reports what it finished.
   follows the form: `text.parse_int`, the three user directories of anti.os,
   every function of anti.fs, `toml.Document.read`, `log.FileSink.new`,
   `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may
-  fail. The test `std_may_fail_only` refuses a function of `std/` written
-  by hand as `-> ?*Error`. A `construct` that can fail is written
+  fail. The tests `std_may_fail_only` and `tests_may_fail_only` refuse a
+  function of `std/` or `tests/` written by hand as `-> ?*Error`, apart
+  from two tests of that form. A `construct` that can fail is written
   `may fail`, a derived one calls `self.super.construct(args)` as its
   first statement, and C makes an object with `anti_<Class>_construct`.
 - Tuples are built. `(int, str)` is an anonymous struct with C layout, `(a, b)`

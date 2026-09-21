@@ -1,28 +1,30 @@
-//! `*out = try f();` stores the result of a failing call through a
+//! `*into = try f();` stores the result of a failing call through a
 //! pointer. The out pointer the compiler supplies for that call is the
-//! pointer's target, read once before the call, so the callee writes
-//! where the program asked. Binding the result to a local first is the
-//! same program and was the only form that ran.
+//! pointer's target, read once before the call. The callee therefore
+//! writes where the program asked. Binding the result to a local first
+//! is the same program and was the only form that ran.
 
 import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-fn inner(out: *int) -> ?*lang.Error
+fn inner(n: int) -> int may fail
 {
-	*out = 42;
-	return none;
+	if n < 0 {
+		fail "n is negative";
+	}
+	return n;
 }
 
-fn outer(out: *int) -> ?*lang.Error
+fn outer(into: *int) may fail
 {
-	*out = try inner();
-	return none;
+	*into = try inner(42);
 }
 
 fn main() -> int
 {
-	let n = outer() catch fatal;
+	let n = 0;
+	outer(&n) catch fatal;
 	printf("n %d\n".ptr, n as c_int);
 	if n != 42 {
 		return 1;

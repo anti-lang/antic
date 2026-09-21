@@ -494,6 +494,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] The prototype of a function that may fail carries one comment line, `May fail: NULL on success, an error otherwise.`. Reason: the specification says the doc comment says so. The C signature does not: `?*Error` and a pointer parameter are one type each.
 - The library file records the `may fail` flag, in a bit of the marks byte of a module item and of a function of a class body. Reason: the specification says a `.antl` records the flag. The convention itself travels in the type, so the flag is what tells a reader the form the declaration wrote.
 - A `may fail` function without a `fail` and without a `try` is a warning from the checker, which `anti check` prints like every other. Reason: the specification makes it a warning and not an error, because an interface function may fail in one implementation and not in another.
+- [provisional] The test `tests_may_fail_only` refuses a function of `tests/` whose result is `?*Error` written by hand, and lets an `extern fn` through. It names two declarations that keep the form on purpose: the `construct` of `errors/construct_forms.anti` and `Box.make` of `programs/out_slot.anti`. Reason: the test programs use `may fail` throughout, as `std/` does. The listing checks that a `construct` refuses the form. `Box.make` writes its result with `=`, which the zeroed table under "Object model" exists for. A `may fail` function builds its result in that storage and runs no `=`, so it would not read the table.
 
 ## Tuples
 

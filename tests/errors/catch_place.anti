@@ -1,17 +1,19 @@
 import anti.lang;
 
-fn risky(out: *int) -> ?*lang.Error
+fn risky(n: int) -> int may fail
 {
-	*out = 1;
-	return none;
+	if n < 0 {
+		fail "n is negative";
+	}
+	return n;
 }
 
 /// `catch` after a call fills the place, in every form the `let` takes.
 fn filled(p: *int) -> int
 {
 	let n = 0;
-	n = risky() catch fatal;
-	*p = risky() catch { yield 2; };
+	n = risky(1) catch fatal;
+	*p = risky(1) catch { yield 2; };
 	return n + *p;
 }
 

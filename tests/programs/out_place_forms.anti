@@ -24,22 +24,23 @@ struct Pair
 	right: int,
 }
 
-fn value(n: int, out: *int) -> ?*lang.Error
+fn value(n: int) -> int may fail
 {
 	if n < 0 {
-		return lang.Error.new(1, "n is negative");
+		fail lang.Error.new(1, "n is negative");
 	}
-	*out = n;
-	return none;
+	return n;
 }
 
-fn small(out: *u32) -> ?*lang.Error
+fn small(layer: u32) -> u32 may fail
 {
-	*out = 9;
-	return none;
+	if layer > 15 {
+		fail "a layer takes four bits";
+	}
+	return layer;
 }
 
-fn places(out: *int) -> ?*lang.Error
+fn places() -> int may fail
 {
 	let n = 0;
 	let numbers: [4]int = [0; 4];
@@ -49,34 +50,37 @@ fn places(out: *int) -> ?*lang.Error
 	n = try value(5);
 	numbers[2] = try value(7);
 	pair.right = try value(11);
-	flags.layer = try small();
+	flags.layer = try small(9);
 	n += try value(13);
 	printf("places %d %d %d %d\n".ptr, n as c_int, numbers[2] as c_int,
 		pair.right as c_int, flags.layer as c_int);
-	*out = n + numbers[2] + pair.right + flags.layer as int;
-	return none;
+	return n + numbers[2] + pair.right + flags.layer as int;
 }
 
 /// The error of a call in assignment position reaches the caller.
-fn fails(out: *int) -> ?*lang.Error
+fn fails() -> int may fail
 {
 	let n = 0;
 	n = try value(-1);
-	*out = n;
-	return none;
+	return n;
 }
 
-fn made(out: *Pair) -> ?*lang.Error
+fn made(n: int) -> Pair may fail
 {
-	*out = Pair { left: 3, right: 4 };
-	return none;
+	if n < 0 {
+		fail lang.Error.new(1, "n is negative");
+	}
+	return Pair { left: n, right: n + 1 };
 }
 
-/// A value of an aggregate type through `*out`, the form anti.os writes.
-fn passed_on(out: *Pair) -> ?*lang.Error
+/// A value of an aggregate type through a pointer, then on to the caller
+/// through the out pointer.
+fn passed_on() -> Pair may fail
 {
-	*out = try made();
-	return none;
+	let pair = Pair { left: 0, right: 0 };
+	let into = &pair;
+	*into = try made(3);
+	return pair;
 }
 
 /// The same five places with a handler of their own, and `*p` as well.
@@ -95,9 +99,9 @@ fn handled() -> int
 		printf("unreached %d\n".ptr, e.code as c_int);
 		yield 0;
 	};
-	flags.layer = small() catch fatal;
+	flags.layer = small(9) catch fatal;
 	n += value(-1) catch { yield 13; };
-	*into = made() catch fatal;
+	*into = made(3) catch fatal;
 	printf("handled %d %d %d %d %d %d\n".ptr, n as c_int,
 		numbers[2] as c_int, pair.right as c_int, flags.layer as c_int,
 		one.left as c_int, one.right as c_int);

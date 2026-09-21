@@ -409,8 +409,18 @@ endforeach()
 # a binding, which refuses it.
 add_test(NAME std_may_fail_only
     COMMAND "${CMAKE_COMMAND}"
-        "-DSTD=${ANTIC_STD_SOURCE_DIR}"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_std_may_fail.cmake")
+        "-DROOT=${ANTIC_STD_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_may_fail_only.cmake")
+
+# So is every failing function of the test programs, apart from two
+# that write the hand-written form on purpose. The listing refuses it on
+# a `construct`, and out_slot reads the `=` of a callee into the storage
+# a `catch` binding supplies, which a `may fail` function never writes.
+add_test(NAME tests_may_fail_only
+    COMMAND "${CMAKE_COMMAND}"
+        "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DSKIP=errors/construct_forms.anti:construct,programs/out_slot.anti:make"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_may_fail_only.cmake")
 
 # The file of the logger that tests/std/log.anti writes. The environment
 # of the test names it, since the C runtime of Windows has no setenv.
