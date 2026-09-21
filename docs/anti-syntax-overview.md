@@ -287,7 +287,7 @@ let a = r.area();       // area(&r)
 
 ## Simd structs
 
-`simd struct` declares a vector whose fields are its lanes. Every field has the same primitive type and the count is a power of two.
+`simd struct` declares a vector whose fields are its lanes. Every field has the same primitive type and the count is a power of two. The size is a multiple of eight bytes up to the vector cap, 256 bytes to start, one constant of the CPU level table.
 
 ```anti
 simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
@@ -684,7 +684,7 @@ A release binary carries no symbol data. `anti build --release` writes a symbols
 
 The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `armv8.5` on macOS, `armv8.2` on Windows and `armv8.0` on Linux. `--cpu` overrides on every target, and a program refuses to start on a processor below its level. A level is a code-generation setting, not a target. The runtime archive holds one runtime per target and level, so a program below the default links a runtime of its own level. The native libraries are built for the default level alone, and a program below it that imports one is refused at link.
 
-Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, the build id in `anti_licenses` of every executable and shared library, the backtraces, with `StackTrace`, `anti.debug.backtrace` and `--anti.backtrace`, and the CPU levels, with `--cpu`, the start-up check and the runtime archive built for the default level of each target. `symbolize` names the function of a frame in every build and its file and line in a `-g` build. Not built yet: the variables of `-g`, `trace` and the symbols archives. Windows has not run a trace.
+Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, the build id in `anti_licenses` of every executable and shared library, the backtraces, with `StackTrace`, `anti.debug.backtrace` and `--anti.backtrace`, and the CPU levels, with `--cpu`, the start-up check and the runtime archive with one runtime per target and level. `symbolize` names the function of a frame in every build and its file and line in a `-g` build. Not built yet: the variables of `-g`, `trace` and the symbols archives. Windows has not run a trace.
 
 ## Wire formats
 
