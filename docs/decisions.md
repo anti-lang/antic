@@ -143,7 +143,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - Release mode applies the form the specification gives it in the pass over the whole program. A call through a table becomes direct when every concrete table that its pointer may point at holds one function at the slot. Those tables are the primary tables of the classes at or below the static class. The tables of the interface sub-objects that lead to it count too. Dev mode keeps the call through the table. See `docs/notes/whole-program.md`.
 
 
-- [provisional] `SystemError.from_win32` is one function on every target. On Windows it reads `GetLastError` and formats the message, and everywhere else it gives code 0 and an empty message. Reason: no Windows machine here runs the test suite. A function that exists on one target alone would also make a program for six targets fail to compile for five.
+- [provisional] `SystemError.from_win32` is one function on every target. On Windows it reads `GetLastError` and formats the message, and everywhere else it gives code 0 and an empty message. Reason: a function that exists on one target alone would make a program for six targets fail to compile for five.
 - On Windows, `os.on_signal` installs a handler in the signal table of the C runtime as well as the console control handler. Reason: the C runtime answers `raise` from that table alone. Its default ends the program with code 3, which `std_signals` showed on the Windows VM. Its handler calls the function on the thread that raised.
 - The file sink of `anti.log` opens its file in binary mode. Reason: the C runtime of Windows writes a text-mode file with CRLF. The log of one program then differed by host, which `std_log` showed on the Windows VM.
 
