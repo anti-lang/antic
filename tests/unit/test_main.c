@@ -29,6 +29,7 @@ void test_float(void);
 void test_struct(void);
 void test_utf(void);
 void test_whole(void);
+void test_sha256(void);
 
 int main(void)
 {
@@ -58,6 +59,7 @@ int main(void)
     test_struct();
     test_utf();
     test_whole();
+    test_sha256();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

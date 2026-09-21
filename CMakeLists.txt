@@ -130,6 +130,7 @@ add_library(antic_core STATIC
     src/regalloc.c
     src/select.c
     src/selfpath.c
+    src/sha256.c
     src/userdirs.c
     src/sema.c
     src/target.c
@@ -152,7 +153,6 @@ add_executable(anti
     tools/anti/main.c
     tools/anti/files.c
     tools/anti/sdk.c
-    tools/anti/sha256.c
     tools/anti/test.c)
 target_link_libraries(anti PRIVATE antic_core)
 

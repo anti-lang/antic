@@ -71,49 +71,77 @@ static void compress(uint32_t hash[8], const unsigned char block[64])
     }
 }
 
+void sha256_init(struct sha256 *s)
+{
+    memcpy(s->hash, initial, sizeof s->hash);
+    s->used = 0;
+    s->length = 0;
+}
+
+void sha256_update(struct sha256 *s, const void *bytes, size_t count)
+{
+    const unsigned char *from = bytes;
+
+    while (count > 0) {
+        size_t n = sizeof s->block - s->used;
+        if (n > count) {
+            n = count;
+        }
+        memcpy(s->block + s->used, from, n);
+        s->used += n;
+        s->length += n;
+        from += n;
+        count -= n;
+        if (s->used == sizeof s->block) {
+            compress(s->hash, s->block);
+            s->used = 0;
+        }
+    }
+}
+
+void sha256_hex(struct sha256 *s, char hex[65])
+{
+    uint64_t bits = s->length * 8;
+    int i;
+
+    /* The padding: a one bit, zeros, and the length in bits in the last
+       eight bytes of a block. */
+    s->block[s->used++] = 0x80;
+    if (s->used > 56) {
+        memset(s->block + s->used, 0, sizeof s->block - s->used);
+        compress(s->hash, s->block);
+        s->used = 0;
+    }
+    memset(s->block + s->used, 0, 56 - s->used);
+    for (i = 0; i < 8; i++) {
+        s->block[56 + i] = (unsigned char)(bits >> (56 - 8 * i));
+    }
+    compress(s->hash, s->block);
+    for (i = 0; i < 8; i++) {
+        snprintf(hex + 8 * i, 9, "%08x", (unsigned)s->hash[i]);
+    }
+    hex[64] = '\0';
+}
+
 bool sha256_file(const char *path, char hex[65])
 {
     FILE *f = fopen(path, "rb");
-    uint32_t hash[8];
-    unsigned char block[64];
-    uint64_t length = 0;
-    size_t used = 0;
+    struct sha256 s;
+    unsigned char bytes[4096];
     size_t n;
-    int i;
 
     if (f == NULL) {
         return false;
     }
-    memcpy(hash, initial, sizeof hash);
-    while ((n = fread(block + used, 1, sizeof block - used, f)) > 0) {
-        used += n;
-        length += n;
-        if (used == sizeof block) {
-            compress(hash, block);
-            used = 0;
-        }
+    sha256_init(&s);
+    while ((n = fread(bytes, 1, sizeof bytes, f)) > 0) {
+        sha256_update(&s, bytes, n);
     }
     if (ferror(f)) {
         fclose(f);
         return false;
     }
     fclose(f);
-    /* The padding: a one bit, zeros, and the length in bits in the last
-       eight bytes of a block. */
-    block[used++] = 0x80;
-    if (used > 56) {
-        memset(block + used, 0, sizeof block - used);
-        compress(hash, block);
-        used = 0;
-    }
-    memset(block + used, 0, 56 - used);
-    for (i = 0; i < 8; i++) {
-        block[56 + i] = (unsigned char)((length * 8) >> (56 - 8 * i));
-    }
-    compress(hash, block);
-    for (i = 0; i < 8; i++) {
-        snprintf(hex + 8 * i, 9, "%08x", (unsigned)hash[i]);
-    }
-    hex[64] = '\0';
+    sha256_hex(&s, hex);
     return true;
 }

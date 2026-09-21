@@ -19,6 +19,7 @@
 #include "whole.h"
 #include "regalloc.h"
 #include "select.h"
+#include "sha256.h"
 #include "parser.h"
 #include "sema.h"
 #include "types.h"
@@ -607,6 +608,65 @@ static bool has_main(const struct ir_module *program, const char *module)
     return false;
 }
 
+/* Feed the bytes of the file at path to the digest. A file that cannot
+   be read adds nothing, and the link that needs it reports it. */
+static void digest_file(struct sha256 *s, const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    unsigned char bytes[4096];
+    size_t n;
+
+    if (f == NULL) {
+        return;
+    }
+    while ((n = fread(bytes, 1, sizeof bytes, f)) > 0) {
+        sha256_update(s, bytes, n);
+    }
+    fclose(f);
+}
+
+/* DESIGN: the build id is the SHA-256 of the code that a link takes from
+   antic. That is the assembly of the module that links, every object the
+   command line adds and the runtime library. The notice is left out,
+   because it holds the id. The paths are left out as well, so two links
+   of one program in two places carry one id. */
+static void build_id(const struct options *o, const struct text *assembly,
+                     char hex[65])
+{
+    struct text library = {0};
+    struct sha256 s;
+    size_t i;
+
+    sha256_init(&s);
+    sha256_update(&s, assembly->data, assembly->length);
+    for (i = 0; i < o->object_count; i++) {
+        digest_file(&s, o->objects[i]);
+    }
+    if (o->runtime != NULL) {
+        link_runtime_library(&library, o->runtime, o->target, o->cpu);
+        digest_file(&s, text_cstr(&library));
+    }
+    sha256_hex(&s, hex);
+    text_free(&library);
+}
+
+/* The notice with the line `build <id>` after its begin marker, where a
+   tool that reads the marker finds it. */
+static void identified_notice(struct text *out, const struct text *notice,
+                              const char *id)
+{
+    size_t begin = sizeof NOTICE_BEGIN - 1;
+
+    if (notice->length < begin ||
+        memcmp(notice->data, NOTICE_BEGIN, begin) != 0) {
+        text_append_bytes(out, notice->data, notice->length);
+        return;
+    }
+    text_append(out, NOTICE_BEGIN);
+    text_appendf(out, "build %s\n", id);
+    text_append_bytes(out, notice->data + begin, notice->length - begin);
+}
+
 /* Lower and optimize the program and run the back end for the target:
    instruction selection, register allocation and emission. The dumps
    print the machine code instead, before allocation for --dump-select.
@@ -697,8 +757,12 @@ static int back_end(const struct options *o, struct module *tree,
         }
         if (ok && extras->notice.length > 0 && status != 3 &&
             !o->assembly_only && o->lib != LIB_STATIC) {
-            emit_licenses(assembly, o->target, extras->notice.data,
-                          extras->notice.length);
+            struct text notice = {0};
+            char id[65];
+            build_id(o, assembly, id);
+            identified_notice(&notice, &extras->notice, id);
+            emit_licenses(assembly, o->target, notice.data, notice.length);
+            text_free(&notice);
         }
         for (i = 0; ok && i < program->function_count; i++) {
             const struct ir_function *f = program->functions[i];

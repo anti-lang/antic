@@ -6,7 +6,10 @@ extern const char anti_licenses[];
 
 static const char begin[] = "ANTI_LICENSES_BEGIN\n";
 static const char end[] = "ANTI_LICENSES_END\n";
+static const char build[] = "build ";
 
+/* DESIGN: the licence text is the notice between the markers without the
+   build id, which is a fact of the binary and no licence. */
 struct anti_text anti_rt_license_text(void)
 {
     struct anti_text text;
@@ -15,6 +18,10 @@ struct anti_text anti_rt_license_text(void)
 
     if (strncmp(from, begin, sizeof begin - 1) == 0) {
         from += sizeof begin - 1;
+    }
+    if (strncmp(from, build, sizeof build - 1) == 0 &&
+        strchr(from, '\n') != NULL) {
+        from = strchr(from, '\n') + 1;
     }
     to = strstr(from, end);
     text.ptr = (const unsigned char *)from;

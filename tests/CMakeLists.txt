@@ -37,6 +37,7 @@ add_executable(antic_unit_tests
     unit/test_struct.c
     unit/test_utf.c
     unit/test_whole.c
+    unit/test_sha256.c
     ../rt/cpu.c
     ../rt/utf.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core)
@@ -1339,6 +1340,20 @@ if(NOT WIN32)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_licenses.cmake")
 endif()
 
+# The build id in the notice is the digest of the code. Two builds of one
+# program carry the same id, and another program carries another.
+if(NOT WIN32)
+    add_test(NAME program_build_id
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+            "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/args.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/build-id"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_build_id.cmake")
+endif()
+
 # A program that imports a standard library module carries the package of
 # the library, which is the reserved root anti.
 if(NOT WIN32)
@@ -1348,7 +1363,7 @@ if(NOT WIN32)
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/io.anti"
-            "-DWANTED=ANTI_LICENSES_BEGIN|package anti.rt [0-9.]+ 0BSD|package anti [0-9.]+ 0BSD|package com.example.hello 2.0.0 MIT"
+            "-DWANTED=ANTI_LICENSES_BEGIN|build [0-9a-f]+|package anti.rt [0-9.]+ 0BSD|package anti [0-9.]+ 0BSD|package com.example.hello 2.0.0 MIT"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses-std"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_licenses.cmake")
 endif()

@@ -347,6 +347,7 @@ sources of each bundled library.
 The driver knows every module in an executable or a shared library at link time. It
 emits one read-only data object, symbol `anti_licenses`, holding:
 
+- The build id of the binary, the digest of its code.
 - For every linked package, in dependency order: name, version, SPDX identifier and
   attribution lines.
 - Every distinct licence text once, followed by the names of the packages it covers.
