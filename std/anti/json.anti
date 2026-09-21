@@ -8,8 +8,10 @@
 //!
 //! `Object.deserialize` builds an object back from the JSON of the
 //! default `serialize`. The functions here read the text of one member,
-//! for a class that writes its own members.
+//! for a class that writes its own members. `member` gives `false` for a
+//! member the object does not hold, and `unquote` may fail.
 
+import anti.lang;
 import anti.text;
 
 /// Write `value` as a JSON object.
@@ -135,21 +137,23 @@ pub fn member(source: str, name: str, out: *str) -> bool
 	return false;
 }
 
-/// Write the bytes of the JSON string `source` into `out`.
+/// Write the bytes of the JSON string `source` into `out`, which may
+/// fail.
 ///
-/// The result is false when `source` is no JSON string. The escapes
-/// `\"`, `\\`, `\/`, `\n`, `\r`, `\t`, `\b` and `\f` are read, and a
-/// `\u` escape is left as it stands.
-pub fn unquote(source: str, out: *text.Builder) -> bool
+/// A `source` that is no JSON string fails with code 0, and `out` keeps
+/// the bytes written before the fault. The escapes `\"`, `\\`, `\/`,
+/// `\n`, `\r`, `\t`, `\b` and `\f` are read, and a `\u` escape is left as
+/// it stands.
+pub fn unquote(source: str, out: *text.Builder) may fail
 {
 	if source.len < 2 || source[0] != 0x22 {
-		return false;
+		fail "the text is no JSON string";
 	}
 	let i = 1;
 	while i < source.len do {
 		let b = source[i];
 		if b == 0x22 {
-			return true;
+			return;
 		}
 		if b != 0x5C {
 			out.append_byte(b);
@@ -158,7 +162,7 @@ pub fn unquote(source: str, out: *text.Builder) -> bool
 		}
 		i += 1;
 		if i >= source.len {
-			return false;
+			fail "the text is no JSON string";
 		}
 		let e = source[i];
 		if e == 0x6E {
@@ -176,7 +180,7 @@ pub fn unquote(source: str, out: *text.Builder) -> bool
 		}
 		i += 1;
 	}
-	return false;
+	fail "the text is no JSON string";
 }
 
 /// The byte of the hexadecimal digit `value`.

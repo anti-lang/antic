@@ -7,3 +7,8 @@ null
 "one, two"
 a"b
 c
+the text is no JSON string
+open
+one, two
+the text is no JSON string
+no such member

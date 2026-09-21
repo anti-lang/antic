@@ -1,6 +1,6 @@
 //! What a program can read of its own classes at run time.
 //!
-//! Every class carries a descriptor in read-only data, and this module
+//! Every class carries a descriptor in read-only data, and `anti.reflect`
 //! reads it. `describe` gives the descriptor of an object, `field_count`
 //! and `function_count` count what it lists, and `field` gives the name,
 //! the offset and the type of one field. `get` and `set` read and write
@@ -14,9 +14,9 @@
 //! `call` calls a public function by its index through the table of the
 //! object's class. Its arguments and its result are `Value`s, and the
 //! compiler writes one trampoline per signature of the program that
-//! unpacks them. `set` and `call` follow the error convention, and the
-//! code of an error names the reason. `--no-reflect` drops the function
-//! lists, and every `call` then gives the error `BAD_INDEX`.
+//! unpacks them. `set` and `call` may fail, and the code of an error
+//! names the reason. `--no-reflect` drops the function lists, and every
+//! `call` then fails with `BAD_INDEX`.
 
 import anti.lang;
 import anti.text;
@@ -136,28 +136,27 @@ pub fn get(object: *byte, d: *byte, index: int) -> Value
 	return v;
 }
 
-/// Write `value` into the field at `index`.
+/// Write `value` into the field at `index`, which may fail.
 ///
 /// The value is of the kind that `get` gives for the field, and an
 /// integer or a float narrows to the field's type. An index out of range,
-/// a field that no `Value` carries and a value of another kind each give
-/// an error with the code that names the reason, and write nothing.
-pub fn set(object: *byte, d: *byte, index: int, value: Value) -> ?*lang.Error
+/// a field that no `Value` carries and a value of another kind each fail
+/// with the code that names the reason, and write nothing.
+pub fn set(object: *byte, d: *byte, index: int, value: Value) may fail
 {
 	let v = value;
 	let reason = anti_rt_reflect_set(object, d, index, &v);
 	if reason == BAD_INDEX {
-		return lang.Error.new(BAD_INDEX, "the class has no field at this index");
+		fail lang.Error.new(BAD_INDEX, "the class has no field at this index");
 	}
 	if reason == NOT_CARRIED {
-		return lang.Error.new(NOT_CARRIED,
+		fail lang.Error.new(NOT_CARRIED,
 			"no Value carries the type of this field");
 	}
 	if reason == WRONG_KIND {
-		return lang.Error.new(WRONG_KIND,
+		fail lang.Error.new(WRONG_KIND,
 			"the value is of another kind than the field takes");
 	}
-	return none;
 }
 
 /// The name of the class `d` describes.
@@ -254,37 +253,38 @@ pub fn of_ptr(v: *byte) -> Value
 	return Value { kind: ValueKind.Ptr, data: Payload { p: v } };
 }
 
-/// Call the public function at `index` of the class of `object`.
+/// Call the public function at `index` of the class of `object`, which
+/// may fail.
 ///
 /// The index counts the list that `function` reads, so the seven
 /// functions of the root come first. `args` holds one value per
 /// parameter after `self`, of the kind that parameter takes, and the call
-/// goes through the table of the object as any call does. `out` receives
+/// goes through the table of the object as any call does. The result is
 /// the value the function returns, which is of kind `None` for a function
-/// without a result. An index out of range gives an error with the code
-/// `BAD_INDEX`, and a signature with a type that no `Value` carries one
-/// with `NOT_CARRIED`. Arguments of another count give `WRONG_COUNT`, and
-/// of another kind `WRONG_KIND`.
-pub fn call(object: *Object, index: int, args: []Value, out: *Value)
-	-> ?*lang.Error
+/// without a result. An index out of range fails with the code
+/// `BAD_INDEX`, and a signature with a type that no `Value` carries with
+/// `NOT_CARRIED`. Arguments of another count fail with `WRONG_COUNT`, and
+/// of another kind with `WRONG_KIND`.
+pub fn call(object: *Object, index: int, args: []Value) -> Value may fail
 {
-	*out = nothing();
-	let reason = anti_rt_reflect_call(object, index, args.ptr, args.len, out);
+	let result = nothing();
+	let reason = anti_rt_reflect_call(object, index, args.ptr, args.len,
+		&result);
 	if reason == BAD_INDEX {
-		return lang.Error.new(BAD_INDEX,
+		fail lang.Error.new(BAD_INDEX,
 			"the class has no public function at this index");
 	}
 	if reason == NOT_CARRIED {
-		return lang.Error.new(NOT_CARRIED,
+		fail lang.Error.new(NOT_CARRIED,
 			"no Value carries a type of this function");
 	}
 	if reason == WRONG_COUNT {
-		return lang.Error.new(WRONG_COUNT,
+		fail lang.Error.new(WRONG_COUNT,
 			"the function takes another number of arguments");
 	}
 	if reason == WRONG_KIND {
-		return lang.Error.new(WRONG_KIND,
+		fail lang.Error.new(WRONG_KIND,
 			"an argument is of another kind than its parameter takes");
 	}
-	return none;
+	return result;
 }

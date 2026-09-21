@@ -429,6 +429,7 @@ endif()
 # The standard library in std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
 set(ANTIC_STD_MODULES lang io text license error time os fs reflect random collection toml args json log)
+set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/std/anti")
 set(std_files "")
 foreach(module IN LISTS ANTIC_STD_MODULES)
     set(output "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
@@ -438,8 +439,8 @@ foreach(module IN LISTS ANTIC_STD_MODULES)
             -I "${ANTIC_RUNTIME_DIR}/std"
             --package-name anti --package-version "${PROJECT_VERSION}"
             --license 0BSD --license-text "${PROJECT_SOURCE_DIR}/std/LICENSE"
-            -o "${output}" "${PROJECT_SOURCE_DIR}/std/anti/${module}.anti"
-        DEPENDS antic "${PROJECT_SOURCE_DIR}/std/anti/${module}.anti"
+            -o "${output}" "${ANTIC_STD_SOURCE_DIR}/${module}.anti"
+        DEPENDS antic "${ANTIC_STD_SOURCE_DIR}/${module}.anti"
             ${std_files}
         VERBATIM)
     list(APPEND std_files "${output}")

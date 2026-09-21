@@ -405,6 +405,13 @@ foreach(source IN LISTS std_sources)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
 
+# Every failing function of std/ is written with `may fail`, apart from
+# the forms that refuse it.
+add_test(NAME std_may_fail_only
+    COMMAND "${CMAKE_COMMAND}"
+        "-DSTD=${ANTIC_STD_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_std_may_fail.cmake")
+
 # The file of the logger that tests/std/log.anti writes. The environment
 # of the test names it, since the C runtime of Windows has no setenv.
 set_tests_properties(std_log PROPERTIES ENVIRONMENT "ANTI_LOGGER=log-test.toml")

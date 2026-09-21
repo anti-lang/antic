@@ -9,3 +9,4 @@ sink.1.path = /tmp/anti.log
 /tmp/anti.log
 none
 the text is not the TOML subset
+the text is not the TOML subset

@@ -2,7 +2,9 @@
 //! object's class. The arguments and the result are `Value`s, and the
 //! compiler writes one trampoline per signature of the program. A call
 //! that cannot be made gives an error whose code names the reason, and
-//! kind `None` means only that the function has no result.
+//! kind `None` means only that the function has no result. `try`
+//! forwards the error of a call.
+import anti.lang;
 import anti.reflect;
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;
@@ -65,6 +67,14 @@ class Square
 	{
 		return parts.len;
 	}
+}
+
+/// The result of the function at `index` of `o`, forwarding the error of
+/// `reflect.call`.
+fn called(o: *Object, index: int, args: []reflect.Value)
+	-> reflect.Value may fail
+{
+	return try reflect.call(o, index, args);
 }
 
 fn main() -> int
@@ -142,6 +152,16 @@ fn main() -> int
 		low.kind != reflect.ValueKind.None ||
 		slices.kind != reflect.ValueKind.None {
 		return 1;
+	}
+
+	let through = called(o, 7, no_args) catch fatal;
+	printf("%d %d\n".ptr, through.kind as c_int, through.data.i as c_int);
+	let lost = called(o, 99, no_args) catch e {
+		printf("%d\n".ptr, (e.code == reflect.BAD_INDEX) as c_int);
+		yield reflect.nothing();
+	};
+	if lost.kind != reflect.ValueKind.None {
+		return 2;
 	}
 	delete(s);
 	return 0;

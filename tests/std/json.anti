@@ -1,7 +1,9 @@
 //! An object writes itself as JSON, a class writes its own members, and
-//! a member of a JSON object is read back by name.
+//! a member of a JSON object is read back by name. `unquote` fails on a
+//! text that is no JSON string, and `try` forwards its error.
 import anti.io;
 import anti.json;
+import anti.lang;
 import anti.text;
 
 class Point
@@ -31,6 +33,16 @@ class Named
 	{
 		return "a\"b\nc";
 	}
+}
+
+/// The bytes of the string member `name` of `source`, which may fail.
+fn text_member(source: str, name: str, into: *text.Builder) may fail
+{
+	let found = "";
+	if !json.member(source, name, &found) {
+		fail "no such member";
+	}
+	try json.unquote(found, into);
 }
 
 fn main() -> int
@@ -70,9 +82,24 @@ fn main() -> int
 	}
 
 	b.clear();
-	if !json.unquote("\"a\\\"b\\nc\"", &b) {
-		return 5;
-	}
+	json.unquote("\"a\\\"b\\nc\"", &b) catch fatal;
 	io.println(b.text());
+
+	/* The bytes before the fault stay in the builder. */
+	b.clear();
+	json.unquote("\"open", &b) catch e {
+		io.println(e.message);
+	};
+	io.println(b.text());
+
+	b.clear();
+	text_member(source, "tag", &b) catch fatal;
+	io.println(b.text());
+	text_member(source, "y", &b) catch e {
+		io.println(e.message);
+	};
+	text_member(source, "missing", &b) catch e {
+		io.println(e.message);
+	};
 	return 0;
 }

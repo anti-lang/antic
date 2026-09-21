@@ -1,8 +1,27 @@
 //! A declared command line reads a flag, a value in three forms and the
-//! arguments that are no option, and writes its own help text.
+//! arguments that are no option, and writes its own help text. An
+//! unknown option and an option without its value each fail with their
+//! code, and `try` forwards the error of `parse`.
 import anti.args;
 import anti.io;
+import anti.lang;
 import anti.text;
+
+/// Read `argv` with `p`, forwarding the error of `parse`.
+fn parse_all(p: *args.Parser, argv: []str) may fail
+{
+	try p.parse(argv);
+}
+
+/// The code of the error that `argv` gives, or -1 when it gives none.
+fn refused(p: *args.Parser, argv: []str) -> int
+{
+	parse_all(p, argv) catch e {
+		io.println(e.message);
+		return e.code;
+	};
+	return -1;
+}
 
 fn main(argv: []str, env: []str) -> int
 {
@@ -35,9 +54,14 @@ fn main(argv: []str, env: []str) -> int
 
 	let q = args.Parser.new("pin", "");
 	let wrong: [2]str = ["pin", "--missing"];
-	q.parse(wrong[0..2]) catch e {
-		io.println(e.message);
-		return 0;
-	};
-	return 5;
+	if refused(&q, wrong[0..2]) != 1 {
+		return 5;
+	}
+	let r = args.Parser.new("pin", "");
+	r.value("output", 0x6F, "the file to write", "a.out");
+	let bare: [2]str = ["pin", "-o"];
+	if refused(&r, bare[0..2]) != 2 {
+		return 6;
+	}
+	return 0;
 }

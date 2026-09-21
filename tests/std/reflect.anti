@@ -1,8 +1,10 @@
 //! A program reads its own classes. The descriptor of an object names
 //! the class, lists the fields it declares and the public functions of
 //! the whole chain. Each field record names the type of its field, and
-//! `get` and `set` reach one field by its index as a `Value`.
+//! `get` and `set` reach one field by its index as a `Value`, and `try`
+//! forwards the error of `set`.
 import anti.io;
+import anti.lang;
 import anti.reflect;
 import anti.text;
 
@@ -74,6 +76,12 @@ class Kinds
 	v: Bits,
 	w: Level,
 	x: Point,
+}
+
+/// Write `v` into the field at `index`, forwarding the error of `set`.
+fn put(object: *byte, d: *byte, index: int, v: reflect.Value) may fail
+{
+	try reflect.set(object, d, index, v);
 }
 
 fn show(v: reflect.Value)
@@ -165,6 +173,9 @@ fn main() -> int
 	reflect.set(m as *byte, d, 9, reflect.of_int(1)) catch e {
 		printf("%d %.*s\n".ptr, (e.code == reflect.BAD_INDEX) as c_int,
 			e.message.len as c_int, e.message.ptr);
+	};
+	put(m as *byte, d, 9, reflect.of_int(1)) catch e {
+		printf("%d\n".ptr, (e.code == reflect.BAD_INDEX) as c_int);
 	};
 	if m.tag != 42 {
 		return 3;

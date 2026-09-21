@@ -65,11 +65,12 @@ pub class Parser
 		self.declare(name, letter, help, true, fallback);
 	}
 
-	/// Read `argv` as the command line, from its second entry on.
+	/// Read `argv` as the command line, from its second entry on, which
+	/// may fail.
 	///
-	/// An unknown option gives an error with code 1, and an option that
-	/// takes a value and has none gives code 2.
-	pub fn parse(self, argv: []str) -> ?*lang.Error
+	/// An unknown option fails with an error of code 1, and an option
+	/// that takes a value and has none with code 2.
+	pub fn parse(self, argv: []str) may fail
 	{
 		let only_rest = false;
 		let i = 1;
@@ -88,7 +89,6 @@ pub class Parser
 			let taken = try self.read_option(arg, argv, i);
 			i = i + taken;
 		}
-		return none;
 	}
 
 	/// Whether the command line gave the option called `name`.
@@ -219,9 +219,9 @@ pub class Parser
 		return -1;
 	}
 
-	/// Read the option at `i` of `argv` and say how many entries it took.
-	fn read_option(self, arg: str, argv: []str, i: int,
-		taken: *int) -> ?*lang.Error
+	/// Read the option at `i` of `argv` and give the number of entries
+	/// it took, which may fail.
+	fn read_option(self, arg: str, argv: []str, i: int) -> int may fail
 	{
 		let body = text.slice(arg, 1, arg.len);
 		let long = false;
@@ -244,24 +244,24 @@ pub class Parser
 			at = self.index_of_letter(body[0]);
 		}
 		if at < 0 {
-			return lang.Error.new(1, self.say("unknown option: ", arg));
+			fail lang.Error.new(1, self.say("unknown option: ", arg));
 		}
-		*taken = 1;
 		if !self.options[at].takes {
 			self.options[at].given = true;
-			return none;
+			return 1;
 		}
+		let taken = 1;
 		if !has_value {
 			if i + 1 >= argv.len {
-				return lang.Error.new(2,
+				fail lang.Error.new(2,
 					self.say("the option has no value: ", arg));
 			}
 			value = argv[i + 1];
-			*taken = 2;
+			taken = 2;
 		}
 		self.options[at].given = true;
 		self.options[at].value = value;
-		return none;
+		return taken;
 	}
 
 	/// Add one option to the declarations.

@@ -1,8 +1,10 @@
 //! A logger reads its level, its format and its sink from the file that
-//! `ANTI_LOGGER` names, drops what its level drops, and writes a text
-//! line and a JSON line.
+//! `ANTI_LOGGER` names. It drops what its level drops and writes a text
+//! line and a JSON line. A file sink fails where no file opens, and `try`
+//! forwards its error.
 import anti.io;
 import anti.json;
+import anti.lang;
 import anti.log;
 import anti.text;
 
@@ -25,16 +27,33 @@ fn seen(line: str)
 		json.member(line, "name", &name);
 		json.member(line, "message", &message);
 		let plain = text.Builder.new();
-		json.unquote(level, &plain);
+		json.unquote(level, &plain) catch fatal;
 		plain.append(" ");
-		json.unquote(name, &plain);
+		json.unquote(name, &plain) catch fatal;
 		plain.append(" ");
-		json.unquote(message, &plain);
+		json.unquote(message, &plain) catch fatal;
 		io.println(plain.text());
 		return;
 	}
 	let space = text.find_byte(line, 0x20);
 	io.print(text.slice(line, space + 1, line.len));
+}
+
+/// A sink that appends to `path`, forwarding the error of `FileSink.new`.
+fn open_sink(path: str) -> *log.FileSink may fail
+{
+	let sink = try log.FileSink.new(path);
+	return sink;
+}
+
+/// Whether a file sink opens at `path`.
+fn opens(path: str) -> bool
+{
+	let sink = open_sink(path) catch e {
+		return false;
+	};
+	delete(sink);
+	return true;
 }
 
 fn write_file(path: str, what: str)
@@ -99,6 +118,14 @@ fn main() -> int
 	}
 	if log.level_of("nonsense", log.Level.Debug) != log.Level.Debug {
 		return 3;
+	}
+
+	/* No file opens in a directory that is not there. */
+	if !opens("log-test.out") {
+		return 4;
+	}
+	if opens("log-test-missing/log-test.out") {
+		return 5;
 	}
 	return 0;
 }

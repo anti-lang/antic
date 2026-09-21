@@ -10,3 +10,4 @@ pin a version of a package
   -o, --output <value>  the file to write
   -j, --jobs <value>    how many jobs run at once
 unknown option: --missing
+the option has no value: -o

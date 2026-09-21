@@ -69,18 +69,18 @@ pub class FileSink
 
 	file: ?*byte,
 
-	/// A sink that appends to the file at `path`.
+	/// A sink that appends to the file at `path`, which may fail.
 	///
-	/// A file that will not open gives an error with code 1.
-	pub fn new(path: str, out: *?*FileSink) -> ?*lang.Error
+	/// A file that will not open fails with the `SystemError` of the
+	/// number the system gave.
+	pub fn new(path: str) -> *FileSink may fail
 	{
 		/* Binary, so a line ends with LF on Windows as well. */
 		let file = fopen(path.ptr, "ab".ptr);
 		if file == none {
-			return failure.SystemError.from_errno();
+			fail failure.SystemError.from_errno();
 		}
-		*out = alloc FileSink { file: file };
-		return none;
+		return alloc FileSink { file: file };
 	}
 
 	concrete fn write(self, line: str)
@@ -372,7 +372,7 @@ fn made(name: str, path: str) -> ?*Sink
 			io.eprint("anti.log: ");
 			io.eprint(e.message);
 			io.eprint("\n");
-			yield none;
+			return none;
 		};
 		return sink;
 	}
@@ -446,28 +446,26 @@ fn first_sink(doc: *toml.Document) -> *Sink
 	return StderrSink.new();
 }
 
-/// The bytes of the file at `path`.
-fn read_file(path: str, out: *str) -> ?*lang.Error
+/// The bytes of the file at `path`, which may fail.
+fn read_file(path: str) -> str may fail
 {
 	let file = fopen(path.ptr, "rb".ptr);
 	if file == none {
-		return failure.SystemError.from_errno();
+		fail failure.SystemError.from_errno();
 	}
 	fseek(file, 0 as c_long, 2 as c_int);
 	let size = ftell(file) as int;
 	fseek(file, 0 as c_long, 0 as c_int);
 	if size <= 0 {
 		fclose(file);
-		*out = "";
-		return none;
+		return "";
 	}
 	let room = alloc(byte, size + 1) else {
 		fclose(file);
-		return lang.Error.new(1, "out of memory");
+		fail lang.Error.new(1, "out of memory");
 	};
 	let read = fread(room, 1 as c_size_t, size as c_size_t, file) as int;
 	fclose(file);
 	room[read] = 0;
-	*out = text.from_c(room);
-	return none;
+	return text.from_c(room);
 }
