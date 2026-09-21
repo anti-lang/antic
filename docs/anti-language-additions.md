@@ -66,7 +66,7 @@ The round-three small items and the simd structs stay where the small things are
 
 A `may fail` function has two channels. On success it returns its value through the normal return. On failure it returns a `*Error` through a separate error channel, which `catch`, `try` and the `yield` of a handler read. A function without `may fail` has the value channel alone, so a `*Error` in its return type is an ordinary value and no failure. The compiler knows a failure by the `may fail` marking and never by the return type.
 
-`may fail` replaces the hand-written convention. The convention stays the ABI.
+The compiler generates the ABI of a `may fail` function: a `?*Error` result and an out pointer for the value. A `may fail` function and a C caller meet in the header, and neither writes the two channels by hand.
 
 - `fn divide(a: int, b: int) -> (int, int) may fail` declares a function with two channels. `return v;` leaves on the result channel. `fail e;` leaves on the error channel with `e`, a `*Error`. `fn close(f: *File) may fail` has no result and returns success at its closing brace.
 - `fail "text";` is sugar for `fail Error.new(0, "text");`. Code zero means "no code", and `fatal` turns it into exit status 1.
