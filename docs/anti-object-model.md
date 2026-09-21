@@ -293,7 +293,7 @@ Four levels, and each applies where it makes sense:
 - `try f(args)` is `f(args) catch e { return e; }` and is allowed only in a function that returns `?*Error`. The error a handler binds is the `*Error` of that result, since the handler runs on the failure alone.
 - `try { ... } catch e { ... }` handles every unhandled failing call in the block. The first error abandons the rest of the block and runs `defer` statements on the way out. Then the handler runs, and execution continues after the block unless the handler left the function. Nothing crosses a function boundary, so nothing is unwound. Nested blocks bind inward.
 - The name after `catch` is any identifier, scoped to the handler. It shadows an outer name, and `anti check` warns when it does.
-- An error bound by `catch e` is deleted when the handler exits, by `yield`, by falling off the end, by `break` or `continue`. `return e` and `try` pass it to the caller instead. `catch { }` deletes it at once. A handler that keeps the error writes `dup(e)`, and a bare `e` stored into anything is refused.
+- An error bound by `catch e` is deleted when the handler exits, by `yield`, by falling off the end, by `break` or `continue`. `return e` and `try` pass it to the caller instead. Passing `e` to a parameter of type `own ?*Error` moves it out of the handler, which then does not delete it, and `Error.wrap` takes its cause so. `catch { }` deletes it at once. A handler that keeps the error writes `dup(e)`, and a bare `e` stored into anything is refused.
 - A `construct` that may fail uses the same forms: `let c = alloc Circle(10.0) catch fatal;`.
 
 ## The C view

@@ -1,0 +1,61 @@
+//! The error a handler binds moves into an `own` parameter once, and the
+//! handler names it no more after the move.
+
+import anti.lang;
+
+fn plain(code: int) may fail
+{
+	fail lang.Error.new(code, "plain");
+}
+
+fn show(e: *lang.Error)
+{
+}
+
+fn named_after()
+{
+	plain(1) catch e {
+		let w = lang.Error.wrap(2, "wrapped", e);
+		show(e);
+		delete(w);
+	};
+}
+
+fn in_a_loop()
+{
+	plain(1) catch e {
+		let n = 0;
+		while n < 2 do {
+			n += 1;
+			let w = lang.Error.wrap(2, "wrapped", e);
+			delete(w);
+		}
+	};
+}
+
+fn deferred()
+{
+	plain(1) catch e {
+		defer show(e);
+		let w = lang.Error.wrap(2, "wrapped", e);
+		delete(w);
+	};
+}
+
+fn passed_on() may fail
+{
+	plain(1) catch e {
+		let w = lang.Error.wrap(2, "wrapped", e);
+		delete(w);
+		fail e;
+	};
+}
+
+fn not_a_pointer(own n: int)
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

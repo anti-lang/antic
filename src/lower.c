@@ -3816,6 +3816,22 @@ static uint32_t sym_of(struct lowerer *l, const struct symbolic *s)
     return a;
 }
 
+/* DESIGN: an argument that moves the error a handler binds into an `own`
+   parameter reads the error, then writes `none` into the handler's copy.
+   The delete that every exit of the handler runs then passes over it. */
+static struct ir_operand lower_argument(struct lowerer *l,
+                                        const struct expr *arg)
+{
+    struct ir_operand value = lower_expr(l, arg);
+
+    if (!arg->moves || l->failed || l->b == NULL) {
+        return value;
+    }
+    value = temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, value));
+    ir_assign(l->f, l->b, arg->symbol->ir, ir_int_op(IR_PTR, 0));
+    return value;
+}
+
 static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
 {
     const struct expr *callee = e->as.call.callee;
@@ -3860,7 +3876,7 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     }
     for (i = 0; i < n; i++) {
         args[i + (bound.kind != IR_NONE ? 1 : 0)] =
-            lower_expr(l, e->as.call.args[i]);
+            lower_argument(l, e->as.call.args[i]);
     }
     if (bound.kind != IR_NONE) {
         n++;
@@ -5392,7 +5408,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
     }
     args[0] = dest;
     for (i = 0; i < e->as.call.arg_count; i++) {
-        args[i + 1] = lower_expr(l, e->as.call.args[i]);
+        args[i + 1] = lower_argument(l, e->as.call.args[i]);
     }
     if (l->failed) {
         free(args);

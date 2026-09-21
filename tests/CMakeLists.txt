@@ -448,11 +448,11 @@ add_test(NAME std_may_fail_only
 # listing skips write the form on purpose: construct_forms refuses it on
 # a `construct`, failing and error_values check that a function written
 # so is ordinary, whose error is a value, and catch_exits returns the
-# error of a handler as one.
+# error of a handler as one, and catch_moves a wrap of it.
 add_test(NAME tests_may_fail_only
     COMMAND "${CMAKE_COMMAND}"
         "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
-        "-DSKIP=errors/construct_forms.anti:construct,errors/failing.anti:by_hand,errors/failing.anti:fail_by_hand,programs/error_values.anti:stored,programs/error_values.anti:maybe,programs/error_values.anti:caught,programs/catch_exits.anti:passed"
+        "-DSKIP=errors/construct_forms.anti:construct,errors/failing.anti:by_hand,errors/failing.anti:fail_by_hand,programs/error_values.anti:stored,programs/error_values.anti:maybe,programs/error_values.anti:caught,programs/catch_exits.anti:passed,programs/catch_moves.anti:by_return"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_may_fail_only.cmake")
 
 # The file of the logger that tests/std/log.anti writes. The environment
@@ -1679,6 +1679,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "construct_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/construct_forms.s,construct_forms.anti"
         "catch_place|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_place.s,catch_place.anti"
         "failing|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/failing.s,failing.anti"
+        "own_moves|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_moves.s,own_moves.anti"
         "fail_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_forms.s,fail_forms.anti"
         "fail_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_no_import.s,fail_no_import.anti"
         "defaults|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/defaults.s,defaults.anti"

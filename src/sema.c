@@ -63,6 +63,7 @@ struct checker {
     bool saw_fail;              /* the body holds a `fail` or a `try` */
     const struct expr *top_call; /* the first statement's call, or NULL */
     int quiet;                  /* above 0, errors are not reported */
+    int deferring;              /* above 0, a `defer` or `undo` is checked */
     bool ok;
 };
 
@@ -2842,6 +2843,44 @@ static void refuse_escaping_error(struct checker *c, const struct expr *e)
     }
 }
 
+/* DESIGN: the error a handler binds moves into an `own` parameter, and
+   the handler then holds it no longer, as after `return e`. Lowering
+   writes `none` into the handler's copy at the move, so the delete on
+   every exit after it passes over the error. The error is not named
+   after the move, so the checker refuses a mention after it in the order
+   of the text. That order is the order of execution unless a loop inside
+   the handler repeats the move, or a `defer` or an `undo` that the
+   handler registered names the error at an exit after it. Both are
+   refused. */
+static void note_move(struct checker *c, const struct symbol *callee,
+                      size_t index, struct expr *arg)
+{
+    struct symbol *moved = arg->symbol;
+
+    if (callee == NULL || callee->owned == NULL ||
+        index >= callee->owned_count || !callee->owned[index] ||
+        arg->kind != EXPR_NAME || moved == NULL || !moved->caught ||
+        c->quiet > 0) {
+        return;
+    }
+    if (c->loop_depth > moved->caught_loops) {
+        error_at(c, arg->pos, "`%.*s` moves into `%.*s` inside a loop of its "
+                 "handler, which would move it again",
+                 (int)arg->as.name.length, arg->as.name.text,
+                 (int)callee->name.length, callee->name.text);
+        return;
+    }
+    if (moved->deferred) {
+        error_at(c, arg->pos, "`%.*s` moves into `%.*s` while a `defer` or an "
+                 "`undo` of its handler names it",
+                 (int)arg->as.name.length, arg->as.name.text,
+                 (int)callee->name.length, callee->name.text);
+        return;
+    }
+    arg->moves = true;
+    moved->moved_into = callee;
+}
+
 /* The value a handled call gives: what the out parameter points at, or
    nothing when the function writes no result. */
 static struct type *handled_result(struct checker *c, const struct expr *e,
@@ -2926,6 +2965,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
         }
         if (h->symbol != NULL) {
             h->symbol->caught = true;
+            h->symbol->caught_loops = c->loop_depth;
         }
         c->yields = result;
         c->handler_depth++;
@@ -3073,6 +3113,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
         struct expr *arg = e->as.call.args[i];
         ok = require(c, arg, check_expr(c, arg, fn->params[i + 1]),
                      fn->params[i + 1]) && ok;
+        note_move(c, m->symbol, i + 1, arg);
     }
     if (!ok) {
         return builtin(c, TYPE_ERROR);
@@ -3251,6 +3292,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
         if (i < fn->param_count) {
             ok = require(c, arg, check_expr(c, arg, fn->params[i]),
                          fn->params[i]) && ok;
+            note_move(c, sym, i, arg);
         } else {
             struct type *t = check_expr(c, arg, NULL);
             if (!is_error(t) && !variadic_ok(t)) {
@@ -4328,6 +4370,16 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             error_at(c, e->pos, "a variadic function has no function pointer "
                      "type");
             return builtin(c, TYPE_ERROR);
+        }
+        if (sym->caught && sym->moved_into != NULL) {
+            error_at(c, e->pos, "`%.*s` has moved into `%.*s` and is not "
+                     "named after it", (int)e->as.name.length,
+                     e->as.name.text, (int)sym->moved_into->name.length,
+                     sym->moved_into->name.text);
+            return builtin(c, TYPE_ERROR);
+        }
+        if (sym->caught && c->deferring > 0) {
+            sym->deferred = true;
         }
         if (sym->kind == SYMBOL_CONST && sym->type == NULL) {
             struct const_value v;
@@ -5957,6 +6009,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
             h->symbol->type = error;
             h->symbol->read_only = true;
             h->symbol->caught = true;
+            h->symbol->caught_loops = c->loop_depth;
         }
     }
     c->yields = types_without_none(c->types, value);
@@ -6278,6 +6331,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
                         : builtin(c, TYPE_ERROR);
                 h->symbol->read_only = true;
                 h->symbol->caught = true;
+                h->symbol->caught_loops = c->loop_depth;
             }
         }
         check_block(c, h->body);
@@ -6473,7 +6527,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
         return;
     case STMT_DEFER:
     case STMT_UNDO:
+        c->deferring++;
         check_stmt(c, s->as.deferred);
+        c->deferring--;
         return;
     case STMT_FAIL: {
         struct type *error;
@@ -6994,6 +7050,44 @@ static void check_defaults(struct checker *c, struct item *it)
     it->symbol->default_count = list != NULL ? count : 0;
 }
 
+/* DESIGN: `own` on a parameter says the function takes over the object,
+   as `own` on a field says the object frees the memory. The rule of the
+   field holds: a pointer or a slice. The error a handler binds moves
+   into such a parameter, and nothing else changes at a call. */
+static void check_owned(struct checker *c, struct item *it)
+{
+    const struct type *fn = it->symbol != NULL ? it->symbol->type : NULL;
+    size_t extra = it->has_self ? 1 : 0;
+    size_t count = it->param_count + extra;
+    bool *list = NULL;
+    size_t i;
+
+    if (fn == NULL || is_error(fn) || fn->kind != TYPE_FN ||
+        fn->param_count < count) {
+        return;
+    }
+    for (i = 0; i < it->param_count; i++) {
+        const struct param *p = &it->params[i];
+        const struct type *t = fn->params[i + extra];
+        if (!p->owned) {
+            continue;
+        }
+        if (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE) {
+            error_at(c, p->pos, "`own` needs a pointer or a slice, and `%.*s` "
+                     "has type `%s`", (int)p->name.length, p->name.text,
+                     tn(t));
+            continue;
+        }
+        if (list == NULL) {
+            list = arena_alloc(c->arena, count * sizeof *list);
+            memset(list, 0, count * sizeof *list);
+        }
+        list[i + extra] = true;
+    }
+    it->symbol->owned = list;
+    it->symbol->owned_count = list != NULL ? count : 0;
+}
+
 static enum symbol_kind item_symbol_kind(enum item_kind kind)
 {
     switch (kind) {
@@ -7429,16 +7523,18 @@ bool sema_check(struct module *module, const char *module_name,
             const_symbol(&c, it->symbol, it->name_pos);
         }
     }
-    /* Every body calls with the defaults, so they are known before the
-       first body is checked. */
+    /* Every body calls with the defaults and the `own` parameters, so
+       they are known before the first body is checked. */
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {
             check_defaults(&c, it);
+            check_owned(&c, it);
         }
         for (j = 0; it->symbol != NULL && j < it->member_count; j++) {
             if (it->members[j]->kind == ITEM_FN) {
                 check_defaults(&c, it->members[j]);
+                check_owned(&c, it->members[j]);
             }
         }
     }

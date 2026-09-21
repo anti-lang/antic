@@ -193,8 +193,9 @@ pub class Error
 		return alloc Error { code: code, message: message, cause: none };
 	}
 
-	/// An error that wraps the one below it.
-	pub fn wrap(code: int, message: str, cause: *Error) -> *Error
+	/// An error that wraps the one below it and takes it over. The error
+	/// a handler binds moves here, and the handler deletes it no longer.
+	pub fn wrap(code: int, message: str, own cause: ?*Error) -> *Error
 	{
 		return alloc Error { code: code, message: message, cause: cause };
 	}

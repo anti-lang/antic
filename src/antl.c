@@ -459,6 +459,18 @@ static void put_param_defaults(struct writer *w, const struct symbol *sym)
     }
 }
 
+/* The `own` parameters follow the defaults: a count, `self` included and
+   0 when none is `own`, then a byte of 0 or 1 per parameter. */
+static void put_param_owned(struct writer *w, const struct symbol *sym)
+{
+    size_t i;
+
+    put_u32(w, (uint32_t)(sym->owned != NULL ? sym->owned_count : 0));
+    for (i = 0; sym->owned != NULL && i < sym->owned_count; i++) {
+        put_u8(w, sym->owned[i] ? 1 : 0);
+    }
+}
+
 /* DESIGN: the defaults of the fields follow the type table. The reader
    reads a value against the type of its field, and it resolves that type
    once the whole table is in. Each field of a struct that the file
@@ -481,6 +493,7 @@ static void put_defaults(struct writer *w, const struct type *t)
     for (i = 0; i < t->member_count; i++) {
         if (carried_member(t->members[i])) {
             put_param_defaults(w, t->members[i]->symbol);
+            put_param_owned(w, t->members[i]->symbol);
         }
     }
 }
@@ -786,6 +799,7 @@ void antl_write(struct text *out, const struct interface *iface,
                 put_bytes(&w, sym->params[j].text, sym->params[j].length);
             }
             put_param_defaults(&w, sym);
+            put_param_owned(&w, sym);
         }
         if (sym->kind == SYMBOL_EXTERN_FN) {
             put_u8(&w, sym->variadic);
@@ -1170,6 +1184,34 @@ static void read_param_defaults(struct reader *r, struct symbol *sym)
     sym->default_count = count;
 }
 
+/* The `own` parameters of sym, whose type is in place. */
+static void read_param_owned(struct reader *r, struct symbol *sym)
+{
+    uint32_t count = get_u32(r);
+    bool *list;
+    uint32_t i;
+
+    if (r->failed || count == 0) {
+        return;
+    }
+    if (sym->type == NULL || sym->type->kind != TYPE_FN ||
+        count > sym->type->param_count) {
+        damaged(r);
+        return;
+    }
+    list = allocate(r, count, sizeof *list);
+    for (i = 0; i < count && !r->failed; i++) {
+        uint8_t owned = get_u8(r);
+        if (owned > 1) {
+            damaged(r);
+            return;
+        }
+        list[i] = owned == 1;
+    }
+    sym->owned = list;
+    sym->owned_count = count;
+}
+
 static void read_types(struct reader *r)
 {
     uint32_t count = get_count(r, 1);
@@ -1440,6 +1482,7 @@ static void read_types(struct reader *r)
         }
         for (j = 0; j < structs[i].member_count && !r->failed; j++) {
             read_param_defaults(r, structs[i].members[j]->symbol);
+            read_param_owned(r, structs[i].members[j]->symbol);
         }
     }
     for (i = 0; i < struct_count && !r->failed; i++) {
@@ -1563,6 +1606,7 @@ static void read_items(struct reader *r)
                 }
                 sym->params = names;
                 read_param_defaults(r, sym);
+                read_param_owned(r, sym);
             }
             if (kind == SYMBOL_EXTERN_FN) {
                 sym->variadic = get_u8(r) != 0;

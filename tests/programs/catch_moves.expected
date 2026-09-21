@@ -1,0 +1,25 @@
+exit 0
+fail 10
+deleted 1
+fail live 0
+deleted 2
+yield 20
+yield live 0
+moved 1
+deleted 3
+one path 1
+one path moved live 0
+moved 0
+deleted 3
+one path 0
+one path kept live 0
+deleted 4
+break 1
+break live 0
+try block 50
+deleted 5
+try block live 0
+guard 60
+return 70
+deleted 7
+guard and return live 0

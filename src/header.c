@@ -185,6 +185,17 @@ static void tuple_c_name(struct text *out, const struct type *t)
     element_c_name(out, t);
 }
 
+/* The comment before parameter i of sym when it is `own`. The function
+   takes over what C passes there, as an `own` field is freed by its
+   object. */
+static const char *owned_note(const struct symbol *sym, size_t i)
+{
+    return sym != NULL && sym->owned != NULL && i < sym->owned_count &&
+                   sym->owned[i]
+               ? "/* own */ "
+               : "";
+}
+
 /* Append the C declaration of name with type t. owner is the aggregate
    whose definition holds the declaration, which names itself with its
    tag. */
@@ -548,7 +559,8 @@ static void member_signature(struct text *out, const struct type *owner,
             snprintf(buffer, sizeof buffer, "a%zu", k);
         }
         declaration(&param, t->params[i], buffer, NULL);
-        text_appendf(&inner, "%s%s", i > 0 ? ", " : "", text_cstr(&param));
+        text_appendf(&inner, "%s%s%s", i > 0 ? ", " : "",
+                     owned_note(m->symbol, i), text_cstr(&param));
         text_free(&param);
     }
     text_append(&inner, t->param_count == 0 ? "void)" : ")");
@@ -814,7 +826,8 @@ static void prototype(struct text *out, const struct symbol *sym)
         char name[128];
         c_name(name, sizeof name, &sym->params[i]);
         declaration(&param, t->params[i], name, NULL);
-        text_appendf(&inner, "%s%s", i > 0 ? ", " : "", text_cstr(&param));
+        text_appendf(&inner, "%s%s%s", i > 0 ? ", " : "", owned_note(sym, i),
+                     text_cstr(&param));
         text_free(&param);
     }
     text_append(&inner, t->param_count == 0 ? "void)" : ")");

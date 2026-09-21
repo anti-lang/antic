@@ -1,0 +1,172 @@
+//! A handler that passes the error it binds to an `own` parameter moves
+//! it there, and the handler leaves it alone on every exit after the
+//! move. `Error.wrap` takes its cause so. Each case runs under a leak
+//! check, the count of the errors alive, which `Counted` keeps. Each
+//! error prints its own delete, so a second delete shows as a second
+//! line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	inherits lang.Error,
+
+	static atomic live: int = 0;
+
+	/// An error that counts itself alive until it is deleted.
+	pub fn make(code: int) -> *Counted
+	{
+		let e = alloc Counted { };
+		e.code = code;
+		e.message = "counted";
+		Counted.live.add(1);
+		return e;
+	}
+
+	concrete fn destruct(self)
+	{
+		Counted.live.sub(1);
+		printf("deleted %d\n".ptr, self.code as c_int);
+	}
+}
+
+/// A box that owns the error it is given.
+class Holder
+{
+	pub own held: ?*lang.Error = none,
+}
+
+/// Take the error into the box, which deletes it with itself.
+fn keep(h: *Holder, own e: ?*lang.Error)
+{
+	h.held = e;
+}
+
+fn value(code: int) -> int may fail
+{
+	fail Counted.make(code);
+}
+
+fn plain(code: int) may fail
+{
+	fail Counted.make(code);
+}
+
+/// Report the errors alive after one case, which is none.
+fn check(name: str)
+{
+	printf("%s live %d\n".ptr, name.ptr, Counted.live.load() as c_int);
+}
+
+/// `fail` with a wrap of the error, which the caller deletes.
+fn by_fail() -> int may fail
+{
+	let v = value(1) catch e {
+		fail lang.Error.wrap(10, "wrapped", e);
+	};
+	return v;
+}
+
+/// A wrap the handler deletes itself before it yields.
+fn by_yield() -> int
+{
+	let v = value(2) catch e {
+		let w = lang.Error.wrap(20, "kept", e);
+		let code = w.code;
+		delete(w);
+		yield code;
+	};
+	return v;
+}
+
+/// A move on one path. The other path deletes the error at the end of
+/// the handler.
+fn on_one_path(moves: bool) -> int
+{
+	let h = Holder { };
+	plain(3) catch e {
+		if moves {
+			keep(&h, e);
+		}
+		printf("moved %d\n".ptr, moves as c_int);
+	};
+	if h.held != none {
+		return 1;
+	}
+	return 0;
+}
+
+/// A move, then `break` out of the loop around the handler.
+fn by_break() -> int
+{
+	let n = 0;
+	let h = Holder { };
+	while n < 5 do {
+		n += 1;
+		plain(4) catch e {
+			keep(&h, e);
+			break;
+		};
+	}
+	return n;
+}
+
+/// A move in the handler of a `try` block.
+fn in_try_block() may fail
+{
+	try {
+		plain(5);
+	} catch e {
+		fail lang.Error.wrap(50, "try block", e);
+	}
+}
+
+/// A move of the error a `catch` on a pointer binds.
+fn by_guard(p: ?*Holder) may fail
+{
+	let h = p catch e {
+		fail lang.Error.wrap(60, "guard", e);
+	};
+}
+
+/// A wrap returned as a value, which `return` hands to the caller.
+fn by_return() -> ?*lang.Error
+{
+	plain(7) catch e {
+		return lang.Error.wrap(70, "returned", e);
+	};
+	return none;
+}
+
+fn main() -> int
+{
+	let a = by_fail() catch e {
+		printf("fail %d\n".ptr, e.code as c_int);
+		yield 0;
+	};
+	check("fail");
+	printf("yield %d\n".ptr, by_yield() as c_int);
+	check("yield");
+	printf("one path %d\n".ptr, on_one_path(true) as c_int);
+	check("one path moved");
+	printf("one path %d\n".ptr, on_one_path(false) as c_int);
+	check("one path kept");
+	printf("break %d\n".ptr, by_break() as c_int);
+	check("break");
+	in_try_block() catch e {
+		printf("try block %d\n".ptr, e.code as c_int);
+	};
+	check("try block");
+	by_guard(none) catch e {
+		printf("guard %d\n".ptr, e.code as c_int);
+	};
+	let r = by_return() else {
+		return 1;
+	};
+	printf("return %d\n".ptr, r.code as c_int);
+	delete(r);
+	check("guard and return");
+	return a;
+}

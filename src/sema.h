@@ -98,6 +98,12 @@ struct symbol {
     bool may_fail;                  /* SYMBOL_FN written `may fail` */
     bool internal;                  /* `internal`: the package alone sees it */
     bool caught;                    /* the error a `catch` binds */
+    /* The error a `catch` binds: the loops its handler stands in, the
+       function it moved into, and whether a `defer` or an `undo` of the
+       handler names it. */
+    int caught_loops;
+    const struct symbol *moved_into;
+    bool deferred;
     const struct name *params;      /* a function of an interface */
     /* DESIGN: the defaults of a function's parameters, one per parameter
        the program writes, `self` included, in the order of the type.
@@ -106,6 +112,13 @@ struct symbol {
        argument. */
     const struct param_default *defaults;
     size_t default_count;
+    /* DESIGN: the `own` parameters of a function, which take over the
+       object passed to them. One flag per parameter, `self` included, as
+       for the defaults, and NULL when none is `own`. They belong to the
+       function and not to its type, so a call through a function value
+       moves nothing. */
+    const bool *owned;
+    size_t owned_count;
 
     /* An export item, whose function has the C symbol of its name. */
     bool exported;

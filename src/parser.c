@@ -1646,6 +1646,12 @@ static struct param *params(struct parser *p, bool allow_variadic,
             accept(p, TOKEN_COMMA);
             break;
         }
+        /* `own name: T`: the function takes over the object. `own` is a
+           contextual word, so a parameter may still carry that name. */
+        if (is_word(p, peek(p), "own") && peek_at(p, 1)->kind == TOKEN_IDENT) {
+            next(p);
+            param.owned = true;
+        }
         param.pos = pos_of(peek(p));
         if (!expect_name(p, &param.name) || !expect(p, TOKEN_COLON) ||
             (param.type = type(p)) == NULL) {

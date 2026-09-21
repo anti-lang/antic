@@ -158,6 +158,9 @@ struct expr {
     struct token_text spelling;     /* source text of a literal */
     struct type *type;              /* set by semantic analysis */
     struct symbol *symbol;          /* EXPR_NAME, set by semantic analysis. */
+    /* EXPR_NAME: an argument that moves the error a `catch` binds into
+       an `own` parameter, so the handler holds it no longer. */
+    bool moves;
     /* DESIGN: a pointer to a class converts to a pointer to one of its
        interfaces by adding the offset of the sub-object. The checker
        records the field here and lowering adds the offset, so every
