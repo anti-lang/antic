@@ -7,3 +7,6 @@ r -1
 n 2
 limit 5 the counter is at its limit
 n 3
+twice n is odd
+t 3 u -1
+apply 4 8

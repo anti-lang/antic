@@ -1,0 +1,5 @@
+fn_may_fail.anti:26:26: error: expected `fn(int) -> int`, found `fn(int) -> int may fail`
+fn_may_fail.anti:27:35: error: expected `fn(int) -> int may fail`, found `fn(int) -> int`
+fn_may_fail.anti:28:47: error: expected `fn(int, *int) -> ?*Error`, found `fn(int) -> int may fail`
+fn_may_fail.anti:30:10: error: this call may fail and its error is not handled
+fn_may_fail.anti:31:16: error: expected `fn(int) -> int`, found `fn(int) -> int may fail`

@@ -1,11 +1,17 @@
 //! A program that calls `may fail` functions of another module. The flag
 //! comes from the library file, so the call needs a handler here and
-//! `try` forwards inside a `may fail` function of this module.
+//! `try` forwards inside a `may fail` function of this module. A function
+//! of the library passes as a value of its failing type.
 
 import anti.lang;
 import com.example.counter;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn double(n: int) -> int
+{
+	return n * 2;
+}
 
 /// Halve n twice, forwarding the failure of either step.
 fn quarter(n: int) -> int may fail
@@ -36,5 +42,14 @@ fn main() -> int
 		       e.message.len as c_int, e.message.ptr);
 	};
 	printf("n %d\n".ptr, c.n as c_int);
+	let h = counter.half;
+	let t = counter.twice_by(h, 12) catch fatal;
+	let u = counter.twice_by(counter.half, 6) catch e {
+		printf("twice %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield -1;
+	};
+	printf("t %d u %d\n".ptr, t as c_int, u as c_int);
+	printf("apply %d %d\n".ptr, counter.apply_or(none, 4) as c_int,
+	       counter.apply_or(double, 4) as c_int);
 	return 0;
 }

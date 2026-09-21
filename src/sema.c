@@ -423,6 +423,7 @@ static struct type *array_of(struct checker *c, struct expr *e,
 }
 
 static struct type *resolve_type(struct checker *c, struct type_expr *t);
+static struct type *error_class(struct checker *c, struct pos pos);
 static const struct type *inherited(const struct type *t);
 
 static bool require(struct checker *c, struct expr *e, struct type *got,
@@ -617,6 +618,7 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         struct type **params =
             arena_alloc(c->arena, (t->param_count + 1) * sizeof *params);
         struct type *result = builtin(c, TYPE_VOID);
+        struct type *fn;
         for (i = 0; i < t->param_count; i++) {
             params[i] = resolve_type(c, t->params[i]);
             if (is_error(params[i])) {
@@ -634,11 +636,24 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
             refuses_half_value(c, t->result->pos, result, "a result")) {
             return builtin(c, TYPE_ERROR);
         }
-        return t->nullable
-                   ? types_with_none(c->types,
-                                     types_fn(c->types, params,
-                                              t->param_count, result))
-                   : types_fn(c->types, params, t->param_count, result);
+        /* `fn(A) -> R may fail` takes the ABI form a `may fail` function
+           has, so a value of it holds such a function as it is. */
+        if (t->may_fail) {
+            struct type *error = error_class(c, t->pos);
+            if (error == NULL) {
+                return builtin(c, TYPE_ERROR);
+            }
+            if (t->result != NULL) {
+                params[t->param_count] = types_pointer(c->types, result);
+            }
+            fn = types_fn_failing(c->types, params,
+                                  t->param_count + (t->result != NULL ? 1 : 0),
+                                  types_pointer_nullable(c->types, error),
+                                  t->result != NULL);
+        } else {
+            fn = types_fn(c->types, params, t->param_count, result);
+        }
+        return t->nullable ? types_with_none(c->types, fn) : fn;
     }
     case TYPEX_TUPLE: {
         struct type **elements =
@@ -776,8 +791,10 @@ static struct type *function_type(struct checker *c, struct item *it)
         if (out == 1) {
             params[it->param_count + extra] = types_pointer(c->types, result);
         }
-        return types_fn(c->types, params, it->param_count + extra + out,
-                        types_pointer_nullable(c->types, error));
+        return types_fn_failing(c->types, params,
+                                it->param_count + extra + out,
+                                types_pointer_nullable(c->types, error),
+                                out == 1);
     }
     return types_fn(c->types, params, it->param_count + extra, result);
 }
@@ -1704,7 +1721,8 @@ static bool comparable_pointers(const struct type *a, const struct type *b)
 {
     if (a->kind == TYPE_FN && b->kind == TYPE_FN) {
         return a->params == b->params && a->param_count == b->param_count &&
-               a->result == b->result && a->bound == b->bound;
+               a->result == b->result && a->bound == b->bound &&
+               a->may_fail == b->may_fail && a->has_out == b->has_out;
     }
     if (a->kind != TYPE_POINTER || b->kind != TYPE_POINTER) {
         return false;
@@ -2818,11 +2836,12 @@ static struct type *caught_error(struct checker *c, struct type *result)
 /* DESIGN: a function fails when it is written `may fail`, and never
    because of its result type. A function that returns `*Error` or
    `?*Error` without the marking gives an error as a value, and its call
-   needs no handler. A call through a function value names no function,
-   so it is ordinary. */
-static bool is_failing(const struct symbol *sym)
+   needs no handler. The marking travels in the function type, so a call
+   through a value of `fn(A) -> R may fail` is handled as a direct call
+   is, and a `may fail` function converts to that type alone. */
+static bool is_failing(const struct type *fn)
 {
-    return sym != NULL && sym->kind == SYMBOL_FN && sym->may_fail;
+    return fn != NULL && fn->kind == TYPE_FN && fn->may_fail;
 }
 
 /* Whether the function whose body is checked may fail. */
@@ -3258,9 +3277,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
        result through the last parameter. A call that gives one argument
        fewer than the function takes leaves that place to the compiler.
        The compiler passes the address of what the `let` declares. */
-    if (is_failing(sym) && !variadic &&
-        given + filled + 1 == fn->param_count &&
-        fn->params[fn->param_count - 1]->kind == TYPE_POINTER) {
+    if (is_failing(fn) && fn->has_out && !variadic &&
+        given + filled + 1 == fn->param_count) {
         e->as.call.out = e;
     }
     if (e->as.call.out != NULL) {
@@ -3308,7 +3326,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
     if (filled > 0) {
         append_defaults(c, e, sym, fn, given, filled);
     }
-    if (is_failing(sym)) {
+    if (is_failing(fn)) {
         return check_handled(c, e, fn, expected);
     }
     /* A call that cannot fail may still give a `?*T`, and a `catch` on
@@ -3461,10 +3479,8 @@ static struct type *check_field(struct checker *c, struct expr *e)
                 m->symbol != NULL && m->symbol->type != NULL &&
                 m->symbol->type->kind == TYPE_FN &&
                 m->symbol->type->param_count > 0) {
-                struct type *fn = m->symbol->type;
                 e->symbol = m->symbol;
-                return types_bound_fn(c->types, fn->params + 1,
-                                      fn->param_count - 1, fn->result);
+                return types_bound_of(c->types, m->symbol->type);
             }
             /* DESIGN: a constant of a body is reached as `T.N`, never
                through a value, so a constant is never mistaken for a

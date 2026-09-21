@@ -32,7 +32,8 @@ static struct type *find_or_add(struct types *types, const struct type *key)
         if (t->kind != key->kind || t->element != key->element ||
             t->length != key->length || t->length_of != key->length_of ||
             t->result != key->result || t->bound != key->bound ||
-            t->nullable != key->nullable ||
+            t->nullable != key->nullable || t->may_fail != key->may_fail ||
+            t->has_out != key->has_out ||
             t->param_count != key->param_count) {
             continue;
         }
@@ -248,8 +249,17 @@ struct type *types_fn(struct types *types, struct type **params,
     return find_or_add(types, &key);
 }
 
-struct type *types_bound_fn(struct types *types, struct type **params,
-                            size_t param_count, struct type *result)
+struct type *types_fn_failing(struct types *types, struct type **params,
+                              size_t param_count, struct type *result,
+                              bool has_out)
+{
+    return types_fn_flagged(types, params, param_count, result, false, true,
+                            has_out);
+}
+
+struct type *types_fn_flagged(struct types *types, struct type **params,
+                              size_t param_count, struct type *result,
+                              bool bound, bool may_fail, bool has_out)
 {
     struct type key = {0};
 
@@ -257,7 +267,23 @@ struct type *types_bound_fn(struct types *types, struct type **params,
     key.params = params;
     key.param_count = param_count;
     key.result = result;
+    key.bound = bound;
+    key.may_fail = may_fail;
+    key.has_out = has_out;
+    return find_or_add(types, &key);
+}
+
+struct type *types_bound_of(struct types *types, const struct type *fn)
+{
+    struct type key = {0};
+
+    key.kind = TYPE_FN;
+    key.params = fn->params + 1;
+    key.param_count = fn->param_count - 1;
+    key.result = fn->result;
     key.bound = true;
+    key.may_fail = fn->may_fail;
+    key.has_out = fn->has_out;
     return find_or_add(types, &key);
 }
 
@@ -527,23 +553,32 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         }
         print_type(out, t->element, qualified);
         return;
-    case TYPE_FN:
+    case TYPE_FN: {
+        /* A failing type is written as the program writes it, without
+           the out pointer and the error of its ABI form. */
+        size_t shown = t->param_count - (t->has_out ? 1 : 0);
+        const struct type *result =
+            t->has_out ? t->params[shown]->element : t->result;
         if (t->nullable) {
             text_append(out, "?");
         }
         text_append(out, t->bound ? "bound fn(" : "fn(");
-        for (i = 0; i < t->param_count; i++) {
+        for (i = 0; i < shown; i++) {
             if (i > 0) {
                 text_append(out, ", ");
             }
             print_type(out, t->params[i], qualified);
         }
         text_append(out, ")");
-        if (t->result->kind != TYPE_VOID) {
+        if (t->has_out || (!t->may_fail && result->kind != TYPE_VOID)) {
             text_append(out, " -> ");
-            print_type(out, t->result, qualified);
+            print_type(out, result, qualified);
+        }
+        if (t->may_fail) {
+            text_append(out, " may fail");
         }
         return;
+    }
     case TYPE_TUPLE:
         text_append(out, "(");
         for (i = 0; i < t->param_count; i++) {

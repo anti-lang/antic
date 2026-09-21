@@ -1,0 +1,33 @@
+//! A `may fail` function converts to `fn(A) -> R may fail` alone, and a
+//! call through a value of that type must handle the error.
+
+import anti.lang;
+
+fn half(n: int) -> int may fail
+{
+	if n % 2 != 0 {
+		fail "odd";
+	}
+	return n / 2;
+}
+
+fn plain(n: int) -> int
+{
+	return n;
+}
+
+fn apply(f: fn(int) -> int, n: int) -> int
+{
+	return f(n);
+}
+
+fn main() -> int
+{
+	let f: fn(int) -> int = half;
+	let g: fn(int) -> int may fail = plain;
+	let by_hand: fn(int, *int) -> ?*lang.Error = half;
+	let h = half;
+	let v = h(3);
+	let w = apply(half, 4);
+	return v + w;
+}

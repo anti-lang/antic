@@ -22,6 +22,12 @@ export fn failing_step(c: *Counter, limit: c_int) may fail
 	c.n += 1;
 }
 
+/// f of n, or the error f gives. C passes a function of the ABI form.
+export fn failing_apply(f: fn(c_int) -> c_int may fail, n: c_int) -> c_int may fail
+{
+	return try f(n);
+}
+
 /// Twice n, which never fails.
 export fn failing_twice(n: c_int) -> c_int
 {

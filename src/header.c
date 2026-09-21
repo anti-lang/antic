@@ -137,6 +137,11 @@ static bool type_names_error(const struct type *t)
             is_error_class(t->params[i]->element)) {
             return true;
         }
+        /* A parameter of a `may fail` function type names the error in
+           its ABI form. */
+        if (t->params[i]->kind == TYPE_FN && type_names_error(t->params[i])) {
+            return true;
+        }
     }
     return false;
 }

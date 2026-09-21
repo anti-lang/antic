@@ -112,6 +112,14 @@ struct type {
     const struct symbolic *length_of; /* TYPE_ARRAY, a symbolic length */
     struct type **params;           /* TYPE_FN */
     bool bound;                     /* TYPE_FN: an object and an entry */
+    /* DESIGN: `fn(A) -> R may fail` is a type of its own. It holds the
+       ABI form that the checker gives a `may fail` function: `?*Error` as
+       the result, and the out pointer last when the type names a result.
+       The passes after the checker then see an ordinary signature. Both
+       flags belong to the key that interns the type, so
+       `fn(A, *R) may fail` and `fn(A) -> R may fail` are two types. */
+    bool may_fail;                  /* TYPE_FN: written `may fail` */
+    bool has_out;                   /* TYPE_FN, may_fail: the out pointer */
     size_t param_count;
     struct type *result;            /* TYPE_FN, TYPE_VOID without a result */
     struct name module;             /* TYPE_STRUCT */
@@ -179,13 +187,22 @@ void symbolic_print(struct text *out, const struct symbolic *s,
                     bool qualified);
 struct type *types_fn(struct types *types, struct type **params,
                       size_t param_count, struct type *result);
+/* A function type in the ABI form of `may fail`: params end with the out
+   pointer when has_out is set, and result is `?*Error`. */
+struct type *types_fn_failing(struct types *types, struct type **params,
+                              size_t param_count, struct type *result,
+                              bool has_out);
+/* A function type with each flag given, as a library file records it. */
+struct type *types_fn_flagged(struct types *types, struct type **params,
+                              size_t param_count, struct type *result,
+                              bool bound, bool may_fail, bool has_out);
 
 /* DESIGN: a bound function is a value of two words, the object and the
    entry of the table. Its type is the function type without `self`. It
    is a distinct type from the plain function pointer of that signature,
-   because the two have different layouts. */
-struct type *types_bound_fn(struct types *types, struct type **params,
-                            size_t param_count, struct type *result);
+   because the two have different layouts. It is made from the type of
+   the method, whose first parameter is `self`, and keeps its `may fail`. */
+struct type *types_bound_of(struct types *types, const struct type *fn);
 
 /* A new struct type without fields. Each call returns a distinct type. */
 struct type *types_object(struct types *types);

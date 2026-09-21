@@ -370,6 +370,15 @@ static struct type_expr *type(struct parser *p)
         if (accept(p, TOKEN_ARROW) && (ty->result = type(p)) == NULL) {
             return NULL;
         }
+        /* DESIGN: `may fail` after a function type belongs to that type,
+           the innermost one when a result is a function type in turn. A
+           signature that fails itself and returns such a type writes the
+           words twice. */
+        if (is_word(p, peek(p), "may") && peek_at(p, 1)->kind == TOKEN_FAIL) {
+            next(p);
+            next(p);
+            ty->may_fail = true;
+        }
     } else {
         error_here(p, "expected a type");
         return NULL;

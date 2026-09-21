@@ -71,6 +71,7 @@ The compiler generates the ABI of a `may fail` function: a `?*Error` result and 
 - `fn divide(a: int, b: int) -> (int, int) may fail` declares a function with two channels. `return v;` leaves on the result channel. `fail e;` leaves on the error channel with `e`, a `*Error`. `fn close(f: *File) may fail` has no result and returns success at its closing brace.
 - `fail "text";` is sugar for `fail Error.new(0, "text");`. Code zero means "no code", and `fatal` turns it into exit status 1.
 - A call to a `may fail` function must be handled with `catch`, `try`, `catch fatal` or a `try` block, which is the existing rule. `try` inside a `may fail` function forwards the error. Inside any other function `try` is refused.
+- `fn(A) -> R may fail` is a function type of its own. A `may fail` function converts to it and to no other function type. A call through a value of it is handled as a direct call is, and the header writes it in the ABI form.
 - `undo` runs on the `fail` path and not on `return`.
 - A `may fail` function with no `fail` and no `try` is a warning from `anti check`, not an error, since an interface function may fail in one implementation and not another.
 - The ABI is the old convention: `?*Error f(args, R *out)`, with `out` absent for a function without a result. The header writes that form and the doc comment says the function may fail. A `.antl` records the flag, so a caller in another module handles it.

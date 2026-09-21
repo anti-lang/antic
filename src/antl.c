@@ -326,12 +326,19 @@ static void put_type(struct writer *w, const struct type *t)
             put_u64(w, t->length);
         }
         break;
+    /* DESIGN: a function type ends with a byte of its flags. Bit 0 is
+       `?`, bit 1 bound, bit 2 `may fail` and bit 3 the out pointer of
+       that form. Each makes another type, and a module that imports this
+       one reads the type the signature names. */
     case TYPE_FN:
         put_u32(w, (uint32_t)t->param_count);
         for (i = 0; i < t->param_count; i++) {
             put_type_ref(w, t->params[i]);
         }
         put_type_ref(w, t->result);
+        put_u8(w, (uint8_t)((unsigned)t->nullable | (unsigned)t->bound << 1 |
+                            (unsigned)t->may_fail << 2 |
+                            (unsigned)t->has_out << 3));
         break;
     case TYPE_TUPLE:
         put_u32(w, (uint32_t)t->param_count);
@@ -1261,12 +1268,30 @@ static void read_types(struct reader *r)
         case TYPE_FN: {
             uint32_t n = get_count(r, 4);
             struct type **params = allocate(r, n, sizeof *params);
+            uint8_t flags;
             for (j = 0; j < n && !r->failed; j++) {
                 params[j] = type_ref(r, i);
             }
             t = type_ref(r, i);
-            if (!r->failed) {
-                t = types_fn(r->types, params, n, t);
+            flags = get_u8(r);
+            if (r->failed) {
+                break;
+            }
+            /* The out pointer belongs to the `may fail` form alone, and it
+               is the last parameter. */
+            if (flags > 15 ||
+                ((flags & 8) != 0 &&
+                 ((flags & 4) == 0 || n == 0 ||
+                  params[n - 1] == NULL ||
+                  params[n - 1]->kind != TYPE_POINTER))) {
+                damaged(r);
+                t = NULL;
+                break;
+            }
+            t = types_fn_flagged(r->types, params, n, t, (flags & 2) != 0,
+                                 (flags & 4) != 0, (flags & 8) != 0);
+            if ((flags & 1) != 0) {
+                t = types_with_none(r->types, t);
             }
             break;
         }

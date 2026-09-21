@@ -1,0 +1,121 @@
+//! `fn(A) -> R may fail` is a type of its own. A value of it holds a
+//! `may fail` function, and a call through it is handled as a direct call
+//! is: with `catch`, with `try`, inside a `try` block and with `catch
+//! fatal`. A variable, a parameter, a field, a `?fn`, a bound function
+//! and a result each hold one.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn half(n: int) -> int may fail
+{
+	if n % 2 != 0 {
+		fail lang.Error.new(n, "odd");
+	}
+	return n / 2;
+}
+
+fn even(n: int) may fail
+{
+	if n % 2 != 0 {
+		fail lang.Error.new(n, "odd");
+	}
+}
+
+/// f of n, twice, and the first failure forwarded.
+fn twice(f: fn(int) -> int may fail, n: int) -> int may fail
+{
+	let once = try f(n);
+	return try f(once);
+}
+
+/// A function that cannot fail and gives one that may. The `may fail`
+/// at the end of the signature belongs to the type of the result.
+fn chooser() -> fn(int) -> int may fail
+{
+	return half;
+}
+
+/// A step and an optional check, as a table of functions holds them.
+struct Steps
+{
+	step: fn(int) -> int may fail,
+	check: ?fn(int) may fail,
+}
+
+/// A counter whose step fails at its limit.
+class Counter
+{
+	pub n: int = 0,
+	pub limit: int = 1,
+
+	pub fn step(self, by: int) -> int may fail
+	{
+		if self.n >= self.limit {
+			fail lang.Error.new(self.limit, "at the limit");
+		}
+		self.n += by;
+		return self.n;
+	}
+}
+
+/// Run the check of s on n when s has one.
+fn checked(s: *Steps, n: int) -> bool
+{
+	let check = s.check else {
+		return true;
+	};
+	check(n) catch e {
+		printf("check %d\n".ptr, e.code as c_int);
+		return false;
+	};
+	return true;
+}
+
+fn main() -> int
+{
+	let f = half;
+	let g: fn(int) -> int may fail = half;
+	let a = f(8) catch e {
+		yield -1;
+	};
+	printf("a %d\n".ptr, a as c_int);
+	let b = g(7) catch e {
+		printf("b failed %d\n".ptr, e.code as c_int);
+		yield -1;
+	};
+	printf("b %d\n".ptr, b as c_int);
+	let c = twice(half, 12) catch fatal;
+	printf("c %d\n".ptr, c as c_int);
+	let d = twice(g, 6) catch e {
+		printf("d failed %d\n".ptr, e.code as c_int);
+		yield -1;
+	};
+	printf("d %d\n".ptr, d as c_int);
+	let s = Steps { step: half, check: even };
+	let x = s.step(20) catch fatal;
+	printf("x %d\n".ptr, x as c_int);
+	printf("checked %d %d\n".ptr, checked(&s, 4) as c_int,
+	       checked(&s, 5) as c_int);
+	s.check = none;
+	printf("unchecked %d\n".ptr, checked(&s, 5) as c_int);
+	let counter = Counter { };
+	let step = counter.step;
+	let y = step(3) catch fatal;
+	let z = step(3) catch e {
+		printf("step failed %d\n".ptr, e.code as c_int);
+		yield -1;
+	};
+	printf("y %d z %d\n".ptr, y as c_int, z as c_int);
+	let chosen = chooser();
+	let q = chosen(16) catch fatal;
+	printf("q %d\n".ptr, q as c_int);
+	try {
+		let w = f(9);
+		printf("w %d\n".ptr, w as c_int);
+	} catch e {
+		printf("block %d\n".ptr, e.code as c_int);
+	}
+	return 0;
+}

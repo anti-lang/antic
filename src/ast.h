@@ -49,6 +49,7 @@ struct type_expr {
     struct type_expr **params;      /* TYPEX_FN, TYPEX_TUPLE */
     size_t param_count;
     struct type_expr *result;       /* TYPEX_FN, NULL without a result */
+    bool may_fail;                  /* TYPEX_FN: `fn(T) -> R may fail` */
     struct type *type;              /* set by semantic analysis */
 };
 

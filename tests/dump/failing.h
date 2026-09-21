@@ -84,6 +84,9 @@ struct anti_Error *failing_half(int32_t n, int32_t * /* non-null */ out);
 /** Add one to the counter, or fail when it would pass the limit. */
 /* May fail: NULL on success, an error otherwise. */
 struct anti_Error *failing_step(Counter * /* non-null */ c, int32_t limit);
+/** f of n, or the error f gives. C passes a function of the ABI form. */
+/* May fail: NULL on success, an error otherwise. */
+struct anti_Error *failing_apply(struct anti_Error *(*f)(int32_t, int32_t * /* non-null */), int32_t n, int32_t * /* non-null */ out);
 /** Twice n, which never fails. */
 int32_t failing_twice(int32_t n);
 

@@ -1,11 +1,18 @@
-/* A C program that calls the two functions of the library failing that
-   may fail, and the `construct` of its class. It takes the path that
-   succeeds and the path that reports an error. The error is a pointer C
-   passes on and never reads. */
+/* A C program that calls the functions of the library failing that may
+   fail and the `construct` of its class. One of them takes a C function
+   in the ABI form. It takes the path that succeeds and the path that
+   reports an error. The error is a pointer C passes on and never reads. */
 #include "../binary_stdio.h"
 #include <stdio.h>
 
 #include "failing.h"
+
+/* A C function of the ABI form of `fn(c_int) -> c_int may fail`, which
+   hands on what failing_half gives. */
+static struct anti_Error *halve(int32_t n, int32_t *out)
+{
+    return failing_half(n, out);
+}
 
 int main(void)
 {
@@ -22,6 +29,10 @@ int main(void)
     printf("%d %d\n", e == NULL, c.n);
     e = failing_step(&c, 2);
     printf("%d %d\n", e == NULL, c.n);
+    e = failing_apply(halve, 12, &half);
+    printf("%d %d\n", e == NULL, half);
+    e = failing_apply(halve, 5, &half);
+    printf("%d\n", e == NULL);
     printf("%d\n", failing_twice(21));
     /* The helper writes the tables and the defaults, then runs
        `construct` with the arguments. */

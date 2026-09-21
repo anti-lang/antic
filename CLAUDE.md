@@ -251,6 +251,7 @@ reports what it finished.
   function of `std/` or `tests/` written by hand as `-> ?*Error`, apart
   from the tests of that form. A function fails by its `may fail`
   marking alone, and one that returns an error without it is ordinary.
+  `fn(A) -> R may fail` is a type, and a call through it takes a handler.
   A `construct` that can fail is written
   `may fail`, a derived one calls `self.super.construct(args)` as its
   first statement, and C makes an object with `anti_<Class>_construct`.

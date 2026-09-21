@@ -1,6 +1,7 @@
 //! A library whose functions are written `may fail`. The library file
 //! records the flag, so the program that imports it handles the error
-//! without seeing this source.
+//! without seeing this source. It records a function type with its
+//! `may fail` and its `?` as well.
 
 import anti.lang;
 
@@ -9,6 +10,23 @@ pub fn half(n: int) -> int may fail
 {
 	if n % 2 != 0 { fail "n is odd"; }
 	return n / 2;
+}
+
+/// f of n, twice, and the first failure forwarded. The type of f carries
+/// `may fail` over the module boundary.
+pub fn twice_by(f: fn(int) -> int may fail, n: int) -> int may fail
+{
+	let once = try f(n);
+	return try f(once);
+}
+
+/// f of n, or n when there is no f.
+pub fn apply_or(f: ?fn(int) -> int, n: int) -> int
+{
+	let g = f else {
+		return n;
+	};
+	return g(n);
 }
 
 /// A counter with a limit.
