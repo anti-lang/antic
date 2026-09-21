@@ -37,3 +37,17 @@ file(GLOB_RECURSE keys "${ROOT}/tools/*.pem" "${ROOT}/tools/*.gpg"
 if(keys)
     message(FATAL_ERROR "tools/ holds ${keys}, and tools/ goes into the package")
 endif()
+
+# SHA256SUMS.sig is the one signature of a release, and the key that makes
+# it stands at keys/private/release-key.pem. The tag of step 7 is annotated
+# and unsigned, as in llvm-tools, so a release asks gpg for no key.
+file(READ "${ROOT}/tools/release.sh" script)
+string(FIND "${script}" "tag -s " signed)
+if(NOT signed EQUAL -1)
+    message(FATAL_ERROR "tools/release.sh signs the tag with gpg, and a "
+                        "release holds no gpg key")
+endif()
+string(FIND "${script}" "tag -a \"$tag\"" annotated)
+if(annotated EQUAL -1)
+    message(FATAL_ERROR "tools/release.sh makes no annotated tag")
+endif()

@@ -787,8 +787,12 @@ repository() {
         sed -E 's|^.*[:/]([^/]+/[^/]+)$|\1|' | sed -E 's|\.git$||'
 }
 
-# Step 7. The signed tag, and the release with its twelve assets and the
+# Step 7. The tag, and the release with its twelve assets and the
 # manifest that names them.
+#
+# DESIGN: the tag is annotated and unsigned, as in llvm-tools.
+# SHA256SUMS.sig of step 6 is the one signature of a release, so a release
+# asks gpg for no key.
 #
 # DESIGN: SHA256SUMS.sig stays off the release. The binaries and the
 # signature that covers them live on two hosts, so a forged release needs
@@ -808,8 +812,8 @@ tag_and_release() {
     fi
     starts 07 release "the tag and the release" || return 0
     if ! git -C "$root" rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
-        git -C "$root" tag -s "$tag" -m "Anti $version" ||
-            die "step 7: the signed tag failed. gpg holds the key of the tag."
+        git -C "$root" tag -a "$tag" -m "Anti $version" ||
+            die "step 7: git made no tag $tag"
     fi
     git -C "$root" push -q origin "refs/tags/$tag" ||
         die "step 7: the tag did not reach origin"
