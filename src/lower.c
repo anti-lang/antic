@@ -5725,63 +5725,127 @@ static void lower_block(struct lowerer *l, const struct block *b)
 
 /* DESIGN: every address-taken local gets its stack slot in the entry
    block, before the first statement. A slot in a loop body would suggest
-   a new slot per iteration, and the back end reserves each one once. */
+   a new slot per iteration, and the back end reserves each one once.
+   The walk reaches every block a statement holds: the bodies of `if`,
+   the loops and a plain block, and as well a `try` block and its
+   handler, the arms of a `switch`, the statement of `defer` and `undo`,
+   the `else` of a `let` and the handler of a failing call. A local in
+   any of them otherwise has no place, and its value lands nowhere. */
+static void reserve_slots(struct lowerer *l, struct ir_block *entry,
+                          const struct block *b);
+
+static void reserve_handler(struct lowerer *l, struct ir_block *entry,
+                            const struct handler *h)
+{
+    if (h->kind == HANDLE_BLOCK && h->body != NULL) {
+        reserve_slots(l, entry, h->body);
+    }
+}
+
+/* The handler of the failing call that e is, or that `alloc T(args)`
+   runs. */
+static void reserve_call_handler(struct lowerer *l, struct ir_block *entry,
+                                 const struct expr *e)
+{
+    if (e == NULL) {
+        return;
+    }
+    if (e->kind == EXPR_ALLOC && e->as.alloc.value != NULL) {
+        e = e->as.alloc.value;
+    }
+    if (e->kind == EXPR_CALL) {
+        reserve_handler(l, entry, &e->as.call.handler);
+    }
+}
+
+static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
+                         const struct stmt *s)
+{
+    struct symbol *sym;
+    size_t j;
+
+    switch (s->kind) {
+    case STMT_LET:
+        sym = s->as.let.symbol;
+        if (sym->address_taken || is_aggregate(sym->type)) {
+            sym->ir = ir_slot(l->f, entry, vtype_of(l, sym->type));
+        }
+        /* The names of `let (a, b) = e;` are locals like any other,
+           and the value they come from is the symbol above. */
+        for (j = 0; j < s->as.let.name_count; j++) {
+            struct symbol *bound = s->as.let.names[j].symbol;
+            if (bound != NULL &&
+                (bound->address_taken || is_aggregate(bound->type))) {
+                bound->ir = ir_slot(l->f, entry, vtype_of(l, bound->type));
+            }
+        }
+        reserve_call_handler(l, entry, s->as.let.value);
+        reserve_handler(l, entry, &s->as.let.guard);
+        if (s->as.let.otherwise != NULL) {
+            reserve_slots(l, entry, s->as.let.otherwise);
+        }
+        break;
+    case STMT_EXPR:
+        reserve_call_handler(l, entry, s->as.expr);
+        break;
+    case STMT_ASSIGN:
+        reserve_call_handler(l, entry, s->as.assign.value);
+        break;
+    case STMT_IF:
+        for (j = 0; j < s->as.if_chain.count; j++) {
+            reserve_slots(l, entry, s->as.if_chain.branches[j].body);
+        }
+        if (s->as.if_chain.else_body != NULL) {
+            reserve_slots(l, entry, s->as.if_chain.else_body);
+        }
+        break;
+    case STMT_WHILE:
+    case STMT_DO_WHILE:
+        reserve_slots(l, entry, s->as.loop.body);
+        break;
+    case STMT_FOR:
+        /* The element of a `for` over an array or a slice is copied
+           into a place of its own when it is an aggregate. */
+        sym = s->as.for_loop.name_count > 0
+                  ? s->as.for_loop
+                        .names[s->as.for_loop.name_count - 1].symbol
+                  : NULL;
+        if (sym != NULL && (sym->address_taken || is_aggregate(sym->type))) {
+            sym->ir = ir_slot(l->f, entry, vtype_of(l, sym->type));
+        }
+        reserve_slots(l, entry, s->as.for_loop.body);
+        break;
+    case STMT_DEFER:
+    case STMT_UNDO:
+        reserve_stmt(l, entry, s->as.deferred);
+        break;
+    case STMT_SWITCH:
+        for (j = 0; j < s->as.switch_stmt.count; j++) {
+            reserve_stmt(l, entry, s->as.switch_stmt.arms[j].body);
+        }
+        if (s->as.switch_stmt.otherwise != NULL) {
+            reserve_stmt(l, entry, s->as.switch_stmt.otherwise);
+        }
+        break;
+    case STMT_TRY:
+        reserve_slots(l, entry, s->as.try_block.body);
+        reserve_handler(l, entry, &s->as.try_block.handler);
+        break;
+    case STMT_BLOCK:
+        reserve_slots(l, entry, s->as.block);
+        break;
+    default:
+        break;
+    }
+}
+
 static void reserve_slots(struct lowerer *l, struct ir_block *entry,
                           const struct block *b)
 {
     size_t i;
-    size_t j;
 
     for (i = 0; i < b->count; i++) {
-        const struct stmt *s = b->stmts[i];
-        struct symbol *sym;
-
-        switch (s->kind) {
-        case STMT_LET:
-            sym = s->as.let.symbol;
-            if (sym->address_taken || is_aggregate(sym->type)) {
-                sym->ir = ir_slot(l->f, entry, vtype_of(l, sym->type));
-            }
-            /* The names of `let (a, b) = e;` are locals like any other,
-               and the value they come from is the symbol above. */
-            for (j = 0; j < s->as.let.name_count; j++) {
-                struct symbol *bound = s->as.let.names[j].symbol;
-                if (bound != NULL &&
-                    (bound->address_taken || is_aggregate(bound->type))) {
-                    bound->ir = ir_slot(l->f, entry, vtype_of(l, bound->type));
-                }
-            }
-            break;
-        case STMT_IF:
-            for (j = 0; j < s->as.if_chain.count; j++) {
-                reserve_slots(l, entry, s->as.if_chain.branches[j].body);
-            }
-            if (s->as.if_chain.else_body != NULL) {
-                reserve_slots(l, entry, s->as.if_chain.else_body);
-            }
-            break;
-        case STMT_WHILE:
-        case STMT_DO_WHILE:
-            reserve_slots(l, entry, s->as.loop.body);
-            break;
-        case STMT_FOR:
-            /* The element of a `for` over an array or a slice is copied
-               into a place of its own when it is an aggregate. */
-            sym = s->as.for_loop.name_count > 0
-                      ? s->as.for_loop
-                            .names[s->as.for_loop.name_count - 1].symbol
-                      : NULL;
-            if (sym != NULL && (sym->address_taken || is_aggregate(sym->type))) {
-                sym->ir = ir_slot(l->f, entry, vtype_of(l, sym->type));
-            }
-            reserve_slots(l, entry, s->as.for_loop.body);
-            break;
-        case STMT_BLOCK:
-            reserve_slots(l, entry, s->as.block);
-            break;
-        default:
-            break;
-        }
+        reserve_stmt(l, entry, b->stmts[i]);
     }
 }
 

@@ -1,0 +1,14 @@
+exit 0
+function 1 0
+try 2 1
+try handler 3 2
+arm 4 3
+else arm 5 4
+undo 7 6
+defer 6 5
+leave through the error
+let else 8 7
+let handler 9 8
+assign handler 10 9
+statement handler 11 10
+handled 0

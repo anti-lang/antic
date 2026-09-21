@@ -1,0 +1,151 @@
+//! A local that needs a place in the frame, declared in every block a
+//! statement holds: a `try` block and its handler, an arm of a `switch`
+//! and its `else`, a `defer` and an `undo`, the `else` of a `let`, and
+//! the handler of a failing call in a `let`, in an assignment and in a
+//! statement. Each block holds a `str`, which is an aggregate, a local
+//! whose address is taken, and the result of a failing call.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+enum Kind { First, Second }
+
+fn number(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "n is negative";
+	}
+	return n;
+}
+
+fn touch(p: *int) -> int
+{
+	*p += 1;
+	return *p;
+}
+
+/// Print the three locals of one block.
+fn locals(where: str, base: int)
+{
+	let s = where;
+	let n = base;
+	let t = touch(&n);
+	let v = number(base) catch fatal;
+	printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+}
+
+fn in_try()
+{
+	try {
+		let s = "try";
+		let n = 1;
+		let t = touch(&n);
+		let v = number(1);
+		printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+		number(-1);
+	} catch e {
+		let s = "try handler";
+		let n = 2;
+		let t = touch(&n);
+		let v = number(2) catch fatal;
+		printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+	}
+}
+
+fn in_switch(k: Kind)
+{
+	switch k {
+		Kind.First => {
+			let s = "arm";
+			let n = 3;
+			let t = touch(&n);
+			let v = number(3) catch fatal;
+			printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+		},
+		else => {
+			let s = "else arm";
+			let n = 4;
+			let t = touch(&n);
+			let v = number(4) catch fatal;
+			printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+		},
+	}
+}
+
+fn in_defer() may fail
+{
+	defer {
+		let s = "defer";
+		let n = 5;
+		let t = touch(&n);
+		let v = number(5) catch fatal;
+		printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+	}
+	undo {
+		let s = "undo";
+		let n = 6;
+		let t = touch(&n);
+		let v = number(6) catch fatal;
+		printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+	}
+	fail "leave through the error";
+}
+
+fn in_else() -> int
+{
+	let p = getenv("ANTI_TEST_NOT_SET_ANYWHERE".ptr) else {
+		let s = "let else";
+		let n = 7;
+		let t = touch(&n);
+		let v = number(7) catch fatal;
+		printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+		return 0;
+	};
+	return 1;
+}
+
+fn in_handlers()
+{
+	let a = number(-1) catch e {
+		let s = "let handler";
+		let n = 8;
+		let t = touch(&n);
+		let v = number(8) catch fatal;
+		printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+		yield 0;
+	};
+	a = number(-1) catch e {
+		let s = "assign handler";
+		let n = 9;
+		let t = touch(&n);
+		let v = number(9) catch fatal;
+		printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+		yield 0;
+	};
+	number(-1) catch e {
+		let s = "statement handler";
+		let n = 10;
+		let t = touch(&n);
+		let v = number(10) catch fatal;
+		printf("%s %lld %lld\n".ptr, s.ptr, t, v);
+	};
+	printf("handled %lld\n".ptr, a);
+}
+
+fn main() -> int
+{
+	locals("function", 0);
+	in_try();
+	in_switch(Kind.First);
+	in_switch(Kind.Second);
+	in_defer() catch e {
+		printf("%s\n".ptr, e.message.ptr);
+	};
+	if in_else() != 0 {
+		return 1;
+	}
+	in_handlers();
+	return 0;
+}
