@@ -404,7 +404,7 @@ final class Circle
 
 	r: f32,
 
-	fn construct(self, r: f32) -> *error.Error
+	fn construct(self, r: f32) -> ?*error.Error
 	{
 		if r <= 0.0 {
 			return error.Error.new(1, "radius must be positive");

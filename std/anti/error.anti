@@ -1,10 +1,16 @@
 //! The error convention of the language.
 //!
-//! A function that can fail returns `*Error`, `none` on success, and writes
-//! its results through out pointers. A function that cannot fail returns
-//! its value. A function whose only failure is "not present" returns
-//! `bool`. The caller owns a returned error and either deletes it or
-//! returns it upward.
+//! A function that can fail is declared `-> R may fail`, or `may fail`
+//! when it has no result. It returns its result with `return`, and it
+//! leaves on the error channel with `fail e;` or with `fail "text";`,
+//! which builds an `Error` of code 0. Two answers come back as a tuple.
+//! The compiler gives it the ABI `?*Error f(args, R *out)`: `none` on
+//! success, with the result written through `out`. A binding writes that
+//! form by hand, and a call handles it the same way.
+//!
+//! A function that cannot fail returns its value. A function whose only
+//! failure is "not present" returns `?*T` or `bool`. The error a handler
+//! binds is deleted when the handler exits, unless the handler returns it.
 
 import anti.io;
 import anti.text;
@@ -134,6 +140,10 @@ pub fn on_fatal(f: fn())
 }
 
 /// Call `fatal` on an error, and return on `none`.
+///
+/// It takes the result of a function written by hand as `-> ?*Error`,
+/// such as a binding. A call of a `may fail` function writes
+/// `catch fatal` instead.
 pub fn check(e: ?*Error)
 {
 	if e != none {

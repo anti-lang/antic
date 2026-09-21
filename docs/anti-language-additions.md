@@ -143,7 +143,7 @@ The switch is the one `assert` uses: emitted in dev mode, absent in release, dec
 let (lo, f) = a.lo + b.lo;
 let (hi, f) = a.hi + b.hi + f.carry;
 if f.overflow {
-	return error.Error.new(1, "sum does not fit");
+	fail error.Error.new(1, "sum does not fit");
 }
 ```
 
@@ -344,7 +344,7 @@ Each is compile-time only. Each removes something people write by hand. None cos
 - `if let Circle c = v { }` on a variant `v` runs the block with `c` bound to the case's fields when `v` holds that case. It is a `switch` with one arm and no `else`, and `else { }` may follow.
 - `p ?? q` on a `?*T` yields `p` as `*T` when it is not `none` and `q` otherwise. `q` has type `*T` or `?*T`, and the result has the wider of the two.
 - `p?.x` and `p?.f(args)` on a `?*T` yield `none` when `p` is `none` and otherwise the field or the call. The result has type `?*U` when the field or result is a pointer, and is refused otherwise, since Anti has no optional values. Chains follow the first `none`.
-- Default parameter values: `fn open(path: str, mode: Mode = Mode.Read) -> *Error`. The default is a constant expression. Named arguments: `open("x", mode: Mode.Write)`. Positional arguments come first and in order. Named ones follow in any order, each at most once. No positional may follow a named one. Defaults fill what is not given.
+- Default parameter values: `fn open(path: str, mode: Mode = Mode.Read) -> *File may fail`. The default is a constant expression. Named arguments: `open("x", mode: Mode.Write)`. Positional arguments come first and in order. Named ones follow in any order, each at most once. No positional may follow a named one. Defaults fill what is not given.
 - `switch` on a `str` compares with `text.equal` in a chain, in arm order. The chapter says it is a chain and not a table.
 - `x in lo..hi` is `x >= lo && x < hi`. `in` applies to ranges only. Membership in a slice is `slice.contains(x)`, a call, because it is a search.
 - Format specifications in `f"..."`: `f"{x:08.3f}"`, `f"{name:>20}"`, `f"{n:x}"`, `f"{n:b}"`. Width, precision, alignment with `<`, `>` and `^`, zero padding, `x`, `X`, `b`, `o` and `e`. Parsed at compile time into calls of `anti.text`. An unknown specification is a compile error.
@@ -408,7 +408,7 @@ Rules:
 - Paths: a bare name resolves from the innermost group outward. A qualified name is a path from a named group, `body.header_length`, or from the format, `NetworkPacket.packet_length`. A bare name that matches at two levels is refused with both paths. A field may reference only fields that come before it in the byte stream.
 - Bit containers: an integer field followed by `{ }` with one line per bit field. Each names its bits in the assembled value, `bit 0`, `bits 2..6`, or a comma-separated list of pieces from most to least significant, `bits 2..4, bit 15, bit 12`. Bit 0 is the least significant. Ranges are half-open. Every bit of the container is named exactly once, by a field or by `_`, and an unaccounted or doubly named bit is an error naming the bits. A one-bit field is a `bool` in the generated class and a wider one the smallest unsigned type. The sequence form, `msb` or `lsb` after the container and fields with a width only, is allowed as an alternative and never mixed with positions in one container.
 - Padding: `pad: 3 bytes` and `align 4`. Both write zero.
-- The generated module holds one class per group, all at module level. The format's class has `fn construct(self, data: []byte) -> *Error`, so `alloc NetworkPacket(data) catch e { }` parses a buffer, and a static `parse(r: *binary.Reader)` for a packet inside a stream. `write(self, w: *binary.Writer)` and `size(self) -> int` are generated. Length and count fields are computed on write and are not fields of the class.
+- The generated module holds one class per group, all at module level. The format's class has `fn construct(self, data: []byte) -> ?*Error`, so `alloc NetworkPacket(data) catch e { }` parses a buffer, and a static `parse(r: *binary.Reader)` for a packet inside a stream. `write(self, w: *binary.Writer)` and `size(self) -> int` are generated. Length and count fields are computed on write and are not fields of the class.
 - `str` and `[]byte` fields are slices into the buffer, so the object is valid while the buffer is. `format Name endian big copy { }` makes them `own` copies instead.
 - Conditions, `if version >= 2 { }`, are the second version.
 

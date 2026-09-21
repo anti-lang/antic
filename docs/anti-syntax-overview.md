@@ -260,7 +260,7 @@ A handler ends with `yield v` or leaves the block. The name after `catch` is any
 
 The ABI is the hand-written convention, `?*Error f(args, R *out)`, with the result through an out pointer. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. A function written by hand in that form stays legal, and bindings produce it.
 
-Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, and `undo` on the fail path. Not built yet: the origin and the frames.
+Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail` over the hand-written form, and `undo` on the fail path. `anti.error` and its test use `may fail`. Not built yet: the origin and the frames, and `may fail` in the other modules of the standard library.
 
 ## Structs
 

@@ -1,50 +1,53 @@
-//! The error convention: a failing function returns `?*Error`, and every
-//! call of one handles the error. `catch` handles it at the call, `try`
-//! hands it to the caller, and a `try` block gives one handler to a
-//! whole block.
+//! The error convention: a function that can fail is declared `may fail`,
+//! and every call of one handles the error. `catch` handles it at the
+//! call, `try` hands it to the caller, and a `try` block gives one handler
+//! to a whole block. `fail "text";` builds an `Error` with code 0.
 import anti.error;
 import anti.io;
 import anti.text;
 
 extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
 
-fn open_missing(path: str) -> ?*error.Error
+fn open_missing(path: str) may fail
 {
 	if fopen(path.ptr, "r".ptr) == none {
-		return error.Error.from_errno();
+		fail error.Error.from_errno();
 	}
-	return none;
 }
 
-fn read_config() -> ?*error.Error
+fn read_config() may fail
 {
 	try open_missing("/nonexistent/anti/config.toml");
-	return none;
 }
 
-fn size_of_file(path: str, out: *int) -> ?*error.Error
+fn size_of_file(path: str) -> int may fail
 {
 	if fopen(path.ptr, "r".ptr) == none {
-		*out = 0;
-		return error.Error.new(7, "no such file");
+		fail error.Error.new(7, "no such file");
 	}
-	*out = 1;
-	return none;
+	return 1;
 }
 
 /// A failing function whose result is itself a `?*T`.
 ///
 /// Its `catch` handles the error of the call, not the pointer, and the
 /// handler yields a pointer of the same type.
-fn first_line(path: str, out: *?*byte) -> ?*error.Error
+fn first_line(path: str) -> ?*byte may fail
 {
 	let file = fopen(path.ptr, "r".ptr);
 	if file == none {
-		*out = none;
-		return error.Error.new(8, "no such file");
+		fail error.Error.new(8, "no such file");
 	}
-	*out = file;
-	return none;
+	return file;
+}
+
+/// A failing function with two answers, which it returns as a tuple.
+fn divide(a: int, b: int) -> (int, int) may fail
+{
+	if b == 0 {
+		fail "division by zero";
+	}
+	return (a / b, a % b);
 }
 
 fn main() -> int
@@ -71,6 +74,21 @@ fn main() -> int
 		return 3;
 	}
 
+	let (q, r) = divide(7, 2) catch fatal;
+	if q != 3 || r != 1 {
+		return 6;
+	}
+	let (z, w) = divide(7, 0) catch e {
+		if e.code != 0 {
+			return 7;
+		}
+		io.println(e.message);
+		yield (-1, -1);
+	};
+	if z != -1 || w != -1 {
+		return 8;
+	}
+
 	read_config() catch e {
 		e.print();
 	};
@@ -88,15 +106,15 @@ fn main() -> int
 	if fopen("/nonexistent/anti/win32".ptr, "r".ptr) != none {
 		return 5;
 	}
-	let w = error.Error.from_win32();
-	if w.code == 0 && text.byte_count(w.message) == 0 {
+	let v = error.Error.from_win32();
+	if v.code == 0 && text.byte_count(v.message) == 0 {
 		io.println("no win32 error");
-	} else if w.code == 3 && text.byte_count(w.message) > 0 {
+	} else if v.code == 3 && text.byte_count(v.message) > 0 {
 		io.println("win32 error 3");
 	} else {
 		return 4;
 	}
-	delete(w);
+	delete(v);
 	io.println("done");
 	return 0;
 }

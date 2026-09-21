@@ -212,7 +212,7 @@ reports what it finished.
   error channel, with an error or with a text, `try` forwards inside another
   `may fail` function, and `undo` runs on the fail path. The header writes the
   ABI and the `.antl` records the flag. The standard library still writes the
-  form by hand.
+  form by hand outside `anti.error`.
 - Tuples are built. `(int, str)` is an anonymous struct with C layout, `(a, b)`
   builds one, `t.0` reads an element, and `let (a, b) = e;` and
   `for i, x in items` are the two forms that take one apart. The header writes
