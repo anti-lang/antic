@@ -6,6 +6,7 @@
 
 #include "antl.h"
 #include "applesdk.h"
+#include "coff.h"
 #include "diagnostic.h"
 #include "emit.h"
 #include "ir.h"
@@ -1523,11 +1524,42 @@ static bool run_command(const struct link_command *c, const char *what)
     return true;
 }
 
+/* Join the COFF objects into one object at output, which src/coff.c does
+   because no linker of COFF writes a relocatable object. */
+static bool join_coff(const struct paths *objects, const char *output)
+{
+    struct coff_input *inputs = calloc(objects->count, sizeof *inputs);
+    struct text *bytes = calloc(objects->count, sizeof *bytes);
+    struct text joined = {0};
+    struct text error = {0};
+    bool ok = inputs != NULL && bytes != NULL;
+    size_t i;
+
+    for (i = 0; ok && i < objects->count; i++) {
+        ok = read_bytes(objects->items[i], &bytes[i]);
+        inputs[i].name = objects->items[i];
+        inputs[i].data = (const unsigned char *)bytes[i].data;
+        inputs[i].size = bytes[i].length;
+    }
+    if (ok && !coff_join(inputs, objects->count, &joined, &error)) {
+        fprintf(stderr, "antic: joining the runtime into the library: %s\n",
+                text_cstr(&error));
+        ok = false;
+    }
+    ok = ok && write_file(output, &joined);
+    for (i = 0; bytes != NULL && i < objects->count; i++) {
+        text_free(&bytes[i]);
+    }
+    free(inputs);
+    free(bytes);
+    text_free(&joined);
+    text_free(&error);
+    return ok;
+}
+
 /* The members of a static library besides the package header. They are
    the compiled object, or with a bundled runtime one relocatable object
-   of it and the runtime's members. COFF has no relocatable link, so a
-   Windows archive holds the runtime's objects as members of their own.
-   The paths are in the memory pool. */
+   of it and the runtime's members. The paths are in the memory pool. */
 static bool bundle(const struct options *o, const char *object,
                    const char *base, struct arena *arena,
                    struct paths *members)
@@ -1589,27 +1621,26 @@ static bool bundle(const struct options *o, const char *object,
         p += n;
         p += strspn(p, "\r\n");
     }
-    if (ok && coff) {
-        size_t i;
-        for (i = 0; i < objects.count; i++) {
-            add_path(members, objects.items[i]);
-        }
-    } else if (ok) {
-        struct link_command c;
-        struct link_inputs in;
-        struct link_facts facts;
+    if (ok) {
         char *copy;
         text_appendf(&joined, "%s.bundled%s", base,
                      target_info(o->target)->object_suffix);
-        memset(&in, 0, sizeof in);
-        ok = link_facts(o, &in, &facts);
-        if (ok) {
-            relocatable_command(&c, o->target, &in, text_cstr(&joined),
-                                objects.items, objects.count);
-            ok = run_command(&c, "joining the runtime into the library");
-            link_command_free(&c);
+        if (coff) {
+            ok = join_coff(&objects, text_cstr(&joined));
+        } else {
+            struct link_command c;
+            struct link_inputs in;
+            struct link_facts facts;
+            memset(&in, 0, sizeof in);
+            ok = link_facts(o, &in, &facts);
+            if (ok) {
+                relocatable_command(&c, o->target, &in, text_cstr(&joined),
+                                    objects.items, objects.count);
+                ok = run_command(&c, "joining the runtime into the library");
+                link_command_free(&c);
+            }
+            link_facts_free(&facts);
         }
-        link_facts_free(&facts);
         copy = arena_alloc(arena, joined.length + 1);
         memcpy(copy, text_cstr(&joined), joined.length + 1);
         add_path(members, copy);

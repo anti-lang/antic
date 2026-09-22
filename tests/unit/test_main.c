@@ -33,6 +33,7 @@ void test_whole(void);
 void test_sha256(void);
 void test_symbols(void);
 void test_float_read(void);
+void test_coff(void);
 
 int main(void)
 {
@@ -66,6 +67,7 @@ int main(void)
     test_sha256();
     test_symbols();
     test_float_read();
+    test_coff();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

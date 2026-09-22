@@ -12,7 +12,10 @@
 #             classes, failing or tuples
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
-#   TARGET    the target of this host
+#   TARGET    the target of this host, or with CROSS the Windows target
+#   LLVM_OBJDUMP  llvm-objdump, which lists the symbols of the runtime
+#   CROSS     ON for a Windows target of another host. The case builds and
+#             links the programs and runs none, and only bundle has one.
 
 # The file names of a library and a program on this host, and what the
 # library driver prints as the compiler of C.
@@ -22,14 +25,22 @@ set(HOST_SHARED_SUFFIX ".so")
 set(EXE "")
 set(DRIVER cc)
 set(LINK "")
-if(APPLE)
-    set(HOST_SHARED_SUFFIX ".dylib")
-elseif(CMAKE_HOST_WIN32)
+set(TARGET_OPTION "")
+if("${TARGET}" MATCHES "^windows-")
     set(PREFIX "")
     set(STATIC_SUFFIX ".lib")
     set(HOST_SHARED_SUFFIX ".dll")
     set(EXE ".exe")
     set(DRIVER cl)
+elseif(APPLE)
+    set(HOST_SHARED_SUFFIX ".dylib")
+endif()
+if(CROSS)
+    if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
+        message("SKIP: the runtime archive has no sysroot for ${TARGET}")
+        return()
+    endif()
+    set(TARGET_OPTION --target "${TARGET}")
 endif()
 set(RUNTIME_LIBRARY "${PREFIX}anti_rt${STATIC_SUFFIX}")
 
@@ -38,11 +49,14 @@ set(RUNTIME_LIBRARY "${PREFIX}anti_rt${STATIC_SUFFIX}")
 # program, and not against the Build Tools of the machine. The pinned
 # archive ships no C++ library, so a C++17 check compiles the header with
 # -x c++ and -fsyntax-only and links nothing.
-if(CMAKE_HOST_WIN32)
+if("${TARGET}" MATCHES "^windows-")
     set(win "${RUNTIME}/sysroot/${TARGET}")
     set(arch x86_64)
     if("${TARGET}" STREQUAL "windows-arm64")
         set(arch aarch64)
+    endif()
+    if(CROSS)
+        list(APPEND CC "--target=${arch}-pc-windows-msvc")
     endif()
     list(APPEND CC -fms-runtime-lib=dll -nostdlibinc
          -isystem "${win}/crt/include" -isystem "${win}/sdk/include/ucrt"
@@ -77,7 +91,7 @@ function(library name kind dir)
     if(kind STREQUAL "shared" AND CMAKE_HOST_WIN32)
         set(link "${dir}/${name}.lib")
     endif()
-    run("${ANTIC}" --lib ${kind} ${ARGN} --llvm-mc "${LLVM_MC}"
+    run("${ANTIC}" --lib ${kind} ${ARGN} ${TARGET_OPTION} --llvm-mc "${LLVM_MC}"
         --llvm-ar "${LLVM_AR}" --runtime "${RUNTIME}" -I "${SOURCES}"
         -o "${file}" "${SOURCES}/com/example/${name}.anti")
     set(run_out "${run_out}" PARENT_SCOPE)
@@ -264,15 +278,37 @@ elseif(CASE STREQUAL "bundle")
     if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "duplicate symbol|multiple definition")
         message(FATAL_ERROR "two bundled runtimes linked: ${status}\n${out}${err}")
     endif()
-    if(NOT "${out}${err}" MATCHES "anti_rt")
-        message(FATAL_ERROR "the duplicate does not name the runtime\n${out}${err}")
+    # One of the duplicates is a symbol that the runtime library defines,
+    # and not only one that antic writes into the library object. Every
+    # linker spells a duplicate its own way, and llvm-objdump lists a
+    # definition of COFF, ELF and Mach-O each its own way.
+    file(GLOB runtime_libraries "${RUNTIME}/lib/${TARGET}/*/${RUNTIME_LIBRARY}")
+    list(GET runtime_libraries 0 runtime_library)
+    set(linked "${out}${err}")
+    run("${LLVM_OBJDUMP}" --syms "${runtime_library}")
+    set(defined "${run_out}")
+    set(spelled "(duplicate symbol:? '?|multiple definition of `)")
+    string(REGEX MATCHALL "${spelled}[^' \n]+" reported "${linked}")
+    set(runtime_duplicate "")
+    foreach(item IN LISTS reported)
+        string(REGEX REPLACE "^${spelled}" "" name "${item}")
+        string(REGEX REPLACE "([][+.*()^$?|\\])" "\\\\\\1" pattern "${name}")
+        if(defined MATCHES "(\\(sec +[1-9][0-9]*\\)\\(fl 0x[0-9a-f]+\\)\\(ty +[0-9a-f]+\\)\\(scl +2\\) \\(nx [0-9]+\\) 0x[0-9a-f]+ |\n[0-9a-f]+ g [^\n]*[ \t])${pattern}\r?\n")
+            set(runtime_duplicate "${name}")
+            break()
+        endif()
+    endforeach()
+    if(runtime_duplicate STREQUAL "")
+        message(FATAL_ERROR "no duplicate is a symbol of the runtime\n${linked}")
     endif()
     # A library that reads the notice links against the stub of the bundle
     # and reports an empty notice.
     library(notice static "${dir}/notice" --bundle-runtime)
     run(${CC} -I "${dir}/notice" "${SOURCES}/notice.c" "${library_file}"
         ${LINK} -o "${dir}/notice/notice${EXE}")
-    expect_printed("0\n" "${dir}/notice/notice${EXE}")
+    if(NOT CROSS)
+        expect_printed("0\n" "${dir}/notice/notice${EXE}")
+    endif()
 else()
     message(FATAL_ERROR "unknown CASE ${CASE}")
 endif()

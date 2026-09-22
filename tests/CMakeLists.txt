@@ -41,6 +41,7 @@ add_executable(antic_unit_tests
     unit/test_f16.c
     unit/test_symbols.c
     unit/test_float_read.c
+    unit/test_coff.c
     ../rt/cpu.c
     ../rt/f16.c
     ../rt/symbols.c
@@ -1559,7 +1560,36 @@ if(ANTIC_LLVM_AR)
                 "-DCC=${ANTIC_TEST_CC}"
                 "-DCXX=${ANTIC_TEST_CXX}"
                 "-DTARGET=${ANTIC_HOST_TARGET}"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
+    endforeach()
+endif()
+# Two bundled libraries of each Windows target on every host. The pinned
+# clang compiles the C program for the target and lld-link links it, and
+# nothing runs.
+if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+    foreach(target windows-x86_64 windows-arm64)
+        if(target STREQUAL ANTIC_HOST_TARGET)
+            continue()
+        endif()
+        add_test(NAME clib_bundle_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DLLVM_AR=${ANTIC_LLVM_AR}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+                "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-${target}"
+                "-DCASE=bundle"
+                "-DCC=${CMAKE_C_COMPILER}"
+                "-DCXX=${CMAKE_C_COMPILER}"
+                "-DTARGET=${target}"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+                -DCROSS=ON
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
+        set_tests_properties(clib_bundle_${target} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
     endforeach()
 endif()
 

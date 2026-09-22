@@ -106,6 +106,7 @@ add_library(antic_core STATIC
     src/antl.c
     src/applesdk.c
     src/arm64.c
+    src/coff.c
     src/arena.c
     src/ast_dump.c
     src/cpu.c

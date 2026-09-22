@@ -153,9 +153,10 @@ The runtime initialises itself on first use in the static case. The thread pool 
 created by the first `parallel`. Nothing runs before the C program calls an exported
 function.
 
-`--bundle-runtime` puts the runtime objects into the static archive for the single-file
-case. The printed link line then omits `libanti_rt.a`. The header carries a comment
-that only one bundled Anti archive may be linked into a program.
+`--bundle-runtime` joins the runtime objects and the library object into one object of
+the static archive for the single-file case, on every target. The printed link line then
+omits `libanti_rt.a`. The header carries a comment that only one bundled Anti archive may
+be linked into a program.
 
 The bundled native libraries behind `anti.raylib`, `anti.miniaudio`, `anti.net` and
 `anti.regex` are never in the archive. The printed link line names them, as the driver
