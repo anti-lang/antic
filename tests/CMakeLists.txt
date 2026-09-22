@@ -1853,6 +1853,25 @@ foreach(mode dev release)
         PASS_REGULAR_EXPRESSION "1 tests in 1 modules, 0 modules failed")
 endforeach()
 
+# The six standard interfaces under `anti test`. The project names no
+# provider for the build, so the link takes the default of each, and
+# `[inject.test]` lays a fake over every one of them. The one test asks
+# each interface for a value no default gives.
+foreach(mode dev release)
+    set(extra "")
+    if(mode STREQUAL "release")
+        set(extra --release)
+    endif()
+    add_test(NAME inject_standard_${mode}
+        COMMAND anti test ${extra}
+                --work "${CMAKE_CURRENT_BINARY_DIR}/inject-standard-${mode}"
+                -I src --runtime "${ANTIC_RUNTIME_DIR}"
+                --llvm-mc "${ANTIC_LLVM_MC}" src/com/example/standard.anti)
+    set_tests_properties(inject_standard_${mode} PROPERTIES
+        WORKING_DIRECTORY "${INJECT}/standard"
+        PASS_REGULAR_EXPRESSION "1 tests in 1 modules, 0 modules failed")
+endforeach()
+
 # ANTI_CONF names the file when the command line names none, and the
 # command line wins when both name one. It is the one environment
 # variable the runtime reads.

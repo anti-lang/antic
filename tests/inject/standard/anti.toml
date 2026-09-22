@@ -1,0 +1,14 @@
+[package]
+name = "com.example"
+version = "0.1.0"
+
+# Every standard interface has a default provider, so no `[inject]` table
+# is needed to build. `anti test` lays these fakes over those defaults,
+# one per interface.
+[inject.test]
+"anti.log.Logger" = "com.example.standard.FakeLogger.get"
+"anti.time.Clock" = "com.example.standard.FakeClock.get"
+"anti.random.Source" = "com.example.standard.FakeSource.get"
+"anti.fs.FileSystem" = "com.example.standard.FakeFiles.get"
+"anti.mem.Allocator" = "com.example.standard.FakeMemory.get"
+"anti.config.Config" = "com.example.standard.FakeSettings.get"

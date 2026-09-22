@@ -1,0 +1,7 @@
+exit 0
+info std injected
+clock
+source
+memory
+files
+settings

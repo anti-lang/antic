@@ -61,6 +61,26 @@ that names no function of the program is refused, and so is one that two
 functions answer. A provider that takes arguments or gives no pointer is
 refused. So is a provider whose class is no such interface.
 
+## The default provider
+
+An interface carries its own provider in a static function `default` of
+it. `resolve_provider` reads the build's table first, and where that
+names none it resolves `<interface>.default` instead. The name is a path
+like any other, so the same split at each dot finds the static function
+of the class. The message of an interface with neither names both ways
+to give one.
+
+The six standard interfaces are written that way. `anti.mem.Allocator`
+gives `LibcAllocator.get()`, `anti.log.Logger` the logger of the
+program, `anti.time.Clock` the `SystemClock`, `anti.random.Source` the
+`SharedRandom`, `anti.fs.FileSystem` the `SystemFileSystem` and
+`anti.config.Config` the `FileConfig`. A library under its own root does
+the same.
+
+The provider graph follows the default as it follows any other provider.
+A default that reads another interface's slot makes an edge, and a cycle
+through the defaults is refused.
+
 ## The cycle
 
 The provider graph has one node per interface. The pass walks the

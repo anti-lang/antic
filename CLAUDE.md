@@ -224,9 +224,9 @@ reports what it finished.
   registry, the singleton check and the used-slot bitmaps.
 - `std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
-  `anti.random`, `anti.collection`, `anti.toml`, `anti.args`, `anti.json`,
-  `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`, `anti.simd` and
-  `anti.trace`.
+  `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`,
+  `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`,
+  `anti.simd` and `anti.trace`.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
@@ -313,6 +313,14 @@ reports what it finished.
   program, so `--anti.inject` reports what it may replace and refuses an
   `inject final` field. The run-time replacement waits for plugins. See
   "Injection" in `docs/decisions.md` and `docs/notes/injection.md`.
+- The six standard interfaces are built, each an abstract class with a
+  default implementation and a default provider: `anti.log.Logger` with
+  `SinkLogger`, `anti.time.Clock` with `SystemClock`, `anti.random.Source`
+  with `SharedRandom`, `anti.fs.FileSystem` with `SystemFileSystem`,
+  `anti.mem.Allocator` with `LibcAllocator` and `anti.config.Config` with
+  `FileConfig`. The default provider is a static `default` of the interface,
+  which the manifest overrides, so an `inject` field of one needs no entry.
+  See "Standard interfaces" in `docs/decisions.md`.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
   Anti function names. Variables are the next step. See `docs/notes/debug.md`.

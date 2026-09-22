@@ -1,0 +1,95 @@
+//! Each standard interface ships a default provider, so a class that
+//! injects one links with no entry in the manifest. One class injects
+//! all six and asks each: the logger of the program, the clock of the
+//! machine, the one generator, the file system, the allocator over the
+//! C library and the settings read from a TOML file.
+import anti.config;
+import anti.fs;
+import anti.io;
+import anti.lang;
+import anti.log;
+import anti.mem;
+import anti.random;
+import anti.text;
+import anti.time;
+
+const SETTINGS: str = "interfaces-test.toml";
+const SCRATCH: str = "interfaces-test.out";
+const SOURCE: str = "name = \"service\"\ncount = 3\nloud = true\n";
+
+/// The bytes of `s`, which share its memory.
+fn bytes_of(s: str) -> []byte
+{
+	return []byte { ptr: s.ptr, len: s.len };
+}
+
+/// Print the line without the wall clock that opens it.
+fn seen(line: str)
+{
+	let space = text.find_byte(line, 0x20);
+	io.print(text.slice(line, space + 1, line.len));
+}
+
+/// A class that asks every standard interface for what it gives.
+class Service
+{
+	inject logger: *log.Logger,
+	inject clock: *time.Clock,
+	inject source: *random.Source,
+	inject files: *fs.FileSystem,
+	inject memory: *mem.Allocator,
+	inject settings: *config.Config,
+
+	pub fn run(self)
+	{
+		self.logger.info("injected");
+
+		let start = self.clock.now();
+		self.clock.sleep(time.milliseconds(1));
+		if self.clock.since(start).nanoseconds > 0 && self.clock.wall() > 0 {
+			io.println("clock");
+		}
+
+		if self.source.below(10) < 10 && self.source.below(1) == 0 {
+			io.println("source");
+		}
+
+		let room = self.memory.alloc(64, 16) else { return; };
+		self.memory.free(room);
+		io.println("memory");
+
+		self.files.write_file(SCRATCH, bytes_of("two")) catch fatal;
+		let back = self.files.read_file(SCRATCH) catch fatal;
+		if text.equal(text.from_bytes(back), "two") {
+			io.println("files");
+		}
+		free(back.ptr);
+		self.files.remove(SCRATCH) catch fatal;
+
+		let name = self.settings.text_of("name", "");
+		if text.equal(name, "service") && self.settings.int_of("count", 0) == 3
+			&& self.settings.bool_of("loud", false) {
+			io.println("settings");
+		}
+	}
+}
+
+fn main() -> int
+{
+	/* The provider of `Logger` gives the logger of the program, so the
+	   one this installs is the one the injected field holds. */
+	let sink = log.CallbackSink.new(seen);
+	let before = log.set(log.SinkLogger.new("std", log.Level.Info, sink))
+		else { return 1; };
+	delete(before);
+
+	fs.write_file(SETTINGS, bytes_of(SOURCE)) catch fatal;
+	config.read(SETTINGS) catch fatal;
+
+	let s = alloc Service { };
+	s.run();
+	delete(s);
+
+	fs.remove(SETTINGS) catch fatal;
+	return 0;
+}

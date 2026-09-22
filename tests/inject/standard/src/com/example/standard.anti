@@ -1,0 +1,193 @@
+//! One class injects all six standard interfaces. The manifest names no
+//! provider for the build, which takes the default of each, and
+//! `[inject.test]` lays a fake over every one of them. Each fake answers
+//! with a value no default gives, so a test says which one filled the
+//! field.
+import anti.config;
+import anti.fs;
+import anti.lang;
+import anti.log;
+import anti.mem;
+import anti.random;
+import anti.text;
+import anti.time;
+
+/// A logger that keeps the last message instead of writing it.
+pub singleton class FakeLogger inherits log.Logger
+{
+	mutable last: str = "",
+
+	concrete fn log(self, level: log.Level, message: str)
+	{
+		self.last = message;
+	}
+}
+
+/// A clock that stands still at readings the test knows.
+pub singleton class FakeClock inherits time.Clock
+{
+	concrete fn now(self) -> int
+	{
+		return 1000;
+	}
+
+	concrete fn wall(self) -> int
+	{
+		return 2000;
+	}
+
+	concrete fn sleep(self, d: time.Duration)
+	{
+	}
+}
+
+/// A generator that draws one number for ever.
+pub singleton class FakeSource inherits random.Source
+{
+	concrete fn next(self) -> u64
+	{
+		return 7;
+	}
+}
+
+/// A file system of one file, which every path reads.
+pub singleton class FakeFiles inherits fs.FileSystem
+{
+	mutable written: str = "",
+
+	concrete fn read_file(self, path: str) -> []byte may fail
+	{
+		if path.len == 0 {
+			fail lang.Error.new(1, "no path");
+		}
+		return []byte { ptr: "fake".ptr, len: 4 };
+	}
+
+	concrete fn write_file(self, path: str, bytes: []byte) may fail
+	{
+		if path.len == 0 {
+			fail lang.Error.new(1, "no path");
+		}
+		self.written = text.from_bytes(bytes);
+	}
+
+	concrete fn list(self, path: str) -> []str may fail
+	{
+		if path.len == 0 {
+			fail lang.Error.new(1, "no path");
+		}
+		return []str { ptr: none, len: 0 };
+	}
+
+	concrete fn remove(self, path: str) may fail
+	{
+		if path.len == 0 {
+			fail lang.Error.new(1, "no path");
+		}
+	}
+
+	concrete fn rename(self, from: str, to: str) may fail
+	{
+		if from.len == 0 || to.len == 0 {
+			fail lang.Error.new(1, "no path");
+		}
+	}
+}
+
+/// An allocator that counts what it handed out.
+pub singleton class FakeMemory inherits mem.Allocator
+{
+	mutable calls: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.calls += 1;
+		return alloc(byte, size);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		free(p);
+	}
+}
+
+/// Settings of one key, which every reading gives.
+pub singleton class FakeSettings inherits config.Config
+{
+	concrete fn has(self, key: str) -> bool
+	{
+		return true;
+	}
+
+	concrete fn text_of(self, key: str, fallback: str) -> str
+	{
+		return "fake";
+	}
+}
+
+/// A class that asks every standard interface for what it gives.
+pub class Service
+{
+	inject logger: *log.Logger,
+	inject clock: *time.Clock,
+	inject source: *random.Source,
+	inject files: *fs.FileSystem,
+	inject memory: *mem.Allocator,
+	inject settings: *config.Config,
+
+	/// The two readings of the clock, added.
+	pub fn reading(self) -> int
+	{
+		return self.clock.now() + self.clock.wall();
+	}
+
+	/// One draw of the generator.
+	pub fn draw(self) -> int
+	{
+		return self.source.below(10) as int;
+	}
+
+	/// Write `message` through the logger.
+	pub fn say(self, message: str)
+	{
+		self.logger.info(message);
+	}
+
+	/// The bytes the file system gives for any path.
+	pub fn stored(self) -> str
+	{
+		let bytes = self.files.read_file("any") catch fatal;
+		return text.from_bytes(bytes);
+	}
+
+	/// Whether the allocator gave the memory it was asked for.
+	pub fn takes(self) -> bool
+	{
+		let room = self.memory.alloc(16, 8) else { return false; };
+		self.memory.free(room);
+		return true;
+	}
+
+	/// The name the settings hold.
+	pub fn name(self) -> str
+	{
+		return self.settings.text_of("name", "");
+	}
+}
+
+tests
+{
+	fn the_test_table_replaces_every_default()
+	{
+		let s = alloc Service { };
+		assert(s.reading() == 3000);
+		assert(s.draw() == 7);
+		s.say("kept");
+		assert(text.equal(FakeLogger.get().last, "kept"));
+		assert(text.equal(s.stored(), "fake"));
+		assert(s.takes());
+		assert(FakeMemory.get().calls == 1);
+		assert(text.equal(s.name(), "fake"));
+		delete(s);
+	}
+}
