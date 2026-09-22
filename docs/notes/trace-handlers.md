@@ -86,6 +86,10 @@ private item of its module, so a test reads `Profiler.inside` and
 fixtures give an `anti.lang.Error` for the object of a hook and a
 `FieldDescriptor` for `changed`.
 
+`tests/trace/handler_reports.anti` pins the reports and the lines of a
+`CallLogger`, against patterns, because the spans a `Profiler` reports
+differ from run to run.
+
 `tests/programs/trace_handlers.anti` drives the handlers through the
 real sites instead. It runs once in release mode, where the five
 always-on hooks fire alone. It runs again under `--trace --trace

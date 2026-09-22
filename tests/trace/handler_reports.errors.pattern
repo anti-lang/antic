@@ -1,0 +1,17 @@
+-> handler_reports\.Cell\.twice
+  -> handler_reports\.Cell\.bump
+  <- handler_reports\.Cell\.bump
+  -> handler_reports\.Cell\.bump
+  <- handler_reports\.Cell\.bump
+<- handler_reports\.Cell\.twice
+-> handler_reports\.Cell\.check
+!! handler_reports\.Cell\.check error 7
+<- handler_reports\.Cell\.check
+anti\.trace: 2 made, 2 freed, 0 live
+anti\.trace: 1 dispatched, 1 joined, 0 running, peak 1
+anti\.trace: 1 failures, last handler_reports\.Cell\.check error 7: below zero
+anti\.trace: Cell\.n
+anti\.trace: Cell\.n
+anti\.trace: handler_reports\.Cell\.twice 1 calls, [0-9]+ ns
+anti\.trace: handler_reports\.Cell\.bump 2 calls, [0-9]+ ns
+anti\.trace: handler_reports\.Cell\.check 1 calls, [0-9]+ ns

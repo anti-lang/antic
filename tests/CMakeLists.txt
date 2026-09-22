@@ -1692,7 +1692,8 @@ foreach(case
         "origin_dev_off|origin|--dev|--anti.backtrace=false|origin.pattern||0"
         "options|options||--anti.backtrace,plain,--anti.backtrace=false,last|options.pattern||0"
         "options_unknown|options||--anti.nonsense|options.empty.pattern|options.unknown.pattern|70"
-        "options_value|options||--anti.backtrace=maybe|options.empty.pattern|options.value.pattern|70")
+        "options_value|options||--anti.backtrace=maybe|options.empty.pattern|options.value.pattern|70"
+        "handlers|handler_reports|--trace,--trace,writes||handler_reports.pattern|handler_reports.errors.pattern|0")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 source)

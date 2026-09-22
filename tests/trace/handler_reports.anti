@@ -1,0 +1,92 @@
+//! The reports of the handlers of `anti.trace`, and the lines a
+//! `CallLogger` writes.
+//!
+//! Every report goes to standard error and is written by the program.
+//! A report from inside a hook would count the objects of its own text.
+//! The spans a `Profiler` reports differ from run to run, so the
+//! expected files are patterns.
+
+import anti.lang;
+import anti.trace;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A class that asks for the call hooks, with one function that calls
+/// another, so the lines of a `CallLogger` nest.
+trace class Cell
+{
+	pub n: int = 0,
+
+	pub fn bump(self, by: int) -> int
+	{
+		self.n += by;
+		return self.n;
+	}
+
+	pub fn twice(self, by: int) -> int
+	{
+		self.bump(by);
+		return self.bump(by);
+	}
+
+	pub fn check(self, v: int) -> int may fail
+	{
+		if v < 0 {
+			fail lang.Error.new(7, "below zero");
+		}
+		return v;
+	}
+}
+
+worker fn read_cell(c: *Cell) -> int
+{
+	return c.n;
+}
+
+/// Write the report of every handler of the composite.
+fn report_all(watch: *lang.TraceHandler)
+{
+	let group = watch as *trace.Composite;
+	let first = group.at(0) else { return; };
+	let second = group.at(1) else { return; };
+	let third = group.at(2) else { return; };
+	let fourth = group.at(3) else { return; };
+	let fifth = group.at(4) else { return; };
+	let leaks = first as *trace.LeakTracker;
+	let threads = second as *trace.ThreadMonitor;
+	let errors = third as *trace.ErrorMonitor;
+	let journal = fourth as *trace.ChangeJournal;
+	let profile = fifth as *trace.Profiler;
+
+	leaks.report();
+	threads.report();
+	errors.report();
+	journal.report();
+	profile.report();
+}
+
+fn main() -> int
+{
+	let names = "leaks,threads,errors,writes,profile,calls";
+	let watch = trace.install(names) else {
+		printf("no handler\n".ptr);
+		return 1;
+	};
+	let c = alloc Cell { n: 0 };
+	let sum = c.twice(2);
+	printf("twice %d\n".ptr, sum as c_int);
+
+	let bad = c.check(-1) catch e {
+		yield e.code;
+	};
+	printf("bad %d\n".ptr, bad as c_int);
+
+	let job = dispatch c -> read_cell();
+	printf("job %d\n".ptr, join(job) as c_int);
+
+	delete(c);
+	lang.Trace.install(none);
+	report_all(watch);
+	delete(watch);
+	return 0;
+}
