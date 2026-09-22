@@ -523,7 +523,7 @@ void anti_lang_Object_destruct(struct anti_object *self)
 }
 
 /* DESIGN: the nine hooks of the root do nothing. A class that wants one
-   replaces it with a concrete function of the same name, and rt/hooks.c
+   replaces it with a concrete function of the same name. rt/hooks.c
    compares the entry with the body here before it dispatches, so a class
    that replaced none pays a load and a compare. */
 void anti_lang_Object_created(struct anti_object *self)

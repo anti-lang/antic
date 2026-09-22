@@ -406,14 +406,14 @@ add_test(NAME program_deserialize_dev
 set_tests_properties(program_deserialize_dev PROPERTIES
     FIXTURES_REQUIRED mem_dev_object)
 # The hooks under the options that decide them. hooks.anti and
-# hook_trace.anti run above without options, which is release mode: the
-# five always-on hooks fire and the call hooks do not. Each case here
-# names its own expected file.
-#   --no-hooks              drops every hook site, the always-on ones too
-#   --trace                 turns the code marked `trace` on
-#   --trace writes          adds the `changed` hook after a write
-#   --trace <pattern>       reaches a class that did not ask, and leaves
-#                           the marked code alone
+# hook_trace.anti run above without options, which is release mode. The
+# five always-on hooks fire there and the call hooks do not, so each case
+# below names an expected file of its own.
+#
+# The option --no-hooks drops every hook site, the always-on ones as
+# well. Bare --trace turns the code marked `trace` on. The value writes
+# adds the `changed` hook after a write. A pattern reaches a class that
+# did not ask, and leaves the marked code alone.
 foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
         "hook_trace|trace|--trace|hook_trace.trace.expected"
         "hook_trace|writes|--trace,--trace,writes|hook_trace.writes.expected"

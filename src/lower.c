@@ -42,9 +42,9 @@ struct exit_action {
     bool unlock;                /* `sync`: unlock the mutex in mutex */
     uint32_t mutex;
     /* DESIGN: the `leave` hook of an instrumented function is an exit
-       action of a scope around its body, so every exit runs it, and it
-       runs after the locals of the body are gone. An exit that gives an
-       error runs `failed` before it. */
+       action of a scope around its body. Every exit therefore runs it,
+       after the locals of the body are gone. An exit that gives an error
+       runs `failed` before it. */
     bool leave;
 };
 
@@ -96,10 +96,10 @@ struct lowerer {
     bool may_fail;              /* the function was written `may fail` */
     bool no_reflect;            /* --no-reflect: no field list */
     bool dev;                   /* --dev: every dispatch checks its table */
-    bool hooks;                 /* the hook sites are written */
-    bool trace_marked;          /* code marked `trace` is instrumented */
-    bool trace_writes;          /* --trace writes: the changed hook */
-    const char *const *patterns;    /* --trace <pattern> */
+    bool hooks;                 /* the hook sites are written. */
+    bool trace_marked;          /* code marked `trace` is instrumented. */
+    bool trace_writes;          /* --trace writes: the changed hook. */
+    const char *const *patterns;    /* --trace <pattern>. */
     size_t pattern_count;
     /* The function being lowered when it is instrumented: the literal of
        its full name and the `self` it hooks. NULL where it is not. */
@@ -812,10 +812,10 @@ enum hook_kind {
 };
 
 /* DESIGN: a hook site is one call of the runtime with the object and the
-   hook. The runtime holds the handler, the order of the handler and the
-   object's own hook, and the compare against the root's empty body, so
-   the order stands in one place and the compiler writes no branch.
-   `--no-hooks` drops every site, the five always-on ones as well. */
+   hook. The runtime holds the handler, the order of the two calls and
+   the compare against the root's empty body. The order then stands in
+   one place and the compiler writes no branch. `--no-hooks` drops every
+   site, the five always-on ones as well. */
 static void hook_object(struct lowerer *l, enum hook_kind hook,
                         struct ir_operand object)
 {
@@ -850,10 +850,10 @@ static bool pattern_names(const char *pattern, const struct type *t)
 }
 
 /* DESIGN: a class is instrumented when it asked for the call hooks with
-   the contextual `trace` and the build compiles marked code, or when a
-   `--trace` pattern names its package or itself, which reaches code that
-   did not ask. The library file carries the marking, so a class of
-   another module answers the same question. */
+   the contextual `trace` and the build compiles marked code. A `--trace`
+   pattern that names its package or itself instruments it as well, which
+   reaches code that did not ask. The library file carries the marking,
+   so a class of another module answers the same question. */
 static bool traced_class(const struct lowerer *l, const struct type *t)
 {
     size_t i;
@@ -1494,7 +1494,7 @@ static bool bound_is_direct(const struct expr *e, const struct type *s)
    runtime symbol instead. */
 /* DESIGN: an entry is keyed by its name and its parameter count. Anti
    has no overloading, so two functions of one name in a chain have one
-   signature everywhere but the nine hooks: `anti.lang.TraceHandler`
+   signature everywhere but the nine hooks. `anti.lang.TraceHandler`
    declares each of them again with the object after `self`, and those
    take entries of their own after the root's. */
 struct entry {
@@ -6422,8 +6422,8 @@ static const struct type *record_of_field(const struct type *t,
 }
 
 /* DESIGN: the `changed` hook takes the record of the written field from
-   the field list its descriptor carries, so the hook reads what
-   reflection already holds and the compiler writes no record of its own.
+   the field list its descriptor carries. It reads what reflection
+   already holds, and the compiler writes no record of its own.
    `--no-reflect` leaves the descriptor without the list, and the list
    itself is still written for the hook. */
 static void hook_changed(struct lowerer *l, const struct place *p,

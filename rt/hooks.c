@@ -5,10 +5,10 @@
 #include "object.h"
 #include "std.h"
 
-/* DESIGN: the one handler lives in an atomic word of the runtime, and
-   not in a static field of anti.lang.Trace, because the hook sites of
-   the runtime read it as well and no C name reaches an Anti global.
-   Trace.install stores it here. */
+/* DESIGN: the one handler lives in an atomic word of the runtime and not
+   in a static field of anti.lang.Trace. The hook sites of the runtime
+   read it as well, and no C name reaches an Anti global. Trace.install
+   stores it here. */
 static void *installed;
 
 void anti_rt_trace_install(struct anti_object *h)
@@ -44,8 +44,8 @@ static anti_body entry_of(const struct anti_object *o, int entry)
 }
 
 /* The empty bodies of the root, in the order of enum anti_hook. An entry
-   that holds one of them is no hook of the class, and the compare is
-   what a program without a hook of its own pays. */
+   that holds one of them is no hook of the class. The compare is what a
+   program without a hook of its own pays. */
 static anti_body root_body(int64_t hook)
 {
     switch (hook) {

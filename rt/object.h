@@ -127,11 +127,11 @@ struct anti_descriptor {
 };
 
 /* DESIGN: the seven functions of the root take the entries after the
-   descriptor, in this order, in the table of every class, and the nine
-   hooks take the entries after them. The order is root_names in
-   src/lower.c, and a unit test pins the two together. The destruct entry
-   of a class holds the teardown the compiler writes for it. The copy
-   entry holds its copy unless the chain declares one. */
+   descriptor, in this order, in the table of every class. The nine hooks
+   take the entries after them. The order is root_names in src/lower.c,
+   and a unit test pins the two together. The destruct entry of a class
+   holds the teardown the compiler writes for it. The copy entry holds
+   its copy unless the chain declares one. */
 enum anti_entry {
     ANTI_ENTRY_DESCRIPTOR,
     ANTI_ENTRY_TYPE_NAME,
@@ -147,7 +147,7 @@ enum anti_entry {
 /* DESIGN: the nine hooks of anti.lang.Object, in the order of
    root_names. Three are lifecycle and two are threads, which every
    build compiles. Three are the calls of an instrumented class, which
-   tracing compiles, and one is a write, which `--trace writes` does. */
+   tracing compiles. One is a write, which `--trace writes` compiles. */
 enum anti_hook {
     ANTI_HOOK_CREATED,
     ANTI_HOOK_DESTROYED,
@@ -161,9 +161,9 @@ enum anti_hook {
     ANTI_HOOK_COUNT
 };
 
-/* The entry of the hook h in the table of a class, and its entry in the
-   table of an anti.lang.TraceHandler, which declares the same nine again
-   with the object after `self`. */
+/* The entry of the hook h in the table of a class. The second gives its
+   entry in the table of an anti.lang.TraceHandler, which declares the
+   same nine again with the object after `self`. */
 #define ANTI_ENTRY_OF_HOOK(h) (ANTI_ENTRY_HOOK + (h))
 #define ANTI_ENTRY_OF_HANDLER(h) (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT + (h))
 
@@ -228,7 +228,7 @@ void anti_lang_Object_copy(struct anti_object *self, struct anti_object *to);
 
 /* DESIGN: the nine hooks of the root have empty bodies. A hook site
    dispatches the object's own hook, and one that reaches a body here
-   does nothing, so a class that replaces none pays a compare. */
+   does nothing. A class that replaces none pays a compare. */
 void anti_lang_Object_created(struct anti_object *self);
 void anti_lang_Object_destroyed(struct anti_object *self);
 void anti_lang_Object_copied(struct anti_object *self,

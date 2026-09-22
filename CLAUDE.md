@@ -199,8 +199,9 @@ nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
 and the CPU levels are built. The variables of `-g` come before the first public
 release. After it, the wrapping and saturating operators with `Flags`, then
 sum types, then locking and channels, all three built. Then injection, hooks
-and tracing, plugins and runtime configuration, which belong together. Then
-generics and closures.
+and tracing, plugins and runtime configuration, which belong together. Hooks
+and tracing and the runtime configuration are built. Then generics and
+closures.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -228,10 +229,23 @@ reports what it finished.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
-  `Object`, `Job` and `Flags` in `anti.lang` itself, and the runtime defines
-  the root's functions and descriptor as `anti_lang_Object_*`.
-- 723 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 722 each, without the `no_paths` test, which needs a
+  `Object`, `Job`, `Flags` and `FieldDescriptor` in `anti.lang` itself, and
+  the runtime defines the root's functions and descriptor as
+  `anti_lang_Object_*`.
+- Hooks and tracing are built. `anti.lang.Object` declares nine hooks with
+  empty bodies, which take the nine table entries after its seven functions:
+  `created`, `destroyed`, `copied`, `dispatched` and `joined` in every build,
+  `enter`, `leave` and `failed` under tracing and `changed` under
+  `--trace writes`. `anti.lang.TraceHandler` declares the same nine with the
+  object after `self`, and `anti.lang.Trace.install(h)` stores one handler. A
+  site calls the handler and then dispatches the object's own hook, reversed
+  on `leave`. `trace` is a contextual word before `class` and before `fn` in a
+  class body, `--trace` and `--no-trace` decide instead of the mode,
+  `--trace <pattern>` reaches a class that did not ask, and `--no-hooks` drops
+  every site. `anti.trace` and its handlers are not built. See "Hooks and
+  tracing" in `docs/decisions.md` and `docs/notes/hooks.md`.
+- 731 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 730 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A

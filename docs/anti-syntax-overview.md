@@ -27,6 +27,7 @@ Contents:
 - [Operators on classes](#operators-on-classes)
 - [Static fields and singletons](#static-fields-and-singletons)
 - [Threads](#threads)
+- [Hooks and tracing](#hooks-and-tracing)
 - [Injection](#injection)
 - [Plugins](#plugins)
 - [Tests](#tests)
@@ -580,6 +581,29 @@ A `sync` on the mutex of an enclosing `sync` in the same function is refused. `c
 
 Built: `parallel`, `dispatch`, `join`, `Mutex`, `sync`, `chan T` with `send`, `recv` and `close`, and `select`. `--anti.threads` and the `threads` key of the configuration file set the pool size, and `ANTI_THREADS` is gone. Not built yet: the warning on a field written inside `sync` and read outside it.
 
+## Hooks and tracing
+
+`anti.lang.Object` declares nine hooks with empty bodies, and every class inherits them. `created`, `destroyed` and `copied` are the lifecycle, `dispatched` and `joined` are the threads, and every build compiles the five. `enter`, `leave` and `failed` need tracing, and `changed` needs `--trace writes`. `anti.lang.TraceHandler` declares the same nine with the object after `self`, and `anti.lang.Trace.install(h)` stores one handler.
+
+```anti
+class Leaks inherits lang.TraceHandler
+{
+	concrete fn created(self, o: *Object) { Leaks.live.add(1); }
+	concrete fn destroyed(self, o: *Object) { Leaks.live.sub(1); }
+}
+
+trace class Renderer
+{
+	pub fn draw(self) { }
+}
+```
+
+Every hook site calls the installed handler and then dispatches the object's own hook. `leave` reverses the two, so the handler and the object's hook nest around the call. A class that replaced a hook does not silence the handler, and the handler does not replace the class's hook.
+
+`--no-hooks` drops every site, the five always-on ones as well. Instrumentation is a build option and never a change to an object's layout.
+
+Built: the nine hooks and their entries in the table of every class, `TraceHandler`, `Trace.install`, the order of the two calls with `leave` reversed, the contextual `trace` before `class` and before `fn` in a class body, `--trace`, `--no-trace`, `--trace <pattern>`, `--trace writes` and `--no-hooks`. A hook site is one call of the runtime. Not built yet: the cost of one load and one compare at a site without a handler, and `anti.trace` with `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`, which the runtime key `trace` names.
+
 ## Injection
 
 A class declares what it needs, the manifest says who provides it, the run-time configuration may replace it.
@@ -708,13 +732,13 @@ In dev mode every array, slice and `str` index is bounds-checked, signed arithme
 trace class Renderer { }
 ```
 
-`trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest.
+`trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest. "Hooks and tracing" above holds the nine hooks and the options that decide them.
 
 A release binary carries no symbol data. `anti build --release` writes a symbols archive beside it, and `anti symbols inventory`, `check` and `resolve` collect the archives of a deployment and turn a raw trace into names and lines. `anti.debug.backtrace` captures one at run time, and `--anti.backtrace` turns the frames of an error on in a release build.
 
 The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `armv8.5` on macOS, `armv8.2` on Windows and `armv8.0` on Linux. `--cpu` overrides on every target, and a program refuses to start on a processor below its level. A level is a code-generation setting, not a target. The runtime archive holds one runtime per target and level, so a program below the default links a runtime of its own level. The native libraries are built for the default level alone, and a program below it that imports one is refused at link.
 
-Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, the build id in `anti_licenses` of every executable and shared library, the backtraces, with `StackTrace`, `anti.debug.backtrace` and `--anti.backtrace`, and the CPU levels, with `--cpu`, the start-up check and the runtime archive with one runtime per target and level. `symbolize` names the function of a frame in every build and its file and line in a `-g` build. Not built yet: the variables of `-g`, `trace` and the symbols archives. Windows has not run a trace.
+Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, the build id in `anti_licenses` of every executable and shared library, the backtraces, with `StackTrace`, `anti.debug.backtrace` and `--anti.backtrace`, and the CPU levels, with `--cpu`, the start-up check and the runtime archive with one runtime per target and level. `symbolize` names the function of a frame in every build and its file and line in a `-g` build. `trace` and the options that decide it are built, and "Hooks and tracing" above names them. Not built yet: the variables of `-g` and the symbols archives. Windows has not run a trace.
 
 ## Wire formats
 

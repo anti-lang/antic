@@ -64,9 +64,7 @@ struct checker {
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
     bool target_sized;          /* a symbolic array length is allowed */
     bool atomic_place;          /* the place of an atomic operation */
-    /* The build writes a program, so every class of it is here. A `-c`
-       or `--lib` build writes a library that other code fills. */
-    bool whole_program;
+    bool program;               /* the build writes a program, not a library */
     struct type *yields;        /* the type `yield` gives in a handler */
     int handler_depth;          /* above 0, a `yield` has a place to go */
     struct block *try_block;    /* the body of the enclosing `try` block */
@@ -9467,7 +9465,7 @@ bool sema_check(struct module *module, const char *module_name,
     c.library_count = library_count;
     c.scope = &c.module_scope;
     c.ok = true;
-    c.whole_program = program;
+    c.program = program;
     declare_root(&c);
 
     for (i = 0; i < module->import_count; i++) {
@@ -10210,7 +10208,7 @@ bool sema_check(struct module *module, const char *module_name,
        and no use. A build that writes a program sees every class, so it
        can say so. A library build sees no program: `anti.lang` writes
        `TraceHandler` for the program that installs a handler. */
-    if (c.whole_program) {
+    if (c.program) {
         for (i = 0; i < module->item_count; i++) {
             struct item *it = module->items[i];
             struct type *t = it->symbol != NULL ? it->symbol->type : NULL;

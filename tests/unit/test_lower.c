@@ -357,7 +357,7 @@ static void check_field_records(const struct ir_module *m,
 }
 
 /* DESIGN: the nine hooks of anti.lang.Object take the entries after the
-   seven of the root in the table of every class, in the order of enum
+   seven of the root in the table of every class. The order is enum
    anti_hook in rt/object.h. rt/hooks.c reads an entry there, so this
    test pins the order and the place of each against the table the
    compiler writes. A class that replaced none holds the runtime's empty
