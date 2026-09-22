@@ -43,6 +43,11 @@ add_executable(antic_unit_tests
     ../rt/f16.c
     ../rt/utf.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core)
+# test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
+# CRT of Windows hold it themselves.
+if(UNIX AND NOT APPLE)
+    target_link_libraries(antic_unit_tests PRIVATE m)
+endif()
 target_include_directories(antic_unit_tests PRIVATE ../rt)
 # ANTI_DEV_CPU lets test_cpu.c stand a level in for the processor, so the
 # refusal of a lower machine is checked on this one. The runtime of the
