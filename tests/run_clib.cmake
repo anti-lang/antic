@@ -12,10 +12,44 @@
 #             classes, failing or tuples
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
+#   TARGET    the target of this host
 
+# The file names of a library and a program on this host, and what the
+# library driver prints as the compiler of C.
+set(PREFIX lib)
+set(STATIC_SUFFIX ".a")
 set(HOST_SHARED_SUFFIX ".so")
+set(EXE "")
+set(DRIVER cc)
+set(LINK "")
 if(APPLE)
     set(HOST_SHARED_SUFFIX ".dylib")
+elseif(CMAKE_HOST_WIN32)
+    set(PREFIX "")
+    set(STATIC_SUFFIX ".lib")
+    set(HOST_SHARED_SUFFIX ".dll")
+    set(EXE ".exe")
+    set(DRIVER cl)
+endif()
+set(RUNTIME_LIBRARY "${PREFIX}anti_rt${STATIC_SUFFIX}")
+
+# DESIGN: on Windows the pinned clang compiles and links each C program
+# against the xwin sysroot of the runtime archive, as antic links an Anti
+# program, and not against the Build Tools of the machine. The pinned
+# archive ships no C++ library, so a C++17 check compiles the header with
+# -x c++ and -fsyntax-only and links nothing.
+if(CMAKE_HOST_WIN32)
+    set(win "${RUNTIME}/sysroot/${TARGET}")
+    set(arch x86_64)
+    if("${TARGET}" STREQUAL "windows-arm64")
+        set(arch aarch64)
+    endif()
+    list(APPEND CC -fms-runtime-lib=dll -nostdlibinc
+         -isystem "${win}/crt/include" -isystem "${win}/sdk/include/ucrt"
+         -isystem "${win}/sdk/include/um" -isystem "${win}/sdk/include/shared")
+    set(CXX ${CC} -x c++)
+    set(LINK -fuse-ld=lld -B "${RUNTIME}/bin" -L "${win}/crt/lib/${arch}"
+             -L "${win}/sdk/lib/ucrt/${arch}" -L "${win}/sdk/lib/um/${arch}")
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
@@ -29,18 +63,26 @@ function(run)
     set(run_out "${out}" PARENT_SCOPE)
 endfunction()
 
-# Build library name as kind, static or shared, into dir.
+# Build library name as kind, static or shared, into dir. Set
+# library_file to the file and library_link to what a program links: the
+# library itself, or the import library of a DLL.
 function(library name kind dir)
     file(MAKE_DIRECTORY "${dir}")
     if(kind STREQUAL "shared")
-        set(file "${dir}/lib${name}${HOST_SHARED_SUFFIX}")
+        set(file "${dir}/${PREFIX}${name}${HOST_SHARED_SUFFIX}")
     else()
-        set(file "${dir}/lib${name}.a")
+        set(file "${dir}/${PREFIX}${name}${STATIC_SUFFIX}")
+    endif()
+    set(link "${file}")
+    if(kind STREQUAL "shared" AND CMAKE_HOST_WIN32)
+        set(link "${dir}/${name}.lib")
     endif()
     run("${ANTIC}" --lib ${kind} ${ARGN} --llvm-mc "${LLVM_MC}"
         --llvm-ar "${LLVM_AR}" --runtime "${RUNTIME}" -I "${SOURCES}"
         -o "${file}" "${SOURCES}/com/example/${name}.anti")
     set(run_out "${run_out}" PARENT_SCOPE)
+    set(library_file "${file}" PARENT_SCOPE)
+    set(library_link "${link}" PARENT_SCOPE)
 endfunction()
 
 # Compare the generated header with the one that chapter 25 prints.
@@ -76,64 +118,78 @@ if(CASE STREQUAL "static")
     library(geo static "${dir}")
     # The printed line links main.c with the archive and the runtime.
     string(STRIP "${run_out}" line)
-    if(NOT line MATCHES "^cc main.c ${dir}/libgeo.a ${RUNTIME}/lib/[a-z0-9_-]+/[a-z0-9.]+/libanti_rt.a")
+    if(NOT line MATCHES "^${DRIVER} main.c ${library_file} ${RUNTIME}/lib/[a-z0-9_-]+/[a-z0-9.]+/${RUNTIME_LIBRARY}")
         message(FATAL_ERROR "unexpected link line: ${line}")
     endif()
     # The archive keeps the copy of the package header in an object.
-    run("${LLVM_AR}" t "${dir}/libgeo.a")
+    run("${LLVM_AR}" t "${library_file}")
     if(NOT run_out MATCHES "geo.package.o")
         message(FATAL_ERROR "the archive holds no package header\n${run_out}")
     endif()
-    string(REPLACE "cc main.c " "" inputs "${line}")
+    string(REPLACE "${DRIVER} main.c " "" inputs "${line}")
     separate_arguments(inputs UNIX_COMMAND "${inputs}")
-    run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" ${inputs} -o "${dir}/roundtrip")
-    expect_output("${dir}/roundtrip" "${SOURCES}/roundtrip.expected")
+    run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" ${inputs} ${LINK}
+        -o "${dir}/roundtrip${EXE}")
+    expect_output("${dir}/roundtrip${EXE}" "${SOURCES}/roundtrip.expected")
 elseif(CASE STREQUAL "classes")
     # A C program builds an Anti class, calls through its table and ends
     # it. The header compiles as C11 and as C++17.
     library(canvas static "${dir}")
     expect_header("${dir}/canvas.h" canvas.h)
     string(STRIP "${run_out}" line)
-    string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/canvas.c" "${dir}/libcanvas.a"
-        "${runtime_library}" -o "${dir}/canvas")
-    expect_output("${dir}/canvas" "${SOURCES}/canvas.expected")
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/canvas.c" "${library_file}"
+        "${runtime_library}" ${LINK} -o "${dir}/canvas${EXE}")
+    expect_output("${dir}/canvas${EXE}" "${SOURCES}/canvas.expected")
     # The copy finds ../binary_stdio.h through the directory of canvas.c.
     configure_file("${SOURCES}/canvas.c" "${dir}/canvas.cpp" COPYONLY)
-    run(${CXX} -std=c++17 -I "${dir}" -I "${SOURCES}" "${dir}/canvas.cpp" "${dir}/libcanvas.a"
-        "${runtime_library}" -o "${dir}/canvaspp")
-    expect_output("${dir}/canvaspp" "${SOURCES}/canvas.expected")
+    if(CMAKE_HOST_WIN32)
+        run(${CXX} -std=c++17 -fsyntax-only -I "${dir}" -I "${SOURCES}"
+            "${dir}/canvas.cpp")
+    else()
+        run(${CXX} -std=c++17 -I "${dir}" -I "${SOURCES}" "${dir}/canvas.cpp"
+            "${library_file}" "${runtime_library}" -o "${dir}/canvaspp")
+        expect_output("${dir}/canvaspp" "${SOURCES}/canvas.expected")
+    endif()
 elseif(CASE STREQUAL "failing")
     # Two `may fail` functions cross to C as `?*Error f(args, R *out)`, and
     # the header says in a comment that each may fail.
     library(failing static "${dir}")
     expect_header("${dir}/failing.h" failing.h)
     string(STRIP "${run_out}" line)
-    string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${line}")
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/failing.c"
-        "${dir}/libfailing.a" "${runtime_library}" -o "${dir}/failing")
-    expect_output("${dir}/failing" "${SOURCES}/failing.expected")
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/failing${EXE}")
+    expect_output("${dir}/failing${EXE}" "${SOURCES}/failing.expected")
 elseif(CASE STREQUAL "tuples")
     # A tuple of an exported signature crosses as the struct the header
     # writes for it, one per distinct tuple, and C builds one of its own.
     library(tuples static "${dir}")
     expect_header("${dir}/tuples.h" tuples.h)
     string(STRIP "${run_out}" line)
-    string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${line}")
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/tuples.c"
-        "${dir}/libtuples.a" "${runtime_library}" -o "${dir}/tuples")
-    expect_output("${dir}/tuples" "${SOURCES}/tuples.expected")
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/tuples${EXE}")
+    expect_output("${dir}/tuples${EXE}" "${SOURCES}/tuples.expected")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
-    run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c"
-        "${dir}/libgeo${HOST_SHARED_SUFFIX}" -o "${dir}/roundtrip")
-    expect_output("${dir}/roundtrip" "${SOURCES}/roundtrip.expected")
+    run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" "${library_link}" ${LINK}
+        -o "${dir}/roundtrip${EXE}")
+    expect_output("${dir}/roundtrip${EXE}" "${SOURCES}/roundtrip.expected")
 elseif(CASE STREQUAL "exports")
     library(geo shared "${dir}")
     if(APPLE)
-        run(nm -gU "${dir}/libgeo.dylib")
+        run(nm -gU "${library_file}")
+    elseif(CMAKE_HOST_WIN32)
+        run("${RUNTIME}/bin/llvm-readobj" --coff-exports "${library_file}")
+        string(REGEX MATCHALL "Name: [A-Za-z_][A-Za-z0-9_.]*" names
+               "${run_out}")
+        string(REPLACE "Name: " "" run_out "${names}")
+        string(REPLACE ";" "\n" run_out "${run_out}\n")
     else()
-        run(nm -D --defined-only "${dir}/libgeo.so")
+        run(nm -D --defined-only "${library_file}")
     endif()
     string(REGEX MATCHALL "[A-Za-z_][A-Za-z0-9_.]*\n" symbols "${run_out}")
     set(names "")
@@ -150,22 +206,29 @@ elseif(CASE STREQUAL "exports")
     endif()
 elseif(CASE STREQUAL "two")
     library(geo shared "${dir}/shared")
+    set(geo "${library_link}")
     library(other shared "${dir}/shared")
-    run(${CC} -I "${dir}/shared" "${SOURCES}/twolibs.c"
-        "${dir}/shared/libgeo${HOST_SHARED_SUFFIX}"
-        "${dir}/shared/libother${HOST_SHARED_SUFFIX}" -o "${dir}/two_shared")
-    expect_printed("10\n" "${dir}/two_shared")
+    # Windows finds a DLL in the directory of the program.
+    set(two_shared "${dir}/two_shared${EXE}")
+    if(CMAKE_HOST_WIN32)
+        set(two_shared "${dir}/shared/two_shared${EXE}")
+    endif()
+    run(${CC} -I "${dir}/shared" "${SOURCES}/twolibs.c" "${geo}"
+        "${library_link}" ${LINK} -o "${two_shared}")
+    expect_printed("10\n" "${two_shared}")
     library(geo static "${dir}/static")
+    set(geo "${library_file}")
     library(other static "${dir}/static")
     # The printed link line names the runtime library of the host.
-    string(REGEX MATCH "[^ ]*libanti_rt.a" runtime_library "${run_out}")
-    run(${CC} -I "${dir}/static" "${SOURCES}/twolibs.c" "${dir}/static/libgeo.a"
-        "${dir}/static/libother.a" ${runtime_library} -o "${dir}/two_static")
-    expect_printed("10\n" "${dir}/two_static")
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${run_out}")
+    run(${CC} -I "${dir}/static" "${SOURCES}/twolibs.c" "${geo}"
+        "${library_file}" ${runtime_library} ${LINK}
+        -o "${dir}/two_static${EXE}")
+    expect_printed("10\n" "${dir}/two_static${EXE}")
 elseif(CASE STREQUAL "loader")
     library(geo shared "${dir}")
-    run(${CC} "${SOURCES}/loader.c" -o "${dir}/loader")
-    expect_printed("1\n" "${dir}/loader" "${dir}/libgeo${HOST_SHARED_SUFFIX}")
+    run(${CC} "${SOURCES}/loader.c" ${LINK} -o "${dir}/loader${EXE}")
+    expect_printed("1\n" "${dir}/loader${EXE}" "${library_file}")
 elseif(CASE STREQUAL "header")
     library(geo static "${dir}")
     expect_header("${dir}/geo.h" geo.h)
@@ -181,6 +244,7 @@ elseif(CASE STREQUAL "header")
         "${SOURCES}/shapes.cpp")
 elseif(CASE STREQUAL "bundle")
     library(geo static "${dir}" --bundle-runtime)
+    set(geo "${library_file}")
     expect_header("${dir}/geo.h" geo.bundle.h)
     string(STRIP "${run_out}" line)
     # The driver puts the system libraries of the target on the line, and
@@ -189,13 +253,13 @@ elseif(CASE STREQUAL "bundle")
     if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
         set(system " -lpthread -lm")
     endif()
-    if(NOT line STREQUAL "cc main.c ${dir}/libgeo.a${system}")
+    if(NOT line STREQUAL "${DRIVER} main.c ${geo}${system}")
         message(FATAL_ERROR "unexpected link line: ${line}")
     endif()
     library(other static "${dir}" --bundle-runtime)
     execute_process(
-        COMMAND ${CC} -I "${dir}" "${SOURCES}/twolibs.c" "${dir}/libgeo.a"
-                "${dir}/libother.a" -o "${dir}/two_bundled"
+        COMMAND ${CC} -I "${dir}" "${SOURCES}/twolibs.c" "${geo}"
+                "${library_file}" ${LINK} -o "${dir}/two_bundled${EXE}"
         RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
     if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "duplicate symbol|multiple definition")
         message(FATAL_ERROR "two bundled runtimes linked: ${status}\n${out}${err}")
@@ -206,9 +270,9 @@ elseif(CASE STREQUAL "bundle")
     # A library that reads the notice links against the stub of the bundle
     # and reports an empty notice.
     library(notice static "${dir}/notice" --bundle-runtime)
-    run(${CC} -I "${dir}/notice" "${SOURCES}/notice.c" "${dir}/notice/libnotice.a"
-        -o "${dir}/notice/notice")
-    expect_printed("0\n" "${dir}/notice/notice")
+    run(${CC} -I "${dir}/notice" "${SOURCES}/notice.c" "${library_file}"
+        ${LINK} -o "${dir}/notice/notice${EXE}")
+    expect_printed("0\n" "${dir}/notice/notice${EXE}")
 else()
     message(FATAL_ERROR "unknown CASE ${CASE}")
 endif()

@@ -1527,7 +1527,8 @@ if(NOT WIN32)
 endif()
 
 # Libraries for C, built with antic --lib and used from C programs on the
-# host. Windows needs the MSVC toolchain and is left to the CI runners.
+# host. Windows compiles the programs with the pinned clang against the
+# xwin sysroot of the runtime archive.
 find_program(ANTIC_LLVM_AR NAMES llvm-ar
     HINTS "${ANTIC_LLVM_DIR}/bin"
     DOC "llvm-ar from LLVM 23.1.1")
@@ -1542,7 +1543,7 @@ if(ANTIC_LLVM_AR)
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/float_digits"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_float_digits.cmake")
 endif()
-if(NOT WIN32 AND ANTIC_LLVM_AR)
+if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
             failing tuples)
         add_test(NAME clib_${case}
@@ -1557,6 +1558,7 @@ if(NOT WIN32 AND ANTIC_LLVM_AR)
                 "-DCASE=${case}"
                 "-DCC=${ANTIC_TEST_CC}"
                 "-DCXX=${ANTIC_TEST_CXX}"
+                "-DTARGET=${ANTIC_HOST_TARGET}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
     endforeach()
 endif()

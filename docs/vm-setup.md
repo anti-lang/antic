@@ -170,7 +170,7 @@ ssh anti-windows %USERPROFILE%\test.cmd
 | The Windows branch of `rt/start.c`, compiled with MSVC | every `program_*` test, through `anti_rt.lib` |
 | `c_wchar` at 16 bits and `c_long` at 32 bits against MSVC | `program_abi_wchar`, `program_abi_structs` |
 | Exception unwinding through an Anti frame | The runtime test that closes the unwind data of chapter 16: an exception raised in C unwinds through an Anti frame to a handler in C. `llvm-readobj` proves that the tables parse, not that Windows walks them. The test does not exist yet. |
-| Shared libraries, `.def` files and `.CRT$XCU` constructors | The `clib_*` tests skip Windows until `tests/run_clib.cmake` supports MSVC. |
+| Shared libraries, `.def` files and `.CRT$XCU` constructors | `clib_shared`, `clib_exports`, `clib_loader`, `clib_two`, compiled with the pinned clang against the xwin sysroot |
 | Whether `link.exe` accepts the COFF symbol form | `program_platform_linker` skips Windows until it supports `link.exe`. |
 | Float aggregates of one member against MSVC | No test compares them yet. The VM can run one. |
 | `tools/install.ps1` | The installer has never run. The VM is the first machine that can parse it. |
