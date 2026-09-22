@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "f16.h"
 #include "registry.h"
 #include "utf.h"
 
@@ -221,28 +220,41 @@ static bool read_string(struct reader *r, unsigned char *out, size_t room,
     return r->at < r->end && *r->at++ == '"';
 }
 
-/* Copy a JSON number into out as a C string. */
-static bool read_number(struct reader *r, char *out, size_t size)
+/* The bytes of a JSON number, which stay in the input. A float has any
+   number of digits. */
+static bool number_span(struct reader *r, const unsigned char **start,
+                        int64_t *length)
 {
-    size_t n = 0;
-
     skip_space(r);
+    *start = r->at;
     while (r->at < r->end &&
            ((*r->at >= '0' && *r->at <= '9') || *r->at == '-' ||
             *r->at == '+' || *r->at == '.' || *r->at == 'e' ||
             *r->at == 'E')) {
-        if (n + 1 >= size) {
-            return false;
-        }
-        out[n++] = (char)*r->at++;
+        r->at++;
     }
-    out[n] = '\0';
-    return n > 0;
+    *length = r->at - *start;
+    return *length > 0;
+}
+
+/* Copy a JSON number into out as a C string. */
+static bool read_number(struct reader *r, char *out, size_t size)
+{
+    const unsigned char *start;
+    int64_t length;
+
+    if (!number_span(r, &start, &length) || (size_t)length >= size) {
+        return false;
+    }
+    memcpy(out, start, (size_t)length);
+    out[length] = '\0';
+    return true;
 }
 
 static bool skip_value(struct reader *r, int depth)
 {
-    char number[64];
+    const unsigned char *number;
+    int64_t digits;
     size_t length;
 
     if (depth > DEPTH_LIMIT) {
@@ -280,7 +292,7 @@ static bool skip_value(struct reader *r, int depth)
         return take(r, ']');
     default:
         return take_word(r, "true") || take_word(r, "false") ||
-               take_word(r, "null") || read_number(r, number, sizeof number);
+               take_word(r, "null") || number_span(r, &number, &digits);
     }
 }
 
@@ -561,24 +573,34 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
     }
     case ANTI_TYPE_CHAR:
         return read_char(r, bytes);
+    /* The text rounds once, to the width of the field. */
     case ANTI_TYPE_F16:
     case ANTI_TYPE_F32:
     case ANTI_TYPE_F64: {
-        double value;
-        if (!read_number(r, number, sizeof number)) {
-            return false;
-        }
-        value = strtod(number, &end);
-        if (*end != '\0') {
+        const unsigned char *start;
+        int64_t length;
+        uint64_t value;
+        if (!number_span(r, &start, &length)) {
             return false;
         }
         if (t == ANTI_TYPE_F16) {
-            uint16_t half = anti_f16_narrow((float)value);
+            uint16_t half;
+            if (!anti_rt_read_float(start, length, 10, 5, &value)) {
+                return false;
+            }
+            half = (uint16_t)value;
             memcpy(bytes, &half, sizeof half);
         } else if (t == ANTI_TYPE_F32) {
-            float narrow = (float)value;
-            memcpy(bytes, &narrow, sizeof narrow);
+            uint32_t single;
+            if (!anti_rt_read_float(start, length, 23, 8, &value)) {
+                return false;
+            }
+            single = (uint32_t)value;
+            memcpy(bytes, &single, sizeof single);
         } else {
+            if (!anti_rt_read_float(start, length, 52, 11, &value)) {
+                return false;
+            }
             memcpy(bytes, &value, sizeof value);
         }
         return true;

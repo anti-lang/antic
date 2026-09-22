@@ -509,3 +509,252 @@ void anti_rt_builder_clear(struct anti_builder *b)
         b->room[0] = 0;
     }
 }
+
+/* DESIGN: a float is read from its text by exact arithmetic on its
+   digits as well, and never by strtod. Halving and doubling the decimal
+   bring its value into [1/2, 1) and count the powers of two. Doubling it by
+   the bits of the mantissa then leaves the mantissa as the whole part.
+   The digits after the point round it, a tie to the even value. The
+   width is a parameter, so an f32 and an f16 round once, from the text,
+   and never twice through an f64. Each step is exact except for digits
+   past EXACT_DIGITS, which are dropped and remembered. A half-way point
+   between two doubles has at most 769 digits. Every value on the way
+   therefore stays at or above the image of each such point below the
+   value read. A drop never moves a value across one, and a remembered
+   drop turns a tie into a value above it. */
+
+/* The bits that one halving or doubling moves at most, so that a digit
+   and the carry above it fit in 64 bits. */
+#define SHIFT_LIMIT 27
+
+static void trim(struct decimal *v)
+{
+    while (v->count > 0 && v->d[v->count - 1] == '0') {
+        v->count--;
+    }
+}
+
+/* v times 2^k, for k up to SHIFT_LIMIT. The lowest digits past
+   EXACT_DIGITS are dropped. */
+static void double_by(struct decimal *v, int k, bool *dropped)
+{
+    char out[EXACT_DIGITS + 10];
+    int64_t n = (int64_t)sizeof out;
+    int64_t count;
+    uint64_t carry = 0;
+    int64_t i;
+
+    for (i = v->count - 1; i >= 0; i--) {
+        uint64_t x = ((uint64_t)(v->d[i] - '0') << k) + carry;
+        out[--n] = (char)('0' + x % 10);
+        carry = x / 10;
+    }
+    for (; carry != 0; carry /= 10) {
+        out[--n] = (char)('0' + carry % 10);
+    }
+    count = (int64_t)sizeof out - n;
+    v->point += count - v->count;
+    for (i = EXACT_DIGITS; i < count; i++) {
+        if (out[n + i] != '0') {
+            *dropped = true;
+        }
+    }
+    if (count > EXACT_DIGITS) {
+        count = EXACT_DIGITS;
+    }
+    memcpy(v->d, out + n, (size_t)count);
+    v->count = count;
+    trim(v);
+}
+
+/* v divided by 2^k, for k up to SHIFT_LIMIT, by long division from the
+   first digit. The digits past EXACT_DIGITS are dropped. */
+static void halve_by(struct decimal *v, int k, bool *dropped)
+{
+    uint64_t mask = ((uint64_t)1 << k) - 1;
+    uint64_t r = 0;
+    int64_t read = 0;
+    int64_t write = 0;
+
+    if (v->count == 0) {
+        return;
+    }
+    /* Read until the first digit of the quotient is not 0. Past the last
+       digit the dividend goes on in zeros. */
+    while ((r >> k) == 0) {
+        r = r * 10 + (read < v->count ? (uint64_t)(v->d[read] - '0') : 0);
+        read++;
+    }
+    v->point -= read - 1;
+    for (; read < v->count; read++) {
+        v->d[write++] = (char)('0' + (r >> k));
+        r = (r & mask) * 10 + (uint64_t)(v->d[read] - '0');
+    }
+    for (; r != 0; r = (r & mask) * 10) {
+        if (write < EXACT_DIGITS) {
+            v->d[write++] = (char)('0' + (r >> k));
+        } else if ((r >> k) != 0) {
+            *dropped = true;
+        }
+    }
+    v->count = write;
+    trim(v);
+}
+
+/* The whole part of v, below 2^63, rounded by the digits after its
+   point. A tie goes to the even value unless digits were dropped, which
+   put the value above the tie. */
+static uint64_t rounded_whole(const struct decimal *v, bool dropped)
+{
+    uint64_t n = 0;
+    int64_t i;
+    bool up;
+
+    for (i = 0; i < v->point; i++) {
+        n = n * 10 + (uint64_t)(digit_at(v, i) - '0');
+    }
+    if (v->point < 0 || v->point >= v->count) {
+        return n;
+    }
+    if (v->d[v->point] == '5' && v->point + 1 == v->count) {
+        up = dropped || n % 2 == 1;
+    } else {
+        up = v->d[v->point] >= '5';
+    }
+    return up ? n + 1 : n;
+}
+
+int anti_rt_read_float(const unsigned char *bytes, int64_t length,
+                       int mantissa, int exponent, uint64_t *bits)
+{
+    /* Entry n is the largest power of 2 below 10^n. It is the most that
+       one step moves a value with n digits before its point. */
+    static const int below_ten[] = {1, 3, 6, 9, 13, 16, 19, 23, 26};
+    int bias = (1 << (exponent - 1)) - 1;
+    uint64_t sign = 0;
+    uint64_t infinite;
+    uint64_t whole;
+    struct decimal v;
+    bool dropped = false;
+    bool digits = false;
+    bool after_point = false;
+    int64_t scale = 0;
+    int64_t power = 0;
+    int64_t i = 0;
+
+    infinite = (((uint64_t)1 << exponent) - 1) << mantissa;
+    if (i < length && (bytes[i] == '+' || bytes[i] == '-')) {
+        if (bytes[i] == '-') {
+            sign = (uint64_t)1 << (mantissa + exponent);
+        }
+        i++;
+    }
+    v.count = 0;
+    v.point = 0;
+    for (; i < length; i++) {
+        unsigned char c = bytes[i];
+        if (c == '.' && !after_point) {
+            after_point = true;
+            continue;
+        }
+        if (c < '0' || c > '9') {
+            break;
+        }
+        digits = true;
+        if (c == '0' && v.count == 0) {
+            v.point -= after_point ? 1 : 0;
+            continue;
+        }
+        v.point += after_point ? 0 : 1;
+        if (v.count < EXACT_DIGITS) {
+            v.d[v.count++] = (char)c;
+        } else if (c != '0') {
+            dropped = true;
+        }
+    }
+    if (!digits) {
+        return 0;
+    }
+    if (i < length && (bytes[i] == 'e' || bytes[i] == 'E')) {
+        bool minus = false;
+        bool any = false;
+        i++;
+        if (i < length && (bytes[i] == '+' || bytes[i] == '-')) {
+            minus = bytes[i] == '-';
+            i++;
+        }
+        for (; i < length && bytes[i] >= '0' && bytes[i] <= '9'; i++) {
+            any = true;
+            /* Past 100000 the value is zero or infinite whatever
+               follows. */
+            if (scale < 100000) {
+                scale = scale * 10 + (bytes[i] - '0');
+            }
+        }
+        if (!any) {
+            return 0;
+        }
+        v.point += minus ? -scale : scale;
+    }
+    if (i != length) {
+        return 0;
+    }
+    trim(&v);
+    /* Below 10^-330 every width rounds to zero, and from 10^310 on each
+       one is infinite. */
+    if (v.count == 0 || v.point < -330) {
+        *bits = sign;
+        return 1;
+    }
+    if (v.point > 310) {
+        *bits = sign | infinite;
+        return 1;
+    }
+    while (v.point > 0) {
+        int k = v.point < 9 ? below_ten[v.point] : SHIFT_LIMIT;
+        halve_by(&v, k, &dropped);
+        power += k;
+    }
+    while (v.point < 0 || (v.point == 0 && v.d[0] < '5')) {
+        int k = -v.point < 9 ? below_ten[-v.point] : SHIFT_LIMIT;
+        double_by(&v, k, &dropped);
+        power -= k;
+    }
+    /* v lies in [1/2, 1), so the first bit of the value is worth
+       2^(power - 1). Below the smallest normal exponent the value is
+       halved until it stands at that exponent with a first bit of 0. */
+    power--;
+    if (power < 1 - bias) {
+        int64_t n;
+        for (n = 1 - bias - power; n > 0; n -= SHIFT_LIMIT) {
+            halve_by(&v, n < SHIFT_LIMIT ? (int)n : SHIFT_LIMIT, &dropped);
+        }
+        power = 1 - bias;
+    }
+    if (power > bias) {
+        *bits = sign | infinite;
+        return 1;
+    }
+    for (i = mantissa + 1; i > 0; i -= SHIFT_LIMIT) {
+        double_by(&v, i < SHIFT_LIMIT ? (int)i : SHIFT_LIMIT, &dropped);
+    }
+    whole = rounded_whole(&v, dropped);
+    /* Rounding up can carry into a new first bit. */
+    if (whole == (uint64_t)2 << mantissa) {
+        whole >>= 1;
+        power++;
+        if (power > bias) {
+            *bits = sign | infinite;
+            return 1;
+        }
+    }
+    /* Without its first bit the value is subnormal, and the exponent
+       field is 0. */
+    if ((whole & ((uint64_t)1 << mantissa)) == 0) {
+        *bits = sign | whole;
+    } else {
+        *bits = sign | ((uint64_t)(power + bias) << mantissa) |
+                (whole & (((uint64_t)1 << mantissa) - 1));
+    }
+    return 1;
+}

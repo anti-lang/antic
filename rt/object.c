@@ -1,5 +1,5 @@
+#include <stdbool.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -246,13 +246,40 @@ static void put(struct anti_builder *b, const char *text)
                            (int64_t)strlen(text));
 }
 
+/* DESIGN: serialize writes every number itself and calls no printf. A
+   float takes the fewest digits that read back as the same value. They
+   come from rt/text.c, so the text is the same on every target. */
+
+/* An integer in decimal, from its magnitude and its sign. */
+static void put_integer(struct anti_builder *b, uint64_t magnitude,
+                        bool negative)
+{
+    unsigned char digits[21];
+    int n = (int)sizeof digits;
+
+    do {
+        digits[--n] = (unsigned char)('0' + magnitude % 10);
+        magnitude /= 10;
+    } while (magnitude != 0);
+    if (negative) {
+        digits[--n] = '-';
+    }
+    anti_rt_builder_append(b, digits + n, (int64_t)sizeof digits - n);
+}
+
+static void put_signed(struct anti_builder *b, int64_t value)
+{
+    put_integer(b, value < 0 ? 0 - (uint64_t)value : (uint64_t)value,
+                value < 0);
+}
+
 /* Append bytes as a JSON string, with the escapes that JSON requires.
    Every other byte goes out as it is, so the text keeps the bytes of a
    str. */
 static void put_text(struct anti_builder *b, const unsigned char *bytes,
                      int64_t len)
 {
-    char escape[8];
+    static const char hex[] = "0123456789abcdef";
     int64_t i;
 
     put(b, "\"");
@@ -268,8 +295,10 @@ static void put_text(struct anti_builder *b, const unsigned char *bytes,
         } else if (c == '\t') {
             put(b, "\\t");
         } else if (c < 0x20) {
-            snprintf(escape, sizeof escape, "\\u%04x", (unsigned)c);
-            put(b, escape);
+            unsigned char escape[6] = {'\\', 'u', '0', '0', 0, 0};
+            escape[4] = (unsigned char)hex[c >> 4];
+            escape[5] = (unsigned char)hex[c & 15];
+            anti_rt_builder_append(b, escape, 6);
         } else {
             anti_rt_builder_append(b, &c, 1);
         }
@@ -326,15 +355,16 @@ static void put_slice(struct anti_builder *b, const void *bytes,
                       int64_t owned)
 {
     struct anti_text s;
-    char number[80];
     size_t size = anti_rt_element_size(type, d);
     int64_t i;
 
     memcpy(&s, bytes, sizeof s);
     if (!owned) {
-        snprintf(number, sizeof number, "{\"address\":%llu,\"length\":%lld}",
-                 (unsigned long long)(uintptr_t)s.ptr, (long long)s.len);
-        put(b, number);
+        put(b, "{\"address\":");
+        put_integer(b, (uint64_t)(uintptr_t)s.ptr, false);
+        put(b, ",\"length\":");
+        put_signed(b, s.len);
+        put(b, "}");
         return;
     }
     if (s.ptr == NULL || !anti_rt_element_walked(type, d)) {
@@ -356,7 +386,6 @@ static void put_value(struct anti_builder *b, const void *bytes,
                       int64_t type, const struct anti_descriptor *d,
                       int64_t owned)
 {
-    char number[48];
     int64_t t = anti_rt_type_scalar(type);
 
     switch (t) {
@@ -375,22 +404,19 @@ static void put_value(struct anti_builder *b, const void *bytes,
     case ANTI_TYPE_F16: {
         uint16_t h;
         memcpy(&h, bytes, sizeof h);
-        snprintf(number, sizeof number, "%.9g", (double)anti_f16_widen(h));
-        put(b, number);
+        anti_rt_builder_float(b, (double)anti_f16_widen(h), -1, 0, 1);
         return;
     }
     case ANTI_TYPE_F32: {
         float v;
         memcpy(&v, bytes, sizeof v);
-        snprintf(number, sizeof number, "%.9g", (double)v);
-        put(b, number);
+        anti_rt_builder_float(b, (double)v, -1, 0, 1);
         return;
     }
     case ANTI_TYPE_F64: {
         double v;
         memcpy(&v, bytes, sizeof v);
-        snprintf(number, sizeof number, "%.17g", v);
-        put(b, number);
+        anti_rt_builder_float(b, v, -1, 0, 0);
         return;
     }
     case ANTI_TYPE_STR: {
@@ -412,9 +438,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
                    anti_rt_element_walked(type, d)) {
             put_value(b, value, ANTI_TYPE_ELEMENT(type), d, 0);
         } else {
-            snprintf(number, sizeof number, "%llu",
-                     (unsigned long long)(uintptr_t)value);
-            put(b, number);
+            put_integer(b, (uint64_t)(uintptr_t)value, false);
         }
         return;
     }
@@ -435,13 +459,9 @@ static void put_value(struct anti_builder *b, const void *bytes,
         if (anti_rt_type_size(t) == 0) {
             put(b, "null");
         } else if (anti_rt_type_signed(t)) {
-            snprintf(number, sizeof number, "%lld",
-                     (long long)(int64_t)anti_rt_load_integer(bytes, t));
-            put(b, number);
+            put_signed(b, (int64_t)anti_rt_load_integer(bytes, t));
         } else {
-            snprintf(number, sizeof number, "%llu",
-                     (unsigned long long)anti_rt_load_integer(bytes, t));
-            put(b, number);
+            put_integer(b, anti_rt_load_integer(bytes, t), false);
         }
         return;
     }

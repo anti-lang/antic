@@ -1,0 +1,178 @@
+//! `serialize` writes a float with the fewest digits that read back as the
+//! same value, from the digits of the runtime, and `Object.deserialize`
+//! reads them back to the same bits, so a round trip gives the same text
+//! and the same value on every target. The values are the hard cases of
+//! float_text.anti, as an `f64`, an `f32` and an `f16`. The texts at the
+//! end come from outside, and each rounds to the nearest value of its
+//! field, a tie to the even one, where a read through an `f64` would
+//! round twice.
+import anti.io;
+import anti.text;
+
+class Floats
+{
+	pub d: f64 = 0.0,
+	pub s: f32 = 0.0,
+	pub h: f16 = 0.0 as f16,
+}
+
+/// 2 to the power n, for n from -1074 to 1023, by halving or doubling,
+/// which is exact in every step.
+fn power(n: int) -> f64
+{
+	let v = 1.0;
+	let i = 0;
+	while i < n do {
+		v = v * 2.0;
+		i += 1;
+	}
+	while i > n do {
+		v = v / 2.0;
+		i -= 1;
+	}
+	return v;
+}
+
+/// Print the text of f, read it back and write what comes back. The
+/// second text is the first, and every field holds the same bits.
+fn trip(b: *text.Builder, c: *text.Builder, f: *Floats)
+{
+	b.clear();
+	f.serialize(b);
+	let first = b.text();
+	io.println(first);
+	let back = Object.deserialize(first);
+	if back == none || !(back is *Floats) {
+		io.println("refused");
+		return;
+	}
+	let g = back as *Floats;
+	c.clear();
+	g.serialize(c);
+	if !text.equal(first, c.text()) || *(&g.d as *u64) != *(&f.d as *u64) ||
+		*(&g.s as *u32) != *(&f.s as *u32) ||
+		*(&g.h as *u16) != *(&f.h as *u16) {
+		io.println("differs");
+	}
+	delete(g);
+}
+
+fn double(b: *text.Builder, c: *text.Builder, v: f64)
+{
+	let f = alloc Floats { d: v };
+	trip(b, c, f);
+	delete(f);
+}
+
+fn single(b: *text.Builder, c: *text.Builder, v: f32)
+{
+	let f = alloc Floats { s: v };
+	trip(b, c, f);
+	delete(f);
+}
+
+fn half(b: *text.Builder, c: *text.Builder, v: f32)
+{
+	let f = alloc Floats { h: v as f16 };
+	trip(b, c, f);
+	delete(f);
+}
+
+/// Read input and print the text of the object it gives.
+fn read(c: *text.Builder, input: str)
+{
+	let back = Object.deserialize(input);
+	if back == none {
+		io.println("refused");
+		return;
+	}
+	c.clear();
+	back.serialize(c);
+	io.println(c.text());
+	delete(back);
+}
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	let c = text.Builder.new();
+	let tiny = power(-1074);
+	let normal = power(-1022);
+	let top = (2.0 - power(-52)) * power(1023);
+
+	double(&b, &c, 0.0);
+	double(&b, &c, -0.0);
+	double(&b, &c, 0.1);
+	double(&b, &c, 0.1 + 0.2);
+	double(&b, &c, 1.0 / 3.0);
+	double(&b, &c, 2.0 / 3.0);
+	double(&b, &c, 1.0e23);
+	double(&b, &c, 1.0e22);
+	double(&b, &c, 1.0e21);
+	double(&b, &c, 1.0e15);
+	double(&b, &c, 1.0e16);
+	double(&b, &c, 123456789012345680.0);
+	double(&b, &c, 9007199254740993.0);
+	double(&b, &c, 0.000123);
+	double(&b, &c, 0.0000123);
+	double(&b, &c, 100.0);
+	double(&b, &c, 2.5e-10);
+	double(&b, &c, -1.5);
+	double(&b, &c, tiny);
+	double(&b, &c, normal);
+	double(&b, &c, normal - tiny);
+	double(&b, &c, top);
+	double(&b, &c, -top);
+	double(&b, &c, tiny * 3.0);
+	double(&b, &c, 4.35);
+	double(&b, &c, 0.3);
+	double(&b, &c, 1.0e-7);
+	double(&b, &c, 9.5e15);
+	double(&b, &c, 2.5);
+	double(&b, &c, 0.35);
+	double(&b, &c, 0.45);
+	double(&b, &c, 0.95);
+	double(&b, &c, 99.95);
+	double(&b, &c, -0.04);
+	double(&b, &c, 1.005);
+	double(&b, &c, 999.9999);
+	double(&b, &c, 9.9995);
+	double(&b, &c, 1.0e300);
+	double(&b, &c, 1.0e-100);
+	double(&b, &c, 123.456);
+	double(&b, &c, 5.0e-5);
+	double(&b, &c, 0.0015);
+
+	single(&b, &c, 0.1);
+	single(&b, &c, (1.0 / 3.0) as f32);
+	single(&b, &c, 16777217.0);
+	single(&b, &c, 3.4028235e38);
+	single(&b, &c, (tiny * power(925)) as f32);
+	single(&b, &c, 1.17549435e-38);
+	single(&b, &c, 0.2);
+	single(&b, &c, 1.0e10);
+	single(&b, &c, 7.0e-45);
+	single(&b, &c, 123456.7);
+	single(&b, &c, -0.0);
+
+	half(&b, &c, 0.1);
+	half(&b, &c, 65504.0);
+	half(&b, &c, 0.00006103515625);
+	half(&b, &c, 0.000000059604644775390625);
+	half(&b, &c, (1.0 / 3.0) as f32);
+	half(&b, &c, -2.5);
+	half(&b, &c, 1000.3);
+	half(&b, &c, 0.00001);
+
+	read(&c, "{\"type\":\"Floats\",\"d\":9007199254740993}");
+	read(&c, "{\"type\":\"Floats\",\"d\":9007199254740993.00000000000000000000000000000000000000000000000000000001}");
+	read(&c, "{\"type\":\"Floats\",\"d\":2.4703282292062327e-324}");
+	read(&c, "{\"type\":\"Floats\",\"d\":2.4703282292062328e-324}");
+	read(&c, "{\"type\":\"Floats\",\"d\":1.7976931348623158e308}");
+	read(&c, "{\"type\":\"Floats\",\"s\":1.00000017881393432617187499}");
+	read(&c, "{\"type\":\"Floats\",\"s\":1.000000178813934326171875}");
+	read(&c, "{\"type\":\"Floats\",\"h\":1.00146484374999999}");
+	read(&c, "{\"type\":\"Floats\",\"h\":1.00146484375}");
+	read(&c, "{\"type\":\"Floats\",\"d\":1e}");
+	return 0;
+}

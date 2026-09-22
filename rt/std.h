@@ -87,6 +87,16 @@ struct anti_text anti_rt_builder_take(struct anti_builder *b);
 void anti_rt_builder_float(struct anti_builder *b, double value,
                            int64_t precision, int64_t exponent, int64_t single);
 
+/* Read length bytes of text as a float with mantissa bits after its point
+   and exponent bits of exponent. An f64 has 52 and 11, an f32 23 and 8,
+   and an f16 10 and 5. The text is an optional sign, digits with an
+   optional point, and an optional exponent after `e` or `E`. The value
+   rounds to the nearest float, a tie to the even one, and one past the
+   largest is infinite. Returns 1 and the bits of the float, or 0 for any
+   other text and leaves bits alone. */
+int anti_rt_read_float(const unsigned char *bytes, int64_t length,
+                       int mantissa, int exponent, uint64_t *bits);
+
 /* The lines of anti_licenses between its markers. */
 struct anti_text anti_rt_license_text(void);
 
