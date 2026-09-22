@@ -1,0 +1,2 @@
+[injections]
+"anti.log.Logger" = 'lib/CISOLogger.so'

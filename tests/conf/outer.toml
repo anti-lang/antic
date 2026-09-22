@@ -1,0 +1,9 @@
+# The including file wins per key, and the second include wins over the
+# first.
+include = [
+	'first.toml',
+	'second.toml',
+]
+
+[runtime]
+trace = 'outer'

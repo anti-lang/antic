@@ -100,6 +100,10 @@ int anti_rt_read_float(const unsigned char *bytes, int64_t length,
 /* The lines of anti_licenses between its markers. */
 struct anti_text anti_rt_license_text(void);
 
+/* The version of the runtime, from the package line of the notice. It
+   is empty when the program carries no notice. */
+struct anti_text anti_rt_runtime_version(void);
+
 #endif
 
 /* The value of errno, which is a macro and therefore not an Anti

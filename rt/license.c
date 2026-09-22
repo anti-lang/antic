@@ -28,3 +28,19 @@ struct anti_text anti_rt_license_text(void)
     text.len = to != NULL ? (int64_t)(to - from) : (int64_t)strlen(from);
     return text;
 }
+
+/* DESIGN: the version is the one antic wrote into the notice for the
+   package anti.rt. The runtime needs no version of its own from the
+   build. --anti.inspect prints it. */
+struct anti_text anti_rt_runtime_version(void)
+{
+    static const char package[] = "package anti.rt ";
+    const char *at = strstr(anti_licenses, package);
+    const char *from = at != NULL ? at + sizeof package - 1 : NULL;
+    const char *to = from != NULL ? strchr(from, ' ') : NULL;
+    struct anti_text text;
+
+    text.ptr = (const unsigned char *)(from != NULL ? from : "");
+    text.len = to != NULL ? (int64_t)(to - from) : 0;
+    return text;
+}

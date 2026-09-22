@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "conf.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 #else
@@ -104,18 +106,16 @@ static int64_t taken;
 static int64_t finished;
 
 /* DESIGN: the count comes from the machine that runs the program, not
-   from the machine that compiled it. ANTI_THREADS overrides it, so a
-   measurement can pin the count without a rebuild. */
+   from the machine that compiled it. The `threads` key of the runtime
+   configuration overrides it, so a measurement can pin the count
+   without a rebuild. `--anti.threads` and the configuration file set
+   that key, and the runtime reads no environment variable of its own
+   but ANTI_CONF. */
 static int worker_count(void)
 {
-#if defined(_WIN32)
-    char text[16];
-    DWORD length = GetEnvironmentVariableA("ANTI_THREADS", text, sizeof text);
-    int n = length > 0 && length < (DWORD)sizeof text ? atoi(text) : 0;
-#else
-    const char *text = getenv("ANTI_THREADS");
-    int n = text != NULL ? atoi(text) : 0;
-#endif
+    struct anti_text value =
+        anti_rt_conf_get((const unsigned char *)"threads", 7);
+    int n = value.len > 0 ? atoi((const char *)value.ptr) : 0;
 
     if (n > 0) {
         return n;

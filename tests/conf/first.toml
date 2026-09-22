@@ -1,0 +1,4 @@
+[runtime]
+threads = 1
+logger = 'first-log.toml'
+trace = 'first'

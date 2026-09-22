@@ -1,0 +1,5 @@
+# The keys of the runtime, for the tests of the file layer.
+[runtime]
+threads = 3
+logger = 'basic-log.toml'
+trace = 'leaks'

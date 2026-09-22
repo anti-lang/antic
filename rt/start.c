@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "conf.h"
 #include "cpu_level.h"
 #include "rt.h"
 #include "utf.h"
@@ -49,25 +50,13 @@ extern int64_t anti_main(struct anti_slice args, struct anti_slice env)
 
 /* DESIGN: the runtime takes every argument under the reserved prefix
    `--anti.` in one pass before main sees the list. It hands the rest on
-   in their order. An option the runtime does not know ends the program
-   before main, with the options it does know. */
+   in their order. rt/conf.c holds the options and the keys they set. An
+   option the runtime does not know ends the program before main, with
+   the options it does know. */
 static const char option_prefix[] = "--anti.";
 
-/* The value of a boolean option: 1 for none or `true`, 0 for `false`. */
-static int boolean_option(const char *name, const char *value)
-{
-    if (value == NULL || strcmp(value, "true") == 0) {
-        return 1;
-    }
-    if (strcmp(value, "false") == 0) {
-        return 0;
-    }
-    fprintf(stderr, "anti: --anti.%s takes true or false, found %s\n", name,
-            value);
-    exit(70);
-}
-
-/* Take the options of the runtime out of args. */
+/* Take the options of the runtime out of args, then read the file they
+   or the environment name. */
 static void runtime_options(struct anti_slice *args)
 {
     int64_t kept = args->len > 0 ? 1 : 0;
@@ -75,33 +64,22 @@ static void runtime_options(struct anti_slice *args)
 
     for (i = 1; i < args->len; i++) {
         const char *arg = (const char *)args->ptr[i].ptr;
-        char name[64];
         const char *value;
-        size_t n;
+        int64_t n;
         if (strncmp(arg, option_prefix, sizeof option_prefix - 1) != 0) {
             args->ptr[kept++] = args->ptr[i];
             continue;
         }
         arg += sizeof option_prefix - 1;
         value = strchr(arg, '=');
-        n = value != NULL ? (size_t)(value - arg) : strlen(arg);
+        n = value != NULL ? (int64_t)(value - arg) : (int64_t)strlen(arg);
         if (value != NULL) {
             value++;
         }
-        if (n < sizeof name) {
-            memcpy(name, arg, n);
-            name[n] = 0;
-        }
-        if (n < sizeof name && strcmp(name, "backtrace") == 0) {
-            anti_rt_option_backtrace = boolean_option(name, value);
-            continue;
-        }
-        fprintf(stderr, "anti: --anti.%.*s is no option of the runtime, which "
-                        "takes --anti.backtrace\n",
-                (int)n, arg);
-        exit(70);
+        anti_rt_conf_option(arg, n, value);
     }
     args->len = kept;
+    anti_rt_conf_start();
 }
 
 static void *allocate(size_t size)

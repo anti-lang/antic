@@ -1,0 +1,35 @@
+//! The runtime of the program, as far as a program reaches it.
+//!
+//! `configure` names the configuration file the program reads. It
+//! stands as the first statement of `main`, and a desktop application
+//! passes a directory of `anti.os` to it. `--anti.conf` and `ANTI_CONF`
+//! name a file before `main` runs, and either of them keeps the file it
+//! named. A program that names none runs as it was built.
+//!
+//! The specification writes the call as `rt.configure(path)`, so a
+//! program imports the module under that name. `anti.rt` is the C
+//! runtime and no module of Anti.
+//!
+//! ```anti
+//! import anti.runtime as rt;
+//!
+//! fn main() -> int
+//! {
+//! 	rt.configure("/etc/some_program/conf.toml");
+//! 	return 0;
+//! }
+//! ```
+
+extern fn anti_rt_conf_configure(path: ?*byte, len: int);
+
+/// Read the configuration file at `path`, with the files it includes,
+/// and take every key of its `[runtime]` table that the command line
+/// did not name.
+///
+/// A file that cannot be read, a cycle of includes, a key the runtime
+/// does not know and a value a key does not take end the program with
+/// status 70 and a message that names the file and the line.
+pub fn configure(path: str)
+{
+	anti_rt_conf_configure(path.ptr, path.len);
+}
