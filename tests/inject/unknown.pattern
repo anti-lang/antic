@@ -1,1 +1,1 @@
-anti: --anti\.inject: other\.Thing is no injectable interface of this program, which has service\.Logger, service\.Clock and service\.Store
+anti: --anti\.inject: other\.Thing is no injectable interface of this program, which has service\.Logger, service\.Clock and service\.Allocator

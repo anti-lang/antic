@@ -149,6 +149,15 @@ static bool expect_name(struct parser *p, struct name *name)
    work order names. They stay keywords everywhere else. A built-in
    `alloc` or `free` never stands after `fn` or `.`, so each position
    has one reading. */
+/* Whether the token may be the name of an `inject` field: an ordinary
+   name, or `alloc` or `free`. A name must stand after `inject`, so a
+   built-in of either name never does. */
+static bool is_field_name(const struct token *t)
+{
+    return t->kind == TOKEN_IDENT || t->kind == TOKEN_ALLOC ||
+           t->kind == TOKEN_FREE;
+}
+
 static bool expect_member_name(struct parser *p, struct name *name)
 {
     const struct token *t = peek(p);
@@ -2304,13 +2313,13 @@ static struct item *class_item(struct parser *p, struct item *it)
            name as well. */
         if (is_word(p, peek(p), "inject") &&
             is_word(p, peek_at(p, 1), "final") &&
-            peek_at(p, 2)->kind == TOKEN_IDENT) {
+            is_field_name(peek_at(p, 2))) {
             next(p);
             next(p);
             field.injected = true;
             field.inject_final = true;
         } else if (is_word(p, peek(p), "inject") &&
-                   peek_at(p, 1)->kind == TOKEN_IDENT) {
+                   is_field_name(peek_at(p, 1))) {
             next(p);
             field.injected = true;
         }
@@ -2336,7 +2345,12 @@ static struct item *class_item(struct parser *p, struct item *it)
             next(p);
             field.atomic = true;
         }
-        if (!expect_name(p, &field.name) || !expect(p, TOKEN_COLON) ||
+        /* An `inject` field may be called `alloc` or `free`, as the
+           example of `docs/anti-syntax-overview.md` writes it. A name
+           must stand after `inject`, so the position has one reading. */
+        if (!(field.injected ? expect_member_name(p, &field.name)
+                             : expect_name(p, &field.name)) ||
+            !expect(p, TOKEN_COLON) ||
             (field.type = type(p)) == NULL ||
             (accept(p, TOKEN_COLON) &&
              (field.bits = expression(p)) == NULL) ||

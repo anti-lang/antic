@@ -155,6 +155,20 @@ ff = "https://anti.foundingfuture.com/repo"
   on one machine because `.antl` files are target-independent. Linking and running need
   the target platform.
 
+`[inject]` maps the path of an injectable interface to its provider, one line per
+interface. `anti build` passes each to `antic` as `--inject Interface=Provider`, and a
+class with an `inject` field of that interface is filled by it. `[inject.test]` holds the
+providers of `anti test`, which lie over `[inject]` per interface. See
+[Injection](anti-language-additions.md#injection).
+
+```toml
+[inject]
+"anti.log.Logger" = "net.niese.ConsoleLogger.get"
+
+[inject.test]
+"anti.log.Logger" = "net.niese.tests.FakeLogger.get"
+```
+
 `[repositories]` maps an alias to a URL prefix. The alias is local to this manifest.
 
 `[dependencies]` maps a package name to a table. The key is quoted, because a dotted

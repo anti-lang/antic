@@ -199,9 +199,9 @@ nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
 and the CPU levels are built. The variables of `-g` come before the first public
 release. After it, the wrapping and saturating operators with `Flags`, then
 sum types, then locking and channels, all three built. Then injection, hooks
-and tracing, plugins and runtime configuration, which belong together. Hooks
-and tracing and the runtime configuration are built. Then generics and
-closures.
+and tracing, plugins and runtime configuration, which belong together.
+Injection, hooks and tracing and the runtime configuration are built. Then
+generics and closures.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -248,8 +248,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 738 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 737 each, without the `no_paths` test, which needs a
+- 751 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 750 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A
@@ -302,6 +302,17 @@ reports what it finished.
   error on in a release build. A line of `[injections]` is a startup error
   while no program carries an injectable interface. See "Runtime
   configuration" in `docs/decisions.md` and `docs/notes/runtime-conf.md`.
+- Injection is built. `inject log: *Logger` and `inject final alloc: *Allocator`
+  mark a field of a class that the provider of its interface fills before
+  `construct` runs. `anti test` reads the `[inject]` and `[inject.test]` tables
+  of `anti.toml` and passes each provider to antic as `--inject
+  Interface=Provider`. One slot per interface holds the provider, and every
+  site calls through it. The link refuses an interface with no provider, a
+  provider that is no function of the program or is no such interface, and a
+  cycle through the providers. `anti_rt_injectable` names the interfaces of a
+  program, so `--anti.inject` reports what it may replace and refuses an
+  `inject final` field. The run-time replacement waits for plugins. See
+  "Injection" in `docs/decisions.md` and `docs/notes/injection.md`.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
   Anti function names. Variables are the next step. See `docs/notes/debug.md`.
