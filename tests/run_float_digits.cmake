@@ -18,13 +18,29 @@ foreach(archive IN LISTS archives)
     set(dir "${WORK}/${key}")
     file(REMOVE_RECURSE "${dir}")
     file(MAKE_DIRECTORY "${dir}")
-    execute_process(COMMAND "${LLVM_AR}" x "${archive}" text.o
+    # The runtime of the host is built by CMake, which names the member
+    # text.c.o or text.c.obj. The one of another target is text.o.
+    execute_process(COMMAND "${LLVM_AR}" t "${archive}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE members ERROR_VARIABLE err
+        ENCODING NONE)
+    string(REPLACE "\r" "" members "${members}")
+    string(REPLACE "\n" ";" members "${members}")
+    set(member "")
+    foreach(name IN LISTS members)
+        if(name MATCHES "^text(\\.c)?\\.o(bj)?$")
+            set(member "${name}")
+        endif()
+    endforeach()
+    if(NOT status EQUAL 0 OR member STREQUAL "")
+        message(FATAL_ERROR "${archive} holds no object of rt/text.c\n${err}")
+    endif()
+    execute_process(COMMAND "${LLVM_AR}" x "${archive}" "${member}"
         WORKING_DIRECTORY "${dir}" RESULT_VARIABLE status
         ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT EXISTS "${dir}/text.o")
-        message(FATAL_ERROR "${archive} holds no text.o\n${err}")
+    if(NOT status EQUAL 0 OR NOT EXISTS "${dir}/${member}")
+        message(FATAL_ERROR "${member} of ${archive} does not extract\n${err}")
     endif()
-    file(STRINGS "${dir}/text.o" names REGEX "printf|scanf|strto[dfl]")
+    file(STRINGS "${dir}/${member}" names REGEX "printf|scanf|strto[dfl]")
     if(NOT names STREQUAL "")
         string(APPEND found "${archive}: ${names}\n")
     endif()
