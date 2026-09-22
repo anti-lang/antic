@@ -77,6 +77,7 @@ the sysroots of all six targets. It passes 364 of 364, and ASan and UBSan with t
 runtimes of the clang archive pass 363 of 363 each. The macOS programs link against Zig's
 stubs, and `link_identity_macos-arm64` finds the bytes that the Mac links. At `64d77b6` on
 2026-09-22 it passes 536 of 536 with three skipped, and ASan and UBSan 535 of 535 each.
+At `b44e7dc` it passes 539 of 539, and ASan and UBSan 538 of 538 each.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -139,9 +140,8 @@ ctest --test-dir build --output-on-failure
 
 The machine ran the whole suite on 2026-09-19 with the pinned clang and the sysroots of all
 six targets. It passes 351 of 351, among them every cross link and `link_identity_macos-arm64`.
-At `64d77b6` on 2026-09-22 it passes 507 of 510 with eight skipped. `std_backtrace`,
-`trace_stack` and `trace_stack_g` fail, because a release link carries no name of an Anti
-function into the PDB.
+At `b44e7dc` on 2026-09-22 it passes 523 of 523 with eight skipped, the ten `clib_*`
+tests among them.
 Extract a tree from the Mac with `tar -xmf`. Ninja otherwise keeps objects that are newer
 than the files the tar restores.
 
