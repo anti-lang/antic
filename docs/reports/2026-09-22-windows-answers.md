@@ -75,3 +75,23 @@ and `vm-linux.log`.
    Shall `--linker platform` keep `/DEBUG` with it?
 2. A release PDB names the checkout through the toolchain of the packer. Shall the
    packer call lld-link itself, with its sysroot and LLVM tools relative to the output?
+
+## Proof
+
+After the push of the report, `git log --oneline -3`:
+
+```text
+6e6777f Report the Windows answers and the runs of all three hosts
+b0a8071 Declare realpath on glibc and key the Linux link line on the target
+ef2921e Keep build paths and a second CodeView out of Windows objects
+```
+
+`git status --short` printed nothing. `git rev-parse HEAD origin/main`:
+
+```text
+6e6777feb0f9de2d72af5b7bd21b8539ef88b7a3
+6e6777feb0f9de2d72af5b7bd21b8539ef88b7a3
+```
+
+The suites: 630 of 630 on the Mac, 629 of 629 under ASan and 629 of 629 under UBSan.
+This section follows in a commit of its own.
