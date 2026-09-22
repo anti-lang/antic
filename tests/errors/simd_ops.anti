@@ -1,0 +1,46 @@
+import anti.simd;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+simd struct I32x4 { a: i32, b: i32, c: i32, d: i32 }
+simd struct U32x4 { a: u32, b: u32, c: u32, d: u32 }
+simd struct Vec2 { x: f64, y: f64 }
+
+struct Plain { x: f32, y: f32, z: f32, w: f32 }
+struct Small { x: f32, y: f32 }
+
+operator fn add(a: Vec4, b: Vec4) -> Vec4
+{
+	return a;
+}
+
+fn main() -> int
+{
+	let a = Vec4.splat(1.0);
+	let i = I32x4.splat(1);
+	let u = U32x4.splat(1);
+	let d = Vec2.splat(2.0);
+	let m = a < a;
+	let bad1 = a + i;
+	let bad2 = a & a;
+	let bad3 = a % a;
+	let bad4 = -u;
+	let bad5 = ~a;
+	let bad6 = m + m;
+	let bad7 = simd.select(a, a, a);
+	let bad8 = simd.select(m, d, d);
+	let bad9 = simd.any(a);
+	let bad10 = a.shuffle(0, 1, 2);
+	let bad11 = a.shuffle(0, 1, 2, 4);
+	let bad12 = m.sum();
+	let bad13 = a as I32x4;
+	let bad14 = a as Small;
+	let bad15 = a as [8]f32;
+	let bad16 = Vec4.splat(1.0, 2.0);
+	let bad17 = Vec4.load(1, 2);
+	let bad18 = a +% a;
+	let ok1 = a as Plain;
+	let ok2 = ok1 as Vec4;
+	let ok3 = a as [16]byte;
+	let ok4 = a as [4]f32;
+	return 0;
+}

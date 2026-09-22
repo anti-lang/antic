@@ -155,6 +155,14 @@ struct type {
     bool has_abstract;              /* TYPE_CLASS: an open function */
     bool is_final;                  /* TYPE_CLASS: no class inherits it */
 
+    /* DESIGN: a `simd struct` is a struct whose fields are its lanes, of
+       one primitive type. The checker gives its operators, and the back
+       end its alignment and its registers. A comparison of two of them
+       gives a mask, a simd struct of `bool` with the same fields, which
+       no program declares. mask holds it, made on the first comparison. */
+    bool simd;                      /* TYPE_STRUCT: a simd struct or a mask */
+    struct type *mask;              /* TYPE_STRUCT, simd: its mask, or NULL */
+
     enum layout_state layout;       /* TYPE_STRUCT, for the cycle check */
     struct type *next;              /* the list of derived types */
 };
@@ -369,6 +377,34 @@ bool types_is_mutex(const struct type *t);
 struct type *types_chan(struct types *types, struct type *element);
 /* Whether t is a channel that types_chan made. */
 bool types_is_chan(const struct type *t);
+/* DESIGN: `simd.select`, `simd.any` and `simd.all` take any simd
+   struct, which no function of Anti can, so the compiler knows them by
+   name in `anti.simd`. A module that calls one imports that module. The
+   names are defined here and nowhere else, and so are the names of the
+   built-ins on a simd struct and its values. */
+#define SIMD_MODULE "anti.simd"
+#define SIMD_SELECT "select"
+#define SIMD_ANY "any"
+#define SIMD_ALL "all"
+#define SIMD_SPLAT "splat"
+#define SIMD_LOAD "load"
+#define SIMD_STORE "store"
+#define SIMD_SHUFFLE "shuffle"
+#define SIMD_SUM "sum"
+#define SIMD_MIN "min"
+#define SIMD_MAX "max"
+#define SIMD_DOT "dot"
+
+/* The mask of the simd struct s: a simd struct of `bool` with the names
+   of the fields of s, one for the compilation. */
+struct type *types_mask(struct types *types, struct type *s);
+/* Whether t is a simd struct, a mask among them. */
+bool type_is_simd(const struct type *t);
+/* Whether t is a simd struct of `bool`, which a comparison gives. */
+bool type_is_mask(const struct type *t);
+/* The type of the lanes of the simd struct t. */
+struct type *type_simd_lane(const struct type *t);
+
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */
 struct type *types_tuple(struct types *types, struct type **elements,

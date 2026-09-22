@@ -975,10 +975,12 @@ static struct expr *postfix(struct parser *p)
                 if (!element_name(p, &outer->as.field.name)) {
                     return NULL;
                 }
-            } else if (check(p, TOKEN_SUPER) || check(p, TOKEN_DESTROY)) {
-                /* `self.super` names the base, and `m.destroy()` the
-                   function that releases a Mutex. The built-in
-                   `destroy` never follows `.`. */
+            } else if (check(p, TOKEN_SUPER) || check(p, TOKEN_DESTROY) ||
+                       check(p, TOKEN_SELECT)) {
+                /* `self.super` names the base, `m.destroy()` the
+                   function that releases a Mutex and `simd.select` the
+                   choice of `anti.simd`. The built-in `destroy` and the
+                   statement `select` never follow `.`. */
                 outer->as.field.name.text = p->source + peek(p)->offset;
                 outer->as.field.name.length = peek(p)->length;
                 next(p);
@@ -2464,6 +2466,12 @@ static struct item *item(struct parser *p)
          peek_at(p, 1)->kind == TOKEN_VARIANT)) {
         next(p);
         it->packed = true;
+    }
+    /* DESIGN: simd is a contextual word as well, and one only directly
+       before struct. */
+    if (is_word(p, peek(p), "simd") && peek_at(p, 1)->kind == TOKEN_STRUCT) {
+        next(p);
+        it->simd = true;
     }
     it->name_pos = pos_of(peek_at(p, 1));
     if (peek(p)->kind == TOKEN_EXTERN) {

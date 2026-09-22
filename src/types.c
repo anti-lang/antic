@@ -692,6 +692,61 @@ struct type *types_struct(struct types *types, struct name module,
     return t;
 }
 
+struct type *types_mask(struct types *types, struct type *s)
+{
+    struct struct_field *fields;
+    struct text text = {0};
+    struct type *m;
+    char *name;
+    size_t i;
+
+    if (s->mask != NULL || type_is_mask(s)) {
+        return s->mask != NULL ? s->mask : s;
+    }
+    /* DESIGN: the mask carries the module of its simd struct and a name
+       that no declaration can spell. Every module that compares values
+       of s therefore names one type. */
+    text_appendf(&text, "mask(%.*s)", (int)s->name.length, s->name.text);
+    name = arena_alloc(types->arena, text.length + 1);
+    memcpy(name, text_cstr(&text), text.length + 1);
+    text_free(&text);
+    m = arena_alloc(types->arena, sizeof *m);
+    memset(m, 0, sizeof *m);
+    m->kind = TYPE_STRUCT;
+    m->module = s->module;
+    m->name.text = name;
+    m->name.length = strlen(name);
+    m->simd = true;
+    fields = arena_alloc(types->arena, (s->field_count + 1) * sizeof *fields);
+    memset(fields, 0, (s->field_count + 1) * sizeof *fields);
+    for (i = 0; i < s->field_count; i++) {
+        fields[i].name = s->fields[i].name;
+        fields[i].pos = s->fields[i].pos;
+        fields[i].type = types_builtin(types, TYPE_BOOL);
+        fields[i].vis = VIS_PUB;
+    }
+    types_set_fields(types, m, fields, s->field_count);
+    m->layout = LAYOUT_DONE;
+    s->mask = m;
+    return m;
+}
+
+bool type_is_simd(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_STRUCT && t->simd &&
+           t->field_count > 0;
+}
+
+bool type_is_mask(const struct type *t)
+{
+    return type_is_simd(t) && t->fields[0].type->kind == TYPE_BOOL;
+}
+
+struct type *type_simd_lane(const struct type *t)
+{
+    return t->fields[0].type;
+}
+
 static struct name name_of(const char *text)
 {
     struct name n;

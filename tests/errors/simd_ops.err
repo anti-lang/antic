@@ -1,0 +1,19 @@
+simd_ops.anti:11:13: error: `Vec4` is a `simd struct`, whose operators are built in
+simd_ops.anti:23:13: error: the operands of `+` have the types `Vec4` and `I32x4`
+simd_ops.anti:24:13: error: `&` needs integer lanes, and `Vec4` has `f32`
+simd_ops.anti:25:13: error: `%` does not apply to a `simd struct`
+simd_ops.anti:26:13: error: unary `-` needs lanes of signed integers or floats, and `U32x4` has `u32`
+simd_ops.anti:27:13: error: unary `~` needs integer lanes, and `Vec4` has `f32`
+simd_ops.anti:28:13: error: `+` needs lanes of numbers, and `mask(Vec4)` has `bool`
+simd_ops.anti:29:25: error: `simd.select` takes a mask, a `simd struct` of `bool`, found `Vec4`
+simd_ops.anti:30:25: error: the mask of `simd.select` has 4 lanes, and `Vec2` has 2
+simd_ops.anti:31:22: error: `simd.any` takes a mask, a `simd struct` of `bool`, found `Vec4`
+simd_ops.anti:32:14: error: `shuffle` takes 4 arguments, found 3
+simd_ops.anti:33:33: error: `shuffle` takes constant lane indexes from 0 to 3
+simd_ops.anti:34:14: error: `sum` needs lanes of numbers, and `mask(Vec4)` has `bool`
+simd_ops.anti:35:14: error: cannot convert `Vec4` to `I32x4`, a `simd struct` converts to an array or a plain struct of the same bytes
+simd_ops.anti:36:14: error: cannot convert `Vec4` of 16 bytes to `Small` of 8
+simd_ops.anti:37:14: error: cannot convert `Vec4` of 16 bytes to `[8]f32` of 32
+simd_ops.anti:38:14: error: `Vec4.splat` takes 1 argument, found 2
+simd_ops.anti:39:24: error: expected `[]f32`, found an integer literal
+simd_ops.anti:40:14: error: `+%` does not apply to a `simd struct`

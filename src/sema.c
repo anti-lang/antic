@@ -8,6 +8,7 @@
 
 #include "../rt/f16.h"
 #include "arith.h"
+#include "cpu.h"
 
 /* DESIGN: one pass over the syntax tree per module, after every
    module-level name is declared, so an item can be used before its
@@ -502,6 +503,102 @@ static uint8_t bitfield_width(struct checker *c, struct param *field,
         return 0;
     }
     return (uint8_t)v.as.integer;
+}
+
+/* The bytes of a lane of type t in a simd struct, or 0 for a type that
+   is no lane. DESIGN: a lane has one width on every target, so the size
+   of a simd struct is a property of its declaration. c_long, c_ulong and
+   c_wchar, whose width the target decides, are no lanes. */
+static uint64_t simd_lane_bytes(const struct type *t)
+{
+    switch (t->kind) {
+    case TYPE_BOOL:
+    case TYPE_I8:
+    case TYPE_U8: return 1;
+    case TYPE_I16:
+    case TYPE_U16:
+    case TYPE_F16: return 2;
+    case TYPE_CHAR:
+    case TYPE_I32:
+    case TYPE_U32:
+    case TYPE_F32: return 4;
+    case TYPE_I64:
+    case TYPE_U64:
+    case TYPE_F64: return 8;
+    default: return 0;
+    }
+}
+
+/* The bytes of the simd struct t: its lanes, without padding. */
+static uint64_t simd_bytes(const struct type *t)
+{
+    return simd_lane_bytes(type_simd_lane(t)) * t->field_count;
+}
+
+/* DESIGN: the rules of a declaration of a simd struct. Every field has
+   one type, a primitive type of one width on every target, and the
+   count is a power of two. The size is a multiple of eight bytes. Above
+   the vector cap of the level table the struct is an array and each
+   operation a loop, which a warning names. The alignment follows from
+   the size, so the declaration has no `align(N)`, and a lane is a whole
+   value, so no field is a bitfield. */
+static void check_simd_struct(struct checker *c, struct item *it)
+{
+    struct type *t = it->symbol->type;
+    const struct type *lane;
+    uint64_t bytes;
+    size_t i;
+
+    lane = t->fields[0].type;
+    if (is_error(lane)) {
+        return;
+    }
+    if (simd_lane_bytes(lane) == 0) {
+        error_at(c, t->fields[0].pos, "a lane of a `simd struct` is an "
+                 "integer of a fixed width, a float, `bool` or `char`, not "
+                 "`%s`", tn(lane));
+        return;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (t->fields[i].bits != 0) {
+            error_at(c, t->fields[i].pos, "a lane of a `simd struct` is no "
+                     "bitfield");
+            return;
+        }
+        if (t->fields[i].type != lane && !is_error(t->fields[i].type)) {
+            error_at(c, t->fields[i].pos, "every lane of `simd struct` "
+                     "`%.*s` is `%s`, and `%.*s` is `%s`",
+                     (int)it->name.length, it->name.text, tn(lane),
+                     (int)t->fields[i].name.length, t->fields[i].name.text,
+                     tn(t->fields[i].type));
+            return;
+        }
+    }
+    if ((t->field_count & (t->field_count - 1)) != 0) {
+        error_at(c, it->name_pos, "a `simd struct` has a power of two of "
+                 "lanes, and `%.*s` has %zu", (int)it->name.length,
+                 it->name.text, t->field_count);
+        return;
+    }
+    if (it->align != NULL) {
+        error_at(c, it->align->pos, "a `simd struct` takes its alignment "
+                 "from its size and has no `align(N)`");
+        return;
+    }
+    bytes = simd_bytes(t);
+    if (bytes % 8 != 0) {
+        error_at(c, it->name_pos, "a `simd struct` is a multiple of 8 bytes, "
+                 "and `%.*s` is %llu", (int)it->name.length, it->name.text,
+                 (unsigned long long)bytes);
+        return;
+    }
+    if (bytes > CPU_VECTOR_BYTE_CAP) {
+        diagnostics_warn(c->diags, it->name_pos.line, it->name_pos.column,
+                         "`%.*s` is %llu bytes, above the vector cap of %d, "
+                         "so it is an array and each operation on it a loop",
+                         (int)it->name.length, it->name.text,
+                         (unsigned long long)bytes, CPU_VECTOR_BYTE_CAP);
+    }
 }
 
 /* The N of align(N): a constant power of two, or 0 after an error. */
@@ -1200,6 +1297,34 @@ static bool require(struct checker *c, struct expr *e, struct type *got,
 static struct symbol *operator_symbol(struct checker *c, struct type *t,
                                       const char *text);
 
+/* Whether the lanes of type lane are numbers, which `+ - * /` take. An
+   f16 lane is one, since each operation reads it as an f32. */
+static bool simd_numeric(const struct type *lane)
+{
+    return type_is_numeric(lane) || lane->kind == TYPE_F16;
+}
+
+/* Unary `-` and `~` on a simd struct apply lane by lane, with the lanes
+   that each takes on one value. */
+static struct type *check_simd_unary(struct checker *c, struct expr *e,
+                                     struct type *t)
+{
+    struct type *lane = type_simd_lane(t);
+
+    if (e->as.unary.op == TOKEN_MINUS && !type_is_signed(lane) &&
+        !type_is_float(lane) && lane->kind != TYPE_F16) {
+        error_at(c, e->pos, "unary `-` needs lanes of signed integers or "
+                 "floats, and `%s` has `%s`", tn(t), tn(lane));
+        return builtin(c, TYPE_ERROR);
+    }
+    if (e->as.unary.op == TOKEN_TILDE && !type_is_integer(lane)) {
+        error_at(c, e->pos, "unary `~` needs integer lanes, and `%s` has `%s`",
+                 tn(t), tn(lane));
+        return builtin(c, TYPE_ERROR);
+    }
+    return t;
+}
+
 static struct type *check_unary(struct checker *c, struct expr *e,
                                 struct type *expected)
 {
@@ -1214,6 +1339,9 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         if (operand->kind != EXPR_INT && operand->kind != EXPR_FLOAT) {
             t = check_expr(c, operand, NULL);
             operand->type = t;
+            if (!is_error(t) && type_is_simd(t)) {
+                return check_simd_unary(c, e, t);
+            }
             if (!is_error(t) && (fn = operator_symbol(c, t, called)) != NULL) {
                 struct expr *call = new_node(c, EXPR_CALL, e->pos);
                 struct expr *callee = new_node(c, EXPR_FIELD, e->pos);
@@ -1494,6 +1622,11 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
         }
         walk_expr(w, e->as.sync_op.target);
         walk_expr(w, e->as.sync_op.value);
+        return;
+    case EXPR_SIMD:
+        for (i = 0; i < e->as.simd.arg_count; i++) {
+            walk_expr(w, e->as.simd.args[i]);
+        }
         return;
     default:
         return;
@@ -1841,6 +1974,72 @@ static bool comparable_pointers(const struct type *a, const struct type *b)
 static struct type *check_coalesce(struct checker *c, struct expr *e,
                                    struct type *expected);
 
+/* DESIGN: an operator on two values of one simd struct applies lane by
+   lane. `+ - * /` take numbers, the bitwise operators take integers, and
+   a comparison takes the lanes it takes on one value and gives the mask.
+   `%`, the wrapping and saturating operators and the logic operators
+   are not among the operators of the section, so they are refused. */
+static struct type *check_simd_binary(struct checker *c, struct expr *e,
+                                      struct type *left, struct type *right)
+{
+    enum token_kind op = e->as.binary.op;
+    char spelling[OP_TEXT];
+    const char *o = op_text(op, spelling);
+    struct type *lane;
+
+    if (left != right) {
+        error_at(c, e->pos, "the operands of `%s` have the types `%s` and "
+                 "`%s`", o, tn(left), tn(right));
+        return builtin(c, TYPE_ERROR);
+    }
+    lane = type_simd_lane(left);
+    switch (op) {
+    case TOKEN_PLUS:
+    case TOKEN_MINUS:
+    case TOKEN_STAR:
+    case TOKEN_SLASH:
+        if (!simd_numeric(lane)) {
+            error_at(c, e->pos, "`%s` needs lanes of numbers, and `%s` has "
+                     "`%s`", o, tn(left), tn(lane));
+            return builtin(c, TYPE_ERROR);
+        }
+        return left;
+    case TOKEN_AMP:
+    case TOKEN_PIPE:
+    case TOKEN_CARET:
+    case TOKEN_SHL:
+    case TOKEN_SHR:
+        if (!type_is_integer(lane)) {
+            error_at(c, e->pos, "`%s` needs integer lanes, and `%s` has `%s`",
+                     o, tn(left), tn(lane));
+            return builtin(c, TYPE_ERROR);
+        }
+        return left;
+    case TOKEN_EQ:
+    case TOKEN_NE:
+        if (!simd_numeric(lane) && lane->kind != TYPE_CHAR &&
+            lane->kind != TYPE_BOOL) {
+            error_at(c, e->pos, "`%s` is not defined on the lanes of `%s`", o,
+                     tn(left));
+            return builtin(c, TYPE_ERROR);
+        }
+        return types_mask(c->types, left);
+    case TOKEN_LT:
+    case TOKEN_LE:
+    case TOKEN_GT:
+    case TOKEN_GE:
+        if (!simd_numeric(lane) && lane->kind != TYPE_CHAR) {
+            error_at(c, e->pos, "`%s` needs lanes of numbers or `char`, and "
+                     "`%s` has `%s`", o, tn(left), tn(lane));
+            return builtin(c, TYPE_ERROR);
+        }
+        return types_mask(c->types, left);
+    default:
+        error_at(c, e->pos, "`%s` does not apply to a `simd struct`", o);
+        return builtin(c, TYPE_ERROR);
+    }
+}
+
 static struct type *check_binary(struct checker *c, struct expr *e,
                                  struct type *expected)
 {
@@ -1891,6 +2090,9 @@ static struct type *check_binary(struct checker *c, struct expr *e,
         if (!binary_operands(c, e, NULL, &left, &right)) {
             return builtin(c, TYPE_ERROR);
         }
+        if (type_is_simd(left) || type_is_simd(right)) {
+            return check_simd_binary(c, e, left, right);
+        }
         if (called != NULL) {
             struct symbol *fn = operator_symbol(c, left, called);
             if (fn != NULL) {
@@ -1919,6 +2121,9 @@ static struct type *check_binary(struct checker *c, struct expr *e,
     default:
         if (!binary_operands(c, e, expected, &left, &right)) {
             return builtin(c, TYPE_ERROR);
+        }
+        if (type_is_simd(left) || type_is_simd(right)) {
+            return check_simd_binary(c, e, left, right);
         }
         if (called != NULL) {
             struct symbol *fn = operator_symbol(c, left, called);
@@ -2106,6 +2311,97 @@ static struct type *check_variant_test(struct checker *c, struct expr *e,
     return builtin(c, TYPE_BOOL);
 }
 
+/* The size and the alignment of t, which are the same on every target,
+   as the C rules lay it out. False for a type that holds a width the
+   target decides, a symbolic length, a bitfield or a table. */
+static bool fixed_layout(const struct type *t, uint64_t *size,
+                         uint64_t *align)
+{
+    uint64_t offset = 0;
+    uint64_t most = 1;
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_POINTER:
+        *size = 8;
+        *align = 8;
+        return true;
+    case TYPE_FN:
+    case TYPE_STR:
+    case TYPE_SLICE:
+        *size = t->kind == TYPE_FN && !t->bound ? 8 : 16;
+        *align = 8;
+        return true;
+    case TYPE_ENUM:
+        return fixed_layout(t->base, size, align);
+    case TYPE_ARRAY:
+        if (t->length_of != NULL || !fixed_layout(t->element, size, align)) {
+            return false;
+        }
+        *size *= t->length;
+        return true;
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+        for (i = 0; i < t->field_count; i++) {
+            uint64_t n;
+            uint64_t a;
+            if (t->fields[i].bits != 0 ||
+                !fixed_layout(t->fields[i].type, &n, &a)) {
+                return false;
+            }
+            a = t->packed ? 1 : a;
+            most = a > most ? a : most;
+            if (t->is_union) {
+                offset = n > offset ? n : offset;
+            } else {
+                offset = (offset + a - 1) / a * a + n;
+            }
+        }
+        if (t->simd) {
+            most = offset < 16 ? offset : 16;
+        }
+        most = t->align > most ? t->align : most;
+        *size = (offset + most - 1) / most * most;
+        *align = most;
+        return true;
+    default:
+        *size = simd_lane_bytes(t);
+        *align = *size;
+        return *size != 0;
+    }
+}
+
+/* DESIGN: `as` between a simd struct and an array or a plain struct of
+   the same bytes is free both ways, since it copies the bytes. The two
+   have one size on every target, which the checker computes by the C
+   rules. Two simd structs do not convert into each other, and neither
+   does a class, a union or a variant, which are no plain structs. */
+static struct type *check_simd_cast(struct checker *c, struct expr *e,
+                                    struct type *from, struct type *to)
+{
+    struct type *other = type_is_simd(from) ? to : from;
+    uint64_t from_size;
+    uint64_t to_size;
+    uint64_t align;
+
+    if ((other->kind != TYPE_ARRAY &&
+         (other->kind != TYPE_STRUCT || other->is_union || other->simd)) ||
+        !fixed_layout(from, &from_size, &align) ||
+        !fixed_layout(to, &to_size, &align)) {
+        error_at(c, e->pos, "cannot convert `%s` to `%s`, a `simd struct` "
+                 "converts to an array or a plain struct of the same bytes",
+                 tn(from), tn(to));
+        return builtin(c, TYPE_ERROR);
+    }
+    if (from_size != to_size) {
+        error_at(c, e->pos, "cannot convert `%s` of %llu bytes to `%s` of "
+                 "%llu", tn(from), (unsigned long long)from_size, tn(to),
+                 (unsigned long long)to_size);
+        return builtin(c, TYPE_ERROR);
+    }
+    return to;
+}
+
 static struct type *check_cast(struct checker *c, struct expr *e)
 {
     const struct type_expr *target = e->as.cast.type;
@@ -2144,6 +2440,9 @@ static struct type *check_cast(struct checker *c, struct expr *e)
         (from->kind == TYPE_POINTER && from->element->kind == TYPE_CLASS &&
          to->kind == TYPE_POINTER && to->element->kind == TYPE_CLASS)) {
         return check_class_cast(c, e, from, to);
+    }
+    if (type_is_simd(from) || type_is_simd(to)) {
+        return check_simd_cast(c, e, from, to);
     }
     if (!can_convert(from, to)) {
         error_at(c, e->pos, "cannot convert `%s` to `%s`", tn(from), tn(to));
@@ -3647,6 +3946,268 @@ static struct type *check_mutex_destroy(struct checker *c, struct expr *e,
     return builtin(c, TYPE_VOID);
 }
 
+/* Rewrite the call e into the built-in op of the simd struct simd with
+   the operands args. None of the built-ins can fail, so a handler on one
+   is refused. */
+static bool simd_node(struct checker *c, struct expr *e, enum simd_op op,
+                      struct expr **args, size_t count,
+                      const struct type *simd)
+{
+    if (e->as.call.handler.kind != HANDLE_NONE) {
+        error_at(c, e->as.call.handler.pos,
+                 "this call cannot fail, so it has no error to handle");
+        return false;
+    }
+    e->kind = EXPR_SIMD;
+    memset(&e->as, 0, sizeof e->as);
+    e->as.simd.op = op;
+    e->as.simd.args = args;
+    e->as.simd.arg_count = count;
+    e->as.simd.simd = simd;
+    return true;
+}
+
+/* Whether the call e names a function of `anti.simd` that the compiler
+   knows, through the import of that module. */
+static bool simd_module_call(const struct checker *c, const struct expr *e)
+{
+    const struct expr *callee = e->as.call.callee;
+    const struct symbol *module;
+
+    if (callee->kind != EXPR_FIELD ||
+        (module = qualifier(c, callee)) == NULL || module->home == NULL ||
+        strcmp(module->home->module, SIMD_MODULE) != 0) {
+        return false;
+    }
+    return name_is(&callee->as.field.name, SIMD_SELECT) ||
+           name_is(&callee->as.field.name, SIMD_ANY) ||
+           name_is(&callee->as.field.name, SIMD_ALL);
+}
+
+/* The type a reduction of lanes of type lane gives. An f16 lane is read
+   as an f32, and so is the value that it reduces to. */
+static struct type *simd_scalar(struct checker *c, struct type *lane)
+{
+    return lane->kind == TYPE_F16 ? builtin(c, TYPE_F32) : lane;
+}
+
+/* `simd.select(mask, a, b)`, `simd.any(mask)` and `simd.all(mask)`. The
+   mask is a simd struct of `bool`, and select takes it with the lane
+   count of a and b. */
+static struct type *check_simd_module(struct checker *c, struct expr *e)
+{
+    const struct name *name = &e->as.call.callee->as.field.name;
+    struct expr **args = e->as.call.args;
+    size_t count = e->as.call.arg_count;
+    bool select = name_is(name, SIMD_SELECT);
+    struct type *mask;
+    struct type *a;
+    struct type *b;
+
+    if (count != (select ? 3u : 1u)) {
+        error_at(c, e->pos, "`simd.%.*s` takes %d argument%s, found %d",
+                 (int)name->length, name->text, select ? 3 : 1,
+                 select ? "s" : "", (int)count);
+        return builtin(c, TYPE_ERROR);
+    }
+    mask = check_expr(c, args[0], NULL);
+    if (is_error(mask)) {
+        return mask;
+    }
+    if (!type_is_mask(mask)) {
+        error_at(c, args[0]->pos, "`simd.%.*s` takes a mask, a `simd struct` "
+                 "of `bool`, found `%s`", (int)name->length, name->text,
+                 tn(mask));
+        return builtin(c, TYPE_ERROR);
+    }
+    if (!select) {
+        if (!simd_node(c, e, name_is(name, SIMD_ANY) ? SIMD_OP_ANY
+                                                     : SIMD_OP_ALL,
+                       args, 1, mask)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        return builtin(c, TYPE_BOOL);
+    }
+    a = check_expr(c, args[1], NULL);
+    if (is_error(a)) {
+        return a;
+    }
+    if (!type_is_simd(a)) {
+        error_at(c, args[1]->pos, "`simd.select` chooses between values of a "
+                 "`simd struct`, found `%s`", tn(a));
+        return builtin(c, TYPE_ERROR);
+    }
+    b = check_expr(c, args[2], a);
+    if (!require(c, args[2], b, a)) {
+        return builtin(c, TYPE_ERROR);
+    }
+    if (mask->field_count != a->field_count) {
+        error_at(c, args[0]->pos, "the mask of `simd.select` has %zu lanes, "
+                 "and `%s` has %zu", mask->field_count, tn(a), a->field_count);
+        return builtin(c, TYPE_ERROR);
+    }
+    if (!simd_node(c, e, SIMD_OP_SELECT, args, 3, a)) {
+        return builtin(c, TYPE_ERROR);
+    }
+    return a;
+}
+
+/* Whether name is a built-in on the simd struct itself, `T.splat` or
+   `T.load`. */
+static bool simd_static_name(const struct name *name)
+{
+    return name_is(name, SIMD_SPLAT) || name_is(name, SIMD_LOAD);
+}
+
+/* `T.splat(v)` writes v into every lane, and `T.load(slice, i)` reads
+   the lanes from the elements of slice from i on. */
+static struct type *check_simd_static(struct checker *c, struct expr *e,
+                                      struct type *t)
+{
+    const struct name *name = &e->as.call.callee->as.field.name;
+    struct expr **args = e->as.call.args;
+    size_t count = e->as.call.arg_count;
+    struct type *lane = type_simd_lane(t);
+    struct type *i64 = builtin(c, TYPE_I64);
+
+    if (name_is(name, SIMD_SPLAT)) {
+        if (count != 1) {
+            error_at(c, e->pos, "`%s." SIMD_SPLAT "` takes 1 argument, found "
+                     "%d", tn(t), (int)count);
+            return builtin(c, TYPE_ERROR);
+        }
+        if (!require(c, args[0], check_expr(c, args[0], lane), lane) ||
+            !simd_node(c, e, SIMD_OP_SPLAT, args, 1, t)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        return t;
+    }
+    if (count != 2) {
+        error_at(c, e->pos, "`%s." SIMD_LOAD "` takes 2 arguments, found %d",
+                 tn(t), (int)count);
+        return builtin(c, TYPE_ERROR);
+    }
+    {
+        struct type *slice = types_slice(c->types, lane);
+        bool ok = require(c, args[0], check_expr(c, args[0], slice), slice);
+        ok = require(c, args[1], check_expr(c, args[1], i64), i64) && ok;
+        if (!ok || !simd_node(c, e, SIMD_OP_LOAD, args, 2, t)) {
+            return builtin(c, TYPE_ERROR);
+        }
+    }
+    return t;
+}
+
+/* Whether name is a built-in on a value of a simd struct. */
+static bool simd_value_name(const struct name *name)
+{
+    return name_is(name, SIMD_STORE) || name_is(name, SIMD_SHUFFLE) ||
+           name_is(name, SIMD_SUM) || name_is(name, SIMD_MIN) ||
+           name_is(name, SIMD_MAX) || name_is(name, SIMD_DOT);
+}
+
+/* The built-ins on a value v of the simd struct s, or on a pointer to
+   one: `v.store(slice, i)`, `v.shuffle(i, ...)`, `v.sum()`, `v.min()`,
+   `v.max()` and `a.dot(b)`. A shuffle names the lane of v that each lane
+   of its result takes, by a constant index. */
+static struct type *check_simd_value(struct checker *c, struct expr *e,
+                                     struct type *base, struct type *s)
+{
+    struct expr *receiver = e->as.call.callee->as.field.base;
+    const struct name *name = &e->as.call.callee->as.field.name;
+    size_t count = e->as.call.arg_count;
+    struct type *lane = type_simd_lane(s);
+    struct type *i64 = builtin(c, TYPE_I64);
+    struct expr **args = arena_alloc(c->arena, (count + 1) * sizeof *args);
+    enum simd_op op;
+    size_t want;
+    size_t i;
+
+    if (base->kind == TYPE_POINTER) {
+        usable_pointer(c, receiver, base);
+    }
+    args[0] = receiver;
+    memcpy(args + 1, e->as.call.args, count * sizeof *args);
+    op = name_is(name, SIMD_STORE)     ? SIMD_OP_STORE
+         : name_is(name, SIMD_SHUFFLE) ? SIMD_OP_SHUFFLE
+         : name_is(name, SIMD_SUM)     ? SIMD_OP_SUM
+         : name_is(name, SIMD_MIN)     ? SIMD_OP_MIN
+         : name_is(name, SIMD_MAX)     ? SIMD_OP_MAX
+                                       : SIMD_OP_DOT;
+    want = op == SIMD_OP_STORE     ? 2
+           : op == SIMD_OP_SHUFFLE ? s->field_count
+           : op == SIMD_OP_DOT     ? 1
+                                   : 0;
+    if (count != want) {
+        error_at(c, e->pos, "`%.*s` takes %zu argument%s, found %d",
+                 (int)name->length, name->text, want, want == 1 ? "" : "s",
+                 (int)count);
+        return builtin(c, TYPE_ERROR);
+    }
+    if (op != SIMD_OP_STORE && op != SIMD_OP_SHUFFLE && !simd_numeric(lane)) {
+        error_at(c, e->pos, "`%.*s` needs lanes of numbers, and `%s` has "
+                 "`%s`", (int)name->length, name->text, tn(s), tn(lane));
+        return builtin(c, TYPE_ERROR);
+    }
+    switch (op) {
+    case SIMD_OP_STORE: {
+        struct type *slice = types_slice(c->types, lane);
+        bool ok = require(c, args[1], check_expr(c, args[1], slice), slice);
+        ok = require(c, args[2], check_expr(c, args[2], i64), i64) && ok;
+        if (!ok || !simd_node(c, e, op, args, 3, s)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        return builtin(c, TYPE_VOID);
+    }
+    case SIMD_OP_SHUFFLE: {
+        uint32_t *lanes = arena_alloc(c->arena, want * sizeof *lanes);
+        for (i = 0; i < want; i++) {
+            struct const_value v;
+            if (!require(c, args[i + 1], check_expr(c, args[i + 1], i64), i64)) {
+                return builtin(c, TYPE_ERROR);
+            }
+            if (!eval_const(c, args[i + 1], &v) || v.kind != CONST_INT ||
+                v.as.integer >= want) {
+                error_at(c, args[i + 1]->pos, "`" SIMD_SHUFFLE "` takes "
+                         "constant lane indexes from 0 to %zu", want - 1);
+                return builtin(c, TYPE_ERROR);
+            }
+            lanes[i] = (uint32_t)v.as.integer;
+        }
+        if (!simd_node(c, e, op, args, 1, s)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        e->as.simd.lanes = lanes;
+        return s;
+    }
+    case SIMD_OP_DOT:
+        if (!require(c, args[1], check_expr(c, args[1], s), s) ||
+            !simd_node(c, e, op, args, 2, s)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        return simd_scalar(c, lane);
+    default:
+        if (!simd_node(c, e, op, args, 1, s)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        return simd_scalar(c, lane);
+    }
+}
+
+/* Whether the module of s declares a function that `v.name(args)` calls
+   through the method syntax. Such a function wins over a built-in of
+   that name, as a function named `close` wins over `close(c)`. */
+static bool simd_method_declared(struct checker *c, const struct type *s,
+                                 const struct name *name)
+{
+    struct symbol *f = method_symbol(c, s, name);
+
+    return f != NULL && (f->kind == SYMBOL_FN || f->kind == SYMBOL_EXTERN_FN) &&
+           f->type != NULL && !is_error(f->type) && f->type->kind == TYPE_FN &&
+           f->type->param_count > 0 &&
+           struct_of(f->type->params[0]) == s;
+}
+
 /* `chan T(n)`, `send(c, v)` and `recv(c)`, which the parser writes. The
    nodes the checker writes from calls carry their type already. */
 static struct type *check_sync_op(struct checker *c, struct expr *e)
@@ -3719,6 +4280,9 @@ static struct type *check_call(struct checker *c, struct expr *e,
         lookup(c, &callee->as.field.base->as.name) == NULL) {
         return check_mutex_new(c, e);
     }
+    if (simd_module_call(c, e)) {
+        return check_simd_module(c, e);
+    }
     if (callee->kind == EXPR_FIELD && (module = qualifier(c, callee)) != NULL) {
         fn = check_qualified(c, callee, module, true);
         callee->type = fn;
@@ -3731,6 +4295,10 @@ static struct type *check_call(struct checker *c, struct expr *e,
                (sym = (struct symbol *)lookup(c,
                         &callee->as.field.base->as.name)) != NULL &&
                sym->kind == SYMBOL_STRUCT) {
+        if (type_is_simd(sym->type) &&
+            simd_static_name(&callee->as.field.name)) {
+            return check_simd_static(c, e, sym->type);
+        }
         /* T.f(args) calls a function of the body of T, which takes no
            self. An enum value is not callable. */
         fn = check_type_member(c, callee, sym->type);
@@ -3761,6 +4329,10 @@ static struct type *check_call(struct checker *c, struct expr *e,
                (sym = library_item(c, module->home,
                         &callee->as.field.base->as.field.name)) != NULL &&
                sym->kind == SYMBOL_STRUCT) {
+        if (type_is_simd(sym->type) &&
+            simd_static_name(&callee->as.field.name)) {
+            return check_simd_static(c, e, sym->type);
+        }
         /* `m.T.f(args)` calls a function of the body of a type of
            another module, which takes no self. */
         fn = check_type_member(c, callee, sym->type);
@@ -3783,6 +4355,11 @@ static struct type *check_call(struct checker *c, struct expr *e,
         if (types_is_mutex(s) &&
             name_is(&callee->as.field.name, MUTEX_DESTROY)) {
             return check_mutex_destroy(c, e, base);
+        }
+        if (type_is_simd(s) && find_field(s, &callee->as.field.name) == NULL &&
+            simd_value_name(&callee->as.field.name) &&
+            !simd_method_declared(c, s, &callee->as.field.name)) {
+            return check_simd_value(c, e, base, s);
         }
         /* DESIGN: a union has no methods, so v.f(args) on a union is
            always a call of the function pointer in field f. */
@@ -5513,6 +6090,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return e->type;
     case EXPR_SYNC_OP:
         return check_sync_op(c, e);
+    case EXPR_SIMD:
+        return e->type;
     case EXPR_OBJECT: {
         const char *what = e->as.object.op == TOKEN_DUP      ? "dup"
                            : e->as.object.op == TOKEN_DELETE ? "delete"
@@ -6310,6 +6889,7 @@ static bool eval_const(struct checker *c, struct expr *e,
     case EXPR_DISPATCH:
     case EXPR_JOIN:
     case EXPR_SYNC_OP:
+    case EXPR_SIMD:
         return fail_const(c, e, "a call");
     case EXPR_SLICE:
     case EXPR_SLICE_LIT:
@@ -6931,6 +7511,7 @@ static bool expr_calls(const struct expr *e)
     case EXPR_JOIN:
     case EXPR_FORMAT:
     case EXPR_SYNC_OP:
+    case EXPR_SIMD:
         return true;
     case EXPR_UNARY:
         return expr_calls(e->as.unary.operand);
@@ -8880,6 +9461,7 @@ bool sema_check(struct module *module, const char *module_name,
         if (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION) {
             it->symbol->type = types_struct(types, c.module_name, it->name);
             it->symbol->type->is_union = it->kind == ITEM_UNION;
+            it->symbol->type->simd = it->simd;
         } else if (it->kind == ITEM_CLASS) {
             it->symbol->type = types_struct(types, c.module_name, it->name);
             it->symbol->type->kind = TYPE_CLASS;
@@ -9126,6 +9708,9 @@ bool sema_check(struct module *module, const char *module_name,
         if (it->align != NULL) {
             it->symbol->type->align = alignment(&c, it->align);
         }
+        if (it->simd) {
+            check_simd_struct(&c, it);
+        }
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
@@ -9148,6 +9733,16 @@ bool sema_check(struct module *module, const char *module_name,
         if (it->symbol != NULL &&
             (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN)) {
             it->symbol->type = function_type(&c, it);
+        }
+        /* The operators of a simd struct are built in, and an `operator
+           fn` beside them would never be called. */
+        if (it->symbol != NULL && it->kind == ITEM_FN && it->is_operator &&
+            it->symbol->type->kind == TYPE_FN &&
+            it->symbol->type->param_count > 0 &&
+            type_is_simd(struct_of(it->symbol->type->params[0]))) {
+            error_at(&c, it->name_pos, "`%s` is a `simd struct`, whose "
+                     "operators are built in",
+                     tn(struct_of(it->symbol->type->params[0])));
         }
     }
     /* DESIGN: a function of a struct body carries the name `T.f`, so its

@@ -1,0 +1,8 @@
+//! The functions of masks, which take a simd struct of any type.
+//!
+//! `select(mask, a, b)` gives the lane of `a` where the lane of `mask`
+//! holds and the lane of `b` where it does not. `any(mask)` holds when
+//! one lane of `mask` holds, and `all(mask)` when every lane does. A
+//! comparison of two values of a `simd struct` gives the mask. No
+//! function of Anti takes a value of any type, so the compiler knows the
+//! three by name, and this module declares nothing.

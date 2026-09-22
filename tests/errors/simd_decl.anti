@@ -1,0 +1,29 @@
+simd struct Three { a: f32, b: f32, c: f32 }
+
+simd struct Mixed { x: f32, y: f64 }
+
+simd struct Wide { x: c_long, y: c_long }
+
+simd struct Tiny { x: f32 }
+
+simd struct Aligned align(32) { x: f32, y: f32 }
+
+simd struct Bits { x: u32 : 4, y: u32 }
+
+simd struct Pointers { p: *int, q: *int }
+
+simd struct Big {
+	a0: f64, a1: f64, a2: f64, a3: f64, a4: f64, a5: f64, a6: f64, a7: f64,
+	b0: f64, b1: f64, b2: f64, b3: f64, b4: f64, b5: f64, b6: f64, b7: f64,
+	c0: f64, c1: f64, c2: f64, c3: f64, c4: f64, c5: f64, c6: f64, c7: f64,
+	d0: f64, d1: f64, d2: f64, d3: f64, d4: f64, d5: f64, d6: f64, d7: f64,
+	e0: f64, e1: f64, e2: f64, e3: f64, e4: f64, e5: f64, e6: f64, e7: f64,
+	f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64,
+	g0: f64, g1: f64, g2: f64, g3: f64, g4: f64, g5: f64, g6: f64, g7: f64,
+	h0: f64, h1: f64, h2: f64, h3: f64, h4: f64, h5: f64, h6: f64, h7: f64,
+}
+
+fn main() -> int
+{
+	return 0;
+}

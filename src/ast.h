@@ -86,6 +86,22 @@ enum sync_op {
     SYNC_CHAN_DELETE                /* delete(c) */
 };
 
+/* The built-ins of a simd struct and the functions of `anti.simd`. The
+   checker writes each from a call. */
+enum simd_op {
+    SIMD_OP_SPLAT,                  /* T.splat(v) */
+    SIMD_OP_LOAD,                   /* T.load(slice, i) */
+    SIMD_OP_STORE,                  /* v.store(slice, i) */
+    SIMD_OP_SHUFFLE,                /* v.shuffle(i, j, k, l), constant */
+    SIMD_OP_SUM,                    /* v.sum() */
+    SIMD_OP_MIN,                    /* v.min() */
+    SIMD_OP_MAX,                    /* v.max() */
+    SIMD_OP_DOT,                    /* a.dot(b) */
+    SIMD_OP_SELECT,                 /* simd.select(mask, a, b) */
+    SIMD_OP_ANY,                    /* simd.any(mask) */
+    SIMD_OP_ALL                     /* simd.all(mask) */
+};
+
 enum expr_kind {
     EXPR_INT,
     EXPR_FLOAT,
@@ -119,7 +135,8 @@ enum expr_kind {
     EXPR_FORMAT,                    /* `f"..."` and `rf"..."` */
     EXPR_IN,                        /* `x in lo..hi` */
     EXPR_OPTIONAL,                  /* `p?.x` and `p?.f(args)`, checked */
-    EXPR_SYNC_OP                    /* an operation of a mutex or a channel */
+    EXPR_SYNC_OP,                   /* an operation of a mutex or a channel */
+    EXPR_SIMD                       /* a built-in of a simd struct */
 };
 
 /* The format specification after the colon of an `{expr}`, as the
@@ -366,6 +383,18 @@ struct expr {
             struct expr *value;
             struct type_expr *element;
         } sync_op;                  /* EXPR_SYNC_OP */
+        /* The operands of a built-in of a simd struct in the order the
+           enum lists them. The value a built-in is called on comes
+           first, and it may be a pointer to one. simd is the simd struct
+           the operation works on, and lanes holds the index of each lane
+           of a shuffle. */
+        struct {
+            enum simd_op op;
+            struct expr **args;
+            size_t arg_count;
+            const struct type *simd;
+            uint32_t *lanes;
+        } simd;                     /* EXPR_SIMD */
     } as;
 };
 
@@ -662,6 +691,7 @@ struct item {
     struct type_expr *type;         /* ITEM_CONST */
     struct expr *value;             /* ITEM_CONST */
     bool packed;                    /* ITEM_STRUCT, ITEM_UNION, ITEM_VARIANT */
+    bool simd;                      /* ITEM_STRUCT: a `simd struct` */
     struct expr *align;             /* the same three, or NULL */
     struct variant_case *cases;     /* ITEM_VARIANT */
     size_t case_count;

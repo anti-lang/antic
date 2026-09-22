@@ -435,6 +435,23 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         }
         break;
     }
+    case EXPR_SIMD: {
+        static const char *const names[] = {
+            "splat", "load", "store", "shuffle", "sum", "min", "max", "dot",
+            "select", "any", "all"
+        };
+        text_appendf(d->out, "simd %s", names[e->as.simd.op]);
+        if (e->as.simd.lanes != NULL) {
+            for (i = 0; i < e->as.simd.simd->field_count; i++) {
+                text_appendf(d->out, " %u", e->as.simd.lanes[i]);
+            }
+        }
+        end(d, start, type);
+        for (i = 0; i < e->as.simd.arg_count; i++) {
+            dump_expr(d, depth + 1, e->as.simd.args[i]);
+        }
+        break;
+    }
     }
 }
 
@@ -827,6 +844,9 @@ static void dump_module(struct dumper *d, const struct module *module)
         dump_doc(d, 1, "note", &it->note);
         if (it->packed) {
             simple(d, 1, "packed", NULL);
+        }
+        if (it->simd) {
+            simple(d, 1, "simd", NULL);
         }
         if (it->align != NULL) {
             simple(d, 1, "align", NULL);

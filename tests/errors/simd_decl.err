@@ -1,0 +1,8 @@
+simd_decl.anti:1:13: error: a `simd struct` has a power of two of lanes, and `Three` has 3
+simd_decl.anti:3:29: error: every lane of `simd struct` `Mixed` is `f32`, and `y` is `float`
+simd_decl.anti:5:20: error: a lane of a `simd struct` is an integer of a fixed width, a float, `bool` or `char`, not `c_long`
+simd_decl.anti:7:13: error: a `simd struct` is a multiple of 8 bytes, and `Tiny` is 4
+simd_decl.anti:9:27: error: a `simd struct` takes its alignment from its size and has no `align(N)`
+simd_decl.anti:11:20: error: a lane of a `simd struct` is no bitfield
+simd_decl.anti:13:24: error: a lane of a `simd struct` is an integer of a fixed width, a float, `bool` or `char`, not `*int`
+simd_decl.anti:15:13: warning: `Big` is 512 bytes, above the vector cap of 256, so it is an array and each operation on it a loop
