@@ -1,0 +1,19 @@
+# Variants
+
+Choices made for sum types in each pass. They describe the inside of the
+compiler. `docs/decisions.md` holds what a reader of the language or a
+user of the tools can observe, under "Sum types".
+
+- The lexer reads `variant` as a keyword of its own, `TOKEN_VARIANT`. `packed` and `align(N)` stay contextual words, and `packed` is one before `variant` as it is before `struct`.
+- The parser reads a variant item into `ITEM_VARIANT` with one `struct variant_case` per case. A case holds its name, its `///` text and its fields as `struct param`, each a name and a type.
+- An arm of `switch` that reads a name, a name and `=>` is an arm that binds. The first name is an `EXPR_NAME` that the checker reads as a case and never resolves, and the second stands in `binds`.
+- `if let Circle c = s { A } else { B }` becomes a `STMT_SWITCH` with `if_let` set, one arm and an `else`. The `else` is an empty block without one in the text. `else if` holds the rest of the chain as one statement in a block, and `else if let` in an ordinary `if` does the same.
+- `geo.Shape.Circle { }` stands in a struct literal with the third name in `member`, and `v is geo.Shape.Circle` puts the third name in `member` of the type after `is`. A two-name form keeps the variant in `module` and the case in `name`, and the checker tells a variant from a module by looking the first name up.
+- The checker declares a variant as `TYPE_VARIANT` in the pass that declares structs. A pass between the enums and the struct fields builds its parts. The tag is the enum `T.tag` over `u8`, `u16` or `u32`, each case with fields a struct `T.Case`, and the union `T.union`. `types_set_cases` gives the variant the fields `tag` and `u`, the enum as `base` and the structs of the cases as `params`. A dot and the keyword `union` keep the three names apart from every struct a program declares.
+- `type_has_fields` holds for a variant, so the cycle check, the copy, the layout and the ABI read it as the struct C sees. The checker refuses every field but `tag` before the struct rules see the name, and `is_place` says no to the tag, so neither an assignment nor `&` reaches it.
+- `Shape.Empty` reaches `check_type_member`, which rewrites the node into the literal `Shape.Empty { }` with the index of its case. A literal the checker has seen keeps its type when a later pass checks it again.
+- The checker gives each arm of a switch on a variant the index of its case. A binding gets a local of the struct of the case, in a scope of the arm. Coverage reads the indexes, and the `fallthrough;` of an arm is refused when the next arm binds.
+- Lowering writes a literal of a variant as a store of the tag and one store per field of its case at the offset of `u`. A switch on a variant lowers the value to its address and loads the tag once. It compares the tag with the number of each arm's case. An arm that binds copies the struct of its case into its local before the body. `is` loads the tag of its operand and compares it with one number.
+- The library file writes a variant as a struct. Its fields reach the enum of field 0 and the union of field 1, both written as types of the table. The reader derives `base` and `params` with `types_cases_from_fields` once every struct of the table has its fields, since the union may stand after the variant. The format is version 44.
+- The header writes an export variant through `variant_view`, which `aggregate` calls. The types that a field of a case holds by value come first, then the enum of the tags, then the typedef.
+- The tests: `test_variant.c` holds the lexer, parser and checker rules. `program_variants` runs on ARM64, through Rosetta on x86_64 and in dev mode. `variant_modules_release` and `variant_modules_dev` take a variant across a module. `clib_variants` pins the header, and `listing_error_variant_cover` pins the messages of coverage.

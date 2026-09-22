@@ -197,8 +197,8 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
 and the CPU levels are built. The variables of `-g` come before the first public
-release. After it, the wrapping and saturating operators with `Flags`, which
-are built, then sum types, then locking and channels. Then injection, hooks
+release. After it, the wrapping and saturating operators with `Flags` and
+then sum types, both built, then locking and channels. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. Then
 generics and closures.
 
@@ -230,8 +230,8 @@ reports what it finished.
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
   `Object`, `Job` and `Flags` in `anti.lang` itself, and the runtime defines
   the root's functions and descriptor as `anti_lang_Object_*`.
-- 661 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 660 each, without the `no_paths` test, which needs a
+- 668 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 667 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A
@@ -239,6 +239,14 @@ reports what it finished.
   the function computes the flags it reads alone. See "Wrapping and
   saturating operators and `Flags`" in `docs/decisions.md` and
   `docs/notes/flags.md`.
+- Sum types are built. `variant Shape { Circle { r: f32 }, Empty }` is a
+  struct of a tag and a union of its cases with C layout.
+  `Shape.Circle { r: 2.0 }` and `Shape.Empty` are literals, and `switch`
+  binds a copy of a case's fields with `Circle c =>` and covers every case
+  without `else`.
+  `if let`, `v is Shape.Circle` and `v.tag` read the tag, a variant crosses
+  a module, and the header writes the enum of its tags. See "Sum types" in
+  `docs/decisions.md` and `docs/notes/variants.md`.
 - `anti.mem.Allocator` is built, with `alloc(size, align)` and `free(p)`, the
   default `LibcAllocator` over `rt/mem.c` and `ArenaAllocator` over blocks of
   another allocator. `alloc` and `free` name a function of a class and follow

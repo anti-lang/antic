@@ -337,9 +337,11 @@ switch s {
 }
 
 if let Circle c = s { }
+let round = s is Shape.Circle;
+let n = s.tag as int;
 ```
 
-Not built yet. The refusal of `fallthrough` into an arm that binds a case's fields comes with them.
+Built: declarations with `packed` and `align(N)`, the literals of the cases, `switch` that names every case or has `else`, `if let`, `is`, `tag`, a variant of another module and the enum of the tags in the C header. `fallthrough` never enters an arm that binds a case's fields.
 
 ## Classes
 

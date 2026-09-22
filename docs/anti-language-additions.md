@@ -210,7 +210,7 @@ tests
 - Layout is a struct of a tag and a union: the tag is the smallest unsigned integer that holds the case count, followed by a union of the cases' field sets, laid out by the target's C rules. `packed` and `align(N)` apply. C sees `struct Shape { uint8_t tag; union { struct { float r; } Circle; struct { float side; } Square; } u; }`, and the header writes the tag values as an `enum`.
 - A literal names the case: `Shape.Circle { r: 2.0 }` and `Shape.Empty`.
 - `switch` on a variant names the cases and binds the fields: `Circle c => c.r`, `Square s => s.side`, `Empty => 0.0`. Without `else` it must cover every case, and the message names the missing ones.
-- `v is Shape.Circle` gives a `bool`. `v.tag` is the tag as its enum. There is no other access to a case's fields than `switch`.
+- `v is Shape.Circle` gives a `bool`. `v.tag` is the tag as its enum. There is no other access to a case's fields than `switch`, and `if let Circle c = s { }`, which is a `switch` of one arm.
 - A variant is a value type with C layout. It may be a struct field, an array element, a parameter and a result. It passes by value under the struct rules. It cannot have functions, since it is a struct.
 - `anti bind` never produces a variant, because C declares none. An exported variant is written as above.
 
