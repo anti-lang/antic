@@ -22,4 +22,6 @@ The module `anti.io` writes through the C streams `stdout` and `stderr`, so its 
 
 The module `anti.simd` declares nothing. `select`, `any` and `all` take a mask of any `simd struct`, which no function of Anti can, so the compiler knows the three by name there. A module that calls one imports `anti.simd`, as one that writes `here` imports `anti.lang`.
 
+The module `anti.runtime` holds `configure`, which names the configuration file of the program. The specification writes that call as `rt.configure(path)`, so a program imports the module as `import anti.runtime as rt;`. The path `anti.rt` is the C runtime, which no compilation may define, and holds no module of Anti.
+
 The modules `anti.net`, `anti.regex`, `anti.raylib` and `anti.miniaudio` wait for the native libraries of the runtime archive.

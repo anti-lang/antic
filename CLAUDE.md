@@ -224,14 +224,14 @@ reports what it finished.
 - `std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.args`, `anti.json`,
-  `anti.log`, `anti.debug`, `anti.mem` and `anti.simd`.
+  `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime` and `anti.simd`.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
   `Object`, `Job` and `Flags` in `anti.lang` itself, and the runtime defines
   the root's functions and descriptor as `anti_lang_Object_*`.
-- 702 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 701 each, without the `no_paths` test, which needs a
+- 722 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 721 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A
@@ -272,6 +272,18 @@ reports what it finished.
   simd struct of 16 bytes is the vector type of C in the header and passes
   in a vector register, and one above the cap of 256 bytes is an array and a
   loop. See "Simd structs" in `docs/decisions.md` and `docs/notes/simd.md`.
+- The runtime configuration is built. `--anti.conf=<path>`, `ANTI_CONF` and
+  `rt.configure(path)` of `anti.runtime` name the TOML file, which holds
+  `include`, `[runtime]` and `[injections]`. The includes run first and in
+  order, so the including file wins per key. Every key of `[runtime]` is an
+  option of the same name, `--anti.inspect` prints the effective value of
+  each with the layer it came from, and `--anti.help` lists the options.
+  Precedence per key is the command line, the file, the build. The pool
+  reads `threads` and `anti.log` reads `logger`, so `ANTI_THREADS` and
+  `ANTI_LOGGER` are gone, and `backtrace = true` turns the frames of an
+  error on in a release build. A line of `[injections]` is a startup error
+  while no program carries an injectable interface. See "Runtime
+  configuration" in `docs/decisions.md` and `docs/notes/runtime-conf.md`.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
   Anti function names. Variables are the next step. See `docs/notes/debug.md`.
