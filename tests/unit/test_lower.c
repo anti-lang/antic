@@ -356,6 +356,57 @@ static void check_field_records(const struct ir_module *m,
     }
 }
 
+/* DESIGN: the nine hooks of anti.lang.Object take the entries after the
+   seven of the root in the table of every class, in the order of enum
+   anti_hook in rt/object.h. rt/hooks.c reads an entry there, so this
+   test pins the order and the place of each against the table the
+   compiler writes. A class that replaced none holds the runtime's empty
+   body at every one. */
+static void records_hook_entries(void)
+{
+    static const char *const names[ANTI_HOOK_COUNT] = {
+        "anti_lang_Object_created", "anti_lang_Object_destroyed",
+        "anti_lang_Object_copied", "anti_lang_Object_dispatched",
+        "anti_lang_Object_joined", "anti_lang_Object_enter",
+        "anti_lang_Object_leave", "anti_lang_Object_failed",
+        "anti_lang_Object_changed"
+    };
+    struct lowered l;
+    const struct ir_global *table;
+    size_t i;
+
+    run(&l, "class Cell\n"
+            "{\n"
+            "    pub n: int = 0,\n"
+            "    pub fn get(self) -> int { return self.n; }\n"
+            "}\n"
+            "fn main() -> int { let c = alloc Cell { }; return c.get(); }\n");
+    CHECK(l.ok);
+    table = global_of(&l.ir, "Cell.table");
+    CHECK(table != NULL && table->value != NULL);
+    if (table == NULL || table->value == NULL) {
+        release(&l);
+        return;
+    }
+    /* The descriptor, the seven of the root, the nine hooks and `get`. */
+    CHECK(table->value->item_count == (size_t)ANTI_ENTRY_HOOK +
+                                          ANTI_HOOK_COUNT + 1);
+    for (i = 0; i < (size_t)ANTI_HOOK_COUNT; i++) {
+        size_t entry = (size_t)ANTI_ENTRY_OF_HOOK(i);
+        uint32_t fn;
+        if (entry >= table->value->item_count) {
+            check_failures++;
+            break;
+        }
+        fn = table->value->items[entry].global;
+        CHECK(table->value->items[entry].kind == IR_CONST_FUNC);
+        CHECK_STR(fn < l.ir.function_count ? l.ir.functions[fn]->name
+                                           : "(none)",
+                  names[i]);
+    }
+    release(&l);
+}
+
 /* DESIGN: a field record names the type of its field by the type id of
    rt/object.h and never by a width. The test pins the numbers that the
    compiler writes to the ones the runtime reads. A struct that a field
@@ -1626,6 +1677,7 @@ void test_lower(void)
            "}\n");
     records_classes();
     records_type_ids();
+    records_hook_entries();
     records_check_kinds();
     allocates_zeroed_classes();
 }

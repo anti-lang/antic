@@ -1,0 +1,130 @@
+//! The call hooks of an instrumented class: `enter` and `leave` around
+//! every `pub` function, `failed` when one gives an error, and `changed`
+//! after a write under `--trace writes`.
+//!
+//! `trace` marks the code whose author wants them. It follows the
+//! `assert` rule, so release mode without `--trace` instruments nothing
+//! and this program then prints its results alone. `--trace` turns the
+//! marked code on, `--trace <pattern>` reaches a class that did not ask,
+//! and `--trace writes` adds the writes.
+//!
+//! `leave` reverses the order of the two calls, so the handler and the
+//! object's own hook nest around the call: the handler enters first and
+//! leaves last.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A class that asks for the call hooks, with hooks of its own.
+trace class Store
+{
+	pub n: int = 0,
+
+	pub fn put(self, v: int) -> int
+	{
+		self.n = v;
+		return self.n;
+	}
+
+	pub fn check(self, v: int) -> int may fail
+	{
+		if v < 0 {
+			fail lang.Error.new(7, "below zero");
+		}
+		return v;
+	}
+
+	concrete fn enter(self, name: str)
+	{
+		printf("store enter\n".ptr);
+	}
+
+	concrete fn leave(self, name: str)
+	{
+		printf("store leave\n".ptr);
+	}
+}
+
+/// A class that asks for nothing, with one function that asks for
+/// itself.
+class Quiet
+{
+	pub n: int = 0,
+
+	pub fn plain(self) -> int
+	{
+		return self.n;
+	}
+
+	pub trace fn marked(self) -> int
+	{
+		return self.n + 1;
+	}
+}
+
+/// A handler that names the call hooks and passes over the rest.
+class Watch inherits lang.TraceHandler
+{
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str)
+	{
+		printf("watch enter %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn leave(self, o: *Object, name: str)
+	{
+		printf("watch leave %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error)
+	{
+		printf("watch failed %.*s %d\n".ptr, name.len as c_int, name.ptr,
+			e.code as c_int);
+	}
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
+	{
+		printf("watch changed %.*s\n".ptr, field.name.len as c_int,
+			field.name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let watch = alloc Watch { };
+	lang.Trace.install(watch);
+
+	let s = alloc Store { };
+	printf("put %d\n".ptr, s.put(4) as c_int);
+
+	let good = s.check(2) catch fatal;
+	printf("check %d\n".ptr, good as c_int);
+	let bad = s.check(-1) catch e {
+		printf("caught %d\n".ptr, e.code as c_int);
+		yield 0;
+	};
+	printf("bad %d\n".ptr, bad as c_int);
+
+	s.n = 9;
+	printf("field %d\n".ptr, s.n as c_int);
+
+	let q = alloc Quiet { n: 1 };
+	printf("plain %d\n".ptr, q.plain() as c_int);
+	printf("marked %d\n".ptr, q.marked() as c_int);
+
+	lang.Trace.install(none);
+	delete(q);
+	delete(s);
+	delete(watch);
+	return 0;
+}

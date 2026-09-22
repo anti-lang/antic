@@ -1,0 +1,17 @@
+exit 0
+watch created
+cell created
+watch created
+watch copied 1
+cell copied
+copy 7
+watch dispatched
+cell dispatched
+watch joined
+cell joined
+job 7
+watch destroyed
+cell destroyed
+watch destroyed
+watch destroyed
+cell destroyed

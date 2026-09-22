@@ -1,0 +1,130 @@
+//! The five hooks that every build compiles: `created` after `construct`,
+//! `destroyed` before the `destruct` chain, `copied` after `dup`,
+//! `dispatched` when the pool takes an object and `joined` when `join`
+//! has its result.
+//!
+//! Every site calls the installed handler first and dispatches the
+//! object's own hook after it, so each pair of lines below names the
+//! handler and then the object. A class that replaced a hook does not
+//! silence the handler, and the handler does not replace the class's
+//! hook.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The object whose own hooks run after the handler's.
+class Cell
+{
+	pub n: int = 0,
+
+	concrete fn created(self)
+	{
+		printf("cell created\n".ptr);
+	}
+
+	concrete fn destroyed(self)
+	{
+		printf("cell destroyed\n".ptr);
+	}
+
+	concrete fn copied(self, from: *Object)
+	{
+		printf("cell copied\n".ptr);
+	}
+
+	concrete fn dispatched(self)
+	{
+		printf("cell dispatched\n".ptr);
+	}
+
+	concrete fn joined(self)
+	{
+		printf("cell joined\n".ptr);
+	}
+}
+
+/// A class that replaces no hook, so its objects reach the handler and
+/// the root's empty bodies.
+class Plain
+{
+	pub n: int = 0,
+}
+
+worker fn read_cell(c: *Cell) -> int
+{
+	return c.n;
+}
+
+/// A handler that names every hook it takes.
+class Watch inherits lang.TraceHandler
+{
+	concrete fn created(self, o: *Object)
+	{
+		printf("watch created\n".ptr);
+	}
+
+	concrete fn destroyed(self, o: *Object)
+	{
+		printf("watch destroyed\n".ptr);
+	}
+
+	concrete fn copied(self, o: *Object, from: *Object)
+	{
+		printf("watch copied %d\n".ptr, (o != from) as c_int);
+	}
+
+	concrete fn dispatched(self, o: *Object)
+	{
+		printf("watch dispatched\n".ptr);
+	}
+
+	concrete fn joined(self, o: *Object)
+	{
+		printf("watch joined\n".ptr);
+	}
+
+	concrete fn enter(self, o: *Object, name: str)
+	{
+		printf("watch enter %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn leave(self, o: *Object, name: str)
+	{
+		printf("watch leave %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error)
+	{
+		printf("watch failed %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
+	{
+		printf("watch changed %.*s\n".ptr, field.name.len as c_int,
+			field.name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let watch = alloc Watch { };
+	lang.Trace.install(watch);
+
+	let cell = alloc Cell { n: 7 };
+	let plain = alloc Plain { n: 1 };
+
+	let copy = dup(cell);
+	printf("copy %d\n".ptr, copy.n as c_int);
+
+	let job = dispatch cell -> read_cell();
+	printf("job %d\n".ptr, join(job) as c_int);
+
+	delete(copy);
+	delete(plain);
+	delete(cell);
+
+	lang.Trace.install(none);
+	delete(watch);
+	return 0;
+}

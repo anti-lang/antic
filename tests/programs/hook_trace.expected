@@ -1,0 +1,8 @@
+exit 0
+put 4
+check 2
+caught 7
+bad 0
+field 9
+plain 1
+marked 2

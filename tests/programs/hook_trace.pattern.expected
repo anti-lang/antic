@@ -1,0 +1,12 @@
+exit 0
+put 4
+check 2
+caught 7
+bad 0
+field 9
+watch enter hook_trace.Quiet.plain
+watch leave hook_trace.Quiet.plain
+plain 1
+watch enter hook_trace.Quiet.marked
+watch leave hook_trace.Quiet.marked
+marked 2

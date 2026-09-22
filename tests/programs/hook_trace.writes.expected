@@ -1,0 +1,25 @@
+exit 0
+watch enter hook_trace.Store.put
+store enter
+watch changed n
+store leave
+watch leave hook_trace.Store.put
+put 4
+watch enter hook_trace.Store.check
+store enter
+store leave
+watch leave hook_trace.Store.check
+check 2
+watch enter hook_trace.Store.check
+store enter
+watch failed hook_trace.Store.check 7
+store leave
+watch leave hook_trace.Store.check
+caught 7
+bad 0
+watch changed n
+field 9
+plain 1
+watch enter hook_trace.Quiet.marked
+watch leave hook_trace.Quiet.marked
+marked 2

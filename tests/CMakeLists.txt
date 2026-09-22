@@ -405,6 +405,36 @@ add_test(NAME program_deserialize_dev
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_tests_properties(program_deserialize_dev PROPERTIES
     FIXTURES_REQUIRED mem_dev_object)
+# The hooks under the options that decide them. hooks.anti and
+# hook_trace.anti run above without options, which is release mode: the
+# five always-on hooks fire and the call hooks do not. Each case here
+# names its own expected file.
+#   --no-hooks              drops every hook site, the always-on ones too
+#   --trace                 turns the code marked `trace` on
+#   --trace writes          adds the `changed` hook after a write
+#   --trace <pattern>       reaches a class that did not ask, and leaves
+#                           the marked code alone
+foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
+        "hook_trace|trace|--trace|hook_trace.trace.expected"
+        "hook_trace|writes|--trace,--trace,writes|hook_trace.writes.expected"
+        "hook_trace|pattern|--trace,Quiet|hook_trace.pattern.expected")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 source)
+    list(GET parts 1 case_name)
+    list(GET parts 2 case_options)
+    list(GET parts 3 case_expected)
+    add_test(NAME program_${source}_${case_name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${source}.anti"
+            "-DOPTIONS=${case_options}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/programs/${case_expected}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-hooks/${case_name}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+endforeach()
+
 # Ownership without a field list: delete, destroy and dup call the
 # teardown and the copy that the compiler writes for each class.
 add_test(NAME program_delete_owned_no_reflect

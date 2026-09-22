@@ -808,7 +808,7 @@ static struct ir_operand slice_length(struct lowerer *l, struct ir_operand p,
    entries they take in the table of every class. */
 enum hook_kind {
     HOOK_CREATED, HOOK_DESTROYED, HOOK_COPIED, HOOK_DISPATCHED, HOOK_JOINED,
-    HOOK_ENTER, HOOK_LEAVE, HOOK_FAILED, HOOK_CHANGED
+    HOOK_ENTER, HOOK_LEAVE, HOOK_FAILED, HOOK_CHANGED, HOOK_COUNT
 };
 
 /* DESIGN: a hook site is one call of the runtime with the object and the
@@ -7911,6 +7911,26 @@ static void declare_function(struct lowerer *l, struct item *it)
     it->symbol->ir = f->index;
 }
 
+/* Whether name is one of the nine hooks, which stand after the seven
+   functions of the root in root_names. */
+static bool hook_name(const struct name *name)
+{
+    size_t count = sizeof root_names / sizeof root_names[0];
+    size_t i;
+
+    for (i = count - (size_t)HOOK_COUNT; i < count; i++) {
+        if (name->length == strlen(root_names[i]) &&
+            memcmp(name->text, root_names[i], name->length) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: a hook is never instrumented. `enter` and `leave` around a
+   body of `enter` would call themselves without end, and a handler's
+   nine are hooks as much as a class's own. The name decides, so a
+   function of any signature under one of the nine names is left alone. */
 /* Whether the function it takes the `enter`, `leave` and `failed` hooks.
    It is a `pub` function of an instrumented class, or a `trace fn` of
    one, and it has an object to hook. */
@@ -7920,7 +7940,8 @@ static bool traced_function(const struct lowerer *l, const struct item *it)
                                    ? it->owner->symbol->type
                                    : NULL;
 
-    if (!it->has_self || owner == NULL || owner->kind != TYPE_CLASS) {
+    if (!it->has_self || owner == NULL || owner->kind != TYPE_CLASS ||
+        hook_name(&it->name)) {
         return false;
     }
     if (l->hooks && l->trace_marked && it->trace) {

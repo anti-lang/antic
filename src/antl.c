@@ -100,7 +100,8 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
     const char *module = w->iface->module;
 
     if ((t->kind == TYPE_CLASS && t->base == NULL) || types_is_job(t) ||
-        types_is_flags(t) || types_is_mutex(t) || types_is_chan(t)) {
+        types_is_flags(t) || types_is_mutex(t) || types_is_chan(t) ||
+        types_is_field_descriptor(t)) {
         return false;
     }
     return type_has_fields(t) && t->module.length == strlen(module) &&
@@ -1099,6 +1100,16 @@ static bool names_flags(const struct name *module, const struct name *name)
     return name_equals_name(module, &lang) && name_equals_name(name, &flags);
 }
 
+static bool names_field_descriptor(const struct name *module,
+                                   const struct name *name)
+{
+    static const struct name lang = {LANG_MODULE, sizeof LANG_MODULE - 1};
+    static const struct name record = {LANG_FIELD_DESCRIPTOR,
+                                       sizeof LANG_FIELD_DESCRIPTOR - 1};
+
+    return name_equals_name(module, &lang) && name_equals_name(name, &record);
+}
+
 /* Whether module and name are those of `anti.lang` and the struct text,
    which the compiler declares. */
 static bool names_lang(const struct name *module, const struct name *name,
@@ -1127,6 +1138,9 @@ static struct type *foreign_struct(struct reader *r, const struct name *module,
     }
     if (names_flags(module, name)) {
         return types_flags(r->types);
+    }
+    if (names_field_descriptor(module, name)) {
+        return types_field_descriptor(r->types);
     }
     lib = library(r, module);
     if (lib == NULL) {
@@ -1398,7 +1412,8 @@ static void read_types(struct reader *r)
             /* The root carries the path of `anti.lang` and is still
                no struct of its library file. */
             if (!name_equals(&module, r->iface->module) ||
-                names_root(&module, &name) || names_flags(&module, &name)) {
+                names_root(&module, &name) || names_flags(&module, &name) ||
+                names_field_descriptor(&module, &name)) {
                 t = foreign_struct(r, &module, &name);
                 break;
             }
