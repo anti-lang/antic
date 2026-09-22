@@ -2508,6 +2508,76 @@ static struct ir_global *interface_table(struct lowerer *l,
     return g;
 }
 
+/* DESIGN: `T.f` of a body qualified by an interface is a function of
+   its own, which the module that names it writes. It moves the object to
+   the sub-object, reads the entry of its table and calls that. A class
+   below that replaces the body is therefore honoured. The call names the
+   interface and the slot, as every call through a table does. */
+static struct ir_function *reach_thunk(struct lowerer *l,
+                                       const struct struct_field *sub,
+                                       const struct symbol *sym)
+{
+    const struct type *sig = sym->type;
+    struct ir_function *outer_f = l->f;
+    struct ir_block *outer_b = l->b;
+    int index = table_index(sub->type, &sym->item->name);
+    struct ir_function *f;
+    struct ir_operand *args;
+    struct ir_operand table;
+    struct ir_operand target;
+    struct ir_inst *call;
+    uint32_t value;
+    char name[192];
+    size_t i;
+
+    snprintf(name, sizeof name, "%.*s.%.*s.%.*s.reach",
+             (int)sub->home->name.length, sub->home->name.text,
+             (int)sub->name.length, sub->name.text,
+             (int)sym->item->name.length, sym->item->name.text);
+    f = find_function(l->m, l->module_name, name);
+    if (f != NULL) {
+        return f;
+    }
+    f = ir_function_add(l->m, l->module_name, name, ir_type_of(sig->result),
+                        result_agg(l, sig->result));
+    f->result_agg = result_agg(l, sig->result);
+    for (i = 0; i < sig->param_count; i++) {
+        add_param(l, f, sig->params[i]);
+    }
+    l->f = f;
+    l->b = ir_block_add(f);
+    args = malloc((sig->param_count + 1) * sizeof *args);
+    if (args == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    args[0] = offset_address(l, temp(l, f->params[0].temp),
+                             field_offset(l, sub->home, &sub->name));
+    for (i = 1; i < sig->param_count; i++) {
+        args[i] = temp(l, f->params[i].temp);
+    }
+    table = load_table(l, args[0], sub->type);
+    target = temp(l, ir_load(l->f, l->b, IR_PTR,
+                             offset_address(l, table, entry_offset(l, index))));
+    value = ir_call_indirect(l->f, l->b, ir_type_of(sig->result), target,
+                             signature(l, sig), args, sig->param_count);
+    call = &l->b->insts[l->b->count - 1];
+    call->c = ir_global_op(class_descriptor(l, sub->type));
+    call->field = (uint32_t)index;
+    free(args);
+    if (sig->result->kind == TYPE_VOID) {
+        ir_ret(l->f, l->b, IR_VOID, none());
+    } else {
+        /* An aggregate result travels as the address of its storage,
+           which is what the called function already returned. */
+        ir_ret(l->f, l->b, f->result == IR_AGG ? IR_PTR : f->result,
+               temp(l, value));
+    }
+    l->f = outer_f;
+    l->b = outer_b;
+    return f;
+}
+
 /* DESIGN: `construct` runs after a literal has written every field,
    base first down the chain. A base therefore sees its own fields
    before the class below it adds to them. A class without one adds
@@ -4426,6 +4496,11 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         /* A bound function is built into a slot, like any aggregate. */
         if (e->type != NULL && e->type->kind == TYPE_FN && e->type->bound) {
             return lower_address(l, e);
+        }
+        if (e->symbol != NULL && e->as.field.through != NULL) {
+            return temp(l, ir_addr(l->f, l->b,
+                                   ir_func_op(reach_thunk(l, e->as.field.through,
+                                                          e->symbol))));
         }
         if (e->symbol != NULL && (e->symbol->kind == SYMBOL_FN ||
                                   e->symbol->kind == SYMBOL_EXTERN_FN)) {

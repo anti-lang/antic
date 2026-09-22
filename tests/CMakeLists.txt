@@ -280,7 +280,7 @@ add_test(NAME program_devirtualise_dev
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 # Qualified bodies in dev mode, where every call through an interface
 # reads a table this module wrote.
-foreach(name IN ITEMS qualified_bodies qualified_chain)
+foreach(name IN ITEMS qualified_bodies qualified_chain qualified_single)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

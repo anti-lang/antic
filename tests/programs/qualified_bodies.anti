@@ -130,6 +130,18 @@ class Square
 	}
 }
 
+/* A class below Square replaces the unqualified body. A call on a
+   Square reaches it through the table that body fills. */
+class Cube
+{
+	inherits Square,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * 6;
+	}
+}
+
 fn show(d: *Drawable, s: *Sketch)
 {
 	d.draw();
@@ -176,10 +188,16 @@ fn main() -> int
 	printf("square %d %d %d %d\n".ptr, s.area() as c_int,
 		ss.area() as c_int, sm.area() as c_int, direct.area() as c_int);
 
+	let c = alloc Cube { };
+	let cs: *Square = c;
+	let bound = cs.area;
+	printf("cube %d %d\n".ptr, cs.area() as c_int, bound() as c_int);
+
 	delete(h);
 	delete(b);
 	delete(e);
 	delete(t);
 	delete(s);
+	delete(c);
 	return 0;
 }

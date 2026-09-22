@@ -1,0 +1,95 @@
+//! One qualified body of a name. A call, a bound function and `T.f` on
+//! the class reach it through the table of its interface, so a class
+//! below that replaces it is honoured, with a plain body or a qualified
+//! one. A value has its concrete class and calls the body directly.
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class Drawable
+{
+	abstract fn draw(self);
+}
+
+abstract class Readable
+{
+	abstract fn read(self, n: int) -> int;
+}
+
+class Hand
+{
+	implements dr: Drawable,
+	implements rd: Readable,
+
+	pub size: int = 5,
+
+	concrete fn Drawable::draw(self)
+	{
+		printf("hand %d\n".ptr, self.size as c_int);
+	}
+
+	concrete fn Readable::read(self, n: int) -> int
+	{
+		return self.size + n;
+	}
+
+	pub fn inside(self)
+	{
+		self.draw();
+	}
+}
+
+/* A plain body replaces the qualified one in the table of Drawable. */
+class Fist
+{
+	inherits Hand,
+
+	concrete fn draw(self)
+	{
+		printf("fist %d\n".ptr, self.size as c_int);
+	}
+}
+
+/* A qualified body replaces it as well. */
+class Palm
+{
+	inherits Hand,
+
+	concrete fn Drawable::draw(self)
+	{
+		printf("palm %d\n".ptr, self.size as c_int);
+	}
+
+	concrete fn Readable::read(self, n: int) -> int
+	{
+		return self.size * n;
+	}
+}
+
+fn show(h: *Hand)
+{
+	h.draw();
+	let bound = h.draw;
+	bound();
+	let named = Hand.draw;
+	named(h);
+	Hand.draw(h);
+	printf("read %d %d\n".ptr, h.read(2) as c_int, Hand.read(h, 3) as c_int);
+	h.inside();
+}
+
+fn main() -> int
+{
+	let h = alloc Hand { };
+	let f = alloc Fist { size: 6 };
+	let p = alloc Palm { size: 7 };
+	show(h);
+	show(f);
+	show(p);
+	let v = Hand { size: 8 };
+	v.draw();
+	let fb = f.draw;
+	fb();
+	delete(h);
+	delete(f);
+	delete(p);
+	return 0;
+}

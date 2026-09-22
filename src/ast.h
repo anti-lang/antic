@@ -25,6 +25,7 @@ struct pos {
 
 struct type;    /* a checked type, filled in by semantic analysis */
 struct symbol;  /* what a name refers to, filled in by semantic analysis */
+struct struct_field;    /* a field of a checked type */
 struct expr;
 
 enum type_expr_kind {
@@ -228,6 +229,9 @@ struct expr {
         struct {
             struct expr *base;
             struct name name;
+            /* The sub-object whose table `T.f` reaches, for a body
+               qualified by an interface. NULL for every other field. */
+            const struct struct_field *through;
             uint32_t enum_value;    /* the index of an enum value, plus 1 */
             bool promoted;          /* the checker wrote it, not the program */
             bool element;           /* `t.0`, which names the field `_0` */

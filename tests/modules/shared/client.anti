@@ -6,7 +6,9 @@
 //! names. A class of each module holds the struct `Extent`, whose one
 //! descriptor the library writes, and `serialize` walks it from both.
 //! A class of the library with qualified bodies keeps its tables here,
-//! and a class of the program inherits them.
+//! and a class of the program inherits them. The one qualified body of
+//! `Crate` is reached through its table from here, by a call, a bound
+//! function and `points.Crate.size`, and a class here replaces it.
 
 import com.example.points;
 import anti.reflect;
@@ -27,6 +29,18 @@ class Shoe
 	pub fn decks(self) -> int
 	{
 		return self.cards / 52;
+	}
+}
+
+/* A crate of the program, whose plain body replaces the qualified one
+   of the library in the table of Sized. */
+class Box
+{
+	inherits points.Crate,
+
+	concrete fn size(self) -> int
+	{
+		return self.w;
 	}
 }
 
@@ -63,6 +77,17 @@ fn main() -> int
 		sized.size() as c_int);
 	let grew = crate.grow(1);
 	printf("grew %d\n".ptr, grew as c_int);
+	let box = alloc Box { w: 4 };
+	let boxed: *points.Crate = box;
+	let bound = boxed.size;
+	let named = points.Crate.size;
+	let from_crate = crate.size();
+	let from_box = boxed.size();
+	let from_bound = bound();
+	let from_named = named(boxed);
+	printf("size %d %d %d %d\n".ptr, from_crate as c_int, from_box as c_int,
+		from_bound as c_int, from_named as c_int);
+	delete(box);
 	let deck = alloc points.Deck { };
 	let drawn: *points.Drawable = deck;
 	let dealt: *points.Dealt = deck;

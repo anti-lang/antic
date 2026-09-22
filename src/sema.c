@@ -2022,30 +2022,42 @@ static struct item *find_member(const struct type *t,
 /* DESIGN: a name used on a value or a type reaches the member that
    find_member gives, less the bodies qualified by an interface. Each of
    those fills the table of its interface alone. At one level a plain
-   body comes before one qualified by a base, so a call reaches the
-   unqualified function when there is one. */
+   body comes before one qualified by a base. A call therefore reaches the
+   unqualified function when there is one. Without one, bodies qualified
+   by one interface give the nearest of them. A use of it goes through
+   the table of that interface. Two interfaces make the name ambiguous,
+   which ambiguous_member reports. */
 static struct item *reached_member(const struct type *t,
                                    const struct name *name)
 {
+    const struct type *level;
+    struct item *lone = NULL;
+    bool two = false;
     size_t i;
 
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+    for (level = t; level != NULL;
+         level = level->kind == TYPE_CLASS ? level->base : NULL) {
         struct item *base_body = NULL;
-        for (i = 0; i < t->member_count; i++) {
-            struct item *m = t->members[i];
+        for (i = 0; i < level->member_count; i++) {
+            struct item *m = level->members[i];
             if (!same_name(&m->name, name)) {
                 continue;
             }
             if (m->kind != ITEM_FN) {
                 return m;
             }
-            switch (types_body_table(t, m)) {
+            switch (types_body_table(level, m)) {
             case BODY_PLAIN:
                 return m;
             case BODY_BASE:
                 base_body = base_body != NULL ? base_body : m;
                 break;
             case BODY_INTERFACE:
+                if (lone == NULL) {
+                    lone = m;
+                } else if (!same_name(&lone->qualifier, &m->qualifier)) {
+                    two = true;
+                }
                 break;
             }
         }
@@ -2053,13 +2065,13 @@ static struct item *reached_member(const struct type *t,
             return base_body;
         }
     }
-    return NULL;
+    return two ? NULL : lone;
 }
 
-/* DESIGN: take a name that only bodies qualified by an interface fill
-   on the chain of t. It is ambiguous on a value of t, and the message
-   names the interfaces. The program reaches one through a sub-object or
-   an interface pointer. Returns whether it reported. */
+/* DESIGN: take a name that only bodies qualified by two or more
+   interfaces fill on the chain of t. It is ambiguous on a value of t,
+   and the message names the interfaces. The program reaches one through
+   a sub-object or an interface pointer. Returns whether it reported. */
 static bool ambiguous_member(struct checker *c, struct pos pos,
                              const struct type *t, const struct name *name,
                              const char *what)
@@ -2105,6 +2117,53 @@ static bool ambiguous_member(struct checker *c, struct pos pos,
              name->text, text_cstr(&list), what);
     text_free(&list);
     return true;
+}
+
+/* The level of the chain of t that declares the member m, or NULL. */
+static const struct type *level_of(const struct type *t,
+                                   const struct item *m)
+{
+    size_t i;
+
+    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+        for (i = 0; i < t->member_count; i++) {
+            if (t->members[i] == m) {
+                return t;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: a use of a function on a class reaches it through a table.
+   Two kinds hold no entry of the primary table: a body qualified by an
+   interface, and a plain body beside one qualified by a base. Each fills
+   the table of an interface sub-object instead. The use goes through the
+   first sub-object of the chain whose table it fills. A class below that
+   replaces it is therefore honoured. A `final` function and a `final` class
+   have no class below them, and a use of either stays direct. NULL when
+   the use goes through the primary table or needs no table. */
+static const struct struct_field *table_sub_object(const struct type *s,
+                                                   const struct item *m)
+{
+    const struct type *up;
+    size_t i;
+
+    if (s == NULL || s->kind != TYPE_CLASS || m == NULL ||
+        m->kind != ITEM_FN || !m->pub || m->is_final || s->is_final ||
+        types_holds_entry(s, m)) {
+        return NULL;
+    }
+    for (up = s; up != NULL; up = up->base) {
+        for (i = 0; i < up->field_count; i++) {
+            const struct struct_field *f = &up->fields[i];
+            if (f->form == FIELD_IMPL &&
+                types_interface_member(s, f->type, &m->name) == m) {
+                return f;
+            }
+        }
+    }
+    return NULL;
 }
 
 /* DESIGN: a class with an open function is never a complete value. It
@@ -2777,6 +2836,15 @@ static bool method_call(struct checker *c, struct expr *call)
         error_at(c, field->pos, "`self.super.construct` is called at the "
                  "top of the body of `construct`");
         return false;
+    }
+    if (t->kind == TYPE_POINTER || names_sub_object(field->as.field.base)) {
+        const struct struct_field *sub = table_sub_object(s, member);
+        if (sub != NULL) {
+            promote_base(c, field, sub);
+            field->as.field.base->type =
+                check_expr(c, field->as.field.base, NULL);
+            return method_call(c, call);
+        }
     }
     /* DESIGN: a call on a class reached through a pointer goes through
        the table. The object may be of a class below the static type. A
@@ -3514,6 +3582,15 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
                  name->text);
         return builtin(c, TYPE_ERROR);
     }
+    /* DESIGN: `T.f` names the body of T. A body qualified by an
+       interface is reached through the table of its sub-object instead,
+       as a call on the class reaches it. A class of a library file has
+       no item that owns its members, so the level is found on the
+       chain. */
+    if (m->kind == ITEM_FN && level_of(t, m) != NULL &&
+        types_body_table(level_of(t, m), m) == BODY_INTERFACE) {
+        e->as.field.through = table_sub_object(t, m);
+    }
     e->symbol = m->symbol;
     return m->symbol->type != NULL ? m->symbol->type
                                    : builtin(c, TYPE_ERROR);
@@ -3580,9 +3657,19 @@ static struct type *check_field(struct checker *c, struct expr *e)
             if (ambiguous_member(c, e->pos, s, name, "the name")) {
                 return builtin(c, TYPE_ERROR);
             }
-            through = promoting_field(c, s, name, &ambiguous);
+            /* A function of the chain wins over a name that a field
+               promotes, as a call finds it. One without an entry of
+               the primary table is bound through its sub-object. */
+            through = m != NULL && m->kind == ITEM_FN
+                          ? NULL
+                          : promoting_field(c, s, name, &ambiguous);
             if (ambiguous) {
                 return builtin(c, TYPE_ERROR);
+            }
+            if (through == NULL &&
+                (base->kind == TYPE_POINTER ||
+                 names_sub_object(e->as.field.base))) {
+                through = table_sub_object(s, m);
             }
             if (through != NULL) {
                 promote_base(c, e, through);

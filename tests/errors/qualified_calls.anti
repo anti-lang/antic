@@ -1,6 +1,8 @@
-//! A call on the class of a name that only qualified bodies fill is
-//! ambiguous, and the message names the interfaces. A call through a
-//! sub-object or an interface pointer names its table.
+//! A call on the class of a name that only bodies qualified by two or
+//! more interfaces fill is ambiguous, and the message names the
+//! interfaces. A call through a sub-object or an interface pointer names
+//! its table. A name that bodies qualified by one interface fill is not
+//! ambiguous, so `p.read()` is accepted.
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
@@ -56,8 +58,31 @@ class Hand
 	}
 }
 
+/* Two interfaces at two levels of the chain are two as well. */
+class Palm
+{
+	implements dr: Drawable,
+
+	concrete fn Drawable::draw(self)
+	{
+	}
+}
+
+class Fist
+{
+	inherits Palm,
+	implements cd: Card,
+
+	concrete fn Card::draw(self, n: int) -> int
+	{
+		return n;
+	}
+}
+
 fn main() -> int
 {
+	let f = Fist { };
+	f.draw(1);
 	let h = Hand { };
 	let p = &h;
 	h.draw();
