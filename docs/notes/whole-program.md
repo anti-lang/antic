@@ -36,8 +36,8 @@ language or a user of the tools can observe.
 - A class is known by the module and the name of its descriptor. A module that names a
   class of another module holds an extern global of its own for that descriptor. An
   index therefore never identifies a class.
-- The root `anti.rt.Object` has no record. A call through a `*Object` reaches every table
-  of the program.
+- The root `anti.lang.Object` has no record. A call through a `*Object` reaches every
+  table of the program.
 - A primary table serves its class and every class above it. The table of a sub-object
   serves its interface and every class above that interface. A call at a slot reaches the
   entry at that slot of every table that serves its static class.
@@ -57,10 +57,11 @@ language or a user of the tools can observe.
   `<Class>.init`. An export class keeps its C name `anti_<Class>_init`. The class record
   names it.
 - The pass asks what the entries of the program reach, the way the optimizer's removal of
-  unused functions marks them. When `anti_rt_reflect_new` or `anti_rt_Object_deserialize`
-  is among them, it writes `anti_rt_registry`. The registry is an exported global with
-  a count and an array of `anti.rt.Class` records. Each record holds the descriptor, the
-  init function, the module path and a flag for a `construct` with arguments.
+  unused functions marks them. When `anti_rt_reflect_new` or
+  `anti_lang_Object_deserialize` is among them, it writes `anti_rt_registry`. The
+  registry is an exported global with a count and an array of `anti.rt.Class` records.
+  Each record holds the descriptor, the init function, the module path and a flag for a
+  `construct` with arguments.
 - The module paths are byte globals of module `anti.rt`, one per module, named
   `registry.<n>`.
 - `rt/registry.c` holds both readers and nothing else. A program that reaches neither does

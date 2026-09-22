@@ -392,7 +392,7 @@ c.move(1.0, 1.0);
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
 - `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
 
-Built. The compiler still names the root `anti.rt.Object`, and the rename to `anti.lang.Object` follows.
+Built.
 
 ## Interfaces
 

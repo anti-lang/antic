@@ -227,7 +227,9 @@ reports what it finished.
   `anti.log` and `anti.debug`.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
-  holds `SystemError`, `on_fatal` and `check`.
+  holds `SystemError`, `on_fatal` and `check`. The compiler declares
+  `Object` and `Job` in `anti.lang` itself, and the runtime defines the
+  root's functions and descriptor as `anti_lang_Object_*`.
 - 633 ctest tests pass on the development Mac and none is skipped. The ASan and
   the UBSan builds run 632 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
