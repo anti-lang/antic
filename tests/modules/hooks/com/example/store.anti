@@ -1,0 +1,16 @@
+//! A class of a library that asks for the call hooks.
+//!
+//! The library is compiled with `--trace`, so `enter` and `leave` stand
+//! in the body of `put` wherever it is called from. It is compiled
+//! without `--trace writes`, so the write inside `put` calls no
+//! `changed`. The build that holds the body decides both.
+pub trace class Store
+{
+	pub n: int = 0,
+
+	pub fn put(self, v: int) -> int
+	{
+		self.n = v;
+		return self.n;
+	}
+}

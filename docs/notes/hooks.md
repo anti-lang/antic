@@ -71,6 +71,13 @@ The marking lives on the type and the library file carries it. A write to
 a field of a class of another module therefore answers the same question
 where the write stands.
 
+`enter`, `leave` and `failed` stand in the body, so the build of the
+module that holds the body decides them. A library file carries the IR of
+a body as it was lowered, and a `--trace` on the program that links it
+adds nothing there. `hooks_modules_release` and `hooks_modules_dev` pin
+both halves with a library built under `--trace` alone and a program
+built under `--trace` and `--trace writes`.
+
 ## Options
 
 `--no-hooks` drops every site the compiler writes. `join` and `join_all`

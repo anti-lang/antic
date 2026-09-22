@@ -14,11 +14,16 @@
 #   PROGRAM    the name of the program's source in ROOT, without .anti
 #   MODE       release or dev
 #   WORK       a directory for the outputs
+#   OPTIONS    optional options of antic for the program, separated by
+#              commas
+#   LIB_OPTIONS  optional options of antic for the library modules
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 string(REPLACE "," ";" libraries "${LIBRARIES}")
 string(REPLACE "," ";" std "${STD}")
+string(REPLACE "," ";" options "${OPTIONS}")
+string(REPLACE "," ";" lib_options "${LIB_OPTIONS}")
 file(MAKE_DIRECTORY "${WORK}/com/example")
 set(program_inputs "${ROOT}/${PROGRAM}.anti")
 if(MODE STREQUAL "dev")
@@ -28,7 +33,7 @@ foreach(library IN LISTS libraries)
     set(source "${ROOT}/com/example/${library}.anti")
     execute_process(
         COMMAND "${ANTIC}" -c -I "${ROOT}" -I "${WORK}"
-                --runtime "${RUNTIME}"
+                --runtime "${RUNTIME}" ${lib_options}
                 -o "${WORK}/com/example/${library}.antl" "${source}"
         RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
@@ -68,7 +73,8 @@ if(MODE STREQUAL "dev")
 endif()
 execute_process(
     COMMAND "${ANTIC}" -I "${WORK}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${WORK}/${PROGRAM}" ${program_inputs}
+            --runtime "${RUNTIME}" ${options}
+            -o "${WORK}/${PROGRAM}" ${program_inputs}
     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic of the program failed with ${status}\n${err}")

@@ -244,8 +244,8 @@ reports what it finished.
   `--trace <pattern>` reaches a class that did not ask, and `--no-hooks` drops
   every site. `anti.trace` and its handlers are not built. See "Hooks and
   tracing" in `docs/decisions.md` and `docs/notes/hooks.md`.
-- 731 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 730 each, without the `no_paths` test, which needs a
+- 733 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 732 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A

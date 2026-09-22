@@ -1290,6 +1290,32 @@ add_test(NAME classlib
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/classlib"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_classlib.cmake")
 
+# The `trace` marking of a class crosses a module boundary in the library
+# file, so a write to a field of that class calls `changed` where the
+# write stands. The `enter` and `leave` of a function stand in its body,
+# so the build of the module that holds the body decides them. The
+# library here is built with --trace and without --trace writes, and the
+# program with both.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME hooks_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/hooks"
+            "-DLIBRARIES=store"
+            "-DLIB_OPTIONS=--trace"
+            "-DOPTIONS=--trace,--trace,writes"
+            "-DSTD=lang"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hooks-modules-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # A program of two modules holds one descriptor and one table per class,
 # so `is`, `==`, `equals` and `reflect.new` agree whichever module made
 # the object, in release mode and in dev mode

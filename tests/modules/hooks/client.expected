@@ -1,0 +1,5 @@
+enter com.example.store.Store.put
+leave com.example.store.Store.put
+put 4
+changed n
+n 7
