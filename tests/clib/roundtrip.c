@@ -18,13 +18,17 @@ int main(void)
     Num n;
     Num half;
     Flags flags = {0, 9};
+    uint32_t layer;
 
     n.d = 7.0;
     half = geo_half(n);
     printf("%d\n", geo_dot(a, b));
     printf("%d %d\n", scaled.x, scaled.y);
     printf("%g\n", half.d);
-    printf("%u %u\n", geo_layer(&flags), flags.visible);
+    /* The call sets visible, and C leaves the order of the arguments
+       unspecified, so the call comes first on a line of its own. */
+    layer = geo_layer(&flags);
+    printf("%u %u\n", layer, flags.visible);
     printf("%d\n", geo_apply(square, a));
     printf("%d\n", (int)LAYERS);
     return 0;
