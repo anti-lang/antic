@@ -39,6 +39,7 @@ VMs did not run.
    choices of the passes, and the overview, the site page and CLAUDE.md follow.
 7. `55cd910`. The program test gains the simd structs of 32 bytes of every lane
    width.
+8. `a80d8e1`. x86_64 compares lanes with `<=` the way `pcmpgt` gives it.
 
 ## The tests
 
@@ -62,6 +63,10 @@ the last lane of a `load`, and `listing_error_simd_decl` and
 
 ## What failed and how it was fixed
 
+- A review of the comparisons found that x86_64 swapped the operands of
+  `a <= b` on integer lanes along with those of `a >= b`. `a <= b` is the
+  negation of `a > b` and needs no swap. The program test now compares every
+  lane kind with `<=`, `>=` and `!=`, and it printed `ile 0010` before the fix.
 - The first x86_64 shuffle wrote `vpshufd $7007` for a simd struct of 32 bytes
   at v3. `pshufd` moves the 32-bit parts inside each half of a wide register,
   so a wide shuffle is no longer native and takes the expansion.
