@@ -225,7 +225,8 @@ reports what it finished.
 - `std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.args`, `anti.json`,
-  `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime` and `anti.simd`.
+  `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`, `anti.simd` and
+  `anti.trace`.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
@@ -242,8 +243,11 @@ reports what it finished.
   on `leave`. `trace` is a contextual word before `class` and before `fn` in a
   class body, `--trace` and `--no-trace` decide instead of the mode,
   `--trace <pattern>` reaches a class that did not ask, and `--no-hooks` drops
-  every site. `anti.trace` and its handlers are not built. See "Hooks and
-  tracing" in `docs/decisions.md` and `docs/notes/hooks.md`.
+  every site. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger`,
+  `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`, and
+  `trace.start` installs the one the runtime key `trace` names. See "Hooks
+  and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
+  `docs/notes/trace-handlers.md`.
 - 733 ctest tests pass on the development Mac and none is skipped. The ASan and
   the UBSan builds run 732 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.

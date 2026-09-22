@@ -602,7 +602,7 @@ Every hook site calls the installed handler and then dispatches the object's own
 
 `--no-hooks` drops every site, the five always-on ones as well. Instrumentation is a build option and never a change to an object's layout.
 
-Built: the nine hooks and their entries in the table of every class, `TraceHandler`, `Trace.install`, the order of the two calls with `leave` reversed, the contextual `trace` before `class` and before `fn` in a class body, `--trace`, `--no-trace`, `--trace <pattern>`, `--trace writes` and `--no-hooks`. A hook site is one call of the runtime. Not built yet: the cost of one load and one compare at a site without a handler, and `anti.trace` with `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`, which the runtime key `trace` names.
+Built: the nine hooks and their entries in the table of every class, `TraceHandler`, `Trace.install`, the order of the two calls with `leave` reversed, the contextual `trace` before `class` and before `fn` in a class body, `--trace`, `--no-trace`, `--trace <pattern>`, `--trace writes` and `--no-hooks`. A hook site is one call of the runtime. `anti.trace` is built with `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`. `trace.start` reads the runtime key `trace` and installs what it names, and `trace.install` takes the same text from a program. Not built yet: the cost of one load and one compare at a site without a handler.
 
 ## Injection
 
@@ -647,7 +647,7 @@ let log = lib.instance(anti.log.Logger) catch fatal;
 
 Versions are checked at load: interface hash chain, no fields added, every slot the program reaches present. `--anti.conf`, `--anti.inspect` and the other `--anti.` options are the runtime's and are consumed before `main`.
 
-Built: the runtime configuration. `--anti.conf=<path>`, `ANTI_CONF` and `rt.configure(path)` of `anti.runtime` name the file, which holds `include`, `[runtime]` and `[injections]`. The includes run first and in order, so the including file wins per key. Every key of `[runtime]` is an option of the same name, `--anti.inspect` prints the effective value of each with the layer it came from, and `--anti.help` lists the options. Precedence per key is the command line, the file, the build. `--anti.threads` and `--anti.logger` reach the pool and `anti.log`, and `backtrace = true` turns the frames of an error on in a release build. Not built yet: plugins, `provides`, `plugin.load`, and the run-time replacement that `[injections]` and `--anti.inject` ask for, which are a startup error today, since no program carries an injectable interface. `--anti.plugins` and `--anti.trace` are taken and kept, and nothing reads them yet.
+Built: the runtime configuration. `--anti.conf=<path>`, `ANTI_CONF` and `rt.configure(path)` of `anti.runtime` name the file, which holds `include`, `[runtime]` and `[injections]`. The includes run first and in order, so the including file wins per key. Every key of `[runtime]` is an option of the same name, `--anti.inspect` prints the effective value of each with the layer it came from, and `--anti.help` lists the options. Precedence per key is the command line, the file, the build. `--anti.threads` and `--anti.logger` reach the pool and `anti.log`, and `backtrace = true` turns the frames of an error on in a release build. Not built yet: plugins, `provides`, `plugin.load`, and the run-time replacement that `[injections]` and `--anti.inject` ask for, which are a startup error today, since no program carries an injectable interface. `--anti.plugins` is taken and kept, and nothing reads it yet. `--anti.trace` names a handler of `anti.trace`, which `trace.start` reads and installs.
 
 ## Tests
 
@@ -670,7 +670,7 @@ tests
 }
 ```
 
-`setup` and `teardown` in `fixtures` run before and after every test of the module. `anti test` compiles each module with `--tests`, writes a runner that calls its tests, links it and runs it. It prints `ok <module>.<test>` for a test that returned, and a failed assertion prints `FAIL <module>.<test>` and then the file and the line. `anti test --release` runs the same tests with the checks and the assertions off.
+`setup` and `teardown` in `fixtures` run before and after every test of the module. `anti test` compiles each module with `--tests`, writes a runner that calls its tests, links it and runs it. The dev run links an object of every module the one under test imports, so a module of the standard library carries a `tests` block too. It prints `ok <module>.<test>` for a test that returned, and a failed assertion prints `FAIL <module>.<test>` and then the file and the line. `anti test --release` runs the same tests with the checks and the assertions off.
 
 Built.
 
@@ -732,7 +732,7 @@ In dev mode every array, slice and `str` index is bounds-checked, signed arithme
 trace class Renderer { }
 ```
 
-`trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest. "Hooks and tracing" above holds the nine hooks and the options that decide them.
+`trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest, and `trace.start` installs the one that the runtime key `trace` names. "Hooks and tracing" above holds the nine hooks and the options that decide them.
 
 A release binary carries no symbol data. `anti build --release` writes a symbols archive beside it, and `anti symbols inventory`, `check` and `resolve` collect the archives of a deployment and turn a raw trace into names and lines. `anti.debug.backtrace` captures one at run time, and `--anti.backtrace` turns the frames of an error on in a release build.
 

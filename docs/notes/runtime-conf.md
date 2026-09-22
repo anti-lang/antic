@@ -61,8 +61,9 @@ Windows goes through UTF-16 as every other path of the runtime does.
 `anti_rt_option_backtrace`, which `anti_rt_backtrace_on` already read for
 `--anti.backtrace`. `threads` is read by `worker_count` of
 `rt/threads.c`, and `logger` by `from_configuration` of
-`std/anti/log.anti` through `anti_rt_conf_get`. Nothing reads `plugins`
-and `trace` yet.
+`std/anti/log.anti` through `anti_rt_conf_get`. `trace` is read the same
+way by `start` of `std/anti/trace.anti`, which the program calls.
+Nothing reads `plugins` yet.
 
 The version that `--anti.inspect` prints comes from the notice of the
 program, through `anti_rt_runtime_version` of `rt/license.c`. That object

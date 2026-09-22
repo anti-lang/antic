@@ -89,3 +89,9 @@ which is on in dev and off in release. `--trace <pattern>` adds a class
 that did not ask, in any mode. `--trace writes` adds the `changed` hook.
 `--trace` takes the word after it as a pattern when that word is no
 option and no last argument, since the last argument is the source file.
+
+## The handlers
+
+`anti.trace` holds the seven handlers that fill `TraceHandler`, and the
+`trace` key of the runtime configuration names one of them.
+`docs/notes/trace-handlers.md` holds their choices.

@@ -22,6 +22,8 @@ The module `anti.io` writes through the C streams `stdout` and `stderr`, so its 
 
 The module `anti.simd` declares nothing. `select`, `any` and `all` take a mask of any `simd struct`, which no function of Anti can, so the compiler knows the three by name there. A module that calls one imports `anti.simd`, as one that writes `here` imports `anti.lang`.
 
+The module `anti.trace` holds the handlers of `anti.lang.TraceHandler` that the hooks of `anti.lang.Object` reach: `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`. The function `trace.start` reads the `trace` key of the runtime configuration and installs what it names, one of `leaks`, `profile`, `calls`, `errors`, `threads` and `writes`, or a list of them separated by commas, which gives a `Composite`. The program makes that call, as it calls `rt.configure`, because a program that does not import the module links none of the handlers. A handler allocates no object inside a hook, since an `alloc` under `created` would call `created` again, so every table it keeps is a field of the handler with a size at compile time. The module's `tests` block holds seventeen tests, which the test `std_tests_trace` runs in dev mode and in release mode.
+
 The module `anti.runtime` holds `configure`, which names the configuration file of the program. The specification writes that call as `rt.configure(path)`, so a program imports the module as `import anti.runtime as rt;`. The path `anti.rt` is the C runtime, which no compilation may define, and holds no module of Anti.
 
 The modules `anti.net`, `anti.regex`, `anti.raylib` and `anti.miniaudio` wait for the native libraries of the runtime archive.
