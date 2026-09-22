@@ -1,0 +1,14 @@
+concrete_signature.anti:43:30: error: `k` of `concrete fn scaled` has type `i32`, and `Shape.scaled` takes `int`
+concrete_signature.anti:48:25: error: `p` of `concrete fn take` is not `own`, and `Shape.take` takes it as `own`
+concrete_signature.anti:52:29: error: `p` of `concrete fn keep` is `own`, and `Shape.keep` does not take it as `own`
+concrete_signature.anti:56:14: error: `concrete fn read` cannot fail, and `Shape.read` may fail
+concrete_signature.anti:61:33: error: `concrete fn check` may fail, and `Shape.check` cannot
+concrete_signature.anti:66:28: error: `concrete fn size` returns `i32`, and `Shape.size` returns `int`
+concrete_signature.anti:71:14: error: `concrete fn grow` takes no parameter besides `self`, and `Shape.grow` takes 1
+concrete_signature.anti:80:29: error: `concrete fn label` returns `i32`, and `Named.label` returns `int`
+concrete_signature.anti:85:21: error: `concrete fn Named::tag` takes no parameter besides `self`, and `Named.tag` takes 1
+concrete_signature.anti:98:31: error: `concrete fn to_text` returns `int`, and `Object.to_text` returns `str`
+concrete_signature.anti:106:35: error: `out` of `concrete fn serialize` has type `*Point`, and `Object.serialize` takes `*Builder`
+concrete_signature.anti:115:32: error: `line` of `concrete fn write` has type `int`, and `Sink.write` takes `str`
+concrete_signature.anti:141:21: error: `concrete fn Named::radius` of `Disc` fills no abstract function
+concrete_signature.anti:146:14: error: `concrete fn spin` does not take `self`, and `Round.spin` does

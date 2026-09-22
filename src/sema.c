@@ -7163,6 +7163,271 @@ static void declare_import(struct checker *c, const struct import *imp)
     }
 }
 
+/* The class or interface that the qualifier q of a `concrete fn` of t
+   names, or NULL. q may name t or a class of its chain. It may also name
+   an interface that a class of the chain implements, or a class of the
+   chain of that interface. */
+static const struct type *qualified_table(const struct type *t,
+                                          const struct name *q)
+{
+    const struct type *up;
+    size_t k;
+
+    for (up = t; up != NULL; up = inherited(up)) {
+        if (same_name(q, &up->name)) {
+            return up;
+        }
+        for (k = 0; k < up->field_count; k++) {
+            const struct type *iface;
+            if (up->fields[k].form != FIELD_IMPL) {
+                continue;
+            }
+            for (iface = up->fields[k].type; iface != NULL;
+                 iface = inherited(iface)) {
+                if (same_name(q, &iface->name)) {
+                    return iface;
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
+/* The function name that the chain of t declares nearest to t, or NULL.
+   owner receives the class that declares it. */
+static const struct item *chain_entry(const struct type *t,
+                                      const struct name *name,
+                                      const struct type **owner)
+{
+    for (; t != NULL; t = inherited(t)) {
+        const struct item *found = find_member(t, name);
+        if (found != NULL && found->kind == ITEM_FN) {
+            *owner = t;
+            return found;
+        }
+    }
+    return NULL;
+}
+
+/* Whether a level of the chain of t fills the table of iface with a
+   body qualified by a class of the chain of iface. That body wins in the
+   table over an unqualified one, as lowering fills it. */
+static bool qualified_body(const struct type *t, const struct type *iface,
+                           const struct name *name)
+{
+    const struct type *up;
+    const struct type *chain;
+    size_t i;
+
+    for (up = t; up != NULL; up = inherited(up)) {
+        for (i = 0; i < up->member_count; i++) {
+            const struct item *m = up->members[i];
+            if (m->kind != ITEM_FN || m->qualifier.length == 0 ||
+                !same_name(&m->name, name)) {
+                continue;
+            }
+            for (chain = iface; chain != NULL; chain = inherited(chain)) {
+                if (same_name(&m->qualifier, &chain->name)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+/* The parameters a signature writes: those of its type without `self`
+   and without the out pointer of a `may fail` function. */
+static size_t written_params(const struct type *fn, bool has_self)
+{
+    size_t count = fn->param_count - (has_self ? 1 : 0);
+    return fn->may_fail && fn->has_out ? count - 1 : count;
+}
+
+/* The result a signature writes, or NULL when it writes none. */
+static const struct type *written_result(const struct type *fn)
+{
+    if (fn->may_fail) {
+        return fn->has_out ? fn->params[fn->param_count - 1]->element : NULL;
+    }
+    return fn->result->kind == TYPE_VOID ? NULL : fn->result;
+}
+
+/* A result for a message: the type in backquotes, or `nothing`. */
+static void returned_text(char *out, size_t size, const struct type *t)
+{
+    if (t == NULL) {
+        snprintf(out, size, "nothing");
+    } else {
+        snprintf(out, size, "`%s`", tn(t));
+    }
+}
+
+static bool owns_param(const struct symbol *sym, size_t index)
+{
+    return sym->owned != NULL && index < sym->owned_count && sym->owned[index];
+}
+
+/* DESIGN: the root declares `serialize(self, out: *text.Builder)`. The
+   checker builds the root before any module and cannot name anti.text.
+   The parameter therefore has the type `*Object`, which takes a builder
+   as it takes any class. A replacement writes the parameter the
+   specification gives, a `*text.Builder`. */
+static bool root_builder(const struct item *entry)
+{
+    return entry->runtime != NULL && name_is(&entry->name, "serialize");
+}
+
+static bool builder_pointer(const struct type *t)
+{
+    return t->kind == TYPE_POINTER && !t->nullable &&
+           t->element->kind == TYPE_CLASS &&
+           name_is(&t->element->module, "anti.text") &&
+           name_is(&t->element->name, "Builder");
+}
+
+/* DESIGN: a `concrete fn` fills an entry with the signature of the
+   function that declared the entry, exactly: `self`, the type and the
+   `own` of each parameter, the result and `may fail`. A call through the
+   table passes what that signature says, so a body that took anything
+   else would read arguments that are not there. The message names the
+   first difference in the order of the text. */
+static bool same_signature(struct checker *c, const struct item *m,
+                           const struct item *entry, const struct type *owner)
+{
+    const struct type *mine = m->symbol != NULL ? m->symbol->type : NULL;
+    const struct type *theirs =
+        entry->symbol != NULL ? entry->symbol->type : NULL;
+    size_t extra = m->has_self ? 1 : 0;
+    size_t count;
+    size_t their_count;
+    const struct type *result;
+    const struct type *their_result;
+    char fn[160];
+    char at[160];
+    size_t i;
+
+    if (mine == NULL || theirs == NULL || mine->kind != TYPE_FN ||
+        theirs->kind != TYPE_FN) {
+        return true;
+    }
+    snprintf(fn, sizeof fn, "concrete fn %.*s%s%.*s",
+             (int)m->qualifier.length, m->qualifier.text,
+             m->qualifier.length > 0 ? "::" : "", (int)m->name.length,
+             m->name.text);
+    snprintf(at, sizeof at, "%s.%.*s", tn(owner), (int)entry->name.length,
+             entry->name.text);
+    if (m->has_self != entry->has_self) {
+        error_at(c, m->name_pos, "`%s` %s `self`, and `%s` %s", fn,
+                 m->has_self ? "takes" : "does not take", at,
+                 m->has_self ? "does not" : "does");
+        return false;
+    }
+    count = written_params(mine, m->has_self);
+    their_count = written_params(theirs, entry->has_self);
+    for (i = 0; i < count && i < their_count && i < m->param_count; i++) {
+        const struct param *p = &m->params[i];
+        const struct type *got = mine->params[i + extra];
+        const struct type *want = theirs->params[i + extra];
+        bool owned = owns_param(m->symbol, i + extra);
+        bool builder = root_builder(entry);
+        if (owned != owns_param(entry->symbol, i + extra)) {
+            error_at(c, p->pos, owned ? "`%.*s` of `%s` is `own`, and `%s` "
+                                        "does not take it as `own`"
+                                      : "`%.*s` of `%s` is not `own`, and "
+                                        "`%s` takes it as `own`",
+                     (int)p->name.length, p->name.text, fn, at);
+            return false;
+        }
+        if (builder ? !builder_pointer(got) : got != want) {
+            error_at(c, p->type->pos, "`%.*s` of `%s` has type `%s`, and `%s` "
+                     "takes `%s`", (int)p->name.length, p->name.text, fn,
+                     tn(got), at, builder ? "*Builder" : tn(want));
+            return false;
+        }
+    }
+    if (count != their_count) {
+        char takes[48];
+        if (count == 0) {
+            snprintf(takes, sizeof takes, "no parameter");
+        } else {
+            snprintf(takes, sizeof takes, "%zu parameter%s", count,
+                     count == 1 ? "" : "s");
+        }
+        error_at(c, m->name_pos, "`%s` takes %s%s, and `%s` takes %zu", fn,
+                 takes, m->has_self ? " besides `self`" : "", at,
+                 their_count);
+        return false;
+    }
+    result = written_result(mine);
+    their_result = written_result(theirs);
+    if (result != their_result) {
+        char given[100];
+        char wanted[100];
+        returned_text(given, sizeof given, result);
+        returned_text(wanted, sizeof wanted, their_result);
+        error_at(c, m->result != NULL ? m->result->pos : m->name_pos,
+                 "`%s` returns %s, and `%s` returns %s", fn, given, at,
+                 wanted);
+        return false;
+    }
+    if (mine->may_fail != theirs->may_fail) {
+        error_at(c, m->may_fail ? m->may_fail_pos : m->name_pos,
+                 mine->may_fail ? "`%s` may fail, and `%s` cannot"
+                                : "`%s` cannot fail, and `%s` may fail",
+                 fn, at);
+        return false;
+    }
+    return true;
+}
+
+/* The entries a `concrete fn` m of t fills, each compared with m. A
+   qualified body fills the table its qualifier names. An unqualified one
+   fills the entry of the base chain and the entry of every interface of
+   the chain that no qualified body fills. */
+static void check_replacement(struct checker *c, const struct item *it,
+                              const struct type *t, const struct item *m)
+{
+    const struct type *owner = NULL;
+    const struct item *entry;
+    const struct type *up;
+    size_t k;
+
+    if (m->qualifier.length > 0 && !same_name(&m->qualifier, &t->name)) {
+        const struct type *table = qualified_table(t, &m->qualifier);
+        if (table == NULL) {
+            return;
+        }
+        entry = chain_entry(table, &m->name, &owner);
+        if (entry == NULL) {
+            error_at(c, m->name_pos, "`concrete fn %.*s::%.*s` of `%.*s` "
+                     "fills no abstract function", (int)m->qualifier.length,
+                     m->qualifier.text, (int)m->name.length, m->name.text,
+                     (int)it->name.length, it->name.text);
+            return;
+        }
+        same_signature(c, m, entry, owner);
+        return;
+    }
+    entry = chain_entry(inherited(t), &m->name, &owner);
+    if (entry != NULL && !same_signature(c, m, entry, owner)) {
+        return;
+    }
+    for (up = t; up != NULL; up = inherited(up)) {
+        for (k = 0; k < up->field_count; k++) {
+            const struct type *iface = up->fields[k].type;
+            if (up->fields[k].form != FIELD_IMPL ||
+                qualified_body(t, iface, &m->name)) {
+                continue;
+            }
+            entry = chain_entry(iface, &m->name, &owner);
+            if (entry != NULL && !same_signature(c, m, entry, owner)) {
+                return;
+            }
+        }
+    }
+}
+
 static void check_export(struct checker *c, struct item *it);
 static void check_extern_fn(struct checker *c, struct item *it);
 
@@ -7649,7 +7914,8 @@ bool sema_check(struct module *module, const char *module_name,
     /* DESIGN: a contract is declared with `abstract fn` and filled with
        `concrete fn` of the same signature. The checker walks the chain of
        `inherits` fields of every struct and refuses one that leaves a
-       contract unfilled. */
+       contract unfilled, and `check_replacement` compares each
+       `concrete fn` with the entries it fills. */
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
@@ -7695,6 +7961,8 @@ bool sema_check(struct module *module, const char *module_name,
                 error_at(&c, m->name_pos, "`concrete fn %.*s` of `%.*s` fills "
                          "no abstract function", (int)m->name.length,
                          m->name.text, (int)it->name.length, it->name.text);
+            } else if (m->contract == FN_CONCRETE) {
+                check_replacement(&c, it, t, m);
             } else if (m->contract == FN_PLAIN && above != NULL &&
                        above->contract != FN_PLAIN) {
                 error_at(&c, m->name_pos, "`%.*s` of `%.*s` matches an "
@@ -7814,27 +8082,10 @@ bool sema_check(struct module *module, const char *module_name,
            it implements. Any other name reaches no table. */
         for (j = 0; j < it->member_count; j++) {
             const struct item *m = it->members[j];
-            const struct type *up;
-            bool found = false;
-            size_t k;
             if (m->kind != ITEM_FN || m->qualifier.length == 0) {
                 continue;
             }
-            for (up = t; up != NULL && !found;
-                 up = up->kind == TYPE_CLASS ? up->base : NULL) {
-                found = same_name(&m->qualifier, &up->name);
-                for (k = 0; k < up->field_count && !found; k++) {
-                    const struct type *iface;
-                    if (up->fields[k].form != FIELD_IMPL) {
-                        continue;
-                    }
-                    for (iface = up->fields[k].type; iface != NULL && !found;
-                         iface = inherited(iface)) {
-                        found = same_name(&m->qualifier, &iface->name);
-                    }
-                }
-            }
-            if (!found) {
+            if (qualified_table(t, &m->qualifier) == NULL) {
                 error_at(&c, m->qualifier_pos, "`%.*s` is no base and no "
                          "interface of `%.*s`", (int)m->qualifier.length,
                          m->qualifier.text, (int)it->name.length,

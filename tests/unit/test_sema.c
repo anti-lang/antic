@@ -675,6 +675,26 @@ void test_sema(void)
             "{ return 1; } }\n", 2, 34,
             "`Pet` already has `tag`");
 
+    /* A `concrete fn` takes the signature of the entry it fills, `own`
+       included, from the base chain, from an interface and through a
+       qualifier. errors/concrete_signature.anti holds the refusals. */
+    accepts("class Point { pub x: int = 0 }\n"
+            "abstract class Shape { abstract fn area(self, k: int) -> int;\n"
+            "    abstract fn take(self, own p: ?*Point); }\n"
+            "abstract class Named { abstract fn label(self, k: i32) -> i32;\n"
+            "    abstract fn size(self) -> int; }\n"
+            "class Square { inherits Shape, implements n: Named,\n"
+            "    concrete fn area(self, k: int) -> int { return k; }\n"
+            "    concrete fn take(self, own p: ?*Point) { }\n"
+            "    concrete fn size(self) -> int { return 1; }\n"
+            "    concrete fn Named::label(self, k: i32) -> i32 "
+            "{ return k; } }\n");
+    rejects("abstract class Shape { abstract fn area(self, k: int) -> int; }\n"
+            "class Square { inherits Shape,\n"
+            "    concrete fn area(self, k: i32) -> int { return 0; } }\n", 3,
+            31, "`k` of `concrete fn area` has type `i32`, and `Shape.area` "
+            "takes `int`");
+
     /* Tuples. The type stands wherever a type stands, the elements are
        `t.0` upwards, and `let (a, b) = e;` and `for i, x in items` are
        the two forms that take one apart. */

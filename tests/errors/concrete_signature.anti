@@ -1,0 +1,154 @@
+//! A `concrete fn` takes the signature of the function it fills exactly:
+//! the type and the `own` of each parameter, the result and `may fail`.
+//! The first difference is the message.
+
+import anti.lang;
+import anti.log;
+import anti.text;
+
+class Point
+{
+	pub x: int = 0,
+}
+
+abstract class Shape
+{
+	abstract fn area(self, k: int) -> int;
+	abstract fn scaled(self, k: int) -> int;
+	abstract fn take(self, own p: ?*Point);
+	abstract fn keep(self, p: ?*Point);
+	abstract fn read(self) -> int may fail;
+	abstract fn check(self) -> int;
+	abstract fn size(self) -> int;
+	abstract fn grow(self, k: int);
+	abstract fn fill(self, own p: ?*Point, k: int) -> int may fail;
+}
+
+abstract class Named
+{
+	abstract fn label(self) -> int;
+	abstract fn tag(self, k: int) -> int;
+}
+
+class Square
+{
+	inherits Shape,
+	implements n: Named,
+
+	concrete fn area(self, k: int) -> int
+	{
+		return k;
+	}
+
+	concrete fn scaled(self, k: i32) -> int
+	{
+		return 0;
+	}
+
+	concrete fn take(self, p: ?*Point)
+	{
+	}
+
+	concrete fn keep(self, own p: ?*Point)
+	{
+	}
+
+	concrete fn read(self) -> int
+	{
+		return 0;
+	}
+
+	concrete fn check(self) -> int may fail
+	{
+		fail "check";
+	}
+
+	concrete fn size(self) -> i32
+	{
+		return 0;
+	}
+
+	concrete fn grow(self)
+	{
+	}
+
+	concrete fn fill(self, own p: ?*Point, k: int) -> int may fail
+	{
+		fail "fill";
+	}
+
+	concrete fn label(self) -> i32
+	{
+		return 0;
+	}
+
+	concrete fn Named::tag(self) -> int
+	{
+		return 0;
+	}
+}
+
+class Page
+{
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		out.append("page");
+	}
+
+	concrete fn to_text(self) -> int
+	{
+		return 0;
+	}
+}
+
+class Sheet
+{
+	concrete fn serialize(self, out: *Point)
+	{
+	}
+}
+
+class Quiet
+{
+	inherits log.Sink,
+
+	concrete fn write(self, line: int)
+	{
+	}
+}
+
+abstract class Round
+{
+	abstract fn radius(self) -> int;
+	abstract fn spin(self);
+}
+
+class Disc
+{
+	inherits Round,
+	implements n: Named,
+
+	concrete fn label(self) -> int
+	{
+		return 0;
+	}
+
+	concrete fn tag(self, k: int) -> int
+	{
+		return k;
+	}
+
+	concrete fn Named::radius(self) -> int
+	{
+		return 0;
+	}
+
+	concrete fn spin()
+	{
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}
