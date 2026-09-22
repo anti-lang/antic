@@ -1,0 +1,74 @@
+//! A class names its base in its header, after `abstract`, `final`,
+//! `singleton` or `pub`, and after `align(N)`. A base of another module
+//! is qualified by the module.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	pub n: int = 1,
+
+	abstract fn area(self) -> int;
+}
+
+abstract class Solid inherits Shape
+{
+	pub depth: int = 2,
+}
+
+final class Box align(16) inherits Solid
+{
+	concrete fn area(self) -> int
+	{
+		return self.n * self.depth * 10;
+	}
+}
+
+pub class Tally
+{
+	pub total: int = 5,
+
+	fn construct(self)
+	{
+		self.total = 7;
+	}
+
+	pub fn twice(self) -> int
+	{
+		return self.total * 2;
+	}
+}
+
+pub class Counted inherits Tally
+{
+	pub more: int = 1,
+}
+
+singleton class Registry inherits Tally
+{
+	mutable label: str = "registry",
+}
+
+class Oops inherits lang.Error
+{
+	pub extra: int = 4,
+}
+
+fn main() -> int
+{
+	let b = Box { n: 3 };
+	let s: *Shape = &b;
+	printf("%d %d %d\n".ptr, s.area() as c_int, b.super.depth as c_int,
+		size_of(Box) as c_int);
+	let c = Counted {};
+	printf("%d %d\n".ptr, c.twice() as c_int, c.more as c_int);
+	printf("%d %s\n".ptr, Registry.get().twice() as c_int,
+		Registry.get().label.ptr);
+	let e = Oops { code: 3, message: "bad" };
+	let base: *lang.Error = &e;
+	printf("%d %s %d\n".ptr, base.code as c_int, e.message.ptr,
+		e.extra as c_int);
+	return 0;
+}

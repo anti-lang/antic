@@ -1864,8 +1864,10 @@ static struct item *member(struct parser *p, const struct item *owner)
 
 /* `inherits` in a class body, where the base stood before it moved to
    the header. The message writes the header the programmer means, with
-   the base as the body named it. */
-static void inherits_in_body(struct parser *p, const struct item *it)
+   the base as the body named it. The base and a comma after it are read
+   and dropped, so the rest of the body parses and reports its own
+   errors. Returns whether a comma followed. */
+static bool inherits_in_body(struct parser *p, const struct item *it)
 {
     const struct token *base = peek_at(p, 1);
     const struct token *dot = peek_at(p, 2);
@@ -1884,6 +1886,12 @@ static void inherits_in_body(struct parser *p, const struct item *it)
              (int)it->name.length, it->name.text, (int)length,
              p->source + base->offset);
     error_here(p, message);
+    next(p);
+    if (accept(p, TOKEN_IDENT) && accept(p, TOKEN_DOT)) {
+        accept(p, TOKEN_IDENT);
+    }
+    p->panic = false;
+    return accept(p, TOKEN_COMMA);
 }
 
 /* Read the functions and constants of a body into it->members. */
@@ -1895,8 +1903,7 @@ static bool members_of(struct parser *p, struct item *it)
         struct item *m;
         if (it->kind == ITEM_CLASS && check(p, TOKEN_INHERITS)) {
             inherits_in_body(p, it);
-            free(list.data);
-            return false;
+            continue;
         }
         m = member(p, it);
         if (m == NULL) {
@@ -2005,9 +2012,10 @@ static struct item *class_item(struct parser *p, struct item *it)
         field.note = doc_before(p, TOKEN_NOTE);
         field.pos = pos_of(peek(p));
         if (check(p, TOKEN_INHERITS)) {
-            inherits_in_body(p, it);
-            free(fields.data);
-            return NULL;
+            if (!inherits_in_body(p, it)) {
+                break;
+            }
+            continue;
         }
         if (accept(p, TOKEN_IMPLEMENTS)) {
             field.form = FIELD_IMPL;

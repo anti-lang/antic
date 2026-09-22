@@ -1,0 +1,2 @@
+inherits_body.anti:14:2: error: inherits belongs in the class header: class Circle inherits Shape
+inherits_body.anti:21:2: error: inherits belongs in the class header: class Oops inherits lang.Error

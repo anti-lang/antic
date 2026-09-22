@@ -1,0 +1,22 @@
+//! The base of a class stands in its header. `inherits` in the body,
+//! where it stood before, is refused with the header it means, for a
+//! base of the module and for one qualified by another module.
+
+import anti.lang;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Circle
+{
+	inherits Shape,
+	pub r: int = 1,
+}
+
+final class Oops
+{
+	pub extra: int = 4,
+	inherits lang.Error,
+}
