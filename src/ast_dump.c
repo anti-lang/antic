@@ -225,7 +225,8 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         text_append(d->out, "here");
         end(d, start, type);
         break;
-    /* The values of the `{expr}` parts follow as children, in order. */
+    /* The values of the `{expr}` parts follow as children, in order, and
+       the allocator of `f"..."(from)` after them. */
     case EXPR_FORMAT:
         text_appendf(d->out, "format_lit %.*s", (int)e->spelling.length,
                      e->spelling.bytes);
@@ -234,6 +235,9 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
             if (e->as.format.parts[i].value != NULL) {
                 dump_expr(d, depth + 1, e->as.format.parts[i].value);
             }
+        }
+        for (i = 0; i < e->as.format.from_count; i++) {
+            dump_expr(d, depth + 1, e->as.format.from[i]);
         }
         break;
     case EXPR_NAME:

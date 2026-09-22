@@ -1,0 +1,168 @@
+//! `f"..."(from)` and `rf"..."(from)` take the memory of their text from
+//! the allocator `from`, and `f"..."` keeps the C library. `Kept`
+//! remembers each block it lends, so the test sees that each text is one
+//! of them and that none is left once they all go back. The allocator is
+//! computed after the values of the literal. `Lender` lends through the
+//! sub-object of an interface, and an `ArenaAllocator` gives every text
+//! back at once.
+import anti.mem;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+/// The most blocks that `Kept` lends.
+const ROOM: int = 8;
+
+/// An allocator over the C library that remembers every block it lends
+/// until the block comes back.
+class Kept inherits mem.Allocator
+{
+	blocks: ?*?*byte = none,
+	pub lent: int = 0,
+	pub live: int = 0,
+
+	/// An allocator with room to remember `ROOM` blocks.
+	pub fn new() -> Kept
+	{
+		return Kept { blocks: alloc(?*byte, ROOM) };
+	}
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let blocks = self.blocks else { return none; };
+		if self.lent == ROOM {
+			return none;
+		}
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		blocks[self.lent] = p;
+		self.lent += 1;
+		self.live += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		let blocks = self.blocks else { return; };
+		let i = 0;
+		while i < self.lent do {
+			if p != none && blocks[i] == p {
+				blocks[i] = none;
+				self.live -= 1;
+				mem.LibcAllocator.get().free(p);
+				return;
+			}
+			i += 1;
+		}
+	}
+
+	/// Whether `p` starts a block that is lent and not back yet.
+	pub fn holds(self, p: ?*byte) -> bool
+	{
+		let blocks = self.blocks else { return false; };
+		let i = 0;
+		while i < self.lent do {
+			if p != none && blocks[i] == p {
+				return true;
+			}
+			i += 1;
+		}
+		return false;
+	}
+
+	/// Give back every block still lent.
+	pub fn free_all(self)
+	{
+		let blocks = self.blocks else { return; };
+		let i = 0;
+		while i < self.lent do {
+			self.free(blocks[i]);
+			i += 1;
+		}
+	}
+
+	fn destruct(self)
+	{
+		free(self.blocks);
+	}
+}
+
+/// An allocator through the sub-object of an interface, which counts
+/// the blocks it lends.
+class Lender
+{
+	implements lending: mem.Allocator,
+
+	pub live: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		self.live += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.live -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// Print `what` and give 7, to show when a value is computed.
+fn step(what: str) -> int
+{
+	printf("%s\n".ptr, what.ptr);
+	return 7;
+}
+
+/// Print that the allocator is computed and give `k`.
+fn pick(k: *Kept) -> *Kept
+{
+	printf("allocator\n".ptr);
+	return k;
+}
+
+fn main() -> int
+{
+	let kept = Kept.new();
+	let n = 42;
+	let name = "pear";
+	let a = f"{name:>6} costs {n:x}"(&kept);
+	let b = rf"C:\{name}"(&kept);
+	let c = f""(&kept);
+	printf("%s|%s|%d\n".ptr, a.ptr, b.ptr, c.len as c_int);
+	printf("kept: %d lent, %d live, texts kept %d\n".ptr,
+		kept.lent as c_int, kept.live as c_int,
+		(kept.holds(a.ptr) && kept.holds(b.ptr) && kept.holds(c.ptr))
+			as c_int);
+
+	let plain = f"{n}";
+	printf("plain: %s, kept %d\n".ptr, plain.ptr,
+		kept.holds(plain.ptr) as c_int);
+	free(plain.ptr);
+
+	let ordered = f#"{step("value")}"#(pick(&kept));
+	printf("ordered: %s\n".ptr, ordered.ptr);
+	kept.free_all();
+	printf("after free_all: %d live\n".ptr, kept.live as c_int);
+
+	let lender = Lender { };
+	let d = f"{n} lent"(&lender);
+	printf("lender: %s, %d live\n".ptr, d.ptr, lender.live as c_int);
+	lender.lending.free(d.ptr);
+	printf("after free: %d live\n".ptr, lender.live as c_int);
+
+	let counting = Lender { };
+	let arena = mem.ArenaAllocator.new(&counting, 1024);
+	let e = f"{n} in an arena"(&arena);
+	printf("arena: %s, %d live\n".ptr, e.ptr, counting.live as c_int);
+	arena.free_all();
+	printf("after free_all: %d live\n".ptr, counting.live as c_int);
+	return 0;
+}

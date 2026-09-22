@@ -2,5 +2,7 @@ exit 0
 kept: 9 lent, 9 live, strings kept 1
 after free_all: 0 live
 failed: none 1, 4 lent, 0 live
+lender: 9 lent, strings kept 1
+after free_all: 0 live
 arena: oak, 1 live
 after free_all: 0 live

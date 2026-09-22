@@ -3,8 +3,9 @@
 //! the memory back through that allocator. `Kept` remembers each block
 //! it lends, so the test sees that the strings of the object are among
 //! them and that none is left once they all go back. A text that fails
-//! gives back what it made. Over an `ArenaAllocator`, `free_all` gives
-//! back every block at once.
+//! gives back what it made. `Lender` lends through the sub-object of an
+//! interface. Over an `ArenaAllocator`, `free_all` gives back every block
+//! at once.
 import anti.mem;
 import anti.text;
 
@@ -86,6 +87,25 @@ class Kept inherits mem.Allocator
 	fn destruct(self)
 	{
 		free(self.blocks);
+	}
+}
+
+/// An allocator through the sub-object of an interface, which hands
+/// every call on to a `Kept`.
+class Lender
+{
+	implements lending: mem.Allocator,
+
+	pub to: *Kept,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		return self.to.alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		self.to.free(p);
 	}
 }
 
@@ -191,6 +211,17 @@ fn main() -> int
 	printf("failed: none %d, %d lent, %d live\n".ptr,
 		(refused == none) as c_int, failed.lent as c_int,
 		failed.live as c_int);
+
+	let behind = Kept.new();
+	let lender = Lender { to: &behind };
+	let lent = Object.deserialize(input, &lender);
+	if lent == none || !(lent is *Tree) {
+		return 5;
+	}
+	printf("lender: %d lent, strings kept %d\n".ptr, behind.lent as c_int,
+		strings_kept(lent as *Tree, &behind) as c_int);
+	behind.free_all();
+	printf("after free_all: %d live\n".ptr, behind.live as c_int);
 
 	let counting = Counting { };
 	let arena = mem.ArenaAllocator.new(&counting, 4096);

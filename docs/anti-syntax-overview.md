@@ -90,7 +90,7 @@ Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of
 
 ## Literals
 
-Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. Bytes in hex `x"00 AB CC"`. The prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
+Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. `f"..."(from)` takes the memory of its text from the `anti.mem.Allocator` `from`. Bytes in hex `x"00 AB CC"`. The prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
 
 ```anti
 let a = 1_000_000;
@@ -100,11 +100,12 @@ let d = r#"a "quoted" string"#;
 let e = b"\x00\x01";
 let g = f"{name:>10} costs {price:8.2f}";
 let h = rf"C:\tools\{name}";
+let t = f"{name} at {price}"(&arena);
 let i = x"00 AB CC";
 let x: i8 = -128;
 ```
 
-Built: `f"..."` and `rf"..."`.
+Built: `f"..."` and `rf"..."`, each with an allocator as well.
 
 ## Variables and constants
 
@@ -575,7 +576,7 @@ class Renderer
 
 Six standard interfaces ship with defaults: `Logger`, `Clock`, `Random`, `FileSystem`, `Allocator`, `Config`. Standard interfaces for services come with a reference implementation: `anti.db` with SQLite, `anti.http`, `anti.serialize`, `anti.crypto`.
 
-Built: `anti.mem.Allocator` with `alloc(size, align)` and `free(p)`, its default `LibcAllocator` over the C library, and `ArenaAllocator`, which hands out memory from blocks and gives them all back at once. `Object.deserialize` takes one. The language's `alloc` and `free` stay bound to the C library. Not built yet: `inject`, the manifest, the run-time replacement, the other five standard interfaces, the containers of `anti.collection` that take an `Allocator`, and the interfaces for services.
+Built: `anti.mem.Allocator` with `alloc(size, align)` and `free(p)`, its default `LibcAllocator` over the C library, and `ArenaAllocator`, which hands out memory from blocks and gives them all back at once. `Object.deserialize` and `f"..."(from)` take one. The language's `alloc` and `free` stay bound to the C library. Not built yet: `inject`, the manifest, the run-time replacement, the other five standard interfaces, the containers of `anti.collection` that take an `Allocator`, and the interfaces for services.
 
 ## Plugins
 

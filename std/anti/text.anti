@@ -8,6 +8,7 @@
 //! and may fail, and every other function of the module cannot.
 
 import anti.lang;
+import anti.mem;
 
 extern fn memcmp(a: ?*byte, b: ?*byte, count: c_size_t) -> c_int;
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
@@ -122,6 +123,31 @@ pub class Builder
 	pub fn take(self) -> str
 	{
 		return anti_rt_builder_take(self);
+	}
+
+	/// The bytes collected so far, in memory of `from`, which now belong
+	/// to the caller.
+	///
+	/// `from.free(s.ptr)` gives the memory back, and so does anything
+	/// that gives back every block of `from` at once. The text keeps its
+	/// NUL. When `from` gives no memory, the text is the empty literal,
+	/// as `take` gives it when the C library has none. The builder is
+	/// empty afterwards and may collect again. `f"..."(from)` ends with
+	/// this call.
+	pub fn take_in(self, from: *mem.Allocator) -> str
+	{
+		let collected = anti_rt_builder_text(self);
+		let made = "";
+		let room = from.alloc(collected.len + 1, 1);
+		if room != none {
+			memcpy(room, collected.ptr, (collected.len + 1) as c_size_t);
+			made = anti_rt_text_slice(room, collected.len);
+		}
+		free(self.room);
+		self.room = none;
+		self.length = 0;
+		self.capacity = 0;
+		return made;
 	}
 
 	/// Write `value` in base `radix` into a field `width` characters
