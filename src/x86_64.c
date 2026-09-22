@@ -1989,8 +1989,9 @@ static void compare_lanes(struct selector *s, enum ir_op op, uint8_t a,
 {
     bool is_float = select_is_float(sh->lane);
     unsigned n = sh->lane_bytes;
-    bool swap = op == IR_FGT || op == IR_FGE || op == IR_SLT || op == IR_SLE ||
-                op == IR_SGE;
+    /* pcmpgt gives a > b, so a < b swaps the operands. a >= b is the
+       negation of b > a and a <= b the negation of a > b. */
+    bool swap = op == IR_FGT || op == IR_FGE || op == IR_SLT || op == IR_SGE;
     bool invert = op == IR_NE || op == IR_SGE || op == IR_SLE;
     enum x64_op code;
     int64_t predicate = 0;

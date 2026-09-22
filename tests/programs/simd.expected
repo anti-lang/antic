@@ -7,6 +7,7 @@ neg -1 -2 -3 -4
 lt 1 0 0 0
 ge 0 1 1 1
 eq 0 1 0 0
+le 1100 ne 1011
 any 1 all 0 all 1 any 0
 select 1 2 2 2
 sum 10 min 1 max 4 dot 20
@@ -39,8 +40,10 @@ ineg -1 2 -3 4
 ishl 4 -8 12 -16
 ishr 0 -1 1 -2
 ilt 1 1 0 1
+ile 1111 ige 0010 ine 1101
 isum -2 imin -4 imax 3 idot -6
 wrap -2147483648 -2147483648 -2147483648 -2147483648
+ule 1010 uge 0111
 ult 1 0 0 0 umax 4294967295 umin 1 ushr 0 2147483647 1 1
 i64 9000000000000000000 25 sum 2999999995 lt 0 1
 i16 24464 max 24464

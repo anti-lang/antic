@@ -94,6 +94,8 @@ fn floats()
 	show4("neg", -a);
 	let lt = a < b;
 	let ge = a >= b;
+	let le = a <= b;
+	let ne = a != b;
 	let eq = a == b;
 	printf("lt %d %d %d %d\n".ptr, lt.x as c_int, lt.y as c_int, lt.z as c_int,
 	       lt.w as c_int);
@@ -101,6 +103,9 @@ fn floats()
 	       ge.w as c_int);
 	printf("eq %d %d %d %d\n".ptr, eq.x as c_int, eq.y as c_int, eq.z as c_int,
 	       eq.w as c_int);
+	printf("le %d%d%d%d ne %d%d%d%d\n".ptr, le.x as c_int, le.y as c_int,
+	       le.z as c_int, le.w as c_int, ne.x as c_int, ne.y as c_int,
+	       ne.z as c_int, ne.w as c_int);
 	printf("any %d all %d all %d any %d\n".ptr, simd.any(lt) as c_int,
 	       simd.all(lt) as c_int, simd.all(a == a) as c_int,
 	       simd.any(a > a + b) as c_int);
@@ -206,8 +211,15 @@ fn integers()
 	showi("ishl", i << I32x4.splat(2));
 	showi("ishr", i >> I32x4.splat(1));
 	let lt = i < j;
+	let le = i <= j;
+	let ge = i >= j;
+	let ne = i != j;
 	printf("ilt %d %d %d %d\n".ptr, lt.a as c_int, lt.b as c_int, lt.c as c_int,
 	       lt.d as c_int);
+	printf("ile %d%d%d%d ige %d%d%d%d ine %d%d%d%d\n".ptr, le.a as c_int,
+	       le.b as c_int, le.c as c_int, le.d as c_int, ge.a as c_int,
+	       ge.b as c_int, ge.c as c_int, ge.d as c_int, ne.a as c_int,
+	       ne.b as c_int, ne.c as c_int, ne.d as c_int);
 	printf("isum %d imin %d imax %d idot %d\n".ptr, i.sum() as c_int,
 	       i.min() as c_int, i.max() as c_int, i.dot(j) as c_int);
 	showi("wrap", I32x4.splat(iopaque(2147483647) as i32) + I32x4.splat(1));
@@ -215,6 +227,11 @@ fn integers()
 	                c: iopaque(2) as u32, d: iopaque(3) as u32 };
 	let two = U32x4.splat(2);
 	let ult = u < two;
+	let ule = u <= two;
+	let uge = u >= two;
+	printf("ule %d%d%d%d uge %d%d%d%d\n".ptr, ule.a as c_int, ule.b as c_int,
+	       ule.c as c_int, ule.d as c_int, uge.a as c_int, uge.b as c_int,
+	       uge.c as c_int, uge.d as c_int);
 	let ushr = u >> U32x4.splat(1);
 	printf("ult %d %d %d %d umax %u umin %u ushr %u %u %u %u\n".ptr,
 	       ult.a as c_int, ult.b as c_int, ult.c as c_int, ult.d as c_int,
