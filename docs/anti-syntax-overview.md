@@ -569,7 +569,7 @@ class Renderer
 
 Six standard interfaces ship with defaults: `Logger`, `Clock`, `Random`, `FileSystem`, `Allocator`, `Config`. Standard interfaces for services come with a reference implementation: `anti.db` with SQLite, `anti.http`, `anti.serialize`, `anti.crypto`.
 
-Not built yet.
+Built: `anti.mem.Allocator` with `alloc(size, align)` and `free(p)`, its default `LibcAllocator` over the C library, and `ArenaAllocator`, which hands out memory from blocks and gives them all back at once. The language's `alloc` and `free` stay bound to the C library. Not built yet: `inject`, the manifest, the run-time replacement, the other five standard interfaces, the containers of `anti.collection` that take an `Allocator`, and the interfaces for services.
 
 ## Plugins
 

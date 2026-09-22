@@ -1,0 +1,65 @@
+//! The allocator over the C library gives memory at every alignment that
+//! is a power of two, up to a page, and the bytes it gives hold what the
+//! program writes. A size below zero and an alignment that is no power
+//! of two give `none`, and a size of zero gives memory that `free`
+//! takes. `LibcAllocator.get()` is one object, which a program holds as
+//! `*mem.Allocator`.
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A pointer read as a number, for the test of its alignment.
+union Address
+{
+	p: ?*byte,
+	n: u64,
+}
+
+fn main() -> int
+{
+	if mem.LibcAllocator.get() != mem.LibcAllocator.get() {
+		return 1;
+	}
+	let heap: *mem.Allocator = mem.LibcAllocator.get();
+	let align = 1;
+	while align <= 4096 do {
+		let p = heap.alloc(100, align) else { return 2; };
+		let at = Address { p: p };
+		if at.n % (align as u64) != 0 {
+			return 3;
+		}
+		let i = 0;
+		while i < 100 do {
+			p[i] = i as byte;
+			i += 1;
+		}
+		i = 0;
+		while i < 100 do {
+			if p[i] != i as byte {
+				return 4;
+			}
+			i += 1;
+		}
+		heap.free(p);
+		printf("%d\n".ptr, align as c_int);
+		align *= 2;
+	}
+
+	if heap.alloc(-1, 8) != none {
+		return 5;
+	}
+	if heap.alloc(8, 0) != none {
+		return 6;
+	}
+	if heap.alloc(8, 3) != none {
+		return 7;
+	}
+	if heap.alloc(8, -16) != none {
+		return 8;
+	}
+	let empty = heap.alloc(0, 8) else { return 9; };
+	heap.free(empty);
+	heap.free(none);
+	printf("done\n".ptr);
+	return 0;
+}

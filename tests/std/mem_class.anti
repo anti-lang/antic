@@ -1,0 +1,156 @@
+//! A class that takes an allocator makes its memory with it and gives
+//! the memory back to it. `Stack` keeps integers in room it asks of the
+//! allocator it was given, grows by asking for more, and gives the room
+//! back in `destruct`. It runs over the C library, over a counting
+//! allocator, which sees every block come back, and over an
+//! `ArenaAllocator`.
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator that counts the blocks it lends and hands every call on
+/// to the C library.
+class Counting inherits mem.Allocator
+{
+	pub live: int = 0,
+	pub taken: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		self.live += 1;
+		self.taken += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.live -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A stack of integers in memory of the allocator it was made with.
+class Stack
+{
+	from: *mem.Allocator,
+	room: ?*byte = none,
+	count: int = 0,
+	capacity: int = 0,
+
+	/// An empty stack whose memory comes from `from`.
+	pub fn new(from: *mem.Allocator) -> Stack
+	{
+		return Stack { from: from };
+	}
+
+	fn destruct(self)
+	{
+		self.from.free(self.room);
+	}
+
+	/// Add `n` on top, or give `false` when the allocator has no room.
+	pub fn push(self, n: int) -> bool
+	{
+		if self.count == self.capacity {
+			let wanted = self.capacity * 2;
+			if wanted == 0 {
+				wanted = 8;
+			}
+			let raw = self.from.alloc(wanted * size_of(int), size_of(int))
+				else { return false; };
+			let next = raw as *int;
+			let i = 0;
+			while i < self.count do {
+				next[i] = self.at(i);
+				i += 1;
+			}
+			self.from.free(self.room);
+			self.room = raw;
+			self.capacity = wanted;
+		}
+		let room = self.room else { return false; };
+		let ints = room as *int;
+		ints[self.count] = n;
+		self.count += 1;
+		return true;
+	}
+
+	/// The integer at `index`, counted from the bottom.
+	pub fn at(self, index: int) -> int
+	{
+		let room = self.room else { return 0; };
+		let ints = room as *int;
+		return ints[index];
+	}
+
+	/// The sum of every integer on the stack.
+	pub fn sum(self) -> int
+	{
+		let total = 0;
+		let i = 0;
+		while i < self.count do {
+			total += self.at(i);
+			i += 1;
+		}
+		return total;
+	}
+}
+
+/// Push the numbers below 1000 onto a stack over `from` and give their
+/// sum, or -1 when a push fails. The stack ends at the return.
+fn thousand(from: *mem.Allocator) -> int
+{
+	let s = Stack.new(from);
+	let i = 0;
+	while i < 1000 do {
+		if !s.push(i) {
+			return -1;
+		}
+		i += 1;
+	}
+	return s.sum();
+}
+
+/// The stack over a counting allocator, which sees it grow by doubling,
+/// each time giving back the room it leaves. The stack ends at the
+/// return, and its `destruct` gives back the last room.
+fn counted(counting: *Counting) -> bool
+{
+	let s = Stack.new(counting);
+	let i = 0;
+	while i < 1000 do {
+		if !s.push(i) {
+			return false;
+		}
+		i += 1;
+	}
+	printf("counting: %d, %d blocks taken, %d live\n".ptr,
+		s.sum() as c_int, counting.taken as c_int, counting.live as c_int);
+	return true;
+}
+
+fn main() -> int
+{
+	printf("libc: %d\n".ptr, thousand(mem.LibcAllocator.get()) as c_int);
+
+	let counting = alloc Counting { };
+	if !counted(counting) {
+		return 1;
+	}
+	printf("after the stack: %d live\n".ptr, counting.live as c_int);
+
+	let arena = mem.ArenaAllocator.new(counting, 1024);
+	printf("arena: %d\n".ptr, thousand(&arena) as c_int);
+	if counting.live == 0 {
+		return 2;
+	}
+	arena.free_all();
+	printf("after free_all: %d live\n".ptr, counting.live as c_int);
+	delete(counting);
+	return 0;
+}

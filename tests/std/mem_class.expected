@@ -1,0 +1,6 @@
+exit 0
+libc: 499500
+counting: 499500, 8 blocks taken, 1 live
+after the stack: 0 live
+arena: 499500
+after free_all: 0 live

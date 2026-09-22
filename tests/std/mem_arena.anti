@@ -1,0 +1,173 @@
+//! `ArenaAllocator` hands out memory from blocks it takes from another
+//! allocator and gives every block back at once. Many small requests
+//! share a block, and no two of them overlap. `free` of one of them
+//! gives nothing back. A request larger than a block, and an alignment
+//! above the one the blocks have, take a block of their own. The
+//! allocator stays usable after `free_all`, and its `destruct` gives
+//! back what is left.
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A pointer read as a number, for the test of its alignment.
+union Address
+{
+	p: ?*byte,
+	n: u64,
+}
+
+/// An allocator that counts the blocks it lends and hands every call on
+/// to the C library.
+class Counting inherits mem.Allocator
+{
+	pub live: int = 0,
+	pub taken: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		self.live += 1;
+		self.taken += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.live -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+fn aligned(p: *byte, align: int) -> bool
+{
+	let at = Address { p: p };
+	return at.n % (align as u64) == 0;
+}
+
+/// Fill `n` bytes at `p` with `value`.
+fn fill(p: *byte, n: int, value: byte)
+{
+	let i = 0;
+	while i < n do {
+		p[i] = value;
+		i += 1;
+	}
+}
+
+/// Whether the `n` bytes at `p` all hold `value`.
+fn holds(p: *byte, n: int, value: byte) -> bool
+{
+	let i = 0;
+	while i < n do {
+		if p[i] != value {
+			return false;
+		}
+		i += 1;
+	}
+	return true;
+}
+
+/// The requests of one `ArenaAllocator`, which its `destruct` ends at
+/// the return.
+fn run(blocks: *Counting) -> int
+{
+	let arena = mem.ArenaAllocator.new(blocks, 256);
+	let a: *mem.Allocator = &arena;
+	if blocks.live != 0 {
+		return 1;
+	}
+
+	let slots = alloc(*byte, 100) else { return 2; };
+	let i = 0;
+	while i < 100 do {
+		let p = a.alloc(24, 8) else { return 3; };
+		if !aligned(p, 8) {
+			return 4;
+		}
+		fill(p, 24, i as byte);
+		slots[i] = p;
+		i += 1;
+	}
+	i = 0;
+	while i < 100 do {
+		if !holds(slots[i], 24, i as byte) {
+			return 5;
+		}
+		i += 1;
+	}
+	/* 2400 bytes need ten blocks of 256 at the least, and blocks that
+	   ten requests share stay far below one block per request. */
+	let shared = blocks.live;
+	if shared < 10 || shared > 20 {
+		return 6;
+	}
+	a.free(slots[0]);
+	if blocks.live != shared {
+		return 7;
+	}
+	free(slots);
+
+	let big = a.alloc(1000, 8) else { return 8; };
+	fill(big, 1000, 7);
+	if blocks.live != shared + 1 || !holds(big, 1000, 7) {
+		return 9;
+	}
+	let wide = a.alloc(64, 64) else { return 10; };
+	let page = a.alloc(100, 4096) else { return 11; };
+	if !aligned(wide, 64) || !aligned(page, 4096) {
+		return 12;
+	}
+	let small = a.alloc(1, 1) else { return 13; };
+	small[0] = 1;
+	let empty = a.alloc(0, 8) else { return 14; };
+	if !aligned(empty, 8) {
+		return 15;
+	}
+	if a.alloc(-1, 8) != none || a.alloc(8, 3) != none ||
+		a.alloc(8, 0) != none {
+		return 16;
+	}
+	/* The request of 1000 bytes, the one at 64 and the one at 4096 each
+	   took a block of its own. */
+	if blocks.live < shared + 3 {
+		return 17;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let blocks = alloc Counting { };
+	let status = run(blocks);
+	if status != 0 {
+		return status;
+	}
+	printf("after destruct: %d\n".ptr, blocks.live as c_int);
+
+	let arena = mem.ArenaAllocator.new(blocks, 128);
+	let a: *mem.Allocator = &arena;
+	let i = 0;
+	while i < 50 do {
+		let p = a.alloc(40, 16) else { return 20; };
+		if !aligned(p, 16) {
+			return 21;
+		}
+		i += 1;
+	}
+	if blocks.live < 2 {
+		return 23;
+	}
+	arena.free_all();
+	printf("after free_all: %d\n".ptr, blocks.live as c_int);
+	let again = a.alloc(40, 16) else { return 22; };
+	fill(again, 40, 3);
+	printf("reused: %d\n".ptr, blocks.live as c_int);
+	arena.free_all();
+	printf("end: %d\n".ptr, blocks.live as c_int);
+	delete(blocks);
+	return 0;
+}

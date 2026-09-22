@@ -121,6 +121,14 @@ int64_t anti_rt_wall(void);
    not positive. */
 void anti_rt_sleep(int64_t nanoseconds);
 
+/* size bytes of the C library at a multiple of align, a power of two, or
+   NULL. A size below zero and an align that is no power of two give
+   NULL. In rt/mem.c. */
+void *anti_rt_mem_alloc(int64_t size, int64_t align);
+
+/* Release what anti_rt_mem_alloc gave. NULL does nothing. */
+void anti_rt_mem_free(void *p);
+
 /* The C side of anti.fs, in rt/fs.c. A path is the bytes of a str and
    their count. Every function reports a failure through errno. */
 
