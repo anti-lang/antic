@@ -1,12 +1,12 @@
 //! A document of the TOML subset gives its keys in order and finds a value
-//! under a dotted path. It numbers the entries of a repeated table, and a
-//! value that is no integer gives the fallback of `int_of`. `try`
-//! forwards the error of `read`.
+//! under a dotted path. It numbers the entries of a repeated table and the
+//! elements of an array, and a value that is no integer gives the fallback
+//! of `int_of`. `try` forwards the error of `read`.
 import anti.io;
 import anti.lang;
 import anti.toml;
 
-const SOURCE: str = "# a comment\nname = \"antic\"\nthreads = 4\nquiet = false\n\n[limits]\ndepth = 32\n\n[[sink]]\nkind = \"stderr\"\n\n[[sink]]\nkind = \"file\"\npath = \"/tmp/anti.log\"\n";
+const SOURCE: str = "# a comment\nname = \"antic\"\nthreads = 4\nquiet = false\nhosts = [\n\t'one', # the first\n\t'two',\n]\nempty = []\n\n[limits]\ndepth = 32\n\n[[sink]]\nkind = \"stderr\"\n\n[[sink]]\nkind = \"file\"\npath = \"/tmp/anti.log\"\n";
 
 /// The depth of the limits `source` names, forwarding the error of
 /// `read`.
@@ -28,6 +28,8 @@ fn main() -> int
 		i += 1;
 	}
 
+	io.println(doc.text_of("hosts.1", "none"));
+	io.println(doc.text_of("empty.0", "none"));
 	io.println(doc.text_of("sink.1.path", "none"));
 	io.println(doc.text_of("sink.2.path", "none"));
 	if doc.int_of("limits.depth", 0) != 32 {

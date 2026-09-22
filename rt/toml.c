@@ -179,30 +179,62 @@ static void read_header(struct reader *r, struct anti_toml *doc)
     }
 }
 
-/* The value that follows `=`, with the quotes of a string removed. */
-static void read_value(struct reader *r, const char **value, int64_t *length)
+/* The bytes in quotes at the read position, without them. */
+static void read_quoted(struct reader *r, const char **text, int64_t *length)
+{
+    int quote = peek(r);
+    int64_t start;
+
+    r->pos++;
+    start = r->pos;
+    while (!at_end(r) && peek(r) != quote && peek(r) != '\n') {
+        r->pos++;
+    }
+    if (peek(r) != quote) {
+        r->failed = 1;
+        return;
+    }
+    *text = (const char *)r->bytes + start;
+    *length = r->pos - start;
+    r->pos++;
+}
+
+/* The key before `=`, bare or in quotes. A quoted key carries the dots
+   of an interface name, so the path it writes holds them as well. */
+static void read_key(struct reader *r, const char **key, int64_t *length)
+{
+    int64_t start;
+
+    if (peek(r) == '"' || peek(r) == '\'') {
+        read_quoted(r, key, length);
+        return;
+    }
+    start = r->pos;
+    while (!at_end(r) && is_bare(peek(r))) {
+        r->pos++;
+    }
+    *key = (const char *)r->bytes + start;
+    *length = r->pos - start;
+    if (*length == 0) {
+        r->failed = 1;
+    }
+}
+
+/* One value, with the quotes of a string removed. Inside an array a
+   comma and the closing bracket end it as well. */
+static void read_value(struct reader *r, int in_array, const char **value,
+                       int64_t *length)
 {
     int64_t start;
 
     skip_spaces(r);
     if (peek(r) == '"' || peek(r) == '\'') {
-        int quote = peek(r);
-        r->pos++;
-        start = r->pos;
-        while (!at_end(r) && peek(r) != quote && peek(r) != '\n') {
-            r->pos++;
-        }
-        if (peek(r) != quote) {
-            r->failed = 1;
-            return;
-        }
-        *value = (const char *)r->bytes + start;
-        *length = r->pos - start;
-        r->pos++;
+        read_quoted(r, value, length);
         return;
     }
     start = r->pos;
-    while (!at_end(r) && peek(r) != '\n' && peek(r) != '#') {
+    while (!at_end(r) && peek(r) != '\n' && peek(r) != '#' &&
+           (!in_array || (peek(r) != ',' && peek(r) != ']'))) {
         r->pos++;
     }
     *length = r->pos - start;
@@ -217,21 +249,60 @@ static void read_value(struct reader *r, const char **value, int64_t *length)
     }
 }
 
+/* The elements of an array, as the keys path.0, path.1, path.2. The
+   array runs over lines, and a comma after its last element is allowed.
+   An array of arrays is outside the subset. */
+static void read_array(struct reader *r, struct anti_toml *doc,
+                       const char *path)
+{
+    int64_t index = 0;
+
+    r->pos++;
+    while (!r->failed) {
+        char key[320];
+        const char *value = NULL;
+        int64_t value_length = 0;
+        int length;
+        skip_blank(r);
+        if (peek(r) == ']') {
+            r->pos++;
+            return;
+        }
+        if (at_end(r) || peek(r) == '[') {
+            r->failed = 1;
+            return;
+        }
+        read_value(r, 1, &value, &value_length);
+        if (r->failed) {
+            return;
+        }
+        length = snprintf(key, sizeof key, "%s.%lld", path, (long long)index);
+        if (length <= 0 || (size_t)length >= sizeof key) {
+            r->failed = 1;
+            return;
+        }
+        add(doc, r, key, length, value, value_length);
+        index++;
+        skip_blank(r);
+        if (peek(r) == ',') {
+            r->pos++;
+        } else if (peek(r) != ']') {
+            r->failed = 1;
+        }
+    }
+}
+
 static void read_pair(struct reader *r, struct anti_toml *doc)
 {
     char path[320];
+    const char *key = NULL;
     const char *value = NULL;
     int64_t value_length = 0;
-    int64_t start = r->pos;
-    int64_t length;
+    int64_t length = 0;
     int written;
 
-    while (!at_end(r) && is_bare(peek(r))) {
-        r->pos++;
-    }
-    length = r->pos - start;
-    if (length <= 0) {
-        r->failed = 1;
+    read_key(r, &key, &length);
+    if (r->failed) {
         return;
     }
     skip_spaces(r);
@@ -240,17 +311,21 @@ static void read_pair(struct reader *r, struct anti_toml *doc)
         return;
     }
     r->pos++;
-    read_value(r, &value, &value_length);
-    if (r->failed) {
-        return;
-    }
     written = r->table_length == 0
-                  ? snprintf(path, sizeof path, "%.*s", (int)length,
-                             r->bytes + start)
+                  ? snprintf(path, sizeof path, "%.*s", (int)length, key)
                   : snprintf(path, sizeof path, "%s.%.*s", r->table,
-                             (int)length, r->bytes + start);
+                             (int)length, key);
     if (written <= 0 || (size_t)written >= sizeof path) {
         r->failed = 1;
+        return;
+    }
+    skip_spaces(r);
+    if (peek(r) == '[') {
+        read_array(r, doc, path);
+        return;
+    }
+    read_value(r, 0, &value, &value_length);
+    if (r->failed) {
         return;
     }
     add(doc, r, path, written, value, value_length);
@@ -275,7 +350,7 @@ struct anti_toml *anti_rt_toml_read(const unsigned char *bytes, int64_t len)
         }
         if (peek(&r) == '[') {
             read_header(&r, doc);
-        } else if (is_bare(peek(&r))) {
+        } else if (is_bare(peek(&r)) || peek(&r) == '"' || peek(&r) == '\'') {
             read_pair(&r, doc);
         } else {
             r.failed = 1;
