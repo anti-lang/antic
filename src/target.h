@@ -19,6 +19,11 @@ enum { MACOS_MIN_MAJOR = 11, MACOS_MIN_MINOR = 0 };
    its descriptor and its ancestors under this C prefix. */
 #define RUNTIME_ROOT "anti_lang_Object_"
 
+/* DESIGN: the slot of an injectable interface is one global per
+   interface under this module, named by the path of the interface. No
+   Anti module may be called `anti.inject`, so the two never meet. */
+#define INJECT_MODULE "anti.inject"
+
 enum target {
     TARGET_LINUX_X86_64,
     TARGET_LINUX_ARM64,

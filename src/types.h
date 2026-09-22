@@ -77,6 +77,12 @@ struct struct_field {
     bool transient;                 /* `transient`: derived state */
     bool atomic;                    /* `atomic`: read and written by calls */
     bool writable;                  /* `mutable`: a singleton field to write. */
+    /* DESIGN: `inject` fills the field from the provider of its
+       interface before `construct` runs. No literal writes it, and the
+       class never builds what it points at. `inject final` keeps the
+       run-time configuration from replacing the provider. */
+    bool injected;
+    bool inject_final;
     const struct expr *value;       /* a field default or an enum value */
     /* DESIGN: the value of a field default, which the checker evaluates.
        A library file carries it, so a module that builds a class of

@@ -1253,6 +1253,500 @@ static void write_slots(struct whole *w, struct ir_module *m,
     free(slots);
 }
 
+/* DESIGN: `inject name: *Interface` fills a field from the provider of
+   its interface before `construct` runs. The program holds one slot per
+   interface, a pointer that holds the provider, and every site calls
+   through it. This pass runs where the program is whole, so it sees
+   every class of every module, every interface they inject and every
+   function a provider may name. An interface the build named no
+   provider for is refused here, which is the link-time error the
+   specification asks for. */
+struct injectable {
+    const char *interface;          /* the path of the abstract class */
+    const char *module;             /* the class that needs it */
+    const char *name;
+    const char *field;
+    uint32_t descriptor;            /* the interface's descriptor */
+    bool final;                     /* an `inject final` field names it */
+    uint32_t slot;                  /* the global that holds the provider */
+    uint32_t provider;              /* the function the slot points at */
+};
+
+/* The injectable interface of path, added to the list when it is new. */
+static struct injectable *injectable_of(struct injectable *list, size_t *count,
+                                        const char *path)
+{
+    size_t i;
+
+    for (i = 0; i < *count; i++) {
+        if (strcmp(list[i].interface, path) == 0) {
+            return &list[i];
+        }
+    }
+    memset(&list[*count], 0, sizeof list[*count]);
+    list[*count].interface = path;
+    list[*count].slot = IR_NO_INDEX;
+    list[*count].provider = IR_NO_INDEX;
+    return &list[(*count)++];
+}
+
+/* The `inject` fields of every class of the program, one entry per
+   interface. The first class that names an interface is the one an
+   error names, and `inject final` anywhere makes the slot final: one
+   slot serves every field of the interface, so a replacement that one
+   field refuses is refused for all. */
+static size_t collect_injectables(const struct ir_module *m,
+                                  struct injectable *list)
+{
+    size_t count = 0;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < m->class_count; i++) {
+        const struct ir_class *c = m->classes[i];
+        for (j = 0; j < c->inject_count; j++) {
+            struct injectable *in =
+                injectable_of(list, &count, c->injects[j].interface);
+            if (in->module == NULL) {
+                in->module = c->module;
+                in->name = c->name;
+                in->field = c->injects[j].field;
+                in->descriptor = c->injects[j].descriptor;
+            }
+            in->final = in->final || c->injects[j].final;
+        }
+    }
+    return count;
+}
+
+/* The slot of the interface, which lowering wrote where a module
+   injects it. A program whose only injection came from a library file
+   whose globals the reader dropped has none, and the pass adds it. */
+static uint32_t slot_global(struct ir_module *m, const char *interface)
+{
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->module != NULL &&
+            strcmp(m->globals[i]->module, INJECT_MODULE) == 0 &&
+            strcmp(m->globals[i]->name, interface) == 0) {
+            return (uint32_t)i;
+        }
+    }
+    return ir_global_add(m, INJECT_MODULE, interface, NULL, 0, 1)->index;
+}
+
+/* The provider the build named for the interface, or NULL. */
+static const char *provider_text(const struct whole_options *o,
+                                 const char *interface)
+{
+    size_t length = strlen(interface);
+    size_t i;
+
+    for (i = 0; i < o->inject_count; i++) {
+        if (strncmp(o->inject[i], interface, length) == 0 &&
+            o->inject[i][length] == '=') {
+            return o->inject[i] + length + 1;
+        }
+    }
+    return NULL;
+}
+
+/* The function of the program that path names. A provider is written as
+   one path, and the module of a function holds dots as its name may, so
+   every split of the path at a dot is tried. Returns IR_NO_INDEX when
+   the program holds none, and sets ambiguous when two answer. */
+static uint32_t function_named(const struct ir_module *m, const char *path,
+                               bool *ambiguous)
+{
+    uint32_t found = IR_NO_INDEX;
+    const char *dot;
+    size_t i;
+
+    for (dot = strchr(path, '.'); dot != NULL; dot = strchr(dot + 1, '.')) {
+        size_t length = (size_t)(dot - path);
+        for (i = 0; i < m->function_count; i++) {
+            const struct ir_function *f = m->functions[i];
+            if (f->module == NULL || strlen(f->module) != length ||
+                strncmp(f->module, path, length) != 0 ||
+                strcmp(f->name, dot + 1) != 0) {
+                continue;
+            }
+            *ambiguous = *ambiguous || (found != IR_NO_INDEX &&
+                                        found != (uint32_t)i);
+            found = (uint32_t)i;
+        }
+    }
+    return found;
+}
+
+/* The class record whose module and name the function belongs to: the
+   part of a name before its last dot, which is `C` of `C.get`. Returns
+   IR_NO_INDEX for a module function. */
+static uint32_t class_of_function(const struct ir_module *m,
+                                  uint32_t function)
+{
+    const struct ir_function *f = m->functions[function];
+    const char *dot = strrchr(f->name, '.');
+    size_t length;
+    size_t i;
+
+    if (dot == NULL || f->module == NULL) {
+        return IR_NO_INDEX;
+    }
+    length = (size_t)(dot - f->name);
+    for (i = 0; i < m->class_count; i++) {
+        const struct ir_class *c = m->classes[i];
+        if (strcmp(c->module, f->module) == 0 && strlen(c->name) == length &&
+            strncmp(c->name, f->name, length) == 0) {
+            return (uint32_t)i;
+        }
+    }
+    return IR_NO_INDEX;
+}
+
+/* The symbolic offset of the interface inside the class, IR_NO_INDEX
+   when the class is no such interface. A class at or below the
+   interface holds it at offset 0, because a base is field 0 of the
+   class below it. An interface it implements is a sub-object at the
+   offset of its field. */
+#define INJECT_AT_ZERO (IR_NO_INDEX - 1)
+
+static uint32_t interface_offset(struct whole *w, struct ir_module *m,
+                                 uint32_t record, uint32_t descriptor)
+{
+    const struct ir_class *c = m->classes[record];
+    size_t i;
+
+    if (at_or_below(w, record, class_of(w, descriptor))) {
+        return INJECT_AT_ZERO;
+    }
+    for (i = 0; i < c->subtable_count; i++) {
+        if (c->subtables[i].interface == descriptor) {
+            return ir_sym_offset_of(m, c->subtables[i].agg,
+                                    c->subtables[i].field);
+        }
+    }
+    return IR_NO_INDEX;
+}
+
+/* A provider that gives a pointer to the class calls that provider and
+   moves the pointer to the interface's sub-object. The slot then holds
+   one signature, `fn() -> *Interface`, whatever the provider gives. */
+static uint32_t write_provider_thunk(struct ir_module *m, uint32_t provider,
+                                     uint32_t offset, const char *interface)
+{
+    struct ir_function *f;
+    struct ir_block *b;
+    char name[256];
+    uint32_t call;
+    uint32_t at;
+
+    if (strlen(interface) + 16 > sizeof name) {
+        return IR_NO_INDEX;
+    }
+    snprintf(name, sizeof name, "provider.%s", interface);
+    f = ir_function_add(m, "anti.rt", name, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    call = ir_call(f, b, IR_PTR, ir_func_op(m->functions[provider]), NULL, 0);
+    at = ir_ptradd(f, b, ir_temp_op(f, call), ir_sym_operand(m, offset));
+    ir_ret(f, b, IR_PTR, ir_temp_op(f, at));
+    return f->index;
+}
+
+/* Resolve the provider of one interface and fill its slot. */
+static void resolve_provider(struct whole *w, struct ir_module *m,
+                             const struct whole_options *o,
+                             struct injectable *in, struct text *errors)
+{
+    static const char *const slot_names[] = {"provider"};
+    static const enum ir_type slot_types[] = {IR_PTR};
+    const char *text = provider_text(o, in->interface);
+    bool ambiguous = false;
+    uint32_t function;
+    uint32_t record;
+    uint32_t agg;
+    struct ir_const *value;
+    struct ir_global *g;
+
+    if (text == NULL) {
+        text_appendf(errors, "`%s` has no provider, and `%s.%s` injects it "
+                             "as `%s`. Name one under `[inject]` of the "
+                             "manifest\n",
+                     in->interface, in->module, in->name, in->field);
+        return;
+    }
+    function = function_named(m, text, &ambiguous);
+    if (function == IR_NO_INDEX) {
+        text_appendf(errors, "the provider `%s` of `%s` names no function of "
+                             "the program\n", text, in->interface);
+        return;
+    }
+    if (ambiguous) {
+        text_appendf(errors, "the provider `%s` of `%s` names more than one "
+                             "function of the program\n", text,
+                     in->interface);
+        return;
+    }
+    if (m->functions[function]->param_count != 0 ||
+        m->functions[function]->result != IR_PTR) {
+        text_appendf(errors, "the provider `%s` of `%s` takes arguments or "
+                             "gives no pointer. A provider is written "
+                             "`fn() -> *%s`\n", text, in->interface,
+                     in->interface);
+        return;
+    }
+    record = class_of_function(m, function);
+    if (record != IR_NO_INDEX) {
+        uint32_t offset = interface_offset(w, m, record, in->descriptor);
+        if (offset == IR_NO_INDEX) {
+            text_appendf(errors, "the provider `%s` of `%s` gives a "
+                                 "`%s.%s`, which is no `%s`\n", text,
+                         in->interface, m->classes[record]->module,
+                         m->classes[record]->name, in->interface);
+            return;
+        }
+        if (offset != INJECT_AT_ZERO) {
+            uint32_t thunk = write_provider_thunk(m, function, offset,
+                                                  in->interface);
+            if (thunk == IR_NO_INDEX) {
+                text_appendf(errors, "the name of `%s` is too long for a "
+                                     "provider\n", in->interface);
+                return;
+            }
+            function = thunk;
+        }
+    }
+    in->provider = function;
+    agg = struct_agg(m, "anti.rt.InjectSlot", slot_names, slot_types, 1);
+    value = ir_const_agg(m, ir_aggregate(agg), 1);
+    value->items[0].kind = IR_CONST_FUNC;
+    value->items[0].scalar = IR_PTR;
+    value->items[0].global = function;
+    g = m->globals[in->slot];
+    g->bytes = NULL;
+    g->size = 0;
+    g->align = 0;
+    g->value = value;
+    g->mutable = true;
+    g->is_extern = false;
+}
+
+/* DESIGN: the provider graph is the code the providers run. An edge
+   from one interface to another stands where the provider of the first,
+   or a function it calls, reads the slot of the second. Only the direct
+   calls are followed: a call through a table names no function here,
+   and a graph that guessed would refuse a program that has no cycle.
+   The walk marks every function a provider may run. */
+static void reach_calls(const struct ir_module *m, uint32_t from, bool *seen,
+                        uint32_t *work, bool *globals)
+{
+    size_t count = 0;
+    size_t b;
+    size_t k;
+
+    if (seen[from]) {
+        return;
+    }
+    seen[from] = true;
+    work[count++] = from;
+    while (count > 0) {
+        const struct ir_function *f = m->functions[work[--count]];
+        for (b = 0; b < f->block_count; b++) {
+            for (k = 0; k < f->blocks[b]->count; k++) {
+                const struct ir_inst *inst = &f->blocks[b]->insts[k];
+                const struct ir_operand *o[2];
+                size_t n;
+                o[0] = &inst->a;
+                o[1] = &inst->b;
+                for (n = 0; n < 2; n++) {
+                    if (o[n]->kind == IR_GLOBAL) {
+                        globals[o[n]->as.index] = true;
+                    } else if (o[n]->kind == IR_FUNC &&
+                               !seen[o[n]->as.index]) {
+                        seen[o[n]->as.index] = true;
+                        work[count++] = o[n]->as.index;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* Refuse a cycle through the providers. The graph has one node per
+   injectable interface. Depth-first search over it names the interfaces
+   of the first cycle it closes. */
+static bool cycle_from(const bool *edges, size_t count, size_t node,
+                       uint8_t *state, size_t *stack, size_t *depth)
+{
+    size_t i;
+
+    state[node] = 1;
+    stack[(*depth)++] = node;
+    for (i = 0; i < count; i++) {
+        if (!edges[node * count + i]) {
+            continue;
+        }
+        if (state[i] == 1) {
+            stack[(*depth)++] = i;
+            return true;
+        }
+        if (state[i] == 0 &&
+            cycle_from(edges, count, i, state, stack, depth)) {
+            return true;
+        }
+    }
+    state[node] = 2;
+    (*depth)--;
+    return false;
+}
+
+static void check_cycles(const struct ir_module *m, struct injectable *list,
+                         size_t count, struct text *errors)
+{
+    bool *edges = allocate(count * count, sizeof *edges);
+    bool *seen = allocate(m->function_count, sizeof *seen);
+    bool *globals = allocate(m->global_count, sizeof *globals);
+    uint32_t *work = allocate(m->function_count, sizeof *work);
+    uint8_t *state = allocate(count, sizeof *state);
+    size_t *stack = allocate(count + 1, sizeof *stack);
+    size_t depth = 0;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < count; i++) {
+        if (list[i].provider == IR_NO_INDEX) {
+            continue;
+        }
+        memset(seen, 0, m->function_count * sizeof *seen);
+        memset(globals, 0, m->global_count * sizeof *globals);
+        reach_calls(m, list[i].provider, seen, work, globals);
+        for (j = 0; j < count; j++) {
+            edges[i * count + j] = globals[list[j].slot];
+        }
+    }
+    for (i = 0; i < count; i++) {
+        if (state[i] != 0 ||
+            !cycle_from(edges, count, i, state, stack, &depth)) {
+            depth = 0;
+            continue;
+        }
+        /* The walk may reach the cycle through nodes that stand
+           outside it. The repeated node closes it, so the report starts
+           where that node first stands. */
+        for (j = 0; stack[j] != stack[depth - 1]; j++) {
+        }
+        text_appendf(errors, "the providers make a cycle: `%s` needs `%s`",
+                     list[stack[j]].interface, list[stack[j + 1]].interface);
+        for (j += 2; j < depth; j++) {
+            text_appendf(errors, ", which needs `%s`",
+                         list[stack[j]].interface);
+        }
+        text_append(errors, "\n");
+        break;
+    }
+    free(edges);
+    free(seen);
+    free(globals);
+    free(work);
+    free(state);
+    free(stack);
+}
+
+/* DESIGN: the program names the interfaces it injects, so the runtime
+   reports what a line of `[injections]` may replace and refuses one
+   that names an interface the program has not or an `inject final`
+   field. The table stands in every program, empty where nothing
+   injects, because the runtime reads it before `main`. */
+static void write_injectable(struct ir_module *m,
+                             const struct injectable *list, size_t count)
+{
+    static const char *const item_names[] = {"name", "class", "field",
+                                             "final", "slot"};
+    static const enum ir_type item_types[] = {IR_PTR, IR_PTR, IR_PTR, IR_I64,
+                                              IR_PTR};
+    static const char *const table_names[] = {"count", "interfaces"};
+    static const enum ir_type table_types[] = {IR_I64, IR_PTR};
+    uint32_t item_agg = struct_agg(m, "anti.rt.Injectable", item_names,
+                                   item_types, 5);
+    uint32_t table_agg = struct_agg(m, "anti.rt.Injectables", table_names,
+                                    table_types, 2);
+    struct ir_const *value = ir_const_agg(m, ir_aggregate(table_agg), 2);
+    struct ir_global *g;
+    size_t i;
+
+    const_int(&value->items[0], IR_I64, count);
+    if (count > 0) {
+        char length[48];
+        struct ir_const *list_value;
+        uint32_t array;
+        snprintf(length, sizeof length, "[%zu]anti.rt.Injectable", count);
+        array = ir_array_add(m, length, ir_aggregate(item_agg),
+                             ir_sym_int(m, IR_I64, count), NULL);
+        list_value = ir_const_agg(m, ir_aggregate(array), count);
+        for (i = 0; i < count; i++) {
+            struct ir_const *item = ir_const_agg(m, ir_aggregate(item_agg), 5);
+            struct text name = {0};
+            char global[48];
+            uint32_t text;
+            snprintf(global, sizeof global, "injectable.%zu.name", i);
+            text = ir_global_add(m, "anti.rt", global,
+                                 (const uint8_t *)list[i].interface,
+                                 strlen(list[i].interface) + 1, 1)->index;
+            const_addr(&item->items[0], text);
+            text_appendf(&name, "%s.%s", list[i].module, list[i].name);
+            snprintf(global, sizeof global, "injectable.%zu.class", i);
+            text = ir_global_add(m, "anti.rt", global,
+                                 (const uint8_t *)text_cstr(&name),
+                                 name.length + 1, 1)->index;
+            text_free(&name);
+            const_addr(&item->items[1], text);
+            snprintf(global, sizeof global, "injectable.%zu.field", i);
+            text = ir_global_add(m, "anti.rt", global,
+                                 (const uint8_t *)list[i].field,
+                                 strlen(list[i].field) + 1, 1)->index;
+            const_addr(&item->items[2], text);
+            const_int(&item->items[3], IR_I64, list[i].final ? 1 : 0);
+            const_addr(&item->items[4], list[i].slot);
+            list_value->items[i] = *item;
+        }
+        const_addr(&value->items[1],
+                   ir_global_add_value(m, "anti.rt", "injectable.list",
+                                       list_value)->index);
+    } else {
+        const_int(&value->items[1], IR_PTR, 0);
+    }
+    g = ir_global_add_value(m, NULL, "anti_rt_injectable", value);
+    g->exported = true;
+}
+
+/* The whole of the injection pass: the interfaces, their slots, their
+   providers and the cycle check. */
+static void write_injections(struct whole *w, struct ir_module *m,
+                             const struct whole_options *o,
+                             struct text *errors)
+{
+    struct injectable *list = NULL;
+    size_t total = 0;
+    size_t count;
+    size_t i;
+
+    for (i = 0; i < m->class_count; i++) {
+        total += m->classes[i]->inject_count;
+    }
+    list = allocate(total, sizeof *list);
+    count = collect_injectables(m, list);
+    for (i = 0; i < count; i++) {
+        list[i].slot = slot_global(m, list[i].interface);
+    }
+    for (i = 0; i < count; i++) {
+        resolve_provider(w, m, o, &list[i], errors);
+    }
+    check_cycles(m, list, count, errors);
+    write_injectable(m, list, count);
+    free(list);
+}
+
 bool whole_program(struct ir_module *program,
                    const struct whole_options *options, struct text *errors)
 {
@@ -1282,7 +1776,10 @@ bool whole_program(struct ir_module *program,
     }
     calls = calls_through_reflection(program, &reach);
     if (!options->library) {
+        size_t before = errors->length;
         write_slots(w, program, &reach, calls && options->reflect);
+        write_injections(w, program, options, errors);
+        ok = ok && errors->length == before;
     }
     reach_free(&reach);
     /* The trampolines come after every reader of the reach, because they

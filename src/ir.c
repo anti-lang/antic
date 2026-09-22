@@ -86,6 +86,7 @@ void ir_module_free(struct ir_module *m)
     for (i = 0; i < m->class_count; i++) {
         free(m->classes[i]->subtables);
         free(m->classes[i]->mutable_fields);
+        free(m->classes[i]->injects);
     }
     free(m->classes);
     free(m->functions);
@@ -430,7 +431,8 @@ struct ir_class *ir_class_add(struct ir_module *m, const char *module,
     return c;
 }
 
-void ir_class_subtable(struct ir_class *c, uint32_t interface, uint32_t table)
+void ir_class_subtable(struct ir_class *c, uint32_t interface, uint32_t table,
+                       uint32_t agg, uint32_t field)
 {
     struct ir_subtable *grown =
         realloc(c->subtables, (c->subtable_count + 1) * sizeof *grown);
@@ -442,7 +444,28 @@ void ir_class_subtable(struct ir_class *c, uint32_t interface, uint32_t table)
     c->subtables = grown;
     c->subtables[c->subtable_count].interface = interface;
     c->subtables[c->subtable_count].table = table;
+    c->subtables[c->subtable_count].agg = agg;
+    c->subtables[c->subtable_count].field = field;
     c->subtable_count++;
+}
+
+void ir_class_inject(struct ir_module *m, struct ir_class *c,
+                     const char *interface, const char *field,
+                     uint32_t descriptor, bool final)
+{
+    struct ir_inject *grown =
+        realloc(c->injects, (c->inject_count + 1) * sizeof *grown);
+
+    if (grown == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    c->injects = grown;
+    c->injects[c->inject_count].interface = keep(m->arena, interface);
+    c->injects[c->inject_count].field = keep(m->arena, field);
+    c->injects[c->inject_count].descriptor = descriptor;
+    c->injects[c->inject_count].final = final;
+    c->inject_count++;
 }
 
 void ir_class_mutable(struct ir_class *c, uint32_t field)

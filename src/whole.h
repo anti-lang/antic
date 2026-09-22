@@ -41,6 +41,10 @@ struct whole_options {
     bool bundled;                   /* the runtime joins the output */
     bool dev;                       /* one object per module. */
     bool library;                   /* a library for C */
+    /* The `--inject Interface=Provider` arguments of the build, which
+       name the provider of every injectable interface. */
+    const char *const *inject;
+    size_t inject_count;
 };
 
 /* Run the passes over program. Each error goes to errors as one line.

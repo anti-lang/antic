@@ -364,6 +364,22 @@ struct ir_subtable {
     uint32_t interface;             /* the global of the interface's
                                        descriptor */
     uint32_t table;                 /* the global of the table */
+    /* DESIGN: the sub-object of an interface sits at a field of the
+       class that declares it. The aggregate and the index give its
+       offset, so a pass over the whole program converts a pointer to
+       the class into a pointer to the interface without the types. */
+    uint32_t agg;
+    uint32_t field;
+};
+
+/* One `inject` field of a class: the path of its interface, the name of
+   the field and whether `inject final` keeps the run-time configuration
+   from replacing the provider. */
+struct ir_inject {
+    const char *interface;
+    const char *field;
+    uint32_t descriptor;            /* the interface's descriptor */
+    bool final;
 };
 
 /* A class record. The descriptor, the base's descriptor and the tables
@@ -383,6 +399,8 @@ struct ir_class {
     size_t subtable_count;
     uint32_t *mutable_fields;       /* fields of agg */
     size_t mutable_count;
+    struct ir_inject *injects;      /* the `inject` fields it declares */
+    size_t inject_count;
 };
 
 struct ir_module {
@@ -483,8 +501,11 @@ struct ir_global *ir_global_add_value(struct ir_module *m, const char *module,
 struct ir_class *ir_class_add(struct ir_module *m, const char *module,
                               const char *name);
 void ir_class_subtable(struct ir_class *c, uint32_t interface,
-                       uint32_t table);
+                       uint32_t table, uint32_t agg, uint32_t field);
 void ir_class_mutable(struct ir_class *c, uint32_t field);
+void ir_class_inject(struct ir_module *m, struct ir_class *c,
+                     const char *interface, const char *field,
+                     uint32_t descriptor, bool final);
 
 /* Room for an aggregate constant of count items, in the memory pool. */
 struct ir_const *ir_const_agg(struct ir_module *m, struct ir_vtype type,

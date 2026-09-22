@@ -397,6 +397,13 @@ static void put_type(struct writer *w, const struct type *t)
                                     (unsigned)t->fields[i].writable << 6 |
                                     (unsigned)t->fields[i].transient << 7));
                 put_u8(w, (uint8_t)t->fields[i].vis);
+                /* DESIGN: `inject` and `inject final` travel with the
+                   field, so a module that builds a class of another
+                   module calls the same provider through the same
+                   slot, and `anti build` reports what a dependency
+                   needs. */
+                put_u8(w, (uint8_t)((unsigned)t->fields[i].injected |
+                                    (unsigned)t->fields[i].inject_final << 1));
                 /* DESIGN: /// on a private item is never stored, and
                    the fields of a private struct are private items. */
                 put_doc(w, t->fields[i].doc.text,
@@ -743,10 +750,22 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         for (j = 0; j < c->subtable_count; j++) {
             put_u32(w, c->subtables[j].interface);
             put_u32(w, c->subtables[j].table);
+            put_u32(w, c->subtables[j].agg);
+            put_u32(w, c->subtables[j].field);
         }
         put_u32(w, (uint32_t)c->mutable_count);
         for (j = 0; j < c->mutable_count; j++) {
             put_u32(w, c->mutable_fields[j]);
+        }
+        /* The `inject` fields, so the pass over the whole program finds
+           every interface of the program and the class that needs a
+           provider for it. */
+        put_u32(w, (uint32_t)c->inject_count);
+        for (j = 0; j < c->inject_count; j++) {
+            put_str(w, c->injects[j].interface);
+            put_str(w, c->injects[j].field);
+            put_u32(w, c->injects[j].descriptor);
+            put_u8(w, (uint8_t)(c->injects[j].final ? 1 : 0));
         }
     }
 }
@@ -1438,6 +1457,7 @@ static void read_types(struct reader *r)
             for (j = 0; j < s->count && !r->failed; j++) {
                 struct name doc;
                 uint8_t form;
+                uint8_t marks;
                 s->fields[j].name = get_name(r);
                 s->types[j] = get_u32(r);
                 s->fields[j].bits = get_u8(r);
@@ -1448,7 +1468,11 @@ static void read_types(struct reader *r)
                 s->fields[j].writable = (form >> 6 & 1) != 0;
                 s->fields[j].transient = (form >> 7 & 1) != 0;
                 s->fields[j].vis = (enum visibility)get_u8(r);
-                if ((form & 15) > FIELD_IMPL || s->fields[j].vis > VIS_PUB) {
+                marks = get_u8(r);
+                s->fields[j].injected = (marks & 1) != 0;
+                s->fields[j].inject_final = (marks >> 1 & 1) != 0;
+                if ((form & 15) > FIELD_IMPL || s->fields[j].vis > VIS_PUB ||
+                    marks > 3) {
                     damaged(r);
                 }
                 doc = get_name(r);
@@ -2422,6 +2446,7 @@ static void read_classes(struct reader *r, struct ir_module *program,
         uint32_t agg = get_u32(r);
         uint32_t subtables;
         uint32_t mutables;
+        uint32_t injects;
         struct ir_class *c;
 
         if (r->failed ||
@@ -2439,12 +2464,20 @@ static void read_classes(struct reader *r, struct ir_module *program,
         c->table = map_global(r, maps, table, true);
         c->init = init == IR_NO_INDEX ? init : maps->functions[init];
         c->agg = map_agg(r, program, maps, agg);
-        subtables = get_count(r, 8);
+        subtables = get_count(r, 16);
         for (j = 0; j < subtables && !r->failed; j++) {
             uint32_t interface = get_u32(r);
             uint32_t at = get_u32(r);
+            uint32_t sub_agg = get_u32(r);
+            uint32_t sub_field = get_u32(r);
+            uint32_t mapped = map_agg(r, program, maps, sub_agg);
+            if (r->failed || sub_field >= program->aggs[mapped]->field_count) {
+                damaged(r);
+                return;
+            }
             ir_class_subtable(c, map_global(r, maps, interface, false),
-                              map_global(r, maps, at, false));
+                              map_global(r, maps, at, false), mapped,
+                              sub_field);
         }
         mutables = get_count(r, 4);
         for (j = 0; j < mutables && !r->failed; j++) {
@@ -2453,6 +2486,19 @@ static void read_classes(struct reader *r, struct ir_module *program,
                 damaged(r);
             }
             ir_class_mutable(c, field);
+        }
+        injects = get_count(r, 13);
+        for (j = 0; j < injects && !r->failed; j++) {
+            const char *path = get_cstr(r);
+            const char *named = get_cstr(r);
+            uint32_t of = get_u32(r);
+            uint8_t last = get_u8(r);
+            if (r->failed || path[0] == '\0' || last > 1) {
+                damaged(r);
+                return;
+            }
+            ir_class_inject(program, c, path, named,
+                            map_global(r, maps, of, false), last != 0);
         }
     }
 }

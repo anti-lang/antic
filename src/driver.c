@@ -666,7 +666,8 @@ static bool lower_checked(const char *input, const char *file,
    one line each. Returns false after an error. */
 static bool whole_checked(const char *input, struct ir_module *program,
                           const char *module, bool release, bool reflect,
-                          bool bundled, bool library, bool dev)
+                          bool bundled, bool library, bool dev,
+                          const struct options *o)
 {
     struct whole_options options;
     struct text errors = {0};
@@ -680,6 +681,8 @@ static bool whole_checked(const char *input, struct ir_module *program,
     options.bundled = bundled;
     options.library = library;
     options.dev = dev;
+    options.inject = o->inject;
+    options.inject_count = o->inject_count;
     ok = whole_program(program, &options, &errors);
     for (line = text_cstr(&errors); *line != '\0';) {
         const char *end = strchr(line, '\n');
@@ -701,7 +704,7 @@ static int dump_ir(const char *input, const char *file, struct module *tree,
                    const char *module, struct ir_module *program,
                    bool optimize, bool release, struct diagnostics *diags,
                    unsigned options, const char *const *patterns,
-                   size_t pattern_count)
+                   size_t pattern_count, const struct options *o)
 {
     bool no_reflect = (options & LOWER_NO_REFLECT) != 0;
     struct text out = {0};
@@ -714,7 +717,7 @@ static int dump_ir(const char *input, const char *file, struct module *tree,
     if (optimize) {
         if ((release || has_main(program, module)) &&
             !whole_checked(input, program, module, release, !no_reflect,
-                           false, false, !release)) {
+                           false, false, !release, o)) {
             return 1;
         }
         ir_optimize(program, module);
@@ -837,7 +840,7 @@ static int back_end(const struct options *o, struct module *tree,
     if ((!o->dev || o->lib != LIB_NONE || has_main(program, module)) &&
         !whole_checked(o->input, program, module, !o->dev,
                        !o->no_reflect, o->bundle_runtime,
-                       o->lib != LIB_NONE, o->dev)) {
+                       o->lib != LIB_NONE, o->dev, o)) {
         return 1;
     }
     /* The build that compiles the program decides, so an assertion of a
@@ -1482,7 +1485,7 @@ static int compile(const struct options *o, struct text *source,
         status = dump_ir(o->input, recorded_file(o), tree, text_cstr(module),
                          &program, o->dump_opt, !o->dev, &diags,
                          lower_options(o), o->trace_patterns,
-                         o->trace_pattern_count);
+                         o->trace_pattern_count, o);
         goto done;
     }
     if (o->lib != LIB_NONE && defines_main(tree)) {

@@ -5016,6 +5016,14 @@ static bool check_field_inits(struct checker *c, struct expr *e,
                      tn(f->home));
             ok = false;
         }
+        /* DESIGN: the provider of an interface fills an `inject` field,
+           so a literal that names it would be overwritten. */
+        if (f->injected) {
+            error_at(c, inits[i].pos, "`%.*s` is `inject`, and its provider "
+                     "fills it", (int)inits[i].name.length,
+                     inits[i].name.text);
+            ok = false;
+        }
         if (require(c, inits[i].value,
                     check_expr(c, inits[i].value, f->type), f->type)) {
             refuse_owned_copy(c, inits[i].value, f->type);
@@ -5031,7 +5039,7 @@ static bool check_field_inits(struct checker *c, struct expr *e,
            table pointer that the literal never writes, so a literal that
            leaves it out is complete. */
         if (type_field_is_unit_break(&fields[j]) ||
-            fields[j].form == FIELD_IMPL) {
+            fields[j].form == FIELD_IMPL || fields[j].injected) {
             continue;
         }
         for (i = 0; i < count; i++) {
@@ -9668,6 +9676,8 @@ bool sema_check(struct module *module, const char *module_name,
             fields[j].transient = it->params[j].transient;
             fields[j].atomic = it->params[j].atomic;
             fields[j].writable = it->params[j].writable;
+            fields[j].injected = it->params[j].injected;
+            fields[j].inject_final = it->params[j].inject_final;
 
             fields[j].value = it->params[j].value;
             c.target_sized = true;
@@ -9729,6 +9739,35 @@ bool sema_check(struct module *module, const char *module_name,
             } else if (fields[j].owned) {
                 error_at(&c, fields[j].pos, "`%.*s` is `transient`, so its "
                          "class frees it in `destruct` and it is not `own`",
+                         (int)fields[j].name.length, fields[j].name.text);
+            }
+        }
+        /* DESIGN: `inject` names a field the provider of its interface
+           fills before `construct` runs. The type is therefore a
+           pointer to an abstract class, which is what an interface is,
+           and never `?*T`, because a provider never gives `none`. No
+           default stands beside it, since the provider writes the field
+           whatever a literal holds, and `own` does not, since the
+           provider owns what it gives. */
+        for (j = 0; j < it->param_count; j++) {
+            const struct type *ft = fields[j].type;
+            if (!fields[j].injected || is_error(ft)) {
+                continue;
+            }
+            if (ft->kind != TYPE_POINTER || ft->nullable ||
+                ft->element->kind != TYPE_CLASS ||
+                !ft->element->has_abstract) {
+                error_at(&c, fields[j].pos, "`inject` needs a pointer to an "
+                         "abstract class, and `%.*s` has type `%s`",
+                         (int)fields[j].name.length, fields[j].name.text,
+                         tn(ft));
+            } else if (it->params[j].value != NULL) {
+                error_at(&c, fields[j].pos, "`%.*s` is `inject`, so its "
+                         "provider fills it and it has no default",
+                         (int)fields[j].name.length, fields[j].name.text);
+            } else if (fields[j].owned) {
+                error_at(&c, fields[j].pos, "`%.*s` is `inject`, so its "
+                         "provider owns what it gives and it is not `own`",
                          (int)fields[j].name.length, fields[j].name.text);
             }
         }

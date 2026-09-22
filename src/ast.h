@@ -641,6 +641,8 @@ struct param {
     bool transient;                 /* `transient`: derived state */
     bool atomic;                    /* `atomic`: read and written by calls */
     bool writable;                  /* `mutable`: a singleton field to write */
+    bool injected;                  /* `inject`: a provider fills the field */
+    bool inject_final;              /* `inject final`: no replacement */
 };
 
 /* One case of a variant: its name and its fields, none for a case such

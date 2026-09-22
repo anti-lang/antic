@@ -551,6 +551,33 @@ static const struct ir_function *fatal_signature(struct lowerer *l)
     return f;
 }
 
+/* DESIGN: a provider takes no arguments and gives a pointer of its
+   interface. The slot of an interface holds one, and a call through the
+   slot needs that signature. */
+static const struct ir_function *provider_signature(struct lowerer *l)
+{
+    struct ir_function *f;
+    uint32_t count = 0;
+    char name[24];
+    size_t i;
+
+    for (i = 0; i < l->m->function_count; i++) {
+        const struct ir_function *g = l->m->functions[i];
+        if (!g->is_extern || g->module == NULL ||
+            strcmp(g->module, l->module_name) != 0 ||
+            strncmp(g->name, "fn.", 3) != 0) {
+            continue;
+        }
+        if (g->param_count == 0 && g->result == IR_PTR) {
+            return g;
+        }
+        count++;
+    }
+    snprintf(name, sizeof name, "fn.%u", count);
+    f = ir_declare_add(l->m, l->module_name, name, IR_PTR, IR_NO_AGG);
+    return f;
+}
+
 /* The signature of a call through a bound function, which takes the
    object as its first parameter and then the declared ones. */
 static const struct ir_function *bound_signature(struct lowerer *l,
@@ -2876,12 +2903,45 @@ static void store_value(struct lowerer *l, const struct type *t,
     }
 }
 
+/* DESIGN: the slot of an injectable interface is one pointer per
+   interface, under the module INJECT_MODULE and named by the path of
+   the interface. It holds the provider the build chose. The pass over
+   the whole program writes it, so one program holds one slot per
+   interface whichever module injects it, and the run-time
+   configuration has one pointer to replace. Every module that injects
+   refers to it. */
+static struct ir_global *inject_slot(struct lowerer *l, const struct type *t)
+{
+    struct ir_module *m = l->m;
+    struct text name = {0};
+    struct ir_global *g;
+    size_t i;
+
+    text_appendf(&name, "%.*s.%.*s", (int)t->module.length, t->module.text,
+                 (int)t->name.length, t->name.text);
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->module != NULL &&
+            strcmp(m->globals[i]->module, INJECT_MODULE) == 0 &&
+            strcmp(m->globals[i]->name, text_cstr(&name)) == 0) {
+            text_free(&name);
+            return m->globals[i];
+        }
+    }
+    g = ir_global_add(m, INJECT_MODULE, text_cstr(&name), NULL, 0, 1);
+    g->is_extern = true;
+    g->mutable = true;
+    text_free(&name);
+    return g;
+}
+
 /* Whether field has a default, declared here or read from a library
-   file, or takes `T { }` as an inline class value. */
+   file, or takes `T { }` as an inline class value. An `inject` field
+   has none and is written all the same, by the provider of its
+   interface. */
 static bool has_default(const struct struct_field *field)
 {
-    return field->value != NULL || field->constant != NULL ||
-           sema_field_takes_literal(field);
+    return field->injected || field->value != NULL ||
+           field->constant != NULL || sema_field_takes_literal(field);
 }
 
 /* DESIGN: every complete class has a function that prepares an object
@@ -2939,6 +2999,21 @@ static void store_default(struct lowerer *l, const struct struct_field *field,
     struct ir_operand v;
     struct ir_vtype vtype;
 
+    /* DESIGN: an `inject` field is filled by a call through the slot of
+       its interface, before `construct` runs. The call is indirect, so
+       a replacement of the slot reaches every site. */
+    if (field->injected) {
+        struct ir_operand slot =
+            temp(l, ir_addr(l->f, l->b,
+                            ir_global_op(inject_slot(l, field->type->element))));
+        struct ir_operand provider =
+            temp(l, ir_load(l->f, l->b, IR_PTR, slot));
+        struct ir_operand object =
+            temp(l, ir_call_indirect(l->f, l->b, IR_PTR, provider,
+                                     provider_signature(l), NULL, 0));
+        ir_store(l->f, l->b, IR_PTR, object, address);
+        return;
+    }
     /* An inline class field without a default is written as `T { }`
        would write it, which the init of T does. */
     if (field->value == NULL && field->constant == NULL) {
@@ -8537,7 +8612,8 @@ static void class_record(struct lowerer *l, const struct item *it)
                         class_descriptor(l, up->fields[k].type)->index;
                     uint32_t table =
                         interface_table(l, t, &up->fields[k])->index;
-                    ir_class_subtable(c, interface, table);
+                    ir_class_subtable(c, interface, table, agg_of(l, up),
+                                      (uint32_t)k);
                 }
             }
         }
@@ -8545,6 +8621,23 @@ static void class_record(struct lowerer *l, const struct item *it)
     for (k = 0; k < t->field_count; k++) {
         if (t->fields[k].writable) {
             ir_class_mutable(c, (uint32_t)k);
+        }
+        /* DESIGN: the record carries the `inject` fields the class
+           declares, never the ones it inherits. The record of the class
+           above carries those. The pass over the whole program then
+           reads one entry per declaration and names the class that
+           needs a provider. */
+        if (t->fields[k].injected) {
+            const struct type *i = t->fields[k].type->element;
+            struct text path = {0};
+            char *field = cstr(&t->fields[k].name);
+            text_appendf(&path, "%.*s.%.*s", (int)i->module.length,
+                         i->module.text, (int)i->name.length, i->name.text);
+            ir_class_inject(l->m, c, text_cstr(&path), field,
+                            class_descriptor(l, i)->index,
+                            t->fields[k].inject_final);
+            free(field);
+            text_free(&path);
         }
     }
 }

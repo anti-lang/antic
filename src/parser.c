@@ -2296,6 +2296,24 @@ static struct item *class_item(struct parser *p, struct item *it)
                 field.vis = VIS_PROTECTED;
             }
         }
+        /* DESIGN: `inject` and `inject final` name a field a provider
+           fills before `construct` runs. Both are contextual, so
+           `inject: int` is still a field named `inject` and
+           `inject final: *L` a field named `final` a provider fills.
+           The `final` form is read first, because its second word is a
+           name as well. */
+        if (is_word(p, peek(p), "inject") &&
+            is_word(p, peek_at(p, 1), "final") &&
+            peek_at(p, 2)->kind == TOKEN_IDENT) {
+            next(p);
+            next(p);
+            field.injected = true;
+            field.inject_final = true;
+        } else if (is_word(p, peek(p), "inject") &&
+                   peek_at(p, 1)->kind == TOKEN_IDENT) {
+            next(p);
+            field.injected = true;
+        }
         /* `transient`, `own`, `atomic` and `mutable` are contextual
            words before a field name, so a field may still carry one of
            those names. */

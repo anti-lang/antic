@@ -50,6 +50,13 @@ struct options {
     bool no_hooks;              /* --no-hooks */
     const char **trace_patterns;    /* --trace <pattern> */
     size_t trace_pattern_count;
+    /* DESIGN: --inject Interface=Provider names the provider of an
+       injectable interface, once per interface. `anti build` passes the
+       `[inject]` table of the manifest and `anti test` the
+       `[inject.test]` table over it. The link refuses an interface the
+       program injects and the table does not name. */
+    const char **inject;            /* --inject Interface=Provider */
+    size_t inject_count;
     enum { LIB_NONE, LIB_STATIC, LIB_SHARED } lib; /* --lib static|shared */
     bool bundle_runtime;        /* --bundle-runtime, with --lib static. */
     bool soname;                /* --soname, with --lib shared. */

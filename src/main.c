@@ -42,6 +42,8 @@ static int usage(FILE *out)
           "  --doc-warnings       warn about documentation, for anti check\n"
           "  --package-name <p>   the package header of the library: name,\n"
           "  --package-version <v>  version,\n"
+          "  --inject <I=P>       the provider P of the injectable "
+          "interface I\n"
           "  --dependency <n,c,u> a dependency with name, constraint, URL,\n"
           "  --license <spdx>     the licence identifier,\n"
           "  --license-text <f>   the file of the licence text\n"
@@ -282,6 +284,19 @@ static int run(int argc, char **argv, struct options *o)
             }
             options.frameworks[options.framework_count++] = value;
             continue;
+        } else if (strcmp(arg, "--inject") == 0) {
+            const char *value = value_of(argc, argv, &i);
+            if (value == NULL) {
+                return 2;
+            }
+            if (strchr(value, '=') == NULL) {
+                fprintf(stderr, "antic: --inject takes an interface and its "
+                                "provider, as --inject Interface=Provider, "
+                                "found %s\n", value);
+                return 2;
+            }
+            options.inject[options.inject_count++] = value;
+            continue;
         } else if (strcmp(arg, "--dependency") == 0 ||
                    strcmp(arg, "--attribution") == 0) {
             const char *value = value_of(argc, argv, &i);
@@ -396,10 +411,11 @@ int main(int argc, char **argv)
     options.frameworks = malloc((size_t)argc * sizeof *options.frameworks);
     options.trace_patterns =
         malloc((size_t)argc * sizeof *options.trace_patterns);
+    options.inject = malloc((size_t)argc * sizeof *options.inject);
     if (options.libraries == NULL || options.objects == NULL ||
         options.roots == NULL || options.dependencies == NULL ||
         options.attribution == NULL || options.frameworks == NULL ||
-        options.trace_patterns == NULL) {
+        options.trace_patterns == NULL || options.inject == NULL) {
         fputs("antic: out of memory\n", stderr);
         return 70;
     }
@@ -411,5 +427,6 @@ int main(int argc, char **argv)
     free((void *)options.attribution);
     free((void *)options.frameworks);
     free((void *)options.trace_patterns);
+    free((void *)options.inject);
     return status;
 }
