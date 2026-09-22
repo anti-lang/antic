@@ -42,7 +42,7 @@ _A4main_main:
     .secrel32 _A4main_scale
     .secidx _A4main_scale
     .byte 0              /* the flags */
-    .asciz "_A4main_scale"
+    .asciz "main.scale"
     .p2align 2
 .Lanti_cv_fn0_end:
     .short 2
@@ -57,7 +57,7 @@ _A4main_main:
     .secrel32 _A4main_main
     .secidx _A4main_main
     .byte 0              /* the flags */
-    .asciz "_A4main_main"
+    .asciz "main.main"
     .p2align 2
 .Lanti_cv_fn1_end:
     .short 2

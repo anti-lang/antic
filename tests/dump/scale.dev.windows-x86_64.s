@@ -45,7 +45,7 @@ _A3com7example5scale_scale:
     .secrel32 _A3com7example5scale_scale
     .secidx _A3com7example5scale_scale
     .byte 0              /* the flags */
-    .asciz "_A3com7example5scale_scale"
+    .asciz "com.example.scale.scale"
     .p2align 2
 .Lanti_cv_fn0_end:
     .short 2

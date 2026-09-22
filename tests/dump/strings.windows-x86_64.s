@@ -86,7 +86,7 @@ _A7strings_main:
     .secrel32 _A7strings_tail
     .secidx _A7strings_tail
     .byte 0              /* the flags */
-    .asciz "_A7strings_tail"
+    .asciz "strings.tail"
     .p2align 2
 .Lanti_cv_fn0_end:
     .short 2
@@ -101,7 +101,7 @@ _A7strings_main:
     .secrel32 _A7strings_main
     .secidx _A7strings_main
     .byte 0              /* the flags */
-    .asciz "_A7strings_main"
+    .asciz "strings.main"
     .p2align 2
 .Lanti_cv_fn1_end:
     .short 2

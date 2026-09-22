@@ -311,8 +311,8 @@ static void symbol_records(void)
     CHECK(occurrences(text_cstr(&out), "/* S_LPROC32 */") == 2);
     CHECK(occurrences(text_cstr(&out), "/* S_END */") == 2);
     CHECK(occurrences(text_cstr(&out), ".section .debug$S") == 1);
-    CHECK(strstr(text_cstr(&out), "    .asciz \"_A4main_scale\"\n") != NULL);
-    CHECK(strstr(text_cstr(&out), "    .asciz \"_A4main_main\"\n") != NULL);
+    CHECK(strstr(text_cstr(&out), "    .asciz \"main.scale\"\n") != NULL);
+    CHECK(strstr(text_cstr(&out), "    .asciz \"main.main\"\n") != NULL);
     CHECK(strstr(text_cstr(&out), "    .cv_linetable 0, _A4main_scale, "
                                   ".Lanti_debug_fn0_end\n") != NULL);
     CHECK(strstr(text_cstr(&out), "    .cv_linetable 1, _A4main_main, "
@@ -431,7 +431,7 @@ void test_emit(void)
                  "    .secrel32 _A4main_f\n"
                  "    .secidx _A4main_f\n"
                  "    .byte 0              /* the flags */\n"
-                 "    .asciz \"_A4main_f\"\n"
+                 "    .asciz \"main.f\"\n"
                  "    .p2align 2\n"
                  ".Lanti_cv_fn0_end:\n"
                  "    .short 2\n"
@@ -886,7 +886,7 @@ void test_emit(void)
           "    .secrel32 _A4main_scale\n"
           "    .secidx _A4main_scale\n"
           "    .byte 0              /* the flags */\n"
-          "    .asciz \"_A4main_scale\"\n"
+          "    .asciz \"main.scale\"\n"
           "    .p2align 2\n"
           ".Lanti_cv_fn0_end:\n"
           "    .short 2\n"
@@ -901,7 +901,7 @@ void test_emit(void)
           "    .secrel32 _A4main_main\n"
           "    .secidx _A4main_main\n"
           "    .byte 0              /* the flags */\n"
-          "    .asciz \"_A4main_main\"\n"
+          "    .asciz \"main.main\"\n"
           "    .p2align 2\n"
           ".Lanti_cv_fn1_end:\n"
           "    .short 2\n"

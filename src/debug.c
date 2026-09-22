@@ -59,8 +59,9 @@ static const char *local(const struct debug *d)
    and lld-link carries only external symbols into the PDB. Without the
    record DbgHelp names a frame after the external symbol below it. The
    record reaches the PDB and never the executable. It names the function
-   by its COFF symbol, the name a dev build carries as an external symbol,
-   which the runtime reads as `module.function`. */
+   as the symbol tables of ELF and Mach-O do, `module.Class.f`, and an
+   export fn by its C name. A debugger and the runtime then read one name
+   on every target. */
 static bool codeview(const struct debug *d)
 {
     return target_info(d->target)->format == FORMAT_COFF;
@@ -245,6 +246,17 @@ static void compile_unit(struct debug *d, struct text *out)
     text_appendf(out, "%santi_debug_unit_end:\n", l);
 }
 
+/* The name that the readers of ELF and Mach-O give a function. That is its
+   module path, a dot and its name, or the C name of an export fn. */
+static void reader_name(struct text *out, const struct ir_function *f)
+{
+    if (f->module == NULL || f->exported) {
+        mach_function_symbol(out, TARGET_LINUX_X86_64, f);
+    } else {
+        text_appendf(out, "%s.%s", f->module, f->name);
+    }
+}
+
 /* The symbol record of each function, in the order the emitter wrote
    them. Each is an S_LPROC32 without a type, closed by an S_END. lld-link
    fills in the parent, the end and the next record. A record ends on a
@@ -262,11 +274,13 @@ static void symbol_records(struct debug *d, struct text *out,
                  CV_SYMBOLS, l, l, l);
     for (i = 0; i < d->m->function_count; i++) {
         struct text symbol = {0};
+        struct text name = {0};
         const char *s;
         if (functions[i] == NULL) {
             continue;
         }
         mach_function_symbol(&symbol, d->target, d->m->functions[i]);
+        reader_name(&name, d->m->functions[i]);
         s = text_cstr(&symbol);
         text_appendf(out, "    .short %santi_cv_fn%zu_end - %santi_cv_fn%zu\n"
                           "%santi_cv_fn%zu:\n", l, id, l, id, l, id);
@@ -282,10 +296,11 @@ static void symbol_records(struct debug *d, struct text *out,
         text_appendf(out, "    .byte 0              /* the flags */\n"
                           "    .asciz \"%s\"\n"
                           "    .p2align 2\n"
-                          "%santi_cv_fn%zu_end:\n", s, l, id);
+                          "%santi_cv_fn%zu_end:\n", text_cstr(&name), l, id);
         text_appendf(out, "    .short 2\n"
                           "    .short %u             /* S_END */\n", S_END);
         text_free(&symbol);
+        text_free(&name);
         id++;
     }
     text_appendf(out, "%santi_cv_symbols_end:\n", l);

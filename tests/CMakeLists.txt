@@ -897,7 +897,7 @@ foreach(target windows-x86_64 windows-arm64)
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
-            "-DNAMES=_A11stack_trace_inner;_A11stack_trace_outer;_A11stack_trace_skipped;_A11stack_trace_put;_A11stack_trace_main"
+            "-DNAMES=stack_trace.inner;stack_trace.outer;stack_trace.skipped;stack_trace.put;stack_trace.main"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb-names"
             "-DTARGET=${target}"
             "-DROOT=${CMAKE_SOURCE_DIR}"
