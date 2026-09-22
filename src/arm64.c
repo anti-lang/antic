@@ -1045,6 +1045,19 @@ static void emit_mul_high(struct selector *s, const struct ir_inst *inst)
    subtract. A read of the borrow tests for C clear, and a borrow goes in
    as C clear. The bool of a carry in holds unknown bits above its width.
    Its bit 0 sets C through cmp, or through negs for a borrow. */
+/* Whether the target selects the simd operation inst on agg of size
+   bytes at level cpu. */
+static bool vector_native(const struct ir_inst *inst,
+                          const struct ir_aggtype *agg, uint64_t size,
+                          enum cpu_level cpu)
+{
+    (void)inst;
+    (void)agg;
+    (void)size;
+    (void)cpu;
+    return false;
+}
+
 static bool flags_native(const struct ir_inst *inst)
 {
     return (inst->op == IR_ADD_FL || inst->op == IR_SUB_FL ||
@@ -2168,6 +2181,7 @@ static const struct target_desc desc = {
     .copy_memory = copy_memory,
     .frame_limit = 0,
     .flags_native = flags_native,
+    .vector_native = vector_native,
     .load_spill = load_spill,
     .store_spill = store_spill,
     .resolve_slot = resolve_slot,

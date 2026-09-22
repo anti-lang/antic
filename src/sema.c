@@ -505,36 +505,6 @@ static uint8_t bitfield_width(struct checker *c, struct param *field,
     return (uint8_t)v.as.integer;
 }
 
-/* The bytes of a lane of type t in a simd struct, or 0 for a type that
-   is no lane. DESIGN: a lane has one width on every target, so the size
-   of a simd struct is a property of its declaration. c_long, c_ulong and
-   c_wchar, whose width the target decides, are no lanes. */
-static uint64_t simd_lane_bytes(const struct type *t)
-{
-    switch (t->kind) {
-    case TYPE_BOOL:
-    case TYPE_I8:
-    case TYPE_U8: return 1;
-    case TYPE_I16:
-    case TYPE_U16:
-    case TYPE_F16: return 2;
-    case TYPE_CHAR:
-    case TYPE_I32:
-    case TYPE_U32:
-    case TYPE_F32: return 4;
-    case TYPE_I64:
-    case TYPE_U64:
-    case TYPE_F64: return 8;
-    default: return 0;
-    }
-}
-
-/* The bytes of the simd struct t: its lanes, without padding. */
-static uint64_t simd_bytes(const struct type *t)
-{
-    return simd_lane_bytes(type_simd_lane(t)) * t->field_count;
-}
-
 /* DESIGN: the rules of a declaration of a simd struct. Every field has
    one type, a primitive type of one width on every target, and the
    count is a power of two. The size is a multiple of eight bytes. Above
@@ -553,7 +523,7 @@ static void check_simd_struct(struct checker *c, struct item *it)
     if (is_error(lane)) {
         return;
     }
-    if (simd_lane_bytes(lane) == 0) {
+    if (type_lane_bytes(lane) == 0) {
         error_at(c, t->fields[0].pos, "a lane of a `simd struct` is an "
                  "integer of a fixed width, a float, `bool` or `char`, not "
                  "`%s`", tn(lane));
@@ -585,7 +555,7 @@ static void check_simd_struct(struct checker *c, struct item *it)
                  "from its size and has no `align(N)`");
         return;
     }
-    bytes = simd_bytes(t);
+    bytes = type_simd_bytes(t);
     if (bytes % 8 != 0) {
         error_at(c, it->name_pos, "a `simd struct` is a multiple of 8 bytes, "
                  "and `%.*s` is %llu", (int)it->name.length, it->name.text,
@@ -2365,7 +2335,7 @@ static bool fixed_layout(const struct type *t, uint64_t *size,
         *align = most;
         return true;
     default:
-        *size = simd_lane_bytes(t);
+        *size = type_lane_bytes(t);
         *align = *size;
         return *size != 0;
     }

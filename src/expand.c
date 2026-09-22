@@ -1,6 +1,7 @@
 #include "expand.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -294,6 +295,197 @@ static size_t flags(struct expander *x, const struct ir_block *b, size_t at)
     return count;
 }
 
+/* DESIGN: a simd operation that the target has no instruction for
+   becomes one scalar operation per lane. It reads the lanes in memory at
+   the offsets of the layout. A comparison writes 0 or 1 to one byte of
+   the mask per lane. A choice between two lanes is a mask of all ones or
+   of zero over the bits of the lane, as for a saturating operation. A
+   fold halves the lanes until one is left, the upper half onto the lower
+   half. That is the order of every target's instructions. The least and
+   the greatest of float lanes keep the offset of the lane they choose
+   and read the lane again. The IR moves no float into an integer. */
+
+/* The address base plus offset bytes. */
+static struct ir_operand lane_address(struct expander *x, struct ir_operand base,
+                                      uint64_t offset)
+{
+    if (offset == 0) {
+        return base;
+    }
+    return temp(x, ir_ptradd(x->f, x->out, base, ir_int_op(IR_I64, offset)));
+}
+
+static struct ir_operand load_lane(struct expander *x, enum ir_type type,
+                                   struct ir_operand base, uint64_t offset)
+{
+    struct ir_operand at = lane_address(x, base, offset);
+
+    return temp(x, ir_load(x->f, x->out, type, at));
+}
+
+static void store_lane(struct expander *x, enum ir_type type,
+                       struct ir_operand value, struct ir_operand base,
+                       uint64_t offset)
+{
+    struct ir_operand at = lane_address(x, base, offset);
+
+    ir_store(x->f, x->out, type, value, at);
+}
+
+/* The integer type of the bits of a lane of type type. */
+static enum ir_type word_of(enum ir_type type)
+{
+    return type == IR_F32 ? IR_I32 : type == IR_F64 ? IR_I64 : type;
+}
+
+/* a where the bool c is 1, b where it is 0, of the integer type of x. */
+static struct ir_operand choose(struct expander *x, struct ir_operand c,
+                                struct ir_operand a, struct ir_operand b)
+{
+    struct ir_operand m = mask_of(x, c);
+    struct ir_operand keep = binary(x, IR_AND, a, m);
+    struct ir_operand rest =
+        binary(x, IR_AND, b, temp(x, ir_unary(x->f, x->out, IR_NOT, x->type,
+                                              m)));
+
+    return binary(x, IR_OR, keep, rest);
+}
+
+static bool is_lane_comparison(enum ir_op op)
+{
+    return (op >= IR_EQ && op <= IR_UGE) || (op >= IR_FEQ && op <= IR_FGE);
+}
+
+/* The fold of the lanes of the value at base, halving them. */
+static struct ir_operand fold_lanes(struct expander *x, const struct ir_inst *inst,
+                                    const struct layout *layout, size_t n,
+                                    enum ir_type lane)
+{
+    enum ir_op op = (enum ir_op)inst->field;
+    bool pick = op != IR_ADD && op != IR_FADD && op != IR_OR && op != IR_AND;
+    bool is_float = lane == IR_F32 || lane == IR_F64;
+    struct ir_operand *v = calloc(n + 1, sizeof *v);
+    struct ir_operand *at = calloc(n + 1, sizeof *at);
+    struct ir_operand result;
+    size_t half;
+    size_t i;
+
+    if (v == NULL || at == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    for (i = 0; i < n; i++) {
+        at[i] = ir_int_op(IR_I64, layout->offsets[i]);
+        v[i] = load_lane(x, lane, inst->a, layout->offsets[i]);
+    }
+    for (half = n / 2; half >= 1; half /= 2) {
+        for (i = 0; i < half; i++) {
+            struct ir_operand lo = v[i];
+            struct ir_operand hi = v[i + half];
+            struct ir_operand c;
+            if (!pick) {
+                x->type = lane;
+                v[i] = binary(x, op, lo, hi);
+                continue;
+            }
+            c = compare(x, op, hi, lo);
+            if (!is_float) {
+                x->type = lane;
+                v[i] = choose(x, c, hi, lo);
+                continue;
+            }
+            x->type = IR_I64;
+            at[i] = choose(x, c, at[i + half], at[i]);
+            v[i] = temp(x, ir_load(x->f, x->out, lane,
+                                   temp(x, ir_ptradd(x->f, x->out, inst->a,
+                                                     at[i]))));
+        }
+    }
+    result = v[0];
+    free(v);
+    free(at);
+    return result;
+}
+
+static void expand_vector(struct expander *x, const struct ir_inst *inst,
+                          const struct expand_target *t)
+{
+    const struct ir_aggtype *agg = t->m->aggs[inst->of.agg];
+    const struct layout *layout = layout_agg(t->layouts, inst->of.agg);
+    enum ir_type lane = agg->fields[0].type.type;
+    enum ir_op op = (enum ir_op)inst->field;
+    size_t n = agg->field_count;
+    struct ir_operand *values;
+    size_t i;
+
+    switch (inst->op) {
+    case IR_VBINARY:
+        for (i = 0; i < n; i++) {
+            struct ir_operand a = load_lane(x, lane, inst->b,
+                                            layout->offsets[i]);
+            struct ir_operand b = load_lane(x, lane, inst->c,
+                                            layout->offsets[i]);
+            if (is_lane_comparison(op)) {
+                store_lane(x, IR_I8, compare(x, op, a, b), inst->a, i);
+            } else {
+                x->type = lane;
+                store_lane(x, lane, binary(x, op, a, b), inst->a,
+                           layout->offsets[i]);
+            }
+        }
+        break;
+    case IR_VUNARY:
+        for (i = 0; i < n; i++) {
+            struct ir_operand a = load_lane(x, lane, inst->b,
+                                            layout->offsets[i]);
+            struct ir_operand r = temp(x, ir_unary(x->f, x->out, op, lane, a));
+            store_lane(x, lane, r, inst->a, layout->offsets[i]);
+        }
+        break;
+    case IR_VSPLAT:
+        for (i = 0; i < n; i++) {
+            store_lane(x, lane, inst->b, inst->a, layout->offsets[i]);
+        }
+        break;
+    case IR_VSELECT:
+        x->type = word_of(lane);
+        for (i = 0; i < n; i++) {
+            struct ir_operand m = load_lane(x, IR_I8, inst->b, i);
+            struct ir_operand a = load_lane(x, x->type, inst->c,
+                                            layout->offsets[i]);
+            struct ir_operand b = load_lane(x, x->type, inst->args[0],
+                                            layout->offsets[i]);
+            store_lane(x, x->type, choose(x, m, a, b), inst->a,
+                       layout->offsets[i]);
+        }
+        break;
+    case IR_VSHUFFLE:
+        values = calloc(n + 1, sizeof *values);
+        if (values == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        for (i = 0; i < n; i++) {
+            values[i] = load_lane(x, lane, inst->b,
+                                  layout->offsets[inst->args[i].as.integer]);
+        }
+        for (i = 0; i < n; i++) {
+            store_lane(x, lane, values[i], inst->a, layout->offsets[i]);
+        }
+        free(values);
+        break;
+    default:
+        ir_assign(x->f, x->out, inst->result,
+                  fold_lanes(x, inst, layout, n, lane));
+        break;
+    }
+}
+
+static bool is_vector(enum ir_op op)
+{
+    return op >= IR_VBINARY && op <= IR_VREDUCE;
+}
+
 static bool is_saturating(enum ir_op op)
 {
     return op == IR_ADD_SAT_S || op == IR_ADD_SAT_U || op == IR_SUB_SAT_S ||
@@ -308,15 +500,19 @@ static bool is_flag_operation(enum ir_op op)
 }
 
 /* Whether inst is an operation that this pass expands. */
-static bool expands(const struct ir_inst *inst,
-                    bool (*native)(const struct ir_inst *inst))
+static bool expands(const struct ir_inst *inst, const struct expand_target *t)
 {
+    if (is_vector(inst->op)) {
+        return !t->vector_native(inst, t->m->aggs[inst->of.agg],
+                                 layout_agg(t->layouts, inst->of.agg)->size,
+                                 t->cpu);
+    }
     return is_saturating(inst->op) ||
-           (is_flag_operation(inst->op) && !native(inst));
+           (is_flag_operation(inst->op) && !t->flags_native(inst));
 }
 
 static bool expand_block(struct ir_function *f, struct ir_block *b,
-                         bool (*native)(const struct ir_inst *inst))
+                         const struct expand_target *t)
 {
     struct ir_block out;
     struct expander x;
@@ -325,7 +521,7 @@ static bool expand_block(struct ir_function *f, struct ir_block *b,
     size_t k;
 
     for (i = 0; i < b->count && !changed; i++) {
-        changed = expands(&b->insts[i], native);
+        changed = expands(&b->insts[i], t);
     }
     if (!changed) {
         return false;
@@ -340,7 +536,9 @@ static bool expand_block(struct ir_function *f, struct ir_block *b,
         x.type = inst->type;
         if (is_saturating(inst->op)) {
             saturate(&x, inst);
-        } else if (expands(inst, native)) {
+        } else if (is_vector(inst->op) && expands(inst, t)) {
+            expand_vector(&x, inst, t);
+        } else if (expands(inst, t)) {
             reads = flags(&x, b, i);
         } else {
             ir_inst_add(&out, inst);
@@ -357,15 +555,14 @@ static bool expand_block(struct ir_function *f, struct ir_block *b,
     return true;
 }
 
-bool expand_function(struct ir_function *f,
-                     bool (*native)(const struct ir_inst *inst))
+bool expand_function(struct ir_function *f, const struct expand_target *t)
 {
     uint32_t line = f->at_line;
     bool changed = false;
     size_t b;
 
     for (b = 0; b < f->block_count; b++) {
-        changed = expand_block(f, f->blocks[b], native) || changed;
+        changed = expand_block(f, f->blocks[b], t) || changed;
     }
     f->at_line = line;
     return changed;

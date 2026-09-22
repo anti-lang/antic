@@ -17,7 +17,7 @@ _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
 _Static_assert(TOKEN_KIND_COUNT == 169, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
-_Static_assert(IR_RET == 79, "raise ANTL_VERSION, then update this");
+_Static_assert(IR_RET == 85, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_SYM == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_EXT_ZERO == 2, "raise ANTL_VERSION, then update this");
@@ -381,7 +381,8 @@ static void put_type(struct writer *w, const struct type *t)
             put_u8(w, (uint8_t)((unsigned)t->is_union |
                                 (unsigned)t->packed << 1 |
                                 (unsigned)t->has_abstract << 2 |
-                                (unsigned)t->is_final << 3));
+                                (unsigned)t->is_final << 3 |
+                                (unsigned)t->simd << 4));
             put_u64(w, t->align);
             put_u32(w, (uint32_t)t->field_count);
             for (i = 0; i < t->field_count; i++) {
@@ -649,7 +650,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         const struct ir_aggtype *t = ir->aggs[i];
         put_u8(w, (uint8_t)t->kind);
         put_str(w, t->name);
-        put_u8(w, t->packed);
+        put_u8(w, (uint8_t)((unsigned)t->packed | (unsigned)t->simd << 1));
         put_u64(w, t->align);
         put_u32(w, t->length);
         put_str(w, t->length_text);
@@ -1408,8 +1409,9 @@ static void read_types(struct reader *r)
             t->packed = (flags & 2) != 0;
             t->has_abstract = (flags & 4) != 0;
             t->is_final = (flags & 8) != 0;
+            t->simd = (flags & 16) != 0;
             t->align = get_u64(r);
-            if (flags > 15 || (t->align & (t->align - 1)) != 0) {
+            if (flags > 31 || (t->align & (t->align - 1)) != 0) {
                 damaged(r);
             }
             s->s = t;
@@ -1803,6 +1805,9 @@ static uint32_t map_agg(struct reader *r, struct ir_module *program,
                                        : ir_array_add(program, t->name,
                                                       t->fields[0].type,
                                                       length, t->length_text);
+    } else if (t->simd) {
+        maps->agg_map[agg] = ir_simd_add(program, t->name, t->fields,
+                                         t->field_count);
     } else {
         maps->agg_map[agg] = ir_struct_add(program, t->kind, t->name, t->fields,
                                            t->field_count, t->packed,
@@ -1963,9 +1968,15 @@ static void read_tables(struct reader *r, struct ir_module *program,
     for (i = 0; i < maps->agg_count && !r->failed; i++) {
         struct ir_aggtype *t = &maps->aggs[i];
         uint8_t kind = get_u8(r);
+        uint8_t flags;
         t->kind = (enum ir_agg_kind)kind;
         t->name = get_cstr(r);
-        t->packed = get_u8(r) != 0;
+        flags = get_u8(r);
+        t->packed = (flags & 1) != 0;
+        t->simd = (flags & 2) != 0;
+        if (flags > 3) {
+            damaged(r);
+        }
         t->align = get_u64(r);
         t->length = get_u32(r);
         t->length_text = get_cstr(r);
@@ -2250,7 +2261,9 @@ static void read_body(struct reader *r, struct ir_module *program,
             }
             if (!r->failed &&
                 ((op == IR_SLOT || op == IR_MEMCOPY || op == IR_BITLOAD ||
-                  op == IR_BITSTORE) == (inst.of.type == IR_VOID) ||
+                  op == IR_BITSTORE ||
+                  (op >= IR_VBINARY && op <= IR_VREDUCE)) ==
+                     (inst.of.type == IR_VOID) ||
                  ((op == IR_BITLOAD || op == IR_BITSTORE) &&
                   (inst.of.type != IR_AGG ||
                    inst.field >= program->aggs[inst.of.agg]->field_count ||

@@ -404,6 +404,13 @@ bool type_is_simd(const struct type *t);
 bool type_is_mask(const struct type *t);
 /* The type of the lanes of the simd struct t. */
 struct type *type_simd_lane(const struct type *t);
+/* The bytes of a lane of type t, or 0 for a type that is no lane.
+   DESIGN: a lane has one width on every target, so the size of a simd
+   struct is a property of its declaration. c_long, c_ulong and c_wchar,
+   whose width the target decides, are no lanes. */
+uint64_t type_lane_bytes(const struct type *t);
+/* The bytes of the simd struct t, its lanes without padding. */
+uint64_t type_simd_bytes(const struct type *t);
 
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */

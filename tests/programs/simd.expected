@@ -1,0 +1,48 @@
+exit 0
+add 3 4 5 6
+sub -1 0 1 2
+mul 2 4 6 8
+div 0.5 1 1.5 2
+neg -1 -2 -3 -4
+lt 1 0 0 0
+ge 0 1 1 1
+eq 0 1 0 0
+any 1 all 0 all 1 any 0
+select 1 2 2 2
+sum 10 min 1 max 4 dot 20
+halving 2
+shuffle 4 3 2 1
+pairs 1 1 2 2
+scale 3 6 9 12
+add8 1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5
+mul8 0.5 1 1.5 2 2.5 3 3.5 4
+twice 2 4 6 8 10 12 14 16
+sum8 36 min8 1 max8 8 dot8 18
+gt8 00001111
+select8 0.5 0.5 0.5 0.5 5 6 7 8
+reverse8 8 7 6 5 4 3 2 1
+f64 2.25 6.25 sum 4 max 2.5
+f32x2 9 16 dot 25
+iadd 4 1 6 -1
+isub -2 -5 0 -7
+imul 3 -6 9 -12
+idiv 0 0 1 -1
+iand 1 2 3 0
+ior 3 -1 3 -1
+ixor 2 -3 0 -1
+inot -2 1 -4 3
+ineg -1 2 -3 4
+ishl 4 -8 12 -16
+ishr 0 -1 1 -2
+ilt 1 1 0 1
+isum -2 imin -4 imax 3 idot -6
+wrap -2147483648 -2147483648 -2147483648 -2147483648
+ult 1 0 0 0 umax 4294967295 umin 1 ushr 0 2147483647 1 1
+i64 9000000000000000000 25 sum 2999999995 lt 0 1
+i16 24464 max 24464
+u8 250 255 0 sum 24 max 255 gt 011
+load 2.5 3.5 4.5 5.5
+store 0 5 7 11 0
+from 2 4 6 8
+as 9 4 128 63
+f16 1.75 sum 14 any 1

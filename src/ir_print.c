@@ -45,6 +45,9 @@ const char *ir_op_name(enum ir_op op)
         [IR_SLOT] = "slot", [IR_LOAD] = "load", [IR_STORE] = "store",
         [IR_PTRADD] = "ptradd", [IR_MEMCOPY] = "memcopy", [IR_ADDR] = "addr",
         [IR_BITLOAD] = "bitload", [IR_BITSTORE] = "bitstore",
+        [IR_VBINARY] = "vbinary", [IR_VUNARY] = "vunary",
+        [IR_VSPLAT] = "vsplat", [IR_VSELECT] = "vselect",
+        [IR_VSHUFFLE] = "vshuffle", [IR_VREDUCE] = "vreduce",
         [IR_CALL] = "call", [IR_JUMP] = "jump", [IR_BRANCH] = "branch",
         [IR_BRANCH_OV] = "branchov",
         [IR_RET] = "ret",
@@ -304,6 +307,43 @@ static void instruction(struct text *out, const struct ir_module *m,
             text_appendf(out, " %" PRIu32, inst->field);
         }
         break;
+    /* A simd operation names the operation of a lane where it has one,
+       the type of a lane, its operands and its simd struct. */
+    case IR_VBINARY:
+    case IR_VUNARY:
+    case IR_VSPLAT:
+    case IR_VSELECT:
+    case IR_VSHUFFLE:
+    case IR_VREDUCE:
+        if (inst->op == IR_VBINARY || inst->op == IR_VUNARY ||
+            inst->op == IR_VREDUCE) {
+            text_appendf(out, " %s", ir_op_name((enum ir_op)inst->field));
+        }
+        text_appendf(out, " %s ", ir_type_name(inst->type));
+        operand(out, m, &inst->a);
+        if (inst->b.kind != IR_NONE) {
+            text_append(out, ", ");
+            operand(out, m, &inst->b);
+        }
+        if (inst->c.kind != IR_NONE) {
+            text_append(out, ", ");
+            operand(out, m, &inst->c);
+        }
+        if (inst->op == IR_VSELECT && inst->arg_count == 1) {
+            text_append(out, ", ");
+            operand(out, m, &inst->args[0]);
+        }
+        if (inst->op == IR_VSHUFFLE) {
+            text_append(out, " [");
+            for (i = 0; i < inst->arg_count; i++) {
+                text_append(out, i > 0 ? ", " : "");
+                operand(out, m, &inst->args[i]);
+            }
+            text_append(out, "]");
+        }
+        text_append(out, ", ");
+        ir_vtype_print(out, m, inst->of);
+        break;
     case IR_RET:
         if (inst->type != IR_VOID) {
             text_appendf(out, " %s ", ir_type_name(inst->type));
@@ -357,7 +397,8 @@ static void aggtype(struct text *out, const struct ir_module *m,
         text_append(out, "\n");
         return;
     }
-    text_appendf(out, "%s%s", t->packed ? "packed " : "",
+    text_appendf(out, "%s%s%s", t->packed ? "packed " : "",
+                 t->simd ? "simd " : "",
                  t->kind == IR_AGG_UNION ? "union" : "struct");
     if (t->align != 0) {
         text_appendf(out, " align(%" PRIu64 ")", t->align);

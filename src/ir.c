@@ -183,6 +183,18 @@ uint32_t ir_struct_add(struct ir_module *m, enum ir_agg_kind kind,
     return add_agg(m, &key, fields, count);
 }
 
+uint32_t ir_simd_add(struct ir_module *m, const char *name,
+                     const struct ir_field *fields, size_t count)
+{
+    struct ir_aggtype key;
+
+    memset(&key, 0, sizeof key);
+    key.kind = IR_AGG_STRUCT;
+    key.name = name;
+    key.simd = true;
+    return add_agg(m, &key, fields, count);
+}
+
 uint32_t ir_array_add(struct ir_module *m, const char *name,
                       struct ir_vtype element, uint32_t length,
                       const char *length_text)
@@ -766,6 +778,101 @@ void ir_bitstore(struct ir_function *f, struct ir_block *b, enum ir_type type,
     inst->b = pointer;
     inst->of = ir_aggregate(agg);
     inst->field = field;
+}
+
+/* A simd operation on agg without a result, with lane operation op. */
+static struct ir_inst *vector_op(struct ir_function *f, struct ir_block *b,
+                                 enum ir_op kind, enum ir_op op,
+                                 enum ir_type lane, uint32_t agg)
+{
+    struct ir_inst *inst = append(f, b, kind, lane, IR_NO_RESULT);
+
+    inst->of = ir_aggregate(agg);
+    inst->field = (uint32_t)op;
+    return inst;
+}
+
+void ir_vbinary(struct ir_function *f, struct ir_block *b, enum ir_op op,
+                enum ir_type lane, struct ir_operand dst, struct ir_operand x,
+                struct ir_operand y, uint32_t agg)
+{
+    struct ir_inst *inst = vector_op(f, b, IR_VBINARY, op, lane, agg);
+
+    inst->a = dst;
+    inst->b = x;
+    inst->c = y;
+}
+
+void ir_vunary(struct ir_function *f, struct ir_block *b, enum ir_op op,
+               enum ir_type lane, struct ir_operand dst, struct ir_operand x,
+               uint32_t agg)
+{
+    struct ir_inst *inst = vector_op(f, b, IR_VUNARY, op, lane, agg);
+
+    inst->a = dst;
+    inst->b = x;
+}
+
+void ir_vsplat(struct ir_function *f, struct ir_block *b, enum ir_type lane,
+               struct ir_operand dst, struct ir_operand value, uint32_t agg)
+{
+    struct ir_inst *inst = vector_op(f, b, IR_VSPLAT, IR_COPY, lane, agg);
+
+    inst->a = dst;
+    inst->b = value;
+}
+
+static struct ir_operand *operand_list(size_t count)
+{
+    struct ir_operand *list = malloc((count + 1) * sizeof *list);
+
+    if (list == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    return list;
+}
+
+void ir_vselect(struct ir_function *f, struct ir_block *b, enum ir_type lane,
+                struct ir_operand dst, struct ir_operand mask,
+                struct ir_operand x, struct ir_operand y, uint32_t agg)
+{
+    struct ir_inst *inst = vector_op(f, b, IR_VSELECT, IR_COPY, lane, agg);
+
+    inst->a = dst;
+    inst->b = mask;
+    inst->c = x;
+    inst->args = operand_list(1);
+    inst->args[0] = y;
+    inst->arg_count = 1;
+}
+
+void ir_vshuffle(struct ir_function *f, struct ir_block *b, enum ir_type lane,
+                 struct ir_operand dst, struct ir_operand x,
+                 const uint32_t *lanes, size_t count, uint32_t agg)
+{
+    struct ir_inst *inst = vector_op(f, b, IR_VSHUFFLE, IR_COPY, lane, agg);
+    size_t i;
+
+    inst->a = dst;
+    inst->b = x;
+    inst->args = operand_list(count);
+    for (i = 0; i < count; i++) {
+        inst->args[i] = ir_int_op(IR_I32, lanes[i]);
+    }
+    inst->arg_count = count;
+}
+
+uint32_t ir_vreduce(struct ir_function *f, struct ir_block *b, enum ir_op op,
+                    enum ir_type type, struct ir_operand x, uint32_t agg)
+{
+    uint32_t result = ir_temp(f, type);
+    struct ir_inst *inst = append(f, b, IR_VREDUCE, type, result);
+
+    inst->a = x;
+    inst->of = ir_aggregate(agg);
+    inst->field = (uint32_t)op;
+    return result;
 }
 
 uint32_t ir_call(struct ir_function *f, struct ir_block *b, enum ir_type type,

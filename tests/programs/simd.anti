@@ -1,0 +1,209 @@
+//! Simd structs on values the program reads at run time: the element-wise
+//! operators, the masks of the comparisons, `simd.select`, `simd.any` and
+//! `simd.all`, the built-ins splat, load, store, shuffle, sum, min, max
+//! and dot, and `as` to an array or a plain struct and back. `F32x8` is
+//! two vectors on ARM64 and below x86-64-v3, and one at v3. A sum folds
+//! the upper half of the lanes onto the lower half, which the line
+//! `halving` shows: in another order the lanes give 1 or 0, not 2.
+
+import anti.simd;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+simd struct F32x8 { a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32 }
+simd struct F64x2 { x: float, y: float }
+simd struct F32x2 { x: f32, y: f32 }
+simd struct I32x4 { a: i32, b: i32, c: i32, d: i32 }
+simd struct U32x4 { a: u32, b: u32, c: u32, d: u32 }
+simd struct I64x2 { a: int, b: int }
+simd struct I16x8 { a: i16, b: i16, c: i16, d: i16, e: i16, f: i16, g: i16, h: i16 }
+simd struct U8x16 {
+	b0: byte, b1: byte, b2: byte, b3: byte, b4: byte, b5: byte, b6: byte, b7: byte,
+	b8: byte, b9: byte, b10: byte, b11: byte, b12: byte, b13: byte, b14: byte, b15: byte,
+}
+simd struct H8 { a: f16, b: f16, c: f16, d: f16, e: f16, f: f16, g: f16, h: f16 }
+
+struct Vector4 { x: f32, y: f32, z: f32, w: f32 }
+
+/// Values the optimizer cannot see through.
+fn opaque(v: f32) -> f32
+{
+	return v;
+}
+
+fn fopaque(v: float) -> float
+{
+	return v;
+}
+
+fn iopaque(v: int) -> int
+{
+	return v;
+}
+
+fn show4(name: str, v: Vec4)
+{
+	printf("%s %g %g %g %g\n".ptr, name.ptr, v.x as float, v.y as float,
+	       v.z as float, v.w as float);
+}
+
+fn show8(name: str, v: F32x8)
+{
+	printf("%s %g %g %g %g %g %g %g %g\n".ptr, name.ptr, v.a as float,
+	       v.b as float, v.c as float, v.d as float, v.e as float,
+	       v.f as float, v.g as float, v.h as float);
+}
+
+fn showi(name: str, v: I32x4)
+{
+	printf("%s %d %d %d %d\n".ptr, name.ptr, v.a as c_int, v.b as c_int,
+	       v.c as c_int, v.d as c_int);
+}
+
+fn scale(v: Vec4, k: f32) -> Vec4
+{
+	return v * Vec4.splat(k);
+}
+
+fn twice(v: F32x8) -> F32x8
+{
+	return v + v;
+}
+
+fn floats()
+{
+	let a = Vec4 { x: opaque(1.0), y: opaque(2.0), z: opaque(3.0), w: opaque(4.0) };
+	let b = Vec4.splat(opaque(2.0));
+	show4("add", a + b);
+	show4("sub", a - b);
+	show4("mul", a * b);
+	show4("div", a / b);
+	show4("neg", -a);
+	let lt = a < b;
+	let ge = a >= b;
+	let eq = a == b;
+	printf("lt %d %d %d %d\n".ptr, lt.x as c_int, lt.y as c_int, lt.z as c_int,
+	       lt.w as c_int);
+	printf("ge %d %d %d %d\n".ptr, ge.x as c_int, ge.y as c_int, ge.z as c_int,
+	       ge.w as c_int);
+	printf("eq %d %d %d %d\n".ptr, eq.x as c_int, eq.y as c_int, eq.z as c_int,
+	       eq.w as c_int);
+	printf("any %d all %d all %d any %d\n".ptr, simd.any(lt) as c_int,
+	       simd.all(lt) as c_int, simd.all(a == a) as c_int,
+	       simd.any(a > a + b) as c_int);
+	show4("select", simd.select(lt, a, b));
+	printf("sum %g min %g max %g dot %g\n".ptr, a.sum() as float,
+	       a.min() as float, a.max() as float, a.dot(b) as float);
+	let h = Vec4 { x: opaque(100000000.0), y: opaque(1.0), z: opaque(-100000000.0),
+	               w: opaque(1.0) };
+	printf("halving %g\n".ptr, h.sum() as float);
+	show4("shuffle", a.shuffle(3, 2, 1, 0));
+	show4("pairs", a.shuffle(0, 0, 1, 1));
+	show4("scale", scale(a, opaque(3.0)));
+}
+
+fn wide()
+{
+	let p = F32x8 { a: opaque(1.0), b: opaque(2.0), c: opaque(3.0), d: opaque(4.0),
+	                e: opaque(5.0), f: opaque(6.0), g: opaque(7.0), h: opaque(8.0) };
+	let q = F32x8.splat(opaque(0.5));
+	show8("add8", p + q);
+	show8("mul8", p * q);
+	show8("twice", twice(p));
+	printf("sum8 %g min8 %g max8 %g dot8 %g\n".ptr, p.sum() as float,
+	       p.min() as float, p.max() as float, p.dot(q) as float);
+	let m = p > F32x8.splat(opaque(4.5));
+	printf("gt8 %d%d%d%d%d%d%d%d\n".ptr, m.a as c_int, m.b as c_int,
+	       m.c as c_int, m.d as c_int, m.e as c_int, m.f as c_int,
+	       m.g as c_int, m.h as c_int);
+	show8("select8", simd.select(m, p, q));
+	show8("reverse8", p.shuffle(7, 6, 5, 4, 3, 2, 1, 0));
+	let d = F64x2 { x: fopaque(1.5), y: fopaque(2.5) };
+	let dd = d * d;
+	printf("f64 %g %g sum %g max %g\n".ptr, dd.x, dd.y, d.sum(), d.max());
+	let e = F32x2 { x: opaque(3.0), y: opaque(4.0) };
+	let ee = e * e;
+	printf("f32x2 %g %g dot %g\n".ptr, ee.x as float, ee.y as float,
+	       e.dot(e) as float);
+}
+
+fn integers()
+{
+	let i = I32x4 { a: iopaque(1) as i32, b: iopaque(-2) as i32,
+	                c: iopaque(3) as i32, d: iopaque(-4) as i32 };
+	let j = I32x4.splat(iopaque(3) as i32);
+	showi("iadd", i + j);
+	showi("isub", i - j);
+	showi("imul", i * j);
+	showi("idiv", i / j);
+	showi("iand", i & j);
+	showi("ior", i | j);
+	showi("ixor", i ^ j);
+	showi("inot", ~i);
+	showi("ineg", -i);
+	showi("ishl", i << I32x4.splat(2));
+	showi("ishr", i >> I32x4.splat(1));
+	let lt = i < j;
+	printf("ilt %d %d %d %d\n".ptr, lt.a as c_int, lt.b as c_int, lt.c as c_int,
+	       lt.d as c_int);
+	printf("isum %d imin %d imax %d idot %d\n".ptr, i.sum() as c_int,
+	       i.min() as c_int, i.max() as c_int, i.dot(j) as c_int);
+	showi("wrap", I32x4.splat(iopaque(2147483647) as i32) + I32x4.splat(1));
+	let u = U32x4 { a: iopaque(1) as u32, b: iopaque(4294967295) as u32,
+	                c: iopaque(2) as u32, d: iopaque(3) as u32 };
+	let two = U32x4.splat(2);
+	let ult = u < two;
+	let ushr = u >> U32x4.splat(1);
+	printf("ult %d %d %d %d umax %u umin %u ushr %u %u %u %u\n".ptr,
+	       ult.a as c_int, ult.b as c_int, ult.c as c_int, ult.d as c_int,
+	       u.max(), u.min(), ushr.a, ushr.b, ushr.c, ushr.d);
+	let k = I64x2 { a: iopaque(3000000000), b: iopaque(-5) };
+	let kk = k * k;
+	let neg = k < I64x2.splat(0);
+	printf("i64 %lld %lld sum %lld lt %d %d\n".ptr, kk.a, kk.b, k.sum(),
+	       neg.a as c_int, neg.b as c_int);
+	let s = I16x8.splat(iopaque(300) as i16) * I16x8.splat(300);
+	printf("i16 %d max %d\n".ptr, s.a as c_int, s.max() as c_int);
+	let b = U8x16 {
+		b0: iopaque(0) as byte, b1: 1, b2: 2, b3: 3, b4: 4, b5: 5, b6: 6, b7: 7,
+		b8: 8, b9: 9, b10: 10, b11: 11, b12: 12, b13: 13, b14: 14, b15: 15,
+	};
+	let c = b + U8x16.splat(250);
+	let big = b > U8x16.splat(7);
+	printf("u8 %d %d %d sum %d max %d gt %d%d%d\n".ptr, c.b0 as c_int,
+	       c.b5 as c_int, c.b6 as c_int, c.sum() as c_int, c.max() as c_int,
+	       big.b7 as c_int, big.b8 as c_int, big.b15 as c_int);
+}
+
+fn memory()
+{
+	let data: [8]f32 = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5];
+	let out: [8]f32 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+	let v = Vec4.load(data[0..8], iopaque(2));
+	show4("load", v);
+	(v * Vec4.splat(2.0)).store(out[0..8], iopaque(3));
+	printf("store %g %g %g %g %g\n".ptr, out[2] as float, out[3] as float,
+	       out[4] as float, out[6] as float, out[7] as float);
+	let raw = Vector4 { x: opaque(1.0), y: opaque(2.0), z: opaque(3.0), w: opaque(4.0) };
+	let w = raw as Vec4;
+	show4("from", w + w);
+	let back = (w * w) as Vector4;
+	let arr = w as [4]f32;
+	let bytes = Vec4.splat(opaque(1.0)) as [16]byte;
+	printf("as %g %g %d %d\n".ptr, back.z as float, arr[3] as float,
+	       bytes[2] as c_int, bytes[3] as c_int);
+	let half = H8.splat(opaque(1.5) as f16) + H8.splat(opaque(0.25) as f16);
+	let hm = half > H8.splat(1.0 as f16);
+	printf("f16 %g sum %g any %d\n".ptr, half.c as float, half.sum() as float,
+	       simd.any(hm) as c_int);
+}
+
+fn main() -> int
+{
+	floats();
+	wide();
+	integers();
+	memory();
+	return 0;
+}

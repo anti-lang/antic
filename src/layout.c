@@ -275,6 +275,13 @@ static void compute(struct layouts *l, uint32_t agg)
             out->unaligned = true;
         }
     }
+    /* DESIGN: a simd struct aligns to its size or to sixteen, whichever
+       is less, as the vector types of C do. Its lanes leave no padding,
+       so the size is the bytes of its lanes. */
+    if (t->simd) {
+        uint64_t bytes = (bit + 7) / 8;
+        align = bytes < 16 ? bytes : 16;
+    }
     /* DESIGN: align(N) raises the alignment, as C's _Alignas does, and a
        value below the alignment the fields give is an error, as in C. */
     if (t->align != 0 && t->align < align) {

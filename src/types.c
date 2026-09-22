@@ -747,6 +747,31 @@ struct type *type_simd_lane(const struct type *t)
     return t->fields[0].type;
 }
 
+uint64_t type_lane_bytes(const struct type *t)
+{
+    switch (t->kind) {
+    case TYPE_BOOL:
+    case TYPE_I8:
+    case TYPE_U8: return 1;
+    case TYPE_I16:
+    case TYPE_U16:
+    case TYPE_F16: return 2;
+    case TYPE_CHAR:
+    case TYPE_I32:
+    case TYPE_U32:
+    case TYPE_F32: return 4;
+    case TYPE_I64:
+    case TYPE_U64:
+    case TYPE_F64: return 8;
+    default: return 0;
+    }
+}
+
+uint64_t type_simd_bytes(const struct type *t)
+{
+    return type_lane_bytes(type_simd_lane(t)) * t->field_count;
+}
+
 static struct name name_of(const char *text)
 {
     struct name n;

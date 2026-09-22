@@ -130,6 +130,12 @@ struct target_desc {
        flags where the instruction leaves them. The back end expands every
        other one into plain operations. */
     bool (*flags_native)(const struct ir_inst *inst);
+    /* Whether the target selects the simd operation inst on the simd
+       struct agg of size bytes at level cpu. The back end expands every
+       other one into an operation per lane. */
+    bool (*vector_native)(const struct ir_inst *inst,
+                          const struct ir_aggtype *agg, uint64_t size,
+                          enum cpu_level cpu);
     /* Register allocation and frame layout, chapter 13. */
     void (*load_spill)(struct mach_block *b, uint8_t reg, int64_t offset);
     void (*store_spill)(struct mach_block *b, uint8_t reg, int64_t offset);

@@ -116,6 +116,99 @@ static void same_type(struct verifier *v, const struct ir_inst *inst,
     }
 }
 
+/* Whether op is an operation of one lane that the simd operation kind
+   takes on lanes of type lane. */
+static bool lane_op_ok(enum ir_op kind, enum ir_op op, enum ir_type lane)
+{
+    bool is_float = lane == IR_F32 || lane == IR_F64;
+
+    switch (kind) {
+    case IR_VBINARY:
+        if (op >= IR_EQ && op <= IR_UGE) {
+            return !is_float;
+        }
+        if (op >= IR_FEQ && op <= IR_FGE) {
+            return is_float;
+        }
+        return is_float ? op >= IR_FADD && op <= IR_FDIV
+                        : op == IR_ADD || op == IR_SUB || op == IR_MUL ||
+                              op == IR_AND || op == IR_OR || op == IR_XOR;
+    case IR_VUNARY:
+        return is_float ? op == IR_FNEG : op == IR_NEG || op == IR_NOT;
+    case IR_VREDUCE:
+        if (op == IR_OR || op == IR_AND) {
+            return lane == IR_I8;
+        }
+        return is_float ? op == IR_FADD || op == IR_FLT || op == IR_FGT
+                        : op == IR_ADD || op == IR_SLT || op == IR_ULT ||
+                              op == IR_SGT || op == IR_UGT;
+    default:
+        return op == IR_COPY;
+    }
+}
+
+/* A simd operation names a simd struct, the type of its lanes and an
+   operation of one lane, and takes addresses of values. */
+static void vector_ok(struct verifier *v, const struct ir_inst *inst)
+{
+    const char *name = ir_op_name(inst->op);
+    const struct ir_aggtype *t;
+    enum ir_type lane;
+    size_t i;
+
+    if (inst->of.type != IR_AGG || inst->of.agg >= v->m->agg_count ||
+        !v->m->aggs[inst->of.agg]->simd) {
+        fail(v, "%s names a type that is not a simd struct", name);
+        return;
+    }
+    t = v->m->aggs[inst->of.agg];
+    lane = t->fields[0].type.type;
+    if (inst->type != lane) {
+        fail(v, "%s works on lanes of %s in a simd struct of %s", name,
+             ir_type_name(inst->type), ir_type_name(lane));
+    }
+    if (!lane_op_ok(inst->op, (enum ir_op)inst->field, lane)) {
+        fail(v, "%s takes no %s on lanes of %s", name,
+             inst->field <= IR_RET ? ir_op_name((enum ir_op)inst->field)
+                                   : "operation",
+             ir_type_name(lane));
+    }
+    same_type(v, inst, &inst->a, IR_PTR);
+    switch (inst->op) {
+    case IR_VSPLAT:
+        same_type(v, inst, &inst->b, lane);
+        break;
+    case IR_VSELECT:
+        same_type(v, inst, &inst->b, IR_PTR);
+        same_type(v, inst, &inst->c, IR_PTR);
+        if (inst->arg_count != 1) {
+            fail(v, "vselect takes one operand after its mask and value");
+        } else {
+            same_type(v, inst, &inst->args[0], IR_PTR);
+        }
+        break;
+    case IR_VSHUFFLE:
+        same_type(v, inst, &inst->b, IR_PTR);
+        if (inst->arg_count != t->field_count) {
+            fail(v, "vshuffle names %zu lanes of a simd struct of %zu",
+                 inst->arg_count, t->field_count);
+        }
+        for (i = 0; i < inst->arg_count; i++) {
+            if (inst->args[i].kind != IR_INT ||
+                inst->args[i].as.integer >= t->field_count) {
+                fail(v, "vshuffle names a lane that is not a constant index");
+            }
+        }
+        break;
+    case IR_VREDUCE:
+        break;
+    default:
+        same_type(v, inst, &inst->b, IR_PTR);
+        same_type(v, inst, &inst->c, IR_PTR);
+        break;
+    }
+}
+
 static void check_inst(struct verifier *v, const struct ir_inst *inst)
 {
     enum ir_type result = v->f->result == IR_AGG ? IR_PTR : v->f->result;
@@ -212,6 +305,14 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
             fail(v, "%s names a field that is not a bitfield",
                  ir_op_name(inst->op));
         }
+        break;
+    case IR_VBINARY:
+    case IR_VUNARY:
+    case IR_VSPLAT:
+    case IR_VSELECT:
+    case IR_VSHUFFLE:
+    case IR_VREDUCE:
+        vector_ok(v, inst);
         break;
     case IR_CALL: {
         /* A direct call names its callee in a, a call through a pointer

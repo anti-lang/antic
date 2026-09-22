@@ -898,6 +898,19 @@ static void emit_overflow(struct selector *s, const struct ir_inst *inst)
    them, since x86_64 keeps the borrow of a subtraction there. bt puts
    bit 0 of the bool of a carry in into CF. A move between them leaves the
    flags alone. */
+/* Whether the target selects the simd operation inst on agg of size
+   bytes at level cpu. */
+static bool vector_native(const struct ir_inst *inst,
+                          const struct ir_aggtype *agg, uint64_t size,
+                          enum cpu_level cpu)
+{
+    (void)inst;
+    (void)agg;
+    (void)size;
+    (void)cpu;
+    return false;
+}
+
 static bool flags_native(const struct ir_inst *inst)
 {
     return (inst->op == IR_ADD_FL || inst->op == IR_SUB_FL ||
@@ -2186,6 +2199,7 @@ static const struct target_desc desc = {
        frame is an error rather than a movabs sequence, see docs/decisions.md. */
     .frame_limit = 0x7fffffff,
     .flags_native = flags_native,
+    .vector_native = vector_native,
     .load_spill = load_spill,
     .store_spill = store_spill,
     .resolve_slot = resolve_slot,

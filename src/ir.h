@@ -67,6 +67,11 @@ struct ir_aggtype {
     struct ir_field *fields;
     size_t field_count;
     bool packed;
+    /* DESIGN: a simd struct is a struct of lanes of one scalar type. The
+       back end aligns it to its size or to sixteen, whichever is less.
+       It passes it in vector registers where its convention passes the
+       vector type of C. */
+    bool simd;
     uint64_t align;                 /* the N of align(N), or 0 */
     uint32_t length;                /* IR_AGG_ARRAY: a symbolic value */
     const char *length_text;        /* IR_AGG_ARRAY: the length as written */
@@ -141,6 +146,24 @@ enum ir_op {
     IR_ADDR,        /* Result ptr: address of a. */
     IR_BITLOAD,     /* Result: load bitfield field of aggregate of from a. */
     IR_BITSTORE,    /* Store a into bitfield field of aggregate of at b. */
+    /* DESIGN: an operation on simd structs works on whole values in
+       memory, as memcopy does, so the IR holds no vector type and no
+       width. of is the simd aggregate of the operands, type the type of
+       one lane and field the operation of one lane, an ir_op. The back
+       end maps each to the native width of its target and level. It
+       expands one it has no instruction for into an operation per
+       lane. */
+    IR_VBINARY,     /* The lane operation field of b and c into a. A
+                       comparison writes a mask, one i8 per lane. */
+    IR_VUNARY,      /* The lane operation field of b into a. */
+    IR_VSPLAT,      /* The scalar b into every lane of a. */
+    IR_VSELECT,     /* Into a the lane of c where the mask b holds, and
+                       the lane of args[0] where it does not. */
+    IR_VSHUFFLE,    /* Into lane i of a the lane args[i] of b. */
+    IR_VREDUCE,     /* Result: the lanes at a folded by field. IR_ADD or
+                       IR_FADD sums, a less-than keeps the least, a
+                       greater-than the greatest, and IR_OR and IR_AND
+                       fold a mask. */
     /* Calls. */
     IR_CALL,        /* Result: call a with args, as signature b if set.
                        A call through a table names in c the descriptor
@@ -409,6 +432,9 @@ uint32_t ir_file_add(struct ir_module *m, const char *path);
 uint32_t ir_struct_add(struct ir_module *m, enum ir_agg_kind kind,
                        const char *name, const struct ir_field *fields,
                        size_t count, bool packed, uint64_t align);
+/* Add a simd struct of count lanes, or find the one of that name. */
+uint32_t ir_simd_add(struct ir_module *m, const char *name,
+                     const struct ir_field *fields, size_t count);
 /* Add an array of a symbolic length, or find the one of that name. */
 uint32_t ir_array_add(struct ir_module *m, const char *name,
                       struct ir_vtype element, uint32_t length,
@@ -520,6 +546,24 @@ uint32_t ir_bitload(struct ir_function *f, struct ir_block *b,
 void ir_bitstore(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand value, struct ir_operand pointer,
                  uint32_t agg, uint32_t field);
+/* The operations on simd structs. lane is the type of one lane of agg,
+   and dst, x, y and mask are addresses of values. */
+void ir_vbinary(struct ir_function *f, struct ir_block *b, enum ir_op op,
+                enum ir_type lane, struct ir_operand dst, struct ir_operand x,
+                struct ir_operand y, uint32_t agg);
+void ir_vunary(struct ir_function *f, struct ir_block *b, enum ir_op op,
+               enum ir_type lane, struct ir_operand dst, struct ir_operand x,
+               uint32_t agg);
+void ir_vsplat(struct ir_function *f, struct ir_block *b, enum ir_type lane,
+               struct ir_operand dst, struct ir_operand value, uint32_t agg);
+void ir_vselect(struct ir_function *f, struct ir_block *b, enum ir_type lane,
+                struct ir_operand dst, struct ir_operand mask,
+                struct ir_operand x, struct ir_operand y, uint32_t agg);
+void ir_vshuffle(struct ir_function *f, struct ir_block *b, enum ir_type lane,
+                 struct ir_operand dst, struct ir_operand x,
+                 const uint32_t *lanes, size_t count, uint32_t agg);
+uint32_t ir_vreduce(struct ir_function *f, struct ir_block *b, enum ir_op op,
+                    enum ir_type type, struct ir_operand x, uint32_t agg);
 uint32_t ir_call(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand callee, const struct ir_operand *args,
                  size_t arg_count);

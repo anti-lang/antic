@@ -100,7 +100,8 @@ static void delete_inst(struct ir_block *b, size_t i)
 static bool is_pure(enum ir_op op)
 {
     return op != IR_STORE && op != IR_BITSTORE && op != IR_MEMCOPY &&
-           op != IR_CALL &&
+           op != IR_CALL && op != IR_VBINARY && op != IR_VUNARY &&
+           op != IR_VSPLAT && op != IR_VSELECT && op != IR_VSHUFFLE &&
            op != IR_JUMP && op != IR_BRANCH && op != IR_BRANCH_OV &&
            op != IR_RET;
 }
@@ -1030,6 +1031,11 @@ static bool forward_stores(struct ir_function *f)
             case IR_MEMCOPY:
             case IR_BITSTORE:
             case IR_BITLOAD:
+            case IR_VBINARY:
+            case IR_VUNARY:
+            case IR_VSPLAT:
+            case IR_VSELECT:
+            case IR_VSHUFFLE:
                 memset(&held, 0, sizeof held);
                 break;
             default:
