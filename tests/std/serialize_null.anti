@@ -54,10 +54,10 @@ fn show(k: *Kinds)
 	printf("bits %d %d %d arr %d %d %d word %d\n".ptr, k.low as c_int,
 		k.high as c_int, k.mid as c_int, k.arr[0] as c_int,
 		k.arr[1] as c_int, k.arr[2] as c_int, k.word.i as c_int);
-	printf("slices %d %d %d pointers %d %d %d name \"%s\"\n".ptr,
+	printf("slices %d %d %d pointers %d %d %d name \"%.*s\"\n".ptr,
 		k.tags.len as c_int, k.rows.len as c_int, k.counts.len as c_int,
 		(k.other == none) as c_int, (k.spot == none) as c_int,
-		(k.f == none) as c_int, k.name.ptr);
+		(k.f == none) as c_int, k.name.len as c_int, k.name.ptr);
 }
 
 fn main() -> int
