@@ -1,6 +1,7 @@
 //! `Object.deserialize` reads the registry of every class of the
 //! program, which the module that links writes. The test
 //! `program_deserialize_dev` builds this program in dev mode as well.
+import anti.mem;
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
@@ -12,12 +13,14 @@ class Point
 
 fn main() -> int
 {
-	let o = Object.deserialize("{\"type\":\"deserialize.Point\",\"x\":7}");
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 256);
+	let o = Object.deserialize("{\"type\":\"deserialize.Point\",\"x\":7}",
+		&arena);
 	if o == none || !(o is *Point) {
 		return 1;
 	}
 	let p = o as *Point;
 	printf("%d %d\n".ptr, p.x as c_int, p.y as c_int);
-	delete(p);
+	arena.free_all();
 	return 0;
 }

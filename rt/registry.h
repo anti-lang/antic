@@ -47,8 +47,11 @@ const struct anti_class *anti_rt_registry_find(const unsigned char *name,
 /* A new object of the class named, on the heap, or NULL. */
 void *anti_rt_reflect_new(const unsigned char *name, int64_t length);
 
-/* A new object from the JSON that the default serialize writes. NULL
-   when the text is not such an object of a class of the program. */
-void *anti_lang_Object_deserialize(struct anti_text input);
+/* A new object from the JSON that the default serialize writes. The
+   object, every string and every owned object come from the
+   anti.mem.Allocator from. NULL when the text is not such an object of a
+   class of the program, and every block it took is back with from. */
+void *anti_lang_Object_deserialize(struct anti_text input,
+                                   struct anti_object *from);
 
 #endif

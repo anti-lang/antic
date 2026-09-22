@@ -725,6 +725,38 @@ static struct type *location_type(struct checker *c, struct pos pos)
     return sym->type;
 }
 
+/* DESIGN: `Object.deserialize` takes the allocator of the memory it makes
+   as a `*anti.mem.Allocator`. The type of a use names that class, so an
+   argument converts to it as to any parameter, through the sub-object of
+   an interface as well. The module imports `anti.mem`, as the one that
+   writes `here` imports `anti.lang`. The type of the use, or NULL after an
+   error at pos. */
+static struct type *deserialize_type(struct checker *c, struct pos pos,
+                                     const struct type *declared)
+{
+    static const struct name module = {MEM_MODULE, sizeof MEM_MODULE - 1};
+    static const struct name class_name = {MEM_ALLOCATOR,
+                                           sizeof MEM_ALLOCATOR - 1};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+    struct type **params;
+
+    if (sym == NULL && name_is(&c->module_name, MEM_MODULE)) {
+        sym = lookup(c, &class_name);
+    }
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
+        sym->type->kind != TYPE_CLASS) {
+        error_at(c, pos, "`" LANG_OBJECT "." ROOT_DESERIALIZE "` takes its "
+                 "memory from an `" MEM_MODULE "." MEM_ALLOCATOR "`, so the "
+                 "module imports `" MEM_MODULE "`");
+        return NULL;
+    }
+    params = arena_alloc(c->arena, 2 * sizeof *params);
+    params[0] = declared->params[0];
+    params[1] = types_pointer(c->types, sym->type);
+    return types_fn(c->types, params, 2, declared->result);
+}
+
 /* The type of a function item, fn(params) -> result. A function of a
    struct body that takes self has a first parameter of type *T. */
 static struct type *function_type(struct checker *c, struct item *it)
@@ -2184,33 +2216,37 @@ static bool refuse_abstract_value(struct checker *c, struct pos pos,
     return true;
 }
 
-/* DESIGN: `Object.deserialize(input: str) -> *Object` is the static
-   counterpart of `serialize`, with its body in the runtime. It is visible
-   everywhere but is not `pub` to the tables, which hold functions with
-   `self` alone. Every table therefore still starts with the seven
-   functions of the root. It gives `none` when the text is not an object of
-   a class of the program. */
+/* DESIGN: `Object.deserialize(input: str, from: *Allocator) -> *Object`
+   is the static counterpart of `serialize`, with its body in the
+   runtime. It is visible everywhere but is not `pub` to the tables, which
+   hold functions with `self` alone. Every table therefore still starts
+   with the seven functions of the root. It gives `none` when the text is
+   not an object of a class of the program. The checker builds the root
+   before any module and cannot name `anti.mem`, so the item holds `*Object`
+   in the place of the allocator. deserialize_type gives a use the real
+   type. */
 static void declare_deserialize(struct checker *c, struct type *object)
 {
     struct item **members =
         arena_alloc(c->arena, (object->member_count + 1) * sizeof *members);
     struct item *it = arena_alloc(c->arena, sizeof *it);
     struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
-    struct type **params = arena_alloc(c->arena, sizeof *params);
+    struct type **params = arena_alloc(c->arena, 2 * sizeof *params);
 
     memset(it, 0, sizeof *it);
     memset(sym, 0, sizeof *sym);
     params[0] = builtin(c, TYPE_STR);
+    params[1] = types_pointer(c->types, object);
     it->kind = ITEM_FN;
     it->vis = VIS_PUB;
-    it->runtime = "deserialize";
-    it->name.text = "deserialize";
-    it->name.length = 11;
+    it->runtime = ROOT_DESERIALIZE;
+    it->name.text = ROOT_DESERIALIZE;
+    it->name.length = sizeof ROOT_DESERIALIZE - 1;
     it->symbol = sym;
     sym->kind = SYMBOL_FN;
     sym->name = it->name;
     sym->item = it;
-    sym->type = types_fn(c->types, params, 1,
+    sym->type = types_fn(c->types, params, 2,
                          types_pointer(c->types, object));
     memcpy(members, object->members, object->member_count * sizeof *members);
     members[object->member_count] = it;
@@ -3603,6 +3639,11 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
         e->as.field.through = table_sub_object(t, m);
     }
     e->symbol = m->symbol;
+    if (m->runtime != NULL && name_is(&m->name, ROOT_DESERIALIZE) &&
+        m->symbol->type != NULL) {
+        struct type *fn = deserialize_type(c, e->pos, m->symbol->type);
+        return fn != NULL ? fn : builtin(c, TYPE_ERROR);
+    }
     return m->symbol->type != NULL ? m->symbol->type
                                    : builtin(c, TYPE_ERROR);
 }

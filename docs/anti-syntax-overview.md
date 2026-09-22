@@ -477,9 +477,15 @@ let r = reflect.call(obj, m, []) catch fatal;
 let fresh = reflect.new("Circle");
 ```
 
-`anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `copy(self, to: *Object)` fills an object that `dup` has already allocated at its concrete size, and a replacement fills the fields and never allocates. `--no-reflect` drops the field and function lists.
+`anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `copy(self, to: *Object)` fills an object that `dup` has already allocated at its concrete size, and a replacement fills the fields and never allocates. `Object.deserialize(text, from)` reads the text of `serialize` back into an object, which comes with its strings and the objects it owns from the `anti.mem.Allocator` `from`. The caller gives them back through `from` at once. `--no-reflect` drops the field and function lists.
 
-Built: descriptors, `get`, `set`, `call`, `new` and `Value`.
+```anti
+let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 4096);
+let back = Object.deserialize(b.text(), &arena);
+arena.free_all();
+```
+
+Built: descriptors, `get`, `set`, `call`, `new`, `Value` and `Object.deserialize` with an `Allocator`.
 
 ## Operators on classes
 
@@ -569,7 +575,7 @@ class Renderer
 
 Six standard interfaces ship with defaults: `Logger`, `Clock`, `Random`, `FileSystem`, `Allocator`, `Config`. Standard interfaces for services come with a reference implementation: `anti.db` with SQLite, `anti.http`, `anti.serialize`, `anti.crypto`.
 
-Built: `anti.mem.Allocator` with `alloc(size, align)` and `free(p)`, its default `LibcAllocator` over the C library, and `ArenaAllocator`, which hands out memory from blocks and gives them all back at once. The language's `alloc` and `free` stay bound to the C library. Not built yet: `inject`, the manifest, the run-time replacement, the other five standard interfaces, the containers of `anti.collection` that take an `Allocator`, and the interfaces for services.
+Built: `anti.mem.Allocator` with `alloc(size, align)` and `free(p)`, its default `LibcAllocator` over the C library, and `ArenaAllocator`, which hands out memory from blocks and gives them all back at once. `Object.deserialize` takes one. The language's `alloc` and `free` stay bound to the C library. Not built yet: `inject`, the manifest, the run-time replacement, the other five standard interfaces, the containers of `anti.collection` that take an `Allocator`, and the interfaces for services.
 
 ## Plugins
 

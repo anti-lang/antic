@@ -1,0 +1,12 @@
+//! `Object.deserialize` takes the allocator of the memory it makes. A
+//! call without one, and a call with a value that is no allocator, are
+//! refused.
+import anti.mem;
+
+fn main() -> int
+{
+	let n = 1;
+	let a = Object.deserialize("{}");
+	let b = Object.deserialize("{}", &n);
+	return 0;
+}

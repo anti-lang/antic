@@ -256,6 +256,11 @@ struct type *types_object(struct types *types);
    function of the same module. */
 #define TEXT_EQUAL "equal"
 #define ROOT_TO_TEXT "to_text"
+/* `Object.deserialize` takes its memory from an allocator of this
+   class. */
+#define MEM_MODULE "anti.mem"
+#define MEM_ALLOCATOR "Allocator"
+#define ROOT_DESERIALIZE "deserialize"
 
 /* Whether t is the class `anti.lang.Error` itself. */
 bool types_is_lang_error(const struct type *t);

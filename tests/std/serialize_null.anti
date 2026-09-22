@@ -7,6 +7,7 @@
 //! included. Every field below holds a value other than its default
 //! before the object is written.
 import anti.io;
+import anti.mem;
 import anti.text;
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;
@@ -84,13 +85,14 @@ fn main() -> int
 	let b = text.Builder.new();
 	k.serialize(&b);
 	io.println(b.text());
-	let back = Object.deserialize(b.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(b.text(), &arena);
 	if back == none || !(back is *Kinds) {
 		return 2;
 	}
 	let e = back as *Kinds;
 	show(e);
-	delete(e);
+	arena.free_all();
 	delete(k);
 	return 0;
 }

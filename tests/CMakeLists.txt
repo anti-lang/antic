@@ -302,7 +302,14 @@ foreach(name IN ITEMS qualified_bodies qualified_chain qualified_single)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
 # The registry of the classes in dev mode, where the module that links
-# writes it.
+# writes it. The program takes its allocator from anti.mem. A dev link
+# names the object of anti.mem on the command line.
+add_test(NAME dev_object_mem
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/mem.antl")
+set_tests_properties(dev_object_mem PROPERTIES FIXTURES_SETUP mem_dev_object)
 add_test(NAME program_deserialize_dev
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
@@ -310,8 +317,11 @@ add_test(NAME program_deserialize_dev
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/deserialize.anti"
         "-DOPTIONS=--dev"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev.o"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+set_tests_properties(program_deserialize_dev PROPERTIES
+    FIXTURES_REQUIRED mem_dev_object)
 # Ownership without a field list: delete, destroy and dup call the
 # teardown and the copy that the compiler writes for each class.
 add_test(NAME program_delete_owned_no_reflect
@@ -1782,6 +1792,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "format_spec|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_spec.s,format_spec.anti"
         "format_types|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_types.s,format_types.anti"
         "format_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_no_import.s,format_no_import.anti"
+        "deserialize_alloc|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/deserialize_alloc.s,deserialize_alloc.anti"
+        "deserialize_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/deserialize_no_import.s,deserialize_no_import.anti"
         "transient|-S,-o,${LISTINGS}/transient.s,transient.anti"
         "member_keywords|-S,-o,${LISTINGS}/member_keywords.s,member_keywords.anti")
     string(REPLACE "|" ";" parts "${case}")

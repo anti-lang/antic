@@ -7,6 +7,7 @@
 //! field, a tie to the even one, where a read through an `f64` would
 //! round twice.
 import anti.io;
+import anti.mem;
 import anti.text;
 
 class Floats
@@ -41,7 +42,8 @@ fn trip(b: *text.Builder, c: *text.Builder, f: *Floats)
 	f.serialize(b);
 	let first = b.text();
 	io.println(first);
-	let back = Object.deserialize(first);
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(first, &arena);
 	if back == none || !(back is *Floats) {
 		io.println("refused");
 		return;
@@ -54,7 +56,7 @@ fn trip(b: *text.Builder, c: *text.Builder, f: *Floats)
 		*(&g.h as *u16) != *(&f.h as *u16) {
 		io.println("differs");
 	}
-	delete(g);
+	arena.free_all();
 }
 
 fn double(b: *text.Builder, c: *text.Builder, v: f64)
@@ -81,7 +83,8 @@ fn half(b: *text.Builder, c: *text.Builder, v: f32)
 /// Read input and print the text of the object it gives.
 fn read(c: *text.Builder, input: str)
 {
-	let back = Object.deserialize(input);
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(input, &arena);
 	if back == none {
 		io.println("refused");
 		return;
@@ -89,7 +92,7 @@ fn read(c: *text.Builder, input: str)
 	c.clear();
 	back.serialize(c);
 	io.println(c.text());
-	delete(back);
+	arena.free_all();
 }
 
 fn main() -> int

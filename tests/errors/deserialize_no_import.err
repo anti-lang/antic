@@ -1,0 +1,1 @@
+deserialize_no_import.anti:6:10: error: `Object.deserialize` takes its memory from an `anti.mem.Allocator`, so the module imports `anti.mem`

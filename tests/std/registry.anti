@@ -1,8 +1,10 @@
 //! The link step writes a registry of every class of the program.
 //! `reflect.new` builds an object of a class it names, and
-//! `Object.deserialize` builds one from the JSON that `serialize` writes.
+//! `Object.deserialize` builds one from the JSON that `serialize` writes,
+//! in memory of an arena that gives it all back at the end.
 import anti.io;
 import anti.lang;
+import anti.mem;
 import anti.reflect;
 import anti.text;
 
@@ -63,6 +65,7 @@ singleton class Settings
 
 fn main() -> int
 {
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
 	let o = reflect.new("Point");
 	if o == none || !(o is *Point) {
 		return 1;
@@ -88,7 +91,7 @@ fn main() -> int
 	/* A field whose class cannot be written as `T { }` has no value
 	   until a literal names it. */
 	if reflect.new("Holds") != none ||
-		Object.deserialize("{\"type\":\"Holds\"}") != none {
+		Object.deserialize("{\"type\":\"Holds\"}", &arena) != none {
 		return 4;
 	}
 
@@ -97,7 +100,7 @@ fn main() -> int
 	let b = text.Builder.new();
 	made.serialize(&b);
 	io.println(b.text());
-	let back = Object.deserialize(b.text());
+	let back = Object.deserialize(b.text(), &arena);
 	if back == none || !(back is *Marked) {
 		return 4;
 	}
@@ -108,24 +111,24 @@ fn main() -> int
 	b.clear();
 	r.serialize(&b);
 	io.println(b.text());
-	delete(r);
 	delete(made);
 
 	/* A class whose construct takes arguments comes back with its
 	   fields, since they come from the text. */
-	let sized = Object.deserialize("{ \"type\" : \"Sized\", \"n\" : 4 }");
+	let sized = Object.deserialize("{ \"type\" : \"Sized\", \"n\" : 4 }",
+		&arena);
 	if sized == none || !(sized is *Sized) {
 		return 5;
 	}
 	printf("%d\n".ptr, (sized as *Sized).n as c_int);
-	delete(sized);
 
-	if Object.deserialize("{\"type\":\"Nothing\"}") != none ||
-		Object.deserialize("{\"type\":\"Shape\"}") != none ||
-		Object.deserialize("{\"x\":1}") != none ||
-		Object.deserialize("{\"type\":\"Point\",\"x\":}") != none ||
-		Object.deserialize("not json") != none {
+	if Object.deserialize("{\"type\":\"Nothing\"}", &arena) != none ||
+		Object.deserialize("{\"type\":\"Shape\"}", &arena) != none ||
+		Object.deserialize("{\"x\":1}", &arena) != none ||
+		Object.deserialize("{\"type\":\"Point\",\"x\":}", &arena) != none ||
+		Object.deserialize("not json", &arena) != none {
 		return 6;
 	}
+	arena.free_all();
 	return 0;
 }

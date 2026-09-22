@@ -1,0 +1,207 @@
+//! `Object.deserialize` takes the object, every string and every owned
+//! object it makes from the allocator it is given, and the caller gives
+//! the memory back through that allocator. `Kept` remembers each block
+//! it lends, so the test sees that the strings of the object are among
+//! them and that none is left once they all go back. A text that fails
+//! gives back what it made. Over an `ArenaAllocator`, `free_all` gives
+//! back every block at once.
+import anti.mem;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+/// The most blocks that `Kept` lends.
+const ROOM: int = 32;
+
+/// An allocator over the C library that remembers every block it lends
+/// until the block comes back.
+class Kept inherits mem.Allocator
+{
+	blocks: ?*?*byte = none,
+	pub lent: int = 0,
+	pub live: int = 0,
+
+	/// An allocator with room to remember `ROOM` blocks.
+	pub fn new() -> Kept
+	{
+		return Kept { blocks: alloc(?*byte, ROOM) };
+	}
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let blocks = self.blocks else { return none; };
+		if self.lent == ROOM {
+			return none;
+		}
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		blocks[self.lent] = p;
+		self.lent += 1;
+		self.live += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		let blocks = self.blocks else { return; };
+		let i = 0;
+		while i < self.lent do {
+			if p != none && blocks[i] == p {
+				blocks[i] = none;
+				self.live -= 1;
+				mem.LibcAllocator.get().free(p);
+				return;
+			}
+			i += 1;
+		}
+	}
+
+	/// Whether `p` starts a block that is lent and not back yet.
+	pub fn holds(self, p: ?*byte) -> bool
+	{
+		let blocks = self.blocks else { return false; };
+		let i = 0;
+		while i < self.lent do {
+			if p != none && blocks[i] == p {
+				return true;
+			}
+			i += 1;
+		}
+		return false;
+	}
+
+	/// Give back every block still lent, as the caller of
+	/// `Object.deserialize` does when the object's life ends.
+	pub fn free_all(self)
+	{
+		let blocks = self.blocks else { return; };
+		let i = 0;
+		while i < self.lent do {
+			self.free(blocks[i]);
+			i += 1;
+		}
+	}
+
+	fn destruct(self)
+	{
+		free(self.blocks);
+	}
+}
+
+/// An allocator over the C library that counts the blocks it lends.
+class Counting inherits mem.Allocator
+{
+	pub live: int = 0,
+	pub taken: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		self.live += 1;
+		self.taken += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.live -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+class Leaf
+{
+	pub name: str = "",
+	pub weight: int = 0,
+}
+
+class Tree
+{
+	pub title: str = "",
+	pub own left: ?*Leaf = none,
+	pub own counts: []i32,
+	pub own words: []str,
+	pub leaf: Leaf = Leaf { },
+}
+
+/// The text that the default `serialize` writes for a tree with a
+/// string in every place that can hold one.
+fn written(b: *text.Builder) -> str
+{
+	let made = alloc Tree {
+		title: "oak",
+		left: alloc Leaf { name: "low", weight: 3 },
+		counts: []i32 { ptr: alloc(i32, 3), len: 3 },
+		words: []str { ptr: alloc(str, 2), len: 2 },
+		leaf: Leaf { name: "in", weight: 5 },
+	};
+	made.counts[0] = 1;
+	made.counts[1] = -2;
+	made.counts[2] = 3;
+	made.words[0] = "a";
+	made.words[1] = "bc";
+	made.serialize(b);
+	delete(made);
+	return b.text();
+}
+
+/// Whether every string of `t` starts a block of `kept`.
+fn strings_kept(t: *Tree, kept: *Kept) -> bool
+{
+	let left = t.left else { return false; };
+	return kept.holds(t.title.ptr) && kept.holds(left.name.ptr) &&
+		kept.holds(t.words[0].ptr) && kept.holds(t.words[1].ptr) &&
+		kept.holds(t.leaf.name.ptr);
+}
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	let input = written(&b);
+
+	let kept = Kept.new();
+	let back = Object.deserialize(input, &kept);
+	if back == none || !(back is *Tree) {
+		return 1;
+	}
+	let t = back as *Tree;
+	let left = t.left else { return 2; };
+	if !text.equal(t.title, "oak") || !text.equal(left.name, "low") ||
+		left.weight != 3 || t.counts.len != 3 || t.counts[1] != -2 ||
+		!text.equal(t.words[1], "bc") || !text.equal(t.leaf.name, "in") {
+		return 3;
+	}
+	printf("kept: %d lent, %d live, strings kept %d\n".ptr,
+		kept.lent as c_int, kept.live as c_int,
+		strings_kept(t, &kept) as c_int);
+	kept.free_all();
+	printf("after free_all: %d live\n".ptr, kept.live as c_int);
+
+	/* The weight is no number, so the text fails after four blocks, and
+	   deserialize gives each of them back. */
+	let failed = Kept.new();
+	let refused = Object.deserialize(
+		"{\"type\":\"Tree\",\"title\":\"oak\",\"left\":{\"type\":\"Leaf\",\"name\":\"low\",\"weight\":\"x\"}}",
+		&failed);
+	printf("failed: none %d, %d lent, %d live\n".ptr,
+		(refused == none) as c_int, failed.lent as c_int,
+		failed.live as c_int);
+
+	let counting = Counting { };
+	let arena = mem.ArenaAllocator.new(&counting, 4096);
+	let from_arena = Object.deserialize(input, &arena);
+	if from_arena == none || !(from_arena is *Tree) {
+		return 4;
+	}
+	let a = from_arena as *Tree;
+	printf("arena: %.*s, %d live\n".ptr, a.title.len as c_int, a.title.ptr,
+		counting.live as c_int);
+	arena.free_all();
+	printf("after free_all: %d live\n".ptr, counting.live as c_int);
+	return 0;
+}

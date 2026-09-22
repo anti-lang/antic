@@ -24,6 +24,10 @@ const BLOCK_ALIGN: int = 16;
 /// Memory on request, given back to the allocator that gave it.
 pub abstract class Allocator
 {
+	/* DESIGN: `Object.deserialize` calls `alloc` and `free` from the
+	   runtime as the two table entries after the seven of the root, in
+	   rt/registry.c. They stay the first two functions, in this order. */
+
 	/// `size` bytes at an address that is a multiple of `align`, or
 	/// `none`.
 	///

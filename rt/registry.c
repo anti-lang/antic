@@ -81,10 +81,82 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
 /* How deep objects and arrays may nest. */
 #define DEPTH_LIMIT 64
 
+/* DESIGN: anti.mem.Allocator declares alloc and free as its first two
+   functions. They take the two entries after the seven of the root, in
+   the table of every allocator and of the sub-object of an interface.
+   The runtime calls them there, as a call through a `*Allocator` does.
+   std/anti/mem.anti keeps the order. std_deserialize_alloc counts every
+   call. */
+enum {
+    ENTRY_ALLOC = ANTI_ENTRY_COPY + 1,
+    ENTRY_FREE
+};
+
+/* DESIGN: an object and a buffer of elements take the alignment that
+   malloc gives on every target of the runtime archive. calloc gave them
+   that before deserialize took an allocator. A string takes one. */
+#define OBJECT_ALIGN 16
+
+/* The blocks that one deserialize took from its allocator, which a
+   failure gives back. The list is memory of the runtime and goes before
+   deserialize returns. */
+struct made {
+    void **blocks;
+    int64_t count;
+    int64_t room;
+};
+
 struct reader {
     const unsigned char *at;
     const unsigned char *end;
+    struct anti_object *from;   /* the anti.mem.Allocator */
+    struct made *made;
 };
+
+/* size bytes at align from the allocator of the reader, zeroed and
+   remembered for a failure, or NULL. */
+static void *lend(struct reader *r, size_t size, int64_t align)
+{
+    void *(*alloc)(struct anti_object *, int64_t, int64_t) =
+        (void *(*)(struct anti_object *, int64_t, int64_t))(
+            void *)r->from->table[ENTRY_ALLOC];
+    struct made *m = r->made;
+    void *p;
+
+    if ((uint64_t)size > (uint64_t)INT64_MAX) {
+        return NULL;
+    }
+    if (m->count == m->room) {
+        int64_t room = m->room == 0 ? 16 : m->room * 2;
+        void **blocks = realloc(m->blocks, (size_t)room * sizeof *blocks);
+        if (blocks == NULL) {
+            return NULL;
+        }
+        m->blocks = blocks;
+        m->room = room;
+    }
+    p = alloc(r->from, (int64_t)size, align);
+    if (p == NULL) {
+        return NULL;
+    }
+    memset(p, 0, size);
+    m->blocks[m->count++] = p;
+    return p;
+}
+
+/* Give every block the reader took back to its allocator, the last
+   first. */
+static void give_back(struct reader *r)
+{
+    void (*give)(struct anti_object *, void *) =
+        (void (*)(struct anti_object *, void *))(
+            void *)r->from->table[ENTRY_FREE];
+    struct made *m = r->made;
+
+    while (m->count > 0) {
+        give(r->from, m->blocks[--m->count]);
+    }
+}
 
 static void skip_space(struct reader *r)
 {
@@ -388,12 +460,10 @@ static bool read_integer(struct reader *r, void *bytes, int64_t type)
     }
 }
 
-/* DESIGN: a str that deserialize reads gets bytes of its own on the
-   heap, which nothing frees. A str never owns its bytes, as the rule of
-   `own` says, so no `destruct` could free them. They come from libc
-   until `anti.mem` exists. deserialize then takes an Allocator, which
-   gives every string and every owned object it makes. The caller frees
-   that memory at once when the object's life ends. */
+/* DESIGN: a str that deserialize reads gets bytes of its own from the
+   allocator, with the NUL that every str has after them. A str never owns
+   its bytes, as the rule of `own` says, so no `destruct` could free them.
+   The caller gives them back through the allocator with the object. */
 static bool read_text(struct reader *r, struct anti_text *out)
 {
     struct reader scan = *r;
@@ -403,9 +473,8 @@ static bool read_text(struct reader *r, struct anti_text *out)
     if (!read_string(&scan, NULL, 0, &length)) {
         return false;
     }
-    bytes = malloc(length > 0 ? length : 1);
+    bytes = lend(r, length + 1, 1);
     if (bytes == NULL || !read_string(r, bytes, length, &length)) {
-        free(bytes);
         return false;
     }
     out->ptr = bytes;
@@ -474,7 +543,7 @@ static bool read_elements(struct reader *r, struct anti_text *out,
 {
     size_t size = anti_rt_element_size(type, d);
     struct reader scan;
-    unsigned char *items;
+    unsigned char *items = NULL;
     int64_t count = 0;
     int64_t i;
 
@@ -495,27 +564,27 @@ static bool read_elements(struct reader *r, struct anti_text *out,
             count++;
         } while (take(&scan, ','));
     }
-    items = calloc(count > 0 ? (size_t)count : 1, size);
-    if (items == NULL) {
-        return false;
+    if (count > 0) {
+        if (size > 0 && (size_t)count > SIZE_MAX / size) {
+            return false;
+        }
+        items = lend(r, (size_t)count * size, OBJECT_ALIGN);
+        if (items == NULL) {
+            return false;
+        }
     }
     for (i = 0; i < count; i++) {
         if ((i > 0 && !take(r, ',')) ||
             !read_value(r, items + (size_t)i * size, ANTI_TYPE_ELEMENT(type),
                         d, 0, depth + 1)) {
-            free(items);
             return false;
         }
     }
     if (!take(r, ']')) {
-        free(items);
         return false;
     }
-    out->ptr = count > 0 ? items : NULL;
+    out->ptr = items;
     out->len = count;
-    if (count == 0) {
-        free(items);
-    }
     return true;
 }
 
@@ -533,10 +602,9 @@ static bool read_owned(struct reader *r, void **out, int64_t type,
         }
         value = read_object(r, d, depth + 1);
     } else {
-        value = calloc(1, size);
+        value = lend(r, size, OBJECT_ALIGN);
         if (value != NULL &&
             !read_value(r, value, ANTI_TYPE_ELEMENT(type), d, 0, depth + 1)) {
-            free(value);
             value = NULL;
         }
     }
@@ -701,10 +769,12 @@ static bool fill(struct reader *r, void *object,
 }
 
 /* DESIGN: an object comes back as a new object of the class that its
-   "type" member names. It is prepared as a literal of the class would be
-   and then filled from the other members. A construct with arguments
-   does not run, because the fields come from the text. A failure deletes
-   what was built. */
+   "type" member names, in memory of the allocator. It is prepared as a
+   literal of the class would be and then filled from the other members.
+   A construct with arguments does not run, because the fields come from
+   the text. A failure leaves what was built to deserialize, which gives
+   every block back. No destruct runs, as none runs when the caller gives
+   the memory back. */
 static void *read_object(struct reader *r,
                          const struct anti_descriptor *expected, int depth)
 {
@@ -721,26 +791,34 @@ static void *read_object(struct reader *r,
         (c->flags & ANTI_CLASS_REQUIRED) != 0) {
         return NULL;
     }
-    object = build(c);
-    if (object != NULL && !fill(r, object, c->descriptor, true, depth)) {
-        anti_rt_delete(object, c->descriptor);
+    object = lend(r, (size_t)c->descriptor->size, OBJECT_ALIGN);
+    if (object == NULL) {
         return NULL;
     }
-    return object;
+    c->init(object);
+    return fill(r, object, c->descriptor, true, depth) ? object : NULL;
 }
 
-void *anti_lang_Object_deserialize(struct anti_text input)
+void *anti_lang_Object_deserialize(struct anti_text input,
+                                   struct anti_object *from)
 {
+    struct made made = {NULL, 0, 0};
     struct reader r;
     void *object;
 
-    r.at = input.ptr;
-    r.end = input.ptr + (input.len > 0 ? input.len : 0);
-    object = read_object(&r, NULL, 0);
-    skip_space(&r);
-    if (object != NULL && r.at != r.end) {
-        anti_rt_delete(object, NULL);
+    if (from == NULL) {
         return NULL;
     }
+    r.at = input.ptr;
+    r.end = input.ptr + (input.len > 0 ? input.len : 0);
+    r.from = from;
+    r.made = &made;
+    object = read_object(&r, NULL, 0);
+    skip_space(&r);
+    if (object == NULL || r.at != r.end) {
+        give_back(&r);
+        object = NULL;
+    }
+    free(made.blocks);
     return object;
 }

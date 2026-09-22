@@ -1,0 +1,13 @@
+//! `Object.deserialize` takes an `anti.mem.Allocator`, and this module
+//! does not import `anti.mem`.
+
+fn read(from: *Object) -> int
+{
+	let o = Object.deserialize("{}", from);
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

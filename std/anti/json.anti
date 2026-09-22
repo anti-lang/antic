@@ -6,8 +6,9 @@
 //! read is written as `null`, and a class that wants more replaces
 //! `serialize` and writes its members with the functions here.
 //!
-//! `Object.deserialize` builds an object back from the JSON of the
-//! default `serialize`. The functions here read the text of one member,
+//! `Object.deserialize(input, from)` builds an object back from the JSON
+//! of the default `serialize`, in memory of the `anti.mem.Allocator`
+//! `from`. The functions here read the text of one member,
 //! for a class that writes its own members. `member` gives `false` for a
 //! member the object does not hold, and `unquote` may fail.
 

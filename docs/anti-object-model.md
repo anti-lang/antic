@@ -238,7 +238,7 @@ Four levels, and each applies where it makes sense:
 ## The root class
 
 - `anti.lang.Object` is the base of every class without `inherits`. It has no fields beyond the table pointer.
-- It declares seven `pub` functions with default bodies over the descriptor: `type_name(self) -> str`, `to_text(self) -> str`, `equals(self, other: *Object) -> bool`, `hash(self) -> u64`, `serialize(self, out: *text.Builder)`, `copy(self, to: *Object)`, and `destruct(self)`, which is empty. A static `Object.deserialize` is the counterpart of `serialize`, in the format `anti.json` defines.
+- It declares seven `pub` functions with default bodies over the descriptor: `type_name(self) -> str`, `to_text(self) -> str`, `equals(self, other: *Object) -> bool`, `hash(self) -> u64`, `serialize(self, out: *text.Builder)`, `copy(self, to: *Object)`, and `destruct(self)`, which is empty. A static `Object.deserialize(input, from)` is the counterpart of `serialize`, in the format `anti.json` defines. It takes the object, its strings and the objects it owns from `from`, an `anti.mem.Allocator`, and the caller gives them back through it at once.
 - A class may replace any of them with `concrete fn`. Replacing `equals` without `hash`, or the reverse, is a warning. The default bodies walk the field list and are slow by design.
 - Every table starts with these seven entries after the descriptor pointer. A C program that has the header of one class knows the head of every table.
 
