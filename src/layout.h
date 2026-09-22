@@ -35,6 +35,10 @@ struct layout {
     struct layout_member *members;  /* recorded up to LAYOUT_MEMBER_LIMIT */
     size_t member_count;
     bool unaligned;                 /* a field lies off its alignment */
+    /* DESIGN: a simd struct of 16 bytes is the vector type of C. Every
+       convention passes it in one vector register or as a vector. A
+       simd struct of another size passes as the struct of its lanes. */
+    bool vector;
 };
 
 /* DESIGN: the members of an aggregate are recorded up to 32 bytes. Every

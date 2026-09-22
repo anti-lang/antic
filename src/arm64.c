@@ -29,6 +29,10 @@ enum a64_op {
     A64_UDIV, A64_MSUB, A64_LSL, A64_ASR, A64_LSR, A64_ADRP, A64_FADD,
     A64_FSUB, A64_FMUL, A64_FDIV, A64_FNEG, A64_FMOV, A64_FCMP, A64_SCVTF,
     A64_UCVTF, A64_FCVTZS, A64_FCVTZU, A64_FCVT, A64_MOVW,
+    A64_VLDR, A64_VSTR, A64_FCMEQ, A64_FCMGT, A64_FCMGE, A64_CMEQ, A64_CMGT,
+    A64_CMGE, A64_CMHI, A64_CMHS, A64_BSL, A64_DUP, A64_XTN, A64_USHR,
+    A64_SXTL, A64_EXT, A64_SMIN, A64_SMAX, A64_UMIN, A64_UMAX, A64_UMOV,
+    A64_INS,
     A64_SEH_SAVE_FPLR_X, A64_SEH_STACKALLOC, A64_SEH_SAVE_REG,
     A64_SEH_SAVE_FREG, A64_SEH_SET_FP, A64_SEH_ADD_FP, A64_SEH_NOP,
     A64_SEH_ENDPROLOGUE, A64_SEH_STARTEPILOGUE, A64_SEH_ENDEPILOGUE
@@ -117,6 +121,31 @@ static const struct mach_opcode opcodes[] = {
     /* A move of a w register clears the upper 32 bits, even into itself,
        so it is no move that register allocation may drop. */
     [A64_MOVW] = {"mov", {DEF, USE}, 0},
+    /* The vector instructions of simd structs. A load and a store of a
+       vector register name it q, d, s, h or b. bsl and an insert keep
+       bits of their first operand. */
+    [A64_VLDR] = {"ldr", {DEF}, 0},
+    [A64_VSTR] = {"str", {USE}, 0},
+    [A64_FCMEQ] = {"fcmeq", {DEF, USE, USE}, 0},
+    [A64_FCMGT] = {"fcmgt", {DEF, USE, USE}, 0},
+    [A64_FCMGE] = {"fcmge", {DEF, USE, USE}, 0},
+    [A64_CMEQ] = {"cmeq", {DEF, USE, USE}, 0},
+    [A64_CMGT] = {"cmgt", {DEF, USE, USE}, 0},
+    [A64_CMGE] = {"cmge", {DEF, USE, USE}, 0},
+    [A64_CMHI] = {"cmhi", {DEF, USE, USE}, 0},
+    [A64_CMHS] = {"cmhs", {DEF, USE, USE}, 0},
+    [A64_BSL] = {"bsl", {USE | DEF, USE, USE}, 0},
+    [A64_DUP] = {"dup", {DEF, USE}, 0},
+    [A64_XTN] = {"xtn", {DEF, USE}, 0},
+    [A64_USHR] = {"ushr", {DEF, USE}, 0},
+    [A64_SXTL] = {"sxtl", {DEF, USE}, 0},
+    [A64_EXT] = {"ext", {DEF, USE, USE}, 0},
+    [A64_SMIN] = {"smin", {DEF, USE, USE}, 0},
+    [A64_SMAX] = {"smax", {DEF, USE, USE}, 0},
+    [A64_UMIN] = {"umin", {DEF, USE, USE}, 0},
+    [A64_UMAX] = {"umax", {DEF, USE, USE}, 0},
+    [A64_UMOV] = {"umov", {DEF, USE}, 0},
+    [A64_INS] = {"mov", {USE | DEF, USE}, 0},
 };
 
 static const uint8_t int_args[] = {X0, X1, X2, X3, X4, X5, X6, X7};
@@ -699,6 +728,436 @@ static void emit_memcopy(struct selector *s, const struct ir_inst *inst)
     copy_memory(s, to, from, select_size(s, inst->of));
 }
 
+/* Simd structs */
+
+/* DESIGN: a simd operation works on its values in memory, one register
+   of 16 bytes at a time, or of 8 bytes for a simd struct of 8. A wide
+   value is several registers. Each one takes the instruction of the
+   operation, so an f32x8 is two. The registers are v16 and v17, which
+   allocation never gives out, and v18 to v23, which the instructions
+   name. No value of the allocator lives in them across the operation. A
+   comparison narrows its lanes of all ones to one byte of 0 or 1 per
+   lane of the mask, and a choice widens the mask back. */
+
+/* The arrangement of a vector register operand, which its value holds.
+   ARR_NONE names the register of its width, q, d, s, h or b. An element
+   holds ARR_ELEMENT plus 16 times its index and has the width of the
+   element. */
+enum arrangement {
+    ARR_NONE, ARR_8B, ARR_16B, ARR_4H, ARR_8H, ARR_2S, ARR_4S, ARR_2D,
+    ARR_ELEMENT
+};
+
+static const char *const arrangement_names[] = {
+    "", "8b", "16b", "4h", "8h", "2s", "4s", "2d"
+};
+
+/* The registers of a fold, as a stack, and the one a choice uses. */
+static const uint8_t fold_registers[] = {
+    V(16), V(17), V(18), V(19), V(20), V(21), V(22)
+};
+#define CHOICE_REGISTER V(23)
+
+static struct mach_operand vector_of(uint8_t reg, enum arrangement a)
+{
+    struct mach_operand o = mach_preg(reg, 128);
+
+    o.value = a;
+    return o;
+}
+
+/* Element index of the register in o, of bits. */
+static struct mach_operand element_of(struct mach_operand o, unsigned bits,
+                                      unsigned index)
+{
+    o.width = (uint8_t)bits;
+    o.value = ARR_ELEMENT + 16 * (int64_t)index;
+    return o;
+}
+
+/* The lanes of a simd operation on the target and the registers of one
+   value. */
+struct shape {
+    enum ir_type lane;
+    unsigned lane_bytes;
+    unsigned chunk;                 /* bytes of one register */
+    unsigned chunks;                /* registers of one value */
+    unsigned lanes;                 /* lanes of one register */
+};
+
+static struct shape shape_of(const struct ir_aggtype *agg, uint64_t size)
+{
+    struct shape sh;
+
+    sh.lane = agg->fields[0].type.type;
+    sh.lane_bytes = bits(sh.lane) / 8;
+    sh.chunk = size < 16 ? (unsigned)size : 16;
+    sh.chunks = (unsigned)(size / sh.chunk);
+    sh.lanes = sh.chunk / sh.lane_bytes;
+    return sh;
+}
+
+static struct shape inst_shape(const struct selector *s,
+                               const struct ir_inst *inst)
+{
+    return shape_of(s->m->aggs[inst->of.agg],
+                    select_layout(s, inst->of.agg)->size);
+}
+
+/* The arrangement of lanes of lane_bytes in a register of chunk bytes. */
+static enum arrangement lanes_arrangement(unsigned lane_bytes,
+                                          unsigned chunk)
+{
+    bool full = chunk == 16;
+
+    switch (lane_bytes) {
+    case 1: return full ? ARR_16B : ARR_8B;
+    case 2: return full ? ARR_8H : ARR_4H;
+    case 4: return full ? ARR_4S : ARR_2S;
+    default: return ARR_2D;
+    }
+}
+
+static enum arrangement bytes_arrangement(unsigned chunk)
+{
+    return chunk == 16 ? ARR_16B : ARR_8B;
+}
+
+static void vector_load(struct selector *s, uint8_t reg,
+                        struct mach_operand base, int64_t offset,
+                        unsigned bytes)
+{
+    emit2(s, A64_VLDR, mach_preg(reg, (uint8_t)(bytes * 8)),
+          memory_at(base, offset, (uint8_t)(bytes * 8)));
+}
+
+static void vector_store(struct selector *s, uint8_t reg,
+                         struct mach_operand base, int64_t offset,
+                         unsigned bytes)
+{
+    emit2(s, A64_VSTR, mach_preg(reg, (uint8_t)(bytes * 8)),
+          memory_at(base, offset, (uint8_t)(bytes * 8)));
+}
+
+/* The instruction of the lane operation op, which is not a comparison. */
+static enum a64_op lane_opcode(enum ir_op op)
+{
+    switch (op) {
+    case IR_FADD: return A64_FADD;
+    case IR_FSUB: return A64_FSUB;
+    case IR_FMUL: return A64_FMUL;
+    case IR_FDIV: return A64_FDIV;
+    case IR_ADD: return A64_ADD;
+    case IR_SUB: return A64_SUB;
+    case IR_MUL: return A64_MUL;
+    case IR_AND: return A64_AND;
+    case IR_OR: return A64_ORR;
+    default: return A64_EOR;
+    }
+}
+
+static bool is_bitwise(enum ir_op op)
+{
+    return op == IR_AND || op == IR_OR || op == IR_XOR;
+}
+
+/* The lanes of a op b into dst, all ones where the comparison op holds
+   and zero where it does not. */
+static void compare_lanes(struct selector *s, enum ir_op op, uint8_t dst,
+                          uint8_t a, uint8_t b, enum arrangement arr,
+                          enum arrangement bytes)
+{
+    static const struct {
+        enum ir_op op;
+        enum a64_op code;
+        bool swap;
+        bool invert;
+    } table[] = {
+        {IR_FEQ, A64_FCMEQ, false, false}, {IR_FNE, A64_FCMEQ, false, true},
+        {IR_FLT, A64_FCMGT, true, false},  {IR_FLE, A64_FCMGE, true, false},
+        {IR_FGT, A64_FCMGT, false, false}, {IR_FGE, A64_FCMGE, false, false},
+        {IR_EQ, A64_CMEQ, false, false},   {IR_NE, A64_CMEQ, false, true},
+        {IR_SLT, A64_CMGT, true, false},   {IR_SLE, A64_CMGE, true, false},
+        {IR_SGT, A64_CMGT, false, false},  {IR_SGE, A64_CMGE, false, false},
+        {IR_ULT, A64_CMHI, true, false},   {IR_ULE, A64_CMHS, true, false},
+        {IR_UGT, A64_CMHI, false, false},  {IR_UGE, A64_CMHS, false, false},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof table / sizeof table[0]; i++) {
+        if (table[i].op != op) {
+            continue;
+        }
+        emit3(s, table[i].code, vector_of(dst, arr),
+              vector_of(table[i].swap ? b : a, arr),
+              vector_of(table[i].swap ? a : b, arr));
+        if (table[i].invert) {
+            emit2(s, A64_MVN, vector_of(dst, bytes), vector_of(dst, bytes));
+        }
+        return;
+    }
+}
+
+/* Narrow the lanes of all ones or zero in reg to one byte of 1 or 0
+   each, in its low bytes. */
+static void narrow_mask(struct selector *s, uint8_t reg, const struct shape *sh)
+{
+    enum arrangement bytes =
+        sh->lane_bytes == 1 ? bytes_arrangement(sh->chunk) : ARR_8B;
+
+    if (sh->lane_bytes == 8) {
+        emit2(s, A64_XTN, vector_of(reg, ARR_2S), vector_of(reg, ARR_2D));
+    }
+    if (sh->lane_bytes >= 4) {
+        emit2(s, A64_XTN, vector_of(reg, ARR_4H), vector_of(reg, ARR_4S));
+    }
+    if (sh->lane_bytes >= 2) {
+        emit2(s, A64_XTN, vector_of(reg, ARR_8B), vector_of(reg, ARR_8H));
+    }
+    emit3(s, A64_USHR, vector_of(reg, bytes), vector_of(reg, bytes),
+          mach_imm(7));
+}
+
+/* Widen the bytes of 1 or 0 of a mask in reg to lanes of all ones or
+   zero. */
+static void widen_mask(struct selector *s, uint8_t reg, const struct shape *sh)
+{
+    emit2(s, A64_NEG, vector_of(reg, ARR_16B), vector_of(reg, ARR_16B));
+    if (sh->lane_bytes >= 2) {
+        emit2(s, A64_SXTL, vector_of(reg, ARR_8H), vector_of(reg, ARR_8B));
+    }
+    if (sh->lane_bytes >= 4) {
+        emit2(s, A64_SXTL, vector_of(reg, ARR_4S), vector_of(reg, ARR_4H));
+    }
+    if (sh->lane_bytes == 8) {
+        emit2(s, A64_SXTL, vector_of(reg, ARR_2D), vector_of(reg, ARR_2S));
+    }
+}
+
+static void emit_vbinary(struct selector *s, const struct ir_inst *inst)
+{
+    struct shape sh = inst_shape(s, inst);
+    enum ir_op op = (enum ir_op)inst->field;
+    enum arrangement arr = lanes_arrangement(sh.lane_bytes, sh.chunk);
+    enum arrangement bytes = bytes_arrangement(sh.chunk);
+    struct mach_operand dst = select_reg(s, &inst->a);
+    struct mach_operand x = select_reg(s, &inst->b);
+    struct mach_operand y = select_reg(s, &inst->c);
+    unsigned k;
+
+    for (k = 0; k < sh.chunks; k++) {
+        vector_load(s, V(16), x, (int64_t)k * sh.chunk, sh.chunk);
+        vector_load(s, V(17), y, (int64_t)k * sh.chunk, sh.chunk);
+        if ((op >= IR_EQ && op <= IR_UGE) || (op >= IR_FEQ && op <= IR_FGE)) {
+            compare_lanes(s, op, V(16), V(16), V(17), arr, bytes);
+            narrow_mask(s, V(16), &sh);
+            vector_store(s, V(16), dst, (int64_t)k * sh.lanes, sh.lanes);
+            continue;
+        }
+        emit3(s, lane_opcode(op), vector_of(V(16), is_bitwise(op) ? bytes : arr),
+              vector_of(V(16), is_bitwise(op) ? bytes : arr),
+              vector_of(V(17), is_bitwise(op) ? bytes : arr));
+        vector_store(s, V(16), dst, (int64_t)k * sh.chunk, sh.chunk);
+    }
+}
+
+static void emit_vunary(struct selector *s, const struct ir_inst *inst)
+{
+    struct shape sh = inst_shape(s, inst);
+    enum ir_op op = (enum ir_op)inst->field;
+    enum arrangement arr = op == IR_NOT
+                               ? bytes_arrangement(sh.chunk)
+                               : lanes_arrangement(sh.lane_bytes, sh.chunk);
+    enum a64_op code = op == IR_NOT    ? A64_MVN
+                       : op == IR_FNEG ? A64_FNEG
+                                       : A64_NEG;
+    struct mach_operand dst = select_reg(s, &inst->a);
+    struct mach_operand x = select_reg(s, &inst->b);
+    unsigned k;
+
+    for (k = 0; k < sh.chunks; k++) {
+        vector_load(s, V(16), x, (int64_t)k * sh.chunk, sh.chunk);
+        emit2(s, code, vector_of(V(16), arr), vector_of(V(16), arr));
+        vector_store(s, V(16), dst, (int64_t)k * sh.chunk, sh.chunk);
+    }
+}
+
+/* dup takes a float lane from element 0 of its register, and an integer
+   lane from a general register. */
+static void emit_vsplat(struct selector *s, const struct ir_inst *inst)
+{
+    struct shape sh = inst_shape(s, inst);
+    enum arrangement arr = lanes_arrangement(sh.lane_bytes, sh.chunk);
+    struct mach_operand value = select_reg(s, &inst->b);
+    struct mach_operand dst = select_reg(s, &inst->a);
+    unsigned k;
+
+    if (select_is_float(sh.lane)) {
+        value = element_of(value, sh.lane_bytes * 8, 0);
+    } else {
+        value = widened(value, sh.lane_bytes == 8 ? 64 : 32);
+    }
+    emit2(s, A64_DUP, vector_of(V(16), arr), value);
+    for (k = 0; k < sh.chunks; k++) {
+        vector_store(s, V(16), dst, (int64_t)k * sh.chunk, sh.chunk);
+    }
+}
+
+/* bsl keeps the bits of its second operand where the mask holds and of
+   its third where it does not. */
+static void emit_vselect(struct selector *s, const struct ir_inst *inst)
+{
+    struct shape sh = inst_shape(s, inst);
+    enum arrangement bytes = bytes_arrangement(sh.chunk);
+    struct mach_operand dst = select_reg(s, &inst->a);
+    struct mach_operand mask = select_reg(s, &inst->b);
+    struct mach_operand x = select_reg(s, &inst->c);
+    struct mach_operand y = select_reg(s, &inst->args[0]);
+    unsigned k;
+
+    for (k = 0; k < sh.chunks; k++) {
+        vector_load(s, V(18), mask, (int64_t)k * sh.lanes, sh.lanes);
+        widen_mask(s, V(18), &sh);
+        vector_load(s, V(16), x, (int64_t)k * sh.chunk, sh.chunk);
+        vector_load(s, V(17), y, (int64_t)k * sh.chunk, sh.chunk);
+        emit3(s, A64_BSL, vector_of(V(18), bytes), vector_of(V(16), bytes),
+              vector_of(V(17), bytes));
+        vector_store(s, V(18), dst, (int64_t)k * sh.chunk, sh.chunk);
+    }
+}
+
+/* A shuffle of one register moves each lane with an insert. */
+static void emit_vshuffle(struct selector *s, const struct ir_inst *inst)
+{
+    struct shape sh = inst_shape(s, inst);
+    struct mach_operand dst = select_reg(s, &inst->a);
+    struct mach_operand x = select_reg(s, &inst->b);
+    unsigned i;
+
+    vector_load(s, V(16), x, 0, sh.chunk);
+    for (i = 0; i < sh.lanes; i++) {
+        emit2(s, A64_INS,
+              element_of(mach_preg(V(17), 128), sh.lane_bytes * 8, i),
+              element_of(mach_preg(V(16), 128), sh.lane_bytes * 8,
+                         (unsigned)inst->args[i].as.integer));
+    }
+    vector_store(s, V(17), dst, 0, sh.chunk);
+}
+
+/* lo becomes lo op hi, lane by lane, the fold of op. The least keeps hi
+   where it is less than lo, and the greatest where it is greater. */
+static void fold_lanes(struct selector *s, enum ir_op op, uint8_t lo,
+                       uint8_t hi, const struct shape *sh)
+{
+    enum arrangement arr = lanes_arrangement(sh->lane_bytes, sh->chunk);
+    enum arrangement bytes = bytes_arrangement(sh->chunk);
+
+    switch (op) {
+    case IR_FLT:
+    case IR_FGT:
+        emit3(s, A64_FCMGT, vector_of(CHOICE_REGISTER, arr),
+              vector_of(op == IR_FLT ? lo : hi, arr),
+              vector_of(op == IR_FLT ? hi : lo, arr));
+        emit3(s, A64_BSL, vector_of(CHOICE_REGISTER, bytes),
+              vector_of(hi, bytes), vector_of(lo, bytes));
+        emit3(s, A64_ORR, vector_of(lo, bytes),
+              vector_of(CHOICE_REGISTER, bytes),
+              vector_of(CHOICE_REGISTER, bytes));
+        return;
+    case IR_SLT:
+    case IR_ULT:
+    case IR_SGT:
+    case IR_UGT:
+        emit3(s, op == IR_SLT   ? A64_SMIN
+                 : op == IR_ULT ? A64_UMIN
+                 : op == IR_SGT ? A64_SMAX
+                                : A64_UMAX,
+              vector_of(lo, arr), vector_of(lo, arr), vector_of(hi, arr));
+        return;
+    default:
+        emit3(s, lane_opcode(op), vector_of(lo, is_bitwise(op) ? bytes : arr),
+              vector_of(lo, is_bitwise(op) ? bytes : arr),
+              vector_of(hi, is_bitwise(op) ? bytes : arr));
+        return;
+    }
+}
+
+/* The registers first, first plus stride and on, count of them, folded
+   into the register of level. Each level halves the ones it folds, the
+   upper half onto the lower half. */
+static void fold_chunks(struct selector *s, enum ir_op op,
+                        struct mach_operand x, const struct shape *sh,
+                        unsigned first, unsigned stride, unsigned count,
+                        unsigned level)
+{
+    if (count == 1) {
+        vector_load(s, fold_registers[level], x, (int64_t)first * sh->chunk,
+                    sh->chunk);
+        return;
+    }
+    fold_chunks(s, op, x, sh, first, stride * 2, count / 2, level);
+    fold_chunks(s, op, x, sh, first + stride, stride * 2, count / 2,
+                level + 1);
+    fold_lanes(s, op, fold_registers[level], fold_registers[level + 1], sh);
+}
+
+/* A fold of the lanes: the registers fold first, then the halves of the
+   one left, each moved down by ext. */
+static void emit_vreduce(struct selector *s, const struct ir_inst *inst)
+{
+    struct shape sh = inst_shape(s, inst);
+    enum ir_op op = (enum ir_op)inst->field;
+    struct mach_operand x = select_reg(s, &inst->a);
+    struct mach_operand result;
+    unsigned bytes;
+
+    fold_chunks(s, op, x, &sh, 0, 1, sh.chunks, 0);
+    for (bytes = sh.chunk; bytes > sh.lane_bytes; bytes /= 2) {
+        struct mach_operand ops[4];
+        ops[0] = vector_of(V(17), ARR_16B);
+        ops[1] = vector_of(V(16), ARR_16B);
+        ops[2] = vector_of(V(16), ARR_16B);
+        ops[3] = mach_imm(bytes / 2);
+        select_emit(s, A64_EXT, 4, ops);
+        fold_lanes(s, op, V(16), V(17), &sh);
+    }
+    result = select_result(s, inst);
+    if (select_is_float(sh.lane)) {
+        emit2(s, A64_FMOV, result, mach_preg(V(16), result.width));
+    } else {
+        emit2(s, A64_UMOV, widened(result, sh.lane_bytes == 8 ? 64 : 32),
+              element_of(mach_preg(V(16), 128), sh.lane_bytes * 8, 0));
+    }
+}
+
+/* DESIGN: every simd operation is native but those without an
+   instruction on the lanes. Those are a product and the least or
+   greatest of 64-bit lanes, and a value of a single 64-bit lane. A
+   shuffle is native in one register. */
+static bool vector_native(const struct ir_inst *inst,
+                          const struct ir_aggtype *agg, uint64_t size,
+                          enum cpu_level cpu)
+{
+    struct shape sh = shape_of(agg, size);
+    enum ir_op op = (enum ir_op)inst->field;
+
+    (void)cpu;
+    if (sh.lanes < 2) {
+        return false;
+    }
+    switch (inst->op) {
+    case IR_VBINARY:
+        return op != IR_MUL || sh.lane_bytes < 8;
+    case IR_VSHUFFLE:
+        return sh.chunks == 1;
+    case IR_VREDUCE:
+        return sh.lane_bytes < 8 ||
+               !(op == IR_SLT || op == IR_ULT || op == IR_SGT || op == IR_UGT);
+    default:
+        return true;
+    }
+}
+
 /* Floats */
 
 static struct mach_operand cond(enum mach_cond c);
@@ -1045,19 +1504,6 @@ static void emit_mul_high(struct selector *s, const struct ir_inst *inst)
    subtract. A read of the borrow tests for C clear, and a borrow goes in
    as C clear. The bool of a carry in holds unknown bits above its width.
    Its bit 0 sets C through cmp, or through negs for a borrow. */
-/* Whether the target selects the simd operation inst on agg of size
-   bytes at level cpu. */
-static bool vector_native(const struct ir_inst *inst,
-                          const struct ir_aggtype *agg, uint64_t size,
-                          enum cpu_level cpu)
-{
-    (void)inst;
-    (void)agg;
-    (void)size;
-    (void)cpu;
-    return false;
-}
-
 static bool flags_native(const struct ir_inst *inst)
 {
     return (inst->op == IR_ADD_FL || inst->op == IR_SUB_FL ||
@@ -1232,7 +1678,11 @@ static void locate_result(const struct selector *s,
     if (f->result != IR_AGG) {
         return;
     }
-    if (hfa_members(agg) > 0) {
+    if (agg->vector) {
+        out->part_count = 1;
+        out->parts[0].reg = V(0);
+        out->parts[0].bytes = 16;
+    } else if (hfa_members(agg) > 0) {
         aggregate_parts(agg, V(0), out);
     } else if (agg->size <= 16) {
         aggregate_parts(agg, X0, out);
@@ -1273,6 +1723,22 @@ static void locate(const struct selector *s, const struct ir_function *callee,
             size_t hfa = hfa_members(agg);
             size_t parts = (size_t)(agg->size + 7) / 8;
             size = 8;
+            /* A vector takes one float register, or 16 aligned bytes of
+               the stack, and then no float register takes another. */
+            if (agg->vector && floats < s->abi->fp_arg_count) {
+                out[i].part_count = 1;
+                out[i].parts[0].reg = s->abi->fp_args[floats++];
+                out[i].parts[0].bytes = 16;
+                continue;
+            }
+            if (agg->vector) {
+                floats = s->abi->fp_arg_count;
+                out[i].stack = true;
+                out[i].size = 16;
+                out[i].offset = (next + 15) / 16 * 16;
+                next = out[i].offset + 16;
+                continue;
+            }
             if (hfa > 0 && floats + hfa <= s->abi->fp_arg_count) {
                 aggregate_parts(agg, s->abi->fp_args[floats], &out[i]);
                 floats += hfa;
@@ -1674,6 +2140,12 @@ static const struct pattern patterns[] = {
     {IR_SUB_FL, match_arith, emit_flag_op},
     {IR_NEG_FL, match_arith, emit_flag_op},
     {IR_FLAG, NULL, emit_flag},
+    {IR_VBINARY, NULL, emit_vbinary},
+    {IR_VUNARY, NULL, emit_vunary},
+    {IR_VSPLAT, NULL, emit_vsplat},
+    {IR_VSELECT, NULL, emit_vselect},
+    {IR_VSHUFFLE, NULL, emit_vshuffle},
+    {IR_VREDUCE, NULL, emit_vreduce},
 };
 
 /* Printing */
@@ -1724,10 +2196,22 @@ static void print_operand(struct text *out, const struct ir_module *m,
     case MACH_PREG:
         if (o->reg == SP) {
             text_append(out, o->width == 64 ? "sp" : "wsp");
+        } else if (o->reg >= V0 && o->value >= ARR_ELEMENT) {
+            text_appendf(out, "v%" PRIu32 ".%c[%" PRId64 "]", o->reg - V0,
+                         o->width == 64   ? 'd'
+                         : o->width == 32 ? 's'
+                         : o->width == 16 ? 'h'
+                                          : 'b',
+                         (o->value - ARR_ELEMENT) / 16);
+        } else if (o->reg >= V0 && o->value != ARR_NONE) {
+            text_appendf(out, "v%" PRIu32 ".%s", o->reg - V0,
+                         arrangement_names[o->value]);
         } else if (o->reg >= V0) {
             text_appendf(out, "%c%" PRIu32,
-                         o->width == 64   ? 'd'
+                         o->width == 128  ? 'q'
+                         : o->width == 64 ? 'd'
                          : o->width == 16 ? 'h'
+                         : o->width == 8  ? 'b'
                                           : 's',
                          o->reg - V0);
         } else {

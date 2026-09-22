@@ -1,0 +1,52 @@
+//! Simd structs of 16 bytes pass as the vector types of C, in vector
+//! registers, and the ninth one on the stack. `F2` and `F8` pass as the
+//! structs of their lanes, as their C declarations do.
+
+extern fn printf(format: ?*byte, ...) -> i32;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+simd struct I32x4 { a: i32, b: i32, c: i32, d: i32 }
+simd struct F64x2 { x: f64, y: f64 }
+simd struct F2 { x: f32, y: f32 }
+simd struct F8 { a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32 }
+
+extern fn abi_simd_mix(a: Vec4, k: f32, b: Vec4) -> Vec4;
+extern fn abi_simd_ints(n: int, a: I32x4, b: I32x4) -> I32x4;
+extern fn abi_simd_doubles(a: F64x2, s: f64) -> F64x2;
+extern fn abi_simd_nine(a: Vec4, b: Vec4, c: Vec4, d: Vec4, e: Vec4, f: Vec4,
+                        g: Vec4, h: Vec4, last: Vec4) -> Vec4;
+extern fn abi_simd_apply(f: fn(Vec4, Vec4) -> Vec4, a: Vec4, b: Vec4) -> Vec4;
+extern fn abi_simd_pair(a: F2, b: F2) -> F2;
+extern fn abi_simd_wide(a: F8) -> F8;
+
+fn show(v: Vec4)
+{
+	printf("%g %g %g %g\n".ptr, v.x as f64, v.y as f64, v.z as f64,
+	       v.w as f64);
+}
+
+fn scaled_sum(a: Vec4, b: Vec4) -> Vec4
+{
+	return a * Vec4.splat(2.0) + b;
+}
+
+fn main() -> int
+{
+	let a = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let b = Vec4 { x: 0.5, y: 0.25, z: 0.125, w: 0.0625 };
+	show(abi_simd_mix(a, 3.0, b));
+	let i = abi_simd_ints(100, I32x4 { a: 1, b: 2, c: 3, d: 4 },
+	                      I32x4 { a: 10, b: 20, c: 30, d: 40 });
+	printf("%d %d %d %d\n".ptr, i.a, i.b, i.c, i.d);
+	let d = abi_simd_doubles(F64x2 { x: 1.5, y: -2.5 }, 4.0);
+	printf("%g %g\n".ptr, d.x, d.y);
+	let one = Vec4.splat(1.0);
+	show(abi_simd_nine(one, one, one, one, one, one, one, one, a));
+	show(abi_simd_apply(scaled_sum, a, b));
+	let p = abi_simd_pair(F2 { x: 3.0, y: 4.0 }, F2 { x: 5.0, y: 6.0 });
+	printf("%g %g\n".ptr, p.x as f64, p.y as f64);
+	let w = abi_simd_wide(F8 { a: 1.0, b: 2.0, c: 3.0, d: 4.0, e: 5.0, f: 6.0,
+	                          g: 7.0, h: 8.0 });
+	printf("%g %g %g\n".ptr, w.a as f64, w.d as f64, w.h as f64);
+	return 0;
+}

@@ -993,6 +993,15 @@ static bool sysv_classify(const struct layout *agg, struct arg_location *loc,
     if (agg->size > 16 || agg->size == 0 || agg->unaligned) {
         return false;
     }
+    /* A vector is one eightbyte of class SSE and one of SSEUP, the whole
+       of one xmm register. */
+    if (agg->vector) {
+        loc->parts[0].offset = 0;
+        loc->parts[0].bytes = 16;
+        loc->part_count = 1;
+        fp[0] = true;
+        return true;
+    }
     for (k = 0; k < count; k++) {
         bool used = false;
         fp[parts] = true;
@@ -1046,6 +1055,15 @@ static void locate_result(const struct selector *s,
             out->parts[k].reg = fp[k] ? fp_results[floats++]
                                       : int_results[ints++];
         }
+        return;
+    }
+    /* Windows returns a vector in xmm0 and passes one as a pointer to a
+       copy, as MSVC does with __m128. */
+    if (s->abi == &windows && select_layout(s, f->result_agg)->vector) {
+        out->part_count = 1;
+        out->parts[0].reg = XMM0;
+        out->parts[0].bytes = 16;
+        out->parts[0].offset = 0;
         return;
     }
     if (s->abi == &windows && windows_by_value(select_layout(s, f->result_agg))) {
@@ -1585,7 +1603,9 @@ static void load_bytes(struct selector *s, struct mach_operand dst,
     unsigned low = bytes >= 4 ? 4 : 2;
     struct mach_operand rest;
 
-    if (is_float_register(s, dst)) {
+    if (is_float_register(s, dst) && bytes == 16) {
+        emit2(s, X64_MOVUPS, widened(dst, 128), memory_at(base, offset, 128));
+    } else if (is_float_register(s, dst)) {
         move_float(s, widened(dst, (uint8_t)(bytes * 8)),
                    memory_at(base, offset, (uint8_t)(bytes * 8)));
     } else if (bytes == 8 || bytes == 4) {
@@ -1611,7 +1631,9 @@ static void store_bytes(struct selector *s, struct mach_operand src,
     unsigned low = bytes >= 4 ? 4 : 2;
     struct mach_operand rest;
 
-    if (is_float_register(s, src)) {
+    if (is_float_register(s, src) && bytes == 16) {
+        emit2(s, X64_MOVUPS, memory_at(base, offset, 128), widened(src, 128));
+    } else if (is_float_register(s, src)) {
         move_float(s, memory_at(base, offset, (uint8_t)(bytes * 8)),
                    widened(src, (uint8_t)(bytes * 8)));
     } else if (bytes == 8 || bytes == 4 || bytes == 2 || bytes == 1) {

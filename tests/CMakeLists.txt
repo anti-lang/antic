@@ -435,10 +435,12 @@ set(ANTIC_X86_64_OPTIONS "--target,macos-x86_64,--cpu,v1")
 if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     abi_x86_64_object(abi_structs_x86_64 abi/structs.c)
     abi_x86_64_object(abi_wchar_x86_64 abi/wchar.c)
+    abi_x86_64_object(abi_simd_x86_64 abi/simd.c)
     abi_wchar_expected(abi_wchar_x86_64_expected _X86_64 -arch x86_64)
     set(abi_structs_x86_64_options "")
+    set(abi_simd_x86_64_options "")
     set(abi_wchar_x86_64_options "-DEXPECTED=${abi_wchar_x86_64_expected}")
-    foreach(case structs wchar)
+    foreach(case structs wchar simd)
         add_test(NAME program_abi_${case}_macos-x86_64
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
@@ -602,6 +604,26 @@ add_test(NAME program_abi_structs
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_structs.anti"
         "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_structs>,,>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+
+# Simd structs against C: the functions of tests/abi/simd.c take and
+# return the vector types of C by value.
+add_library(abi_simd OBJECT abi/simd.c)
+target_compile_options(abi_simd PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
+if(APPLE)
+    target_compile_options(abi_simd PRIVATE -mmacosx-version-min=11.0)
+endif()
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(abi_simd PRIVATE -fno-sanitize=all)
+endif()
+add_test(NAME program_abi_simd
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_simd.anti"
+        "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_simd>,,>"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 

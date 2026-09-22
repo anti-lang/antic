@@ -292,6 +292,7 @@ static void compute(struct layouts *l, uint32_t agg)
     }
     out->align = align;
     out->size = round_up((bit + 7) / 8, align);
+    out->vector = t->simd && out->size == 16;
     for (i = 0; t->kind != IR_AGG_ARRAY && i < t->field_count; i++) {
         if (t->fields[i].bits != 0 && !bit_unit(l, t, out, i)) {
             break;
