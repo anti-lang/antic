@@ -737,6 +737,22 @@ struct import {
     struct name alias;              /* empty without as */
 };
 
+/* `provides Interface as Class;` at module level: one interface a
+   library offers and the class it gives for it. The interface is one
+   path, qualified by a module alias, by a whole module path, or by
+   nothing. */
+struct provides {
+    struct pos pos;
+    struct name qualifier;          /* empty when the path has one name */
+    struct name interface;
+    struct pos interface_pos;
+    struct name class_name;
+    struct pos class_pos;
+    /* Filled by the checker: the interface and the class it names. */
+    const struct type *type;
+    const struct type *class_type;
+};
+
 /* A doc comment that no item, field or module took. Its text is lost, so
    `--doc-warnings` reports it. */
 struct dropped_doc {
@@ -753,6 +769,8 @@ struct module {
     size_t import_count;
     struct item **items;
     size_t item_count;
+    struct provides *provides;
+    size_t provides_count;
     struct dropped_doc *dropped;
     size_t dropped_count;
 };

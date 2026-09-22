@@ -9467,6 +9467,102 @@ static bool same_qualifier(const struct item *it, const struct item *a,
 static void check_export(struct checker *c, struct item *it);
 static void check_extern_fn(struct checker *c, struct item *it);
 
+/* The interface a `provides` line names. It is a class of the module
+   being checked, or a pub class of another. The qualifier names that
+   module by its alias or by its whole path. NULL when neither
+   answers. */
+static const struct type *provides_interface(struct checker *c,
+                                             const struct provides *pr)
+{
+    const struct interface *lib;
+    struct symbol *sym;
+
+    if (pr->qualifier.length == 0) {
+        sym = scope_find_local(&c->module_scope, &pr->interface);
+        if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
+            error_at(c, pr->interface_pos, "cannot find class `%.*s`",
+                     (int)pr->interface.length, pr->interface.text);
+            return NULL;
+        }
+        return sym->type;
+    }
+    sym = scope_find_local(&c->module_scope, &pr->qualifier);
+    lib = sym != NULL && sym->kind == SYMBOL_MODULE
+              ? sym->home
+              : find_library(c, &pr->qualifier);
+    if (lib == NULL) {
+        error_at(c, pr->interface_pos, "cannot find module `%.*s`",
+                 (int)pr->qualifier.length, pr->qualifier.text);
+        return NULL;
+    }
+    sym = library_item(c, lib, &pr->interface);
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
+        error_at(c, pr->interface_pos, "`%.*s` has no public class `%.*s`",
+                 (int)pr->qualifier.length, pr->qualifier.text,
+                 (int)pr->interface.length, pr->interface.text);
+        return NULL;
+    }
+    return sym->type;
+}
+
+/* DESIGN: `provides Interface as Class;` says what a library offers.
+   The interface is an abstract class of the module being checked or of
+   one it imports. The class is a complete class of the module that
+   inherits the interface or implements it. A host reaches it through
+   the interface alone, so one line per interface is all it may ask
+   for. */
+static void check_provides(struct checker *c, struct module *module)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < module->provides_count; i++) {
+        struct provides *pr = &module->provides[i];
+        const struct type *iface = provides_interface(c, pr);
+        const struct symbol *sym =
+            scope_find_local(&c->module_scope, &pr->class_name);
+        const struct item *it = sym != NULL ? sym->item : NULL;
+
+        for (j = 0; j < i; j++) {
+            if (module->provides[j].type != NULL &&
+                module->provides[j].type == iface) {
+                error_at(c, pr->interface_pos,
+                         "`%s` is provided twice by this module",
+                         tn((struct type *)iface));
+            }
+        }
+        if (iface == NULL) {
+            continue;
+        }
+        if (iface->kind != TYPE_CLASS || !iface->has_abstract) {
+            error_at(c, pr->interface_pos, "`%s` is not abstract, and a "
+                     "`provides` line names an interface",
+                     tn((struct type *)iface));
+            continue;
+        }
+        if (it == NULL || it->kind != ITEM_CLASS || sym->type == NULL) {
+            error_at(c, pr->class_pos, "cannot find class `%.*s` of this "
+                     "module", (int)pr->class_name.length,
+                     pr->class_name.text);
+            continue;
+        }
+        if (it->is_abstract || sym->type->has_abstract) {
+            error_at(c, pr->class_pos, "`%.*s` is abstract, and a `provides` "
+                     "line names a complete class",
+                     (int)pr->class_name.length, pr->class_name.text);
+            continue;
+        }
+        if (!fills(sym->type, iface)) {
+            error_at(c, pr->class_pos, "`%.*s` neither inherits `%s` nor "
+                     "implements it", (int)pr->class_name.length,
+                     pr->class_name.text, tn((struct type *)iface));
+            continue;
+        }
+        pr->type = iface;
+        pr->class_type = sym->type;
+    }
+}
+
 bool sema_check(struct module *module, const char *module_name,
                 const char *package,
                 const struct interface *const *libraries,
@@ -10292,6 +10388,7 @@ bool sema_check(struct module *module, const char *module_name,
             check_extern_fn(&c, module->items[i]);
         }
     }
+    check_provides(&c, module);
     free(c.module_scope.entries);
     return c.ok;
 }

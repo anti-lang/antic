@@ -383,6 +383,15 @@ struct ir_inject {
     bool final;
 };
 
+/* One `provides Interface as Class;` line of the module that declares
+   the class: the path of the interface and the global of its
+   descriptor. The factory is written by the pass over the whole
+   program, so the record carries what that pass needs and no more. */
+struct ir_provides {
+    const char *interface;
+    uint32_t descriptor;            /* the interface's descriptor */
+};
+
 /* A class record. The descriptor, the base's descriptor and the tables
    are globals. The table of an abstract class is IR_NO_INDEX. The init
    function sets the tables of an object, writes the defaults and runs
@@ -402,6 +411,8 @@ struct ir_class {
     size_t mutable_count;
     struct ir_inject *injects;      /* the `inject` fields it declares */
     size_t inject_count;
+    struct ir_provides *provides;   /* the interfaces it is provided for */
+    size_t provides_count;
 };
 
 struct ir_module {
@@ -504,6 +515,8 @@ struct ir_class *ir_class_add(struct ir_module *m, const char *module,
 void ir_class_subtable(struct ir_class *c, uint32_t interface,
                        uint32_t table, uint32_t agg, uint32_t field);
 void ir_class_mutable(struct ir_class *c, uint32_t field);
+void ir_class_provides(struct ir_module *m, struct ir_class *c,
+                       const char *interface, uint32_t descriptor);
 void ir_class_inject(struct ir_module *m, struct ir_class *c,
                      const char *interface, const char *field,
                      uint32_t descriptor, bool final);

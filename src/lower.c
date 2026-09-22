@@ -8581,7 +8581,8 @@ static bool requires_class_field(const struct type *t)
 
 /* The record of a class that the module being lowered declares, for the
    passes over the whole program. */
-static void class_record(struct lowerer *l, const struct item *it)
+static void class_record(struct lowerer *l, const struct module *module,
+                         const struct item *it)
 {
     const struct type *t = it->symbol->type;
     char *name = cstr(&t->name);
@@ -8640,6 +8641,23 @@ static void class_record(struct lowerer *l, const struct item *it)
             free(field);
             text_free(&path);
         }
+    }
+    /* DESIGN: a `provides` line stands at module level and names a class
+       of the module, so its record carries the interfaces the library
+       offers for it. The pass over the whole program then writes one
+       table, and nothing of the line reaches a function body. */
+    for (k = 0; k < module->provides_count; k++) {
+        const struct provides *pr = &module->provides[k];
+        struct text path = {0};
+        if (pr->class_type != t || pr->type == NULL) {
+            continue;
+        }
+        text_appendf(&path, "%.*s.%.*s", (int)pr->type->module.length,
+                     pr->type->module.text, (int)pr->type->name.length,
+                     pr->type->name.text);
+        ir_class_provides(l->m, c, text_cstr(&path),
+                          class_descriptor(l, pr->type)->index);
+        text_free(&path);
     }
 }
 
@@ -8721,7 +8739,7 @@ bool lower_module(struct module *module, const char *module_name,
         const struct item *it = module->items[i];
         if (it->kind == ITEM_CLASS && it->symbol != NULL &&
             it->symbol->type != NULL) {
-            class_record(&l, it);
+            class_record(&l, module, it);
         }
         if (it->kind == ITEM_STRUCT && it->symbol != NULL &&
             it->symbol->type != NULL) {

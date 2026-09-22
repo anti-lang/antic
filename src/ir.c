@@ -87,6 +87,7 @@ void ir_module_free(struct ir_module *m)
         free(m->classes[i]->subtables);
         free(m->classes[i]->mutable_fields);
         free(m->classes[i]->injects);
+        free(m->classes[i]->provides);
     }
     free(m->classes);
     free(m->functions);
@@ -466,6 +467,22 @@ void ir_class_inject(struct ir_module *m, struct ir_class *c,
     c->injects[c->inject_count].descriptor = descriptor;
     c->injects[c->inject_count].final = final;
     c->inject_count++;
+}
+
+void ir_class_provides(struct ir_module *m, struct ir_class *c,
+                       const char *interface, uint32_t descriptor)
+{
+    struct ir_provides *grown =
+        realloc(c->provides, (c->provides_count + 1) * sizeof *grown);
+
+    if (grown == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    c->provides = grown;
+    c->provides[c->provides_count].interface = keep(m->arena, interface);
+    c->provides[c->provides_count].descriptor = descriptor;
+    c->provides_count++;
 }
 
 void ir_class_mutable(struct ir_class *c, uint32_t field)

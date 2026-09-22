@@ -15,7 +15,7 @@ _Static_assert(TYPE_VARIANT == 28, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
-_Static_assert(TOKEN_KIND_COUNT == 169, "raise ANTL_VERSION, then update this");
+_Static_assert(TOKEN_KIND_COUNT == 170, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_RET == 85, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
@@ -766,6 +766,13 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
             put_str(w, c->injects[j].field);
             put_u32(w, c->injects[j].descriptor);
             put_u8(w, (uint8_t)(c->injects[j].final ? 1 : 0));
+        }
+        /* The `provides` lines, so a library file carries what its
+           module offers to a host that loads it. */
+        put_u32(w, (uint32_t)c->provides_count);
+        for (j = 0; j < c->provides_count; j++) {
+            put_str(w, c->provides[j].interface);
+            put_u32(w, c->provides[j].descriptor);
         }
     }
 }
@@ -2447,6 +2454,7 @@ static void read_classes(struct reader *r, struct ir_module *program,
         uint32_t subtables;
         uint32_t mutables;
         uint32_t injects;
+        uint32_t provides;
         struct ir_class *c;
 
         if (r->failed ||
@@ -2499,6 +2507,17 @@ static void read_classes(struct reader *r, struct ir_module *program,
             }
             ir_class_inject(program, c, path, named,
                             map_global(r, maps, of, false), last != 0);
+        }
+        provides = get_count(r, 8);
+        for (j = 0; j < provides && !r->failed; j++) {
+            const char *path = get_cstr(r);
+            uint32_t of = get_u32(r);
+            if (r->failed || path[0] == '\0') {
+                damaged(r);
+                return;
+            }
+            ir_class_provides(program, c, path, map_global(r, maps, of,
+                                                           false));
         }
     }
 }

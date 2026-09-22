@@ -816,6 +816,17 @@ static void dump_module(struct dumper *d, const struct module *module)
         }
         text_append(d->out, "\n");
     }
+    for (i = 0; i < module->provides_count; i++) {
+        const struct provides *pr = &module->provides[i];
+        text_append(d->out, "provides ");
+        if (pr->qualifier.length > 0) {
+            text_appendf(d->out, "%.*s.", (int)pr->qualifier.length,
+                         pr->qualifier.text);
+        }
+        text_appendf(d->out, "%.*s as %.*s\n", (int)pr->interface.length,
+                     pr->interface.text, (int)pr->class_name.length,
+                     pr->class_name.text);
+    }
     for (i = 0; i < module->item_count; i++) {
         const struct item *it = module->items[i];
         const struct type *type = it->symbol != NULL ? it->symbol->type : NULL;

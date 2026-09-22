@@ -2746,6 +2746,42 @@ static bool test_block(struct parser *p, struct list *items,
     return expect(p, TOKEN_RBRACE);
 }
 
+/* `provides Interface as Class;` at module level. The interface is one
+   dotted path. The last name is the interface. The names before it are
+   its module, written as an alias or as the whole path. */
+static bool provides_line(struct parser *p, struct list *out)
+{
+    struct provides pr;
+    struct name path;
+    const char *dot;
+
+    memset(&pr, 0, sizeof pr);
+    pr.pos = pos_of(peek(p));
+    next(p);
+    pr.interface_pos = pos_of(peek(p));
+    if (!module_path(p, &path)) {
+        return false;
+    }
+    dot = path.length > 0 ? strrchr(path.text, '.') : NULL;
+    if (dot != NULL) {
+        pr.qualifier.text = path.text;
+        pr.qualifier.length = (size_t)(dot - path.text);
+        pr.interface.text = dot + 1;
+        pr.interface.length = path.length - pr.qualifier.length - 1;
+    } else {
+        pr.interface = path;
+    }
+    if (!expect(p, TOKEN_AS)) {
+        return false;
+    }
+    pr.class_pos = pos_of(peek(p));
+    if (!expect_name(p, &pr.class_name) || !expect(p, TOKEN_SEMICOLON)) {
+        return false;
+    }
+    list_push(out, &pr);
+    return true;
+}
+
 bool parse(const char *source, const struct token_list *tokens,
            struct arena *arena, struct diagnostics *diags,
            struct module **out)
@@ -2755,6 +2791,7 @@ bool parse(const char *source, const struct token_list *tokens,
     struct module *m = arena_alloc(arena, sizeof *m);
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
     struct list items = {NULL, 0, 0, sizeof(struct item *)};
+    struct list provides = {NULL, 0, 0, sizeof(struct provides)};
     struct list dropped = {NULL, 0, 0, sizeof(struct dropped_doc)};
     struct token *kept = malloc(tokens->count * sizeof *kept);
     size_t *origin = malloc(tokens->count * sizeof *origin);
@@ -2818,6 +2855,15 @@ bool parse(const char *source, const struct token_list *tokens,
             }
             continue;
         }
+        if (check(&p, TOKEN_PROVIDES)) {
+            if (!provides_line(&p, &provides)) {
+                if (p.pos == before) {
+                    next(&p);
+                }
+                sync_item(&p);
+            }
+            continue;
+        }
         it = item(&p);
         if (it != NULL) {
             list_push(&items, &it);
@@ -2830,6 +2876,7 @@ bool parse(const char *source, const struct token_list *tokens,
     }
     m->imports = list_finish(&p, &imports, &m->import_count);
     m->items = list_finish(&p, &items, &m->item_count);
+    m->provides = list_finish(&p, &provides, &m->provides_count);
     for (i = 0; i < tokens->count; i++) {
         const struct token *t = &tokens->items[i];
         struct dropped_doc d;

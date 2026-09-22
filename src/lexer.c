@@ -111,6 +111,7 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_SEND] = {"send", CAT_KEYWORD},
     [TOKEN_RECV] = {"recv", CAT_KEYWORD},
     [TOKEN_SELECT] = {"select", CAT_KEYWORD},
+    [TOKEN_PROVIDES] = {"provides", CAT_KEYWORD},
     [TOKEN_LPAREN] = {"(", CAT_SYMBOL},
     [TOKEN_RPAREN] = {")", CAT_SYMBOL},
     [TOKEN_LBRACE] = {"{", CAT_SYMBOL},
