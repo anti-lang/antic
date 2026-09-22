@@ -5944,6 +5944,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             sym = scope_find_local(&c->module_scope, name);
             if (sym == NULL && name_is(name, LANG_FLAGS)) {
                 t = types_flags(c->types);
+            } else if (sym == NULL && name_is(name, LANG_FIELD_DESCRIPTOR)) {
+                t = types_field_descriptor(c->types);
             } else if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
                 error_at(c, e->pos, "unknown struct `%.*s`",
                          (int)name->length, name->text);

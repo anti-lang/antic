@@ -851,6 +851,14 @@ void test_sema(void)
             1, 26,
             "the result of export fn `bad` has type `(int, str)`, which C "
             "cannot represent");
+    /* `FieldDescriptor` is a struct the compiler declares, as `Flags`
+       is, so a literal of it names it without an import. */
+    accepts("fn f() -> int {\n"
+            "    let r = FieldDescriptor { name: \"n\", offset: 8,\n"
+            "                              type_id: 0, owned: 0,\n"
+            "                              descriptor: none };\n"
+            "    return r.offset;\n"
+            "}\n");
     /* A `tests` or `fixtures` block sees every private item of its own
        module, the insides of its classes included. */
     accepts("class Counter {\n"
