@@ -1,0 +1,10 @@
+anti: the options of the runtime, which it takes before the program sees its arguments
+  --anti\.backtrace\[=true.false\] +capture the frames of an error
+  --anti\.conf=<path> +read the configuration file
+  --anti\.help +print these options and end
+  --anti\.inject=<interface>=<path> +take an interface from a library
+  --anti\.inspect +print the effective configuration and end
+  --anti\.logger=<path> +the configuration file of anti\.log
+  --anti\.plugins=<dir:dir> +where a plugin is loaded from
+  --anti\.threads=<count> +the threads of the worker pool
+  --anti\.trace=<what> +what the runtime traces

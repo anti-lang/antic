@@ -1,0 +1,8 @@
+anti runtime [0-9]+\.[0-9]+\.[0-9]+
+backtrace =  \(build\)
+logger = basic-log\.toml \(.*basic\.toml\)
+plugins =  \(build\)
+threads = 3 \(.*basic\.toml\)
+trace = leaks \(.*basic\.toml\)
+injectable interfaces: none
+loaded plugins: none

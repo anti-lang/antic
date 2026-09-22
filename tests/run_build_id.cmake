@@ -9,7 +9,9 @@
 #
 # The id is the line "build <64 digits>" after the begin marker. The two
 # links of SOURCE give one id, since the digest is of the code, and OTHER
-# gives another.
+# gives another. The search takes that whole form, because rt/license.c
+# holds the constant "build " that it reads the notice with, and its
+# object reaches every program through --anti.inspect.
 
 function(build_id out dir source)
     file(MAKE_DIRECTORY "${WORK}/${dir}")
@@ -20,7 +22,7 @@ function(build_id out dir source)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic failed for ${source}\n${err}")
     endif()
-    file(STRINGS "${WORK}/${dir}/program" lines REGEX "^build ")
+    file(STRINGS "${WORK}/${dir}/program" lines REGEX "^build [0-9a-f]+$")
     list(LENGTH lines count)
     if(NOT count EQUAL 1)
         message(FATAL_ERROR "${dir} holds ${count} build lines: ${lines}")

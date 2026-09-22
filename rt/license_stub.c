@@ -12,3 +12,14 @@ struct anti_text anti_rt_license_text(void)
     text.len = 0;
     return text;
 }
+
+/* The version of the runtime in such a library, which --anti.inspect
+   would print. An archive carries no notice, so it names none. */
+struct anti_text anti_rt_runtime_version(void)
+{
+    struct anti_text text;
+
+    text.ptr = NULL;
+    text.len = 0;
+    return text;
+}

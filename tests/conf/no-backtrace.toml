@@ -1,0 +1,3 @@
+# Backtraces are on in a dev build, and this file turns them off.
+[runtime]
+backtrace = false

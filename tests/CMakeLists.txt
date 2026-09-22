@@ -384,8 +384,6 @@ foreach(name IN ITEMS sync_exits sync_workers channels select_two
 endforeach()
 set_tests_properties(program_sync_exits_dev PROPERTIES
     FIXTURES_REQUIRED lang_dev_object)
-set_tests_properties(program_channel_workers_dev PROPERTIES
-    ENVIRONMENT "ANTI_THREADS=4")
 # The registry of the classes in dev mode, where the module that links
 # writes it. The program takes its allocator from anti.mem. A dev link
 # names the object of anti.mem on the command line.
@@ -532,8 +530,6 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
         ENVIRONMENT "ANTI_TEST_GREETING=héllo")
     set_tests_properties(program_nullable_macos-x86_64 PROPERTIES
         ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
-    set_tests_properties(program_channel_workers_macos-x86_64 PROPERTIES
-        ENVIRONMENT "ANTI_THREADS=4")
     foreach(name IN ITEMS sync_exits sync_workers channels select_two
             channel_workers)
         set_tests_properties(program_${name}_macos-x86_64 PROPERTIES
@@ -550,10 +546,9 @@ set_tests_properties(program_nullable PROPERTIES
     ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
 
 # The workers of tests/programs/channel_workers.anti wait on each other, so
-# each needs a thread of the pool. A program that leaves a mutex locked or
-# a channel waiting stops, and the timeout reports it.
-set_tests_properties(program_channel_workers PROPERTIES
-    ENVIRONMENT "ANTI_THREADS=4")
+# each needs a thread of the pool. Its .args file passes --anti.threads=4,
+# which every run of the program takes. A program that leaves a mutex
+# locked or a channel waiting stops, and the timeout reports it.
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
         channel_workers)
     set_tests_properties(program_${name} PROPERTIES TIMEOUT 120)
@@ -601,10 +596,6 @@ add_test(NAME tests_may_fail_only
         "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DSKIP=errors/construct_forms.anti:construct,errors/failing.anti:by_hand,errors/failing.anti:fail_by_hand,programs/error_values.anti:stored,programs/error_values.anti:maybe,programs/error_values.anti:caught,programs/catch_exits.anti:passed,programs/catch_moves.anti:by_return"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_may_fail_only.cmake")
-
-# The file of the logger that tests/std/log.anti writes. The environment
-# of the test names it, since the C runtime of Windows has no setenv.
-set_tests_properties(std_log PROPERTIES ENVIRONMENT "ANTI_LOGGER=log-test.toml")
 
 # DESIGN: the three directory functions of anti.os fail when the
 # environment names no home, and the message names the variable that is
@@ -1664,6 +1655,74 @@ foreach(case
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/trace-${name}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
 endforeach()
+
+# The runtime configuration: the options under --anti., the file that
+# --anti.conf, ANTI_CONF or rt.configure names, and the includes of that
+# file. A case is a name, the source in tests/conf, the options of antic
+# and the arguments of the program, then the pattern files of the output
+# and of the error output and the exit status. The runner is the one of
+# the trace tests, because the layer of a key names an absolute path
+# that a comparison cannot hold.
+set(CONF "${CMAKE_CURRENT_SOURCE_DIR}/conf")
+foreach(case
+        "inspect_build|report||--anti.inspect|inspect.build.pattern||0"
+        "inspect_options|report||--anti.backtrace,--anti.logger=log.toml,--anti.plugins=a:b,--anti.threads=4,--anti.trace=leaks,--anti.inspect|inspect.options.pattern||0"
+        "inspect_file|report||--anti.conf=${CONF}/basic.toml,--anti.inspect|inspect.file.pattern||0"
+        "precedence|report||--anti.conf=${CONF}/basic.toml,--anti.threads=9,--anti.inspect|inspect.precedence.pattern||0"
+        "include|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
+        "environment|report||--anti.inspect|inspect.file.pattern||0"
+        "environment_option|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
+        "arguments|report||--anti.threads=2,one,--anti.backtrace,two|arguments.pattern||0"
+        "help|report||--anti.help|help.pattern||0"
+        "configure|configure||${CONF}/backtrace.toml|configure.pattern||0"
+        "configure_dev|configure|--dev|${CONF}/no-backtrace.toml|configure.plain.pattern||0"
+        "configure_missing|configure||${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"
+        "file_missing|report||--anti.conf=${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"
+        "include_missing|report||--anti.conf=${CONF}/missing.toml|empty.pattern|missing.pattern|70"
+        "include_cycle|report||--anti.conf=${CONF}/cycle.toml|empty.pattern|cycle.pattern|70"
+        "unknown_option|report||--anti.nonsense|empty.pattern|unknown-option.pattern|70"
+        "unknown_key|report||--anti.conf=${CONF}/unknown-key.toml|empty.pattern|unknown-key.pattern|70"
+        "bad_value|report||--anti.conf=${CONF}/bad-value.toml|empty.pattern|bad-value.pattern|70"
+        "injection|report||--anti.conf=${CONF}/injection.toml|empty.pattern|injection.pattern|70"
+        "inject_option|report||--anti.inject=anti.log.Logger=lib/x.so|empty.pattern|inject-option.pattern|70")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 source)
+    list(GET parts 2 options)
+    list(GET parts 3 arguments)
+    list(GET parts 4 expected)
+    list(GET parts 5 errors)
+    list(GET parts 6 status)
+    set(error_patterns "")
+    if(NOT errors STREQUAL "")
+        set(error_patterns "-DERRORS=${CONF}/${errors}")
+    endif()
+    # A dev build links the objects of the modules the program imports.
+    set(std "")
+    if(options MATCHES "--dev")
+        set(std "lang,runtime")
+    endif()
+    add_test(NAME conf_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CONF}/${source}.anti"
+            "-DOPTIONS=${options}"
+            "-DARGS=${arguments}"
+            "-DEXPECTED=${CONF}/${expected}"
+            ${error_patterns}
+            "-DSTD=${std}"
+            "-DSTATUS=${status}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-${name}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
+endforeach()
+
+# ANTI_CONF names the file when the command line names none, and the
+# command line wins when both name one. It is the one environment
+# variable the runtime reads.
+set_tests_properties(conf_environment conf_environment_option PROPERTIES
+    ENVIRONMENT "ANTI_CONF=${CONF}/basic.toml")
 
 # The readers of the symbol table and the line table, on the binaries
 # that this host links for the other targets.

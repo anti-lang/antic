@@ -5,8 +5,10 @@
 //! line is one `write` call of the sink, so two threads never interleave
 //! one line with another.
 //!
-//! `ANTI_LOGGER` names a file of the TOML subset that the first call
-//! reads. It holds `level`, `format` and `[[sink]]` entries with `kind`,
+//! The `logger` key of the runtime configuration names a file of the
+//! TOML subset that the first call reads. `--anti.logger=<path>` and
+//! the `[runtime]` table of the configuration file set that key. The
+//! file holds `level`, `format` and `[[sink]]` entries with `kind`,
 //! `path` and `level`. A file that is missing or outside the subset
 //! writes one line to standard error, and the program goes on with the
 //! default, which is standard error at level `info` in text. A `log.set`
@@ -20,7 +22,7 @@ import anti.text;
 import anti.time;
 import anti.toml;
 
-extern fn getenv(name: ?*byte) -> ?*byte;
+extern fn anti_rt_conf_get(key: ?*byte, len: int) -> str;
 extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
 extern fn fclose(file: ?*byte) -> c_int;
 extern fn fwrite(bytes: ?*byte, size: c_size_t, count: c_size_t,
@@ -203,8 +205,8 @@ pub class Logger
 
 /// The logger of the program.
 ///
-/// The first call to `get` builds it, from `ANTI_LOGGER` when that names
-/// a file and from the default otherwise.
+/// The first call to `get` builds it, from the file the `logger` key
+/// names and from the default otherwise.
 pub singleton class Log
 {
 	atomic logger: ?*Logger = none,
@@ -212,7 +214,7 @@ pub singleton class Log
 
 	fn construct(self)
 	{
-		self.logger.store(from_environment());
+		self.logger.store(from_configuration());
 	}
 
 	/// The logger every function of the module writes through.
@@ -380,14 +382,15 @@ fn made(name: str, path: str) -> ?*Sink
 	return none;
 }
 
-/// The logger the environment asks for, or the default one.
-fn from_environment() -> *Logger
+/// The logger the `logger` key of the runtime configuration asks for,
+/// or the default one.
+fn from_configuration() -> *Logger
 {
-	let path = getenv("ANTI_LOGGER".ptr);
-	if path == none {
+	let path = anti_rt_conf_get("logger".ptr, 6);
+	if path.len == 0 {
 		return Logger.new("", Level.Info, StderrSink.new());
 	}
-	let source = read_file(text.from_c(path)) catch e {
+	let source = read_file(path) catch e {
 		io.eprint("anti.log: ");
 		io.eprint(e.message);
 		io.eprint("\n");

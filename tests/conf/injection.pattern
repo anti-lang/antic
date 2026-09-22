@@ -1,0 +1,1 @@
+anti: .*injection\.toml:2: anti\.log\.Logger is no injectable interface of this program, which has none
