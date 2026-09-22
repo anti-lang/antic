@@ -219,7 +219,7 @@ tests
 - `anti.lang.Mutex` is a struct wrapping the platform's mutex, created with `Mutex.new()` and released with `m.destroy()`.
 - `sync m { }` locks `m` for the block and unlocks it on every exit, including `return`, `break`, `continue` and the error forms. Nested `sync` on the same mutex is a compile error when both are in one function and a run-time deadlock otherwise, which the chapter states.
 - A field written inside a `sync` block and read outside any `sync` is a warning from the whole-program analysis. The warning fires when both sites are in functions a worker reaches.
-- `chan T` is a bounded queue of `T` values, `T` pointer-free by the `parallel` rule. `let c = chan int(16);` creates one. `send(c, v)` blocks when full, `recv(c) -> ?T` blocks when empty and returns `none` after `close(c)`. `select` waits on more than one channel and is written like `switch` over the channels. `chan`, `send`, `recv`, `select` and `sync` were reserved from chapter 2.
+- `chan T` is a bounded queue of `T` values, `T` pointer-free by the `parallel` rule. `let c = chan int(16);` creates one. `send(c, v)` blocks when full, `recv(c) -> ?*T` blocks when empty and returns `none` after `close(c)`. `select` waits on more than one channel and is written like `switch` over the channels. `chan`, `send`, `recv`, `select` and `sync` were reserved from chapter 2.
 - Both are implemented in `anti.rt` over the platform layer of the threading chapter.
 
 ## Debug information

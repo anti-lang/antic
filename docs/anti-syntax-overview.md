@@ -553,9 +553,32 @@ let job = dispatch sprite -> render(frame);
 join(job);
 ```
 
-Worker parameters are pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `ANTI_THREADS` is gone. `--anti.threads` and the configuration file set the pool size. `sync m { }` and `chan T` are the locking and channel forms.
+Worker parameters are pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `ANTI_THREADS` is gone. `--anti.threads` and the configuration file set the pool size.
 
-Built: `parallel`, `dispatch`, `join`. Not built yet: `sync`, `chan`, `--anti.threads` and the configuration file. `ANTI_THREADS` still sets the pool size.
+`sync m { }` holds a `Mutex` for its block and unlocks it on every exit. `chan T` is a bounded queue of pointer-free values, and `select` waits on more than one channel, written like `switch` over them.
+
+```anti
+let m = Mutex.new();
+sync m {
+	total += 1;
+}
+m.destroy();
+
+let c = chan int(16);
+send(c, 42);
+close(c);
+let v = recv(c) else { return 0; };     // v is *int, none once closed and empty
+
+select {
+	a x => take(x),                     // x is ?*int
+	b y => take(y),
+}
+delete(c);
+```
+
+A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. A worker takes a `Mutex` and a `chan T` beside its values.
+
+Built: `parallel`, `dispatch`, `join`, `Mutex`, `sync`, `chan T` with `send`, `recv` and `close`, and `select`. Not built yet: the warning on a field written inside `sync` and read outside it, `--anti.threads` and the configuration file. `ANTI_THREADS` still sets the pool size.
 
 ## Injection
 

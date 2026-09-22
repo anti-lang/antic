@@ -197,8 +197,8 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
 and the CPU levels are built. The variables of `-g` come before the first public
-release. After it, the wrapping and saturating operators with `Flags` and
-then sum types, both built, then locking and channels. Then injection, hooks
+release. After it, the wrapping and saturating operators with `Flags`, then
+sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. Then
 generics and closures.
 
@@ -247,6 +247,14 @@ reports what it finished.
   `if let`, `v is Shape.Circle` and `v.tag` read the tag, a variant crosses
   a module, and the header writes the enum of its tags. See "Sum types" in
   `docs/decisions.md` and `docs/notes/variants.md`.
+- Locking and channels are built. `Mutex.new()` makes an `anti.lang.Mutex`,
+  `sync m { }` holds it for a block and unlocks it on every exit, and a
+  nested `sync` on the same place in one function is refused. `chan int(16)`
+  makes a channel, `send` and `recv` block, `recv` gives `?*T` or `none`
+  once the channel is closed and empty, and `select` takes from whichever
+  channel is ready. `rt/sync.c` holds both. The warning on a field written
+  inside `sync` and read outside it is not built. See "Locking and channels"
+  in `docs/decisions.md` and `docs/notes/locking.md`.
 - `anti.mem.Allocator` is built, with `alloc(size, align)` and `free(p)`, the
   default `LibcAllocator` over `rt/mem.c` and `ArenaAllocator` over blocks of
   another allocator. `alloc` and `free` name a function of a class and follow

@@ -1,0 +1,24 @@
+# Locking and channels
+
+Choices made for `sync`, `Mutex`, `chan T` and `select` in each pass. They
+describe the inside of the compiler and the runtime. `docs/decisions.md`
+holds what a reader of the language or a user of the tools can observe,
+under "Locking and channels".
+
+- The lexer reads `sync`, `chan`, `send`, `recv` and `select` as keywords of their own. They left the list of reserved words, and `thread` stays in it. Five new token kinds moved every kind after them, so the library format rose to version 45.
+- `close` and `Mutex` are names. The checker takes `close(c)` as the built-in when no function or local of that name is in scope, as it does for `mul_high`, and `Mutex` as the built-in type when the module declares no type of that name, as it does for `Flags`.
+- The parser reads `chan T` as `TYPEX_CHAN`. `chan T(n)`, `send(c, v)` and `recv(c)` become `EXPR_SYNC_OP` with an operation each. The checker writes the same node for `Mutex.new()`, `m.destroy()`, `close(c)` and `delete(c)` of a channel, so every later pass reads one node kind.
+- `destroy` after `.` is a member name, as `super` is. The built-in `destroy(p)` never stands there.
+- `sync m { }` is `STMT_SYNC` with its operand, read as a condition is, and its block. `select { }` is `STMT_SELECT` with one `struct switch_arm` per arm: the channel in `value` and the name in `binds`. An arm body is a call, an assignment or a block, as in a `switch`, and a `send` or a `recv` counts as a call in both.
+- `types_mutex` and `types_chan` make structs of `anti.lang` with the one field `handle`, a `*byte`. A channel is one struct per element type, which stands in `element`, and its name is the keyword, so no module can declare one. The passes after the checker see a struct of one pointer, so layout, copying and the ABI need nothing of their own. `print_type` writes a channel as `chan T`.
+- `type_pointer_free` holds for both, so a worker takes them beside its values and a channel may carry a channel.
+- The checker keeps the `sync` blocks around the statement it checks in a list on the stack of the C function. A `sync` compares its operand with each of them by `same_mutex`: the same symbol, or the same field names down to it, with `&` and `*` taken off at every step.
+- `recv(c)` and an arm of `select` have the type `?*T`. The name an arm binds is a local of that type in a scope of the arm, so `let v = x else { }` narrows it as it does any local.
+- A `sync` counts for the missing-return rule when its block does, and for the leave rule of `let ... else` in the same way. The walk over the fields a `construct` sets reads a `sync` as its block and a `select` as a choice among its arms.
+- Lowering reads the handle of a `sync` once, into a temporary, and calls `anti_rt_mutex_lock`. It opens a scope around the block and records the unlock as its first exit action. The scopes that `return`, `break`, `continue`, `fail`, `try` and a handler leave run their actions in reverse, so the unlock comes after the block's own `defer` statements. The first error of a `try` block runs the actions of every scope inside it before it reaches the handler.
+- `recv` passes a slot of the frame for its value and gives what the runtime returns, the slot or null. `send` stores its value in a slot and passes its address. `chan T(n)` passes the size of T as a symbolic operand, so the IR holds no size.
+- `select` builds two arrays of pointers in the frame, the handles and one slot per arm, and calls `anti_rt_select`. It compares the index it gets with each arm in order, and the last arm takes what is left. Each arm loads the pointer that the runtime wrote into its binding.
+- A field of either type has the type id none and no descriptor, as a field of variant type has.
+- The library file writes both as structs of `anti.lang` that it does not declare. A channel writes the reference of its element type after its name, and the reader visits the element first, so a reference reaches back only.
+- `rt/sync.c` holds the runtime. A Mutex is a pthread mutex of the default type, or an SRWLOCK on Windows. A channel is one block: its lock, two condition variables, the ring of values and its counts. A `select` that finds no channel ready waits on one condition variable of the program. A send and a close wake it when the count of waiting selects is above zero. A select raises that count before it looks at its channels again under the lock of that condition. A thread starts its next select one arm further on.
+- The tests: `test_sync.c` holds the lexer, three parse trees, two syntax errors, the accepted forms and the refusals. `sync_exits`, `sync_workers`, `channels`, `select_two` and `channel_workers` run on ARM64, through Rosetta on x86_64 and in dev mode. `channel_workers` needs a thread of the pool for each worker and runs with `ANTI_THREADS=4`, and the others run on a pool of any size. `sync_modules_release` and `sync_modules_dev` take both types across a module.
