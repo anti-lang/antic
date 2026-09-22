@@ -230,8 +230,8 @@ reports what it finished.
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
   `Object`, `Job` and `Flags` in `anti.lang` itself, and the runtime defines
   the root's functions and descriptor as `anti_lang_Object_*`.
-- 722 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 721 each, without the `no_paths` test, which needs a
+- 723 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 722 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A

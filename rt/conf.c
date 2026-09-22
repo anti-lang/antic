@@ -327,6 +327,54 @@ static void read_includes(const struct anti_toml *doc, const char *path,
     }
 }
 
+/* Whether every byte of text is a digit, and there is one. */
+static int digits_only(const char *text)
+{
+    const char *at = text;
+
+    while (*at >= '0' && *at <= '9') {
+        at++;
+    }
+    return at != text && *at == '\0';
+}
+
+/* The elements of an array value, joined with `:`, the separator that
+   --anti.plugins=dir:dir writes. The reader numbers the elements, so
+   they stand in order under the keys <prefix>.0 and further. */
+static char *join_elements(const struct anti_toml *doc, int64_t from,
+                           const char *prefix)
+{
+    size_t length = strlen(prefix);
+    int64_t count = anti_rt_toml_count(doc);
+    char *out = copy("", 0);
+    int64_t i;
+
+    for (i = from; i < count; i++) {
+        struct anti_text key = anti_rt_toml_key(doc, i);
+        struct anti_text value = anti_rt_toml_value(doc, i);
+        const char *name = (const char *)key.ptr;
+        size_t held = strlen(out);
+        char *grown;
+        if (strncmp(name, prefix, length) != 0 || name[length] != '.' ||
+            !digits_only(name + length + 1)) {
+            break;
+        }
+        grown = malloc(held + (size_t)value.len + 2);
+        if (grown == NULL) {
+            startup_error("out of memory at program start");
+        }
+        memcpy(grown, out, held);
+        if (held > 0) {
+            grown[held++] = ':';
+        }
+        memcpy(grown + held, value.ptr, (size_t)value.len);
+        grown[held + (size_t)value.len] = '\0';
+        free(out);
+        out = grown;
+    }
+    return out;
+}
+
 /* The keys of the document, after its includes. */
 static void read_keys(const struct anti_toml *doc, const char *path)
 {
@@ -337,8 +385,12 @@ static void read_keys(const struct anti_toml *doc, const char *path)
         struct anti_text key = anti_rt_toml_key(doc, i);
         struct anti_text value = anti_rt_toml_value(doc, i);
         const char *name = (const char *)key.ptr;
+        const char *element;
         char position[280];
         char where[320];
+        char prefix[64];
+        char *elements;
+        size_t length;
         struct key *k;
         snprintf(position, sizeof position, "%s:%lld", path,
                  (long long)anti_rt_toml_line(doc, i));
@@ -358,17 +410,40 @@ static void read_keys(const struct anti_toml *doc, const char *path)
             fputs(" of the table runtime\n", stderr);
             exit(70);
         }
-        k = key_of(name + 8, strlen(name + 8));
+        /* An array value stands as <key>.0, <key>.1 and further. The
+           first element takes the whole array, and the rest of them
+           are then done. */
+        name += 8;
+        element = strchr(name, '.');
+        length = strlen(name);
+        if (element != NULL && !digits_only(element + 1)) {
+            element = NULL;
+        }
+        if (element != NULL) {
+            length = (size_t)(element - name);
+        }
+        k = key_of(name, length);
         if (k == NULL) {
             fprintf(stderr,
-                    "anti: %s: %s is no key of the table runtime, which takes",
-                    position, name + 8);
+                    "anti: %s: %.*s is no key of the table runtime, which "
+                    "takes",
+                    position, (int)length, name);
             print_keys(stderr);
             fputs("\n", stderr);
             exit(70);
         }
         snprintf(where, sizeof where, "%s: %s", position, k->name);
-        set_key(k, (const char *)value.ptr, LAYER_FILE, path, where);
+        if (element == NULL) {
+            set_key(k, (const char *)value.ptr, LAYER_FILE, path, where);
+            continue;
+        }
+        if (strcmp(element + 1, "0") != 0) {
+            continue;
+        }
+        snprintf(prefix, sizeof prefix, "runtime.%s", k->name);
+        elements = join_elements(doc, i, prefix);
+        set_key(k, elements, LAYER_FILE, path, where);
+        free(elements);
     }
 }
 

@@ -1,0 +1,7 @@
+# An array value of a key, which --anti.plugins writes with the same
+# separator.
+[runtime]
+plugins = [
+	'/opt/some_program/lib',
+	'/usr/lib/some_program',
+]

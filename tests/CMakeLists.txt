@@ -1670,6 +1670,7 @@ foreach(case
         "inspect_file|report||--anti.conf=${CONF}/basic.toml,--anti.inspect|inspect.file.pattern||0"
         "precedence|report||--anti.conf=${CONF}/basic.toml,--anti.threads=9,--anti.inspect|inspect.precedence.pattern||0"
         "include|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
+        "array|report||--anti.conf=${CONF}/array.toml,--anti.inspect|inspect.array.pattern||0"
         "environment|report||--anti.inspect|inspect.file.pattern||0"
         "environment_option|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
         "arguments|report||--anti.threads=2,one,--anti.backtrace,two|arguments.pattern||0"

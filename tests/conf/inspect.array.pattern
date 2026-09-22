@@ -1,0 +1,8 @@
+anti runtime [0-9]+\.[0-9]+\.[0-9]+
+backtrace =  \(build\)
+logger =  \(build\)
+plugins = /opt/some_program/lib:/usr/lib/some_program \(.*array\.toml\)
+threads =  \(build\)
+trace =  \(build\)
+injectable interfaces: none
+loaded plugins: none
