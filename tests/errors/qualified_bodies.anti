@@ -16,9 +16,8 @@ abstract class Shape
 	abstract fn area(self) -> int;
 }
 
-abstract class Flat
+abstract class Flat inherits Shape
 {
-	inherits Shape,
 }
 
 abstract class Measured
@@ -55,10 +54,8 @@ class Own
 }
 
 /* Both bases name the one primary table. */
-class Level
+class Level inherits Flat
 {
-	inherits Flat,
-
 	concrete fn Shape::area(self) -> int
 	{
 		return 1;
@@ -83,9 +80,8 @@ class Half
 }
 
 /* The body for Measured leaves the primary table empty. */
-class Hollow
+class Hollow inherits Shape
 {
-	inherits Shape,
 	implements me: Measured,
 
 	concrete fn Measured::area(self) -> int
@@ -96,10 +92,8 @@ class Hollow
 
 /* The body qualified by the base fills the primary table, and no
    interface has `area`, so the unqualified body fills nothing. */
-class Spare
+class Spare inherits Shape
 {
-	inherits Shape,
-
 	concrete fn Shape::area(self) -> int
 	{
 		return 1;

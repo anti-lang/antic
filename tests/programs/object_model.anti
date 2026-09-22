@@ -26,10 +26,8 @@ abstract class Serializable
 	abstract fn serialize(self, out: *text.Builder);
 }
 
-abstract class Shape
+abstract class Shape inherits Drawable
 {
-	inherits Drawable,
-
 	pub kind: Kind,
 	pub x: f32 = 0.0,
 	pub y: f32 = 0.0,
@@ -56,9 +54,8 @@ abstract class Shape
 	}
 }
 
-final class Circle
+final class Circle inherits Shape
 {
-	inherits Shape,
 	implements ser: Serializable,
 
 	r: f32,
@@ -88,10 +85,8 @@ final class Circle
 	}
 }
 
-class Square
+class Square inherits Shape
 {
-	inherits Shape,
-
 	side: f32,
 	own label: []byte,
 

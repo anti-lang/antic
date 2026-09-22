@@ -14,9 +14,8 @@ class Shape
 	pub n: int = 0,
 }
 
-class Circle
+class Circle inherits Shape
 {
-	inherits Shape,
 	pub r: int = 0,
 }
 

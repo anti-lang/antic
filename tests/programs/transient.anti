@@ -30,9 +30,8 @@ class Named
 }
 
 /// A class below one with a transient field copies it as `none` too.
-class Tagged
+class Tagged inherits Named
 {
-	inherits Named,
 	pub tag: int = 0,
 }
 

@@ -82,9 +82,8 @@ class Pad
 
 /* A class below Board inherits its bodies, so its tables hold the same
    functions. */
-class Easel
+class Easel inherits Board
 {
-	inherits Board,
 }
 
 abstract class Shape
@@ -98,10 +97,8 @@ abstract class Measured
 }
 
 /* A body qualified by the base fills the primary table alone. */
-class Tile
+class Tile inherits Shape
 {
-	inherits Shape,
-
 	pub side: int = 2,
 
 	concrete fn Shape::area(self) -> int
@@ -112,9 +109,8 @@ class Tile
 
 /* The body qualified by the base fills the primary table, and the
    unqualified one beside it fills the table of Measured. */
-class Square
+class Square inherits Shape
 {
-	inherits Shape,
 	implements me: Measured,
 
 	pub side: int = 3,
@@ -132,10 +128,8 @@ class Square
 
 /* A class below Square replaces the unqualified body. A call on a
    Square reaches it through the table that body fills. */
-class Cube
+class Cube inherits Square
 {
-	inherits Square,
-
 	concrete fn area(self) -> int
 	{
 		return self.side * 6;

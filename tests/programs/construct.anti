@@ -19,9 +19,8 @@ class Base
 	}
 }
 
-class Derived
+class Derived inherits Base
 {
-	inherits Base,
 	pub m: int = 10,
 
 	fn construct(self)

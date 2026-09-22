@@ -1,6 +1,6 @@
-qualified_bodies.anti:38:24: error: `Twice` declares `draw` twice
-qualified_bodies.anti:52:19: error: `Own` declares `draw` twice
-qualified_bodies.anti:67:20: error: `Level` declares `area` twice
-qualified_bodies.anti:74:7: error: `Half` lacks `concrete fn draw` of `Drawable`
-qualified_bodies.anti:86:7: error: `Hollow` lacks `concrete fn area`
-qualified_bodies.anti:108:14: error: `concrete fn area` of `Spare` fills no abstract function
+qualified_bodies.anti:37:24: error: `Twice` declares `draw` twice
+qualified_bodies.anti:51:19: error: `Own` declares `draw` twice
+qualified_bodies.anti:64:20: error: `Level` declares `area` twice
+qualified_bodies.anti:71:7: error: `Half` lacks `concrete fn draw` of `Drawable`
+qualified_bodies.anti:83:7: error: `Hollow` lacks `concrete fn area`
+qualified_bodies.anti:102:14: error: `concrete fn area` of `Spare` fills no abstract function

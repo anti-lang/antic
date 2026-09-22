@@ -22,10 +22,8 @@ class Bin
 }
 
 /* A deck of the program, whose tables start as those of the library's. */
-class Shoe
+class Shoe inherits points.Deck
 {
-	inherits points.Deck,
-
 	pub fn decks(self) -> int
 	{
 		return self.cards / 52;
@@ -34,10 +32,8 @@ class Shoe
 
 /* A crate of the program, whose plain body replaces the qualified one
    of the library in the table of Sized. */
-class Box
+class Box inherits points.Crate
 {
-	inherits points.Crate,
-
 	concrete fn size(self) -> int
 	{
 		return self.w;

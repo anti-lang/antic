@@ -9,9 +9,8 @@ abstract class Shape
 	abstract fn area(self) -> int;
 }
 
-class Square
+class Square inherits Shape
 {
-	inherits Shape,
 	pub side: int = 3,
 
 	concrete fn area(self) -> int
@@ -20,9 +19,8 @@ class Square
 	}
 }
 
-class Box
+class Box inherits Shape
 {
-	inherits Shape,
 	w: int = 2,
 
 	concrete fn area(self) -> int

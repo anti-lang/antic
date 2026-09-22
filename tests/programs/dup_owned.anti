@@ -10,9 +10,8 @@ class Shape
 	pub n: int = 1,
 }
 
-class Circle
+class Circle inherits Shape
 {
-	inherits Shape,
 	pub r: int = 5,
 }
 

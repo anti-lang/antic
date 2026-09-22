@@ -14,9 +14,8 @@ abstract class Closable
 	abstract fn close(self);
 }
 
-class Square
+class Square inherits Shape
 {
-	inherits Shape,
 	implements cl: Closable,
 
 	pub side: int = 2,
@@ -32,10 +31,8 @@ class Square
 	}
 }
 
-class Cube
+class Cube inherits Square
 {
-	inherits Square,
-
 	concrete fn area(self) -> int
 	{
 		return self.super.area() * 6;

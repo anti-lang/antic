@@ -1862,13 +1862,43 @@ static struct item *member(struct parser *p, const struct item *owner)
     return (m->body = block(p)) == NULL ? NULL : m;
 }
 
+/* `inherits` in a class body, where the base stood before it moved to
+   the header. The message writes the header the programmer means, with
+   the base as the body named it. */
+static void inherits_in_body(struct parser *p, const struct item *it)
+{
+    const struct token *base = peek_at(p, 1);
+    const struct token *dot = peek_at(p, 2);
+    const struct token *name = peek_at(p, 3);
+    size_t length = 0;
+    char message[192];
+
+    if (base->kind == TOKEN_IDENT) {
+        length = base->length;
+        if (dot->kind == TOKEN_DOT && name->kind == TOKEN_IDENT) {
+            length = name->offset + name->length - base->offset;
+        }
+    }
+    snprintf(message, sizeof message,
+             "inherits belongs in the class header: class %.*s inherits %.*s",
+             (int)it->name.length, it->name.text, (int)length,
+             p->source + base->offset);
+    error_here(p, message);
+}
+
 /* Read the functions and constants of a body into it->members. */
 static bool members_of(struct parser *p, struct item *it)
 {
     struct list list = {NULL, 0, 0, sizeof(struct item *)};
 
     while (!check(p, TOKEN_RBRACE) && !check(p, TOKEN_EOF)) {
-        struct item *m = member(p, it);
+        struct item *m;
+        if (it->kind == ITEM_CLASS && check(p, TOKEN_INHERITS)) {
+            inherits_in_body(p, it);
+            free(list.data);
+            return false;
+        }
+        m = member(p, it);
         if (m == NULL) {
             free(list.data);
             return false;
@@ -1922,9 +1952,12 @@ static bool struct_field_only(struct parser *p, const struct item *it)
     return false;
 }
 
-/* `class Circle { inherits Shape, implements ser: Serializable, ... }`.
-   The base and the interfaces open the body, then the fields, then the
-   constants and the functions. */
+/* `class Circle inherits Shape { implements ser: Serializable, ... }`.
+   DESIGN: the base is no member. It sits at offset 0, has no name of its
+   own, is reached as `self.super`, and a class has at most one, so the
+   header names it. `implements` and `use` open the body, because each is
+   a named sub-object with a place in the layout. Then come the fields,
+   then the constants and the functions. */
 static struct item *class_item(struct parser *p, struct item *it)
 {
     struct list fields = {NULL, 0, 0, sizeof(struct param)};
@@ -1934,10 +1967,28 @@ static struct item *class_item(struct parser *p, struct item *it)
     if (!expect_name(p, &it->name)) {
         return NULL;
     }
+    /* DESIGN: `align(N)` stays directly after the name, as on a struct,
+       and the base follows it. */
     if (is_word(p, peek(p), "align")) {
         next(p);
         if (!expect(p, TOKEN_LPAREN) || (it->align = expression(p)) == NULL ||
             !expect(p, TOKEN_RPAREN)) {
+            return NULL;
+        }
+    }
+    /* The base is one name, qualified by its module or not, and no field
+       of its own. The checker builds the `super` field from it. */
+    if (check(p, TOKEN_INHERITS)) {
+        it->base_pos = pos_of(peek(p));
+        next(p);
+        if (!expect_name(p, &it->base_name) ||
+            (accept(p, TOKEN_DOT) &&
+             (it->base_module = it->base_name,
+              !expect_name(p, &it->base_name)))) {
+            return NULL;
+        }
+        if (check(p, TOKEN_COMMA) || check(p, TOKEN_INHERITS)) {
+            error_here(p, "a class has one base");
             return NULL;
         }
     }
@@ -1953,28 +2004,10 @@ static struct item *class_item(struct parser *p, struct item *it)
         field.doc = doc_before(p, TOKEN_DOC);
         field.note = doc_before(p, TOKEN_NOTE);
         field.pos = pos_of(peek(p));
-        /* The base is one name, qualified by its module or not, and no
-           field of its own. The checker builds the `super` field from
-           it. */
         if (check(p, TOKEN_INHERITS)) {
-            if (it->base_name.length > 0) {
-                error_here(p, "a class has one base");
-                free(fields.data);
-                return NULL;
-            }
-            it->base_pos = pos_of(peek(p));
-            next(p);
-            if (!expect_name(p, &it->base_name) ||
-                (accept(p, TOKEN_DOT) &&
-                 (it->base_module = it->base_name,
-                  !expect_name(p, &it->base_name)))) {
-                free(fields.data);
-                return NULL;
-            }
-            if (!accept(p, TOKEN_COMMA)) {
-                break;
-            }
-            continue;
+            inherits_in_body(p, it);
+            free(fields.data);
+            return NULL;
         }
         if (accept(p, TOKEN_IMPLEMENTS)) {
             field.form = FIELD_IMPL;

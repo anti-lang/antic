@@ -15,9 +15,8 @@ abstract class Shape
 	}
 }
 
-class Square
+class Square inherits Shape
 {
-	inherits Shape,
 	pub side: int = 0,
 
 	concrete fn area(self) -> int
@@ -26,9 +25,8 @@ class Square
 	}
 }
 
-class Box
+class Box inherits Shape
 {
-	inherits Shape,
 	pub w: int = 0,
 	pub h: int = 0,
 

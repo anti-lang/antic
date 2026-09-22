@@ -7,9 +7,8 @@ import com.example.parts;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-class Crate
+class Crate inherits parts.Box
 {
-	inherits parts.Box,
 	pub part: parts.Part = parts.Part { n: 0 },
 	pub own list: []parts.Part,
 

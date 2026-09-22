@@ -29,20 +29,16 @@ class Top
 	}
 }
 
-class Middle
+class Middle inherits Top
 {
-	inherits Top,
-
 	concrete fn draw(self) -> int
 	{
 		return 3;
 	}
 }
 
-class Bottom
+class Bottom inherits Middle
 {
-	inherits Middle,
-
 	concrete fn Sketch::draw(self) -> int
 	{
 		return 4;

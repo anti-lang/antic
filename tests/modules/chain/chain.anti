@@ -10,9 +10,8 @@ import com.example.dog;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-class Puppy
+class Puppy inherits dog.Dog
 {
-	inherits dog.Dog,
 	pub age: int = 0,
 
 	fn construct(self)
@@ -26,9 +25,8 @@ class Puppy
 	}
 }
 
-class Cat
+class Cat inherits animal.Pet
 {
-	inherits animal.Pet,
 	pub lives: int = 9,
 
 	fn construct(self, owner: int) may fail

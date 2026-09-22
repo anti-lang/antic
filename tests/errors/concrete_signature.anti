@@ -30,9 +30,8 @@ abstract class Named
 	abstract fn tag(self, k: int) -> int;
 }
 
-class Square
+class Square inherits Shape
 {
-	inherits Shape,
 	implements n: Named,
 
 	concrete fn area(self, k: int) -> int
@@ -108,10 +107,8 @@ class Sheet
 	}
 }
 
-class Quiet
+class Quiet inherits log.Sink
 {
-	inherits log.Sink,
-
 	concrete fn write(self, line: int)
 	{
 	}
@@ -123,9 +120,8 @@ abstract class Round
 	abstract fn spin(self);
 }
 
-class Disc
+class Disc inherits Round
 {
-	inherits Round,
 	implements n: Named,
 
 	concrete fn label(self) -> int

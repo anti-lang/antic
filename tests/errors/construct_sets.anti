@@ -64,9 +64,8 @@ class Base
 	}
 }
 
-class Orphan
+class Orphan inherits Base
 {
-	inherits Base,
 	pub d: int,
 
 	fn construct(self, x: int) may fail
@@ -109,9 +108,8 @@ class Good
 	}
 }
 
-class Derived
+class Derived inherits Base
 {
-	inherits Base,
 	pub d: int,
 
 	fn construct(self, x: int) may fail

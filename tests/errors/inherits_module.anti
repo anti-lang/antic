@@ -3,9 +3,8 @@
 
 import com.example.board;
 
-class Score
+class Score inherits board.bump
 {
-	inherits board.bump,
 	pub n: int = 0,
 }
 

@@ -638,7 +638,7 @@ void test_sema(void)
        calls a `construct`. */
     accepts("class Pet { pub n: int = 0, fn construct(self, n: int) "
             "{ self.n = n; } }\n"
-            "class Cat { inherits Pet, fn construct(self, n: int) "
+            "class Cat inherits Pet { fn construct(self, n: int) "
             "{ self.super.construct(n * 2); } }\n");
     rejects("class Pet { pub n: int = 0, fn construct(self, n: int) "
             "{ self.n = n; }\n"
@@ -656,23 +656,23 @@ void test_sema(void)
        another matter, and the chain keeps its one name for each. */
     accepts("class Pet { pub n: int = 0,\n"
             "    pub fn new(n: int) -> Pet { return Pet { n: n }; } }\n"
-            "class Cat { inherits Pet,\n"
+            "class Cat inherits Pet {\n"
             "    pub fn new() -> Cat { return Cat { n: 1 }; } }\n"
             "fn f() -> int { let a = Pet.new(2); let b = Cat.new();\n"
             "    return a.n + b.n; }\n");
     rejects("class Pet { pub n: int = 0, pub fn tag(self) -> int "
             "{ return self.n; } }\n"
-            "class Cat { inherits Pet, pub fn tag(self) -> int "
-            "{ return 1; } }\n", 2, 34,
+            "class Cat inherits Pet { pub fn tag(self) -> int "
+            "{ return 1; } }\n", 2, 33,
             "`Pet` already has `tag`");
     rejects("class Pet { pub n: int = 0,\n"
             "    pub fn make() -> Pet { return Pet { n: 1 }; } }\n"
-            "class Cat { inherits Pet, pub make: int = 0 }\n", 3, 27,
+            "class Cat inherits Pet { pub make: int = 0 }\n", 3, 26,
             "`Pet` already has `make`");
     rejects("class Pet { pub n: int = 0, pub fn tag(self) -> int "
             "{ return self.n; } }\n"
-            "class Cat { inherits Pet, pub fn tag() -> int "
-            "{ return 1; } }\n", 2, 34,
+            "class Cat inherits Pet { pub fn tag() -> int "
+            "{ return 1; } }\n", 2, 33,
             "`Pet` already has `tag`");
 
     /* A `concrete fn` takes the signature of the entry it fills, `own`
@@ -683,14 +683,14 @@ void test_sema(void)
             "    abstract fn take(self, own p: ?*Point); }\n"
             "abstract class Named { abstract fn label(self, k: i32) -> i32;\n"
             "    abstract fn size(self) -> int; }\n"
-            "class Square { inherits Shape, implements n: Named,\n"
+            "class Square inherits Shape { implements n: Named,\n"
             "    concrete fn area(self, k: int) -> int { return k; }\n"
             "    concrete fn take(self, own p: ?*Point) { }\n"
             "    concrete fn size(self) -> int { return 1; }\n"
             "    concrete fn Named::label(self, k: i32) -> i32 "
             "{ return k; } }\n");
     rejects("abstract class Shape { abstract fn area(self, k: int) -> int; }\n"
-            "class Square { inherits Shape,\n"
+            "class Square inherits Shape {\n"
             "    concrete fn area(self, k: i32) -> int { return 0; } }\n", 3,
             31, "`k` of `concrete fn area` has type `i32`, and `Shape.area` "
             "takes `int`");

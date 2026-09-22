@@ -13,10 +13,8 @@ abstract class Source
 	abstract fn read(self, n: int) -> int may fail;
 }
 
-final class Doubler
+final class Doubler inherits Source
 {
-	inherits Source,
-
 	concrete fn read(self, n: int) -> int may fail
 	{
 		if n < 0 { fail "n is negative"; }
@@ -24,9 +22,8 @@ final class Doubler
 	}
 }
 
-final class Refuser
+final class Refuser inherits Source
 {
-	inherits Source,
 	pub code: int = 9,
 
 	concrete fn read(self, n: int) -> int may fail

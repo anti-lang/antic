@@ -20,9 +20,8 @@ class Shape
 	}
 }
 
-class Big
+class Big inherits Shape
 {
-	inherits Shape,
 	concrete fn area(self) -> int
 	{
 		return 100 * self.size;

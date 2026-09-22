@@ -32,9 +32,8 @@ export class Shape
 }
 
 /// A square of one side.
-export class Square
+export class Square inherits Shape
 {
-	inherits Shape,
 	implements ink: Ink,
 	side: c_int = 1,
 
@@ -50,9 +49,8 @@ export class Square
 }
 
 /// A circle of a positive radius.
-export class Circle
+export class Circle inherits Shape
 {
-	inherits Shape,
 	radius: c_int = 1,
 
 	/// Take the radius, or fail when it is not positive.
@@ -94,9 +92,8 @@ export class Stamp
 }
 
 /// A tile, whose body of `area` names the base.
-export class Tile
+export class Tile inherits Shape
 {
-	inherits Shape,
 	side: c_int = 3,
 
 	concrete fn Shape::area(self) -> c_int

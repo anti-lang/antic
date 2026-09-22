@@ -23,9 +23,8 @@ class Account
 	}
 }
 
-class Savings
+class Savings inherits Account
 {
-	inherits Account,
 	pub rate: int = 1,
 
 	fn construct(self, balance: int, rate: int) may fail
@@ -36,9 +35,8 @@ class Savings
 	}
 }
 
-class Blank
+class Blank inherits Account
 {
-	inherits Account,
 	pub note: int = 0,
 
 	fn construct(self, note: int) may fail

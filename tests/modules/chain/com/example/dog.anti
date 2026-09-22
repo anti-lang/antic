@@ -6,9 +6,8 @@ import com.example.animal;
 extern fn printf(format: ?*byte, ...) -> c_int;
 
 /// A dog, an animal with a tail.
-pub class Dog
+pub class Dog inherits animal.Animal
 {
-	inherits animal.Animal,
 	pub tail: int = 1,
 
 	fn construct(self)

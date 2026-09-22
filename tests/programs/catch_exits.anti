@@ -10,10 +10,8 @@ import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-class Counted
+class Counted inherits lang.Error
 {
-	inherits lang.Error,
-
 	static atomic live: int = 0;
 
 	/// An error that counts itself alive until it is deleted.

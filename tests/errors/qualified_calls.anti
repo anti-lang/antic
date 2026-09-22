@@ -68,9 +68,8 @@ class Palm
 	}
 }
 
-class Fist
+class Fist inherits Palm
 {
-	inherits Palm,
 	implements cd: Card,
 
 	concrete fn Card::draw(self, n: int) -> int

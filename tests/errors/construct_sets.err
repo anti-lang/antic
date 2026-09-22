@@ -1,5 +1,5 @@
 construct_sets.anti:20:3: error: `construct` of `Box` returns `none` before it sets `part`
 construct_sets.anti:36:2: error: `construct` of `Branches` returns `none` before it sets `a`
 construct_sets.anti:51:2: error: `construct` of `Loop` returns `none` before it sets `a`
-construct_sets.anti:78:2: error: `construct` of `Orphan` returns `none` before it sets `b`
-construct_sets.anti:90:2: error: `construct` of `Quiet` returns `none` before it sets `q`
+construct_sets.anti:77:2: error: `construct` of `Orphan` returns `none` before it sets `b`
+construct_sets.anti:89:2: error: `construct` of `Quiet` returns `none` before it sets `q`

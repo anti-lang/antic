@@ -14,9 +14,8 @@ extern fn anti_rt_last_error_text(code: c_int) -> ?*byte;
 extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
 
 /// The error of a failing system call, with the number the system gave.
-pub class SystemError
+pub class SystemError inherits lang.Error
 {
-	inherits lang.Error,
 	/// The number of the failure: `errno`, or the Win32 error code. The
 	/// code of the error holds it as well.
 	pub errno: int = 0,

@@ -294,10 +294,10 @@ void test_nullable(void)
     /* `is`, `as` and `as?` take a `?*T`: `none` is of no class. `dup`,
        `delete` and `destroy` read the table and need a checked one. */
     accepts("class Shape { pub n: int = 0 }\n"
-            "class Circle { inherits Shape, pub r: int = 0 }\n"
+            "class Circle inherits Shape { pub r: int = 0 }\n"
             "fn f(p: ?*Shape) -> bool { return p is *Circle; }\n");
     accepts("class Shape { pub n: int = 0 }\n"
-            "class Circle { inherits Shape, pub r: int = 0 }\n"
+            "class Circle inherits Shape { pub r: int = 0 }\n"
             "fn f(p: ?*Shape) -> ?*Circle { return p as? *Circle; }\n");
     rejects("class Shape { pub n: int = 0 }\n"
             "fn f(p: ?*Shape) { delete(p); }\n",

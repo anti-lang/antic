@@ -12,9 +12,8 @@ class Point
 	pub y: int = 0,
 }
 
-class Named
+class Named inherits Point
 {
-	inherits Point,
 	pub mark: int = 0,
 	pub own tag: ?*Point,
 

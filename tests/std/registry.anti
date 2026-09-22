@@ -19,10 +19,8 @@ class Point
 	}
 }
 
-class Marked
+class Marked inherits Point
 {
-	inherits Point,
-
 	pub tag: int = 9,
 	pub own next: *Point,
 	pub ratio: f64 = 0.5,
@@ -50,10 +48,8 @@ abstract class Shape
 	abstract fn area(self) -> int;
 }
 
-class Square
+class Square inherits Shape
 {
-	inherits Shape,
-
 	concrete fn area(self) -> int
 	{
 		return 4;

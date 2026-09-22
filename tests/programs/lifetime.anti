@@ -17,9 +17,8 @@ class Node
 	}
 }
 
-class Leaf
+class Leaf inherits Node
 {
-	inherits Node,
 	concrete fn destruct(self)
 	{
 		printf("destruct Leaf %d\n".ptr, self.n as c_int);

@@ -39,9 +39,8 @@ class Base
 	}
 }
 
-class Late
+class Late inherits Base
 {
-	inherits Base,
 	pub m: int = 0,
 
 	fn construct(self, n: int) may fail
@@ -53,10 +52,8 @@ class Late
 	}
 }
 
-class Again
+class Again inherits Base
 {
-	inherits Base,
-
 	fn construct(self, n: int) may fail
 	{
 		try self.super.construct(n);
@@ -77,9 +74,8 @@ class Gone
 	}
 }
 
-class Heir
+class Heir inherits Base
 {
-	inherits Base,
 }
 
 fn main() -> int

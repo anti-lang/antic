@@ -38,10 +38,8 @@ class Hand
 }
 
 /* A plain body replaces the qualified one in the table of Drawable. */
-class Fist
+class Fist inherits Hand
 {
-	inherits Hand,
-
 	concrete fn draw(self)
 	{
 		printf("fist %d\n".ptr, self.size as c_int);
@@ -49,10 +47,8 @@ class Fist
 }
 
 /* A qualified body replaces it as well. */
-class Palm
+class Palm inherits Hand
 {
-	inherits Hand,
-
 	concrete fn Drawable::draw(self)
 	{
 		printf("palm %d\n".ptr, self.size as c_int);

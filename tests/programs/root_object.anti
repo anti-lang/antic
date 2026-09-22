@@ -11,9 +11,8 @@ class Point
 	pub y: int = 2,
 }
 
-class Named
+class Named inherits Point
 {
-	inherits Point,
 	concrete fn type_name(self) -> str
 	{
 		return "renamed";

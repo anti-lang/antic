@@ -32,10 +32,8 @@ class Base
 	pub low: u8 : 3 = 5,
 }
 
-class Kinds
+class Kinds inherits Base
 {
-	inherits Base,
-
 	pub high: u8 : 4 = 9,
 	pub mid: i8 : 3 = -2,
 	pub arr: [3]i32 = [1, 2, 3],

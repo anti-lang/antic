@@ -35,9 +35,8 @@ class Point
 	}
 }
 
-class Marked
+class Marked inherits Point
 {
-	inherits Point,
 	pub tag: int = 9,
 	pub small: u8 = 200,
 	pub ratio: f32 = 0.5,

@@ -1,1 +1,1 @@
-inherits_module.anti:8:2: error: `board` has no public struct `bump`
+inherits_module.anti:6:13: error: `board` has no public struct `bump`

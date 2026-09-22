@@ -15,9 +15,8 @@ pub class Shape
 	}
 }
 
-pub class Big
+pub class Big inherits Shape
 {
-	inherits Shape,
 	concrete fn area(self) -> int
 	{
 		return 100 * self.size;

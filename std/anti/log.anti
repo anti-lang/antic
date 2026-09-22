@@ -46,10 +46,8 @@ pub abstract class Sink
 }
 
 /// A sink that writes to standard error.
-pub class StderrSink
+pub class StderrSink inherits Sink
 {
-	inherits Sink,
-
 	/// A sink on standard error.
 	pub fn new() -> *StderrSink
 	{
@@ -63,10 +61,8 @@ pub class StderrSink
 }
 
 /// A sink that appends to a file.
-pub class FileSink
+pub class FileSink inherits Sink
 {
-	inherits Sink,
-
 	file: ?*byte,
 
 	/// A sink that appends to the file at `path`, which may fail.
@@ -102,10 +98,8 @@ pub class FileSink
 }
 
 /// A sink that hands each line to a function.
-pub class CallbackSink
+pub class CallbackSink inherits Sink
 {
-	inherits Sink,
-
 	to: fn(str),
 
 	/// A sink that calls `to` with every line.

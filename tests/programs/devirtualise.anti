@@ -10,10 +10,8 @@ abstract class Speaker
 	abstract fn speak(self) -> int;
 }
 
-class Dog
+class Dog inherits Speaker
 {
-	inherits Speaker,
-
 	pub legs: int = 4,
 
 	concrete fn speak(self) -> int
@@ -47,10 +45,8 @@ class Base
 	}
 }
 
-class Derived
+class Derived inherits Base
 {
-	inherits Base,
-
 	concrete fn value(self) -> int
 	{
 		return 2;

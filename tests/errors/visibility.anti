@@ -9,9 +9,8 @@ class Shape
 	}
 }
 
-class Circle
+class Circle inherits Shape
 {
-	inherits Shape,
 	r: f32 = 1.0,
 
 	pub fn widen(self)

@@ -285,10 +285,8 @@ pub class Error
 /// `p catch fatal` and `p catch e { }` on a `?*T` give one of these. It
 /// is an `Error` like any other, so a handler that takes an `*Error`
 /// takes it too.
-pub class NoneDereference
+pub class NoneDereference inherits Error
 {
-	inherits Error,
-
 	/// The error a `catch` on a `none` pointer gives.
 	pub fn new() -> *NoneDereference
 	{

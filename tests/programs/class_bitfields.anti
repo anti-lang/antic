@@ -13,10 +13,8 @@ class Base
 	pub flag: u8 : 1 = 1,
 }
 
-class Packed
+class Packed inherits Base
 {
-	inherits Base,
-
 	pub high: u8 : 4 = 9,
 	pub mid: i8 : 3 = -2,
 

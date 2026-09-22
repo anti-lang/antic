@@ -661,12 +661,12 @@ void test_parser(void)
         errors("fn f() { let x: int = 1 as 5; }", e, 1);
     }
 
-    /* A class body opens with its base and the interfaces it
-       implements. Then come the fields with their visibility and
-       defaults, then the constants and the functions. */
-    tree("class Circle\n"
+    /* A class names its base in its header. The body opens with the
+       interfaces it implements and the parts it uses. Then come the
+       fields with their visibility and defaults, then the constants and
+       the functions. */
+    tree("class Circle inherits Shape\n"
          "{\n"
-         "    inherits Shape,\n"
          "    implements ser: Serializable,\n"
          "    use hit: Box,\n"
          "    r: f32 = 1.0,\n"
@@ -751,6 +751,60 @@ void test_parser(void)
          "  field title\n"
          "    type str\n"
          "    mutable\n");
+    /* The base follows the name after every modifier, and a base of
+       another module is qualified by it. `align` stays next to the
+       name. */
+    tree("abstract class Shape inherits Base {}\n"
+         "final class Circle inherits shapes.Shape {}\n"
+         "singleton class Config inherits Base { path: str }\n"
+         "pub class Square inherits Shape {}\n"
+         "packed class Wide align(16) inherits Base { x: u8 }\n",
+         "class_decl Shape\n"
+         "  abstract\n"
+         "  inherits Base\n"
+         "class_decl Circle\n"
+         "  final\n"
+         "  inherits shapes.Shape\n"
+         "class_decl Config\n"
+         "  singleton\n"
+         "  inherits Base\n"
+         "  field path\n"
+         "    type str\n"
+         "pub class_decl Square\n"
+         "  inherits Shape\n"
+         "class_decl Wide\n"
+         "  packed\n"
+         "  align\n"
+         "    int_lit 16\n"
+         "  inherits Base\n"
+         "  field x\n"
+         "    type u8\n");
+    /* The base is no member of the body. Its old place there is
+       refused wherever it stands, and the message gives the header. */
+    {
+        static const struct expected_error e[] = {
+            {1, 16, "inherits belongs in the class header: class Circle "
+                    "inherits Shape"}};
+        errors("class Circle { inherits Shape, r: int }\n", e, 1);
+    }
+    {
+        static const struct expected_error e[] = {
+            {3, 5, "inherits belongs in the class header: class Circle "
+                   "inherits shapes.Shape"}};
+        errors("final class Circle\n{\n    inherits shapes.Shape,\n}\n",
+               e, 1);
+    }
+    {
+        static const struct expected_error e[] = {
+            {1, 30, "inherits belongs in the class header: class Circle "
+                    "inherits Shape"}};
+        errors("class Circle { fn f(self) {} inherits Shape }\n", e, 1);
+    }
+    {
+        static const struct expected_error e[] = {
+            {1, 28, "a class has one base"}};
+        errors("class Circle inherits Shape, Round {}\n", e, 1);
+    }
     /* An enum names its underlying type and may give explicit values. */
     tree("enum Mode: u8 { A = 1, B }\n",
          "enum_decl Mode\n"

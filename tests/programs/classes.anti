@@ -22,9 +22,8 @@ class Shape
 	}
 }
 
-final class Circle
+final class Circle inherits Shape
 {
-	inherits Shape,
 	pub r: f32 = 3.0,
 
 	pub fn area(self) -> f32
