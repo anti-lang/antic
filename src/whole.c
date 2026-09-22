@@ -1486,9 +1486,18 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
         return;
     }
     function = function_named(m, text, &ambiguous);
+    /* A class name alone names the `get` of its singleton, which is the
+       second form the specification gives a provider. */
+    if (function == IR_NO_INDEX) {
+        struct text get = {0};
+        text_appendf(&get, "%s.get", text);
+        function = function_named(m, text_cstr(&get), &ambiguous);
+        text_free(&get);
+    }
     if (function == IR_NO_INDEX) {
         text_appendf(errors, "the provider `%s` of `%s` names no function of "
-                             "the program\n", text, in->interface);
+                             "the program, and no singleton with a `get`\n",
+                     text, in->interface);
         return;
     }
     if (ambiguous) {

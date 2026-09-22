@@ -1791,14 +1791,15 @@ endforeach()
 
 # Injection. The program of tests/inject names three interfaces and takes
 # a provider of each from --inject: the `get` of a singleton that
-# implements the interface, a module function, and the `get` of a
-# singleton that inherits it. One field is called `alloc`, which the
+# implements the interface, a module function, and the name of a
+# singleton that inherits the interface, whose `get` the provider is.
+# One field is called `alloc`, which the
 # example of the overview writes. `inject final` then refuses a
 # replacement at start, and --anti.inspect lists what it injects. The runner
 # is the one of the configuration tests, because a pattern file holds the
 # output of each.
 set(INJECT "${CMAKE_CURRENT_SOURCE_DIR}/inject")
-set(INJECT_OPTIONS "--inject,service.Logger=service.Console.get,--inject,service.Clock=service.the_clock,--inject,service.Allocator=service.Memory.get")
+set(INJECT_OPTIONS "--inject,service.Logger=service.Console.get,--inject,service.Clock=service.the_clock,--inject,service.Allocator=service.Memory")
 foreach(case
         "service|${INJECT_OPTIONS}||service.pattern||0"
         "inspect|${INJECT_OPTIONS}|--anti.inspect|inspect.pattern||0"

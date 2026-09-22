@@ -46,8 +46,10 @@ The pass collects one entry per interface, finds the slot, resolves the
 provider and writes the value of the slot. `--inject Interface=Provider`
 carries the table of the build. The provider's path is split at each
 dot, and the module and the name that answer name a function of the
-program. Where the name is `C.f` and the module holds a class `C`, the
-class must be the interface, inherit it or implement it. An interface it
+program. A path that names no function names a class, and `get` is
+appended to it, which is the second form of the specification. Where the
+name is `C.f` and the module holds a class `C`, the class must be the
+interface, inherit it or implement it. An interface it
 implements is a sub-object at a field, so the pass writes a thunk that
 calls the provider and moves the pointer by the offset of that field.
 `struct ir_subtable` carries the aggregate and the index of the field

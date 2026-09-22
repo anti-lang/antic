@@ -625,7 +625,7 @@ class Renderer
 
 Six standard interfaces ship with defaults: `Logger`, `Clock`, `Random`, `FileSystem`, `Allocator`, `Config`. Standard interfaces for services come with a reference implementation: `anti.db` with SQLite, `anti.http`, `anti.serialize`, `anti.crypto`.
 
-A provider is a module function that gives a pointer of the interface, or the `get` of a singleton that implements it.
+A provider is a module function that gives a pointer of the interface, or the `get` of a singleton that implements it. The name of that singleton alone names its `get`.
 
 Built: `inject name: *Interface` and `inject final name: *Interface`. The `[inject]` and `[inject.test]` tables of the manifest reach `antic` as `--inject Interface=Provider`, and `anti test` passes them. One slot per interface holds the provider, and every site calls through it. The link refuses an interface with no provider, a provider that is no function of the program or is no such interface, and a cycle through the providers. `anti.mem.Allocator` is built, with `alloc(size, align)` and `free(p)`, its default `LibcAllocator` over the C library, and `ArenaAllocator`, which hands out memory from blocks and gives them all back at once. `Object.deserialize` and `f"..."(from)` take one. The language's `alloc` and `free` stay bound to the C library. Not built yet: the run-time replacement, which waits for plugins, `--closed`, the other five standard interfaces, the containers of `anti.collection` that take an `Allocator`, and the interfaces for services.
 
