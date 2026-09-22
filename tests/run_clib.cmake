@@ -264,7 +264,7 @@ elseif(CASE STREQUAL "bundle")
     # The driver puts the system libraries of the target on the line, and
     # a Linux program links pthread and the maths library.
     set(system "")
-    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    if("${TARGET}" MATCHES "^linux-")
         set(system " -lpthread -lm")
     endif()
     if(NOT line STREQUAL "${DRIVER} main.c ${geo}${system}")

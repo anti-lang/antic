@@ -1,6 +1,6 @@
-/* readlink, realpath, stat and PATH_MAX are POSIX, outside the C11
-   library. */
-#define _POSIX_C_SOURCE 200809L
+/* readlink, stat and PATH_MAX are POSIX, outside the C11 library, and
+   glibc declares realpath for X/Open alone, which takes POSIX with it. */
+#define _XOPEN_SOURCE 700
 
 /* DESIGN: an installed antic sits in bin/ of the runtime archive, so the
    directory above it holds lib/, std/ and sysroot/. Asking the system
