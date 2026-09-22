@@ -1562,14 +1562,15 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
                              struct injectable *in, struct text *errors)
 {
     const char *named = provider_text(o, in->interface);
-    struct text own = {0};
+    bool own = named == NULL;
+    struct text fallback = {0};
 
-    if (named == NULL) {
-        text_appendf(&own, "%s.default", in->interface);
-        named = text_cstr(&own);
+    if (own) {
+        text_appendf(&fallback, "%s.default", in->interface);
+        named = text_cstr(&fallback);
     }
-    resolve_named_provider(w, m, in, named, own.length != 0, errors);
-    text_free(&own);
+    resolve_named_provider(w, m, in, named, own, errors);
+    text_free(&fallback);
 }
 
 /* DESIGN: the provider graph is the code the providers run. An edge

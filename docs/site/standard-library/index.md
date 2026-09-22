@@ -26,4 +26,6 @@ The module `anti.trace` holds the handlers of `anti.lang.TraceHandler` that the 
 
 The module `anti.runtime` holds `configure`, which names the configuration file of the program. The specification writes that call as `rt.configure(path)`, so a program imports the module as `import anti.runtime as rt;`. The path `anti.rt` is the C runtime, which no compilation may define, and holds no module of Anti.
 
+Six modules hold a standard interface, an abstract class a program injects with `inject name: *Interface`. Each ships a default implementation and a default provider, so an `inject` field of one links with no entry in the manifest. They are `anti.log.Logger` with `SinkLogger`, `anti.time.Clock` with `SystemClock`, `anti.random.Source` with `SharedRandom`, `anti.fs.FileSystem` with `SystemFileSystem`, `anti.mem.Allocator` with `LibcAllocator` and `anti.config.Config` with `FileConfig`. The default provider is a static function `default` of the interface, which the `[inject]` table of the manifest overrides. The module `anti.config` reads the settings of the program from one TOML file that `config.read` names, and the `[runtime]` table of `--anti.conf` stays the runtime's own.
+
 The modules `anti.net`, `anti.regex`, `anti.raylib` and `anti.miniaudio` wait for the native libraries of the runtime archive.
