@@ -1,0 +1,84 @@
+//! `select` waits on two channels and takes a value from one that holds
+//! one. An arm binds `none` once its channel is closed and empty, and the
+//! loop ends when both are. Two chunks of a `parallel` fill the channels
+//! and a third drains them. Each channel holds every value sent to it, so
+//! the chunks may run in turn on a pool of one thread.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn fill(out: chan int, first: int, count: int)
+{
+	for i in 0..count {
+		send(out, first + i);
+	}
+	close(out);
+}
+
+fn drain(a: chan int, b: chan int, results: chan int)
+{
+	let from_a = 0;
+	let from_b = 0;
+	let sum_a = 0;
+	let sum_b = 0;
+	let a_open = true;
+	let b_open = true;
+	while a_open || b_open do {
+		select {
+			a x => {
+				let v = x else {
+					a_open = false;
+					continue;
+				};
+				from_a += 1;
+				sum_a += *v;
+			},
+			b y => {
+				let v = y else {
+					b_open = false;
+					continue;
+				};
+				from_b += 1;
+				sum_b += *v;
+			},
+		}
+	}
+	send(results, from_a);
+	send(results, sum_a);
+	send(results, from_b);
+	send(results, sum_b);
+}
+
+worker fn run(roles: []int, a: chan int, b: chan int, results: chan int)
+	-> int
+{
+	for role in roles {
+		switch role {
+			0 => fill(a, 1, 100),
+			1 => fill(b, 1000, 50),
+			else => drain(a, b, results),
+		}
+	}
+	return roles.len;
+}
+
+fn main() -> int
+{
+	let a = chan int(100);
+	let b = chan int(50);
+	let results = chan int(4);
+	let roles = [0, 1, 2];
+	let all = roles[0..3];
+	let done = parallel all by 3 -> run(a, b, results);
+	free(done.ptr);
+	close(results);
+	while true do {
+		let r = recv(results) else {
+			break;
+		};
+		printf("%d\n".ptr, *r as c_int);
+	}
+	delete(a);
+	delete(b);
+	delete(results);
+	return 0;
+}

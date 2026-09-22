@@ -311,6 +311,12 @@ static struct type_expr *type(struct parser *p)
                 return NULL;
             }
         }
+    } else if (accept(p, TOKEN_CHAN)) {
+        /* `chan T`, the channel of values of T. */
+        ty->kind = TYPEX_CHAN;
+        if ((ty->element = type(p)) == NULL) {
+            return NULL;
+        }
     } else if (check(p, TOKEN_STAR) || check(p, TOKEN_QUESTION_STAR)) {
         ty->nullable = accept(p, TOKEN_QUESTION_STAR);
         if (!ty->nullable) {
@@ -817,6 +823,37 @@ static struct expr *primary(struct parser *p)
         }
         accept(p, TOKEN_COMMA);
         return expect(p, TOKEN_RPAREN) ? e : NULL;
+    /* DESIGN: `chan T(n)` makes a channel of capacity n, and `send(c, v)`
+       and `recv(c)` read as calls of their keyword. `close(c)` is a call
+       of a name, which the checker takes as the built-in unless a
+       function of that name is in scope. */
+    case TOKEN_CHAN:
+        next(p);
+        e = new_expr(p, EXPR_SYNC_OP, t);
+        e->as.sync_op.op = SYNC_CHAN_NEW;
+        if ((e->as.sync_op.element = type(p)) == NULL ||
+            !expect(p, TOKEN_LPAREN) ||
+            (e->as.sync_op.value = expression(p)) == NULL) {
+            return NULL;
+        }
+        accept(p, TOKEN_COMMA);
+        return expect(p, TOKEN_RPAREN) ? e : NULL;
+    case TOKEN_SEND:
+    case TOKEN_RECV:
+        next(p);
+        e = new_expr(p, EXPR_SYNC_OP, t);
+        e->as.sync_op.op = t->kind == TOKEN_SEND ? SYNC_SEND : SYNC_RECV;
+        if (!expect(p, TOKEN_LPAREN) ||
+            (e->as.sync_op.target = expression(p)) == NULL) {
+            return NULL;
+        }
+        if (t->kind == TOKEN_SEND &&
+            (!expect(p, TOKEN_COMMA) ||
+             (e->as.sync_op.value = expression(p)) == NULL)) {
+            return NULL;
+        }
+        accept(p, TOKEN_COMMA);
+        return expect(p, TOKEN_RPAREN) ? e : NULL;
     case TOKEN_PARALLEL:
         /* DESIGN: `parallel a by n -> f(x)` reads as one expression. The
            array and the chunk count are expressions, and `by` is a
@@ -938,10 +975,13 @@ static struct expr *postfix(struct parser *p)
                 if (!element_name(p, &outer->as.field.name)) {
                     return NULL;
                 }
-            } else if (check(p, TOKEN_SUPER)) {
+            } else if (check(p, TOKEN_SUPER) || check(p, TOKEN_DESTROY)) {
+                /* `self.super` names the base, and `m.destroy()` the
+                   function that releases a Mutex. The built-in
+                   `destroy` never follows `.`. */
                 outer->as.field.name.text = p->source + peek(p)->offset;
                 outer->as.field.name.length = peek(p)->length;
-                accept(p, TOKEN_SUPER);
+                next(p);
             } else if (!expect_member_name(p, &outer->as.field.name)) {
                 return NULL;
             }
@@ -1270,7 +1310,11 @@ static struct stmt *let_or_const(struct parser *p)
    arm carries no `;` of its own. It is a block, or one assignment or call
    that the comma or the closing brace ends. Anything longer takes a
    block. */
-static struct stmt *arm_body(struct parser *p)
+/* The refusal of an arm body that is none of the three forms. */
+#define SWITCH_ARM "an arm of a `switch` is a call, an assignment or a block"
+#define SELECT_ARM "an arm of a `select` is a call, an assignment or a block"
+
+static struct stmt *arm_body(struct parser *p, const char *refusal)
 {
     const struct token *t = peek(p);
     struct stmt *s;
@@ -1289,9 +1333,8 @@ static struct stmt *arm_body(struct parser *p)
         s->as.assign.target = e;
         return (s->as.assign.value = expression(p)) == NULL ? NULL : s;
     }
-    if (e->kind != EXPR_CALL) {
-        error_here(p, "an arm of a `switch` is a call, an assignment or a "
-                      "block");
+    if (e->kind != EXPR_CALL && e->kind != EXPR_SYNC_OP) {
+        error_here(p, refusal);
         return NULL;
     }
     s = new_stmt(p, STMT_EXPR, t);
@@ -1588,7 +1631,8 @@ static struct stmt *statement(struct parser *p)
                 }
                 s->as.switch_stmt.otherwise_at = arms.count;
                 if (!expect(p, TOKEN_FAT_ARROW) ||
-                    (s->as.switch_stmt.otherwise = arm_body(p)) == NULL) {
+                    (s->as.switch_stmt.otherwise =
+                         arm_body(p, SWITCH_ARM)) == NULL) {
                     free(arms.data);
                     return NULL;
                 }
@@ -1605,7 +1649,7 @@ static struct stmt *statement(struct parser *p)
                 }
                 if ((arm.value == NULL && (arm.value = expression(p)) == NULL) ||
                     !expect(p, TOKEN_FAT_ARROW) ||
-                    (arm.body = arm_body(p)) == NULL) {
+                    (arm.body = arm_body(p, SWITCH_ARM)) == NULL) {
                     free(arms.data);
                     return NULL;
                 }
@@ -1616,6 +1660,63 @@ static struct stmt *statement(struct parser *p)
             }
         }
         s->as.switch_stmt.arms = list_finish(p, &arms, &s->as.switch_stmt.count);
+        return expect(p, TOKEN_RBRACE) ? s : NULL;
+    }
+    /* DESIGN: `sync m { }` holds the mutex m for the block. The operand
+       is read as a condition is, so its `{` opens the block. */
+    case TOKEN_SYNC:
+        next(p);
+        s = new_stmt(p, STMT_SYNC, t);
+        if ((s->as.sync.mutex = condition(p)) == NULL ||
+            (s->as.sync.body = block(p)) == NULL) {
+            return NULL;
+        }
+        return s;
+    /* DESIGN: `select { a x => stmt, b => stmt }` is written like a
+       `switch` over the channels. Each arm names a channel and, before
+       the arrow, the name that takes what the channel gives. It has no
+       `else`, since it waits until one of its channels has a value or is
+       closed. */
+    case TOKEN_SELECT: {
+        struct list arms = {NULL, 0, 0, sizeof(struct switch_arm)};
+        next(p);
+        s = new_stmt(p, STMT_SELECT, t);
+        if (!expect(p, TOKEN_LBRACE)) {
+            return NULL;
+        }
+        if (check(p, TOKEN_RBRACE)) {
+            error_here(p, "a `select` waits on one channel or more");
+            return NULL;
+        }
+        while (!check(p, TOKEN_RBRACE) && !check(p, TOKEN_EOF)) {
+            struct switch_arm arm;
+            memset(&arm, 0, sizeof arm);
+            arm.pos = pos_of(peek(p));
+            if (check(p, TOKEN_ELSE)) {
+                error_here(p, "a `select` has no `else`");
+                free(arms.data);
+                return NULL;
+            }
+            if ((arm.value = expression(p)) == NULL) {
+                free(arms.data);
+                return NULL;
+            }
+            if (check(p, TOKEN_IDENT) &&
+                peek_at(p, 1)->kind == TOKEN_FAT_ARROW) {
+                arm.binds_pos = pos_of(peek(p));
+                expect_name(p, &arm.binds);
+            }
+            if (!expect(p, TOKEN_FAT_ARROW) ||
+                (arm.body = arm_body(p, SELECT_ARM)) == NULL) {
+                free(arms.data);
+                return NULL;
+            }
+            list_push(&arms, &arm);
+            if (!accept(p, TOKEN_COMMA)) {
+                break;
+            }
+        }
+        s->as.select.arms = list_finish(p, &arms, &s->as.select.count);
         return expect(p, TOKEN_RBRACE) ? s : NULL;
     }
     /* DESIGN: `defer stmt;` records a statement that runs at every exit
@@ -1747,7 +1848,8 @@ static struct stmt *statement(struct parser *p)
                 return NULL;
             }
             if (e->kind != EXPR_CALL && e->kind != EXPR_FREE &&
-                e->kind != EXPR_OBJECT && e->kind != EXPR_JOIN) {
+                e->kind != EXPR_OBJECT && e->kind != EXPR_JOIN &&
+                e->kind != EXPR_SYNC_OP) {
                 error_here(p, "expected a call or an assignment");
                 return NULL;
             }

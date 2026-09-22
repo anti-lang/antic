@@ -106,6 +106,11 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_HERE] = {"here", CAT_KEYWORD},
     [TOKEN_FALLTHROUGH] = {"fallthrough", CAT_KEYWORD},
     [TOKEN_VARIANT] = {"variant", CAT_KEYWORD},
+    [TOKEN_SYNC] = {"sync", CAT_KEYWORD},
+    [TOKEN_CHAN] = {"chan", CAT_KEYWORD},
+    [TOKEN_SEND] = {"send", CAT_KEYWORD},
+    [TOKEN_RECV] = {"recv", CAT_KEYWORD},
+    [TOKEN_SELECT] = {"select", CAT_KEYWORD},
     [TOKEN_LPAREN] = {"(", CAT_SYMBOL},
     [TOKEN_RPAREN] = {")", CAT_SYMBOL},
     [TOKEN_LBRACE] = {"{", CAT_SYMBOL},
@@ -178,9 +183,11 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
 
 /* The words chapter 2 reserves for threads and does not use yet. They lex
    as TOKEN_RESERVED, which no grammar rule accepts. Chapter 22 took
-   `worker` and `parallel` out of the list and gave them a token. */
+   `worker` and `parallel` out of the list and gave them a token, and
+   locking and channels took `chan`, `recv`, `select`, `send` and
+   `sync`. */
 static const char *const reserved[] = {
-    "chan", "recv", "select", "send", "sync", "thread",
+    "thread",
 };
 
 struct lexer {

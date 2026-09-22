@@ -1,0 +1,95 @@
+//! Workers that wait on each other through channels smaller than what
+//! passes through them. A dispatched consumer takes a thousand values
+//! from a channel of four while `main` sends them, and `main` selects
+//! over two channels of two while dispatched producers fill them. `send`
+//! blocks while a channel is full and `recv` while it is empty. The test
+//! runs with ANTI_THREADS=4, so the pool holds a thread for each worker.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Consumer
+{
+	pub total: int = 0,
+}
+
+class Producer
+{
+	pub first: int,
+}
+
+worker fn consume(c: *Consumer, input: chan int) -> int
+{
+	let count = 0;
+	while true do {
+		let v = recv(input) else {
+			break;
+		};
+		c.total += *v;
+		count += 1;
+	}
+	return count;
+}
+
+worker fn produce(p: *Producer, out: chan int, count: int) -> int
+{
+	for i in 0..count {
+		send(out, p.first + i);
+	}
+	close(out);
+	return count;
+}
+
+fn main() -> int
+{
+	let input = chan int(4);
+	let c = alloc Consumer { };
+	let job = dispatch c -> consume(input);
+	for i in 0..1000 {
+		send(input, i);
+	}
+	close(input);
+	let n = join(job);
+	printf("%d received, total %d\n".ptr, n as c_int, c.total as c_int);
+	delete(input);
+	free(c);
+
+	let a = chan int(2);
+	let b = chan int(2);
+	let pa = alloc Producer { first: 1 };
+	let pb = alloc Producer { first: 1000 };
+	let ja = dispatch pa -> produce(a, 300);
+	let jb = dispatch pb -> produce(b, 200);
+	let from_a = 0;
+	let from_b = 0;
+	let sum = 0;
+	let a_open = true;
+	let b_open = true;
+	while a_open || b_open do {
+		select {
+			a x => {
+				let v = x else {
+					a_open = false;
+					continue;
+				};
+				from_a += 1;
+				sum += *v;
+			},
+			b y => {
+				let v = y else {
+					b_open = false;
+					continue;
+				};
+				from_b += 1;
+				sum += *v;
+			},
+		}
+	}
+	printf("%d from a, %d from b, sum %d\n".ptr, from_a as c_int,
+		from_b as c_int, sum as c_int);
+	printf("%d %d\n".ptr, join(ja) as c_int, join(jb) as c_int);
+	delete(a);
+	delete(b);
+	free(pa);
+	free(pb);
+	return 0;
+}

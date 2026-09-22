@@ -537,6 +537,79 @@ struct type *types_flags(struct types *types)
     return types->flags;
 }
 
+/* The struct of one handle that a Mutex and a channel are. */
+static struct type *handle_struct(struct types *types, const char *name,
+                                  struct type *element)
+{
+    static const char module_text[] = LANG_MODULE;
+    static const char field_text[] = SYNC_HANDLE;
+    struct struct_field field;
+    struct type *t;
+
+    t = arena_alloc(types->arena, sizeof *t);
+    memset(t, 0, sizeof *t);
+    t->kind = TYPE_STRUCT;
+    t->module.text = module_text;
+    t->module.length = sizeof module_text - 1;
+    t->name.text = name;
+    t->name.length = strlen(name);
+    t->element = element;
+    t->next = types->derived;
+    types->derived = t;
+    memset(&field, 0, sizeof field);
+    field.name.text = field_text;
+    field.name.length = sizeof field_text - 1;
+    field.type = types_pointer(types, types_builtin(types, TYPE_U8));
+    types_set_fields(types, t, &field, 1);
+    t->layout = LAYOUT_DONE;
+    return t;
+}
+
+struct type *types_mutex(struct types *types)
+{
+    static const char name_text[] = LANG_MUTEX;
+
+    if (types->mutex == NULL) {
+        types->mutex = handle_struct(types, name_text, NULL);
+    }
+    return types->mutex;
+}
+
+struct type *types_chan(struct types *types, struct type *element)
+{
+    static const char name_text[] = LANG_CHAN;
+    struct type *t;
+
+    for (t = types->derived; t != NULL; t = t->next) {
+        if (types_is_chan(t) && t->element == element) {
+            return t;
+        }
+    }
+    return handle_struct(types, name_text, element);
+}
+
+/* Whether t is the struct of anti.lang named name. */
+static bool lang_struct(const struct type *t, const char *name)
+{
+    size_t length = strlen(name);
+
+    return t != NULL && t->kind == TYPE_STRUCT &&
+           t->name.length == length &&
+           memcmp(t->name.text, name, length) == 0 &&
+           t->module.length == sizeof LANG_MODULE - 1 &&
+           memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
+}
+
+bool types_is_mutex(const struct type *t)
+{
+    return lang_struct(t, LANG_MUTEX);
+}
+
+bool types_is_chan(const struct type *t)
+{
+    return lang_struct(t, LANG_CHAN) && t->element != NULL;
+}
+
 bool types_is_flags(const struct type *t)
 {
     return t != NULL && t->kind == TYPE_STRUCT && t->result == NULL &&
@@ -837,6 +910,12 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     };
     size_t i;
 
+    /* A channel is written as the program writes its type. */
+    if (types_is_chan(t)) {
+        text_append(out, LANG_CHAN " ");
+        print_type(out, t->element, qualified);
+        return;
+    }
     switch (t->kind) {
     case TYPE_POINTER:
         text_append(out, t->nullable ? "?*" : "*");
@@ -977,6 +1056,12 @@ bool type_pointer_free(const struct type *t)
     case TYPE_CLASS:
     case TYPE_TUPLE:
     case TYPE_VARIANT:
+        /* DESIGN: a Mutex and a channel are handles of objects made to
+           be shared between threads, so a worker takes them beside its
+           values. A worker that holds a copy names the same one. */
+        if (types_is_mutex(t) || types_is_chan(t)) {
+            return true;
+        }
         /* DESIGN: the pointer-free test of `parallel` exempts the table
            pointer and the `own` fields of a class. The table is read-only
            data that every object of the class shares, and an `own` field

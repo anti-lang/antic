@@ -1,0 +1,14 @@
+exit 0
+unlocked after the closing brace
+2
+unlocked after return
+4
+unlocked after break and continue
+-1
+unlocked after fail
+-2
+unlocked after try
+-1
+unlocked after a handler that returns
+8
+unlocked after a defer

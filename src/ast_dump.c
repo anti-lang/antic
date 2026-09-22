@@ -146,6 +146,11 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
             dump_type(d, depth + 1, t->params[i]);
         }
         break;
+    case TYPEX_CHAN:
+        text_append(d->out, "type chan");
+        end(d, start, NULL);
+        dump_type(d, depth + 1, t->element);
+        break;
     }
 }
 
@@ -412,6 +417,24 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         end(d, start, type);
         dump_expr(d, depth + 1, e->as.join.job);
         break;
+    case EXPR_SYNC_OP: {
+        static const char *const names[] = {
+            "mutex_new", "mutex_destroy", "chan", "send", "recv", "close",
+            "delete"
+        };
+        text_append(d->out, names[e->as.sync_op.op]);
+        end(d, start, type);
+        if (e->as.sync_op.element != NULL) {
+            dump_type(d, depth + 1, e->as.sync_op.element);
+        }
+        if (e->as.sync_op.target != NULL) {
+            dump_expr(d, depth + 1, e->as.sync_op.target);
+        }
+        if (e->as.sync_op.value != NULL) {
+            dump_expr(d, depth + 1, e->as.sync_op.value);
+        }
+        break;
+    }
     }
 }
 
@@ -560,6 +583,25 @@ static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
         if (s->as.switch_stmt.otherwise != NULL) {
             simple(d, depth + 1, "else", NULL);
             dump_stmt(d, depth + 2, s->as.switch_stmt.otherwise);
+        }
+        break;
+    case STMT_SYNC:
+        simple(d, depth, "sync_stmt", NULL);
+        dump_expr(d, depth + 1, s->as.sync.mutex);
+        dump_block(d, depth + 1, s->as.sync.body);
+        break;
+    case STMT_SELECT:
+        simple(d, depth, "select_stmt", NULL);
+        for (i = 0; i < s->as.select.count; i++) {
+            const struct switch_arm *arm = &s->as.select.arms[i];
+            simple(d, depth + 1, "arm", NULL);
+            dump_expr(d, depth + 2, arm->value);
+            if (arm->binds.length > 0) {
+                size_t at = begin(d, depth + 2);
+                label_name(d, "binds", NULL, &arm->binds);
+                end(d, at, arm->bound != NULL ? arm->bound->type : NULL);
+            }
+            dump_stmt(d, depth + 2, arm->body);
         }
         break;
     case STMT_DEFER:

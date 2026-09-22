@@ -234,8 +234,8 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check cpu errno f16 fs init io
-    license mem object platform reflect registry signal start symbols text
-    threads time toml trace utf)
+    license mem object platform reflect registry signal start symbols sync
+    text threads time toml trace utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "rt/${source}.c")

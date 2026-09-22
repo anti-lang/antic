@@ -38,6 +38,8 @@ struct exit_action {
     bool error;                 /* delete the error in error_temp */
     uint32_t error_temp;
     const struct type *error_type;
+    bool unlock;                /* `sync`: unlock the mutex in mutex */
+    uint32_t mutex;
 };
 
 struct defers {
@@ -1731,6 +1733,13 @@ static uint64_t type_id_of(const struct type *t)
         [TYPE_F16] = TYPE_ID_F16,
     };
 
+    /* DESIGN: a Mutex and a channel are handles of objects that threads
+       share. A walk has nothing to write or copy there, so their type id
+       is none, as a variant's is, and `serialize` and `reflect.get`
+       pass over them. */
+    if (types_is_mutex(t) || types_is_chan(t)) {
+        return TYPE_ID_NONE;
+    }
     switch (t->kind) {
     case TYPE_POINTER: return TYPE_ID_PTR;
     case TYPE_FN: return TYPE_ID_FN;
@@ -2152,7 +2161,8 @@ static struct ir_global *class_descriptor(struct lowerer *l,
    declares the struct writes it, whether a class there names it or not.
    It cannot know which classes of other modules hold it. A union
    has none, since no walk knows which of its fields holds the value. A
-   Job and Flags have none either, since no module declares them. */
+   Job, Flags, a Mutex and a channel have none either, since no module
+   declares them. */
 static struct ir_global *struct_descriptor(struct lowerer *l,
                                            const struct type *t)
 {
@@ -2164,7 +2174,8 @@ static struct ir_global *struct_descriptor(struct lowerer *l,
     size_t count = own_fields(t);
     size_t k;
 
-    if (t->is_union || types_is_job(t) || types_is_flags(t)) {
+    if (t->is_union || types_is_job(t) || types_is_flags(t) ||
+        types_is_mutex(t) || types_is_chan(t)) {
         return NULL;
     }
     g = struct_global(l, t, "descriptor", &module, &name);
@@ -3152,6 +3163,9 @@ static struct ir_operand lower_format(struct lowerer *l, const struct expr *e)
 
 /* The address of the memory that holds the aggregate value of e. A
    literal gets a slot of its own, and a constant is read-only data. */
+static struct ir_operand lower_sync_op(struct lowerer *l,
+                                       const struct expr *e);
+
 static struct ir_operand lower_address(struct lowerer *l,
                                        const struct expr *e)
 {
@@ -3190,6 +3204,8 @@ static struct ir_operand lower_address(struct lowerer *l,
         return lower_dispatch(l, e);
     case EXPR_JOIN:
         return lower_join(l, e);
+    case EXPR_SYNC_OP:
+        return lower_sync_op(l, e);
     case EXPR_HERE:
         return const_address(l, location_value(l, e->pos, e->type), e->type);
     case EXPR_FORMAT:
@@ -4652,6 +4668,119 @@ static struct ir_operand lower_parallel(struct lowerer *l,
     return temp(l, out);
 }
 
+/* Locking and channels */
+
+/* DESIGN: a Mutex and a channel are structs of one handle. The handle
+   names the object the runtime made. Each operation passes the handle to
+   a function of the runtime, which holds the platform's mutex and the
+   queue. A value that `send` puts and `recv` takes goes through a slot
+   of the frame. The IR then names no size but the one of the element
+   type. */
+
+/* The handle that the Mutex or the channel e holds. A pointer to a
+   Mutex points at its handle. */
+static struct ir_operand load_handle(struct lowerer *l, const struct expr *e)
+{
+    struct ir_operand at = e->type->kind == TYPE_POINTER ? lower_expr(l, e)
+                                                          : lower_address(l, e);
+
+    if (l->failed) {
+        return none();
+    }
+    return temp(l, ir_load(l->f, l->b, IR_PTR, at));
+}
+
+/* A call of the runtime function name on count arguments. */
+static struct ir_operand sync_call(struct lowerer *l, const char *name,
+                                   enum ir_type result,
+                                   const enum ir_type *params,
+                                   const struct ir_operand *args,
+                                   size_t count)
+{
+    struct ir_function *f = rt_function_giving(l, name, result, params, count);
+    uint32_t value = ir_call(l->f, l->b, result, ir_func_op(f), args, count);
+
+    return result == IR_VOID ? none() : temp(l, value);
+}
+
+static struct ir_operand lower_sync_op(struct lowerer *l,
+                                       const struct expr *e)
+{
+    static const enum ir_type one[] = {IR_PTR};
+    static const enum ir_type two[] = {IR_PTR, IR_PTR};
+    static const enum ir_type sizes[] = {IR_I64, IR_I64};
+    const struct expr *target = e->as.sync_op.target;
+    const struct type *element = NULL;
+    struct ir_operand args[2];
+    struct ir_operand handle;
+    uint32_t slot;
+
+    switch (e->as.sync_op.op) {
+    case SYNC_MUTEX_NEW:
+        handle = sync_call(l, "anti_rt_mutex_new", IR_PTR, NULL, NULL, 0);
+        break;
+    case SYNC_CHAN_NEW:
+        args[0] = size_operand(l, e->type->element);
+        args[1] = lower_expr(l, e->as.sync_op.value);
+        if (l->failed) {
+            return none();
+        }
+        handle = sync_call(l, "anti_rt_chan_new", IR_PTR, sizes, args, 2);
+        break;
+    /* The runtime clears the handle it frees, so a second `destroy`
+       frees nothing. */
+    case SYNC_MUTEX_DESTROY:
+        args[0] = target->type->kind == TYPE_POINTER
+                      ? lower_expr(l, target)
+                      : lower_address(l, target);
+        if (!l->failed) {
+            sync_call(l, "anti_rt_mutex_destroy", IR_VOID, one, args, 1);
+        }
+        return none();
+    case SYNC_SEND:
+        element = target->type->element;
+        args[0] = load_handle(l, target);
+        if (l->failed) {
+            return none();
+        }
+        slot = ir_entry_slot(l->f, vtype_of(l, element));
+        store_value(l, element, e->as.sync_op.value, temp(l, slot));
+        args[1] = temp(l, slot);
+        if (!l->failed) {
+            sync_call(l, "anti_rt_chan_send", IR_VOID, two, args, 2);
+        }
+        return none();
+    /* `recv` gives the address of the slot it filled, or `none` when
+       the channel is closed and empty. */
+    case SYNC_RECV:
+        element = target->type->element;
+        args[0] = load_handle(l, target);
+        if (l->failed) {
+            return none();
+        }
+        slot = ir_entry_slot(l->f, vtype_of(l, element));
+        args[1] = temp(l, slot);
+        return sync_call(l, "anti_rt_chan_recv", IR_PTR, two, args, 2);
+    case SYNC_CLOSE:
+    case SYNC_CHAN_DELETE:
+        args[0] = load_handle(l, target);
+        if (!l->failed) {
+            sync_call(l,
+                      e->as.sync_op.op == SYNC_CLOSE ? "anti_rt_chan_close"
+                                                     : "anti_rt_chan_delete",
+                      IR_VOID, one, args, 1);
+        }
+        return none();
+    }
+    if (l->failed) {
+        return none();
+    }
+    /* A new Mutex or channel is a slot that holds the handle. */
+    slot = ir_entry_slot(l->f, vtype_of(l, e->type));
+    ir_store(l->f, l->b, IR_PTR, handle, temp(l, slot));
+    return temp(l, slot);
+}
+
 static struct ir_operand lower_expr_value(struct lowerer *l,
                                          const struct expr *e);
 
@@ -4716,6 +4845,8 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         return lower_dispatch(l, e);
     case EXPR_JOIN:
         return lower_join(l, e);
+    case EXPR_SYNC_OP:
+        return lower_sync_op(l, e);
     case EXPR_FIELD:
         if (e->symbol != NULL && e->symbol->kind == SYMBOL_CONST) {
             return constant(l, e->symbol->value, type);
@@ -4962,6 +5093,8 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->error = false;
     action->error_temp = 0;
     action->error_type = NULL;
+    action->unlock = false;
+    action->mutex = 0;
 }
 
 /* Record the delete of the error a handler binds, whose name is sym or
@@ -4979,6 +5112,26 @@ static void push_error_action(struct lowerer *l, const struct symbol *sym,
     action->error = true;
     action->error_temp = error;
     action->error_type = error_type;
+    action->unlock = false;
+    action->mutex = 0;
+}
+
+/* Record the unlock of the mutex whose handle is in mutex, which a `sync`
+   holds until its block ends. */
+static void push_unlock_action(struct lowerer *l, uint32_t mutex)
+{
+    struct exit_action *action;
+
+    l->defers->items = grow_defers(l->defers);
+    action = &l->defers->items[l->defers->count++];
+    action->stmt = NULL;
+    action->local = NULL;
+    action->undo = false;
+    action->error = false;
+    action->error_temp = 0;
+    action->error_type = NULL;
+    action->unlock = true;
+    action->mutex = mutex;
 }
 
 static void jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -4990,6 +5143,122 @@ static void jump_to_join(struct lowerer *l, struct ir_block **join)
         *join = new_block(l);
     }
     ir_jump(l->f, l->b, *join);
+}
+
+static void lower_stmt(struct lowerer *l, const struct stmt *s);
+
+/* DESIGN: `sync m { }` reads the handle of m once, locks it, and records
+   its unlock as the first exit action of a scope around the block. Every
+   exit of the block runs the actions of the scopes it leaves, `return`,
+   `break`, `continue` and the error forms among them, so each unlocks
+   after the statements of the block's own `defer` have run. */
+static void lower_sync(struct lowerer *l, const struct stmt *s)
+{
+    static const enum ir_type one[] = {IR_PTR};
+    struct ir_operand handle = load_handle(l, s->as.sync.mutex);
+    struct defers scope;
+    uint32_t mutex;
+
+    if (l->failed) {
+        return;
+    }
+    mutex = ir_unary(l->f, l->b, IR_COPY, IR_PTR, handle);
+    sync_call(l, "anti_rt_mutex_lock", IR_VOID, one, &handle, 1);
+    memset(&scope, 0, sizeof scope);
+    scope.outer = l->defers;
+    l->defers = &scope;
+    push_unlock_action(l, mutex);
+    lower_block(l, s->as.sync.body);
+    run_defers(l, &scope, false);
+    l->defers = scope.outer;
+    free(scope.items);
+}
+
+/* An array of count pointers, the form in which `select` hands its
+   channels and its slots to the runtime. */
+static uint32_t pointer_array(struct lowerer *l, size_t count)
+{
+    char name[32];
+    char length[24];
+    uint32_t agg;
+
+    snprintf(name, sizeof name, "[%zu]*byte", count);
+    agg = ir_agg_find(l->m, name);
+    if (agg != IR_NO_AGG) {
+        return agg;
+    }
+    snprintf(length, sizeof length, "%zu", count);
+    return ir_array_add(l->m, name, ir_scalar(IR_PTR),
+                        ir_sym_int(l->m, IR_I64, count), length);
+}
+
+/* DESIGN: `select` passes the handle of each arm's channel to
+   anti_rt_select, and a slot of its element type. The runtime waits until
+   one channel has a value or is closed. It gives the index of that arm and writes what
+   `recv` would have given into one pointer, which the arm binds. The
+   arms are then compared with the index in order, as a `switch` compares
+   its values. */
+static void lower_select(struct lowerer *l, const struct stmt *s)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_PTR, IR_I64, IR_PTR};
+    size_t count = s->as.select.count;
+    uint32_t agg = pointer_array(l, count);
+    uint32_t chans = ir_entry_slot(l->f, ir_aggregate(agg));
+    uint32_t slots = ir_entry_slot(l->f, ir_aggregate(agg));
+    uint32_t got = ir_entry_slot(l->f, ir_scalar(IR_PTR));
+    struct ir_operand pointer_size =
+        ir_sym_operand(l->m, ir_sym_size_of(l->m, ir_scalar(IR_PTR)));
+    struct ir_block *join = NULL;
+    struct ir_operand args[4];
+    struct ir_operand index;
+    size_t i;
+
+    for (i = 0; i < count && !l->failed; i++) {
+        const struct switch_arm *arm = &s->as.select.arms[i];
+        struct ir_operand handle = load_handle(l, arm->value);
+        struct ir_operand offset;
+        uint32_t slot;
+        if (l->failed) {
+            return;
+        }
+        offset = temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                   ir_int_op(IR_I64, i), pointer_size));
+        ir_store(l->f, l->b, IR_PTR, handle,
+                 offset_address(l, temp(l, chans), offset));
+        slot = ir_entry_slot(l->f, vtype_of(l, arm->value->type->element));
+        ir_store(l->f, l->b, IR_PTR, temp(l, slot),
+                 offset_address(l, temp(l, slots), offset));
+    }
+    if (l->failed) {
+        return;
+    }
+    args[0] = temp(l, chans);
+    args[1] = temp(l, slots);
+    args[2] = ir_int_op(IR_I64, count);
+    args[3] = temp(l, got);
+    index = sync_call(l, "anti_rt_select", IR_I64, params, args, 4);
+    for (i = 0; i < count && l->b != NULL && !l->failed; i++) {
+        const struct switch_arm *arm = &s->as.select.arms[i];
+        struct ir_block *body = new_block(l);
+        struct ir_block *next = i + 1 < count ? new_block(l) : NULL;
+        if (next != NULL) {
+            struct ir_operand test =
+                temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, index,
+                                  ir_int_op(IR_I64, i)));
+            ir_branch(l->f, l->b, test, body, next);
+        } else {
+            ir_jump(l->f, l->b, body);
+        }
+        l->b = body;
+        if (arm->bound != NULL) {
+            bind_value(l, arm->bound,
+                       temp(l, ir_load(l->f, l->b, IR_PTR, temp(l, got))));
+        }
+        lower_stmt(l, arm->body);
+        jump_to_join(l, &join);
+        l->b = next;
+    }
+    l->b = join;
 }
 
 /* Each condition of the chain branches to its body or to the next
@@ -6444,6 +6713,12 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
     case STMT_BLOCK:
         lower_block(l, s->as.block);
         return;
+    case STMT_SYNC:
+        lower_sync(l, s);
+        return;
+    case STMT_SELECT:
+        lower_select(l, s);
+        return;
     }
 }
 
@@ -6474,7 +6749,14 @@ static void run_defers(struct lowerer *l, const struct defers *scope,
         if (action->undo) {
             continue;
         }
-        if (action->error) {
+        if (action->unlock) {
+            static const enum ir_type handle[] = {IR_PTR};
+            struct ir_operand mutex = temp(l, action->mutex);
+            ir_call(l->f, l->b, IR_VOID,
+                    ir_func_op(rt_function(l, "anti_rt_mutex_unlock", handle,
+                                           1)),
+                    &mutex, 1);
+        } else if (action->error) {
             if (action->local == NULL || action->local != l->moved) {
                 object_call(l, "anti_rt_delete", temp(l, action->error_temp),
                             action->error_type);
@@ -6639,6 +6921,14 @@ static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
         break;
     case STMT_BLOCK:
         reserve_slots(l, entry, s->as.block);
+        break;
+    case STMT_SYNC:
+        reserve_slots(l, entry, s->as.sync.body);
+        break;
+    case STMT_SELECT:
+        for (j = 0; j < s->as.select.count; j++) {
+            reserve_stmt(l, entry, s->as.select.arms[j].body);
+        }
         break;
     default:
         break;

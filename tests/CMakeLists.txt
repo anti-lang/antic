@@ -21,6 +21,7 @@ add_executable(antic_unit_tests
     unit/test_sema.c
     unit/test_nullable.c
     unit/test_variant.c
+    unit/test_sync.c
     unit/test_ir.c
     unit/test_layout.c
     unit/test_lower.c
@@ -451,6 +452,13 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
         ENVIRONMENT "ANTI_TEST_GREETING=héllo")
     set_tests_properties(program_nullable_macos-x86_64 PROPERTIES
         ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
+    set_tests_properties(program_channel_workers_macos-x86_64 PROPERTIES
+        ENVIRONMENT "ANTI_THREADS=4")
+    foreach(name IN ITEMS sync_exits sync_workers channels select_two
+            channel_workers)
+        set_tests_properties(program_${name}_macos-x86_64 PROPERTIES
+            TIMEOUT 120)
+    endforeach()
 endif()
 
 # The environment variable that tests/programs/args.anti looks for.
@@ -460,6 +468,16 @@ set_tests_properties(program_args PROPERTIES
 # The `?*byte` that tests/programs/nullable.anti reads from getenv.
 set_tests_properties(program_nullable PROPERTIES
     ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
+
+# The workers of tests/programs/channel_workers.anti wait on each other, so
+# each needs a thread of the pool. A program that leaves a mutex locked or
+# a channel waiting stops, and the timeout reports it.
+set_tests_properties(program_channel_workers PROPERTIES
+    ENVIRONMENT "ANTI_THREADS=4")
+foreach(name IN ITEMS sync_exits sync_workers channels select_two
+        channel_workers)
+    set_tests_properties(program_${name} PROPERTIES TIMEOUT 120)
+endforeach()
 
 # The modules of the standard library in std/, which the build writes as
 # library files into std/ of the runtime archive. Each test program imports

@@ -300,7 +300,7 @@ void test_lexer(void)
               "worker parallel self abstract concrete enum use inherits "
               "class super is dup delete destroy static assert switch for "
               "defer implements singleton internal protected catch try yield "
-              "chan r b br _ Fn c_",
+              "thread r b br _ Fn c_",
               k, sizeof k / sizeof k[0]);
     }
     {

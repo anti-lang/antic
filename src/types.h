@@ -166,6 +166,7 @@ struct types {
     struct symbolic *symbolics;
     struct type *object;            /* anti.lang.Object, the class root */
     struct type *flags;             /* anti.lang.Flags */
+    struct type *mutex;             /* anti.lang.Mutex */
 };
 
 void types_init(struct types *types, struct arena *arena);
@@ -254,6 +255,21 @@ struct type *types_object(struct types *types);
 #define FLAGS_CARRY "carry"
 #define FLAGS_ZERO "zero"
 #define FLAGS_NEGATIVE "negative"
+
+/* DESIGN: `Mutex` is the built-in struct of `sync`, which the compiler
+   declares in `anti.lang` as it does `Flags`. A channel is `chan T`, a
+   struct of `anti.lang` per element type, whose name is the keyword, so
+   no module declares one. Both hold one field, the handle of the object
+   the runtime makes, so a copy names the same mutex or channel. A type
+   named `Mutex` in the module wins over the built-in one, and so does a
+   function named `close` over the built-in `close(c)`. Neither carries a
+   descriptor, since no module declares them. */
+#define LANG_MUTEX "Mutex"
+#define LANG_CHAN "chan"
+#define SYNC_HANDLE "handle"
+#define MUTEX_NEW "new"
+#define MUTEX_DESTROY "destroy"
+#define CHAN_CLOSE "close"
 
 /* DESIGN: an `f"..."` builds its text with `anti.text.Builder`, which
    the compiler knows by name, with the enum of its alignments and the
@@ -345,6 +361,14 @@ bool types_is_job(const struct type *t);
 struct type *types_flags(struct types *types);
 /* Whether t is the struct that types_flags made. */
 bool types_is_flags(const struct type *t);
+/* The struct `anti.lang.Mutex`, one for the compilation. */
+struct type *types_mutex(struct types *types);
+/* Whether t is the struct that types_mutex made. */
+bool types_is_mutex(const struct type *t);
+/* `chan T`, one per element type. */
+struct type *types_chan(struct types *types, struct type *element);
+/* Whether t is a channel that types_chan made. */
+bool types_is_chan(const struct type *t);
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */
 struct type *types_tuple(struct types *types, struct type **elements,
@@ -400,7 +424,9 @@ bool type_is_numeric(const struct type *t);
 int type_bits(const struct type *t);
 
 /* A type with no pointer inside it, the property the threading chapter
-   needs. str counts as pointer-free, because its bytes never change. */
+   needs. str counts as pointer-free, because its bytes never change. A
+   Mutex and a channel count as well, because each is made to be shared
+   between threads. */
 bool type_pointer_free(const struct type *t);
 
 /* Whether t declares fields, which a struct, a union and a class do. */

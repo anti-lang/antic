@@ -40,6 +40,13 @@ struct scope {
     size_t narrowed_capacity;
 };
 
+/* One `sync` that the statement being checked stands in, innermost
+   first. */
+struct held_mutex {
+    const struct expr *mutex;
+    const struct held_mutex *outer;
+};
+
 struct checker {
     struct types *types;
     struct arena *arena;
@@ -66,6 +73,7 @@ struct checker {
     int quiet;                  /* above 0, errors are not reported */
     int deferring;              /* above 0, a `defer` or `undo` is checked */
     const struct expr *field_base; /* the base of the field checked now */
+    const struct held_mutex *held; /* the `sync` blocks around it */
     bool ok;
 };
 
@@ -580,6 +588,20 @@ static bool refuses_half(struct checker *c, struct pos pos,
     return true;
 }
 
+/* DESIGN: a channel carries values under the rule of `parallel`, so
+   no two threads reach one piece of memory through what it carries. */
+static struct type *chan_element(struct checker *c, struct type_expr *t)
+{
+    struct type *element = resolve_type(c, t);
+
+    if (!is_error(element) && !type_pointer_free(element)) {
+        error_at(c, t->pos, "a channel carries values alone, and `%s` holds "
+                 "a pointer", tn(element));
+        return builtin(c, TYPE_ERROR);
+    }
+    return element;
+}
+
 static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
 {
     struct type *element;
@@ -603,6 +625,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         }
         if (sym == NULL && name_is(&t->name, LANG_FLAGS)) {
             return types_flags(c->types);
+        }
+        if (sym == NULL && name_is(&t->name, LANG_MUTEX)) {
+            return types_mutex(c->types);
         }
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
             error_at(c, t->pos, "unknown type `%.*s`", (int)t->name.length,
@@ -672,6 +697,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         }
         return types_tuple(c->types, elements, t->param_count);
     }
+    case TYPEX_CHAN:
+        element = chan_element(c, t->element);
+        return is_error(element) ? element : types_chan(c->types, element);
     }
     return builtin(c, TYPE_ERROR);
 }
@@ -1456,6 +1484,17 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
         walk_expr(w, e->as.optional.base);
         walk_expr(w, e->as.optional.access);
         return;
+    /* A channel is shared between workers as an object is, so a worker
+       deletes neither. */
+    case EXPR_SYNC_OP:
+        if (e->as.sync_op.op == SYNC_CHAN_DELETE) {
+            error_at(w->c, e->pos, "`%.*s` is a `worker fn` and cannot "
+                     "`delete` an object another one may hold",
+                     (int)w->worker->name.length, w->worker->name.text);
+        }
+        walk_expr(w, e->as.sync_op.target);
+        walk_expr(w, e->as.sync_op.value);
+        return;
     default:
         return;
     }
@@ -1520,6 +1559,16 @@ static void walk_stmt(struct worker_walk *w, const struct stmt *s)
         walk_expr(w, s->as.switch_stmt.value);
         for (i = 0; i < s->as.switch_stmt.count; i++) {
             walk_stmt(w, s->as.switch_stmt.arms[i].body);
+        }
+        return;
+    case STMT_SYNC:
+        walk_expr(w, s->as.sync.mutex);
+        walk_block(w, s->as.sync.body);
+        return;
+    case STMT_SELECT:
+        for (i = 0; i < s->as.select.count; i++) {
+            walk_expr(w, s->as.select.arms[i].value);
+            walk_stmt(w, s->as.select.arms[i].body);
         }
         return;
     default:
@@ -3501,6 +3550,143 @@ static struct type *check_mul_high(struct checker *c, struct expr *e,
     return check_binary(c, e, expected);
 }
 
+/* Locking and channels */
+
+/* The channel that the operation what reads. A pointer to one is
+   written `*p`, as it is for the value a `switch` takes. */
+static struct type *channel_of(struct checker *c, struct expr *e,
+                               const char *what)
+{
+    struct type *t = check_expr(c, e, NULL);
+
+    if (!is_error(t) && !types_is_chan(t)) {
+        error_at(c, e->pos, "`%s` takes a channel, found `%s`", what, tn(t));
+        return builtin(c, TYPE_ERROR);
+    }
+    return t;
+}
+
+/* Rewrite the call e into the operation op on target. None of the calls
+   can fail, so a handler on one is refused. */
+static bool sync_call(struct checker *c, struct expr *e, enum sync_op op,
+                      struct expr *target)
+{
+    if (e->as.call.handler.kind != HANDLE_NONE) {
+        error_at(c, e->as.call.handler.pos,
+                 "this call cannot fail, so it has no error to handle");
+        return false;
+    }
+    e->kind = EXPR_SYNC_OP;
+    memset(&e->as, 0, sizeof e->as);
+    e->as.sync_op.op = op;
+    e->as.sync_op.target = target;
+    return true;
+}
+
+/* `close(c)` ends what a channel takes. What it holds is still
+   received. */
+static struct type *check_close(struct checker *c, struct expr *e)
+{
+    struct type *t;
+
+    if (e->as.call.arg_count != 1) {
+        error_at(c, e->pos, "`" CHAN_CLOSE "` takes 1 argument, found %d",
+                 (int)e->as.call.arg_count);
+        return builtin(c, TYPE_ERROR);
+    }
+    t = channel_of(c, e->as.call.args[0], CHAN_CLOSE);
+    if (is_error(t) || !sync_call(c, e, SYNC_CLOSE, e->as.call.args[0])) {
+        return builtin(c, TYPE_ERROR);
+    }
+    return builtin(c, TYPE_VOID);
+}
+
+/* `Mutex.new()` makes a mutex, which the runtime holds. */
+static struct type *check_mutex_new(struct checker *c, struct expr *e)
+{
+    const struct name *name = &e->as.call.callee->as.field.name;
+
+    if (!name_is(name, MUTEX_NEW)) {
+        error_at(c, e->as.call.callee->pos, "`" LANG_MUTEX "` has no "
+                 "function `%.*s`", (int)name->length, name->text);
+        return builtin(c, TYPE_ERROR);
+    }
+    if (e->as.call.arg_count != 0) {
+        error_at(c, e->pos, "`" LANG_MUTEX "." MUTEX_NEW "` takes no "
+                 "arguments");
+        return builtin(c, TYPE_ERROR);
+    }
+    if (!sync_call(c, e, SYNC_MUTEX_NEW, NULL)) {
+        return builtin(c, TYPE_ERROR);
+    }
+    return types_mutex(c->types);
+}
+
+/* `m.destroy()` releases the mutex that m names, a Mutex in a place or
+   a pointer to one. */
+static struct type *check_mutex_destroy(struct checker *c, struct expr *e,
+                                        struct type *base)
+{
+    struct expr *m = e->as.call.callee->as.field.base;
+
+    if (e->as.call.arg_count != 0) {
+        error_at(c, e->pos, "`" MUTEX_DESTROY "` takes no arguments");
+        return builtin(c, TYPE_ERROR);
+    }
+    if (base->kind == TYPE_POINTER) {
+        usable_pointer(c, m, base);
+    } else if (!is_place(m)) {
+        error_at(c, m->pos, "calling `" MUTEX_DESTROY "` needs a place");
+        return builtin(c, TYPE_ERROR);
+    } else {
+        mark_address_taken(m);
+    }
+    if (!sync_call(c, e, SYNC_MUTEX_DESTROY, m)) {
+        return builtin(c, TYPE_ERROR);
+    }
+    return builtin(c, TYPE_VOID);
+}
+
+/* `chan T(n)`, `send(c, v)` and `recv(c)`, which the parser writes. The
+   nodes the checker writes from calls carry their type already. */
+static struct type *check_sync_op(struct checker *c, struct expr *e)
+{
+    struct type *i64 = builtin(c, TYPE_I64);
+    struct type *t;
+
+    switch (e->as.sync_op.op) {
+    case SYNC_CHAN_NEW:
+        t = chan_element(c, e->as.sync_op.element);
+        if (!require(c, e->as.sync_op.value,
+                     check_expr(c, e->as.sync_op.value, i64), i64) ||
+            is_error(t)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        return types_chan(c->types, t);
+    case SYNC_SEND:
+        t = channel_of(c, e->as.sync_op.target, "send");
+        if (is_error(t)) {
+            check_expr(c, e->as.sync_op.value, NULL);
+            return t;
+        }
+        if (!require(c, e->as.sync_op.value,
+                     check_expr(c, e->as.sync_op.value, t->element),
+                     t->element)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        /* The channel holds a copy of the value, which an `own` field
+           would give two owners. */
+        refuse_owned_copy(c, e->as.sync_op.value, t->element);
+        return builtin(c, TYPE_VOID);
+    case SYNC_RECV:
+        t = channel_of(c, e->as.sync_op.target, "recv");
+        return is_error(t) ? t
+                           : types_pointer_nullable(c->types, t->element);
+    default:
+        return e->type;
+    }
+}
+
 static struct type *check_call(struct checker *c, struct expr *e,
                                struct type *expected)
 {
@@ -3522,6 +3708,16 @@ static struct type *check_call(struct checker *c, struct expr *e,
     if (callee->kind == EXPR_NAME && name_is(&callee->as.name, MUL_HIGH) &&
         lookup(c, &callee->as.name) == NULL) {
         return check_mul_high(c, e, expected);
+    }
+    if (callee->kind == EXPR_NAME && name_is(&callee->as.name, CHAN_CLOSE) &&
+        lookup(c, &callee->as.name) == NULL) {
+        return check_close(c, e);
+    }
+    if (callee->kind == EXPR_FIELD &&
+        callee->as.field.base->kind == EXPR_NAME &&
+        name_is(&callee->as.field.base->as.name, LANG_MUTEX) &&
+        lookup(c, &callee->as.field.base->as.name) == NULL) {
+        return check_mutex_new(c, e);
     }
     if (callee->kind == EXPR_FIELD && (module = qualifier(c, callee)) != NULL) {
         fn = check_qualified(c, callee, module, true);
@@ -3584,6 +3780,10 @@ static struct type *check_call(struct checker *c, struct expr *e,
             return base;
         }
         s = struct_of(base);
+        if (types_is_mutex(s) &&
+            name_is(&callee->as.field.name, MUTEX_DESTROY)) {
+            return check_mutex_destroy(c, e, base);
+        }
         /* DESIGN: a union has no methods, so v.f(args) on a union is
            always a call of the function pointer in field f. */
         if (s != NULL && !s->is_union &&
@@ -5311,6 +5511,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     /* A node the checker makes, already typed. */
     case EXPR_ATOMIC:
         return e->type;
+    case EXPR_SYNC_OP:
+        return check_sync_op(c, e);
     case EXPR_OBJECT: {
         const char *what = e->as.object.op == TOKEN_DUP      ? "dup"
                            : e->as.object.op == TOKEN_DELETE ? "delete"
@@ -5318,6 +5520,16 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         t = check_expr(c, e->as.object.operand, NULL);
         if (is_error(t)) {
             return t;
+        }
+        /* DESIGN: `delete(c)` ends a channel and frees what the runtime
+           holds for it, as `delete` frees an object on the heap. */
+        if (e->as.object.op == TOKEN_DELETE && types_is_chan(t)) {
+            struct expr *operand = e->as.object.operand;
+            e->kind = EXPR_SYNC_OP;
+            memset(&e->as, 0, sizeof e->as);
+            e->as.sync_op.op = SYNC_CHAN_DELETE;
+            e->as.sync_op.target = operand;
+            return builtin(c, TYPE_VOID);
         }
         /* All three read the table of the object, so all three need a
            pointer the program has checked. `dup(p)` then gives the type
@@ -6097,6 +6309,7 @@ static bool eval_const(struct checker *c, struct expr *e,
         return fail_const(c, e, "`parallel`");
     case EXPR_DISPATCH:
     case EXPR_JOIN:
+    case EXPR_SYNC_OP:
         return fail_const(c, e, "a call");
     case EXPR_SLICE:
     case EXPR_SLICE_LIT:
@@ -6194,6 +6407,10 @@ static bool stmt_returns(const struct stmt *s)
     if (s->kind == STMT_RETURN || s->kind == STMT_FAIL) {
         return true;
     }
+    /* A `sync` block returns when its last statement does. */
+    if (s->kind == STMT_SYNC) {
+        return block_returns(s->as.sync.body);
+    }
     /* `if let` is an `if` with an `else`, whose two blocks are the arm
        and the `else` of its switch. */
     if (s->kind == STMT_SWITCH && s->as.switch_stmt.if_let) {
@@ -6236,6 +6453,8 @@ static bool stmt_leaves(const struct stmt *s)
         return true;
     case STMT_BLOCK:
         return block_leaves(s->as.block);
+    case STMT_SYNC:
+        return block_leaves(s->as.sync.body);
     case STMT_SWITCH:
         return s->as.switch_stmt.if_let &&
                block_leaves(s->as.switch_stmt.arms[0].body->as.block) &&
@@ -6711,6 +6930,7 @@ static bool expr_calls(const struct expr *e)
     case EXPR_DISPATCH:
     case EXPR_JOIN:
     case EXPR_FORMAT:
+    case EXPR_SYNC_OP:
         return true;
     case EXPR_UNARY:
         return expr_calls(e->as.unary.operand);
@@ -7066,6 +7286,122 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
     s->as.let.symbol = value;
     bind_elements(c, s->as.let.names, s->as.let.name_count, t,
                   s->as.let.name_pos, false);
+}
+
+static void check_stmt(struct checker *c, struct stmt *s);
+
+/* The mutex of a `sync` without the `&` or the `*` before it, so `m`,
+   `&m` and `*&m` name one mutex. */
+static const struct expr *mutex_place(const struct expr *e)
+{
+    while (e->kind == EXPR_UNARY && (e->as.unary.op == TOKEN_AMP ||
+                                     e->as.unary.op == TOKEN_STAR)) {
+        e = e->as.unary.operand;
+    }
+    return e;
+}
+
+/* DESIGN: two `sync` blocks hold one mutex when their operands name one
+   place: the same variable, or the same path of fields from it. That is
+   what one function can prove. Two places that hold copies of one
+   handle deadlock at run time instead. */
+static bool same_mutex(const struct expr *a, const struct expr *b)
+{
+    a = mutex_place(a);
+    b = mutex_place(b);
+    if (a->kind == EXPR_NAME && b->kind == EXPR_NAME) {
+        return a->symbol != NULL && a->symbol == b->symbol;
+    }
+    if (a->kind == EXPR_FIELD && b->kind == EXPR_FIELD) {
+        return same_name(&a->as.field.name, &b->as.field.name) &&
+               same_mutex(a->as.field.base, b->as.field.base);
+    }
+    return false;
+}
+
+/* The operand of a `sync` as the program wrote it. */
+static void spell_mutex(struct text *out, const struct expr *e)
+{
+    while (e->kind == EXPR_UNARY && (e->as.unary.op == TOKEN_AMP ||
+                                     e->as.unary.op == TOKEN_STAR)) {
+        text_append(out, e->as.unary.op == TOKEN_AMP ? "&" : "*");
+        e = e->as.unary.operand;
+    }
+    spell(out, e);
+}
+
+/* `sync m { }` holds m, a Mutex or a pointer to one, for the block. A
+   `sync` on the mutex that an enclosing one of the function holds would
+   wait for itself. */
+static void check_sync(struct checker *c, struct stmt *s)
+{
+    struct type *t = check_expr(c, s->as.sync.mutex, NULL);
+    const struct held_mutex *h;
+    struct held_mutex here;
+
+    if (!is_error(t) && t->kind == TYPE_POINTER) {
+        t = usable_pointer(c, s->as.sync.mutex, t)->element;
+    }
+    if (!is_error(t) && !types_is_mutex(t)) {
+        error_at(c, s->as.sync.mutex->pos, "`sync` takes a `" LANG_MUTEX
+                 "` or a pointer to one, found `%s`", tn(t));
+    }
+    for (h = c->held; h != NULL; h = h->outer) {
+        if (same_mutex(h->mutex, s->as.sync.mutex)) {
+            struct text inner = {0};
+            struct text outer = {0};
+            spell_mutex(&inner, s->as.sync.mutex);
+            spell_mutex(&outer, h->mutex);
+            error_at(c, s->pos, "`sync %s` inside `sync %s` deadlocks",
+                     text_cstr(&inner), text_cstr(&outer));
+            text_free(&inner);
+            text_free(&outer);
+            break;
+        }
+    }
+    here.mutex = s->as.sync.mutex;
+    here.outer = c->held;
+    c->held = &here;
+    check_block(c, s->as.sync.body);
+    c->held = here.outer;
+}
+
+/* DESIGN: an arm of `select` names a channel, and the name it binds
+   holds what `recv` of that channel would give: a `?*T`, `none` once
+   the channel is closed and empty. The name lives in the arm alone. */
+static void check_select(struct checker *c, struct stmt *s)
+{
+    struct stmt *outer = c->fallthrough;
+    size_t i;
+
+    c->fallthrough = NULL;
+    for (i = 0; i < s->as.select.count; i++) {
+        struct switch_arm *arm = &s->as.select.arms[i];
+        struct type *t = check_expr(c, arm->value, NULL);
+        struct scope scope;
+
+        if (!is_error(t) && !types_is_chan(t)) {
+            error_at(c, arm->value->pos, "an arm of a `select` names a "
+                     "channel, found `%s`", tn(t));
+            t = builtin(c, TYPE_ERROR);
+        }
+        if (arm->binds.length == 0) {
+            check_stmt(c, arm->body);
+            continue;
+        }
+        enter_scope(c, &scope);
+        arm->bound = declare(c, SYMBOL_LOCAL, &arm->binds, arm->binds_pos,
+                             "`%.*s` is already declared in this block");
+        if (arm->bound != NULL) {
+            arm->bound->type = is_error(t)
+                                   ? t
+                                   : types_pointer_nullable(c->types,
+                                                            t->element);
+        }
+        check_stmt(c, arm->body);
+        leave_scope(c, &scope);
+    }
+    c->fallthrough = outer;
 }
 
 static void check_stmt(struct checker *c, struct stmt *s)
@@ -7577,6 +7913,12 @@ static void check_stmt(struct checker *c, struct stmt *s)
     case STMT_BLOCK:
         check_block(c, s->as.block);
         return;
+    case STMT_SYNC:
+        check_sync(c, s);
+        return;
+    case STMT_SELECT:
+        check_select(c, s);
+        return;
     }
 }
 
@@ -7812,6 +8154,17 @@ static bool sets_stmt(struct checker *c, const struct required *r,
         return true;
     case STMT_BLOCK:
         return sets_block(c, r, s->as.block, set);
+    case STMT_SYNC:
+        return sets_block(c, r, s->as.sync.body, set);
+    /* One arm of a `select` runs, and any of them may. */
+    case STMT_SELECT:
+        for (i = 0; i < s->as.select.count; i++) {
+            memcpy(copy, set, r->count);
+            if (sets_stmt(c, r, s->as.select.arms[i].body, copy)) {
+                meet(r, out, copy, &any);
+            }
+        }
+        break;
     case STMT_RETURN:
         if (s->as.return_value == NULL) {
             require_set(c, r, set, s->pos);

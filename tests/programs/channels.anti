@@ -1,0 +1,58 @@
+//! A channel is a bounded queue of values. `recv` gives a pointer to the
+//! value it took, and `none` once the channel is closed and empty.
+//! `close` ends what the channel takes, and what it holds is still
+//! received. Workers fill a channel that holds every value they send,
+//! so the program runs on a pool of any size.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+worker fn produce(chunk: []int, out: chan int) -> int
+{
+	for x in chunk {
+		send(out, x * x);
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let points = chan Point(4);
+	send(points, Point { x: 1, y: 2 });
+	send(points, Point { x: 3, y: 4 });
+	close(points);
+	while true do {
+		let p = recv(points) else {
+			break;
+		};
+		printf("%d %d\n".ptr, p.x as c_int, p.y as c_int);
+	}
+	if recv(points) == none {
+		printf("closed and empty\n".ptr);
+	}
+	delete(points);
+
+	let squares = chan int(64);
+	let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
+	let all = numbers[0..8];
+	let counts = parallel all by 4 -> produce(squares);
+	free(counts.ptr);
+	close(squares);
+	let sum = 0;
+	let n = 0;
+	while true do {
+		let v = recv(squares) else {
+			break;
+		};
+		sum += *v;
+		n += 1;
+	}
+	printf("%d values, sum %d\n".ptr, n as c_int, sum as c_int);
+	delete(squares);
+	return 0;
+}

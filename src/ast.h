@@ -35,7 +35,8 @@ enum type_expr_kind {
     TYPEX_ARRAY,    /* [N]T */
     TYPEX_SLICE,    /* []T */
     TYPEX_FN,       /* fn(T, U) -> R */
-    TYPEX_TUPLE     /* (int, str) */
+    TYPEX_TUPLE,    /* (int, str) */
+    TYPEX_CHAN      /* chan T */
 };
 
 struct type_expr {
@@ -47,7 +48,8 @@ struct type_expr {
     /* TYPEX_NAMED after `is`: the case of `v is geo.Shape.Circle`, whose
        module and variant stand in module and name. Empty otherwise. */
     struct name member;
-    struct type_expr *element;      /* TYPEX_POINTER, TYPEX_ARRAY, TYPEX_SLICE */
+    struct type_expr *element;      /* TYPEX_POINTER, TYPEX_ARRAY, TYPEX_SLICE,
+                                       TYPEX_CHAN */
     bool nullable;                  /* TYPEX_POINTER: `?*T` */
     struct expr *length;            /* TYPEX_ARRAY */
     struct type_expr **params;      /* TYPEX_FN, TYPEX_TUPLE */
@@ -68,6 +70,20 @@ enum atomic_op {
     ATOMIC_AND,
     ATOMIC_OR,
     ATOMIC_CAS
+};
+
+/* The operations of a mutex and a channel. The parser writes the three
+   that have a keyword of their own. The checker writes the others from
+   the calls `Mutex.new()`, `m.destroy()` and `close(c)` and from
+   `delete(c)` of a channel. */
+enum sync_op {
+    SYNC_MUTEX_NEW,                 /* Mutex.new() */
+    SYNC_MUTEX_DESTROY,             /* m.destroy() */
+    SYNC_CHAN_NEW,                  /* chan T(n) */
+    SYNC_SEND,                      /* send(c, v) */
+    SYNC_RECV,                      /* recv(c) */
+    SYNC_CLOSE,                     /* close(c) */
+    SYNC_CHAN_DELETE                /* delete(c) */
 };
 
 enum expr_kind {
@@ -102,7 +118,8 @@ enum expr_kind {
     EXPR_HERE,                      /* `here`, the position it stands at */
     EXPR_FORMAT,                    /* `f"..."` and `rf"..."` */
     EXPR_IN,                        /* `x in lo..hi` */
-    EXPR_OPTIONAL                   /* `p?.x` and `p?.f(args)`, checked */
+    EXPR_OPTIONAL,                  /* `p?.x` and `p?.f(args)`, checked */
+    EXPR_SYNC_OP                    /* an operation of a mutex or a channel */
 };
 
 /* The format specification after the colon of an `{expr}`, as the
@@ -340,6 +357,15 @@ struct expr {
             struct symbol *bound;
             struct expr *access;
         } optional;                 /* EXPR_OPTIONAL */
+        /* The mutex or the channel an operation reads, the value that
+           `send` puts and the capacity of `chan T(n)`, and the element
+           type that `chan T(n)` names. */
+        struct {
+            enum sync_op op;
+            struct expr *target;
+            struct expr *value;
+            struct type_expr *element;
+        } sync_op;                  /* EXPR_SYNC_OP */
     } as;
 };
 
@@ -407,7 +433,9 @@ enum stmt_kind {
     STMT_YIELD,
     STMT_TRY,
     STMT_FALLTHROUGH,
-    STMT_BLOCK
+    STMT_BLOCK,
+    STMT_SYNC,
+    STMT_SELECT
 };
 
 
@@ -530,6 +558,18 @@ struct stmt {
         } switch_stmt;
         struct expr *return_value;  /* STMT_RETURN, NULL for return; */
         struct block *block;        /* STMT_BLOCK */
+        /* `sync m { }`: the mutex, a `Mutex` or a pointer to one, and the
+           block that holds it. */
+        struct {
+            struct expr *mutex;
+            struct block *body;
+        } sync;                     /* STMT_SYNC */
+        /* `select { a x => stmt, b => stmt }`. The value of an arm is its
+           channel, and binds names what the channel gives, a `?*T`. */
+        struct {
+            struct switch_arm *arms;
+            size_t count;
+        } select;                   /* STMT_SELECT */
     } as;
 };
 

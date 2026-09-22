@@ -1,0 +1,123 @@
+//! `sync m { }` unlocks m on every exit of its block: the closing brace,
+//! `return`, `break`, `continue`, `fail`, `try` and a handler that
+//! returns. A `sync` on the same mutex follows each case, and it would
+//! wait for ever if the exit had left the mutex locked.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Guarded
+{
+	lock: Mutex,
+	n: int,
+}
+
+/// Take the mutex once more, which waits for ever if it is still held.
+fn check(g: *Guarded, what: str)
+{
+	sync g.lock {
+		g.n += 0;
+	}
+	printf("unlocked after %s\n".ptr, what.ptr);
+}
+
+fn by_return(g: *Guarded) -> int
+{
+	sync g.lock {
+		g.n += 1;
+		return g.n;
+	}
+}
+
+fn by_loop(g: *Guarded) -> int
+{
+	let seen = 0;
+	for i in 0..10 {
+		sync g.lock {
+			if i == 2 {
+				continue;
+			}
+			if i == 5 {
+				break;
+			}
+			seen += 1;
+		}
+	}
+	return seen;
+}
+
+fn failing() -> int may fail
+{
+	fail "inner";
+}
+
+fn by_fail(g: *Guarded) -> int may fail
+{
+	sync g.lock {
+		if g.n > 0 {
+			fail "the count is above zero";
+		}
+	}
+	return g.n;
+}
+
+fn by_try(g: *Guarded) -> int may fail
+{
+	sync g.lock {
+		g.n += try failing();
+	}
+	return g.n;
+}
+
+fn by_handler(g: *Guarded) -> int
+{
+	sync g.lock {
+		let n = failing() catch e {
+			return -1;
+		};
+		g.n += n;
+	}
+	return g.n;
+}
+
+/// The statements of a `defer` in the block run while the mutex is held.
+fn by_defer(g: *Guarded) -> int
+{
+	sync g.lock {
+		defer g.n += 5;
+		g.n += 1;
+	}
+	return g.n;
+}
+
+fn main() -> int
+{
+	let g = Guarded { lock: Mutex.new(), n: 0 };
+
+	sync g.lock {
+		g.n = 1;
+	}
+	check(&g, "the closing brace");
+	printf("%d\n".ptr, by_return(&g) as c_int);
+	check(&g, "return");
+	printf("%d\n".ptr, by_loop(&g) as c_int);
+	check(&g, "break and continue");
+	let a = by_fail(&g) catch e {
+		yield -1;
+	};
+	printf("%d\n".ptr, a as c_int);
+	check(&g, "fail");
+	let b = by_try(&g) catch e {
+		yield -2;
+	};
+	printf("%d\n".ptr, b as c_int);
+	check(&g, "try");
+	printf("%d\n".ptr, by_handler(&g) as c_int);
+	check(&g, "a handler that returns");
+	printf("%d\n".ptr, by_defer(&g) as c_int);
+	check(&g, "a defer");
+	g.lock.destroy();
+	g.lock.destroy();
+	return 0;
+}
