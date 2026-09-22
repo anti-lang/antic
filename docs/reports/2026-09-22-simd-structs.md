@@ -37,6 +37,8 @@ VMs did not run.
    its lanes with its alignment.
 6. `8c2c521`. The decisions gain "Simd structs", `docs/notes/simd.md` holds the
    choices of the passes, and the overview, the site page and CLAUDE.md follow.
+7. `55cd910`. The program test gains the simd structs of 32 bytes of every lane
+   width.
 
 ## The tests
 
@@ -48,7 +50,10 @@ take and return `float32x4_t`, `int32x4_t` and `float64x2_t` by value. One of
 them takes nine vectors, so that the ninth goes to the stack, and one calls an
 Anti function back.
 `clib_simd` calls an Anti library from C through the header, and `tests/dump/simdlib.h`
-pins it. `simd_width` counts the instructions of one add of 32 bytes per target
+pins it. The simd structs of 32 bytes in the program cover the narrowing and the
+widening of a mask at every lane width. They are two registers where the Mac
+runs them and one at x86-64-v3, which llvm-mc assembles and no machine here
+runs, since Rosetta has no AVX2. `simd_width` counts the instructions of one add of 32 bytes per target
 and level: one `vaddps %ymm` at x86-64-v3, two `addps %xmm` at v1 and v2 and two
 `fadd v` on ARM64. `program_simd_big` runs the loops of a 512-byte simd struct
 under the warning of its declaration, `bounds_simd` covers the dev-mode check of
