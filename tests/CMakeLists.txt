@@ -887,6 +887,23 @@ foreach(target windows-x86_64 windows-arm64)
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# The PDB of a Windows program names every function of it, in a release
+# build and in one with -g.
+foreach(target windows-x86_64 windows-arm64)
+    add_test(NAME pdb_names_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
+            "-DNAMES=_A11stack_trace_inner;_A11stack_trace_outer;_A11stack_trace_skipped;_A11stack_trace_put;_A11stack_trace_main"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb-names"
+            "-DTARGET=${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pdb_names.cmake")
+    set_tests_properties(pdb_names_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # antic writes the same assembly for every test program on every host.
 add_test(NAME emit_identity
     COMMAND "${CMAKE_COMMAND}"

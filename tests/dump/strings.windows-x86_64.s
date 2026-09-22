@@ -25,6 +25,7 @@ _A7strings_tail:
     addq $16, %rsp
     popq %rbp
     ret
+.Lanti_debug_fn0_end:
     .seh_endproc
 _A7strings_main:
     .seh_proc _A7strings_main
@@ -67,7 +68,45 @@ _A7strings_main:
     addq $112, %rsp
     popq %rbp
     ret
+.Lanti_debug_fn1_end:
     .seh_endproc
+    .section .debug$S,"dr"
+    .p2align 2
+    .long 4              /* the section starts with a 4 */
+    .long 241            /* DEBUG_S_SYMBOLS */
+    .long .Lanti_cv_symbols_end - .Lanti_cv_symbols
+.Lanti_cv_symbols:
+    .short .Lanti_cv_fn0_end - .Lanti_cv_fn0
+.Lanti_cv_fn0:
+    .short 4367          /* S_LPROC32 */
+    .long 0, 0, 0        /* the parent, the end, the next */
+    .long .Lanti_debug_fn0_end - _A7strings_tail
+    .long 0, 0           /* the ends of the prologue and the epilogue */
+    .long 0              /* no type */
+    .secrel32 _A7strings_tail
+    .secidx _A7strings_tail
+    .byte 0              /* the flags */
+    .asciz "_A7strings_tail"
+    .p2align 2
+.Lanti_cv_fn0_end:
+    .short 2
+    .short 6             /* S_END */
+    .short .Lanti_cv_fn1_end - .Lanti_cv_fn1
+.Lanti_cv_fn1:
+    .short 4367          /* S_LPROC32 */
+    .long 0, 0, 0        /* the parent, the end, the next */
+    .long .Lanti_debug_fn1_end - _A7strings_main
+    .long 0, 0           /* the ends of the prologue and the epilogue */
+    .long 0              /* no type */
+    .secrel32 _A7strings_main
+    .secidx _A7strings_main
+    .byte 0              /* the flags */
+    .asciz "_A7strings_main"
+    .p2align 2
+.Lanti_cv_fn1_end:
+    .short 2
+    .short 6             /* S_END */
+.Lanti_cv_symbols_end:
     .section .rdata,"dr"
 _A7strings_0:
     .byte 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x00

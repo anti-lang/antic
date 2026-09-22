@@ -18,9 +18,9 @@
 #include "types.h"
 
 /* Compile source as module main for target and append the assembly file
-   that the emitter writes, or the error. */
-static void emits_as(const char *source, enum target target, bool one_module,
-                     const char *expected)
+   that the emitter writes to out, or the error. debug_info is -g. */
+static void assemble(const char *source, enum target target, bool one_module,
+                     bool debug_info, struct text *out)
 {
     struct arena arena = {0};
     struct diagnostics diags = {0};
@@ -29,7 +29,6 @@ static void emits_as(const char *source, enum target target, bool one_module,
     struct types types;
     struct ir_module ir;
     struct mach_function **functions = NULL;
-    struct text out = {0};
     char error[200] = "";
     bool ok;
     size_t i;
@@ -59,16 +58,15 @@ static void emits_as(const char *source, enum target target, bool one_module,
             }
         }
         ok = ok && (one_module
-                        ? emit_module(&out, target, cpu_default(target), &ir,
+                        ? emit_module(out, target, cpu_default(target), &ir,
                                       functions, "main",
-                                      false, error, sizeof error)
-                        : emit_program(&out, target, cpu_default(target), &ir,
+                                      debug_info, error, sizeof error)
+                        : emit_program(out, target, cpu_default(target), &ir,
                                        functions, "main",
-                                       false, error, sizeof error));
+                                       debug_info, error, sizeof error));
         if (!ok) {
-            text_append(&out, error);
+            text_append(out, error);
         }
-        CHECK_STR(text_cstr(&out), expected);
         for (i = 0; i < ir.function_count; i++) {
             if (functions[i] != NULL) {
                 mach_function_free(functions[i]);
@@ -77,11 +75,20 @@ static void emits_as(const char *source, enum target target, bool one_module,
         }
         free(functions);
     }
-    text_free(&out);
     ir_module_free(&ir);
     token_list_free(&tokens);
     diagnostics_free(&diags);
     arena_free(&arena);
+}
+
+static void emits_as(const char *source, enum target target, bool one_module,
+                     const char *expected)
+{
+    struct text out = {0};
+
+    assemble(source, target, one_module, false, &out);
+    CHECK_STR(text_cstr(&out), expected);
+    text_free(&out);
 }
 
 static void emits(const char *source, enum target target,
@@ -279,9 +286,57 @@ static void library_data(enum target t, const char *expected)
     text_free(&out);
 }
 
+/* How often needle stands in haystack. */
+static int occurrences(const char *haystack, const char *needle)
+{
+    int n = 0;
+    const char *at = haystack;
+
+    while ((at = strstr(at, needle)) != NULL) {
+        n++;
+        at += strlen(needle);
+    }
+    return n;
+}
+
+/* A symbol record names each function on COFF, with -g beside the line
+   table of the function. ELF and Mach-O name the functions in the symbol
+   table and write no such record, and without -g no debug section at
+   all. */
+static void symbol_records(void)
+{
+    struct text out = {0};
+
+    assemble(scale, TARGET_WINDOWS_ARM64, false, true, &out);
+    CHECK(occurrences(text_cstr(&out), "/* S_LPROC32 */") == 2);
+    CHECK(occurrences(text_cstr(&out), "/* S_END */") == 2);
+    CHECK(occurrences(text_cstr(&out), ".section .debug$S") == 1);
+    CHECK(strstr(text_cstr(&out), "    .asciz \"_A4main_scale\"\n") != NULL);
+    CHECK(strstr(text_cstr(&out), "    .asciz \"_A4main_main\"\n") != NULL);
+    CHECK(strstr(text_cstr(&out), "    .cv_linetable 0, _A4main_scale, "
+                                  ".Lanti_debug_fn0_end\n") != NULL);
+    CHECK(strstr(text_cstr(&out), "    .cv_linetable 1, _A4main_main, "
+                                  ".Lanti_debug_fn1_end\n") != NULL);
+    text_free(&out);
+
+    assemble(scale, TARGET_WINDOWS_ARM64, true, false, &out);
+    CHECK(occurrences(text_cstr(&out), "/* S_LPROC32 */") == 2);
+    CHECK(strstr(text_cstr(&out), ".cv_") == NULL);
+    text_free(&out);
+
+    assemble(scale, TARGET_LINUX_ARM64, false, false, &out);
+    CHECK(strstr(text_cstr(&out), "debug") == NULL);
+    text_free(&out);
+    assemble(scale, TARGET_MACOS_ARM64, false, true, &out);
+    CHECK(strstr(text_cstr(&out), "S_LPROC32") == NULL);
+    CHECK(strstr(text_cstr(&out), "__debug_info") != NULL);
+    text_free(&out);
+}
+
 void test_emit(void)
 {
     page_offsets();
+    symbol_records();
     data_relocation();
     data_relocation_past_end();
 
@@ -359,6 +414,29 @@ void test_emit(void)
                  "    adrp x0, _A4main_0\n"
                  "    add x0, x0, :lo12:_A4main_0\n"
                  "    ret\n"
+                 ".Lanti_debug_fn0_end:\n"
+                 "    .section .debug$S,\"dr\"\n"
+                 "    .p2align 2\n"
+                 "    .long 4              /* the section starts with a 4 */\n"
+                 "    .long 241            /* DEBUG_S_SYMBOLS */\n"
+                 "    .long .Lanti_cv_symbols_end - .Lanti_cv_symbols\n"
+                 ".Lanti_cv_symbols:\n"
+                 "    .short .Lanti_cv_fn0_end - .Lanti_cv_fn0\n"
+                 ".Lanti_cv_fn0:\n"
+                 "    .short 4367          /* S_LPROC32 */\n"
+                 "    .long 0, 0, 0        /* the parent, the end, the next */\n"
+                 "    .long .Lanti_debug_fn0_end - _A4main_f\n"
+                 "    .long 0, 0           /* the ends of the prologue and the epilogue */\n"
+                 "    .long 0              /* no type */\n"
+                 "    .secrel32 _A4main_f\n"
+                 "    .secidx _A4main_f\n"
+                 "    .byte 0              /* the flags */\n"
+                 "    .asciz \"_A4main_f\"\n"
+                 "    .p2align 2\n"
+                 ".Lanti_cv_fn0_end:\n"
+                 "    .short 2\n"
+                 "    .short 6             /* S_END */\n"
+                 ".Lanti_cv_symbols_end:\n"
                  "    .section .rdata,\"dr\"\n"
                  "_A4main_0:\n"
                  "    .byte 0x68, 0x69, 0x00\n"
@@ -722,7 +800,8 @@ void test_emit(void)
           "    .byte 0x20, 0x69, 0x6e, 0x20, 0x2a, 0x00\n"
           "    .section .note.GNU-stack,\"\",@progbits\n");
 
-    /* COFF: the symbol form of chapter 9. */
+    /* COFF: the symbol form of chapter 9. Without -g as with it, a
+       symbol record in .debug$S names each function for the PDB. */
     emits(scale, TARGET_WINDOWS_X86_64,
           "    .text\n"
           "    .globl _A4anti2rt_main\n"
@@ -773,6 +852,7 @@ void test_emit(void)
           "    addq $64, %rsp\n"
           "    popq %rbp\n"
           "    ret\n"
+          ".Lanti_debug_fn0_end:\n"
           "    .seh_endproc\n"
           "_A4main_main:\n"
           "    .seh_proc _A4main_main\n"
@@ -788,7 +868,45 @@ void test_emit(void)
           "    addq $32, %rsp\n"
           "    popq %rbp\n"
           "    ret\n"
+          ".Lanti_debug_fn1_end:\n"
           "    .seh_endproc\n"
+          "    .section .debug$S,\"dr\"\n"
+          "    .p2align 2\n"
+          "    .long 4              /* the section starts with a 4 */\n"
+          "    .long 241            /* DEBUG_S_SYMBOLS */\n"
+          "    .long .Lanti_cv_symbols_end - .Lanti_cv_symbols\n"
+          ".Lanti_cv_symbols:\n"
+          "    .short .Lanti_cv_fn0_end - .Lanti_cv_fn0\n"
+          ".Lanti_cv_fn0:\n"
+          "    .short 4367          /* S_LPROC32 */\n"
+          "    .long 0, 0, 0        /* the parent, the end, the next */\n"
+          "    .long .Lanti_debug_fn0_end - _A4main_scale\n"
+          "    .long 0, 0           /* the ends of the prologue and the epilogue */\n"
+          "    .long 0              /* no type */\n"
+          "    .secrel32 _A4main_scale\n"
+          "    .secidx _A4main_scale\n"
+          "    .byte 0              /* the flags */\n"
+          "    .asciz \"_A4main_scale\"\n"
+          "    .p2align 2\n"
+          ".Lanti_cv_fn0_end:\n"
+          "    .short 2\n"
+          "    .short 6             /* S_END */\n"
+          "    .short .Lanti_cv_fn1_end - .Lanti_cv_fn1\n"
+          ".Lanti_cv_fn1:\n"
+          "    .short 4367          /* S_LPROC32 */\n"
+          "    .long 0, 0, 0        /* the parent, the end, the next */\n"
+          "    .long .Lanti_debug_fn1_end - _A4main_main\n"
+          "    .long 0, 0           /* the ends of the prologue and the epilogue */\n"
+          "    .long 0              /* no type */\n"
+          "    .secrel32 _A4main_main\n"
+          "    .secidx _A4main_main\n"
+          "    .byte 0              /* the flags */\n"
+          "    .asciz \"_A4main_main\"\n"
+          "    .p2align 2\n"
+          ".Lanti_cv_fn1_end:\n"
+          "    .short 2\n"
+          "    .short 6             /* S_END */\n"
+          ".Lanti_cv_symbols_end:\n"
           "    .section .rdata,\"dr\"\n"
           "_A4main_0:\n"
           "    .byte 0x6d, 0x61, 0x69, 0x6e, 0x3a, 0x32, 0x3a, 0x20, 0x6f, 0x76, 0x65, 0x72, 0x66, 0x6c, 0x6f, 0x77\n"

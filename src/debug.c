@@ -40,10 +40,30 @@ enum {
     DWARF_ADDRESS_SIZE = 8
 };
 
+/* The CodeView codes of the symbol records: the kind of the subsection
+   of .debug$S that holds them, and the two kinds of record. */
+enum {
+    CV_SYMBOLS = 0xF1,
+    S_LPROC32 = 0x110F,
+    S_END = 0x0006
+};
+
 /* The label prefix that keeps a label out of the symbol table. */
 static const char *local(const struct debug *d)
 {
     return target_info(d->target)->format == FORMAT_MACHO ? "L" : ".L";
+}
+
+/* DESIGN: on COFF a symbol record in .debug$S names every function, with
+   -g and without it. A release writes each function as a static symbol,
+   and lld-link carries only external symbols into the PDB. Without the
+   record DbgHelp names a frame after the external symbol below it. The
+   record reaches the PDB and never the executable. It names the function
+   by its COFF symbol, the name a dev build carries as an external symbol,
+   which the runtime reads as `module.function`. */
+static bool codeview(const struct debug *d)
+{
+    return target_info(d->target)->format == FORMAT_COFF;
 }
 
 void debug_init(struct debug *d, enum target t, const struct ir_module *m,
@@ -91,13 +111,16 @@ void debug_open(struct debug *d, struct text *out,
                 const struct ir_function *f)
 {
     if (!d->on) {
+        /* The symbol record takes the length of the function from its
+           end label. */
+        d->function += codeview(d) ? 1 : 0;
         return;
     }
     d->file = f->file;
     /* The line of the instruction before is the line of another function,
        so the first position of this one is written whatever it is. */
     d->line = 0;
-    if (target_info(d->target)->format == FORMAT_COFF) {
+    if (codeview(d)) {
         text_appendf(out, "    .cv_func_id %zu\n", d->function);
     }
     d->function++;
@@ -121,7 +144,7 @@ void debug_at(struct debug *d, struct text *out, uint32_t line)
 
 void debug_close(struct debug *d, struct text *out)
 {
-    if (!d->on) {
+    if (!d->on && !codeview(d)) {
         return;
     }
     text_appendf(out, "%santi_debug_fn%zu_end:\n", local(d), d->function - 1);
@@ -222,6 +245,52 @@ static void compile_unit(struct debug *d, struct text *out)
     text_appendf(out, "%santi_debug_unit_end:\n", l);
 }
 
+/* The symbol record of each function, in the order the emitter wrote
+   them. Each is an S_LPROC32 without a type, closed by an S_END. lld-link
+   fills in the parent, the end and the next record. A record ends on a
+   multiple of 4, which the PDB asks for. */
+static void symbol_records(struct debug *d, struct text *out,
+                           struct mach_function *const *functions)
+{
+    const char *l = local(d);
+    size_t id = 0;
+    size_t i;
+
+    text_appendf(out, "    .long %u            /* DEBUG_S_SYMBOLS */\n"
+                      "    .long %santi_cv_symbols_end - %santi_cv_symbols\n"
+                      "%santi_cv_symbols:\n",
+                 CV_SYMBOLS, l, l, l);
+    for (i = 0; i < d->m->function_count; i++) {
+        struct text symbol = {0};
+        const char *s;
+        if (functions[i] == NULL) {
+            continue;
+        }
+        mach_function_symbol(&symbol, d->target, d->m->functions[i]);
+        s = text_cstr(&symbol);
+        text_appendf(out, "    .short %santi_cv_fn%zu_end - %santi_cv_fn%zu\n"
+                          "%santi_cv_fn%zu:\n", l, id, l, id, l, id);
+        text_appendf(out, "    .short %u          /* S_LPROC32 */\n",
+                     S_LPROC32);
+        text_append(out, "    .long 0, 0, 0        /* the parent, the end, "
+                         "the next */\n");
+        text_appendf(out, "    .long %santi_debug_fn%zu_end - %s\n", l, id, s);
+        text_append(out, "    .long 0, 0           /* the ends of the "
+                         "prologue and the epilogue */\n"
+                         "    .long 0              /* no type */\n");
+        text_appendf(out, "    .secrel32 %s\n    .secidx %s\n", s, s);
+        text_appendf(out, "    .byte 0              /* the flags */\n"
+                          "    .asciz \"%s\"\n"
+                          "    .p2align 2\n"
+                          "%santi_cv_fn%zu_end:\n", s, l, id);
+        text_appendf(out, "    .short 2\n"
+                          "    .short %u             /* S_END */\n", S_END);
+        text_free(&symbol);
+        id++;
+    }
+    text_appendf(out, "%santi_cv_symbols_end:\n", l);
+}
+
 /* The CodeView line table of every function, in the order the emitter
    wrote them, with the table of file names and the strings they name. */
 static void line_tables(struct debug *d, struct text *out,
@@ -230,10 +299,6 @@ static void line_tables(struct debug *d, struct text *out,
     size_t id = 0;
     size_t i;
 
-    text_append(out, "    .section .debug$S,\"dr\"\n"
-                     "    .p2align 2\n"
-                     "    .long 4              /* the section starts "
-                     "with a 4 */\n");
     for (i = 0; i < d->m->function_count; i++) {
         struct text symbol = {0};
         if (functions[i] == NULL) {
@@ -251,13 +316,19 @@ static void line_tables(struct debug *d, struct text *out,
 void debug_sections(struct debug *d, struct text *out,
                     struct mach_function *const *functions)
 {
-    if (!d->on) {
-        return;
+    if (d->on) {
+        text_appendf(out, "%santi_debug_code_end:\n", local(d));
     }
-    text_appendf(out, "%santi_debug_code_end:\n", local(d));
-    if (target_info(d->target)->format == FORMAT_COFF) {
-        line_tables(d, out, functions);
-    } else {
+    if (codeview(d)) {
+        text_append(out, "    .section .debug$S,\"dr\"\n"
+                         "    .p2align 2\n"
+                         "    .long 4              /* the section starts "
+                         "with a 4 */\n");
+        symbol_records(d, out, functions);
+        if (d->on) {
+            line_tables(d, out, functions);
+        }
+    } else if (d->on) {
         compile_unit(d, out);
     }
 }
