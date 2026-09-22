@@ -2074,6 +2074,12 @@ static struct type *check_cast(struct checker *c, struct expr *e)
     if (e->as.cast.test && !is_error(from) && from->kind == TYPE_VARIANT) {
         return check_variant_test(c, e, from);
     }
+    if (e->as.cast.test && !is_error(from) && from->kind == TYPE_POINTER &&
+        from->element->kind == TYPE_VARIANT) {
+        error_at(c, e->pos, "`is` takes a variant as a value, found the "
+                 "pointer `%s`", tn(from));
+        return builtin(c, TYPE_ERROR);
+    }
     if (target->kind == TYPEX_NAMED && target->member.length > 0) {
         if (!is_error(from)) {
             error_at(c, e->pos, "`is` names a case on a variant alone, "

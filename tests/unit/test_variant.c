@@ -379,6 +379,14 @@ void test_variant(void)
     rejects(SHAPE
             "fn f(s: Shape) -> bool { return s is Shape.Triangle; }\n",
             2, 33, "`Shape` has no case `Triangle`");
+    rejects(SHAPE
+            "fn f(p: *Shape) -> bool { return p is Shape.Circle; }\n",
+            2, 34, "`is` takes a variant as a value, found the pointer "
+                   "`*Shape`");
+    rejects(SHAPE
+            "fn f(p: *Shape) { switch p { Empty => { }, else => { } } }\n",
+            2, 26, "`switch` takes an enum, an integer, a `str` or a "
+                   "variant, found `*Shape`");
 
     /* The tag is the smallest unsigned integer that holds the number of
        cases. */
