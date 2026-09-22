@@ -224,15 +224,19 @@ reports what it finished.
 - `std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.args`, `anti.json`,
-  `anti.log` and `anti.debug`.
+  `anti.log`, `anti.debug` and `anti.mem`.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
   `Object` and `Job` in `anti.lang` itself, and the runtime defines the
   root's functions and descriptor as `anti_lang_Object_*`.
-- 633 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 632 each, without the `no_paths` test, which needs a
+- 639 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 638 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
+- `anti.mem.Allocator` is built, with `alloc(size, align)` and `free(p)`, the
+  default `LibcAllocator` over `rt/mem.c` and `ArenaAllocator` over blocks of
+  another allocator. `alloc` and `free` name a function of a class and follow
+  `.`. See "`anti.mem`" in `docs/decisions.md`.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
   Anti function names. Variables are the next step. See `docs/notes/debug.md`.
