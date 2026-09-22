@@ -746,19 +746,19 @@ static void class_view(struct text *out, const struct symbol *sym)
         }
     }
     /* DESIGN: each prototype names a symbol the library holds, so a C
-       call to it links. An inherited entry takes the name and the `self`
-       of the class that declares it, and an abstract one has no body and
-       no prototype. Its wrapper through the table carries its comment. */
+       call to it links. The section of the class that declares a function
+       declares it once, and a class below does not repeat it. An abstract
+       entry has no body and no prototype, and its wrapper carries its
+       comment. */
     for (i = 0; i < count; i++) {
-        const struct type *owner = types_member_level(t, entries[i]);
         if (entries[i]->runtime != NULL ||
-            entries[i]->contract == FN_ABSTRACT) {
+            entries[i]->contract == FN_ABSTRACT ||
+            types_member_level(t, entries[i]) != t) {
             continue;
         }
         doc_comment(out, &entries[i]->doc, "");
         may_fail_note(out, entries[i]->symbol, "");
-        member_signature(out, owner != NULL ? owner : t, entries[i], "",
-                         false);
+        member_signature(out, t, entries[i], "", false);
         text_append(out, ";\n");
     }
     text_append(out, "\n");

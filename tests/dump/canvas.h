@@ -171,8 +171,6 @@ static inline Ink *anti_Square_as_Ink(Square *self)
     return &self->ink;
 }
 int32_t Square_area(Square *self);
-/** Move the shape by dx and dy. */
-void Shape_move(Shape *self, int32_t dx, int32_t dy);
 int32_t Square_colour(Square *self);
 
 static inline int32_t anti_Square_area(Square *self)
@@ -231,8 +229,6 @@ static inline Circle *anti_Circle_dup(Circle *self)
 }
 
 int32_t Circle_area(Circle *self);
-/** Move the shape by dx and dy. */
-void Shape_move(Shape *self, int32_t dx, int32_t dy);
 
 static inline int32_t anti_Circle_area(Circle *self)
 {
@@ -374,8 +370,6 @@ static inline Tile *anti_Tile_dup(Tile *self)
 }
 
 int32_t Tile_Shape_area(Tile *self);
-/** Move the shape by dx and dy. */
-void Shape_move(Shape *self, int32_t dx, int32_t dy);
 
 static inline int32_t anti_Tile_area(Tile *self)
 {
