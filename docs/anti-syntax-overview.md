@@ -303,7 +303,7 @@ let s = c.sum();
 
 Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus apply lane by lane. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select`, `simd.any` and `simd.all` are in `anti.simd`. `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` are built in. `as` between a `simd struct` and the array or plain struct of the same bytes is free. The back end maps each operation to the target's native width, so the lane count is the programmer's and the instruction count is the machine's. Above the vector cap it is an array and a loop.
 
-Not built yet.
+Built: the declaration and its rules, the element-wise operators, the masks of the comparisons, `simd.select`, `simd.any` and `simd.all` of `anti.simd`, the eight built-ins and `as` to an array or a plain struct of the same bytes. A `simd struct` of 16 bytes is the vector type of C in the header and passes in a vector register. One of another size passes as the struct of its lanes. An `f32x8` is one instruction at x86-64-v3 and two everywhere else, and a `simd struct` above the cap is an array and a loop, which a warning at its declaration names.
 
 ## Enums
 
