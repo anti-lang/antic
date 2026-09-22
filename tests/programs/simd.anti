@@ -141,8 +141,10 @@ fn wide()
 	printf("f64 %g %g sum %g max %g\n".ptr, dd.x, dd.y, d.sum(), d.max());
 	let e = F32x2 { x: opaque(3.0), y: opaque(4.0) };
 	let ee = e * e;
-	printf("f32x2 %g %g dot %g\n".ptr, ee.x as float, ee.y as float,
-	       e.dot(e) as float);
+	let swapped = e.shuffle(1, 0);
+	printf("f32x2 %g %g dot %g swap %g %g\n".ptr, ee.x as float,
+	       ee.y as float, e.dot(e) as float, swapped.x as float,
+	       swapped.y as float);
 }
 
 /// The simd structs of 32 bytes, two registers below x86-64-v3 and one
