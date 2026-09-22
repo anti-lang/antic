@@ -488,12 +488,18 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
    through C code. The walk takes the unwind data instead, which antic
    writes for every function and the C compiler for its own. The names
    come from DbgHelp, which reads the PDB that every Windows link
-   writes. */
+   writes.
+
+   The walk unwinds one frame at a time with RtlVirtualUnwind.
+   RtlCaptureStackBackTrace follows the chain of frame records on ARM64.
+   A C function that builds no record, as anti_rt_trace_walk, then hides
+   the frame of its caller. A frame without unwind data ends the walk, and
+   so does one that does not move up the stack. */
 int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
 {
-    void *frames[64];
-    USHORT count;
-    USHORT i;
+    CONTEXT context;
+    int64_t count = 0;
+    int64_t depth;
 
     if (room > 64) {
         room = 64;
@@ -501,10 +507,43 @@ int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
     if (room <= 0 || skip < 0 || skip > 1000) {
         return 0;
     }
-    count = RtlCaptureStackBackTrace((DWORD)(skip + 1), (DWORD)room, frames,
-                                     NULL);
-    for (i = 0; i < count; i++) {
-        into[i] = (uint64_t)(uintptr_t)frames[i];
+    RtlCaptureContext(&context);
+    /* The first frame is the one of anti_rt_trace_walk, which the trace
+       leaves out. */
+    for (depth = 0; count < room; depth++) {
+#if defined(_M_ARM64)
+        DWORD64 pc = context.Pc;
+        DWORD64 sp = context.Sp;
+#else
+        DWORD64 pc = context.Rip;
+        DWORD64 sp = context.Rsp;
+#endif
+        DWORD64 base = 0;
+        PVOID data = NULL;
+        DWORD64 establisher = 0;
+        PRUNTIME_FUNCTION entry;
+
+        if (pc == 0) {
+            break;
+        }
+        if (depth > skip) {
+            into[count++] = (uint64_t)pc;
+        }
+        entry = RtlLookupFunctionEntry(pc, &base, NULL);
+        if (entry == NULL) {
+            break;
+        }
+        RtlVirtualUnwind(UNW_FLAG_NHANDLER, base, pc, entry, &context, &data,
+                         &establisher, NULL);
+#if defined(_M_ARM64)
+        if (context.Sp <= sp) {
+            break;
+        }
+#else
+        if (context.Rsp <= sp) {
+            break;
+        }
+#endif
     }
     return count;
 }

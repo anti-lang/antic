@@ -39,9 +39,11 @@ It stops at a return address of 0 as well. The bounds of the stack come from
 `pthread_get_stackaddr_np` on macOS and `pthread_getattr_np` on Linux. A C
 frame without a record then ends the trace rather than the program.
 
-Windows walks with `RtlCaptureStackBackTrace`, over the unwind data that antic
-writes for every function. Clang for the x64 convention of Windows sets `rbp`
-at an offset into the frame, so there is no chain to follow through C code.
+Windows unwinds one frame at a time with `RtlVirtualUnwind`, over the unwind
+data that antic writes for every function. Clang for the x64 convention of
+Windows sets `rbp` at an offset into the frame, so there is no chain to follow
+through C code. `RtlCaptureStackBackTrace` follows the chain of frame records
+on ARM64 and loses the caller of every function that builds none.
 
 ## The module of a frame
 
