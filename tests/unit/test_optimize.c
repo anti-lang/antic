@@ -11,8 +11,8 @@
 #include "sema.h"
 #include "types.h"
 
-/* Lower source as module main, optimize it and compare the printed IR.
-   The verifier runs before and after the optimizer. */
+/* Lower source as module main, run the optimizer on it and compare the
+   printed IR. The verifier runs before and after the optimizer. */
 static void optimizes(const char *source, const char *expected)
 {
     struct arena arena = {0};
@@ -151,8 +151,8 @@ void test_optimize(void)
               "name_length: i64, parent: ptr, size: i64, depth: i64, "
               "ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, "
               "offset: i64, function_count: i64, functions: ptr }\n"
-              "type anti.rt.Object = struct { table: ptr }\n"
-              "type main.Box = struct { super: anti.rt.Object, n: i64 }\n"
+              "type anti.lang.Object = struct { table: ptr }\n"
+              "type main.Box = struct { super: anti.lang.Object, n: i64 }\n"
               "type [2]ptr = array 2 of ptr\n"
               "type anti.rt.Field = struct { name: ptr, name_length: i64, "
               "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
@@ -162,7 +162,7 @@ void test_optimize(void)
               "signature: ptr }\n"
               "type [7]anti.rt.Function = array 7 of anti.rt.Function\n"
               "type str = struct { ptr: ptr, len: i64 }\n"
-              "global (null).anti_rt_Object_descriptor size 0 align 1 "
+              "global (null).anti_lang_Object_descriptor size 0 align 1 "
               "bytes\n"
               "fn main.main() -> i64 {\n"
               "b0:\n"
@@ -457,8 +457,8 @@ void test_optimize(void)
               "    ret i16 %4\n"
               "}\n");
 
-    /* A variable assigned several times stays, and the add moves into the
-       assignment. */
+    /* A variable assigned more than once stays, and the add moves into
+       the assignment. */
     optimizes("fn g(n: int) -> int {\n"
               "    let i = 0;\n"
               "    while i < n do {\n"
@@ -581,7 +581,7 @@ void test_optimize(void)
               "}\n");
 
     /* An i64 converts to f32 in one rounding step. 2^60 + 2^36 + 1 lies
-       just above the midpoint of two f32 values and rounds up, while
+       1 above the midpoint of two f32 values and rounds up, while
        rounding through f64 first lands on the midpoint and rounds down. */
     optimizes("fn r() -> f32 {\n"
               "    return 1152921573326323713 as f32;\n"

@@ -595,7 +595,7 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
            compiler declares. A program writes the name where the object
            model uses it, as in `equals(self, other: *Object)`, and a
            class of that name in the module wins over it. */
-        if (sym == NULL && name_is(&t->name, "Object")) {
+        if (sym == NULL && name_is(&t->name, LANG_OBJECT)) {
             return types_object(c->types);
         }
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
@@ -2218,7 +2218,7 @@ static void declare_deserialize(struct checker *c, struct type *object)
     object->member_count++;
 }
 
-/* DESIGN: anti.rt.Object declares seven public functions whose bodies
+/* DESIGN: anti.lang.Object declares seven public functions whose bodies
    live in the runtime. The checker builds one item per function, so
    `v.type_name()` resolves like any inherited call and lowering finds the
    runtime symbol behind it. The list is built once per session. */
@@ -3378,7 +3378,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
     } else if (callee->kind == EXPR_FIELD &&
                callee->as.field.base->kind == EXPR_NAME &&
                lookup(c, &callee->as.field.base->as.name) == NULL &&
-               name_is(&callee->as.field.base->as.name, "Object")) {
+               name_is(&callee->as.field.base->as.name, LANG_OBJECT)) {
         /* `Object.f(args)` calls a static function of the root. */
         struct type *root = types_object(c->types);
         fn = check_type_member(c, callee, root);
@@ -3625,7 +3625,8 @@ static struct type *check_field(struct checker *c, struct expr *e)
         }
         /* The root reaches its namespace by its name as it does as a
            type, for `Object.deserialize`. */
-        if (sym == NULL && name_is(&e->as.field.base->as.name, "Object")) {
+        if (sym == NULL &&
+            name_is(&e->as.field.base->as.name, LANG_OBJECT)) {
             return check_type_member(c, e, types_object(c->types));
         }
     }
@@ -4038,8 +4039,7 @@ static struct type *check_join(struct checker *c, struct expr *e)
                  "jobs, and this is `%s`", tn(t));
         return builtin(c, TYPE_ERROR);
     }
-    if (job->kind != TYPE_STRUCT || job->result == NULL ||
-        !name_is(&job->name, "Job")) {
+    if (!types_is_job(job)) {
         error_at(c, e->as.join.job->pos, "`%s` waits for a job of `dispatch`, "
                  "and this is `%s`", what, tn(t));
         return builtin(c, TYPE_ERROR);
@@ -7786,7 +7786,7 @@ bool sema_check(struct module *module, const char *module_name,
        whole at offset 0, so the checker resolves it before the fields,
        which put the base at index 0. A base that is not a class, or that
        is `final`, is refused. A class without `inherits` takes the root
-       `anti.rt.Object`, which the compiler declares. */
+       `anti.lang.Object`, which the compiler declares. */
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         struct symbol *base;

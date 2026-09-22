@@ -1,6 +1,6 @@
 //! A list and two maps over objects.
 //!
-//! Anti has no generics, so a collection holds `*anti.rt.Object` and the
+//! Anti has no generics, so a collection holds `*anti.lang.Object` and the
 //! program casts what it takes out with `as` or `as?`. Every class
 //! descends from that root, so any object goes in. A collection owns its
 //! own memory and never the objects, which the program still deletes.

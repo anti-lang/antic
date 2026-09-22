@@ -183,22 +183,22 @@ void *anti_rt_copy_buffer(const void *from, int64_t bytes);
 
 /* The descriptor of the root and its one ancestor, which every module
    of a program shares. */
-extern const struct anti_descriptor anti_rt_Object_descriptor;
-extern const struct anti_descriptor *const anti_rt_Object_ancestors[1];
+extern const struct anti_descriptor anti_lang_Object_descriptor;
+extern const struct anti_descriptor *const anti_lang_Object_ancestors[1];
 
 /* The start of the object that object points into. A pointer to an
    interface sub-object moves back by the offset its descriptor holds. */
 void *anti_rt_object_of(void *object);
 
-/* The seven functions of anti.rt.Object. A class replaces any of them
+/* The seven functions of anti.lang.Object. A class replaces any of them
    with a concrete function of the same name. */
-struct anti_text anti_rt_Object_type_name(struct anti_object *self);
-struct anti_text anti_rt_Object_to_text(struct anti_object *self);
-int8_t anti_rt_Object_equals(struct anti_object *self,
-                             struct anti_object *other);
-uint64_t anti_rt_Object_hash(struct anti_object *self);
-void anti_rt_Object_serialize(struct anti_object *self, void *out);
-void anti_rt_Object_destruct(struct anti_object *self);
-void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to);
+struct anti_text anti_lang_Object_type_name(struct anti_object *self);
+struct anti_text anti_lang_Object_to_text(struct anti_object *self);
+int8_t anti_lang_Object_equals(struct anti_object *self,
+                               struct anti_object *other);
+uint64_t anti_lang_Object_hash(struct anti_object *self);
+void anti_lang_Object_serialize(struct anti_object *self, void *out);
+void anti_lang_Object_destruct(struct anti_object *self);
+void anti_lang_Object_copy(struct anti_object *self, struct anti_object *to);
 
 #endif

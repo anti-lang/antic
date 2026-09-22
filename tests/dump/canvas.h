@@ -33,7 +33,7 @@ void *anti_rt_dup(void *object, const anti_descriptor *type);
 typedef struct Ink Ink;
 typedef struct Ink_vtable {
     const void *descriptor;
-    /* The seven functions of anti.rt.Object. They take and give Anti
+    /* The seven functions of anti.lang.Object. They take and give Anti
        values, so C reads their slots and does not call them. */
     void *type_name;
     void *to_text;
@@ -75,7 +75,7 @@ static inline int32_t anti_Ink_colour(Ink *self)
 typedef struct Shape Shape;
 typedef struct Shape_vtable {
     const void *descriptor;
-    /* The seven functions of anti.rt.Object. They take and give Anti
+    /* The seven functions of anti.lang.Object. They take and give Anti
        values, so C reads their slots and does not call them. */
     void *type_name;
     void *to_text;
@@ -128,7 +128,7 @@ static inline void anti_Shape_move(Shape *self, int32_t dx, int32_t dy)
 typedef struct Square Square;
 typedef struct Square_vtable {
     const void *descriptor;
-    /* The seven functions of anti.rt.Object. They take and give Anti
+    /* The seven functions of anti.lang.Object. They take and give Anti
        values, so C reads their slots and does not call them. */
     void *type_name;
     void *to_text;
@@ -189,7 +189,7 @@ static inline int32_t anti_Square_colour(Square *self)
 typedef struct Circle Circle;
 typedef struct Circle_vtable {
     const void *descriptor;
-    /* The seven functions of anti.rt.Object. They take and give Anti
+    /* The seven functions of anti.lang.Object. They take and give Anti
        values, so C reads their slots and does not call them. */
     void *type_name;
     void *to_text;
@@ -242,7 +242,7 @@ static inline void anti_Circle_move(Circle *self, int32_t dx, int32_t dy)
 typedef struct Tint Tint;
 typedef struct Tint_vtable {
     const void *descriptor;
-    /* The seven functions of anti.rt.Object. They take and give Anti
+    /* The seven functions of anti.lang.Object. They take and give Anti
        values, so C reads their slots and does not call them. */
     void *type_name;
     void *to_text;
@@ -284,7 +284,7 @@ static inline int32_t anti_Tint_colour(Tint *self, int32_t k)
 typedef struct Stamp Stamp;
 typedef struct Stamp_vtable {
     const void *descriptor;
-    /* The seven functions of anti.rt.Object. They take and give Anti
+    /* The seven functions of anti.lang.Object. They take and give Anti
        values, so C reads their slots and does not call them. */
     void *type_name;
     void *to_text;
@@ -334,7 +334,7 @@ static inline Tint *anti_Stamp_as_Tint(Stamp *self)
 typedef struct Tile Tile;
 typedef struct Tile_vtable {
     const void *descriptor;
-    /* The seven functions of anti.rt.Object. They take and give Anti
+    /* The seven functions of anti.lang.Object. They take and give Anti
        values, so C reads their slots and does not call them. */
     void *type_name;
     void *to_text;

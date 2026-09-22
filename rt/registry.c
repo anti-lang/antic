@@ -729,7 +729,7 @@ static void *read_object(struct reader *r,
     return object;
 }
 
-void *anti_rt_Object_deserialize(struct anti_text input)
+void *anti_lang_Object_deserialize(struct anti_text input)
 {
     struct reader r;
     void *object;

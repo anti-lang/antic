@@ -287,10 +287,12 @@ struct type *types_bound_of(struct types *types, const struct type *fn)
     return find_or_add(types, &key);
 }
 
-/* DESIGN: `anti.rt.Object` is the root of every class chain. The
-   compiler declares it, because no compilation may define the module
-   `anti.rt`. Its one field is the table pointer, which no program names
-   and which every class carries at offset 0 through its base. */
+/* DESIGN: `anti.lang.Object` is the root of every class chain. The
+   compiler declares it, and `std/anti/lang.anti` does not, because a
+   class inherits it without an import and its bodies and its descriptor
+   are the runtime's. Its one field is the table pointer, which no
+   program names and which every class carries at offset 0 through its
+   base. */
 bool types_is_lang_error(const struct type *t)
 {
     return t != NULL && t->kind == TYPE_CLASS &&
@@ -445,8 +447,8 @@ char *types_member_symbol(struct arena *arena, const struct name *owner,
 
 struct type *types_object(struct types *types)
 {
-    static const char module_text[] = "anti.rt";
-    static const char name_text[] = "Object";
+    static const char module_text[] = LANG_MODULE;
+    static const char name_text[] = LANG_OBJECT;
     static const char field_text[] = "table";
     struct struct_field field;
     struct name module;
@@ -472,8 +474,8 @@ struct type *types_object(struct types *types)
 
 struct type *types_job(struct types *types, struct type *result)
 {
-    static const char module_text[] = "anti.rt";
-    static const char name_text[] = "Job";
+    static const char module_text[] = LANG_MODULE;
+    static const char name_text[] = LANG_JOB;
     static const char field_text[] = "handle";
     struct type *t;
     struct struct_field field;
@@ -502,6 +504,15 @@ struct type *types_job(struct types *types, struct type *result)
     field.type = types_pointer(types, types_builtin(types, TYPE_U8));
     types_set_fields(types, t, &field, 1);
     return t;
+}
+
+bool types_is_job(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_STRUCT && t->result != NULL &&
+           t->name.length == sizeof LANG_JOB - 1 &&
+           memcmp(t->name.text, LANG_JOB, sizeof LANG_JOB - 1) == 0 &&
+           t->module.length == sizeof LANG_MODULE - 1 &&
+           memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
 }
 
 /* The name of element i of a tuple, `_0` upwards, in the memory pool of

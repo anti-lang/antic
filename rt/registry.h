@@ -49,6 +49,6 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length);
 
 /* A new object from the JSON that the default serialize writes. NULL
    when the text is not such an object of a class of the program. */
-void *anti_rt_Object_deserialize(struct anti_text input);
+void *anti_lang_Object_deserialize(struct anti_text input);
 
 #endif

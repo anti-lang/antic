@@ -1,8 +1,8 @@
 //! The root of the standard library, which imports nothing.
 //!
 //! It holds the types the compiler knows by name, so every other module
-//! can name them without an import cycle. `Object` and `Job` are declared
-//! by the compiler itself, under `anti.rt` for now.
+//! can name them without an import cycle. `Object` and `Job` belong to
+//! it as well, and the compiler declares both itself.
 //!
 //! `Error` is the error convention of the language. A function that can
 //! fail is declared `-> R may fail`, or `may fail` when it has no result.

@@ -15,6 +15,10 @@ enum { MACOS_MIN_MAJOR = 11, MACOS_MIN_MINOR = 0 };
 #define RUNTIME_MODULE "anti.rt"
 #define RUNTIME_ENTRY "main"
 
+/* The runtime defines the functions of the root class anti.lang.Object,
+   its descriptor and its ancestors under this C prefix. */
+#define RUNTIME_ROOT "anti_lang_Object_"
+
 enum target {
     TARGET_LINUX_X86_64,
     TARGET_LINUX_ARM64,

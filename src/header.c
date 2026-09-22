@@ -633,7 +633,7 @@ static void class_view(struct text *out, const struct symbol *sym)
                  name_length, name_text);
     text_appendf(out, "typedef struct %.*s_vtable {\n"
                       "    const void *descriptor;\n"
-                      "    /* The seven functions of anti.rt.Object. They "
+                      "    /* The seven functions of anti.lang.Object. They "
                       "take and give Anti\n       values, so C reads their "
                       "slots and does not call them. */\n",
                  name_length, name_text);

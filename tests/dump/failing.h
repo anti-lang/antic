@@ -38,7 +38,7 @@ typedef struct Counter {
 typedef struct Gauge Gauge;
 typedef struct Gauge_vtable {
     const void *descriptor;
-    /* The seven functions of anti.rt.Object. They take and give Anti
+    /* The seven functions of anti.lang.Object. They take and give Anti
        values, so C reads their slots and does not call them. */
     void *type_name;
     void *to_text;

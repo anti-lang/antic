@@ -7,6 +7,14 @@
 
 #include "canvas.h"
 
+/* The functions of the root are the runtime's, under the prefix
+   anti_lang_Object_. The header gives the root's layout and no prototype
+   of them, so the program declares the one it calls. */
+#ifdef __cplusplus
+extern "C"
+#endif
+uint64_t anti_lang_Object_hash(anti_Object *self);
+
 int main(void)
 {
     Square *s = (Square *)malloc(sizeof *s);
@@ -14,6 +22,8 @@ int main(void)
     Shape *base;
     Circle c;
     Tile t;
+    Square a;
+    Square b;
     struct anti_Error *e;
 
     anti_Square_init(s);
@@ -47,5 +57,16 @@ int main(void)
        The call links against the symbol of Shape. */
     Shape_move(&t.base, 2, 4);
     printf("%d %d\n", t.base.x, t.base.y);
+    /* The hash of the root reads the fields of the chain. Two squares of
+       one side hash alike, and a square of another side does not. */
+    anti_Square_init(&a);
+    anti_Square_init(&b);
+    a.side = 3;
+    b.side = 3;
+    printf("%d", anti_lang_Object_hash(&a.base.base) ==
+                     anti_lang_Object_hash(&b.base.base));
+    b.side = 5;
+    printf(" %d\n", anti_lang_Object_hash(&a.base.base) !=
+                        anti_lang_Object_hash(&b.base.base));
     return 0;
 }

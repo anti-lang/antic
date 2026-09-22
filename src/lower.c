@@ -402,11 +402,11 @@ static struct ir_function *callee_function(struct lowerer *l,
     size_t i;
 
     /* DESIGN: a function of the root has no source. Its body is a symbol
-       of the runtime under the `anti_rt_Object_` prefix, declared with
-       the signature the checker gave the function. */
+       of the runtime under the prefix RUNTIME_ROOT, declared with the
+       signature the checker gave the function. */
     if (sym->item != NULL && sym->item->runtime != NULL) {
         char symbol[64];
-        snprintf(symbol, sizeof symbol, "anti_rt_Object_%s",
+        snprintf(symbol, sizeof symbol, RUNTIME_ROOT "%s",
                  sym->item->runtime);
         f = find_function(l->m, NULL, symbol);
         if (f == NULL) {
@@ -1330,7 +1330,7 @@ struct table {
     size_t capacity;
 };
 
-/* DESIGN: anti.rt.Object declares seven public functions whose bodies
+/* DESIGN: anti.lang.Object declares seven public functions whose bodies
    live in the runtime. Every class inherits them, so they take the first
    entries of every table. A class replaces one with a concrete function
    of the same name. */
@@ -1563,7 +1563,7 @@ static uint32_t descriptor_agg(struct lowerer *l)
     return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 12, false, 0);
 }
 
-/* The depth of a class in its chain. The root anti.rt.Object is 0. */
+/* The depth of a class in its chain. The root anti.lang.Object is 0. */
 static uint32_t class_depth(const struct type *t)
 {
     uint32_t depth = 0;
@@ -1892,7 +1892,7 @@ static struct ir_global *class_ancestors(struct lowerer *l,
     uint32_t i;
 
     if (t->base == NULL) {
-        return runtime_global(l, "anti_rt_Object_ancestors");
+        return runtime_global(l, RUNTIME_ROOT "ancestors");
     }
     g = class_global(l, t, "ancestors", &module, &name);
     if (g != NULL) {
@@ -2053,7 +2053,7 @@ static struct ir_global *class_descriptor(struct lowerer *l,
        modules of one program share one and `p is *Object` compares the
        same address everywhere. */
     if (t->base == NULL) {
-        return runtime_global(l, "anti_rt_Object_descriptor");
+        return runtime_global(l, RUNTIME_ROOT "descriptor");
     }
     g = class_global(l, t, "descriptor", &module, &name);
     if (g != NULL) {
@@ -2155,7 +2155,6 @@ static struct ir_global *class_descriptor(struct lowerer *l,
 static struct ir_global *struct_descriptor(struct lowerer *l,
                                            const struct type *t)
 {
-    static const char runtime[] = RUNTIME_MODULE;
     struct ir_const *value;
     struct ir_global *g;
     struct token_text text;
@@ -2164,9 +2163,7 @@ static struct ir_global *struct_descriptor(struct lowerer *l,
     size_t count = own_fields(t);
     size_t k;
 
-    if (t->is_union ||
-        (t->module.length == sizeof runtime - 1 &&
-         memcmp(t->module.text, runtime, sizeof runtime - 1) == 0)) {
+    if (t->is_union || types_is_job(t)) {
         return NULL;
     }
     g = struct_global(l, t, "descriptor", &module, &name);

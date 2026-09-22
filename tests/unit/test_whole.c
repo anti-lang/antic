@@ -194,8 +194,8 @@ static void finds_entries(void)
     check_entries(w, &p.ir, global_named(&p.ir, "main", "Named.descriptor"),
                   8, "Square.n.label.thunk Tile.n.label.thunk");
     check_entries(w, &p.ir,
-                  global_named(&p.ir, "main", "anti_rt_Object_descriptor"), 1,
-                  "anti_rt_Object_type_name Square.n.type_name.thunk "
+                  global_named(&p.ir, "main", "anti_lang_Object_descriptor"), 1,
+                  "anti_lang_Object_type_name Square.n.type_name.thunk "
                   "Tile.n.type_name.thunk");
     whole_free(w);
     close_program(&p);

@@ -8,7 +8,7 @@
 #include "std.h"
 #include "utf.h"
 
-/* DESIGN: the default bodies of anti.rt.Object walk the field list of the
+/* DESIGN: the default bodies of anti.lang.Object walk the field list of the
    descriptor. They are slow by design: a class that needs speed replaces
    the one it cares about with a concrete function. A build with
    --no-reflect has no field list, and these bodies then fall back to the
@@ -19,13 +19,13 @@
    same address wherever it is written, and no two modules define it. */
 static const unsigned char object_name[] = "Object";
 
-const struct anti_descriptor *const anti_rt_Object_ancestors[1] = {
-    &anti_rt_Object_descriptor
+const struct anti_descriptor *const anti_lang_Object_ancestors[1] = {
+    &anti_lang_Object_descriptor
 };
 
-const struct anti_descriptor anti_rt_Object_descriptor = {
+const struct anti_descriptor anti_lang_Object_descriptor = {
     object_name, 6, NULL, (int64_t)sizeof(struct anti_object), 0,
-    anti_rt_Object_ancestors, 0, NULL, NULL, 0, 0, NULL
+    anti_lang_Object_ancestors, 0, NULL, NULL, 0, 0, NULL
 };
 
 const struct anti_descriptor *anti_rt_descriptor(const void *object)
@@ -54,14 +54,14 @@ static void *checked_object(void *object, const struct anti_descriptor *type)
 
     if (o != NULL && o->table == NULL) {
         if (type == NULL) {
-            type = &anti_rt_Object_descriptor;
+            type = &anti_lang_Object_descriptor;
         }
         anti_rt_table_unset(type->name, type->name_length);
     }
     return anti_rt_object_of(object);
 }
 
-struct anti_text anti_rt_Object_type_name(struct anti_object *self)
+struct anti_text anti_lang_Object_type_name(struct anti_object *self)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
     struct anti_text text;
@@ -71,9 +71,9 @@ struct anti_text anti_rt_Object_type_name(struct anti_object *self)
     return text;
 }
 
-struct anti_text anti_rt_Object_to_text(struct anti_object *self)
+struct anti_text anti_lang_Object_to_text(struct anti_object *self)
 {
-    return anti_rt_Object_type_name(self);
+    return anti_lang_Object_type_name(self);
 }
 
 int64_t anti_rt_type_scalar(int64_t type)
@@ -187,8 +187,8 @@ static size_t compared_size(int64_t type)
 
 /* Compare the fields the chain declares, from the root down. Two objects
    of different classes are never equal. */
-int8_t anti_rt_Object_equals(struct anti_object *self,
-                             struct anti_object *other)
+int8_t anti_lang_Object_equals(struct anti_object *self,
+                               struct anti_object *other)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
     int64_t i;
@@ -218,7 +218,7 @@ int8_t anti_rt_Object_equals(struct anti_object *self,
 
 /* FNV-1a over the same fields that equals compares, so two equal objects
    hash alike. */
-uint64_t anti_rt_Object_hash(struct anti_object *self)
+uint64_t anti_lang_Object_hash(struct anti_object *self)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
     uint64_t h = 1469598103934665603u;
@@ -510,14 +510,14 @@ static void serialize_into(struct anti_builder *b, const void *object,
    not own is an object of its address and its length. A union, an
    array, a bitfield and an `own` slice of class values or of slices are
    null, and a class that wants them replaces the body. */
-void anti_rt_Object_serialize(struct anti_object *self, void *out)
+void anti_lang_Object_serialize(struct anti_object *self, void *out)
 {
     serialize_into(out, self, anti_rt_descriptor(self));
 }
 
 /* The root frees nothing. The teardown the compiler writes for a class
    runs each destruct body of its chain and destroys what it owns. */
-void anti_rt_Object_destruct(struct anti_object *self)
+void anti_lang_Object_destruct(struct anti_object *self)
 {
     (void)self;
 }
@@ -533,7 +533,7 @@ static void *table_entry(const void *object, enum anti_entry entry)
 
 /* The bytes of the object. The copy the compiler writes for a class
    replaces this body in its table and copies what the object owns. */
-void anti_rt_Object_copy(struct anti_object *self, struct anti_object *to)
+void anti_lang_Object_copy(struct anti_object *self, struct anti_object *to)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
 

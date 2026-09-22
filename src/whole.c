@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "target.h"
+
 /* DESIGN: a module that names a class of another module refers to its
    descriptor through a global of its own. That global is extern and
    carries the module and the name of the definition. The pass therefore
@@ -23,7 +25,7 @@ struct served {
 /* The root has no class record. It stands for every class. */
 #define ROOT (IR_NO_INDEX - 1)
 
-static const char root_descriptor[] = "anti_rt_Object_descriptor";
+static const char root_descriptor[] = RUNTIME_ROOT "descriptor";
 
 /* A map from the module and the name of a global to a class record. */
 struct slot {
@@ -402,7 +404,7 @@ static void reach_free(struct reach *r)
 
 /* The runtime functions that read the registry. */
 static const char *const registry_readers[] = {
-    "anti_rt_reflect_new", "anti_rt_Object_deserialize"
+    "anti_rt_reflect_new", RUNTIME_ROOT "deserialize"
 };
 
 static bool reads_registry(const struct ir_module *m, const struct reach *r)

@@ -153,7 +153,7 @@ struct types {
     struct type builtins[TYPE_BUILTIN_COUNT];
     struct type *derived;
     struct symbolic *symbolics;
-    struct type *object;            /* anti.rt.Object, the class root */
+    struct type *object;            /* anti.lang.Object, the class root */
 };
 
 void types_init(struct types *types, struct arena *arena);
@@ -212,9 +212,13 @@ struct type *types_object(struct types *types);
    compiler knows these of them by name: `Error`, which a failing function
    returns, `NoneDereference`, the error of a `catch` on a `?*T`,
    `SourceLocation`, the value of `here`, and `StackTrace`, whose
-   `capture` a `fail` calls. The names are defined here and nowhere else,
-   and so are the fields of them that the compiler writes. */
+   `capture` a `fail` calls. It declares two more of the module itself:
+   `Object`, the root of every class chain, and `Job`, which `dispatch`
+   gives. The names are defined here and nowhere else, and so are the
+   fields of them that the compiler writes. */
 #define LANG_MODULE "anti.lang"
+#define LANG_OBJECT "Object"
+#define LANG_JOB "Job"
 #define LANG_ERROR "Error"
 #define LANG_NONE_DEREFERENCE "NoneDereference"
 #define LANG_SOURCE_LOCATION "SourceLocation"
@@ -304,6 +308,8 @@ char *types_member_symbol(struct arena *arena, const struct name *owner,
    result type is a distinct type from a Job of another, and every one
    has the layout of one pointer. */
 struct type *types_job(struct types *types, struct type *result);
+/* Whether t is a Job that types_job made. */
+bool types_is_job(const struct type *t);
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */
 struct type *types_tuple(struct types *types, struct type **elements,

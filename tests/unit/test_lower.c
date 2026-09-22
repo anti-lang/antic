@@ -262,7 +262,7 @@ static void records_classes(void)
         CHECK(shape->table == IR_NO_INDEX);
         CHECK_STR(global_name(&l.ir, shape->descriptor), "Shape.descriptor");
         CHECK_STR(global_name(&l.ir, shape->base),
-                  "anti_rt_Object_descriptor");
+                  "anti_lang_Object_descriptor");
     }
     if (square != NULL) {
         CHECK(square->flags == IR_CLASS_FINAL);

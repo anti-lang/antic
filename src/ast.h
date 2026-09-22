@@ -508,7 +508,7 @@ struct doc_text {
    an `implements` field holds the sub-object of an interface. The checker
    adds two more that no declaration writes. One is the base of a class,
    named by `inherits` and carried as the field `super`. The other is the
-   table pointer of the root `anti.rt.Object`. */
+   table pointer of the root `anti.lang.Object`. */
 enum field_form { FIELD_PLAIN, FIELD_USE, FIELD_BASE, FIELD_TABLE,
                   FIELD_IMPL };
 

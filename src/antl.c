@@ -89,10 +89,17 @@ static uint64_t float_bits(double d)
     return bits;
 }
 
+/* DESIGN: the root class and a Job carry the path `anti.lang`, and the
+   compiler declares both. The library file of `anti.lang` names them as
+   it names a struct of another module and declares neither, so a reader
+   takes the compiler's own. The root is the one class without a base. */
 static bool is_local_struct(const struct writer *w, const struct type *t)
 {
     const char *module = w->iface->module;
 
+    if ((t->kind == TYPE_CLASS && t->base == NULL) || types_is_job(t)) {
+        return false;
+    }
     return type_has_fields(t) && t->module.length == strlen(module) &&
            memcmp(t->module.text, module, t->module.length) == 0;
 }
@@ -1053,20 +1060,29 @@ static bool name_equals_name(const struct name *a, const struct name *b)
            memcmp(a->text, b->text, a->length) == 0;
 }
 
+/* Whether module and name spell the root of every class chain. */
+static bool names_root(const struct name *module, const struct name *name)
+{
+    static const struct name root_module = {LANG_MODULE,
+                                            sizeof LANG_MODULE - 1};
+    static const struct name root_name = {LANG_OBJECT,
+                                          sizeof LANG_OBJECT - 1};
+
+    return name_equals_name(module, &root_module) &&
+           name_equals_name(name, &root_name);
+}
+
 /* A struct of another module is the struct that module's library file
    declared. */
 static struct type *foreign_struct(struct reader *r, const struct name *module,
                                    const struct name *name)
 {
-    static const struct name root_module = {"anti.rt", 7};
-    static const struct name root_name = {"Object", 6};
     const struct interface *lib;
     size_t i;
 
     /* The root of every class chain is the compiler's own, not a module
        any library file declares. */
-    if (name_equals_name(module, &root_module) &&
-        name_equals_name(name, &root_name)) {
+    if (names_root(module, name)) {
         return types_object(r->types);
     }
     lib = library(r, module);
@@ -1324,7 +1340,10 @@ static void read_types(struct reader *r)
             if (r->failed) {
                 break;
             }
-            if (!name_equals(&module, r->iface->module)) {
+            /* The root carries the path of `anti.lang` and is still
+               no struct of its library file. */
+            if (!name_equals(&module, r->iface->module) ||
+                names_root(&module, &name)) {
                 t = foreign_struct(r, &module, &name);
                 break;
             }
