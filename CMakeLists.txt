@@ -159,7 +159,9 @@ target_link_libraries(antic PRIVATE antic_core)
 # tools/anti/, linked against antic_core. Its commands are sdk export and
 # sdk import, which move the stubs of Apple's SDK from a Mac to a host
 # that links a program naming a framework, and test, which runs the
-# `tests` and `fixtures` blocks of a module.
+# `tests` and `fixtures` blocks of a module. It reads the `[inject]`
+# table of anti.toml with rt/toml.c, the one parser that anti.toml, the
+# logger and the runtime configuration share.
 add_executable(anti
     tools/anti/main.c
     tools/anti/files.c
@@ -168,8 +170,6 @@ add_executable(anti
     tools/anti/test.c
     rt/toml.c)
 target_link_libraries(anti PRIVATE antic_core)
-# The manifest reader is the runtime's TOML reader, the one parser that
-# anti.toml, the logger and the runtime configuration share.
 target_include_directories(anti PRIVATE rt)
 
 target_compile_definitions(antic PRIVATE

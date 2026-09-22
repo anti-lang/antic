@@ -1835,8 +1835,9 @@ endforeach()
 # The `[inject]` and `[inject.test]` tables of a manifest. `anti test`
 # runs in the project root, reads both and lays the test table over the
 # plain one, per interface. The one test of the module adds the label of
-# the logger the test table names to the reading of the clock the plain
-# table names, so a run proves which provider filled each field.
+# its logger to the reading of its clock. The test table names the
+# first provider and the plain table the second, so the sum says which
+# provider filled each field.
 foreach(mode dev release)
     set(extra "")
     if(mode STREQUAL "release")
