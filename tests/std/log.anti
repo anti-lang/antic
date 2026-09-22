@@ -93,7 +93,7 @@ fn main() -> int
 	show_file("log-test.out");
 
 	let sink = log.CallbackSink.new(seen);
-	let before = log.set(log.Logger.new("test", log.Level.Info, sink))
+	let before = log.set(log.SinkLogger.new("test", log.Level.Info, sink))
 		else { return 1; };
 	delete(before);
 

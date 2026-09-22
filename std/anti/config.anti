@@ -1,0 +1,115 @@
+//! The settings of the program, as keys with text values.
+//!
+//! `Config` is the standard interface. `FileConfig` is its default, one
+//! configuration of the program read from the TOML file that
+//! `config.read` names. A program that names none answers every key
+//! with the fallback of the call, so the build stays the default and a
+//! file holds only what someone changed.
+//!
+//! A key is the path of its value with a dot between the parts, as
+//! `anti.toml` writes it. `port = 8080` under `[server]` is
+//! `server.port`.
+//!
+//! These are the program's own settings. The `[runtime]` table of
+//! `--anti.conf` is the runtime's, and `anti.runtime` names that file.
+
+import anti.fs;
+import anti.lang;
+import anti.text;
+import anti.toml;
+
+/// The settings a program reads, which a class takes so that a test can
+/// give it the settings the test wants.
+pub abstract class Config
+{
+	/// Whether the configuration holds `key`.
+	abstract fn has(self, key: str) -> bool;
+
+	/// The text under `key`, or `fallback` where the configuration has
+	/// none.
+	abstract fn text_of(self, key: str, fallback: str) -> str;
+
+	/// The integer under `key`, or `fallback` where the configuration
+	/// has none and where the value is no integer.
+	pub fn int_of(self, key: str, fallback: int) -> int
+	{
+		if !self.has(key) {
+			return fallback;
+		}
+		let n = text.parse_int(self.text_of(key, "")) catch e {
+			yield fallback;
+		};
+		return n;
+	}
+
+	/// The boolean under `key`, or `fallback` for anything else.
+	pub fn bool_of(self, key: str, fallback: bool) -> bool
+	{
+		let v = self.text_of(key, "");
+		if text.equal(v, "true") {
+			return true;
+		}
+		if text.equal(v, "false") {
+			return false;
+		}
+		return fallback;
+	}
+
+	/// The provider the link takes where the build names none, which is
+	/// the configuration of the program.
+	pub fn default() -> *Config
+	{
+		return FileConfig.get();
+	}
+}
+
+/// The configuration of the program, read from one TOML file.
+///
+/// It holds no keys until `read` names a file, and answers every key
+/// with the fallback of the call until then.
+pub singleton class FileConfig inherits Config
+{
+	atomic document: ?*toml.Document = none,
+
+	/// Read the TOML file at `path` as the configuration of the
+	/// program, which may fail.
+	///
+	/// A file that cannot be read fails with the `SystemError` of the
+	/// number the system gave, and a text outside the TOML subset with
+	/// an error of code 1. A second call replaces what the first read,
+	/// and every `str` the first gave out ends there.
+	pub fn read(self, path: str) may fail
+	{
+		let bytes = try fs.read_file(path);
+		defer free(bytes.ptr);
+		let doc = try toml.Document.open(text.from_bytes(bytes));
+		let before = self.document.swap(doc);
+		if before != none {
+			delete(before);
+		}
+	}
+
+	concrete fn has(self, key: str) -> bool
+	{
+		let doc = self.document.load() else { return false; };
+		return doc.has(key);
+	}
+
+	concrete fn text_of(self, key: str, fallback: str) -> str
+	{
+		let doc = self.document.load() else { return fallback; };
+		return doc.text_of(key, fallback);
+	}
+}
+
+/// The configuration of the program.
+pub fn current() -> *Config
+{
+	return FileConfig.get();
+}
+
+/// Read the TOML file at `path` as the configuration of the program.
+pub fn read(path: str) may fail
+{
+	try FileConfig.get().read(path);
+}

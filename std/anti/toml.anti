@@ -116,4 +116,17 @@ pub class Document
 		}
 		return Document { handle: handle };
 	}
+
+	/// Read `source` as a document the caller owns and deletes.
+	///
+	/// It is `read` for a program that holds the document in a field,
+	/// where a value would end with the block that made it.
+	pub fn open(source: str) -> *Document may fail
+	{
+		let handle = anti_rt_toml_read(source.ptr, source.len);
+		if handle == none {
+			fail lang.Error.new(1, "the text is not the TOML subset");
+		}
+		return alloc Document { handle: handle };
+	}
 }

@@ -6,6 +6,10 @@
 //! may fail, and the error is a `SystemError` with the number the system
 //! gave. A path goes to the system as the program wrote it, and Windows
 //! takes `/` as well as `\`.
+//!
+//! `FileSystem` is the standard interface. It works in whole files, so a
+//! fake of it holds the bytes of each path, and `SystemFileSystem` is
+//! its default.
 
 import anti.error;
 import anti.lang;
@@ -137,5 +141,102 @@ pub fn rename(from: str, to: str) may fail
 {
 	if anti_rt_fs_rename(from.ptr, from.len, to.ptr, to.len) != 0 {
 		fail error.SystemError.from_errno();
+	}
+}
+
+/// The bytes of the whole file at `path`.
+///
+/// The caller frees them with `free(bytes.ptr)`. An empty file gives a
+/// slice of no bytes, whose `ptr` is `none`.
+pub fn read_file(path: str) -> []byte may fail
+{
+	let f = try open(path, Mode.Read);
+	defer close(f) catch ignored { };
+	let n = try size(f);
+	if n <= 0 {
+		return []byte { ptr: none, len: 0 };
+	}
+	let room = alloc(byte, n) else {
+		fail lang.Error.new(1, "out of memory");
+	};
+	let got = read(f, []byte { ptr: room, len: n }) catch e {
+		free(room);
+		fail e;
+	};
+	return []byte { ptr: room, len: got };
+}
+
+/// Write `bytes` as the whole file at `path`, which it creates or
+/// empties first.
+pub fn write_file(path: str, bytes: []byte) may fail
+{
+	let f = try open(path, Mode.Write);
+	write(f, bytes) catch e {
+		close(f) catch ignored { };
+		fail e;
+	};
+	try close(f);
+}
+
+/// The files a program reads and writes, which a class takes so that a
+/// test can hold them in memory.
+///
+/// The interface works in whole files, since a fake of it holds the
+/// bytes of each path. A program that reads a file in pieces calls
+/// `open` and `read` of the module instead.
+pub abstract class FileSystem
+{
+	/// The bytes of the whole file at `path`, which the caller frees
+	/// with `free(bytes.ptr)`.
+	abstract fn read_file(self, path: str) -> []byte may fail;
+
+	/// Write `bytes` as the whole file at `path`.
+	abstract fn write_file(self, path: str, bytes: []byte) may fail;
+
+	/// The names of the entries of the directory `path`, which the
+	/// caller frees with `free(names.ptr)`.
+	abstract fn list(self, path: str) -> []str may fail;
+
+	/// Remove the file at `path`.
+	abstract fn remove(self, path: str) may fail;
+
+	/// Give the file at `from` the path `to`.
+	abstract fn rename(self, from: str, to: str) may fail;
+
+	/// The provider the link takes where the build names none, which is
+	/// the file system of the machine.
+	pub fn default() -> *FileSystem
+	{
+		return SystemFileSystem.get();
+	}
+}
+
+/// The file system of the machine, which is the default of
+/// `FileSystem`.
+pub singleton class SystemFileSystem inherits FileSystem
+{
+	concrete fn read_file(self, path: str) -> []byte may fail
+	{
+		return try read_file(path);
+	}
+
+	concrete fn write_file(self, path: str, bytes: []byte) may fail
+	{
+		try write_file(path, bytes);
+	}
+
+	concrete fn list(self, path: str) -> []str may fail
+	{
+		return try list(path);
+	}
+
+	concrete fn remove(self, path: str) may fail
+	{
+		try remove(path);
+	}
+
+	concrete fn rename(self, from: str, to: str) may fail
+	{
+		try rename(from, to);
 	}
 }

@@ -40,6 +40,13 @@ pub abstract class Allocator
 	///
 	/// `none` does nothing.
 	abstract fn free(self, p: ?*byte);
+
+	/// The provider the link takes where the build names none, which is
+	/// the allocator over the C library.
+	pub fn default() -> *Allocator
+	{
+		return LibcAllocator.get();
+	}
 }
 
 /// The allocator over the C library, which is the default of

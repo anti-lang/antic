@@ -5,6 +5,10 @@
 //! line is one `write` call of the sink, so two threads never interleave
 //! one line with another.
 //!
+//! `Logger` is the standard interface, and `SinkLogger` is its default,
+//! the logger that writes through a `Sink`. A class that takes a
+//! `*Logger` runs under a fake logger in a test.
+//!
 //! The `logger` key of the runtime configuration names a file of the
 //! TOML subset that the first call reads. `--anti.logger=<path>` and
 //! the `[runtime]` table of the configuration file set that key. The
@@ -116,8 +120,13 @@ pub class CallbackSink inherits Sink
 	}
 }
 
-/// A level, a sink, a format and a name.
-pub class Logger
+/// Where a program writes its lines, which a class takes so that a test
+/// can collect them.
+///
+/// A name, a level and a format stand here, because every logger
+/// carries them and `log.logger().level` reads and writes one.
+/// `SinkLogger` is the default, which writes through a `Sink`.
+pub abstract class Logger
 {
 	/// The name that every line of this logger carries.
 	pub name: str = "",
@@ -125,45 +134,18 @@ pub class Logger
 	pub level: Level = Level.Info,
 	/// The shape of a line.
 	pub format: Format = Format.Text,
-	own sink: *Sink,
-
-	/// A logger with a name, a level and a sink it owns.
-	pub fn new(name: str, level: Level, sink: *Sink) -> *Logger
-	{
-		return alloc Logger { name: name, level: level,
-			format: Format.Text, sink: sink };
-	}
 
 	/// Write `message` at `level`, unless the logger drops that level.
-	pub fn log(self, level: Level, message: str)
+	abstract fn log(self, level: Level, message: str);
+
+	/// The provider the link takes where the build names none, which is
+	/// the logger of the program.
+	///
+	/// A `log.set` after the field was filled does not reach it, since
+	/// the provider runs once, before `construct`.
+	pub fn default() -> *Logger
 	{
-		if (level as int) < (self.level as int) || self.sink == none {
-			return;
-		}
-		let line = text.Builder.new();
-		if self.format == Format.Json {
-			line.append("{\"time\":");
-			json.write_int(time.wall(), &line);
-			line.append(",\"level\":");
-			json.write_text(level_name(level), &line);
-			line.append(",\"name\":");
-			json.write_text(self.name, &line);
-			line.append(",\"message\":");
-			json.write_text(message, &line);
-			line.append("}\n");
-		} else {
-			json.write_int(time.wall(), &line);
-			line.append(" ");
-			line.append(level_name(level));
-			line.append(" ");
-			if self.name.len != 0 {
-				line.append(self.name);
-				line.append(" ");
-			}
-			line.append(message);
-			line.append("\n");
-		}
-		self.sink.write(line.text());
+		return logger();
 	}
 
 	/// Write `message` at the lowest level.
@@ -203,6 +185,53 @@ pub class Logger
 	}
 }
 
+/// A logger that writes each line to a sink it owns, which is the
+/// default of `Logger`.
+pub class SinkLogger inherits Logger
+{
+	own sink: *Sink,
+
+	/// A logger with a name, a level and a sink it owns.
+	pub fn new(name: str, level: Level, sink: *Sink) -> *SinkLogger
+	{
+		let made = alloc SinkLogger { sink: sink };
+		made.name = name;
+		made.level = level;
+		return made;
+	}
+
+	concrete fn log(self, level: Level, message: str)
+	{
+		if (level as int) < (self.level as int) || self.sink == none {
+			return;
+		}
+		let line = text.Builder.new();
+		if self.format == Format.Json {
+			line.append("{\"time\":");
+			json.write_int(time.wall(), &line);
+			line.append(",\"level\":");
+			json.write_text(level_name(level), &line);
+			line.append(",\"name\":");
+			json.write_text(self.name, &line);
+			line.append(",\"message\":");
+			json.write_text(message, &line);
+			line.append("}\n");
+		} else {
+			json.write_int(time.wall(), &line);
+			line.append(" ");
+			line.append(level_name(level));
+			line.append(" ");
+			if self.name.len != 0 {
+				line.append(self.name);
+				line.append(" ");
+			}
+			line.append(message);
+			line.append("\n");
+		}
+		self.sink.write(line.text());
+	}
+}
+
 /// The logger of the program.
 ///
 /// The first call to `get` builds it, from the file the `logger` key
@@ -223,7 +252,7 @@ pub singleton class Log
 		/* `construct` stores one before any caller reaches this, so the
 		   `else` stands for a logger that `set` replaced with `none`. */
 		let held = self.logger.load() else {
-			let made = Logger.new("", Level.Info, StderrSink.new());
+			let made = SinkLogger.new("", Level.Info, StderrSink.new());
 			self.logger.store(made);
 			return made;
 		};
@@ -388,7 +417,7 @@ fn from_configuration() -> *Logger
 {
 	let path = anti_rt_conf_get("logger".ptr, 6);
 	if path.len == 0 {
-		return Logger.new("", Level.Info, StderrSink.new());
+		return SinkLogger.new("", Level.Info, StderrSink.new());
 	}
 	let source = read_file(path) catch e {
 		io.eprint("anti.log: ");
@@ -397,16 +426,17 @@ fn from_configuration() -> *Logger
 		yield "";
 	};
 	if source.len == 0 {
-		return Logger.new("", Level.Info, StderrSink.new());
+		return SinkLogger.new("", Level.Info, StderrSink.new());
 	}
 	let doc = toml.Document.read(source) catch e {
 		io.eprint("anti.log: ");
 		io.eprint(e.message);
 		io.eprint("\n");
-		return Logger.new("", Level.Info, StderrSink.new());
+		return SinkLogger.new("", Level.Info, StderrSink.new());
 	};
 	let level = level_of(doc.text_of("level", "info"), Level.Info);
-	let logger = Logger.new(doc.text_of("name", ""), level, first_sink(&doc));
+	let logger = SinkLogger.new(doc.text_of("name", ""), level,
+		first_sink(&doc));
 	if text.equal(doc.text_of("format", "text"), "json") {
 		logger.format = Format.Json;
 	}

@@ -39,6 +39,15 @@ pub fn from_c(bytes: ?*byte) -> str
 	return anti_rt_text_from_c(bytes);
 }
 
+/// The bytes as text, which share their memory.
+///
+/// The bytes must outlive the `str`, and nothing checks that they are
+/// UTF-8.
+pub fn from_bytes(bytes: []byte) -> str
+{
+	return anti_rt_text_slice(bytes.ptr, bytes.len);
+}
+
 /// The number of bytes of `s`.
 pub fn byte_count(s: str) -> int
 {

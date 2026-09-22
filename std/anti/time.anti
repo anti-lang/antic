@@ -3,6 +3,10 @@
 //! A `Duration` is a count of nanoseconds. The monotonic clock measures a
 //! duration and never moves backwards. The wall clock gives a date and may
 //! move either way when the machine corrects itself.
+//!
+//! `Clock` is the standard interface over the three readings, and
+//! `SystemClock` is its default. A class that takes a `*Clock` runs
+//! under a fake clock in a test.
 
 extern fn anti_rt_monotonic() -> int;
 extern fn anti_rt_wall() -> int;
@@ -80,4 +84,54 @@ pub fn wall() -> int
 pub fn sleep(d: Duration)
 {
 	anti_rt_sleep(d.nanoseconds);
+}
+
+/// The time a program reads, which a class takes so that a test can
+/// hold it still.
+///
+/// `SystemClock` is the default. A fake gives a reading the test picked
+/// and returns from `sleep` at once.
+pub abstract class Clock
+{
+	/// A reading of the monotonic clock, in nanoseconds. Its zero has no
+	/// meaning, so two readings are only ever subtracted.
+	abstract fn now(self) -> int;
+
+	/// Nanoseconds since 1970-01-01T00:00:00Z.
+	abstract fn wall(self) -> int;
+
+	/// Wait for `d`. A duration that is not positive returns at once.
+	abstract fn sleep(self, d: Duration);
+
+	/// The time from the last reading of `now` to this one.
+	pub fn since(self, reading: int) -> Duration
+	{
+		return between(self.now(), reading);
+	}
+
+	/// The provider the link takes where the build names none, which is
+	/// the clock of the machine.
+	pub fn default() -> *Clock
+	{
+		return SystemClock.get();
+	}
+}
+
+/// The clock of the machine, which is the default of `Clock`.
+pub singleton class SystemClock inherits Clock
+{
+	concrete fn now(self) -> int
+	{
+		return anti_rt_monotonic();
+	}
+
+	concrete fn wall(self) -> int
+	{
+		return anti_rt_wall();
+	}
+
+	concrete fn sleep(self, d: Duration)
+	{
+		anti_rt_sleep(d.nanoseconds);
+	}
 }
