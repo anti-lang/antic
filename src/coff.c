@@ -25,9 +25,14 @@
      goes, as `ld.lld -r` drops it, and every symbol of the joined object
      is then significant.
    - One @feat.00 stays, with the features every object claims.
+   CodeView holds one type stream and one table of strings per object,
+   which a join cannot keep apart. The first object with a line table or
+   a type stream keeps its CodeView, and a later one loses its own. The
+   runtime of a release carries neither, and a Debug runtime of a Windows
+   host loses the debug information of all its members but one.
    A join that would change the meaning of the objects fails instead.
-   That is a symbol defined twice, a CodeView line table or type stream
-   in two objects, or an auxiliary record it does not read. */
+   That is a symbol defined twice, a second COMDAT of a name that does
+   not select `any`, or an auxiliary record it does not read. */
 
 enum {
     HEADER_SIZE = 20,
@@ -425,14 +430,22 @@ static bool read_comdats(struct join *j, struct object *o)
     return true;
 }
 
-/* Take the directives, drop the tables that name symbols by index, and
-   refuse a second line table or type stream. */
-static bool read_sections(struct join *j, struct object *o, bool *lines,
-                          bool *types)
+static bool is_codeview(const struct section *s)
+{
+    return is_named(s->name, s->name_length, ".debug$S") ||
+           is_named(s->name, s->name_length, ".debug$T") ||
+           is_named(s->name, s->name_length, ".debug$P") ||
+           is_named(s->name, s->name_length, ".debug$H");
+}
+
+/* Take the directives and drop the tables that name symbols by index.
+   The CodeView of an object goes when it carries a line table or a type
+   stream and an object before it does too. codeview is set once one
+   has. */
+static bool read_sections(struct join *j, struct object *o, bool *codeview)
 {
     size_t i;
     bool has_lines = false;
-    bool has_types = false;
 
     for (i = 0; i < o->section_count; i++) {
         struct section *s = &o->sections[i];
@@ -447,20 +460,18 @@ static bool read_sections(struct join *j, struct object *o, bool *lines,
             s->kept = false;
         } else if (is_named(s->name, s->name_length, ".llvm_addrsig")) {
             s->kept = false;
-        } else if (is_named(s->name, s->name_length, ".debug$T") ||
-                   is_named(s->name, s->name_length, ".debug$P")) {
-            has_types = has_types || size > 0;
         } else if (is_named(s->name, s->name_length, ".debug$S")) {
             has_lines = has_lines || holds_lines(data, size);
+        } else if (is_codeview(s)) {
+            has_lines = has_lines || size > 0;
         }
     }
-    if ((has_lines && *lines) || (has_types && *types)) {
-        text_appendf(j->error, "%s carries CodeView lines or types, and so "
-                               "does an object before it", o->in->name);
-        return false;
+    for (i = 0; has_lines && *codeview && i < o->section_count; i++) {
+        if (is_codeview(&o->sections[i])) {
+            o->sections[i].kept = false;
+        }
     }
-    *lines = *lines || has_lines;
-    *types = *types || has_types;
+    *codeview = *codeview || has_lines;
     return true;
 }
 
@@ -848,8 +859,7 @@ bool coff_join(const struct coff_input *inputs, size_t count,
     uint32_t symbols;
     uint32_t features_index;
     uint32_t features;
-    bool lines = false;
-    bool types = false;
+    bool codeview = false;
     bool ok = true;
     size_t k;
 
@@ -861,7 +871,7 @@ bool coff_join(const struct coff_input *inputs, size_t count,
         uint16_t m = 0;
         j.objects[k].in = &inputs[k];
         ok = parse(&j, &j.objects[k], &m) && read_comdats(&j, &j.objects[k]) &&
-             read_sections(&j, &j.objects[k], &lines, &types);
+             read_sections(&j, &j.objects[k], &codeview);
         if (ok && k > 0 && m != machine) {
             text_appendf(error, "%s is for another machine than %s",
                          inputs[k].name, inputs[0].name);

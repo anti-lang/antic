@@ -423,16 +423,55 @@ static void test_features(void)
     text_free(&error);
 }
 
+/* CodeView holds one type stream and one table of strings per object.
+   An object with a line table or a type stream loses its debug sections
+   when one before it has either. Its code stays. */
+static void test_codeview(void)
+{
+    static const char lines[] = "\4\0\0\0\xf3\0\0\0\4\0\0\0\0\0\0\0";
+    static const char names[] = "\4\0\0\0\xf1\0\0\0\0\0\0\0";
+    struct t_object a = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                 {".debug$S", DEBUG, lines, 16, {{0}}, 0},
+                                 {".debug$T", DEBUG, "\4\0\0\0", 4, {{0}}, 0}}, 3,
+                         {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object b = {AMD64, {{".debug$S", DEBUG, names, 12, {{0}}, 0},
+                                 {".text", CODE, call, 8, {{0}}, 0},
+                                 {".debug$S", DEBUG, lines, 16, {{0}}, 0},
+                                 {".debug$T", DEBUG, "\4\0\0\0", 4, {{0}}, 0}}, 4,
+                         {{".debug$S", 0, 3, STATIC, true, 0, 0},
+                          {"bar", 0, 2, EXTERNAL, false, 0, 0}}, 2};
+    struct text out = {0};
+    struct text error = {0};
+    char name[64];
+    size_t i;
+    int debug = 0;
+
+    CHECK(join(&a, &b, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    if (out.length == 0) {
+        return;
+    }
+    CHECK(sections_of(&out) == 4);
+    for (i = 1; i <= sections_of(&out); i++) {
+        section_name(&out, i, name);
+        debug += strncmp(name, ".debug$", 7) == 0;
+    }
+    CHECK(debug == 2);
+    section_name(&out, 4, name);
+    CHECK_STR(name, ".text");
+    CHECK(find_symbol(&out, ".debug$S", 0) == -1);
+    CHECK(symbol_section(&out, find_symbol(&out, "bar", 0)) == 4);
+    text_free(&out);
+    text_free(&error);
+}
+
 /* The joins that would give another program than the objects do. */
 static void test_refusals(void)
 {
-    static const char lines[] = "\4\0\0\0\xf3\0\0\0\4\0\0\0\0\0\0\0";
     struct t_object a = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
                          {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
     struct t_object arm = {ARM64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
                            {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
-    struct t_object debug = {AMD64, {{".debug$S", DEBUG, lines, 16, {{0}}, 0}}, 1,
-                             {{0}}, 0};
     struct t_object single = {AMD64,
                               {{".rdata", RDATA | COMDAT, "u", 1, {{0}}, 0}}, 1,
                               {{".rdata", 0, 1, STATIC, true, NODUPLICATES, 0},
@@ -444,9 +483,6 @@ static void test_refusals(void)
     CHECK(strstr(text_cstr(&error), "foo") != NULL);
     error.length = 0;
     CHECK(!join(&a, &arm, &out, &error));
-    CHECK(error.length > 0);
-    error.length = 0;
-    CHECK(!join(&debug, &debug, &out, &error));
     CHECK(error.length > 0);
     error.length = 0;
     CHECK(!join(&single, &single, &out, &error));
@@ -461,5 +497,6 @@ void test_coff(void)
     test_directives();
     test_comdat();
     test_features();
+    test_codeview();
     test_refusals();
 }

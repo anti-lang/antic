@@ -77,6 +77,14 @@ else()
     # the machine that built it. The test no_paths checks the result.
     add_compile_options("-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
                         "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=.")
+    # CodeView keeps two paths that the map does not reach. S_OBJNAME names
+    # the object, which clang makes absolute against the directory of the
+    # compile, and LF_BUILDINFO holds the command line. A compile for
+    # Windows keeps the object relative and records no command line, so a
+    # PDB that links anti_rt names no directory of this checkout either.
+    if(WIN32)
+        add_compile_options(-fdebug-compilation-dir=. -gno-codeview-command-line)
+    endif()
 endif()
 
 # The host target name, in the form of the runtime archive directories
