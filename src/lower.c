@@ -41,6 +41,11 @@ struct exit_action {
     const struct type *error_type;
     bool unlock;                /* `sync`: unlock the mutex in mutex */
     uint32_t mutex;
+    /* DESIGN: the `leave` hook of an instrumented function is an exit
+       action of a scope around its body, so every exit runs it, and it
+       runs after the locals of the body are gone. An exit that gives an
+       error runs `failed` before it. */
+    bool leave;
 };
 
 struct defers {
@@ -96,6 +101,14 @@ struct lowerer {
     bool trace_writes;          /* --trace writes: the changed hook */
     const char *const *patterns;    /* --trace <pattern> */
     size_t pattern_count;
+    /* The function being lowered when it is instrumented: the literal of
+       its full name and the `self` it hooks. NULL where it is not. */
+    const struct ir_global *trace_name;
+    int64_t trace_name_length;
+    struct ir_operand trace_self;
+    /* The error of the exit that runs the deferred statements, which the
+       `failed` hook takes. */
+    struct ir_operand failing_error;
     bool failed;
 };
 
@@ -629,6 +642,10 @@ struct place {
     bool bitfield;
     uint32_t agg;                   /* bitfield */
     uint32_t field;                 /* bitfield */
+    /* A field of a struct or a class: the start of the value that holds
+       it and its type. The `changed` hook takes both. */
+    struct ir_operand object;
+    const struct type *owner;
 };
 
 static struct ir_operand lower_address(struct lowerer *l,
@@ -812,6 +829,85 @@ static void hook_object(struct lowerer *l, enum hook_kind hook,
     args[1] = ir_int_op(IR_I64, (uint64_t)hook);
     ir_call(l->f, l->b, IR_VOID,
             ir_func_op(rt_function(l, "anti_rt_hook", params, 2)), args, 2);
+}
+
+/* Whether the `--trace` pattern names the module path of the class, a
+   package above it, or the class itself. */
+static bool pattern_names(const char *pattern, const struct type *t)
+{
+    size_t length = strlen(pattern);
+
+    if (t->name.length == length &&
+        memcmp(t->name.text, pattern, length) == 0) {
+        return true;
+    }
+    if (t->module.length == length &&
+        memcmp(t->module.text, pattern, length) == 0) {
+        return true;
+    }
+    return t->module.length > length && t->module.text[length] == '.' &&
+           memcmp(t->module.text, pattern, length) == 0;
+}
+
+/* DESIGN: a class is instrumented when it asked for the call hooks with
+   the contextual `trace` and the build compiles marked code, or when a
+   `--trace` pattern names its package or itself, which reaches code that
+   did not ask. The library file carries the marking, so a class of
+   another module answers the same question. */
+static bool traced_class(const struct lowerer *l, const struct type *t)
+{
+    size_t i;
+
+    if (!l->hooks || t == NULL || t->kind != TYPE_CLASS) {
+        return false;
+    }
+    if (l->trace_marked && t->traced) {
+        return true;
+    }
+    for (i = 0; i < l->pattern_count; i++) {
+        if (pattern_names(l->patterns[i], t)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The `enter` or the `leave` hook of the function being lowered, which
+   names itself. A function that is not instrumented writes none. */
+static void hook_call(struct lowerer *l, enum hook_kind hook)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_PTR, IR_I64};
+    struct ir_operand args[4];
+
+    if (l->trace_name == NULL || l->failed || l->b == NULL) {
+        return;
+    }
+    args[0] = l->trace_self;
+    args[1] = ir_int_op(IR_I64, (uint64_t)hook);
+    args[2] = temp(l, ir_addr(l->f, l->b, ir_global_op(l->trace_name)));
+    args[3] = ir_int_op(IR_I64, (uint64_t)l->trace_name_length);
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(rt_function(l, "anti_rt_hook_call", params, 4)), args,
+            4);
+}
+
+/* The `failed` hook, before the `leave` of an exit that gives an error. */
+static void hook_failed(struct lowerer *l, struct ir_operand err)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_PTR, IR_I64, IR_PTR};
+    struct ir_operand args[4];
+
+    if (l->trace_name == NULL || l->failed || l->b == NULL ||
+        err.kind == IR_NONE) {
+        return;
+    }
+    args[0] = l->trace_self;
+    args[1] = temp(l, ir_addr(l->f, l->b, ir_global_op(l->trace_name)));
+    args[2] = ir_int_op(IR_I64, (uint64_t)l->trace_name_length);
+    args[3] = err;
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(rt_function(l, "anti_rt_hook_failed", params, 4)),
+            args, 4);
 }
 
 /* The `copied` hook, after `dup` made the object at `made` out of the
@@ -1140,6 +1236,8 @@ static bool lower_place(struct lowerer *l, const struct expr *e,
 
     p->bitfield = false;
     p->in_temp = false;
+    p->object = none();
+    p->owner = NULL;
     p->type = ir_type_of(e->type);
     switch (e->kind) {
     case EXPR_NAME:
@@ -1171,9 +1269,24 @@ static bool lower_place(struct lowerer *l, const struct expr *e,
             p->address = base->type->kind == TYPE_POINTER
                              ? lower_expr(l, base)
                              : lower_address(l, base);
+            p->object = p->address;
+            p->owner = owner;
             return !l->failed;
         }
-        p->address = field_address(l, e);
+        {
+            const struct expr *base = e->as.field.base;
+            bool pointer = base->type->kind == TYPE_POINTER;
+            const struct type *s = pointer ? base->type->element : base->type;
+            struct ir_operand address =
+                pointer ? lower_expr(l, base) : lower_address(l, base);
+            if (l->failed) {
+                return false;
+            }
+            p->object = address;
+            p->owner = s;
+            p->address = offset_address(l, address,
+                                        field_offset(l, s, &e->as.field.name));
+        }
         return !l->failed;
     default:
         /* DESIGN: a value that is no place still has an address once it
@@ -5806,6 +5919,18 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->error_type = NULL;
     action->unlock = false;
     action->mutex = 0;
+    action->leave = false;
+}
+
+/* Record the `leave` hook of the function around the scope. */
+static void push_leave_action(struct lowerer *l)
+{
+    struct exit_action *action;
+
+    l->defers->items = grow_defers(l->defers);
+    action = &l->defers->items[l->defers->count++];
+    memset(action, 0, sizeof *action);
+    action->leave = true;
 }
 
 /* Record the delete of the error a handler binds, whose name is sym or
@@ -5825,6 +5950,7 @@ static void push_error_action(struct lowerer *l, const struct symbol *sym,
     action->error_type = error_type;
     action->unlock = false;
     action->mutex = 0;
+    action->leave = false;
 }
 
 /* Record the unlock of the mutex whose handle is in mutex, which a `sync`
@@ -5843,6 +5969,7 @@ static void push_unlock_action(struct lowerer *l, uint32_t mutex)
     action->error_type = NULL;
     action->unlock = true;
     action->mutex = mutex;
+    action->leave = false;
 }
 
 static void jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -6267,6 +6394,69 @@ static struct ir_operand call_into_slot(struct lowerer *l,
 
 static void lower_flags_assign(struct lowerer *l, const struct stmt *s);
 
+/* The level of the chain of t that declares the field name, with the
+   index of its record in the field list of that level. NULL when no
+   level lists it, which a bitfield and a table field are. */
+static const struct type *record_of_field(const struct type *t,
+                                          const struct name *name,
+                                          size_t *index)
+{
+    const struct type *up;
+    size_t i;
+    size_t n;
+
+    for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
+        n = 0;
+        for (i = 0; i < up->field_count; i++) {
+            if (!listed_field(&up->fields[i])) {
+                continue;
+            }
+            if (same_name(&up->fields[i].name, name)) {
+                *index = n;
+                return up;
+            }
+            n++;
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: the `changed` hook takes the record of the written field from
+   the field list its descriptor carries, so the hook reads what
+   reflection already holds and the compiler writes no record of its own.
+   `--no-reflect` leaves the descriptor without the list, and the list
+   itself is still written for the hook. */
+static void hook_changed(struct lowerer *l, const struct place *p,
+                         const struct expr *target)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_PTR};
+    struct ir_operand args[2];
+    struct ir_operand list;
+    struct ir_operand at;
+    const struct type *up;
+    size_t index = 0;
+
+    if (!l->trace_writes || l->failed || l->b == NULL ||
+        target->kind != EXPR_FIELD || p->object.kind == IR_NONE ||
+        !traced_class(l, p->owner)) {
+        return;
+    }
+    up = record_of_field(p->owner, &target->as.field.name, &index);
+    if (up == NULL) {
+        return;
+    }
+    list = temp(l, ir_addr(l->f, l->b,
+                           ir_global_op(class_fields(l, up))));
+    at = ir_sym_operand(l->m,
+                        ir_sym_offset_of(l->m, fields_agg(l, own_fields(up)),
+                                         (uint32_t)index));
+    args[0] = p->object;
+    args[1] = offset_address(l, list, at);
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(rt_function(l, "anti_rt_hook_changed", params, 2)),
+            args, 2);
+}
+
 static void lower_assign(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *target = s->as.assign.target;
@@ -6293,6 +6483,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
             return;
         }
         handle_error(l, value, err, p.address, true, none());
+        hook_changed(l, &p, target);
         return;
     }
     /* DESIGN: `=` into a place that holds a value needing a teardown
@@ -6314,6 +6505,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
             }
         }
         ir_memcopy(l->f, l->b, p.address, v, vtype_of(l, target->type));
+        hook_changed(l, &p, target);
         return;
     }
     if (s->as.assign.op != TOKEN_ASSIGN) {
@@ -6339,6 +6531,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     } else {
         ir_store(l->f, l->b, p.type, v, p.address);
     }
+    hook_changed(l, &p, target);
 }
 
 /* A local that is not address-taken gets a temporary of its own. An
@@ -6591,7 +6784,9 @@ static void handle_error(struct lowerer *l, const struct expr *call,
         }
         break;
     case HANDLE_TRY:
+        l->failing_error = err;
         run_defers_to(l, NULL, true);
+        l->failing_error = none();
         if (l->b != NULL) {
             ir_ret(l->f, l->b, IR_PTR, err);
         }
@@ -7119,7 +7314,9 @@ static void lower_fail(struct lowerer *l, const struct stmt *s)
     if (s->as.fail.value->kind == EXPR_NAME) {
         l->moved = s->as.fail.value->symbol;
     }
+    l->failing_error = err;
     run_defers_to(l, NULL, true);
+    l->failing_error = none();
     l->moved = NULL;
     if (l->b != NULL) {
         ir_ret(l->f, l->b, IR_PTR, err);
@@ -7485,7 +7682,12 @@ static void run_defers(struct lowerer *l, const struct defers *scope,
         if (action->undo) {
             continue;
         }
-        if (action->unlock) {
+        if (action->leave) {
+            if (failing) {
+                hook_failed(l, l->failing_error);
+            }
+            hook_call(l, HOOK_LEAVE);
+        } else if (action->unlock) {
             static const enum ir_type handle[] = {IR_PTR};
             struct ir_operand mutex = temp(l, action->mutex);
             ir_call(l->f, l->b, IR_VOID,
@@ -7709,8 +7911,42 @@ static void declare_function(struct lowerer *l, struct item *it)
     it->symbol->ir = f->index;
 }
 
+/* Whether the function it takes the `enter`, `leave` and `failed` hooks.
+   It is a `pub` function of an instrumented class, or a `trace fn` of
+   one, and it has an object to hook. */
+static bool traced_function(const struct lowerer *l, const struct item *it)
+{
+    const struct type *owner = it->owner != NULL && it->owner->symbol != NULL
+                                   ? it->owner->symbol->type
+                                   : NULL;
+
+    if (!it->has_self || owner == NULL || owner->kind != TYPE_CLASS) {
+        return false;
+    }
+    if (l->hooks && l->trace_marked && it->trace) {
+        return true;
+    }
+    return it->pub && traced_class(l, owner);
+}
+
+/* The literal of the full name of the function, `module.Class.f`, which
+   the `enter`, `leave` and `failed` hooks take. */
+static void take_trace_name(struct lowerer *l)
+{
+    struct token_text text;
+    struct text name = {0};
+
+    text_appendf(&name, "%s.%s", l->module_name, l->f->name);
+    text.bytes = text_cstr(&name);
+    text.length = name.length;
+    l->trace_name = literal_global(l, &text);
+    l->trace_name_length = (int64_t)name.length;
+    text_free(&name);
+}
+
 static void lower_function(struct lowerer *l, struct item *it)
 {
+    struct defers around;
     struct ir_block *entry;
     size_t first;
     size_t i;
@@ -7718,6 +7954,9 @@ static void lower_function(struct lowerer *l, struct item *it)
     l->f = l->m->functions[it->symbol->ir];
     l->f->decl_line = (uint32_t)it->pos.line;
     l->loop = NULL;
+    l->defers = NULL;
+    l->trace_name = NULL;
+    l->failing_error = none();
     l->may_fail = it->may_fail;
     l->result_out = none();
     entry = new_block(l);
@@ -7750,7 +7989,24 @@ static void lower_function(struct lowerer *l, struct item *it)
         l->result_out = temp(l, l->f->params[it->param_count + first].temp);
     }
     l->b = entry;
+    /* DESIGN: the `enter` hook stands before the first statement and the
+       `leave` hook is an exit action of a scope around the whole body,
+       so every `return`, every `fail` and the closing brace run it, and
+       it runs after the locals of the body are gone. */
+    memset(&around, 0, sizeof around);
+    l->defers = &around;
+    if (traced_function(l, it)) {
+        take_trace_name(l);
+        l->trace_self = temp(l, l->f->params[0].temp);
+        hook_call(l, HOOK_ENTER);
+        push_leave_action(l);
+    }
     lower_block(l, it->body);
+    if (l->b != NULL && !l->failed) {
+        run_defers(l, &around, false);
+    }
+    l->defers = NULL;
+    free(around.items);
     /* Semantic analysis rejects a function with a result that can reach
        its end, so only a function without one gets here. A `may fail`
        function reports success there. */

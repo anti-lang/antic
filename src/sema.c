@@ -9497,6 +9497,7 @@ bool sema_check(struct module *module, const char *module_name,
             it->symbol->type = types_struct(types, c.module_name, it->name);
             it->symbol->type->kind = TYPE_CLASS;
             it->symbol->type->has_abstract = it->is_abstract;
+            it->symbol->type->traced = it->trace;
             it->symbol->type->is_final = it->is_final;
         } else if (it->kind == ITEM_VARIANT) {
             it->symbol->type = types_struct(types, c.module_name, it->name);

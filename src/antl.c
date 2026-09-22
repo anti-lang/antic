@@ -382,7 +382,8 @@ static void put_type(struct writer *w, const struct type *t)
                                 (unsigned)t->packed << 1 |
                                 (unsigned)t->has_abstract << 2 |
                                 (unsigned)t->is_final << 3 |
-                                (unsigned)t->simd << 4));
+                                (unsigned)t->simd << 4 |
+                                (unsigned)t->traced << 5));
             put_u64(w, t->align);
             put_u32(w, (uint32_t)t->field_count);
             for (i = 0; i < t->field_count; i++) {
@@ -1410,8 +1411,9 @@ static void read_types(struct reader *r)
             t->has_abstract = (flags & 4) != 0;
             t->is_final = (flags & 8) != 0;
             t->simd = (flags & 16) != 0;
+            t->traced = (flags & 32) != 0;
             t->align = get_u64(r);
-            if (flags > 31 || (t->align & (t->align - 1)) != 0) {
+            if (flags > 63 || (t->align & (t->align - 1)) != 0) {
                 damaged(r);
             }
             s->s = t;

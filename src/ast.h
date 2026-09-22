@@ -718,6 +718,11 @@ struct item {
     bool is_singleton;              /* ITEM_CLASS with one instance */
     bool singleton_get;             /* the generated `get` of a singleton */
     bool is_operator;               /* ITEM_FN that an operator calls */
+    /* DESIGN: the contextual `trace` marks a class whose `pub` functions
+       want the call hooks, or one function of a class. It follows the
+       `assert` rule: on in dev mode and off in release, with `--trace`
+       and `--no-trace` deciding instead. */
+    bool trace;                     /* ITEM_CLASS, ITEM_FN in a body */
     enum visibility vis;
     struct name qualifier;          /* `concrete fn X::f`, the X */
     struct pos qualifier_pos;

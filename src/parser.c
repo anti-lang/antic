@@ -2037,6 +2037,12 @@ static struct item *member(struct parser *p, const struct item *owner)
         next(p);
         m->is_operator = true;
     }
+    /* `trace` before `fn` marks one function of the class, as it marks
+       every `pub` function before `class`. */
+    if (is_word(p, peek(p), "trace") && peek_at(p, 1)->kind == TOKEN_FN) {
+        next(p);
+        m->trace = true;
+    }
     if (accept(p, TOKEN_ABSTRACT)) {
         m->contract = FN_ABSTRACT;
     } else if (accept(p, TOKEN_CONCRETE)) {
@@ -2433,6 +2439,20 @@ static struct item *item(struct parser *p)
     /* DESIGN: `abstract` marks a class with an open function, and the
        contextual `final` forbids inheritance. Both stand before `class`,
        after `pub`. */
+    /* DESIGN: `trace` marks a class whose `pub` functions call the enter
+       and leave hooks. It is a contextual word before `class`, and
+       before `fn` in a class body, where it marks one function. A module
+       function has no object to hook, so `trace` before one is refused. */
+    if (is_word(p, peek(p), "trace") &&
+        (peek_at(p, 1)->kind == TOKEN_CLASS ||
+         peek_at(p, 1)->kind == TOKEN_FN)) {
+        next(p);
+        if (peek(p)->kind != TOKEN_CLASS) {
+            error_here(p, "`trace` marks a class or a function of one");
+            return NULL;
+        }
+        it->trace = true;
+    }
     if (peek(p)->kind == TOKEN_ABSTRACT && peek_at(p, 1)->kind == TOKEN_CLASS) {
         next(p);
         it->is_abstract = true;

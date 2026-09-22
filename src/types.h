@@ -154,6 +154,10 @@ struct type {
                                        TYPE_CLASS: the class it inherits */
     bool has_abstract;              /* TYPE_CLASS: an open function */
     bool is_final;                  /* TYPE_CLASS: no class inherits it */
+    /* DESIGN: the contextual `trace` on the class. A library file carries
+       it, so a write to a field of a class of another module is
+       instrumented where the write stands. */
+    bool traced;                    /* TYPE_CLASS: written `trace class` */
 
     /* DESIGN: a `simd struct` is a struct whose fields are its lanes, of
        one primitive type. The checker gives its operators, and the back
