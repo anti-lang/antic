@@ -12,6 +12,8 @@
 #   UNSET     optional environment variables the program runs without,
 #             separated by commas, for a program whose subject is what it
 #             does when one of them is absent
+#   WARNING   optional text that antic prints, for a program whose subject
+#             is a warning. Without it antic prints nothing
 #
 # The expected file starts with the line "exit N", the process exit code.
 # Every byte after that line is the expected standard output. An optional
@@ -45,8 +47,14 @@ execute_process(
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
 endif()
-# Warnings are errors: antic, llvm-mc and the linker must print nothing.
-if(NOT out STREQUAL "" OR NOT err STREQUAL "")
+# Warnings are errors: antic, llvm-mc and the linker must print nothing
+# but the warning that the program is about.
+if(DEFINED WARNING AND NOT WARNING STREQUAL "")
+    string(FIND "${err}" "${WARNING}" at)
+    if(NOT out STREQUAL "" OR at EQUAL -1)
+        message(FATAL_ERROR "antic printed other output\n${out}${err}")
+    endif()
+elseif(NOT out STREQUAL "" OR NOT err STREQUAL "")
     message(FATAL_ERROR "antic printed output\n${out}${err}")
 endif()
 

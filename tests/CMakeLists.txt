@@ -189,6 +189,43 @@ foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_level.cmake")
 endforeach()
 
+# A simd struct above the vector cap is an array and every operation on
+# it a loop, which a warning at the declaration says.
+add_test(NAME program_simd_big
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs"
+        "-DWARNING=simd_big.anti:10:13: warning: `F64x64` is 512 bytes, above the vector cap of 256"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+
+# The native width of a simd operation: one instruction on the registers
+# of 32 bytes at x86-64-v3, and two on the 16 bytes of every other level
+# and of ARM64.
+foreach(case "linux-x86_64,v3,    vaddps %ymm,1"
+        "linux-x86_64,v1,    addps %xmm,2"
+        "linux-x86_64,v2,    addps %xmm,2"
+        "macos-arm64,armv8.5,    fadd v,2"
+        "linux-arm64,armv8.0,    fadd v,2")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 target)
+    list(GET parts 1 level)
+    list(GET parts 2 pattern)
+    list(GET parts 3 count)
+    add_test(NAME simd_width_${target}_${level}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DTARGET=${target}"
+            "-DLEVEL=${level}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_wide.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/simd"
+            "-DPATTERN=${pattern}"
+            "-DCOUNT=${count}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_simd_width.cmake")
+endforeach()
+
 # DESIGN: the start-up check on a real machine below the level. Rosetta
 # runs a macos-x86_64 program on a macos-arm64 host and has no AVX2, so a
 # program of the default level x86-64-v3 refuses there with the message of
@@ -469,6 +506,16 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
     endif()
+    add_test(NAME program_simd_big_macos-x86_64
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
+            "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64"
+            "-DWARNING=simd_big.anti:10:13: warning: `F64x64` is 512 bytes, above the vector cap of 256"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
     foreach(source IN LISTS program_sources)
         get_filename_component(name "${source}" NAME_WE)
         add_test(NAME program_${name}_macos-x86_64
@@ -1684,7 +1731,7 @@ if(ANTIC_LLVM_AR)
 endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
-            failing tuples flags variants)
+            failing tuples flags variants simd)
         add_test(NAME clib_${case}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"

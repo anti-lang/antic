@@ -1,0 +1,23 @@
+//! A `load` of a simd struct reads the lanes from the elements of a
+//! slice from an index on. The check covers the last of them, which
+//! lies past the end here while the first one does not.
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(v: f32)
+{
+}
+
+fn main() -> int
+{
+	let a: [6]f32 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+	let s = a[0..6];
+	let v = Vec4.load(s, opaque(4));
+	sink(v.x);
+	return 7;
+}

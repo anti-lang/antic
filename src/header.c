@@ -537,9 +537,44 @@ static void variant_view(struct text *out, const struct symbol *sym,
     text_append(out, "\n");
 }
 
+/* The vector type of C that a simd struct of 16 bytes is, one name per
+   architecture. It is the NEON type on ARM64 and the SSE type on
+   x86_64. The bits of f16 lanes cross as an integer vector, as a single
+   f16 crosses as its sixteen bits. */
+static void vector_typedef(struct text *out, const struct type *t)
+{
+    const struct type *lane = type_simd_lane(t);
+    const char *neon = "uint8x16_t";
+    const char *sse = "__m128i";
+
+    switch (lane->kind) {
+    case TYPE_F32: neon = "float32x4_t"; sse = "__m128"; break;
+    case TYPE_F64: neon = "float64x2_t"; sse = "__m128d"; break;
+    case TYPE_I8: neon = "int8x16_t"; break;
+    case TYPE_U8: neon = "uint8x16_t"; break;
+    case TYPE_I16: neon = "int16x8_t"; break;
+    case TYPE_U16:
+    case TYPE_F16: neon = "uint16x8_t"; break;
+    case TYPE_I32: neon = "int32x4_t"; break;
+    case TYPE_CHAR:
+    case TYPE_U32: neon = "uint32x4_t"; break;
+    case TYPE_I64: neon = "int64x2_t"; break;
+    default: neon = "uint64x2_t"; break;
+    }
+    text_appendf(out, "#if defined(__aarch64__) || defined(_M_ARM64)\n"
+                      "typedef %s %.*s;\n"
+                      "#else\n"
+                      "typedef %s %.*s;\n"
+                      "#endif\n\n",
+                 neon, (int)t->name.length, t->name.text, sse,
+                 (int)t->name.length, t->name.text);
+}
+
 /* DESIGN: an export struct or union becomes a typedef of the same name.
    packed becomes #pragma pack and align(N) an _Alignas on the first
-   field, which C++ spells alignas. */
+   field, which C++ spells alignas. A simd struct of 16 bytes is the
+   vector type of C. One of another size is the struct of its lanes,
+   aligned to its size or to sixteen, whichever is less. */
 static void aggregate(struct text *out, const struct symbol *sym,
                       const struct interface *const *ifaces, size_t count,
                       struct emitted *done)
@@ -560,6 +595,10 @@ static void aggregate(struct text *out, const struct symbol *sym,
         emit_uses(out, t->fields[i].type, ifaces, count, done);
     }
     doc_comment(out, &sym->doc, "");
+    if (t->simd && type_simd_bytes(t) == 16) {
+        vector_typedef(out, t);
+        return;
+    }
     if (t->packed) {
         text_append(out, "#pragma pack(push, 1)\n");
     }
@@ -571,7 +610,11 @@ static void aggregate(struct text *out, const struct symbol *sym,
         c_name(buffer, sizeof buffer, &t->fields[i].name);
         doc_comment(out, &t->fields[i].doc, "    ");
         text_append(out, "    ");
-        if (i == 0 && t->align != 0) {
+        if (i == 0 && t->simd) {
+            uint64_t bytes = type_simd_bytes(t);
+            text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ",
+                         bytes < 16 ? bytes : 16);
+        } else if (i == 0 && t->align != 0) {
             text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ", t->align);
         }
         if (type_field_is_unit_break(&t->fields[i])) {
@@ -1019,6 +1062,25 @@ void header_write(struct text *out, const char *name,
                      "#else\n"
                      "#define ANTI_ALIGNAS(n) _Alignas(n)\n"
                      "#endif\n\n");
+    /* The vector types of C, which a simd struct of 16 bytes is. Each
+       architecture has its own header for them. */
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < ifaces[i]->item_count; j++) {
+            const struct symbol *sym = ifaces[i]->items[j];
+            if (sym->exported && sym->kind == SYMBOL_STRUCT &&
+                type_is_simd(sym->type) &&
+                type_simd_bytes(sym->type) == 16) {
+                text_append(out,
+                    "#if defined(__aarch64__) || defined(_M_ARM64)\n"
+                    "#include <arm_neon.h>\n"
+                    "#else\n"
+                    "#include <immintrin.h>\n"
+                    "#endif\n\n");
+                i = count;
+                break;
+            }
+        }
+    }
     /* The error class, declared once when an exported signature names
        it. A C caller passes the pointer on and never reads it. */
     for (i = 0; i < count; i++) {

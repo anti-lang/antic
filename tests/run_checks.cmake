@@ -59,6 +59,8 @@ check(bounds_array "index out of bounds"
       "bounds_array\\.anti:[0-9]+: index out of bounds: index 5, length 4" ON)
 check(bounds_slice "index out of bounds"
       "bounds_slice\\.anti:[0-9]+: index out of bounds: index 4, length 2" ON)
+check(bounds_simd "index out of bounds"
+      "bounds_simd\\.anti:[0-9]+: index out of bounds: index 7, length 6" ON)
 check(bounds_str "index out of bounds"
       "bounds_str\\.anti:[0-9]+: index out of bounds: index 7, length 3" ON)
 check(overflow_add "overflow in"

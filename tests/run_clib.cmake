@@ -8,7 +8,7 @@
 #   SOURCES   tests/clib
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
-#   CASE      static, shared, exports, two, loader, header, bundle,
+#   CASE      static, shared, exports, two, loader, header, bundle, simd,
 #             classes, failing, tuples, flags or variants
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
@@ -187,6 +187,18 @@ elseif(CASE STREQUAL "tuples")
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/tuples${EXE}")
     expect_output("${dir}/tuples${EXE}" "${SOURCES}/tuples.expected")
+elseif(CASE STREQUAL "simd")
+    # A simd struct of 16 bytes crosses as the vector type of C, which
+    # the header writes per architecture, and one of another size as the
+    # struct of its lanes.
+    library(simdlib static "${dir}")
+    expect_header("${dir}/simdlib.h" simdlib.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/simd.c"
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/simd${EXE}")
+    expect_output("${dir}/simd${EXE}" "${SOURCES}/simd.expected")
 elseif(CASE STREQUAL "flags")
     # Flags crosses as the struct of four bools the header writes for it,
     # passed and returned by value and held as a field.

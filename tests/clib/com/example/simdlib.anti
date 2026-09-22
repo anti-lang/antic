@@ -1,0 +1,45 @@
+//! A library for C whose signatures name simd structs. One of 16 bytes
+//! crosses as the vector type of C, which the header writes per
+//! architecture, and one of another size as the struct of its lanes,
+//! aligned to its size or to sixteen.
+
+import anti.simd;
+
+/// Four floats, the vector type of C.
+export simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+/// Four 32-bit integers.
+export simd struct I32x4 { a: i32, b: i32, c: i32, d: i32 }
+
+/// Two floats, which pass as the struct of their lanes.
+export simd struct F2 { x: f32, y: f32 }
+
+/// Every lane of a times k plus b.
+export fn simd_mix(a: Vec4, k: f32, b: Vec4) -> Vec4
+{
+	return a * Vec4.splat(k) + b;
+}
+
+/// The sum of the lanes.
+export fn simd_total(a: Vec4) -> f32
+{
+	return a.sum();
+}
+
+/// The lanes of a where they are greater than the lanes of b.
+export fn simd_greater(a: Vec4, b: Vec4) -> Vec4
+{
+	return simd.select(a > b, a, b);
+}
+
+/// Every lane doubled.
+export fn simd_twice(v: I32x4) -> I32x4
+{
+	return v + v;
+}
+
+/// The product of the lanes of a pair.
+export fn simd_pair(p: F2) -> f32
+{
+	return p.x * p.y;
+}
