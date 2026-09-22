@@ -29,6 +29,12 @@ set(exe "${WORK}/${name}")
 string(REPLACE "," ";" options "${OPTIONS}")
 string(REPLACE "," ";" arguments "${ARGS}")
 string(REPLACE "," ";" std "${STD}")
+# antic names the object of a dev build with the suffix of the host,
+# which is .obj on Windows.
+set(object_suffix .o)
+if(CMAKE_HOST_WIN32)
+    set(object_suffix .obj)
+endif()
 set(objects "")
 foreach(module IN LISTS std)
     execute_process(
@@ -38,7 +44,7 @@ foreach(module IN LISTS std)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic --dev of anti.${module} failed\n${err}")
     endif()
-    list(APPEND objects "${WORK}/std_${module}.o")
+    list(APPEND objects "${WORK}/std_${module}${object_suffix}")
 endforeach()
 execute_process(
     COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
