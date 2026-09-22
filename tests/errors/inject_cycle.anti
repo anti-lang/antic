@@ -1,0 +1,34 @@
+//! The provider of one interface needs the other, whose provider needs
+//! the first. The link refuses the cycle.
+abstract class Logger
+{
+	abstract fn say(self) -> int;
+}
+
+abstract class Clock
+{
+	abstract fn now(self) -> int;
+}
+
+singleton class Console
+{
+	implements lg: Logger,
+	inject time: *Clock,
+
+	concrete fn say(self) -> int { return 0; }
+}
+
+singleton class Watch
+{
+	implements ck: Clock,
+	inject log: *Logger,
+
+	concrete fn now(self) -> int { return 0; }
+}
+
+fn main() -> int
+{
+	let c = Console.get();
+	let w = Watch.get();
+	return c.say() + w.now();
+}

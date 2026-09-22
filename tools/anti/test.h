@@ -11,9 +11,12 @@
    files, the objects and the runner. runtime names the runtime archive,
    and llvm_mc the assembler, either of them NULL for the default.
    roots are the -I search roots, which also give each module its
-   path. Returns the exit status of anti. */
+   path. inject holds the `Interface=Provider` entries of the manifest,
+   which every compile of the run passes to antic. Returns the exit
+   status of anti. */
 int test_run(const char *const *sources, size_t source_count,
              const char *const *roots, size_t root_count, const char *work,
-             const char *runtime, const char *llvm_mc, bool release);
+             const char *runtime, const char *llvm_mc, bool release,
+             const char **inject, size_t inject_count);
 
 #endif

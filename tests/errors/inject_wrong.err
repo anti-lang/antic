@@ -1,0 +1,1 @@
+inject_wrong.anti: error: the provider `inject_wrong.Console.get` of `inject_wrong.Clock` gives `inject_wrong.Console`, which is no `inject_wrong.Clock`

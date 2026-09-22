@@ -398,8 +398,8 @@ static void put_type(struct writer *w, const struct type *t)
                                     (unsigned)t->fields[i].transient << 7));
                 put_u8(w, (uint8_t)t->fields[i].vis);
                 /* DESIGN: `inject` and `inject final` travel with the
-                   field, so a module that builds a class of another
-                   module calls the same provider through the same
+                   field. A module that builds a class of another
+                   module then calls the same provider through the same
                    slot, and `anti build` reports what a dependency
                    needs. */
                 put_u8(w, (uint8_t)((unsigned)t->fields[i].injected |

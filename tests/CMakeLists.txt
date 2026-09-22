@@ -1789,6 +1789,67 @@ foreach(case
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
 endforeach()
 
+# Injection. The program of tests/inject names three interfaces and takes
+# a provider of each from --inject: the `get` of a singleton that
+# implements the interface, a module function, and the `get` of a
+# singleton that inherits it. `inject final` then refuses a replacement
+# at start, and --anti.inspect lists what the program injects. The runner
+# is the one of the configuration tests, because a pattern file holds the
+# output of each.
+set(INJECT "${CMAKE_CURRENT_SOURCE_DIR}/inject")
+set(INJECT_OPTIONS "--inject,service.Logger=service.Console.get,--inject,service.Clock=service.the_clock,--inject,service.Store=service.Memory.get")
+foreach(case
+        "service|${INJECT_OPTIONS}||service.pattern||0"
+        "inspect|${INJECT_OPTIONS}|--anti.inspect|inspect.pattern||0"
+        "final|${INJECT_OPTIONS}|--anti.inject=service.Clock=lib/x.so|empty.pattern|final.pattern|70"
+        "unknown|${INJECT_OPTIONS}|--anti.inject=other.Thing=lib/x.so|empty.pattern|unknown.pattern|70"
+        "plugin|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so|empty.pattern|plugin.pattern|70")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 options)
+    list(GET parts 2 arguments)
+    list(GET parts 3 expected)
+    list(GET parts 4 errors)
+    list(GET parts 5 status)
+    set(error_patterns "")
+    if(NOT errors STREQUAL "")
+        set(error_patterns "-DERRORS=${INJECT}/${errors}")
+    endif()
+    add_test(NAME inject_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${INJECT}/service.anti"
+            "-DOPTIONS=${options}"
+            "-DARGS=${arguments}"
+            "-DEXPECTED=${INJECT}/${expected}"
+            ${error_patterns}
+            "-DSTATUS=${status}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-${name}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
+endforeach()
+
+# The `[inject]` and `[inject.test]` tables of a manifest. `anti test`
+# runs in the project root, reads both and lays the test table over the
+# plain one, per interface. The one test of the module adds the label of
+# the logger the test table names to the reading of the clock the plain
+# table names, so a run proves which provider filled each field.
+foreach(mode dev release)
+    set(extra "")
+    if(mode STREQUAL "release")
+        set(extra --release)
+    endif()
+    add_test(NAME inject_manifest_${mode}
+        COMMAND anti test ${extra}
+                --work "${CMAKE_CURRENT_BINARY_DIR}/inject-manifest-${mode}"
+                -I src --runtime "${ANTIC_RUNTIME_DIR}"
+                --llvm-mc "${ANTIC_LLVM_MC}" src/com/example/app.anti)
+    set_tests_properties(inject_manifest_${mode} PROPERTIES
+        WORKING_DIRECTORY "${INJECT}/project"
+        PASS_REGULAR_EXPRESSION "1 tests in 1 modules, 0 modules failed")
+endforeach()
+
 # ANTI_CONF names the file when the command line names none, and the
 # command line wins when both name one. It is the one environment
 # variable the runtime reads.
@@ -2103,7 +2164,13 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "transient|-S,-o,${LISTINGS}/transient.s,transient.anti"
         "member_keywords|-S,-o,${LISTINGS}/member_keywords.s,member_keywords.anti"
         "simd_decl|-S,-o,${LISTINGS}/simd_decl.s,simd_decl.anti"
-        "simd_ops|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/simd_ops.s,simd_ops.anti")
+        "simd_ops|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/simd_ops.s,simd_ops.anti"
+        "inject_type|-S,-o,${LISTINGS}/inject_type.s,inject_type.anti"
+        "inject_literal|-S,-o,${LISTINGS}/inject_literal.s,inject_literal.anti"
+        "inject_missing|-S,-o,${LISTINGS}/inject_missing.s,inject_missing.anti"
+        "inject_wrong|-S,--inject,inject_wrong.Clock=inject_wrong.Console.get,-o,${LISTINGS}/inject_wrong.s,inject_wrong.anti"
+        "inject_provider|-S,--inject,inject_provider.Logger=inject_provider.nowhere,--inject,inject_provider.Clock=inject_provider.ticks,-o,${LISTINGS}/inject_provider.s,inject_provider.anti"
+        "inject_cycle|-S,--inject,inject_cycle.Logger=inject_cycle.Console.get,--inject,inject_cycle.Clock=inject_cycle.Watch.get,-o,${LISTINGS}/inject_cycle.s,inject_cycle.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

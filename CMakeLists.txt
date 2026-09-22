@@ -163,9 +163,14 @@ target_link_libraries(antic PRIVATE antic_core)
 add_executable(anti
     tools/anti/main.c
     tools/anti/files.c
+    tools/anti/manifest.c
     tools/anti/sdk.c
-    tools/anti/test.c)
+    tools/anti/test.c
+    rt/toml.c)
 target_link_libraries(anti PRIVATE antic_core)
+# The manifest reader is the runtime's TOML reader, the one parser that
+# anti.toml, the logger and the runtime configuration share.
+target_include_directories(anti PRIVATE rt)
 
 target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")

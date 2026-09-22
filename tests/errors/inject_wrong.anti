@@ -1,0 +1,40 @@
+//! A provider whose class is no such interface is refused.
+abstract class Logger
+{
+	abstract fn say(self) -> int;
+}
+
+abstract class Clock
+{
+	abstract fn now(self) -> int;
+}
+
+singleton class Console
+{
+	implements lg: Logger,
+
+	concrete fn say(self) -> int { return 0; }
+}
+
+singleton class Watch
+{
+	implements ck: Clock,
+
+	concrete fn now(self) -> int { return 0; }
+}
+
+class Service
+{
+	inject time: *Clock,
+
+	pub fn run(self) -> int
+	{
+		return self.time.now();
+	}
+}
+
+fn main() -> int
+{
+	let s = Service { };
+	return s.run();
+}

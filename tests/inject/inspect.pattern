@@ -1,0 +1,11 @@
+anti runtime [0-9]+\.[0-9]+\.[0-9]+
+backtrace =  \(build\)
+logger =  \(build\)
+plugins =  \(build\)
+threads =  \(build\)
+trace =  \(build\)
+injectable interfaces:
+  service\.Logger \(service\.Service\.log\)
+  service\.Clock \(service\.Service\.time, final\)
+  service\.Store \(service\.Service\.keeper\)
+loaded plugins: none

@@ -1,0 +1,86 @@
+//! `inject` fills a field from the provider of its interface before
+//! `construct` runs. The provider of `Logger` is the `get` of a
+//! singleton that implements it, the provider of `Clock` is a module
+//! function, and `Store` inherits the interface it gives. `inject
+//! final` marks a field the run-time configuration may not replace.
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class Logger
+{
+	abstract fn say(self, n: int);
+}
+
+abstract class Clock
+{
+	abstract fn now(self) -> int;
+}
+
+abstract class Store
+{
+	abstract fn keep(self) -> int;
+}
+
+singleton class Console
+{
+	implements lg: Logger,
+
+	concrete fn say(self, n: int)
+	{
+		printf("console %d\n".ptr, n as c_int);
+	}
+}
+
+singleton class Watch
+{
+	implements ck: Clock,
+
+	concrete fn now(self) -> int
+	{
+		return 12;
+	}
+}
+
+/* A class that inherits the interface holds it at offset 0, so the
+   provider needs no thunk. */
+singleton class Memory inherits Store
+{
+	concrete fn keep(self) -> int
+	{
+		return 3;
+	}
+}
+
+fn the_clock() -> *Clock
+{
+	return Watch.get();
+}
+
+class Service
+{
+	inject log: *Logger,
+	inject final time: *Clock,
+	inject keeper: *Store,
+
+	seen: int = 0,
+
+	fn construct(self)
+	{
+		/* The providers ran before this body, so every field holds
+		   its object. */
+		self.log.say(self.time.now() + self.keeper.keep());
+	}
+
+	pub fn report(self)
+	{
+		self.log.say(self.time.now());
+		self.log.say(self.keeper.keep());
+	}
+}
+
+fn main() -> int
+{
+	let s = alloc Service { };
+	s.report();
+	delete(s);
+	return 0;
+}

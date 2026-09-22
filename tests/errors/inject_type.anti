@@ -1,0 +1,30 @@
+//! `inject` needs a pointer to an abstract class. A nullable pointer, a
+//! pointer to a complete class, a default beside it and `own` are each
+//! refused.
+abstract class Logger
+{
+	abstract fn say(self);
+}
+
+class Console
+{
+	implements lg: Logger,
+
+	concrete fn say(self) { }
+}
+
+class Bad
+{
+	inject a: int,
+	inject b: ?*Logger,
+	inject c: *Console,
+	inject own d: *Logger,
+	inject e: *Logger = none,
+}
+
+fn main() -> int
+{
+	let x = Console { };
+	x.say();
+	return 0;
+}

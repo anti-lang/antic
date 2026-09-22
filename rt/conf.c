@@ -191,9 +191,9 @@ static void list_injectable(char *out, size_t size)
 }
 
 /* DESIGN: a line that names an interface to take from a library. The
-   interface must be one the program injects and must not be `inject
+   interface must be one the program injects. It must not be `inject
    final`. A line that passes both waits for plugins, which are not
-   built: the library the line names cannot be loaded, so the line is a
+   built. The library it names cannot be loaded, so the line is a
    startup error that says so. */
 static void injection_error(const char *name, size_t length,
                             const char *where)

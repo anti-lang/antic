@@ -20,9 +20,12 @@ enum { MACOS_MIN_MAJOR = 11, MACOS_MIN_MINOR = 0 };
 #define RUNTIME_ROOT "anti_lang_Object_"
 
 /* DESIGN: the slot of an injectable interface is one global per
-   interface under this module, named by the path of the interface. No
-   Anti module may be called `anti.inject`, so the two never meet. */
-#define INJECT_MODULE "anti.inject"
+   interface, of the runtime module. Its name is this prefix and the
+   path of the interface. The passes over the whole program write data
+   of the runtime module, and that data belongs to the object that
+   links. No Anti identifier holds a dot, so no module of the standard
+   library takes such a name. */
+#define INJECT_SLOT_PREFIX "inject."
 
 enum target {
     TARGET_LINUX_X86_64,

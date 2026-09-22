@@ -1,0 +1,47 @@
+//! A provider that names no function of the program is refused, and so
+//! is one that takes arguments or gives no pointer.
+abstract class Logger
+{
+	abstract fn say(self) -> int;
+}
+
+abstract class Clock
+{
+	abstract fn now(self) -> int;
+}
+
+singleton class Console
+{
+	implements lg: Logger,
+
+	concrete fn say(self) -> int { return 0; }
+}
+
+singleton class Watch
+{
+	implements ck: Clock,
+
+	concrete fn now(self) -> int { return 0; }
+}
+
+fn ticks(n: int) -> int
+{
+	return n;
+}
+
+class Service
+{
+	inject log: *Logger,
+	inject time: *Clock,
+
+	pub fn run(self) -> int
+	{
+		return self.log.say() + self.time.now();
+	}
+}
+
+fn main() -> int
+{
+	let s = Service { };
+	return s.run();
+}

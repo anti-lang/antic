@@ -1,0 +1,1 @@
+inject_cycle.anti: error: the providers make a cycle: `inject_cycle.Clock` needs `inject_cycle.Logger`, which needs `inject_cycle.Clock`

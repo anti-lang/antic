@@ -1,0 +1,12 @@
+[package]
+name = "com.example"
+version = "0.1.0"
+
+# The build takes these providers, and `anti test` lays `[inject.test]`
+# over them, per interface.
+[inject]
+"com.example.app.Logger" = "com.example.app.ConsoleLogger.get"
+"com.example.app.Clock" = "com.example.app.Watch.get"
+
+[inject.test]
+"com.example.app.Logger" = "com.example.app.FakeLogger.get"

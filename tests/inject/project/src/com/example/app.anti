@@ -1,0 +1,64 @@
+//! A class names the interfaces it needs, and the manifest names who
+//! provides each. `[inject.test]` replaces the provider of `Logger`
+//! for `anti test` and leaves the one of `Clock` as the build has it.
+pub abstract class Logger
+{
+	pub abstract fn label(self) -> int;
+}
+
+pub abstract class Clock
+{
+	pub abstract fn now(self) -> int;
+}
+
+pub singleton class ConsoleLogger
+{
+	implements lg: Logger,
+
+	pub concrete fn label(self) -> int
+	{
+		return 1;
+	}
+}
+
+pub singleton class FakeLogger
+{
+	implements lg: Logger,
+
+	pub concrete fn label(self) -> int
+	{
+		return 2;
+	}
+}
+
+pub singleton class Watch
+{
+	implements ck: Clock,
+
+	pub concrete fn now(self) -> int
+	{
+		return 40;
+	}
+}
+
+pub class Service
+{
+	inject log: *Logger,
+	inject time: *Clock,
+
+	pub fn sum(self) -> int
+	{
+		return self.log.label() + self.time.now();
+	}
+}
+
+tests
+{
+	fn the_test_table_replaces_one_provider()
+	{
+		let s = alloc Service { };
+		let n = s.sum();
+		delete(s);
+		assert(n == 42);
+	}
+}

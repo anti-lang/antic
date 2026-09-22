@@ -1256,11 +1256,11 @@ static void write_slots(struct whole *w, struct ir_module *m,
 /* DESIGN: `inject name: *Interface` fills a field from the provider of
    its interface before `construct` runs. The program holds one slot per
    interface, a pointer that holds the provider, and every site calls
-   through it. This pass runs where the program is whole, so it sees
-   every class of every module, every interface they inject and every
-   function a provider may name. An interface the build named no
-   provider for is refused here, which is the link-time error the
-   specification asks for. */
+   through it. This pass runs where the program is whole. It sees every
+   class of every module, every interface they inject and every function
+   a provider may name. An interface the build named no provider for is
+   refused here, which is the link-time error the specification asks
+   for. */
 struct injectable {
     const char *interface;          /* the path of the abstract class */
     const char *module;             /* the class that needs it */
@@ -1292,9 +1292,9 @@ static struct injectable *injectable_of(struct injectable *list, size_t *count,
 
 /* The `inject` fields of every class of the program, one entry per
    interface. The first class that names an interface is the one an
-   error names, and `inject final` anywhere makes the slot final: one
-   slot serves every field of the interface, so a replacement that one
-   field refuses is refused for all. */
+   error names. `inject final` anywhere makes the slot final: one slot
+   serves every field of the interface, so a replacement that one field
+   refuses is refused for all. */
 static size_t collect_injectables(const struct ir_module *m,
                                   struct injectable *list)
 {
@@ -1324,16 +1324,24 @@ static size_t collect_injectables(const struct ir_module *m,
    whose globals the reader dropped has none, and the pass adds it. */
 static uint32_t slot_global(struct ir_module *m, const char *interface)
 {
+    struct text name = {0};
+    uint32_t found = IR_NO_INDEX;
     size_t i;
 
-    for (i = 0; i < m->global_count; i++) {
+    text_appendf(&name, INJECT_SLOT_PREFIX "%s", interface);
+    for (i = 0; i < m->global_count && found == IR_NO_INDEX; i++) {
         if (m->globals[i]->module != NULL &&
-            strcmp(m->globals[i]->module, INJECT_MODULE) == 0 &&
-            strcmp(m->globals[i]->name, interface) == 0) {
-            return (uint32_t)i;
+            strcmp(m->globals[i]->module, RUNTIME_MODULE) == 0 &&
+            strcmp(m->globals[i]->name, text_cstr(&name)) == 0) {
+            found = (uint32_t)i;
         }
     }
-    return ir_global_add(m, INJECT_MODULE, interface, NULL, 0, 1)->index;
+    if (found == IR_NO_INDEX) {
+        found = ir_global_add(m, RUNTIME_MODULE, text_cstr(&name), NULL, 0,
+                              1)->index;
+    }
+    text_free(&name);
+    return found;
 }
 
 /* The provider the build named for the interface, or NULL. */
@@ -1353,9 +1361,10 @@ static const char *provider_text(const struct whole_options *o,
 }
 
 /* The function of the program that path names. A provider is written as
-   one path, and the module of a function holds dots as its name may, so
-   every split of the path at a dot is tried. Returns IR_NO_INDEX when
-   the program holds none, and sets ambiguous when two answer. */
+   one path, and the module of a function holds dots as its name may.
+   Every split of the path at a dot is therefore tried. Returns
+   IR_NO_INDEX when the program holds none, and sets ambiguous when two
+   answer. */
 static uint32_t function_named(const struct ir_module *m, const char *path,
                                bool *ambiguous)
 {
@@ -1500,7 +1509,7 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
     if (record != IR_NO_INDEX) {
         uint32_t offset = interface_offset(w, m, record, in->descriptor);
         if (offset == IR_NO_INDEX) {
-            text_appendf(errors, "the provider `%s` of `%s` gives a "
+            text_appendf(errors, "the provider `%s` of `%s` gives "
                                  "`%s.%s`, which is no `%s`\n", text,
                          in->interface, m->classes[record]->module,
                          m->classes[record]->name, in->interface);
@@ -1535,7 +1544,7 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
 /* DESIGN: the provider graph is the code the providers run. An edge
    from one interface to another stands where the provider of the first,
    or a function it calls, reads the slot of the second. Only the direct
-   calls are followed: a call through a table names no function here,
+   calls are followed. A call through a table names no function here,
    and a graph that guessed would refuse a program that has no cycle.
    The walk marks every function a provider may run. */
 static void reach_calls(const struct ir_module *m, uint32_t from, bool *seen,
@@ -1653,8 +1662,8 @@ static void check_cycles(const struct ir_module *m, struct injectable *list,
     free(stack);
 }
 
-/* DESIGN: the program names the interfaces it injects, so the runtime
-   reports what a line of `[injections]` may replace and refuses one
+/* DESIGN: the program names the interfaces it injects. The runtime then
+   reports what a line of `[injections]` may replace, and refuses one
    that names an interface the program has not or an `inject final`
    field. The table stands in every program, empty where nothing
    injects, because the runtime reads it before `main`. */
@@ -1745,8 +1754,8 @@ static void write_injections(struct whole *w, struct ir_module *m,
     check_cycles(m, list, count, errors);
     /* DESIGN: the table of the interfaces belongs to the program the
        runtime starts. A library for C has one only where it carries the
-       runtime, because the configuration reads the table before `main`
-       and that copy of the runtime is the one that runs. */
+       runtime. The configuration reads the table before `main`, and
+       that copy of the runtime is the one that runs. */
     if (!o->library || o->bundled) {
         write_injectable(m, list, count);
     }

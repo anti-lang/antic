@@ -359,17 +359,18 @@ enum ir_class_flag {
 };
 
 /* The table of one interface sub-object of a concrete class, the ones it
-   inherits among them. */
+   inherits among them.
+
+   DESIGN: the sub-object of an interface sits at a field of the class
+   that declares it. The aggregate and the index give its offset. A pass
+   over the whole program then converts a pointer to the class into a
+   pointer to the interface, without the types. */
 struct ir_subtable {
     uint32_t interface;             /* the global of the interface's
                                        descriptor */
     uint32_t table;                 /* the global of the table */
-    /* DESIGN: the sub-object of an interface sits at a field of the
-       class that declares it. The aggregate and the index give its
-       offset, so a pass over the whole program converts a pointer to
-       the class into a pointer to the interface without the types. */
-    uint32_t agg;
-    uint32_t field;
+    uint32_t agg;                   /* the aggregate of the sub-object */
+    uint32_t field;                 /* its field of that aggregate */
 };
 
 /* One `inject` field of a class: the path of its interface, the name of

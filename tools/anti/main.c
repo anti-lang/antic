@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "linker.h"
+#include "manifest.h"
 #include "sdk.h"
 #include "selfpath.h"
 #include "userdirs.h"
@@ -26,7 +27,9 @@ static int usage(FILE *out)
           "test compiles each module with its `tests` and `fixtures` blocks,\n"
           "writes a runner that calls every test of the module, links it and\n"
           "runs it. Every other build drops both blocks. --release runs the\n"
-          "same tests with the checks and the assertions off.\n",
+          "same tests with the checks and the assertions off. It reads the\n"
+          "`[inject]` and `[inject.test]` tables of anti.toml in the current\n"
+          "directory and passes each provider to antic.\n",
           out);
     return out == stdout ? 0 : 2;
 }
@@ -75,6 +78,7 @@ int main(int argc, char **argv)
         const char *work = "build/tests";
         const char *runtime = NULL;
         const char *llvm_mc = NULL;
+        struct manifest_inject inject;
         struct text home = {0};
         size_t count = 0;
         size_t root_count = 0;
@@ -107,8 +111,18 @@ int main(int argc, char **argv)
         if (runtime == NULL && default_runtime(&home)) {
             runtime = text_cstr(&home);
         }
+        /* DESIGN: the manifest is `anti.toml` of the project root, and
+           `anti test` runs there. A project without one injects
+           nothing, which is no error. */
+        if (!manifest_inject_read(MANIFEST_FILE, true, &inject)) {
+            free(sources);
+            free(roots);
+            text_free(&home);
+            return 1;
+        }
         status = test_run(sources, count, roots, root_count, work, runtime,
-                          llvm_mc, release);
+                          llvm_mc, release, inject.entries, inject.count);
+        manifest_inject_free(&inject);
         free(sources);
         free(roots);
         text_free(&home);

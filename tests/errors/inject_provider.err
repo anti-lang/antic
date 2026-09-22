@@ -1,0 +1,2 @@
+inject_provider.anti: error: the provider `inject_provider.nowhere` of `inject_provider.Logger` names no function of the program
+inject_provider.anti: error: the provider `inject_provider.ticks` of `inject_provider.Clock` takes arguments or gives no pointer. A provider is written `fn() -> *inject_provider.Clock`

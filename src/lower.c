@@ -2904,10 +2904,10 @@ static void store_value(struct lowerer *l, const struct type *t,
 }
 
 /* DESIGN: the slot of an injectable interface is one pointer per
-   interface, under the module INJECT_MODULE and named by the path of
-   the interface. It holds the provider the build chose. The pass over
-   the whole program writes it, so one program holds one slot per
-   interface whichever module injects it, and the run-time
+   interface, of the runtime module and named INJECT_SLOT_PREFIX and
+   the path of the interface. It holds the provider the build chose.
+   The pass over the whole program writes it. One program then holds
+   one slot per interface whichever module injects it, and the run-time
    configuration has one pointer to replace. Every module that injects
    refers to it. */
 static struct ir_global *inject_slot(struct lowerer *l, const struct type *t)
@@ -2917,17 +2917,18 @@ static struct ir_global *inject_slot(struct lowerer *l, const struct type *t)
     struct ir_global *g;
     size_t i;
 
-    text_appendf(&name, "%.*s.%.*s", (int)t->module.length, t->module.text,
+    text_appendf(&name, INJECT_SLOT_PREFIX "%.*s.%.*s",
+                 (int)t->module.length, t->module.text,
                  (int)t->name.length, t->name.text);
     for (i = 0; i < m->global_count; i++) {
         if (m->globals[i]->module != NULL &&
-            strcmp(m->globals[i]->module, INJECT_MODULE) == 0 &&
+            strcmp(m->globals[i]->module, RUNTIME_MODULE) == 0 &&
             strcmp(m->globals[i]->name, text_cstr(&name)) == 0) {
             text_free(&name);
             return m->globals[i];
         }
     }
-    g = ir_global_add(m, INJECT_MODULE, text_cstr(&name), NULL, 0, 1);
+    g = ir_global_add(m, RUNTIME_MODULE, text_cstr(&name), NULL, 0, 1);
     g->is_extern = true;
     g->mutable = true;
     text_free(&name);

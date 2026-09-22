@@ -448,7 +448,8 @@ done:
 
 int test_run(const char *const *sources, size_t source_count,
              const char *const *roots, size_t root_count, const char *work,
-             const char *runtime, const char *llvm_mc, bool release)
+             const char *runtime, const char *llvm_mc, bool release,
+             const char **inject, size_t inject_count)
 {
     struct options base;
     const char **search;
@@ -478,6 +479,11 @@ int test_run(const char *const *sources, size_t source_count,
         search[i + 1] = roots[i];
     }
     base_options(&base, runtime, llvm_mc, search, root_count + 1);
+    /* DESIGN: `[inject.test]` of the manifest lies over `[inject]`, so a
+       test run takes the fake of an interface where the manifest names
+       one. Every compile of the run carries the same table. */
+    base.inject = inject;
+    base.inject_count = inject_count;
     for (i = 0; i < source_count; i++) {
         if (!read_unit(sources[i], roots, root_count, work, &units[i])) {
             failed = source_count;
