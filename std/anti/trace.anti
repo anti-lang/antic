@@ -1,0 +1,1285 @@
+//! The stock handlers of the nine hooks, and the `trace` key that names
+//! one.
+//!
+//! `anti.lang.TraceHandler` declares the nine hooks with the object
+//! after `self`, and `anti.lang.Trace.install` stores one handler. This
+//! module ships seven that fill it: `LeakTracker` counts the objects a
+//! program makes and frees, `Profiler` times the calls of an
+//! instrumented class, `CallLogger` writes a line per call,
+//! `ErrorMonitor` keeps the last failure, `ThreadMonitor` counts the
+//! jobs in flight, `ChangeJournal` keeps the last field writes and
+//! `Composite` holds several handlers at once.
+//!
+//! `start` reads the `trace` key of the runtime configuration and
+//! installs the handler it names, one of `leaks`, `profile`, `calls`,
+//! `errors`, `threads` and `writes`. A key of several names, separated
+//! by commas, gives a `Composite` of them. The program calls it, as it
+//! calls `rt.configure`, because the handlers live in this module and a
+//! program that does not import it links none of them.
+//!
+//! ```anti
+//! import anti.trace;
+//!
+//! fn main() -> int
+//! {
+//! 	let watch = trace.start();
+//! 	return 0;
+//! }
+//! ```
+//!
+//! A hook runs wherever the object it stands for runs, so a handler
+//! counts with atomic fields. It allocates no object of its own inside a
+//! hook: an `alloc` under `created` would call `created` again. The
+//! reports are written by the program, not by a hook, and each goes to
+//! standard error.
+
+import anti.io;
+import anti.lang;
+import anti.reflect;
+import anti.text;
+import anti.time;
+
+extern fn anti_rt_conf_get(key: ?*byte, len: int) -> str;
+
+/// How many distinct functions a `Profiler` measures.
+pub const PROFILE_SLOTS: int = 64;
+/// How many writes a `ChangeJournal` keeps.
+pub const JOURNAL_SLOTS: int = 64;
+/// The bytes of the message an `ErrorMonitor` keeps, the NUL included.
+pub const MESSAGE_BYTES: int = 128;
+/// How many handlers a `Composite` holds.
+pub const COMPOSITE_SLOTS: int = 8;
+
+/// The number of objects a program made and the number it freed.
+///
+/// `created` and `copied` each count one object made, because `dup`
+/// builds an object without running `construct`. `destroyed` counts one
+/// freed. `live` is the difference, and a program that ends with a
+/// positive one kept objects it never deleted.
+pub class LeakTracker inherits lang.TraceHandler
+{
+	atomic builds: int = 0,
+	atomic copies: int = 0,
+	atomic deaths: int = 0,
+
+	/// A tracker that counts nothing yet.
+	pub fn new() -> *LeakTracker
+	{
+		return alloc LeakTracker { };
+	}
+
+	/// The objects that `construct` and `dup` made.
+	pub fn made(self) -> int
+	{
+		return self.builds.load() + self.copies.load();
+	}
+
+	/// The objects that `delete` and `destroy` freed.
+	pub fn freed(self) -> int
+	{
+		return self.deaths.load();
+	}
+
+	/// The objects that are still alive.
+	pub fn live(self) -> int
+	{
+		return self.made() - self.freed();
+	}
+
+	/// Write the three numbers to standard error.
+	pub fn report(self)
+	{
+		io.eprint("anti.trace: ");
+		eprint_int(self.made());
+		io.eprint(" made, ");
+		eprint_int(self.freed());
+		io.eprint(" freed, ");
+		eprint_int(self.live());
+		io.eprintln(" live");
+	}
+
+	concrete fn created(self, o: *Object)
+	{
+		self.builds.add(1);
+	}
+
+	concrete fn destroyed(self, o: *Object)
+	{
+		self.deaths.add(1);
+	}
+
+	concrete fn copied(self, o: *Object, from: *Object)
+	{
+		self.copies.add(1);
+	}
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str) { }
+
+	concrete fn leave(self, o: *Object, name: str) { }
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
+}
+
+/// The calls and the time of every function an instrumented class ran.
+///
+/// One slot per function name. `enter` counts a call and reads the
+/// clock when the function was not already running, and the matching
+/// `leave` adds the span, so a function that calls itself is measured
+/// once per outermost call. The names come from the compiler as
+/// constants, so a slot keeps the `str` it was given.
+///
+/// The slots are of the whole program and the stack of a call is not,
+/// so the spans of a function that two threads run at once overlap in
+/// one slot. The counts stay right.
+pub class Profiler inherits lang.TraceHandler
+{
+	names: [PROFILE_SLOTS]str,
+	runs: [PROFILE_SLOTS]int,
+	spans: [PROFILE_SLOTS]int,
+	opened: [PROFILE_SLOTS]int,
+	inside: [PROFILE_SLOTS]int,
+	count: int = 0,
+	atomic overflow: int = 0,
+
+	/// A profiler with every slot free.
+	pub fn new() -> *Profiler
+	{
+		return alloc Profiler {
+			names: [""; PROFILE_SLOTS],
+			runs: [0; PROFILE_SLOTS],
+			spans: [0; PROFILE_SLOTS],
+			opened: [0; PROFILE_SLOTS],
+			inside: [0; PROFILE_SLOTS],
+		};
+	}
+
+	/// The number of functions the profiler has a slot for.
+	pub fn len(self) -> int
+	{
+		return self.count;
+	}
+
+	/// The name of the function in slot `index`, or the empty text.
+	pub fn name(self, index: int) -> str
+	{
+		if index < 0 || index >= self.count {
+			return "";
+		}
+		return self.names[index];
+	}
+
+	/// The calls of `name`, or 0 for a function with no slot.
+	pub fn calls(self, name: str) -> int
+	{
+		let at = self.find(name);
+		if at < 0 {
+			return 0;
+		}
+		return self.runs[at];
+	}
+
+	/// The nanoseconds spent in `name`, or 0 for one with no slot.
+	pub fn nanoseconds(self, name: str) -> int
+	{
+		let at = self.find(name);
+		if at < 0 {
+			return 0;
+		}
+		return self.spans[at];
+	}
+
+	/// The calls that found every slot taken.
+	pub fn missed(self) -> int
+	{
+		return self.overflow.load();
+	}
+
+	/// Write one line per slot to standard error.
+	pub fn report(self)
+	{
+		let i = 0;
+		while i < self.count do {
+			io.eprint("anti.trace: ");
+			io.eprint(self.names[i]);
+			io.eprint(" ");
+			eprint_int(self.runs[i]);
+			io.eprint(" calls, ");
+			eprint_int(self.spans[i]);
+			io.eprintln(" ns");
+			i += 1;
+		}
+	}
+
+	/// The slot of `name`, or -1 when it has none.
+	fn find(self, name: str) -> int
+	{
+		let i = 0;
+		while i < self.count do {
+			if text.equal(self.names[i], name) {
+				return i;
+			}
+			i += 1;
+		}
+		return -1;
+	}
+
+	/// The slot of `name`, a free one when it has none, or -1 when every
+	/// slot is taken.
+	fn slot(self, name: str) -> int
+	{
+		let at = self.find(name);
+		if at >= 0 {
+			return at;
+		}
+		if self.count >= PROFILE_SLOTS {
+			return -1;
+		}
+		at = self.count;
+		self.names[at] = name;
+		self.count += 1;
+		return at;
+	}
+
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str)
+	{
+		let at = self.slot(name);
+		if at < 0 {
+			self.overflow.add(1);
+			return;
+		}
+		self.runs[at] += 1;
+		if self.inside[at] == 0 {
+			self.opened[at] = time.now();
+		}
+		self.inside[at] += 1;
+	}
+
+	concrete fn leave(self, o: *Object, name: str)
+	{
+		let at = self.find(name);
+		if at < 0 || self.inside[at] == 0 {
+			return;
+		}
+		self.inside[at] -= 1;
+		if self.inside[at] == 0 {
+			self.spans[at] += time.now() - self.opened[at];
+		}
+	}
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
+}
+
+/// A line per call of an instrumented class, on standard error.
+///
+/// `enter` writes `-> name` and `leave` writes `<- name`, each indented
+/// by the depth of the call. A function that gave an error writes
+/// `!! name error <code>` between the two. `quiet` counts the lines
+/// without writing them, which is what a test of the handler wants.
+pub class CallLogger inherits lang.TraceHandler
+{
+	atomic depth: int = 0,
+	atomic taken: int = 0,
+	atomic silent: bool = false,
+
+	/// A logger that writes every line.
+	pub fn new() -> *CallLogger
+	{
+		return alloc CallLogger { };
+	}
+
+	/// Write the lines, or count them alone.
+	pub fn quiet(self, on: bool)
+	{
+		self.silent.store(on);
+	}
+
+	/// The lines the logger has taken.
+	pub fn lines(self) -> int
+	{
+		return self.taken.load();
+	}
+
+	/// Write `mark`, the name and the indentation of `depth`.
+	fn put(self, depth: int, mark: str, name: str)
+	{
+		self.taken.add(1);
+		if self.silent.load() {
+			return;
+		}
+		let i = 0;
+		while i < depth && i < 32 do {
+			io.eprint("  ");
+			i += 1;
+		}
+		io.eprint(mark);
+		io.eprintln(name);
+	}
+
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str)
+	{
+		self.put(self.depth.add(1), "-> ", name);
+	}
+
+	concrete fn leave(self, o: *Object, name: str)
+	{
+		let was = self.depth.sub(1);
+		self.put(was - 1, "<- ", name);
+	}
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error)
+	{
+		self.taken.add(1);
+		if self.silent.load() {
+			return;
+		}
+		let i = 1;
+		while i < self.depth.load() && i < 32 do {
+			io.eprint("  ");
+			i += 1;
+		}
+		io.eprint("!! ");
+		io.eprint(name);
+		io.eprint(" error ");
+		eprint_int(e.code);
+		io.eprintln("");
+	}
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
+}
+
+/// The failures of instrumented functions, with the last one kept.
+///
+/// `failed` carries the error that a function left with, and the error
+/// is deleted once its handler exits. The monitor therefore copies the
+/// message into itself and keeps the code and the name of the function,
+/// never the pointer.
+pub class ErrorMonitor inherits lang.TraceHandler
+{
+	atomic total: int = 0,
+	code: int = 0,
+	message: [MESSAGE_BYTES]byte,
+	message_len: int = 0,
+	name: str = "",
+
+	/// A monitor that has seen no failure.
+	pub fn new() -> *ErrorMonitor
+	{
+		return alloc ErrorMonitor { message: [0; MESSAGE_BYTES] };
+	}
+
+	/// The failures the monitor has taken.
+	pub fn failures(self) -> int
+	{
+		return self.total.load();
+	}
+
+	/// The code of the last error, or 0 before the first.
+	pub fn last_code(self) -> int
+	{
+		return self.code;
+	}
+
+	/// The message of the last error, cut to `MESSAGE_BYTES` bytes.
+	pub fn last_message(self) -> str
+	{
+		return text.from_c(&self.message[0]);
+	}
+
+	/// The name of the function that gave the last error.
+	pub fn last_function(self) -> str
+	{
+		return self.name;
+	}
+
+	/// Write the last failure to standard error.
+	pub fn report(self)
+	{
+		io.eprint("anti.trace: ");
+		eprint_int(self.failures());
+		io.eprint(" failures, last ");
+		io.eprint(self.last_function());
+		io.eprint(" error ");
+		eprint_int(self.code);
+		io.eprint(": ");
+		io.eprintln(self.last_message());
+	}
+
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str) { }
+
+	concrete fn leave(self, o: *Object, name: str) { }
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error)
+	{
+		self.total.add(1);
+		self.code = e.code;
+		self.name = name;
+		let room = MESSAGE_BYTES - 1;
+		let n = e.message.len;
+		if n > room {
+			n = room;
+		}
+		let i = 0;
+		while i < n do {
+			self.message[i] = e.message[i];
+			i += 1;
+		}
+		self.message[n] = 0;
+		self.message_len = n;
+	}
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
+}
+
+/// The jobs a program dispatched and joined.
+///
+/// `running` is the difference, the jobs the pool still holds, and
+/// `peak` is the highest that difference ever was.
+pub class ThreadMonitor inherits lang.TraceHandler
+{
+	atomic starts: int = 0,
+	atomic ends: int = 0,
+	atomic most: int = 0,
+
+	/// A monitor that has seen no job.
+	pub fn new() -> *ThreadMonitor
+	{
+		return alloc ThreadMonitor { };
+	}
+
+	/// The jobs that `dispatch` gave to the pool.
+	pub fn sent(self) -> int
+	{
+		return self.starts.load();
+	}
+
+	/// The jobs that `join` took back.
+	pub fn taken(self) -> int
+	{
+		return self.ends.load();
+	}
+
+	/// The jobs the pool still holds.
+	pub fn running(self) -> int
+	{
+		return self.sent() - self.taken();
+	}
+
+	/// The most jobs the pool ever held at once.
+	pub fn peak(self) -> int
+	{
+		return self.most.load();
+	}
+
+	/// Write the four numbers to standard error.
+	pub fn report(self)
+	{
+		io.eprint("anti.trace: ");
+		eprint_int(self.sent());
+		io.eprint(" dispatched, ");
+		eprint_int(self.taken());
+		io.eprint(" joined, ");
+		eprint_int(self.running());
+		io.eprint(" running, peak ");
+		eprint_int(self.peak());
+		io.eprintln("");
+	}
+
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object)
+	{
+		let now = self.starts.add(1) + 1 - self.ends.load();
+		let high = self.most.load();
+		while now > high do {
+			if self.most.compare_swap(high, now) {
+				return;
+			}
+			high = self.most.load();
+		}
+	}
+
+	concrete fn joined(self, o: *Object)
+	{
+		self.ends.add(1);
+	}
+
+	concrete fn enter(self, o: *Object, name: str) { }
+
+	concrete fn leave(self, o: *Object, name: str) { }
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
+}
+
+/// The last `JOURNAL_SLOTS` writes to a field of an instrumented class.
+///
+/// `changed` carries the record of the field, whose name stands in
+/// read-only data, and the journal reads the name of the object's class
+/// from its descriptor. It keeps both names and never the object, which
+/// the program may delete before the journal is read.
+pub class ChangeJournal inherits lang.TraceHandler
+{
+	classes: [JOURNAL_SLOTS]str,
+	fields: [JOURNAL_SLOTS]str,
+	atomic total: int = 0,
+
+	/// A journal with no entry.
+	pub fn new() -> *ChangeJournal
+	{
+		return alloc ChangeJournal {
+			classes: [""; JOURNAL_SLOTS],
+			fields: [""; JOURNAL_SLOTS],
+		};
+	}
+
+	/// The writes the journal has taken, the ones it dropped included.
+	pub fn writes(self) -> int
+	{
+		return self.total.load();
+	}
+
+	/// The entries the journal holds.
+	pub fn len(self) -> int
+	{
+		let taken = self.writes();
+		if taken > JOURNAL_SLOTS {
+			return JOURNAL_SLOTS;
+		}
+		return taken;
+	}
+
+	/// The class of entry `index`, where 0 is the newest.
+	pub fn class_of(self, index: int) -> str
+	{
+		let at = self.place(index);
+		if at < 0 {
+			return "";
+		}
+		return self.classes[at];
+	}
+
+	/// The field of entry `index`, where 0 is the newest.
+	pub fn field_of(self, index: int) -> str
+	{
+		let at = self.place(index);
+		if at < 0 {
+			return "";
+		}
+		return self.fields[at];
+	}
+
+	/// Write one line per entry to standard error, the newest first.
+	pub fn report(self)
+	{
+		let i = 0;
+		let held = self.len();
+		while i < held do {
+			io.eprint("anti.trace: ");
+			io.eprint(self.class_of(i));
+			io.eprint(".");
+			io.eprintln(self.field_of(i));
+			i += 1;
+		}
+	}
+
+	/// The slot of entry `index`, or -1 when the journal has none.
+	fn place(self, index: int) -> int
+	{
+		if index < 0 || index >= self.len() {
+			return -1;
+		}
+		let newest = self.writes() - 1 - index;
+		return newest % JOURNAL_SLOTS;
+	}
+
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str) { }
+
+	concrete fn leave(self, o: *Object, name: str) { }
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
+	{
+		let at = self.total.add(1) % JOURNAL_SLOTS;
+		self.classes[at] = class_name(o);
+		self.fields[at] = field.name;
+	}
+}
+
+/// Several handlers under the one that `Trace.install` holds.
+///
+/// Each hook reaches every handler in the order they were added, and
+/// `leave` reaches them in the other order, so the handlers nest around
+/// a call as the handler and the object's own hook do. A composite owns
+/// the handlers it holds and deletes them with itself.
+pub class Composite inherits lang.TraceHandler
+{
+	handlers: [COMPOSITE_SLOTS]?*lang.TraceHandler,
+	count: int = 0,
+
+	/// A composite that holds no handler.
+	pub fn new() -> *Composite
+	{
+		return alloc Composite { handlers: [none; COMPOSITE_SLOTS] };
+	}
+
+	/// Take `h` over, or give `false` when every slot is taken.
+	pub fn add(self, h: *lang.TraceHandler) -> bool
+	{
+		if self.count >= COMPOSITE_SLOTS {
+			return false;
+		}
+		self.handlers[self.count] = h;
+		self.count += 1;
+		return true;
+	}
+
+	/// The handlers the composite holds.
+	pub fn len(self) -> int
+	{
+		return self.count;
+	}
+
+	/// The handler at `index`, or `none` outside the composite.
+	pub fn at(self, index: int) -> ?*lang.TraceHandler
+	{
+		if index < 0 || index >= self.count {
+			return none;
+		}
+		return self.handlers[index];
+	}
+
+	concrete fn created(self, o: *Object)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				h.created(o);
+			}
+			i += 1;
+		}
+	}
+
+	concrete fn destroyed(self, o: *Object)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				h.destroyed(o);
+			}
+			i += 1;
+		}
+	}
+
+	concrete fn copied(self, o: *Object, from: *Object)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				h.copied(o, from);
+			}
+			i += 1;
+		}
+	}
+
+	concrete fn dispatched(self, o: *Object)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				h.dispatched(o);
+			}
+			i += 1;
+		}
+	}
+
+	concrete fn joined(self, o: *Object)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				h.joined(o);
+			}
+			i += 1;
+		}
+	}
+
+	concrete fn enter(self, o: *Object, name: str)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				h.enter(o, name);
+			}
+			i += 1;
+		}
+	}
+
+	concrete fn leave(self, o: *Object, name: str)
+	{
+		let i = self.count;
+		while i > 0 do {
+			i -= 1;
+			let h = self.handlers[i];
+			if h != none {
+				h.leave(o, name);
+			}
+		}
+	}
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				h.failed(o, name, e);
+			}
+			i += 1;
+		}
+	}
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				h.changed(o, field);
+			}
+			i += 1;
+		}
+	}
+
+	concrete fn destruct(self)
+	{
+		let i = 0;
+		while i < self.count do {
+			let h = self.handlers[i];
+			if h != none {
+				delete(h);
+			}
+			self.handlers[i] = none;
+			i += 1;
+		}
+		self.count = 0;
+	}
+}
+
+/// Install the handler that the `trace` key of the runtime
+/// configuration names, and give it back.
+///
+/// The key is empty in a program that was given none, and the call then
+/// installs nothing and gives `none`. The program owns what it gets
+/// back and deletes it once it has installed `none` in its place.
+pub fn start() -> ?*lang.TraceHandler
+{
+	return install(anti_rt_conf_get("trace".ptr, 5));
+}
+
+/// Install the handlers that `what` names, and give back the one that
+/// `Trace.install` now holds.
+///
+/// `what` is one name, or several separated by commas, which give a
+/// `Composite` in the order they stand. A name that no handler has
+/// writes one line to standard error and is passed over.
+pub fn install(what: str) -> ?*lang.TraceHandler
+{
+	let made = handlers_of(what);
+	lang.Trace.install(made);
+	return made;
+}
+
+/// The handler that `what` names, a `Composite` of several, or `none`.
+fn handlers_of(what: str) -> ?*lang.TraceHandler
+{
+	let made: ?*lang.TraceHandler = none;
+	let group: ?*Composite = none;
+	let rest = what;
+	while rest.len > 0 do {
+		let name = rest;
+		let comma = text.find_byte(rest, 0x2C);
+		if comma >= 0 {
+			name = text.slice(rest, 0, comma);
+			rest = text.slice(rest, comma + 1, rest.len);
+		} else {
+			rest = text.slice(rest, rest.len, rest.len);
+		}
+		if name.len == 0 {
+			continue;
+		}
+		let one = handler_of(name) else { continue; };
+		let held = made else {
+			made = one;
+			continue;
+		};
+		let several = group else {
+			let c = Composite.new();
+			c.add(held);
+			c.add(one);
+			made = c;
+			group = c;
+			continue;
+		};
+		several.add(one);
+	}
+	return made;
+}
+
+/// A new handler of that name, or `none` for a name that has none.
+fn handler_of(name: str) -> ?*lang.TraceHandler
+{
+	if text.equal(name, "leaks") {
+		return LeakTracker.new();
+	}
+	if text.equal(name, "profile") {
+		return Profiler.new();
+	}
+	if text.equal(name, "calls") {
+		return CallLogger.new();
+	}
+	if text.equal(name, "errors") {
+		return ErrorMonitor.new();
+	}
+	if text.equal(name, "threads") {
+		return ThreadMonitor.new();
+	}
+	if text.equal(name, "writes") {
+		return ChangeJournal.new();
+	}
+	io.eprint("anti.trace: ");
+	io.eprint(name);
+	io.eprint(" names no handler, which is one of leaks, profile, ");
+	io.eprintln("calls, errors, threads and writes");
+	return none;
+}
+
+/// The name of the class of `o`, or `?` where it has no descriptor.
+fn class_name(o: *Object) -> str
+{
+	let d = reflect.describe(o as *byte) else {
+		return "?";
+	};
+	return reflect.name(d);
+}
+
+/// Write `n` in decimal to standard error.
+fn eprint_int(n: int)
+{
+	/* A character literal is a Unicode scalar, so `-` and the digits
+	   stand here as their values. The NUL of the last byte ends the text
+	   that `from_c` reads. */
+	let digits: [24]byte = [0; 24];
+	let at = 23;
+	let rest = n;
+	if rest == 0 {
+		at -= 1;
+		digits[at] = 0x30;
+	}
+	while rest != 0 do {
+		let digit = rest % 10;
+		if digit < 0 {
+			digit = -digit;
+		}
+		at -= 1;
+		digits[at] = (0x30 + digit) as byte;
+		rest = rest / 10;
+	}
+	if n < 0 {
+		at -= 1;
+		digits[at] = 0x2D;
+	}
+	io.eprint(text.from_c(&digits[at]));
+}
+
+fixtures
+{
+	/// An error to stand for the object a hook takes. Its code and its
+	/// message are what an `ErrorMonitor` reads.
+	fn an_object() -> *lang.Error
+	{
+		return lang.Error.new(3, "a message");
+	}
+
+	/// One record of a field list, which the `changed` hook takes.
+	fn a_field(name: str) -> FieldDescriptor
+	{
+		return FieldDescriptor {
+			name: name,
+			offset: 0,
+			type_id: 0,
+			owned: 0,
+			descriptor: none,
+		};
+	}
+
+	/// A message of more bytes than an `ErrorMonitor` keeps.
+	fn a_long_message() -> str
+	{
+		return "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
+	}
+}
+
+tests
+{
+	fn leaks_counts_what_lived()
+	{
+		let o = an_object();
+		let watch = LeakTracker.new();
+		watch.created(o);
+		watch.created(o);
+		watch.copied(o, o);
+		watch.destroyed(o);
+		let made = watch.made();
+		let freed = watch.freed();
+		let live = watch.live();
+		assert(made == 3);
+		assert(freed == 1);
+		assert(live == 2);
+		delete(watch);
+		delete(o);
+	}
+
+	fn profile_counts_and_times_a_call()
+	{
+		let o = an_object();
+		let watch = Profiler.new();
+		watch.enter(o, "m.C.f");
+		watch.leave(o, "m.C.f");
+		watch.enter(o, "m.C.f");
+		watch.leave(o, "m.C.f");
+		let slots = watch.len();
+		let named = text.equal(watch.name(0), "m.C.f");
+		let runs = watch.calls("m.C.f");
+		let span = watch.nanoseconds("m.C.f");
+		let other = watch.calls("m.C.g");
+		assert(slots == 1);
+		assert(named);
+		assert(runs == 2);
+		assert(span >= 0);
+		assert(other == 0);
+		delete(watch);
+		delete(o);
+	}
+
+	fn profile_measures_the_outermost_call()
+	{
+		let o = an_object();
+		let watch = Profiler.new();
+		watch.enter(o, "m.C.f");
+		watch.enter(o, "m.C.f");
+		watch.leave(o, "m.C.f");
+		assert(watch.inside[0] == 1);
+		watch.leave(o, "m.C.f");
+		assert(watch.inside[0] == 0);
+		let runs = watch.calls("m.C.f");
+		let slots = watch.len();
+		assert(runs == 2);
+		assert(slots == 1);
+		delete(watch);
+		delete(o);
+	}
+
+	fn profile_counts_the_calls_it_had_no_slot_for()
+	{
+		let o = an_object();
+		let watch = Profiler.new();
+		let i = 0;
+		while i < PROFILE_SLOTS do {
+			watch.names[i] = "taken";
+			i += 1;
+		}
+		watch.count = PROFILE_SLOTS;
+		watch.enter(o, "m.C.f");
+		let over = watch.missed();
+		assert(over == 1);
+		delete(watch);
+		delete(o);
+	}
+
+	fn calls_takes_a_line_per_hook()
+	{
+		let o = an_object();
+		let watch = CallLogger.new();
+		watch.quiet(true);
+		watch.enter(o, "m.C.f");
+		watch.failed(o, "m.C.f", o);
+		watch.leave(o, "m.C.f");
+		let lines = watch.lines();
+		let depth = watch.depth.load();
+		assert(lines == 3);
+		assert(depth == 0);
+		delete(watch);
+		delete(o);
+	}
+
+	fn errors_keeps_the_last_failure()
+	{
+		let e = an_object();
+		let watch = ErrorMonitor.new();
+		watch.failed(e, "m.C.f", e);
+		let count = watch.failures();
+		let code = watch.last_code();
+		let said = text.equal(watch.last_message(), "a message");
+		let where = text.equal(watch.last_function(), "m.C.f");
+		assert(count == 1);
+		assert(code == 3);
+		assert(said);
+		assert(where);
+		delete(watch);
+		delete(e);
+	}
+
+	fn errors_cuts_a_long_message()
+	{
+		let e = lang.Error.new(9, a_long_message());
+		let watch = ErrorMonitor.new();
+		watch.failed(e, "m.C.g", e);
+		let code = watch.last_code();
+		let length = watch.last_message().len;
+		assert(code == 9);
+		assert(length == MESSAGE_BYTES - 1);
+		delete(watch);
+		delete(e);
+	}
+
+	fn threads_counts_the_jobs()
+	{
+		let o = an_object();
+		let watch = ThreadMonitor.new();
+		watch.dispatched(o);
+		watch.dispatched(o);
+		watch.joined(o);
+		let sent = watch.sent();
+		let taken = watch.taken();
+		let running = watch.running();
+		let peak = watch.peak();
+		assert(sent == 2);
+		assert(taken == 1);
+		assert(running == 1);
+		assert(peak == 2);
+		delete(watch);
+		delete(o);
+	}
+
+	fn journal_keeps_the_newest_first()
+	{
+		let o = an_object();
+		let watch = ChangeJournal.new();
+		let one = a_field("code");
+		let two = a_field("message");
+		watch.changed(o, &one);
+		watch.changed(o, &two);
+		let writes = watch.writes();
+		let held = watch.len();
+		let newest = text.equal(watch.field_of(0), "message");
+		let older = text.equal(watch.field_of(1), "code");
+		let whose = text.equal(watch.class_of(0), "Error");
+		let past = text.equal(watch.field_of(2), "");
+		assert(writes == 2);
+		assert(held == 2);
+		assert(newest);
+		assert(older);
+		assert(whose);
+		assert(past);
+		delete(watch);
+		delete(o);
+	}
+
+	fn journal_drops_the_oldest_write()
+	{
+		let o = an_object();
+		let watch = ChangeJournal.new();
+		let one = a_field("n");
+		let i = 0;
+		while i < JOURNAL_SLOTS + 4 do {
+			watch.changed(o, &one);
+			i += 1;
+		}
+		let writes = watch.writes();
+		let held = watch.len();
+		assert(writes == JOURNAL_SLOTS + 4);
+		assert(held == JOURNAL_SLOTS);
+		delete(watch);
+		delete(o);
+	}
+
+	fn composite_reaches_every_handler()
+	{
+		let o = an_object();
+		let group = Composite.new();
+		let leaks = LeakTracker.new();
+		let threads = ThreadMonitor.new();
+		let record = a_field("n");
+		group.add(leaks);
+		group.add(threads);
+		let held = group.len();
+		assert(held == 2);
+		group.created(o);
+		group.copied(o, o);
+		group.destroyed(o);
+		group.dispatched(o);
+		group.joined(o);
+		group.changed(o, &record);
+		let made = leaks.made();
+		let freed = leaks.freed();
+		let sent = threads.sent();
+		let taken = threads.taken();
+		assert(made == 2);
+		assert(freed == 1);
+		assert(sent == 1);
+		assert(taken == 1);
+		delete(group);
+		delete(o);
+	}
+
+	fn composite_leaves_every_handler()
+	{
+		let o = an_object();
+		let group = Composite.new();
+		let first = CallLogger.new();
+		let second = CallLogger.new();
+		first.quiet(true);
+		second.quiet(true);
+		group.add(first);
+		group.add(second);
+		group.enter(o, "m.C.f");
+		group.failed(o, "m.C.f", o);
+		group.leave(o, "m.C.f");
+		let one = first.lines();
+		let two = second.lines();
+		let left = first.depth.load() + second.depth.load();
+		assert(one == 3);
+		assert(two == 3);
+		assert(left == 0);
+		delete(group);
+		delete(o);
+	}
+
+	fn composite_refuses_one_handler_too_many()
+	{
+		let group = Composite.new();
+		let i = 0;
+		while i < COMPOSITE_SLOTS do {
+			let room = group.add(LeakTracker.new());
+			assert(room);
+			i += 1;
+		}
+		let over = LeakTracker.new();
+		let room = group.add(over);
+		let held = group.len();
+		assert(!room);
+		assert(held == COMPOSITE_SLOTS);
+		delete(over);
+		delete(group);
+	}
+
+	fn install_names_one_handler()
+	{
+		let watch = install("leaks") else {
+			assert(false);
+			return;
+		};
+		lang.Trace.install(none);
+		let leaks = watch is *LeakTracker;
+		assert(leaks);
+		delete(watch);
+	}
+
+	fn install_takes_a_list()
+	{
+		let watch = install("leaks,calls,threads") else {
+			assert(false);
+			return;
+		};
+		lang.Trace.install(none);
+		let many = watch is *Composite;
+		assert(many);
+		let group = watch as *Composite;
+		let held = group.len();
+		let first = group.at(0);
+		let last = group.at(2);
+		assert(held == 3);
+		assert(first != none);
+		assert(last != none);
+		delete(watch);
+	}
+
+	fn install_passes_over_a_name_no_handler_has()
+	{
+		let watch = install("nothing,leaks") else {
+			assert(false);
+			return;
+		};
+		lang.Trace.install(none);
+		let leaks = watch is *LeakTracker;
+		assert(leaks);
+		delete(watch);
+	}
+
+	fn install_takes_nothing_from_an_empty_key()
+	{
+		let watch = install("");
+		lang.Trace.install(none);
+		assert(watch == none);
+	}
+}

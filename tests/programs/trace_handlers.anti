@@ -1,0 +1,116 @@
+//! The handlers of `anti.trace` at the real hook sites.
+//!
+//! `trace.install` takes the names of the runtime key and gives the
+//! handler that `Trace.install` now holds. The five always-on hooks fire
+//! in every build, so `LeakTracker` and `ThreadMonitor` count in this
+//! program whatever the options are. The call hooks need tracing and the
+//! `changed` hook needs `--trace writes`, so `ErrorMonitor`, `Profiler`
+//! and `ChangeJournal` count nothing in a release build without them.
+
+import anti.lang;
+import anti.trace;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A class that asks for the call hooks.
+trace class Counter
+{
+	pub n: int = 0,
+
+	pub fn bump(self, by: int) -> int
+	{
+		self.n += by;
+		return self.n;
+	}
+
+	pub fn check(self, v: int) -> int may fail
+	{
+		if v < 0 {
+			fail lang.Error.new(7, "below zero");
+		}
+		return v;
+	}
+}
+
+worker fn read_counter(c: *Counter) -> int
+{
+	return c.n;
+}
+
+/// Print what each handler of the composite counted.
+fn report(watch: *lang.TraceHandler)
+{
+	let group = watch as *trace.Composite;
+	let first = group.at(0) else { return; };
+	let second = group.at(1) else { return; };
+	let third = group.at(2) else { return; };
+	let fourth = group.at(3) else { return; };
+	let fifth = group.at(4) else { return; };
+	let leaks = first as *trace.LeakTracker;
+	let threads = second as *trace.ThreadMonitor;
+	let errors = third as *trace.ErrorMonitor;
+	let journal = fourth as *trace.ChangeJournal;
+	let profile = fifth as *trace.Profiler;
+
+	let made = leaks.made();
+	let freed = leaks.freed();
+	let live = leaks.live();
+	printf("leaks %d %d %d\n".ptr, made as c_int, freed as c_int,
+		live as c_int);
+
+	let sent = threads.sent();
+	let taken = threads.taken();
+	let peak = threads.peak();
+	printf("threads %d %d %d\n".ptr, sent as c_int, taken as c_int,
+		peak as c_int);
+
+	let failures = errors.failures();
+	let code = errors.last_code();
+	let said = errors.last_message();
+	printf("errors %d %d %.*s\n".ptr, failures as c_int, code as c_int,
+		said.len as c_int, said.ptr);
+
+	let writes = journal.writes();
+	let held = journal.len();
+	let whose = journal.class_of(0);
+	let what = journal.field_of(0);
+	printf("journal %d %d %.*s %.*s\n".ptr, writes as c_int, held as c_int,
+		whose.len as c_int, whose.ptr, what.len as c_int, what.ptr);
+
+	let bumps = profile.calls("trace_handlers.Counter.bump");
+	let slots = profile.len();
+	printf("profile %d %d\n".ptr, bumps as c_int, slots as c_int);
+}
+
+fn main() -> int
+{
+	let watch = trace.install("leaks,threads,errors,writes,profile") else {
+		printf("no handler\n".ptr);
+		return 1;
+	};
+	let c = alloc Counter { n: 0 };
+	let first = c.bump(4);
+	let second = c.bump(3);
+	printf("bump %d %d\n".ptr, first as c_int, second as c_int);
+
+	let good = c.check(2) catch fatal;
+	printf("check %d\n".ptr, good as c_int);
+	let bad = c.check(-1) catch e {
+		printf("caught %d\n".ptr, e.code as c_int);
+		yield 0;
+	};
+	printf("bad %d\n".ptr, bad as c_int);
+
+	let copy = dup(c);
+	printf("copy %d\n".ptr, copy.n as c_int);
+
+	let job = dispatch c -> read_counter();
+	printf("job %d\n".ptr, join(job) as c_int);
+
+	delete(copy);
+	delete(c);
+	lang.Trace.install(none);
+	report(watch);
+	delete(watch);
+	return 0;
+}

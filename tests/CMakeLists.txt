@@ -405,10 +405,10 @@ add_test(NAME program_deserialize_dev
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_tests_properties(program_deserialize_dev PROPERTIES
     FIXTURES_REQUIRED mem_dev_object)
-# The hooks under the options that decide them. hooks.anti and
-# hook_trace.anti run above without options, which is release mode. The
-# five always-on hooks fire there and the call hooks do not, so each case
-# below names an expected file of its own.
+# The hooks under the options that decide them. hooks.anti,
+# hook_trace.anti and trace_handlers.anti run above without options,
+# which is release mode. The five always-on hooks fire there and the call
+# hooks do not, so each case below names an expected file of its own.
 #
 # The option --no-hooks drops every hook site, the always-on ones as
 # well. Bare --trace turns the code marked `trace` on. The value writes
@@ -417,7 +417,8 @@ set_tests_properties(program_deserialize_dev PROPERTIES
 foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
         "hook_trace|trace|--trace|hook_trace.trace.expected"
         "hook_trace|writes|--trace,--trace,writes|hook_trace.writes.expected"
-        "hook_trace|pattern|--trace,Quiet|hook_trace.pattern.expected")
+        "hook_trace|pattern|--trace,Quiet|hook_trace.pattern.expected"
+        "trace_handlers|traced|--trace,--trace,writes|trace_handlers.traced.expected")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 source)
     list(GET parts 1 case_name)
@@ -787,6 +788,18 @@ add_test(NAME anti_test
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test.cmake")
+
+# The `tests` block of a module of the standard library. The module
+# imports other modules, so the dev run links an object of each.
+add_test(NAME std_tests_trace
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DSTD=${CMAKE_SOURCE_DIR}/std"
+        "-DSOURCE=${ANTIC_STD_SOURCE_DIR}/trace.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-tests-trace"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_std_tests.cmake")
 
 add_test(NAME anti_sdk
     COMMAND "${CMAKE_COMMAND}" "-DANTI=$<TARGET_FILE:anti>"
