@@ -65,6 +65,7 @@ struct handling {
 struct try_scope {
     struct ir_block *handler;
     uint32_t error;             /* the temporary the error lands in */
+    const struct defers *defers_at; /* the scope around the `try` block */
     struct try_scope *outer;
 };
 
@@ -5866,10 +5867,15 @@ static void handle_error(struct lowerer *l, const struct expr *call,
     switch (h->kind) {
     case HANDLE_NONE:
     case HANDLE_ENCLOSING:
-        /* The `try` block around the call holds the one handler. */
+        /* The `try` block around the call holds the one handler. The
+           error leaves every block between the call and that handler,
+           and each runs its `undo` and `defer` statements on the way. */
         if (l->try_scope != NULL) {
             ir_assign(l->f, l->b, l->try_scope->error, err);
-            ir_jump(l->f, l->b, l->try_scope->handler);
+            run_defers_to(l, l->try_scope->defers_at, true);
+            if (l->b != NULL) {
+                ir_jump(l->f, l->b, l->try_scope->handler);
+            }
         } else {
             ir_jump(l->f, l->b, join);
         }
@@ -6441,6 +6447,7 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         scope.handler = handler;
         scope.error = ir_unary(l->f, l->b, IR_COPY, IR_PTR,
                                ir_int_op(IR_PTR, 0));
+        scope.defers_at = l->defers;
         scope.outer = l->try_scope;
         l->try_scope = &scope;
         lower_block(l, s->as.try_block.body);

@@ -1,6 +1,6 @@
 //! `sync m { }` unlocks m on every exit of its block: the closing brace,
-//! `return`, `break`, `continue`, `fail`, `try` and a handler that
-//! returns. A `sync` on the same mutex follows each case, and it would
+//! `return`, `break`, `continue`, `fail`, `try`, a handler that returns
+//! and the error that leaves for the handler of a `try` block. A `sync` on the same mutex follows each case, and it would
 //! wait for ever if the exit had left the mutex locked.
 
 import anti.lang;
@@ -81,6 +81,18 @@ fn by_handler(g: *Guarded) -> int
 	return g.n;
 }
 
+fn by_try_block(g: *Guarded) -> int
+{
+	try {
+		sync g.lock {
+			g.n += failing();
+		}
+	} catch e {
+		return -3;
+	}
+	return g.n;
+}
+
 /// The statements of a `defer` in the block run while the mutex is held.
 fn by_defer(g: *Guarded) -> int
 {
@@ -115,6 +127,8 @@ fn main() -> int
 	check(&g, "try");
 	printf("%d\n".ptr, by_handler(&g) as c_int);
 	check(&g, "a handler that returns");
+	printf("%d\n".ptr, by_try_block(&g) as c_int);
+	check(&g, "a try block");
 	printf("%d\n".ptr, by_defer(&g) as c_int);
 	check(&g, "a defer");
 	g.lock.destroy();

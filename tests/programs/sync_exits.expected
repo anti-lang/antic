@@ -10,5 +10,7 @@ unlocked after fail
 unlocked after try
 -1
 unlocked after a handler that returns
+-3
+unlocked after a try block
 8
 unlocked after a defer

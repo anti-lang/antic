@@ -1,0 +1,28 @@
+//! The first error in a `try` block leaves every block between the call
+//! and the handler. Each runs its `undo` and `defer` statements on the
+//! way out, the innermost block first, before the handler runs.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn failing() -> int may fail
+{
+	fail "inner";
+}
+
+fn main() -> int
+{
+	try {
+		defer printf("outer deferred\n".ptr);
+		{
+			defer printf("inner deferred\n".ptr);
+			undo printf("inner undone\n".ptr);
+			let n = failing();
+			printf("%d\n".ptr, n as c_int);
+		}
+	} catch e {
+		printf("handled\n".ptr);
+	}
+	return 0;
+}
