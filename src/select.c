@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "expand.h"
 #include "optimize.h"
 
 /* DESIGN: an IR temporary %n becomes the virtual register tn, so the
@@ -538,6 +539,9 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
         if (!layout_resolve(&layouts, m->functions[i], &resolved)) {
             layouts_free(&layouts);
             return false;
+        }
+        if (!m->functions[i]->is_extern && expand_function(m->functions[i])) {
+            resolved = true;
         }
         if (resolved && !m->functions[i]->is_extern) {
             ir_optimize_function(m->functions[i]);

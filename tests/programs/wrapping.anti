@@ -1,0 +1,65 @@
+//! The wrapping operators `+% -% *% <<%` give the result modulo 2^N in
+//! every build and never trap. Each one runs on values that the program
+//! reads at run time and again on constants. `<<%` gives 0 for a count
+//! at or above the width, and a negative count counts as one above it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A value the optimizer cannot see through.
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn line(name: str, v: int)
+{
+	printf("%s %lld\n".ptr, name.ptr, v);
+}
+
+fn uline(name: str, v: u64)
+{
+	printf("%s %llu\n".ptr, name.ptr, v);
+}
+
+const WRAP_U8: u8 = 250 +% 10;
+const WRAP_I8: i8 = -128 -% 1;
+const WRAP_MUL: u16 = 300 *% 300;
+const SHIFT_OUT: int = 1 <<% 64;
+const SHIFT_NEG: i32 = 1 <<% -1;
+const SHIFT_TOP: int = 1 <<% 63;
+
+fn main() -> int
+{
+	let max = opaque(9223372036854775807);
+	let min = opaque(-9223372036854775807 - 1);
+	let small = opaque(127) as i8;
+	let byte_max = opaque(255) as u8;
+	let big = opaque(65536) as i32;
+	let wide = opaque(300) as u16;
+	let one = opaque(1);
+	line("max +% 1", max +% 1);
+	line("min -% 1", min -% 1);
+	line("max *% 2", max *% 2);
+	line("small +% 1", (small +% 1) as int);
+	line("small *% 3", (small *% 3) as int);
+	uline("byte_max +% 1", (byte_max +% 1) as u64);
+	uline("0 -% byte_max", (0 -% byte_max) as u64);
+	line("big *% big", (big *% big) as int);
+	uline("wide *% wide", (wide *% wide) as u64);
+	line("one <<% 63", one <<% 63);
+	line("one <<% 64", one <<% opaque(64));
+	line("3 <<% 70", opaque(3) <<% opaque(70));
+	line("one <<% -1", one <<% opaque(-1));
+	line("i8 1 <<% 7", ((one as i8) <<% (opaque(7) as i8)) as int);
+	line("i8 1 <<% 8", ((one as i8) <<% (opaque(8) as i8)) as int);
+	uline("u8 0x81 <<% 1", ((opaque(0x81) as u8) <<% (one as u8)) as u64);
+	uline("u32 <<% 31", ((one as u32) <<% (opaque(31) as u32)) as u64);
+	uline("u32 <<% 32", ((one as u32) <<% (opaque(32) as u32)) as u64);
+	uline("const u8", WRAP_U8 as u64);
+	line("const i8", WRAP_I8 as int);
+	uline("const u16", WRAP_MUL as u64);
+	line("const out", SHIFT_OUT);
+	line("const neg", SHIFT_NEG as int);
+	line("const top", SHIFT_TOP);
+	return 0;
+}

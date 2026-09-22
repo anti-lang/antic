@@ -1,0 +1,116 @@
+//! The saturating operators `+| -| *|` clamp at the minimum or the maximum
+//! of the type, signed and unsigned, at every width. Each one runs on
+//! values that the program reads at run time and again on constants.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A value the optimizer cannot see through.
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn uopaque(n: u64) -> u64
+{
+	return n;
+}
+
+fn line(name: str, v: int)
+{
+	printf("%s %lld\n".ptr, name.ptr, v);
+}
+
+fn uline(name: str, v: u64)
+{
+	printf("%s %llu\n".ptr, name.ptr, v);
+}
+
+const SAT_U8: u8 = 200 +| 100;
+const SAT_I8: i8 = -100 -| 100;
+const SAT_MUL: i16 = -300 *| 300;
+const FITS: u8 = 20 +| 30;
+
+fn bytes()
+{
+	let a = opaque(200) as u8;
+	let b = opaque(100) as u8;
+	uline("u8 200 +| 100", (a +| b) as u64);
+	uline("u8 100 +| 100", (b +| b) as u64);
+	uline("u8 100 -| 200", (b -| a) as u64);
+	uline("u8 200 -| 100", (a -| b) as u64);
+	uline("u8 200 *| 100", (a *| b) as u64);
+	uline("u8 15 *| 17", ((opaque(15) as u8) *| (opaque(17) as u8)) as u64);
+	let p = opaque(100) as i8;
+	let n = opaque(-100) as i8;
+	line("i8 100 +| 100", (p +| p) as int);
+	line("i8 -100 +| -100", (n +| n) as int);
+	line("i8 -100 +| 100", (n +| p) as int);
+	line("i8 -100 -| 100", (n -| p) as int);
+	line("i8 100 -| -100", (p -| n) as int);
+	line("i8 100 *| 100", (p *| p) as int);
+	line("i8 -100 *| 100", (n *| p) as int);
+	line("i8 -100 *| -100", (n *| n) as int);
+	line("i8 3 *| -4", ((opaque(3) as i8) *| (opaque(-4) as i8)) as int);
+}
+
+fn halves()
+{
+	let a = opaque(60000) as u16;
+	let p = opaque(30000) as i16;
+	let n = opaque(-30000) as i16;
+	uline("u16 60000 +| 60000", (a +| a) as u64);
+	uline("u16 60000 *| 2", (a *| (opaque(2) as u16)) as u64);
+	line("i16 30000 +| 30000", (p +| p) as int);
+	line("i16 -30000 -| 30000", (n -| p) as int);
+	line("i16 -30000 *| 2", (n *| (opaque(2) as i16)) as int);
+}
+
+fn words()
+{
+	let a = opaque(4000000000) as u32;
+	let p = opaque(2000000000) as i32;
+	let n = opaque(-2000000000) as i32;
+	uline("u32 4e9 +| 4e9", (a +| a) as u64);
+	uline("u32 0 -| 4e9", ((opaque(0) as u32) -| a) as u64);
+	uline("u32 4e9 *| 4e9", (a *| a) as u64);
+	line("i32 2e9 +| 2e9", (p +| p) as int);
+	line("i32 -2e9 +| -2e9", (n +| n) as int);
+	line("i32 -2e9 -| 2e9", (n -| p) as int);
+	line("i32 2e9 *| -2e9", (p *| n) as int);
+	line("i32 -2e9 *| -2e9", (n *| n) as int);
+	line("i32 -7 *| 6", ((opaque(-7) as i32) *| (opaque(6) as i32)) as int);
+}
+
+fn longs()
+{
+	let max = opaque(9223372036854775807);
+	let min = opaque(-9223372036854775807 - 1);
+	let big = opaque(4294967296);
+	let umax = uopaque(18446744073709551615);
+	let ubig = uopaque(4294967296);
+	line("i64 max +| 1", max +| opaque(1));
+	line("i64 min -| 1", min -| opaque(1));
+	line("i64 min +| max", min +| max);
+	line("i64 big *| big", big *| big);
+	line("i64 -big *| big", (0 - big) *| big);
+	line("i64 min *| -1", min *| opaque(-1));
+	line("i64 min *| 1", min *| opaque(1));
+	line("i64 -1 *| -1", opaque(-1) *| opaque(-1));
+	uline("u64 max +| 1", umax +| uopaque(1));
+	uline("u64 0 -| 1", uopaque(0) -| uopaque(1));
+	uline("u64 big *| big", ubig *| ubig);
+	uline("u64 big *| 3", ubig *| uopaque(3));
+}
+
+fn main() -> int
+{
+	bytes();
+	halves();
+	words();
+	longs();
+	uline("const u8", SAT_U8 as u64);
+	line("const i8", SAT_I8 as int);
+	line("const i16", SAT_MUL as int);
+	uline("const fits", FITS as u64);
+	return 0;
+}

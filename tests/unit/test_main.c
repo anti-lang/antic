@@ -31,6 +31,7 @@ void test_struct(void);
 void test_utf(void);
 void test_whole(void);
 void test_sha256(void);
+void test_arith(void);
 void test_symbols(void);
 void test_float_read(void);
 void test_coff(void);
@@ -65,6 +66,7 @@ int main(void)
     test_utf();
     test_whole();
     test_sha256();
+    test_arith();
     test_symbols();
     test_float_read();
     test_coff();

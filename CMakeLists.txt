@@ -113,6 +113,7 @@ set(ANTIC_HOST_TARGET "${ANTIC_HOST_OS}-${ANTIC_HOST_CPU}")
 add_library(antic_core STATIC
     src/antl.c
     src/applesdk.c
+    src/arith.c
     src/arm64.c
     src/coff.c
     src/arena.c
@@ -122,6 +123,7 @@ add_library(antic_core STATIC
     src/diagnostic.c
     src/driver.c
     src/emit.c
+    src/expand.c
     src/header.c
     src/ir.c
     src/ir_print.c

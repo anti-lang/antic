@@ -127,6 +127,9 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
     /* An overflow operation gives the result of the arithmetic, and
        IR_BRANCH_OV reads whether it left the range. */
     case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV:
+    case IR_MULH_S: case IR_MULH_U: case IR_ADD_SAT_S: case IR_ADD_SAT_U:
+    case IR_SUB_SAT_S: case IR_SUB_SAT_U: case IR_MUL_SAT_S:
+    case IR_MUL_SAT_U:
         same_type(v, inst, &inst->a, inst->type);
         same_type(v, inst, &inst->b, inst->type);
         break;

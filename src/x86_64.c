@@ -26,7 +26,7 @@ enum x64_op {
     X64_CVTSI2S, X64_CVTTS2SI, X64_CVTS2S, X64_MOVQX, X64_XORP, X64_ANDP,
     X64_ANDNP, X64_ORP, X64_MOVUPS, X64_CMOV, X64_MOVL, X64_SEH_PUSHREG,
     X64_SEH_STACKALLOC, X64_SEH_SAVEREG, X64_SEH_SAVEXMM, X64_SEH_ENDPROLOGUE,
-    X64_CVTPH2PS, X64_CVTPS2PH
+    X64_CVTPH2PS, X64_CVTPS2PH, X64_IMUL1, X64_MUL1
 };
 
 #define USE ROLE_USE
@@ -98,6 +98,10 @@ static const struct mach_opcode opcodes[] = {
        MXCSR, as every other conversion does. */
     [X64_CVTPH2PS] = {"vcvtph2ps", {DEF, USE}, 0},
     [X64_CVTPS2PH] = {"vcvtps2ph", {DEF, USE, 0}, 0},
+    /* The one-operand multiplies, which leave the full product of rax and
+       their operand in rdx and rax. */
+    [X64_IMUL1] = {"imul", {USE}, 0},
+    [X64_MUL1] = {"mul", {USE}, 0},
 };
 
 #define BIT(r) ((uint64_t)1 << (r))
@@ -445,6 +449,56 @@ static void emit_div(struct selector *s, const struct ir_inst *inst)
     div->uses = BIT(RAX) | BIT(RDX);
     div->defs = BIT(RAX) | BIT(RDX);
     move(s, r, mach_preg(remainder ? RDX : RAX, r.width));
+}
+
+/* A 32-bit value to the 64-bit register dst, extended by is_signed. A
+   32-bit move clears the upper half, and movslq extends the sign. */
+static void widen_32(struct selector *s, struct mach_operand dst,
+                     const struct ir_operand *value, bool is_signed)
+{
+    if (value->kind == IR_INT) {
+        load(s, dst, is_signed ? (uint64_t)signed_value(value->as.integer, 32)
+                               : value->as.integer & 0xffffffff);
+    } else if (is_signed) {
+        emit2(s, X64_MOVSX, dst, select_reg(s, value));
+    } else {
+        emit2(s, X64_MOVL, widened(dst, 32), select_reg(s, value));
+    }
+}
+
+/* DESIGN: the upper half of a 64-bit product comes from the one-operand
+   imul or mul, which leave the whole product in rdx and rax. A narrower
+   product is exact in a register twice as wide, or in 32 bits for 8 and
+   16, and its upper half is a shift away. */
+static void emit_mul_high(struct selector *s, const struct ir_inst *inst)
+{
+    bool is_signed = inst->op == IR_MULH_S;
+    struct mach_operand r = select_result(s, inst);
+    struct mach_operand a;
+    struct mach_operand b;
+    struct mach_inst *mul;
+
+    if (r.width == 64) {
+        b = select_reg(s, &inst->b);
+        extend_into(s, mach_preg(RAX, 64), &inst->a, is_signed);
+        mul = emit1(s, is_signed ? X64_IMUL1 : X64_MUL1, b);
+        mul->uses = BIT(RAX);
+        mul->defs = BIT(RAX) | BIT(RDX);
+        move(s, r, mach_preg(RDX, 64));
+        return;
+    }
+    a = select_new_vreg(s, r.width == 32 ? 64 : 32);
+    b = select_new_vreg(s, a.width);
+    if (r.width == 32) {
+        widen_32(s, a, &inst->a, is_signed);
+        widen_32(s, b, &inst->b, is_signed);
+    } else {
+        extend_into(s, a, &inst->a, is_signed);
+        extend_into(s, b, &inst->b, is_signed);
+    }
+    emit2(s, X64_IMUL, a, b);
+    emit2(s, is_signed ? X64_SAR : X64_SHR, a, mach_imm(r.width));
+    move(s, r, widened(a, r.width));
 }
 
 /* A variable shift count must be in cl. */
@@ -1606,6 +1660,8 @@ static const struct pattern patterns[] = {
     {IR_SUB_OV, NULL, emit_overflow},
     {IR_MUL_OV, NULL, emit_overflow},
     {IR_BRANCH_OV, NULL, emit_branch_ov},
+    {IR_MULH_S, match_arith, emit_mul_high},
+    {IR_MULH_U, match_arith, emit_mul_high},
 };
 
 /* Printing in AT&T syntax: the source comes before the destination, a

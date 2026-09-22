@@ -574,6 +574,39 @@ void test_sema(void)
             "const INF: f64 = 1.0 / 0.0;\n"
             "const LAST: i8 = -127 / -1;\n"
             "const ALMOST: u8 = 255.9 as u8;");
+    /* The wrapping and saturating operators take two integers of one
+       type. `<<%` has a value for every count, so a constant count at
+       or above the width is no error. */
+    accepts("fn f(a: u8, b: u8, n: int) -> u8 {\n"
+            "    let x = 1 <<% n;\n"
+            "    return a +% b -% a *% b +| a -| b *| (a <<% b);\n"
+            "}\n"
+            "const Z: int = 1 <<% 64;\n"
+            "const N: i32 = 1 <<% -1;\n"
+            "const S: u8 = 200 +| 100;");
+    rejects("fn f(a: f64) -> f64 { return a +% a; }", 1, 30,
+            "`+%` needs integer operands, found `float`");
+    rejects("fn f(a: f32) -> f32 { return a *| a; }", 1, 30,
+            "`*|` needs integer operands, found `f32`");
+    rejects("fn f(a: u8, b: i8) -> u8 { return a +| b; }", 1, 35,
+            "the operands of `+|` have the types `byte` and `i8`");
+    rejects("fn f(a: bool) -> bool { return a <<% a; }", 1, 32,
+            "`<<%` needs integer operands, found `bool`");
+    /* `mul_high` is a built-in of two integers of one type. A function
+       of that name in the module wins over it. */
+    accepts("fn f(a: u64, b: u64, c: i8) -> u64 {\n"
+            "    let h = mul_high(c, c);\n"
+            "    return mul_high(a, b);\n"
+            "}\n"
+            "const H: u64 = mul_high(1 << 40, 1 << 40);");
+    rejects("fn f(a: u64) -> u64 { return mul_high(a); }", 1, 30,
+            "`mul_high` takes 2 arguments, found 1");
+    rejects("fn f(a: f64) -> f64 { return mul_high(a, a); }", 1, 30,
+            "`mul_high` needs integer operands, found `float`");
+    rejects("fn f(a: u64, b: u32) -> u64 { return mul_high(a, b); }", 1, 38,
+            "the operands of `mul_high` have the types `u64` and `u32`");
+    accepts("fn mul_high(a: int) -> int { return a; }\n"
+            "fn f() -> int { return mul_high(3); }");
     rejects("const X: int = 1;\nfn f() -> *int { return &X; }", 2, 26,
             "a constant has no address");
     accepts("const GRID: [3]int = [1, 2, 3];\n"

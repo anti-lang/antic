@@ -107,6 +107,14 @@ enum ir_op {
        end emits one instruction where it sets the overflow flag, and a
        multiply into twice the width where none does. */
     IR_ADD_OV, IR_SUB_OV, IR_MUL_OV,
+    /* result = op a, b: the upper half of the full product, signed or
+       unsigned. */
+    IR_MULH_S, IR_MULH_U,
+    /* result = op a, b: the operation clamped at the minimum or the
+       maximum of the type, signed or unsigned. The back end expands each
+       into plain operations once it knows the width. */
+    IR_ADD_SAT_S, IR_ADD_SAT_U, IR_SUB_SAT_S, IR_SUB_SAT_U, IR_MUL_SAT_S,
+    IR_MUL_SAT_U,
     /* result = op a, with the result type named by the instruction */
     IR_TRUNC, IR_SEXT, IR_ZEXT, IR_SITOF, IR_UITOF, IR_FTOSI, IR_FTOUI,
     IR_FEXT, IR_FTRUNC,

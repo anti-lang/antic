@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "../rt/f16.h"
+#include "arith.h"
 
 /* DESIGN: one pass over the syntax tree per module, after every
    module-level name is declared, so an item can be used before its
@@ -1300,12 +1301,15 @@ static bool binary_operands(struct checker *c, struct expr *e,
     return !is_error(*left) && !is_error(*right);
 }
 
-/* Copy the spelling of an operator without its backticks into buffer. */
-static const char *op_text(enum token_kind op, char buffer[8])
+/* Copy the spelling of an operator without its backticks into buffer.
+   The longest is `mul_high`. */
+#define OP_TEXT 16
+
+static const char *op_text(enum token_kind op, char buffer[OP_TEXT])
 {
     const char *quoted = token_kind_name(op);
 
-    snprintf(buffer, 8, "%.*s", (int)(strlen(quoted) - 2), quoted + 1);
+    snprintf(buffer, OP_TEXT, "%.*s", (int)(strlen(quoted) - 2), quoted + 1);
     return buffer;
 }
 
@@ -1775,7 +1779,7 @@ static struct type *check_binary(struct checker *c, struct expr *e,
     enum token_kind op = e->as.binary.op;
     struct type *left;
     struct type *right;
-    char spelling[8];
+    char spelling[OP_TEXT];
     const char *o = op_text(op, spelling);
     const char *called = operator_name(op);
 
@@ -3372,6 +3376,36 @@ static struct type *check_construct(struct checker *c, struct expr *e,
     return handled_result(c, e, fn);
 }
 
+/* DESIGN: `mul_high(a, b)` is a built-in, and a function or a local of
+   that name wins over it, as a class named `Object` does. The call
+   becomes a binary expression, so the rules of an operator hold for it:
+   two operands of one integer type, constants, and the lowering. */
+static struct type *check_mul_high(struct checker *c, struct expr *e,
+                                   struct type *expected)
+{
+    struct expr *a;
+    struct expr *b;
+
+    if (e->as.call.arg_count != 2) {
+        error_at(c, e->pos, "`" MUL_HIGH "` takes 2 arguments, found %d",
+                 (int)e->as.call.arg_count);
+        return builtin(c, TYPE_ERROR);
+    }
+    if (e->as.call.handler.kind != HANDLE_NONE) {
+        error_at(c, e->as.call.handler.pos,
+                 "this call cannot fail, so it has no error to handle");
+        return builtin(c, TYPE_ERROR);
+    }
+    a = e->as.call.args[0];
+    b = e->as.call.args[1];
+    e->kind = EXPR_BINARY;
+    memset(&e->as, 0, sizeof e->as);
+    e->as.binary.op = TOKEN_MUL_HIGH;
+    e->as.binary.left = a;
+    e->as.binary.right = b;
+    return check_binary(c, e, expected);
+}
+
 static struct type *check_call(struct checker *c, struct expr *e,
                                struct type *expected)
 {
@@ -3389,6 +3423,10 @@ static struct type *check_call(struct checker *c, struct expr *e,
     /* An operation on an atomic field becomes one node of its own. */
     if (atomic_call(c, e, &fn)) {
         return fn;
+    }
+    if (callee->kind == EXPR_NAME && name_is(&callee->as.name, MUL_HIGH) &&
+        lookup(c, &callee->as.name) == NULL) {
+        return check_mul_high(c, e, expected);
     }
     if (callee->kind == EXPR_FIELD && (module = qualifier(c, callee)) != NULL) {
         fn = check_qualified(c, callee, module, true);
@@ -5227,7 +5265,7 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
 {
     struct text x = {0};
     struct text y = {0};
-    char spelling[8];
+    char spelling[OP_TEXT];
     bool found = false;
 
     if (e->kind == EXPR_CAST) {
@@ -5467,6 +5505,13 @@ static bool eval_const(struct checker *c, struct expr *e,
         if (reports_undefined(c, e, e->type, &a, &b)) {
             return false;
         }
+        /* The upper half of a product of c_long has another value at
+           each width, and no symbolic value carries the signedness of
+           c_wchar. */
+        if (op == TOKEN_MUL_HIGH && type_is_target_sized(operand)) {
+            return fail_const(c, e, "`" MUL_HIGH "` of a type whose width "
+                              "the target decides");
+        }
         if (a.kind == CONST_SYMBOLIC || b.kind == CONST_SYMBOLIC) {
             out->type = e->type;
             return symbolic_value(c, out, SYMBOLIC_BINARY, op, &a, &b);
@@ -5517,9 +5562,42 @@ static bool eval_const(struct checker *c, struct expr *e,
             return true;
         }
         switch (op) {
-        case TOKEN_PLUS: out->as.integer = a.as.integer + b.as.integer; break;
-        case TOKEN_MINUS: out->as.integer = a.as.integer - b.as.integer; break;
-        case TOKEN_STAR: out->as.integer = a.as.integer * b.as.integer; break;
+        case TOKEN_PLUS:
+        case TOKEN_PLUS_WRAP:
+            out->as.integer = a.as.integer + b.as.integer;
+            break;
+        case TOKEN_MINUS:
+        case TOKEN_MINUS_WRAP:
+            out->as.integer = a.as.integer - b.as.integer;
+            break;
+        case TOKEN_STAR:
+        case TOKEN_STAR_WRAP:
+            out->as.integer = a.as.integer * b.as.integer;
+            break;
+        /* A count at or above the width gives 0, and a negative count
+           holds its sign in the bits above, which makes it one. A
+           target-sized type computes at 64 bits and must fit the narrower
+           width, as every constant of it does. */
+        case TOKEN_SHL_WRAP:
+            out->as.integer =
+                b.as.integer >= (uint64_t)(type_is_target_sized(operand)
+                                               ? 64
+                                               : bits)
+                    ? 0
+                    : a.as.integer << b.as.integer;
+            break;
+        case TOKEN_PLUS_SAT:
+        case TOKEN_MINUS_SAT:
+        case TOKEN_STAR_SAT:
+            out->as.integer = arith_saturate(
+                op == TOKEN_PLUS_SAT ? '+' : op == TOKEN_MINUS_SAT ? '-' : '*',
+                a.as.integer, b.as.integer,
+                type_is_target_sized(operand) ? 64 : bits, is_signed);
+            break;
+        case TOKEN_MUL_HIGH:
+            out->as.integer =
+                arith_mul_high(a.as.integer, b.as.integer, bits, is_signed);
+            break;
         case TOKEN_AMP: out->as.integer = a.as.integer & b.as.integer; break;
         case TOKEN_PIPE: out->as.integer = a.as.integer | b.as.integer; break;
         case TOKEN_CARET: out->as.integer = a.as.integer ^ b.as.integer; break;
@@ -6064,7 +6142,7 @@ static void check_assign(struct checker *c, struct stmt *s)
          op == TOKEN_STAR_ASSIGN || op == TOKEN_SLASH_ASSIGN)
             ? !type_is_numeric(t)
             : !type_is_integer(t)) {
-        char spelling[8];
+        char spelling[OP_TEXT];
         error_at(c, s->pos, "`%s` does not apply to `%s`",
                  op_text(op, spelling), tn(t));
     }

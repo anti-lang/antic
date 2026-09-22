@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arith.h"
+
 enum { UNSEEN, BUSY, DONE };
 
 static void *allocate(size_t count, size_t size)
@@ -369,6 +371,24 @@ static bool fold_op(struct layouts *l, const struct ir_sym *s,
     case IR_TRUNC:
     case IR_ZEXT: *out = trim(type, a); break;
     case IR_SEXT: *out = (uint64_t)signed_value(type, a); break;
+    case IR_MULH_S:
+    case IR_MULH_U:
+        *out = arith_mul_high(a, b, bits(type), s->op == IR_MULH_S);
+        break;
+    case IR_ADD_SAT_S:
+    case IR_ADD_SAT_U:
+    case IR_SUB_SAT_S:
+    case IR_SUB_SAT_U:
+    case IR_MUL_SAT_S:
+    case IR_MUL_SAT_U:
+        *out = arith_saturate(
+            s->op == IR_ADD_SAT_S || s->op == IR_ADD_SAT_U   ? '+'
+            : s->op == IR_SUB_SAT_S || s->op == IR_SUB_SAT_U ? '-'
+                                                             : '*',
+            a, b, bits(type),
+            s->op == IR_ADD_SAT_S || s->op == IR_SUB_SAT_S ||
+                s->op == IR_MUL_SAT_S);
+        break;
     default:
         fail(l, "a size expression uses `%s`, which does not fold",
              ir_op_name((enum ir_op)s->op));
@@ -629,6 +649,10 @@ static enum ir_op signed_op(enum ir_op op)
     case IR_ZEXT: return IR_SEXT;
     case IR_UITOF: return IR_SITOF;
     case IR_FTOUI: return IR_FTOSI;
+    case IR_MULH_U: return IR_MULH_S;
+    case IR_ADD_SAT_U: return IR_ADD_SAT_S;
+    case IR_SUB_SAT_U: return IR_SUB_SAT_S;
+    case IR_MUL_SAT_U: return IR_MUL_SAT_S;
     default: return op;
     }
 }

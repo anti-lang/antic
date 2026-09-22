@@ -165,6 +165,14 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_CARET_ASSIGN] = {"^=", CAT_SYMBOL},
     [TOKEN_SHL_ASSIGN] = {"<<=", CAT_SYMBOL},
     [TOKEN_SHR_ASSIGN] = {">>=", CAT_SYMBOL},
+    [TOKEN_PLUS_WRAP] = {"+%", CAT_SYMBOL},
+    [TOKEN_MINUS_WRAP] = {"-%", CAT_SYMBOL},
+    [TOKEN_STAR_WRAP] = {"*%", CAT_SYMBOL},
+    [TOKEN_SHL_WRAP] = {"<<%", CAT_SYMBOL},
+    [TOKEN_PLUS_SAT] = {"+|", CAT_SYMBOL},
+    [TOKEN_MINUS_SAT] = {"-|", CAT_SYMBOL},
+    [TOKEN_STAR_SAT] = {"*|", CAT_SYMBOL},
+    [TOKEN_MUL_HIGH] = {MUL_HIGH, CAT_OTHER},
 };
 
 /* The words chapter 2 reserves for threads and does not use yet. They lex

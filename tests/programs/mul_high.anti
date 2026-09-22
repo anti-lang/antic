@@ -1,0 +1,61 @@
+//! `mul_high(a, b)` gives the upper half of the full product of two
+//! integers of one type, signed or unsigned by the type, at every width.
+//! Each case runs on values that the program reads at run time, and the
+//! constants fold the same product.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A value the optimizer cannot see through.
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn uopaque(n: u64) -> u64
+{
+	return n;
+}
+
+fn line(name: str, v: int)
+{
+	printf("%s %lld\n".ptr, name.ptr, v);
+}
+
+fn uline(name: str, v: u64)
+{
+	printf("%s %llu\n".ptr, name.ptr, v);
+}
+
+const HIGH: u64 = mul_high(1 << 40, 1 << 40);
+const SIGNED: i8 = mul_high(-128, 127);
+
+fn main() -> int
+{
+	let umax = uopaque(18446744073709551615);
+	let min = opaque(-9223372036854775807 - 1);
+	uline("u64 2^63 * 4", mul_high(uopaque(9223372036854775808), uopaque(4)));
+	uline("u64 max * max", mul_high(umax, umax));
+	uline("u64 max * 1", mul_high(umax, uopaque(1)));
+	line("i64 -1 * 1", mul_high(opaque(-1), opaque(1)));
+	line("i64 min * min", mul_high(min, min));
+	line("i64 min * -1", mul_high(min, opaque(-1)));
+	line("i64 2^40 * -2^40", mul_high(opaque(1099511627776),
+	                                  opaque(-1099511627776)));
+	uline("u32 max * 2", mul_high(uopaque(4294967295) as u32,
+	                             uopaque(2) as u32) as u64);
+	line("i32 -2 * 3", mul_high(opaque(-2) as i32, opaque(3) as i32) as int);
+	line("i32 min * min", mul_high(opaque(-2147483648) as i32,
+	                               opaque(-2147483648) as i32) as int);
+	uline("u16 60000 * 60000", mul_high(uopaque(60000) as u16,
+	                                   uopaque(60000) as u16) as u64);
+	line("i16 -300 * 300", mul_high(opaque(-300) as i16,
+	                                opaque(300) as i16) as int);
+	uline("u8 200 * 200", mul_high(uopaque(200) as u8,
+	                              uopaque(200) as u8) as u64);
+	line("i8 -128 * 127", mul_high(opaque(-128) as i8,
+	                               opaque(127) as i8) as int);
+	line("i8 5 * 6", mul_high(opaque(5) as i8, opaque(6) as i8) as int);
+	uline("const u64", HIGH);
+	line("const i8", SIGNED as int);
+	return 0;
+}

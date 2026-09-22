@@ -21,7 +21,7 @@ enum {
 
 enum a64_op {
     A64_MOV, A64_MOVZ, A64_MOVK, A64_ADD, A64_SUB, A64_MUL, A64_AND,
-    A64_ADDS, A64_SUBS, A64_SMULL, A64_SMULH,
+    A64_ADDS, A64_SUBS, A64_SMULL, A64_SMULH, A64_UMULL, A64_UMULH,
     A64_ORR, A64_EOR, A64_NEG, A64_MVN, A64_CMP, A64_CSET, A64_B, A64_BCOND,
     A64_CBZ, A64_CBNZ, A64_BL, A64_BLR, A64_LDRGOT, A64_RET, A64_LDR, A64_STR, A64_STP, A64_LDP,
     A64_CMN, A64_SXTB, A64_SXTH, A64_SXTW, A64_UXTB, A64_UXTH, A64_SDIV,
@@ -49,6 +49,8 @@ static const struct mach_opcode opcodes[] = {
     [A64_SUBS] = {"subs", {DEF, USE, USE}, 0},
     [A64_SMULL] = {"smull", {DEF, USE, USE}, 0},
     [A64_SMULH] = {"smulh", {DEF, USE, USE}, 0},
+    [A64_UMULL] = {"umull", {DEF, USE, USE}, 0},
+    [A64_UMULH] = {"umulh", {DEF, USE, USE}, 0},
     [A64_AND] = {"and", {DEF, USE, USE}, 0},
     [A64_ORR] = {"orr", {DEF, USE, USE}, 0},
     [A64_EOR] = {"eor", {DEF, USE, USE}, 0},
@@ -998,6 +1000,37 @@ static void emit_overflow(struct selector *s, const struct ir_inst *inst)
     emit2(s, A64_CMP, high, back);
 }
 
+/* DESIGN: smulh and umulh give the upper half of a 64-bit product.
+   smull and umull hold the whole product of two 32-bit values, and the
+   upper half is a shift away. Values of 8 and 16 bits extend to 32 bits,
+   where their product is exact, and shift the same way. */
+static void emit_mul_high(struct selector *s, const struct ir_inst *inst)
+{
+    bool is_signed = inst->op == IR_MULH_S;
+    uint8_t n = bits(inst->type);
+    struct mach_operand r = select_result(s, inst);
+    struct mach_operand a;
+    struct mach_operand b;
+    struct mach_operand wide;
+
+    if (n == 64) {
+        a = select_reg(s, &inst->a);
+        emit3(s, is_signed ? A64_SMULH : A64_UMULH, r, a,
+              select_reg(s, &inst->b));
+        return;
+    }
+    a = extended(s, &inst->a, is_signed);
+    b = extended(s, &inst->b, is_signed);
+    wide = select_new_vreg(s, n == 32 ? 64 : 32);
+    if (n == 32) {
+        emit3(s, is_signed ? A64_SMULL : A64_UMULL, wide, a, b);
+    } else {
+        emit3(s, A64_MUL, wide, a, b);
+    }
+    emit3(s, is_signed ? A64_ASR : A64_LSR, wide, wide, mach_imm(n));
+    move(s, r, widened(wide, 32));
+}
+
 static void jump(struct selector *s, const struct ir_operand *target)
 {
     struct mach_operand b = block(target);
@@ -1551,6 +1584,8 @@ static const struct pattern patterns[] = {
     {IR_SUB_OV, NULL, emit_overflow},
     {IR_MUL_OV, NULL, emit_overflow},
     {IR_BRANCH_OV, NULL, emit_branch_ov},
+    {IR_MULH_S, match_arith, emit_mul_high},
+    {IR_MULH_U, match_arith, emit_mul_high},
 };
 
 /* Printing */

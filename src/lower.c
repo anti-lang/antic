@@ -3231,6 +3231,13 @@ static enum ir_op binary_op(enum token_kind op, const struct type *t)
     case TOKEN_CARET: return IR_XOR;
     case TOKEN_SHL: return IR_SHL;
     case TOKEN_SHR: return is_signed ? IR_SHR_S : IR_SHR_U;
+    case TOKEN_PLUS_WRAP: return IR_ADD;
+    case TOKEN_MINUS_WRAP: return IR_SUB;
+    case TOKEN_STAR_WRAP: return IR_MUL;
+    case TOKEN_PLUS_SAT: return is_signed ? IR_ADD_SAT_S : IR_ADD_SAT_U;
+    case TOKEN_MINUS_SAT: return is_signed ? IR_SUB_SAT_S : IR_SUB_SAT_U;
+    case TOKEN_STAR_SAT: return is_signed ? IR_MUL_SAT_S : IR_MUL_SAT_U;
+    case TOKEN_MUL_HIGH: return is_signed ? IR_MULH_S : IR_MULH_U;
     case TOKEN_EQ: return is_float ? IR_FEQ : IR_EQ;
     case TOKEN_NE: return is_float ? IR_FNE : IR_NE;
     case TOKEN_LT: return is_float ? IR_FLT : is_signed ? IR_SLT : IR_ULT;
@@ -3371,6 +3378,38 @@ static struct ir_operand object_of(struct lowerer *l, struct ir_operand p)
                            &p, 1));
 }
 
+/* A bool of 0 or 1 as a value of type, which is itself for an i8. */
+static struct ir_operand bool_as(struct lowerer *l, struct ir_operand v,
+                                 enum ir_type type)
+{
+    return type == IR_I8 ? v : temp(l, ir_unary(l->f, l->b, IR_ZEXT, type, v));
+}
+
+/* DESIGN: `a <<% n` is the shift where the count is below the width and
+   0 elsewhere. The count widens to 64 bits by its signedness and compares
+   unsigned against the width, as the dev-mode check of `<<` does. A
+   negative count therefore counts as one above it. The comparison becomes
+   a mask of all ones or of zero, so no branch is taken. A constant count
+   in the width leaves the shift alone after folding. */
+static struct ir_operand shift_wrap(struct lowerer *l, const struct type *t,
+                                    struct ir_operand value,
+                                    struct ir_operand count)
+{
+    enum ir_type type = ir_type_of(t);
+    struct ir_operand wide = widen_operand(l, count, t);
+    struct ir_operand width =
+        temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64, size_operand(l, t),
+                          ir_int_op(IR_I64, 8)));
+    struct ir_operand inside =
+        temp(l, ir_binary(l->f, l->b, IR_ULT, IR_I8, wide, width));
+    struct ir_operand shifted =
+        temp(l, ir_binary(l->f, l->b, IR_SHL, type, value, count));
+    struct ir_operand one = bool_as(l, inside, type);
+    struct ir_operand mask = temp(l, ir_unary(l->f, l->b, IR_NEG, type, one));
+
+    return temp(l, ir_binary(l->f, l->b, IR_AND, type, shifted, mask));
+}
+
 static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
 {
     enum token_kind op = e->as.binary.op;
@@ -3396,6 +3435,9 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     if (identity) {
         left = object_of(l, left);
         right = object_of(l, right);
+    }
+    if (op == TOKEN_SHL_WRAP) {
+        return shift_wrap(l, operands, left, right);
     }
     checked = binary_checks(l, op, operands, left, right, e->pos.line);
     if (checked.kind != IR_NONE) {
@@ -3819,6 +3861,25 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
 
 /* The IR form of a symbolic value: the operations of lower_binary and
    lower_cast on symbolic operands. */
+/* `a <<% n` of symbolic values, with the mask of shift_wrap. */
+static uint32_t shift_wrap_sym(struct lowerer *l, const struct symbolic *s,
+                               uint32_t value, uint32_t count)
+{
+    enum ir_type type = ir_type_of(s->type);
+    uint32_t wide = ir_sym_op(l->m, type_is_signed(s->b->type) ? IR_SEXT
+                                                                : IR_ZEXT,
+                              IR_I64, count, IR_NO_AGG);
+    uint32_t size = ir_sym_size_of(l->m, vtype_of(l, s->type));
+    uint32_t width =
+        ir_sym_op(l->m, IR_MUL, IR_I64, size, ir_sym_int(l->m, IR_I64, 8));
+    uint32_t inside = ir_sym_op(l->m, IR_ULT, IR_I8, wide, width);
+    uint32_t shifted = ir_sym_op(l->m, IR_SHL, type, value, count);
+    uint32_t one = ir_sym_op(l->m, IR_ZEXT, type, inside, IR_NO_AGG);
+    uint32_t mask = ir_sym_op(l->m, IR_NEG, type, one, IR_NO_AGG);
+
+    return ir_sym_op(l->m, IR_AND, type, shifted, mask);
+}
+
 static uint32_t sym_of(struct lowerer *l, const struct symbolic *s)
 {
     enum ir_type type = ir_type_of(s->type);
@@ -3839,6 +3900,9 @@ static uint32_t sym_of(struct lowerer *l, const struct symbolic *s)
                          IR_NO_AGG);
     case SYMBOLIC_BINARY:
         a = sym_of(l, s->a);
+        if (s->op == TOKEN_SHL_WRAP) {
+            return shift_wrap_sym(l, s, a, sym_of(l, s->b));
+        }
         if (s->op == TOKEN_AND_AND || s->op == TOKEN_OR_OR) {
             return ir_sym_op(l->m, s->op == TOKEN_AND_AND ? IR_AND : IR_OR,
                              IR_I8, a, sym_of(l, s->b));

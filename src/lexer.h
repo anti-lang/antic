@@ -69,9 +69,20 @@ enum token_kind {
     TOKEN_DISPATCH,
     TOKEN_JOIN, TOKEN_JOIN_ALL,
     TOKEN_QUESTION_QUESTION, TOKEN_QUESTION_DOT,
+    /* The wrapping operators `+% -% *% <<%` and the saturating ones
+       `+| -| *|`. */
+    TOKEN_PLUS_WRAP, TOKEN_MINUS_WRAP, TOKEN_STAR_WRAP, TOKEN_SHL_WRAP,
+    TOKEN_PLUS_SAT, TOKEN_MINUS_SAT, TOKEN_STAR_SAT,
+    /* DESIGN: `mul_high(a, b)` is a built-in with the operands of a binary
+       operator, so the checker makes a binary expression of the call with
+       this kind. No source text lexes as it. */
+    TOKEN_MUL_HIGH,
 
     TOKEN_KIND_COUNT
 };
+
+/* The name of the built-in that TOKEN_MUL_HIGH stands for. */
+#define MUL_HIGH "mul_high"
 
 /* Bytes that belong to a token: the decoded bytes of a string literal,
    or the digits of a float literal without separators. */

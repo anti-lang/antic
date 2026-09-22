@@ -38,6 +38,7 @@ add_executable(antic_unit_tests
     unit/test_utf.c
     unit/test_whole.c
     unit/test_sha256.c
+    unit/test_arith.c
     unit/test_f16.c
     unit/test_symbols.c
     unit/test_float_read.c
@@ -291,6 +292,19 @@ add_test(NAME program_devirtualise_dev
 # Qualified bodies in dev mode, where every call through an interface
 # reads a table this module wrote.
 foreach(name IN ITEMS qualified_bodies qualified_chain qualified_single)
+    add_test(NAME program_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+endforeach()
+# The wrapping and saturating operators and mul_high in dev mode, whose
+# checks trap on the plain operators and on none of these.
+foreach(name IN ITEMS wrapping saturating mul_high)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

@@ -166,9 +166,15 @@ static const char *binary_rule(enum token_kind op)
     case TOKEN_GE: return "relation";
     case TOKEN_QUESTION_QUESTION: return "coalesce";
     case TOKEN_SHL:
+    case TOKEN_SHL_WRAP:
     case TOKEN_SHR: return "shift";
     case TOKEN_PLUS:
-    case TOKEN_MINUS: return "additive";
+    case TOKEN_PLUS_WRAP:
+    case TOKEN_PLUS_SAT:
+    case TOKEN_MINUS:
+    case TOKEN_MINUS_WRAP:
+    case TOKEN_MINUS_SAT: return "additive";
+    case TOKEN_MUL_HIGH: return "mul_high";
     default: return "multiplicative";
     }
 }

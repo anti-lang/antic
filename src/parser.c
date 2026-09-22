@@ -1024,11 +1024,20 @@ static int precedence(enum token_kind kind)
        compares the pointer it gives. Its operands are pointers, which
        take none of the operators that bind tighter. */
     case TOKEN_QUESTION_QUESTION: return 8;
+    /* The wrapping and saturating operators bind as the plain operator
+       they extend. */
     case TOKEN_SHL:
+    case TOKEN_SHL_WRAP:
     case TOKEN_SHR: return 9;
     case TOKEN_PLUS:
-    case TOKEN_MINUS: return 10;
+    case TOKEN_PLUS_WRAP:
+    case TOKEN_PLUS_SAT:
+    case TOKEN_MINUS:
+    case TOKEN_MINUS_WRAP:
+    case TOKEN_MINUS_SAT: return 10;
     case TOKEN_STAR:
+    case TOKEN_STAR_WRAP:
+    case TOKEN_STAR_SAT:
     case TOKEN_SLASH:
     case TOKEN_PERCENT: return 11;
     default: return 0;

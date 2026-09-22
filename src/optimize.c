@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../rt/f16.h"
+#include "arith.h"
 #include "target.h"
 
 /* DESIGN: the passes rely on three properties and nothing else.
@@ -223,6 +224,21 @@ static bool fold_int(enum ir_op op, enum ir_type t, uint64_t a, uint64_t b,
     case IR_ULE: *out = a <= b; return true;
     case IR_UGT: *out = a > b; return true;
     case IR_UGE: *out = a >= b; return true;
+    case IR_MULH_S:
+    case IR_MULH_U: *out = arith_mul_high(a, b, n, op == IR_MULH_S); break;
+    case IR_ADD_SAT_S:
+    case IR_ADD_SAT_U:
+    case IR_SUB_SAT_S:
+    case IR_SUB_SAT_U:
+    case IR_MUL_SAT_S:
+    case IR_MUL_SAT_U:
+        *out = arith_saturate(
+            op == IR_ADD_SAT_S || op == IR_ADD_SAT_U   ? '+'
+            : op == IR_SUB_SAT_S || op == IR_SUB_SAT_U ? '-'
+                                                       : '*',
+            a, b, n,
+            op == IR_ADD_SAT_S || op == IR_SUB_SAT_S || op == IR_MUL_SAT_S);
+        break;
     default:
         return false;
     }
@@ -339,6 +355,9 @@ static bool fold_inst(const struct ir_inst *inst, struct ir_operand *out)
     case IR_SHL: case IR_SHR_S: case IR_SHR_U:
     case IR_EQ: case IR_NE: case IR_SLT: case IR_SLE: case IR_SGT:
     case IR_SGE: case IR_ULT: case IR_ULE: case IR_UGT: case IR_UGE:
+    case IR_MULH_S: case IR_MULH_U: case IR_ADD_SAT_S: case IR_ADD_SAT_U:
+    case IR_SUB_SAT_S: case IR_SUB_SAT_U: case IR_MUL_SAT_S:
+    case IR_MUL_SAT_U:
         if (inst->a.kind != IR_INT || inst->b.kind != IR_INT ||
             !fold_int(inst->op, inst->a.type, inst->a.as.integer,
                       inst->b.as.integer, &v)) {
