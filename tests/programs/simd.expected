@@ -23,6 +23,10 @@ select8 0.5 0.5 0.5 0.5 5 6 7 8
 reverse8 8 7 6 5 4 3 2 1
 f64 2.25 6.25 sum 4 max 2.5
 f32x2 9 16 dot 25
+i32x8 4 11 gt 00011111 pick 3 6 sum 36 min 1 max 8
+f64x4 0101 0 4.5 sum 5 min -3.5 max 4.5
+i16x16 001 8 13 sum 136 min 1 max 16
+u8x32 001 7 10 sum 240 max 31 any 1 all 0
 iadd 4 1 6 -1
 isub -2 -5 0 -7
 imul 3 -6 9 -12

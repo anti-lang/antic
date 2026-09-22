@@ -23,6 +23,18 @@ simd struct U8x16 {
 	b8: byte, b9: byte, b10: byte, b11: byte, b12: byte, b13: byte, b14: byte, b15: byte,
 }
 simd struct H8 { a: f16, b: f16, c: f16, d: f16, e: f16, f: f16, g: f16, h: f16 }
+simd struct I32x8 { a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32 }
+simd struct I16x16 {
+	l0: i16, l1: i16, l2: i16, l3: i16, l4: i16, l5: i16, l6: i16, l7: i16,
+	l8: i16, l9: i16, l10: i16, l11: i16, l12: i16, l13: i16, l14: i16, l15: i16,
+}
+simd struct F64x4 { w: f64, x: f64, y: f64, z: f64 }
+simd struct U8x32 {
+	b0: byte, b1: byte, b2: byte, b3: byte, b4: byte, b5: byte, b6: byte, b7: byte,
+	b8: byte, b9: byte, b10: byte, b11: byte, b12: byte, b13: byte, b14: byte, b15: byte,
+	b16: byte, b17: byte, b18: byte, b19: byte, b20: byte, b21: byte, b22: byte, b23: byte,
+	b24: byte, b25: byte, b26: byte, b27: byte, b28: byte, b29: byte, b30: byte, b31: byte,
+}
 
 struct Vector4 { x: f32, y: f32, z: f32, w: f32 }
 
@@ -128,6 +140,55 @@ fn wide()
 	       e.dot(e) as float);
 }
 
+/// The simd structs of 32 bytes, two registers below x86-64-v3 and one
+/// there: a comparison of every lane width narrows its mask, and a
+/// choice widens it back.
+fn wider()
+{
+	let i = I32x8 { a: iopaque(1) as i32, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7,
+	                h: 8 };
+	let three = I32x8.splat(iopaque(3) as i32);
+	let sum = i + three;
+	let gt = i > three;
+	let picked = simd.select(gt, i, three);
+	printf("i32x8 %d %d gt %d%d%d%d%d%d%d%d pick %d %d sum %d min %d max %d\n".ptr,
+	       sum.a as c_int, sum.h as c_int, gt.a as c_int, gt.b as c_int,
+	       gt.c as c_int, gt.d as c_int, gt.e as c_int, gt.f as c_int,
+	       gt.g as c_int, gt.h as c_int, picked.b as c_int, picked.f as c_int,
+	       i.sum() as c_int, i.min() as c_int, i.max() as c_int);
+	let d = F64x4 { w: fopaque(1.5), x: fopaque(2.5), y: fopaque(-3.5),
+	                z: fopaque(4.5) };
+	let over = d > F64x4.splat(fopaque(2.0));
+	let kept = simd.select(over, d, F64x4.splat(0.0));
+	printf("f64x4 %d%d%d%d %g %g sum %g min %g max %g\n".ptr, over.w as c_int,
+	       over.x as c_int, over.y as c_int, over.z as c_int, kept.w, kept.z,
+	       d.sum(), d.min(), d.max());
+	let c = U8x32 {
+		b0: iopaque(0) as byte, b1: 1, b2: 2, b3: 3, b4: 4, b5: 5, b6: 6, b7: 7,
+		b8: 8, b9: 9, b10: 10, b11: 11, b12: 12, b13: 13, b14: 14, b15: 15,
+		b16: 16, b17: 17, b18: 18, b19: 19, b20: 20, b21: 21, b22: 22, b23: 23,
+		b24: 24, b25: 25, b26: 26, b27: 27, b28: 28, b29: 29, b30: 30, b31: 31,
+	};
+	let w = I16x16 {
+		l0: iopaque(1) as i16, l1: 2, l2: 3, l3: 4, l4: 5, l5: 6, l6: 7, l7: 8,
+		l8: 9, l9: 10, l10: 11, l11: 12, l12: 13, l13: 14, l14: 15, l15: 16,
+	};
+	let eight = I16x16.splat(iopaque(8) as i16);
+	let above = w > eight;
+	let taken = simd.select(above, w, eight);
+	printf("i16x16 %d%d%d %d %d sum %d min %d max %d\n".ptr,
+	       above.l0 as c_int, above.l7 as c_int, above.l8 as c_int,
+	       taken.l2 as c_int, taken.l12 as c_int, w.sum() as c_int,
+	       w.min() as c_int, w.max() as c_int);
+	let seven = U8x32.splat(iopaque(7) as byte);
+	let big = c > seven;
+	let chosen = simd.select(big, c, seven);
+	printf("u8x32 %d%d%d %d %d sum %d max %d any %d all %d\n".ptr,
+	       big.b0 as c_int, big.b7 as c_int, big.b8 as c_int,
+	       chosen.b3 as c_int, chosen.b10 as c_int, c.sum() as c_int,
+	       c.max() as c_int, simd.any(big) as c_int, simd.all(big) as c_int);
+}
+
 fn integers()
 {
 	let i = I32x4 { a: iopaque(1) as i32, b: iopaque(-2) as i32,
@@ -203,6 +264,7 @@ fn main() -> int
 {
 	floats();
 	wide();
+	wider();
 	integers();
 	memory();
 	return 0;
