@@ -104,6 +104,32 @@ static void tree(const char *source, const char *expected)
     arena_free(&arena);
 }
 
+/* The kind of the integer under the tag of a variant of count cases
+   without fields. */
+static enum type_kind tag_kind(size_t count)
+{
+    struct checked c;
+    struct text source = {0};
+    enum type_kind kind = TYPE_ERROR;
+    size_t i;
+
+    text_append(&source, "variant V {");
+    for (i = 0; i < count; i++) {
+        text_appendf(&source, " C%zu,", i);
+    }
+    text_append(&source, " }\n");
+    run(&c, text_cstr(&source));
+    CHECK(c.ok);
+    if (c.ok) {
+        const struct type *v = c.module->items[0]->symbol->type;
+        CHECK(v->kind == TYPE_VARIANT && v->param_count == count);
+        kind = v->base->base->kind;
+    }
+    release(&c);
+    text_free(&source);
+    return kind;
+}
+
 /* The variant of every case below, on line 1. */
 #define SHAPE "variant Shape { Circle { r: f32 }, Square { side: f32 }, " \
               "Empty }\n"
@@ -353,6 +379,12 @@ void test_variant(void)
     rejects(SHAPE
             "fn f(s: Shape) -> bool { return s is Shape.Triangle; }\n",
             2, 33, "`Shape` has no case `Triangle`");
+
+    /* The tag is the smallest unsigned integer that holds the number of
+       cases. */
+    CHECK(tag_kind(3) == TYPE_U8);
+    CHECK(tag_kind(255) == TYPE_U8);
+    CHECK(tag_kind(256) == TYPE_U16);
 
     /* The declaration. */
     rejects("variant V { }\n", 1, 9, "variant `V` has no case");
