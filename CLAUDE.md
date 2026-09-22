@@ -215,7 +215,8 @@ reports what it finished.
   links every target against the sysroots of the runtime archive.
 - The object model is implemented: classes, interfaces as inline sub-objects
   with thunks, four visibility levels, `construct` and `destruct`, operators,
-  singletons, the error forms and reflection over descriptors.
+  singletons, the error forms and reflection over descriptors. A class names
+  its base in its header, `class Circle inherits Shape { }`.
 - `worker fn`, `parallel` and `dispatch` compile and run on all six targets.
 - A pass over the whole program's IR runs after lowering. In dev mode it runs
   for the module that links. It holds release devirtualisation, the class
@@ -227,8 +228,8 @@ reports what it finished.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`.
-- 630 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 629 each, without the `no_paths` test, which needs a
+- 633 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 632 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - `antic -g` writes the line of every statement, and the link then keeps the
   debug sections. lldb and gdb stop by file and line and print a backtrace of
