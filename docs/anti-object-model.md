@@ -62,9 +62,8 @@ Contents:
 ## Class declaration
 
 ```anti
-class Circle
+class Circle inherits Shape
 {
-	inherits Shape,
 	implements ser: Serializable,
 	implements dr: Drawable,
 
@@ -84,8 +83,10 @@ class Circle
 }
 ```
 
-- `class Name { }` declares a class. The body holds, in this order by convention and in any order by grammar: one `inherits` line, `implements` lines, `use` lines, fields, constants, static fields, functions.
-- `inherits Base,` names the base class. At most one. Without it the class inherits `anti.lang.Object`, the root. The base is nested whole at offset 0, trailing padding included, and the class's own fields follow at `size_of(Base)`. The base part is reached as `self.super`.
+- `class Name { }` declares a class. The body holds, in this order by convention and in any order by grammar: `implements` lines, `use` lines, fields, constants, static fields, functions.
+- `class Name inherits Base { }` names the base class in the header. At most one. Without it the class inherits `anti.lang.Object`, the root. The base is nested whole at offset 0, trailing padding included, and the class's own fields follow at `size_of(Base)`. The base part is reached as `self.super`.
+- The base is no member of the body. It sits at offset 0, has no name of its own, is reached as `self.super`, and a class has at most one, so it belongs to the header. `implements` and `use` stay in the body, because each is a named sub-object with a place in the layout. `inherits` in the body is refused: `inherits belongs in the class header: class Circle inherits Shape`.
+- A base of another module is qualified by it: `class Circle inherits shapes.Shape { }`. The header takes the base after every modifier: `abstract class`, `final class`, `singleton class`, `pub class` and `packed class`.
 - `implements name: Interface,` places an interface sub-object in the class at a named field. Any number. See [Interfaces](#interfaces).
 - `use name: T,` is a field with promotion. See [Composition](#composition).
 - `abstract class Name { }` is required for a class with any function that has no body, own or inherited. A class with an open function and no `abstract` is refused, naming the open functions.
@@ -140,7 +141,7 @@ Four levels, and each applies where it makes sense:
 
 ## Inheritance
 
-- One base per class, named by `inherits`. The chain ends at `anti.lang.Object`.
+- One base per class, named by `inherits` in the class header. The chain ends at `anti.lang.Object`.
 - The derived class adds fields after the base's. It cannot remove, reorder or retype a base field. A pointer to the derived class is a pointer to the base at the same address.
 - A derived class inherits every table entry and every non-private function of its base. It replaces an entry with `concrete fn`. It reaches the replaced body with `self.super.f()`.
 - `final class` stops the chain. `` `Circle` cannot inherit `final` class `Dot` `` is the message.
@@ -379,10 +380,8 @@ abstract class Serializable
 	abstract fn serialize(self, out: *text.Builder);
 }
 
-abstract class Shape
+abstract class Shape inherits Drawable
 {
-	inherits Drawable,
-
 	pub kind: Kind,
 	pub x: f32 = 0.0,
 	pub y: f32 = 0.0,
@@ -409,9 +408,8 @@ abstract class Shape
 	}
 }
 
-final class Circle
+final class Circle inherits Shape
 {
-	inherits Shape,
 	implements ser: Serializable,
 
 	r: f32,
@@ -441,10 +439,8 @@ final class Circle
 	}
 }
 
-class Square
+class Square inherits Shape
 {
-	inherits Shape,
-
 	side: f32,
 	own label: []byte,
 

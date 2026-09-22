@@ -2,7 +2,7 @@
 
 Rules for the features decided after `docs/anti-object-model.md` and outside it. `docs/decisions.md` refers to the additions document and repeats none of it. The book covers what the compiler does for each. The rest is the language's and lives on anti-lang.com.
 
-Settled on 2026-09-20. The small things, wire formats, binary I/O and the SDK were settled on 2026-09-23. Failing functions, tuples, error origins, source locations, the symbols tooling, the CPU levels, the simd structs and the round-three small items were settled on 2026-09-21.
+Settled on 2026-09-20. The small things, wire formats, binary I/O and the SDK were settled on 2026-09-23. Failing functions, tuples, error origins, source locations, the symbols tooling, the CPU levels, the simd structs and the round-three small items were settled on 2026-09-21. The base in the class header was settled on 2026-09-22.
 
 Contents:
 
@@ -31,6 +31,7 @@ Contents:
 - [Runtime configuration](#runtime-configuration)
 - [Small things](#small-things)
 - [Small items, round three](#small-items-round-three)
+- [Base in the class header](#base-in-the-class-header)
 - [Wire formats](#wire-formats)
 - [Binary I/O](#binary-io)
 - [SDK and frameworks](#sdk-and-frameworks)
@@ -39,7 +40,7 @@ Contents:
 
 ## Timing
 
-Before the first public release: nullable pointers, dev-mode checks, debug information, tests and fixtures, the CPU levels and `none`. Each changes signatures or output that a user would otherwise depend on. The CPU levels change what a release is built for, and `none` is a rename.
+Before the first public release: nullable pointers, dev-mode checks, debug information, tests and fixtures, the CPU levels and `none`. The base in the class header comes before it as well. Each changes signatures or output that a user would otherwise depend on. The CPU levels change what a release is built for, and `none` is a rename. The class header moves a line of every class with a base.
 
 After the first release, in this order: the wrapping and saturating operators with `Flags`, sum types, locking and channels. Then `may fail` with tuples, error origins and stack traces, then the symbols tooling, then the small things and wire formats. Then injection, hooks and tracing, plugins and runtime configuration, which belong together. Then generics and closures, which `docs/anti-object-model.md` names.
 
@@ -369,6 +370,12 @@ Each is compile-time only. Each removes something people write by hand. None cos
 - A static function is namespaced by its class and may share a name with a static in the chain. The redeclaration rule covers fields, functions that take `self`, and constants.
 - Considered and declined: a power operator `**`. It would be the one arithmetic operator that compiles to a library call, and `math.pow` says that it is one. Considered and declined: multiple names in one `let`, `let a, b = e;`, since a `let` binds one name and the two-name form is tuple destructuring.
 
+## Base in the class header
+
+- `class Circle inherits Shape { }` names the base in the header, and `inherits Shape,` as the first line of the body is gone. The base is no member: it sits at offset 0, has no name of its own, is reached as `self.super`, and a class has at most one, so it belongs to the header. `implements` and `use` stay in the body, because each is a named sub-object with a place in the layout.
+- The header takes the base after every modifier: `abstract class`, `final class`, `singleton class`, `pub class` and `packed class`. A base of another module is qualified by it, as in `class Circle inherits shapes.Shape { }`.
+- `inherits` in the body is refused, and the message gives the header the programmer means.
+
 ## Wire formats
 
 A wire format is a description of bytes from which `anti format` generates a parser, a writer and the classes that hold the parsed data. It is a tool, like `anti bind`. The language gains no keyword. The description lives in a `.fmt` file and the generated module is ordinary Anti over `anti.binary`.
@@ -470,6 +477,7 @@ Rules:
 - `` `Vec4` lanes must share one type ``
 - `` `f32x128` exceeds the vector cap, use an array ``
 - `` this program needs a processor with AVX2 (x86-64-v3, 2013 or later) `` at run time
+- `` inherits belongs in the class header: class Circle inherits Shape ``
 
 ## Keywords
 

@@ -360,9 +360,8 @@ abstract class Shape
 	}
 }
 
-final class Circle
+final class Circle inherits Shape
 {
-	inherits Shape,
 	r: f32,
 
 	fn construct(self, r: f32) may fail
@@ -382,7 +381,7 @@ let a = c.area();
 c.move(1.0, 1.0);
 ```
 
-- `inherits Base,` first line, one base, `anti.lang.Object` when absent. `self.super` is the base part and `self.super.f()` the base's function, which is refused when that function is abstract.
+- `class Name inherits Base` names the base in the header, after the name and after `align(N)` when the class has one. One base, `anti.lang.Object` when absent, and `module.Class` for a base of another module. The base is no member, so `inherits` in the body is refused, and `implements` and `use` stay there as named sub-objects. `self.super` is the base part and `self.super.f()` the base's function, which is refused when that function is abstract.
 - `pub fn` goes into the table and is visible everywhere, `protected fn` to the class and its chain, `fn` to the class only. A function without `self` is static: `Circle.new(...)`.
 - `abstract class` is required when any function has no body. `final class` and `final fn` forbid inheritance and replacement.
 - `concrete fn` replaces an inherited entry, `concrete fn Base::f` documents which, `concrete fn Iface::f` fills one interface's table only.
@@ -411,9 +410,8 @@ abstract class Drawable
 	pub fn describe(self) -> str { return self.type_name(); }
 }
 
-class Circle
+class Circle inherits Shape
 {
-	inherits Shape,
 	implements ser: Serializable,
 	implements dr: Drawable,
 
