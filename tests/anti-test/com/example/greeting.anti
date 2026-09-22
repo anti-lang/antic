@@ -1,0 +1,21 @@
+//! A module whose tests reach another module. A dev build compiles one
+//! module into its own object, so the runner links the objects of every
+//! module this one imports.
+
+import anti.text;
+
+pub fn greeting(name: str) -> bool
+{
+	return text.equal(name, "hello");
+}
+
+tests
+{
+	fn greeting_knows_its_word()
+	{
+		let known = greeting("hello");
+		let other = greeting("goodbye");
+		assert(known);
+		assert(!other);
+	}
+}

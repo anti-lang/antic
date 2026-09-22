@@ -1144,6 +1144,30 @@ static bool find_libraries(const struct options *o, const struct module *tree,
     return ok;
 }
 
+bool driver_libraries(const struct options *options, struct arena *arena,
+                      const char ***paths, size_t *count)
+{
+    struct module empty = {0};
+    struct paths found = {0};
+    const char **list;
+    size_t n;
+    size_t i;
+
+    if (!find_libraries(options, &empty, arena, &found)) {
+        free((void *)found.items);
+        return false;
+    }
+    n = found.count;
+    list = arena_alloc(arena, (n + 1) * sizeof *list);
+    for (i = 0; i < n; i++) {
+        list[i] = found.items[i];
+    }
+    free((void *)found.items);
+    *paths = list;
+    *count = n;
+    return true;
+}
+
 /* Read the library files and load each after the libraries it imports,
    whatever the order on the command line. The interfaces go to out in
    load order. */

@@ -83,6 +83,16 @@ struct options {
 
 /* Compile options->input and return the process exit status for antic. */
 int driver_run(const struct options *options);
+struct arena;
+
+/* The library files that options->libraries needs: those files, every
+   module each of them imports, and every module below those. The paths
+   go into the memory pool, and `paths` points at them. A dev build
+   compiles one module into its own object, so `anti test` reads the list
+   to write an object of every module the runner links. Returns false
+   when a file cannot be read. */
+bool driver_libraries(const struct options *options, struct arena *arena,
+                      const char ***paths, size_t *count);
 
 
 #endif

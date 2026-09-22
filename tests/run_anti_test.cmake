@@ -7,9 +7,10 @@
 #   MODULES   the directory that holds com/example/*.anti
 #   WORK      a directory for the library files, the objects and the runner
 #
-# The run covers the four things the blocks promise: a module with both
+# The run covers the five things the blocks promise: a module with both
 # blocks, a fixture two tests share, `setup` and `teardown` around every
-# test, and the report of a failed assertion with its file and its line.
+# test, a module whose tests reach another module, and the report of a
+# failed assertion with its file and its line.
 # It then compiles the same module without --tests and shows that no name
 # of either block reaches the assembly or the library file.
 
@@ -66,6 +67,16 @@ if(NOT teardown_count EQUAL 2)
     message(FATAL_ERROR
         "teardown ran ${teardown_count} times, expected 2\n${text}")
 endif()
+
+# A module whose tests reach another module. A dev build compiles one
+# module into its own object, so the runner links an object of every
+# library file the module needs.
+run_tests(com/example/greeting.anti OFF status text)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "anti test failed with ${status}\n${text}")
+endif()
+expect("${text}" "ok com.example.greeting.greeting_knows_its_word"
+       "the test of an importing module")
 
 # A failed assertion names the test, then the file and the line the
 # compiler wrote into the message.

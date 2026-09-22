@@ -244,6 +244,94 @@ static bool compile_object(struct unit *u, const struct options *base,
     return status == 0 || status == 3;
 }
 
+/* The objects of the modules a unit imports, for a dev link. */
+struct imports {
+    struct text *items;
+    size_t count;
+};
+
+static void imports_free(struct imports *list)
+{
+    size_t i;
+
+    for (i = 0; i < list->count; i++) {
+        text_free(&list->items[i]);
+    }
+    free(list->items);
+    list->items = NULL;
+    list->count = 0;
+}
+
+/* DESIGN: a dev build compiles one module into its own object and links
+   the objects of the modules it imports. The run therefore writes an
+   object of every library file the module under test needs, its own
+   excepted. Those objects go on the link line of the runner. That is
+   what lets a module of the standard library carry a `tests` block. The
+   release run takes the whole program from the library files and needs
+   none of this. */
+static bool compile_imports(const struct unit *u, const struct options *base,
+                            const char *work, const char *flat,
+                            struct imports *out)
+{
+    struct arena arena = {0};
+    struct options search = *base;
+    struct text directory = {0};
+    const char *seed[1];
+    const char **paths = NULL;
+    size_t count = 0;
+    size_t i;
+    bool ok = true;
+
+    seed[0] = text_cstr(&u->library);
+    search.libraries = seed;
+    search.library_count = 1;
+    search.input = NULL;
+    if (!driver_libraries(&search, &arena, &paths, &count)) {
+        arena_free(&arena);
+        return false;
+    }
+    text_appendf(&directory, "%s/anti/test/imports/%s", work, flat);
+    if (!make_dirs(text_cstr(&directory))) {
+        text_free(&directory);
+        arena_free(&arena);
+        return false;
+    }
+    out->items = calloc(count + 1, sizeof *out->items);
+    if (out->items == NULL) {
+        die_out_of_memory();
+    }
+    for (i = 0; ok && i < count; i++) {
+        struct options one = *base;
+        struct text base_path = {0};
+        struct text object = {0};
+        int status;
+        if (strcmp(paths[i], seed[0]) == 0) {
+            continue;
+        }
+        text_appendf(&base_path, "%s/%zu", text_cstr(&directory), i);
+        text_appendf(&object, "%s%s", text_cstr(&base_path),
+                     target_info(base->target)->object_suffix);
+        one.input = paths[i];
+        one.output = text_cstr(&base_path);
+        one.dev = true;
+        /* A module without `main` stops at its object, which is status 3. */
+        status = driver_run(&one);
+        ok = status == 0 || status == 3;
+        if (ok) {
+            out->items[out->count++] = object;
+        } else {
+            text_free(&object);
+        }
+        text_free(&base_path);
+    }
+    text_free(&directory);
+    arena_free(&arena);
+    if (!ok) {
+        imports_free(out);
+    }
+    return ok;
+}
+
 /* DESIGN: the runner is Anti source. It imports the module under test,
    names each test to the runtime before it calls it, and prints the line
    of a test that returned. A failed assertion prints the name and its
@@ -290,7 +378,8 @@ static bool run_unit(const struct unit *u, const struct options *base,
     struct text program = {0};
     struct text directory = {0};
     struct text flat = {0};
-    const char *objects[1];
+    struct imports imports = {0};
+    const char **objects = NULL;
     const char *argv[2];
     bool ok = false;
     size_t i;
@@ -326,9 +415,19 @@ static bool run_unit(const struct unit *u, const struct options *base,
         o.checks = CHECKS_OFF;
     } else {
         o.dev = true;
+        if (!compile_imports(u, base, work, text_cstr(&flat), &imports)) {
+            goto done;
+        }
+        objects = malloc((imports.count + 1) * sizeof *objects);
+        if (objects == NULL) {
+            die_out_of_memory();
+        }
         objects[0] = text_cstr(&u->object);
+        for (i = 0; i < imports.count; i++) {
+            objects[i + 1] = text_cstr(&imports.items[i]);
+        }
         o.objects = objects;
-        o.object_count = 1;
+        o.object_count = imports.count + 1;
     }
     if (driver_run(&o) != 0) {
         goto done;
@@ -337,6 +436,8 @@ static bool run_unit(const struct unit *u, const struct options *base,
     argv[1] = NULL;
     ok = process_run(argv) == 0;
 done:
+    imports_free(&imports);
+    free((void *)objects);
     text_free(&source);
     text_free(&path);
     text_free(&program);
