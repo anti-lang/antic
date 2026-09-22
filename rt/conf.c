@@ -153,14 +153,68 @@ static void set_key(struct key *k, const char *value, enum layer layer,
     }
 }
 
-/* A line that names an interface to take from a library. No program
-   carries an injectable interface yet, so every line is an error. */
+/* The entry of the interface the text names, or NULL. */
+static const struct anti_injectable *injectable_of(const char *name,
+                                                   size_t length)
+{
+    int64_t i;
+
+    for (i = 0; i < anti_rt_injectable.count; i++) {
+        const unsigned char *text = anti_rt_injectable.interfaces[i].name;
+        if (strlen((const char *)text) == length &&
+            memcmp(text, name, length) == 0) {
+            return &anti_rt_injectable.interfaces[i];
+        }
+    }
+    return NULL;
+}
+
+/* The interfaces the program does carry, for the message of a line that
+   names one it has not. */
+static void list_injectable(char *out, size_t size)
+{
+    size_t at = 0;
+    int64_t i;
+
+    if (anti_rt_injectable.count == 0) {
+        snprintf(out, size, "none");
+        return;
+    }
+    for (i = 0; i < anti_rt_injectable.count && at + 1 < size; i++) {
+        const char *before = i == 0 ? ""
+                             : i + 1 == anti_rt_injectable.count ? " and "
+                                                                 : ", ";
+        at += (size_t)snprintf(out + at, size - at, "%s%s", before,
+                               (const char *)
+                                   anti_rt_injectable.interfaces[i].name);
+    }
+}
+
+/* DESIGN: a line that names an interface to take from a library. The
+   interface must be one the program injects and must not be `inject
+   final`. A line that passes both waits for plugins, which are not
+   built: the library the line names cannot be loaded, so the line is a
+   startup error that says so. */
 static void injection_error(const char *name, size_t length,
                             const char *where)
 {
-    startup_error("%s: %.*s is no injectable interface of this program, "
-                  "which has none",
-                  where, (int)length, name);
+    const struct anti_injectable *in = injectable_of(name, length);
+    char list[512];
+
+    if (in == NULL) {
+        list_injectable(list, sizeof list);
+        startup_error("%s: %.*s is no injectable interface of this program, "
+                      "which has %s",
+                      where, (int)length, name, list);
+    } else if (in->final != 0) {
+        startup_error("%s: %s is `inject final` in %s and cannot be replaced",
+                      where, (const char *)in->field,
+                      (const char *)in->owner);
+    } else {
+        startup_error("%s: %.*s comes from a library, and this build of anti "
+                      "loads no plugin",
+                      where, (int)length, name);
+    }
 }
 
 static void unknown_option(const char *name, size_t length)
@@ -520,7 +574,19 @@ static void inspect(void)
         printf("%s = %s (%s)\n", keys[i].name,
                keys[i].value == NULL ? "" : keys[i].value, layer);
     }
-    printf("injectable interfaces: none\n");
+    if (anti_rt_injectable.count == 0) {
+        printf("injectable interfaces: none\n");
+    } else {
+        int64_t k;
+        printf("injectable interfaces:\n");
+        for (k = 0; k < anti_rt_injectable.count; k++) {
+            const struct anti_injectable *in =
+                &anti_rt_injectable.interfaces[k];
+            printf("  %s (%s.%s%s)\n", (const char *)in->name,
+                   (const char *)in->owner, (const char *)in->field,
+                   in->final != 0 ? ", final" : "");
+        }
+    }
     printf("loaded plugins: none\n");
 }
 

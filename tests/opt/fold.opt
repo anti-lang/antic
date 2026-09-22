@@ -1,7 +1,10 @@
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr }
+type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global fold.2 size 27 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global fold.3 size 45 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 38 3a 20 73 68 69 66 74 20 63 6f 75 6e 74 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 3e 3e 00
 global fold.5 size 36 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 31 39 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00
+global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn fold.quotient() -> i64 {
 b0:
     %0 = addov i64 -4, -1

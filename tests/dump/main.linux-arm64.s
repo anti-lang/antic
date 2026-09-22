@@ -16,4 +16,9 @@ main.main:
     bl main.scale
     ldp x29, x30, [sp], #16
     ret
+    .section .rodata
+    .p2align 3
+    .globl anti_rt_injectable
+anti_rt_injectable:
+    .byte 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     .section .note.GNU-stack,"",@progbits

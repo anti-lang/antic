@@ -18,6 +18,8 @@ type devirt.Dog = struct { super: devirt.Speaker }
 type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
 type anti.rt.SlotTable = struct { count: i64, interfaces: ptr }
 type [1]anti.rt.Slots = array 1 of anti.rt.Slots
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr }
+type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn anti_lang_Object_type_name(ptr) -> agg str
 extern fn anti_lang_Object_to_text(ptr) -> agg str
 extern fn anti_lang_Object_equals(ptr, ptr) -> i8
@@ -94,6 +96,7 @@ global devirt.54 size 30 align 1 bytes 64 65 76 69 72 74 2e 61 6e 74 69 3a 34 37
 global anti.rt.slots.0 size 3 align 1 bytes 00 00 02
 global anti.rt.slots.list [1]anti.rt.Slots { anti.rt.Slots { @devirt.Speaker.descriptor, i64 18, @anti.rt.slots.0 } }
 global (null).anti_rt_slots anti.rt.SlotTable { i64 1, @anti.rt.slots.list }
+global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn devirt.Only.value(%0: ptr) -> i64 {
 b0:
     %1 = ptradd %0, offset_of devirt.Only.n

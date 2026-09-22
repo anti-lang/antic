@@ -1743,7 +1743,13 @@ static void write_injections(struct whole *w, struct ir_module *m,
         resolve_provider(w, m, o, &list[i], errors);
     }
     check_cycles(m, list, count, errors);
-    write_injectable(m, list, count);
+    /* DESIGN: the table of the interfaces belongs to the program the
+       runtime starts. A library for C has one only where it carries the
+       runtime, because the configuration reads the table before `main`
+       and that copy of the runtime is the one that runs. */
+    if (!o->library || o->bundled) {
+        write_injectable(m, list, count);
+    }
     free(list);
 }
 
@@ -1752,6 +1758,7 @@ bool whole_program(struct ir_module *program,
 {
     struct whole *w = whole_build(program);
     struct reach reach;
+    size_t inject_errors;
     bool partial;
     bool calls;
     bool ok;
@@ -1776,11 +1783,13 @@ bool whole_program(struct ir_module *program,
     }
     calls = calls_through_reflection(program, &reach);
     if (!options->library) {
-        size_t before = errors->length;
         write_slots(w, program, &reach, calls && options->reflect);
-        write_injections(w, program, options, errors);
-        ok = ok && errors->length == before;
     }
+    /* The providers of a library for C are resolved as a program's are.
+       Its host is C and cannot fill a slot. */
+    inject_errors = errors->length;
+    write_injections(w, program, options, errors);
+    ok = ok && errors->length == inject_errors;
     reach_free(&reach);
     /* The trampolines come after every reader of the reach, because they
        add functions that it does not cover. */

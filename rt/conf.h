@@ -7,6 +7,27 @@
 
 #include "std.h"
 
+/* DESIGN: the link step writes the injectable interfaces of the
+   program, one entry per interface, with the class and the field that
+   need it and whether `inject final` keeps the run-time configuration
+   from replacing the provider. The table stands in every program,
+   empty where nothing injects, because the runtime reads it before
+   `main`. `slot` is the pointer that holds the provider. */
+struct anti_injectable {
+    const unsigned char *name;
+    const unsigned char *owner;     /* `module.Class` of the field */
+    const unsigned char *field;
+    int64_t final;
+    void **slot;
+};
+
+struct anti_injectables {
+    int64_t count;
+    const struct anti_injectable *interfaces;
+};
+
+extern const struct anti_injectables anti_rt_injectable;
+
 /* Take one argument under --anti., its name without the prefix and the
    value after the `=`, which is NULL when the argument carried none.
    A name or a value the runtime does not know ends the program with
