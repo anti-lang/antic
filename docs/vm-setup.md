@@ -57,12 +57,26 @@ git archive HEAD | ssh anti-linux 'rm -rf antic-check && mkdir antic-check && ta
   ctest --test-dir build -j"$(nproc)" --output-on-failure'
 ```
 
+### Sanitizer suites
+
+The two presets build beside `build` in the same tree, after the test run. They take the
+same four directories.
+
+```sh
+ssh anti-linux 'cd antic-check && V="$HOME/.local/share/anti-vm" && for p in asan ubsan; do
+  cmake --preset $p -DANTIC_CLANG_DIR="$V/clang" -DANTIC_LLVM_DIR="$V/toolchain" \
+    -DANTIC_SYSROOT_DIR="$V/sysroot" -DANTIC_RAYLIB_DIR="$V/raylib/raylib-6.0" &&
+  cmake --build build-$p -j"$(nproc)" &&
+  ctest --test-dir build-$p -j"$(nproc)" --output-on-failure; done'
+```
+
 ### Coverage
 
 The machine ran the whole suite on 2026-09-19 with the pinned clang of `23.1.1-anti.3` and
 the sysroots of all six targets. It passes 364 of 364, and ASan and UBSan with the pinned
 runtimes of the clang archive pass 363 of 363 each. The macOS programs link against Zig's
-stubs, and `link_identity_macos-arm64` finds the bytes that the Mac links.
+stubs, and `link_identity_macos-arm64` finds the bytes that the Mac links. At `64d77b6` on
+2026-09-22 it passes 536 of 536 with three skipped, and ASan and UBSan 535 of 535 each.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -125,6 +139,9 @@ ctest --test-dir build --output-on-failure
 
 The machine ran the whole suite on 2026-09-19 with the pinned clang and the sysroots of all
 six targets. It passes 351 of 351, among them every cross link and `link_identity_macos-arm64`.
+At `64d77b6` on 2026-09-22 it passes 507 of 510 with eight skipped. `std_backtrace`,
+`trace_stack` and `trace_stack_g` fail, because a release link carries no name of an Anti
+function into the PDB.
 Extract a tree from the Mac with `tar -xmf`. Ninja otherwise keeps objects that are newer
 than the files the tar restores.
 
