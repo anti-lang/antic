@@ -44,6 +44,18 @@ endfunction()
 if("${TARGET}" MATCHES "^linux-")
     probe(elf "${exe}" symbols.inner 0 "symbols.inner symbols.anti:8")
     probe(elf "${exe}" symbols.main 0 "symbols.main symbols.anti:12")
+    # A dev build of linux-arm64 puts the mapping symbol `$x` of the object
+    # at the address of its first function, where it names no function.
+    # Dev mode gives every function a prologue, so its first address lies
+    # on the line of its declaration.
+    execute_process(
+        COMMAND "${ANTIC}" --dev -g --target ${TARGET} --llvm-mc "${LLVM_MC}"
+                --runtime "${RUNTIME}" -o "${exe}_dev" "${SOURCE}"
+        RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "antic --dev -g failed for ${TARGET}\n${err}")
+    endif()
+    probe(elf "${exe}_dev" symbols.inner 0 "symbols.inner symbols.anti:6")
 elseif("${TARGET}" MATCHES "^macos-")
     probe(macho "${exe}.o" _symbols.inner 0 "symbols.anti:8")
     probe(macho "${exe}.o" _symbols.main 0 "symbols.anti:12")

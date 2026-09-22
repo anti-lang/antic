@@ -572,7 +572,11 @@ static bool elf_nearest(void *context, const char *name, uint64_t value,
 {
     struct nearest *n = context;
 
-    if ((type != ELF_STT_FUNC && type != ELF_STT_NOTYPE) ||
+    /* A name that starts with `$` is a mapping symbol of ARM and AArch64,
+       such as `$x` or `$d.1`. It marks code or data in a section and
+       names no function. */
+    if (name[0] == '$' ||
+        (type != ELF_STT_FUNC && type != ELF_STT_NOTYPE) ||
         (flags & ELF_SHF_EXECINSTR) == 0 || value > n->address ||
         (size > 0 && n->address >= value + size)) {
         return false;
