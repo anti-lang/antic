@@ -1,0 +1,4 @@
+abstract_call.anti:49:10: error: `area` is abstract in `Shape` and has no body to call
+abstract_call.anti:51:10: error: `area` is abstract in `Shape` and has no body to call
+abstract_call.anti:26:10: error: `area` is abstract in `Shape` and has no body to call
+abstract_call.anti:31:3: error: `close` is abstract in `Closable` and has no body to call

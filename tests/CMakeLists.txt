@@ -1697,6 +1697,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "concrete_signature|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/concrete_signature.s,concrete_signature.anti"
         "qualified_bodies|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_bodies.s,qualified_bodies.anti"
         "qualified_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_calls.s,qualified_calls.anti"
+        "abstract_call|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/abstract_call.s,abstract_call.anti"
         "fail_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_forms.s,fail_forms.anti"
         "fail_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_no_import.s,fail_no_import.anti"
         "defaults|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/defaults.s,defaults.anti"

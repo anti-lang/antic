@@ -382,7 +382,7 @@ let a = c.area();
 c.move(1.0, 1.0);
 ```
 
-- `inherits Base,` first line, one base, `anti.lang.Object` when absent. `self.super` is the base part and `self.super.f()` the base's function.
+- `inherits Base,` first line, one base, `anti.lang.Object` when absent. `self.super` is the base part and `self.super.f()` the base's function, which is refused when that function is abstract.
 - `pub fn` goes into the table and is visible everywhere, `protected fn` to the class and its chain, `fn` to the class only. A function without `self` is static: `Circle.new(...)`.
 - `abstract class` is required when any function has no body. `final class` and `final fn` forbid inheritance and replacement.
 - `concrete fn` replaces an inherited entry, `concrete fn Base::f` documents which, `concrete fn Iface::f` fills one interface's table only.

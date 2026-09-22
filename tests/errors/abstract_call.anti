@@ -1,0 +1,54 @@
+//! A direct call of an abstract function has no body to reach. The
+//! checker refuses `self.super.area()`, a call of `Shape.area` and the
+//! function value `Shape.area`, which would call the function at index 0
+//! of the module. A call through a pointer or a sub-object reads the
+//! table, and `self.super.area()` of a base that fills it is direct.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+abstract class Closable
+{
+	abstract fn close(self);
+}
+
+class Square
+{
+	inherits Shape,
+	implements cl: Closable,
+
+	pub side: int = 2,
+
+	concrete fn area(self) -> int
+	{
+		return self.super.area() + self.side;
+	}
+
+	concrete fn close(self)
+	{
+		Closable.close(&self.cl);
+	}
+}
+
+class Cube
+{
+	inherits Square,
+
+	concrete fn area(self) -> int
+	{
+		return self.super.area() * 6;
+	}
+}
+
+fn main() -> int
+{
+	let s = alloc Cube { };
+	let p: *Shape = s;
+	let f = Shape.area;
+	s.cl.close();
+	let n = Shape.area(p) + f(p) + p.area();
+	delete(s);
+	return n;
+}

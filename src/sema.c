@@ -2135,6 +2135,26 @@ static const struct type *level_of(const struct type *t,
     return NULL;
 }
 
+/* DESIGN: an abstract function has no body, and no function of the IR
+   stands for it. A direct use of one, `self.super.f()` or `T.f`, would
+   reach the function at index 0 of the module, so the checker refuses
+   it. A use through a table reads the entry the object's class filled.
+   Returns whether it reported. */
+static bool refuse_abstract_call(struct checker *c, struct pos pos,
+                                 const struct type *t, const struct item *m)
+{
+    const struct type *level;
+
+    if (m == NULL || m->kind != ITEM_FN || m->contract != FN_ABSTRACT) {
+        return false;
+    }
+    level = level_of(t, m);
+    error_at(c, pos, "`%.*s` is abstract in `%s` and has no body to call",
+             (int)m->name.length, m->name.text,
+             tn(level != NULL ? level : t));
+    return true;
+}
+
 /* DESIGN: a use of a function on a class reaches it through a table.
    Two kinds hold no entry of the primary table: a body qualified by an
    interface, and a plain body beside one qualified by a base. Each fills
@@ -2862,6 +2882,10 @@ static bool method_call(struct checker *c, struct expr *call)
         call->as.call.dispatch = s;
         call->as.call.entry = field->as.field.name;
     }
+    if (call->as.call.dispatch == NULL &&
+        refuse_abstract_call(c, field->pos, s, member)) {
+        return false;
+    }
     callee = new_node(c, EXPR_NAME, field->pos);
     callee->as.name = f->name;
     callee->symbol = f;
@@ -3587,6 +3611,9 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
        as a call on the class reaches it. A class of a library file has
        no item that owns its members, so the level is found on the
        chain. */
+    if (refuse_abstract_call(c, e->pos, t, m)) {
+        return builtin(c, TYPE_ERROR);
+    }
     if (m->kind == ITEM_FN && level_of(t, m) != NULL &&
         types_body_table(level_of(t, m), m) == BODY_INTERFACE) {
         e->as.field.through = table_sub_object(t, m);

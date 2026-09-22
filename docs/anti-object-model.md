@@ -221,7 +221,7 @@ Four levels, and each applies where it makes sense:
 - `concrete` is required on every replacement. A function that matches an inherited entry without it is an error. A `concrete fn` that matches nothing is an error. A replacement of a `final fn` is an error.
 - An abstract entry is zero until a class fills it. A class with any zero entry is abstract.
 - A call through a pointer is direct when the function is `final`, the class is `final`, or release mode proves no class replaces it. Otherwise it loads the entry and calls it with the object as `self`. Release mode devirtualises across the whole program. Dev mode compiles one module and relies on `final`.
-- `self.super.f()` is a direct call to the base's entry. `Serializable.serialize(&self.ser)` is a direct call to the interface's own body by name.
+- `self.super.f()` is a direct call to the base's entry. `Serializable.serialize(&self.ser)` is a direct call to the interface's own body by name. A direct call of an abstract function is refused, because it has no body: ``` `area` is abstract in `Shape` and has no body to call ```.
 - `c.f()` on a `*Circle` resolves to the unqualified function when there is one. A single qualified body is not ambiguous. When the bodies of `f` are qualified by one interface alone, a call, a bound function and `Circle.f` reach the nearest of them through that interface's table entry. A replacement in a derived class is therefore honoured. When two or more interfaces have qualified bodies of `f` and no unqualified body exists, the use is ambiguous and the message names the interfaces. The caller writes `c.ser.f()` or converts to the interface pointer.
 
 ## Descriptor and reflection
