@@ -630,12 +630,24 @@ typedef BOOL(WINAPI *sym_initialize)(HANDLE, PCSTR, BOOL);
 typedef DWORD(WINAPI *sym_set_options)(DWORD);
 typedef BOOL(WINAPI *sym_from_addr)(HANDLE, DWORD64, PDWORD64, PSYMBOL_INFO);
 typedef BOOL(WINAPI *sym_line)(HANDLE, DWORD64, PDWORD, PIMAGEHLP_LINE64);
+typedef BOOL(WINAPI *sym_search_path)(HANDLE, PWSTR, DWORD);
+typedef BOOL(WINAPI *sym_set_search_path)(HANDLE, PCWSTR);
 
 /* DbgHelp serves one thread at a time, so one lock covers every call. */
 static SRWLOCK help_lock = SRWLOCK_INIT;
 static bool help_tried;
 static sym_from_addr help_from_addr;
 static sym_line help_line;
+static sym_search_path help_get_path;
+static sym_set_search_path help_set_path;
+
+/* The modules whose directory the search path of DbgHelp holds. The
+   record in an executable names its PDB by file name alone. DbgHelp looks
+   for it in the working directory of the process and not beside the
+   module. */
+#define SEARCHED_MAX 32
+static uint64_t searched[SEARCHED_MAX];
+static size_t searched_count;
 
 static void open_help(void)
 {
@@ -662,6 +674,60 @@ static void open_help(void)
         help, "SymFromAddr");
     help_line = (sym_line)(void (*)(void))GetProcAddress(
         help, "SymGetLineFromAddr64");
+    help_get_path = (sym_search_path)(void (*)(void))GetProcAddress(
+        help, "SymGetSearchPathW");
+    help_set_path = (sym_set_search_path)(void (*)(void))GetProcAddress(
+        help, "SymSetSearchPathW");
+}
+
+/* Put the directory of the module at base on the search path, before
+   DbgHelp loads the symbols of that module. */
+static void search_module(uint64_t base)
+{
+    wchar_t path[4096];
+    wchar_t file[1024];
+    size_t length;
+    size_t used;
+    size_t i;
+    DWORD n;
+
+    for (i = 0; i < searched_count; i++) {
+        if (searched[i] == base) {
+            return;
+        }
+    }
+    if (searched_count == SEARCHED_MAX || help_get_path == NULL ||
+        help_set_path == NULL) {
+        return;
+    }
+    searched[searched_count++] = base;
+    n = GetModuleFileNameW((HMODULE)(uintptr_t)base, file, 1024);
+    if (n == 0 || n >= 1024) {
+        return;
+    }
+    length = n;
+    while (length > 0 && file[length - 1] != L'\\' &&
+           file[length - 1] != L'/') {
+        length--;
+    }
+    if (length > 0) {
+        length--;
+    }
+    if (length == 0 ||
+        !help_get_path(GetCurrentProcess(), path, (DWORD)(sizeof path /
+                                                           sizeof path[0]))) {
+        return;
+    }
+    used = wcslen(path);
+    if (used + 1 + length + 1 > sizeof path / sizeof path[0]) {
+        return;
+    }
+    if (used > 0) {
+        path[used++] = L';';
+    }
+    memcpy(path + used, file, length * sizeof file[0]);
+    path[used + length] = 0;
+    help_set_path(GetCurrentProcess(), path);
 }
 
 void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
@@ -690,13 +756,20 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
     if (!help_tried) {
         open_help();
     }
+    if (frame->base != 0) {
+        search_module(frame->base);
+    }
     memset(&symbol, 0, sizeof symbol);
     symbol.info.SizeOfStruct = sizeof(SYMBOL_INFO);
     symbol.info.MaxNameLen = 512;
     if (help_from_addr != NULL &&
         help_from_addr(GetCurrentProcess(), pc, &displacement, &symbol.info)) {
-        out->function = keep(symbol.info.Name,
-                             strnlen(symbol.info.Name, symbol.info.NameLen));
+        size_t n = strnlen(symbol.info.Name, symbol.info.NameLen);
+        char name[512];
+        size_t named = anti_coff_demangle(symbol.info.Name, n, name,
+                                          sizeof name);
+        out->function = named > 0 ? keep(name, named)
+                                  : keep(symbol.info.Name, n);
     }
     memset(&line, 0, sizeof line);
     line.SizeOfStruct = sizeof line;

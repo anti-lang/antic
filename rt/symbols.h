@@ -20,6 +20,13 @@ struct anti_found {
     int64_t line;
 };
 
+/* The name of an Anti function from its COFF symbol, which
+   `_A4anti4lang_StackTrace.capture` spells for
+   `anti.lang.StackTrace.capture`. Returns the length it writes to out, or
+   0 when name is not of that form or needs more than room bytes. */
+size_t anti_coff_demangle(const char *name, size_t length, char *out,
+                          size_t room);
+
 /* The function of an ELF file that holds vaddr, from its symbol table. */
 bool anti_elf_function(const uint8_t *file, size_t size, uint64_t vaddr,
                        struct anti_found *out);

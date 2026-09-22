@@ -39,8 +39,10 @@ add_executable(antic_unit_tests
     unit/test_whole.c
     unit/test_sha256.c
     unit/test_f16.c
+    unit/test_symbols.c
     ../rt/cpu.c
     ../rt/f16.c
+    ../rt/symbols.c
     ../rt/utf.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core)
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the

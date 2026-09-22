@@ -2,6 +2,44 @@
 
 #include <string.h>
 
+/* The form is `_A`, each segment of the module path as its length in
+   decimal and its bytes, then `_` and the name of the function. */
+size_t anti_coff_demangle(const char *name, size_t length, char *out,
+                          size_t room)
+{
+    size_t at = 2;
+    size_t n = 0;
+    size_t segments = 0;
+
+    if (length < 2 || name[0] != '_' || name[1] != 'A') {
+        return 0;
+    }
+    while (at < length && name[at] >= '0' && name[at] <= '9') {
+        size_t count = 0;
+        while (at < length && name[at] >= '0' && name[at] <= '9') {
+            if (count > length) {
+                return 0;
+            }
+            count = count * 10 + (size_t)(name[at] - '0');
+            at++;
+        }
+        if (count == 0 || count > length - at || n + count + 1 > room) {
+            return 0;
+        }
+        memcpy(out + n, name + at, count);
+        n += count;
+        out[n++] = '.';
+        at += count;
+        segments++;
+    }
+    if (segments == 0 || at >= length - 1 || name[at] != '_' ||
+        n + (length - at - 1) > room) {
+        return 0;
+    }
+    memcpy(out + n, name + at + 1, length - at - 1);
+    return n + (length - at - 1);
+}
+
 /* DESIGN: every read goes through these helpers, which take the bytes
    little-endian at any alignment and refuse a read past the end. A file
    of another host or a damaged file then gives no answer, never a crash.

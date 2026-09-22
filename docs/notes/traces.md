@@ -78,8 +78,11 @@ and on its line.
   line comes from `.debug_line`. Both are read from the file of the module.
   Every build keeps its symbol table there, and a `-g` build its line table.
 - Windows. DbgHelp reads the PDB that every Windows link writes, under one
-  lock, since it serves one thread at a time. The names it gives are kept
-  once each for the life of the program.
+  lock, since it serves one thread at a time. The record of the program
+  names the PDB by file name alone. The directory of each module therefore
+  goes on the search path before the first lookup there. A name of the COFF form,
+  `_A11stack_trace_inner`, reads as `stack_trace.inner`. The names it gives
+  are kept once each for the life of the program.
 
 The line reader takes DWARF 2 to 5. The file of a row is the name that the
 file table holds, which antic writes as the path under the search root.
