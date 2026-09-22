@@ -851,4 +851,24 @@ void test_sema(void)
             1, 26,
             "the result of export fn `bad` has type `(int, str)`, which C "
             "cannot represent");
+    /* A `tests` or `fixtures` block sees every private item of its own
+       module, the insides of its classes included. */
+    accepts("class Counter {\n"
+            "    n: int = 0,\n"
+            "    fn bump(self) { self.n = self.n + 1; }\n"
+            "}\n"
+            "fixtures {\n"
+            "    fn one() -> *Counter { return alloc Counter { n: 1 }; }\n"
+            "}\n"
+            "tests {\n"
+            "    fn counts() {\n"
+            "        let c = one();\n"
+            "        c.bump();\n"
+            "        assert(c.n == 2);\n"
+            "    }\n"
+            "}\n");
+    /* Outside those blocks the levels stand. */
+    rejects("class Counter { n: int = 0, }\n"
+            "fn f(c: *Counter) -> int { return c.n; }\n", 2, 35,
+            "`n` is private to `Counter`");
 }

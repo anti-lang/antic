@@ -2885,6 +2885,18 @@ static const struct type *checking_class(const struct checker *c)
     return owner != NULL && owner->symbol != NULL ? owner->symbol->type : NULL;
 }
 
+/* DESIGN: a `tests` or `fixtures` block is part of the module it stands
+   in. It sees every private item of that module, the insides of its
+   classes included. The rule stands under "Tests and fixtures" of
+   docs/anti-language-additions.md. It reaches a class of the module
+   being compiled alone. A level of another module is checked as ever,
+   and no block reaches into a library. */
+static bool from_test_block(const struct checker *c, const struct type *t)
+{
+    return c->function != NULL && c->function->block != BLOCK_NONE &&
+           t != NULL && same_name(&t->module, &c->module_name);
+}
+
 /* DESIGN: the four levels of the object model document. A public member
    is visible everywhere. A protected one reaches the class that declares
    it and every class below it. A private one reaches its own class
@@ -2895,6 +2907,9 @@ static bool level_allows(const struct checker *c, enum visibility vis,
     const struct type *from = checking_class(c);
 
     if (vis == VIS_PUB) {
+        return true;
+    }
+    if (from_test_block(c, declared_in != NULL ? declared_in : t)) {
         return true;
     }
     if (from == NULL) {
