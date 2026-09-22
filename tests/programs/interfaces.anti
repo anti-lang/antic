@@ -91,5 +91,9 @@ fn main() -> int
 	if one != other {
 		printf("other\n".ptr);
 	}
+	/* A call on a sub-object goes through its table, as a call through
+	   the interface pointer does, and so does a name it promotes. */
+	s.dr.draw();
+	printf("sub %d %d\n".ptr, s.rd.read() as c_int, s.twice() as c_int);
 	return 0;
 }

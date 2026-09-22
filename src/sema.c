@@ -2570,6 +2570,23 @@ static bool implemented_in(const struct type *t, const struct type *iface)
     return false;
 }
 
+/* DESIGN: an interface sub-object, as `c.ser`, is a value inside an
+   object of a class that fills its table. A call on it goes through that
+   table, as a call through a pointer to the interface does. The table
+   holds the thunk into the body of the class. */
+static bool names_sub_object(const struct expr *e)
+{
+    const struct type *s;
+    const struct struct_field *f;
+
+    if (e->kind != EXPR_FIELD) {
+        return false;
+    }
+    s = struct_of(e->as.field.base->type);
+    f = s != NULL ? find_field(s, &e->as.field.name) : NULL;
+    return f != NULL && f->form == FIELD_IMPL;
+}
+
 /* Rewrite v.f(args) into f(receiver, args). The struct T of v has no
    field f, and the module declares a function f whose first parameter is
    T or *T. Returns false after reporting an error. */
@@ -2678,8 +2695,9 @@ static bool method_call(struct checker *c, struct expr *call)
        function. The checker reads one module, and a class of a module
        that imports this one replaces what this one cannot see. Such a
        direct call is a miscompile, so `final` is the only way to one. */
-    if (t->kind == TYPE_POINTER && s->kind == TYPE_CLASS &&
-        member != NULL && member->pub && !member->is_final && !s->is_final) {
+    if ((t->kind == TYPE_POINTER || names_sub_object(field->as.field.base)) &&
+        s->kind == TYPE_CLASS && member != NULL && member->pub &&
+        !member->is_final && !s->is_final) {
         call->as.call.dispatch = s;
         call->as.call.entry = field->as.field.name;
     }
