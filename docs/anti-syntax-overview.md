@@ -135,9 +135,9 @@ let (sum, f) = a + b;
 if f.carry { }
 ```
 
-`let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. A carry in is `a + b + f.carry`.
+`let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. A carry in is `a + b + f.carry`. `mul_high(a, b)` gives the upper half of the full product.
 
-Built: `x in lo..hi`, `??` and `?.`. Not built yet: wrapping and saturating operators and `Flags`.
+Built: `x in lo..hi`, `??` and `?.`, the wrapping and saturating operators, `mul_high` and `Flags`, with `adc` and `adcs` for a carry in.
 
 ## Statements
 
