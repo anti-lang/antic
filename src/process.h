@@ -9,6 +9,12 @@
    standard output and standard error. */
 int process_run(const char *const argv[]);
 
+/* Run a program as process_run does, with directory as its working
+   directory, where every relative path of its arguments then starts. A
+   relative argv[0] with a separator names the program from directory as
+   well, and a bare name is found through PATH. */
+int process_run_in(const char *directory, const char *const argv[]);
+
 /* Run a program as process_run does and append its standard output to
    out. */
 int process_capture(const char *const argv[], struct text *out);

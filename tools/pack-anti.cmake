@@ -173,17 +173,19 @@ function(build_program host output program)
         endif()
         file(MAKE_DIRECTORY "${SYMBOLS}/${host}")
         list(APPEND link -Wl,/DEBUG "-Wl,/PDBALTPATH:%_PDB%"
-             -Wl,/pdbsourcepath:. -Wl,/ignore:4099
-             "-Wl,/PDB:${SYMBOLS}/${host}/${program}.pdb")
+             -Wl,/pdbsourcepath:. -Wl,/ignore:4099)
     endif()
-    if(host MATCHES "^linux-")
-        # The clang driver looks for the start files of gcc on Linux, so
-        # the objects go to ld.lld with the musl ones instead.
+    # The clang driver looks for the start files of gcc on Linux, so the
+    # objects go to ld.lld with the musl ones instead. A Windows program
+    # links from objects too, which the link names by relative paths. The
+    # objects stand outside the tree of the package, which is
+    # work/<host>/anti.
+    if(host MATCHES "^linux-|^windows-")
         set(objects "")
-        file(MAKE_DIRECTORY "${DEST}/work/${host}/${program}")
+        file(MAKE_DIRECTORY "${DEST}/work/${host}/objects/${program}")
         foreach(source IN LISTS sources)
             get_filename_component(name "${source}" NAME_WE)
-            set(object "${DEST}/work/${host}/${program}/${name}.o")
+            set(object "${DEST}/work/${host}/objects/${program}/${name}.o")
             execute_process(COMMAND "${CLANG}" ${common} -c -o "${object}"
                                     "${source}" RESULT_VARIABLE failed)
             if(failed)
@@ -191,6 +193,8 @@ function(build_program host output program)
             endif()
             list(APPEND objects "${object}")
         endforeach()
+    endif()
+    if(host MATCHES "^linux-")
         set(lib "${SYSROOT}/${host}/usr/lib")
         execute_process(
             COMMAND "${LLVM_BIN}/ld.lld" -static -pie --no-dynamic-linker
@@ -198,6 +202,25 @@ function(build_program host output program)
                     "${lib}/libc.a" "${lib}/libclang_rt.builtins.a"
                     "${lib}/crtn.o"
             RESULT_VARIABLE failed)
+    elseif(host MATCHES "^windows-")
+        # DESIGN: the link runs in the directory of the output and names
+        # the objects, the PDB and the output relative to it, as antic
+        # links a Windows program. lld-link records each of them and the
+        # whole command line in the PDB, which the symbols archive ships.
+        get_filename_component(out_dir "${output}" DIRECTORY ABSOLUTE)
+        get_filename_component(out_name "${output}" NAME)
+        set(relative "")
+        foreach(object IN LISTS objects)
+            get_filename_component(object "${object}" ABSOLUTE)
+            file(RELATIVE_PATH path "${out_dir}" "${object}")
+            list(APPEND relative "${path}")
+        endforeach()
+        get_filename_component(pdb "${SYMBOLS}/${host}/${program}.pdb" ABSOLUTE)
+        file(RELATIVE_PATH pdb "${out_dir}" "${pdb}")
+        execute_process(COMMAND "${CLANG}" --target=${triple} -fms-runtime-lib=dll
+                                ${link} "-Wl,/PDB:${pdb}" -o "${out_name}"
+                                ${relative}
+                        WORKING_DIRECTORY "${out_dir}" RESULT_VARIABLE failed)
     else()
         execute_process(COMMAND "${CLANG}" ${common} ${link} -o "${output}"
                                 ${sources} RESULT_VARIABLE failed)

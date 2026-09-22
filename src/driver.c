@@ -23,6 +23,7 @@
 #include "sha256.h"
 #include "parser.h"
 #include "sema.h"
+#include "selfpath.h"
 #include "types.h"
 #include "process.h"
 #include "text.h"
@@ -427,12 +428,134 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     return true;
 }
 
+/* DESIGN: a Windows link runs in the directory of its output. The object
+   files, the PDB and the output are named relative to that directory, and
+   so is a runtime archive given by a relative path. lld-link and link.exe
+   record the path of every object and the whole command line in the PDB.
+   The PDB goes into the symbols archive of a release, and a path of the
+   build in it would ship. An absolute runtime archive, such as
+   the one of an install, stays as given, and so do its linker and its
+   sysroot. */
+struct windows_link {
+    struct arena arena;
+    struct text directory;      /* where the link runs, empty for here */
+    struct text base;           /* the absolute form of that directory */
+};
+
+static const char *windows_keep(struct windows_link *w, const struct text *t)
+{
+    char *copy = arena_alloc(&w->arena, t->length + 1);
+
+    memcpy(copy, text_cstr(t), t->length + 1);
+    return copy;
+}
+
+/* path as the link names it from its directory. A relative path, and any
+   path when relative is set, is relative to that directory unless it
+   stands on another root. Any other path stays as given. */
+static const char *windows_path(struct windows_link *w, const char *path,
+                                bool relative)
+{
+    struct text absolute = {0};
+    struct text from = {0};
+    const char *result = path;
+
+    if (path == NULL || (!relative && path_is_absolute(path))) {
+        return path;
+    }
+    if (absolute_path(path, &absolute)) {
+        result = link_relative(&from, text_cstr(&absolute), text_cstr(&w->base))
+                     ? windows_keep(w, &from)
+                     : windows_keep(w, &absolute);
+    }
+    text_free(&absolute);
+    text_free(&from);
+    return result;
+}
+
+/* Name the paths of in, and the .def file of a DLL, from the directory of
+   in->executable, where the link runs. */
+static bool windows_link_paths(struct windows_link *w, struct link_inputs *in,
+                               const char **def_file)
+{
+    const char *exe = in->executable;
+    const char *cut = NULL;
+    const char **extra;
+    const char *p;
+    size_t i;
+
+    for (p = exe; *p != '\0'; p++) {
+#if defined(_WIN32)
+        if (*p == '\\') {
+            cut = p;
+        }
+#endif
+        if (*p == '/') {
+            cut = p;
+        }
+    }
+    if (cut != NULL) {
+        text_appendf(&w->directory, "%.*s", cut == exe ? 1 : (int)(cut - exe),
+                     exe);
+    }
+    if (!absolute_path(cut != NULL ? text_cstr(&w->directory) : ".", &w->base)) {
+        fprintf(stderr, "antic: cannot find the directory of %s\n", exe);
+        return false;
+    }
+    if (cut != NULL) {
+        w->directory.length = 0;
+        text_append(&w->directory, text_cstr(&w->base));
+#if defined(_WIN32)
+        for (i = 0; i < w->directory.length; i++) {
+            if (w->directory.data[i] == '/') {
+                w->directory.data[i] = '\\';
+            }
+        }
+#endif
+    }
+    in->object = windows_path(w, in->object, true);
+    in->executable = windows_path(w, in->executable, true);
+    if (def_file != NULL) {
+        *def_file = windows_path(w, *def_file, true);
+    }
+    extra = arena_alloc(&w->arena, (in->extra_count + 1) * sizeof *extra);
+    for (i = 0; i < in->extra_count; i++) {
+        extra[i] = windows_path(w, in->extra[i], true);
+    }
+    in->extra = extra;
+    in->runtime = windows_path(w, in->runtime, false);
+    in->sysroot = windows_path(w, in->sysroot, false);
+    in->lld_dir = windows_path(w, in->lld_dir, false);
+    return true;
+}
+
+static void windows_link_free(struct windows_link *w)
+{
+    arena_free(&w->arena);
+    text_free(&w->directory);
+    text_free(&w->base);
+}
+
+/* Run the command of a link, a Windows link in the directory it names. */
+static bool run_link(const struct windows_link *w, const struct link_command *c)
+{
+    const char *directory = w->directory.length > 0 ? text_cstr(&w->directory)
+                                                    : NULL;
+
+    if (process_run_in(directory, c->argv) != 0) {
+        fprintf(stderr, "antic: the linker failed\n");
+        return false;
+    }
+    return true;
+}
+
 static bool link_program(const struct options *o, const char *object,
                          const char *executable)
 {
     struct link_inputs in;
     struct link_command command;
     struct link_facts facts;
+    struct windows_link w;
     bool ok;
 
     memset(&in, 0, sizeof in);
@@ -443,15 +566,16 @@ static bool link_program(const struct options *o, const char *object,
     in.extra_count = o->object_count;
     in.frameworks = o->frameworks;
     in.framework_count = o->framework_count;
-    ok = link_facts(o, &in, &facts);
+    memset(&w, 0, sizeof w);
+    ok = link_facts(o, &in, &facts) &&
+         (target_info(o->target)->os != OS_WINDOWS ||
+          windows_link_paths(&w, &in, NULL));
     if (ok) {
         link_command(&command, o->target, &in);
-        ok = process_run(command.argv) == 0;
-        if (!ok) {
-            fprintf(stderr, "antic: the linker failed\n");
-        }
+        ok = run_link(&w, &command);
         link_command_free(&command);
     }
+    windows_link_free(&w);
     link_facts_free(&facts);
     return ok;
 }
@@ -1746,6 +1870,7 @@ static bool build_c_library(const struct options *o, const char *object,
         struct link_command c;
         struct shared_options s = {NULL, NULL, NULL};
         struct link_facts facts;
+        struct windows_link w;
         struct text def = {0};
         struct text versioned = {0};
         memset(&in, 0, sizeof in);
@@ -1787,12 +1912,15 @@ static bool build_c_library(const struct options *o, const char *object,
             text_free(&content);
         }
         memset(&facts, 0, sizeof facts);
-        ok = ok && link_facts(o, &in, &facts);
+        memset(&w, 0, sizeof w);
+        ok = ok && link_facts(o, &in, &facts) &&
+             (info->os != OS_WINDOWS || windows_link_paths(&w, &in, &s.def_file));
         if (ok) {
             link_shared_command(&c, o->target, &in, &s);
-            ok = run_command(&c, "the linker");
+            ok = run_link(&w, &c);
             link_command_free(&c);
         }
+        windows_link_free(&w);
         /* DESIGN: with --soname a Linux library is lib<name>.so.<major>,
            and lib<name>.so links to it for the C compiler. */
         if (ok && versioned.length > 0) {

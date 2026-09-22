@@ -9,8 +9,8 @@
 #include "text.h"
 
 /* The runtime archive keeps the runtime of each target and processor
-   level in <runtime>/RUNTIME_LIB_DIR/<target>/<level>/, so that a program
-   built with --cpu below the target's default links a runtime of its own
+   level in <runtime>/RUNTIME_LIB_DIR/<target>/<level>/. A program built
+   with --cpu below the target's default then links a runtime of its own
    level. The native libraries stay in <runtime>/RUNTIME_LIB_DIR/<target>/
    and are built for the default level alone. The sysroot that lld links
    against is <runtime>/RUNTIME_SYSROOT_DIR/<target>/, and the pinned LLVM
@@ -116,6 +116,12 @@ bool link_is_input(const char *path);
    runtime. */
 void link_runtime_library(struct text *out, const char *runtime, enum target t,
                           enum cpu_level cpu);
+
+/* Append the path of path relative to the directory directory. Both are
+   absolute and separate their parts with '/', and neither holds `.` or
+   `..`. Returns false when the two stand on different roots, a drive or a
+   share of Windows, and no relative path joins them. */
+bool link_relative(struct text *out, const char *path, const char *directory);
 
 /* The directories that may hold the glibc start files for a Linux target,
    in the order of search, ending with NULL. */

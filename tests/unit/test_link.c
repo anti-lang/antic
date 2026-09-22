@@ -87,7 +87,8 @@ static bool holds(const struct link_command *c, const char *argument)
    debug directory. That record is the build id of a Windows program, and
    it is no debug information. /PDBALTPATH:%_PDB% keeps the path of the machine
    that linked it out of that record, and /pdbsourcepath:. keeps the
-   directory of the link out of the file names of the PDB. */
+   directory of the link out of the file names of the PDB. link.exe knows
+   no /pdbsourcepath and never gets it. */
 static void strips_debug(void)
 {
     static const enum target targets[] = {
@@ -152,6 +153,56 @@ static void strips_debug(void)
             CHECK(!holds(&c, want));
         }
         link_command_free(&c);
+
+        if (windows) {
+            in = windows_inputs;
+            link_command(&c, t, &in);
+            CHECK(holds(&c, "/DEBUG"));
+            CHECK(holds(&c, "/PDBALTPATH:%_PDB%"));
+            CHECK(!holds(&c, "/pdbsourcepath:."));
+            link_command_free(&c);
+            link_shared_command(&c, t, &in, &none);
+            CHECK(holds(&c, "/DEBUG"));
+            CHECK(!holds(&c, "/pdbsourcepath:."));
+            link_command_free(&c);
+        }
+    }
+}
+
+/* A Windows link runs in the directory of its output, and names each
+   path relative to that directory. Two paths on different roots have no
+   relative path. */
+static void relative_paths(void)
+{
+    static const char *const cases[][3] = {
+        {"/a/b/c/prog.obj", "/a/b/c", "prog.obj"},
+        {"/a/b/runtime/lib/anti_rt.lib", "/a/b/tests/w",
+         "../../runtime/lib/anti_rt.lib"},
+        {"/a//b/x.obj", "/a/b/", "x.obj"},
+        {"/x.obj", "/", "x.obj"},
+        {"/a", "/a/b/c", "../.."},
+        {"C:/w/prog.obj", "C:/w", "prog.obj"},
+        {"c:/rt/anti_rt.lib", "C:/w/out", "../../rt/anti_rt.lib"},
+        {"//host/share/a/x.obj", "//host/share/b", "../a/x.obj"},
+    };
+    static const char *const apart[][2] = {
+        {"C:/w/prog.obj", "D:/w"},
+        {"//host/one/x.obj", "//host/two/w"},
+        {"//one/share/x.obj", "//two/share/w"},
+        {"/a/x.obj", "C:/a"},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        struct text out = {0};
+        CHECK(link_relative(&out, cases[i][0], cases[i][1]));
+        CHECK_STR(text_cstr(&out), cases[i][2]);
+        text_free(&out);
+    }
+    for (i = 0; i < sizeof apart / sizeof apart[0]; i++) {
+        struct text out = {0};
+        CHECK(!link_relative(&out, apart[i][0], apart[i][1]));
+        text_free(&out);
     }
 }
 
@@ -312,8 +363,8 @@ static void libraries(void)
     win.object = "geo.obj";
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
-           "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /DLL /MACHINE:ARM64 /OUT:geo.dll "
-           "/DEF:geo.def "
+           "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /DLL /MACHINE:ARM64 /OUT:geo.dll "
+           "/PDB:geo.pdb /DEF:geo.def "
            "geo.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
            "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
@@ -349,7 +400,7 @@ static void libraries(void)
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
            "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /DLL /MACHINE:ARM64 "
-           "/OUT:geo.dll "
+           "/OUT:geo.dll /PDB:geo.pdb "
            "/DEF:geo.def /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 geo.obj "
@@ -431,6 +482,7 @@ void test_link(void)
     libraries();
     frameworks();
     strips_debug();
+    relative_paths();
     runtime_entry();
     runtime_markers();
     runtime_licence(ANTIC_SOURCE_DIR "/rt/LICENSE");
@@ -452,12 +504,12 @@ void test_link(void)
           "prog.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "-L/usr/lib/x86_64-linux-gnu -lc /usr/lib/x86_64-linux-gnu/crtn.o");
     links(TARGET_WINDOWS_X86_64, &windows_inputs,
-          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
-          "prog.obj C:/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
+          "/PDB:prog.pdb prog.obj C:/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
     links(TARGET_WINDOWS_ARM64, &windows_inputs,
-          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
-          "/OUT:prog.exe "
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
+          "/OUT:prog.exe /PDB:prog.pdb "
           "prog.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
@@ -480,7 +532,7 @@ void test_link(void)
     links(TARGET_WINDOWS_X86_64, &lld_windows_inputs,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /SUBSYSTEM:CONSOLE "
           "/MACHINE:X64 "
-          "/OUT:prog.exe /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
+          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 prog.obj "
           "/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib libvcruntime.lib "
@@ -491,7 +543,8 @@ void test_link(void)
         no_sysroot.lld_dir = NULL;
         links(TARGET_WINDOWS_ARM64, &no_sysroot,
               "lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
-              "/OUT:prog.exe prog.obj /rt/lib/windows-arm64/armv8.2/anti_rt.lib "
+              "/OUT:prog.exe /PDB:prog.pdb prog.obj "
+              "/rt/lib/windows-arm64/armv8.2/anti_rt.lib "
               "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
     }
 
@@ -507,8 +560,8 @@ void test_link(void)
           "prog.o shapes.o libm.a /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "-L/usr/lib/aarch64-linux-gnu -lc /usr/lib/aarch64-linux-gnu/crtn.o");
     links(TARGET_WINDOWS_ARM64, &extra_windows_inputs,
-          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
-          "prog.obj shapes.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
+          "/PDB:prog.pdb prog.obj shapes.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
     /* The directories that may hold the start files of glibc, in order. */

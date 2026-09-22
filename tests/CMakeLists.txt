@@ -889,7 +889,7 @@ foreach(target windows-x86_64 windows-arm64)
 endforeach()
 
 # The PDB of a Windows program names every function of it, in a release
-# build and in one with -g.
+# build and in one with -g, and holds no path of the build.
 foreach(target windows-x86_64 windows-arm64)
     add_test(NAME pdb_names_${target}
         COMMAND "${CMAKE_COMMAND}"
@@ -900,6 +900,7 @@ foreach(target windows-x86_64 windows-arm64)
             "-DNAMES=_A11stack_trace_inner;_A11stack_trace_outer;_A11stack_trace_skipped;_A11stack_trace_put;_A11stack_trace_main"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb-names"
             "-DTARGET=${target}"
+            "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pdb_names.cmake")
     set_tests_properties(pdb_names_${target} PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")

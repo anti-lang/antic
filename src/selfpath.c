@@ -1,4 +1,5 @@
-/* readlink, stat and PATH_MAX are POSIX, outside the C11 library. */
+/* readlink, realpath, stat and PATH_MAX are POSIX, outside the C11
+   library. */
 #define _POSIX_C_SOURCE 200809L
 
 /* DESIGN: an installed antic sits in bin/ of the runtime archive, so the
@@ -8,6 +9,7 @@
 
 #include "selfpath.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #if !defined(_WIN32)
@@ -108,6 +110,89 @@ bool directory_exists(const char *path)
     struct stat info;
 
     return stat(path, &info) == 0 && S_ISDIR(info.st_mode);
+}
+
+#endif
+
+#if defined(_WIN32)
+
+bool path_is_absolute(const char *path)
+{
+    return path[0] == '/' || path[0] == '\\' ||
+           (path[0] != '\0' && path[1] == ':' &&
+            (path[2] == '/' || path[2] == '\\'));
+}
+
+bool absolute_path(const char *path, struct text *out)
+{
+    int count = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
+    wchar_t *wide;
+    wchar_t *full;
+    DWORD length;
+    char *bytes;
+    bool ok = false;
+    int i;
+
+    if (count <= 0 || (wide = malloc((size_t)count * sizeof *wide)) == NULL) {
+        return false;
+    }
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wide, count);
+    length = GetFullPathNameW(wide, 0, NULL, NULL);
+    full = length > 0 ? malloc((size_t)length * sizeof *full) : NULL;
+    if (full != NULL && GetFullPathNameW(wide, length, full, NULL) > 0) {
+        count = WideCharToMultiByte(CP_UTF8, 0, full, -1, NULL, 0, NULL, NULL);
+        bytes = count > 0 ? malloc((size_t)count) : NULL;
+        if (bytes != NULL &&
+            WideCharToMultiByte(CP_UTF8, 0, full, -1, bytes, count, NULL,
+                                NULL) > 0) {
+            for (i = 0; bytes[i] != '\0'; i++) {
+                bytes[i] = bytes[i] == '\\' ? '/' : bytes[i];
+            }
+            text_append(out, bytes);
+            ok = true;
+        }
+        free(bytes);
+    }
+    free(full);
+    free(wide);
+    return ok;
+}
+
+#else
+
+bool path_is_absolute(const char *path)
+{
+    return path[0] == '/';
+}
+
+bool absolute_path(const char *path, struct text *out)
+{
+    char *real = realpath(path, NULL);
+    const char *slash;
+    struct text directory = {0};
+
+    if (real != NULL) {
+        text_append(out, real);
+        free(real);
+        return true;
+    }
+    slash = strrchr(path, '/');
+    if (slash == NULL) {
+        text_append(&directory, ".");
+    } else if (slash == path) {
+        text_append(&directory, "/");
+    } else {
+        text_appendf(&directory, "%.*s", (int)(slash - path), path);
+    }
+    real = realpath(text_cstr(&directory), NULL);
+    text_free(&directory);
+    if (real == NULL) {
+        return false;
+    }
+    text_appendf(out, "%s%s%s", real, strcmp(real, "/") == 0 ? "" : "/",
+                 slash != NULL ? slash + 1 : path);
+    free(real);
+    return true;
 }
 
 #endif

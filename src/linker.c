@@ -187,18 +187,39 @@ static void linux_lld(struct link_command *c, enum target t,
    holds a build path. lld-link makes each relative file name of a PDB
    absolute against the directory of the link. With the flag, a line table
    names its source by the path under the search root. link.exe knows no
-   such flag and says so with warning LNK4044.
+   such flag and says so with warning LNK4044, so it goes to lld-link
+   alone.
 
    The objects of the Microsoft C runtime name PDBs that no machine here
    holds, and lld-link warns once per object when it cannot read one.
    /ignore:4099 drops that warning, which says nothing about the program
    being linked. */
-static void windows_debug(struct link_command *c)
+static void windows_debug(struct link_command *c, const struct link_inputs *in)
 {
     add(c, "/DEBUG");
     add(c, "/PDBALTPATH:%_PDB%");
-    add(c, "/pdbsourcepath:.");
+    if (in->linker == LINKER_LLD) {
+        add(c, "/pdbsourcepath:.");
+    }
     add(c, "/ignore:4099");
+}
+
+/* The output and the PDB of a Windows link. The PDB takes the name of the
+   output with its suffix replaced, as the linker names it by default, and
+   stands beside it. */
+static void windows_output(struct link_command *c, const struct link_inputs *in)
+{
+    struct text *output = next(c);
+    struct text *pdb = next(c);
+    const char *name = in->executable;
+    const char *slash = strrchr(name, '/');
+    const char *dot = strrchr(slash != NULL ? slash : name, '.');
+
+    text_appendf(output, "/OUT:%s", name);
+    text_appendf(pdb, "/PDB:%.*s.pdb",
+                 (int)(dot != NULL ? (size_t)(dot - name) : strlen(name)), name);
+    add(c, text_cstr(output));
+    add(c, text_cstr(pdb));
 }
 
 /* The library directories of lld-link: the CRT and the SDK that xwin
@@ -271,18 +292,16 @@ static void windows(struct link_command *c, enum target t,
                     const struct link_inputs *in)
 {
     const char *linker = program(c, in, "lld-link", "link.exe");
-    struct text *output = next(c);
     struct text *library = next(c);
 
-    text_appendf(output, "/OUT:%s", in->executable);
     link_runtime_library(library, in->runtime, t, in->cpu);
     add(c, linker);
     add(c, "/NOLOGO");
-    windows_debug(c);
+    windows_debug(c, in);
     add(c, "/SUBSYSTEM:CONSOLE");
     add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                               : "/MACHINE:X64");
-    add(c, text_cstr(output));
+    windows_output(c, in);
     windows_libpaths(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
@@ -411,17 +430,15 @@ void link_shared_command(struct link_command *c, enum target t,
     }
     case OS_WINDOWS: {
         const char *linker = program(c, in, "lld-link", "link.exe");
-        struct text *output = next(c);
         struct text *def = next(c);
-        text_appendf(output, "/OUT:%s", in->executable);
         text_appendf(def, "/DEF:%s", s->def_file != NULL ? s->def_file : "");
         add(c, linker);
         add(c, "/NOLOGO");
-        windows_debug(c);
+        windows_debug(c, in);
         add(c, "/DLL");
         add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                                   : "/MACHINE:X64");
-        add(c, text_cstr(output));
+        windows_output(c, in);
         add(c, text_cstr(def));
         windows_libpaths(c, t, in);
         add_inputs(c, in);
@@ -495,4 +512,95 @@ void link_line(struct text *out, enum target t, const char *library,
     if (target_info(t)->os == OS_LINUX) {
         text_append(out, " -lpthread -lm");
     }
+}
+
+/* The length of the root of an absolute path. That is a drive such as
+   `C:`, the host and share of a path that starts with `//`, or nothing. */
+static size_t root_length(const char *path)
+{
+    size_t n = 0;
+    int parts = 0;
+
+    if (strncmp(path, "//", 2) != 0) {
+        return strcspn(path, "/");
+    }
+    n = 2;
+    while (parts < 2 && path[n] != '\0') {
+        n += strcspn(path + n, "/");
+        parts++;
+        if (parts < 2 && path[n] == '/') {
+            n++;
+        }
+    }
+    return n;
+}
+
+static bool same_root(const char *a, size_t n, const char *b, size_t m)
+{
+    size_t i;
+
+    if (n != m) {
+        return false;
+    }
+    for (i = 0; i < n; i++) {
+        char x = a[i] >= 'A' && a[i] <= 'Z' ? (char)(a[i] - 'A' + 'a') : a[i];
+        char y = b[i] >= 'A' && b[i] <= 'Z' ? (char)(b[i] - 'A' + 'a') : b[i];
+        if (x != y) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* The next part of a path after at, skipping empty parts. Returns its
+   length, 0 at the end. */
+static size_t part(const char *path, size_t *at)
+{
+    while (path[*at] == '/') {
+        (*at)++;
+    }
+    return strcspn(path + *at, "/");
+}
+
+bool link_relative(struct text *out, const char *path, const char *directory)
+{
+    size_t root = root_length(path);
+    size_t at = root;
+    size_t from = root_length(directory);
+    size_t start = out->length;
+    size_t n;
+    size_t m;
+
+    if (!same_root(path, root, directory, from)) {
+        return false;
+    }
+    /* The parts the two share. */
+    for (;;) {
+        size_t a = at;
+        size_t b = from;
+        n = part(path, &a);
+        m = part(directory, &b);
+        if (n == 0 || n != m || strncmp(path + a, directory + b, n) != 0) {
+            at = a;
+            from = b;
+            break;
+        }
+        at = a + n;
+        from = b + m;
+    }
+    /* A `..` for each part of the directory left, then the rest of the
+       path. */
+    while ((m = part(directory, &from)) > 0) {
+        text_append(out, out->length > start ? "/.." : "..");
+        from += m;
+    }
+    while ((n = part(path, &at)) > 0) {
+        text_appendf(out, "%s%.*s", out->length > start ? "/" : "", (int)n,
+                     path + at);
+        at += n;
+    }
+    if (out->length == start) {
+        text_append(out, ".");
+    }
+    return true;
 }

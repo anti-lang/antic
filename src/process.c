@@ -1,4 +1,5 @@
-/* posix_spawn and waitpid are POSIX, outside the C11 library. */
+/* posix_spawn, fork, chdir and waitpid are POSIX, outside the C11
+   library. */
 #define _POSIX_C_SOURCE 200809L
 
 #include "process.h"
@@ -83,15 +84,43 @@ static int wait_for(HANDLE process, const char *name)
     return (int)code;
 }
 
-/* Start argv[0] with the command line that argv spells. Without an
-   application name CreateProcessW searches PATH and appends .exe, as a
-   shell does. */
-static int start(const char *const argv[], HANDLE output,
-                 PROCESS_INFORMATION *info)
+/* The program that a relative path with a separator names from
+   directory, with .exe when its name has no suffix. CreateProcessW would
+   look for it from the directory of antic. */
+static wchar_t *program_in(const char *directory, const char *program)
+{
+    struct text path = {0};
+    const char *name = program;
+    const char *p;
+    wchar_t *wide;
+
+    for (p = program; *p != '\0'; p++) {
+        if (*p == '/' || *p == '\\') {
+            name = p + 1;
+        }
+    }
+    if (directory == NULL || name == program || program[0] == '/' ||
+        program[0] == '\\' || (program[0] != '\0' && program[1] == ':')) {
+        return NULL;
+    }
+    text_appendf(&path, "%s\\%s%s", directory, program,
+                 strchr(name, '.') == NULL ? ".exe" : "");
+    wide = widen(text_cstr(&path));
+    text_free(&path);
+    return wide;
+}
+
+/* Start argv[0] with the command line that argv spells, in directory or
+   in the current one. Without an application name CreateProcessW searches
+   PATH and appends .exe, as a shell does. */
+static int start(const char *directory, const char *const argv[],
+                 HANDLE output, PROCESS_INFORMATION *info)
 {
     struct text line = {0};
     STARTUPINFOW startup;
     wchar_t *wide;
+    wchar_t *wide_directory = NULL;
+    wchar_t *application;
     size_t i;
     BOOL started;
 
@@ -103,8 +132,12 @@ static int start(const char *const argv[], HANDLE output,
     }
     wide = widen(text_cstr(&line));
     text_free(&line);
-    if (wide == NULL) {
+    if (directory != NULL) {
+        wide_directory = widen(directory);
+    }
+    if (wide == NULL || (directory != NULL && wide_directory == NULL)) {
         fprintf(stderr, "antic: cannot run %s: out of memory\n", argv[0]);
+        free(wide);
         return -1;
     }
     memset(&startup, 0, sizeof startup);
@@ -115,9 +148,12 @@ static int start(const char *const argv[], HANDLE output,
         startup.hStdOutput = output;
         startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
     }
-    started = CreateProcessW(NULL, wide, NULL, NULL, output != NULL, 0, NULL,
-                             NULL, &startup, info);
+    application = program_in(directory, argv[0]);
+    started = CreateProcessW(application, wide, NULL, NULL, output != NULL, 0,
+                             NULL, wide_directory, &startup, info);
     free(wide);
+    free(wide_directory);
+    free(application);
     if (!started) {
         fprintf(stderr, "antic: cannot run %s: error %lu\n", argv[0],
                 (unsigned long)GetLastError());
@@ -126,18 +162,23 @@ static int start(const char *const argv[], HANDLE output,
     return 0;
 }
 
-int process_run(const char *const argv[])
+int process_run_in(const char *directory, const char *const argv[])
 {
     PROCESS_INFORMATION info;
     int status;
 
-    if (start(argv, NULL, &info) != 0) {
+    if (start(directory, argv, NULL, &info) != 0) {
         return -1;
     }
     status = wait_for(info.hProcess, argv[0]);
     CloseHandle(info.hProcess);
     CloseHandle(info.hThread);
     return status;
+}
+
+int process_run(const char *const argv[])
+{
+    return process_run_in(NULL, argv);
 }
 
 int process_capture(const char *const argv[], struct text *out)
@@ -160,7 +201,7 @@ int process_capture(const char *const argv[], struct text *out)
     }
     /* The child writes into the pipe and never reads from it. */
     SetHandleInformation(reader, HANDLE_FLAG_INHERIT, 0);
-    if (start(argv, writer, &info) != 0) {
+    if (start(NULL, argv, writer, &info) != 0) {
         CloseHandle(reader);
         CloseHandle(writer);
         return -1;
@@ -226,6 +267,35 @@ int process_run(const char *const argv[])
 
     if (spawn(argv, NULL, &pid) != 0) {
         return -1;
+    }
+    return wait_for(pid, argv[0]);
+}
+
+/* DESIGN: posix_spawn sets no working directory before POSIX.1-2024, so
+   the child changes to it between fork and exec. The child calls only
+   chdir, execvp and _exit there, and a message on failure. */
+int process_run_in(const char *directory, const char *const argv[])
+{
+    pid_t pid;
+
+    if (directory == NULL) {
+        return process_run(argv);
+    }
+    pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "antic: cannot run %s: %s\n", argv[0], strerror(errno));
+        return -1;
+    }
+    if (pid == 0) {
+        if (chdir(directory) != 0) {
+            fprintf(stderr, "antic: cannot enter %s: %s\n", directory,
+                    strerror(errno));
+        } else {
+            execvp(argv[0], (char *const *)argv);
+            fprintf(stderr, "antic: cannot run %s: %s\n", argv[0],
+                    strerror(errno));
+        }
+        _exit(127);
     }
     return wait_for(pid, argv[0]);
 }
