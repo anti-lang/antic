@@ -96,6 +96,7 @@ foreach(pair "windows-x86_64=x86_64-pc-windows-msvc=X64"
     foreach(program antic anti)
         execute_process(
             COMMAND "${LLVM_BIN}/lld-link" /NOLOGO /DEBUG "/PDBALTPATH:%_PDB%"
+                    /pdbsourcepath:.
                     /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE /NODEFAULTLIB
                     "/MACHINE:${machine}"
                     "/OUT:${WORK}/fixture/${host}/${program}.exe"

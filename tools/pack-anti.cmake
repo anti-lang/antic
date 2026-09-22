@@ -162,15 +162,18 @@ function(build_program host output program)
         # 4 of the release folds it into the symbols archive of the host.
         # /PDBALTPATH:%_PDB% keeps the CodeView record of the executable
         # to the file name of the PDB, so the path of this machine does
-        # not ship. /ignore:4099 drops the warning that the objects of the
-        # Microsoft C runtime name PDBs no machine here holds.
+        # not ship. /pdbsourcepath:. keeps the directory of the link out of
+        # the relative file names of the PDB. /ignore:4099 drops the
+        # warning that the objects of the Microsoft C runtime name PDBs no
+        # machine here holds.
         if(NOT DEFINED SYMBOLS)
             message(FATAL_ERROR "${host}: a Windows program is linked with "
                                 "/DEBUG, and SYMBOLS names the directory its "
                                 "PDB goes in")
         endif()
         file(MAKE_DIRECTORY "${SYMBOLS}/${host}")
-        list(APPEND link -Wl,/DEBUG "-Wl,/PDBALTPATH:%_PDB%" -Wl,/ignore:4099
+        list(APPEND link -Wl,/DEBUG "-Wl,/PDBALTPATH:%_PDB%"
+             -Wl,/pdbsourcepath:. -Wl,/ignore:4099
              "-Wl,/PDB:${SYMBOLS}/${host}/${program}.pdb")
     endif()
     if(host MATCHES "^linux-")

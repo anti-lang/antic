@@ -183,6 +183,11 @@ static void linux_lld(struct link_command *c, enum target t,
    symbols of its own build. Those symbols are what the archive of a
    release carries. /PDBALTPATH:%_PDB% keeps the record to the file name,
    so no path of the machine that linked the program goes out with it.
+   /pdbsourcepath:. is the Windows form of the rule that nothing shipped
+   holds a build path. lld-link makes each relative file name of a PDB
+   absolute against the directory of the link. With the flag, a line table
+   names its source by the path under the search root. link.exe knows no
+   such flag and says so with warning LNK4044.
 
    The objects of the Microsoft C runtime name PDBs that no machine here
    holds, and lld-link warns once per object when it cannot read one.
@@ -192,6 +197,7 @@ static void windows_debug(struct link_command *c)
 {
     add(c, "/DEBUG");
     add(c, "/PDBALTPATH:%_PDB%");
+    add(c, "/pdbsourcepath:.");
     add(c, "/ignore:4099");
 }
 
