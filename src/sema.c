@@ -9662,12 +9662,16 @@ static bool c_representable(const struct type *t, bool field,
         return t->result->kind == TYPE_VOID ||
                c_representable(t->result, false, hidden);
     /* Flags crosses as the struct of four bools that the header writes
-       for it. */
+       for it. A Mutex and a channel hold a handle of the runtime, which
+       C has no declaration of. */
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
         if (t->item_exported || is_error_class(t) || types_is_flags(t)) {
             return true;
+        }
+        if (types_is_mutex(t) || types_is_chan(t)) {
+            return false;
         }
         *hidden = t;
         return false;

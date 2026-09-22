@@ -387,6 +387,13 @@ void test_sync(void)
             "`Mutex.new` takes no arguments");
     rejects("fn f(c: chan int) { let d = dup(c); }\n", 1, 33,
             "`dup` needs a class pointer, found `chan int`");
+    /* C has no form of either, so an export refuses both. */
+    rejects("export fn f(m: *Mutex) { }\n", 1, 13,
+            "the parameter `m` of export fn `f` has type `*Mutex`, which C "
+            "cannot represent");
+    rejects("export fn f(c: chan int) { }\n", 1, 13,
+            "the parameter `c` of export fn `f` has type `chan int`, which "
+            "C cannot represent");
     rejects("worker fn w(chunk: []int, c: chan int) -> int {\n"
             "    delete(c);\n"
             "    return 0;\n"
