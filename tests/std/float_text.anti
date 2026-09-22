@@ -1,0 +1,140 @@
+//! The text of a float is the same on every target. Each line writes one
+//! value in the shortest form and with a precision, in positional form and
+//! with an exponent. The values hold exact ties, which round to the even
+//! digit, the smallest and the largest double and float, and precisions
+//! that write every digit of the exact value.
+import anti.io;
+import anti.text;
+
+/// 2 to the power n, for n from -1074 to 1023, by halving or doubling,
+/// which is exact in every step.
+fn power(n: int) -> f64
+{
+	let v = 1.0;
+	let i = 0;
+	while i < n do {
+		v = v * 2.0;
+		i += 1;
+	}
+	while i > n do {
+		v = v / 2.0;
+		i -= 1;
+	}
+	return v;
+}
+
+fn line(b: *text.Builder)
+{
+	io.println(b.text());
+	b.clear();
+}
+
+fn shortest(b: *text.Builder, v: f64)
+{
+	b.append_float(v);
+	b.append_byte(0x20);
+	b.append_float(v, -1, true);
+	line(b);
+}
+
+fn fixed(b: *text.Builder, v: f64, p: int)
+{
+	b.append_float(v, p);
+	b.append_byte(0x20);
+	b.append_float(v, p, true);
+	line(b);
+}
+
+fn single(b: *text.Builder, v: f32)
+{
+	b.append_f32(v);
+	b.append_byte(0x20);
+	b.append_f32(v, -1, true);
+	b.append_byte(0x20);
+	b.append_f32(v, 3);
+	line(b);
+}
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	let tiny = power(-1074);
+	let normal = power(-1022);
+	let top = (2.0 - power(-52)) * power(1023);
+
+	shortest(&b, 0.0);
+	shortest(&b, -0.0);
+	shortest(&b, 0.1);
+	shortest(&b, 0.1 + 0.2);
+	shortest(&b, 1.0 / 3.0);
+	shortest(&b, 2.0 / 3.0);
+	shortest(&b, 1.0e23);
+	shortest(&b, 1.0e22);
+	shortest(&b, 1.0e21);
+	shortest(&b, 1.0e15);
+	shortest(&b, 1.0e16);
+	shortest(&b, 123456789012345680.0);
+	shortest(&b, 9007199254740993.0);
+	shortest(&b, 0.000123);
+	shortest(&b, 0.0000123);
+	shortest(&b, 100.0);
+	shortest(&b, 2.5e-10);
+	shortest(&b, -1.5);
+	shortest(&b, tiny);
+	shortest(&b, normal);
+	shortest(&b, top);
+	shortest(&b, 5.0e-324 * 3.0);
+	shortest(&b, 4.35);
+	shortest(&b, 0.3);
+	shortest(&b, 1.0e-7);
+	shortest(&b, 9.5e15);
+	shortest(&b, 1.7976931348623157e308);
+
+	fixed(&b, 0.5, 0);
+	fixed(&b, 1.5, 0);
+	fixed(&b, 2.5, 0);
+	fixed(&b, 3.5, 0);
+	fixed(&b, -2.5, 0);
+	fixed(&b, 9.5, 0);
+	fixed(&b, 0.25, 1);
+	fixed(&b, 0.35, 1);
+	fixed(&b, 0.45, 1);
+	fixed(&b, 0.95, 1);
+	fixed(&b, 99.95, 1);
+	fixed(&b, -0.04, 1);
+	fixed(&b, 0.125, 2);
+	fixed(&b, 0.375, 2);
+	fixed(&b, 1.005, 2);
+	fixed(&b, 999.9999, 2);
+	fixed(&b, 1.125, 2);
+	fixed(&b, 9.9995, 3);
+	fixed(&b, 0.1, 20);
+	fixed(&b, 0.1, 60);
+	fixed(&b, 1.0e22, 0);
+	fixed(&b, 1.0e23, 0);
+	fixed(&b, 1.0e300, 3);
+	fixed(&b, 1.0e-100, 2);
+	fixed(&b, tiny, 5);
+	fixed(&b, tiny, 1074);
+	fixed(&b, tiny, 760);
+	fixed(&b, normal, 20);
+	fixed(&b, top, 0);
+	fixed(&b, 0.0, 3);
+	fixed(&b, -0.0, 3);
+	fixed(&b, 123.456, 0);
+	fixed(&b, 5.0e-5, 3);
+	fixed(&b, 0.0005, 3);
+	fixed(&b, 0.0015, 3);
+
+	single(&b, 0.1);
+	single(&b, 1.0 / 3.0);
+	single(&b, 16777217.0);
+	single(&b, 3.4028235e38);
+	single(&b, (tiny * power(925)) as f32);
+	single(&b, 1.17549435e-38);
+	single(&b, 0.2);
+	single(&b, 1.0e10);
+	single(&b, 7.0e-45);
+	single(&b, 123456.7);
+	return 0;
+}

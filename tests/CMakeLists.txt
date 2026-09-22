@@ -1512,6 +1512,17 @@ endif()
 find_program(ANTIC_LLVM_AR NAMES llvm-ar
     HINTS "${ANTIC_LLVM_DIR}/bin"
     DOC "llvm-ar from LLVM 23.1.1")
+
+# The text of a float takes no digit from the C library in any runtime of
+# the archive. std/float_text.anti holds the text itself.
+if(ANTIC_LLVM_AR)
+    add_test(NAME float_digits
+        COMMAND "${CMAKE_COMMAND}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/float_digits"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_float_digits.cmake")
+endif()
 if(NOT WIN32 AND ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
             failing tuples)
