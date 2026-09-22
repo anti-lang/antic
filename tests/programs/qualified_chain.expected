@@ -1,0 +1,5 @@
+exit 0
+top 1 2 1 2
+middle 3 3 3 3
+bottom 3 4 3 4
+plain 3 3 3

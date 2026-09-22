@@ -214,9 +214,10 @@ Four levels, and each applies where it makes sense:
 - Entry 0 of every table points at the class descriptor. The remaining entries are the `pub` functions.
 - The primary table holds one entry per `pub` function of the base chain. Base entries come first in declaration order, own entries are appended. A derived class's table starts as a copy of its base's.
 - An interface table holds one entry per `pub` function of the interface and its chain, in the same order. Its entries point at thunks.
-- `concrete fn f(self)` unqualified fills every table that has an entry named `f` and no qualified body. All those entries must share one signature, or the message names the ones that differ.
+- `concrete fn f(self)` unqualified fills every table that has an entry named `f` and no qualified body of its class. All those entries must share one signature, or the message names the ones that differ.
+- The nearest body wins. An unqualified body of a derived class replaces an inherited qualified one in every table with that name, unless the derived class qualifies its own.
 - `concrete fn Circle::f(self)`, the class's own name, means the same as the unqualified form and may be written for clarity. Declaring both for one name is an error.
-- `concrete fn Serializable::f(self)`, a base or an interface, fills that table only, with that table's signature. A qualified body wins in its table over an unqualified one.
+- `concrete fn Serializable::f(self)`, a base or an interface, fills that table only, with that table's signature. A qualified body wins in its table over an unqualified one of its class.
 - `concrete` is required on every replacement. A function that matches an inherited entry without it is an error. A `concrete fn` that matches nothing is an error. A replacement of a `final fn` is an error.
 - An abstract entry is zero until a class fills it. A class with any zero entry is abstract.
 - A call through a pointer is direct when the function is `final`, the class is `final`, or release mode proves no class replaces it. Otherwise it loads the entry and calls it with the object as `self`. Release mode devirtualises across the whole program. Dev mode compiles one module and relies on `final`.

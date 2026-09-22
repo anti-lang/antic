@@ -280,15 +280,17 @@ add_test(NAME program_devirtualise_dev
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 # Qualified bodies in dev mode, where every call through an interface
 # reads a table this module wrote.
-add_test(NAME program_qualified_bodies_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/qualified_bodies.anti"
-        "-DOPTIONS=--dev"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+foreach(name IN ITEMS qualified_bodies qualified_chain)
+    add_test(NAME program_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+endforeach()
 # The registry of the classes in dev mode, where the module that links
 # writes it.
 add_test(NAME program_deserialize_dev

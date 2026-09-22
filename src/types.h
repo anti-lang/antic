@@ -259,11 +259,13 @@ bool types_is_lang_error(const struct type *t);
 /* DESIGN: a `concrete fn` fills the tables its qualifier names. One
    without a qualifier, or qualified by its own class, is a plain body. It
    fills the primary table. It also fills each interface table of its name
-   that no qualified body fills. A body qualified by a class of the base
-   chain fills the primary table alone. It wins there over a plain body of
-   the same level. Any other qualifier names an interface, and the body
-   fills its table alone. The checker, lowering and the header read the
-   tables through the functions below, so the three agree. */
+   that no qualified body of its level fills. The nearest body wins, so a
+   plain body replaces the qualified bodies of the levels above it. A body
+   qualified by a class of the base chain fills the primary table alone.
+   It wins there over a plain body of the same level. Any other qualifier
+   names an interface, and the body fills its table alone. The checker,
+   lowering and the header read the tables through the functions below,
+   so the three agree. */
 enum body_table {
     BODY_PLAIN,
     BODY_BASE,
@@ -282,8 +284,9 @@ const struct item *types_primary_member(const struct type *t,
    chain of t. A plain body beside one qualified by a base holds none. */
 bool types_holds_entry(const struct type *t, const struct item *m);
 /* The public function of the chain of t that fills the entry name of the
-   table of iface. A body qualified by a class of the chain of iface wins
-   at any level, and otherwise the plain body nearest to t fills it. */
+   table of iface. It sits at the level nearest to t that declares one.
+   There a body qualified by a class of the chain of iface comes before a
+   plain one. */
 const struct item *types_interface_member(const struct type *t,
                                           const struct type *iface,
                                           const struct name *name);

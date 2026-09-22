@@ -7330,27 +7330,25 @@ static const struct item *chain_entry(const struct type *t,
     return NULL;
 }
 
-/* Whether a level of the chain of t fills the table of iface with a
-   body qualified by a class of the chain of iface. That body wins in the
-   table over an unqualified one, as lowering fills it. */
+/* Whether the level t itself fills the table of iface with a body
+   qualified by a class of the chain of iface. That body wins in the
+   table over an unqualified one of its level, as lowering fills it. A
+   level above counts for nothing, because the nearest body wins. */
 static bool qualified_body(const struct type *t, const struct type *iface,
                            const struct name *name)
 {
-    const struct type *up;
     const struct type *chain;
     size_t i;
 
-    for (up = t; up != NULL; up = inherited(up)) {
-        for (i = 0; i < up->member_count; i++) {
-            const struct item *m = up->members[i];
-            if (m->kind != ITEM_FN || m->qualifier.length == 0 ||
-                !same_name(&m->name, name)) {
-                continue;
-            }
-            for (chain = iface; chain != NULL; chain = inherited(chain)) {
-                if (same_name(&m->qualifier, &chain->name)) {
-                    return true;
-                }
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind != ITEM_FN || m->qualifier.length == 0 ||
+            !same_name(&m->name, name)) {
+            continue;
+        }
+        for (chain = iface; chain != NULL; chain = inherited(chain)) {
+            if (same_name(&m->qualifier, &chain->name)) {
+                return true;
             }
         }
     }
@@ -8118,18 +8116,23 @@ bool sema_check(struct module *module, const char *module_name,
             }
             /* An interface declares functions the class fills, so a
                `concrete fn` matches there as well as in the base
-               chain. */
-            for (k = 0; above == NULL && k < t->field_count; k++) {
-                const struct type *iface;
-                if (t->fields[k].form != FIELD_IMPL) {
-                    continue;
-                }
-                for (iface = t->fields[k].type;
-                     iface != NULL && above == NULL;
-                     iface = inherited(iface)) {
-                    const struct item *found = find_member(iface, &m->name);
-                    if (found != NULL && found->kind == ITEM_FN) {
-                        above = found;
+               chain. An interface a base implements counts, because a
+               body below replaces the one of the base in its table. */
+            for (base = t; above == NULL && base != NULL;
+                 base = inherited(base)) {
+                for (k = 0; above == NULL && k < base->field_count; k++) {
+                    const struct type *iface;
+                    if (base->fields[k].form != FIELD_IMPL) {
+                        continue;
+                    }
+                    for (iface = base->fields[k].type;
+                         iface != NULL && above == NULL;
+                         iface = inherited(iface)) {
+                        const struct item *found =
+                            find_member(iface, &m->name);
+                        if (found != NULL && found->kind == ITEM_FN) {
+                            above = found;
+                        }
                     }
                 }
             }

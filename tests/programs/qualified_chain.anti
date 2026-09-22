@@ -1,0 +1,75 @@
+//! The nearest body wins. A plain body of a class below replaces every
+//! qualified body of its name that it inherits, in each table, and a
+//! class below that qualifies its own takes that one table back.
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class Drawable
+{
+	abstract fn draw(self) -> int;
+}
+
+abstract class Sketch
+{
+	abstract fn draw(self) -> int;
+}
+
+class Top
+{
+	implements dr: Drawable,
+	implements sk: Sketch,
+
+	concrete fn Drawable::draw(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Sketch::draw(self) -> int
+	{
+		return 2;
+	}
+}
+
+class Middle
+{
+	inherits Top,
+
+	concrete fn draw(self) -> int
+	{
+		return 3;
+	}
+}
+
+class Bottom
+{
+	inherits Middle,
+
+	concrete fn Sketch::draw(self) -> int
+	{
+		return 4;
+	}
+}
+
+fn report(name: str, t: *Top)
+{
+	let d: *Drawable = t;
+	let s: *Sketch = t;
+	printf("%s %d %d %d %d\n".ptr, name.ptr, d.draw() as c_int,
+		s.draw() as c_int, t.dr.draw() as c_int, t.sk.draw() as c_int);
+}
+
+fn main() -> int
+{
+	let t = alloc Top { };
+	let m = alloc Middle { };
+	let b = alloc Bottom { };
+	report("top", t);
+	report("middle", m);
+	report("bottom", b);
+	let bm: *Middle = b;
+	printf("plain %d %d %d\n".ptr, m.draw() as c_int, bm.draw() as c_int,
+		b.draw() as c_int);
+	delete(t);
+	delete(m);
+	delete(b);
+	return 0;
+}

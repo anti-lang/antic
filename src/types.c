@@ -375,11 +375,11 @@ const struct item *types_interface_member(const struct type *t,
                                           const struct type *iface,
                                           const struct name *name)
 {
-    const struct item *plain = NULL;
     const struct type *chain;
     size_t i;
 
     for (; t != NULL; t = level_above(t)) {
+        const struct item *plain = NULL;
         for (i = 0; i < t->member_count; i++) {
             const struct item *m = t->members[i];
             if (m->kind != ITEM_FN || !m->pub || !same_text(&m->name, name)) {
@@ -401,8 +401,11 @@ const struct item *types_interface_member(const struct type *t,
                 break;
             }
         }
+        if (plain != NULL) {
+            return plain;
+        }
     }
-    return plain;
+    return NULL;
 }
 
 char *types_member_symbol(struct arena *arena, const struct name *owner,
