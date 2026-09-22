@@ -26,9 +26,6 @@ void *anti_rt_mem_alloc(int64_t size, int64_t align)
     if (size < 0 || align <= 0 || (align & (align - 1)) != 0) {
         return NULL;
     }
-    if ((uint64_t)size > SIZE_MAX || (uint64_t)align > SIZE_MAX) {
-        return NULL;
-    }
     /* A size of zero is one byte, so that every request that succeeds
        gives memory of its own. */
     if (size == 0) {
