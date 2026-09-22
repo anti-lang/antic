@@ -39,6 +39,7 @@ struct whole_options {
     bool release;                   /* optimise the code as well */
     bool reflect;                   /* list the classes in the registry */
     bool bundled;                   /* the runtime joins the output */
+    bool dev;                       /* one object per module. */
     bool library;                   /* a library for C */
 };
 

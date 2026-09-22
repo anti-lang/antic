@@ -572,7 +572,8 @@ static bool asks_backtrace(const struct ir_module *m, const struct reach *r)
    `fail`. The pass writes the default as `anti_rt_backtrace_default`
    into a program that reaches the runtime's reader of it, as it writes
    the registry. A library for C with the runtime bundled holds that
-   reader and gets the default of its own build. */
+   reader and gets the default of its own build. A dev build writes it
+   whatever the reach says, for the reason the `dev` option gives. */
 static void write_backtrace_default(struct ir_module *m, bool release)
 {
     static const char *const names[] = {"on"};
@@ -1257,18 +1258,26 @@ bool whole_program(struct ir_module *program,
 {
     struct whole *w = whole_build(program);
     struct reach reach;
+    bool partial;
     bool calls;
     bool ok;
 
+    /* DESIGN: a dev build links one object per module. An object
+       carries every function of its module, reached or not. A table the
+       runtime reads is then pulled into the link by a function this
+       program never calls. The pass therefore writes each of them
+       whatever the reach says. A release build sees the whole program
+       in one IR. It writes what that program reaches. */
+    partial = options->dev;
     ok = check_singletons(w, program, errors);
     memset(&reach, 0, sizeof reach);
     reach_program(&reach, program, options->entry);
-    if (reads_registry(program, &reach)) {
+    if (reads_registry(program, &reach) || partial) {
         write_registry(program, options->reflect);
     } else if (options->bundled) {
         write_registry(program, false);
     }
-    if (asks_backtrace(program, &reach) || options->bundled) {
+    if (asks_backtrace(program, &reach) || options->bundled || partial) {
         write_backtrace_default(program, options->release);
     }
     calls = calls_through_reflection(program, &reach);
@@ -1278,8 +1287,8 @@ bool whole_program(struct ir_module *program,
     reach_free(&reach);
     /* The trampolines come after every reader of the reach, because they
        add functions that it does not cover. */
-    if (calls || options->bundled) {
-        write_trampolines(program, calls && options->reflect);
+    if (calls || options->bundled || partial) {
+        write_trampolines(program, (calls || partial) && options->reflect);
     }
     if (options->release) {
         devirtualise(w, program);

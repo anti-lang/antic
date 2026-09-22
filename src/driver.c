@@ -666,7 +666,7 @@ static bool lower_checked(const char *input, const char *file,
    one line each. Returns false after an error. */
 static bool whole_checked(const char *input, struct ir_module *program,
                           const char *module, bool release, bool reflect,
-                          bool bundled, bool library)
+                          bool bundled, bool library, bool dev)
 {
     struct whole_options options;
     struct text errors = {0};
@@ -679,6 +679,7 @@ static bool whole_checked(const char *input, struct ir_module *program,
     options.reflect = reflect;
     options.bundled = bundled;
     options.library = library;
+    options.dev = dev;
     ok = whole_program(program, &options, &errors);
     for (line = text_cstr(&errors); *line != '\0';) {
         const char *end = strchr(line, '\n');
@@ -713,7 +714,7 @@ static int dump_ir(const char *input, const char *file, struct module *tree,
     if (optimize) {
         if ((release || has_main(program, module)) &&
             !whole_checked(input, program, module, release, !no_reflect,
-                           false, false)) {
+                           false, false, !release)) {
             return 1;
         }
         ir_optimize(program, module);
@@ -836,7 +837,7 @@ static int back_end(const struct options *o, struct module *tree,
     if ((!o->dev || o->lib != LIB_NONE || has_main(program, module)) &&
         !whole_checked(o->input, program, module, !o->dev,
                        !o->no_reflect, o->bundle_runtime,
-                       o->lib != LIB_NONE)) {
+                       o->lib != LIB_NONE, o->dev)) {
         return 1;
     }
     /* The build that compiles the program decides, so an assertion of a
