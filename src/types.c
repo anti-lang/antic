@@ -537,6 +537,46 @@ struct type *types_flags(struct types *types)
     return types->flags;
 }
 
+/* DESIGN: the five fields stand in the order of `struct anti_field` of
+   `rt/object.h`, and `name` covers its pointer and its length, as a
+   `str` does. The `changed` hook takes a pointer into the field list the
+   descriptor already carries, so the record is read and never built. */
+struct type *types_field_descriptor(struct types *types)
+{
+    static const char module_text[] = LANG_MODULE;
+    static const char name_text[] = LANG_FIELD_DESCRIPTOR;
+    static const char *const names[] = {
+        FIELD_RECORD_NAME, FIELD_RECORD_OFFSET, FIELD_RECORD_TYPE,
+        FIELD_RECORD_OWNED, FIELD_RECORD_DESCRIPTOR
+    };
+    struct struct_field fields[5];
+    struct name module;
+    struct name name;
+    size_t i;
+
+    if (types->field_record != NULL) {
+        return types->field_record;
+    }
+    module.text = module_text;
+    module.length = sizeof module_text - 1;
+    name.text = name_text;
+    name.length = sizeof name_text - 1;
+    types->field_record = types_struct(types, module, name);
+    memset(fields, 0, sizeof fields);
+    for (i = 0; i < 5; i++) {
+        fields[i].name.text = names[i];
+        fields[i].name.length = strlen(names[i]);
+        fields[i].type = types_builtin(types, TYPE_I64);
+        fields[i].vis = VIS_PUB;
+    }
+    fields[0].type = types_builtin(types, TYPE_STR);
+    fields[4].type = types_pointer_nullable(types,
+                                            types_builtin(types, TYPE_U8));
+    types_set_fields(types, types->field_record, fields, 5);
+    types->field_record->layout = LAYOUT_DONE;
+    return types->field_record;
+}
+
 /* The struct of one handle that a Mutex and a channel are. */
 static struct type *handle_struct(struct types *types, const char *name,
                                   struct type *element)
@@ -608,6 +648,11 @@ bool types_is_mutex(const struct type *t)
 bool types_is_chan(const struct type *t)
 {
     return lang_struct(t, LANG_CHAN) && t->element != NULL;
+}
+
+bool types_is_field_descriptor(const struct type *t)
+{
+    return lang_struct(t, LANG_FIELD_DESCRIPTOR);
 }
 
 bool types_is_flags(const struct type *t)

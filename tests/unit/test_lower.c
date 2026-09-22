@@ -37,7 +37,7 @@ static void run(struct lowered *l, const char *source)
         check_failures++;
         return;
     }
-    l->ok = lower_module(l->module, "main", &l->ir, &l->diags, 0);
+    l->ok = lower_module(l->module, "main", &l->ir, &l->diags, 0, NULL, 0);
 }
 
 static void release(struct lowered *l)
@@ -301,7 +301,7 @@ static void records_classes(void)
     if (call != NULL) {
         CHECK(call->c.kind == IR_GLOBAL);
         CHECK_STR(global_name(&l.ir, call->c.as.index), "Shape.descriptor");
-        CHECK(call->field == 8);
+        CHECK(call->field == 17);
     }
     release(&l);
 }

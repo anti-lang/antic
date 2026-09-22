@@ -39,6 +39,17 @@ struct options {
     /* The dev-mode checks follow the mode the same way, under their own
        pair of options. --checks and --no-checks decide instead of it. */
     enum { CHECKS_MODE, CHECKS_ON, CHECKS_OFF } checks;
+    /* DESIGN: the contextual `trace` follows the mode as `assert` does,
+       and --trace and --no-trace decide instead of it. --trace <pattern>
+       instruments a package or a class that did not ask, in any mode,
+       and --trace writes adds the `changed` hook after a write.
+       --no-hooks drops every hook site, the five always-on ones as
+       well. */
+    enum { TRACE_MODE, TRACE_ON, TRACE_OFF } trace;
+    bool trace_writes;          /* --trace writes */
+    bool no_hooks;              /* --no-hooks */
+    const char **trace_patterns;    /* --trace <pattern> */
+    size_t trace_pattern_count;
     enum { LIB_NONE, LIB_STATIC, LIB_SHARED } lib; /* --lib static|shared */
     bool bundle_runtime;        /* --bundle-runtime, with --lib static. */
     bool soname;                /* --soname, with --lib shared. */

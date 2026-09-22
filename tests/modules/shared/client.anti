@@ -58,17 +58,17 @@ fn main() -> int
 	printf("%d %d\n".ptr, (built is *points.Point) as c_int,
 		points.is_point(built) as c_int);
 	let by = [reflect.of_int(4)];
-	let shifted = reflect.call(made, 7, by[0..1]) catch fatal;
+	let shifted = reflect.call(made, 16, by[0..1]) catch fatal;
 	printf("%d %d\n".ptr, shifted.kind as c_int, shifted.data.i as c_int);
 
 	let crate = alloc points.Crate { w: 3 };
 	let sized: *points.Sized = crate;
 	let inside: *Object = sized;
 	let d = reflect.describe(inside as *byte) else { return 1; };
-	let grow = reflect.function(d, 7);
+	let grow = reflect.function(d, 16);
 	printf("%s %d\n".ptr, grow.name.ptr, sized.size() as c_int);
 	let wider = [reflect.of_int(2)];
-	let grown = reflect.call(inside, 7, wider[0..1]) catch fatal;
+	let grown = reflect.call(inside, 16, wider[0..1]) catch fatal;
 	printf("%d %d %d\n".ptr, grown.kind as c_int, grown.data.i as c_int,
 		sized.size() as c_int);
 	let grew = crate.grow(1);

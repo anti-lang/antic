@@ -175,6 +175,7 @@ struct types {
     struct type *object;            /* anti.lang.Object, the class root */
     struct type *flags;             /* anti.lang.Flags */
     struct type *mutex;             /* anti.lang.Mutex */
+    struct type *field_record;      /* anti.lang.FieldDescriptor */
 };
 
 void types_init(struct types *types, struct arena *arena);
@@ -279,6 +280,20 @@ struct type *types_object(struct types *types);
 #define MUTEX_DESTROY "destroy"
 #define CHAN_CLOSE "close"
 
+/* DESIGN: `FieldDescriptor` is the built-in struct that the `changed`
+   hook takes, which the compiler declares in `anti.lang` as it does
+   `Flags`. Its five fields are one record of a class's field list, in
+   the order `struct anti_field` of `rt/object.h` holds them, so a hook
+   reads the record the descriptor already carries. The compiler declares
+   it, so no import is needed where a class replaces `changed`, and it
+   carries no descriptor, since no module declares it. */
+#define LANG_FIELD_DESCRIPTOR "FieldDescriptor"
+#define FIELD_RECORD_NAME "name"
+#define FIELD_RECORD_OFFSET "offset"
+#define FIELD_RECORD_TYPE "type_id"
+#define FIELD_RECORD_OWNED "owned"
+#define FIELD_RECORD_DESCRIPTOR "descriptor"
+
 /* DESIGN: an `f"..."` builds its text with `anti.text.Builder`, which
    the compiler knows by name, with the enum of its alignments and the
    functions the literal calls. The names are defined here and nowhere
@@ -311,6 +326,26 @@ struct type *types_object(struct types *types);
 #define MEM_MODULE "anti.mem"
 #define MEM_ALLOCATOR "Allocator"
 #define ROOT_DESERIALIZE "deserialize"
+
+/* DESIGN: `anti.lang.Object` declares nine hooks with empty bodies after
+   its seven functions. They take the entries after those in the table of
+   every class, in this order, which `enum anti_hook` of `rt/object.h`
+   repeats and the unit test `records_hook_entries` pins. The names are
+   defined here and nowhere else. */
+#define ROOT_CREATED "created"
+#define ROOT_DESTROYED "destroyed"
+#define ROOT_COPIED "copied"
+#define ROOT_DISPATCHED "dispatched"
+#define ROOT_JOINED "joined"
+#define ROOT_ENTER "enter"
+#define ROOT_LEAVE "leave"
+#define ROOT_FAILED "failed"
+#define ROOT_CHANGED "changed"
+/* `anti.lang.TraceHandler` declares the same nine, each taking the
+   object after `self`. `anti.lang.Trace` installs one handler. */
+#define LANG_TRACE_HANDLER "TraceHandler"
+#define LANG_TRACE "Trace"
+#define TRACE_INSTALL "install"
 
 /* Whether t is the class `anti.lang.Error` itself. */
 bool types_is_lang_error(const struct type *t);
@@ -369,6 +404,10 @@ bool types_is_job(const struct type *t);
 struct type *types_flags(struct types *types);
 /* Whether t is the struct that types_flags made. */
 bool types_is_flags(const struct type *t);
+/* The struct `anti.lang.FieldDescriptor`, one for the compilation. */
+struct type *types_field_descriptor(struct types *types);
+/* Whether t is the struct that types_field_descriptor made. */
+bool types_is_field_descriptor(const struct type *t);
 /* The struct `anti.lang.Mutex`, one for the compilation. */
 struct type *types_mutex(struct types *types);
 /* Whether t is the struct that types_mutex made. */

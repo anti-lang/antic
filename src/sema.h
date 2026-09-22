@@ -150,14 +150,16 @@ struct interface {
 /* Check one module against the rules of chapter 2: resolve every name,
    give every expression its type and compute every constant. The method
    syntax v.f(args) and qualified names are rewritten into plain names.
-   libraries holds the interface of every loaded library. Returns true
-   when no error occurred. */
+   libraries holds the interface of every loaded library. program says
+   that the build writes a program and not a library, which decides the
+   report of an abstract class that nothing fills. Returns true when no
+   error occurred. */
 bool sema_check(struct module *module, const char *module_name,
                 const char *package,
                 const struct interface *const *libraries,
                 size_t library_count, struct types *types,
                 struct arena *arena, struct diagnostics *diags,
-                bool whole_program);
+                bool program);
 
 /* The `fallthrough;` that ends the body of a switch arm, the last
    statement of its block, or NULL when the arm ends otherwise. */

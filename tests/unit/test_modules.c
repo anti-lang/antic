@@ -214,7 +214,7 @@ static void lowers_imports(void)
     module = check_module(&s, "main", source, &ok);
     CHECK(ok);
     ir_module_init(&ir, &s.arena, "main");
-    CHECK(ok && lower_module(module, "main", &ir, &s.diags, 0));
+    CHECK(ok && lower_module(module, "main", &ir, &s.diags, 0, NULL, 0));
     ir_print(&out, &ir);
     CHECK_STR(text_cstr(&out),
               "extern fn geometry.make() -> ptr\n"
@@ -248,7 +248,7 @@ static bool build_library(struct session *s, const char *name,
 
     module = check_module(s, name, source, &ok);
     ir_module_init(&ir, &s->arena, name);
-    ok = ok && lower_module(module, name, &ir, &s->diags, 0);
+    ok = ok && lower_module(module, name, &ir, &s->diags, 0, NULL, 0);
     if (!ok) {
         check_failures++;
         fprintf(stderr, "library %s does not compile:\n", name);
@@ -518,7 +518,7 @@ static void keeps_symbolic_sizes(void)
                           "    return b.data.len;\n"
                           "}\n",
                           &ok);
-    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0));
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0));
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
               "type sized.H = struct { tag: i8, n: i32 }\n"
@@ -669,7 +669,7 @@ static void write_with(struct session *s, const char *source,
 
     module = check_module(s, "com.example.geo", source, &ok);
     ir_module_init(&ir, &s->arena, "com.example.geo");
-    CHECK(ok && lower_module(module, "com.example.geo", &ir, &s->diags, 0));
+    CHECK(ok && lower_module(module, "com.example.geo", &ir, &s->diags, 0, NULL, 0));
     sema_interface(module, "com.example.geo", &s->arena, iface);
     if (package != NULL) {
         iface->package = *package;
@@ -932,7 +932,7 @@ static void keeps_literals(void)
                           "    return words.hi().len + \"hi\".len;\n"
                           "}\n",
                           &ok);
-    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0));
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0));
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
               "type str = struct { ptr: ptr, len: i64 }\n"
@@ -1010,7 +1010,7 @@ static void keeps_constants(void)
                           "    return pair.base().b as int;\n"
                           "}\n",
                           &ok);
-    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0));
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0));
     ir_print(&ir, &program);
     CHECK(strstr(text_cstr(&ir),
                  "global pair.5 pair.Pair { i8 7, i32 11 }\n") != NULL);
@@ -1053,7 +1053,7 @@ static void keeps_halves(void)
                           "    return (t.u + t.v) as int;\n"
                           "}\n",
                           &ok);
-    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0));
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0));
     ir_print(&ir, &program);
     CHECK(strstr(text_cstr(&ir), "hext f32 15360\n") != NULL);
     text_free(&bytes);
@@ -1376,7 +1376,7 @@ static void keeps_classes(void)
     open_session(&a);
     module = check_module(&a, "shapes", source, &ok);
     ir_module_init(&ir, &a.arena, "shapes");
-    ok = ok && lower_module(module, "shapes", &ir, &a.diags, 0);
+    ok = ok && lower_module(module, "shapes", &ir, &a.diags, 0, NULL, 0);
     CHECK(ok);
     iface = arena_alloc(&a.arena, sizeof *iface);
     if (ok) {
@@ -1386,7 +1386,7 @@ static void keeps_classes(void)
     }
     CHECK(strstr(text_cstr(&before), "class shapes.Square") != NULL);
     CHECK(strstr(text_cstr(&before), "worker fn shapes.tally") != NULL);
-    CHECK(strstr(text_cstr(&before), " table @shapes.Shape.descriptor 8") !=
+    CHECK(strstr(text_cstr(&before), " table @shapes.Shape.descriptor 17") !=
           NULL);
     open_session(&b);
     ir_module_init(&program, &b.arena, "");
@@ -1448,7 +1448,7 @@ static void one_struct_descriptor(void)
     open_session(&s);
     module = check_module(&s, "vec", vec, &ok);
     ir_module_init(&lib, &s.arena, "vec");
-    ok = ok && lower_module(module, "vec", &lib, &s.diags, 0);
+    ok = ok && lower_module(module, "vec", &lib, &s.diags, 0, NULL, 0);
     CHECK(ok);
     g = global_in(&lib, "vec", "V2.descriptor");
     CHECK(g != NULL && !g->is_extern && g->value != NULL);
@@ -1463,7 +1463,7 @@ static void one_struct_descriptor(void)
 
     module = check_module(&s, "main", source, &ok);
     ir_module_init(&ir, &s.arena, "main");
-    ok = ok && lower_module(module, "main", &ir, &s.diags, 0);
+    ok = ok && lower_module(module, "main", &ir, &s.diags, 0, NULL, 0);
     CHECK(ok);
     g = global_in(&ir, "vec", "V2.descriptor");
     CHECK(g != NULL && g->is_extern && g->value == NULL);

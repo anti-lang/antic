@@ -232,6 +232,29 @@ static int run(int argc, char **argv, struct options *o)
         } else if (strcmp(arg, "--no-checks") == 0) {
             options.checks = CHECKS_OFF;
             continue;
+        } else if (strcmp(arg, "--no-hooks") == 0) {
+            options.no_hooks = true;
+            continue;
+        } else if (strcmp(arg, "--no-trace") == 0) {
+            options.trace = TRACE_OFF;
+            continue;
+        /* DESIGN: `--trace` takes a pattern or stands alone. The word
+           after it is the pattern when it is no option and no last
+           argument, because the last argument is the source file. The
+           pattern `writes` names the writes and no package. */
+        } else if (strcmp(arg, "--trace") == 0) {
+            if (i + 2 < argc && argv[i + 1][0] != '-') {
+                const char *pattern = argv[++i];
+                if (strcmp(pattern, "writes") == 0) {
+                    options.trace_writes = true;
+                } else {
+                    options.trace_patterns[options.trace_pattern_count++] =
+                        pattern;
+                }
+            } else {
+                options.trace = TRACE_ON;
+            }
+            continue;
         } else if (strcmp(arg, "--strip-docs") == 0) {
             options.strip_docs = true;
             continue;
@@ -371,9 +394,12 @@ int main(int argc, char **argv)
     options.dependencies = malloc((size_t)argc * sizeof *options.dependencies);
     options.attribution = malloc((size_t)argc * sizeof *options.attribution);
     options.frameworks = malloc((size_t)argc * sizeof *options.frameworks);
+    options.trace_patterns =
+        malloc((size_t)argc * sizeof *options.trace_patterns);
     if (options.libraries == NULL || options.objects == NULL ||
         options.roots == NULL || options.dependencies == NULL ||
-        options.attribution == NULL || options.frameworks == NULL) {
+        options.attribution == NULL || options.frameworks == NULL ||
+        options.trace_patterns == NULL) {
         fputs("antic: out of memory\n", stderr);
         return 70;
     }
@@ -384,5 +410,6 @@ int main(int argc, char **argv)
     free((void *)options.dependencies);
     free((void *)options.attribution);
     free((void *)options.frameworks);
+    free((void *)options.trace_patterns);
     return status;
 }

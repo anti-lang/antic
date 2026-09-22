@@ -24,6 +24,7 @@ extern fn anti_rt_trace_walk(into: ?*u64, room: int, skip: int) -> int;
 extern fn anti_rt_trace_frame(address: u64, out: ?*RawFrame);
 extern fn anti_rt_trace_text(frames: ?*RawFrame, count: int) -> ?*byte;
 extern fn anti_rt_trace_symbolize(frame: ?*RawFrame, out: ?*Frame);
+extern fn anti_rt_trace_install(handler: ?*TraceHandler);
 
 /// The most frames a trace keeps, the innermost ones.
 const TRACE_DEPTH: int = 64;
@@ -294,6 +295,55 @@ pub class NoneDereference inherits Error
 		e.code = 1;
 		e.message = "the pointer is none";
 		return e;
+	}
+}
+
+/// The nine hooks of `Object`, each taking the object they stand for.
+///
+/// `Trace.install` stores one handler, and every hook site calls it
+/// before it dispatches the object's own hook. `leave` reverses the two,
+/// so the handler and the object's hook nest around the call.
+///
+/// `created`, `destroyed`, `copied`, `dispatched` and `joined` are
+/// compiled into every build. `enter`, `leave` and `failed` need
+/// tracing, which the contextual `trace` asks for and `--trace` decides,
+/// and `changed` needs `--trace writes`. `--no-hooks` drops them all.
+///
+/// A handler fills every one of the nine. One it has nothing to say
+/// about is an empty body.
+pub abstract class TraceHandler
+{
+	/// `o` was constructed.
+	abstract fn created(self, o: *Object);
+	/// `o` is about to run the `destruct` bodies of its chain.
+	abstract fn destroyed(self, o: *Object);
+	/// `o` is the copy that `dup` made of `from`.
+	abstract fn copied(self, o: *Object, from: *Object);
+	/// `o` went to the worker pool.
+	abstract fn dispatched(self, o: *Object);
+	/// The job of `o` is done and `join` has taken its result.
+	abstract fn joined(self, o: *Object);
+	/// A `pub` function of the instrumented `o` was entered.
+	abstract fn enter(self, o: *Object, name: str);
+	/// A `pub` function of the instrumented `o` was left.
+	abstract fn leave(self, o: *Object, name: str);
+	/// A `pub` function of the instrumented `o` gave the error `e`.
+	abstract fn failed(self, o: *Object, name: str, e: *Error);
+	/// A field of the instrumented `o` was written.
+	abstract fn changed(self, o: *Object, field: *FieldDescriptor);
+}
+
+/// The one handler that every hook of every object calls.
+pub class Trace
+{
+	/// Install `h`, or `none` to leave the hooks to the objects alone.
+	///
+	/// The handler stands in one atomic word, so a program replaces it
+	/// without a data race. It is not deleted here: the program owns it
+	/// and outlives its installation.
+	pub fn install(h: ?*TraceHandler)
+	{
+		anti_rt_trace_install(h);
 	}
 }
 

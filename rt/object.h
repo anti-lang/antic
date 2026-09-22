@@ -127,10 +127,11 @@ struct anti_descriptor {
 };
 
 /* DESIGN: the seven functions of the root take the entries after the
-   descriptor, in this order, in the table of every class. The order is
-   root_names in src/lower.c, and a unit test pins the two together. The
-   destruct entry of a class holds the teardown the compiler writes for
-   it. The copy entry holds its copy unless the chain declares one. */
+   descriptor, in this order, in the table of every class, and the nine
+   hooks take the entries after them. The order is root_names in
+   src/lower.c, and a unit test pins the two together. The destruct entry
+   of a class holds the teardown the compiler writes for it. The copy
+   entry holds its copy unless the chain declares one. */
 enum anti_entry {
     ANTI_ENTRY_DESCRIPTOR,
     ANTI_ENTRY_TYPE_NAME,
@@ -139,8 +140,32 @@ enum anti_entry {
     ANTI_ENTRY_HASH,
     ANTI_ENTRY_SERIALIZE,
     ANTI_ENTRY_DROP,
-    ANTI_ENTRY_COPY
+    ANTI_ENTRY_COPY,
+    ANTI_ENTRY_HOOK     /* the first of the nine hooks */
 };
+
+/* DESIGN: the nine hooks of anti.lang.Object, in the order of
+   root_names. Three are lifecycle and two are threads, which every
+   build compiles. Three are the calls of an instrumented class, which
+   tracing compiles, and one is a write, which `--trace writes` does. */
+enum anti_hook {
+    ANTI_HOOK_CREATED,
+    ANTI_HOOK_DESTROYED,
+    ANTI_HOOK_COPIED,
+    ANTI_HOOK_DISPATCHED,
+    ANTI_HOOK_JOINED,
+    ANTI_HOOK_ENTER,
+    ANTI_HOOK_LEAVE,
+    ANTI_HOOK_FAILED,
+    ANTI_HOOK_CHANGED,
+    ANTI_HOOK_COUNT
+};
+
+/* The entry of the hook h in the table of a class, and its entry in the
+   table of an anti.lang.TraceHandler, which declares the same nine again
+   with the object after `self`. */
+#define ANTI_ENTRY_OF_HOOK(h) (ANTI_ENTRY_HOOK + (h))
+#define ANTI_ENTRY_OF_HANDLER(h) (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT + (h))
 
 /* Every object starts with the address of its table, and entry 0 of a
    table is the descriptor of its class. */
@@ -200,5 +225,21 @@ uint64_t anti_lang_Object_hash(struct anti_object *self);
 void anti_lang_Object_serialize(struct anti_object *self, void *out);
 void anti_lang_Object_destruct(struct anti_object *self);
 void anti_lang_Object_copy(struct anti_object *self, struct anti_object *to);
+
+/* DESIGN: the nine hooks of the root have empty bodies. A hook site
+   dispatches the object's own hook, and one that reaches a body here
+   does nothing, so a class that replaces none pays a compare. */
+void anti_lang_Object_created(struct anti_object *self);
+void anti_lang_Object_destroyed(struct anti_object *self);
+void anti_lang_Object_copied(struct anti_object *self,
+                             struct anti_object *from);
+void anti_lang_Object_dispatched(struct anti_object *self);
+void anti_lang_Object_joined(struct anti_object *self);
+void anti_lang_Object_enter(struct anti_object *self, struct anti_text name);
+void anti_lang_Object_leave(struct anti_object *self, struct anti_text name);
+void anti_lang_Object_failed(struct anti_object *self, struct anti_text name,
+                             struct anti_object *e);
+void anti_lang_Object_changed(struct anti_object *self,
+                              const struct anti_field *field);
 
 #endif

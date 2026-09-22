@@ -91,6 +91,11 @@ struct lowerer {
     bool may_fail;              /* the function was written `may fail` */
     bool no_reflect;            /* --no-reflect: no field list */
     bool dev;                   /* --dev: every dispatch checks its table */
+    bool hooks;                 /* the hook sites are written */
+    bool trace_marked;          /* code marked `trace` is instrumented */
+    bool trace_writes;          /* --trace writes: the changed hook */
+    const char *const *patterns;    /* --trace <pattern> */
+    size_t pattern_count;
     bool failed;
 };
 
@@ -781,6 +786,52 @@ static struct ir_function *rt_function(struct lowerer *l, const char *name,
 static struct ir_operand slice_length(struct lowerer *l, struct ir_operand p,
                                       const struct type *slice);
 
+/* The nine hooks of enum anti_hook in rt/object.h, in its order. The
+   unit test records_hook_entries pins the two together, and pins the
+   entries they take in the table of every class. */
+enum hook_kind {
+    HOOK_CREATED, HOOK_DESTROYED, HOOK_COPIED, HOOK_DISPATCHED, HOOK_JOINED,
+    HOOK_ENTER, HOOK_LEAVE, HOOK_FAILED, HOOK_CHANGED
+};
+
+/* DESIGN: a hook site is one call of the runtime with the object and the
+   hook. The runtime holds the handler, the order of the handler and the
+   object's own hook, and the compare against the root's empty body, so
+   the order stands in one place and the compiler writes no branch.
+   `--no-hooks` drops every site, the five always-on ones as well. */
+static void hook_object(struct lowerer *l, enum hook_kind hook,
+                        struct ir_operand object)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_I64};
+    struct ir_operand args[2];
+
+    if (!l->hooks || l->failed || l->b == NULL || object.kind == IR_NONE) {
+        return;
+    }
+    args[0] = object;
+    args[1] = ir_int_op(IR_I64, (uint64_t)hook);
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(rt_function(l, "anti_rt_hook", params, 2)), args, 2);
+}
+
+/* The `copied` hook, after `dup` made the object at `made` out of the
+   one at `from`. */
+static void hook_copied(struct lowerer *l, struct ir_operand made,
+                        struct ir_operand from)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_PTR};
+    struct ir_operand args[2];
+
+    if (!l->hooks || l->failed || l->b == NULL || made.kind == IR_NONE) {
+        return;
+    }
+    args[0] = made;
+    args[1] = from;
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(rt_function(l, "anti_rt_hook_copied", params, 2)),
+            args, 2);
+}
+
 /* The text of a failed check: the file, the line and the operation. The
    values the kind names follow it at run time. The back end formats
    nothing, and a build without the checks drops the whole string. */
@@ -1324,11 +1375,18 @@ static bool bound_is_direct(const struct expr *e, const struct type *s)
    `concrete fn` takes the entry of the function it replaces. An
    `abstract fn` leaves its entry zero until a class fills it. */
 
-/* One entry of a table. It holds the name a call names and the function
-   of the class that fills it. A function of the root has no source, so
-   it holds the runtime symbol instead. */
+/* One entry of a table. It holds the name a call names, the count of its
+   parameters with `self` among them, and the function of the class that
+   fills it. A function of the root has no source, so it holds the
+   runtime symbol instead. */
+/* DESIGN: an entry is keyed by its name and its parameter count. Anti
+   has no overloading, so two functions of one name in a chain have one
+   signature everywhere but the nine hooks: `anti.lang.TraceHandler`
+   declares each of them again with the object after `self`, and those
+   take entries of their own after the root's. */
 struct entry {
     struct name name;
+    size_t params;
     const struct item *fn;
     const char *runtime;
 };
@@ -1340,12 +1398,20 @@ struct table {
 };
 
 /* DESIGN: anti.lang.Object declares seven public functions whose bodies
-   live in the runtime. Every class inherits them, so they take the first
-   entries of every table. A class replaces one with a concrete function
-   of the same name. */
+   live in the runtime, and nine hooks with empty bodies after them.
+   Every class inherits all sixteen, so they take the first entries of
+   every table. A class replaces one with a concrete function of the same
+   name. The order of the nine is `enum anti_hook` of rt/object.h, and
+   the unit test records_hook_entries pins the two together. */
 static const char *const root_names[] = {
     "type_name", ROOT_TO_TEXT, "equals", "hash", "serialize", "destruct",
-    "copy"
+    "copy", ROOT_CREATED, ROOT_DESTROYED, ROOT_COPIED, ROOT_DISPATCHED,
+    ROOT_JOINED, ROOT_ENTER, ROOT_LEAVE, ROOT_FAILED, ROOT_CHANGED
+};
+
+/* The parameters of each, `self` among them. */
+static const unsigned char root_params[] = {
+    1, 1, 2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 2, 3, 2
 };
 
 static bool same_name(const struct name *a, const struct name *b)
@@ -1354,13 +1420,23 @@ static bool same_name(const struct name *a, const struct name *b)
            memcmp(a->text, b->text, a->length) == 0;
 }
 
-static void table_add(struct table *t, struct name name,
+/* The parameters of the member m, `self` among them. The out pointer of
+   a `may fail` function is no parameter of the declaration. */
+static size_t member_params(const struct item *m)
+{
+    return m->symbol != NULL && m->symbol->type != NULL
+               ? m->symbol->type->param_count
+               : (size_t)m->param_count + (m->has_self ? 1 : 0);
+}
+
+static void table_add(struct table *t, struct name name, size_t params,
                       const struct item *m, const char *runtime)
 {
     size_t i;
 
     for (i = 0; i < t->count; i++) {
-        if (same_name(&t->entries[i].name, &name)) {
+        if (same_name(&t->entries[i].name, &name) &&
+            t->entries[i].params == params) {
             t->entries[i].fn = m;
             return;
         }
@@ -1377,6 +1453,7 @@ static void table_add(struct table *t, struct name name,
         t->capacity = capacity;
     }
     t->entries[t->count].name = name;
+    t->entries[t->count].params = params;
     t->entries[t->count].fn = m;
     t->entries[t->count].runtime = runtime;
     t->count++;
@@ -1397,7 +1474,7 @@ static void table_of(const struct type *t, struct table *out)
             struct name name;
             name.text = root_names[i];
             name.length = strlen(root_names[i]);
-            table_add(out, name, NULL, root_names[i]);
+            table_add(out, name, root_params[i], NULL, root_names[i]);
         }
     }
     /* DESIGN: `concrete fn I::f` fills the table of I alone, and the
@@ -1409,14 +1486,14 @@ static void table_of(const struct type *t, struct table *out)
         const struct item *m = t->members[i];
         if (m->kind == ITEM_FN && m->pub &&
             types_body_table(t, m) == BODY_PLAIN) {
-            table_add(out, m->name, m, NULL);
+            table_add(out, m->name, member_params(m), m, NULL);
         }
     }
     for (i = 0; i < t->member_count; i++) {
         const struct item *m = t->members[i];
         if (m->kind == ITEM_FN && m->pub &&
             types_body_table(t, m) == BODY_BASE) {
-            table_add(out, m->name, m, NULL);
+            table_add(out, m->name, member_params(m), m, NULL);
         }
     }
 }
@@ -1424,7 +1501,8 @@ static void table_of(const struct type *t, struct table *out)
 /* The index of the entry that holds the function `name`, or 0 when the
    class has no such entry. Entry 0 is the descriptor, so a real entry is
    never 0. */
-static int table_index(const struct type *t, const struct name *name)
+static int table_index(const struct type *t, const struct name *name,
+                       size_t params)
 {
     struct table table = {0};
     size_t i;
@@ -1432,7 +1510,8 @@ static int table_index(const struct type *t, const struct name *name)
 
     table_of(t, &table);
     for (i = 0; i < table.count; i++) {
-        if (same_name(&table.entries[i].name, name)) {
+        if (same_name(&table.entries[i].name, name) &&
+            table.entries[i].params == params) {
             found = (int)i + 1;
             break;
         }
@@ -2535,7 +2614,8 @@ static struct ir_function *reach_thunk(struct lowerer *l,
     const struct type *sig = sym->type;
     struct ir_function *outer_f = l->f;
     struct ir_block *outer_b = l->b;
-    int index = table_index(sub->type, &sym->item->name);
+    int index = table_index(sub->type, &sym->item->name,
+                            sig->param_count);
     struct ir_function *f;
     struct ir_operand *args;
     struct ir_operand table;
@@ -2597,8 +2677,8 @@ static struct ir_function *reach_thunk(struct lowerer *l,
    base first down the chain. A base therefore sees its own fields
    before the class below it adds to them. A class without one adds
    nothing. */
-static void run_construct(struct lowerer *l, const struct type *t,
-                          struct ir_operand dest)
+static void run_construct_bodies(struct lowerer *l, const struct type *t,
+                                 struct ir_operand dest)
 {
     static const struct name construct_name = {"construct", 9};
     size_t i;
@@ -2606,7 +2686,7 @@ static void run_construct(struct lowerer *l, const struct type *t,
     if (t == NULL || t->kind != TYPE_CLASS) {
         return;
     }
-    run_construct(l, t->base, dest);
+    run_construct_bodies(l, t->base, dest);
     for (i = 0; i < t->member_count && !l->failed; i++) {
         const struct item *m = t->members[i];
         if (m->kind != ITEM_FN || !same_name(&m->name, &construct_name) ||
@@ -2616,6 +2696,18 @@ static void run_construct(struct lowerer *l, const struct type *t,
         }
         ir_call(l->f, l->b, IR_VOID,
                 ir_func_op(callee_function(l, m->symbol)), &dest, 1);
+    }
+}
+
+/* The bodies of the chain, and then the `created` hook of the object
+   the literal built. One object gives one hook, whatever its chain
+   declares. */
+static void run_construct(struct lowerer *l, const struct type *t,
+                          struct ir_operand dest)
+{
+    run_construct_bodies(l, t, dest);
+    if (t != NULL && t->kind == TYPE_CLASS) {
+        hook_object(l, HOOK_CREATED, dest);
     }
 }
 
@@ -3036,7 +3128,9 @@ static void build_into(struct lowerer *l, const struct expr *e,
            body, because no class below replaces it. */
         if (t->kind == TYPE_FN && t->bound) {
             const struct type *s = struct_of_expr(e->as.field.base);
-            int index = s != NULL ? table_index(s, &e->as.field.name) : 0;
+            int index = s != NULL ? table_index(s, &e->as.field.name,
+                                               t->param_count + 1)
+                                  : 0;
             struct ir_operand object =
                 e->as.field.base->type->kind == TYPE_POINTER
                     ? lower_expr(l, e->as.field.base)
@@ -4712,6 +4806,18 @@ static struct ir_operand lower_argument(struct lowerer *l,
     return value;
 }
 
+/* The parameters that the dispatched function of the call e declares,
+   `self` among them. The out pointer of a `may fail` call is none of
+   them, so the count comes from the callee where there is one. */
+static size_t dispatched_params(const struct expr *e,
+                                const struct symbol *sym, size_t given)
+{
+    if (sym != NULL && sym->type != NULL) {
+        return sym->type->param_count;
+    }
+    return e->as.call.out != NULL ? given - 1 : given;
+}
+
 static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
 {
     const struct expr *callee = e->as.call.callee;
@@ -4776,7 +4882,8 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
        which entries it may reach. */
     slot = 0;
     if (e->as.call.dispatch != NULL && n > 0) {
-        int index = table_index(e->as.call.dispatch, &e->as.call.entry);
+        int index = table_index(e->as.call.dispatch, &e->as.call.entry,
+                                dispatched_params(e, sym, n));
         if (index > 0) {
             slot = (uint32_t)index;
             struct ir_operand table =
@@ -5128,6 +5235,7 @@ static struct ir_operand lower_dispatch(struct lowerer *l,
                      ir_func_op(rt_function(l, "anti_rt_dispatch", signature,
                                             4)),
                      args, 4);
+    hook_object(l, HOOK_DISPATCHED, args[0]);
     out = ir_slot(l->f, l->b, vtype_of(l, e->type));
     ir_store(l->f, l->b, IR_PTR, temp(l, handle), temp(l, out));
     return temp(l, out);
@@ -5153,7 +5261,9 @@ static struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
                                   offset_address(l, value,
                                       field_offset(l, job, &len_name))));
         ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(rt_function(l, "anti_rt_join_all", all, 2)),
+                ir_func_op(rt_function(l, l->hooks ? "anti_rt_join_all_hooked"
+                                                   : "anti_rt_join_all",
+                                       all, 2)),
                 args, 2);
         return none();
     }
@@ -5162,14 +5272,18 @@ static struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
         args[1] = ir_int_op(IR_I64, 0);
         args[2] = ir_int_op(IR_PTR, 0);
         ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(rt_function(l, "anti_rt_join", one, 3)), args, 3);
+                ir_func_op(rt_function(l, l->hooks ? "anti_rt_join_hooked"
+                                                 : "anti_rt_join",
+                                     one, 3)), args, 3);
         return none();
     }
     out = ir_slot(l->f, l->b, vtype_of(l, e->type));
     args[1] = size_operand(l, e->type);
     args[2] = temp(l, out);
     ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(rt_function(l, "anti_rt_join", one, 3)), args, 3);
+            ir_func_op(rt_function(l, l->hooks ? "anti_rt_join_hooked"
+                                                 : "anti_rt_join",
+                                     one, 3)), args, 3);
     if (is_aggregate(e->type)) {
         return temp(l, out);
     }
@@ -5574,6 +5688,12 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         v = lower_expr(l, e->as.object.operand);
         if (l->failed) {
             return none();
+        }
+        if (e->as.object.op == TOKEN_DUP) {
+            struct ir_operand made =
+                object_call(l, name, v, e->as.object.operand->type);
+            hook_copied(l, made, v);
+            return made;
         }
         return object_call(l, name, v, e->as.object.operand->type);
     }
@@ -6479,7 +6599,7 @@ static void handle_error(struct lowerer *l, const struct expr *call,
     case HANDLE_FATAL: {
         static const struct name fatal_name = {"fatal", 5};
         const struct type *error_type = call->as.call.callee->type->result;
-        int index = table_index(error_type->element, &fatal_name);
+        int index = table_index(error_type->element, &fatal_name, 1);
         struct ir_operand table = load_table(l, err, error_type);
         struct ir_operand entry =
             temp(l, ir_load(l->f, l->b, IR_PTR,
@@ -6541,7 +6661,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
         }
     }
     if (t->base != NULL) {
-        run_construct(l, t->base, dest);
+        run_construct_bodies(l, t->base, dest);
     }
     for (i = 0; i < t->member_count; i++) {
         if (t->members[i]->kind == ITEM_FN &&
@@ -6550,6 +6670,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
         }
     }
     if (m == NULL || m->symbol == NULL || l->failed) {
+        hook_object(l, HOOK_CREATED, dest);
         return none();
     }
     args = malloc((e->as.call.arg_count + 1) * sizeof *args);
@@ -6572,7 +6693,25 @@ static struct ir_operand lower_construct(struct lowerer *l,
                      ir_func_op(callee_function(l, m->symbol)), args,
                      e->as.call.arg_count + 1);
     free(args);
-    return fails ? temp(l, result) : none();
+    if (!fails) {
+        hook_object(l, HOOK_CREATED, dest);
+        return none();
+    }
+    /* A `construct` that failed leaves no object, and its memory goes
+       back before the handler runs, so the hook is the success path's. */
+    if (l->hooks && !l->failed && l->b != NULL) {
+        struct ir_block *made = new_block(l);
+        struct ir_block *after = new_block(l);
+        ir_branch(l->f, l->b,
+                  temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
+                                    temp(l, result), ir_int_op(IR_PTR, 0))),
+                  made, after);
+        l->b = made;
+        hook_object(l, HOOK_CREATED, dest);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+    }
+    return temp(l, result);
 }
 
 /* Whether the expression is a call whose error a handler takes. */
@@ -6612,7 +6751,7 @@ static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
                           NULL, 0));
     if (h->kind == HANDLE_FATAL) {
         static const struct name fatal_name = {"fatal", 5};
-        int index = table_index(error_type->element, &fatal_name);
+        int index = table_index(error_type->element, &fatal_name, 1);
         struct ir_operand table = load_table(l, err, error_type);
         struct ir_operand entry =
             temp(l, ir_load(l->f, l->b, IR_PTR,
@@ -7936,6 +8075,7 @@ static void class_teardown(struct lowerer *l, const struct type *t)
     l->f = f;
     l->b = ir_block_add(f);
     self = temp(l, f->params[0].temp);
+    hook_object(l, HOOK_DESTROYED, self);
     for (up = t; up->base != NULL; up = up->base) {
         const struct item *m = level_fn(up, &destruct_name);
         if (m != NULL) {
@@ -8134,7 +8274,8 @@ static void class_record(struct lowerer *l, const struct item *it)
 
 bool lower_module(struct module *module, const char *module_name,
                   struct ir_module *out, struct diagnostics *diags,
-                  unsigned options)
+                  unsigned options, const char *const *patterns,
+                  size_t pattern_count)
 {
     struct lowerer l;
     /* Every function of the module sits past the ones the library files
@@ -8151,6 +8292,11 @@ bool lower_module(struct module *module, const char *module_name,
     l.file_index = ir_file_add(out, l.file);
     l.no_reflect = (options & LOWER_NO_REFLECT) != 0;
     l.dev = (options & LOWER_DEV) != 0;
+    l.hooks = (options & LOWER_NO_HOOKS) == 0;
+    l.trace_marked = l.hooks && (options & LOWER_TRACE) != 0;
+    l.trace_writes = l.hooks && (options & LOWER_TRACE_WRITES) != 0;
+    l.patterns = patterns;
+    l.pattern_count = patterns != NULL ? pattern_count : 0;
     /* A function of a struct body is a function of the module with one
        more segment in its name. It is declared and lowered like a free
        function. */

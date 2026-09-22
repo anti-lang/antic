@@ -18,6 +18,8 @@
 #include <string.h>
 
 #include "conf.h"
+#include "hooks.h"
+#include "object.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -441,5 +443,30 @@ void anti_rt_join_all(void *const *handles, int64_t count)
 
     for (i = 0; i < count; i++) {
         anti_rt_join(handles[i], 0, NULL);
+    }
+}
+
+/* DESIGN: `join` fires the `joined` hook of the object the pool ran,
+   which the site of the call cannot name: a Job holds the handle alone.
+   The compiler calls these two where hooks are compiled and the plain
+   pair under `--no-hooks`, so the option removes the site as it removes
+   every other. */
+void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+{
+    struct one *job = handle;
+    void *object = job != NULL ? job->object : NULL;
+
+    anti_rt_join(handle, result_size, out);
+    if (object != NULL) {
+        anti_rt_hook(object, ANTI_HOOK_JOINED);
+    }
+}
+
+void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+{
+    int64_t i;
+
+    for (i = 0; i < count; i++) {
+        anti_rt_join_hooked(handles[i], 0, NULL);
     }
 }

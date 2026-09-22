@@ -47,6 +47,15 @@ typedef struct Gauge_vtable {
     void *serialize;
     void *destruct;
     void *copy;
+    void *created;
+    void *destroyed;
+    void *copied;
+    void *dispatched;
+    void *joined;
+    void *enter;
+    void *leave;
+    void *failed;
+    void *changed;
 } Gauge_vtable;
 
 /** A gauge whose limit must be positive. */

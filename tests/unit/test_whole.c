@@ -54,7 +54,7 @@ static struct module *compile(struct program *p, const char *name,
               parse(source, tokens, &p->arena, &p->diags, &module) &&
               sema_check(module, name, NULL, p->libraries, p->library_count,
                          &p->types, &p->arena, &p->diags, true) &&
-              lower_module(module, name, out, &p->diags, 0);
+              lower_module(module, name, out, &p->diags, 0, NULL, 0);
 
     if (!ok) {
         check_failures++;
@@ -185,14 +185,14 @@ static void finds_entries(void)
     compile(&p, "main", shapes, &p.ir);
     w = whole_build(&p.ir);
     shape = global_named(&p.ir, "main", "Shape.descriptor");
-    check_entries(w, &p.ir, shape, 8, "Square.area Tile.area");
-    check_entries(w, &p.ir, shape, 9, "Shape.name");
+    check_entries(w, &p.ir, shape, 17, "Square.area Tile.area");
+    check_entries(w, &p.ir, shape, 18, "Shape.name");
     check_entries(w, &p.ir, global_named(&p.ir, "main", "Square.descriptor"),
-                  8, "Square.area Tile.area");
-    check_entries(w, &p.ir, global_named(&p.ir, "main", "Tile.descriptor"), 8,
+                  17, "Square.area Tile.area");
+    check_entries(w, &p.ir, global_named(&p.ir, "main", "Tile.descriptor"), 17,
                   "Tile.area");
     check_entries(w, &p.ir, global_named(&p.ir, "main", "Named.descriptor"),
-                  8, "Square.n.label.thunk Tile.n.label.thunk");
+                  17, "Square.n.label.thunk Tile.n.label.thunk");
     check_entries(w, &p.ir,
                   global_named(&p.ir, "main", "anti_lang_Object_descriptor"), 1,
                   "anti_lang_Object_type_name Square.n.type_name.thunk "
@@ -223,7 +223,7 @@ static void joins_modules(void)
                  "}\n");
     w = whole_build(&p.ir);
     check_entries(w, &p.ir, global_named(&p.ir, "shapes", "Named.descriptor"),
-                  8, "Square.n.label.thunk Tile.n.label.thunk "
+                  17, "Square.n.label.thunk Tile.n.label.thunk "
                      "Tag.n.label.thunk");
     whole_free(w);
     close_program(&p);
@@ -295,43 +295,43 @@ static void devirtualises(void)
            "fn main.calls(%0: ptr, %1: ptr, %2: ptr) -> i64 {\n"
            "b0:\n"
            "    %3 = load ptr %0\n"
-           "    %4 = mul i64 8, size_of ptr\n"
+           "    %4 = mul i64 17, size_of ptr\n"
            "    %5 = ptradd %3, %4\n"
            "    %6 = load ptr %5\n"
-           "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor 8\n"
+           "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor 17\n"
            "    %8 = load ptr %0\n"
-           "    %9 = mul i64 9, size_of ptr\n"
+           "    %9 = mul i64 18, size_of ptr\n"
            "    %10 = ptradd %8, %9\n"
            "    %11 = load ptr %10\n"
            "    %12 = call i64 @main.Shape.name(%0)\n"
            "    %13 = addov i64 %7, %12\n"
            "    branchov %13, b1, b2\n"
            "b1:\n"
-           "    %14 = addr @main.46\n"
+           "    %14 = addr @main.57\n"
            "    call void @anti_rt_check_failed(%14, 22, 1, %7, %12)\n"
            "    jump b2\n"
            "b2:\n"
            "    %15 = load ptr %1\n"
-           "    %16 = mul i64 8, size_of ptr\n"
+           "    %16 = mul i64 17, size_of ptr\n"
            "    %17 = ptradd %15, %16\n"
            "    %18 = load ptr %17\n"
-           "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor 8\n"
+           "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor 17\n"
            "    %20 = addov i64 %13, %19\n"
            "    branchov %20, b3, b4\n"
            "b3:\n"
-           "    %21 = addr @main.46\n"
+           "    %21 = addr @main.57\n"
            "    call void @anti_rt_check_failed(%21, 22, 1, %13, %19)\n"
            "    jump b4\n"
            "b4:\n"
            "    %22 = load ptr %2\n"
-           "    %23 = mul i64 8, size_of ptr\n"
+           "    %23 = mul i64 17, size_of ptr\n"
            "    %24 = ptradd %22, %23\n"
            "    %25 = load ptr %24\n"
            "    %26 = call i64 @main.Tile.area(%2)\n"
            "    %27 = addov i64 %20, %26\n"
            "    branchov %27, b5, b6\n"
            "b5:\n"
-           "    %28 = addr @main.46\n"
+           "    %28 = addr @main.57\n"
            "    call void @anti_rt_check_failed(%28, 22, 1, %20, %26)\n"
            "    jump b6\n"
            "b6:\n"
@@ -341,43 +341,43 @@ static void devirtualises(void)
            "fn main.calls(%0: ptr, %1: ptr, %2: ptr) -> i64 {\n"
            "b0:\n"
            "    %3 = load ptr %0\n"
-           "    %4 = mul i64 8, size_of ptr\n"
+           "    %4 = mul i64 17, size_of ptr\n"
            "    %5 = ptradd %3, %4\n"
            "    %6 = load ptr %5\n"
-           "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor 8\n"
+           "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor 17\n"
            "    %8 = load ptr %0\n"
-           "    %9 = mul i64 9, size_of ptr\n"
+           "    %9 = mul i64 18, size_of ptr\n"
            "    %10 = ptradd %8, %9\n"
            "    %11 = load ptr %10\n"
-           "    %12 = call i64 %11 via @main.fn.0(%0) table @main.Shape.descriptor 9\n"
+           "    %12 = call i64 %11 via @main.fn.0(%0) table @main.Shape.descriptor 18\n"
            "    %13 = addov i64 %7, %12\n"
            "    branchov %13, b1, b2\n"
            "b1:\n"
-           "    %14 = addr @main.46\n"
+           "    %14 = addr @main.57\n"
            "    call void @anti_rt_check_failed(%14, 22, 1, %7, %12)\n"
            "    jump b2\n"
            "b2:\n"
            "    %15 = load ptr %1\n"
-           "    %16 = mul i64 8, size_of ptr\n"
+           "    %16 = mul i64 17, size_of ptr\n"
            "    %17 = ptradd %15, %16\n"
            "    %18 = load ptr %17\n"
-           "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor 8\n"
+           "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor 17\n"
            "    %20 = addov i64 %13, %19\n"
            "    branchov %20, b3, b4\n"
            "b3:\n"
-           "    %21 = addr @main.46\n"
+           "    %21 = addr @main.57\n"
            "    call void @anti_rt_check_failed(%21, 22, 1, %13, %19)\n"
            "    jump b4\n"
            "b4:\n"
            "    %22 = load ptr %2\n"
-           "    %23 = mul i64 8, size_of ptr\n"
+           "    %23 = mul i64 17, size_of ptr\n"
            "    %24 = ptradd %22, %23\n"
            "    %25 = load ptr %24\n"
-           "    %26 = call i64 %25 via @main.fn.0(%2) table @main.Tile.descriptor 8\n"
+           "    %26 = call i64 %25 via @main.fn.0(%2) table @main.Tile.descriptor 17\n"
            "    %27 = addov i64 %20, %26\n"
            "    branchov %27, b5, b6\n"
            "b5:\n"
-           "    %28 = addr @main.46\n"
+           "    %28 = addr @main.57\n"
            "    call void @anti_rt_check_failed(%28, 22, 1, %20, %26)\n"
            "    jump b6\n"
            "b6:\n"
@@ -582,12 +582,12 @@ static void records_slots(void)
     print_lines(&out, &p.ir, "global anti.rt.");
     print_lines(&out, &p.ir, "global (null).anti_rt_slots");
     CHECK_STR(text_cstr(&out),
-              "global anti.rt.slots.0 size 2 align 1 bytes 04 01\n"
-              "global anti.rt.slots.1 size 2 align 1 bytes 04 01\n"
+              "global anti.rt.slots.0 size 3 align 1 bytes 04 00 02\n"
+              "global anti.rt.slots.1 size 3 align 1 bytes 04 00 02\n"
               "global anti.rt.slots.list [2]anti.rt.Slots { "
-              "anti.rt.Slots { @main.Shape.descriptor, i64 9, "
+              "anti.rt.Slots { @main.Shape.descriptor, i64 18, "
               "@anti.rt.slots.0 }, "
-              "anti.rt.Slots { @main.Named.descriptor, i64 9, "
+              "anti.rt.Slots { @main.Named.descriptor, i64 18, "
               "@anti.rt.slots.1 } }\n"
               "global (null).anti_rt_slots anti.rt.SlotTable { i64 2, "
               "@anti.rt.slots.list }\n");
@@ -682,11 +682,15 @@ static void writes_trampolines(void)
                   "%3: i64, %4: ptr) -> i8 {\n"
                   "fn anti.rt.trampoline.void(%0: ptr, %1: ptr, %2: ptr, "
                   "%3: i64, %4: ptr) -> i8 {\n"
+                  "fn anti.rt.trampoline.void.str(%0: ptr, %1: ptr, %2: ptr, "
+                  "%3: i64, %4: ptr) -> i8 {\n"
+                  "fn anti.rt.trampoline.void.str.ptr(%0: ptr, %1: ptr, "
+                  "%2: ptr, %3: i64, %4: ptr) -> i8 {\n"
                   "fn anti.rt.trampoline.i64(%0: ptr, %1: ptr, %2: ptr, "
                   "%3: i64, %4: ptr) -> i8 {\n");
     reflect_calls(true, true, "global (null).anti_rt_trampolines",
                   "global (null).anti_rt_trampolines anti.rt.Trampolines "
-                  "{ i64 6, @anti.rt.trampolines.list }\n");
+                  "{ i64 8, @anti.rt.trampolines.list }\n");
     reflect_calls(false, true, "global (null).anti_rt_trampolines", "");
     reflect_calls(true, false, "global (null).anti_rt_trampolines",
                   "global (null).anti_rt_trampolines anti.rt.Trampolines "
@@ -698,12 +702,12 @@ static void writes_trampolines(void)
 static void call_reaches_every_slot(void)
 {
     reflect_calls(true, true, "global anti.rt.slots.",
-                  "global anti.rt.slots.0 size 2 align 1 bytes fe 03\n"
-                  "global anti.rt.slots.1 size 2 align 1 bytes fe 01\n"
+                  "global anti.rt.slots.0 size 3 align 1 bytes fe ff 07\n"
+                  "global anti.rt.slots.1 size 3 align 1 bytes fe ff 03\n"
                   "global anti.rt.slots.list [2]anti.rt.Slots { "
-                  "anti.rt.Slots { @main.Shape.descriptor, i64 10, "
+                  "anti.rt.Slots { @main.Shape.descriptor, i64 19, "
                   "@anti.rt.slots.0 }, "
-                  "anti.rt.Slots { @main.Named.descriptor, i64 9, "
+                  "anti.rt.Slots { @main.Named.descriptor, i64 18, "
                   "@anti.rt.slots.1 } }\n");
 }
 

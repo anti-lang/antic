@@ -616,7 +616,17 @@ static void dump_tokens(const char *source, const struct token_list *tokens)
 /* The options of lowering that the command line sets. */
 static unsigned lower_options(const struct options *o)
 {
-    return (o->no_reflect ? LOWER_NO_REFLECT : 0u) | (o->dev ? LOWER_DEV : 0u);
+    unsigned flags = (o->no_reflect ? LOWER_NO_REFLECT : 0u) |
+                     (o->dev ? LOWER_DEV : 0u) |
+                     (o->no_hooks ? LOWER_NO_HOOKS : 0u) |
+                     (o->trace_writes ? LOWER_TRACE_WRITES : 0u);
+
+    /* `trace` follows the mode, as `assert` does, and `--trace` and
+       `--no-trace` decide instead of it. */
+    if (o->trace == TRACE_ON || (o->trace == TRACE_MODE && o->dev)) {
+        flags |= LOWER_TRACE;
+    }
+    return flags;
 }
 
 /* The path a failed assertion or a failed dev-mode check names: the
@@ -632,13 +642,15 @@ static const char *recorded_file(const struct options *o)
 static bool lower_checked(const char *input, const char *file,
                           struct module *tree, const char *module,
                           struct ir_module *ir, struct diagnostics *diags,
-                          unsigned options)
+                          unsigned options, const char *const *patterns,
+                          size_t pattern_count)
 {
     struct text errors = {0};
     bool ok = false;
 
     tree->file = file;
-    if (!lower_module(tree, module, ir, diags, options)) {
+    if (!lower_module(tree, module, ir, diags, options, patterns,
+                      pattern_count)) {
         print_diagnostics(input, diags);
     } else if (!ir_verify(ir, &errors)) {
         fprintf(stderr, "antic: internal error, the IR of %s fails "
@@ -687,14 +699,15 @@ static bool has_main(const struct ir_module *program, const char *module);
 static int dump_ir(const char *input, const char *file, struct module *tree,
                    const char *module, struct ir_module *program,
                    bool optimize, bool release, struct diagnostics *diags,
-                   unsigned options)
+                   unsigned options, const char *const *patterns,
+                   size_t pattern_count)
 {
     bool no_reflect = (options & LOWER_NO_REFLECT) != 0;
     struct text out = {0};
     struct text errors = {0};
 
-    if (!lower_checked(input, file, tree, module, program, diags,
-                       options)) {
+    if (!lower_checked(input, file, tree, module, program, diags, options,
+                       patterns, pattern_count)) {
         return 1;
     }
     if (optimize) {
@@ -812,7 +825,8 @@ static int back_end(const struct options *o, struct module *tree,
 
     if (tree != NULL &&
         !lower_checked(o->input, recorded_file(o), tree, module, program,
-                       diags, lower_options(o))) {
+                       diags, lower_options(o), o->trace_patterns,
+                       o->trace_pattern_count)) {
         return 1;
     }
     /* DESIGN: the passes over the whole program run where the program is
@@ -981,7 +995,8 @@ static int write_library(const struct options *o, struct module *tree,
 
     ir_module_init(&ir, arena, module);
     if (lower_checked(o->input, recorded_file(o), tree, module, &ir, diags,
-                      lower_options(o)) &&
+                      lower_options(o), o->trace_patterns,
+                      o->trace_pattern_count) &&
         own_interface(o, tree, module, arena, &iface)) {
         antl_write(&bytes, &iface, &ir, o->strip_docs);
         if (o->output != NULL) {
@@ -1416,7 +1431,8 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     if (!sema_check(tree, text_cstr(module), o->package_name, libraries,
-                    paths.count, &types, &arena, &diags, !o->dev)) {
+                    paths.count, &types, &arena, &diags,
+                    !o->dev && !o->library && o->lib == LIB_NONE)) {
         print_diagnostics(o->input, &diags);
         goto done;
     }
@@ -1440,7 +1456,8 @@ static int compile(const struct options *o, struct text *source,
     if (o->dump_ir || o->dump_opt) {
         status = dump_ir(o->input, recorded_file(o), tree, text_cstr(module),
                          &program, o->dump_opt, !o->dev, &diags,
-                         lower_options(o));
+                         lower_options(o), o->trace_patterns,
+                         o->trace_pattern_count);
         goto done;
     }
     if (o->lib != LIB_NONE && defines_main(tree)) {

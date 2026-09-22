@@ -64,7 +64,9 @@ struct checker {
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
     bool target_sized;          /* a symbolic array length is allowed */
     bool atomic_place;          /* the place of an atomic operation */
-    bool whole_program;         /* release mode: every class is here */
+    /* The build writes a program, so every class of it is here. A `-c`
+       or `--lib` build writes a library that other code fills. */
+    bool whole_program;
     struct type *yields;        /* the type `yield` gives in a handler */
     int handler_depth;          /* above 0, a `yield` has a place to go */
     struct block *try_block;    /* the body of the enclosing `try` block */
@@ -695,6 +697,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         }
         if (sym == NULL && name_is(&t->name, LANG_MUTEX)) {
             return types_mutex(c->types);
+        }
+        if (sym == NULL && name_is(&t->name, LANG_FIELD_DESCRIPTOR)) {
+            return types_field_descriptor(c->types);
         }
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
             error_at(c, t->pos, "unknown type `%.*s`", (int)t->name.length,
@@ -2674,25 +2679,61 @@ static void declare_deserialize(struct checker *c, struct type *object)
     object->member_count++;
 }
 
+/* The class `anti.lang.Error` when the compilation carries `anti.lang`,
+   and NULL where it does not. The root's `failed` hook names it, and a
+   program without that module cannot name it either. */
+static struct type *lang_error_or_null(struct checker *c)
+{
+    static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
+    static const struct name class_name = {LANG_ERROR, sizeof LANG_ERROR - 1};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
+        sym->type->kind != TYPE_CLASS) {
+        return NULL;
+    }
+    return sym->type;
+}
+
 /* DESIGN: anti.lang.Object declares seven public functions whose bodies
-   live in the runtime. The checker builds one item per function, so
-   `v.type_name()` resolves like any inherited call and lowering finds the
-   runtime symbol behind it. The list is built once per session. */
+   live in the runtime, and nine hooks with empty bodies after them. The
+   checker builds one item per function, so `v.type_name()` resolves like
+   any inherited call and lowering finds the runtime symbol behind it.
+   The list is built once per session. */
+/* The type of one parameter of a hook, after `self`. */
+enum root_param { ROOT_P_OBJECT, ROOT_P_STR, ROOT_P_ERROR, ROOT_P_FIELD };
+
 static void declare_root(struct checker *c)
 {
     static const struct {
         const char *name;
         int params;             /* besides self */
         enum type_kind result;
+        enum root_param kinds[2];
     } root[] = {
-        {"type_name", 0, TYPE_STR},   {ROOT_TO_TEXT, 0, TYPE_STR},
-        {"equals", 1, TYPE_BOOL},     {"hash", 0, TYPE_U64},
-        {"serialize", 1, TYPE_VOID},  {"destruct", 0, TYPE_VOID},
-        {"copy", 1, TYPE_VOID}
+        {"type_name", 0, TYPE_STR, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {ROOT_TO_TEXT, 0, TYPE_STR, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {"equals", 1, TYPE_BOOL, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {"hash", 0, TYPE_U64, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {"serialize", 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {"destruct", 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {"copy", 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {ROOT_CREATED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {ROOT_DESTROYED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {ROOT_COPIED, 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {ROOT_DISPATCHED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {ROOT_JOINED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+        {ROOT_ENTER, 1, TYPE_VOID, {ROOT_P_STR, ROOT_P_OBJECT}},
+        {ROOT_LEAVE, 1, TYPE_VOID, {ROOT_P_STR, ROOT_P_OBJECT}},
+        {ROOT_FAILED, 2, TYPE_VOID, {ROOT_P_STR, ROOT_P_ERROR}},
+        {ROOT_CHANGED, 1, TYPE_VOID, {ROOT_P_FIELD, ROOT_P_OBJECT}}
     };
     struct type *object = types_object(c->types);
+    struct type *error = lang_error_or_null(c);
     struct item **members;
     size_t i;
+    int k;
 
     if (object->member_count > 0) {
         return;
@@ -2702,11 +2743,31 @@ static void declare_root(struct checker *c)
     for (i = 0; i < sizeof root / sizeof root[0]; i++) {
         struct item *it = arena_alloc(c->arena, sizeof *it);
         struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
-        struct type **params = arena_alloc(c->arena, 2 * sizeof *params);
+        struct type **params = arena_alloc(c->arena, 3 * sizeof *params);
         memset(it, 0, sizeof *it);
         memset(sym, 0, sizeof *sym);
         params[0] = types_pointer(c->types, object);
-        params[1] = params[0];
+        for (k = 0; k < 2; k++) {
+            switch (root[i].kinds[k]) {
+            case ROOT_P_STR:
+                params[k + 1] = builtin(c, TYPE_STR);
+                break;
+            /* Where the compilation carries no `anti.lang`, the error of
+               `failed` is a plain object, which is what a module without
+               that class can name. */
+            case ROOT_P_ERROR:
+                params[k + 1] = types_pointer(c->types,
+                                              error != NULL ? error : object);
+                break;
+            case ROOT_P_FIELD:
+                params[k + 1] =
+                    types_pointer(c->types, types_field_descriptor(c->types));
+                break;
+            default:
+                params[k + 1] = params[0];
+                break;
+            }
+        }
         it->kind = ITEM_FN;
         it->pub = true;
         it->vis = VIS_PUB;
@@ -9388,7 +9449,7 @@ bool sema_check(struct module *module, const char *module_name,
                 const struct interface *const *libraries,
                 size_t library_count, struct types *types,
                 struct arena *arena, struct diagnostics *diags,
-                bool whole_program)
+                bool program)
 {
     struct checker c;
     size_t i;
@@ -9406,7 +9467,7 @@ bool sema_check(struct module *module, const char *module_name,
     c.library_count = library_count;
     c.scope = &c.module_scope;
     c.ok = true;
-    c.whole_program = whole_program;
+    c.whole_program = program;
     declare_root(&c);
 
     for (i = 0; i < module->import_count; i++) {
@@ -10145,7 +10206,9 @@ bool sema_check(struct module *module, const char *module_name,
         free(walk.seen);
     }
     /* An abstract class that no class of the program fills has no value
-       and no use. Release mode sees every class, so it can say so. */
+       and no use. A build that writes a program sees every class, so it
+       can say so. A library build sees no program: `anti.lang` writes
+       `TraceHandler` for the program that installs a handler. */
     if (c.whole_program) {
         for (i = 0; i < module->item_count; i++) {
             struct item *it = module->items[i];

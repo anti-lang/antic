@@ -522,6 +522,64 @@ void anti_lang_Object_destruct(struct anti_object *self)
     (void)self;
 }
 
+/* DESIGN: the nine hooks of the root do nothing. A class that wants one
+   replaces it with a concrete function of the same name, and rt/hooks.c
+   compares the entry with the body here before it dispatches, so a class
+   that replaced none pays a load and a compare. */
+void anti_lang_Object_created(struct anti_object *self)
+{
+    (void)self;
+}
+
+void anti_lang_Object_destroyed(struct anti_object *self)
+{
+    (void)self;
+}
+
+void anti_lang_Object_copied(struct anti_object *self,
+                             struct anti_object *from)
+{
+    (void)self;
+    (void)from;
+}
+
+void anti_lang_Object_dispatched(struct anti_object *self)
+{
+    (void)self;
+}
+
+void anti_lang_Object_joined(struct anti_object *self)
+{
+    (void)self;
+}
+
+void anti_lang_Object_enter(struct anti_object *self, struct anti_text name)
+{
+    (void)self;
+    (void)name;
+}
+
+void anti_lang_Object_leave(struct anti_object *self, struct anti_text name)
+{
+    (void)self;
+    (void)name;
+}
+
+void anti_lang_Object_failed(struct anti_object *self, struct anti_text name,
+                             struct anti_object *e)
+{
+    (void)self;
+    (void)name;
+    (void)e;
+}
+
+void anti_lang_Object_changed(struct anti_object *self,
+                              const struct anti_field *field)
+{
+    (void)self;
+    (void)field;
+}
+
 /* The entry of a table, which the compiler fills with the function the
    concrete class ended with. */
 static void *table_entry(const void *object, enum anti_entry entry)

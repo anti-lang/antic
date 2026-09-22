@@ -82,13 +82,13 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
 #define DEPTH_LIMIT 64
 
 /* DESIGN: anti.mem.Allocator declares alloc and free as its first two
-   functions. They take the two entries after the seven of the root, in
-   the table of every allocator and of the sub-object of an interface.
-   The runtime calls them there, as a call through a `*Allocator` does.
-   std/anti/mem.anti keeps the order. std_deserialize_alloc counts every
-   call. */
+   functions. They take the two entries after the seven of the root and
+   the nine hooks, in the table of every allocator and of the sub-object
+   of an interface. The runtime calls them there, as a call through a
+   `*Allocator` does. std/anti/mem.anti keeps the order.
+   std_deserialize_alloc counts every call. */
 enum {
-    ENTRY_ALLOC = ANTI_ENTRY_COPY + 1,
+    ENTRY_ALLOC = ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT,
     ENTRY_FREE
 };
 

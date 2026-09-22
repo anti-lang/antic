@@ -42,6 +42,15 @@ typedef struct Ink_vtable {
     void *serialize;
     void *destruct;
     void *copy;
+    void *created;
+    void *destroyed;
+    void *copied;
+    void *dispatched;
+    void *joined;
+    void *enter;
+    void *leave;
+    void *failed;
+    void *changed;
     int32_t (*colour)(Ink *self);
 } Ink_vtable;
 
@@ -84,6 +93,15 @@ typedef struct Shape_vtable {
     void *serialize;
     void *destruct;
     void *copy;
+    void *created;
+    void *destroyed;
+    void *copied;
+    void *dispatched;
+    void *joined;
+    void *enter;
+    void *leave;
+    void *failed;
+    void *changed;
     int32_t (*area)(Shape *self);
     void (*move)(Shape *self, int32_t dx, int32_t dy);
 } Shape_vtable;
@@ -137,6 +155,15 @@ typedef struct Square_vtable {
     void *serialize;
     void *destruct;
     void *copy;
+    void *created;
+    void *destroyed;
+    void *copied;
+    void *dispatched;
+    void *joined;
+    void *enter;
+    void *leave;
+    void *failed;
+    void *changed;
     int32_t (*area)(Square *self);
     void (*move)(Square *self, int32_t dx, int32_t dy);
     int32_t (*colour)(Square *self);
@@ -198,6 +225,15 @@ typedef struct Circle_vtable {
     void *serialize;
     void *destruct;
     void *copy;
+    void *created;
+    void *destroyed;
+    void *copied;
+    void *dispatched;
+    void *joined;
+    void *enter;
+    void *leave;
+    void *failed;
+    void *changed;
     int32_t (*area)(Circle *self);
     void (*move)(Circle *self, int32_t dx, int32_t dy);
 } Circle_vtable;
@@ -251,6 +287,15 @@ typedef struct Tint_vtable {
     void *serialize;
     void *destruct;
     void *copy;
+    void *created;
+    void *destroyed;
+    void *copied;
+    void *dispatched;
+    void *joined;
+    void *enter;
+    void *leave;
+    void *failed;
+    void *changed;
     int32_t (*colour)(Tint *self, int32_t k);
 } Tint_vtable;
 
@@ -293,6 +338,15 @@ typedef struct Stamp_vtable {
     void *serialize;
     void *destruct;
     void *copy;
+    void *created;
+    void *destroyed;
+    void *copied;
+    void *dispatched;
+    void *joined;
+    void *enter;
+    void *leave;
+    void *failed;
+    void *changed;
 } Stamp_vtable;
 
 /** A stamp, which fills `colour` once for each ink. */
@@ -343,6 +397,15 @@ typedef struct Tile_vtable {
     void *serialize;
     void *destruct;
     void *copy;
+    void *created;
+    void *destroyed;
+    void *copied;
+    void *dispatched;
+    void *joined;
+    void *enter;
+    void *leave;
+    void *failed;
+    void *changed;
     int32_t (*area)(Tile *self);
     void (*move)(Tile *self, int32_t dx, int32_t dy);
 } Tile_vtable;

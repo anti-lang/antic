@@ -1,4 +1,4 @@
-type [9]ptr = array 9 of ptr
+type [18]ptr = array 18 of ptr
 type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
 type anti.lang.Object = struct { table: ptr }
 type devirt.Only = struct { super: anti.lang.Object, n: i64 }
@@ -6,11 +6,11 @@ type [2]ptr = array 2 of ptr
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [1]anti.rt.Field = array 1 of anti.rt.Field
 type anti.rt.Function = struct { name: ptr, name_length: i64, slot: i64, param_count: i64, signature: ptr }
-type [8]anti.rt.Function = array 8 of anti.rt.Function
+type [17]anti.rt.Function = array 17 of anti.rt.Function
 type str = struct { ptr: ptr, len: i64 }
-type [10]ptr = array 10 of ptr
+type [19]ptr = array 19 of ptr
 type devirt.Base = struct { super: anti.lang.Object, n: i64 }
-type [9]anti.rt.Function = array 9 of anti.rt.Function
+type [18]anti.rt.Function = array 18 of anti.rt.Function
 type devirt.Derived = struct { super: devirt.Base }
 type [3]ptr = array 3 of ptr
 type devirt.Speaker = struct { super: anti.lang.Object }
@@ -23,10 +23,20 @@ extern fn anti_lang_Object_to_text(ptr) -> agg str
 extern fn anti_lang_Object_equals(ptr, ptr) -> i8
 extern fn anti_lang_Object_hash(ptr) -> i64
 extern fn anti_lang_Object_serialize(ptr, ptr)
+extern fn anti_lang_Object_created(ptr)
+extern fn anti_lang_Object_destroyed(ptr)
+extern fn anti_lang_Object_copied(ptr, ptr)
+extern fn anti_lang_Object_dispatched(ptr)
+extern fn anti_lang_Object_joined(ptr)
+extern fn anti_lang_Object_enter(ptr, agg str)
+extern fn anti_lang_Object_leave(ptr, agg str)
+extern fn anti_lang_Object_failed(ptr, agg str, ptr)
+extern fn anti_lang_Object_changed(ptr, ptr)
+extern fn anti_rt_hook(ptr, i64)
 extern fn devirt.fn.0(ptr) -> i64
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global devirt.Only.table [9]ptr { @devirt.Only.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @anti_lang_Object_equals, @anti_lang_Object_hash, @anti_lang_Object_serialize, @devirt.Only.destroy, @devirt.Only.copy, @devirt.Only.value }
-global devirt.Only.descriptor anti.rt.Descriptor { @devirt.2, i64 4, @anti_lang_Object_descriptor, size_of devirt.Only, i64 1, @devirt.Only.ancestors, i64 1, @devirt.Only.fields, ptr 0, i64 0, i64 8, @devirt.Only.functions }
+global devirt.Only.table [18]ptr { @devirt.Only.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @anti_lang_Object_equals, @anti_lang_Object_hash, @anti_lang_Object_serialize, @devirt.Only.destroy, @devirt.Only.copy, @anti_lang_Object_created, @anti_lang_Object_destroyed, @anti_lang_Object_copied, @anti_lang_Object_dispatched, @anti_lang_Object_joined, @anti_lang_Object_enter, @anti_lang_Object_leave, @anti_lang_Object_failed, @anti_lang_Object_changed, @devirt.Only.value }
+global devirt.Only.descriptor anti.rt.Descriptor { @devirt.2, i64 4, @anti_lang_Object_descriptor, size_of devirt.Only, i64 1, @devirt.Only.ancestors, i64 1, @devirt.Only.fields, ptr 0, i64 0, i64 17, @devirt.Only.functions }
 global devirt.2 size 5 align 1 bytes 4f 6e 6c 79 00
 global (null).anti_lang_Object_descriptor size 0 align 1 bytes
 global devirt.Only.ancestors [2]ptr { @anti_lang_Object_descriptor, @devirt.Only.descriptor }
@@ -44,34 +54,45 @@ global devirt.14 size 10 align 1 bytes 73 65 72 69 61 6c 69 7a 65 00
 global devirt.15 size 5 align 1 bytes 76 6f 69 64 00
 global devirt.16 size 9 align 1 bytes 64 65 73 74 72 75 63 74 00
 global devirt.17 size 5 align 1 bytes 63 6f 70 79 00
-global devirt.18 size 4 align 1 bytes 69 36 34 00
-global devirt.19 size 6 align 1 bytes 76 61 6c 75 65 00
-global devirt.Only.functions [8]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.19, i64 5, i64 8, i64 1, @devirt.18 } }
-global devirt.Base.table [10]ptr { @devirt.Base.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @anti_lang_Object_equals, @anti_lang_Object_hash, @anti_lang_Object_serialize, @devirt.Base.destroy, @devirt.Base.copy, @devirt.Base.value, @devirt.Base.same }
-global devirt.Base.descriptor anti.rt.Descriptor { @devirt.23, i64 4, @anti_lang_Object_descriptor, size_of devirt.Base, i64 1, @devirt.Base.ancestors, i64 1, @devirt.Base.fields, ptr 0, i64 0, i64 9, @devirt.Base.functions }
-global devirt.23 size 5 align 1 bytes 42 61 73 65 00
+global devirt.18 size 8 align 1 bytes 63 72 65 61 74 65 64 00
+global devirt.19 size 10 align 1 bytes 64 65 73 74 72 6f 79 65 64 00
+global devirt.20 size 7 align 1 bytes 63 6f 70 69 65 64 00
+global devirt.21 size 11 align 1 bytes 64 69 73 70 61 74 63 68 65 64 00
+global devirt.22 size 7 align 1 bytes 6a 6f 69 6e 65 64 00
+global devirt.23 size 9 align 1 bytes 76 6f 69 64 2e 73 74 72 00
+global devirt.24 size 6 align 1 bytes 65 6e 74 65 72 00
+global devirt.25 size 6 align 1 bytes 6c 65 61 76 65 00
+global devirt.26 size 13 align 1 bytes 76 6f 69 64 2e 73 74 72 2e 70 74 72 00
+global devirt.27 size 7 align 1 bytes 66 61 69 6c 65 64 00
+global devirt.28 size 8 align 1 bytes 63 68 61 6e 67 65 64 00
+global devirt.29 size 4 align 1 bytes 69 36 34 00
+global devirt.30 size 6 align 1 bytes 76 61 6c 75 65 00
+global devirt.Only.functions [17]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.18, i64 7, i64 8, i64 1, @devirt.15 }, anti.rt.Function { @devirt.19, i64 9, i64 9, i64 1, @devirt.15 }, anti.rt.Function { @devirt.20, i64 6, i64 10, i64 2, @devirt.13 }, anti.rt.Function { @devirt.21, i64 10, i64 11, i64 1, @devirt.15 }, anti.rt.Function { @devirt.22, i64 6, i64 12, i64 1, @devirt.15 }, anti.rt.Function { @devirt.24, i64 5, i64 13, i64 2, @devirt.23 }, anti.rt.Function { @devirt.25, i64 5, i64 14, i64 2, @devirt.23 }, anti.rt.Function { @devirt.27, i64 6, i64 15, i64 3, @devirt.26 }, anti.rt.Function { @devirt.28, i64 7, i64 16, i64 2, @devirt.13 }, anti.rt.Function { @devirt.30, i64 5, i64 17, i64 1, @devirt.29 } }
+global devirt.Base.table [19]ptr { @devirt.Base.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @anti_lang_Object_equals, @anti_lang_Object_hash, @anti_lang_Object_serialize, @devirt.Base.destroy, @devirt.Base.copy, @anti_lang_Object_created, @anti_lang_Object_destroyed, @anti_lang_Object_copied, @anti_lang_Object_dispatched, @anti_lang_Object_joined, @anti_lang_Object_enter, @anti_lang_Object_leave, @anti_lang_Object_failed, @anti_lang_Object_changed, @devirt.Base.value, @devirt.Base.same }
+global devirt.Base.descriptor anti.rt.Descriptor { @devirt.34, i64 4, @anti_lang_Object_descriptor, size_of devirt.Base, i64 1, @devirt.Base.ancestors, i64 1, @devirt.Base.fields, ptr 0, i64 0, i64 18, @devirt.Base.functions }
+global devirt.34 size 5 align 1 bytes 42 61 73 65 00
 global devirt.Base.ancestors [2]ptr { @anti_lang_Object_descriptor, @devirt.Base.descriptor }
 global devirt.Base.fields [1]anti.rt.Field { anti.rt.Field { @devirt.4, i64 1, offset_of devirt.Base.n, i64 6, i64 0, ptr 0 } }
-global devirt.26 size 5 align 1 bytes 73 61 6d 65 00
-global devirt.Base.functions [9]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.19, i64 5, i64 8, i64 1, @devirt.18 }, anti.rt.Function { @devirt.26, i64 4, i64 9, i64 1, @devirt.18 } }
-global devirt.Derived.table [10]ptr { @devirt.Derived.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @anti_lang_Object_equals, @anti_lang_Object_hash, @anti_lang_Object_serialize, @devirt.Derived.destroy, @devirt.Derived.copy, @devirt.Derived.value, @devirt.Base.same }
-global devirt.Derived.descriptor anti.rt.Descriptor { @devirt.30, i64 7, @devirt.Base.descriptor, size_of devirt.Derived, i64 2, @devirt.Derived.ancestors, i64 0, ptr 0, ptr 0, i64 0, i64 9, @devirt.Derived.functions }
-global devirt.30 size 8 align 1 bytes 44 65 72 69 76 65 64 00
+global devirt.37 size 5 align 1 bytes 73 61 6d 65 00
+global devirt.Base.functions [18]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.18, i64 7, i64 8, i64 1, @devirt.15 }, anti.rt.Function { @devirt.19, i64 9, i64 9, i64 1, @devirt.15 }, anti.rt.Function { @devirt.20, i64 6, i64 10, i64 2, @devirt.13 }, anti.rt.Function { @devirt.21, i64 10, i64 11, i64 1, @devirt.15 }, anti.rt.Function { @devirt.22, i64 6, i64 12, i64 1, @devirt.15 }, anti.rt.Function { @devirt.24, i64 5, i64 13, i64 2, @devirt.23 }, anti.rt.Function { @devirt.25, i64 5, i64 14, i64 2, @devirt.23 }, anti.rt.Function { @devirt.27, i64 6, i64 15, i64 3, @devirt.26 }, anti.rt.Function { @devirt.28, i64 7, i64 16, i64 2, @devirt.13 }, anti.rt.Function { @devirt.30, i64 5, i64 17, i64 1, @devirt.29 }, anti.rt.Function { @devirt.37, i64 4, i64 18, i64 1, @devirt.29 } }
+global devirt.Derived.table [19]ptr { @devirt.Derived.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @anti_lang_Object_equals, @anti_lang_Object_hash, @anti_lang_Object_serialize, @devirt.Derived.destroy, @devirt.Derived.copy, @anti_lang_Object_created, @anti_lang_Object_destroyed, @anti_lang_Object_copied, @anti_lang_Object_dispatched, @anti_lang_Object_joined, @anti_lang_Object_enter, @anti_lang_Object_leave, @anti_lang_Object_failed, @anti_lang_Object_changed, @devirt.Derived.value, @devirt.Base.same }
+global devirt.Derived.descriptor anti.rt.Descriptor { @devirt.41, i64 7, @devirt.Base.descriptor, size_of devirt.Derived, i64 2, @devirt.Derived.ancestors, i64 0, ptr 0, ptr 0, i64 0, i64 18, @devirt.Derived.functions }
+global devirt.41 size 8 align 1 bytes 44 65 72 69 76 65 64 00
 global devirt.Derived.ancestors [3]ptr { @anti_lang_Object_descriptor, @devirt.Base.descriptor, @devirt.Derived.descriptor }
-global devirt.Derived.functions [9]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.19, i64 5, i64 8, i64 1, @devirt.18 }, anti.rt.Function { @devirt.26, i64 4, i64 9, i64 1, @devirt.18 } }
-global devirt.Dog.table [9]ptr { @devirt.Dog.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @anti_lang_Object_equals, @anti_lang_Object_hash, @anti_lang_Object_serialize, @devirt.Dog.destroy, @devirt.Dog.copy, @devirt.Dog.speak }
-global devirt.Dog.descriptor anti.rt.Descriptor { @devirt.35, i64 3, @devirt.Speaker.descriptor, size_of devirt.Dog, i64 2, @devirt.Dog.ancestors, i64 0, ptr 0, ptr 0, i64 0, i64 8, @devirt.Dog.functions }
-global devirt.35 size 4 align 1 bytes 44 6f 67 00
-global devirt.Speaker.descriptor anti.rt.Descriptor { @devirt.37, i64 7, @anti_lang_Object_descriptor, size_of devirt.Speaker, i64 1, @devirt.Speaker.ancestors, i64 0, ptr 0, ptr 0, i64 0, i64 8, @devirt.Speaker.functions }
-global devirt.37 size 8 align 1 bytes 53 70 65 61 6b 65 72 00
+global devirt.Derived.functions [18]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.18, i64 7, i64 8, i64 1, @devirt.15 }, anti.rt.Function { @devirt.19, i64 9, i64 9, i64 1, @devirt.15 }, anti.rt.Function { @devirt.20, i64 6, i64 10, i64 2, @devirt.13 }, anti.rt.Function { @devirt.21, i64 10, i64 11, i64 1, @devirt.15 }, anti.rt.Function { @devirt.22, i64 6, i64 12, i64 1, @devirt.15 }, anti.rt.Function { @devirt.24, i64 5, i64 13, i64 2, @devirt.23 }, anti.rt.Function { @devirt.25, i64 5, i64 14, i64 2, @devirt.23 }, anti.rt.Function { @devirt.27, i64 6, i64 15, i64 3, @devirt.26 }, anti.rt.Function { @devirt.28, i64 7, i64 16, i64 2, @devirt.13 }, anti.rt.Function { @devirt.30, i64 5, i64 17, i64 1, @devirt.29 }, anti.rt.Function { @devirt.37, i64 4, i64 18, i64 1, @devirt.29 } }
+global devirt.Dog.table [18]ptr { @devirt.Dog.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @anti_lang_Object_equals, @anti_lang_Object_hash, @anti_lang_Object_serialize, @devirt.Dog.destroy, @devirt.Dog.copy, @anti_lang_Object_created, @anti_lang_Object_destroyed, @anti_lang_Object_copied, @anti_lang_Object_dispatched, @anti_lang_Object_joined, @anti_lang_Object_enter, @anti_lang_Object_leave, @anti_lang_Object_failed, @anti_lang_Object_changed, @devirt.Dog.speak }
+global devirt.Dog.descriptor anti.rt.Descriptor { @devirt.46, i64 3, @devirt.Speaker.descriptor, size_of devirt.Dog, i64 2, @devirt.Dog.ancestors, i64 0, ptr 0, ptr 0, i64 0, i64 17, @devirt.Dog.functions }
+global devirt.46 size 4 align 1 bytes 44 6f 67 00
+global devirt.Speaker.descriptor anti.rt.Descriptor { @devirt.48, i64 7, @anti_lang_Object_descriptor, size_of devirt.Speaker, i64 1, @devirt.Speaker.ancestors, i64 0, ptr 0, ptr 0, i64 0, i64 17, @devirt.Speaker.functions }
+global devirt.48 size 8 align 1 bytes 53 70 65 61 6b 65 72 00
 global devirt.Speaker.ancestors [2]ptr { @anti_lang_Object_descriptor, @devirt.Speaker.descriptor }
-global devirt.39 size 6 align 1 bytes 73 70 65 61 6b 00
-global devirt.Speaker.functions [8]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.39, i64 5, i64 8, i64 1, @devirt.18 } }
+global devirt.50 size 6 align 1 bytes 73 70 65 61 6b 00
+global devirt.Speaker.functions [17]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.18, i64 7, i64 8, i64 1, @devirt.15 }, anti.rt.Function { @devirt.19, i64 9, i64 9, i64 1, @devirt.15 }, anti.rt.Function { @devirt.20, i64 6, i64 10, i64 2, @devirt.13 }, anti.rt.Function { @devirt.21, i64 10, i64 11, i64 1, @devirt.15 }, anti.rt.Function { @devirt.22, i64 6, i64 12, i64 1, @devirt.15 }, anti.rt.Function { @devirt.24, i64 5, i64 13, i64 2, @devirt.23 }, anti.rt.Function { @devirt.25, i64 5, i64 14, i64 2, @devirt.23 }, anti.rt.Function { @devirt.27, i64 6, i64 15, i64 3, @devirt.26 }, anti.rt.Function { @devirt.28, i64 7, i64 16, i64 2, @devirt.13 }, anti.rt.Function { @devirt.50, i64 5, i64 17, i64 1, @devirt.29 } }
 global devirt.Dog.ancestors [3]ptr { @anti_lang_Object_descriptor, @devirt.Speaker.descriptor, @devirt.Dog.descriptor }
-global devirt.Dog.functions [8]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.39, i64 5, i64 8, i64 1, @devirt.18 } }
-global devirt.43 size 30 align 1 bytes 64 65 76 69 72 74 2e 61 6e 74 69 3a 34 37 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
-global anti.rt.slots.0 size 2 align 1 bytes 00 01
-global anti.rt.slots.list [1]anti.rt.Slots { anti.rt.Slots { @devirt.Speaker.descriptor, i64 9, @anti.rt.slots.0 } }
+global devirt.Dog.functions [17]anti.rt.Function { anti.rt.Function { @devirt.7, i64 9, i64 1, i64 1, @devirt.6 }, anti.rt.Function { @devirt.8, i64 7, i64 2, i64 1, @devirt.6 }, anti.rt.Function { @devirt.10, i64 6, i64 3, i64 2, @devirt.9 }, anti.rt.Function { @devirt.12, i64 4, i64 4, i64 1, @devirt.11 }, anti.rt.Function { @devirt.14, i64 9, i64 5, i64 2, @devirt.13 }, anti.rt.Function { @devirt.16, i64 8, i64 6, i64 1, @devirt.15 }, anti.rt.Function { @devirt.17, i64 4, i64 7, i64 2, @devirt.13 }, anti.rt.Function { @devirt.18, i64 7, i64 8, i64 1, @devirt.15 }, anti.rt.Function { @devirt.19, i64 9, i64 9, i64 1, @devirt.15 }, anti.rt.Function { @devirt.20, i64 6, i64 10, i64 2, @devirt.13 }, anti.rt.Function { @devirt.21, i64 10, i64 11, i64 1, @devirt.15 }, anti.rt.Function { @devirt.22, i64 6, i64 12, i64 1, @devirt.15 }, anti.rt.Function { @devirt.24, i64 5, i64 13, i64 2, @devirt.23 }, anti.rt.Function { @devirt.25, i64 5, i64 14, i64 2, @devirt.23 }, anti.rt.Function { @devirt.27, i64 6, i64 15, i64 3, @devirt.26 }, anti.rt.Function { @devirt.28, i64 7, i64 16, i64 2, @devirt.13 }, anti.rt.Function { @devirt.50, i64 5, i64 17, i64 1, @devirt.29 } }
+global devirt.54 size 30 align 1 bytes 64 65 76 69 72 74 2e 61 6e 74 69 3a 34 37 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global anti.rt.slots.0 size 3 align 1 bytes 00 00 02
+global anti.rt.slots.list [1]anti.rt.Slots { anti.rt.Slots { @devirt.Speaker.descriptor, i64 18, @anti.rt.slots.0 } }
 global (null).anti_rt_slots anti.rt.SlotTable { i64 1, @anti.rt.slots.list }
 fn devirt.Only.value(%0: ptr) -> i64 {
 b0:
@@ -97,14 +118,14 @@ fn devirt.total(%0: ptr, %1: ptr) -> i64 {
 b0:
     %2 = call i64 @devirt.Only.value(%0)
     %3 = load ptr %1
-    %4 = shl i64 size_of ptr, 3
+    %4 = mul i64 size_of ptr, 17
     %5 = ptradd %3, %4
     %6 = load ptr %5
-    %7 = call i64 %6 via @devirt.fn.0(%1) table @devirt.Base.descriptor 8
+    %7 = call i64 %6 via @devirt.fn.0(%1) table @devirt.Base.descriptor 17
     %8 = addov i64 %2, %7
     branchov %8, b1, b2
 b1:
-    %9 = addr @devirt.43
+    %9 = addr @devirt.54
     call void @anti_rt_check_failed(%9, 29, 1, %2, %7)
     jump b2
 b2:
@@ -112,7 +133,7 @@ b2:
     %11 = addov i64 %8, %10
     branchov %11, b3, b4
 b3:
-    %12 = addr @devirt.43
+    %12 = addr @devirt.54
     call void @anti_rt_check_failed(%12, 29, 1, %8, %10)
     jump b4
 b4:
@@ -129,6 +150,7 @@ b0:
 }
 fn devirt.Only.destroy(%0: ptr) {
 b0:
+    call void @anti_rt_hook(%0, 1)
     ret
 }
 fn devirt.Only.copy(%0: ptr, %1: ptr) {
@@ -142,10 +164,12 @@ b0:
     store ptr %1, %0
     %2 = ptradd %0, offset_of devirt.Only.n
     store i64 1, %2
+    call void @anti_rt_hook(%0, 0)
     ret
 }
 fn devirt.Base.destroy(%0: ptr) {
 b0:
+    call void @anti_rt_hook(%0, 1)
     ret
 }
 fn devirt.Base.copy(%0: ptr, %1: ptr) {
@@ -159,10 +183,12 @@ b0:
     store ptr %1, %0
     %2 = ptradd %0, offset_of devirt.Base.n
     store i64 2, %2
+    call void @anti_rt_hook(%0, 0)
     ret
 }
 fn devirt.Derived.destroy(%0: ptr) {
 b0:
+    call void @anti_rt_hook(%0, 1)
     ret
 }
 fn devirt.Derived.copy(%0: ptr, %1: ptr) {
@@ -176,10 +202,12 @@ b0:
     store ptr %1, %0
     %2 = ptradd %0, offset_of devirt.Base.n
     store i64 2, %2
+    call void @anti_rt_hook(%0, 0)
     ret
 }
 fn devirt.Dog.destroy(%0: ptr) {
 b0:
+    call void @anti_rt_hook(%0, 1)
     ret
 }
 fn devirt.Dog.copy(%0: ptr, %1: ptr) {
@@ -191,5 +219,6 @@ fn devirt.Dog.init(%0: ptr) {
 b0:
     %1 = addr @devirt.Dog.table
     store ptr %1, %0
+    call void @anti_rt_hook(%0, 0)
     ret
 }

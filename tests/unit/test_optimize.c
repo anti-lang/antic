@@ -29,7 +29,7 @@ static void optimizes(const char *source, const char *expected)
     if (!lex(source, strlen(source), &arena, &diags, &tokens) ||
         !parse(source, &tokens, &arena, &diags, &module) ||
         !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
-        !lower_module(module, "main", &ir, &diags, 0)) {
+        !lower_module(module, "main", &ir, &diags, 0, NULL, 0)) {
         check_failures++;
         fprintf(stderr, "test source does not lower: %s\n%s\n",
                 diags.count > 0 ? diags.items[0].message : "", source);
@@ -146,7 +146,7 @@ void test_optimize(void)
               "{\n"
               "    return 0;\n"
               "}\n",
-              "type [8]ptr = array 8 of ptr\n"
+              "type [17]ptr = array 17 of ptr\n"
               "type anti.rt.Descriptor = struct { name: ptr, "
               "name_length: i64, parent: ptr, size: i64, depth: i64, "
               "ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, "
@@ -160,7 +160,7 @@ void test_optimize(void)
               "type anti.rt.Function = struct { name: ptr, "
               "name_length: i64, slot: i64, param_count: i64, "
               "signature: ptr }\n"
-              "type [7]anti.rt.Function = array 7 of anti.rt.Function\n"
+              "type [16]anti.rt.Function = array 16 of anti.rt.Function\n"
               "type str = struct { ptr: ptr, len: i64 }\n"
               "global (null).anti_lang_Object_descriptor size 0 align 1 "
               "bytes\n"
