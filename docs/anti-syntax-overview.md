@@ -479,7 +479,7 @@ let r = reflect.call(obj, m, []) catch fatal;
 let fresh = reflect.new("Circle");
 ```
 
-`anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `--no-reflect` drops the field and function lists.
+`anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `copy(self, to: *Object)` fills an object that `dup` has already allocated at its concrete size, and a replacement fills the fields and never allocates. `--no-reflect` drops the field and function lists.
 
 Built: descriptors, `get`, `set`, `call`, `new` and `Value`.
 
