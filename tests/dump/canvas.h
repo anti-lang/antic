@@ -65,9 +65,8 @@ static inline Ink *anti_Ink_dup(Ink *self)
     return (Ink *)anti_rt_dup(self, &anti_Ink_descriptor);
 }
 
-/** The colour the shape draws with. */
-int32_t Ink_colour(Ink *self);
 
+/** The colour the shape draws with. */
 static inline int32_t anti_Ink_colour(Ink *self)
 {
     return ((const Ink_vtable *)self->base.vtable)->colour(self);
@@ -173,7 +172,7 @@ static inline Ink *anti_Square_as_Ink(Square *self)
 }
 int32_t Square_area(Square *self);
 /** Move the shape by dx and dy. */
-void Square_move(Square *self, int32_t dx, int32_t dy);
+void Shape_move(Shape *self, int32_t dx, int32_t dy);
 int32_t Square_colour(Square *self);
 
 static inline int32_t anti_Square_area(Square *self)
@@ -233,7 +232,7 @@ static inline Circle *anti_Circle_dup(Circle *self)
 
 int32_t Circle_area(Circle *self);
 /** Move the shape by dx and dy. */
-void Circle_move(Circle *self, int32_t dx, int32_t dy);
+void Shape_move(Shape *self, int32_t dx, int32_t dy);
 
 static inline int32_t anti_Circle_area(Circle *self)
 {
@@ -279,9 +278,8 @@ static inline Tint *anti_Tint_dup(Tint *self)
     return (Tint *)anti_rt_dup(self, &anti_Tint_descriptor);
 }
 
-/** The colour at the shade k. */
-int32_t Tint_colour(Tint *self, int32_t k);
 
+/** The colour at the shade k. */
 static inline int32_t anti_Tint_colour(Tint *self, int32_t k)
 {
     return ((const Tint_vtable *)self->base.vtable)->colour(self, k);
@@ -377,7 +375,7 @@ static inline Tile *anti_Tile_dup(Tile *self)
 
 int32_t Tile_Shape_area(Tile *self);
 /** Move the shape by dx and dy. */
-void Tile_move(Tile *self, int32_t dx, int32_t dy);
+void Shape_move(Shape *self, int32_t dx, int32_t dy);
 
 static inline int32_t anti_Tile_area(Tile *self)
 {

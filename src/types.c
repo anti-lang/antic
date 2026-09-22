@@ -357,6 +357,21 @@ const struct item *types_primary_member(const struct type *t,
     return NULL;
 }
 
+const struct type *types_member_level(const struct type *t,
+                                      const struct item *m)
+{
+    size_t i;
+
+    for (; t != NULL; t = level_above(t)) {
+        for (i = 0; i < t->member_count; i++) {
+            if (t->members[i] == m) {
+                return t;
+            }
+        }
+    }
+    return NULL;
+}
+
 bool types_holds_entry(const struct type *t, const struct item *m)
 {
     size_t i;

@@ -43,5 +43,9 @@ int main(void)
        a symbol of its own. */
     anti_Tile_init(&t);
     printf("%d %d\n", anti_Shape_area(&t.base), Tile_Shape_area(&t));
+    /* A class names an inherited entry after the class that declares
+       it, whose symbol the library holds, so the call links. */
+    Shape_move(&t.base, 2, 4);
+    printf("%d %d\n", t.base.x, t.base.y);
     return 0;
 }

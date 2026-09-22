@@ -745,13 +745,20 @@ static void class_view(struct text *out, const struct symbol *sym)
                          up == t ? "" : "base.", buffer);
         }
     }
+    /* DESIGN: each prototype names a symbol the library holds, so a C
+       call to it links. An inherited entry takes the name and the `self`
+       of the class that declares it, and an abstract one has no body and
+       no prototype. Its wrapper through the table carries its comment. */
     for (i = 0; i < count; i++) {
-        if (entries[i]->runtime != NULL) {
+        const struct type *owner = types_member_level(t, entries[i]);
+        if (entries[i]->runtime != NULL ||
+            entries[i]->contract == FN_ABSTRACT) {
             continue;
         }
         doc_comment(out, &entries[i]->doc, "");
         may_fail_note(out, entries[i]->symbol, "");
-        member_signature(out, t, entries[i], "", false);
+        member_signature(out, owner != NULL ? owner : t, entries[i], "",
+                         false);
         text_append(out, ";\n");
     }
     text_append(out, "\n");
@@ -759,6 +766,9 @@ static void class_view(struct text *out, const struct symbol *sym)
     for (i = 0; i < count; i++) {
         if (entries[i]->runtime != NULL) {
             continue;
+        }
+        if (entries[i]->contract == FN_ABSTRACT) {
+            doc_comment(out, &entries[i]->doc, "");
         }
         text_append(out, "static inline ");
         member_signature(out, t, entries[i], "anti_", false);

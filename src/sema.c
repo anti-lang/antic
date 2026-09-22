@@ -2119,22 +2119,6 @@ static bool ambiguous_member(struct checker *c, struct pos pos,
     return true;
 }
 
-/* The level of the chain of t that declares the member m, or NULL. */
-static const struct type *level_of(const struct type *t,
-                                   const struct item *m)
-{
-    size_t i;
-
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
-        for (i = 0; i < t->member_count; i++) {
-            if (t->members[i] == m) {
-                return t;
-            }
-        }
-    }
-    return NULL;
-}
-
 /* DESIGN: an abstract function has no body, and no function of the IR
    stands for it. A direct use of one, `self.super.f()` or `T.f`, would
    reach the function at index 0 of the module, so the checker refuses
@@ -2148,7 +2132,7 @@ static bool refuse_abstract_call(struct checker *c, struct pos pos,
     if (m == NULL || m->kind != ITEM_FN || m->contract != FN_ABSTRACT) {
         return false;
     }
-    level = level_of(t, m);
+    level = types_member_level(t, m);
     error_at(c, pos, "`%.*s` is abstract in `%s` and has no body to call",
              (int)m->name.length, m->name.text,
              tn(level != NULL ? level : t));
@@ -3614,8 +3598,8 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (refuse_abstract_call(c, e->pos, t, m)) {
         return builtin(c, TYPE_ERROR);
     }
-    if (m->kind == ITEM_FN && level_of(t, m) != NULL &&
-        types_body_table(level_of(t, m), m) == BODY_INTERFACE) {
+    if (m->kind == ITEM_FN && types_member_level(t, m) != NULL &&
+        types_body_table(types_member_level(t, m), m) == BODY_INTERFACE) {
         e->as.field.through = table_sub_object(t, m);
     }
     e->symbol = m->symbol;

@@ -280,6 +280,9 @@ enum body_table types_body_table(const struct type *t, const struct item *m);
    declares the name outside the table of an interface. */
 const struct item *types_primary_member(const struct type *t,
                                         const struct name *name);
+/* The level of the chain of t that declares the member m, or NULL. */
+const struct type *types_member_level(const struct type *t,
+                                      const struct item *m);
 /* Whether m holds its entry in the primary table of its level of the
    chain of t. A plain body beside one qualified by a base holds none. */
 bool types_holds_entry(const struct type *t, const struct item *m);
