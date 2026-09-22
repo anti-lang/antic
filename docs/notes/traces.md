@@ -46,8 +46,9 @@ at an offset into the frame, so there is no chain to follow through C code.
 ## The module of a frame
 
 macOS asks `dladdr`, which gives the path and the header of the image.
-Linux asks `dl_iterate_phdr`, which names the program `/` in a static musl
-program, so the path of the program comes from `/proc/self/exe`. Windows
+Linux asks `dl_iterate_phdr`, which visits the program first. glibc names it
+with an empty text and musl with `/proc/self/exe` in a static program, so the
+path of the first module comes from `/proc/self/exe`. Windows
 asks `GetModuleHandleExW` and `GetModuleFileNameW`.
 
 The build id comes from the notice of the module. macOS reads the symbol

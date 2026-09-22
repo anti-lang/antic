@@ -368,7 +368,9 @@ struct module_of {
     uintptr_t address;
     const char *name;
     uintptr_t bias;
+    size_t visited;
     bool found;
+    bool program;
 };
 
 static int visit_module(struct dl_phdr_info *info, size_t size, void *context)
@@ -377,6 +379,7 @@ static int visit_module(struct dl_phdr_info *info, size_t size, void *context)
     int i;
 
     (void)size;
+    m->visited++;
     for (i = 0; i < info->dlpi_phnum; i++) {
         const ElfW(Phdr) *p = &info->dlpi_phdr[i];
         uintptr_t from = info->dlpi_addr + p->p_vaddr;
@@ -385,6 +388,7 @@ static int visit_module(struct dl_phdr_info *info, size_t size, void *context)
             m->name = info->dlpi_name;
             m->bias = info->dlpi_addr;
             m->found = true;
+            m->program = m->visited == 1;
             return 1;
         }
     }
@@ -392,14 +396,15 @@ static int visit_module(struct dl_phdr_info *info, size_t size, void *context)
 }
 
 /* The module of address with its path, where the program itself has the
-   path of its executable. */
+   path of its executable. dl_iterate_phdr visits the program first. glibc
+   names it with an empty text and musl `/proc/self/exe` in a static
+   program, so its path is read from that link. */
 static bool module_at(uintptr_t address, struct module_of *m)
 {
     memset(m, 0, sizeof *m);
     m->address = address;
     dl_iterate_phdr(visit_module, m);
-    if (m->found && (m->name == NULL || m->name[0] == 0 ||
-                     strcmp(m->name, "/") == 0)) {
+    if (m->found && m->program) {
         pthread_once(&program_once, read_program_path);
         m->name = program_path;
     }
