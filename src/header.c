@@ -241,6 +241,7 @@ static void declaration(struct text *out, const struct type *t,
         break;
     case TYPE_STRUCT:
     case TYPE_CLASS:
+    case TYPE_VARIANT:
         if (is_error_class(t)) {
             text_append(out, "struct anti_Error");
         } else if (types_is_flags(t)) {
@@ -379,7 +380,8 @@ static void emit_uses(struct text *out, const struct type *t,
         flags_view(out, t, done);
         return;
     }
-    if (t->kind != TYPE_STRUCT || was_emitted(done, t)) {
+    if ((t->kind != TYPE_STRUCT && t->kind != TYPE_VARIANT) ||
+        was_emitted(done, t)) {
         return;
     }
     for (i = 0; i < count; i++) {
@@ -466,6 +468,75 @@ static void emit_tuples(struct text *out, const struct type *t,
     }
 }
 
+/* DESIGN: an export variant writes the enum of its tags, then the
+   typedef of the struct C sees. The field `tag` holds the integer of
+   the tag, since an enum of C has the width of an int, and the enum names
+   its values as `T_Case`. The union `u` holds one anonymous struct per
+   case that has fields, named by the case. packed and align(N) follow
+   the struct rules, and `#pragma pack` covers the structs inside. */
+static void variant_view(struct text *out, const struct symbol *sym,
+                         const struct interface *const *ifaces, size_t count,
+                         struct emitted *done)
+{
+    const struct type *t = sym->type;
+    const struct type *tag = t->base;
+    const struct type *u = t->field_count > 1 ? t->fields[1].type : NULL;
+    int n = (int)t->name.length;
+    size_t i;
+    size_t j;
+
+    for (i = 0; u != NULL && i < u->field_count; i++) {
+        const struct type *payload = u->fields[i].type;
+        for (j = 0; j < payload->field_count; j++) {
+            emit_uses(out, payload->fields[j].type, ifaces, count, done);
+        }
+    }
+    text_appendf(out, "/* The tags of %.*s. */\nenum %.*s_tag {\n", n,
+                 t->name.text, n, t->name.text);
+    for (i = 0; i < tag->field_count; i++) {
+        char buffer[128];
+        c_name(buffer, sizeof buffer, &tag->fields[i].name);
+        doc_comment(out, &tag->fields[i].doc, "    ");
+        text_appendf(out, "    %.*s_%s = %" PRIu64 "%s\n", n, t->name.text,
+                     buffer, tag->fields[i].number,
+                     i + 1 < tag->field_count ? "," : "");
+    }
+    text_append(out, "};\n\n");
+    doc_comment(out, &sym->doc, "");
+    if (t->packed) {
+        text_append(out, "#pragma pack(push, 1)\n");
+    }
+    text_appendf(out, "typedef struct %.*s {\n    ", n, t->name.text);
+    if (t->align != 0) {
+        text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ", t->align);
+    }
+    text_appendf(out, "%s " VARIANT_TAG ";\n", scalar_name(tag->base));
+    if (u != NULL) {
+        text_append(out, "    union {\n");
+        for (i = 0; i < u->field_count; i++) {
+            const struct type *payload = u->fields[i].type;
+            char buffer[128];
+            text_append(out, "        struct {\n");
+            for (j = 0; j < payload->field_count; j++) {
+                struct text field = {0};
+                c_name(buffer, sizeof buffer, &payload->fields[j].name);
+                doc_comment(out, &payload->fields[j].doc, "            ");
+                declaration(&field, payload->fields[j].type, buffer, NULL);
+                text_appendf(out, "            %s;\n", text_cstr(&field));
+                text_free(&field);
+            }
+            c_name(buffer, sizeof buffer, &u->fields[i].name);
+            text_appendf(out, "        } %s;\n", buffer);
+        }
+        text_append(out, "    } " VARIANT_UNION ";\n");
+    }
+    text_appendf(out, "} %.*s;\n", n, t->name.text);
+    if (t->packed) {
+        text_append(out, "#pragma pack(pop)\n");
+    }
+    text_append(out, "\n");
+}
+
 /* DESIGN: an export struct or union becomes a typedef of the same name.
    packed becomes #pragma pack and align(N) an _Alignas on the first
    field, which C++ spells alignas. */
@@ -481,6 +552,10 @@ static void aggregate(struct text *out, const struct symbol *sym,
         return;
     }
     mark_emitted(done, t);
+    if (t->kind == TYPE_VARIANT) {
+        variant_view(out, sym, ifaces, count, done);
+        return;
+    }
     for (i = 0; i < t->field_count; i++) {
         emit_uses(out, t->fields[i].type, ifaces, count, done);
     }

@@ -1,7 +1,7 @@
 /* A C program that calls a library whose signatures name a variant. C
-   sets the tag and the fields of one case, passes the variant by value,
-   and reads the tag and the case of one it is given, alone and as a
-   field. */
+   sets the tag and the fields of one case and passes the variant by
+   value. It reads the tag and the case of one it is given, alone and as
+   a field. */
 #include "../binary_stdio.h"
 #include <stdio.h>
 

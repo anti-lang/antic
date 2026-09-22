@@ -201,8 +201,8 @@ elseif(CASE STREQUAL "flags")
 elseif(CASE STREQUAL "variants")
     # An export variant crosses as the enum of its tags and the struct of
     # its tag and the union of its cases. C sets and reads both, by value
-    # as a parameter, a result and a field, and the header compiles as
-    # C++17 as well.
+    # as a parameter, a result and a field. The header compiles as C++17
+    # as well.
     library(variants static "${dir}")
     expect_header("${dir}/variants.h" variants.h)
     string(STRIP "${run_out}" line)

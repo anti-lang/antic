@@ -1264,9 +1264,9 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
-# A variant of a library: another module builds it, switches on it with
-# every case named, tests it with `is` and `if let`, and passes it back
-# inside a struct of the library.
+# A variant of a library, which another module builds and switches on
+# with every case named. It tests one with `is` and `if let` and passes
+# it back inside a struct of the library.
 foreach(mode release dev)
     if(mode STREQUAL "dev" AND WIN32)
         continue()

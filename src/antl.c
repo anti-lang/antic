@@ -254,6 +254,7 @@ static void visit_type(struct writer *w, const struct type *t)
         break;
     case TYPE_STRUCT:
     case TYPE_CLASS:
+    case TYPE_VARIANT:
         add_type(w, t);
         if (is_local_struct(w, t)) {
             for (i = 0; i < t->field_count; i++) {
@@ -358,9 +359,13 @@ static void put_type(struct writer *w, const struct type *t)
         break;
     /* DESIGN: a class is written like a struct, with the form and the
        own bit of each field. Its base is the type of field 0, so the
-       chain follows the ordinary type references. */
+       chain follows the ordinary type references. A variant is written
+       as the struct C sees. Its tag is the enum of field 0, which names
+       the cases. The union of field 1 holds the struct of each case that
+       has fields, so the reader finds both again. */
     case TYPE_STRUCT:
     case TYPE_CLASS:
+    case TYPE_VARIANT:
         put_bytes(w, t->module.text, t->module.length);
         put_bytes(w, t->name.text, t->name.length);
         if (is_local_struct(w, t)) {
@@ -1347,7 +1352,8 @@ static void read_types(struct reader *r)
             break;
         }
         case TYPE_STRUCT:
-        case TYPE_CLASS: {
+        case TYPE_CLASS:
+        case TYPE_VARIANT: {
             struct name module = get_name(r);
             struct name name = get_name(r);
             uint8_t flags;
@@ -1502,6 +1508,7 @@ static void read_types(struct reader *r)
                 s->fields[0].form == FIELD_BASE) {
                 s->s->base = s->fields[0].type;
             }
+
         }
         /* DESIGN: a class of a library carries the public functions of
            its body. The reader builds one item per function. It has the
@@ -1521,6 +1528,14 @@ static void read_types(struct reader *r)
         if (!r->failed && s->member_count > 0) {
             s->s->members = s->members;
             s->s->member_count = s->member_count;
+        }
+    }
+    /* The cases of a variant come from its union, whose fields are in
+       place once every struct of the table has them. */
+    for (i = 0; i < struct_count && !r->failed; i++) {
+        if (structs[i].s->kind == TYPE_VARIANT &&
+            !types_cases_from_fields(r->types, structs[i].s)) {
+            damaged(r);
         }
     }
     for (i = 0; i < struct_count && !r->failed; i++) {
@@ -1671,7 +1686,8 @@ static void read_items(struct reader *r)
             ok = ok && !r->failed;
             break;
         case SYMBOL_STRUCT:
-            /* A struct, a class and an enum share this symbol kind. */
+            /* A struct, a class, a variant and an enum share this
+               symbol kind. */
             ok = (type_has_fields(sym->type) ||
                   sym->type->kind == TYPE_ENUM) &&
                  name_equals(&sym->type->module, iface->module);
