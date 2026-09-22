@@ -1,0 +1,46 @@
+//! A Mutex inside a struct of a library, which the program holds with
+//! `sync`, and channels that pass between the program and the library.
+
+import com.example.queue;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+worker fn feed(chunk: []int, out: chan int) -> int
+{
+	for x in chunk {
+		send(out, x);
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let t = queue.tally();
+	queue.add(&t, 3);
+	sync t.lock {
+		t.n += 4;
+	}
+	printf("%d\n".ptr, t.n as c_int);
+	t.lock.destroy();
+
+	let c = queue.channel(8);
+	let numbers = [1, 2, 3, 4];
+	let all = numbers[0..4];
+	let counts = parallel all by 2 -> feed(c);
+	free(counts.ptr);
+	close(c);
+	printf("%d\n".ptr, queue.drain(c) as c_int);
+	delete(c);
+
+	let a = queue.channel(2);
+	let b = queue.channel(1);
+	send(a, 1);
+	send(a, 2);
+	send(b, 10);
+	close(a);
+	close(b);
+	printf("%d\n".ptr, queue.merge(a, b) as c_int);
+	delete(a);
+	delete(b);
+	return 0;
+}

@@ -1,0 +1,66 @@
+//! A library of shared state: a struct that holds a Mutex, and functions
+//! that make, drain and merge channels.
+
+/// A count that threads share under its mutex.
+pub struct Tally
+{
+	lock: Mutex,
+	n: int,
+}
+
+pub fn tally() -> Tally
+{
+	return Tally { lock: Mutex.new(), n: 0 };
+}
+
+pub fn add(t: *Tally, n: int)
+{
+	sync t.lock {
+		t.n += n;
+	}
+}
+
+pub fn channel(capacity: int) -> chan int
+{
+	return chan int(capacity);
+}
+
+/// The sum of what c holds until it is closed and empty.
+pub fn drain(c: chan int) -> int
+{
+	let sum = 0;
+	while true do {
+		let v = recv(c) else {
+			break;
+		};
+		sum += *v;
+	}
+	return sum;
+}
+
+/// The sum of what a and b hold until both are closed and empty.
+pub fn merge(a: chan int, b: chan int) -> int
+{
+	let sum = 0;
+	let a_open = true;
+	let b_open = true;
+	while a_open || b_open do {
+		select {
+			a x => {
+				let v = x else {
+					a_open = false;
+					continue;
+				};
+				sum += *v;
+			},
+			b y => {
+				let v = y else {
+					b_open = false;
+					continue;
+				};
+				sum += *v;
+			},
+		}
+	}
+	return sum;
+}

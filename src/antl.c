@@ -90,17 +90,17 @@ static uint64_t float_bits(double d)
     return bits;
 }
 
-/* DESIGN: the root class, a Job and Flags carry the path `anti.lang`, and
-   the compiler declares all three. The library file of `anti.lang` names
-   them as it names a struct of another module and declares none, so a
-   reader takes the compiler's own. The root is the one class without a
-   base. */
+/* DESIGN: the root class, a Job, Flags, a Mutex and a channel carry the
+   path `anti.lang`, and the compiler declares all of them. The library
+   file of `anti.lang` names them as it names a struct of another module
+   and declares none, so a reader takes the compiler's own. The root is
+   the one class without a base. */
 static bool is_local_struct(const struct writer *w, const struct type *t)
 {
     const char *module = w->iface->module;
 
     if ((t->kind == TYPE_CLASS && t->base == NULL) || types_is_job(t) ||
-        types_is_flags(t)) {
+        types_is_flags(t) || types_is_mutex(t) || types_is_chan(t)) {
         return false;
     }
     return type_has_fields(t) && t->module.length == strlen(module) &&
@@ -255,6 +255,10 @@ static void visit_type(struct writer *w, const struct type *t)
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
+        /* A channel names its element, which comes first. */
+        if (types_is_chan(t)) {
+            visit_type(w, t->element);
+        }
         add_type(w, t);
         if (is_local_struct(w, t)) {
             for (i = 0; i < t->field_count; i++) {
@@ -368,6 +372,11 @@ static void put_type(struct writer *w, const struct type *t)
     case TYPE_VARIANT:
         put_bytes(w, t->module.text, t->module.length);
         put_bytes(w, t->name.text, t->name.length);
+        /* `chan T` is one struct per element type, so the element
+           follows its name. */
+        if (types_is_chan(t)) {
+            put_type_ref(w, t->element);
+        }
         if (is_local_struct(w, t)) {
             put_u8(w, (uint8_t)((unsigned)t->is_union |
                                 (unsigned)t->packed << 1 |
@@ -1088,6 +1097,19 @@ static bool names_flags(const struct name *module, const struct name *name)
     return name_equals_name(module, &lang) && name_equals_name(name, &flags);
 }
 
+/* Whether module and name are those of `anti.lang` and the struct text,
+   which the compiler declares. */
+static bool names_lang(const struct name *module, const struct name *name,
+                       const char *text)
+{
+    static const struct name lang = {LANG_MODULE, sizeof LANG_MODULE - 1};
+    struct name wanted;
+
+    wanted.text = text;
+    wanted.length = strlen(text);
+    return name_equals_name(module, &lang) && name_equals_name(name, &wanted);
+}
+
 /* A struct of another module is the struct that module's library file
    declared. */
 static struct type *foreign_struct(struct reader *r, const struct name *module,
@@ -1358,6 +1380,17 @@ static void read_types(struct reader *r)
             struct name name = get_name(r);
             uint8_t flags;
             if (r->failed) {
+                break;
+            }
+            if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_CHAN)) {
+                struct type *element = type_ref(r, i);
+                if (!r->failed) {
+                    t = types_chan(r->types, element);
+                }
+                break;
+            }
+            if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_MUTEX)) {
+                t = types_mutex(r->types);
                 break;
             }
             /* The root carries the path of `anti.lang` and is still

@@ -318,6 +318,37 @@ foreach(name IN ITEMS wrapping saturating mul_high flags carry_chain
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
+# Locking and channels in dev mode, whose checks run inside every `sync`
+# block and every arm of a `select`. sync_exits fails with the errors of
+# anti.lang, so its dev link names the object of anti.lang.
+add_test(NAME dev_object_lang
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/lang.antl")
+set_tests_properties(dev_object_lang PROPERTIES FIXTURES_SETUP lang_dev_object)
+foreach(name IN ITEMS sync_exits sync_workers channels select_two
+        channel_workers)
+    set(objects "")
+    if(name STREQUAL "sync_exits")
+        set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o")
+    endif()
+    add_test(NAME program_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${objects}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_tests_properties(program_${name}_dev PROPERTIES TIMEOUT 120)
+endforeach()
+set_tests_properties(program_sync_exits_dev PROPERTIES
+    FIXTURES_REQUIRED lang_dev_object)
+set_tests_properties(program_channel_workers_dev PROPERTIES
+    ENVIRONMENT "ANTI_THREADS=4")
 # The registry of the classes in dev mode, where the module that links
 # writes it. The program takes its allocator from anti.mem. A dev link
 # names the object of anti.mem on the command line.
@@ -1300,6 +1331,26 @@ foreach(mode release dev)
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variants-${mode}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
+# A Mutex in a struct of a library and channels that pass between the
+# program and a library, which drains one and selects over two.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME sync_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/sync"
+            "-DLIBRARIES=queue"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sync-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+    set_tests_properties(sync_modules_${mode} PROPERTIES TIMEOUT 120)
 endforeach()
 
 # The internal level: a module of the same package sees an internal item
