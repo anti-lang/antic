@@ -1,0 +1,42 @@
+//! An interface carries its own default provider in a static `default`,
+//! and a program that injects it needs no entry in the manifest. The
+//! build's table overrides that function where it names the interface,
+//! which the tests of `tests/inject` cover.
+import anti.io;
+
+abstract class Greeter
+{
+	abstract fn greeting(self) -> str;
+
+	/// The provider the link takes where the build names none.
+	pub fn default() -> *Greeter
+	{
+		return Console.get();
+	}
+}
+
+singleton class Console inherits Greeter
+{
+	concrete fn greeting(self) -> str
+	{
+		return "console";
+	}
+}
+
+class Service
+{
+	inject out: *Greeter,
+
+	pub fn run(self)
+	{
+		io.println(self.out.greeting());
+	}
+}
+
+fn main() -> int
+{
+	let s = alloc Service { };
+	s.run();
+	delete(s);
+	return 0;
+}

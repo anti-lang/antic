@@ -1463,14 +1463,15 @@ static uint32_t write_provider_thunk(struct ir_module *m, uint32_t provider,
     return f->index;
 }
 
-/* Resolve the provider of one interface and fill its slot. */
-static void resolve_provider(struct whole *w, struct ir_module *m,
-                             const struct whole_options *o,
-                             struct injectable *in, struct text *errors)
+/* Resolve one provider, named by the build or by the interface itself,
+   and fill the slot. `own` says the name came from the interface, which
+   is what the message of a missing provider tells apart. */
+static void resolve_named_provider(struct whole *w, struct ir_module *m,
+                                   struct injectable *in, const char *text,
+                                   bool own, struct text *errors)
 {
     static const char *const slot_names[] = {"provider"};
     static const enum ir_type slot_types[] = {IR_PTR};
-    const char *text = provider_text(o, in->interface);
     bool ambiguous = false;
     uint32_t function;
     uint32_t record;
@@ -1478,13 +1479,6 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
     struct ir_const *value;
     struct ir_global *g;
 
-    if (text == NULL) {
-        text_appendf(errors, "`%s` has no provider, and `%s.%s` injects it "
-                             "as `%s`. Name one under `[inject]` of the "
-                             "manifest\n",
-                     in->interface, in->module, in->name, in->field);
-        return;
-    }
     function = function_named(m, text, &ambiguous);
     /* A class name alone names the `get` of its singleton, which is the
        second form the specification gives a provider. */
@@ -1493,6 +1487,14 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
         text_appendf(&get, "%s.get", text);
         function = function_named(m, text_cstr(&get), &ambiguous);
         text_free(&get);
+    }
+    if (function == IR_NO_INDEX && own) {
+        text_appendf(errors, "`%s` has no provider, and `%s.%s` injects it "
+                             "as `%s`. Name one under `[inject]` of the "
+                             "manifest, or give `%s` a static `default`\n",
+                     in->interface, in->module, in->name, in->field,
+                     in->interface);
+        return;
     }
     if (function == IR_NO_INDEX) {
         text_appendf(errors, "the provider `%s` of `%s` names no function of "
@@ -1548,6 +1550,26 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
     g->value = value;
     g->mutable = true;
     g->is_extern = false;
+}
+
+/* DESIGN: an interface carries its own default provider in a static
+   function `default` of the interface, which the build's table
+   overrides. The six standard interfaces are written that way, so
+   `inject log: *Logger` needs no entry in the manifest. A library ships
+   its own interface with a default the same way. */
+static void resolve_provider(struct whole *w, struct ir_module *m,
+                             const struct whole_options *o,
+                             struct injectable *in, struct text *errors)
+{
+    const char *named = provider_text(o, in->interface);
+    struct text own = {0};
+
+    if (named == NULL) {
+        text_appendf(&own, "%s.default", in->interface);
+        named = text_cstr(&own);
+    }
+    resolve_named_provider(w, m, in, named, own.length != 0, errors);
+    text_free(&own);
 }
 
 /* DESIGN: the provider graph is the code the providers run. An edge

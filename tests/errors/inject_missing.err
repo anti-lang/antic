@@ -1,1 +1,1 @@
-inject_missing.anti: error: `inject_missing.Logger` has no provider, and `inject_missing.Service` injects it as `log`. Name one under `[inject]` of the manifest
+inject_missing.anti: error: `inject_missing.Logger` has no provider, and `inject_missing.Service` injects it as `log`. Name one under `[inject]` of the manifest, or give `inject_missing.Logger` a static `default`
