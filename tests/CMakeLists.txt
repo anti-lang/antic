@@ -1782,7 +1782,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "format_spec|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_spec.s,format_spec.anti"
         "format_types|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_types.s,format_types.anti"
         "format_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_no_import.s,format_no_import.anti"
-        "transient|-S,-o,${LISTINGS}/transient.s,transient.anti")
+        "transient|-S,-o,${LISTINGS}/transient.s,transient.anti"
+        "member_keywords|-S,-o,${LISTINGS}/member_keywords.s,member_keywords.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

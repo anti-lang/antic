@@ -247,6 +247,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - Float literals have digits on both sides of the `.`, an optional exponent with `e` or `E` and an optional sign, and `_` separators. `1e9` is not a float literal.
 - Inside every string literal a CRLF line break becomes LF, so the program does not depend on how Git checked the file out.
 - Keywords: the statement keywords, `as`, the type names, `true`, `false`, `none`, `alloc`, `free`, `size_of`, `union`, `export` and the threading words reserved above. `packed` and `align` are contextual words, not keywords.
+- [provisional] `alloc` and `free` name a function of a struct or a class, after `fn` and after the `::` of a qualified `concrete fn`, and they name a member after `.`. Everywhere else they stay keywords, so a module function, a field, a parameter and a local of either name are refused. Reason: the work order of `anti.mem` gives `Allocator` the functions `alloc(size, align)` and `free(p)`. The built-in `alloc` and `free` never stand after `fn` or `.`, so each position keeps one reading. The field `alloc` of the example under "Injection" in `docs/anti-syntax-overview.md` waits for `inject`, which is not built.
 
 ## Program entry
 

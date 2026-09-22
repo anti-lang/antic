@@ -1,0 +1,46 @@
+//! `alloc` and `free` name a function of a class and follow `.`, which
+//! is what `anti.mem.Allocator` needs. Each is declared abstract in a
+//! base, filled by a `concrete fn`, one of them qualified, and called
+//! through the table, directly by the class name and as a bound
+//! function. The built-in `alloc` and `free` work beside them, inside
+//! the functions of those names too.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Pool
+{
+	abstract fn alloc(self, n: int) -> int;
+	abstract fn free(self, n: int);
+}
+
+class Counter inherits Pool
+{
+	pub live: int = 0,
+
+	concrete fn alloc(self, n: int) -> int
+	{
+		let raw = alloc(byte, n) else { return -1; };
+		free(raw);
+		self.live += n;
+		return self.live;
+	}
+
+	concrete fn Pool::free(self, n: int)
+	{
+		self.live -= n;
+	}
+}
+
+fn main() -> int
+{
+	let c = alloc Counter { };
+	let p: *Pool = c;
+	printf("%d\n".ptr, p.alloc(3) as c_int);
+	printf("%d\n".ptr, Counter.alloc(c, 4) as c_int);
+	p.free(2);
+	let f = p.free;
+	f(1);
+	printf("%d\n".ptr, c.live as c_int);
+	delete(c);
+	return 0;
+}

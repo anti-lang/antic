@@ -1,0 +1,21 @@
+//! `alloc` and `free` name a function of a class and follow `.`, and
+//! stay keywords everywhere else. A module function, a field, a
+//! parameter and a local of either name are refused.
+
+class Holder
+{
+	free: int = 0,
+}
+
+fn alloc() { }
+
+fn take(alloc: int) -> int
+{
+	return alloc;
+}
+
+fn main() -> int
+{
+	let free = 1;
+	return free;
+}

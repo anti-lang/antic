@@ -144,6 +144,24 @@ static bool expect_name(struct parser *p, struct name *name)
     return true;
 }
 
+/* DESIGN: `alloc` and `free` name a function of a struct or class and
+   follow `.`, so that `anti.mem.Allocator` has the two functions its
+   work order names. They stay keywords everywhere else. A built-in
+   `alloc` or `free` never stands after `fn` or `.`, so each position
+   has one reading. */
+static bool expect_member_name(struct parser *p, struct name *name)
+{
+    const struct token *t = peek(p);
+
+    if (t->kind == TOKEN_ALLOC || t->kind == TOKEN_FREE) {
+        next(p);
+        name->text = p->source + t->offset;
+        name->length = t->length;
+        return true;
+    }
+    return expect_name(p, name);
+}
+
 static void *node(struct parser *p, size_t size)
 {
     return arena_alloc(p->arena, size);
@@ -896,7 +914,7 @@ static struct expr *postfix(struct parser *p)
                 outer->as.field.name.text = p->source + peek(p)->offset;
                 outer->as.field.name.length = peek(p)->length;
                 accept(p, TOKEN_SUPER);
-            } else if (!expect_name(p, &outer->as.field.name)) {
+            } else if (!expect_member_name(p, &outer->as.field.name)) {
                 return NULL;
             }
         } else {
@@ -1830,7 +1848,7 @@ static struct item *member(struct parser *p, const struct item *owner)
     }
     m->kind = ITEM_FN;
     m->name_pos = pos_of(peek(p));
-    if (!expect_name(p, &m->name)) {
+    if (!expect_member_name(p, &m->name)) {
         return NULL;
     }
     /* DESIGN: `concrete fn Serializable::f` fills the table of that base
@@ -1845,7 +1863,7 @@ static struct item *member(struct parser *p, const struct item *owner)
         m->qualifier = m->name;
         m->qualifier_pos = m->name_pos;
         m->name_pos = pos_of(peek(p));
-        if (!expect_name(p, &m->name)) {
+        if (!expect_member_name(p, &m->name)) {
             return NULL;
         }
     }
