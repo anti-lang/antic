@@ -2150,8 +2150,8 @@ static struct ir_global *class_descriptor(struct lowerer *l,
    size and the field list, and nothing of a chain. The module that
    declares the struct writes it, whether a class there names it or not.
    It cannot know which classes of other modules hold it. A union
-   has none, since no walk knows which of its fields holds the value, and
-   neither does a Job, which no module declares. */
+   has none, since no walk knows which of its fields holds the value. A
+   Job and Flags have none either, since no module declares them. */
 static struct ir_global *struct_descriptor(struct lowerer *l,
                                            const struct type *t)
 {
@@ -2163,7 +2163,7 @@ static struct ir_global *struct_descriptor(struct lowerer *l,
     size_t count = own_fields(t);
     size_t k;
 
-    if (t->is_union || types_is_job(t)) {
+    if (t->is_union || types_is_job(t) || types_is_flags(t)) {
         return NULL;
     }
     g = struct_global(l, t, "descriptor", &module, &name);
@@ -3410,6 +3410,104 @@ static struct ir_operand shift_wrap(struct lowerer *l, const struct type *t,
     return temp(l, ir_binary(l->f, l->b, IR_AND, type, shifted, mask));
 }
 
+/* The flag operation of the operator op on operands of type t. */
+static enum ir_op flag_op(enum token_kind op, bool unary, const struct type *t)
+{
+    if (unary) {
+        return IR_NEG_FL;
+    }
+    switch (op) {
+    case TOKEN_PLUS: return IR_ADD_FL;
+    case TOKEN_MINUS: return IR_SUB_FL;
+    case TOKEN_STAR: return IR_MUL_FL;
+    case TOKEN_SHL: return IR_SHL_FL;
+    default: return type_is_signed(t) ? IR_SHR_S_FL : IR_SHR_U_FL;
+    }
+}
+
+/* DESIGN: the flags form is one flag operation and one IR_FLAG per field
+   in want, which holds the fields that the program reads. A field that
+   nothing reads costs nothing. `a + b + f.carry` is one operation with
+   the carry in, which the back end makes adc and adcs, and so is `a -
+   b - f.carry` with the borrow. A carry after any other operand is the
+   operand plus 0 and the carry. The operands are computed from left to
+   right, the carry last. Writes flags[k] for each bit k of want and
+   returns the result. */
+static struct ir_operand lower_flag_operation(struct lowerer *l,
+                                              const struct expr *e,
+                                              uint8_t want,
+                                              struct ir_operand flags[4])
+{
+    enum ir_type type = ir_type_of(e->type);
+    struct ir_operand a;
+    struct ir_operand b = none();
+    struct ir_operand c = none();
+    struct ir_operand result;
+    enum ir_op op;
+    int k;
+
+    if (e->kind == EXPR_UNARY) {
+        op = IR_NEG_FL;
+        a = lower_expr(l, e->as.unary.operand);
+    } else if (e->as.binary.carry) {
+        const struct expr *left = e->as.binary.left;
+        op = flag_op(e->as.binary.op, false, e->type);
+        if (left->kind == EXPR_BINARY && left->as.binary.op == e->as.binary.op &&
+            !left->as.binary.carry && left->type == e->type &&
+            left->as.binary.left->type == e->type) {
+            a = lower_expr(l, left->as.binary.left);
+            b = lower_expr(l, left->as.binary.right);
+        } else {
+            a = lower_expr(l, left);
+            b = ir_int_op(type, 0);
+        }
+        c = lower_expr(l, e->as.binary.right);
+    } else {
+        op = flag_op(e->as.binary.op, false, e->as.binary.left->type);
+        a = lower_expr(l, e->as.binary.left);
+        b = lower_expr(l, e->as.binary.right);
+    }
+    if (l->failed) {
+        return none();
+    }
+    result = temp(l, ir_flag_op(l->f, l->b, op, type, a, b, c));
+    for (k = 0; k < 4; k++) {
+        if ((want >> k) & 1) {
+            flags[k] = temp(l, ir_flag(l->f, l->b, (enum ir_flag)k, result));
+        }
+    }
+    return result;
+}
+
+/* `a + b + f.carry` or `a - f.carry` as a value. It keeps the check of
+   the plain operator in a dev build, over the whole operation, and reads
+   the overflow flag for it. */
+static struct ir_operand lower_carry(struct lowerer *l, const struct expr *e)
+{
+    struct ir_operand flags[4];
+    struct ir_operand result;
+    struct ir_operand a;
+    struct ir_operand b;
+    const struct ir_global *text;
+    const struct type *t = e->type;
+    char operation[64];
+
+    result = lower_flag_operation(
+        l, e, type_is_signed(t) ? 1u << IR_FLAG_OVERFLOW : 0u, flags);
+    if (l->failed || !type_is_signed(t)) {
+        return result;
+    }
+    /* The operation stands before its one read. */
+    a = l->b->insts[l->b->count - 2].a;
+    b = l->b->insts[l->b->count - 2].b;
+    snprintf(operation, sizeof operation, "overflow in %s",
+             e->as.binary.op == TOKEN_PLUS ? "+" : "-");
+    text = check_text(l, e->pos.line, operation);
+    check_branch(l, flags[IR_FLAG_OVERFLOW], true, text, CHECK_OVERFLOW, a, b,
+                 t);
+    return result;
+}
+
 static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
 {
     enum token_kind op = e->as.binary.op;
@@ -3426,6 +3524,9 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     }
     if (op == TOKEN_QUESTION_QUESTION) {
         return coalesce(l, e);
+    }
+    if (e->as.binary.carry) {
+        return lower_carry(l, e);
     }
     left = lower_expr(l, e->as.binary.left);
     right = lower_expr(l, e->as.binary.right);
@@ -5119,6 +5220,8 @@ static struct ir_operand call_into_slot(struct lowerer *l,
     return temp(l, ir_load(l->f, l->b, p->type, out));
 }
 
+static void lower_flags_assign(struct lowerer *l, const struct stmt *s);
+
 static void lower_assign(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *target = s->as.assign.target;
@@ -5128,6 +5231,10 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     struct ir_operand old = none();
     struct ir_operand v;
 
+    if (target->kind == EXPR_TUPLE) {
+        lower_flags_assign(l, s);
+        return;
+    }
     if (!lower_place(l, target, &p)) {
         return;
     }
@@ -5747,8 +5854,85 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
     }
 }
 
+/* Whether s is `let (result, flags) = e;` of the flags form, whose value
+   is the operation rather than a tuple. */
+static bool is_flags_let(const struct stmt *s)
+{
+    return s->kind == STMT_LET && s->as.let.name_count == 2 &&
+           s->as.let.value->type != NULL &&
+           type_is_integer(s->as.let.value->type);
+}
+
+/* Write the flags of want into the Flags value at address. */
+static void store_flags(struct lowerer *l, struct ir_operand address,
+                        const struct type *t, uint8_t want,
+                        const struct ir_operand flags[4])
+{
+    int k;
+
+    for (k = 0; k < 4; k++) {
+        if ((want >> k) & 1) {
+            struct ir_operand at = offset_address(
+                l, address, field_offset(l, t, &t->fields[k].name));
+            ir_store(l->f, l->b, IR_I8, flags[k], at);
+        }
+    }
+}
+
+/* DESIGN: `let (result, flags) = e;` binds the result as any `let` binds
+   a value, and writes the fields of the flags that the function reads.
+   The flags are a local of their own, or the Flags variable in scope
+   that the statement assigns. Either is a place of the frame. */
+static void lower_flags_let(struct lowerer *l, const struct stmt *s)
+{
+    struct symbol *result = s->as.let.names[0].symbol;
+    struct symbol *flags = s->as.let.names[1].symbol;
+    struct ir_operand values[4];
+    struct ir_operand v =
+        lower_flag_operation(l, s->as.let.value, flags->flags_read, values);
+
+    if (l->failed) {
+        return;
+    }
+    if (result->address_taken) {
+        ir_store(l->f, l->b, ir_type_of(result->type), v, temp(l, result->ir));
+    } else {
+        result->ir = ir_unary(l->f, l->b, IR_COPY, ir_type_of(result->type), v);
+    }
+    store_flags(l, temp(l, flags->ir), flags->type, flags->flags_read, values);
+}
+
+/* `(result, flags) = e;` assigns the result and the flags to the two
+   names, which exist. */
+static void lower_flags_assign(struct lowerer *l, const struct stmt *s)
+{
+    const struct expr *target = s->as.assign.target;
+    const struct expr *flags = target->as.tuple.elements[1];
+    struct ir_operand values[4];
+    struct place result;
+    struct place into;
+    struct ir_operand v = lower_flag_operation(
+        l, s->as.assign.value, flags->symbol->flags_read, values);
+
+    if (l->failed || !lower_place(l, target->as.tuple.elements[0], &result) ||
+        !lower_place(l, flags, &into)) {
+        return;
+    }
+    if (result.in_temp) {
+        ir_assign(l->f, l->b, result.temp, v);
+    } else {
+        ir_store(l->f, l->b, result.type, v, result.address);
+    }
+    store_flags(l, into.address, flags->type, flags->symbol->flags_read,
+                values);
+}
+
 static void lower_let(struct lowerer *l, const struct stmt *s)
 {
+    if (is_flags_let(s)) {
+        lower_flags_let(l, s);
+        return;
+    }
     lower_let_value(l, s);
     if (s->as.let.name_count > 0 && !l->failed && l->b != NULL) {
         destructure(l, s);
@@ -6295,14 +6479,17 @@ static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
     switch (s->kind) {
     case STMT_LET:
         sym = s->as.let.symbol;
-        if (sym->address_taken || is_aggregate(sym->type)) {
+        /* The pair of the flags form has no place of its own. */
+        if (!is_flags_let(s) &&
+            (sym->address_taken || is_aggregate(sym->type))) {
             sym->ir = ir_slot(l->f, entry, vtype_of(l, sym->type));
         }
         /* The names of `let (a, b) = e;` are locals like any other,
-           and the value they come from is the symbol above. */
+           and the value they come from is the symbol above. A flags
+           name that assigns a Flags variable has its place already. */
         for (j = 0; j < s->as.let.name_count; j++) {
             struct symbol *bound = s->as.let.names[j].symbol;
-            if (bound != NULL &&
+            if (bound != NULL && !s->as.let.names[j].assigns &&
                 (bound->address_taken || is_aggregate(bound->type))) {
                 bound->ir = ir_slot(l->f, entry, vtype_of(l, bound->type));
             }

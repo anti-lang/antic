@@ -205,6 +205,51 @@ void test_header(void)
               "#endif\n"
               "\n"
               "#endif\n");
+    /* Flags crosses as a struct of four bools, which the header writes
+       once where an exported signature or struct names it. */
+    header_of("com.example.geo",
+              "export struct Step { sum: u64, flags: Flags }\n"
+              "export fn add(a: u64, b: u64, f: Flags) -> Flags {\n"
+              "    let (r, g) = a + b + f.carry;\n"
+              "    return g;\n"
+              "}\n",
+              false,
+              "/* geo.h, the C interface of com.example.geo, written by antic.\n"
+              "   Do not edit. A failure that Anti cannot report calls abort(). */\n"
+              "#ifndef GEO_H\n"
+              "#define GEO_H\n"
+              "\n"
+              "#include <stdbool.h>\n"
+              "#include <stddef.h>\n"
+              "#include <stdint.h>\n"
+              "\n"
+              "#ifdef __cplusplus\n"
+              "#define ANTI_ALIGNAS(n) alignas(n)\n"
+              "extern \"C\" {\n"
+              "#else\n"
+              "#define ANTI_ALIGNAS(n) _Alignas(n)\n"
+              "#endif\n"
+              "\n"
+              "/* The flags of one arithmetic operation. */\n"
+              "struct anti_Flags {\n"
+              "    bool overflow;\n"
+              "    bool carry;\n"
+              "    bool zero;\n"
+              "    bool negative;\n"
+              "};\n"
+              "\n"
+              "typedef struct Step {\n"
+              "    uint64_t sum;\n"
+              "    struct anti_Flags flags;\n"
+              "} Step;\n"
+              "\n"
+              "struct anti_Flags add(uint64_t a, uint64_t b, struct anti_Flags f);\n"
+              "\n"
+              "#ifdef __cplusplus\n"
+              "}\n"
+              "#endif\n"
+              "\n"
+              "#endif\n");
     /* A bundled archive carries the runtime, and two in one program
        define it twice. */
     header_of("com.example.geo", "export fn one() -> int { return 1; }\n", true,

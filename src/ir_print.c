@@ -35,6 +35,9 @@ const char *ir_op_name(enum ir_op op)
         [IR_ADD_SAT_S] = "saddsat", [IR_ADD_SAT_U] = "uaddsat",
         [IR_SUB_SAT_S] = "ssubsat", [IR_SUB_SAT_U] = "usubsat",
         [IR_MUL_SAT_S] = "smulsat", [IR_MUL_SAT_U] = "umulsat",
+        [IR_ADD_FL] = "addfl", [IR_SUB_FL] = "subfl", [IR_MUL_FL] = "mulfl",
+        [IR_SHL_FL] = "shlfl", [IR_SHR_S_FL] = "sshrfl",
+        [IR_SHR_U_FL] = "ushrfl", [IR_NEG_FL] = "negfl", [IR_FLAG] = "flag",
         [IR_TRUNC] = "trunc", [IR_SEXT] = "sext", [IR_ZEXT] = "zext",
         [IR_SITOF] = "sitof", [IR_UITOF] = "uitof", [IR_FTOSI] = "ftosi",
         [IR_FTOUI] = "ftoui", [IR_FEXT] = "fext", [IR_FTRUNC] = "ftrunc",
@@ -305,6 +308,24 @@ static void instruction(struct text *out, const struct ir_module *m,
         if (inst->type != IR_VOID) {
             text_appendf(out, " %s ", ir_type_name(inst->type));
             operand(out, m, &inst->a);
+        }
+        break;
+    case IR_FLAG: {
+        static const char *const flags[] = {"overflow", "carry", "zero",
+                                            "negative"};
+        text_appendf(out, " %s ", inst->field < 4 ? flags[inst->field] : "?");
+        operand(out, m, &inst->a);
+        break;
+    }
+    case IR_ADD_FL:
+    case IR_SUB_FL:
+        text_appendf(out, " %s ", ir_type_name(inst->type));
+        operand(out, m, &inst->a);
+        text_append(out, ", ");
+        operand(out, m, &inst->b);
+        if (inst->c.kind != IR_NONE) {
+            text_append(out, ", ");
+            operand(out, m, &inst->c);
         }
         break;
     default:

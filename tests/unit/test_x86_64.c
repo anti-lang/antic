@@ -187,10 +187,51 @@ static const char fnptr[] = "extern fn abs(x: i32) -> i32;\n"
                             "    return abs;\n"
                             "}\n";
 
+/* The source of the carry and borrow chains, which both back ends
+   compile. */
+static const char chains[] =
+    "fn add(a: u64, b: u64, c: u64, d: u64) -> u64 {\n"
+    "    let (low, f) = a + c;\n"
+    "    let (high, g) = b + d + f.carry;\n"
+    "    return high ^ low ^ (g.carry as u64);\n"
+    "}\n"
+    "fn sub(a: u64, b: u64, c: u64, d: u64) -> u64 {\n"
+    "    let (low, f) = a - c;\n"
+    "    let (high, g) = b - d - f.carry;\n"
+    "    return high ^ low ^ (g.carry as u64);\n"
+    "}\n"
+    "fn flags(a: i32, b: i32) -> bool {\n"
+    "    let (r, f) = a + b;\n"
+    "    return f.overflow || f.zero || f.negative || r == 3;\n"
+    "}\n";
+
+/* A carry into `+` is adc and a borrow into `-` is sbb. bt puts the bool
+   of the earlier word into the carry flag. Each flag the program reads is
+   one set after the instruction that gave it. */
+static void carries(void)
+{
+    struct text out = {0};
+    const char *text;
+
+    run(chains, TARGET_LINUX_X86_64, &out);
+    text = text_cstr(&out);
+    CHECK(strstr(text, "    addq ") != NULL);
+    CHECK(strstr(text, "    adcq ") != NULL);
+    CHECK(strstr(text, "    subq ") != NULL);
+    CHECK(strstr(text, "    sbbq ") != NULL);
+    CHECK(strstr(text, "    btl $0, ") != NULL);
+    CHECK(strstr(text, "    setb ") != NULL);
+    CHECK(strstr(text, "    seto ") != NULL);
+    CHECK(strstr(text, "    sete ") != NULL);
+    CHECK(strstr(text, "    sets ") != NULL);
+    text_free(&out);
+}
+
 void test_x86_64(void)
 {
     probe();
     rip_relative();
+    carries();
 
     /* A 16-byte xmm save starts at a multiple of 16, which the unwind
        code of the save requires. rbx takes 8 bytes above it. */

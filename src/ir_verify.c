@@ -44,6 +44,13 @@ static bool is_overflow(enum ir_op op)
     return op == IR_ADD_OV || op == IR_SUB_OV || op == IR_MUL_OV;
 }
 
+static bool is_flag_operation(enum ir_op op)
+{
+    return op == IR_ADD_FL || op == IR_SUB_FL || op == IR_MUL_FL ||
+           op == IR_SHL_FL || op == IR_SHR_S_FL || op == IR_SHR_U_FL ||
+           op == IR_NEG_FL;
+}
+
 static bool is_terminator(enum ir_op op)
 {
     return op == IR_JUMP || op == IR_BRANCH || op == IR_BRANCH_OV ||
@@ -121,15 +128,28 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
         same_type(v, inst, &inst->a, inst->type);
         same_type(v, inst, &inst->b, inst->type);
         break;
-    case IR_NEG: case IR_NOT: case IR_FNEG: case IR_COPY:
+    case IR_NEG: case IR_NOT: case IR_FNEG: case IR_COPY: case IR_NEG_FL:
         same_type(v, inst, &inst->a, inst->type);
+        break;
+    /* The carry of + and the borrow of - is a bool, or none. */
+    case IR_ADD_FL: case IR_SUB_FL:
+        same_type(v, inst, &inst->a, inst->type);
+        same_type(v, inst, &inst->b, inst->type);
+        same_type(v, inst, &inst->c, IR_I8);
+        break;
+    case IR_FLAG:
+        if (inst->a.kind != IR_TEMP || inst->type != IR_I8 ||
+            inst->field > IR_FLAG_NEGATIVE) {
+            fail(v, "flag reads a flag of a temporary into an i8");
+        }
         break;
     /* An overflow operation gives the result of the arithmetic, and
        IR_BRANCH_OV reads whether it left the range. */
     case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV:
     case IR_MULH_S: case IR_MULH_U: case IR_ADD_SAT_S: case IR_ADD_SAT_U:
     case IR_SUB_SAT_S: case IR_SUB_SAT_U: case IR_MUL_SAT_S:
-    case IR_MUL_SAT_U:
+    case IR_MUL_SAT_U: case IR_MUL_FL: case IR_SHL_FL: case IR_SHR_S_FL:
+    case IR_SHR_U_FL:
         same_type(v, inst, &inst->a, inst->type);
         same_type(v, inst, &inst->b, inst->type);
         break;
@@ -414,6 +434,18 @@ bool ir_verify(const struct ir_module *m, struct text *errors)
                      !is_overflow(b->insts[k - 1].op) ||
                      b->insts[k - 1].result != b->insts[k].a.as.temp)) {
                     fail(&v, "branchov does not follow its operation");
+                }
+                /* The reads of the flags follow their operation, with
+                   other reads alone between. */
+                if (b->insts[k].op == IR_FLAG) {
+                    size_t at = k;
+                    while (at > 0 && b->insts[at - 1].op == IR_FLAG) {
+                        at--;
+                    }
+                    if (at == 0 || !is_flag_operation(b->insts[at - 1].op) ||
+                        b->insts[at - 1].result != b->insts[k].a.as.temp) {
+                        fail(&v, "flag does not follow its operation");
+                    }
                 }
                 if (is_terminator(b->insts[k].op) && k + 1 < b->count) {
                     fail(&v, "%s is not the last instruction",

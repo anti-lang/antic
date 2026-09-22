@@ -65,6 +65,7 @@ struct checker {
     const struct expr *top_call; /* the first statement's call, or NULL */
     int quiet;                  /* above 0, errors are not reported */
     int deferring;              /* above 0, a `defer` or `undo` is checked */
+    const struct expr *field_base; /* the base of the field checked now */
     bool ok;
 };
 
@@ -598,6 +599,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
            class of that name in the module wins over it. */
         if (sym == NULL && name_is(&t->name, LANG_OBJECT)) {
             return types_object(c->types);
+        }
+        if (sym == NULL && name_is(&t->name, LANG_FLAGS)) {
+            return types_flags(c->types);
         }
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
             error_at(c, t->pos, "unknown type `%.*s`", (int)t->name.length,
@@ -1260,6 +1264,14 @@ static struct type *check_unary(struct checker *c, struct expr *e,
 /* Check both operands of a binary operator so that a literal takes the
    type of the other operand. outer is the type the context expects of
    the result, used when both operands are literals. */
+/* Whether e is written `x.carry`, the form a carry into `+` and a borrow
+   into `-` take when x is a Flags value. */
+static bool names_carry(const struct expr *e)
+{
+    return e->kind == EXPR_FIELD && !e->as.field.optional &&
+           name_is(&e->as.field.name, FLAGS_CARRY);
+}
+
 static bool binary_operands(struct checker *c, struct expr *e,
                             struct type *outer, struct type **left,
                             struct type **right)
@@ -1283,8 +1295,9 @@ static bool binary_operands(struct checker *c, struct expr *e,
         }
     }
     /* A literal beside an f16 takes no type from it, so the refusal of
-       the f16 is the one message. */
-    if (is_untyped(l) && !is_untyped(r)) {
+       the f16 is the one message. A literal before a carry takes the type
+       of the context, since the carry is a bool. */
+    if (is_untyped(l) && !is_untyped(r) && !names_carry(r)) {
         *right = check_expr(c, r, outer);
         *left = check_expr(c, l, (*right)->kind == TYPE_F16 ? NULL
                                  : is_error(*right)          ? outer
@@ -1857,6 +1870,20 @@ static struct type *check_binary(struct checker *c, struct expr *e,
             if (fn != NULL) {
                 return check_operator(c, e, right, fn);
             }
+        }
+        /* DESIGN: `a + f.carry` and `a - f.carry` take the `carry` of a
+           Flags value as a carry or a borrow into the operation. The
+           field is a bool, and the operation keeps the type of a. */
+        if ((op == TOKEN_PLUS || op == TOKEN_MINUS) &&
+            names_carry(e->as.binary.right) &&
+            types_is_flags(struct_of(e->as.binary.right->as.field.base->type))) {
+            if (!type_is_integer(left)) {
+                error_at(c, e->pos, "a carry goes into an integer, found `%s`",
+                         tn(left));
+                return builtin(c, TYPE_ERROR);
+            }
+            e->as.binary.carry = true;
+            return left;
         }
         if (left != right &&
             !((op == TOKEN_EQ || op == TOKEN_NE) &&
@@ -3692,6 +3719,7 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
 static struct type *check_field(struct checker *c, struct expr *e)
 {
     const struct symbol *module = qualifier(c, e);
+    const struct expr *saved_base;
     struct type *base;
     struct name *name = &e->as.field.name;
     struct type *s;
@@ -3724,11 +3752,20 @@ static struct type *check_field(struct checker *c, struct expr *e)
             return check_type_member(c, e, sym->type);
         }
     }
+    saved_base = c->field_base;
+    c->field_base = e->as.field.base;
     base = check_expr(c, e->as.field.base, NULL);
+    c->field_base = saved_base;
     if (is_error(base)) {
         return base;
     }
     base = usable_pointer(c, e->as.field.base, base);
+    if (types_is_flags(base) && e->as.field.base->kind == EXPR_NAME &&
+        e->as.field.base->symbol != NULL &&
+        (f = find_field(base, name)) != NULL) {
+        e->as.field.base->symbol->flags_read |=
+            (uint8_t)(1u << (f - base->fields));
+    }
     if ((s = struct_of(base)) != NULL) {
         if ((f = find_field(s, name)) == NULL && e->as.field.element) {
             /* `t.0` names the element `_0`, so the message names the
@@ -4708,6 +4745,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         if (sym->caught && c->deferring > 0) {
             sym->deferred = true;
         }
+        /* A Flags value that is not the base of a field is read whole. */
+        if (types_is_flags(sym->type) && c->field_base != e) {
+            sym->flags_read = FLAGS_READ_ALL;
+        }
         if (sym->kind == SYMBOL_CONST && sym->type == NULL) {
             struct const_value v;
             if (!eval_const(c, e, &v)) {
@@ -4809,12 +4850,15 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             }
         } else {
             sym = scope_find_local(&c->module_scope, name);
-            if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
+            if (sym == NULL && name_is(name, LANG_FLAGS)) {
+                t = types_flags(c->types);
+            } else if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
                 error_at(c, e->pos, "unknown struct `%.*s`",
                          (int)name->length, name->text);
                 return builtin(c, TYPE_ERROR);
+            } else {
+                t = sym->type;
             }
-            t = sym->type;
         }
         if (singleton_type(t) && checking_class(c) != t) {
             error_at(c, e->pos, "`%s` is a singleton, and `%s.get()` gives "
@@ -6068,13 +6112,20 @@ static void refuse_owned_copy(struct checker *c, const struct expr *value,
     }
 }
 
+static void check_flags_assign(struct checker *c, struct stmt *s);
+
 static void check_assign(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
-    struct type *t = check_storage(c, target);
+    struct type *t;
     struct type *v;
     enum token_kind op = s->as.assign.op;
 
+    if (target->kind == EXPR_TUPLE) {
+        check_flags_assign(c, s);
+        return;
+    }
+    t = check_storage(c, target);
     if (is_error(t)) {
         check_expr(c, s->as.assign.value, NULL);
         return;
@@ -6438,6 +6489,151 @@ static void bind_elements(struct checker *c, struct binding *names,
     }
 }
 
+/* DESIGN: the flags form takes one arithmetic operation on an integer
+   type: `+`, `-`, `*`, `<<`, `>>` or unary `-`. A `-` directly before a
+   literal forms a constant rather than an operation, so it has no
+   flags. Returns false after a message. */
+static bool flags_operation(struct checker *c, const struct expr *value,
+                            const struct type *t)
+{
+    char spelling[OP_TEXT];
+    enum token_kind op = value->kind == EXPR_BINARY ? value->as.binary.op
+                         : value->kind == EXPR_UNARY ? value->as.unary.op
+                                                     : TOKEN_EOF;
+    bool known = value->kind == EXPR_BINARY
+                     ? op == TOKEN_PLUS || op == TOKEN_MINUS ||
+                           op == TOKEN_STAR || op == TOKEN_SHL ||
+                           op == TOKEN_SHR
+                     : op == TOKEN_MINUS;
+
+    if (is_error(t)) {
+        return false;
+    }
+    if (op == TOKEN_EOF || !known) {
+        error_at(c, value->pos, "the flags form takes one `+`, `-`, `*`, "
+                 "`<<`, `>>` or unary `-`, found %s%s%s",
+                 op != TOKEN_EOF ? "`" : "",
+                 op != TOKEN_EOF ? op_text(op, spelling)
+                 : value->kind == EXPR_TUPLE ? "a tuple"
+                                             : "another expression",
+                 op != TOKEN_EOF ? "`" : "");
+        return false;
+    }
+    if (value->kind == EXPR_UNARY &&
+        (value->as.unary.operand->kind == EXPR_INT ||
+         value->as.unary.operand->kind == EXPR_FLOAT)) {
+        error_at(c, value->pos, "a `-` before a literal forms a constant, "
+                 "which has no flags");
+        return false;
+    }
+    if (!type_is_integer(t)) {
+        error_at(c, value->pos, "the flags form takes an integer type, found "
+                 "`%s`", tn(t));
+        return false;
+    }
+    return true;
+}
+
+/* `let (result, flags) = e;` destructures the `(T, Flags)` of the flags
+   form. The result name is always new. The flags name takes a Flags
+   variable in scope, which the statement then assigns, and is new
+   otherwise. The statement's own symbol holds the pair for the dump and
+   no place. */
+static void check_flags_let(struct checker *c, struct stmt *s, struct type *t)
+{
+    struct binding *names = s->as.let.names;
+    struct type *flags = types_flags(c->types);
+    struct type *pair[2];
+    struct symbol *value;
+    struct symbol *sym;
+
+    if (!flags_operation(c, s->as.let.value, t)) {
+        t = builtin(c, TYPE_ERROR);
+    }
+    sym = declare(c, SYMBOL_LOCAL, &names[0].name, names[0].pos,
+                  "`%.*s` is already declared in this block");
+    if (sym != NULL) {
+        sym->type = t;
+        names[0].symbol = sym;
+    }
+    sym = lookup(c, &names[1].name);
+    if (sym != NULL && (sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
+        sym->type == flags) {
+        if (sym->read_only) {
+            error_at(c, names[1].pos, "`%.*s` is the variable of a `for` and "
+                     "is read-only", (int)names[1].name.length,
+                     names[1].name.text);
+        }
+        names[1].symbol = sym;
+        names[1].assigns = true;
+    } else {
+        sym = declare(c, SYMBOL_LOCAL, &names[1].name, names[1].pos,
+                      "`%.*s` is already declared in this block");
+        if (sym != NULL) {
+            sym->type = flags;
+            names[1].symbol = sym;
+        }
+    }
+    value = arena_alloc(c->arena, sizeof *value);
+    memset(value, 0, sizeof *value);
+    value->kind = SYMBOL_LOCAL;
+    value->pos = s->as.let.name_pos;
+    pair[0] = t;
+    pair[1] = flags;
+    value->type = is_error(t) ? t : types_tuple(c->types, pair, 2);
+    s->as.let.symbol = value;
+}
+
+/* `(result, flags) = e;` assigns the flags form to two names that exist:
+   a variable of the operand type and a Flags variable. */
+static void check_flags_assign(struct checker *c, struct stmt *s)
+{
+    struct expr *target = s->as.assign.target;
+    struct expr *value = s->as.assign.value;
+    struct type *places[2];
+    struct type *t;
+    size_t i;
+
+    if (s->as.assign.op != TOKEN_ASSIGN || target->as.tuple.count != 2 ||
+        target->as.tuple.elements[0]->kind != EXPR_NAME ||
+        target->as.tuple.elements[1]->kind != EXPR_NAME) {
+        error_at(c, target->pos, "the flags form assigns to two names");
+        return;
+    }
+    for (i = 0; i < 2; i++) {
+        struct expr *name = target->as.tuple.elements[i];
+        struct symbol *sym = lookup(c, &name->as.name);
+        if (sym == NULL) {
+            error_at(c, name->pos, "unknown name `%.*s`",
+                     (int)name->as.name.length, name->as.name.text);
+            return;
+        }
+        if ((sym->kind != SYMBOL_LOCAL && sym->kind != SYMBOL_PARAM) ||
+            sym->type == NULL) {
+            error_at(c, name->pos, "cannot assign to this expression");
+            return;
+        }
+        if (sym->read_only) {
+            error_at(c, name->pos, "`%.*s` is the variable of a `for` and is "
+                     "read-only", (int)name->as.name.length,
+                     name->as.name.text);
+            return;
+        }
+        name->symbol = sym;
+        name->type = sym->type;
+        places[i] = sym->type;
+    }
+    if (places[1] != types_flags(c->types)) {
+        error_at(c, target->as.tuple.elements[1]->pos,
+                 "expected `%s`, found `%s`", LANG_FLAGS, tn(places[1]));
+        return;
+    }
+    t = check_expr(c, value, places[0]);
+    if (flags_operation(c, value, t)) {
+        require(c, value, t, places[0]);
+    }
+}
+
 /* `let (a, b) = e;`. The value goes into a place of its own, which the
    statement's own symbol names and no scope holds. The names take the
    elements from there. */
@@ -6449,6 +6645,13 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
     c->target_sized = true;
     t = check_expr(c, s->as.let.value, NULL);
     c->target_sized = false;
+    if (s->as.let.name_count == 2 && s->as.let.guard.kind == HANDLE_NONE &&
+        !is_error(t) && t->kind != TYPE_TUPLE &&
+        (s->as.let.value->kind == EXPR_BINARY ||
+         s->as.let.value->kind == EXPR_UNARY)) {
+        check_flags_let(c, s, t);
+        return;
+    }
     if (s->as.let.guard.kind != HANDLE_NONE) {
         t = check_pointer_guard(c, s, t);
     }
@@ -8664,9 +8867,11 @@ static bool c_representable(const struct type *t, bool field,
         }
         return t->result->kind == TYPE_VOID ||
                c_representable(t->result, false, hidden);
+    /* Flags crosses as the struct of four bools that the header writes
+       for it. */
     case TYPE_STRUCT:
     case TYPE_CLASS:
-        if (t->item_exported || is_error_class(t)) {
+        if (t->item_exported || is_error_class(t) || types_is_flags(t)) {
             return true;
         }
         *hidden = t;

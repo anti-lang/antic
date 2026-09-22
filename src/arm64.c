@@ -22,6 +22,7 @@ enum {
 enum a64_op {
     A64_MOV, A64_MOVZ, A64_MOVK, A64_ADD, A64_SUB, A64_MUL, A64_AND,
     A64_ADDS, A64_SUBS, A64_SMULL, A64_SMULH, A64_UMULL, A64_UMULH,
+    A64_ADCS, A64_SBCS, A64_NEGS,
     A64_ORR, A64_EOR, A64_NEG, A64_MVN, A64_CMP, A64_CSET, A64_B, A64_BCOND,
     A64_CBZ, A64_CBNZ, A64_BL, A64_BLR, A64_LDRGOT, A64_RET, A64_LDR, A64_STR, A64_STP, A64_LDP,
     A64_CMN, A64_SXTB, A64_SXTH, A64_SXTW, A64_UXTB, A64_UXTH, A64_SDIV,
@@ -51,6 +52,11 @@ static const struct mach_opcode opcodes[] = {
     [A64_SMULH] = {"smulh", {DEF, USE, USE}, 0},
     [A64_UMULL] = {"umull", {DEF, USE, USE}, 0},
     [A64_UMULH] = {"umulh", {DEF, USE, USE}, 0},
+    /* The add and the subtract that take the C flag in, and the negation
+       that sets the flags. */
+    [A64_ADCS] = {"adcs", {DEF, USE, USE}, 0},
+    [A64_SBCS] = {"sbcs", {DEF, USE, USE}, 0},
+    [A64_NEGS] = {"negs", {DEF, USE}, 0},
     [A64_AND] = {"and", {DEF, USE, USE}, 0},
     [A64_ORR] = {"orr", {DEF, USE, USE}, 0},
     [A64_EOR] = {"eor", {DEF, USE, USE}, 0},
@@ -1031,6 +1037,71 @@ static void emit_mul_high(struct selector *s, const struct ir_inst *inst)
     move(s, r, widened(wide, 32));
 }
 
+/* DESIGN: adds, adcs, subs, sbcs and negs set the four flags of 32 and 64
+   bits. The flag operations of an add, a subtract and a negation at those
+   widths are therefore instructions. A narrower type has no such
+   instruction and takes the plain operations of the back end's
+   expansion. C is the carry of an add and the inverse of the borrow of a
+   subtract. A read of the borrow tests for C clear, and a borrow goes in
+   as C clear. The bool of a carry in holds unknown bits above its width.
+   Its bit 0 sets C through cmp, or through negs for a borrow. */
+static bool flags_native(const struct ir_inst *inst)
+{
+    return (inst->op == IR_ADD_FL || inst->op == IR_SUB_FL ||
+            inst->op == IR_NEG_FL) &&
+           (inst->type == IR_I32 || inst->type == IR_I64);
+}
+
+static void emit_flag_op(struct selector *s, const struct ir_inst *inst)
+{
+    bool add = inst->op == IR_ADD_FL;
+    struct mach_operand ops[4];
+    struct mach_operand bit;
+    int64_t v;
+
+    ops[0] = select_result(s, inst);
+    if (inst->op == IR_NEG_FL) {
+        emit2(s, A64_NEGS, ops[0], select_reg(s, &inst->a));
+        return;
+    }
+    if (inst->c.kind == IR_NONE) {
+        ops[1] = select_reg(s, &inst->a);
+        v = inst->b.kind == IR_INT
+                ? signed_value(inst->b.as.integer, bits(inst->b.type))
+                : -1;
+        if (inst->b.kind == IR_INT && fits_imm12(v)) {
+            emit_imm12(s, add ? A64_ADDS : A64_SUBS, 2, ops, v);
+        } else {
+            emit3(s, add ? A64_ADDS : A64_SUBS, ops[0], ops[1],
+                  select_reg(s, &inst->b));
+        }
+        return;
+    }
+    bit = select_new_vreg(s, 32);
+    emit3(s, A64_AND, bit, widened(select_reg(s, &inst->c), 32), mach_imm(1));
+    if (add) {
+        ops[1] = bit;
+        emit_imm12(s, A64_CMP, 1, ops + 1, 1);
+    } else {
+        emit2(s, A64_NEGS, select_new_vreg(s, 32), bit);
+    }
+    ops[1] = select_reg(s, &inst->a);
+    ops[2] = select_reg(s, &inst->b);
+    emit3(s, add ? A64_ADCS : A64_SBCS, ops[0], ops[1], ops[2]);
+}
+
+/* One cset per flag, right after the instruction that set it. */
+static void emit_flag(struct selector *s, const struct ir_inst *inst)
+{
+    enum mach_cond c = inst->field == IR_FLAG_OVERFLOW ? COND_VS
+                       : inst->field == IR_FLAG_ZERO   ? COND_EQ
+                       : inst->field == IR_FLAG_NEGATIVE ? COND_MI
+                       : s->flags->op == IR_ADD_FL       ? COND_HS
+                                                         : COND_LO;
+
+    emit2(s, A64_CSET, select_result(s, inst), cond(c));
+}
+
 static void jump(struct selector *s, const struct ir_operand *target)
 {
     struct mach_operand b = block(target);
@@ -1586,6 +1657,10 @@ static const struct pattern patterns[] = {
     {IR_BRANCH_OV, NULL, emit_branch_ov},
     {IR_MULH_S, match_arith, emit_mul_high},
     {IR_MULH_U, match_arith, emit_mul_high},
+    {IR_ADD_FL, match_arith, emit_flag_op},
+    {IR_SUB_FL, match_arith, emit_flag_op},
+    {IR_NEG_FL, match_arith, emit_flag_op},
+    {IR_FLAG, NULL, emit_flag},
 };
 
 /* Printing */
@@ -2092,6 +2167,7 @@ static const struct target_desc desc = {
     .incoming_address = incoming_address,
     .copy_memory = copy_memory,
     .frame_limit = 0,
+    .flags_native = flags_native,
     .load_spill = load_spill,
     .store_spill = store_spill,
     .resolve_slot = resolve_slot,

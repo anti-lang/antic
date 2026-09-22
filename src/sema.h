@@ -119,6 +119,11 @@ struct symbol {
        moves nothing. */
     const bool *owned;
     size_t owned_count;
+    /* DESIGN: the fields of a local or parameter of type Flags that its
+       function reads. Each field has one bit, in the order of the struct.
+       A use of the whole value reads all four. The flags form computes
+       these alone, so a field that nothing reads costs nothing. */
+    uint8_t flags_read;
 
     /* An export item, whose function has the C symbol of its name. */
     bool exported;
@@ -126,6 +131,9 @@ struct symbol {
     const struct interface *home;   /* the library of an imported item */
     uint32_t ir;                    /* set by lowering, see lower.h */
 };
+
+/* flags_read of a Flags value whose every field is read. */
+#define FLAGS_READ_ALL 15
 
 /* What other modules see of a module: its imports and its pub items. A
    library file stores it, and an import reads it. */

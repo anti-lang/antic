@@ -607,6 +607,71 @@ void test_sema(void)
             "the operands of `mul_high` have the types `u64` and `u32`");
     accepts("fn mul_high(a: int) -> int { return a; }\n"
             "fn f() -> int { return mul_high(3); }");
+    /* `let (result, flags) = e;` destructures the `(T, Flags)` of one
+       arithmetic operation on integers. The flags name may be a Flags
+       variable in scope, which the statement assigns. A carry into `+`
+       and `-` is the `carry` field of a Flags value. */
+    typed("fn f(a: u8, b: u8) {\n"
+          "    let (r, f) = a + b;\n"
+          "}\n",
+          "function f                 fn(byte, byte)\n"
+          "  param a                  byte\n"
+          "    type u8\n"
+          "  param b                  byte\n"
+          "    type u8\n"
+          "  block\n"
+          "    let_stmt               (byte, Flags)\n"
+          "      name r               byte\n"
+          "      name f               Flags\n"
+          "      additive +           byte\n"
+          "        ident a            byte\n"
+          "        ident b            byte\n");
+    accepts("fn f(a: int, b: int) -> bool {\n"
+            "    let (r, f) = a + b;\n"
+            "    let (s, f) = a - b - f.carry;\n"
+            "    let (t, g) = -a;\n"
+            "    let (u, h) = a << 3;\n"
+            "    let (v, k) = a >> b;\n"
+            "    let (w, m) = a * b + f.carry;\n"
+            "    (r, f) = a * b;\n"
+            "    let x: Flags = f;\n"
+            "    let y = Flags { overflow: false, carry: true, zero: false,\n"
+            "                    negative: false };\n"
+            "    let z = a + b + y.carry + x.carry;\n"
+            "    return f.carry || g.zero || h.negative || k.overflow ||\n"
+            "           m.carry || x.overflow || r + s + t + u + v + w + z == 0;\n"
+            "}");
+    rejects("fn f(a: int, b: int) { let (r, f) = a / b; }", 1, 37,
+            "the flags form takes one `+`, `-`, `*`, `<<`, `>>` or unary "
+            "`-`, found `/`");
+    rejects("fn f(a: int, b: int) { let (r, f) = a +% b; }", 1, 37,
+            "the flags form takes one `+`, `-`, `*`, `<<`, `>>` or unary "
+            "`-`, found `+%`");
+    rejects("fn f(a: f64, b: f64) { let (r, f) = a + b; }", 1, 37,
+            "the flags form takes an integer type, found `float`");
+    rejects("fn f() { let (r, f) = -5; }", 1, 23,
+            "a `-` before a literal forms a constant, which has no flags");
+    rejects("fn f(a: int) { let x = 1; let (r, x) = a + a; }", 1, 35,
+            "`x` is already declared in this block");
+    rejects("fn f(a: int) { let r = 1; let (r, g) = a + a; }", 1, 32,
+            "`r` is already declared in this block");
+    rejects("fn f(a: int) { let r = 1; let g = 2; (r, g) = a + a; }", 1, 42,
+            "expected `Flags`, found `int`");
+    rejects("fn f(a: int, b: u8) { let (r, g) = a + a; (b, g) = a + a; }", 1,
+            52, "expected `byte`, found `int`");
+    rejects("fn f(a: int) { let (r, g) = a + a; (r, g) = (a, g); }", 1, 45,
+            "the flags form takes one `+`, `-`, `*`, `<<`, `>>` or unary "
+            "`-`, found a tuple");
+    rejects("fn f(a: int, p: *int) { let (r, g) = a + a; (*p, g) = a + a; }",
+            1, 45, "the flags form assigns to two names");
+    rejects("fn f(a: u8, g: Flags) -> u8 { return a +% g.carry; }", 1, 38,
+            "the operands of `+%` have the types `byte` and `bool`");
+    rejects("fn f(a: u8, g: Flags) -> u8 { return a * g.carry; }", 1, 38,
+            "the operands of `*` have the types `byte` and `bool`");
+    rejects("fn f(a: f64, g: Flags) -> f64 { return a + g.carry; }", 1, 40,
+            "a carry goes into an integer, found `float`");
+    rejects("fn f(a: u8, g: bool) -> u8 { return a + g; }", 1, 37,
+            "the operands of `+` have the types `byte` and `bool`");
     rejects("const X: int = 1;\nfn f() -> *int { return &X; }", 2, 26,
             "a constant has no address");
     accepts("const GRID: [3]int = [1, 2, 3];\n"

@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 42, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 43, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -310,7 +310,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 255, 255, 255, 255, 0, 0, 0, 0,              /* no type, field 0 */
     0, 0, 0, 0,                                     /* no arguments */
-    71, 4, 3, 0, 0, 0, 255, 255, 255, 255,          /* line 3: ret i64 */
+    79, 4, 3, 0, 0, 0, 255, 255, 255, 255,          /* line 3: ret i64 */
     1, 4, 1, 0, 0, 0, 0, 0, 0, 0,                   /* %1 */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1289,9 +1289,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 43;
+    copy[4] = 44;
     refuses_file(copy, sizeof copy,
-                 "has format version 43, and antic reads version 42");
+                 "has format version 44, and antic reads version 43");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");

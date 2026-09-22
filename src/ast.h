@@ -182,6 +182,10 @@ struct expr {
             enum token_kind op;
             struct expr *left;
             struct expr *right;
+            /* `a + f.carry` and `a - f.carry`: the right operand is the
+               `carry` of a Flags value, which goes in as a carry or a
+               borrow. Set by the checker. */
+            bool carry;
         } binary;
         struct {
             struct expr *operand;
@@ -335,6 +339,10 @@ struct binding {
     struct name name;
     struct pos pos;
     struct symbol *symbol;
+    /* The flags name of `let (result, flags) = e;` that names a Flags
+       variable in scope, which the statement assigns. symbol is then
+       that variable. */
+    bool assigns;
 };
 
 struct stmt;

@@ -1,0 +1,94 @@
+//! A carry chain across the four words of a 256-bit number, lowest word
+//! first. Each word takes the carry of the word below it, which is `adc`
+//! on x86_64 and `adcs` on ARM64, and a difference takes the borrow, which
+//! is `sbb` and `sbcs`. The flags of the top word tell whether the whole
+//! number carried out and whether it overflowed as a signed number.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Wide
+{
+	w: [4]u64,
+}
+
+fn number(w3: u64, w2: u64, w1: u64, w0: u64) -> Wide
+{
+	return Wide { w: [w0, w1, w2, w3] };
+}
+
+fn show(name: str, v: Wide, f: Flags)
+{
+	printf("%s %016llx %016llx %016llx %016llx carry %d overflow %d\n".ptr,
+	       name.ptr, v.w[3], v.w[2], v.w[1], v.w[0], f.carry as c_int,
+	       f.overflow as c_int);
+}
+
+/// The chain written out, word by word, with one flags name.
+fn add(a: Wide, b: Wide) -> (Wide, Flags)
+{
+	let (w0, f) = a.w[0] + b.w[0];
+	let (w1, f) = a.w[1] + b.w[1] + f.carry;
+	let (w2, f) = a.w[2] + b.w[2] + f.carry;
+	let (w3, f) = a.w[3] + b.w[3] + f.carry;
+	return (number(w3, w2, w1, w0), f);
+}
+
+fn subtract(a: Wide, b: Wide) -> (Wide, Flags)
+{
+	let (w0, f) = a.w[0] - b.w[0];
+	let (w1, f) = a.w[1] - b.w[1] - f.carry;
+	let (w2, f) = a.w[2] - b.w[2] - f.carry;
+	let (w3, f) = a.w[3] - b.w[3] - f.carry;
+	return (number(w3, w2, w1, w0), f);
+}
+
+/// The same chain as a loop. The flags name of the loop body is the one
+/// of the function, which each word assigns.
+fn add_loop(a: Wide, b: Wide) -> (Wide, Flags)
+{
+	let sum = number(0, 0, 0, 0);
+	let (first, f) = a.w[0] + b.w[0];
+	sum.w[0] = first;
+	for i in 1..4 {
+		let (word, f) = a.w[i] + b.w[i] + f.carry;
+		sum.w[i] = word;
+	}
+	return (sum, f);
+}
+
+/// A carry that runs through a word of all ones into the next.
+fn increment(a: Wide) -> (Wide, Flags)
+{
+	let (w0, f) = a.w[0] + 1;
+	let (w1, f) = a.w[1] + f.carry;
+	let (w2, f) = a.w[2] + f.carry;
+	let (w3, f) = a.w[3] + f.carry;
+	return (number(w3, w2, w1, w0), f);
+}
+
+fn main() -> int
+{
+	let ones: u64 = 18446744073709551615;
+	let top: u64 = 9223372036854775807;
+	let all = number(ones, ones, ones, ones);
+	let one = number(0, 0, 0, 1);
+	let a = number(ones, 1, ones, ones);
+	let b = number(0, ones, 0, 1);
+	let (s, f) = add(all, one);
+	show("all + 1", s, f);
+	let (t, g) = add(a, b);
+	show("a + b", t, g);
+	let (u, h) = add_loop(a, b);
+	show("a + b loop", u, h);
+	let (v, k) = subtract(one, number(0, 0, 0, 2));
+	show("1 - 2", v, k);
+	let (w, m) = subtract(t, b);
+	show("a + b - b", w, m);
+	let (x, n) = add(number(top, ones, ones, ones), one);
+	show("max + 1", x, n);
+	let (y, p) = subtract(number(top + 1, 0, 0, 0), one);
+	show("min - 1", y, p);
+	let (z, q) = increment(number(0, ones, ones, ones));
+	show("increment", z, q);
+	return 0;
+}

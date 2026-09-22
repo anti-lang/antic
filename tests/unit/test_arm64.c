@@ -335,8 +335,50 @@ static const char fnptr[] = "extern fn abs(x: i32) -> i32;\n"
                             "    return abs;\n"
                             "}\n";
 
+/* The source of the carry and borrow chains, which both back ends
+   compile. */
+static const char chains[] =
+    "fn add(a: u64, b: u64, c: u64, d: u64) -> u64 {\n"
+    "    let (low, f) = a + c;\n"
+    "    let (high, g) = b + d + f.carry;\n"
+    "    return high ^ low ^ (g.carry as u64);\n"
+    "}\n"
+    "fn sub(a: u64, b: u64, c: u64, d: u64) -> u64 {\n"
+    "    let (low, f) = a - c;\n"
+    "    let (high, g) = b - d - f.carry;\n"
+    "    return high ^ low ^ (g.carry as u64);\n"
+    "}\n"
+    "fn flags(a: i32, b: i32) -> bool {\n"
+    "    let (r, f) = a + b;\n"
+    "    return f.overflow || f.zero || f.negative || r == 3;\n"
+    "}\n";
+
+/* A carry into `+` is adcs and a borrow into `-` is sbcs. A compare puts
+   the bool of the earlier word into the C flag, which subtraction reads
+   inverted. Each flag the program reads is one cset after the
+   instruction that gave it. */
+static void carries(void)
+{
+    struct text out = {0};
+    const char *text;
+
+    run(chains, TARGET_LINUX_ARM64, &out);
+    text = text_cstr(&out);
+    CHECK(strstr(text, "    adds ") != NULL);
+    CHECK(strstr(text, "    adcs ") != NULL);
+    CHECK(strstr(text, "    subs ") != NULL);
+    CHECK(strstr(text, "    sbcs ") != NULL);
+    CHECK(strstr(text, ", hs\n") != NULL);
+    CHECK(strstr(text, ", lo\n") != NULL);
+    CHECK(strstr(text, ", vs\n") != NULL);
+    CHECK(strstr(text, ", eq\n") != NULL);
+    CHECK(strstr(text, ", mi\n") != NULL);
+    text_free(&out);
+}
+
 void test_arm64(void)
 {
+    carries();
     /* blr calls the address in a register. The address of a C function
        comes from the GOT on Linux and macOS, and from adrp and add on
        Windows. The dumps print the ELF form. */

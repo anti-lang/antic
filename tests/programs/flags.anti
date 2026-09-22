@@ -1,0 +1,204 @@
+//! `let (result, flags) = e;` gives the wrapped result of one arithmetic
+//! operation and its four flags, and never traps. `carry` is the carry
+//! out of `+`, the borrow of `-` and the last bit a shift moved out, and
+//! for `*` it tells that the unsigned product does not fit. `overflow`
+//! tells that the signed result does not fit. `zero` and `negative` read
+//! the wrapped result. Each operation runs on values that the program
+//! reads at run time, at several widths.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A value the optimizer cannot see through.
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn uopaque(n: u64) -> u64
+{
+	return n;
+}
+
+fn show(name: str, r: int, f: Flags)
+{
+	printf("%s %lld o%d c%d z%d n%d\n".ptr, name.ptr, r,
+	       f.overflow as c_int, f.carry as c_int, f.zero as c_int,
+	       f.negative as c_int);
+}
+
+fn ushow(name: str, r: u64, f: Flags)
+{
+	printf("%s %llu o%d c%d z%d n%d\n".ptr, name.ptr, r,
+	       f.overflow as c_int, f.carry as c_int, f.zero as c_int,
+	       f.negative as c_int);
+}
+
+fn sums()
+{
+	let max = opaque(9223372036854775807);
+	let umax = uopaque(18446744073709551615);
+	let (a, f) = max + opaque(1);
+	show("i64 max + 1", a, f);
+	let (b, g) = umax + uopaque(1);
+	ushow("u64 max + 1", b, g);
+	let (c, h) = (opaque(100) as i8) + (opaque(100) as i8);
+	show("i8 100 + 100", c as int, h);
+	let (d, k) = (opaque(200) as u8) + (opaque(100) as u8);
+	ushow("u8 200 + 100", d as u64, k);
+	let (e, m) = (opaque(-1) as i8) + (opaque(1) as i8);
+	show("i8 -1 + 1", e as int, m);
+	let (p, q) = (opaque(-2000000000) as i32) + (opaque(-2000000000) as i32);
+	show("i32 -2e9 + -2e9", p as int, q);
+	let (s, t) = (opaque(1) as u16) + (opaque(2) as u16);
+	ushow("u16 1 + 2", s as u64, t);
+}
+
+fn differences()
+{
+	let (a, f) = (opaque(1) as u8) - (opaque(2) as u8);
+	ushow("u8 1 - 2", a as u64, f);
+	let (b, g) = (opaque(-128) as i8) - (opaque(1) as i8);
+	show("i8 -128 - 1", b as int, g);
+	let (c, h) = opaque(5) - opaque(5);
+	show("i64 5 - 5", c, h);
+	let (d, k) = uopaque(0) - uopaque(1);
+	ushow("u64 0 - 1", d, k);
+	let (e, m) = (opaque(3) as i16) - (opaque(5) as i16);
+	show("i16 3 - 5", e as int, m);
+}
+
+fn products()
+{
+	let (a, f) = (opaque(16) as i8) * (opaque(8) as i8);
+	show("i8 16 * 8", a as int, f);
+	let (b, g) = (opaque(16) as u8) * (opaque(16) as u8);
+	ushow("u8 16 * 16", b as u64, g);
+	let (c, h) = (opaque(-1) as i32) * (opaque(-1) as i32);
+	show("i32 -1 * -1", c as int, h);
+	let (d, k) = opaque(3) * opaque(-4);
+	show("i64 3 * -4", d, k);
+	let (e, m) = uopaque(4294967296) * uopaque(4294967296);
+	ushow("u64 2^32 * 2^32", e, m);
+	let (p, q) = uopaque(3) * uopaque(5);
+	ushow("u64 3 * 5", p, q);
+	let (r, s) = (opaque(300) as i16) * (opaque(-200) as i16);
+	show("i16 300 * -200", r as int, s);
+}
+
+fn shifts()
+{
+	let (a, f) = (opaque(0x81) as u8) << (opaque(1) as u8);
+	ushow("u8 0x81 << 1", a as u64, f);
+	let (b, g) = (opaque(0x40) as i8) << (opaque(1) as i8);
+	show("i8 0x40 << 1", b as int, g);
+	let (c, h) = opaque(1) << opaque(63);
+	show("i64 1 << 63", c, h);
+	let (d, k) = (uopaque(0xf0000000) as u32) << (uopaque(4) as u32);
+	ushow("u32 0xf0000000 << 4", d as u64, k);
+	let (e, m) = opaque(5) << opaque(0);
+	show("i64 5 << 0", e, m);
+	let (p, q) = (opaque(-1) as i16) << (opaque(15) as i16);
+	show("i16 -1 << 15", p as int, q);
+	let (r, s) = (opaque(0x81) as u8) >> (opaque(1) as u8);
+	ushow("u8 0x81 >> 1", r as u64, s);
+	let (t, u) = (opaque(-3) as i8) >> (opaque(1) as i8);
+	show("i8 -3 >> 1", t as int, u);
+	let (v, w) = opaque(4) >> opaque(3);
+	show("i64 4 >> 3", v, w);
+	let (x, y) = uopaque(18446744073709551615) >> uopaque(63);
+	ushow("u64 max >> 63", x, y);
+	let (z, zz) = (opaque(8) as i32) >> (opaque(0) as i32);
+	show("i32 8 >> 0", z as int, zz);
+}
+
+fn negations()
+{
+	let (a, f) = -(opaque(-128) as i8);
+	show("i8 -(-128)", a as int, f);
+	let (b, g) = -opaque(5);
+	show("i64 -(5)", b, g);
+	let (c, h) = -(opaque(0) as i32);
+	show("i32 -(0)", c as int, h);
+	let (d, k) = -(opaque(-7) as i16);
+	show("i16 -(-7)", d as int, k);
+}
+
+/// A carry into `+` and a borrow into `-`, from the `carry` of an earlier
+/// operation, and a flags name that takes the flags of the next one.
+fn carries()
+{
+	let (a, f) = uopaque(18446744073709551615) + uopaque(1);
+	let (b, f) = uopaque(5) + uopaque(6) + f.carry;
+	ushow("u64 5 + 6 + 1", b, f);
+	let (c, g) = (opaque(255) as u8) + (opaque(1) as u8);
+	let (d, g) = (opaque(255) as u8) + (opaque(255) as u8) + g.carry;
+	ushow("u8 255 + 255 + 1", d as u64, g);
+	let (e, g) = (opaque(127) as i8) + (opaque(0) as i8) + g.carry;
+	show("i8 127 + 0 + 1", e as int, g);
+	let (h, g) = (opaque(255) as u8) + g.carry;
+	ushow("u8 255 + 0", h as u64, g);
+	let (k, m) = uopaque(0) - uopaque(1);
+	let (p, m) = uopaque(0) - uopaque(0) - m.carry;
+	ushow("u64 0 - 0 - 1", p, m);
+	let (q, n) = (opaque(5) as u8) - (opaque(3) as u8) - m.carry;
+	ushow("u8 5 - 3 - 1", q as u64, n);
+	let (r, n) = (opaque(3) as u8) - (opaque(3) as u8) - m.carry;
+	ushow("u8 3 - 3 - 1", r as u64, n);
+	let (s, n) = (opaque(-128) as i8) - (opaque(0) as i8) - m.carry;
+	show("i8 -128 - 0 - 1", s as int, n);
+	let (t, n) = (opaque(0) as u8) - m.carry;
+	ushow("u8 0 - 1", t as u64, n);
+	let u = uopaque(7) + uopaque(8) + m.carry;
+	ushow("u64 7 + 8 + 1 plain", u, n);
+	printf("unused %llu %llu %llu\n".ptr, a, c as u64, k);
+}
+
+/// `(result, flags) = e;` assigns both to names that exist.
+fn assigns()
+{
+	let r = opaque(0);
+	let f = Flags { overflow: false, carry: true, zero: true, negative: false };
+	show("literal", r, f);
+	(r, f) = opaque(-3) * opaque(3);
+	show("assigned -3 * 3", r, f);
+	if r < 0 {
+		let (s, f) = opaque(-9) + opaque(9);
+		show("inner -9 + 9", s, f);
+	}
+	show("outer after", r, f);
+}
+
+/// The flags name is the parameter, which the statement assigns.
+fn add_into(a: u64, b: u64, f: Flags) -> Flags
+{
+	let (sum, f) = a + b + f.carry;
+	printf("add_into %llu\n".ptr, sum);
+	return f;
+}
+
+/// The function reads the carry alone, so the other three are never
+/// computed.
+fn carry_only(a: u64, b: u64) -> u64
+{
+	let (sum, f) = a + b;
+	return sum ^ (f.carry as u64);
+}
+
+fn main() -> int
+{
+	let set = Flags { overflow: false, carry: true, zero: false,
+	                  negative: false };
+	ushow("add_into max + 0 + 1", 0, add_into(uopaque(18446744073709551615),
+	                                          uopaque(0), set));
+	printf("carry_only %llu %llu\n".ptr,
+	       carry_only(uopaque(18446744073709551615), uopaque(2)),
+	       carry_only(uopaque(1), uopaque(2)));
+	sums();
+	differences();
+	products();
+	shifts();
+	negations();
+	carries();
+	assigns();
+	return 0;
+}

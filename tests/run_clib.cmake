@@ -9,7 +9,7 @@
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle,
-#             classes, failing or tuples
+#             classes, failing, tuples or flags
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
@@ -187,6 +187,17 @@ elseif(CASE STREQUAL "tuples")
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/tuples${EXE}")
     expect_output("${dir}/tuples${EXE}" "${SOURCES}/tuples.expected")
+elseif(CASE STREQUAL "flags")
+    # Flags crosses as the struct of four bools the header writes for it,
+    # passed and returned by value and held as a field.
+    library(flags static "${dir}")
+    expect_header("${dir}/flags.h" flags.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/flags.c"
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/flags${EXE}")
+    expect_output("${dir}/flags${EXE}" "${SOURCES}/flags.expected")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
     run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" "${library_link}" ${LINK}

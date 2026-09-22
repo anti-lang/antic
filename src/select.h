@@ -126,6 +126,10 @@ struct target_desc {
     void (*copy_memory)(struct selector *s, struct mach_operand dst,
                         struct mach_operand src, uint64_t size);
     uint64_t frame_limit;               /* 0 for no limit */
+    /* Whether the target selects the flag operation inst and reads its
+       flags where the instruction leaves them. The back end expands every
+       other one into plain operations. */
+    bool (*flags_native)(const struct ir_inst *inst);
     /* Register allocation and frame layout, chapter 13. */
     void (*load_spill)(struct mach_block *b, uint8_t reg, int64_t offset);
     void (*store_spill)(struct mach_block *b, uint8_t reg, int64_t offset);
@@ -152,6 +156,7 @@ struct selector {
     uint32_t line;                      /* the line of the instruction */
     const struct ir_inst *fused;        /* a comparison for the branch */
     const struct ir_inst *overflow;     /* What a branchov reads. */
+    const struct ir_inst *flags;        /* What a flag read reads. */
     struct address address;             /* for the next load or store */
     bool has_address;
     struct mach_operand result_address; /* of an aggregate result */

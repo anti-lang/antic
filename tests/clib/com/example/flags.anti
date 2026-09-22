@@ -1,0 +1,24 @@
+//! A library for C whose signatures name Flags. Flags crosses as the
+//! struct of four bools that the header writes for it, by value, as a
+//! parameter, a result and a field.
+
+/// The flags of a sum of two words and the carry of an earlier sum.
+export fn flags_carry(a: u64, b: u64, f: Flags) -> Flags
+{
+	let (sum, g) = a + b + f.carry;
+	return g;
+}
+
+/// A word of a sum and its flags.
+export struct FlagsStep
+{
+	sum: u64,
+	flags: Flags,
+}
+
+/// The sum of two words and the carry of an earlier sum, with its flags.
+export fn flags_step(a: u64, b: u64, f: Flags) -> FlagsStep
+{
+	let (sum, g) = a + b + f.carry;
+	return FlagsStep { sum: sum, flags: g };
+}

@@ -633,6 +633,30 @@ uint32_t ir_binary(struct ir_function *f, struct ir_block *b, enum ir_op op,
     return result;
 }
 
+uint32_t ir_flag_op(struct ir_function *f, struct ir_block *b, enum ir_op op,
+                    enum ir_type type, struct ir_operand x,
+                    struct ir_operand y, struct ir_operand c)
+{
+    uint32_t result = ir_temp(f, type);
+    struct ir_inst *inst = append(f, b, op, type, result);
+
+    inst->a = x;
+    inst->b = y;
+    inst->c = c;
+    return result;
+}
+
+uint32_t ir_flag(struct ir_function *f, struct ir_block *b, enum ir_flag flag,
+                 struct ir_operand of)
+{
+    uint32_t result = ir_temp(f, IR_I8);
+    struct ir_inst *inst = append(f, b, IR_FLAG, IR_I8, result);
+
+    inst->a = of;
+    inst->field = (uint32_t)flag;
+    return result;
+}
+
 uint32_t ir_unary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                   enum ir_type type, struct ir_operand x)
 {

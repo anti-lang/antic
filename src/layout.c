@@ -653,6 +653,7 @@ static enum ir_op signed_op(enum ir_op op)
     case IR_ADD_SAT_U: return IR_ADD_SAT_S;
     case IR_SUB_SAT_U: return IR_SUB_SAT_S;
     case IR_MUL_SAT_U: return IR_MUL_SAT_S;
+    case IR_SHR_U_FL: return IR_SHR_S_FL;
     default: return op;
     }
 }

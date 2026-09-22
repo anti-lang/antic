@@ -26,7 +26,7 @@ enum x64_op {
     X64_CVTSI2S, X64_CVTTS2SI, X64_CVTS2S, X64_MOVQX, X64_XORP, X64_ANDP,
     X64_ANDNP, X64_ORP, X64_MOVUPS, X64_CMOV, X64_MOVL, X64_SEH_PUSHREG,
     X64_SEH_STACKALLOC, X64_SEH_SAVEREG, X64_SEH_SAVEXMM, X64_SEH_ENDPROLOGUE,
-    X64_CVTPH2PS, X64_CVTPS2PH, X64_IMUL1, X64_MUL1
+    X64_CVTPH2PS, X64_CVTPS2PH, X64_IMUL1, X64_MUL1, X64_ADC, X64_SBB, X64_BT
 };
 
 #define USE ROLE_USE
@@ -102,6 +102,11 @@ static const struct mach_opcode opcodes[] = {
        their operand in rdx and rax. */
     [X64_IMUL1] = {"imul", {USE}, 0},
     [X64_MUL1] = {"mul", {USE}, 0},
+    /* The add and the subtract that take the carry flag in, and the bit
+       test that puts a bit of a register there. */
+    [X64_ADC] = {"adc", {USE | DEF, USE}, 0},
+    [X64_SBB] = {"sbb", {USE | DEF, USE}, 0},
+    [X64_BT] = {"bt", {USE, 0}, 0},
 };
 
 #define BIT(r) ((uint64_t)1 << (r))
@@ -887,6 +892,51 @@ static void emit_overflow(struct selector *s, const struct ir_inst *inst)
                 inst->op == IR_ADD_OV);
 }
 
+/* DESIGN: add, adc, sub, sbb and neg set the four flags for their own
+   width, 8 bits included. Every flag operation of an add, a subtract and
+   a negation is therefore an instruction. The carry is CF after each of
+   them, since x86_64 keeps the borrow of a subtraction there. bt puts
+   bit 0 of the bool of a carry in into CF. A move between them leaves the
+   flags alone. */
+static bool flags_native(const struct ir_inst *inst)
+{
+    return (inst->op == IR_ADD_FL || inst->op == IR_SUB_FL ||
+            inst->op == IR_NEG_FL) &&
+           is_int_type(inst->type);
+}
+
+static void emit_flag_op(struct selector *s, const struct ir_inst *inst)
+{
+    bool add = inst->op == IR_ADD_FL;
+    struct mach_operand r;
+
+    if (inst->op == IR_NEG_FL) {
+        r = select_result(s, inst);
+        load_into(s, r, &inst->a);
+        emit1(s, X64_NEG, r);
+        return;
+    }
+    if (inst->c.kind != IR_NONE) {
+        emit2(s, X64_BT, widened(select_reg(s, &inst->c), 32), mach_imm(0));
+    }
+    two_operand(s, inst,
+                inst->c.kind == IR_NONE ? (add ? X64_ADD : X64_SUB)
+                : add                   ? X64_ADC
+                                        : X64_SBB,
+                add);
+}
+
+/* One set per flag, right after the instruction that set it. */
+static void emit_flag(struct selector *s, const struct ir_inst *inst)
+{
+    static const enum mach_cond conds[] = {
+        [IR_FLAG_OVERFLOW] = COND_VS, [IR_FLAG_CARRY] = COND_LO,
+        [IR_FLAG_ZERO] = COND_EQ, [IR_FLAG_NEGATIVE] = COND_MI,
+    };
+
+    emit2(s, X64_SET, select_result(s, inst), cond(conds[inst->field]));
+}
+
 /* The operation right before this one left the flags, so the branch
    needs no compare of its own. */
 static void emit_branch_ov(struct selector *s, const struct ir_inst *inst)
@@ -1662,6 +1712,10 @@ static const struct pattern patterns[] = {
     {IR_BRANCH_OV, NULL, emit_branch_ov},
     {IR_MULH_S, match_arith, emit_mul_high},
     {IR_MULH_U, match_arith, emit_mul_high},
+    {IR_ADD_FL, match_arith, emit_flag_op},
+    {IR_SUB_FL, match_arith, emit_flag_op},
+    {IR_NEG_FL, match_arith, emit_flag_op},
+    {IR_FLAG, NULL, emit_flag},
 };
 
 /* Printing in AT&T syntax: the source comes before the destination, a
@@ -1688,7 +1742,7 @@ static const char *const cond_names[] = {
     [COND_EQ] = "e", [COND_NE] = "ne", [COND_LT] = "l", [COND_LE] = "le",
     [COND_GT] = "g", [COND_GE] = "ge", [COND_LO] = "b", [COND_LS] = "be",
     [COND_HI] = "a", [COND_HS] = "ae", [COND_P] = "p", [COND_NP] = "np",
-    [COND_VS] = "o", [COND_VC] = "no",
+    [COND_VS] = "o", [COND_VC] = "no", [COND_MI] = "s", [COND_PL] = "ns",
 };
 
 static const char *const xmm_names[] = {
@@ -2131,6 +2185,7 @@ static const struct target_desc desc = {
     /* DESIGN: sub and memory displacements hold signed 32 bits. A larger
        frame is an error rather than a movabs sequence, see docs/decisions.md. */
     .frame_limit = 0x7fffffff,
+    .flags_native = flags_native,
     .load_spill = load_spill,
     .store_spill = store_spill,
     .resolve_slot = resolve_slot,

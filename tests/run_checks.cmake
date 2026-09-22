@@ -69,6 +69,8 @@ check(overflow_mul "overflow in"
       "overflow_mul\\.anti:[0-9]+: overflow in \\*: left 4000000000, right 4000000000" ON)
 check(overflow_mul32 "overflow in"
       "overflow_mul32\\.anti:[0-9]+: overflow in \\*: left 100000, right 100000" ON)
+check(overflow_carry "overflow in"
+      "overflow_carry\\.anti:[0-9]+: overflow in \\+: left 9223372036854775806, right 1" ON)
 check(narrow "out of range"
       "narrow\\.anti:[0-9]+: value out of range for i8: value 300" ON)
 check(narrow_sign "out of range"

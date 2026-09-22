@@ -165,21 +165,167 @@ static void saturate(struct expander *x, const struct ir_inst *inst)
     finish(x, inst->result, IR_XOR, r, choice);
 }
 
+/* A bool as a value of the type, 0 or 1. */
+static struct ir_operand widen_bool(struct expander *x, struct ir_operand b)
+{
+    return x->type == IR_I8
+               ? b
+               : temp(x, ir_unary(x->f, x->out, IR_ZEXT, x->type, b));
+}
+
+static struct ir_operand both(struct expander *x, struct ir_operand p,
+                              struct ir_operand q)
+{
+    return temp(x, ir_binary(x->f, x->out, IR_AND, IR_I8, p, q));
+}
+
+/* The bit that a shift by n moved out last: bit n - 1 of a moves out
+   right, and the top bit of a << (n - 1) left. A count of 0 moves none.
+   n - 1 of a count of 0 is a count out of the width. Its shift gives what
+   the processor gives, and the test of n drops that bit. */
+static struct ir_operand last_bit(struct expander *x, bool left,
+                                  struct ir_operand a, struct ir_operand n)
+{
+    struct ir_operand moved = compare(x, IR_NE, n, constant(x, 0));
+    struct ir_operand less = binary(x, IR_SUB, n, constant(x, 1));
+    struct ir_operand shifted = binary(x, left ? IR_SHL : IR_SHR_U, a, less);
+    struct ir_operand bit;
+
+    if (left) {
+        bit = compare(x, IR_SLT, shifted, constant(x, 0));
+    } else {
+        struct ir_operand low = binary(x, IR_AND, shifted, constant(x, 1));
+        bit = compare(x, IR_NE, low, constant(x, 0));
+    }
+    return both(x, moved, bit);
+}
+
+/* The flag that a portable sequence gives for flag of the operation inst,
+   whose result is r. c is the carry or the borrow in, or none. */
+static struct ir_operand flag_of(struct expander *x, const struct ir_inst *inst,
+                                 enum ir_flag flag, struct ir_operand r)
+{
+    struct ir_operand a = inst->a;
+    struct ir_operand b = inst->b;
+    struct ir_operand c = inst->c;
+
+    if (flag == IR_FLAG_ZERO) {
+        return compare(x, IR_EQ, r, constant(x, 0));
+    }
+    if (flag == IR_FLAG_NEGATIVE) {
+        return compare(x, IR_SLT, r, constant(x, 0));
+    }
+    switch (inst->op) {
+    case IR_ADD_FL:
+    case IR_SUB_FL: {
+        bool add = inst->op == IR_ADD_FL;
+        struct ir_operand below;
+        struct ir_operand equal;
+        if (flag == IR_FLAG_OVERFLOW) {
+            return signed_overflow(x, add ? IR_ADD : IR_SUB, a, b, r);
+        }
+        /* A carry leaves a sum below a, or at a with a carry in. A
+           borrow takes b above a, or equal to a with a borrow in. */
+        below = add ? compare(x, IR_ULT, r, a) : compare(x, IR_ULT, a, b);
+        if (c.kind == IR_NONE) {
+            return below;
+        }
+        equal = add ? compare(x, IR_EQ, r, a) : compare(x, IR_EQ, a, b);
+        return temp(x, ir_binary(x->f, x->out, IR_OR, IR_I8, below,
+                                 both(x, c, equal)));
+    }
+    case IR_NEG_FL:
+        if (flag == IR_FLAG_OVERFLOW) {
+            struct ir_operand sign = binary(x, IR_AND, a, r);
+            return compare(x, IR_SLT, sign, constant(x, 0));
+        }
+        return compare(x, IR_NE, a, constant(x, 0));
+    case IR_MUL_FL:
+        return flag == IR_FLAG_OVERFLOW
+                   ? signed_overflow(x, IR_MUL, a, b, r)
+                   : unsigned_overflow(x, IR_MUL, a, b, r);
+    case IR_SHL_FL:
+        if (flag == IR_FLAG_OVERFLOW) {
+            struct ir_operand back = binary(x, IR_SHR_S, r, b);
+            return compare(x, IR_NE, back, a);
+        }
+        return last_bit(x, true, a, b);
+    default:
+        if (flag == IR_FLAG_OVERFLOW) {
+            return ir_int_op(IR_I8, 0);
+        }
+        return last_bit(x, false, a, b);
+    }
+}
+
+/* The flag operation at b->insts[at] and its reads, which follow it, as
+   plain operations. The result of the operation may be one of its
+   operands, so it is computed into a new temporary and goes to its own
+   last. Returns the count of the reads. */
+static size_t flags(struct expander *x, const struct ir_block *b, size_t at)
+{
+    static const enum ir_op plain[] = {
+        [IR_ADD_FL] = IR_ADD, [IR_SUB_FL] = IR_SUB, [IR_MUL_FL] = IR_MUL,
+        [IR_SHL_FL] = IR_SHL, [IR_SHR_S_FL] = IR_SHR_S,
+        [IR_SHR_U_FL] = IR_SHR_U,
+    };
+    const struct ir_inst *inst = &b->insts[at];
+    struct ir_operand r;
+    size_t count = 0;
+
+    if (inst->op == IR_NEG_FL) {
+        r = temp(x, ir_unary(x->f, x->out, IR_NEG, x->type, inst->a));
+    } else {
+        r = binary(x, plain[inst->op], inst->a, inst->b);
+    }
+    if (inst->c.kind != IR_NONE) {
+        struct ir_operand one = widen_bool(x, inst->c);
+        r = binary(x, inst->op == IR_ADD_FL ? IR_ADD : IR_SUB, r, one);
+    }
+    while (at + 1 + count < b->count &&
+           b->insts[at + 1 + count].op == IR_FLAG) {
+        const struct ir_inst *read = &b->insts[at + 1 + count];
+        struct ir_operand value =
+            flag_of(x, inst, (enum ir_flag)read->field, r);
+        ir_assign(x->f, x->out, read->result, value);
+        count++;
+    }
+    ir_assign(x->f, x->out, inst->result, r);
+    return count;
+}
+
 static bool is_saturating(enum ir_op op)
 {
     return op == IR_ADD_SAT_S || op == IR_ADD_SAT_U || op == IR_SUB_SAT_S ||
            op == IR_SUB_SAT_U || op == IR_MUL_SAT_S || op == IR_MUL_SAT_U;
 }
 
-static bool expand_block(struct ir_function *f, struct ir_block *b)
+static bool is_flag_operation(enum ir_op op)
+{
+    return op == IR_ADD_FL || op == IR_SUB_FL || op == IR_MUL_FL ||
+           op == IR_SHL_FL || op == IR_SHR_S_FL || op == IR_SHR_U_FL ||
+           op == IR_NEG_FL;
+}
+
+/* Whether inst is an operation that this pass expands. */
+static bool expands(const struct ir_inst *inst,
+                    bool (*native)(const struct ir_inst *inst))
+{
+    return is_saturating(inst->op) ||
+           (is_flag_operation(inst->op) && !native(inst));
+}
+
+static bool expand_block(struct ir_function *f, struct ir_block *b,
+                         bool (*native)(const struct ir_inst *inst))
 {
     struct ir_block out;
     struct expander x;
     bool changed = false;
     size_t i;
+    size_t k;
 
     for (i = 0; i < b->count && !changed; i++) {
-        changed = is_saturating(b->insts[i].op);
+        changed = expands(&b->insts[i], native);
     }
     if (!changed) {
         return false;
@@ -189,14 +335,20 @@ static bool expand_block(struct ir_function *f, struct ir_block *b)
     x.out = &out;
     for (i = 0; i < b->count; i++) {
         const struct ir_inst *inst = &b->insts[i];
+        size_t reads = 0;
+        f->at_line = inst->line;
+        x.type = inst->type;
         if (is_saturating(inst->op)) {
-            f->at_line = inst->line;
-            x.type = inst->type;
             saturate(&x, inst);
+        } else if (expands(inst, native)) {
+            reads = flags(&x, b, i);
         } else {
             ir_inst_add(&out, inst);
         }
-        free(b->insts[i].args);
+        for (k = 0; k <= reads; k++) {
+            free(b->insts[i + k].args);
+        }
+        i += reads;
     }
     free(b->insts);
     b->insts = out.insts;
@@ -205,14 +357,15 @@ static bool expand_block(struct ir_function *f, struct ir_block *b)
     return true;
 }
 
-bool expand_function(struct ir_function *f)
+bool expand_function(struct ir_function *f,
+                     bool (*native)(const struct ir_inst *inst))
 {
     uint32_t line = f->at_line;
     bool changed = false;
     size_t b;
 
     for (b = 0; b < f->block_count; b++) {
-        changed = expand_block(f, f->blocks[b]) || changed;
+        changed = expand_block(f, f->blocks[b], native) || changed;
     }
     f->at_line = line;
     return changed;

@@ -154,6 +154,7 @@ struct types {
     struct type *derived;
     struct symbolic *symbolics;
     struct type *object;            /* anti.lang.Object, the class root */
+    struct type *flags;             /* anti.lang.Flags */
 };
 
 void types_init(struct types *types, struct arena *arena);
@@ -231,6 +232,17 @@ struct type *types_object(struct types *types);
 #define LANG_LOCATION_COLUMN "column"
 #define LANG_LOCATION_FUNCTION "function"
 #define LANG_LOCATION_MODULE "module"
+
+/* DESIGN: `Flags` is the built-in struct of the flags form, which the
+   compiler declares in `anti.lang` as it does `Object`. Its four bools
+   stand in this order, which lowering follows when it reads a flag. A
+   type of that name in the module wins over it, as a class named
+   `Object` does. It carries no descriptor, since no module declares it. */
+#define LANG_FLAGS "Flags"
+#define FLAGS_OVERFLOW "overflow"
+#define FLAGS_CARRY "carry"
+#define FLAGS_ZERO "zero"
+#define FLAGS_NEGATIVE "negative"
 
 /* DESIGN: an `f"..."` builds its text with `anti.text.Builder`, which
    the compiler knows by name, with the enum of its alignments and the
@@ -318,6 +330,10 @@ char *types_member_symbol(struct arena *arena, const struct name *owner,
 struct type *types_job(struct types *types, struct type *result);
 /* Whether t is a Job that types_job made. */
 bool types_is_job(const struct type *t);
+/* The struct `anti.lang.Flags`, one for the compilation. */
+struct type *types_flags(struct types *types);
+/* Whether t is the struct that types_flags made. */
+bool types_is_flags(const struct type *t);
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */
 struct type *types_tuple(struct types *types, struct type **elements,

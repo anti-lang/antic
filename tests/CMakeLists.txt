@@ -302,9 +302,9 @@ foreach(name IN ITEMS qualified_bodies qualified_chain qualified_single)
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
-# The wrapping and saturating operators and mul_high in dev mode, whose
-# checks trap on the plain operators and on none of these.
-foreach(name IN ITEMS wrapping saturating mul_high)
+# The wrapping and saturating operators, mul_high and the flags form in
+# dev mode, whose checks trap on the plain operators and on none of these.
+foreach(name IN ITEMS wrapping saturating mul_high flags carry_chain)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -1571,7 +1571,7 @@ if(ANTIC_LLVM_AR)
 endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
-            failing tuples)
+            failing tuples flags)
         add_test(NAME clib_${case}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"

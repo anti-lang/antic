@@ -243,6 +243,8 @@ static void declaration(struct text *out, const struct type *t,
     case TYPE_CLASS:
         if (is_error_class(t)) {
             text_append(out, "struct anti_Error");
+        } else if (types_is_flags(t)) {
+            text_append(out, "struct anti_" LANG_FLAGS);
         } else if (t == owner) {
             text_appendf(out, "%s %.*s", t->is_union ? "union" : "struct",
                          (int)t->name.length, t->name.text);
@@ -337,6 +339,27 @@ static void emit_tuples(struct text *out, const struct type *t,
                         const struct interface *const *ifaces, size_t count,
                         struct emitted *done);
 
+/* DESIGN: Flags is a struct of four bools that no module declares. The
+   header writes it once, as it writes a tuple, before the first aggregate
+   or signature that names it. */
+static void flags_view(struct text *out, const struct type *t,
+                       struct emitted *done)
+{
+    size_t i;
+
+    if (was_emitted(done, t)) {
+        return;
+    }
+    mark_emitted(done, t);
+    text_append(out, "/* The flags of one arithmetic operation. */\n"
+                     "struct anti_" LANG_FLAGS " {\n");
+    for (i = 0; i < t->field_count; i++) {
+        text_appendf(out, "    bool %.*s;\n", (int)t->fields[i].name.length,
+                     t->fields[i].name.text);
+    }
+    text_append(out, "};\n\n");
+}
+
 /* The export aggregate that type t holds by value, emitted first. */
 static void emit_uses(struct text *out, const struct type *t,
                       const struct interface *const *ifaces, size_t count,
@@ -350,6 +373,10 @@ static void emit_uses(struct text *out, const struct type *t,
     }
     if (t->kind == TYPE_TUPLE) {
         emit_tuples(out, t, ifaces, count, done);
+        return;
+    }
+    if (types_is_flags(t)) {
+        flags_view(out, t, done);
         return;
     }
     if (t->kind != TYPE_STRUCT || was_emitted(done, t)) {
@@ -428,6 +455,11 @@ static void emit_tuples(struct text *out, const struct type *t,
             emit_tuples(out, t->params[i], ifaces, count, done);
         }
         tuple_view(out, t, ifaces, count, done);
+        return;
+    case TYPE_STRUCT:
+        if (types_is_flags(t)) {
+            flags_view(out, t, done);
+        }
         return;
     default:
         return;

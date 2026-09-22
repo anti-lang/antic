@@ -431,8 +431,37 @@ static void records_type_ids(void)
     release(&l);
 }
 
+/* The flags form is one flag operation and one read per field that the
+   function reads. A field nothing reads costs nothing. */
+static void flag_reads(void)
+{
+    struct lowered l;
+    struct text out = {0};
+    const char *text;
+
+    run(&l, "fn f(a: int, b: int) -> bool {\n"
+            "    let (r, g) = a + b;\n"
+            "    return g.carry && r > 0;\n"
+            "}\n"
+            "fn h(a: u8, g: Flags) -> u8 {\n"
+            "    return a + a + g.carry;\n"
+            "}\n");
+    CHECK(l.ok);
+    ir_print(&out, &l.ir);
+    text = text_cstr(&out);
+    CHECK(strstr(text, " = addfl i64 %0, %1\n") != NULL);
+    CHECK(strstr(text, " = flag carry %") != NULL);
+    CHECK(strstr(text, "flag overflow") == NULL);
+    CHECK(strstr(text, "flag zero") == NULL);
+    CHECK(strstr(text, "flag negative") == NULL);
+    CHECK(strstr(text, " = addfl i8 %0, %0, %") != NULL);
+    text_free(&out);
+    release(&l);
+}
+
 void test_lower(void)
 {
+    flag_reads();
     /* A bitfield is read and written through the address of its struct and
        the field, and the back end lowers both to shifts and masks. */
     lowers("struct Flags { visible: u32 : 1, level: i8 : 3 }\n"

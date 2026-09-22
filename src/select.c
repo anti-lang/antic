@@ -497,8 +497,12 @@ static void select_function(struct selector *s)
                 }
             }
             /* A branch on overflow reads the flags of the operation
-               right before it, which the verifier keeps adjacent. */
+               right before it, which the verifier keeps adjacent. The
+               reads of a flag operation follow it the same way. */
             s->overflow = select_is_overflow(inst->op) ? inst : NULL;
+            if (inst->op != IR_FLAG) {
+                s->flags = inst;
+            }
             s->fused = NULL;
             s->has_address = false;
         }
@@ -540,7 +544,8 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
             layouts_free(&layouts);
             return false;
         }
-        if (!m->functions[i]->is_extern && expand_function(m->functions[i])) {
+        if (!m->functions[i]->is_extern &&
+            expand_function(m->functions[i], target_desc(t)->flags_native)) {
             resolved = true;
         }
         if (resolved && !m->functions[i]->is_extern) {

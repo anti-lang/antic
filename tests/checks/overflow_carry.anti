@@ -1,0 +1,19 @@
+//! A sum with a carry in that leaves the range of int. The plain `+`
+//! keeps its check with a carry in, over the whole sum.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let (low, f) = opaque(-1) + opaque(1);
+	sink(low);
+	sink(opaque(9223372036854775806) + opaque(1) + f.carry);
+	return 7;
+}

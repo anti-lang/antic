@@ -506,6 +506,46 @@ struct type *types_job(struct types *types, struct type *result)
     return t;
 }
 
+struct type *types_flags(struct types *types)
+{
+    static const char module_text[] = LANG_MODULE;
+    static const char name_text[] = LANG_FLAGS;
+    static const char *const names[] = {FLAGS_OVERFLOW, FLAGS_CARRY,
+                                        FLAGS_ZERO, FLAGS_NEGATIVE};
+    struct struct_field fields[4];
+    struct name module;
+    struct name name;
+    size_t i;
+
+    if (types->flags != NULL) {
+        return types->flags;
+    }
+    module.text = module_text;
+    module.length = sizeof module_text - 1;
+    name.text = name_text;
+    name.length = sizeof name_text - 1;
+    types->flags = types_struct(types, module, name);
+    memset(fields, 0, sizeof fields);
+    for (i = 0; i < 4; i++) {
+        fields[i].name.text = names[i];
+        fields[i].name.length = strlen(names[i]);
+        fields[i].type = types_builtin(types, TYPE_BOOL);
+        fields[i].vis = VIS_PUB;
+    }
+    types_set_fields(types, types->flags, fields, 4);
+    types->flags->layout = LAYOUT_DONE;
+    return types->flags;
+}
+
+bool types_is_flags(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_STRUCT && t->result == NULL &&
+           t->name.length == sizeof LANG_FLAGS - 1 &&
+           memcmp(t->name.text, LANG_FLAGS, sizeof LANG_FLAGS - 1) == 0 &&
+           t->module.length == sizeof LANG_MODULE - 1 &&
+           memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
+}
+
 bool types_is_job(const struct type *t)
 {
     return t != NULL && t->kind == TYPE_STRUCT && t->result != NULL &&

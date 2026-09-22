@@ -1,0 +1,4 @@
+max + 1 o0 c1 z1 n0
+max + 0 + carry o0 c1 z1 n0
+1 + 2 + carry 4 o0 c0 z0 n0
+top + 1 9223372036854775808 o1 c0 z0 n1

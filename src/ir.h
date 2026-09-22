@@ -115,6 +115,15 @@ enum ir_op {
        into plain operations once it knows the width. */
     IR_ADD_SAT_S, IR_ADD_SAT_U, IR_SUB_SAT_S, IR_SUB_SAT_U, IR_MUL_SAT_S,
     IR_MUL_SAT_U,
+    /* DESIGN: a flag operation gives the result of its arithmetic and
+       leaves the four flags of it, which IR_FLAG reads. The reads follow
+       the operation with nothing between, which the verifier checks, so a
+       target whose instruction sets a flag reads it there. c of + and -
+       is a carry or a borrow of type i8, or none. */
+    IR_ADD_FL, IR_SUB_FL, IR_MUL_FL, IR_SHL_FL, IR_SHR_S_FL, IR_SHR_U_FL,
+    IR_NEG_FL,
+    /* result i8 = the flag field of the flag operation that gave a */
+    IR_FLAG,
     /* result = op a, with the result type named by the instruction */
     IR_TRUNC, IR_SEXT, IR_ZEXT, IR_SITOF, IR_UITOF, IR_FTOSI, IR_FTOUI,
     IR_FEXT, IR_FTRUNC,
@@ -145,6 +154,15 @@ enum ir_op {
                        IR_ADD_OV, IR_SUB_OV or IR_MUL_OV, which is the
                        instruction right before this one. */
     IR_RET          /* Return a, or nothing. */
+};
+
+/* The flags IR_FLAG reads, in the order of the fields of Flags. */
+enum ir_flag {
+    IR_FLAG_OVERFLOW,   /* the signed result does not fit */
+    IR_FLAG_CARRY,      /* the carry of +, the borrow of -, the bit a shift
+                           moved out last, the unsigned product too wide */
+    IR_FLAG_ZERO,
+    IR_FLAG_NEGATIVE    /* the top bit of the result */
 };
 
 enum ir_operand_kind {
@@ -183,7 +201,7 @@ struct ir_inst {
     struct ir_operand b;
     struct ir_operand c;
     struct ir_vtype of;             /* IR_SLOT, IR_MEMCOPY, the bitfield ops */
-    uint32_t field;                 /* IR_BITLOAD, IR_BITSTORE */
+    uint32_t field;                 /* IR_BITLOAD, IR_BITSTORE, IR_FLAG */
     struct ir_operand *args;        /* IR_CALL */
     size_t arg_count;
 };
@@ -468,6 +486,14 @@ uint32_t ir_binary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                    struct ir_operand y);
 uint32_t ir_unary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                   enum ir_type type, struct ir_operand x);
+/* A flag operation of x and y, with the carry or borrow c of an add or a
+   subtract, or none. */
+uint32_t ir_flag_op(struct ir_function *f, struct ir_block *b, enum ir_op op,
+                    enum ir_type type, struct ir_operand x,
+                    struct ir_operand y, struct ir_operand c);
+/* Read flag of the flag operation whose result is of, right after it. */
+uint32_t ir_flag(struct ir_function *f, struct ir_block *b, enum ir_flag flag,
+                 struct ir_operand of);
 void ir_assign(struct ir_function *f, struct ir_block *b, uint32_t dst,
                struct ir_operand src);
 uint32_t ir_slot(struct ir_function *f, struct ir_block *b,
