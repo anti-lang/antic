@@ -1,0 +1,40 @@
+//! A library whose public variant another module builds, takes apart and
+//! passes back. The cases, their fields and the tag come from the library
+//! file.
+
+/// A shape of the plane.
+pub variant Shape
+{
+	/// A circle of radius `r`.
+	Circle { r: f32 },
+	Rect { w: f32, h: f32 },
+	Empty,
+}
+
+/// A shape together with the number of times it repeats.
+pub struct Tile
+{
+	shape: Shape,
+	count: int,
+}
+
+pub fn circle(r: f32) -> Shape
+{
+	return Shape.Circle { r: r };
+}
+
+pub fn area(s: Shape) -> f32
+{
+	let a: f32 = 0.0;
+	switch s {
+		Circle c => a = 3.0 * c.r * c.r,
+		Rect x => a = x.w * x.h,
+		Empty => a = 0.0,
+	}
+	return a;
+}
+
+pub fn tiled(t: Tile) -> f32
+{
+	return area(t.shape) * t.count as f32;
+}

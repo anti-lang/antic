@@ -619,6 +619,115 @@ struct type *types_struct(struct types *types, struct name module,
     return t;
 }
 
+static struct name name_of(const char *text)
+{
+    struct name n;
+
+    n.text = text;
+    n.length = strlen(text);
+    return n;
+}
+
+static bool same_name_text(const struct name *a, const struct name *b)
+{
+    return a->length == b->length && memcmp(a->text, b->text, a->length) == 0;
+}
+
+void types_set_cases(struct types *types, struct type *v, struct type *tag,
+                     struct type **payloads, size_t count)
+{
+    struct struct_field fields[2];
+    struct struct_field *members;
+    struct type *u;
+    size_t used = 0;
+    size_t i;
+
+    memset(fields, 0, sizeof fields);
+    v->base = tag;
+    v->params = arena_alloc(types->arena, (count + 1) * sizeof *v->params);
+    memcpy(v->params, payloads, count * sizeof *v->params);
+    v->param_count = count;
+    fields[0].name = name_of(VARIANT_TAG);
+    fields[0].type = tag;
+    fields[0].vis = VIS_PUB;
+    members = arena_alloc(types->arena, (count + 1) * sizeof *members);
+    for (i = 0; i < count; i++) {
+        if (payloads[i] == NULL) {
+            continue;
+        }
+        memset(&members[used], 0, sizeof members[used]);
+        members[used].name = tag->fields[i].name;
+        members[used].type = payloads[i];
+        members[used].vis = VIS_PUB;
+        used++;
+    }
+    if (used == 0) {
+        types_set_fields(types, v, fields, 1);
+        return;
+    }
+    /* DESIGN: the union is named `T.union`, which no case can be, since
+       `union` is a keyword. Its IR aggregate is then distinct from the
+       struct of every case. */
+    {
+        char *text = arena_alloc(types->arena, v->name.length + 7);
+        memcpy(text, v->name.text, v->name.length);
+        memcpy(text + v->name.length, ".union", 7);
+        u = types_struct(types, v->module, name_of(text));
+    }
+    u->is_union = true;
+    u->packed = v->packed;
+    types_set_fields(types, u, members, used);
+    fields[1].name = name_of(VARIANT_UNION);
+    fields[1].type = u;
+    fields[1].vis = VIS_PUB;
+    types_set_fields(types, v, fields, 2);
+}
+
+bool types_cases_from_fields(struct types *types, struct type *v)
+{
+    const struct type *tag;
+    const struct type *u;
+    size_t i;
+    size_t j;
+
+    if (v->field_count < 1 || v->field_count > 2 ||
+        v->fields[0].type->kind != TYPE_ENUM) {
+        return false;
+    }
+    tag = v->fields[0].type;
+    u = v->field_count == 2 ? v->fields[1].type : NULL;
+    if (u != NULL && (u->kind != TYPE_STRUCT || !u->is_union)) {
+        return false;
+    }
+    v->base = v->fields[0].type;
+    v->param_count = tag->field_count;
+    v->params = arena_alloc(types->arena,
+                            (tag->field_count + 1) * sizeof *v->params);
+    for (i = 0; i < tag->field_count; i++) {
+        if (tag->fields[i].number != i) {
+            return false;
+        }
+        for (j = 0; u != NULL && j < u->field_count; j++) {
+            if (same_name_text(&u->fields[j].name, &tag->fields[i].name)) {
+                v->params[i] = u->fields[j].type;
+            }
+        }
+    }
+    return true;
+}
+
+int types_case_index(const struct type *v, const struct name *name)
+{
+    size_t i;
+
+    for (i = 0; v->base != NULL && i < v->base->field_count; i++) {
+        if (same_name_text(&v->base->fields[i].name, name)) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
 /* A named integer type. Its values live in its fields, each with its
    name and the expression that gives it a number. */
 struct type *types_enum(struct types *types, struct name module,
@@ -784,6 +893,7 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_ENUM:
+    case TYPE_VARIANT:
         if (qualified) {
             text_appendf(out, "%.*s.", (int)t->module.length, t->module.text);
         }
@@ -803,7 +913,7 @@ bool type_is_integer(const struct type *t)
 bool type_has_fields(const struct type *t)
 {
     return t != NULL && (t->kind == TYPE_STRUCT || t->kind == TYPE_CLASS ||
-                         t->kind == TYPE_TUPLE);
+                         t->kind == TYPE_TUPLE || t->kind == TYPE_VARIANT);
 }
 
 bool type_field_is_unit_break(const struct struct_field *f)
@@ -866,6 +976,7 @@ bool type_pointer_free(const struct type *t)
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_TUPLE:
+    case TYPE_VARIANT:
         /* DESIGN: the pointer-free test of `parallel` exempts the table
            pointer and the `own` fields of a class. The table is read-only
            data that every object of the class shares, and an `own` field

@@ -543,12 +543,19 @@ static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
         dump_expr(d, depth + 1, s->as.assertion.cond);
         break;
     case STMT_SWITCH:
-        simple(d, depth, "switch_stmt", NULL);
+        simple(d, depth, s->as.switch_stmt.if_let ? "if_let" : "switch_stmt",
+               NULL);
         dump_expr(d, depth + 1, s->as.switch_stmt.value);
         for (i = 0; i < s->as.switch_stmt.count; i++) {
+            const struct switch_arm *arm = &s->as.switch_stmt.arms[i];
             simple(d, depth + 1, "arm", NULL);
-            dump_expr(d, depth + 2, s->as.switch_stmt.arms[i].value);
-            dump_stmt(d, depth + 2, s->as.switch_stmt.arms[i].body);
+            dump_expr(d, depth + 2, arm->value);
+            if (arm->binds.length > 0) {
+                size_t at = begin(d, depth + 2);
+                label_name(d, "binds", NULL, &arm->binds);
+                end(d, at, arm->bound != NULL ? arm->bound->type : NULL);
+            }
+            dump_stmt(d, depth + 2, arm->body);
         }
         if (s->as.switch_stmt.otherwise != NULL) {
             simple(d, depth + 1, "else", NULL);
@@ -736,6 +743,7 @@ static void dump_members(struct dumper *d, const struct item *it)
 static void dump_module(struct dumper *d, const struct module *module)
 {
     size_t i;
+    size_t j;
 
     dump_doc(d, 0, "module_doc", &module->doc);
     dump_doc(d, 0, "module_note", &module->note);
@@ -758,6 +766,7 @@ static void dump_module(struct dumper *d, const struct module *module)
                             : it->kind == ITEM_UNION     ? "union_decl"
                             : it->kind == ITEM_ENUM      ? "enum_decl"
                             : it->kind == ITEM_CLASS     ? "class_decl"
+                            : it->kind == ITEM_VARIANT   ? "variant_decl"
                                                          : "const_decl";
         size_t start = begin(d, 0);
 
@@ -828,6 +837,20 @@ static void dump_module(struct dumper *d, const struct module *module)
             }
             dump_params(d, 1, "field", it->params, it->param_count, type);
             dump_members(d, it);
+            break;
+        case ITEM_VARIANT:
+            for (j = 0; j < it->case_count; j++) {
+                const struct variant_case *one = &it->cases[j];
+                size_t at = begin(d, 1);
+                const struct type *payload =
+                    type != NULL && j < type->param_count ? type->params[j]
+                                                          : NULL;
+                label_name(d, "case", NULL, &one->name);
+                end(d, at, NULL);
+                dump_doc(d, 2, "doc", &one->doc);
+                dump_params(d, 2, "field", one->fields, one->field_count,
+                            payload);
+            }
             break;
         case ITEM_ENUM:
             if (it->base != NULL) {

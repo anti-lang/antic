@@ -1,0 +1,38 @@
+//! A program that builds the variant of another module, switches on it
+//! with every case named, tests it with `is` and `if let`, and hands it
+//! back by value inside a struct of that module.
+
+import com.example.geo;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn perimeter(s: geo.Shape) -> f32
+{
+	let p: f32 = 0.0;
+	switch s {
+		Circle c => p = 6.0 * c.r,
+		Rect x => p = 2.0 * (x.w + x.h),
+		Empty => p = 0.0,
+	}
+	return p;
+}
+
+fn main() -> int
+{
+	let c = geo.circle(1.5);
+	let r = geo.Shape.Rect { w: 2.0, h: 3.5 };
+	let e = geo.Shape.Empty;
+	printf("area %.2f %.2f %.2f\n".ptr, geo.area(c) as f64,
+		geo.area(r) as f64, geo.area(e) as f64);
+	printf("perimeter %.2f %.2f %.2f\n".ptr, perimeter(c) as f64,
+		perimeter(r) as f64, perimeter(e) as f64);
+	printf("is %d %d %d\n".ptr, (c is geo.Shape.Circle) as c_int,
+		(r is geo.Shape.Circle) as c_int, e.tag as c_int);
+	if let Rect x = r {
+		printf("rect %.1f %.1f\n".ptr, x.w as f64, x.h as f64);
+	}
+	let t = geo.Tile { shape: r, count: 3 };
+	printf("tiled %.2f\n".ptr, geo.tiled(t) as f64);
+	printf("size %d\n".ptr, size_of(geo.Shape) as c_int);
+	return 0;
+}

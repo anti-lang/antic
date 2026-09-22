@@ -44,6 +44,9 @@ struct type_expr {
     enum token_kind builtin;        /* TYPEX_BUILTIN */
     struct name module;             /* TYPEX_NAMED, empty when unqualified */
     struct name name;               /* TYPEX_NAMED */
+    /* TYPEX_NAMED after `is`: the case of `v is geo.Shape.Circle`, whose
+       module and variant stand in module and name. Empty otherwise. */
+    struct name member;
     struct type_expr *element;      /* TYPEX_POINTER, TYPEX_ARRAY, TYPEX_SLICE */
     bool nullable;                  /* TYPEX_POINTER: `?*T` */
     struct expr *length;            /* TYPEX_ARRAY */
@@ -195,6 +198,9 @@ struct expr {
             bool from_sub;          /* the source may be a sub-object */
             bool promoted;          /* the checker's read of an f16 */
             const struct type *target;  /* the class of `is` and `as` */
+            /* `v is Shape.Circle`: the index of the case plus 1, set by
+               the checker, and 0 for every other `is` and `as`. */
+            uint32_t variant_case;
         } cast;
         struct {
             struct expr *callee;
@@ -244,8 +250,14 @@ struct expr {
         struct {
             struct name module;     /* empty when unqualified */
             struct name name;
+            /* The case of `geo.Shape.Circle { }`, whose module and
+               variant stand in module and name. Empty otherwise. */
+            struct name member;
             struct field_init *fields;
             size_t field_count;
+            /* A literal of a variant: the index of its case plus 1, set
+               by the checker, and 0 for a struct or a class. */
+            uint32_t variant_case;
         } struct_lit;
         struct {
             struct type_expr *element;
@@ -358,6 +370,13 @@ struct switch_arm {
     struct expr *value;
     struct pos pos;
     struct stmt *body;
+    /* `Circle c =>` on a variant: the name that binds the fields of the
+       case, empty without one. The checker sets the symbol and the index
+       of the case plus 1. */
+    struct name binds;
+    struct pos binds_pos;
+    struct symbol *bound;
+    uint32_t variant_case;
     /* Set by the checker on a `switch` over a `str`: the call of
        `anti.text.equal` on the value and this arm's. */
     struct expr *test;
@@ -503,6 +522,11 @@ struct stmt {
             /* The local that holds the value of a `switch` on a `str`,
                which each arm's test reads. Set by the checker. */
             struct symbol *bound;
+            /* DESIGN: `if let Circle c = s { } else { }` is a switch on
+               s with one arm and an `else`, which is empty when the text
+               writes none. The flag names the form for the messages and
+               for the missing-return rule, which reads it as an `if`. */
+            bool if_let;
         } switch_stmt;
         struct expr *return_value;  /* STMT_RETURN, NULL for return; */
         struct block *block;        /* STMT_BLOCK */
@@ -550,6 +574,16 @@ struct param {
     bool writable;                  /* `mutable`: a singleton field to write */
 };
 
+/* One case of a variant: its name and its fields, none for a case such
+   as `Empty`. */
+struct variant_case {
+    struct name name;
+    struct pos pos;
+    struct doc_text doc;            /* the /// text */
+    struct param *fields;
+    size_t field_count;
+};
+
 enum item_kind {
     ITEM_FN,
     ITEM_EXTERN_FN,
@@ -557,7 +591,8 @@ enum item_kind {
     ITEM_UNION,
     ITEM_CONST,
     ITEM_ENUM,
-    ITEM_CLASS
+    ITEM_CLASS,
+    ITEM_VARIANT
 };
 
 /* A function of a struct body against the contracts of its chain. */
@@ -586,8 +621,10 @@ struct item {
     struct block *body;             /* ITEM_FN */
     struct type_expr *type;         /* ITEM_CONST */
     struct expr *value;             /* ITEM_CONST */
-    bool packed;                    /* ITEM_STRUCT, ITEM_UNION */
-    struct expr *align;             /* ITEM_STRUCT, ITEM_UNION, or NULL */
+    bool packed;                    /* ITEM_STRUCT, ITEM_UNION, ITEM_VARIANT */
+    struct expr *align;             /* the same three, or NULL */
+    struct variant_case *cases;     /* ITEM_VARIANT */
+    size_t case_count;
     struct symbol *symbol;
     struct doc_text doc;            /* the /// text */
     struct doc_text note;           /* the //# text */

@@ -139,6 +139,7 @@ static enum ir_type ir_type_of(const struct type *t)
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_TUPLE:
+    case TYPE_VARIANT:
     case TYPE_ARRAY:
     case TYPE_STR:
     case TYPE_SLICE:
@@ -2837,6 +2838,56 @@ static void build_slice(struct lowerer *l, const struct expr *e,
 
 /* Construct the aggregate value of e at dest. A literal fills its fields
    or elements in place, and any other value is copied. */
+static const struct name tag_name = {VARIANT_TAG, sizeof VARIANT_TAG - 1};
+static const struct name union_name = {VARIANT_UNION,
+                                       sizeof VARIANT_UNION - 1};
+
+/* The tag of the variant v at address, read as its integer. */
+static struct ir_operand load_tag(struct lowerer *l, const struct type *v,
+                                  struct ir_operand address)
+{
+    return temp(l, ir_load(l->f, l->b, ir_type_of(v->base),
+                           offset_address(l, address,
+                                          field_offset(l, v, &tag_name))));
+}
+
+/* The address of the fields of case index of the variant v at address.
+   Every member of the union starts at its offset 0. */
+static struct ir_operand case_address(struct lowerer *l, const struct type *v,
+                                      struct ir_operand address)
+{
+    return offset_address(l, address, field_offset(l, v, &union_name));
+}
+
+/* DESIGN: a literal of a variant writes the tag of its case and the
+   fields of that case, and nothing else. The bytes of the union that
+   the case leaves are never read, since `switch` reads the fields of the
+   case the tag names alone. */
+static void build_variant(struct lowerer *l, const struct expr *e,
+                          struct ir_operand dest)
+{
+    const struct type *v = e->type;
+    uint32_t index = e->as.struct_lit.variant_case - 1;
+    const struct type *payload = v->params[index];
+    struct ir_operand fields;
+    size_t i;
+
+    ir_store(l->f, l->b, ir_type_of(v->base),
+             ir_int_op(ir_type_of(v->base), v->base->fields[index].number),
+             offset_address(l, dest, field_offset(l, v, &tag_name)));
+    if (payload == NULL) {
+        return;
+    }
+    fields = case_address(l, v, dest);
+    for (i = 0; i < e->as.struct_lit.field_count && !l->failed; i++) {
+        const struct field_init *init = &e->as.struct_lit.fields[i];
+        const struct struct_field *field = field_of(payload, &init->name);
+        store_value(l, field->type, init->value,
+                    offset_address(l, fields,
+                                   field_offset(l, payload, &field->name)));
+    }
+}
+
 static void build_into(struct lowerer *l, const struct expr *e,
                        struct ir_operand dest)
 {
@@ -2864,6 +2915,10 @@ static void build_into(struct lowerer *l, const struct expr *e,
         }
         break;
     case EXPR_STRUCT_LIT:
+        if (t->kind == TYPE_VARIANT) {
+            build_variant(l, e, dest);
+            break;
+        }
         /* The table pointer is the first word of every object, and the
            base of a class sits at offset 0, so it goes at dest. */
         if (t->kind == TYPE_CLASS) {
@@ -3920,6 +3975,16 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
         }
         op = to->kind == TYPE_F16 ? IR_HTRUNC : IR_HEXT;
         return temp(l, ir_unary(l->f, l->b, op, target, v));
+    }
+    /* `v is Shape.Circle` compares the tag with the number of the case.
+       The operand is a variant, so v is its address. */
+    if (e->as.cast.variant_case != 0) {
+        uint32_t index = e->as.cast.variant_case - 1;
+        enum ir_type tag = ir_type_of(from->base);
+        return temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
+                                 load_tag(l, from, v),
+                                 ir_int_op(tag,
+                                           from->base->fields[index].number)));
     }
     /* A class test, and a conversion down a chain, which needs a check.
        A conversion up a chain is the same address and needs none. */
@@ -6175,13 +6240,22 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         uint32_t line;
         size_t i;
         size_t k;
+        const struct type *variant = s->as.switch_stmt.value->type;
+        struct ir_operand address = none();
         over = lower_expr(l, s->as.switch_stmt.value);
         if (l->failed) {
             return;
         }
-        /* A `str` is bound by its address, which each arm's call of
-           `text.equal` reads. */
-        if (s->as.switch_stmt.bound != NULL) {
+        /* DESIGN: a switch on a variant reads the tag once and compares it
+           with the number of each arm's case. The value stays where it
+           is. An arm that binds the fields copies them before its body
+           runs, so the body may replace the value. */
+        if (variant->kind == TYPE_VARIANT) {
+            address = over;
+            over = load_tag(l, variant, address);
+        } else if (s->as.switch_stmt.bound != NULL) {
+            /* A `str` is bound by its address, which each arm's call of
+               `text.equal` reads. */
             bind_value(l, s->as.switch_stmt.bound, over);
         } else {
             type = ir_type_of(s->as.switch_stmt.value->type);
@@ -6195,6 +6269,12 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
             struct ir_operand test;
             if (at->test != NULL) {
                 test = lower_expr(l, at->test);
+            } else if (at->variant_case != 0) {
+                const struct struct_field *number =
+                    &variant->base->fields[at->variant_case - 1];
+                test = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over,
+                                         ir_int_op(ir_type_of(variant->base),
+                                                   number->number)));
             } else {
                 struct ir_operand value = lower_expr(l, at->value);
                 if (l->failed) {
@@ -6212,6 +6292,11 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
             ir_branch(l->f, l->b, test, arm, next_test);
             l->b = arm;
             entry[k] = arm;
+            if (at->bound != NULL) {
+                ir_memcopy(l->f, l->b, temp(l, at->bound->ir),
+                           case_address(l, variant, address),
+                           vtype_of(l, at->bound->type));
+            }
             lower_stmt(l, body);
             if ((falls[k] = sema_arm_fallthrough(body)) != NULL) {
                 tail[k] = l->b;
@@ -6536,6 +6621,12 @@ static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
         break;
     case STMT_SWITCH:
         for (j = 0; j < s->as.switch_stmt.count; j++) {
+            /* The name an arm binds holds a copy of the fields of its
+               case, a struct in a place of its own. */
+            sym = s->as.switch_stmt.arms[j].bound;
+            if (sym != NULL) {
+                sym->ir = ir_slot(l->f, entry, vtype_of(l, sym->type));
+            }
             reserve_stmt(l, entry, s->as.switch_stmt.arms[j].body);
         }
         if (s->as.switch_stmt.otherwise != NULL) {

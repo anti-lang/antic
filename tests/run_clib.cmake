@@ -9,7 +9,7 @@
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle,
-#             classes, failing, tuples or flags
+#             classes, failing, tuples, flags or variants
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
@@ -198,6 +198,21 @@ elseif(CASE STREQUAL "flags")
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/flags${EXE}")
     expect_output("${dir}/flags${EXE}" "${SOURCES}/flags.expected")
+elseif(CASE STREQUAL "variants")
+    # An export variant crosses as the enum of its tags and the struct of
+    # its tag and the union of its cases. C sets and reads both, by value
+    # as a parameter, a result and a field, and the header compiles as
+    # C++17 as well.
+    library(variants static "${dir}")
+    expect_header("${dir}/variants.h" variants.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/variants.c"
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/variants${EXE}")
+    expect_output("${dir}/variants${EXE}" "${SOURCES}/variants.expected")
+    run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
+        "${SOURCES}/variants.cpp")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
     run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" "${library_link}" ${LINK}

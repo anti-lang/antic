@@ -260,6 +260,7 @@ static void sync_item(struct parser *p)
         case TOKEN_FN:
         case TOKEN_STRUCT:
         case TOKEN_UNION:
+        case TOKEN_VARIANT:
         case TOKEN_EXTERN:
         case TOKEN_CONST:
         case TOKEN_PUB:
@@ -639,14 +640,25 @@ static struct expr *primary(struct parser *p)
         bool qualified = peek_at(p, 1)->kind == TOKEN_DOT &&
                          peek_at(p, 2)->kind == TOKEN_IDENT &&
                          peek_at(p, 3)->kind == TOKEN_LBRACE;
+        /* `geo.Shape.Circle { }` names the case of a variant of another
+           module. */
+        bool member = peek_at(p, 1)->kind == TOKEN_DOT &&
+                      peek_at(p, 2)->kind == TOKEN_IDENT &&
+                      peek_at(p, 3)->kind == TOKEN_DOT &&
+                      peek_at(p, 4)->kind == TOKEN_IDENT &&
+                      peek_at(p, 5)->kind == TOKEN_LBRACE;
         if (!p->no_struct_literal &&
-            (qualified || peek_at(p, 1)->kind == TOKEN_LBRACE)) {
+            (qualified || member || peek_at(p, 1)->kind == TOKEN_LBRACE)) {
             e = new_expr(p, EXPR_STRUCT_LIT, t);
             expect_name(p, &e->as.struct_lit.name);
-            if (qualified) {
+            if (qualified || member) {
                 e->as.struct_lit.module = e->as.struct_lit.name;
                 next(p);
                 expect_name(p, &e->as.struct_lit.name);
+            }
+            if (member) {
+                next(p);
+                expect_name(p, &e->as.struct_lit.member);
             }
             next(p);
             e->as.struct_lit.fields =
@@ -999,6 +1011,14 @@ static struct expr *cast(struct parser *p)
         if ((c->as.cast.type = type(p)) == NULL) {
             return NULL;
         }
+        /* `v is geo.Shape.Circle` names the case of a variant of another
+           module, one name more than a type has. */
+        if (test && c->as.cast.type->kind == TYPEX_NAMED &&
+            c->as.cast.type->module.length > 0 && check(p, TOKEN_DOT) &&
+            peek_at(p, 1)->kind == TOKEN_IDENT) {
+            next(p);
+            expect_name(p, &c->as.cast.type->member);
+        }
         e = c;
     }
     return e;
@@ -1279,12 +1299,85 @@ static struct stmt *arm_body(struct parser *p)
     return s;
 }
 
+static struct stmt *if_statement(struct parser *p);
+
+/* A statement as a block of its own, for the `else` of an `if let`. */
+static struct block *block_of(struct parser *p, struct stmt *s)
+{
+    struct block *b = node(p, sizeof *b);
+
+    b->pos = s->pos;
+    b->end = s->pos;
+    b->stmts = node(p, sizeof *b->stmts);
+    b->stmts[0] = s;
+    b->count = 1;
+    return b;
+}
+
+/* `if let Circle c = s { } else { }`, after `if`. The `else` is empty
+   when the text writes none, and `else if` holds the rest of the chain
+   as one statement. */
+static struct stmt *if_let(struct parser *p, const struct token *t)
+{
+    struct stmt *s = new_stmt(p, STMT_SWITCH, t);
+    struct switch_arm *arm = node(p, sizeof *arm);
+    struct stmt *body;
+    struct stmt *otherwise;
+
+    next(p);
+    s->as.switch_stmt.if_let = true;
+    arm->pos = pos_of(peek(p));
+    arm->value = new_expr(p, EXPR_NAME, peek(p));
+    if (!expect_name(p, &arm->value->as.name)) {
+        return NULL;
+    }
+    if (check(p, TOKEN_IDENT)) {
+        arm->binds_pos = pos_of(peek(p));
+        expect_name(p, &arm->binds);
+    }
+    if (!expect(p, TOKEN_ASSIGN)) {
+        return NULL;
+    }
+    p->no_struct_literal = true;
+    s->as.switch_stmt.value = expression(p);
+    p->no_struct_literal = false;
+    body = new_stmt(p, STMT_BLOCK, peek(p));
+    if (s->as.switch_stmt.value == NULL ||
+        (body->as.block = block(p)) == NULL) {
+        return NULL;
+    }
+    arm->body = body;
+    otherwise = new_stmt(p, STMT_BLOCK, peek(p));
+    if (!accept(p, TOKEN_ELSE)) {
+        otherwise->as.block = node(p, sizeof *otherwise->as.block);
+        otherwise->as.block->pos = otherwise->pos;
+        otherwise->as.block->end = otherwise->pos;
+    } else if (check(p, TOKEN_IF)) {
+        struct stmt *rest = if_statement(p);
+        if (rest == NULL) {
+            return NULL;
+        }
+        otherwise->as.block = block_of(p, rest);
+    } else if ((otherwise->as.block = block(p)) == NULL) {
+        return NULL;
+    }
+    s->as.switch_stmt.arms = arm;
+    s->as.switch_stmt.count = 1;
+    s->as.switch_stmt.otherwise = otherwise;
+    s->as.switch_stmt.otherwise_at = 1;
+    return s;
+}
+
 static struct stmt *if_statement(struct parser *p)
 {
     const struct token *t = next(p);
-    struct stmt *s = new_stmt(p, STMT_IF, t);
+    struct stmt *s;
     struct list branches = {NULL, 0, 0, sizeof(struct if_branch)};
 
+    if (check(p, TOKEN_LET)) {
+        return if_let(p, t);
+    }
+    s = new_stmt(p, STMT_IF, t);
     for (;;) {
         struct if_branch b;
         if ((b.cond = condition(p)) == NULL || (b.body = block(p)) == NULL) {
@@ -1293,6 +1386,17 @@ static struct stmt *if_statement(struct parser *p)
         }
         list_push(&branches, &b);
         if (!accept(p, TOKEN_ELSE)) {
+            break;
+        }
+        /* `else if let` ends the chain with an `if let`, which holds the
+           rest of it. */
+        if (check(p, TOKEN_IF) && peek_at(p, 1)->kind == TOKEN_LET) {
+            struct stmt *rest = if_statement(p);
+            if (rest == NULL) {
+                free(branches.data);
+                return NULL;
+            }
+            s->as.if_chain.else_body = block_of(p, rest);
             break;
         }
         if (!accept(p, TOKEN_IF)) {
@@ -1489,7 +1593,17 @@ static struct stmt *statement(struct parser *p)
                     return NULL;
                 }
             } else {
-                if ((arm.value = expression(p)) == NULL ||
+                /* `Circle c =>` binds the fields of a case of a variant
+                   to c. The case is a name, which the checker reads. */
+                if (check(p, TOKEN_IDENT) &&
+                    peek_at(p, 1)->kind == TOKEN_IDENT &&
+                    peek_at(p, 2)->kind == TOKEN_FAT_ARROW) {
+                    arm.value = new_expr(p, EXPR_NAME, peek(p));
+                    expect_name(p, &arm.value->as.name);
+                    arm.binds_pos = pos_of(peek(p));
+                    expect_name(p, &arm.binds);
+                }
+                if ((arm.value == NULL && (arm.value = expression(p)) == NULL) ||
                     !expect(p, TOKEN_FAT_ARROW) ||
                     (arm.body = arm_body(p)) == NULL) {
                     free(arms.data);
@@ -2115,6 +2229,73 @@ static struct item *class_item(struct parser *p, struct item *it)
     return expect(p, TOKEN_RBRACE) ? it : NULL;
 }
 
+/* DESIGN: a variant body holds its cases and nothing else. A case is a
+   name and, in braces, the fields it carries, each a name and a type. A
+   variant is a struct, so no function, constant, default or bitfield
+   stands in it. */
+static struct item *variant_item(struct parser *p, struct item *it)
+{
+    struct list cases = {NULL, 0, 0, sizeof(struct variant_case)};
+
+    next(p);
+    it->kind = ITEM_VARIANT;
+    if (!expect_name(p, &it->name)) {
+        return NULL;
+    }
+    if (is_word(p, peek(p), "align")) {
+        next(p);
+        if (!expect(p, TOKEN_LPAREN) || (it->align = expression(p)) == NULL ||
+            !expect(p, TOKEN_RPAREN)) {
+            return NULL;
+        }
+    }
+    if (!expect(p, TOKEN_LBRACE)) {
+        return NULL;
+    }
+    while (!check(p, TOKEN_RBRACE) && !check(p, TOKEN_EOF)) {
+        struct variant_case one;
+        memset(&one, 0, sizeof one);
+        one.doc = doc_before(p, TOKEN_DOC);
+        doc_before(p, TOKEN_NOTE);
+        one.pos = pos_of(peek(p));
+        if (!expect_name(p, &one.name)) {
+            free(cases.data);
+            return NULL;
+        }
+        if (accept(p, TOKEN_LBRACE)) {
+            struct list fields = {NULL, 0, 0, sizeof(struct param)};
+            while (!check(p, TOKEN_RBRACE) && !check(p, TOKEN_EOF)) {
+                struct param field;
+                memset(&field, 0, sizeof field);
+                field.doc = doc_before(p, TOKEN_DOC);
+                field.note = doc_before(p, TOKEN_NOTE);
+                field.pos = pos_of(peek(p));
+                if (!expect_name(p, &field.name) || !expect(p, TOKEN_COLON) ||
+                    (field.type = type(p)) == NULL) {
+                    free(fields.data);
+                    free(cases.data);
+                    return NULL;
+                }
+                list_push(&fields, &field);
+                if (!accept(p, TOKEN_COMMA)) {
+                    break;
+                }
+            }
+            one.fields = list_finish(p, &fields, &one.field_count);
+            if (!expect(p, TOKEN_RBRACE)) {
+                free(cases.data);
+                return NULL;
+            }
+        }
+        list_push(&cases, &one);
+        if (!accept(p, TOKEN_COMMA)) {
+            break;
+        }
+    }
+    it->cases = list_finish(p, &cases, &it->case_count);
+    return expect(p, TOKEN_RBRACE) ? it : NULL;
+}
+
 static struct item *item(struct parser *p)
 {
     const struct token *start = peek(p);
@@ -2172,12 +2353,13 @@ static struct item *item(struct parser *p)
         return NULL;
     }
     /* DESIGN: packed and align are contextual words. packed is one only
-       directly before struct or union, and align only between the name of
-       a struct or union and its opening brace. */
+       directly before struct, union or variant, and align only between
+       the name of one of them and its opening brace. */
     if (is_word(p, peek(p), "packed") &&
         (peek_at(p, 1)->kind == TOKEN_STRUCT ||
          peek_at(p, 1)->kind == TOKEN_UNION ||
-         peek_at(p, 1)->kind == TOKEN_CLASS)) {
+         peek_at(p, 1)->kind == TOKEN_CLASS ||
+         peek_at(p, 1)->kind == TOKEN_VARIANT)) {
         next(p);
         it->packed = true;
     }
@@ -2278,6 +2460,8 @@ static struct item *item(struct parser *p)
     }
     case TOKEN_CLASS:
         return class_item(p, it);
+    case TOKEN_VARIANT:
+        return variant_item(p, it);
     case TOKEN_ENUM: {
         struct list values = {NULL, 0, 0, sizeof(struct param)};
         next(p);

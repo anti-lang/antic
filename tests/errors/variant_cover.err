@@ -1,0 +1,4 @@
+variant_cover.anti:15:2: error: this `switch` on `Shape` has no arm for `Square`, `Empty`
+variant_cover.anti:24:2: error: this `switch` on `Shape` has no arm for `Circle`
+variant_cover.anti:36:4: error: `fallthrough` into an arm that binds the fields of `Circle`
+variant_cover.anti:47:9: error: case `Empty` of `Shape` has no fields to bind

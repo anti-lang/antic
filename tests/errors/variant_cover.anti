@@ -1,0 +1,50 @@
+//! A `switch` on a variant without `else` names every case, and the
+//! message names each case it misses. An arm binds the fields of a case
+//! that has some, and `fallthrough` never enters an arm that binds.
+
+variant Shape
+{
+	Circle { r: f32 },
+	Square { side: f32 },
+	Empty,
+}
+
+fn one_arm(s: Shape) -> f32
+{
+	let a: f32 = 0.0;
+	switch s {
+		Circle c => a = c.r,
+	}
+	return a;
+}
+
+fn two_arms(s: Shape) -> f32
+{
+	let a: f32 = 0.0;
+	switch s {
+		Empty => a = 1.0,
+		Square q => a = q.side,
+	}
+	return a;
+}
+
+fn into_binding(s: Shape) -> f32
+{
+	let a: f32 = 0.0;
+	switch s {
+		Empty => {
+			fallthrough;
+		},
+		Circle c => a = c.r,
+		else => a = 2.0,
+	}
+	return a;
+}
+
+fn nothing_to_bind(s: Shape)
+{
+	switch s {
+		Empty e => { },
+		else => { },
+	}
+}

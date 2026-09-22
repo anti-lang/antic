@@ -1,0 +1,63 @@
+//! A library for C whose signatures name a variant. The header writes the
+//! tags of each variant as an enum, and the variant as a struct of the tag
+//! and a union of its cases, which C builds and reads.
+
+/// A shape of the plane.
+export variant Shape
+{
+	/// A circle of radius `r`.
+	Circle { r: f32 },
+	Rect { w: f32, h: f32 },
+	Empty,
+}
+
+/// A shape and its count, held by value.
+export struct Tile
+{
+	shape: Shape,
+	count: i32,
+}
+
+/// A mark on a line, packed.
+export packed variant Mark
+{
+	At { x: i32 },
+	Off,
+}
+
+/// A variant on a boundary of sixteen bytes.
+export variant Wide align(16)
+{
+	One { a: u8 },
+	Two,
+}
+
+/// The area of a shape.
+export fn shape_area(s: Shape) -> f32
+{
+	let a: f32 = 0.0;
+	switch s {
+		Circle c => a = 3.0 * c.r * c.r,
+		Rect x => a = x.w * x.h,
+		Empty => a = 0.0,
+	}
+	return a;
+}
+
+/// A circle of radius `r`.
+export fn shape_circle(r: f32) -> Shape
+{
+	return Shape.Circle { r: r };
+}
+
+/// The shape scaled by `k`, counted twice.
+export fn shape_tile(s: Shape, k: f32) -> Tile
+{
+	let scaled = s;
+	switch s {
+		Circle c => scaled = Shape.Circle { r: c.r * k },
+		Rect x => scaled = Shape.Rect { w: x.w * k, h: x.h * k },
+		Empty => scaled = Shape.Empty,
+	}
+	return Tile { shape: scaled, count: 2 };
+}

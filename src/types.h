@@ -50,7 +50,18 @@ enum type_kind {
        the struct's. It carries no module and no name. Two tuples of the
        same elements in the same order are one type, so the elements
        intern it. */
-    TYPE_TUPLE
+    TYPE_TUPLE,
+    /* DESIGN: a variant is a struct of a tag and a union of its cases,
+       with C layout. Its fields are the ones C sees. `tag` has the enum
+       of its cases, and `u` is a union with one struct per case that has
+       fields, named by the case. A variant whose cases have no fields
+       has no `u`. base is the enum of the tags. Its values number the
+       cases from 0 in the order of the declaration. params holds the
+       struct of each case in that order, NULL for a case without fields,
+       and param_count is the number of cases. Every rule of layout,
+       passing and returning is the struct's, so the passes after the
+       checker see a struct. */
+    TYPE_VARIANT
 };
 
 struct struct_field {
@@ -340,6 +351,23 @@ struct type *types_tuple(struct types *types, struct type **elements,
                          size_t count);
 struct type *types_struct(struct types *types, struct name module,
                           struct name name);
+/* The name of the field of a variant that holds its tag, and of the one
+   that holds the union of its cases. */
+#define VARIANT_TAG "tag"
+#define VARIANT_UNION "u"
+
+/* Give the variant v its tag of type tag and the union of the structs
+   of its cases. payloads[i] is the struct of case i, or NULL for a case
+   without fields. */
+void types_set_cases(struct types *types, struct type *v, struct type *tag,
+                     struct type **payloads, size_t count);
+/* Read base and params of the variant v back from its fields, as a
+   library file carries them. False when the fields are not those of a
+   variant. */
+bool types_cases_from_fields(struct types *types, struct type *v);
+/* The index of the case name of the variant v, or -1. */
+int types_case_index(const struct type *v, const struct name *name);
+
 /* A named integer type over base. Each call returns a distinct type. */
 struct type *types_enum(struct types *types, struct name module,
                         struct name name, struct type *base);

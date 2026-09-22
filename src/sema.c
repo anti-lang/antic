@@ -425,6 +425,7 @@ static struct type *array_of(struct checker *c, struct expr *e,
 }
 
 static struct type *resolve_type(struct checker *c, struct type_expr *t);
+static const struct name *case_name(const struct type *v, size_t index);
 static struct type *error_class(struct checker *c, struct pos pos);
 static const struct type *inherited(const struct type *t);
 
@@ -855,6 +856,11 @@ static bool is_place(const struct expr *e)
                (base->kind == TYPE_ARRAY && is_place(e->as.index.base));
     case EXPR_FIELD:
         base = e->as.field.base->type;
+        /* The tag of a variant changes with the whole value alone. */
+        if ((base->kind == TYPE_POINTER ? base->element : base)->kind ==
+            TYPE_VARIANT) {
+            return false;
+        }
         return base->kind == TYPE_POINTER ||
                (type_has_fields(base) && is_place(e->as.field.base));
     default:
@@ -2006,6 +2012,51 @@ static bool is_float_literal(const struct expr *e)
     return e->kind == EXPR_FLOAT;
 }
 
+/* DESIGN: `v is Shape.Circle` tests the tag of v. The case is named by
+   its variant, which is the type of v, as a literal names it. */
+static struct type *check_variant_test(struct checker *c, struct expr *e,
+                                       struct type *from)
+{
+    const struct type_expr *target = e->as.cast.type;
+    const struct type *named = NULL;
+    const struct name *which;
+    int index;
+
+    if (target->kind != TYPEX_NAMED || target->module.length == 0) {
+        error_at(c, e->pos, "`is` on `%s` names one of its cases, as "
+                 "`%s.%.*s`", tn(from), tn(from),
+                 (int)case_name(from, 0)->length, case_name(from, 0)->text);
+        return builtin(c, TYPE_ERROR);
+    }
+    if (target->member.length > 0) {
+        named = imported_struct(c, &target->module, &target->name,
+                                target->pos);
+        if (is_error((struct type *)named)) {
+            return builtin(c, TYPE_ERROR);
+        }
+        which = &target->member;
+    } else {
+        const struct symbol *sym = lookup(c, &target->module);
+        named = sym != NULL && sym->kind == SYMBOL_STRUCT ? sym->type : NULL;
+        which = &target->name;
+    }
+    if (named != from) {
+        error_at(c, e->pos, "`%.*s.%.*s` is not a case of `%s`",
+                 (int)target->module.length, target->module.text,
+                 (int)target->name.length, target->name.text, tn(from));
+        return builtin(c, TYPE_ERROR);
+    }
+    index = types_case_index(from, which);
+    if (index < 0) {
+        error_at(c, e->pos, "`%s` has no case `%.*s`", tn(from),
+                 (int)which->length, which->text);
+        return builtin(c, TYPE_ERROR);
+    }
+    e->as.cast.variant_case = (uint32_t)index + 1;
+    e->as.cast.target = from;
+    return builtin(c, TYPE_BOOL);
+}
+
 static struct type *check_cast(struct checker *c, struct expr *e)
 {
     const struct type_expr *target = e->as.cast.type;
@@ -2018,8 +2069,19 @@ static struct type *check_cast(struct checker *c, struct expr *e)
                 is_float_literal(operand)
             ? check_expr(c, operand, builtin(c, TYPE_F32))
             : check_expr(c, operand, NULL);
-    struct type *to = resolve_type(c, e->as.cast.type);
+    struct type *to;
 
+    if (e->as.cast.test && !is_error(from) && from->kind == TYPE_VARIANT) {
+        return check_variant_test(c, e, from);
+    }
+    if (target->kind == TYPEX_NAMED && target->member.length > 0) {
+        if (!is_error(from)) {
+            error_at(c, e->pos, "`is` names a case on a variant alone, "
+                     "found `%s`", tn(from));
+        }
+        return builtin(c, TYPE_ERROR);
+    }
+    to = resolve_type(c, e->as.cast.type);
     if (is_error(from) || is_error(to)) {
         return builtin(c, TYPE_ERROR);
     }
@@ -3659,6 +3721,175 @@ static struct item *find_member(const struct type *t, const struct name *name)
 /* A type name on the left of a dot reaches the namespace of that type.
    It names a value of an enum, a constant of a body, or a function.
    `T.f(&v, args)` calls a function with `self` written out. */
+static bool check_field_inits(struct checker *c, struct expr *e,
+                              struct field_init *inits, size_t count,
+                              const struct struct_field *fields,
+                              size_t field_count, const char *type_name,
+                              bool skip_missing);
+
+/* The text `a.b`, for the names the checker gives the parts of a
+   variant. */
+static struct name dotted(struct checker *c, const struct name *a,
+                          const struct name *b)
+{
+    char *text = arena_alloc(c->arena, a->length + b->length + 2);
+    struct name out;
+
+    memcpy(text, a->text, a->length);
+    text[a->length] = '.';
+    memcpy(text + a->length + 1, b->text, b->length);
+    out.text = text;
+    out.length = a->length + b->length + 1;
+    return out;
+}
+
+/* DESIGN: the tag of a variant is an enum named `T.tag` over the
+   smallest unsigned integer that holds the number of its cases. Its
+   values number the cases from 0 in the order of the declaration. Each
+   case with fields is a struct named `T.Case` with C layout, which the
+   union of the variant holds. No program names either, and a message
+   does. packed applies to the structs of the cases as it does to the
+   variant, as `#pragma pack` in C covers the definitions inside. */
+static void declare_cases(struct checker *c, struct item *it)
+{
+    static const struct name tag_word = {VARIANT_TAG, sizeof VARIANT_TAG - 1};
+    struct type *v = it->symbol->type;
+    size_t count = it->case_count;
+    struct struct_field *values =
+        arena_alloc(c->arena, (count + 1) * sizeof *values);
+    struct type **payloads =
+        arena_alloc(c->arena, (count + 1) * sizeof *payloads);
+    struct type *tag;
+    size_t i;
+    size_t j;
+    size_t k;
+
+    if (count == 0) {
+        error_at(c, it->name_pos, "variant `%.*s` has no case",
+                 (int)it->name.length, it->name.text);
+    }
+    tag = types_enum(c->types, c->module_name, dotted(c, &it->name, &tag_word),
+                     builtin(c, count <= UINT8_MAX    ? TYPE_U8
+                                : count <= UINT16_MAX ? TYPE_U16
+                                                      : TYPE_U32));
+    for (i = 0; i < count; i++) {
+        const struct variant_case *one = &it->cases[i];
+        memset(&values[i], 0, sizeof values[i]);
+        values[i].name = one->name;
+        values[i].pos = one->pos;
+        values[i].doc = one->doc;
+        values[i].type = tag;
+        values[i].number = i;
+        for (k = 0; k < i; k++) {
+            if (same_name(&values[k].name, &one->name)) {
+                error_at(c, one->pos, "variant `%.*s` has two cases named "
+                         "`%.*s`", (int)it->name.length, it->name.text,
+                         (int)one->name.length, one->name.text);
+                break;
+            }
+        }
+    }
+    types_set_fields(c->types, tag, values, count);
+    v->packed = it->packed;
+    if (it->align != NULL) {
+        v->align = alignment(c, it->align);
+    }
+    for (i = 0; i < count; i++) {
+        const struct variant_case *one = &it->cases[i];
+        struct struct_field *fields;
+        payloads[i] = NULL;
+        if (one->field_count == 0) {
+            continue;
+        }
+        fields = arena_alloc(c->arena, one->field_count * sizeof *fields);
+        for (j = 0; j < one->field_count; j++) {
+            memset(&fields[j], 0, sizeof fields[j]);
+            fields[j].name = one->fields[j].name;
+            fields[j].pos = one->fields[j].pos;
+            fields[j].doc = one->fields[j].doc;
+            fields[j].vis = VIS_PUB;
+            c->target_sized = true;
+            fields[j].type = resolve_type(c, one->fields[j].type);
+            c->target_sized = false;
+            for (k = 0; k < j; k++) {
+                if (same_name(&fields[k].name, &fields[j].name)) {
+                    error_at(c, fields[j].pos, "case `%.*s` of `%.*s` has two "
+                             "fields named `%.*s`", (int)one->name.length,
+                             one->name.text, (int)it->name.length,
+                             it->name.text, (int)fields[j].name.length,
+                             fields[j].name.text);
+                    break;
+                }
+            }
+        }
+        payloads[i] = types_struct(c->types, c->module_name,
+                                   dotted(c, &it->name, &one->name));
+        payloads[i]->packed = it->packed;
+        types_set_fields(c->types, payloads[i], fields, one->field_count);
+    }
+    types_set_cases(c->types, v, tag, payloads, count);
+}
+
+/* The name of case index of the variant v. */
+static const struct name *case_name(const struct type *v, size_t index)
+{
+    return &v->base->fields[index].name;
+}
+
+/* DESIGN: `Shape.Empty` is the literal of a case without fields, and the
+   checker writes it as the literal `Shape.Empty { }`, so lowering reads
+   one form. A case with fields names them in braces. */
+static struct type *variant_case_value(struct checker *c, struct expr *e,
+                                       struct type *t)
+{
+    struct name name = e->as.field.name;
+    int index = types_case_index(t, &name);
+
+    if (index < 0) {
+        error_at(c, e->pos, "`%s` has no case `%.*s`", tn(t),
+                 (int)name.length, name.text);
+        return builtin(c, TYPE_ERROR);
+    }
+    if (t->params[index] != NULL) {
+        error_at(c, e->pos, "`%s.%.*s` has fields, which its literal names "
+                 "in braces", tn(t), (int)name.length, name.text);
+        return builtin(c, TYPE_ERROR);
+    }
+    e->kind = EXPR_STRUCT_LIT;
+    memset(&e->as.struct_lit, 0, sizeof e->as.struct_lit);
+    e->as.struct_lit.module = t->name;
+    e->as.struct_lit.name = name;
+    e->as.struct_lit.variant_case = (uint32_t)index + 1;
+    return t;
+}
+
+/* `Shape.Circle { r: 2.0 }`: the fields of the case against its struct,
+   which a case without fields does not have. */
+static struct type *variant_literal(struct checker *c, struct expr *e,
+                                    struct type *v, const struct name *name)
+{
+    int index = types_case_index(v, name);
+    const struct type *payload;
+    char written[160];
+
+    if (index < 0) {
+        error_at(c, e->pos, "`%s` has no case `%.*s`", tn(v),
+                 (int)name->length, name->text);
+        return builtin(c, TYPE_ERROR);
+    }
+    payload = v->params[index];
+    e->as.struct_lit.variant_case = (uint32_t)index + 1;
+    snprintf(written, sizeof written, "%s.%.*s", tn(v), (int)name->length,
+             name->text);
+    return check_field_inits(c, e, e->as.struct_lit.fields,
+                             e->as.struct_lit.field_count,
+                             payload != NULL ? payload->fields : NULL,
+                             payload != NULL ? payload->field_count : 0,
+                             written, false)
+               ? v
+               : builtin(c, TYPE_ERROR);
+}
+
 static struct type *check_type_member(struct checker *c, struct expr *e,
                                       struct type *t)
 {
@@ -3666,6 +3897,9 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     struct item *m = reached_member(t, name);
     const struct struct_field *f;
 
+    if (t->kind == TYPE_VARIANT) {
+        return variant_case_value(c, e, t);
+    }
     if (t->kind == TYPE_ENUM && (f = find_field(t, name)) != NULL) {
         e->as.field.enum_value = (uint32_t)(f - t->fields) + 1;
         return t;
@@ -3767,6 +4001,14 @@ static struct type *check_field(struct checker *c, struct expr *e)
             (uint8_t)(1u << (f - base->fields));
     }
     if ((s = struct_of(base)) != NULL) {
+        /* DESIGN: a variant gives its tag as a field, and `switch` alone
+           reads the fields of its cases. The union `u` is the header's,
+           and no program names it. */
+        if (s->kind == TYPE_VARIANT && !name_is(name, VARIANT_TAG)) {
+            error_at(c, e->pos, "a variant has the field `tag` alone, and "
+                     "`switch` reads the fields of its cases");
+            return builtin(c, TYPE_ERROR);
+        }
         if ((f = find_field(s, name)) == NULL && e->as.field.element) {
             /* `t.0` names the element `_0`, so the message names the
                number the program wrote. */
@@ -4843,6 +5085,29 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return e->type;
     case EXPR_STRUCT_LIT: {
         struct name *name = &e->as.struct_lit.name;
+        const struct symbol *named;
+        /* A literal the checker wrote from `Shape.Empty` is complete. */
+        if (e->as.struct_lit.variant_case != 0 && e->type != NULL) {
+            return e->type;
+        }
+        /* `geo.Shape.Circle { }` and `Shape.Circle { }` name a case. */
+        if (e->as.struct_lit.member.length > 0) {
+            t = imported_struct(c, &e->as.struct_lit.module, name, e->pos);
+            if (is_error(t)) {
+                return t;
+            }
+            if (t->kind != TYPE_VARIANT) {
+                error_at(c, e->pos, "`%s` is not a variant", tn(t));
+                return builtin(c, TYPE_ERROR);
+            }
+            return variant_literal(c, e, t, &e->as.struct_lit.member);
+        }
+        if (e->as.struct_lit.module.length > 0 &&
+            (named = lookup(c, &e->as.struct_lit.module)) != NULL &&
+            named->kind == SYMBOL_STRUCT && named->type != NULL &&
+            named->type->kind == TYPE_VARIANT) {
+            return variant_literal(c, e, named->type, name);
+        }
         if (e->as.struct_lit.module.length > 0) {
             t = imported_struct(c, &e->as.struct_lit.module, name, e->pos);
             if (is_error(t)) {
@@ -4859,6 +5124,11 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             } else {
                 t = sym->type;
             }
+        }
+        if (t->kind == TYPE_VARIANT) {
+            error_at(c, e->pos, "a literal of variant `%s` names one of its "
+                     "cases", tn(t));
+            return builtin(c, TYPE_ERROR);
         }
         if (singleton_type(t) && checking_class(c) != t) {
             error_at(c, e->pos, "`%s` is a singleton, and `%s.get()` gives "
@@ -5723,6 +5993,9 @@ static bool eval_const(struct checker *c, struct expr *e,
         if (s->is_union) {
             return fail_const(c, e, "a union");
         }
+        if (s->kind == TYPE_VARIANT) {
+            return fail_const(c, e, "a variant");
+        }
         out->kind = CONST_STRUCT;
         out->as.aggregate.count = s->field_count;
         out->as.aggregate.items =
@@ -5915,6 +6188,12 @@ static bool stmt_returns(const struct stmt *s)
     if (s->kind == STMT_RETURN || s->kind == STMT_FAIL) {
         return true;
     }
+    /* `if let` is an `if` with an `else`, whose two blocks are the arm
+       and the `else` of its switch. */
+    if (s->kind == STMT_SWITCH && s->as.switch_stmt.if_let) {
+        return block_returns(s->as.switch_stmt.arms[0].body->as.block) &&
+               block_returns(s->as.switch_stmt.otherwise->as.block);
+    }
     if (s->kind == STMT_IF && s->as.if_chain.else_body != NULL) {
         for (i = 0; i < s->as.if_chain.count; i++) {
             if (!block_returns(s->as.if_chain.branches[i].body)) {
@@ -5951,6 +6230,10 @@ static bool stmt_leaves(const struct stmt *s)
         return true;
     case STMT_BLOCK:
         return block_leaves(s->as.block);
+    case STMT_SWITCH:
+        return s->as.switch_stmt.if_let &&
+               block_leaves(s->as.switch_stmt.arms[0].body->as.block) &&
+               block_leaves(s->as.switch_stmt.otherwise->as.block);
     case STMT_IF:
         if (s->as.if_chain.else_body == NULL) {
             return false;
@@ -6165,6 +6448,12 @@ static void check_assign(struct checker *c, struct stmt *s)
             return;
         }
     }
+    if (target->kind == EXPR_FIELD &&
+        struct_of(target->as.field.base->type) != NULL &&
+        struct_of(target->as.field.base->type)->kind == TYPE_VARIANT) {
+        error_at(c, target->pos, "the `tag` of a variant is read-only");
+        return;
+    }
     if (!is_place(target) ||
         (target->kind == EXPR_INDEX &&
          target->as.index.base->type->kind == TYPE_STR)) {
@@ -6222,6 +6511,105 @@ static void check_switch_covers(struct checker *c, const struct stmt *s,
         text_appendf(&missing, "%s`%.*s`", found++ > 0 ? ", " : "",
                      (int)over->fields[i].name.length,
                      over->fields[i].name.text);
+    }
+    if (found > 0) {
+        error_at(c, s->pos, "this `switch` on `%s` has no arm for %s",
+                 tn((struct type *)over), text_cstr(&missing));
+    }
+    text_free(&missing);
+}
+
+/* DESIGN: an arm of a `switch` on a variant names one of its cases. It
+   may bind the fields of that case to a name, which holds a copy of them
+   in the arm alone. Returns whether the arm opened the scope of that
+   name, which the caller closes after the body. */
+static bool check_variant_arm(struct checker *c, struct stmt *s, size_t index,
+                              const struct type *over, struct scope *scope)
+{
+    struct switch_arm *arm = &s->as.switch_stmt.arms[index];
+    int found;
+    size_t j;
+
+    if (arm->value->kind != EXPR_NAME) {
+        error_at(c, arm->pos, "an arm of a `switch` on `%s` names one of "
+                 "its cases", tn(over));
+        return false;
+    }
+    found = types_case_index(over, &arm->value->as.name);
+    if (found < 0) {
+        error_at(c, arm->pos, "`%s` has no case `%.*s`", tn(over),
+                 (int)arm->value->as.name.length, arm->value->as.name.text);
+        return false;
+    }
+    for (j = 0; j < index; j++) {
+        if (s->as.switch_stmt.arms[j].variant_case == (uint32_t)found + 1) {
+            error_at(c, arm->pos, "this case already has an arm");
+            break;
+        }
+    }
+    arm->variant_case = (uint32_t)found + 1;
+    arm->value->type = over->base;
+    if (arm->binds.length == 0) {
+        return false;
+    }
+    if (over->params[found] == NULL) {
+        error_at(c, arm->binds_pos, "case `%.*s` of `%s` has no fields to "
+                 "bind", (int)arm->value->as.name.length,
+                 arm->value->as.name.text, tn(over));
+        return false;
+    }
+    enter_scope(c, scope);
+    arm->bound = declare(c, SYMBOL_LOCAL, &arm->binds, arm->binds_pos,
+                         "`%.*s` is already declared in this block");
+    if (arm->bound != NULL) {
+        arm->bound->type = over->params[found];
+    }
+    return true;
+}
+
+/* The `fallthrough;` that ends an arm enters the arm at position next,
+   which binds nothing. */
+static void refuse_fallthrough_binding(struct checker *c, const struct stmt *s,
+                                       size_t next)
+{
+    const struct switch_arm *arm;
+
+    if (s->as.switch_stmt.otherwise != NULL &&
+        next == s->as.switch_stmt.otherwise_at) {
+        return;
+    }
+    if (s->as.switch_stmt.otherwise != NULL &&
+        next > s->as.switch_stmt.otherwise_at) {
+        next--;
+    }
+    arm = &s->as.switch_stmt.arms[next];
+    if (arm->binds.length > 0) {
+        error_at(c, c->fallthrough->pos, "`fallthrough` into an arm that "
+                 "binds the fields of `%.*s`", (int)arm->value->as.name.length,
+                 arm->value->as.name.text);
+    }
+}
+
+/* A switch on a variant without `else` names every case, and the message
+   names the ones it misses in the order of the declaration. */
+static void check_cases_covered(struct checker *c, const struct stmt *s,
+                                const struct type *over)
+{
+    struct text missing = {0};
+    size_t found = 0;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < over->param_count; i++) {
+        for (j = 0; j < s->as.switch_stmt.count &&
+                    s->as.switch_stmt.arms[j].variant_case != i + 1;
+             j++) {
+        }
+        if (j < s->as.switch_stmt.count) {
+            continue;
+        }
+        text_appendf(&missing, "%s`%.*s`", found++ > 0 ? ", " : "",
+                     (int)case_name(over, i)->length, case_name(over, i)->text);
     }
     if (found > 0) {
         error_at(c, s->pos, "this `switch` on `%s` has no arm for %s",
@@ -7005,8 +7393,15 @@ static void check_stmt(struct checker *c, struct stmt *s)
         struct symbol *equal = NULL;
         size_t arms = s->as.switch_stmt.count +
                       (s->as.switch_stmt.otherwise != NULL ? 1 : 0);
+        bool variant;
         size_t k;
         size_t j;
+        if (s->as.switch_stmt.if_let && !is_error(over) &&
+            over->kind != TYPE_VARIANT) {
+            error_at(c, s->as.switch_stmt.value->pos, "`if let` takes a "
+                     "variant, found `%s`", tn(over));
+            over = builtin(c, TYPE_ERROR);
+        }
         if (!is_error(over) && over->kind == TYPE_STR) {
             struct symbol *bound;
             equal = text_equal(c, s->as.switch_stmt.value->pos);
@@ -7021,21 +7416,32 @@ static void check_stmt(struct checker *c, struct stmt *s)
                 s->as.switch_stmt.bound = bound;
             }
         } else if (!is_error(over) && !type_is_integer(over) &&
-                   over->kind != TYPE_ENUM) {
+                   over->kind != TYPE_ENUM && over->kind != TYPE_VARIANT) {
             error_at(c, s->as.switch_stmt.value->pos,
-                     "`switch` takes an enum, an integer or a `str`, found "
-                     "`%s`", tn(over));
+                     "`switch` takes an enum, an integer, a `str` or a "
+                     "variant, found `%s`", tn(over));
             over = builtin(c, TYPE_ERROR);
         }
+        variant = !is_error(over) && over->kind == TYPE_VARIANT;
         for (k = 0, i = 0; k < arms; k++) {
             struct stmt *body;
             struct const_value v;
+            struct scope arm_scope;
+            bool scoped = false;
             if (s->as.switch_stmt.otherwise != NULL &&
                 k == s->as.switch_stmt.otherwise_at) {
                 body = s->as.switch_stmt.otherwise;
+            } else if (variant) {
+                body = s->as.switch_stmt.arms[i].body;
+                scoped = check_variant_arm(c, s, i, over, &arm_scope);
+                i++;
             } else {
                 struct switch_arm *arm = &s->as.switch_stmt.arms[i];
                 body = arm->body;
+                if (arm->binds.length > 0) {
+                    error_at(c, arm->binds_pos, "an arm binds the fields of "
+                             "a case in a `switch` on a variant alone");
+                }
                 if (require(c, arm->value, check_expr(c, arm->value, over),
                             over) &&
                     !is_error(over) && eval_const(c, arm->value, &v)) {
@@ -7056,25 +7462,38 @@ static void check_stmt(struct checker *c, struct stmt *s)
                 }
                 i++;
             }
-            c->fallthrough = sema_arm_fallthrough(body);
+            /* The block of an `if let` is no arm that `fallthrough`
+               leaves. */
+            c->fallthrough = s->as.switch_stmt.if_let
+                                 ? NULL
+                                 : sema_arm_fallthrough(body);
             if (c->fallthrough != NULL && k + 1 == arms) {
                 error_at(c, c->fallthrough->pos,
                          "`fallthrough` in the last arm");
+            } else if (c->fallthrough != NULL && variant) {
+                refuse_fallthrough_binding(c, s, k + 1);
             }
             check_stmt(c, body);
+            if (scoped) {
+                leave_scope(c, &arm_scope);
+            }
         }
         c->fallthrough = outer;
         if (s->as.switch_stmt.otherwise == NULL && !is_error(over) &&
             over->kind == TYPE_ENUM) {
             check_switch_covers(c, s, over);
         }
+        if (s->as.switch_stmt.otherwise == NULL && variant) {
+            check_cases_covered(c, s, over);
+        }
         return;
     }
     /* DESIGN: the switch above names the one `fallthrough;` of each arm
        that stands where the rule allows it, the last statement of the
-       arm's block. Every other one is refused here, inside a nested
-       block, an `if`, a loop or a `defer` as well. No arm binds a
-       variant's fields yet, so there is no such arm to refuse it into. */
+       arm's block. It refuses one into an arm that binds the fields of a
+       case, since nothing would fill them. Every other one is refused
+       here, inside a nested block, an `if`, a loop or a `defer` as
+       well. */
     case STMT_FALLTHROUGH:
         if (s != c->fallthrough) {
             error_at(c, s->pos, "`fallthrough` is allowed as the last "
@@ -7666,7 +8085,8 @@ static enum symbol_kind item_symbol_kind(enum item_kind kind)
     case ITEM_STRUCT:
     case ITEM_UNION:
     case ITEM_ENUM:
-    case ITEM_CLASS: return SYMBOL_STRUCT;
+    case ITEM_CLASS:
+    case ITEM_VARIANT: return SYMBOL_STRUCT;
     default: return SYMBOL_CONST;
     }
 }
@@ -8106,6 +8526,9 @@ bool sema_check(struct module *module, const char *module_name,
             it->symbol->type->kind = TYPE_CLASS;
             it->symbol->type->has_abstract = it->is_abstract;
             it->symbol->type->is_final = it->is_final;
+        } else if (it->kind == ITEM_VARIANT) {
+            it->symbol->type = types_struct(types, c.module_name, it->name);
+            it->symbol->type->kind = TYPE_VARIANT;
         } else if (it->kind == ITEM_ENUM) {
             /* DESIGN: the underlying type of an enum is c_int unless the
                declaration names one, as an unfixed C enum is an int. */
@@ -8212,6 +8635,12 @@ bool sema_check(struct module *module, const char *module_name,
             }
         }
         types_set_fields(types, it->symbol->type, values, it->param_count);
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL && it->kind == ITEM_VARIANT) {
+            declare_cases(&c, it);
+        }
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
@@ -8348,6 +8777,11 @@ bool sema_check(struct module *module, const char *module_name,
                      it->kind == ITEM_UNION ? "union" : "struct",
                      (int)it->name.length, it->name.text);
         }
+        if (it->symbol != NULL && it->kind == ITEM_VARIANT &&
+            types_find_cycle(it->symbol->type) != NULL) {
+            error_at(&c, it->name_pos, "variant `%.*s` contains itself",
+                     (int)it->name.length, it->name.text);
+        }
     }
 
     for (i = 0; i < module->item_count; i++) {
@@ -8412,7 +8846,8 @@ bool sema_check(struct module *module, const char *module_name,
         struct item *it = module->items[i];
         if (it->symbol != NULL &&
             (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
-             it->kind == ITEM_CLASS || it->kind == ITEM_ENUM)) {
+             it->kind == ITEM_CLASS || it->kind == ITEM_ENUM ||
+             it->kind == ITEM_VARIANT)) {
             it->symbol->type->item_exported = it->exported;
         }
     }
@@ -8871,6 +9306,7 @@ static bool c_representable(const struct type *t, bool field,
        for it. */
     case TYPE_STRUCT:
     case TYPE_CLASS:
+    case TYPE_VARIANT:
         if (t->item_exported || is_error_class(t) || types_is_flags(t)) {
             return true;
         }
@@ -9085,6 +9521,24 @@ static void check_export(struct checker *c, struct item *it)
                      (int)t->fields[0].name.length, t->fields[0].name.text,
                      it->kind == ITEM_UNION ? "union" : "struct",
                      (int)it->name.length, it->name.text);
+        }
+        return;
+    /* A variant crosses as the struct of its tag and the union of its
+       cases, so the fields of every case follow the export rule. */
+    case ITEM_VARIANT:
+        for (i = 0; i < t->param_count; i++) {
+            const struct type *payload = t->params[i];
+            for (j = 0; payload != NULL && j < payload->field_count; j++) {
+                snprintf(what, sizeof what, "the field `%.*s` of case `%.*s` "
+                         "of export variant `%.*s`",
+                         (int)payload->fields[j].name.length,
+                         payload->fields[j].name.text,
+                         (int)t->base->fields[i].name.length,
+                         t->base->fields[i].name.text,
+                         (int)it->name.length, it->name.text);
+                check_c_type(c, payload->fields[j].pos, what,
+                             payload->fields[j].type, true);
+            }
         }
         return;
     case ITEM_CONST:

@@ -11,10 +11,11 @@
    file. It stores enum values of types.h, sema.h and ir.h. These checks
    fail when one of them changes, and the version changes with it. */
 _Static_assert(TYPE_STRUCT == 24, "raise ANTL_VERSION, then update this");
+_Static_assert(TYPE_VARIANT == 28, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
-_Static_assert(TOKEN_KIND_COUNT == 163, "raise ANTL_VERSION, then update this");
+_Static_assert(TOKEN_KIND_COUNT == 164, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_RET == 79, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");

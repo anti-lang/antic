@@ -20,6 +20,7 @@ add_executable(antic_unit_tests
     unit/test_types.c
     unit/test_sema.c
     unit/test_nullable.c
+    unit/test_variant.c
     unit/test_ir.c
     unit/test_layout.c
     unit/test_lower.c
@@ -304,7 +305,8 @@ foreach(name IN ITEMS qualified_bodies qualified_chain qualified_single)
 endforeach()
 # The wrapping and saturating operators, mul_high and the flags form in
 # dev mode, whose checks trap on the plain operators and on none of these.
-foreach(name IN ITEMS wrapping saturating mul_high flags carry_chain)
+foreach(name IN ITEMS wrapping saturating mul_high flags carry_chain
+        variants)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -1262,6 +1264,26 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# A variant of a library: another module builds it, switches on it with
+# every case named, tests it with `is` and `if let`, and passes it back
+# inside a struct of the library.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME variant_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/variants"
+            "-DLIBRARIES=geo"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variants-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # The internal level: a module of the same package sees an internal item
 # of a library, and a module of another package does not.
 add_test(NAME internal_package
@@ -1571,7 +1593,7 @@ if(ANTIC_LLVM_AR)
 endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
-            failing tuples flags)
+            failing tuples flags variants)
         add_test(NAME clib_${case}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
@@ -1798,6 +1820,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "defaults|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/defaults.s,defaults.anti"
         "tuples|-S,-o,${LISTINGS}/tuples.s,tuples.anti"
         "switch_fallthrough|-S,-o,${LISTINGS}/switch_fallthrough.s,switch_fallthrough.anti"
+        "variant_cover|-S,-o,${LISTINGS}/variant_cover.s,variant_cover.anti"
         "switch_str|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/switch_str.s,switch_str.anti"
         "switch_str_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/switch_str_no_import.s,switch_str_no_import.anti"
         "hex_bytes|-S,-o,${LISTINGS}/hex_bytes.s,hex_bytes.anti"

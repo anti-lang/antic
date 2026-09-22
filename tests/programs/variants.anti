@@ -1,0 +1,174 @@
+//! A variant is a tag and a union of its cases, laid out by the C rules.
+//! A literal names its case, `switch` binds the fields of the case it
+//! takes, `if let` takes one case, `is` tests the tag and `tag` reads it.
+//! A variant is a value: a field, an element, a parameter and a result,
+//! passed and returned by value.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Shape
+{
+	Circle { r: f32 },
+	Square { side: f32 },
+	Empty,
+}
+
+/// A case with a wide field and one with a `str`.
+variant Token
+{
+	Number { value: i64 },
+	Word { text: str, weight: u8 },
+	End,
+}
+
+/// No case has a field, so the variant is its tag.
+variant Light { Red, Amber, Green }
+
+/// packed and align(N) apply as they do to a struct.
+packed variant Tight { Wide { x: i32 }, Nothing }
+variant Roomy align(16) { Byte { b: u8 }, Nothing }
+
+/// A case holds another variant by value.
+variant Layer
+{
+	Solid { shape: Shape, depth: int },
+	Hole,
+}
+
+struct Holder
+{
+	first: Shape,
+	count: int,
+}
+
+fn area(s: Shape) -> f32
+{
+	let a: f32 = 0.0;
+	switch s {
+		Circle c => a = 3.0 * c.r * c.r,
+		Square q => a = q.side * q.side,
+		Empty => a = 0.0,
+	}
+	return a;
+}
+
+fn scaled(s: Shape, k: f32) -> Shape
+{
+	if let Circle c = s {
+		return Shape.Circle { r: c.r * k };
+	} else if let Square q = s {
+		return Shape.Square { side: q.side * k };
+	} else {
+		return s;
+	}
+}
+
+fn describe(t: Token)
+{
+	switch t {
+		Number n => printf("number %lld\n".ptr, n.value),
+		Word w => printf("word %s %d\n".ptr, w.text.ptr, w.weight as c_int),
+		End => printf("end\n".ptr),
+	}
+}
+
+fn next(l: Light) -> Light
+{
+	let n = l;
+	switch l {
+		Red => n = Light.Green,
+		Green => n = Light.Amber,
+		else => n = Light.Red,
+	}
+	return n;
+}
+
+/// `fallthrough` enters an arm that binds nothing.
+fn weight(s: Shape) -> int
+{
+	let n = 0;
+	switch s {
+		Square => {
+			n += 1;
+			fallthrough;
+		},
+		Empty => n += 10,
+		Circle c => n = c.r as int,
+	}
+	return n;
+}
+
+fn depth(l: Layer) -> int
+{
+	switch l {
+		Solid s => return_area(s.shape, s.depth),
+		Hole => printf("hole\n".ptr),
+	}
+	return 0;
+}
+
+fn return_area(s: Shape, d: int)
+{
+	printf("solid %.1f %d\n".ptr, area(s) as f64, d as c_int);
+}
+
+fn main() -> int
+{
+	let s = Shape.Circle { r: 2.0 };
+	let q = Shape.Square { side: 3.0 };
+	let e = Shape.Empty;
+	let p = &q;
+
+	printf("size %d %d %d %d %d %d\n".ptr, size_of(Shape) as c_int,
+		size_of(Token) as c_int, size_of(Light) as c_int,
+		size_of(Tight) as c_int, size_of(Roomy) as c_int,
+		size_of(Layer) as c_int);
+	printf("area %.1f %.1f %.1f\n".ptr, area(s) as f64, area(q) as f64,
+		area(e) as f64);
+	printf("scaled %.1f %.1f %.1f\n".ptr, area(scaled(s, 2.0)) as f64,
+		area(scaled(q, 2.0)) as f64, area(scaled(e, 2.0)) as f64);
+	printf("tag %d %d %d\n".ptr, s.tag as c_int, q.tag as c_int,
+		e.tag as c_int);
+	printf("is %d %d %d %d\n".ptr, (s is Shape.Circle) as c_int,
+		(s is Shape.Square) as c_int, (e is Shape.Empty) as c_int,
+		(s.tag == q.tag) as c_int);
+	printf("pointer %d %.1f\n".ptr, p.tag as c_int, area(*p) as f64);
+
+	// The name an arm binds is a copy of the fields, so replacing the
+	// value in the arm leaves it as it was.
+	switch s {
+		Circle c => {
+			s = Shape.Empty;
+			printf("copy %.1f %d\n".ptr, c.r as f64, s.tag as c_int);
+		},
+		else => printf("wrong\n".ptr),
+	}
+	switch *p {
+		Square sq => printf("deref %.1f\n".ptr, sq.side as f64),
+		else => printf("wrong\n".ptr),
+	}
+
+	describe(Token.Number { value: 9000000000 });
+	describe(Token.Word { text: "anti", weight: 7 });
+	describe(Token.End);
+
+	let lights = [Light.Red, Light.Green, Light.Amber];
+	for l in lights {
+		printf("light %d %d\n".ptr, l.tag as c_int, next(l).tag as c_int);
+	}
+
+	let h = Holder { first: Shape.Square { side: 1.5 }, count: 2 };
+	let all = [Shape.Circle { r: 1.0 }, h.first, Shape.Empty];
+	let total: f32 = 0.0;
+	for x in all {
+		total += area(x);
+	}
+	printf("holder %.2f %.2f\n".ptr, area(h.first) as f64, total as f64);
+
+	printf("weight %d %d %d\n".ptr, weight(q) as c_int, weight(e) as c_int,
+		weight(Shape.Circle { r: 4.5 }) as c_int);
+
+	depth(Layer.Solid { shape: Shape.Square { side: 2.0 }, depth: 3 });
+	depth(Layer.Hole);
+	return 0;
+}

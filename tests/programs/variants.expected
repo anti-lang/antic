@@ -1,0 +1,19 @@
+exit 0
+size 8 32 1 5 16 24
+area 12.0 9.0 0.0
+scaled 48.0 36.0 0.0
+tag 0 1 2
+is 1 0 1 0
+pointer 1 9.0
+copy 2.0 2
+deref 3.0
+number 9000000000
+word anti 7
+end
+light 0 2
+light 2 1
+light 1 0
+holder 2.25 5.25
+weight 11 10 4
+solid 4.0 3
+hole
