@@ -384,6 +384,10 @@ static void put_type(struct writer *w, const struct type *t)
                     continue;
                 }
                 put_bytes(w, m->name.text, m->name.length);
+                /* The qualifier decides the table a body fills and
+                   the symbol it has, so an importing module builds
+                   the same tables. */
+                put_bytes(w, m->qualifier.text, m->qualifier.length);
                 put_type_ref(w, m->symbol->type);
                 put_u8(w, (uint8_t)((unsigned)m->contract |
                                     (unsigned)m->is_final << 4 |
@@ -1375,6 +1379,7 @@ static void read_types(struct reader *r)
                 memset(m, 0, sizeof *m);
                 memset(sym, 0, sizeof *sym);
                 m->name = get_name(r);
+                m->qualifier = get_name(r);
                 s->member_types[j] = get_u32(r);
                 marks = get_u8(r);
                 m->contract = (enum fn_contract)(marks & 15);
@@ -1466,25 +1471,19 @@ static void read_types(struct reader *r)
             }
         }
         /* DESIGN: a class of a library carries the public functions of
-           its body. The reader builds one item per function, with the
-           name `T.f` that its symbol has, so a call resolves and reaches
-           the symbol the library defines. */
+           its body. The reader builds one item per function. It has the
+           name `T.f` or `T.Q.f` of its symbol, so a call resolves and
+           reaches the symbol the library defines. */
         for (j = 0; j < s->member_count && !r->failed; j++) {
             struct item *m = s->members[j];
-            size_t length = s->s->name.length + 1 + m->name.length;
-            char *qualified = arena_alloc(r->arena, length + 1);
             if (s->member_types[j] >= count) {
                 damaged(r);
                 break;
             }
             m->symbol->type = r->table[s->member_types[j]];
-            memcpy(qualified, s->s->name.text, s->s->name.length);
-            qualified[s->s->name.length] = '.';
-            memcpy(qualified + s->s->name.length + 1, m->name.text,
-                   m->name.length);
-            qualified[length] = '\0';
-            m->symbol->name.text = qualified;
-            m->symbol->name.length = length;
+            m->symbol->name.text =
+                types_member_symbol(r->arena, &s->s->name, m);
+            m->symbol->name.length = strlen(m->symbol->name.text);
         }
         if (!r->failed && s->member_count > 0) {
             s->s->members = s->members;

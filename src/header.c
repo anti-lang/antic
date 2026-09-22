@@ -486,11 +486,14 @@ static void aggregate(struct text *out, const struct symbol *sym,
 }
 
 /* The public functions of the chain of t, base first, in table order. A
-   name that repeats replaces the entry it repeats, as the table does. */
+   name that repeats replaces the entry it repeats, as the table does. A
+   body qualified by an interface fills no entry here. One qualified by a
+   base replaces a plain body of its level, as types_body_table says. */
 static size_t chain_functions(const struct type *t, const struct item **out,
                               size_t limit)
 {
     size_t count = 0;
+    int pass;
     size_t i;
     size_t j;
 
@@ -500,20 +503,25 @@ static size_t chain_functions(const struct type *t, const struct item **out,
     if (t->kind == TYPE_CLASS) {
         count = chain_functions(t->base, out, limit);
     }
-    for (i = 0; i < t->member_count; i++) {
-        const struct item *m = t->members[i];
-        if (m->kind != ITEM_FN || !m->pub) {
-            continue;
-        }
-        for (j = 0; j < count; j++) {
-            if (out[j]->name.length == m->name.length &&
-                memcmp(out[j]->name.text, m->name.text, m->name.length) == 0) {
-                out[j] = m;
-                break;
+    for (pass = 0; pass < 2; pass++) {
+        enum body_table fills = pass == 0 ? BODY_PLAIN : BODY_BASE;
+        for (i = 0; i < t->member_count; i++) {
+            const struct item *m = t->members[i];
+            if (m->kind != ITEM_FN || !m->pub ||
+                types_body_table(t, m) != fills) {
+                continue;
             }
-        }
-        if (j == count && count < limit) {
-            out[count++] = m;
+            for (j = 0; j < count; j++) {
+                if (out[j]->name.length == m->name.length &&
+                    memcmp(out[j]->name.text, m->name.text,
+                           m->name.length) == 0) {
+                    out[j] = m;
+                    break;
+                }
+            }
+            if (j == count && count < limit) {
+                out[count++] = m;
+            }
         }
     }
     return count;
@@ -543,6 +551,13 @@ static void member_signature(struct text *out, const struct type *owner,
 
     if (pointer) {
         text_appendf(&inner, "(*%.*s)(", (int)m->name.length, m->name.text);
+    } else if (*prefix == '\0' && m->qualifier.length > 0 &&
+               types_body_table(owner, m) == BODY_BASE) {
+        /* A body qualified by a base has the symbol `T.Q.f`, so that
+           a plain body of its name keeps `T.f`. */
+        text_appendf(&inner, "%.*s_%.*s_%.*s(", (int)owner->name.length,
+                     owner->name.text, (int)m->qualifier.length,
+                     m->qualifier.text, (int)m->name.length, m->name.text);
     } else {
         text_appendf(&inner, "%s%.*s_%.*s(", prefix, (int)owner->name.length,
                      owner->name.text, (int)m->name.length, m->name.text);

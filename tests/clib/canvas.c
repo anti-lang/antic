@@ -10,8 +10,10 @@
 int main(void)
 {
     Square *s = (Square *)malloc(sizeof *s);
+    Stamp *stamp = (Stamp *)malloc(sizeof *stamp);
     Shape *base;
     Circle c;
+    Tile t;
     struct anti_Error *e;
 
     anti_Square_init(s);
@@ -31,5 +33,15 @@ int main(void)
     printf("%d %d\n", e == NULL, anti_Shape_area(&c.base));
     e = anti_Circle_construct(&c, 0);
     printf("%d\n", e == NULL);
+    /* Each qualified body fills the table of its own interface, and the
+       table of the class holds neither. */
+    anti_Stamp_init(stamp);
+    printf("%d %d\n", anti_Ink_colour(anti_Stamp_as_Ink(stamp)),
+           anti_Tint_colour(anti_Stamp_as_Tint(stamp), 3));
+    anti_Stamp_delete(stamp);
+    /* A body qualified by the base fills the table of the class and has
+       a symbol of its own. */
+    anti_Tile_init(&t);
+    printf("%d %d\n", anti_Shape_area(&t.base), Tile_Shape_area(&t));
     return 0;
 }

@@ -244,6 +244,150 @@ static inline void anti_Circle_move(Circle *self, int32_t dx, int32_t dy)
      ((const Circle_vtable *)self->base.base.vtable)->move(self, dx, dy);
 }
 
+typedef struct Tint Tint;
+typedef struct Tint_vtable {
+    const void *descriptor;
+    /* The seven functions of anti.rt.Object. They take and give Anti
+       values, so C reads their slots and does not call them. */
+    void *type_name;
+    void *to_text;
+    void *equals;
+    void *hash;
+    void *serialize;
+    void *destruct;
+    void *copy;
+    int32_t (*colour)(Tint *self, int32_t k);
+} Tint_vtable;
+
+/** A second ink, which takes a shade. */
+struct Tint {
+    anti_Object base;
+};
+
+extern const anti_descriptor anti_Tint_descriptor;
+/* Tint is abstract: no table and no init, because it has no complete value. */
+static inline void anti_Tint_delete(Tint *self)
+{
+    anti_rt_delete(self, &anti_Tint_descriptor);
+}
+static inline void anti_Tint_destroy(Tint *self)
+{
+    anti_rt_destroy(self, &anti_Tint_descriptor);
+}
+static inline Tint *anti_Tint_dup(Tint *self)
+{
+    return (Tint *)anti_rt_dup(self, &anti_Tint_descriptor);
+}
+
+/** The colour at the shade k. */
+int32_t Tint_colour(Tint *self, int32_t k);
+
+static inline int32_t anti_Tint_colour(Tint *self, int32_t k)
+{
+    return ((const Tint_vtable *)self->base.vtable)->colour(self, k);
+}
+
+typedef struct Stamp Stamp;
+typedef struct Stamp_vtable {
+    const void *descriptor;
+    /* The seven functions of anti.rt.Object. They take and give Anti
+       values, so C reads their slots and does not call them. */
+    void *type_name;
+    void *to_text;
+    void *equals;
+    void *hash;
+    void *serialize;
+    void *destruct;
+    void *copy;
+} Stamp_vtable;
+
+/** A stamp, which fills `colour` once for each ink. */
+struct Stamp {
+    anti_Object base;
+    Ink ink;   /* private */
+    Tint tint;   /* private */
+    int32_t shade;   /* private */
+};
+
+extern const anti_descriptor anti_Stamp_descriptor;
+extern const Stamp_vtable anti_Stamp_vtable;
+void anti_Stamp_init(Stamp *self);
+static inline void anti_Stamp_delete(Stamp *self)
+{
+    anti_rt_delete(self, &anti_Stamp_descriptor);
+}
+static inline void anti_Stamp_destroy(Stamp *self)
+{
+    anti_rt_destroy(self, &anti_Stamp_descriptor);
+}
+static inline Stamp *anti_Stamp_dup(Stamp *self)
+{
+    return (Stamp *)anti_rt_dup(self, &anti_Stamp_descriptor);
+}
+
+extern const Ink_vtable anti_Stamp_Ink_vtable;
+static inline Ink *anti_Stamp_as_Ink(Stamp *self)
+{
+    return &self->ink;
+}
+extern const Tint_vtable anti_Stamp_Tint_vtable;
+static inline Tint *anti_Stamp_as_Tint(Stamp *self)
+{
+    return &self->tint;
+}
+
+
+typedef struct Tile Tile;
+typedef struct Tile_vtable {
+    const void *descriptor;
+    /* The seven functions of anti.rt.Object. They take and give Anti
+       values, so C reads their slots and does not call them. */
+    void *type_name;
+    void *to_text;
+    void *equals;
+    void *hash;
+    void *serialize;
+    void *destruct;
+    void *copy;
+    int32_t (*area)(Tile *self);
+    void (*move)(Tile *self, int32_t dx, int32_t dy);
+} Tile_vtable;
+
+/** A tile, whose body of `area` names the base. */
+struct Tile {
+    Shape base;
+    int32_t side;   /* private */
+};
+
+extern const anti_descriptor anti_Tile_descriptor;
+extern const Tile_vtable anti_Tile_vtable;
+void anti_Tile_init(Tile *self);
+static inline void anti_Tile_delete(Tile *self)
+{
+    anti_rt_delete(self, &anti_Tile_descriptor);
+}
+static inline void anti_Tile_destroy(Tile *self)
+{
+    anti_rt_destroy(self, &anti_Tile_descriptor);
+}
+static inline Tile *anti_Tile_dup(Tile *self)
+{
+    return (Tile *)anti_rt_dup(self, &anti_Tile_descriptor);
+}
+
+int32_t Tile_Shape_area(Tile *self);
+/** Move the shape by dx and dy. */
+void Tile_move(Tile *self, int32_t dx, int32_t dy);
+
+static inline int32_t anti_Tile_area(Tile *self)
+{
+    return ((const Tile_vtable *)self->base.base.vtable)->area(self);
+}
+static inline void anti_Tile_move(Tile *self, int32_t dx, int32_t dy)
+{
+     ((const Tile_vtable *)self->base.base.vtable)->move(self, dx, dy);
+}
+
 #ifdef __cplusplus
 }
 #endif

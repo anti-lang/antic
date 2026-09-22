@@ -1,0 +1,6 @@
+qualified_calls.anti:63:2: error: `Hand` fills `draw` only for `Drawable`, `Card` and `Deck`, so the call is ambiguous, reach it through an interface
+qualified_calls.anti:64:2: error: `Hand` fills `draw` only for `Drawable`, `Card` and `Deck`, so the call is ambiguous, reach it through an interface
+qualified_calls.anti:65:14: error: `Hand` fills `draw` only for `Drawable`, `Card` and `Deck`, so the name is ambiguous, reach it through an interface
+qualified_calls.anti:66:2: error: `Hand` fills `draw` only for `Drawable`, `Card` and `Deck`, so the name is ambiguous, reach it through an interface
+qualified_calls.anti:67:2: error: `Hand` fills `read` only for `Readable`, so the call is ambiguous, reach it through an interface
+qualified_calls.anti:55:3: error: `Hand` fills `draw` only for `Drawable`, `Card` and `Deck`, so the call is ambiguous, reach it through an interface

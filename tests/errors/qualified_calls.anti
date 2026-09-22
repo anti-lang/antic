@@ -1,0 +1,72 @@
+//! A call on the class of a name that only qualified bodies fill is
+//! ambiguous, and the message names the interfaces. A call through a
+//! sub-object or an interface pointer names its table.
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class Drawable
+{
+	abstract fn draw(self);
+}
+
+abstract class Card
+{
+	abstract fn draw(self, n: int) -> int;
+}
+
+abstract class Deck
+{
+	abstract fn draw(self, n: int) -> int;
+}
+
+abstract class Readable
+{
+	abstract fn read(self) -> int;
+}
+
+class Hand
+{
+	implements dr: Drawable,
+	implements cd: Card,
+	implements dk: Deck,
+	implements rd: Readable,
+
+	concrete fn Drawable::draw(self)
+	{
+	}
+
+	concrete fn Card::draw(self, n: int) -> int
+	{
+		return n;
+	}
+
+	concrete fn Deck::draw(self, n: int) -> int
+	{
+		return n + 1;
+	}
+
+	concrete fn Readable::read(self) -> int
+	{
+		return 1;
+	}
+
+	pub fn inside(self)
+	{
+		self.draw();
+	}
+}
+
+fn main() -> int
+{
+	let h = Hand { };
+	let p = &h;
+	h.draw();
+	p.draw(1);
+	let bound = p.draw;
+	Hand.draw(&h);
+	p.read();
+	h.dr.draw();
+	let c: *Card = p;
+	printf("%d\n".ptr, (c.draw(1) + h.dk.draw(2) + h.rd.read()) as c_int);
+	return 0;
+}

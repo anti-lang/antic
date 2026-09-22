@@ -67,3 +67,40 @@ export class Circle
 		return 3 * self.radius * self.radius;
 	}
 }
+
+/// A second ink, which takes a shade.
+export abstract class Tint
+{
+	/// The colour at the shade k.
+	abstract fn colour(self, k: c_int) -> c_int;
+}
+
+/// A stamp, which fills `colour` once for each ink.
+export class Stamp
+{
+	implements ink: Ink,
+	implements tint: Tint,
+	shade: c_int = 2,
+
+	concrete fn Ink::colour(self) -> c_int
+	{
+		return 5;
+	}
+
+	concrete fn Tint::colour(self, k: c_int) -> c_int
+	{
+		return self.shade * k;
+	}
+}
+
+/// A tile, whose body of `area` names the base.
+export class Tile
+{
+	inherits Shape,
+	side: c_int = 3,
+
+	concrete fn Shape::area(self) -> c_int
+	{
+		return self.side * self.side;
+	}
+}

@@ -1,0 +1,117 @@
+//! The forms of qualified bodies that stay refused, and the tables a
+//! class leaves empty when a qualified body fills another one.
+
+abstract class Drawable
+{
+	abstract fn draw(self);
+}
+
+abstract class Card
+{
+	abstract fn draw(self, n: int) -> int;
+}
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+abstract class Flat
+{
+	inherits Shape,
+}
+
+abstract class Measured
+{
+	abstract fn area(self) -> int;
+}
+
+/* Two bodies for one interface. */
+class Twice
+{
+	implements dr: Drawable,
+
+	concrete fn Drawable::draw(self)
+	{
+	}
+
+	concrete fn Drawable::draw(self)
+	{
+	}
+}
+
+/* The class's own name means the unqualified form. */
+class Own
+{
+	implements dr: Drawable,
+
+	concrete fn draw(self)
+	{
+	}
+
+	concrete fn Own::draw(self)
+	{
+	}
+}
+
+/* Both bases name the one primary table. */
+class Level
+{
+	inherits Flat,
+
+	concrete fn Shape::area(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Flat::area(self) -> int
+	{
+		return 2;
+	}
+}
+
+/* The body for Card leaves the table of Drawable empty. */
+class Half
+{
+	implements dr: Drawable,
+	implements cd: Card,
+
+	concrete fn Card::draw(self, n: int) -> int
+	{
+		return n;
+	}
+}
+
+/* The body for Measured leaves the primary table empty. */
+class Hollow
+{
+	inherits Shape,
+	implements me: Measured,
+
+	concrete fn Measured::area(self) -> int
+	{
+		return 1;
+	}
+}
+
+/* The body qualified by the base fills the primary table, and no
+   interface has `area`, so the unqualified body fills nothing. */
+class Spare
+{
+	inherits Shape,
+
+	concrete fn Shape::area(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn area(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

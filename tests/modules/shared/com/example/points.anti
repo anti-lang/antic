@@ -54,6 +54,43 @@ pub class Crate
 	}
 }
 
+/// Something drawn.
+pub abstract class Drawable
+{
+	abstract fn draw(self) -> int;
+}
+
+/// Something dealt from.
+pub abstract class Dealt
+{
+	abstract fn draw(self, n: int) -> int;
+}
+
+/// A deck, which fills `draw` once for each interface.
+pub class Deck
+{
+	pub cards: int = 52,
+	implements drawn: Drawable,
+	implements dealt: Dealt,
+
+	concrete fn Drawable::draw(self) -> int
+	{
+		return self.cards;
+	}
+
+	concrete fn Dealt::draw(self, n: int) -> int
+	{
+		self.cards = self.cards - n;
+		return self.cards;
+	}
+
+	/// The count of cards left.
+	pub fn left(self) -> int
+	{
+		return self.cards;
+	}
+}
+
 /// An extent that a class of this module and one of the program hold.
 /// This module writes its one descriptor.
 pub struct Extent

@@ -425,7 +425,7 @@ let s = &c as *Serializable;
 s.serialize(&b);
 ```
 
-`implements name: Iface,` places the interface's table pointer and fields inside the object at a named field. `&c` converts to `*Serializable` implicitly. A `concrete fn` without a qualifier fills every table with that name. `use name: T,` is composition: `T`'s public names are reachable on the class and the class does not convert to `*T`.
+`implements name: Iface,` places the interface's table pointer and fields inside the object at a named field. `&c` converts to `*Serializable` implicitly. A `concrete fn` without a qualifier fills every table with that name that no qualified body fills. Two qualified bodies of one name fill the tables of two interfaces whose signatures differ, and `c.f()` on the class is ambiguous when only qualified bodies exist for `f`. `use name: T,` is composition: `T`'s public names are reachable on the class and the class does not convert to `*T`.
 
 Built.
 

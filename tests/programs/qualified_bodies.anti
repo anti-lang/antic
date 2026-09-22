@@ -1,0 +1,185 @@
+//! Qualified bodies. Two bodies of one name fill the tables of two
+//! interfaces whose signatures differ, and an unqualified body beside a
+//! qualified one fills every table of its name that no qualified body
+//! fills. A call through each interface pointer reaches the body of that
+//! table, and a call on the class reaches the unqualified body.
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class Drawable
+{
+	abstract fn draw(self);
+}
+
+abstract class Sketch
+{
+	abstract fn draw(self);
+}
+
+abstract class Card
+{
+	abstract fn draw(self, n: int) -> int;
+}
+
+/* Two qualified bodies of one name, one per interface. */
+class Hand
+{
+	implements dr: Drawable,
+	implements cd: Card,
+
+	pub size: int = 5,
+
+	concrete fn Drawable::draw(self)
+	{
+		printf("hand of %d\n".ptr, self.size as c_int);
+	}
+
+	concrete fn Card::draw(self, n: int) -> int
+	{
+		self.size = self.size - n;
+		return self.size;
+	}
+}
+
+/* The unqualified body fills Drawable and Sketch, and the qualified one
+   fills Card. */
+class Board
+{
+	implements dr: Drawable,
+	implements sk: Sketch,
+	implements cd: Card,
+
+	pub marks: int = 0,
+
+	concrete fn draw(self)
+	{
+		printf("board %d\n".ptr, self.marks as c_int);
+	}
+
+	concrete fn Card::draw(self, n: int) -> int
+	{
+		self.marks = self.marks + n;
+		return self.marks;
+	}
+}
+
+/* A qualified body wins in its table over an unqualified one of the same
+   signature. */
+class Pad
+{
+	implements dr: Drawable,
+	implements sk: Sketch,
+
+	concrete fn draw(self)
+	{
+		printf("pad plain\n".ptr);
+	}
+
+	concrete fn Sketch::draw(self)
+	{
+		printf("pad sketch\n".ptr);
+	}
+}
+
+/* A class below Board inherits its bodies, so its tables hold the same
+   functions. */
+class Easel
+{
+	inherits Board,
+}
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+abstract class Measured
+{
+	abstract fn area(self) -> int;
+}
+
+/* A body qualified by the base fills the primary table alone. */
+class Tile
+{
+	inherits Shape,
+
+	pub side: int = 2,
+
+	concrete fn Shape::area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+/* The body qualified by the base fills the primary table, and the
+   unqualified one beside it fills the table of Measured. */
+class Square
+{
+	inherits Shape,
+	implements me: Measured,
+
+	pub side: int = 3,
+
+	concrete fn Shape::area(self) -> int
+	{
+		return self.side * self.side;
+	}
+
+	concrete fn area(self) -> int
+	{
+		return self.side * 4;
+	}
+}
+
+fn show(d: *Drawable, s: *Sketch)
+{
+	d.draw();
+	s.draw();
+}
+
+fn main() -> int
+{
+	let h = alloc Hand { };
+	let hd: *Drawable = h;
+	let hc: *Card = h;
+	hd.draw();
+	printf("left %d\n".ptr, hc.draw(2) as c_int);
+	hd.draw();
+	h.dr.draw();
+	printf("left %d\n".ptr, h.cd.draw(1) as c_int);
+
+	let b = alloc Board { };
+	let bc: *Card = b;
+	b.draw();
+	printf("marks %d\n".ptr, bc.draw(4) as c_int);
+	show(b, b);
+	printf("marks %d\n".ptr, b.cd.draw(1) as c_int);
+
+	let p = Pad { };
+	p.draw();
+	show(&p, &p);
+
+	let e = alloc Easel { };
+	let eb: *Board = e;
+	let ec: *Card = e;
+	eb.draw();
+	printf("marks %d\n".ptr, ec.draw(7) as c_int);
+	show(e, e);
+
+	let t = alloc Tile { };
+	let ts: *Shape = t;
+	printf("tile %d %d\n".ptr, t.area() as c_int, ts.area() as c_int);
+
+	let s = alloc Square { };
+	let ss: *Shape = s;
+	let sm: *Measured = s;
+	let direct = Square { side: 5 };
+	printf("square %d %d %d %d\n".ptr, s.area() as c_int,
+		ss.area() as c_int, sm.area() as c_int, direct.area() as c_int);
+
+	delete(h);
+	delete(b);
+	delete(e);
+	delete(t);
+	delete(s);
+	return 0;
+}

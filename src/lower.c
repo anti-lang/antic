@@ -1297,12 +1297,14 @@ static const struct type *struct_of_expr(const struct expr *e)
 }
 
 /* Whether a bound function names one body. A `final` function and a
-   `final` class have no class below them to replace it. */
+   `final` class have no class below them to replace it. A plain body
+   beside one qualified by a base holds no entry of the primary table. */
 static bool bound_is_direct(const struct expr *e, const struct type *s)
 {
     const struct item *m = e->symbol != NULL ? e->symbol->item : NULL;
 
-    return s == NULL || s->is_final || (m != NULL && m->is_final);
+    return s == NULL || s->is_final ||
+           (m != NULL && (m->is_final || !types_holds_entry(s, m)));
 }
 
 /* DESIGN: the table of a class holds the class descriptor at entry 0 and
@@ -1389,49 +1391,25 @@ static void table_of(const struct type *t, struct table *out)
             table_add(out, name, NULL, root_names[i]);
         }
     }
+    /* DESIGN: `concrete fn I::f` fills the table of I alone, and the
+       primary table keeps the inherited entry or a plain body. A body
+       qualified by a base fills the primary table. It wins over a plain
+       body of the same level, so it is added after it. The rule is
+       types_body_table's. */
     for (i = 0; i < t->member_count; i++) {
         const struct item *m = t->members[i];
-        /* DESIGN: `concrete fn I::f` fills the table of I alone. The
-           primary table of the class keeps whatever it had, which is the
-           inherited entry or an unqualified body. The class's own name
-           as a qualifier means the primary table. */
         if (m->kind == ITEM_FN && m->pub &&
-            (m->qualifier.length == 0 || same_name(&m->qualifier, &t->name))) {
+            types_body_table(t, m) == BODY_PLAIN) {
             table_add(out, m->name, m, NULL);
         }
     }
-}
-
-/* The member of t that fills the entry `name` of the table of iface: a
-   body qualified by that interface first, then an unqualified one. */
-static const struct item *qualified_member(const struct type *t,
-                                           const struct type *iface,
-                                           const struct name *name)
-{
-    const struct item *plain = NULL;
-    const struct type *up;
-    size_t i;
-
-    for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
-        for (i = 0; i < up->member_count; i++) {
-            const struct item *m = up->members[i];
-            const struct type *chain;
-            if (m->kind != ITEM_FN || !m->pub || !same_name(&m->name, name)) {
-                continue;
-            }
-            if (m->qualifier.length == 0 && plain == NULL) {
-                plain = m;
-                continue;
-            }
-            for (chain = iface; chain != NULL;
-                 chain = chain->kind == TYPE_CLASS ? chain->base : NULL) {
-                if (same_name(&m->qualifier, &chain->name)) {
-                    return m;
-                }
-            }
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind == ITEM_FN && m->pub &&
+            types_body_table(t, m) == BODY_BASE) {
+            table_add(out, m->name, m, NULL);
         }
     }
-    return plain;
 }
 
 /* The index of the entry that holds the function `name`, or 0 when the
@@ -2507,7 +2485,7 @@ static struct ir_global *interface_table(struct lowerer *l,
            Where it does not, the interface's own body serves, and that
            body already takes a pointer to the sub-object. */
         const struct item *fn =
-            qualified_member(t, sub->type, &table.entries[i].name);
+            types_interface_member(t, sub->type, &table.entries[i].name);
         bool own = fn != NULL && fn->symbol != NULL && has_body(fn);
         if (!own) {
             fn = find_member_fn(sub->type, &table.entries[i].name);

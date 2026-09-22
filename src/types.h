@@ -256,6 +256,43 @@ struct type *types_object(struct types *types);
 /* Whether t is the class `anti.lang.Error` itself. */
 bool types_is_lang_error(const struct type *t);
 
+/* DESIGN: a `concrete fn` fills the tables its qualifier names. One
+   without a qualifier, or qualified by its own class, is a plain body. It
+   fills the primary table. It also fills each interface table of its name
+   that no qualified body fills. A body qualified by a class of the base
+   chain fills the primary table alone. It wins there over a plain body of
+   the same level. Any other qualifier names an interface, and the body
+   fills its table alone. The checker, lowering and the header read the
+   tables through the functions below, so the three agree. */
+enum body_table {
+    BODY_PLAIN,
+    BODY_BASE,
+    BODY_INTERFACE
+};
+
+/* The tables that the member m of the level t of a chain fills. */
+enum body_table types_body_table(const struct type *t, const struct item *m);
+/* The function of the chain of t that the primary table holds under
+   name. It sits at the level nearest to t that declares one, and there a
+   body qualified by a base comes before a plain one. NULL when no level
+   declares the name outside the table of an interface. */
+const struct item *types_primary_member(const struct type *t,
+                                        const struct name *name);
+/* Whether m holds its entry in the primary table of its level of the
+   chain of t. A plain body beside one qualified by a base holds none. */
+bool types_holds_entry(const struct type *t, const struct item *m);
+/* The public function of the chain of t that fills the entry name of the
+   table of iface. A body qualified by a class of the chain of iface wins
+   at any level, and otherwise the plain body nearest to t fills it. */
+const struct item *types_interface_member(const struct type *t,
+                                          const struct type *iface,
+                                          const struct name *name);
+/* The symbol name of the member m of the class named owner. It is `T.f`,
+   and `T.Q.f` for a body qualified by another class, so that two bodies
+   of one name have two symbols. */
+char *types_member_symbol(struct arena *arena, const struct name *owner,
+                          const struct item *m);
+
 /* DESIGN: `dispatch` gives a Job back, and `join` of it gives the result
    of the worker. The result therefore belongs to the type. A Job of one
    result type is a distinct type from a Job of another, and every one

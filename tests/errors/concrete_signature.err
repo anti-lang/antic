@@ -12,3 +12,4 @@ concrete_signature.anti:106:35: error: `out` of `concrete fn serialize` has type
 concrete_signature.anti:115:32: error: `line` of `concrete fn write` has type `int`, and `Sink.write` takes `str`
 concrete_signature.anti:141:21: error: `concrete fn Named::radius` of `Disc` fills no abstract function
 concrete_signature.anti:146:14: error: `concrete fn spin` does not take `self`, and `Round.spin` does
+concrete_signature.anti:126:7: error: `Disc` lacks `concrete fn radius`

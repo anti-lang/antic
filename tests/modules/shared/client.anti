@@ -5,6 +5,8 @@
 //! interface calls the function of the object's class that the index
 //! names. A class of each module holds the struct `Extent`, whose one
 //! descriptor the library writes, and `serialize` walks it from both.
+//! A class of the library with qualified bodies keeps its tables here,
+//! and a class of the program inherits them.
 
 import com.example.points;
 import anti.reflect;
@@ -15,6 +17,17 @@ extern fn printf(format: ?*byte, ...) -> c_int;
 class Bin
 {
 	pub extent: points.Extent = points.Extent { w: 0, h: 0 },
+}
+
+/* A deck of the program, whose tables start as those of the library's. */
+class Shoe
+{
+	inherits points.Deck,
+
+	pub fn decks(self) -> int
+	{
+		return self.cards / 52;
+	}
 }
 
 fn main() -> int
@@ -48,6 +61,28 @@ fn main() -> int
 	let grown = reflect.call(inside, 7, wider[0..1]) catch fatal;
 	printf("%d %d %d\n".ptr, grown.kind as c_int, grown.data.i as c_int,
 		sized.size() as c_int);
+	let grew = crate.grow(1);
+	printf("grew %d\n".ptr, grew as c_int);
+	let deck = alloc points.Deck { };
+	let drawn: *points.Drawable = deck;
+	let dealt: *points.Dealt = deck;
+	let seen = drawn.draw();
+	let after = dealt.draw(2);
+	let left = deck.left();
+	printf("deck %d %d %d\n".ptr, seen as c_int, after as c_int,
+		left as c_int);
+	let shoe = alloc Shoe { cards: 104 };
+	let from: *points.Deck = shoe;
+	let shoe_drawn: *points.Drawable = shoe;
+	let shoe_dealt: *points.Dealt = shoe;
+	let dealt_shoe = shoe_dealt.draw(4);
+	let shown = shoe_drawn.draw();
+	let shoe_left = from.left();
+	let decks = shoe.decks();
+	printf("shoe %d %d %d %d\n".ptr, dealt_shoe as c_int, shown as c_int,
+		shoe_left as c_int, decks as c_int);
+	delete(deck);
+	delete(shoe);
 	let pallet = alloc points.Pallet { };
 	let bin = alloc Bin { extent: points.Extent { w: 5, h: 6 } };
 	let b = text.Builder.new();

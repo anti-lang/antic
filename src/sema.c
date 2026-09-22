@@ -2019,6 +2019,94 @@ static struct expr *new_node(struct checker *c, enum expr_kind kind,
 static struct item *find_member(const struct type *t,
                                const struct name *name);
 
+/* DESIGN: a name used on a value or a type reaches the member that
+   find_member gives, less the bodies qualified by an interface. Each of
+   those fills the table of its interface alone. At one level a plain
+   body comes before one qualified by a base, so a call reaches the
+   unqualified function when there is one. */
+static struct item *reached_member(const struct type *t,
+                                   const struct name *name)
+{
+    size_t i;
+
+    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+        struct item *base_body = NULL;
+        for (i = 0; i < t->member_count; i++) {
+            struct item *m = t->members[i];
+            if (!same_name(&m->name, name)) {
+                continue;
+            }
+            if (m->kind != ITEM_FN) {
+                return m;
+            }
+            switch (types_body_table(t, m)) {
+            case BODY_PLAIN:
+                return m;
+            case BODY_BASE:
+                base_body = base_body != NULL ? base_body : m;
+                break;
+            case BODY_INTERFACE:
+                break;
+            }
+        }
+        if (base_body != NULL) {
+            return base_body;
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: take a name that only bodies qualified by an interface fill
+   on the chain of t. It is ambiguous on a value of t, and the message
+   names the interfaces. The program reaches one through a sub-object or
+   an interface pointer. Returns whether it reported. */
+static bool ambiguous_member(struct checker *c, struct pos pos,
+                             const struct type *t, const struct name *name,
+                             const char *what)
+{
+    const struct name *seen[16];
+    size_t count = 0;
+    struct text list = {0};
+    const struct type *up;
+    size_t i;
+    size_t k;
+
+    if (t == NULL || t->kind != TYPE_CLASS ||
+        reached_member(t, name) != NULL) {
+        return false;
+    }
+    for (up = t; up != NULL; up = up->base) {
+        for (i = 0; i < up->member_count; i++) {
+            const struct item *m = up->members[i];
+            if (m->kind != ITEM_FN || !same_name(&m->name, name) ||
+                types_body_table(up, m) != BODY_INTERFACE) {
+                continue;
+            }
+            for (k = 0; k < count; k++) {
+                if (same_name(seen[k], &m->qualifier)) {
+                    break;
+                }
+            }
+            if (k == count && count < sizeof seen / sizeof seen[0]) {
+                seen[count++] = &m->qualifier;
+            }
+        }
+    }
+    if (count == 0) {
+        return false;
+    }
+    for (k = 0; k < count; k++) {
+        text_appendf(&list, "%s`%.*s`",
+                     k == 0 ? "" : k + 1 == count ? " and " : ", ",
+                     (int)seen[k]->length, seen[k]->text);
+    }
+    error_at(c, pos, "`%s` fills `%.*s` only for %s, so %s is ambiguous, "
+             "reach it through an interface", tn(t), (int)name->length,
+             name->text, text_cstr(&list), what);
+    text_free(&list);
+    return true;
+}
+
 /* DESIGN: a class with an open function is never a complete value. It
    appears as a base and behind a pointer, and nowhere else. A local, a
    plain field, an `alloc` and a literal of it are all refused. */
@@ -2375,7 +2463,7 @@ static struct symbol *method_symbol(const struct checker *c,
                                     const struct name *name)
 {
     const struct interface *lib;
-    struct item *m = find_member(s, name);
+    struct item *m = reached_member(s, name);
 
     if (m != NULL && m->kind == ITEM_FN && m->symbol != NULL &&
         member_visible(c, s, m)) {
@@ -2596,18 +2684,23 @@ static bool method_call(struct checker *c, struct expr *call)
     struct expr *receiver = field->as.field.base;
     struct type *t = receiver->type;
     struct type *s = struct_of(t);
-    struct symbol *f = method_symbol(c, s, &field->as.field.name);
+    struct symbol *f;
     const struct item *member = s != NULL
-                                    ? find_member(s, &field->as.field.name)
+                                    ? reached_member(s, &field->as.field.name)
                                     : NULL;
     struct type *first;
     struct expr **args;
     struct expr *callee;
 
+    if (ambiguous_member(c, field->pos, s, &field->as.field.name,
+                         "the call")) {
+        return false;
+    }
+    f = method_symbol(c, s, &field->as.field.name);
     if (f == NULL || (f->kind != SYMBOL_FN && f->kind != SYMBOL_EXTERN_FN) ||
         is_error(f->type) || f->type->param_count == 0 ||
         !descends_from(s, struct_of(f->type->params[0]))) {
-        const struct item *hidden = find_member(s, &field->as.field.name);
+        const struct item *hidden = reached_member(s, &field->as.field.name);
         bool ambiguous = false;
         const struct struct_field *through =
             promoting_field(c, s, &field->as.field.name, &ambiguous);
@@ -2697,7 +2790,7 @@ static bool method_call(struct checker *c, struct expr *call)
        direct call is a miscompile, so `final` is the only way to one. */
     if ((t->kind == TYPE_POINTER || names_sub_object(field->as.field.base)) &&
         s->kind == TYPE_CLASS && member != NULL && member->pub &&
-        !member->is_final && !s->is_final) {
+        !member->is_final && !s->is_final && types_holds_entry(s, member)) {
         call->as.call.dispatch = s;
         call->as.call.entry = field->as.field.name;
     }
@@ -3390,12 +3483,15 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
                                       struct type *t)
 {
     struct name *name = &e->as.field.name;
-    struct item *m = find_member(t, name);
+    struct item *m = reached_member(t, name);
     const struct struct_field *f;
 
     if (t->kind == TYPE_ENUM && (f = find_field(t, name)) != NULL) {
         e->as.field.enum_value = (uint32_t)(f - t->fields) + 1;
         return t;
+    }
+    if (ambiguous_member(c, e->pos, t, name, "the name")) {
+        return builtin(c, TYPE_ERROR);
     }
     if (m == NULL) {
         error_at(c, e->pos, "`%s` has no function `%.*s`", tn(t),
@@ -3478,10 +3574,13 @@ static struct type *check_field(struct checker *c, struct expr *e)
             return builtin(c, TYPE_ERROR);
         }
         if (f == NULL) {
-            const struct item *m = find_member(s, name);
+            const struct item *m = reached_member(s, name);
             bool ambiguous = false;
-            const struct struct_field *through =
-                promoting_field(c, s, name, &ambiguous);
+            const struct struct_field *through;
+            if (ambiguous_member(c, e->pos, s, name, "the name")) {
+                return builtin(c, TYPE_ERROR);
+            }
+            through = promoting_field(c, s, name, &ambiguous);
             if (ambiguous) {
                 return builtin(c, TYPE_ERROR);
             }
@@ -7211,17 +7310,21 @@ static const struct type *qualified_table(const struct type *t,
     return NULL;
 }
 
-/* The function name that the chain of t declares nearest to t, or NULL.
-   owner receives the class that declares it. */
+/* The function name that the primary table of the chain of t holds, or
+   NULL. owner receives the class that declares it. */
 static const struct item *chain_entry(const struct type *t,
                                       const struct name *name,
                                       const struct type **owner)
 {
-    for (; t != NULL; t = inherited(t)) {
-        const struct item *found = find_member(t, name);
-        if (found != NULL && found->kind == ITEM_FN) {
-            *owner = t;
-            return found;
+    const struct item *found = types_primary_member(t, name);
+    size_t i;
+
+    for (; found != NULL && t != NULL; t = inherited(t)) {
+        for (i = 0; i < t->member_count; i++) {
+            if (t->members[i] == found) {
+                *owner = t;
+                return found;
+            }
         }
     }
     return NULL;
@@ -7399,16 +7502,55 @@ static bool same_signature(struct checker *c, const struct item *m,
     return true;
 }
 
+/* Whether two bodies of t with two qualifiers fill one table. Both may
+   name a class of the base chain. Both may name a class of the chain of
+   one interface that the chain of t implements. */
+static bool one_table(const struct type *t, const struct item *a,
+                      const struct item *b)
+{
+    enum body_table a_table = types_body_table(t, a);
+    const struct type *up;
+    const struct type *chain;
+    size_t k;
+
+    if (a_table != types_body_table(t, b) || a_table == BODY_PLAIN) {
+        return false;
+    }
+    if (a_table == BODY_BASE) {
+        return true;
+    }
+    for (up = t; up != NULL; up = inherited(up)) {
+        for (k = 0; k < up->field_count; k++) {
+            bool has_a = false;
+            bool has_b = false;
+            if (up->fields[k].form != FIELD_IMPL) {
+                continue;
+            }
+            for (chain = up->fields[k].type; chain != NULL;
+                 chain = inherited(chain)) {
+                has_a = has_a || same_name(&a->qualifier, &chain->name);
+                has_b = has_b || same_name(&b->qualifier, &chain->name);
+            }
+            if (has_a && has_b) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /* The entries a `concrete fn` m of t fills, each compared with m. A
    qualified body fills the table its qualifier names. An unqualified one
-   fills the entry of the base chain and the entry of every interface of
-   the chain that no qualified body fills. */
+   fills the entry of the base chain, unless a body qualified by a base
+   holds it. It also fills the entry of every interface of the chain that
+   no qualified body fills. One that fills none of them is refused. */
 static void check_replacement(struct checker *c, const struct item *it,
                               const struct type *t, const struct item *m)
 {
     const struct type *owner = NULL;
     const struct item *entry;
     const struct type *up;
+    bool filled = false;
     size_t k;
 
     if (m->qualifier.length > 0 && !same_name(&m->qualifier, &t->name)) {
@@ -7427,10 +7569,13 @@ static void check_replacement(struct checker *c, const struct item *it,
         same_signature(c, m, entry, owner);
         return;
     }
-    entry = chain_entry(inherited(t), &m->name, &owner);
+    entry = types_holds_entry(t, m)
+                ? chain_entry(inherited(t), &m->name, &owner)
+                : NULL;
     if (entry != NULL && !same_signature(c, m, entry, owner)) {
         return;
     }
+    filled = entry != NULL;
     for (up = t; up != NULL; up = inherited(up)) {
         for (k = 0; k < up->field_count; k++) {
             const struct type *iface = up->fields[k].type;
@@ -7442,8 +7587,32 @@ static void check_replacement(struct checker *c, const struct item *it,
             if (entry != NULL && !same_signature(c, m, entry, owner)) {
                 return;
             }
+            filled = filled || entry != NULL;
         }
     }
+    if (!filled) {
+        error_at(c, m->name_pos, "`concrete fn %.*s` of `%.*s` fills no "
+                 "abstract function", (int)m->name.length, m->name.text,
+                 (int)it->name.length, it->name.text);
+    }
+}
+
+/* DESIGN: two functions of one name in one body are one name twice,
+   unless their qualifiers differ. Each qualified body fills a table of
+   its own. The class's own name means no qualifier. Two qualifiers that
+   reach one table are refused later, when the chain is known. */
+static bool same_qualifier(const struct item *it, const struct item *a,
+                           const struct item *b)
+{
+    bool a_plain = a->qualifier.length == 0 ||
+                   same_name(&a->qualifier, &it->name);
+    bool b_plain = b->qualifier.length == 0 ||
+                   same_name(&b->qualifier, &it->name);
+
+    if (a->kind != ITEM_FN || b->kind != ITEM_FN || (a_plain && b_plain)) {
+        return true;
+    }
+    return !a_plain && !b_plain && same_name(&a->qualifier, &b->qualifier);
 }
 
 static void check_export(struct checker *c, struct item *it);
@@ -7765,21 +7934,17 @@ bool sema_check(struct module *module, const char *module_name,
         for (j = 0; j < it->member_count; j++) {
             struct item *m = it->members[j];
             struct symbol *sym = arena_alloc(arena, sizeof *sym);
-            struct text qualified = {0};
             char *text;
             size_t k;
             for (k = 0; k < j; k++) {
-                if (same_name(&it->members[k]->name, &m->name)) {
+                if (same_name(&it->members[k]->name, &m->name) &&
+                    same_qualifier(it, it->members[k], m)) {
                     error_at(&c, m->name_pos, "`%.*s` declares `%.*s` twice",
                              (int)it->name.length, it->name.text,
                              (int)m->name.length, m->name.text);
                 }
             }
-            text_appendf(&qualified, "%.*s.%.*s", (int)it->name.length,
-                         it->name.text, (int)m->name.length, m->name.text);
-            text = arena_alloc(arena, qualified.length + 1);
-            memcpy(text, qualified.data, qualified.length + 1);
-            text_free(&qualified);
+            text = types_member_symbol(arena, &it->name, m);
             if (m->contract == FN_ABSTRACT) {
                 it->symbol->type->has_abstract = true;
             }
@@ -7948,12 +8113,8 @@ bool sema_check(struct module *module, const char *module_name,
             if (m->kind != ITEM_FN) {
                 continue;
             }
-            for (base = inherited(t); base != NULL; base = inherited(base)) {
-                const struct item *found = find_member(base, &m->name);
-                if (found != NULL && found->kind == ITEM_FN) {
-                    above = found;
-                    break;
-                }
+            if (inherited(t) != NULL) {
+                above = types_primary_member(inherited(t), &m->name);
             }
             /* An interface declares functions the class fills, so a
                `concrete fn` matches there as well as in the base
@@ -8050,7 +8211,7 @@ bool sema_check(struct module *module, const char *module_name,
                 if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT) {
                     continue;
                 }
-                filled = find_member(t, &a->name);
+                filled = types_primary_member(t, &a->name);
                 if (filled == NULL || filled->contract != FN_CONCRETE) {
                     error_at(&c, it->name_pos, "`%.*s` lacks `concrete fn "
                              "%.*s`", (int)it->name.length, it->name.text,
@@ -8097,9 +8258,12 @@ bool sema_check(struct module *module, const char *module_name,
         }
         /* DESIGN: the qualifier of a `concrete fn` names the table it
            fills: the class itself, a class of its chain, or an interface
-           it implements. Any other name reaches no table. */
+           it implements. Any other name reaches no table. Two qualifiers
+           that reach one table fill it twice, which is refused as a name
+           declared twice. */
         for (j = 0; j < it->member_count; j++) {
             const struct item *m = it->members[j];
+            size_t k;
             if (m->kind != ITEM_FN || m->qualifier.length == 0) {
                 continue;
             }
@@ -8108,6 +8272,19 @@ bool sema_check(struct module *module, const char *module_name,
                          "interface of `%.*s`", (int)m->qualifier.length,
                          m->qualifier.text, (int)it->name.length,
                          it->name.text);
+                continue;
+            }
+            for (k = 0; k < j; k++) {
+                const struct item *other = it->members[k];
+                if (other->kind == ITEM_FN &&
+                    same_name(&other->name, &m->name) &&
+                    other->qualifier.length > 0 &&
+                    !same_name(&other->qualifier, &m->qualifier) &&
+                    one_table(t, other, m)) {
+                    error_at(&c, m->name_pos, "`%.*s` declares `%.*s` twice",
+                             (int)it->name.length, it->name.text,
+                             (int)m->name.length, m->name.text);
+                }
             }
         }
         /* An interface leaves its functions open, and the class that
@@ -8127,7 +8304,8 @@ bool sema_check(struct module *module, const char *module_name,
                     if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT) {
                         continue;
                     }
-                    filled = find_member(t, &a->name);
+                    filled = types_interface_member(t, t->fields[j].type,
+                                                    &a->name);
                     if (filled == NULL || filled->contract != FN_CONCRETE) {
                         error_at(&c, it->name_pos, "`%.*s` lacks `concrete "
                                  "fn %.*s` of `%s`", (int)it->name.length,

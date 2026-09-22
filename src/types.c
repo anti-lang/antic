@@ -300,6 +300,131 @@ bool types_is_lang_error(const struct type *t)
            memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
 }
 
+static bool same_text(const struct name *a, const struct name *b)
+{
+    return a->length == b->length &&
+           memcmp(a->text, b->text, a->length) == 0;
+}
+
+/* The next level of a chain: the base of a class, and nothing above any
+   other type. */
+static const struct type *level_above(const struct type *t)
+{
+    return t->kind == TYPE_CLASS ? t->base : NULL;
+}
+
+enum body_table types_body_table(const struct type *t, const struct item *m)
+{
+    const struct type *up;
+
+    if (m->qualifier.length == 0 || same_text(&m->qualifier, &t->name)) {
+        return BODY_PLAIN;
+    }
+    for (up = level_above(t); up != NULL; up = level_above(up)) {
+        if (same_text(&m->qualifier, &up->name)) {
+            return BODY_BASE;
+        }
+    }
+    return BODY_INTERFACE;
+}
+
+const struct item *types_primary_member(const struct type *t,
+                                        const struct name *name)
+{
+    size_t i;
+
+    for (; t != NULL; t = level_above(t)) {
+        const struct item *plain = NULL;
+        for (i = 0; i < t->member_count; i++) {
+            const struct item *m = t->members[i];
+            if (m->kind != ITEM_FN || !same_text(&m->name, name)) {
+                continue;
+            }
+            switch (types_body_table(t, m)) {
+            case BODY_BASE:
+                return m;
+            case BODY_PLAIN:
+                plain = plain != NULL ? plain : m;
+                break;
+            case BODY_INTERFACE:
+                break;
+            }
+        }
+        if (plain != NULL) {
+            return plain;
+        }
+    }
+    return NULL;
+}
+
+bool types_holds_entry(const struct type *t, const struct item *m)
+{
+    size_t i;
+
+    for (; t != NULL; t = level_above(t)) {
+        for (i = 0; i < t->member_count; i++) {
+            if (t->members[i] == m) {
+                return types_primary_member(t, &m->name) == m;
+            }
+        }
+    }
+    return false;
+}
+
+const struct item *types_interface_member(const struct type *t,
+                                          const struct type *iface,
+                                          const struct name *name)
+{
+    const struct item *plain = NULL;
+    const struct type *chain;
+    size_t i;
+
+    for (; t != NULL; t = level_above(t)) {
+        for (i = 0; i < t->member_count; i++) {
+            const struct item *m = t->members[i];
+            if (m->kind != ITEM_FN || !m->pub || !same_text(&m->name, name)) {
+                continue;
+            }
+            switch (types_body_table(t, m)) {
+            case BODY_PLAIN:
+                plain = plain != NULL ? plain : m;
+                break;
+            case BODY_INTERFACE:
+                for (chain = iface; chain != NULL;
+                     chain = level_above(chain)) {
+                    if (same_text(&m->qualifier, &chain->name)) {
+                        return m;
+                    }
+                }
+                break;
+            case BODY_BASE:
+                break;
+            }
+        }
+    }
+    return plain;
+}
+
+char *types_member_symbol(struct arena *arena, const struct name *owner,
+                          const struct item *m)
+{
+    bool qualified = m->qualifier.length > 0 &&
+                     !same_text(&m->qualifier, owner);
+    size_t length = owner->length + 1 + m->name.length +
+                    (qualified ? m->qualifier.length + 1 : 0);
+    char *text = arena_alloc(arena, length + 1);
+
+    if (qualified) {
+        snprintf(text, length + 1, "%.*s.%.*s.%.*s", (int)owner->length,
+                 owner->text, (int)m->qualifier.length, m->qualifier.text,
+                 (int)m->name.length, m->name.text);
+    } else {
+        snprintf(text, length + 1, "%.*s.%.*s", (int)owner->length,
+                 owner->text, (int)m->name.length, m->name.text);
+    }
+    return text;
+}
+
 struct type *types_object(struct types *types)
 {
     static const char module_text[] = "anti.rt";
