@@ -271,12 +271,12 @@ static struct symbol *declare(struct checker *c, enum symbol_kind kind,
     return sym;
 }
 
-/* DESIGN: the name after `catch` is any identifier, and the object model
-   makes a name that an outer scope holds a warning of the checker rather
-   than an error. Only a variable is reported, because that is what the
-   message names: a function or a constant of the module is no variable.
-   The call stands inside the handler's own scope, so the lookup starts
-   at the scope above it. */
+/* DESIGN: the name after `catch` is any identifier. The object model makes
+   a name that an outer scope holds a warning of the checker and not an
+   error. Only a variable is reported, because that is what the message
+   names. A function or a constant of the module is no variable. The call
+   stands inside the handler's own scope, so the lookup starts at the scope
+   above it. */
 static void warn_catch_shadow(struct checker *c, const struct name *name,
                               struct pos pos)
 {
