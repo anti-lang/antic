@@ -97,3 +97,32 @@ A later step folds them into `docs/decisions.md`.
   a field read before fails the whole text. Reason: the first value
   would stay behind with no field to hold it, and the audit's fix is to
   refuse it. Every other malformed member fails the text as well.
+
+## The runtime on Windows, step 19
+
+- [provisional] The platform layer of the runtime is `src/rt/platform.h`
+  with `platform_posix.c` and `platform_windows.c`, as rule 22 names it.
+  Both files stand in the one list of runtime sources and are compiled
+  for every target. Each wraps its code in one `#if` of its own system,
+  so the other compiles to a typedef alone. Reason: the list stays one
+  list for every target, as its `DESIGN` comment asks.
+- [provisional] `src/rt/time.c` and `src/rt/platform.c` are gone. The
+  clocks, the sleep and `anti_rt_is_windows` were nothing but calls of
+  the system, so they moved whole into the platform files. Reason:
+  rule 22, and a portable wrapper of each would add nothing.
+- [provisional] A lock the runtime keeps at file scope is a name of
+  `enum anti_rt_lock` in `platform.h`, whose storage and initializer
+  stand in the platform file. `conf.c` holds `ANTI_RT_LOCK_CONF`.
+  Reason: the lock must be ready before `main` without a `#if` outside
+  the layer.
+- [provisional] A sleep on Windows is a loop of `Sleep` steps of at
+  most a day, each rounded up to the whole millisecond. A wait is then
+  never shorter than asked, as `nanosleep` guarantees elsewhere, and a
+  wait below a millisecond sleeps one. Reason: the audit asks for a
+  loop of bounded calls with the rounding stated, and no document names
+  the rounding.
+- `ANTI_CONF` is read through `GetEnvironmentVariableW` into a buffer of
+  the length it reports and converted to UTF-8. A plugin loads through
+  `LoadLibraryW` from its UTF-8 path. A value or a path that is no valid
+  UTF-8 or UTF-16 counts as unset or fails the load. Reason: M20, and
+  `anti_rt_fs_open` reads a path as UTF-8 on Windows already.
