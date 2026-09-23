@@ -3,6 +3,7 @@
 #include "atomic.h"
 #include "hooks.h"
 #include "object.h"
+#include "plugin.h"
 #include "std.h"
 
 /* DESIGN: the one handler lives in an atomic word of the runtime and not
@@ -86,6 +87,14 @@ void anti_rt_hook(struct anti_object *self, int64_t hook)
     handler_fn taken = (handler_fn)handler_hook(h, hook);
     object_fn own = (object_fn)own_hook(self, hook);
 
+    /* DESIGN: the objects of a loaded library are counted here, so
+       `unload` refuses to take the code of a live object away. A
+       program with no library open pays one load and one compare. */
+    if (hook == ANTI_HOOK_CREATED) {
+        anti_rt_plugin_created(self != NULL ? self->table : NULL);
+    } else if (hook == ANTI_HOOK_DESTROYED) {
+        anti_rt_plugin_destroyed(self != NULL ? self->table : NULL);
+    }
     if (taken != NULL) {
         taken(h, self);
     }

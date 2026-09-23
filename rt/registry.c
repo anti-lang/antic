@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "plugin.h"
 #include "registry.h"
 #include "utf.h"
 
@@ -16,22 +17,18 @@ static bool same_bytes(const unsigned char *a, int64_t a_length,
            (a_length == 0 || memcmp(a, b, (size_t)a_length) == 0);
 }
 
-/* DESIGN: a name without a dot is the name the descriptor holds, which
-   two modules may both declare. It finds a class when one class alone
-   has it. `module.Class` names the class of one module and is never in
-   doubt. */
-const struct anti_class *anti_rt_registry_find(const unsigned char *name,
-                                               int64_t length)
+/* The class of one table whose name matches, or NULL. A bare name that
+   two classes of the table carry sets two. */
+static const struct anti_class *find_in(const struct anti_registry *r,
+                                        const unsigned char *name,
+                                        int64_t length, int64_t dot,
+                                        bool *two)
 {
     const struct anti_class *found = NULL;
-    int64_t dot = length;
     int64_t i;
 
-    while (dot > 0 && name[dot - 1] != '.') {
-        dot--;
-    }
-    for (i = 0; i < anti_rt_registry.count; i++) {
-        const struct anti_class *c = &anti_rt_registry.classes[i];
+    for (i = 0; i < r->count; i++) {
+        const struct anti_class *c = &r->classes[i];
         if (!same_bytes(c->descriptor->name, c->descriptor->name_length,
                         name + dot, length - dot)) {
             continue;
@@ -43,11 +40,53 @@ const struct anti_class *anti_rt_registry_find(const unsigned char *name,
             continue;
         }
         if (found != NULL) {
+            *two = true;
             return NULL;
         }
         found = c;
     }
     return found;
+}
+
+/* DESIGN: a name without a dot is the name the descriptor holds, which
+   two modules may both declare. It finds a class when one class alone
+   has it. `module.Class` names the class of one module and is never in
+   doubt. */
+const struct anti_class *anti_rt_registry_find(const unsigned char *name,
+                                               int64_t length)
+{
+    const struct anti_class *found;
+    bool two = false;
+    int64_t dot = length;
+    int64_t i;
+
+    while (dot > 0 && name[dot - 1] != '.') {
+        dot--;
+    }
+    found = find_in(&anti_rt_registry, name, length, dot, &two);
+    /* DESIGN: a loaded library brings classes of its own, and
+       `reflect.new` finds one by name as it finds a class of the
+       program. The loader holds the table of each open library, and a
+       lookup walks them after the program's own. */
+    for (i = 0; i < ANTI_PLUGIN_MAX && !two; i++) {
+        const struct anti_registry *r = anti_rt_plugin_registry(i);
+        const struct anti_class *c;
+        if (r == NULL) {
+            continue;
+        }
+        c = find_in(r, name, length, dot, &two);
+        if (c == NULL) {
+            continue;
+        }
+        if (dot > 0) {
+            return c;
+        }
+        if (found != NULL) {
+            return NULL;
+        }
+        found = c;
+    }
+    return two ? NULL : found;
 }
 
 /* A zeroed object of the class, prepared as a literal of it would be. */

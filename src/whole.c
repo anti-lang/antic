@@ -402,9 +402,11 @@ static void reach_free(struct reach *r)
     free(r->work);
 }
 
-/* The runtime functions that read the registry. */
+/* The runtime functions that read the registry. The loader is one of
+   them. It adds the classes of a library to the registry, so a program
+   that loads one carries the table those classes join. */
 static const char *const registry_readers[] = {
-    "anti_rt_reflect_new", RUNTIME_ROOT "deserialize"
+    "anti_rt_reflect_new", RUNTIME_ROOT "deserialize", PLUGIN_LOAD
 };
 
 static bool reads_registry(const struct ir_module *m, const struct reach *r)
@@ -1822,8 +1824,8 @@ static void write_provides(struct whole *w, struct ir_module *m,
                            struct text *errors)
 {
     static const char *const entry_names[] = {
-        "interface", "interface_length", "descriptor", "class", "init",
-        "offset", "flags"
+        "path", "path_length", "descriptor", "class", "init", "offset",
+        "flags"
     };
     static const enum ir_type entry_types[] = {
         IR_PTR, IR_I64, IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_I64
