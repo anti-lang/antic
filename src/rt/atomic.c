@@ -11,15 +11,14 @@
 #if defined(_MSC_VER)
 #include <intrin.h>
 
-/* DESIGN: a load through `volatile` is a plain load on ARM64, which a
-   later load to another address may pass. clang, which compiles every
-   runtime of the archive, gives the sequentially consistent load of the
-   other branch: ldar on ARM64 and a plain load on x86_64, where the
-   locked exchange of every store keeps the order. MSVC, which compiles
-   this file for the tools of a Windows host, loads as its own C++
-   library does: on ARM64 a load and a full barrier after it, and on
-   x86_64 a volatile load. The types are signed by name, so a byte loads
-   the same whether `char` is signed or not. */
+/* DESIGN: a load through `volatile` is a plain load on ARM64, and a
+   later load to another address may pass it. clang compiles every
+   runtime of the archive. It gives the load of the other branch, ldar
+   on ARM64 and a plain load on x86_64. There the locked exchange of
+   every store keeps the order. MSVC compiles atomic.c into the tools of
+   a Windows host. It loads as its own C++ library does, with a full
+   barrier after the load on ARM64. The types are signed by name, so a
+   byte loads the same whether `char` is signed or not. */
 int64_t anti_rt_atomic_load(const void *address, int64_t width)
 {
 #if defined(__clang__)
