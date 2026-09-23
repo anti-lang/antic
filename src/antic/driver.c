@@ -800,20 +800,25 @@ static bool has_main(const struct ir_module *program, const char *module)
 }
 
 /* Feed the bytes of the file at path to the digest. A file that cannot
-   be read adds nothing, and the link that needs it reports it. */
-static void digest_file(struct sha256 *s, const char *path)
+   be opened adds nothing, and the link that needs it reports it. A file
+   that opens and then fails to read returns false, since a digest of part
+   of it would name other code. */
+static bool digest_file(struct sha256 *s, const char *path)
 {
     FILE *f = fopen(path, "rb");
     unsigned char bytes[4096];
     size_t n;
+    bool ok;
 
     if (f == NULL) {
-        return;
+        return true;
     }
     while ((n = fread(bytes, 1, sizeof bytes, f)) > 0) {
         sha256_update(s, bytes, n);
     }
+    ok = !ferror(f);
     fclose(f);
+    return ok;
 }
 
 /* DESIGN: the build id is the SHA-256 of the code that a link takes from
@@ -824,13 +829,15 @@ static void digest_file(struct sha256 *s, const char *path)
    too, so a `-g` link and a plain link of one program carry one id.
    `anti symbols` then matches a trace of the one to the archive of the
    other. */
-static void build_id(const struct options *o, const struct text *assembly,
-                     const struct debug_spans *spans, char hex[65])
+static bool build_id(const struct options *o, const struct text *assembly,
+                     const struct debug_spans *spans, char hex[65],
+                     char *error, size_t size)
 {
     struct text library = {0};
     struct sha256 s;
     size_t at = 0;
     size_t i;
+    bool ok = true;
 
     sha256_init(&s);
     for (i = 0; spans != NULL && i < spans->count; i++) {
@@ -842,15 +849,22 @@ static void build_id(const struct options *o, const struct text *assembly,
     if (at < assembly->length) {
         sha256_update(&s, assembly->data + at, assembly->length - at);
     }
-    for (i = 0; i < o->object_count; i++) {
-        digest_file(&s, o->objects[i]);
+    for (i = 0; ok && i < o->object_count; i++) {
+        if (!digest_file(&s, o->objects[i])) {
+            snprintf(error, size, "cannot read %s", o->objects[i]);
+            ok = false;
+        }
     }
-    if (o->runtime != NULL) {
+    if (ok && o->runtime != NULL) {
         link_runtime_library(&library, o->runtime, o->target, o->cpu);
-        digest_file(&s, text_cstr(&library));
+        if (!digest_file(&s, text_cstr(&library))) {
+            snprintf(error, size, "cannot read %s", text_cstr(&library));
+            ok = false;
+        }
     }
     sha256_hex(&s, hex);
     text_free(&library);
+    return ok;
 }
 
 /* The notice with the line `build <id>` after its begin marker, where a
@@ -986,10 +1000,13 @@ static int back_end(const struct options *o, struct module *tree,
             !o->assembly_only && o->lib != LIB_STATIC) {
             struct text notice = {0};
             char id[65];
-            build_id(o, assembly, &spans, id);
-            identified_notice(&notice, &extras->notice, id);
-            emit_licenses(assembly, o->target, notice.data, notice.length);
-            text_free(&notice);
+            ok = build_id(o, assembly, &spans, id, error, sizeof error);
+            if (ok) {
+                identified_notice(&notice, &extras->notice, id);
+                emit_licenses(assembly, o->target, notice.data,
+                              notice.length);
+                text_free(&notice);
+            }
         }
         for (i = 0; ok && i < program->function_count; i++) {
             const struct ir_function *f = program->functions[i];

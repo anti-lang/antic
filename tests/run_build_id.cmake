@@ -56,3 +56,18 @@ endif()
 if(first STREQUAL other)
     message(FATAL_ERROR "two programs carry one id: ${first}")
 endif()
+
+# An object that opens and then fails to read is refused, where a short
+# digest would give the program the id of other code. A directory opens
+# for reading on macOS and Linux, and its first read fails.
+file(MAKE_DIRECTORY "${WORK}/unreadable.o")
+execute_process(
+    COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+            -o "${WORK}/unreadable" "${SOURCE}" "${WORK}/unreadable.o"
+    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(status EQUAL 0)
+    message(FATAL_ERROR "antic linked an object it cannot read")
+endif()
+if(NOT err MATCHES "antic: cannot read [^\n]*unreadable\\.o\n")
+    message(FATAL_ERROR "antic did not name the object it cannot read\n${err}")
+endif()

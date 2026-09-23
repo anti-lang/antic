@@ -2180,7 +2180,8 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
 endforeach()
 
 # The build id in the notice is the digest of the code. Two builds of one
-# program carry the same id, and another program carries another.
+# program carry the same id, and another program carries another. An
+# object that opens and fails to read is refused.
 if(NOT WIN32)
     add_test(NAME program_build_id
         COMMAND "${CMAKE_COMMAND}"
