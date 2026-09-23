@@ -213,6 +213,15 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
              (int)version.len, version.ptr);
         return NULL;
     }
+    /* The platform gives one handle per file, so a second load of the
+       same library is the library that is open. */
+    for (i = 0; i < ANTI_PLUGIN_MAX; i++) {
+        struct anti_plugin *open = anti_rt_plugin_at(i);
+        if (open->used != 0 && open->table == table) {
+            close_library(handle);
+            return open;
+        }
+    }
     base = anti_rt_plugin_image(table);
     for (i = 0; i < table->count; i++) {
         const struct anti_provides *e = &table->entries[i];
