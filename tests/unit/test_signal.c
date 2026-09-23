@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#include "../binary_stdio.h"
 #include "../../src/rt/atomic.h"
 #include "../../src/rt/signal.h"
 #include "check.h"

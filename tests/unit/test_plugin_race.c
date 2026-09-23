@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../binary_stdio.h"
 #include "../../src/rt/atomic.h"
 #include "../../src/rt/plugin.h"
 #include "check.h"

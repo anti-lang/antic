@@ -44,3 +44,36 @@ A later step folds them into `docs/decisions.md`.
 - A TOML key is at most 319 bytes, the room of a path less its NUL. A
   longer key was refused before by the length of the path it wrote, and
   it is now refused where it is read.
+
+## Shared state, step 12
+
+- The end of a chunk of `parallel` or of a dispatched job wakes every
+  waiter of the pool. Each waiter checks its own condition.
+- An atomic load is sequentially consistent on every target. clang,
+  which compiles each runtime of the archive, uses the load of the
+  builtins on Windows as elsewhere.
+- [provisional] MSVC compiles `src/rt/atomic.c` into the tools of a
+  Windows host. On ARM64 it loads with a plain load and a full barrier
+  after it, as its own C++ library does. Reason: MSVC has no builtin of
+  clang, and no MSVC build ran here.
+- One lock guards the signal table, the start of the reader and the
+  pipe. A reader calls the registered function after it releases the
+  lock. A pipe whose reader thread did not start is closed, so a later
+  registration starts afresh.
+- [provisional] A later layer or include may replace the value of a
+  configuration key. The value it replaces is kept until the program
+  ends, never freed. Reason: `anti_rt_conf_get` hands out the bytes of
+  a value to any thread. Of the two fixes the audit gives, this one
+  keeps `rt.configure` usable after threads start.
+- A second call of `rt.configure` returns at once while the first one
+  reads its file, as it did after the first one ended.
+- One lock in `src/rt/loaded.c` guards the slots of the open libraries.
+  Load and unload write a slot under it. The two hooks that count the
+  objects of a library read the slots under it, and so does the lookup
+  of a class by name. The library is opened and closed outside it.
+- A lookup by name may find a class of a library. The class stays
+  valid while the program keeps that library open, as the handle of
+  the library does.
+- [provisional] The reason of a failed call of the loader is kept per
+  thread. Reason: of the two fixes the audit gives, it changes no
+  signature that `anti.plugin` calls.

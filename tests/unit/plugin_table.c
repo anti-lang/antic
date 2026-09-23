@@ -1,6 +1,7 @@
 /* A shared library that rt_plugin_tests loads: the table of a plugin with
    nothing in it, built for the runtime version the test gives. The test
    builds it twice, as two libraries with a table each. */
+#include "../binary_stdio.h"
 #include "../../src/rt/plugin.h"
 
 #if defined(_WIN32)

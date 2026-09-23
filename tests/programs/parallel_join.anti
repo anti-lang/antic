@@ -32,7 +32,7 @@ worker fn spin(f: *Flag) -> int
 /// chunk or after it. A pool may wake its waiters in either order.
 worker fn outer(f: *Flag) -> int
 {
-	let inner = alloc Flag {};
+	let inner = alloc Flag { };
 	if Flag.joiner_first.load() == 0 {
 		while Flag.started.load() == 0 do {
 			time.sleep(time.microseconds(100));
@@ -46,9 +46,9 @@ worker fn outer(f: *Flag) -> int
 	return answer;
 }
 
-/// The chunk that starts with 5 is slow. It ends once the joiner waits, so
-/// the wake-up of its end finds two waiters. The other one takes long enough
-/// that a worker takes the slow one before the caller could.
+/// The chunk that starts with 5 is slow. It ends once the joiner waits, so the
+/// wake-up of its end finds two waiters. The other one takes long enough that a
+/// worker takes the slow one before the caller could.
 worker fn total(chunk: []int) -> int
 {
 	let sum = 0;
@@ -75,7 +75,7 @@ fn main() -> int
 	let answers = 0;
 
 	for round in 0..6 {
-		let f = alloc Flag {};
+		let f = alloc Flag { };
 		Flag.joiner_first.store(round % 2);
 		Flag.started.store(0);
 		Flag.joining.store(0);
