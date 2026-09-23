@@ -1,7 +1,18 @@
 #include "types.h"
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+void *types_alloc_array(struct arena *arena, size_t count, size_t size)
+{
+    if (size != 0 && count > SIZE_MAX / size) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    return arena_alloc(arena, count * size);
+}
 
 void types_init(struct types *types, struct arena *arena)
 {
@@ -23,7 +34,9 @@ struct type *types_builtin(struct types *types, enum type_kind kind)
    searches it before it creates a type. A program has few distinct
    types, so a linear search is enough and keeps identity a pointer
    comparison. */
-static struct type *find_or_add(struct types *types, const struct type *key)
+static struct type *find_or_add_params(struct types *types,
+                                       const struct type *key,
+                                       struct type *const *params)
 {
     struct type *t;
     size_t i;
@@ -38,7 +51,7 @@ static struct type *find_or_add(struct types *types, const struct type *key)
             continue;
         }
         for (i = 0; i < t->param_count; i++) {
-            if (t->params[i] != key->params[i]) {
+            if (t->params[i] != params[i]) {
                 break;
             }
         }
@@ -48,14 +61,20 @@ static struct type *find_or_add(struct types *types, const struct type *key)
     }
     t = arena_alloc(types->arena, sizeof *t);
     *t = *key;
+    t->params = NULL;
     if (key->param_count > 0) {
-        t->params = arena_alloc(types->arena,
-                                key->param_count * sizeof *t->params);
-        memcpy(t->params, key->params, key->param_count * sizeof *t->params);
+        t->params = types_alloc_array(types->arena, key->param_count,
+                                      sizeof *t->params);
+        memcpy(t->params, params, key->param_count * sizeof *t->params);
     }
     t->next = types->derived;
     types->derived = t;
     return t;
+}
+
+static struct type *find_or_add(struct types *types, const struct type *key)
+{
+    return find_or_add_params(types, key, key->params);
 }
 
 struct type *types_pointer_of(struct types *types, struct type *element,
@@ -237,19 +256,14 @@ struct type *types_slice(struct types *types, struct type *element)
     return find_or_add(types, &key);
 }
 
-struct type *types_fn(struct types *types, struct type **params,
+struct type *types_fn(struct types *types, struct type *const *params,
                       size_t param_count, struct type *result)
 {
-    struct type key = {0};
-
-    key.kind = TYPE_FN;
-    key.params = params;
-    key.param_count = param_count;
-    key.result = result;
-    return find_or_add(types, &key);
+    return types_fn_flagged(types, params, param_count, result, false, false,
+                            false);
 }
 
-struct type *types_fn_failing(struct types *types, struct type **params,
+struct type *types_fn_failing(struct types *types, struct type *const *params,
                               size_t param_count, struct type *result,
                               bool has_out)
 {
@@ -257,20 +271,19 @@ struct type *types_fn_failing(struct types *types, struct type **params,
                             has_out);
 }
 
-struct type *types_fn_flagged(struct types *types, struct type **params,
+struct type *types_fn_flagged(struct types *types, struct type *const *params,
                               size_t param_count, struct type *result,
                               bool bound, bool may_fail, bool has_out)
 {
     struct type key = {0};
 
     key.kind = TYPE_FN;
-    key.params = params;
     key.param_count = param_count;
     key.result = result;
     key.bound = bound;
     key.may_fail = may_fail;
     key.has_out = has_out;
-    return find_or_add(types, &key);
+    return find_or_add_params(types, &key, params);
 }
 
 struct type *types_bound_of(struct types *types, const struct type *fn)
@@ -293,13 +306,21 @@ struct type *types_bound_of(struct types *types, const struct type *fn)
    are the runtime's. Its one field is the table pointer, which no
    program names and which every class carries at offset 0 through its
    base. */
-bool types_is_lang_error(const struct type *t)
+/* Whether t is the item of anti.lang of the kind given, named name. */
+static bool lang_item(const struct type *t, enum type_kind kind,
+                      const char *name)
 {
-    return t != NULL && t->kind == TYPE_CLASS &&
-           t->name.length == sizeof LANG_ERROR - 1 &&
-           memcmp(t->name.text, LANG_ERROR, sizeof LANG_ERROR - 1) == 0 &&
+    size_t length = strlen(name);
+
+    return t != NULL && t->kind == kind && t->name.length == length &&
+           memcmp(t->name.text, name, length) == 0 &&
            t->module.length == sizeof LANG_MODULE - 1 &&
            memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
+}
+
+bool types_is_lang_error(const struct type *t)
+{
+    return lang_item(t, TYPE_CLASS, LANG_ERROR);
 }
 
 static bool same_text(const struct name *a, const struct name *b)
@@ -425,24 +446,29 @@ const struct item *types_interface_member(const struct type *t,
     return NULL;
 }
 
-char *types_member_symbol(struct arena *arena, const struct name *owner,
-                          const struct item *m)
+struct name types_member_symbol(struct arena *arena, const struct name *owner,
+                                const struct item *m)
 {
     bool qualified = m->qualifier.length > 0 &&
                      !same_text(&m->qualifier, owner);
     size_t length = owner->length + 1 + m->name.length +
                     (qualified ? m->qualifier.length + 1 : 0);
     char *text = arena_alloc(arena, length + 1);
+    char *at = text;
+    struct name symbol;
 
+    memcpy(at, owner->text, owner->length);
+    at += owner->length;
+    *at++ = '.';
     if (qualified) {
-        snprintf(text, length + 1, "%.*s.%.*s.%.*s", (int)owner->length,
-                 owner->text, (int)m->qualifier.length, m->qualifier.text,
-                 (int)m->name.length, m->name.text);
-    } else {
-        snprintf(text, length + 1, "%.*s.%.*s", (int)owner->length,
-                 owner->text, (int)m->name.length, m->name.text);
+        memcpy(at, m->qualifier.text, m->qualifier.length);
+        at += m->qualifier.length;
+        *at++ = '.';
     }
-    return text;
+    memcpy(at, m->name.text, m->name.length);
+    symbol.text = text;
+    symbol.length = length;
+    return symbol;
 }
 
 struct type *types_object(struct types *types)
@@ -587,7 +613,6 @@ static struct type *handle_struct(struct types *types, const char *name,
     struct type *t;
 
     t = arena_alloc(types->arena, sizeof *t);
-    memset(t, 0, sizeof *t);
     t->kind = TYPE_STRUCT;
     t->module.text = module_text;
     t->module.length = sizeof module_text - 1;
@@ -628,49 +653,29 @@ struct type *types_chan(struct types *types, struct type *element)
     return handle_struct(types, name_text, element);
 }
 
-/* Whether t is the struct of anti.lang named name. */
-static bool lang_struct(const struct type *t, const char *name)
-{
-    size_t length = strlen(name);
-
-    return t != NULL && t->kind == TYPE_STRUCT &&
-           t->name.length == length &&
-           memcmp(t->name.text, name, length) == 0 &&
-           t->module.length == sizeof LANG_MODULE - 1 &&
-           memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
-}
-
 bool types_is_mutex(const struct type *t)
 {
-    return lang_struct(t, LANG_MUTEX);
+    return lang_item(t, TYPE_STRUCT, LANG_MUTEX);
 }
 
 bool types_is_chan(const struct type *t)
 {
-    return lang_struct(t, LANG_CHAN) && t->element != NULL;
+    return lang_item(t, TYPE_STRUCT, LANG_CHAN) && t->element != NULL;
 }
 
 bool types_is_field_descriptor(const struct type *t)
 {
-    return lang_struct(t, LANG_FIELD_DESCRIPTOR);
+    return lang_item(t, TYPE_STRUCT, LANG_FIELD_DESCRIPTOR);
 }
 
 bool types_is_flags(const struct type *t)
 {
-    return t != NULL && t->kind == TYPE_STRUCT && t->result == NULL &&
-           t->name.length == sizeof LANG_FLAGS - 1 &&
-           memcmp(t->name.text, LANG_FLAGS, sizeof LANG_FLAGS - 1) == 0 &&
-           t->module.length == sizeof LANG_MODULE - 1 &&
-           memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
+    return lang_item(t, TYPE_STRUCT, LANG_FLAGS) && t->result == NULL;
 }
 
 bool types_is_job(const struct type *t)
 {
-    return t != NULL && t->kind == TYPE_STRUCT && t->result != NULL &&
-           t->name.length == sizeof LANG_JOB - 1 &&
-           memcmp(t->name.text, LANG_JOB, sizeof LANG_JOB - 1) == 0 &&
-           t->module.length == sizeof LANG_MODULE - 1 &&
-           memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
+    return lang_item(t, TYPE_STRUCT, LANG_JOB) && t->result != NULL;
 }
 
 /* The name of element i of a tuple, `_0` upwards, in the memory pool of
@@ -678,17 +683,25 @@ bool types_is_job(const struct type *t)
 static struct name element_name(struct types *types, size_t i)
 {
     char digits[24];
+    size_t at = sizeof digits;
     struct name name;
-    int n = snprintf(digits, sizeof digits, "_%zu", i);
-    char *text = arena_alloc(types->arena, (size_t)n + 1);
+    char *text;
 
-    memcpy(text, digits, (size_t)n + 1);
+    /* The digits go in from the end, so that no formatted text can be
+       cut. A size_t has at most 20 decimal digits. */
+    do {
+        digits[--at] = (char)('0' + i % 10);
+        i /= 10;
+    } while (i > 0);
+    digits[--at] = '_';
+    text = arena_alloc(types->arena, sizeof digits - at + 1);
+    memcpy(text, digits + at, sizeof digits - at);
     name.text = text;
-    name.length = (size_t)n;
+    name.length = sizeof digits - at;
     return name;
 }
 
-struct type *types_tuple(struct types *types, struct type **elements,
+struct type *types_tuple(struct types *types, struct type *const *elements,
                          size_t count)
 {
     struct struct_field *fields;
@@ -697,7 +710,6 @@ struct type *types_tuple(struct types *types, struct type **elements,
     size_t i;
 
     key.kind = TYPE_TUPLE;
-    key.params = elements;
     key.param_count = count;
     for (t = types->derived; t != NULL; t = t->next) {
         if (t->kind != TYPE_TUPLE || t->param_count != count) {
@@ -711,10 +723,9 @@ struct type *types_tuple(struct types *types, struct type **elements,
     }
     t = arena_alloc(types->arena, sizeof *t);
     *t = key;
-    t->params = arena_alloc(types->arena, count * sizeof *t->params);
+    t->params = types_alloc_array(types->arena, count, sizeof *t->params);
     memcpy(t->params, elements, count * sizeof *t->params);
-    fields = arena_alloc(types->arena, count * sizeof *fields);
-    memset(fields, 0, count * sizeof *fields);
+    fields = types_alloc_array(types->arena, count, sizeof *fields);
     for (i = 0; i < count; i++) {
         fields[i].name = element_name(types, i);
         fields[i].type = elements[i];
@@ -743,6 +754,7 @@ struct type *types_mask(struct types *types, struct type *s)
     struct text text = {0};
     struct type *m;
     char *name;
+    size_t length;
     size_t i;
 
     if (s->mask != NULL || type_is_mask(s)) {
@@ -751,19 +763,21 @@ struct type *types_mask(struct types *types, struct type *s)
     /* DESIGN: the mask carries the module of its simd struct and a name
        that no declaration can spell. Every module that compares values
        of s therefore names one type. */
-    text_appendf(&text, "mask(%.*s)", (int)s->name.length, s->name.text);
-    name = arena_alloc(types->arena, text.length + 1);
-    memcpy(name, text_cstr(&text), text.length + 1);
+    text_append(&text, "mask(");
+    text_append_bytes(&text, s->name.text, s->name.length);
+    text_append(&text, ")");
+    length = text.length;
+    name = arena_alloc(types->arena, length + 1);
+    memcpy(name, text_cstr(&text), length + 1);
     text_free(&text);
     m = arena_alloc(types->arena, sizeof *m);
-    memset(m, 0, sizeof *m);
     m->kind = TYPE_STRUCT;
     m->module = s->module;
     m->name.text = name;
-    m->name.length = strlen(name);
+    m->name.length = length;
     m->simd = true;
-    fields = arena_alloc(types->arena, (s->field_count + 1) * sizeof *fields);
-    memset(fields, 0, (s->field_count + 1) * sizeof *fields);
+    fields = types_alloc_array(types->arena, s->field_count + 1,
+                               sizeof *fields);
     for (i = 0; i < s->field_count; i++) {
         fields[i].name = s->fields[i].name;
         fields[i].pos = s->fields[i].pos;
@@ -826,13 +840,8 @@ static struct name name_of(const char *text)
     return n;
 }
 
-static bool same_name_text(const struct name *a, const struct name *b)
-{
-    return a->length == b->length && memcmp(a->text, b->text, a->length) == 0;
-}
-
 void types_set_cases(struct types *types, struct type *v, struct type *tag,
-                     struct type **payloads, size_t count)
+                     struct type *const *payloads, size_t count)
 {
     struct struct_field fields[2];
     struct struct_field *members;
@@ -842,13 +851,13 @@ void types_set_cases(struct types *types, struct type *v, struct type *tag,
 
     memset(fields, 0, sizeof fields);
     v->base = tag;
-    v->params = arena_alloc(types->arena, (count + 1) * sizeof *v->params);
+    v->params = types_alloc_array(types->arena, count + 1, sizeof *v->params);
     memcpy(v->params, payloads, count * sizeof *v->params);
     v->param_count = count;
     fields[0].name = name_of(VARIANT_TAG);
     fields[0].type = tag;
     fields[0].vis = VIS_PUB;
-    members = arena_alloc(types->arena, (count + 1) * sizeof *members);
+    members = types_alloc_array(types->arena, count + 1, sizeof *members);
     for (i = 0; i < count; i++) {
         if (payloads[i] == NULL) {
             continue;
@@ -899,14 +908,14 @@ bool types_cases_from_fields(struct types *types, struct type *v)
     }
     v->base = v->fields[0].type;
     v->param_count = tag->field_count;
-    v->params = arena_alloc(types->arena,
-                            (tag->field_count + 1) * sizeof *v->params);
+    v->params = types_alloc_array(types->arena, tag->field_count + 1,
+                                  sizeof *v->params);
     for (i = 0; i < tag->field_count; i++) {
         if (tag->fields[i].number != i) {
             return false;
         }
         for (j = 0; u != NULL && j < u->field_count; j++) {
-            if (same_name_text(&u->fields[j].name, &tag->fields[i].name)) {
+            if (same_text(&u->fields[j].name, &tag->fields[i].name)) {
                 v->params[i] = u->fields[j].type;
             }
         }
@@ -914,16 +923,18 @@ bool types_cases_from_fields(struct types *types, struct type *v)
     return true;
 }
 
-int types_case_index(const struct type *v, const struct name *name)
+bool types_case_index(const struct type *v, const struct name *name,
+                      size_t *index)
 {
     size_t i;
 
     for (i = 0; v->base != NULL && i < v->base->field_count; i++) {
-        if (same_name_text(&v->base->fields[i].name, name)) {
-            return (int)i;
+        if (same_text(&v->base->fields[i].name, name)) {
+            *index = i;
+            return true;
         }
     }
-    return -1;
+    return false;
 }
 
 /* A named integer type. Its values live in its fields, each with its
@@ -945,7 +956,7 @@ void types_set_fields(struct types *types, struct type *s,
 {
     size_t i;
 
-    s->fields = arena_alloc(types->arena, count * sizeof *s->fields);
+    s->fields = types_alloc_array(types->arena, count, sizeof *s->fields);
     memcpy(s->fields, fields, count * sizeof *s->fields);
     s->field_count = count;
     /* Every field remembers the type that declares it, so a flattened

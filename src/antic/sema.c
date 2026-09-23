@@ -2371,7 +2371,7 @@ static struct type *check_variant_test(struct checker *c, struct expr *e,
     const struct type_expr *target = e->as.cast.type;
     const struct type *named = NULL;
     const struct name *which;
-    int index;
+    size_t index;
 
     /* A variant without cases has had its message and has no case to
        give as the example. */
@@ -2404,13 +2404,12 @@ static struct type *check_variant_test(struct checker *c, struct expr *e,
                  (int)target->name.length, target->name.text, tn(from));
         return builtin(c, TYPE_ERROR);
     }
-    index = types_case_index(from, which);
-    if (index < 0) {
+    if (!types_case_index(from, which, &index)) {
         error_at(c, e->pos, "`%s` has no case `%.*s`", tn(from),
                  (int)which->length, which->text);
         return builtin(c, TYPE_ERROR);
     }
-    e->as.cast.variant_case = (uint32_t)index + 1;
+    e->as.cast.variant_case = (uint32_t)(index + 1);
     e->as.cast.target = from;
     return builtin(c, TYPE_BOOL);
 }
@@ -4964,9 +4963,9 @@ static struct type *variant_case_value(struct checker *c, struct expr *e,
                                        struct type *t)
 {
     struct name name = e->as.field.name;
-    int index = types_case_index(t, &name);
+    size_t index;
 
-    if (index < 0) {
+    if (!types_case_index(t, &name, &index)) {
         error_at(c, e->pos, "`%s` has no case `%.*s`", tn(t),
                  (int)name.length, name.text);
         return builtin(c, TYPE_ERROR);
@@ -4980,7 +4979,7 @@ static struct type *variant_case_value(struct checker *c, struct expr *e,
     memset(&e->as.struct_lit, 0, sizeof e->as.struct_lit);
     e->as.struct_lit.module = t->name;
     e->as.struct_lit.name = name;
-    e->as.struct_lit.variant_case = (uint32_t)index + 1;
+    e->as.struct_lit.variant_case = (uint32_t)(index + 1);
     return t;
 }
 
@@ -4989,17 +4988,17 @@ static struct type *variant_case_value(struct checker *c, struct expr *e,
 static struct type *variant_literal(struct checker *c, struct expr *e,
                                     struct type *v, const struct name *name)
 {
-    int index = types_case_index(v, name);
+    size_t index;
     const struct type *payload;
     char written[160];
 
-    if (index < 0) {
+    if (!types_case_index(v, name, &index)) {
         error_at(c, e->pos, "`%s` has no case `%.*s`", tn(v),
                  (int)name->length, name->text);
         return builtin(c, TYPE_ERROR);
     }
     payload = v->params[index];
-    e->as.struct_lit.variant_case = (uint32_t)index + 1;
+    e->as.struct_lit.variant_case = (uint32_t)(index + 1);
     snprintf(written, sizeof written, "%s.%.*s", tn(v), (int)name->length,
              name->text);
     return check_field_inits(c, e, e->as.struct_lit.fields,
@@ -7980,7 +7979,7 @@ static bool check_variant_arm(struct checker *c, struct stmt *s, size_t index,
                               const struct type *over, struct scope *scope)
 {
     struct switch_arm *arm = &s->as.switch_stmt.arms[index];
-    int found;
+    size_t found;
     size_t j;
 
     if (arm->value->kind != EXPR_NAME) {
@@ -7988,19 +7987,18 @@ static bool check_variant_arm(struct checker *c, struct stmt *s, size_t index,
                  "its cases", tn(over));
         return false;
     }
-    found = types_case_index(over, &arm->value->as.name);
-    if (found < 0) {
+    if (!types_case_index(over, &arm->value->as.name, &found)) {
         error_at(c, arm->pos, "`%s` has no case `%.*s`", tn(over),
                  (int)arm->value->as.name.length, arm->value->as.name.text);
         return false;
     }
     for (j = 0; j < index; j++) {
-        if (s->as.switch_stmt.arms[j].variant_case == (uint32_t)found + 1) {
+        if ((size_t)s->as.switch_stmt.arms[j].variant_case == found + 1) {
             error_at(c, arm->pos, "this case already has an arm");
             break;
         }
     }
-    arm->variant_case = (uint32_t)found + 1;
+    arm->variant_case = (uint32_t)(found + 1);
     arm->value->type = over->base;
     if (arm->binds.length == 0) {
         return false;
@@ -8055,7 +8053,7 @@ static void check_cases_covered(struct checker *c, const struct stmt *s,
 
     for (i = 0; i < over->param_count; i++) {
         for (j = 0; j < s->as.switch_stmt.count &&
-                    s->as.switch_stmt.arms[j].variant_case != i + 1;
+                    (size_t)s->as.switch_stmt.arms[j].variant_case != i + 1;
              j++) {
         }
         if (j < s->as.switch_stmt.count) {
@@ -10552,7 +10550,7 @@ bool sema_check(struct module *module, const char *module_name,
         for (j = 0; j < it->member_count; j++) {
             struct item *m = it->members[j];
             struct symbol *sym = arena_alloc(arena, sizeof *sym);
-            char *text;
+            struct name text;
             size_t k;
             for (k = 0; k < j; k++) {
                 if (same_name(&it->members[k]->name, &m->name) &&
@@ -10577,8 +10575,7 @@ bool sema_check(struct module *module, const char *module_name,
             sym->kind = m->kind != ITEM_CONST  ? SYMBOL_FN
                         : m->is_static         ? SYMBOL_GLOBAL
                                                : SYMBOL_CONST;
-            sym->name.text = text;
-            sym->name.length = strlen(text);
+            sym->name = text;
             sym->pos = m->name_pos;
             sym->item = m;
             sym->exported = m->exported;

@@ -1856,9 +1856,8 @@ static void read_types(struct reader *r)
                 break;
             }
             m->symbol->type = fn;
-            m->symbol->name.text =
+            m->symbol->name =
                 types_member_symbol(r->arena, &s->s->name, m);
-            m->symbol->name.length = strlen(m->symbol->name.text);
         }
         if (!r->failed && s->member_count > 0) {
             s->s->members = s->members;

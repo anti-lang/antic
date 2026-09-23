@@ -196,6 +196,10 @@ struct types {
 };
 
 void types_init(struct types *types, struct arena *arena);
+/* Memory for count items of size bytes each, zeroed, in the pool arena,
+   which frees it. antic stops when the product does not fit in a size_t,
+   as on any failed allocation. */
+void *types_alloc_array(struct arena *arena, size_t count, size_t size);
 struct type *types_builtin(struct types *types, enum type_kind kind);
 /* `*T`, the pointer that never holds `none`. */
 struct type *types_pointer(struct types *types, struct type *element);
@@ -224,15 +228,15 @@ const struct symbolic *types_symbolic(struct types *types,
    struct name carries its module. */
 void symbolic_print(struct text *out, const struct symbolic *s,
                     bool qualified);
-struct type *types_fn(struct types *types, struct type **params,
+struct type *types_fn(struct types *types, struct type *const *params,
                       size_t param_count, struct type *result);
 /* A function type in the ABI form of `may fail`: params end with the out
    pointer when has_out is set, and result is `?*Error`. */
-struct type *types_fn_failing(struct types *types, struct type **params,
+struct type *types_fn_failing(struct types *types, struct type *const *params,
                               size_t param_count, struct type *result,
                               bool has_out);
 /* A function type with each flag given, as a library file records it. */
-struct type *types_fn_flagged(struct types *types, struct type **params,
+struct type *types_fn_flagged(struct types *types, struct type *const *params,
                               size_t param_count, struct type *result,
                               bool bound, bool may_fail, bool has_out);
 
@@ -404,9 +408,10 @@ const struct item *types_interface_member(const struct type *t,
                                           const struct name *name);
 /* The symbol name of the member m of the class named owner. It is `T.f`,
    and `T.Q.f` for a body qualified by another class, so that two bodies
-   of one name have two symbols. */
-char *types_member_symbol(struct arena *arena, const struct name *owner,
-                          const struct item *m);
+   of one name have two symbols. The text lies in the memory pool arena
+   and ends in a NUL, and the pool frees it. */
+struct name types_member_symbol(struct arena *arena, const struct name *owner,
+                                const struct item *m);
 
 /* DESIGN: `dispatch` gives a Job back, and `join` of it gives the result
    of the worker. The result therefore belongs to the type. A Job of one
@@ -468,7 +473,7 @@ uint64_t type_simd_bytes(const struct type *t);
 
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */
-struct type *types_tuple(struct types *types, struct type **elements,
+struct type *types_tuple(struct types *types, struct type *const *elements,
                          size_t count);
 struct type *types_struct(struct types *types, struct name module,
                           struct name name);
@@ -481,13 +486,15 @@ struct type *types_struct(struct types *types, struct name module,
    of its cases. payloads[i] is the struct of case i, or NULL for a case
    without fields. */
 void types_set_cases(struct types *types, struct type *v, struct type *tag,
-                     struct type **payloads, size_t count);
+                     struct type *const *payloads, size_t count);
 /* Read base and params of the variant v back from its fields, as a
    library file carries them. False when the fields are not those of a
    variant. */
 bool types_cases_from_fields(struct types *types, struct type *v);
-/* The index of the case name of the variant v, or -1. */
-int types_case_index(const struct type *v, const struct name *name);
+/* Whether the variant v has the case name. If so, index receives the
+   index of the case. */
+bool types_case_index(const struct type *v, const struct name *name,
+                      size_t *index);
 
 /* A named integer type over base. Each call returns a distinct type. */
 struct type *types_enum(struct types *types, struct name module,
