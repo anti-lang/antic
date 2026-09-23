@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "conf.h"
+#include "platform.h"
 #include "plugin.h"
 
 #include "rt.h"
@@ -19,11 +20,6 @@
 
 #include "atomic.h"
 
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <pthread.h>
-#endif
 
 /* Where a value came from. A higher layer keeps its value. */
 enum layer { LAYER_BUILD, LAYER_FILE, LAYER_COMMAND };
@@ -84,15 +80,8 @@ static int64_t file_read;
    thread may still hold the bytes of a value that a later layer or
    include replaces. So the list below keeps every such value until the
    program ends. A program holds few values, and they are short. */
-#if defined(_WIN32)
-static SRWLOCK lock = SRWLOCK_INIT;
-static void hold(void) { AcquireSRWLockExclusive(&lock); }
-static void release(void) { ReleaseSRWLockExclusive(&lock); }
-#else
-static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-static void hold(void) { pthread_mutex_lock(&lock); }
-static void release(void) { pthread_mutex_unlock(&lock); }
-#endif
+static void hold(void) { anti_rt_lock_hold(ANTI_RT_LOCK_CONF); }
+static void release(void) { anti_rt_lock_release(ANTI_RT_LOCK_CONF); }
 
 struct retired {
     struct retired *next;
@@ -404,32 +393,15 @@ static unsigned char *file_bytes(const char *path, int64_t *length)
     return bytes;
 }
 
-static int is_absolute(const char *path)
-{
-#if defined(_WIN32)
-    if (path[0] == '\\' ||
-        ((path[0] | 32) >= 'a' && (path[0] | 32) <= 'z' && path[1] == ':')) {
-        return 1;
-    }
-#endif
-    return path[0] == '/';
-}
-
 /* The path of an include, which is relative to the file that names
    it. */
 static char *resolve(const char *base, const char *path)
 {
-    const char *last = strrchr(base, '/');
+    const char *last = anti_rt_path_last_separator(base);
     size_t directory;
     char *out;
 
-#if defined(_WIN32)
-    const char *back = strrchr(base, '\\');
-    if (back != NULL && (last == NULL || back > last)) {
-        last = back;
-    }
-#endif
-    if (is_absolute(path) || last == NULL) {
+    if (anti_rt_path_is_absolute(path) || last == NULL) {
         return copy(path, strlen(path));
     }
     directory = (size_t)(last - base) + 1;
@@ -634,20 +606,16 @@ static void read_file(const char *path, const struct including *from)
     anti_rt_atomic_store(&file_read, (int64_t)sizeof file_read, 1);
 }
 
-/* The path of ANTI_CONF, or NULL. It is the one variable the runtime
-   reads. */
-static const char *environment_path(void)
+/* The path of ANTI_CONF in memory of its own, or NULL. It is the one
+   variable the runtime reads. */
+static char *environment_path(void)
 {
-#if defined(_WIN32)
-    static char text[1024];
-    DWORD length = GetEnvironmentVariableA("ANTI_CONF", text, sizeof text);
+    char *text;
 
-    return length > 0 && length < sizeof text ? text : NULL;
-#else
-    const char *text = getenv("ANTI_CONF");
-
-    return text != NULL && text[0] != '\0' ? text : NULL;
-#endif
+    if (anti_rt_getenv("ANTI_CONF", &text) != 0) {
+        startup_error("out of memory at program start");
+    }
+    return text;
 }
 
 /* DESIGN: an interface whose provider is a library gets its object
@@ -773,17 +741,18 @@ static void help(void)
 
 void anti_rt_conf_start(void)
 {
-    const char *path = conf_path;
-
     if (help_asked) {
         help();
         exit(0);
     }
-    if (path == NULL) {
-        path = environment_path();
-    }
-    if (path != NULL) {
-        read_file(copy(path, strlen(path)), NULL);
+    if (conf_path != NULL) {
+        read_file(copy(conf_path, strlen(conf_path)), NULL);
+    } else {
+        char *path = environment_path();
+
+        if (path != NULL) {
+            read_file(path, NULL);
+        }
     }
     fill_injections();
     if (inspect_asked) {

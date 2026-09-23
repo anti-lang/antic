@@ -18,14 +18,10 @@
 
 #include "atomic.h"
 #include "digest.h"
+#include "platform.h"
 #include "std.h"
 #include "toml.h"
 
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 
 enum { ANTI_PLUGIN_PATH = 4096 };
 
@@ -50,56 +46,6 @@ struct anti_text anti_rt_plugin_message(void)
     text.ptr = (const unsigned char *)message;
     text.len = (int64_t)strlen(message);
     return text;
-}
-
-/* The platform's loader. */
-
-static void *open_library(const char *path)
-{
-#if defined(_WIN32)
-    return LoadLibraryA(path);
-#else
-    return dlopen(path, RTLD_NOW | RTLD_LOCAL);
-#endif
-}
-
-static void close_library(void *handle)
-{
-#if defined(_WIN32)
-    FreeLibrary((HMODULE)handle);
-#else
-    dlclose(handle);
-#endif
-}
-
-static void *symbol_of(void *handle, const char *name)
-{
-#if defined(_WIN32)
-    union {
-        FARPROC from;
-        void *to;
-    } cast;
-    cast.from = GetProcAddress((HMODULE)handle, name);
-    return cast.to;
-#else
-    return dlsym(handle, name);
-#endif
-}
-
-/* The reason the last open failed, as the platform gives it. Windows
-   writes it into text, of size bytes. dlerror keeps its own text per
-   thread. */
-static const char *open_message(char *text, size_t size)
-{
-#if defined(_WIN32)
-    snprintf(text, size, "error %lu", (unsigned long)GetLastError());
-    return text;
-#else
-    const char *reason = dlerror();
-    (void)text;
-    (void)size;
-    return reason != NULL ? reason : "cannot open the file";
-#endif
 }
 
 static int same_bytes(const unsigned char *a, int64_t a_length,
@@ -427,7 +373,7 @@ static void *build(const struct anti_plugin *p,
     return sub;
 }
 
-/* Take a slot for the library that open_library gave. The caller holds
+/* Take a slot for the library that anti_rt_library_open gave. The caller holds
    the lock of the slots. Gives the slot, or NULL with the reason in
    message. *same is 1 when the library is open already, in the slot it
    gives, and the caller then closes the handle it opened. */
@@ -586,27 +532,27 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
              ANTI_PLUGIN_PATH - 1);
         return NULL;
     }
-    handle = open_library(name);
+    handle = anti_rt_library_open(name);
     if (handle == NULL) {
-        fail("%s: %s", name, open_message(why, sizeof why));
+        fail("%s: %s", name, anti_rt_library_error(why, sizeof why));
         return NULL;
     }
-    table = symbol_of(handle, "anti_rt_provides");
+    table = anti_rt_library_symbol(handle, "anti_rt_provides");
     if (table == NULL) {
-        close_library(handle);
+        anti_rt_library_close(handle);
         fail("%s provides nothing and is no plugin", name);
         return NULL;
     }
     damage = damage_of(table);
     if (damage != NULL) {
-        close_library(handle);
+        anti_rt_library_close(handle);
         fail("%s carries a damaged table of what it provides: %s", name,
              damage);
         return NULL;
     }
     if (!same_bytes(table->version, table->version_length, version.ptr,
                     version.len)) {
-        close_library(handle);
+        anti_rt_library_close(handle);
         fail("%s was built for runtime %.*s, and this program carries %.*s",
              name, (int)table->version_length, table->version,
              (int)version.len, version.ptr);
@@ -616,7 +562,7 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     p = claim(name, handle, table, anti_rt_plugin_image(table), &same);
     anti_rt_plugin_release();
     if (p == NULL || same) {
-        close_library(handle);
+        anti_rt_library_close(handle);
     }
     return p;
 }
@@ -712,7 +658,7 @@ int8_t anti_rt_plugin_unload(void *handle)
     anti_rt_plugin_release();
     if (closed) {
         free_stubs(&gone, gone.table->count);
-        close_library(gone.handle);
+        anti_rt_library_close(gone.handle);
     }
     return closed;
 }

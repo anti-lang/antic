@@ -102,8 +102,10 @@ add_test(NAME rt_signal COMMAND rt_signal_tests)
 # program carries no sanitizer, and this program does in the sanitizer
 # builds.
 add_executable(rt_conf_tests unit/test_conf_race.c ../src/rt/conf.c
-    ../src/rt/toml.c ../src/rt/atomic.c)
-target_link_libraries(rt_conf_tests PRIVATE Threads::Threads)
+    ../src/rt/toml.c ../src/rt/atomic.c ../src/rt/platform_posix.c
+    ../src/rt/platform_windows.c)
+target_link_libraries(rt_conf_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_conf_tests PRIVATE
     ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME rt_conf_race COMMAND rt_conf_tests)
@@ -116,7 +118,7 @@ foreach(which one two)
 endforeach()
 add_executable(rt_plugin_tests unit/test_plugin_race.c ../src/rt/plugin.c
     ../src/rt/loaded.c ../src/rt/atomic.c ../src/rt/digest.c
-    ../src/rt/toml.c)
+    ../src/rt/toml.c ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_plugin_tests PRIVATE
@@ -125,11 +127,31 @@ target_compile_definitions(rt_plugin_tests PRIVATE
 add_dependencies(rt_plugin_tests plugin_table_one plugin_table_two)
 add_test(NAME rt_plugin_race COMMAND rt_plugin_tests)
 
+# The platform layer of the runtime on the host. Both platform files go
+# in, and the one of the other system compiles to nothing. The library of
+# an empty plugin table is copied into a directory whose name is outside
+# ASCII, which a loader that takes the ANSI code page cannot open.
+add_executable(rt_platform_tests unit/test_platform.c
+    ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
+target_link_libraries(rt_platform_tests PRIVATE ${CMAKE_DL_LIBS})
+set(platform_plugin "${CMAKE_CURRENT_BINARY_DIR}/platform-ü")
+add_custom_command(TARGET rt_platform_tests POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${platform_plugin}"
+    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:plugin_table_one>"
+        "${platform_plugin}/$<TARGET_FILE_NAME:plugin_table_one>"
+    VERBATIM)
+target_compile_definitions(rt_platform_tests PRIVATE
+    "PLUGIN_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\""
+    "PLUGIN_NAME=\"$<TARGET_FILE_NAME:plugin_table_one>\"")
+add_dependencies(rt_platform_tests plugin_table_one)
+add_test(NAME rt_platform COMMAND rt_platform_tests)
+
 # The loader against a table of a plugin with one value damaged at a time.
 add_library(plugin_bad SHARED unit/plugin_bad.c)
 add_executable(rt_plugin_table_tests unit/test_plugin_table.c
     ../src/rt/plugin.c ../src/rt/loaded.c ../src/rt/atomic.c
-    ../src/rt/digest.c ../src/rt/toml.c)
+    ../src/rt/digest.c ../src/rt/toml.c ../src/rt/platform_posix.c
+    ../src/rt/platform_windows.c)
 target_link_libraries(rt_plugin_table_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_plugin_table_tests PRIVATE
@@ -2122,6 +2144,8 @@ foreach(case
         "array|report||--anti.conf=${CONF}/array.toml,--anti.inspect|inspect.array.pattern||0"
         "environment|report||--anti.inspect|inspect.file.pattern||0"
         "environment_option|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
+        "environment_long|report||--anti.inspect|empty.pattern|missing.pattern|70"
+        "environment_utf8|report||--anti.inspect|inspect.file.pattern||0"
         "arguments|report||--anti.threads=2,one,--anti.backtrace,two|arguments.pattern||0"
         "help|report||--anti.help|help.pattern||0"
         "configure|configure||${CONF}/backtrace.toml|configure.pattern||0"
@@ -2294,6 +2318,22 @@ endif()
 # variable the runtime reads.
 set_tests_properties(conf_environment conf_environment_option PROPERTIES
     ENVIRONMENT "ANTI_CONF=${CONF}/basic.toml")
+
+# A value past 1023 bytes, and a path outside ASCII, reach the runtime
+# whole on every system. The long one names a file that is not there, and
+# the other a copy of basic.toml in a directory whose name is not ASCII.
+string(REPEAT "long/" 220 conf_long)
+set_tests_properties(conf_environment_long PROPERTIES
+    ENVIRONMENT "ANTI_CONF=${CONF}/${conf_long}nowhere.toml")
+set(conf_utf8 "${CMAKE_CURRENT_BINARY_DIR}/conf-ü€")
+add_test(NAME conf_environment_utf8_file
+    COMMAND "${CMAKE_COMMAND}" -E copy "${CONF}/basic.toml"
+        "${conf_utf8}/basic.toml")
+set_tests_properties(conf_environment_utf8_file PROPERTIES
+    FIXTURES_SETUP conf_utf8)
+set_tests_properties(conf_environment_utf8 PROPERTIES
+    ENVIRONMENT "ANTI_CONF=${conf_utf8}/basic.toml"
+    FIXTURES_REQUIRED conf_utf8)
 
 # The readers of the symbol table and the line table, on the binaries
 # that this host links for the other targets.
