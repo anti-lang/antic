@@ -1435,6 +1435,14 @@ add_test(NAME error_lexical
 set_tests_properties(error_lexical PROPERTIES
     PASS_REGULAR_EXPRESSION "lexical.anti:3:14: error: unknown escape `\\\\q`\n[^\n]*lexical.anti:4:10: error: a character literal holds one character\n")
 
+# A source of 64 MiB passes the front end, and one a byte longer is
+# refused when it is read, before the lexer sees it.
+add_test(NAME error_source_cap
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-cap"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_source_cap.cmake")
+
 # scale.ast is the syntax tree listing that chapter 1 prints.
 add_test(NAME dump_ast_scale
     COMMAND "${CMAKE_COMMAND}"

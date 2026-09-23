@@ -520,6 +520,26 @@ void test_lexer(void)
         }
         done(&l);
     }
+    /* A failing doc comment first in the braces of an interpolated
+       text pushes no token. The lexer then reads none before the list. */
+    error("let s = f\"{/" "** a\n}\";", 1, 12, "unterminated block comment");
+    error("let s = f\"{/" "** a\n*" "/ x}\";", 1, 12,
+          "doc comment text starts on the line after `/**`");
+    {
+        /* A source above the cap is refused before a byte of it is
+           read, so the length may run past the buffer. */
+        struct lexed l;
+        lex_n(&l, "a", LEX_SOURCE_MAX + 1);
+        CHECK(!l.ok);
+        CHECK(l.diags.count == 1);
+        if (l.diags.count == 1) {
+            CHECK_STR(l.diags.items[0].message,
+                      "the source is larger than 64 MiB");
+        }
+        CHECK(l.tokens.count == 1 &&
+              l.tokens.items[0].kind == TOKEN_EOF);
+        done(&l);
+    }
     {
         /* One report per literal, and the tokens after it still lex. */
         struct lexed l;

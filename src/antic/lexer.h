@@ -137,6 +137,12 @@ struct token_list {
     size_t capacity;
 };
 
+/* DESIGN: the largest source antic reads, 64 MiB. A line and a column
+   count in int, and a source of this size keeps both far below INT_MAX.
+   Every reader of a source file stops at it, and lex refuses a longer
+   length before it reads a byte. */
+#define LEX_SOURCE_MAX ((size_t)64 << 20)
+
 /* Split source into tokens, ending with TOKEN_EOF. Report every error to
    diags and keep going, so that one run reports all of them. Returns true
    when no error occurred. */

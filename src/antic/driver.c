@@ -100,12 +100,14 @@ static bool read_bytes(const char *path, struct text *out)
 }
 
 /* Read the whole file. A source file holding a NUL byte is rejected,
-   because the text buffer ends at the first NUL. */
+   because the text buffer ends at the first NUL. One above
+   LEX_SOURCE_MAX is rejected as well, since the lexer refuses it. */
 static bool read_source(const char *path, struct text *out)
 {
     FILE *f = fopen(path, "rb");
     char buffer[4096];
     size_t n;
+    size_t total = 0;
     bool ok = true;
 
     if (f == NULL) {
@@ -113,6 +115,12 @@ static bool read_source(const char *path, struct text *out)
         return false;
     }
     while ((n = fread(buffer, 1, sizeof buffer - 1, f)) > 0) {
+        if (n > LEX_SOURCE_MAX - total) {
+            fprintf(stderr, "antic: %s is larger than 64 MiB\n", path);
+            ok = false;
+            break;
+        }
+        total += n;
         buffer[n] = '\0';
         if (strlen(buffer) != n) {
             fprintf(stderr, "antic: %s contains a NUL byte\n", path);
@@ -2277,7 +2285,7 @@ static void index_others(struct text *out, const char *path, const char *name)
         const char *next = strstr(block + 11, "[[library]]\n");
         size_t n = next != NULL ? (size_t)(next - block) : strlen(block);
         if (!index_names(block, n, name)) {
-            text_appendf(out, "%.*s", (int)n, block);
+            text_append_bytes(out, block, n);
         }
         block = next;
     }

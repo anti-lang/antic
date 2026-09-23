@@ -1278,13 +1278,19 @@ static void placeholder(struct lexer *lx, size_t end, bool raw,
     advance(&inner); /* the `{` */
     for (;;) {
         enum token_kind kind;
+        size_t before;
         skip_trivia(&inner);
         c = at(&inner, 0);
         if (c == -1 ||
             (depth == 0 && (c == '}' || (c == ':' && at(&inner, 1) != ':')))) {
             break;
         }
+        before = tokens.count;
         lex_token(&inner);
+        /* A doc comment that fails pushes no token. */
+        if (tokens.count == before) {
+            continue;
+        }
         kind = tokens.items[tokens.count - 1].kind;
         if (kind == TOKEN_LPAREN || kind == TOKEN_LBRACKET ||
             kind == TOKEN_LBRACE) {
@@ -1519,6 +1525,11 @@ bool lex(const char *source, size_t length, struct arena *arena,
 {
     struct lexer lx = {source, length, 0, 1, 1, arena, diags, out, true};
 
+    if (length > LEX_SOURCE_MAX) {
+        error_at(&lx, 1, 1, "the source is larger than 64 MiB");
+        push(&lx, TOKEN_EOF, 0, 1, 1);
+        return false;
+    }
     /* DESIGN: a byte order mark is not part of the text, so positions
        start after it. */
     if (length >= 3 && memcmp(source, "\xEF\xBB\xBF", 3) == 0) {
