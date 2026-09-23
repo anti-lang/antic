@@ -1,5 +1,7 @@
 /* The reader of a C header through clang: the AST that clang dumps as
    JSON, and the macros and pragmas of the preprocessed text. */
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +54,24 @@ static void find_clang(struct text *out)
     text_append(out, "clang");
 }
 
+/* The decimal number at the start of s, or -1 when s starts with no
+   digit or the number does not fit an int. */
+static int leading_int(const char *s)
+{
+    char *end;
+    long value;
+
+    if (*s < '0' || *s > '9') {
+        return -1;
+    }
+    errno = 0;
+    value = strtol(s, &end, 10);
+    if (errno == ERANGE || end == s || value > INT_MAX) {
+        return -1;
+    }
+    return (int)value;
+}
+
 /* The major version that `clang --version` names in its first line, or
    -1. Apple's clang writes `Apple clang version`, and a distribution
    writes its own name before `clang version`. */
@@ -63,11 +83,7 @@ static int major_version(const char *text)
     if (at == NULL || (newline != NULL && at > newline)) {
         return -1;
     }
-    at += strlen("clang version ");
-    if (*at < '0' || *at > '9') {
-        return -1;
-    }
-    return atoi(at);
+    return leading_int(at + strlen("clang version "));
 }
 
 static bool check_version(const char *clang)
@@ -101,11 +117,34 @@ static bool check_version(const char *clang)
     return false;
 }
 
+/* The argument vector of a run of clang. Its elements are strings, as
+   process_capture reads them, and not the void pointers of a bind_list. */
+struct arg_list {
+    const char **items;
+    size_t count;
+    size_t room;
+};
+
+static void arg_add(struct arg_list *list, const char *arg)
+{
+    if (list->count == list->room) {
+        size_t room = list->room == 0 ? 16 : list->room * 2;
+        const char **items = realloc(list->items, room * sizeof *items);
+        if (items == NULL) {
+            fputs("anti: out of memory\n", stderr);
+            exit(70);
+        }
+        list->items = items;
+        list->room = room;
+    }
+    list->items[list->count++] = arg;
+}
+
 /* The options that aim clang at a target and at the headers of its
    sysroot in the runtime archive. The build compiles the runtime of that
    target with the same ones. */
 static bool target_options(const char *clang, enum target t,
-                           const char *runtime, struct bind_list *args,
+                           const char *runtime, struct arg_list *args,
                            struct bind_module *b)
 {
     struct text sysroot = {0};
@@ -120,7 +159,7 @@ static bool target_options(const char *clang, enum target t,
         text_free(&sysroot);
         return false;
     }
-#define ARG(s) bind_list_add(args, (void *)bind_strdup(b, (s)))
+#define ARG(s) arg_add(args, bind_strdup(b, (s)))
 #define SYS(s)                                                             \
     do {                                                                   \
         struct text p_ = {0};                                              \
@@ -396,7 +435,8 @@ static const char *enum_named(void *context, const char *name)
         if (e->e != NULL && e->tag != NULL && strcmp(e->tag, name) == 0) {
             return e->e->name;
         }
-        if (e->e != NULL && strcmp(e->e->name, name) == 0) {
+        if (e->e != NULL && e->e->name != NULL &&
+            strcmp(e->e->name, name) == 0) {
             return e->e->name;
         }
     }
@@ -1058,13 +1098,21 @@ static void read_preprocessed(struct reader *r, char *text)
                 } else if (args != NULL) {
                     const char *digit = args;
                     bool push = strstr(args, "push") != NULL;
+                    int number;
                     while (*digit != '\0' && (*digit < '0' || *digit > '9')) {
                         digit++;
                     }
                     if (push && depth < (int)(sizeof stack / sizeof stack[0])) {
                         stack[depth++] = pack;
                     }
-                    value = *digit != '\0' ? atoi(digit) : (push ? pack : 0);
+                    number = leading_int(digit);
+                    /* clang ignores a value that does not fit, and the
+                       pack stays as it was. */
+                    if (*digit == '\0') {
+                        value = push ? pack : 0;
+                    } else if (number >= 0) {
+                        value = number;
+                    }
                 }
                 pack = value;
                 if (here) {
@@ -1246,10 +1294,10 @@ static void read_macros(struct reader *r)
     }
 }
 
-static bool run(const struct bind_list *args, struct text *out,
+static bool run(const struct arg_list *args, struct text *out,
                 const char *what)
 {
-    int status = process_capture((const char *const *)args->items, out);
+    int status = process_capture(args->items, out);
 
     if (status != 0) {
         fprintf(stderr, "anti: clang could not %s, status %d\n", what, status);
@@ -1286,9 +1334,9 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
 {
     struct reader r;
     struct text clang = {0};
-    struct bind_list common = {0};
-    struct bind_list ast = {0};
-    struct bind_list pre = {0};
+    struct arg_list common = {0};
+    struct arg_list ast = {0};
+    struct arg_list pre = {0};
     struct text json = {0};
     struct text text = {0};
     struct json_tree tree;
@@ -1311,35 +1359,35 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
     if (!check_version(text_cstr(&clang))) {
         goto done;
     }
-    bind_list_add(&common, (void *)text_cstr(&clang));
+    arg_add(&common, text_cstr(&clang));
     if (!target_options(text_cstr(&clang), t, q->runtime, &common, b)) {
         goto done;
     }
-    bind_list_add(&common, "-x");
-    bind_list_add(&common, "c");
+    arg_add(&common, "-x");
+    arg_add(&common, "c");
     for (i = 0; i < q->include_count; i++) {
-        bind_list_add(&common, "-I");
-        bind_list_add(&common, (void *)q->includes[i]);
+        arg_add(&common, "-I");
+        arg_add(&common, q->includes[i]);
     }
     for (i = 0; i < q->define_count; i++) {
         struct text d = {0};
         text_appendf(&d, "-D%s", q->defines[i]);
-        bind_list_add(&common, (void *)bind_strdup(b, text_cstr(&d)));
+        arg_add(&common, bind_strdup(b, text_cstr(&d)));
         text_free(&d);
     }
     for (i = 0; i < common.count; i++) {
-        bind_list_add(&ast, common.items[i]);
-        bind_list_add(&pre, common.items[i]);
+        arg_add(&ast, common.items[i]);
+        arg_add(&pre, common.items[i]);
     }
-    bind_list_add(&ast, "-fsyntax-only");
-    bind_list_add(&ast, "-Xclang");
-    bind_list_add(&ast, "-ast-dump=json");
-    bind_list_add(&ast, (void *)q->header);
-    bind_list_add(&ast, NULL);
-    bind_list_add(&pre, "-E");
-    bind_list_add(&pre, "-dD");
-    bind_list_add(&pre, (void *)q->header);
-    bind_list_add(&pre, NULL);
+    arg_add(&ast, "-fsyntax-only");
+    arg_add(&ast, "-Xclang");
+    arg_add(&ast, "-ast-dump=json");
+    arg_add(&ast, q->header);
+    arg_add(&ast, NULL);
+    arg_add(&pre, "-E");
+    arg_add(&pre, "-dD");
+    arg_add(&pre, q->header);
+    arg_add(&pre, NULL);
     if (!run(&pre, &text, "preprocess the header") ||
         !run(&ast, &json, "read the header as C")) {
         goto done;
