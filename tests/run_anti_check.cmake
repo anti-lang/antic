@@ -107,15 +107,15 @@ expect("${text}" "the `anti` block of `twice` at src/com/example/hidden.anti:3 f
 expect("${text}" "doc blocks: 1 block, 1 failed" "the class")
 refuse("${text}" "formatting:" "the class below")
 
-# The formatting class reads the rules of the canonical form.
+# The formatting class writes the canonical text and compares the bytes,
+# which is the test `anti fmt --check` runs. It names the first line that
+# differs.
 run(format "" status text)
 if(status EQUAL 0)
     message(FATAL_ERROR "the format project passed\n${text}")
 endif()
-expect("${text}" "loose.anti:5:1: error: the indent is tabs, and this line starts with a space" "the indent")
-expect("${text}" "loose.anti:5:16: error: one statement per line" "the statements")
-expect("${text}" "loose.anti:5:1: error: the line stands 0 tabs in, and its level is 1" "the level")
-expect("${text}" "formatting: 1 file, 3 findings" "the class")
+expect("${text}" "loose.anti:5:1: error: the line is not the one `anti fmt` writes" "the line")
+expect("${text}" "formatting: 1 file, 1 finding" "the class")
 refuse("${text}" "patterns:" "the class below")
 
 # The standard library of this checkout, read as one package. Every class

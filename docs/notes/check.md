@@ -92,38 +92,20 @@ pointer type and `a * b` in prose out of it.
 The class reports and fails nothing. `docs/decisions.md` holds the reason
 under "The check command".
 
-## The formatting rules
+## The formatting class
 
-`format_check` lexes the file and reads seven rules against the tokens and
-the bytes.
+The class writes the canonical text of each file with `fmt_source` of
+`anti fmt` and compares the bytes. It reports the first line that differs,
+one finding per file, which is the test `anti fmt --check` runs. The rules
+are `anti fmt`, so `docs/notes/fmt.md` holds them and the class holds none
+of its own.
 
-`mark_code` marks the bytes of every token, so a rule passes over the
-inside of a literal and of a doc comment. An ordinary comment is no token
-at all. Its bytes are unmarked, so the rules pass over it as well. The
-indent of a line is read only where the first byte after the whitespace
-begins a token. That leaves the position of a comment alone.
-
-The rules are the indent of tabs alone and no tab past the indent. One
-statement stands per line. One tab stands per level, with one more for a
-wrapped line. The parentheses around a whole condition are dropped.
-`} else {` is one line, and so is the `} while` of a `do` block.
-
-Three of them needed a reading that the rule as written does not give:
-
-- The `;` of `[0; 8]` ends no statement. The rule counts the brackets and
-  parentheses around it and reads a `;` at depth zero alone.
-- `do {` opens a `do` block where the token before the `do` starts a
-  statement, and it stands after the condition in `while cond do {`. Only
-  the first takes a `while` on the line of its closing brace.
-- The level of a line is the number of open braces before its first
-  token. A line that starts with a closing brace stands one level out. A
-  wrapped line takes one more tab, so the check takes the level or one
-  above it and reports anything else.
-
-The placement of a brace is no rule of the class. The canonical form keeps
-the one-line body of `concrete fn joined(self, o: *Object) { }` and of
-`pub enum Mode: u8 { Read, Write }`. A token stream does not say which of
-the two forms an item asked for.
+It read the rules against the token stream while the formatter was not
+built. The indent, one statement per line, the level of a line, the
+parentheses of a condition and the two joined lines were readable that
+way. The placement of a brace was not, because a token stream does not say
+whether an item asked for the one-line body of
+`concrete fn joined(self, o: *Object) { }`. The comparison reaches it.
 
 ## What the classes report
 
@@ -133,6 +115,6 @@ backtick around a name that no table of a module holds. Those are the name
 of an environment variable, of a key of a configuration file or of a
 function of the C library.
 
-`tests/programs/simd.anti` aligns its wrapped lines with spaces under the
-opening parenthesis, which the formatting class reports and
-`tools/scripts/format_anti.py --check` reports as well.
+Every source of `std/` and of `tests/` stands in the canonical form since
+`anti fmt` was run over them, so the class reports nothing there. The test
+`fmt_canonical` keeps it that way.

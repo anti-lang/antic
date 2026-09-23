@@ -21,7 +21,7 @@
 #include "diagnostic.h"
 #include "driver.h"
 #include "files.h"
-#include "format.h"
+#include "fmt.h"
 #include "lexer.h"
 #include "manifest.h"
 #include "modpath.h"
@@ -575,25 +575,55 @@ done:
     return ok;
 }
 
-/* The layout of one file against the formatter rules. */
+/* The line of the first byte the two texts do not share, counted from
+   one. Both end with a newline, so a text that runs out is a line that
+   differs as well. */
+static int first_difference(const struct text *a, const struct text *b)
+{
+    const char *left = text_cstr(a);
+    const char *right = text_cstr(b);
+    size_t shorter = a->length < b->length ? a->length : b->length;
+    int line = 1;
+    size_t i;
+
+    for (i = 0; i < shorter; i++) {
+        if (left[i] != right[i]) {
+            return line;
+        }
+        line += left[i] == '\n';
+    }
+    return line;
+}
+
+/* DESIGN: the class writes the canonical text of each file and compares
+   the bytes, which is the test `anti fmt --check` runs. It reported the
+   rules against the token stream while `anti fmt` was not built. */
 static size_t format_class(const struct unit *units, size_t count)
 {
     size_t findings = 0;
     size_t i;
 
     for (i = 0; i < count; i++) {
-        struct diagnostics diags = {0};
-        size_t j;
-        if (!format_check(units[i].source, &diags)) {
+        struct text source = {0};
+        struct text formed = {0};
+        if (!read_file(units[i].source, &source)) {
             findings++;
+        } else if (!fmt_source(text_cstr(&source), source.length, &formed)) {
+            /* A file the lexer refuses is the front-end class's to
+               report, and that class runs before this one. */
+            findings++;
+            fprintf(stderr, "%s:1:1: error: the file does not lex, so it has "
+                            "no canonical form\n", units[i].source);
+        } else if (formed.length != source.length ||
+                   memcmp(text_cstr(&formed), text_cstr(&source),
+                          formed.length) != 0) {
+            findings++;
+            fprintf(stderr, "%s:%d:1: error: the line is not the one "
+                            "`anti fmt` writes\n", units[i].source,
+                    first_difference(&source, &formed));
         }
-        for (j = 0; j < diags.count; j++) {
-            fprintf(stderr, "%s:%d:%d: error: %s\n", units[i].source,
-                    diags.items[j].line, diags.items[j].column,
-                    diags.items[j].message);
-        }
-        findings += diags.count;
-        diagnostics_free(&diags);
+        text_free(&source);
+        text_free(&formed);
     }
     return findings;
 }

@@ -86,11 +86,8 @@ What the command does today, with the reasons under "The check command" in
 - The doc-warning class reports and fails nothing. The front end, the doc blocks and the
   formatting decide the status. Every finding of the class is a warning, and a backtick
   holds a name of the system as often as a name of the program.
-- The formatting class reads the rules of the canonical form against the token stream and
-  reports the line of every finding, rather than writing the canonical text and comparing
-  bytes, which waits for `anti fmt`. It reads the indent of tabs, one tab per level with
-  one more for a wrapped line, nothing aligned past the indent, one statement per line,
-  the parentheses around a whole condition, `} else {` and the `} while` of a `do` block.
+- The formatting class writes the canonical text of each file with `anti fmt` and
+  compares the bytes. It reports the first line that differs, one finding per file.
 - The pattern check of `regex.compile` waits for PCRE2. The last status line says that the
   class was skipped and names PCRE2.
 

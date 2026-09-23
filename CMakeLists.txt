@@ -167,7 +167,6 @@ add_executable(anti
     tools/anti/check.c
     tools/anti/files.c
     tools/anti/fmt.c
-    tools/anti/format.c
     tools/anti/manifest.c
     tools/anti/sdk.c
     tools/anti/test.c
