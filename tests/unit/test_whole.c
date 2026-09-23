@@ -712,19 +712,19 @@ static void reflection_marks_the_table(void)
                   "ptr 0, i64 0 }\n");
 }
 
-/* The ways a library file can describe the interface a plugin provides
-   out of shape. The plugin copies the chain of the interface into its
-   own image and reads the length, the source, the size and the version
-   from the descriptor. */
+/* The ways a library file can damage the interface a plugin provides.
+   The plugin copies the chain of the interface into its own image. It
+   reads the length, the source, the size and the version from the
+   descriptor. */
 enum damage {
     INTACT,
-    CHAIN_TOO_LONG,         /* the length passes the items of the chain */
-    CHAIN_NOT_ADDRESS,      /* the chain is an integer, no global */
-    CHAIN_NO_VALUE,         /* the chain names a global of bytes */
-    CHAIN_ITEM_ADDRESS,     /* a hash of the chain is an address */
-    SIZE_FLOAT,             /* the size of the interface is a float */
-    FIELDS_ADDRESS,         /* the field count is an address */
-    VERSION_TOO_LONG        /* the version length passes its bytes */
+    CHAIN_TOO_LONG,         /* the length passes the items of the chain. */
+    CHAIN_NOT_ADDRESS,      /* the chain is an integer, no global. */
+    CHAIN_NO_VALUE,         /* the chain names a global of bytes. */
+    CHAIN_ITEM_ADDRESS,     /* a hash of the chain is an address. */
+    SIZE_FLOAT,             /* the size of the interface is a float. */
+    FIELDS_ADDRESS,         /* the field count is an address. */
+    VERSION_TOO_LONG        /* the version length passes its bytes. */
 };
 
 /* The global named name that holds a constant. */

@@ -1966,9 +1966,9 @@ static bool is_integer(const struct ir_const *c, bool sym)
 }
 
 /* The chain of hashes the version record names, or NULL where the
-   library file that carries it is damaged: the record is no address and
-   a length, the global holds no array of at least that many integers, or
-   the length is zero. */
+   library file that carries it is damaged. It is damaged where the record
+   is no address and a length, or the length is zero. It is damaged as
+   well where the global holds no array of that many integers. */
 static const struct ir_const *chain_of(const struct ir_module *m,
                                        const struct ir_const *record)
 {
