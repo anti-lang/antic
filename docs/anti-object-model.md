@@ -185,6 +185,9 @@ Four levels, and each applies where it makes sense:
 - `fn destruct(self)` is the destructor. A class declares it for anything the `own` rule cannot express. It never calls `self.super.destruct()`, because the compiler chains it.
 - `delete(p)` runs the concrete `destruct`, then each base's up the chain, destroys every owned object and frees every owned buffer, then frees the object. `p` must be a heap object.
 - `destroy(&c)` runs the same chain without the final free, for an object on the stack or inline in another object.
+- Memory goes back to the allocator it came from, and whoever chose the allocator says which one. `destroy(p, from)` runs the destruct chain of `p` and of everything it owns and returns each piece of owned memory to `from`, an `anti.mem.Allocator`, instead of the C library. `delete(p, from)` does the same and also returns the object itself to `from`. `delete(p)` and `destroy(p)` without an allocator mean `LibcAllocator.get()`, as before.
+- Over an `ArenaAllocator`, returning one piece does nothing, so `destroy(p, &arena)` runs every `destruct` and `arena.free_all()` returns the memory in one go.
+- Memory a class takes itself in its `construct` stays its own, and its `destruct` frees it the way it took it.
 - A local of class type whose chain declares `destruct` or has `own` fields is destroyed at the end of its block, as if `destroy(&c)` had been written as the last `defer`. A heap object is never destroyed by itself.
 - A local of array type whose element type has `destruct` or `own` fields is destroyed element by element at the end of its block, last to first.
 - An `own` slice of class values destroys its elements last to first before its buffer is freed. Every sequence of class values has that one order.
@@ -238,7 +241,7 @@ Four levels, and each applies where it makes sense:
 ## The root class
 
 - `anti.lang.Object` is the base of every class without `inherits`. It has no fields beyond the table pointer.
-- It declares seven `pub` functions with default bodies over the descriptor: `type_name(self) -> str`, `to_text(self) -> str`, `equals(self, other: *Object) -> bool`, `hash(self) -> u64`, `serialize(self, out: *text.Builder)`, `copy(self, to: *Object)`, and `destruct(self)`, which is empty. A static `Object.deserialize(input, from)` is the counterpart of `serialize`, in the format `anti.json` defines. It takes the object, its strings and the objects it owns from `from`, an `anti.mem.Allocator`, and the caller gives them back through it at once.
+- It declares seven `pub` functions with default bodies over the descriptor: `type_name(self) -> str`, `to_text(self) -> str`, `equals(self, other: *Object) -> bool`, `hash(self) -> u64`, `serialize(self, out: *text.Builder)`, `copy(self, to: *Object)`, and `destruct(self)`, which is empty. A static `Object.deserialize(input, from)` is the counterpart of `serialize`, in the format `anti.json` defines. It takes the object, its strings and the objects it owns from `from`, an `anti.mem.Allocator`. The caller ends the object's life with `destroy(p, from)`, which runs the destruct chain and returns the owned memory to `from`, and then frees what `from` still holds, the object and its strings, through it.
 - A class may replace any of them with `concrete fn`. Replacing `equals` without `hash`, or the reverse, is a warning. The default bodies walk the field list and are slow by design.
 - Every table starts with these seven entries after the descriptor pointer, and the nine hooks that "Hooks and tracing" of `docs/anti-language-additions.md` adds follow them. A C program that has the header of one class knows the head of every table.
 

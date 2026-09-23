@@ -395,6 +395,9 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
                                                               : "destroy");
         end(d, start, type);
         dump_expr(d, depth + 1, e->as.object.operand);
+        if (e->as.object.from != NULL) {
+            dump_expr(d, depth + 1, e->as.object.from);
+        }
         break;
     case EXPR_SIZE_OF:
         text_append(d->out, "size_of");

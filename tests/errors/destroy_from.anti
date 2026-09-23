@@ -1,0 +1,20 @@
+//! `delete(p, from)` and `destroy(p, from)` take a `*anti.mem.Allocator` after
+//! the object. `dup` takes no allocator, `delete` of a channel takes none, and
+//! a value that is no allocator is refused.
+import anti.mem;
+
+class Box
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let n = 1;
+	let c = dup(b, mem.LibcAllocator.get());
+	destroy(b, &n);
+	let ch = chan int(4);
+	delete(ch, mem.LibcAllocator.get());
+	return 0;
+}

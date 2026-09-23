@@ -1,0 +1,17 @@
+//! `destroy(p, from)` gives the memory back to an `anti.mem.Allocator`, and
+//! this module does not import `anti.mem`.
+
+class Box
+{
+	pub n: int = 0,
+}
+
+fn drop(b: *Box, from: *Object)
+{
+	destroy(b, from);
+}
+
+fn main() -> int
+{
+	return 0;
+}

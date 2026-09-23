@@ -1,0 +1,3 @@
+destroy_from.anti:15:17: error: `dup` takes 1 argument, found 2
+destroy_from.anti:16:13: error: expected `*Allocator`, found `*int`
+destroy_from.anti:18:13: error: `delete` takes 1 argument, found 2

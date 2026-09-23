@@ -1,0 +1,18 @@
+exit 0
+made: 6 live
+destruct Outer
+destruct Leaf 1
+destruct Tag 2
+destruct Item 4
+destruct Item 3
+destruct Leaf 5
+after delete: 0 live
+arena: 1 live
+destruct Outer
+destruct Leaf 1
+destruct Tag 2
+destruct Item 4
+destruct Item 3
+destruct Leaf 5
+after destroy: 1 live
+after free_all: 0 live

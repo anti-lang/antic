@@ -792,7 +792,12 @@ static struct expr *primary(struct parser *p)
             (e->as.object.operand = expression(p)) == NULL) {
             return NULL;
         }
-        accept(p, TOKEN_COMMA);
+        if (accept(p, TOKEN_COMMA) && !check(p, TOKEN_RPAREN)) {
+            if ((e->as.object.from = expression(p)) == NULL) {
+                return NULL;
+            }
+            accept(p, TOKEN_COMMA);
+        }
         return expect(p, TOKEN_RPAREN) ? e : NULL;
     case TOKEN_FREE:
         next(p);

@@ -625,34 +625,64 @@ void *anti_rt_dup(void *object, const struct anti_descriptor *type)
     return made + ((char *)object - start);
 }
 
-void anti_rt_destroy(void *object, const struct anti_descriptor *type)
+void anti_rt_give(struct anti_object *from, void *p)
+{
+    void (*give)(struct anti_object *, void *);
+
+    if (from == NULL) {
+        free(p);
+        return;
+    }
+    give = (void (*)(struct anti_object *, void *))(
+        void *)from->table[ANTI_ENTRY_FREE];
+    give(from, p);
+}
+
+void anti_rt_destroy_from(void *object, const struct anti_descriptor *type,
+                          struct anti_object *from)
 {
     void *start = checked_object(object, type);
-    void (*teardown)(struct anti_object *) =
-        (void (*)(struct anti_object *))table_entry(start, ANTI_ENTRY_DROP);
+    void (*teardown)(struct anti_object *, struct anti_object *) =
+        (void (*)(struct anti_object *, struct anti_object *))table_entry(
+            start, ANTI_ENTRY_DROP);
 
     if (teardown != NULL) {
-        teardown(start);
+        teardown(start, from);
     }
+}
+
+void anti_rt_delete_from(void *object, const struct anti_descriptor *type,
+                         struct anti_object *from)
+{
+    void *start = checked_object(object, type);
+
+    if (start == NULL) {
+        return;
+    }
+    anti_rt_destroy_from(start, type, from);
+    anti_rt_give(from, start);
+}
+
+void anti_rt_destroy(void *object, const struct anti_descriptor *type)
+{
+    anti_rt_destroy_from(object, type, NULL);
 }
 
 void anti_rt_delete(void *object, const struct anti_descriptor *type)
 {
-    void *start = checked_object(object, type);
-
-    anti_rt_destroy(start, type);
-    free(start);
+    anti_rt_delete_from(object, type, NULL);
 }
 
 /* DESIGN: every sequence of class values is torn down last to first, a
    local array and an `own` slice alike. */
 void anti_rt_destroy_elements(void *elements, int64_t count,
-                              const struct anti_descriptor *type)
+                              const struct anti_descriptor *type,
+                              struct anti_object *from)
 {
     int64_t i;
 
     for (i = count - 1; elements != NULL && type != NULL && i >= 0; i--) {
-        anti_rt_destroy((char *)elements + i * type->size, type);
+        anti_rt_destroy_from((char *)elements + i * type->size, type, from);
     }
 }
 

@@ -1,0 +1,1 @@
+destroy_from_no_import.anti:11:13: error: `destroy` with an allocator gives the memory back to an `anti.mem.Allocator`, so the module imports `anti.mem`

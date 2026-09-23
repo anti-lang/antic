@@ -121,17 +121,6 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
 /* How deep objects and arrays may nest. */
 #define DEPTH_LIMIT ANTI_JSON_DEPTH
 
-/* DESIGN: anti.mem.Allocator declares alloc and free as its first two
-   functions. They take the two entries after the seven of the root and
-   the nine hooks. That is the table of every allocator and of the
-   sub-object of an interface. The runtime calls them there, as a call
-   through a `*Allocator` does. std/anti/mem.anti keeps the order.
-   std_deserialize_alloc counts every call. */
-enum {
-    ENTRY_ALLOC = ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT,
-    ENTRY_FREE
-};
-
 /* DESIGN: an object and a buffer of elements take the alignment that
    malloc gives on every target of the runtime archive. calloc gave them
    that before deserialize took an allocator. A string takes one. */
@@ -158,7 +147,7 @@ static void *lend(struct reader *r, size_t size, int64_t align)
 {
     void *(*alloc)(struct anti_object *, int64_t, int64_t) =
         (void *(*)(struct anti_object *, int64_t, int64_t))(
-            void *)r->from->table[ENTRY_ALLOC];
+            void *)r->from->table[ANTI_ENTRY_ALLOC];
     struct made *m = r->made;
     void *p;
 
@@ -189,7 +178,7 @@ static void give_back(struct reader *r)
 {
     void (*give)(struct anti_object *, void *) =
         (void (*)(struct anti_object *, void *))(
-            void *)r->from->table[ENTRY_FREE];
+            void *)r->from->table[ANTI_ENTRY_FREE];
     struct made *m = r->made;
 
     while (m->count > 0) {
@@ -650,8 +639,9 @@ static bool fill(struct reader *r, void *object,
    literal of the class would be and then filled from the other members.
    A construct with arguments does not run, because the fields come from
    the text. A failure leaves what was built to deserialize, which gives
-   every block back. No destruct runs, as none runs when the caller gives
-   the memory back. */
+   every block back without a destruct. On success the caller runs the
+   destructs with destroy(p, from), which gives the owned memory back to
+   the same allocator. */
 static void *read_object(struct reader *r,
                          const struct anti_descriptor *expected, int depth)
 {

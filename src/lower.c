@@ -2698,7 +2698,9 @@ static bool has_body(const struct item *fn)
    They fill the destruct and the copy entries of its table, and delete,
    destroy and dup reach them through it. Ownership therefore never reads
    the field list, which --no-reflect drops. A chain that declares `copy`
-   keeps that function in the entry, and no copy is written. */
+   keeps that function in the entry, and no copy is written. The
+   teardown takes the anti.mem.Allocator that the memory the object owns
+   goes back to, which is zero for the C library. */
 static struct ir_function *class_function(struct lowerer *l,
                                           const struct type *t,
                                           const char *part)
@@ -2716,7 +2718,7 @@ static struct ir_function *class_function(struct lowerer *l,
                                   IR_NO_AGG)
                 : ir_declare_add(l->m, module, name, IR_VOID, IR_NO_AGG);
         ir_param_add(f, IR_PTR, IR_NO_AGG);
-        if (strcmp(part, "copy") == 0) {
+        if (strcmp(part, "copy") == 0 || strcmp(part, "destroy") == 0) {
             ir_param_add(f, IR_PTR, IR_NO_AGG);
         }
     }
@@ -5380,6 +5382,11 @@ static struct ir_operand static_descriptor(struct lowerer *l,
     return temp(l, ir_addr(l->f, l->b, ir_global_op(class_descriptor(l, t))));
 }
 
+static struct ir_operand rt_call(struct lowerer *l, const char *name,
+                                 enum ir_type result,
+                                 const enum ir_type *params,
+                                 struct ir_operand *args, size_t count);
+
 /* A call of anti_rt_delete, anti_rt_destroy or anti_rt_dup on object,
    which the program holds as a t. Only dup gives a value. */
 static struct ir_operand object_call(struct lowerer *l, const char *name,
@@ -6090,6 +6097,21 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         v = lower_expr(l, e->as.object.operand);
         if (l->failed) {
             return none();
+        }
+        if (e->as.object.from != NULL) {
+            static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
+            struct ir_operand args[3];
+            args[0] = v;
+            args[1] = static_descriptor(l, e->as.object.operand->type);
+            args[2] = lower_expr(l, e->as.object.from);
+            if (l->failed) {
+                return none();
+            }
+            return rt_call(l,
+                           e->as.object.op == TOKEN_DELETE
+                               ? "anti_rt_delete_from"
+                               : "anti_rt_destroy_from",
+                           IR_VOID, three, args, 3);
         }
         if (e->as.object.op == TOKEN_DUP) {
             struct ir_operand made =
@@ -6899,6 +6921,7 @@ static struct ir_operand element_count(struct lowerer *l, const struct type *t)
 static void destroy_value(struct lowerer *l, struct ir_operand p,
                           const struct type *t, bool replaced)
 {
+    struct ir_operand args[2];
     struct ir_block *after;
 
     if (!replaced) {
@@ -6906,8 +6929,10 @@ static void destroy_value(struct lowerer *l, struct ir_operand p,
         return;
     }
     after = when_made(l, p);
+    args[0] = p;
+    args[1] = ir_int_op(IR_PTR, 0);
     ir_call(l->f, l->b, IR_VOID, ir_func_op(class_function(l, t, "destroy")),
-            &p, 1);
+            args, 2);
     ir_jump(l->f, l->b, after);
     l->b = after;
 }
@@ -8581,12 +8606,15 @@ static struct ir_operand slice_length(struct lowerer *l, struct ir_operand p,
                                           field_offset(l, slice, &len_name))));
 }
 
-/* The teardown of the field f of level up, in the object at self. */
+/* The teardown of the field f of level up, in the object at self. Owned
+   memory goes back to the allocator from. */
 static void teardown_field(struct lowerer *l, const struct type *up,
                            const struct struct_field *f,
-                           struct ir_operand self)
+                           struct ir_operand self, struct ir_operand from)
 {
-    static const enum ir_type three[] = {IR_PTR, IR_I64, IR_PTR};
+    static const enum ir_type two[] = {IR_PTR, IR_PTR};
+    static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
+    static const enum ir_type four[] = {IR_PTR, IR_I64, IR_PTR, IR_PTR};
     const struct type *element = f->type->element;
     struct ir_operand at;
     struct ir_operand v;
@@ -8600,25 +8628,33 @@ static void teardown_field(struct lowerer *l, const struct type *up,
     }
     at = offset_address(l, self, field_offset(l, up, &f->name));
     if (!f->owned) {
-        struct ir_operand arg = at;
+        struct ir_operand args[2];
+        args[0] = at;
+        args[1] = from;
         check_table(l, temp(l, ir_load(l->f, l->b, IR_PTR, at)), f->type);
         ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(class_function(l, f->type, "destroy")), &arg, 1);
+                ir_func_op(class_function(l, f->type, "destroy")), args, 2);
         return;
     }
     v = temp(l, ir_load(l->f, l->b, IR_PTR, at));
     if (f->type->kind == TYPE_POINTER && element->kind == TYPE_CLASS) {
-        object_call(l, "anti_rt_delete", v, element);
+        struct ir_operand args[3];
+        args[0] = v;
+        args[1] = static_descriptor(l, element);
+        args[2] = from;
+        rt_call(l, "anti_rt_delete_from", IR_VOID, three, args, 3);
     } else {
+        struct ir_operand args[4];
         if (f->type->kind == TYPE_SLICE && element->kind == TYPE_CLASS) {
-            struct ir_operand args[3];
             args[0] = v;
             args[1] = slice_length(l, at, f->type);
             args[2] = static_descriptor(l, element);
-            rt_call(l, "anti_rt_destroy_elements", IR_VOID, three, args, 3);
+            args[3] = from;
+            rt_call(l, "anti_rt_destroy_elements", IR_VOID, four, args, 4);
         }
-        ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(c_function(l, "free", IR_VOID, IR_PTR)), &v, 1);
+        args[0] = from;
+        args[1] = v;
+        rt_call(l, "anti_rt_give", IR_VOID, two, args, 2);
     }
     ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
 }
@@ -8636,11 +8672,13 @@ static void class_teardown(struct lowerer *l, const struct type *t)
     struct ir_function *f = class_function(l, t, "destroy");
     const struct type *up;
     struct ir_operand self;
+    struct ir_operand from;
     size_t i;
 
     l->f = f;
     l->b = ir_block_add(f);
     self = temp(l, f->params[0].temp);
+    from = temp(l, f->params[1].temp);
     hook_object(l, HOOK_DESTROYED, self);
     for (up = t; up->base != NULL; up = up->base) {
         const struct item *m = level_fn(up, &destruct_name);
@@ -8652,7 +8690,7 @@ static void class_teardown(struct lowerer *l, const struct type *t)
     }
     for (up = t; up->base != NULL; up = up->base) {
         for (i = 0; i < up->field_count; i++) {
-            teardown_field(l, up, &up->fields[i], self);
+            teardown_field(l, up, &up->fields[i], self, from);
         }
     }
     ir_ret(l->f, l->b, IR_VOID, none());

@@ -853,6 +853,26 @@ static struct type *location_type(struct checker *c, struct pos pos)
     return sym->type;
 }
 
+/* The type `*anti.mem.Allocator`, or NULL when the module does not
+   import `anti.mem`. */
+static struct type *allocator_pointer(struct checker *c)
+{
+    static const struct name module = {MEM_MODULE, sizeof MEM_MODULE - 1};
+    static const struct name class_name = {MEM_ALLOCATOR,
+                                           sizeof MEM_ALLOCATOR - 1};
+    const struct interface *lib = find_library(c, &module);
+    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+
+    if (sym == NULL && name_is(&c->module_name, MEM_MODULE)) {
+        sym = lookup(c, &class_name);
+    }
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
+        sym->type->kind != TYPE_CLASS) {
+        return NULL;
+    }
+    return types_pointer(c->types, sym->type);
+}
+
 /* DESIGN: `Object.deserialize` takes the allocator of the memory it makes
    as a `*anti.mem.Allocator`. The type of a use names that class, so an
    argument converts to it as to any parameter, through the sub-object of
@@ -862,18 +882,10 @@ static struct type *location_type(struct checker *c, struct pos pos)
 static struct type *deserialize_type(struct checker *c, struct pos pos,
                                      const struct type *declared)
 {
-    static const struct name module = {MEM_MODULE, sizeof MEM_MODULE - 1};
-    static const struct name class_name = {MEM_ALLOCATOR,
-                                           sizeof MEM_ALLOCATOR - 1};
-    const struct interface *lib = find_library(c, &module);
-    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+    struct type *from = allocator_pointer(c);
     struct type **params;
 
-    if (sym == NULL && name_is(&c->module_name, MEM_MODULE)) {
-        sym = lookup(c, &class_name);
-    }
-    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
-        sym->type->kind != TYPE_CLASS) {
+    if (from == NULL) {
         error_at(c, pos, "`" LANG_OBJECT "." ROOT_DESERIALIZE "` takes its "
                  "memory from an `" MEM_MODULE "." MEM_ALLOCATOR "`, so the "
                  "module imports `" MEM_MODULE "`");
@@ -881,8 +893,28 @@ static struct type *deserialize_type(struct checker *c, struct pos pos,
     }
     params = arena_alloc(c->arena, 2 * sizeof *params);
     params[0] = declared->params[0];
-    params[1] = types_pointer(c->types, sym->type);
+    params[1] = from;
     return types_fn(c->types, params, 2, declared->result);
+}
+
+/* DESIGN: `delete(p, from)` and `destroy(p, from)` give the memory back
+   to the allocator it came from, a `*anti.mem.Allocator`, which converts
+   as any argument does. The module imports `anti.mem`, as the one that
+   calls `Object.deserialize` does. Whether the allocator of e checks. */
+static bool check_object_from(struct checker *c, struct expr *e,
+                              const char *what)
+{
+    struct type *expected = allocator_pointer(c);
+    struct type *got;
+
+    if (expected == NULL) {
+        error_at(c, e->as.object.from->pos, "`%s` with an allocator gives "
+                 "the memory back to an `" MEM_MODULE "." MEM_ALLOCATOR "`, "
+                 "so the module imports `" MEM_MODULE "`", what);
+        return false;
+    }
+    got = check_expr(c, e->as.object.from, expected);
+    return require(c, e->as.object.from, got, expected);
 }
 
 /* The type of a function item, fn(params) -> result. A function of a
@@ -1540,6 +1572,7 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
                      (int)w->worker->name.length, w->worker->name.text);
         }
         walk_expr(w, e->as.object.operand);
+        walk_expr(w, e->as.object.from);
         return;
     case EXPR_FIELD: {
         const struct type *owner =
@@ -6336,6 +6369,15 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         t = check_expr(c, e->as.object.operand, NULL);
         if (is_error(t)) {
             return t;
+        }
+        if (e->as.object.from != NULL &&
+            (e->as.object.op == TOKEN_DUP || types_is_chan(t))) {
+            error_at(c, e->as.object.from->pos, "`%s` takes 1 argument, "
+                     "found 2", what);
+            return builtin(c, TYPE_ERROR);
+        }
+        if (e->as.object.from != NULL && !check_object_from(c, e, what)) {
+            return builtin(c, TYPE_ERROR);
         }
         /* DESIGN: `delete(c)` ends a channel and frees what the runtime
            holds for it, as `delete` frees an object on the heap. */

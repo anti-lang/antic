@@ -166,6 +166,14 @@ enum anti_entry {
     ANTI_ENTRY_HOOK     /* the first of the nine hooks */
 };
 
+/* DESIGN: anti.mem.Allocator declares alloc and free as its first two
+   functions. They take the two entries after the seven of the root and
+   the nine hooks. That holds for the table of every allocator and of the
+   sub-object of an interface. The runtime calls them there, as a call through a
+   `*Allocator` does. std/anti/mem.anti keeps the order. */
+#define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+#define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
+
 /* DESIGN: the nine hooks of anti.lang.Object, in the order of
    root_names. Three are lifecycle and two are threads, which every
    build compiles. Three are the calls of an instrumented class, which
@@ -206,6 +214,15 @@ const struct anti_descriptor *anti_rt_descriptor(const void *object);
    copy entry of its table. */
 void *anti_rt_dup(void *object, const struct anti_descriptor *type);
 
+/* DESIGN: memory goes back to the allocator it came from. The teardown
+   in the destruct entry takes the object and the anti.mem.Allocator of
+   the memory it owns. NULL there is the C library, where `alloc` takes
+   it, and the two forms without an allocator pass NULL. */
+
+/* Give p back to the allocator from, or to the C library when from is
+   NULL. */
+void anti_rt_give(struct anti_object *from, void *p);
+
 /* Run the destruct body of each class of the chain, destroy every object
    the chain owns, free every buffer it owns, and free the object. */
 void anti_rt_delete(void *object, const struct anti_descriptor *type);
@@ -214,10 +231,18 @@ void anti_rt_delete(void *object, const struct anti_descriptor *type);
    heap of its own. */
 void anti_rt_destroy(void *object, const struct anti_descriptor *type);
 
+/* delete and destroy that give every piece of memory back to from. */
+void anti_rt_delete_from(void *object, const struct anti_descriptor *type,
+                         struct anti_object *from);
+void anti_rt_destroy_from(void *object, const struct anti_descriptor *type,
+                          struct anti_object *from);
+
 /* The teardown of each of count class values of the type in a row, last
-   to first, as an `own` slice of them holds. */
+   to first, as an `own` slice of them holds. What they own goes back to
+   from. */
 void anti_rt_destroy_elements(void *elements, int64_t count,
-                              const struct anti_descriptor *type);
+                              const struct anti_descriptor *type,
+                              struct anti_object *from);
 
 /* The copy of each of count class values of the type from one row into
    another. */

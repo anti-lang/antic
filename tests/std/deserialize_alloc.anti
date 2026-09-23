@@ -1,10 +1,14 @@
 //! `Object.deserialize` takes the object, every string and every owned object
-//! it makes from the allocator it is given, and the caller gives the memory
-//! back through that allocator. `Kept` remembers each block it lends, so the
-//! test sees that the strings of the object are among them and that none is
-//! left once they all go back. A text that fails gives back what it made.
+//! it makes from the allocator it is given. The caller runs the destruct chain
+//! with `delete(p, from)` or `destroy(p, from)`, which give every piece of
+//! owned memory back to that allocator, and then frees what the allocator still
+//! holds. `Kept` remembers each block it lends, so the test sees that the
+//! strings of the object are among them, which pieces the teardown gives back
+//! and that none is left at the end. A text that fails gives back what it made.
 //! `Lender` lends through the sub-object of an interface. Over an
-//! `ArenaAllocator`, `free_all` gives back every block at once.
+//! `ArenaAllocator`, `destroy` runs every destruct and `free_all` gives back
+//! every block at once. `Scratch` takes memory of its own in its `construct`
+//! and `Holder` holds a resource, and `Tally` counts that each is given back.
 import anti.mem;
 import anti.text;
 
@@ -112,7 +116,7 @@ class Lender
 class Counting inherits mem.Allocator
 {
 	pub live: int = 0,
-	pub taken: int = 0,
+	pub mutable taken: int = 0,
 
 	concrete fn alloc(self, size: int, align: int) -> ?*byte
 	{
@@ -133,6 +137,52 @@ class Counting inherits mem.Allocator
 	}
 }
 
+/// What the classes below take and give back.
+singleton class Tally
+{
+	pub mutable taken: int = 0,
+	pub mutable given: int = 0,
+	pub mutable opened: int = 0,
+	pub mutable closed: int = 0,
+}
+
+/// A class whose `construct` takes memory of its own from the C library, which
+/// its `destruct` gives back there. The field is `transient`, so the reader
+/// leaves it alone.
+class Scratch
+{
+	pub size: int = 0,
+	transient buffer: ?*byte = none,
+
+	fn construct(self)
+	{
+		self.buffer = alloc(byte, 64);
+		Tally.get().taken += 1;
+	}
+
+	fn destruct(self)
+	{
+		free(self.buffer);
+		Tally.get().given += 1;
+	}
+}
+
+/// A class that holds a resource from its `construct` to its `destruct`.
+class Holder
+{
+	pub label: int = 0,
+
+	fn construct(self)
+	{
+		Tally.get().opened += 1;
+	}
+
+	fn destruct(self)
+	{
+		Tally.get().closed += 1;
+	}
+}
+
 class Leaf
 {
 	pub name: str = "",
@@ -146,6 +196,24 @@ class Tree
 	pub own counts: []i32,
 	pub own words: []str,
 	pub leaf: Leaf = Leaf { },
+	pub own scratch: ?*Scratch = none,
+	pub holder: Holder = Holder { },
+}
+
+/// A class without a resource, for the text that fails.
+class Branch
+{
+	pub title: str = "",
+	pub own left: ?*Leaf = none,
+}
+
+/// Print what `Tally` has counted so far.
+fn tally(when: str)
+{
+	let t = Tally.get();
+	printf("%s: taken %d, given %d, opened %d, closed %d\n".ptr, when.ptr,
+		t.taken as c_int, t.given as c_int, t.opened as c_int,
+		t.closed as c_int);
 }
 
 /// The text that the default `serialize` writes for a tree with a string in
@@ -158,6 +226,7 @@ fn written(b: *text.Builder) -> str
 		counts: []i32 { ptr: alloc(i32, 3), len: 3 },
 		words: []str { ptr: alloc(str, 2), len: 2 },
 		leaf: Leaf { name: "in", weight: 5 },
+		scratch: alloc Scratch { size: 64 },
 	};
 	made.counts[0] = 1;
 	made.counts[1] = -2;
@@ -195,9 +264,17 @@ fn main() -> int
 		!text.equal(t.words[1], "bc") || !text.equal(t.leaf.name, "in") {
 		return 3;
 	}
+	let scratch = t.scratch else { return 6; };
+	if scratch.size != 64 {
+		return 7;
+	}
 	printf("kept: %d lent, %d live, strings kept %d\n".ptr,
 		kept.lent as c_int, kept.live as c_int,
 		strings_kept(t, &kept) as c_int);
+	tally("before delete");
+	delete(t, &kept);
+	tally("after delete");
+	printf("after delete: %d live\n".ptr, kept.live as c_int);
 	kept.free_all();
 	printf("after free_all: %d live\n".ptr, kept.live as c_int);
 
@@ -205,7 +282,7 @@ fn main() -> int
 	   deserialize gives each of them back. */
 	let failed = Kept.new();
 	let refused = Object.deserialize(
-		"{\"type\":\"Tree\",\"title\":\"oak\",\"left\":{\"type\":\"Leaf\",\"name\":\"low\",\"weight\":\"x\"}}",
+		"{\"type\":\"Branch\",\"title\":\"oak\",\"left\":{\"type\":\"Leaf\",\"name\":\"low\",\"weight\":\"x\"}}",
 		&failed);
 	printf("failed: none %d, %d lent, %d live\n".ptr,
 		(refused == none) as c_int, failed.lent as c_int,
@@ -219,6 +296,8 @@ fn main() -> int
 	}
 	printf("lender: %d lent, strings kept %d\n".ptr, behind.lent as c_int,
 		strings_kept(lent as *Tree, &behind) as c_int);
+	destroy(lent as *Tree, &lender);
+	printf("after destroy: %d live\n".ptr, behind.live as c_int);
 	behind.free_all();
 	printf("after free_all: %d live\n".ptr, behind.live as c_int);
 
@@ -231,7 +310,10 @@ fn main() -> int
 	let a = from_arena as *Tree;
 	printf("arena: %.*s, %d live\n".ptr, a.title.len as c_int, a.title.ptr,
 		counting.live as c_int);
+	destroy(a, &arena);
+	printf("after destroy: %d live\n".ptr, counting.live as c_int);
 	arena.free_all();
 	printf("after free_all: %d live\n".ptr, counting.live as c_int);
+	tally("at the end");
 	return 0;
 }

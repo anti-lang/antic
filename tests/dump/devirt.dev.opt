@@ -166,7 +166,7 @@ b2:
     %7 = call i64 %6 via @devirt.fn.0(%0) table @devirt.Speaker.descriptor 17
     ret i64 %7
 }
-fn devirt.Only.destroy(%0: ptr) {
+fn devirt.Only.destroy(%0: ptr, %1: ptr) {
 b0:
     call void @anti_rt_hook(%0, 1)
     ret
@@ -185,7 +185,7 @@ b0:
     call void @anti_rt_hook(%0, 0)
     ret
 }
-fn devirt.Base.destroy(%0: ptr) {
+fn devirt.Base.destroy(%0: ptr, %1: ptr) {
 b0:
     call void @anti_rt_hook(%0, 1)
     ret
@@ -204,7 +204,7 @@ b0:
     call void @anti_rt_hook(%0, 0)
     ret
 }
-fn devirt.Derived.destroy(%0: ptr) {
+fn devirt.Derived.destroy(%0: ptr, %1: ptr) {
 b0:
     call void @anti_rt_hook(%0, 1)
     ret
@@ -223,7 +223,7 @@ b0:
     call void @anti_rt_hook(%0, 0)
     ret
 }
-fn devirt.Dog.destroy(%0: ptr) {
+fn devirt.Dog.destroy(%0: ptr, %1: ptr) {
 b0:
     call void @anti_rt_hook(%0, 1)
     ret

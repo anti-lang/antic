@@ -1,0 +1,160 @@
+//! `delete(p, from)` and `destroy(p, from)` run the destruct chain of `p` and
+//! of everything it owns, and give each piece of owned memory back to `from`.
+//! `delete` gives the object back as well. Every piece here comes from
+//! `Counting`, so its count shows what came back: an object behind an `own`
+//! pointer, one behind an `own` pointer to an interface, an `own` slice of
+//! class values, whose elements run their chains last to first, an `own`
+//! buffer, and what a class value held inline owns. Over an `ArenaAllocator`,
+//! `free` of one piece gives nothing back, so `destroy` runs every destruct and
+//! `free_all` gives back the blocks.
+import anti.mem;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+extern fn memset(p: ?*byte, c: c_int, n: c_size_t) -> ?*byte;
+
+/// An allocator over the C library that counts the blocks it lends.
+class Counting inherits mem.Allocator
+{
+	pub live: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		self.live += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.live -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+class Leaf
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("destruct Leaf %d\n".ptr, self.n as c_int);
+	}
+}
+
+abstract class Named
+{
+	abstract fn label(self) -> int;
+}
+
+class Tag
+{
+	pub id: int = 0,
+	implements named: Named,
+
+	concrete fn Named::label(self) -> int
+	{
+		return self.id;
+	}
+
+	fn destruct(self)
+	{
+		printf("destruct Tag %d\n".ptr, self.id as c_int);
+	}
+}
+
+class Item
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("destruct Item %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Part
+{
+	pub own leaf: ?*Leaf = none,
+}
+
+class Outer
+{
+	pub own leaf: ?*Leaf = none,
+	pub own named: ?*Named = none,
+	pub own items: []Item,
+	pub own counts: []i32,
+	pub part: Part = Part { },
+
+	fn destruct(self)
+	{
+		printf("destruct Outer\n".ptr);
+	}
+}
+
+/// `size` bytes of `from`, zeroed, so a class value there has a zero table
+/// until the program makes it.
+fn take(from: *mem.Allocator, size: int) -> ?*byte
+{
+	let raw = from.alloc(size, 16) else { return none; };
+	memset(raw, 0, size as c_size_t);
+	return raw;
+}
+
+fn leaf(from: *mem.Allocator, n: int) -> ?*Leaf
+{
+	let raw = take(from, size_of(Leaf)) else { return none; };
+	let made = raw as *Leaf;
+	*made = Leaf { n: n };
+	return made;
+}
+
+fn tag(from: *mem.Allocator, id: int) -> ?*Tag
+{
+	let raw = take(from, size_of(Tag)) else { return none; };
+	let made = raw as *Tag;
+	*made = Tag { id: id };
+	return made;
+}
+
+/// An `Outer` whose every piece comes from `from`.
+fn outer(from: *mem.Allocator) -> ?*Outer
+{
+	let raw = take(from, size_of(Outer)) else { return none; };
+	let items = take(from, 2 * size_of(Item)) else { return none; };
+	let counts = take(from, 3 * size_of(i32)) else { return none; };
+	let o = raw as *Outer;
+	*o = Outer {
+		items: []Item { ptr: items as *Item, len: 2 },
+		counts: []i32 { ptr: counts as *i32, len: 3 },
+	};
+	o.leaf = leaf(from, 1);
+	let t = tag(from, 2) else { return none; };
+	o.named = t;
+	o.items[0] = Item { n: 3 };
+	o.items[1] = Item { n: 4 };
+	o.part.leaf = leaf(from, 5);
+	return o;
+}
+
+fn main() -> int
+{
+	let counting = Counting { };
+	let o = outer(&counting) else { return 1; };
+	printf("made: %d live\n".ptr, counting.live as c_int);
+	delete(o, &counting);
+	printf("after delete: %d live\n".ptr, counting.live as c_int);
+
+	let blocks = Counting { };
+	let arena = mem.ArenaAllocator.new(&blocks, 4096);
+	let a = outer(&arena) else { return 2; };
+	printf("arena: %d live\n".ptr, blocks.live as c_int);
+	destroy(a, &arena);
+	printf("after destroy: %d live\n".ptr, blocks.live as c_int);
+	arena.free_all();
+	printf("after free_all: %d live\n".ptr, blocks.live as c_int);
+	return 0;
+}

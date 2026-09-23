@@ -320,6 +320,7 @@ struct expr {
         struct {
             enum token_kind op;     /* dup, delete or destroy */
             struct expr *operand;
+            struct expr *from;      /* the allocator of delete or destroy */
         } object;
         struct {
             struct expr *job;       /* EXPR_JOIN: the job or the slice */

@@ -2446,6 +2446,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "format_alloc|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_alloc.s,format_alloc.anti"
         "deserialize_alloc|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/deserialize_alloc.s,deserialize_alloc.anti"
         "deserialize_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/deserialize_no_import.s,deserialize_no_import.anti"
+        "destroy_from|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/destroy_from.s,destroy_from.anti"
+        "destroy_from_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/destroy_from_no_import.s,destroy_from_no_import.anti"
         "transient|-S,-o,${LISTINGS}/transient.s,transient.anti"
         "member_keywords|-S,-o,${LISTINGS}/member_keywords.s,member_keywords.anti"
         "simd_decl|-S,-o,${LISTINGS}/simd_decl.s,simd_decl.anti"
