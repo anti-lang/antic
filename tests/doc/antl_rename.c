@@ -2,6 +2,7 @@
    replaces every occurrence of one byte string with another. The two are
    of one length, so every length and offset of the file stays valid. A
    library file holds NUL bytes, which a CMake script cannot write. */
+#include "../binary_stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
