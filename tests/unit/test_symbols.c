@@ -423,6 +423,41 @@ static void long_leb(void)
     free(file);
 }
 
+/* S37: a build id is read only where a readable PT_LOAD of the mapped
+   module holds it. The read ends at the end of that segment. */
+static void loaded_room(void)
+{
+    uint8_t headers[3 * 56];
+
+    memset(headers, 0, sizeof headers);
+    /* PT_LOAD, readable, 0x1000 bytes in memory at 0x10000. */
+    put(headers, 1, 4);
+    put(headers + 4, 4, 4);
+    put(headers + 16, 0x10000, 8);
+    put(headers + 40, 0x1000, 8);
+    /* PT_LOAD with no read permission at 0x20000. */
+    put(headers + 56, 1, 4);
+    put(headers + 56 + 16, 0x20000, 8);
+    put(headers + 56 + 40, 0x1000, 8);
+    /* PT_NOTE at 0x30000, and a segment that wraps the address space. */
+    put(headers + 112, 4, 4);
+    put(headers + 112 + 4, 4, 4);
+    put(headers + 112 + 16, 0x30000, 8);
+    put(headers + 112 + 40, 0x1000, 8);
+    CHECK(anti_elf_loaded_room(headers, 3, 0x10000) == 0x1000);
+    CHECK(anti_elf_loaded_room(headers, 3, 0x10ff0) == 0x10);
+    CHECK(anti_elf_loaded_room(headers, 3, 0x11000) == 0);
+    CHECK(anti_elf_loaded_room(headers, 3, 0xffff) == 0);
+    CHECK(anti_elf_loaded_room(headers, 3, 0x20010) == 0);
+    CHECK(anti_elf_loaded_room(headers, 3, 0x30010) == 0);
+    CHECK(anti_elf_loaded_room(headers, 1, 0x10000) == 0x1000);
+    CHECK(anti_elf_loaded_room(headers, 0, 0x10000) == 0);
+    put(headers + 112, 1, 4);
+    put(headers + 112 + 16, UINT64_MAX - 0xf, 8);
+    CHECK(anti_elf_loaded_room(headers, 3, UINT64_MAX) == 0);
+    CHECK(anti_elf_loaded_room(headers, 3, 0x5) == 0);
+}
+
 void test_symbols(void)
 {
     /* The forms of "Symbols" in docs/decisions.md. */
@@ -453,4 +488,5 @@ void test_symbols(void)
     line_overflow();
     empty_entry_formats();
     long_leb();
+    loaded_room();
 }

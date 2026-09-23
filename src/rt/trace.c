@@ -69,19 +69,24 @@ extern const char anti_licenses[] __attribute__((weak));
 #endif
 
 /* The build id of a notice, the digits of its line `build <id>` after
-   the begin marker, or an empty text. */
-static struct anti_text notice_id(const char *notice)
+   the begin marker, or an empty text. No byte at or past room is read,
+   and a notice of this program or of a table in memory passes
+   SIZE_MAX. */
+static struct anti_text notice_id(const char *notice, size_t room)
 {
     static const char head[] = "ANTI_LICENSES_BEGIN\nbuild ";
-    const char *from;
-    const char *to;
+    size_t at = sizeof head - 1;
 
-    if (notice == NULL || strncmp(notice, head, sizeof head - 1) != 0) {
+    if (notice == NULL || room < at || strncmp(notice, head, at) != 0) {
         return text_of(NULL);
     }
-    from = notice + sizeof head - 1;
-    to = strchr(from, '\n');
-    return to != NULL ? text_part(from, (size_t)(to - from)) : text_of(NULL);
+    while (at < room && notice[at] != '\n' && notice[at] != 0) {
+        at++;
+    }
+    if (at == room || notice[at] != '\n') {
+        return text_of(NULL);
+    }
+    return text_part(notice + sizeof head - 1, at - (sizeof head - 1));
 }
 
 #if !defined(_WIN32)
@@ -142,6 +147,14 @@ static const struct loaded *load(const char *path, bool object)
                 break;
             }
             l->size += n;
+        }
+        /* A read error leaves a short image, which the readers would take
+           for the whole file. The entry then holds no bytes, as for a
+           file that does not open. */
+        if (f != NULL && ferror(f) != 0) {
+            free(l->bytes);
+            l->bytes = NULL;
+            l->size = 0;
         }
         if (f != NULL) {
             fclose(f);
@@ -282,7 +295,8 @@ static struct anti_text image_id(const uint8_t *header)
     if ((flags & 0x80000000u) == 0 &&
         anti_macho_table(header, SIZE_MAX, true, slide, &t) &&
         anti_macho_symbol(&t, "anti_licenses", &vaddr)) {
-        id = notice_id((const char *)(uintptr_t)(vaddr + (uint64_t)slide));
+        id = notice_id((const char *)(uintptr_t)(vaddr + (uint64_t)slide),
+                       SIZE_MAX);
     }
     if (known_count < KNOWN_MAX) {
         known[known_count].header = header;
@@ -363,11 +377,17 @@ static void read_program_path(void)
     program_path[n > 0 ? n : 0] = 0;
 }
 
+/* anti_elf_loaded_room reads the program headers as the 56 bytes of
+   the 64-bit form, which every Linux target has. */
+_Static_assert(sizeof(ElfW(Phdr)) == 56, "a program header is 56 bytes");
+
 /* The module an address lies in, as the list of modules gives it. */
 struct module_of {
     uintptr_t address;
     const char *name;
     uintptr_t bias;
+    const ElfW(Phdr) *headers;      /* read by anti_elf_loaded_room */
+    size_t header_count;
     size_t visited;
     bool found;
     bool program;
@@ -387,6 +407,8 @@ static int visit_module(struct dl_phdr_info *info, size_t size, void *context)
             m->address - from < p->p_memsz) {
             m->name = info->dlpi_name;
             m->bias = info->dlpi_addr;
+            m->headers = info->dlpi_phdr;
+            m->header_count = info->dlpi_phnum;
             m->found = true;
             m->program = m->visited == 1;
             return 1;
@@ -413,23 +435,32 @@ static bool module_at(uintptr_t address, struct module_of *m)
 
 /* The build id of the module. The one of this runtime reads its own
    notice. Another one is read by the symbol `anti_licenses` of its file,
-   which only an Anti binary has. */
+   which only an Anti binary has. The file on disk may no longer be the
+   one mapped, so the notice is read only inside a loaded segment of the
+   module. */
 static struct anti_text module_id(const struct module_of *m)
 {
     struct module_of self;
     const struct loaded *l;
     uint64_t vaddr;
+    uint64_t room;
 
     if (module_at((uintptr_t)anti_rt_trace_walk, &self) &&
         self.bias == m->bias) {
-        return notice_id(anti_licenses);
+        return notice_id(anti_licenses, SIZE_MAX);
     }
     l = load(m->name, false);
     if (l == NULL || !anti_elf_symbol(l->bytes, l->size, "anti_licenses",
                                       &vaddr)) {
         return text_of(NULL);
     }
-    return notice_id((const char *)(m->bias + (uintptr_t)vaddr));
+    room = anti_elf_loaded_room((const uint8_t *)m->headers,
+                                m->header_count, vaddr);
+    if (room == 0) {
+        return text_of(NULL);
+    }
+    return notice_id((const char *)(m->bias + (uintptr_t)vaddr),
+                     room < SIZE_MAX ? (size_t)room : SIZE_MAX);
 }
 
 void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
@@ -617,12 +648,12 @@ void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
                            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        (LPCWSTR)(uintptr_t)anti_rt_trace_walk, &self);
     if (module == self) {
-        out->build_id = notice_id(anti_licenses);
+        out->build_id = notice_id(anti_licenses, SIZE_MAX);
         return;
     }
     notice = GetProcAddress(module, "anti_licenses");
     if (notice != NULL) {
-        out->build_id = notice_id((const char *)(uintptr_t)notice);
+        out->build_id = notice_id((const char *)(uintptr_t)notice, SIZE_MAX);
     }
 }
 

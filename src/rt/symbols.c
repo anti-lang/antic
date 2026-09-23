@@ -500,7 +500,8 @@ static bool dwarf_line(const struct line_sections *s, uint64_t address,
 
 enum {
     ELF_SHT_SYMTAB = 2, ELF_SHT_NOBITS = 8, ELF_SHF_EXECINSTR = 4,
-    ELF_STT_FUNC = 2, ELF_STT_NOTYPE = 0
+    ELF_STT_FUNC = 2, ELF_STT_NOTYPE = 0, ELF_PT_LOAD = 1, ELF_PF_R = 4,
+    ELF_PHDR = 56
 };
 
 /* One section of an ELF file. */
@@ -763,6 +764,26 @@ bool anti_elf_line(const uint8_t *file, size_t size, uint64_t vaddr,
         s.str_size = section.size;
     }
     return dwarf_line(&s, vaddr, out);
+}
+
+uint64_t anti_elf_loaded_room(const uint8_t *headers, size_t count,
+                              uint64_t vaddr)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        const uint8_t *p = headers + i * ELF_PHDR;
+        uint64_t start = get(p + 16, 8);
+        uint64_t size = get(p + 40, 8);
+        if (get(p, 4) != ELF_PT_LOAD || (get(p + 4, 4) & ELF_PF_R) == 0 ||
+            size > UINT64_MAX - start) {
+            continue;
+        }
+        if (vaddr >= start && vaddr - start < size) {
+            return size - (vaddr - start);
+        }
+    }
+    return 0;
 }
 
 /* Mach-O */

@@ -49,6 +49,13 @@ bool anti_elf_line(const uint8_t *file, size_t size, uint64_t vaddr,
 bool anti_elf_symbol(const uint8_t *file, size_t size, const char *name,
                      uint64_t *vaddr);
 
+/* The bytes from vaddr to the end of the readable PT_LOAD segment that
+   holds it, or 0 when none holds it. headers holds the count program
+   headers of a mapped 64-bit ELF module. Each is 56 bytes, little-endian,
+   as the dynamic loader gives them. */
+uint64_t anti_elf_loaded_room(const uint8_t *headers, size_t count,
+                              uint64_t vaddr);
+
 /* The symbol table of a Mach-O image or file. */
 struct anti_macho_table {
     const uint8_t *symbols;         /* the nlist_64 records */
