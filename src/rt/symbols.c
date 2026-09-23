@@ -85,6 +85,8 @@ static uint64_t take(struct cursor *c, int n)
     return v;
 }
 
+/* The shift stops counting at 64, where no bit of a byte lands in the
+   value. It then stays in range however long the number runs. */
 static uint64_t uleb(struct cursor *c)
 {
     uint64_t v = 0;
@@ -94,8 +96,8 @@ static uint64_t uleb(struct cursor *c)
         uint64_t byte = take(c, 1);
         if (shift < 64) {
             v |= (byte & 0x7f) << shift;
+            shift += 7;
         }
-        shift += 7;
         if ((byte & 0x80) == 0) {
             break;
         }
@@ -113,8 +115,8 @@ static int64_t sleb(struct cursor *c)
         byte = take(c, 1);
         if (shift < 64) {
             v |= (byte & 0x7f) << shift;
+            shift += 7;
         }
-        shift += 7;
         if ((byte & 0x80) == 0) {
             break;
         }
@@ -245,6 +247,9 @@ static const char *file_name(struct cursor table, int version, uint64_t index,
             forms[k] = uleb(&table);
         }
         count = uleb(&table);
+        if (formats == 0 && count != 0) {
+            return NULL;
+        }
         for (i = 0; i < count && !table.bad; i++) {
             const char *path = NULL;
             for (k = 0; k < formats; k++) {
@@ -276,6 +281,17 @@ static const char *file_name(struct cursor table, int version, uint64_t index,
         }
     }
     return NULL;
+}
+
+/* Add delta to the line register, or refuse a sum outside int64_t. */
+static bool advance_line(int64_t *line, int64_t delta)
+{
+    if ((delta > 0 && *line > INT64_MAX - delta) ||
+        (delta < 0 && *line < INT64_MIN - delta)) {
+        return false;
+    }
+    *line += delta;
+    return true;
 }
 
 /* One row of the line program. */
@@ -366,6 +382,11 @@ static bool unit_line(struct cursor *c, const struct line_sections *s,
             forms[k] = uleb(&unit);
         }
         count = uleb(&unit);
+        /* Entries of no format take no bytes, so a count of them would
+           loop without reading. */
+        if (formats == 0 && count != 0) {
+            return false;
+        }
         for (j = 0; j < count && !unit.bad; j++) {
             for (k = 0; k < formats; k++) {
                 const char *text;
@@ -394,7 +415,9 @@ static bool unit_line(struct cursor *c, const struct line_sections *s,
         if (op >= opcode_base) {
             uint8_t adjusted = (uint8_t)(op - opcode_base);
             r.address += (uint64_t)(adjusted / line_range) * min_length;
-            r.line += line_base + adjusted % line_range;
+            if (!advance_line(&r.line, line_base + adjusted % line_range)) {
+                return false;
+            }
             emit = true;
         } else if (op == 0) {
             uint64_t n = uleb(&unit);
@@ -417,7 +440,9 @@ static bool unit_line(struct cursor *c, const struct line_sections *s,
         } else if (op == 2) {
             r.address += uleb(&unit) * min_length;
         } else if (op == 3) {
-            r.line += sleb(&unit);
+            if (!advance_line(&r.line, sleb(&unit))) {
+                return false;
+            }
         } else if (op == 4) {
             r.file = uleb(&unit);
         } else if (op == 8) {
@@ -474,8 +499,8 @@ static bool dwarf_line(const struct line_sections *s, uint64_t address,
 /* ELF */
 
 enum {
-    ELF_SHT_SYMTAB = 2, ELF_SHF_EXECINSTR = 4, ELF_STT_FUNC = 2,
-    ELF_STT_NOTYPE = 0
+    ELF_SHT_SYMTAB = 2, ELF_SHT_NOBITS = 8, ELF_SHF_EXECINSTR = 4,
+    ELF_STT_FUNC = 2, ELF_STT_NOTYPE = 0
 };
 
 /* One section of an ELF file. */
@@ -514,7 +539,19 @@ static bool elf_section_at(const struct bytes *b, uint64_t shoff,
     out->offset = get(p + 24, 8);
     out->size = get(p + 32, 8);
     out->link = (uint32_t)get(p + 40, 4);
-    return inside(b, out->offset, out->type == 8 ? 0 : out->size);
+    return inside(b, out->offset,
+                  out->type == ELF_SHT_NOBITS ? 0 : out->size);
+}
+
+/* DESIGN: a NOBITS section, such as .bss, has a size in memory and no
+   bytes in the file. Its size is then no bound on the file. The home of
+   a symbol may be one, since only its flags are read. A reader of the
+   bytes of a section takes it through this check, which refuses one. */
+static bool elf_section_bytes(const struct bytes *b, uint64_t shoff,
+                              uint32_t index, struct elf_section *out)
+{
+    return elf_section_at(b, shoff, index, out) &&
+           out->type != ELF_SHT_NOBITS;
 }
 
 /* The section of an ELF file with the name, by index. */
@@ -528,12 +565,12 @@ static bool elf_find(const struct bytes *b, const char *name,
     uint32_t i;
 
     if (!elf_header(b, &shoff, &shnum, &shstrndx) ||
-        !elf_section_at(b, shoff, shstrndx, &names)) {
+        !elf_section_bytes(b, shoff, shstrndx, &names)) {
         return false;
     }
     for (i = 0; i < shnum; i++) {
         const char *s;
-        if (!elf_section_at(b, shoff, i, out)) {
+        if (!elf_section_bytes(b, shoff, i, out)) {
             continue;
         }
         s = string_in(b->data + names.offset, names.size, out->name);
@@ -565,7 +602,7 @@ static bool elf_symbols(const struct bytes *b, elf_visit *visit, void *context)
     if (!elf_header(b, &shoff, &shnum, &shstrndx) ||
         !elf_find(b, ".symtab", &symtab, NULL) ||
         symtab.type != ELF_SHT_SYMTAB || symtab.link >= shnum ||
-        !elf_section_at(b, shoff, symtab.link, &strtab)) {
+        !elf_section_bytes(b, shoff, symtab.link, &strtab)) {
         return false;
     }
     for (i = 0; i + 24 <= symtab.size; i += 24) {
