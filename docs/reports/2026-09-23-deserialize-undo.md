@@ -9,8 +9,8 @@ This session carries out Eddie's answers to the two questions of
   on every system, the same as the language's `alloc` and `free`. The decision and the
   object model no longer name `LibcAllocator.get()` for that case. The code did not change,
   since it already passed zero for the C library.
-- The two entries of the last session lost their `[provisional]` tag: the allocator as the
-  second argument with its import, and the zero allocator of the teardown.
+- The two entries of the last session lost their `[provisional]` tag. One is the allocator
+  as the second argument with its import, the other the zero allocator of the teardown.
 - A text that fails undoes what `Object.deserialize` built. The reader keeps a list of every
   object whose `construct` ran and of the field that owns it. On a failure it clears those
   fields and runs each teardown newest first with `anti_rt_give_nothing`, which gives no
