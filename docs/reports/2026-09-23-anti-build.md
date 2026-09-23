@@ -64,25 +64,43 @@ archive of a release, `anti run` and `anti new`.
 
 ## Provisional entries
 
-Added to `docs/decisions.md` under "The build command". They are the name of a
-deliverable, the library project, the module that links a dev build and the
-objects of the standard library. Then the lock file against a dependency of a
-path, the depth of a chain of path dependencies and the cache key. Then the
-package name `anti new` takes and the two entries of the symbols archive.
+Added to `docs/decisions.md` under "The build command". They are the module that
+links a dev build and the objects of the standard library. Then the depth of a
+chain of path dependencies and the cache key. Then the package name `anti new`
+takes and the archive a release writes. Eddie settled three of them in his
+answers. The name of a deliverable, the library project and the lock file
+against a dependency of a path carry no tag.
+
+## What the answers changed
+
+Eddie answered the three open items of this report.
+
+- The build id is the SHA-256 of what the program executes, not of every line of
+  assembly. `src/debug.c` records the byte range of everything `-g` appends, and
+  `build_id` of `src/driver.c` digests the assembly around those ranges. A `-g`
+  link and a plain link of one program now carry one id, which is what
+  `anti symbols` needs to match a trace to its archive. The `S_LPROC32` records
+  of COFF and the end label they read stand in every build, so neither is a
+  range and no id of a plain build moved. `program_build_id` compares the two
+  ids of one program, and `anti_build` reads the id out of the program, the
+  debug link and the map of a release archive.
+- The `https://` fetch gets no automated test yet. It waits for Mbed TLS in
+  `src/native/`. The manual check stands under "Gates" below.
+- The three entries Eddie named lost their `[provisional]` tag.
 
 ## Gates
 
 ```text
 $ git log --oneline -3
-e8a9be7 Record the build command in the decisions, the tooling page and the notes
-e26531f Write the symbols archive of a release build
-9c1fbf9 Build a project with anti build, anti run and anti new
+fcb5411 Record the build id rule and settle three entries of the build command
+6cf687d Leave what -g added out of the build id
+9dc3650 Report the anti build step
 
 $ git status --short
 
 $ git rev-parse HEAD origin/main
-e8a9be7bc64cb2c1142004b82d14e70db9d7b244
-e8a9be7bc64cb2c1142004b82d14e70db9d7b244
+fcb54112c8a0ccd2e9b898e4fa26abf2acfa4c81
+fcb54112c8a0ccd2e9b898e4fa26abf2acfa4c81
 ```
 
 - Host build: zero warnings.
@@ -91,21 +109,43 @@ e8a9be7bc64cb2c1142004b82d14e70db9d7b244
 - UBSan suite: 771 of 771 passed.
 - The docs-style checker reports nothing on every file the session touched.
 
+### The fetch over HTTP, by hand
+
+The `https://` fetch has no test in the suite until Mbed TLS stands in
+`src/native/`. It is one curl request, and the same code runs for a
+`http://127.0.0.1` repository, which the rules allow. The check below was run on
+the development Mac against a server of the standard library of Python, with the
+library file of `tests/anti-build/units` published under the layout of
+"Repositories" in `docs/tooling.md`.
+
+```text
+$ python3 -m http.server 8788 --directory <repo> &
+$ cat anti.toml
+[repositories]
+local = "http://127.0.0.1:8788"
+
+[dependencies]
+"com.example.units" = { version = "1.2.0", repo = "local" }
+
+$ XDG_CACHE_HOME=<cache> anti build --runtime <runtime> --llvm-mc <llvm-mc>
+$ ./dist/macos-arm64/dev/consumer
+consumer
+$ echo $?
+8
+$ ls <cache>/anti/pkg/com.example.units/1.2.0/
+com.example.units.antl
+```
+
+The index and the library file were fetched into the cache. The digest of the
+index was checked against the file, and `anti.lock` recorded the repository by
+URL. The program linked against the fetched module and ran.
+
 ## Open
 
-- "Symbols tooling" in `docs/anti-language-additions.md` asks that the program
-  and its debug link both carry the build id. The id is the digest of the
-  assembly antic wrote, and `-g` writes more of it, so the two links carry two
-  ids. The map names the id of the program. Both links place every function at
-  the same address, so the one map answers for both. A build id that leaves the
-  debug directives out would make the rule hold. That is a change to "Build
-  ids" in `docs/decisions.md`, which is Eddie's to make.
-- The `https://` fetch has no test. It is one curl request, the same code the
-  test drives over `file://`, and it was run by hand against a server on
-  `127.0.0.1`. A test of it needs a server in the suite, which no test starts
-  today.
 - `anti add`, `anti fetch`, `anti clean` and `anti publish` of the command table
   are not built, and neither is `anti symbols`.
+- The `https://` fetch has no automated test until Mbed TLS stands in
+  `src/native/`. The manual check under "Gates" is its evidence.
 - A library for C is one call over the whole program in both modes. `--lib`
   with no `--release` therefore differs from a release build in the assertions,
   the checks and `-g` alone. `docs/tooling-addendum.md` gives the two modes for
