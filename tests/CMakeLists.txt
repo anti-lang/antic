@@ -50,12 +50,15 @@ add_executable(antic_unit_tests
     unit/test_bind.c
     unit/test_deps.c
     unit/test_zip.c
+    unit/test_syms.c
     ../src/anti/bindexpr.c
     ../src/anti/bindtype.c
     ../src/anti/deps.c
     ../src/anti/files.c
     ../src/anti/manifest.c
     ../src/anti/repo.c
+    ../src/anti/symmap.c
+    ../src/anti/syms.c
     ../src/anti/zip.c
     ../src/rt/cpu.c
     ../src/rt/f16.c
@@ -864,6 +867,14 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_symbols.cmake")
 endif()
+
+# `anti symbols resolve` refuses a line of a map or a trace whose number
+# does not fit 64 bits. The archive is written here, so every host runs it.
+add_test(NAME anti_symbols_input
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols-input"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_symbols_input.cmake")
 
 # A binding names its framework with `link framework`, and `anti build`
 # passes it to antic. A Mac takes the SDK from the Command Line Tools.

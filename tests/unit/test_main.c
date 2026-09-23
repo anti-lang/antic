@@ -44,6 +44,7 @@ void test_json(void);
 void test_bind(void);
 void test_deps(void);
 void test_zip(void);
+void test_syms(void);
 
 int main(void)
 {
@@ -88,6 +89,7 @@ int main(void)
     test_bind();
     test_deps();
     test_zip();
+    test_syms();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

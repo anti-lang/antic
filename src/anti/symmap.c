@@ -164,6 +164,16 @@ static void macho_lines(struct map *m, const struct anti_macho_table *t)
     text_free(&object);
 }
 
+/* Sort the functions by address. A program the reader finds no
+   function in leaves items NULL, which qsort may not take even with a
+   count of zero. */
+static void sort_map(struct map *m)
+{
+    if (m->count > 0) {
+        qsort(m->items, m->count, sizeof *m->items, by_address);
+    }
+}
+
 bool symmap_build_id(const char *program, struct text *out)
 {
     static const char marker[] = "build ";
@@ -216,13 +226,13 @@ bool symmap_write(const char *program, enum target t, const char *id,
     if (info->format == FORMAT_ELF) {
         anti_elf_functions((const uint8_t *)bytes.data, bytes.length,
                            add_function, &m);
-        qsort(m.items, m.count, sizeof *m.items, by_address);
+        sort_map(&m);
         elf_lines(&m, &bytes);
     } else if (info->format == FORMAT_MACHO &&
                anti_macho_table((const uint8_t *)bytes.data, bytes.length,
                                 false, 0, &table)) {
         anti_macho_functions(&table, add_function, &m);
-        qsort(m.items, m.count, sizeof *m.items, by_address);
+        sort_map(&m);
         macho_lines(&m, &table);
     }
     text_append(&out, "# The map of a symbols archive of Anti.\n");

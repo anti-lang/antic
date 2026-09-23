@@ -639,7 +639,10 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
         }
         for (k = first; k < out->count; k++) {
             struct unit *u = &out->items[k];
-            if (u->id.length == (size_t)(slash - name) &&
+            /* A unit the index gives no id names no entry. An entry
+               name that starts with `/` would otherwise match it, with
+               memcmp over a null pointer. */
+            if (u->id.length > 0 && u->id.length == (size_t)(slash - name) &&
                 memcmp(u->id.data, name, u->id.length) == 0) {
                 struct text *bytes;
                 texts_add(&u->names, slash + 1, strlen(slash + 1));
@@ -929,6 +932,97 @@ int syms_check(const char *conf, const char *const *symbols, size_t count)
     return absent > 0 ? 1 : 0;
 }
 
+/* DESIGN: the lines of a map and of a trace come from other machines.
+   sscanf leaves a number that does not fit its object undefined, so a
+   cursor reads them instead. It takes digits alone and refuses a sign
+   and a value above 64 bits. It names each token by its start and its
+   length, so no line is copied into a buffer of fixed size. */
+struct cursor {
+    const char *at;
+    const char *end;
+};
+
+static bool is_blank(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r';
+}
+
+/* Pass over blanks. Returns whether there was one. */
+static bool cursor_blank(struct cursor *c)
+{
+    const char *from = c->at;
+
+    while (c->at < c->end && is_blank(*c->at)) {
+        c->at++;
+    }
+    return c->at > from;
+}
+
+static int digit_of(char c, unsigned base)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (base == 16 && c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+    if (base == 16 && c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    }
+    return -1;
+}
+
+/* The digits in base at the cursor as one value. Returns false for no
+   digit and for a value above UINT64_MAX. */
+static bool cursor_number(struct cursor *c, unsigned base, uint64_t *out)
+{
+    uint64_t value = 0;
+    const char *from = c->at;
+    int d;
+
+    while (c->at < c->end && (d = digit_of(*c->at, base)) >= 0) {
+        if (value > (UINT64_MAX - (uint64_t)d) / base) {
+            return false;
+        }
+        value = value * base + (uint64_t)d;
+        c->at++;
+    }
+    *out = value;
+    return c->at > from;
+}
+
+/* A hex number, with or without `0x`. */
+static bool cursor_hex(struct cursor *c, uint64_t *out)
+{
+    if (c->end - c->at > 2 && c->at[0] == '0' &&
+        (c->at[1] == 'x' || c->at[1] == 'X')) {
+        c->at += 2;
+    }
+    return cursor_number(c, 16, out);
+}
+
+static bool cursor_char(struct cursor *c, char want)
+{
+    if (c->at < c->end && *c->at == want) {
+        c->at++;
+        return true;
+    }
+    return false;
+}
+
+/* The bytes up to the next blank or the end. Returns false for none. */
+static bool cursor_token(struct cursor *c, const char **token, size_t *length)
+{
+    const char *from = c->at;
+
+    while (c->at < c->end && !is_blank(*c->at)) {
+        c->at++;
+    }
+    *token = from;
+    *length = (size_t)(c->at - from);
+    return *length > 0;
+}
+
 /* One entry of a map: the range of a function, its name and where the
    debug information gave them, its file and line. */
 struct mapped {
@@ -948,26 +1042,28 @@ static bool map_lookup(const struct text *map, uint64_t vaddr,
     while (*line != '\0') {
         const char *stop = strchr(line, '\n');
         size_t length = stop != NULL ? (size_t)(stop - line) : strlen(line);
-        unsigned long long start;
-        unsigned long long end;
-        char name[512];
-        char where[1024];
-        char text[1600];
-        int fields;
-        if (length < sizeof text && line[0] != '#') {
-            memcpy(text, line, length);
-            text[length] = '\0';
-            where[0] = '\0';
-            fields = sscanf(text, "%llx-%llx %511s %1023s", &start, &end,
-                            name, where);
-            if (fields >= 3 && vaddr >= start &&
-                (vaddr < end || (end == start && vaddr == start))) {
-                text_append(&out->function, name);
-                if (fields == 4) {
-                    text_append(&out->where, where);
-                }
-                return true;
+        struct cursor c;
+        uint64_t start;
+        uint64_t end;
+        const char *name;
+        size_t name_length;
+        const char *where;
+        size_t where_length = 0;
+        c.at = line;
+        c.end = line + length;
+        cursor_blank(&c);
+        if (line[0] != '#' && cursor_hex(&c, &start) &&
+            cursor_char(&c, '-') && cursor_hex(&c, &end) &&
+            cursor_blank(&c) && cursor_token(&c, &name, &name_length) &&
+            vaddr >= start &&
+            (vaddr < end || (end == start && vaddr == start))) {
+            cursor_blank(&c);
+            cursor_token(&c, &where, &where_length);
+            text_append_bytes(&out->function, name, name_length);
+            if (where_length > 0) {
+                text_append_bytes(&out->where, where, where_length);
             }
+            return true;
         }
         line += length + (stop != NULL ? 1 : 0);
     }
@@ -1135,24 +1231,32 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
         size_t length = stop != NULL ? (size_t)(stop - line) : strlen(line);
         size_t shown = length > 0 && line[length - 1] == '\r' ? length - 1
                                                               : length;
-        char text[1024];
-        unsigned long long address;
-        unsigned long long offset;
-        long long number;
-        char id[80];
-        int used = 0;
+        struct cursor c;
+        uint64_t address;
+        uint64_t offset;
+        uint64_t number;
+        const char *id;
+        size_t id_length;
+        const char *base;
+        size_t base_length;
         fwrite(line, 1, shown, stdout);
-        if (shown < sizeof text) {
-            memcpy(text, line, shown);
-            text[shown] = '\0';
-            if (sscanf(text, "module %lld %79s %*s %n", &number, id, &used) ==
-                    2 &&
-                used > 0 && number == (long long)modules.count) {
-                texts_add(&modules, id, strlen(id));
-            } else if (sscanf(text, "%llx %lld+%llx%n", &address, &number,
-                              &offset, &used) == 3 &&
-                       (size_t)used == shown && number >= 0 &&
-                       (size_t)number < modules.count) {
+        c.at = line;
+        c.end = line + shown;
+        if (shown > 7 && memcmp(line, "module ", 7) == 0) {
+            c.at += 7;
+            cursor_blank(&c);
+            if (cursor_number(&c, 10, &number) && cursor_blank(&c) &&
+                cursor_token(&c, &id, &id_length) && cursor_blank(&c) &&
+                cursor_token(&c, &base, &base_length) &&
+                number == modules.count) {
+                texts_add(&modules, id, id_length);
+            }
+        } else {
+            cursor_blank(&c);
+            if (cursor_hex(&c, &address) && cursor_blank(&c) &&
+                cursor_number(&c, 10, &number) && cursor_char(&c, '+') &&
+                cursor_hex(&c, &offset) && c.at == c.end &&
+                number < modules.count) {
                 const struct unit *u = unit_of(
                     &units, text_cstr(&modules.items[number]));
                 struct mapped m;
