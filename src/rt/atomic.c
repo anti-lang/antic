@@ -11,14 +11,48 @@
 #if defined(_MSC_VER)
 #include <intrin.h>
 
+/* DESIGN: a load through `volatile` is a plain load on ARM64, which a
+   later load to another address may pass. clang, which compiles every
+   runtime of the archive, gives the sequentially consistent load of the
+   other branch: ldar on ARM64 and a plain load on x86_64, where the
+   locked exchange of every store keeps the order. MSVC, which compiles
+   this file for the tools of a Windows host, loads as its own C++
+   library does: on ARM64 a load and a full barrier after it, and on
+   x86_64 a volatile load. The types are signed by name, so a byte loads
+   the same whether `char` is signed or not. */
 int64_t anti_rt_atomic_load(const void *address, int64_t width)
 {
+#if defined(__clang__)
     switch (width) {
-    case 1: return *(const volatile char *)address;
-    case 2: return *(const volatile short *)address;
-    case 4: return *(const volatile int *)address;
-    default: return *(const volatile long long *)address;
+    case 1: return __atomic_load_n((const int8_t *)address, __ATOMIC_SEQ_CST);
+    case 2: return __atomic_load_n((const int16_t *)address, __ATOMIC_SEQ_CST);
+    case 4: return __atomic_load_n((const int32_t *)address, __ATOMIC_SEQ_CST);
+    default: return __atomic_load_n((const int64_t *)address,
+                                    __ATOMIC_SEQ_CST);
     }
+#elif defined(_M_ARM64)
+    int64_t value;
+
+    switch (width) {
+    case 1: value = __iso_volatile_load8((const volatile __int8 *)address);
+        break;
+    case 2: value = __iso_volatile_load16((const volatile __int16 *)address);
+        break;
+    case 4: value = __iso_volatile_load32((const volatile __int32 *)address);
+        break;
+    default: value = __iso_volatile_load64((const volatile __int64 *)address);
+        break;
+    }
+    __dmb(_ARM64_BARRIER_ISH);
+    return value;
+#else
+    switch (width) {
+    case 1: return *(const volatile int8_t *)address;
+    case 2: return *(const volatile int16_t *)address;
+    case 4: return *(const volatile int32_t *)address;
+    default: return *(const volatile int64_t *)address;
+    }
+#endif
 }
 
 void anti_rt_atomic_store(void *address, int64_t width, int64_t value)

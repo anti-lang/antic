@@ -180,6 +180,27 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# An atomic load of the runtime is sequentially consistent on every ARM64
+# target and level, as src/rt/atomic.c promises. Windows compiled it through
+# `volatile` once, which is a plain load there.
+foreach(target linux-arm64 macos-arm64 windows-arm64)
+    foreach(level armv8.0 armv8.2 armv8.5)
+        if(target STREQUAL "windows-arm64")
+            set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/anti_rt.lib")
+        else()
+            set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/libanti_rt.a")
+        endif()
+        add_test(NAME atomic_load_${target}_${level}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+                "-DLIBRARY=${library}"
+                "-DTARGET=${target}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_atomic_load.cmake")
+        set_tests_properties(atomic_load_${target}_${level} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
+endforeach()
+
 # The two conversions of f16. ARM64 and x86-64-v3 have one instruction
 # for each, and v1 and v2, which lack F16C, call the runtime.
 set(f16_call "anti_rt_f16_to_f32|anti_rt_f32_to_f16")
