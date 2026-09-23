@@ -446,3 +446,5 @@ add_custom_target(anti_std ALL DEPENDS ${std_files})
 
 enable_testing()
 add_subdirectory(tests)
+# The native libraries of the runtime archive and their tests.
+add_subdirectory(src/native)

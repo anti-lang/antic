@@ -1,0 +1,28 @@
+//! PCRE2 of the runtime tree, reached through the C functions of
+//! pcre2_probe.c. The library reports UTF support and no JIT. A group
+//! starts and ends where PCRE2 says, and `.` takes the two bytes of `ß`
+//! as one character. A caseless `ö` matches `Ö`, which needs the Unicode
+//! tables. A pattern with an open group fails at offset 3, and a pattern
+//! that is not in the subject does not match.
+
+extern fn printf(format: ?*byte, ...) -> i32;
+extern fn pcre2_probe(pattern: ?*byte, subject: ?*byte, group: i32, end: i32) -> i32;
+extern fn pcre2_probe_config(what: i32) -> i32;
+
+fn show(v: i32)
+{
+	printf("%d\n".ptr, v as c_int);
+}
+
+fn main() -> int
+{
+	show(pcre2_probe_config(0));
+	show(pcre2_probe_config(1));
+	show(pcre2_probe("([0-9]+)-(.)".ptr, "id 42-ß!".ptr, 1, 0));
+	show(pcre2_probe("([0-9]+)-(.)".ptr, "id 42-ß!".ptr, 2, 1));
+	show(pcre2_probe("(?i)ö".ptr, "xÖ".ptr, 0, 0));
+	show(pcre2_probe("(?i)ö".ptr, "xÖ".ptr, 0, 1));
+	show(pcre2_probe("a(b".ptr, "ab".ptr, 0, 0));
+	show(pcre2_probe("z".ptr, "ab".ptr, 0, 0));
+	return 0;
+}

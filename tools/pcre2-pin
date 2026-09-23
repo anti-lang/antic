@@ -1,0 +1,5 @@
+# The pinned PCRE2 release that src/native/get-pcre2.cmake downloads. The
+# digest is the SHA-256 of pcre2-<version>.tar.gz that the release page of
+# PCRE2Project/pcre2 publishes.
+PCRE2_VERSION=10.48
+PCRE2_DIGEST=ebcc25aadf2a51fa1fefa9b8bc9e7a79b3dae86870a0f1152a22e42befd46888
