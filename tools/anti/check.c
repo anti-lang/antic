@@ -28,22 +28,13 @@
 #include "parser.h"
 #include "target.h"
 #include "text.h"
+#include "units.h"
 
 /* The directories of the work tree. The interface files stand in its
    root. The module of a user doc block goes under docs and the module of
    a developer doc block under dev. */
 #define CHECK_DOCS_DIR "check/docs"
 #define CHECK_DEV_DIR "check/dev"
-
-/* One module of the run. */
-struct unit {
-    const char *source;
-    struct text path;           /* the module path */
-    struct text library;        /* the interface file of the work directory */
-    struct text *imports;       /* the module path of each import */
-    size_t import_count;
-    bool parsed;                /* the lexer and the parser took it */
-};
 
 /* One fenced `anti` block of a doc comment. */
 struct doc_block {
@@ -109,149 +100,6 @@ static void flat_path(const char *module, struct text *out)
     for (p = module; *p != '\0'; p++) {
         text_appendf(out, "%c", *p == '.' ? '_' : *p);
     }
-}
-
-/* The path of the file at dir/<module as directories><suffix>, with every
-   directory above it made. */
-static bool module_file(const char *dir, const char *module,
-                        const char *suffix, struct text *out)
-{
-    struct text directory = {0};
-    const char *p;
-    bool ok;
-
-    text_appendf(out, "%s/", dir);
-    for (p = module; *p != '\0'; p++) {
-        text_appendf(out, "%c", *p == '.' ? '/' : *p);
-    }
-    text_append(out, suffix);
-    text_append(&directory, text_cstr(out));
-    while (directory.length > 0 &&
-           directory.data[directory.length - 1] != '/') {
-        directory.length--;
-    }
-    if (directory.length > 0) {
-        directory.data[--directory.length] = '\0';
-    }
-    ok = directory.length == 0 || make_dirs(text_cstr(&directory));
-    text_free(&directory);
-    return ok;
-}
-
-/* Read one module: its path, its imports and whether the front end's first
-   two passes took it. A file the parser refuses reports here and no pass
-   below sees it, so no message is printed twice. */
-static bool read_unit(const char *source, const char *const *roots,
-                      size_t root_count, const char *work, struct unit *out)
-{
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *tree = NULL;
-    struct text bytes = {0};
-    char message[256];
-    size_t i;
-    bool ok = false;
-
-    memset(out, 0, sizeof *out);
-    out->source = source;
-    if (!read_file(source, &bytes)) {
-        goto done;
-    }
-    if (!module_path_of_source(source, roots, root_count, &out->path, message,
-                               sizeof message)) {
-        fprintf(stderr, "anti: %s\n", message);
-        goto done;
-    }
-    if (!module_file(work, text_cstr(&out->path), ANTL_SUFFIX,
-                     &out->library)) {
-        goto done;
-    }
-    ok = true;
-    if (!lex(text_cstr(&bytes), bytes.length, &arena, &diags, &tokens) ||
-        !parse(text_cstr(&bytes), &tokens, &arena, &diags, &tree)) {
-        for (i = 0; i < diags.count; i++) {
-            fprintf(stderr, "%s:%d:%d: error: %s\n", source,
-                    diags.items[i].line, diags.items[i].column,
-                    diags.items[i].message);
-        }
-        goto done;
-    }
-    out->parsed = true;
-    out->imports = calloc(tree->import_count + 1, sizeof *out->imports);
-    if (out->imports == NULL) {
-        out_of_memory();
-    }
-    for (i = 0; i < tree->import_count; i++) {
-        text_append_bytes(&out->imports[i], tree->imports[i].module.text,
-                          tree->imports[i].module.length);
-    }
-    out->import_count = tree->import_count;
-done:
-    token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
-    text_free(&bytes);
-    return ok;
-}
-
-static void unit_free(struct unit *u)
-{
-    size_t i;
-
-    for (i = 0; i < u->import_count; i++) {
-        text_free(&u->imports[i]);
-    }
-    free(u->imports);
-    text_free(&u->path);
-    text_free(&u->library);
-}
-
-/* The order the interface files are written in: a module after every
-   module of the run that it imports. A cycle among the imports keeps the
-   order the files came in, and the compiler reports it. */
-static void order_units(const struct unit *units, size_t count, size_t *order)
-{
-    bool *done = calloc(count + 1, sizeof *done);
-    size_t placed = 0;
-    size_t i;
-    size_t j;
-    size_t k;
-    bool grew = true;
-
-    if (done == NULL) {
-        out_of_memory();
-    }
-    while (grew && placed < count) {
-        grew = false;
-        for (i = 0; i < count; i++) {
-            bool ready = true;
-            if (done[i]) {
-                continue;
-            }
-            for (j = 0; ready && j < units[i].import_count; j++) {
-                for (k = 0; k < count; k++) {
-                    if (!done[k] && k != i &&
-                        strcmp(text_cstr(&units[k].path),
-                               text_cstr(&units[i].imports[j])) == 0) {
-                        ready = false;
-                        break;
-                    }
-                }
-            }
-            if (ready) {
-                order[placed++] = i;
-                done[i] = true;
-                grew = true;
-            }
-        }
-    }
-    for (i = 0; i < count; i++) {
-        if (!done[i]) {
-            order[placed++] = i;
-        }
-    }
-    free(done);
 }
 
 /* The options every call of the run shares. */
@@ -483,7 +331,7 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
         struct text original = {0};
         text_appendf(&directory, "%s/%s", work, CHECK_DEV_DIR);
         if (!read_file(u->source, &original) ||
-            !module_file(text_cstr(&directory), text_cstr(&u->path),
+            !unit_file(text_cstr(&directory), text_cstr(&u->path),
                          SOURCE_SUFFIX, &path)) {
             text_free(&directory);
             text_free(&original);
@@ -735,9 +583,9 @@ int check_run(const char *const *sources, size_t source_count,
     for (i = 0; i < count; i++) {
         const char *source =
             source_count > 0 ? sources[i] : text_cstr(&found.items[i]);
-        read_unit(source, path_roots, path_root_count, work, &units[i]);
+        unit_read(source, path_roots, path_root_count, work, &units[i]);
     }
-    order_units(units, count, order);
+    unit_order(units, count, order);
 
     failed = front_end_class(units, count, order, &base, &counts,
                              undocumented, all_targets, &targets);

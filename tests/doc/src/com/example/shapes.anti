@@ -1,0 +1,109 @@
+//! Shapes of the plane and what they measure.
+//!
+//! Every length is a whole number of `UNIT`, so a measurement never carries a
+//! fraction. The module holds:
+//!
+//! - `Circle`, the one shape with a body
+//! - `Figure`, the variant a drawing stores
+//!
+//! ```anti
+//! let c = shapes.Circle { radius: 2, stroke: shapes.Stroke.Solid };
+//! let a = shapes.area(c);
+//! ```
+
+import anti.lang;
+
+/// How an outline is drawn.
+pub enum Stroke: byte
+{
+	/// A line with no gaps.
+	Solid,
+	/// A line with gaps.
+	Dashed,
+}
+
+/// The unit every length is written in.
+pub const UNIT: int = 1;
+
+/// A circle, named by its radius.
+pub struct Circle
+{
+	/// The radius, in whole units of `UNIT`.
+	radius: int,
+	/// How the outline is drawn.
+	stroke: Stroke,
+}
+
+/// Either of the two figures a drawing stores.
+pub variant Figure
+{
+	Round { radius: int },
+	Empty,
+}
+
+/// A drawing that counts the shapes put on it.
+pub class Canvas
+{
+	/// The name of the drawing.
+	pub name: str,
+	/// How many shapes stand on it.
+	protected count: int = 0,
+	private_note: int = 0,
+
+	/// A canvas with a name.
+	pub fn new(name: str) -> *Canvas
+	{
+		return alloc Canvas { name: name };
+	}
+
+	/// Put `shape` on the canvas.
+	pub fn add(self, shape: Circle)
+	{
+		self.count = self.count + shape.radius - shape.radius + 1;
+	}
+
+	/// How many shapes stand on the canvas.
+	pub fn size(self) -> int
+	{
+		return self.count;
+	}
+
+	fn secret(self) -> int
+	{
+		return self.private_note;
+	}
+}
+
+//# The area is four times the radius, which is close enough for the test and
+//# wrong everywhere else.
+/// The area of `c`, rounded down.
+pub fn area(c: Circle) -> int
+{
+	return c.radius * 4;
+}
+
+/// The width and the height of `c`.
+pub fn bounds(c: Circle) -> (int, int)
+{
+	return (c.radius * 2, c.radius * 2);
+}
+
+/// The radius `text` names, or a failure when it names none.
+pub fn parse(text: str) -> int may fail
+{
+	if text.len == 0 {
+		fail "no radius";
+	}
+	return text.len;
+}
+
+/// Measure `c` on a worker.
+pub worker fn measure(c: Circle) -> int
+{
+	return area(c);
+}
+
+fn helper(n: int) -> int
+{
+	return n + 1;
+}

@@ -1,0 +1,10 @@
+//! The program that draws with `com.example.shapes`.
+
+import com.example.shapes;
+
+/// Draw one circle of `radius` and give the area of it.
+pub fn draw(radius: int) -> int
+{
+	let c = shapes.Circle { radius: radius, stroke: shapes.Stroke.Solid };
+	return shapes.area(c);
+}

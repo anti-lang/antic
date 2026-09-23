@@ -165,11 +165,13 @@ target_link_libraries(antic PRIVATE antic_core)
 add_executable(anti
     tools/anti/main.c
     tools/anti/check.c
+    tools/anti/doc.c
     tools/anti/files.c
     tools/anti/fmt.c
     tools/anti/manifest.c
     tools/anti/sdk.c
     tools/anti/test.c
+    tools/anti/units.c
     rt/toml.c)
 target_link_libraries(anti PRIVATE antic_core)
 target_include_directories(anti PRIVATE rt)

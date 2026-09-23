@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "check.h"
+#include "doc.h"
 #include "files.h"
 #include "fmt.h"
 #include "linker.h"
@@ -25,6 +26,9 @@ static int usage(FILE *out)
           "       anti check [--warn-undocumented] [--targets all]\n"
           "                  [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
           "                  [<file.anti>...]\n"
+          "       anti doc [--dev] [--private] [--markdown] [-o <dir>]\n"
+          "                [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
+          "                [<file.anti>|<file.antl>...]\n"
           "       anti fmt [--check] [<file.anti>...]\n"
           "\n"
           "sdk export packs the .tbd stubs and the version of Apple's SDK into\n"
@@ -47,6 +51,16 @@ static int usage(FILE *out)
           "nothing and lists the files that differ. Without a file it takes\n"
           "every source under the directories that `[layout]` of anti.toml\n"
           "names.\n"
+          "\n"
+          "doc writes one page per module and an index of them. User docs\n"
+          "come from the public interface alone, so a library file is\n"
+          "enough and a page built from one reads as the page built from\n"
+          "the source. --dev writes the developer's docs, which need the\n"
+          "source and carry the private items and the `//#` notes.\n"
+          "--private keeps the private items in the user docs and needs\n"
+          "the source as well. The pages are plain semantic HTML with a\n"
+          "fixed set of class names and no styling, or Markdown with\n"
+          "--markdown, which passes the doc text through unchanged.\n"
           "\n"
           "check runs the front end on every source, compiles the `anti`\n"
           "blocks of the doc comments, reports the doc warnings and reads the\n"
@@ -141,6 +155,95 @@ int main(int argc, char **argv)
                            undocumented, all_targets);
         free((void *)sources);
         free((void *)roots);
+        text_free(&home);
+        return status;
+    }
+    if (argc >= 2 && strcmp(argv[1], "doc") == 0) {
+        const char **sources = malloc((size_t)argc * sizeof *sources);
+        const char **roots = malloc((size_t)argc * sizeof *roots);
+        struct file_list found = {0};
+        struct text src = {0};
+        struct text test = {0};
+        struct text package = {0};
+        struct text home = {0};
+        const char *out = "build/doc";
+        const char *work = "build/doc-work";
+        const char *runtime = NULL;
+        size_t count = 0;
+        size_t root_count = 0;
+        enum doc_form form = DOC_HTML;
+        bool dev = false;
+        bool private_items = false;
+        int status;
+        if (sources == NULL || roots == NULL) {
+            fputs("anti: out of memory\n", stderr);
+            return 70;
+        }
+        for (i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "--dev") == 0) {
+                dev = true;
+            } else if (strcmp(argv[i], "--private") == 0) {
+                private_items = true;
+            } else if (strcmp(argv[i], "--markdown") == 0) {
+                form = DOC_MARKDOWN;
+            } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+                out = argv[++i];
+            } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
+                work = argv[++i];
+            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+                runtime = argv[++i];
+            } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
+                roots[root_count++] = argv[++i];
+            } else if (argv[i][0] == '-') {
+                free((void *)sources);
+                free((void *)roots);
+                return usage(stderr);
+            } else {
+                sources[count++] = argv[i];
+            }
+        }
+        if (runtime == NULL && default_runtime(&home)) {
+            runtime = text_cstr(&home);
+        }
+        /* DESIGN: without a file the command takes the source directory
+           of `[layout]`, as `anti check` and `anti fmt` do, so the three
+           read the same files. The test directory holds no module a
+           reader of the library documents. */
+        if (count == 0) {
+            size_t j;
+            if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
+                !list_tree(text_cstr(&src), SOURCE_SUFFIX, &found)) {
+                free((void *)sources);
+                file_list_free(&found);
+                text_free(&src);
+                text_free(&test);
+                text_free(&package);
+                text_free(&home);
+                free((void *)roots);
+                return 1;
+            }
+            free((void *)sources);
+            sources = malloc((found.count + 1) * sizeof *sources);
+            if (sources == NULL) {
+                fputs("anti: out of memory\n", stderr);
+                return 70;
+            }
+            for (j = 0; j < found.count; j++) {
+                sources[j] = text_cstr(&found.items[j]);
+            }
+            count = found.count;
+            if (root_count == 0) {
+                roots[root_count++] = text_cstr(&src);
+            }
+        }
+        status = doc_run(sources, count, roots, root_count, out, work,
+                         runtime, form, dev, private_items);
+        free((void *)sources);
+        free((void *)roots);
+        file_list_free(&found);
+        text_free(&src);
+        text_free(&test);
+        text_free(&package);
         text_free(&home);
         return status;
     }

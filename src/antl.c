@@ -872,10 +872,12 @@ void antl_write(struct text *out, const struct interface *iface,
         put_type_ref(&w, sym->type);
         /* DESIGN: the `may fail` flag is recorded, so a reader of the
            file sees the form the declaration wrote. The type alone gives
-           the `?*Error` of the ABI and never the form. */
+           the `?*Error` of the ABI and never the form. `worker` is
+           recorded for the same reason, and `anti doc` prints it. */
         put_u8(&w, (uint8_t)((unsigned)sym->exported |
                              (unsigned)sym->internal << 1 |
-                             (unsigned)sym->may_fail << 2));
+                             (unsigned)sym->may_fail << 2 |
+                             (unsigned)sym->worker << 3));
         put_doc(&w, sym->doc.text, sym->doc.length);
         if (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN) {
             size_t j;
@@ -1772,6 +1774,7 @@ static void read_items(struct reader *r)
             sym->exported = (marks & 1) != 0;
             sym->internal = (marks >> 1 & 1) != 0;
             sym->may_fail = (marks >> 2 & 1) != 0;
+            sym->worker = (marks >> 3 & 1) != 0;
         }
         {
             struct name doc = get_name(r);

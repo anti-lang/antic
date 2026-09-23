@@ -1641,6 +1641,7 @@ const struct interface *driver_interface(const struct options *o,
     struct paths paths = {0};
     struct text source = {0};
     struct text module = {0};
+    char *kept;
     size_t length = strlen(o->input);
     bool library_file = length > strlen(ANTL_SUFFIX) &&
                         strcmp(o->input + length - strlen(ANTL_SUFFIX),
@@ -1703,8 +1704,12 @@ const struct interface *driver_interface(const struct options *o,
     if (!read_source(o->input, &source)) {
         goto done;
     }
-    if (!lex(text_cstr(&source), source.length, arena, &diags, &tokens) ||
-        !parse(text_cstr(&source), &tokens, arena, &diags, &parsed)) {
+    /* The names of the interface point into the source, which outlives
+       the call in the memory pool and not in this buffer. */
+    kept = arena_alloc(arena, source.length + 1);
+    memcpy(kept, text_cstr(&source), source.length + 1);
+    if (!lex(kept, source.length, arena, &diags, &tokens) ||
+        !parse(kept, &tokens, arena, &diags, &parsed)) {
         report_diagnostics(o, &diags);
         goto done;
     }
