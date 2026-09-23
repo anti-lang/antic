@@ -1648,6 +1648,14 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
     struct text fallback = {0};
 
     /* A library is named where a function of the program would be. */
+    if (named != NULL && (strcmp(named, PROVIDER_DISCOVER) == 0 ||
+                          strncmp(named, PROVIDER_PLUGIN,
+                                  sizeof PROVIDER_PLUGIN - 1) == 0) &&
+        o->closed) {
+        text_appendf(errors, "the provider `%s` of `%s` names a library, and "
+                             "`--closed` loads none\n", named, in->interface);
+        return;
+    }
     if (named != NULL && strcmp(named, PROVIDER_DISCOVER) == 0) {
         in->discover = true;
         in->library = "";
@@ -1905,7 +1913,13 @@ static void write_injections(struct whole *w, struct ir_module *m,
     count = collect_injectables(m, list);
     for (i = 0; i < count; i++) {
         list[i].slot = slot_global(m, list[i].interface);
-        write_replacement(m, &list[i]);
+        list[i].holder = IR_NO_INDEX;
+        list[i].thunk = IR_NO_INDEX;
+        /* A closed program takes no provider from a library, so it
+           carries no place to put one. */
+        if (!o->closed) {
+            write_replacement(m, &list[i]);
+        }
     }
     for (i = 0; i < count; i++) {
         resolve_provider(w, m, o, &list[i], errors);

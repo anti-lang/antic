@@ -56,6 +56,25 @@ run("${ANTIC}" --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
 run("${WORK}/host" "${library}")
 same("the host" "${output}" "${EXPECTED}")
 
+# `--closed` builds a program without the exports a plugin binds
+# against, so the load of the same library fails.
+run("${ANTIC}" --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+    -I "${WORK}" --closed -o "${WORK}/closed" "${SOURCES}/host.anti")
+execute_process(COMMAND "${WORK}/closed" "${library}" RESULT_VARIABLE status
+                OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+if(status EQUAL 0)
+    message(FATAL_ERROR "a closed program loaded the library\n${out}")
+endif()
+# It takes no provider from a library either, which the link says.
+execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}"
+                        --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}"
+                        --closed --inject "${interface}=plugin:${library}"
+                        -o "${WORK}/shut" "${SOURCES}/user.anti"
+                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(status EQUAL 0 OR NOT err MATCHES "names a library, and `--closed` loads")
+    message(FATAL_ERROR "a closed build took a library provider\n${err}")
+endif()
+
 # `plugin:<path>` of the manifest fills the slot of an injected field
 # from that library, and `discover` finds it through the index.
 run("${ANTIC}" --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"

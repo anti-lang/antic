@@ -44,6 +44,9 @@ struct whole_options {
     /* --lib shared --no-runtime: a plugin. It carries the table of what
        it provides, and the host holds the registry and the slots. */
     bool plugin;
+    /* --closed: the program carries no exports for a plugin to bind
+       against, and it takes no provider from a library. */
+    bool closed;
     /* The `--inject Interface=Provider` arguments of the build, which
        name the provider of every injectable interface. */
     const char *const *inject;

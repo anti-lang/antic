@@ -698,6 +698,7 @@ static bool whole_checked(const char *input, struct ir_module *program,
     options.library = library;
     options.dev = dev;
     options.plugin = is_plugin(o);
+    options.closed = o->closed;
     options.inject = o->inject;
     options.inject_count = o->inject_count;
     ok = whole_program(program, &options, &errors);
