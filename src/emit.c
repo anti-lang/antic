@@ -258,14 +258,15 @@ static void emit_data(struct text *out, enum target t,
 static bool emit(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
                  const char *module, bool one_module, bool exports,
-                 bool debug_info, char *error, size_t error_size)
+                 bool debug_info, struct debug_spans *spans, char *error,
+                 size_t error_size)
 {
     const struct target_info *info = target_info(t);
     struct debug debug;
     size_t i;
     size_t j;
 
-    debug_init(&debug, t, m, module, debug_info);
+    debug_init(&debug, t, m, module, debug_info, spans);
 
     /* An address takes the eight bytes at its offset, so it lies inside
        the data that holds it. A library file read from disk is the one
@@ -311,19 +312,19 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
 bool emit_program(struct text *out, enum target t, enum cpu_level cpu,
                   const struct ir_module *m, struct mach_function **functions,
                   const char *module, bool exports, bool debug_info,
-                  char *error, size_t error_size)
+                  struct debug_spans *spans, char *error, size_t error_size)
 {
     return emit(out, t, cpu, m, functions, module, false, exports, debug_info,
-                error, error_size);
+                spans, error, error_size);
 }
 
 bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
                  const char *module, bool exports, bool debug_info,
-                 char *error, size_t error_size)
+                 struct debug_spans *spans, char *error, size_t error_size)
 {
     return emit(out, t, cpu, m, functions, module, true, exports, debug_info,
-                error, error_size);
+                spans, error, error_size);
 }
 
 /* DESIGN: a shared library initialises the runtime in a constructor. The

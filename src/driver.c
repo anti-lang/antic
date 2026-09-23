@@ -812,16 +812,28 @@ static void digest_file(struct sha256 *s, const char *path)
    antic. That is the assembly of the module that links, every object the
    command line adds and the runtime library. The notice is left out,
    because it holds the id. The paths are left out as well, so two links
-   of one program in two places carry one id. */
+   of one program in two places carry one id. What `-g` added is left out
+   too, so a `-g` link and a plain link of one program carry one id.
+   `anti symbols` then matches a trace of the one to the archive of the
+   other. */
 static void build_id(const struct options *o, const struct text *assembly,
-                     char hex[65])
+                     const struct debug_spans *spans, char hex[65])
 {
     struct text library = {0};
     struct sha256 s;
+    size_t at = 0;
     size_t i;
 
     sha256_init(&s);
-    sha256_update(&s, assembly->data, assembly->length);
+    for (i = 0; spans != NULL && i < spans->count; i++) {
+        if (spans->items[i].start > at) {
+            sha256_update(&s, assembly->data + at, spans->items[i].start - at);
+        }
+        at = spans->items[i].end > at ? spans->items[i].end : at;
+    }
+    if (at < assembly->length) {
+        sha256_update(&s, assembly->data + at, assembly->length - at);
+    }
     for (i = 0; i < o->object_count; i++) {
         digest_file(&s, o->objects[i]);
     }
@@ -862,6 +874,7 @@ static int back_end(const struct options *o, struct module *tree,
 {
     struct mach_function **functions;
     struct text out = {0};
+    struct debug_spans spans = {0};
     char error[200];
     bool dump = o->dump_select || o->dump_alloc;
     bool ok;
@@ -948,11 +961,11 @@ static int back_end(const struct options *o, struct module *tree,
     } else if (ok) {
         ok = o->dev || is_plugin(o)
                  ? emit_module(assembly, o->target, o->cpu, program, functions,
-                               module, extras->hosts_plugins, o->debug, error,
-                               sizeof error)
+                               module, extras->hosts_plugins, o->debug, &spans,
+                               error, sizeof error)
                  : emit_program(assembly, o->target, o->cpu, program,
                                 functions, module, extras->hosts_plugins,
-                                o->debug, error, sizeof error);
+                                o->debug, &spans, error, sizeof error);
         if (ok && o->dev && !has_main(program, module)) {
             status = 3;
         }
@@ -965,7 +978,7 @@ static int back_end(const struct options *o, struct module *tree,
             !o->assembly_only && o->lib != LIB_STATIC) {
             struct text notice = {0};
             char id[65];
-            build_id(o, assembly, id);
+            build_id(o, assembly, &spans, id);
             identified_notice(&notice, &extras->notice, id);
             emit_licenses(assembly, o->target, notice.data, notice.length);
             text_free(&notice);
@@ -989,6 +1002,7 @@ static int back_end(const struct options *o, struct module *tree,
     }
     free(functions);
     text_free(&out);
+    debug_spans_free(&spans);
     return status;
 }
 

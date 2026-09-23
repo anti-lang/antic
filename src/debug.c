@@ -1,6 +1,8 @@
 #include "debug.h"
 
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* DESIGN: `.file` and `.loc` give llvm-mc a line table and nothing else.
@@ -67,8 +69,44 @@ static bool codeview(const struct debug *d)
     return target_info(d->target)->format == FORMAT_COFF;
 }
 
+void debug_spans_free(struct debug_spans *s)
+{
+    free(s->items);
+    memset(s, 0, sizeof *s);
+}
+
+/* Record the bytes appended to out since start as a range that `-g`
+   added. A caller that reads no range records none. */
+static void mark(const struct debug *d, const struct text *out, size_t start)
+{
+    struct debug_spans *s = d->spans;
+
+    if (s == NULL || out->length <= start) {
+        return;
+    }
+    /* The ranges come in the order of the file, so one that follows the
+       last without a byte between them joins it. */
+    if (s->count > 0 && s->items[s->count - 1].end == start) {
+        s->items[s->count - 1].end = out->length;
+        return;
+    }
+    if (s->count == s->capacity) {
+        size_t capacity = s->capacity == 0 ? 64 : s->capacity * 2;
+        struct debug_span *items = realloc(s->items, capacity * sizeof *items);
+        if (items == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        s->items = items;
+        s->capacity = capacity;
+    }
+    s->items[s->count].start = start;
+    s->items[s->count].end = out->length;
+    s->count++;
+}
+
 void debug_init(struct debug *d, enum target t, const struct ir_module *m,
-                const char *module, bool on)
+                const char *module, bool on, struct debug_spans *spans)
 {
     memset(d, 0, sizeof *d);
     d->target = t;
@@ -76,6 +114,7 @@ void debug_init(struct debug *d, enum target t, const struct ir_module *m,
     d->module = module;
     d->on = on;
     d->file = IR_NO_INDEX;
+    d->spans = spans;
 }
 
 /* The file of the program's own module, which names the compile unit. */
@@ -96,6 +135,7 @@ static const char *unit_file(const struct debug *d)
 void debug_files(struct debug *d, struct text *out)
 {
     bool codeview = target_info(d->target)->format == FORMAT_COFF;
+    size_t start = out->length;
     size_t i;
 
     if (!d->on) {
@@ -106,11 +146,14 @@ void debug_files(struct debug *d, struct text *out)
                      i + 1, d->m->files[i]);
     }
     text_appendf(out, "%santi_debug_code:\n", local(d));
+    mark(d, out, start);
 }
 
 void debug_open(struct debug *d, struct text *out,
                 const struct ir_function *f)
 {
+    size_t start = out->length;
+
     if (!d->on) {
         /* The symbol record takes the length of the function from its
            end label. */
@@ -123,13 +166,18 @@ void debug_open(struct debug *d, struct text *out,
     d->line = 0;
     if (codeview(d)) {
         text_appendf(out, "    .cv_func_id %zu\n", d->function);
+        mark(d, out, start);
     }
     d->function++;
+    /* The position of the declaration marks its own range, which joins
+       the one above it. */
     debug_at(d, out, f->decl_line);
 }
 
 void debug_at(struct debug *d, struct text *out, uint32_t line)
 {
+    size_t start = out->length;
+
     if (!d->on || line == 0 || line == d->line || d->file == IR_NO_INDEX) {
         return;
     }
@@ -141,14 +189,22 @@ void debug_at(struct debug *d, struct text *out, uint32_t line)
         text_appendf(out, "    .loc %" PRIu32 " %" PRIu32 " 0\n", d->file + 1,
                      line);
     }
+    mark(d, out, start);
 }
 
 void debug_close(struct debug *d, struct text *out)
 {
+    size_t start = out->length;
+
     if (!d->on && !codeview(d)) {
         return;
     }
     text_appendf(out, "%santi_debug_fn%zu_end:\n", local(d), d->function - 1);
+    /* On COFF the label stands in every build, because the symbol record
+       of the function reads it. It is then no range of `-g`. */
+    if (!codeview(d)) {
+        mark(d, out, start);
+    }
 }
 
 /* The section that holds part of the debug information. ELF and COFF name
@@ -331,8 +387,11 @@ static void line_tables(struct debug *d, struct text *out,
 void debug_sections(struct debug *d, struct text *out,
                     struct mach_function *const *functions)
 {
+    size_t start = out->length;
+
     if (d->on) {
         text_appendf(out, "%santi_debug_code_end:\n", local(d));
+        mark(d, out, start);
     }
     if (codeview(d)) {
         text_append(out, "    .section .debug$S,\"dr\"\n"
@@ -341,9 +400,13 @@ void debug_sections(struct debug *d, struct text *out,
                          "with a 4 */\n");
         symbol_records(d, out, functions);
         if (d->on) {
+            start = out->length;
             line_tables(d, out, functions);
+            mark(d, out, start);
         }
     } else if (d->on) {
+        start = out->length;
         compile_unit(d, out);
+        mark(d, out, start);
     }
 }

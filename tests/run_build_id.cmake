@@ -9,15 +9,17 @@
 #
 # The id is the line "build <64 digits>" after the begin marker. The two
 # links of SOURCE give one id, since the digest is of the code, and OTHER
-# gives another. The search takes that whole form, because rt/license.c
-# holds the constant "build " that it reads the notice with, and its
-# object reaches every program through --anti.inspect.
+# gives another. A -g link of SOURCE gives that same id, because the
+# digest leaves the debug directives and the debug sections out. The
+# search takes that whole form, because rt/license.c holds the constant
+# "build " that it reads the notice with, and its object reaches every
+# program through --anti.inspect.
 
 function(build_id out dir source)
     file(MAKE_DIRECTORY "${WORK}/${dir}")
     execute_process(
         COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-                -o "${WORK}/${dir}/program" "${source}"
+                ${ARGN} -o "${WORK}/${dir}/program" "${source}"
         RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic failed for ${source}\n${err}")
@@ -38,10 +40,18 @@ endfunction()
 file(REMOVE_RECURSE "${WORK}")
 build_id(first first "${SOURCE}")
 build_id(second second "${SOURCE}")
+build_id(debug debug "${SOURCE}" -g)
 build_id(other other "${OTHER}")
 if(NOT first STREQUAL second)
     message(FATAL_ERROR "two links of one program carry two ids: ${first} and "
                         "${second}")
+endif()
+# A -g build carries the lines of the program and the same code, so
+# `anti symbols` matches a trace of the plain build to the archive of the
+# debug build by this id.
+if(NOT first STREQUAL debug)
+    message(FATAL_ERROR "a -g link carries the id ${debug} and a plain link "
+                        "carries ${first}")
 endif()
 if(first STREQUAL other)
     message(FATAL_ERROR "two programs carry one id: ${first}")

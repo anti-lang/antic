@@ -20,6 +20,26 @@
    no statement carries the line 0 and writes nothing, a prologue or an
    epilogue among them. It keeps the position of the one before it. */
 
+/* One range of an assembly file that `-g` added, as offsets into it. */
+struct debug_span {
+    size_t start;
+    size_t end;
+};
+
+/* DESIGN: the build id is the digest of what a program executes, so the
+   ranges below are left out of it. A `-g` link and a plain link of one
+   program then carry one id. That id is what ties a trace of the plain
+   binary to the symbols archive of the other. A range is recorded only
+   where `-g` decides the bytes. The `S_LPROC32` records of COFF and the
+   end label they read stand in every build, so neither is a range. */
+struct debug_spans {
+    struct debug_span *items;
+    size_t count;
+    size_t capacity;
+};
+
+void debug_spans_free(struct debug_spans *s);
+
 /* The debug information of one assembly file. */
 struct debug {
     enum target target;
@@ -29,10 +49,11 @@ struct debug {
     uint32_t file;              /* the file being written */
     uint32_t line;              /* the line last written */
     size_t function;            /* the functions opened */
+    struct debug_spans *spans;  /* NULL for a caller that reads none */
 };
 
 void debug_init(struct debug *d, enum target t, const struct ir_module *m,
-                const char *module, bool on);
+                const char *module, bool on, struct debug_spans *spans);
 
 /* Append a directive per source file and the label the code starts at. It
    goes after the text section and before the first function. */

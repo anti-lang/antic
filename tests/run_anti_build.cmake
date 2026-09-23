@@ -143,6 +143,14 @@ file(READ "${WORK}/symbols/app.map" map)
 if(NOT map MATCHES "# build ${id}")
     message(FATAL_ERROR "the map names no build id of the program:\n${map}")
 endif()
+# The debug link carries the id of the program, because the digest leaves
+# what -g added out. A trace of the program then finds this archive.
+file(STRINGS "${WORK}/symbols/app.debug" lines REGEX "^build [0-9a-f]+$")
+string(REGEX MATCH "^build ([0-9a-f]+)$" line "${lines}")
+if(NOT CMAKE_MATCH_1 STREQUAL id)
+    message(FATAL_ERROR "app.debug carries ${CMAKE_MATCH_1} and the program "
+                        "carries ${id}")
+endif()
 foreach(name com.example.app.main com.example.greet.word)
     if(NOT map MATCHES "${name}")
         message(FATAL_ERROR "the map names no ${name}")

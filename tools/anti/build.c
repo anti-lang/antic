@@ -517,12 +517,10 @@ static void archive_stem(enum target t, const char *name, struct text *out)
 
 /* DESIGN: a release binary carries no symbol data, so the build writes
    the archive that names it. It holds the same link with the debug
-   sections kept and the map of that program. The map names the build id
-   of the binary beside it, which is what ties a frame of a trace to this
-   archive. The debug link carries an id of its own, because the id is
-   the digest of the assembly and `-g` writes more of it. Its addresses
-   are the addresses of the binary, so the map answers for both. A
-   Windows link writes the symbols to a PDB, which goes in as well. */
+   sections kept and the map of that program. All three carry the build
+   id of the binary, because the digest leaves what `-g` added out. That
+   id is what ties a frame of a trace to this archive. A Windows link
+   writes the symbols to a PDB, which goes in as well. */
 static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
                           size_t main_at, const struct strings *libraries,
                           const char *deliverable)

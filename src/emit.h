@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include "cpu.h"
+#include "debug.h"
 #include "ir.h"
 #include "mach.h"
 #include "target.h"
@@ -14,14 +15,15 @@
    machine code after register allocation for each IR function, and NULL
    for an extern function. The function main of module becomes the runtime
    entry. debug_info is -g, which adds the directives of the source
-   positions. exports makes every name global and hidden by nothing, so
-   a plugin loaded into the program resolves against it. Returns false
-   and writes a message to error for a program that the emitter cannot
-   write yet. */
+   positions. spans takes the ranges of out that -g added, or NULL for a
+   caller that reads none. exports makes every name global and hidden by
+   nothing, so a plugin loaded into the program resolves against it.
+   Returns false and writes a message to error for a program that the
+   emitter cannot write yet. */
 bool emit_program(struct text *out, enum target t, enum cpu_level cpu,
                   const struct ir_module *m, struct mach_function **functions,
                   const char *module, bool exports, bool debug_info,
-                  char *error, size_t error_size);
+                  struct debug_spans *spans, char *error, size_t error_size);
 
 /* Append the assembly file of one module in dev mode. Every function of
    the module is global and hidden, and the functions of other modules are
@@ -29,7 +31,7 @@ bool emit_program(struct text *out, enum target t, enum cpu_level cpu,
 bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
                  const char *module, bool exports, bool debug_info,
-                 char *error, size_t error_size);
+                 struct debug_spans *spans, char *error, size_t error_size);
 
 /* Append a constructor that calls C function function when the library
    loads. */
