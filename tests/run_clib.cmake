@@ -9,7 +9,7 @@
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, simd,
-#             classes, failing, tuples, flags or variants
+#             classes, failing, tuples, flags, variants or names
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
@@ -210,6 +210,17 @@ elseif(CASE STREQUAL "flags")
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/flags${EXE}")
     expect_output("${dir}/flags${EXE}" "${SOURCES}/flags.expected")
+elseif(CASE STREQUAL "names")
+    # The header gives two fields whose names share a long prefix one C
+    # name each, writes a whole float constant as a float of its type, and
+    # declares every entry of a table of more than 64 public functions.
+    library(names static "${dir}")
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/names.c"
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/names${EXE}")
+    expect_output("${dir}/names${EXE}" "${SOURCES}/names.expected")
 elseif(CASE STREQUAL "variants")
     # An export variant crosses as the enum of its tags and the struct of
     # its tag and the union of its cases. C sets and reads both, by value

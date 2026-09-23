@@ -80,7 +80,7 @@ static bool stdint_macro(const struct name *name)
 
 /* DESIGN: the header keeps the Anti name of a parameter or a field. A
    name that C or C++ reserves gets a trailing _, as default_. */
-static void c_name(char *out, size_t size, const struct name *name)
+static void c_name(struct text *out, const struct name *name)
 {
     size_t i;
     bool reserved = stdint_macro(name);
@@ -90,8 +90,8 @@ static void c_name(char *out, size_t size, const struct name *name)
         reserved = strlen(reserved_names[i]) == name->length &&
                    memcmp(reserved_names[i], name->text, name->length) == 0;
     }
-    snprintf(out, size, "%.*s%s", (int)name->length, name->text,
-             reserved ? "_" : "");
+    text_appendf(out, "%.*s%s", (int)name->length, name->text,
+                 reserved ? "_" : "");
 }
 
 /* DESIGN: `anti.lang.Error` crosses to C as `struct anti_Error *`, the
@@ -418,12 +418,13 @@ static void tuple_view(struct text *out, const struct type *t,
                  text_cstr(&written), text_cstr(&tag));
     for (i = 0; i < t->field_count; i++) {
         struct text field = {0};
-        char buffer[128];
-        c_name(buffer, sizeof buffer, &t->fields[i].name);
+        struct text buffer = {0};
+        c_name(&buffer, &t->fields[i].name);
         text_append(out, "    ");
-        declaration(&field, t->fields[i].type, buffer, t);
+        declaration(&field, t->fields[i].type, text_cstr(&buffer), t);
         text_appendf(out, "%s;\n", text_cstr(&field));
         text_free(&field);
+        text_free(&buffer);
     }
     text_append(out, "};\n\n");
     text_free(&written);
@@ -494,12 +495,13 @@ static void variant_view(struct text *out, const struct symbol *sym,
     text_appendf(out, "/* The tags of %.*s. */\nenum %.*s_tag {\n", n,
                  t->name.text, n, t->name.text);
     for (i = 0; i < tag->field_count; i++) {
-        char buffer[128];
-        c_name(buffer, sizeof buffer, &tag->fields[i].name);
+        struct text buffer = {0};
+        c_name(&buffer, &tag->fields[i].name);
         doc_comment(out, &tag->fields[i].doc, "    ");
         text_appendf(out, "    %.*s_%s = %" PRIu64 "%s\n", n, t->name.text,
-                     buffer, tag->fields[i].number,
+                     text_cstr(&buffer), tag->fields[i].number,
                      i + 1 < tag->field_count ? "," : "");
+        text_free(&buffer);
     }
     text_append(out, "};\n\n");
     doc_comment(out, &sym->doc, "");
@@ -515,18 +517,22 @@ static void variant_view(struct text *out, const struct symbol *sym,
         text_append(out, "    union {\n");
         for (i = 0; i < u->field_count; i++) {
             const struct type *payload = u->fields[i].type;
-            char buffer[128];
+            struct text buffer = {0};
             text_append(out, "        struct {\n");
             for (j = 0; j < payload->field_count; j++) {
                 struct text field = {0};
-                c_name(buffer, sizeof buffer, &payload->fields[j].name);
+                struct text member = {0};
+                c_name(&member, &payload->fields[j].name);
                 doc_comment(out, &payload->fields[j].doc, "            ");
-                declaration(&field, payload->fields[j].type, buffer, NULL);
+                declaration(&field, payload->fields[j].type,
+                            text_cstr(&member), NULL);
                 text_appendf(out, "            %s;\n", text_cstr(&field));
                 text_free(&field);
+                text_free(&member);
             }
-            c_name(buffer, sizeof buffer, &u->fields[i].name);
-            text_appendf(out, "        } %s;\n", buffer);
+            c_name(&buffer, &u->fields[i].name);
+            text_appendf(out, "        } %s;\n", text_cstr(&buffer));
+            text_free(&buffer);
         }
         text_append(out, "    } " VARIANT_UNION ";\n");
     }
@@ -606,8 +612,8 @@ static void aggregate(struct text *out, const struct symbol *sym,
                  t->name.text);
     for (i = 0; i < t->field_count; i++) {
         struct text field = {0};
-        char buffer[128];
-        c_name(buffer, sizeof buffer, &t->fields[i].name);
+        struct text buffer = {0};
+        c_name(&buffer, &t->fields[i].name);
         doc_comment(out, &t->fields[i].doc, "    ");
         text_append(out, "    ");
         if (i == 0 && t->simd) {
@@ -617,16 +623,18 @@ static void aggregate(struct text *out, const struct symbol *sym,
         } else if (i == 0 && t->align != 0) {
             text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ", t->align);
         }
-        if (type_field_is_unit_break(&t->fields[i])) {
-            buffer[0] = '\0';
-        }
-        declaration(&field, t->fields[i].type, buffer, t);
+        declaration(&field, t->fields[i].type,
+                    type_field_is_unit_break(&t->fields[i])
+                        ? ""
+                        : text_cstr(&buffer),
+                    t);
         text_append(out, text_cstr(&field));
         if (t->fields[i].bits != 0 || type_field_is_unit_break(&t->fields[i])) {
             text_appendf(out, " : %u", (unsigned)t->fields[i].bits);
         }
         text_append(out, ";\n");
         text_free(&field);
+        text_free(&buffer);
     }
     text_appendf(out, "} %.*s;\n", (int)t->name.length, t->name.text);
     if (t->packed) {
@@ -635,10 +643,23 @@ static void aggregate(struct text *out, const struct symbol *sym,
     text_append(out, "\n");
 }
 
+/* The members of every level of the chain of t, which bounds the entries
+   chain_functions writes. */
+static size_t chain_members(const struct type *t)
+{
+    size_t count = 0;
+
+    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+        count += t->member_count;
+    }
+    return count;
+}
+
 /* The public functions of the chain of t, base first, in table order. A
    name that repeats replaces the entry it repeats, as the table does. A
    body qualified by an interface fills no entry here. One qualified by a
-   base replaces a plain body of its level, as types_body_table says. */
+   base replaces a plain body of its level, as types_body_table says. out
+   holds limit entries, and chain_members(t) of them hold every one. */
 static size_t chain_functions(const struct type *t, const struct item **out,
                               size_t limit)
 {
@@ -714,7 +735,7 @@ static void member_signature(struct text *out, const struct type *owner,
     }
     for (i = 0; i < t->param_count; i++) {
         struct text param = {0};
-        char buffer[128];
+        struct text buffer = {0};
         size_t k = i - (m->has_self ? 1 : 0);
         if (i == 0 && m->has_self) {
             text_appendf(&inner, "%.*s *self", (int)owner->name.length,
@@ -722,16 +743,17 @@ static void member_signature(struct text *out, const struct type *owner,
             continue;
         }
         if (m->symbol->params != NULL && k < m->param_count) {
-            c_name(buffer, sizeof buffer, &m->symbol->params[k]);
+            c_name(&buffer, &m->symbol->params[k]);
         } else if (m->params != NULL && k < m->param_count) {
-            c_name(buffer, sizeof buffer, &m->params[k].name);
+            c_name(&buffer, &m->params[k].name);
         } else {
-            snprintf(buffer, sizeof buffer, "a%zu", k);
+            text_appendf(&buffer, "a%zu", k);
         }
-        declaration(&param, t->params[i], buffer, NULL);
+        declaration(&param, t->params[i], text_cstr(&buffer), NULL);
         text_appendf(&inner, "%s%s%s", i > 0 ? ", " : "",
                      owned_note(m->symbol, i), text_cstr(&param));
         text_free(&param);
+        text_free(&buffer);
     }
     text_append(&inner, t->param_count == 0 ? "void)" : ")");
     declaration(&decl, t->result, text_cstr(&inner), NULL);
@@ -762,17 +784,23 @@ static const struct item *construct_with_arguments(const struct type *t)
    has no complete value, so it gets no table symbol and no `init`. */
 static void class_view(struct text *out, const struct symbol *sym)
 {
-    const struct item *entries[64];
     const struct type *t = sym->type;
+    size_t limit = chain_members(t);
+    const struct item **entries = malloc((limit + 1) * sizeof *entries);
     int name_length = (int)t->name.length;
     const char *name_text = t->name.text;
-    size_t count = chain_functions(t, entries, 64);
+    size_t count;
     struct text to_root = {0};
     const struct item *made;
     const struct type *up;
     size_t i;
     size_t j;
 
+    if (entries == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    count = chain_functions(t, entries, limit);
     /* The table pointer sits in the root, so a wrapper reaches it
        through one `base` per level of the chain. */
     for (up = t; up != NULL && up->base != NULL; up = up->base) {
@@ -803,7 +831,7 @@ static void class_view(struct text *out, const struct symbol *sym)
     text_appendf(out, "struct %.*s {\n", name_length, name_text);
     for (i = 0; i < t->field_count; i++) {
         struct text field = {0};
-        char buffer[128];
+        struct text buffer = {0};
         const struct struct_field *f = &t->fields[i];
         if (f->form == FIELD_TABLE) {
             text_appendf(out, "    const %.*s_vtable *vtable;\n", name_length,
@@ -816,10 +844,11 @@ static void class_view(struct text *out, const struct symbol *sym)
                          (int)f->type->name.length, f->type->name.text);
             continue;
         }
-        c_name(buffer, sizeof buffer, &f->name);
+        c_name(&buffer, &f->name);
         doc_comment(out, &f->doc, "    ");
         text_append(out, "    ");
-        declaration(&field, f->type, buffer, t);
+        declaration(&field, f->type, text_cstr(&buffer), t);
+        text_free(&buffer);
         text_append(out, text_cstr(&field));
         text_appendf(out, ";%s%s\n",
                      f->owned ? "   /* own */" : "",
@@ -876,11 +905,11 @@ static void class_view(struct text *out, const struct symbol *sym)
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *f = &up->fields[i];
-            char buffer[128];
+            struct text buffer = {0};
             if (f->form != FIELD_IMPL) {
                 continue;
             }
-            c_name(buffer, sizeof buffer, &f->name);
+            c_name(&buffer, &f->name);
             text_appendf(out,
                          "extern const %.*s_vtable anti_%.*s_%.*s_vtable;\n"
                          "static inline %.*s *anti_%.*s_as_%.*s(%.*s *self)\n"
@@ -892,7 +921,8 @@ static void class_view(struct text *out, const struct symbol *sym)
                          name_length, name_text,
                          (int)f->type->name.length, f->type->name.text,
                          name_length, name_text,
-                         up == t ? "" : "base.", buffer);
+                         up == t ? "" : "base.", text_cstr(&buffer));
+            text_free(&buffer);
         }
     }
     /* DESIGN: each prototype names a symbol the library holds, so a C
@@ -931,23 +961,25 @@ static void class_view(struct text *out, const struct symbol *sym)
                      name_length, name_text, text_cstr(&to_root),
                      (int)entries[i]->name.length, entries[i]->name.text);
         for (j = 1; j < entries[i]->symbol->type->param_count; j++) {
-            char buffer[128];
+            struct text buffer = {0};
             size_t k = j - 1;
             if (entries[i]->symbol->params != NULL &&
                 k < entries[i]->param_count) {
-                c_name(buffer, sizeof buffer, &entries[i]->symbol->params[k]);
+                c_name(&buffer, &entries[i]->symbol->params[k]);
             } else if (entries[i]->params != NULL &&
                        k < entries[i]->param_count) {
-                c_name(buffer, sizeof buffer, &entries[i]->params[k].name);
+                c_name(&buffer, &entries[i]->params[k].name);
             } else {
-                snprintf(buffer, sizeof buffer, "a%zu", k);
+                text_appendf(&buffer, "a%zu", k);
             }
-            text_appendf(out, ", %s", buffer);
+            text_appendf(out, ", %s", text_cstr(&buffer));
+            text_free(&buffer);
         }
         text_append(out, ");\n}\n");
     }
     text_append(out, "\n");
     text_free(&to_root);
+    free(entries);
 }
 
 static void constant(struct text *out, const struct symbol *sym)
@@ -962,11 +994,18 @@ static void constant(struct text *out, const struct symbol *sym)
         text_appendf(out, "#define %.*s %s\n", (int)sym->name.length,
                      sym->name.text, v->as.boolean ? "true" : "false");
         return;
-    case CONST_FLOAT:
-        text_appendf(out, "#define %.*s %.17g%s\n", (int)sym->name.length,
-                     sym->name.text, v->as.floating,
+    /* A whole value gets `.0`, since C reads `2` as an int and refuses
+       `2f`. */
+    case CONST_FLOAT: {
+        struct text digits = {0};
+        text_appendf(&digits, "%.17g", v->as.floating);
+        text_appendf(out, "#define %.*s %s%s%s\n", (int)sym->name.length,
+                     sym->name.text, text_cstr(&digits),
+                     strpbrk(text_cstr(&digits), ".e") == NULL ? ".0" : "",
                      t->kind == TYPE_F32 ? "f" : "");
+        text_free(&digits);
         return;
+    }
     case CONST_TEXT:
         text_appendf(out, "static const char %.*s[] = \"",
                      (int)sym->name.length, sym->name.text);
@@ -1003,12 +1042,13 @@ static void prototype(struct text *out, const struct symbol *sym)
     text_appendf(&inner, "%.*s(", (int)sym->name.length, sym->name.text);
     for (i = 0; i < t->param_count; i++) {
         struct text param = {0};
-        char name[128];
-        c_name(name, sizeof name, &sym->params[i]);
-        declaration(&param, t->params[i], name, NULL);
+        struct text name = {0};
+        c_name(&name, &sym->params[i]);
+        declaration(&param, t->params[i], text_cstr(&name), NULL);
         text_appendf(&inner, "%s%s%s", i > 0 ? ", " : "", owned_note(sym, i),
                      text_cstr(&param));
         text_free(&param);
+        text_free(&name);
     }
     text_append(&inner, t->param_count == 0 ? "void)" : ")");
     declaration(&decl, t->result, text_cstr(&inner), NULL);

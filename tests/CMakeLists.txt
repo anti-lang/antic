@@ -2402,7 +2402,7 @@ if(ANTIC_LLVM_AR)
 endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
-            failing tuples flags variants simd)
+            failing tuples flags variants simd names)
         add_test(NAME clib_${case}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"

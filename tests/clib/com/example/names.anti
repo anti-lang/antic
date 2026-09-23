@@ -1,0 +1,374 @@
+//! What the header of a library writes for C: two field names that share
+//! their first 136 bytes, a float constant with a whole value, and a class
+//! whose table holds more than 64 public functions.
+
+import anti.lang;
+
+/// Two fields whose names differ past byte 136.
+export struct Pair
+{
+	sharedqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa: c_int,
+	sharedqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqb: c_int,
+}
+
+/// A whole f32, which C reads as a float.
+export const TWO_F32: f32 = 2.0;
+
+/// A whole f64, which C reads as a double.
+export const TWO_F64: f64 = 2.0;
+
+/// A class with 70 functions of its own.
+export class Many
+{
+	n: c_int = 0,
+
+	export fn step0(self) -> c_int
+	{
+		return 0;
+	}
+
+	export fn step1(self) -> c_int
+	{
+		return 1;
+	}
+
+	export fn step2(self) -> c_int
+	{
+		return 2;
+	}
+
+	export fn step3(self) -> c_int
+	{
+		return 3;
+	}
+
+	export fn step4(self) -> c_int
+	{
+		return 4;
+	}
+
+	export fn step5(self) -> c_int
+	{
+		return 5;
+	}
+
+	export fn step6(self) -> c_int
+	{
+		return 6;
+	}
+
+	export fn step7(self) -> c_int
+	{
+		return 7;
+	}
+
+	export fn step8(self) -> c_int
+	{
+		return 8;
+	}
+
+	export fn step9(self) -> c_int
+	{
+		return 9;
+	}
+
+	export fn step10(self) -> c_int
+	{
+		return 10;
+	}
+
+	export fn step11(self) -> c_int
+	{
+		return 11;
+	}
+
+	export fn step12(self) -> c_int
+	{
+		return 12;
+	}
+
+	export fn step13(self) -> c_int
+	{
+		return 13;
+	}
+
+	export fn step14(self) -> c_int
+	{
+		return 14;
+	}
+
+	export fn step15(self) -> c_int
+	{
+		return 15;
+	}
+
+	export fn step16(self) -> c_int
+	{
+		return 16;
+	}
+
+	export fn step17(self) -> c_int
+	{
+		return 17;
+	}
+
+	export fn step18(self) -> c_int
+	{
+		return 18;
+	}
+
+	export fn step19(self) -> c_int
+	{
+		return 19;
+	}
+
+	export fn step20(self) -> c_int
+	{
+		return 20;
+	}
+
+	export fn step21(self) -> c_int
+	{
+		return 21;
+	}
+
+	export fn step22(self) -> c_int
+	{
+		return 22;
+	}
+
+	export fn step23(self) -> c_int
+	{
+		return 23;
+	}
+
+	export fn step24(self) -> c_int
+	{
+		return 24;
+	}
+
+	export fn step25(self) -> c_int
+	{
+		return 25;
+	}
+
+	export fn step26(self) -> c_int
+	{
+		return 26;
+	}
+
+	export fn step27(self) -> c_int
+	{
+		return 27;
+	}
+
+	export fn step28(self) -> c_int
+	{
+		return 28;
+	}
+
+	export fn step29(self) -> c_int
+	{
+		return 29;
+	}
+
+	export fn step30(self) -> c_int
+	{
+		return 30;
+	}
+
+	export fn step31(self) -> c_int
+	{
+		return 31;
+	}
+
+	export fn step32(self) -> c_int
+	{
+		return 32;
+	}
+
+	export fn step33(self) -> c_int
+	{
+		return 33;
+	}
+
+	export fn step34(self) -> c_int
+	{
+		return 34;
+	}
+
+	export fn step35(self) -> c_int
+	{
+		return 35;
+	}
+
+	export fn step36(self) -> c_int
+	{
+		return 36;
+	}
+
+	export fn step37(self) -> c_int
+	{
+		return 37;
+	}
+
+	export fn step38(self) -> c_int
+	{
+		return 38;
+	}
+
+	export fn step39(self) -> c_int
+	{
+		return 39;
+	}
+
+	export fn step40(self) -> c_int
+	{
+		return 40;
+	}
+
+	export fn step41(self) -> c_int
+	{
+		return 41;
+	}
+
+	export fn step42(self) -> c_int
+	{
+		return 42;
+	}
+
+	export fn step43(self) -> c_int
+	{
+		return 43;
+	}
+
+	export fn step44(self) -> c_int
+	{
+		return 44;
+	}
+
+	export fn step45(self) -> c_int
+	{
+		return 45;
+	}
+
+	export fn step46(self) -> c_int
+	{
+		return 46;
+	}
+
+	export fn step47(self) -> c_int
+	{
+		return 47;
+	}
+
+	export fn step48(self) -> c_int
+	{
+		return 48;
+	}
+
+	export fn step49(self) -> c_int
+	{
+		return 49;
+	}
+
+	export fn step50(self) -> c_int
+	{
+		return 50;
+	}
+
+	export fn step51(self) -> c_int
+	{
+		return 51;
+	}
+
+	export fn step52(self) -> c_int
+	{
+		return 52;
+	}
+
+	export fn step53(self) -> c_int
+	{
+		return 53;
+	}
+
+	export fn step54(self) -> c_int
+	{
+		return 54;
+	}
+
+	export fn step55(self) -> c_int
+	{
+		return 55;
+	}
+
+	export fn step56(self) -> c_int
+	{
+		return 56;
+	}
+
+	export fn step57(self) -> c_int
+	{
+		return 57;
+	}
+
+	export fn step58(self) -> c_int
+	{
+		return 58;
+	}
+
+	export fn step59(self) -> c_int
+	{
+		return 59;
+	}
+
+	export fn step60(self) -> c_int
+	{
+		return 60;
+	}
+
+	export fn step61(self) -> c_int
+	{
+		return 61;
+	}
+
+	export fn step62(self) -> c_int
+	{
+		return 62;
+	}
+
+	export fn step63(self) -> c_int
+	{
+		return 63;
+	}
+
+	export fn step64(self) -> c_int
+	{
+		return 64;
+	}
+
+	export fn step65(self) -> c_int
+	{
+		return 65;
+	}
+
+	export fn step66(self) -> c_int
+	{
+		return 66;
+	}
+
+	export fn step67(self) -> c_int
+	{
+		return 67;
+	}
+
+	export fn step68(self) -> c_int
+	{
+		return 68;
+	}
+
+	export fn step69(self) -> c_int
+	{
+		return 69;
+	}
+}
