@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bind.h"
 #include "build.h"
 #include "check.h"
 #include "doc.h"
@@ -17,6 +18,8 @@
 #include "test.h"
 #include "text.h"
 
+/* The text stands in several literals, since C99 guarantees a length of
+   4095 bytes for one. */
 static int usage(FILE *out)
 {
     fputs("usage: anti new <name>\n"
@@ -39,7 +42,10 @@ static int usage(FILE *out)
           "                [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
           "                [<file.anti>|<file.antl>...]\n"
           "       anti fmt [--check] [<file.anti>...]\n"
-          "\n"
+          "       anti bind --header <file.antl> [-o <dir>] [-I <dir>]\n"
+          "                 [--runtime <dir>]\n",
+          out);
+    fputs("\n"
           "new writes a project of the default layout: anti.toml, src/ with\n"
           "one module whose path is the package name, and test/. The name is\n"
           "a module path of at least two segments, and the directory takes\n"
@@ -98,6 +104,11 @@ static int usage(FILE *out)
           "of anti.toml names. --targets all runs the front end once per\n"
           "target, so a program that type-checks on the host is proven to\n"
           "type-check on all six.\n",
+          out);
+    fputs("\n"
+          "bind --header writes <name>.h from the public interface of the\n"
+          "library file <name>.antl, the header that antic --lib writes for\n"
+          "the same module.\n",
           out);
     return out == stdout ? 0 : 2;
 }
@@ -438,6 +449,44 @@ int main(int argc, char **argv)
         manifest_inject_free(&inject);
         free(sources);
         free(roots);
+        text_free(&home);
+        return status;
+    }
+    if (argc >= 2 && strcmp(argv[1], "bind") == 0) {
+        const char **roots = malloc((size_t)argc * sizeof *roots);
+        const char *header = NULL;
+        const char *out = ".";
+        const char *runtime = NULL;
+        struct text home = {0};
+        size_t root_count = 0;
+        int status;
+        if (roots == NULL) {
+            fputs("anti: out of memory\n", stderr);
+            return 70;
+        }
+        for (i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "--header") == 0 && i + 1 < argc) {
+                header = argv[++i];
+            } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+                out = argv[++i];
+            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+                runtime = argv[++i];
+            } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
+                roots[root_count++] = argv[++i];
+            } else {
+                free((void *)roots);
+                return usage(stderr);
+            }
+        }
+        if (header == NULL) {
+            free((void *)roots);
+            return usage(stderr);
+        }
+        if (runtime == NULL && default_runtime(&home)) {
+            runtime = text_cstr(&home);
+        }
+        status = bind_header(header, out, runtime, roots, root_count);
+        free((void *)roots);
         text_free(&home);
         return status;
     }

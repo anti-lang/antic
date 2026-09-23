@@ -154,5 +154,15 @@ const struct interface *driver_interface(const struct options *options,
                                          struct ir_module *program,
                                          struct module **tree);
 
+struct text;
+
+/* Append to out the C header of the library file options->input, as
+   `antic --lib` writes it for the same module. The header names the
+   library after options->output as --lib does, and after the last
+   segment of the module without one. The libraries the file imports are
+   loaded, so an export type of theirs is written too. Returns false with
+   a message when the file cannot be read. */
+bool driver_library_header(const struct options *options, struct text *out);
+
 
 #endif

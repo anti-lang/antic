@@ -164,6 +164,7 @@ target_link_libraries(antic PRIVATE antic_core)
 # logger and the runtime configuration share.
 add_executable(anti
     tools/anti/main.c
+    tools/anti/bind.c
     tools/anti/build.c
     tools/anti/check.c
     tools/anti/deps.c

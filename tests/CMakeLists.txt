@@ -877,6 +877,19 @@ add_test(NAME anti_doc
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_doc.cmake")
 
+# anti bind --header writes the header that antic --lib writes for the
+# same module, from the library file alone.
+add_test(NAME anti_bind_header
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+        "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bind-header"
+        -DCASE=header
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_bind.cmake")
+
 # The `tests` block of a module of the standard library. The module
 # imports other modules, so the dev run links an object of each.
 add_test(NAME std_tests_trace

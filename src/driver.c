@@ -1762,6 +1762,96 @@ done:
     return iface;
 }
 
+bool driver_library_header(const struct options *o, struct text *out)
+{
+    struct arena arena = {0};
+    struct types types;
+    struct ir_module program;
+    struct options with_input = *o;
+    struct module empty;
+    struct interface header;
+    struct paths paths = {0};
+    struct text source = {0};
+    struct text name = {0};
+    struct diagnostics diags = {0};
+    const struct interface **libraries = NULL;
+    const struct interface *own = NULL;
+    char error[200];
+    size_t kept = 0;
+    size_t i;
+    bool ok = false;
+
+    memset(&empty, 0, sizeof empty);
+    types_init(&types, &arena);
+    ir_module_init(&program, &arena, "");
+    with_input.libraries =
+        malloc((o->library_count + 1) * sizeof *with_input.libraries);
+    if (with_input.libraries == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    with_input.libraries[0] = o->input;
+    memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
+           o->library_count * sizeof *o->libraries);
+    with_input.library_count = o->library_count + 1;
+    if (!read_bytes(o->input, &source) ||
+        !antl_header((const uint8_t *)source.data, source.length, &arena,
+                     &header, error, sizeof error)) {
+        if (source.length > 0) {
+            fprintf(stderr, "antic: %s %s\n", o->input, error);
+        }
+        goto done;
+    }
+    if (!find_libraries(&with_input, &empty, &arena, &paths)) {
+        goto done;
+    }
+    libraries = malloc((paths.count + 1) * sizeof *libraries);
+    if (libraries == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    if (!load_libraries(&paths, "", &arena, &types, &program, libraries)) {
+        goto done;
+    }
+    /* The checker declares the functions of anti.lang.Object, which the
+       table of an export class writes. An empty module checks nothing
+       else. */
+    if (!sema_check(&empty, "", NULL, libraries, paths.count, &types,
+                    &arena, &diags, false)) {
+        report_diagnostics(o, &diags);
+        goto done;
+    }
+    /* The module of the file goes last, where the compiled module stands
+       when antic writes the header of --lib, so both write one order. */
+    for (i = 0; i < paths.count; i++) {
+        if (strcmp(libraries[i]->module, header.module) == 0) {
+            own = libraries[i];
+        } else {
+            libraries[kept++] = libraries[i];
+        }
+    }
+    if (own == NULL) {
+        fprintf(stderr, "antic: %s holds no module `%s`\n", o->input,
+                header.module);
+        goto done;
+    }
+    libraries[kept] = own;
+    library_name(o, header.module, &name);
+    header_write(out, text_cstr(&name), libraries, kept + 1, false);
+    ok = true;
+
+done:
+    free((void *)with_input.libraries);
+    free((void *)libraries);
+    free((void *)paths.items);
+    text_free(&source);
+    text_free(&name);
+    diagnostics_free(&diags);
+    ir_module_free(&program);
+    arena_free(&arena);
+    return ok;
+}
+
 /* DESIGN: dev mode also compiles a library file of the dependency graph
    into its own object. The IR in the file is the module, and the other
    library files declare what it calls. A main module comes from source,
