@@ -712,6 +712,152 @@ static void reflection_marks_the_table(void)
                   "ptr 0, i64 0 }\n");
 }
 
+/* The ways a library file can describe the interface a plugin provides
+   out of shape. The plugin copies the chain of the interface into its
+   own image and reads the length, the source, the size and the version
+   from the descriptor. */
+enum damage {
+    INTACT,
+    CHAIN_TOO_LONG,         /* the length passes the items of the chain */
+    CHAIN_NOT_ADDRESS,      /* the chain is an integer, no global */
+    CHAIN_NO_VALUE,         /* the chain names a global of bytes */
+    CHAIN_ITEM_ADDRESS,     /* a hash of the chain is an address */
+    SIZE_FLOAT,             /* the size of the interface is a float */
+    FIELDS_ADDRESS,         /* the field count is an address */
+    VERSION_TOO_LONG        /* the version length passes its bytes */
+};
+
+/* The global named name that holds a constant. */
+static struct ir_global *value_named(const struct ir_module *m,
+                                     const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->value != NULL &&
+            strcmp(m->globals[i]->name, name) == 0) {
+            return m->globals[i];
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no global %s with a value\n", name);
+    return NULL;
+}
+
+/* The first global that holds bytes and no constant. The reader bounds
+   every address of a library file, so a damaged chain still names a
+   global of the program. */
+static uint32_t bytes_global(const struct ir_module *m)
+{
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->value == NULL) {
+            return (uint32_t)i;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no global of bytes\n");
+    return 0;
+}
+
+/* Build a plugin that provides the interface of a library, with the
+   descriptor of the interface damaged as damage says. A damaged one
+   is reported and read no further. */
+static void provides_from_library(enum damage damage)
+{
+    static const char greet[] =
+        "pub abstract class Greeter\n"
+        "{\n"
+        "    pub abstract fn words(self) -> int;\n"
+        "}\n";
+    static const char fancy[] =
+        "import greet;\n"
+        "\n"
+        "provides greet.Greeter as Fancy;\n"
+        "\n"
+        "pub class Fancy\n"
+        "{\n"
+        "    implements g: greet.Greeter,\n"
+        "\n"
+        "    pub concrete fn words(self) -> int\n"
+        "    {\n"
+        "        return 1;\n"
+        "    }\n"
+        "}\n";
+    struct program p;
+    struct text errors = {0};
+    struct whole_options options;
+    struct ir_global *versions;
+    struct ir_global *descriptor;
+    struct ir_const *record;
+    struct ir_const *chain;
+    bool ok;
+
+    open_program(&p);
+    load_library(&p, "greet", greet);
+    compile(&p, "fancy", fancy, &p.ir);
+    versions = value_named(&p.ir, "Greeter.versions");
+    descriptor = value_named(&p.ir, "Greeter.descriptor");
+    if (versions == NULL || descriptor == NULL) {
+        close_program(&p);
+        return;
+    }
+    record = versions->value;
+    chain = p.ir.globals[record->items[0].global]->value;
+    switch (damage) {
+    case INTACT:
+        break;
+    case CHAIN_TOO_LONG:
+        record->items[1].integer = 1000;
+        break;
+    case CHAIN_NOT_ADDRESS:
+        record->items[0].kind = IR_CONST_INT;
+        break;
+    case CHAIN_NO_VALUE:
+        record->items[0].global = bytes_global(&p.ir);
+        break;
+    case CHAIN_ITEM_ADDRESS:
+        chain->items[1].kind = IR_CONST_ADDR;
+        break;
+    case SIZE_FLOAT:
+        descriptor->value->items[3].kind = IR_CONST_FLOAT;
+        break;
+    case FIELDS_ADDRESS:
+        descriptor->value->items[6].kind = IR_CONST_ADDR;
+        break;
+    case VERSION_TOO_LONG:
+        descriptor->value->items[13].integer = 1000;
+        break;
+    }
+    memset(&options, 0, sizeof options);
+    options.entry = "fancy";
+    options.library = true;
+    options.plugin = true;
+    ok = whole_program(&p.ir, &options, &errors);
+    CHECK(ok == (damage == INTACT));
+    CHECK_STR(text_cstr(&errors),
+              damage == INTACT
+                  ? ""
+                  : "`fancy.Fancy` provides `greet.Greeter`, and the "
+                    "library file that describes it is damaged\n"
+                    "a plugin has at least one `provides` line\n");
+    text_free(&errors);
+    close_program(&p);
+}
+
+static void checks_provided_interfaces(void)
+{
+    provides_from_library(INTACT);
+    provides_from_library(CHAIN_TOO_LONG);
+    provides_from_library(CHAIN_NOT_ADDRESS);
+    provides_from_library(CHAIN_NO_VALUE);
+    provides_from_library(CHAIN_ITEM_ADDRESS);
+    provides_from_library(SIZE_FLOAT);
+    provides_from_library(FIELDS_ADDRESS);
+    provides_from_library(VERSION_TOO_LONG);
+}
+
 void test_whole(void)
 {
     finds_entries();
@@ -722,4 +868,5 @@ void test_whole(void)
     records_slots();
     writes_trampolines();
     reflection_marks_the_table();
+    checks_provided_interfaces();
 }

@@ -1959,6 +1959,42 @@ static const struct ir_const *descriptor_item(const struct ir_module *m,
     return &value->items[at];
 }
 
+/* Whether c is an integer, or a symbolic value where sym is set. */
+static bool is_integer(const struct ir_const *c, bool sym)
+{
+    return c->kind == IR_CONST_INT || (sym && c->kind == IR_CONST_SYM);
+}
+
+/* The chain of hashes the version record names, or NULL where the
+   library file that carries it is damaged: the record is no address and
+   a length, the global holds no array of at least that many integers, or
+   the length is zero. */
+static const struct ir_const *chain_of(const struct ir_module *m,
+                                       const struct ir_const *record)
+{
+    const struct ir_const *from;
+    uint64_t n;
+    size_t i;
+
+    if (record->kind != IR_CONST_AGG || record->item_count < 2 ||
+        record->items[0].kind != IR_CONST_ADDR ||
+        record->items[1].kind != IR_CONST_INT) {
+        return NULL;
+    }
+    from = global_value(m, record->items[0].global);
+    n = record->items[1].integer;
+    if (from == NULL || from->kind != IR_CONST_AGG || n == 0 ||
+        n > from->item_count) {
+        return NULL;
+    }
+    for (i = 0; i < n; i++) {
+        if (from->items[i].kind != IR_CONST_INT) {
+            return NULL;
+        }
+    }
+    return from;
+}
+
 /* DESIGN: a plugin copies the chain and the version of the interface it
    was built against into its own image. A reference to the interface's
    own globals would resolve against the host at load. It would then give
@@ -2080,6 +2116,7 @@ static void write_provides(struct whole *w, struct ir_module *m,
                             version->global < m->global_count
                         ? m->globals[version->global]
                         : NULL;
+                const struct ir_const *hashes;
                 if (chain == NULL || chain->item_count < 2 ||
                     fields == NULL || size == NULL || length == NULL ||
                     built == NULL || built->bytes == NULL) {
@@ -2088,8 +2125,20 @@ static void write_provides(struct whole *w, struct ir_module *m,
                                  c->name, c->provides[j].interface);
                     continue;
                 }
+                /* The descriptor comes from the library file of another
+                   module, so each value is checked before it is read. */
+                hashes = chain_of(m, chain);
+                if (hashes == NULL || !is_integer(fields, false) ||
+                    !is_integer(size, true) || !is_integer(length, false) ||
+                    length->integer > built->size) {
+                    text_appendf(errors, "`%s.%s` provides `%s`, and the "
+                                 "library file that describes it is "
+                                 "damaged\n", c->module, c->name,
+                                 c->provides[j].interface);
+                    continue;
+                }
                 const_addr(&item->items[7],
-                           copy_chain(m, global_value(m, chain->items[0].global),
+                           copy_chain(m, hashes,
                                       (size_t)chain->items[1].integer, n));
                 const_int(&item->items[8], IR_I64,
                           (uint64_t)chain->items[1].integer);
