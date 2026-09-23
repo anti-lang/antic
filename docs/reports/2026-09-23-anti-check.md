@@ -82,6 +82,27 @@ the formatting class that reads rules instead of writing the form follow.
   a sentence and a long `-D` argument read as prose. Each block reports
   nothing when the checker reads it on its own.
 
+## Committed, pushed and green
+
+The output after the push of `cbb5258`, which carried this report. The
+commit that adds this section follows it and changes this file alone.
+
+```text
+$ git log --oneline -3
+cbb5258 Report the anti check step
+88ad248 Split the sentence of the shadowing comment for the docs-style rules
+2ce2c8c Record the decisions of anti check and its notes
+
+$ git status --short
+
+$ git rev-parse HEAD origin/main
+cbb5258fb80acf0c43700f9f09bee2cda25299ad
+cbb5258fb80acf0c43700f9f09bee2cda25299ad
+```
+
+The three suite counts at `88ad248`: 767 of 767 on the host, 766 of 766
+under ASan and 766 of 766 under UBSan.
+
 ## Questions for Eddie
 
 - The doc-warning class reports and fails nothing, which is a provisional
