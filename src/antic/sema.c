@@ -3967,6 +3967,12 @@ static struct type *check_construct(struct checker *c, struct expr *e,
         return builtin(c, TYPE_ERROR);
     }
     fn = m->symbol->type;
+    /* A parameter of an unknown type leaves construct without a function
+       type. That type had its message, and the call has no count to
+       compare. */
+    if (fn == NULL || fn->kind != TYPE_FN) {
+        return builtin(c, TYPE_ERROR);
+    }
     e->as.call.builds = t;
     e->as.call.callee->symbol = m->symbol;
     e->as.call.callee->type = fn;

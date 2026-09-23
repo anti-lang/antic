@@ -1,0 +1,15 @@
+//! A `construct` whose parameter has an unknown type has one message, the
+//! unknown type. A call of it adds no count of arguments.
+
+class A
+{
+	fn construct(self, x: Nope)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let a = A(1);
+	return 0;
+}
