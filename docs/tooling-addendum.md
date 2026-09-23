@@ -72,6 +72,28 @@ comment warning. antic without that option is silent about documentation.
 
 `anti fmt --check` remains for a pre-commit hook that only checks layout.
 
+`anti check --targets all` runs the front end once per target, so a program that
+type-checks on the host is proven to type-check on all six. `--warn-undocumented` adds
+the fifth doc warning. Without a file argument the command takes every `.anti` file under
+the source and the test directory that `[layout]` names.
+
+What the command does today, with the reasons under "The check command" in
+`docs/decisions.md`:
+
+- The front-end class writes the interface file of every module into its work directory,
+  in the order the imports ask for. A module that imports another of the project needs
+  it, and those files are the only thing the command writes.
+- The doc-warning class reports and fails nothing. The front end, the doc blocks and the
+  formatting decide the status. Every finding of the class is a warning, and a backtick
+  holds a name of the system as often as a name of the program.
+- The formatting class reads the rules of the canonical form against the token stream and
+  reports the line of every finding, rather than writing the canonical text and comparing
+  bytes, which waits for `anti fmt`. It reads the indent of tabs, one tab per level with
+  one more for a wrapped line, nothing aligned past the indent, one statement per line,
+  the parentheses around a whole condition, `} else {` and the `} while` of a `do` block.
+- The pattern check of `regex.compile` waits for PCRE2. The last status line says that the
+  class was skipped and names PCRE2.
+
 ## Formatter rules
 
 `anti fmt` writes every `.anti` file under `src/` and `test/` in this form. The same form

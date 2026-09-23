@@ -407,8 +407,20 @@ reports what it finished.
   under "The release script" in `docs/decisions.md`.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
   only. It has never run.
-- The `anti` tool holds `sdk export`, `sdk import` and `test`, and nothing else
-  of `docs/tooling.md`. `tools/scripts/format_anti.py` stands in for `anti fmt`.
+- The `anti` tool holds `sdk export`, `sdk import`, `test` and `check`, and
+  nothing else of `docs/tooling.md`. `tools/scripts/format_anti.py` stands in
+  for `anti fmt`.
+- `anti check` is built, with its four classes in the order of
+  `docs/tooling-addendum.md`: the front end on every source, with
+  `--targets all` once per target, the `anti` blocks of the doc comments in
+  their two contexts, the doc warnings and the formatting rules. The first
+  failing class ends the run, the doc-warning class reports and fails
+  nothing, and the last status line says the pattern check of
+  `regex.compile` waits for PCRE2. `antic --front-end` runs the front end
+  alone, `--warn-undocumented` reports a `pub` item without a `///`
+  comment, and the checker warns where the name a `catch` binds shadows a
+  variable. See "The check command" in `docs/decisions.md` and
+  `docs/notes/check.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
   both blocks after parsing.

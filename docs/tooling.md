@@ -57,7 +57,7 @@ shows none of its code.
 | `anti build --lib shared [--soname]` | Shared library plus header. Import library on Windows |
 | `anti run [--release]` | Build for the host, then run the executable |
 | `anti test [--release] [--all-modes]` | Run the `tests` blocks of every module, and the programs under `test/` against their expected outputs |
-| `anti check [--warn-undocumented]` | Front end, doc blocks, doc warnings, formatting |
+| `anti check [--warn-undocumented] [--targets all]` | Front end, doc blocks, doc warnings, formatting |
 | `anti add <name> [--repo <alias>] [--version <c>]` | Add a dependency to `anti.toml` and update the lock file |
 | `anti fetch` | Download every locked dependency into the cache without building |
 | `anti clean` | Delete `build/` and `dist/` |
