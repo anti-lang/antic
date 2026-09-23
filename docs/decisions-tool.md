@@ -57,3 +57,20 @@ tool. A later step folds them into `docs/decisions.md`.
 - [provisional] A version of clang that does not fit an `int` reads as
   -1 and is refused as a version not tested. A `#pragma pack` value that
   does not fit an `int` leaves the pack as it was, as clang ignores it.
+
+## Step 16, anti symbols and zip
+
+- [provisional] `zip_read` frees everything it took when it fails and
+  leaves the archive empty, so a caller frees nothing on that path. A
+  caller that still calls `zip_archive_free` does no harm.
+- [provisional] The deflate reader stops at the size the central
+  directory declares for the entry, and the entry is broken. A copy may
+  not reach back into bytes the output buffer held before the entry.
+- [provisional] Each number in a line of a symbols map, and in a frame
+  or `module` line of a trace, is digits alone. `0x` may lead a hex number,
+  and no sign may. A number above 64 bits refuses the line, which is
+  then passed over as another line that is no frame. Blanks may lead a
+  line. A name, a location or an id has no length bound, where `sscanf`
+  cut them at 511, 1023 and 79 bytes.
+- [provisional] A unit of a deployment index with no `id` matches no
+  entry of the archive.
