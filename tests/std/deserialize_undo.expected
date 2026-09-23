@@ -11,3 +11,12 @@ destruct Outer
 destruct Holder 0
 inside: none 1, 3 lent, 0 live
 after inside: taken 2, given 2, opened 4, closed 4
+destruct Scratch 5
+destruct Outer
+destruct Holder 0
+repeated: none 1, 0 live
+after repeated: taken 3, given 3, opened 5, closed 5
+destruct Outer
+destruct Holder 1
+titled: none 1, 0 live
+after titled: taken 3, given 3, opened 6, closed 6

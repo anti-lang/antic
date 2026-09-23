@@ -326,19 +326,33 @@ static bool type_of(struct reader r, unsigned char *out, size_t *length)
 /* The field of the chain of d with the name, or NULL. */
 static const struct anti_field *field_named(const struct anti_descriptor *d,
                                             const unsigned char *name,
-                                            size_t length)
+                                            size_t length, int64_t *index)
 {
     int64_t i;
 
+    *index = 0;
     for (; d != NULL; d = d->parent) {
         for (i = 0; i < d->field_count; i++) {
             if (same_bytes(d->fields[i].name, d->fields[i].name_length, name,
                            (int64_t)length)) {
+                *index += i;
                 return &d->fields[i];
             }
         }
+        *index += d->field_count;
     }
     return NULL;
+}
+
+/* The fields of the chain of d, which field_named numbers. */
+static int64_t fields_of(const struct anti_descriptor *d)
+{
+    int64_t count = 0;
+
+    for (; d != NULL; d = d->parent) {
+        count += d->field_count;
+    }
+    return count;
 }
 
 /* Whether a class is the class of expected or a class below it. */
@@ -432,41 +446,6 @@ static bool read_char(struct reader *r, void *bytes)
     return true;
 }
 
-/* The address and the length of a slice that the object does not own. */
-static bool read_view(struct reader *r, struct anti_text *out)
-{
-    unsigned char name[NAME_ROOM];
-    char number[64];
-    char *end;
-    size_t length;
-    int64_t found = 0;
-
-    if (!take(r, '{')) {
-        return false;
-    }
-    do {
-        unsigned long long value;
-        if (!read_string(r, name, NAME_ROOM, &length) || !take(r, ':') ||
-            !read_number(r, number, sizeof number) || number[0] == '-') {
-            return false;
-        }
-        value = strtoull(number, &end, 10);
-        if (*end != '\0') {
-            return false;
-        }
-        if (length == 7 && memcmp(name, "address", 7) == 0) {
-            out->ptr = (const unsigned char *)(uintptr_t)value;
-            found |= 1;
-        } else if (length == 6 && memcmp(name, "length", 6) == 0) {
-            out->len = (int64_t)value;
-            found |= 2;
-        } else {
-            return false;
-        }
-    } while (take(r, ','));
-    return found == 3 && take(r, '}');
-}
-
 /* The elements of a slice that the object owns, in new memory. */
 static bool read_elements(struct reader *r, struct anti_text *out,
                           int64_t type, const struct anti_descriptor *d,
@@ -552,8 +531,6 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
                        int depth)
 {
     int64_t t = anti_rt_type_scalar(type);
-    char number[64];
-    char *end;
 
     if (depth > DEPTH_LIMIT) {
         return false;
@@ -612,6 +589,11 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
         memcpy(bytes, &text, sizeof text);
         return true;
     }
+    /* DESIGN: the text never gives an address. A pointer or a function
+       pointer that the object does not own was written as null, and null
+       is all the reader takes there. An address from text means nothing
+       in another run. From untrusted text it would let the input choose
+       what memory the program reaches. */
     case ANTI_TYPE_PTR:
     case ANTI_TYPE_FN: {
         void *value = NULL;
@@ -625,28 +607,21 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
             }
             owned_by(r->made, value, (void **)bytes);
         } else {
-            unsigned long long address;
-            if (!read_number(r, number, sizeof number) || number[0] == '-') {
-                return false;
-            }
-            address = strtoull(number, &end, 10);
-            if (*end != '\0') {
-                return false;
-            }
-            value = (void *)(uintptr_t)address;
+            return false;
         }
         memcpy(bytes, &value, sizeof value);
         return true;
     }
     case ANTI_TYPE_SLICE: {
-        struct anti_text slice;
+        struct anti_text slice = {NULL, 0};
         if (owned && !anti_rt_element_walked(type, d)) {
             /* The serializer wrote null, and the field keeps its
                default. */
             return skip_value(r, depth + 1);
         }
-        if (!(owned ? read_elements(r, &slice, type, d, depth)
-                    : read_view(r, &slice))) {
+        /* A slice the object does not own is null, as a pointer is. */
+        if (owned ? !read_elements(r, &slice, type, d, depth)
+                  : !take_word(r, "null")) {
             return false;
         }
         memcpy(bytes, &slice, sizeof slice);
@@ -670,11 +645,19 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
 
 /* Read the members of the object that r stands before into the object
    of the class or the struct d. The member "type" of a class was read
-   before. A member that names no field of the chain is skipped. */
+   before. A member that names no field of the chain is skipped.
+
+   DESIGN: a member that names a field read before fails the text. The
+   first value would otherwise stay behind, an object whose construct
+   ran or a string, which no field holds and nothing gives back. seen
+   holds one bit per field of the chain. */
 static bool fill(struct reader *r, void *object,
                  const struct anti_descriptor *d, bool typed, int depth)
 {
     unsigned char name[NAME_ROOM];
+    unsigned char *seen = NULL;
+    int64_t count = fields_of(d);
+    bool ok = false;
     size_t length;
 
     if (depth > DEPTH_LIMIT || !take(r, '{')) {
@@ -683,21 +666,42 @@ static bool fill(struct reader *r, void *object,
     if (take(r, '}')) {
         return true;
     }
+    if (count > 0) {
+        seen = calloc((size_t)(count + 7) / 8, 1);
+        if (seen == NULL) {
+            return false;
+        }
+    }
     do {
         const struct anti_field *f;
+        int64_t index = 0;
+        unsigned char bit;
         if (!read_string(r, name, NAME_ROOM, &length) || !take(r, ':')) {
-            return false;
+            goto done;
         }
         f = typed && length == 4 && memcmp(name, "type", 4) == 0
                 ? NULL
-                : field_named(d, name, length);
-        if (f != NULL ? !read_value(r, (unsigned char *)object + f->offset,
-                                    f->type, f->descriptor, f->owned, depth)
-                      : !skip_value(r, depth + 1)) {
-            return false;
+                : field_named(d, name, length, &index);
+        if (f == NULL) {
+            if (!skip_value(r, depth + 1)) {
+                goto done;
+            }
+            continue;
+        }
+        bit = (unsigned char)(1u << (index % 8));
+        if ((seen[index / 8] & bit) != 0) {
+            goto done;
+        }
+        seen[index / 8] = (unsigned char)(seen[index / 8] | bit);
+        if (!read_value(r, (unsigned char *)object + f->offset, f->type,
+                        f->descriptor, f->owned, depth)) {
+            goto done;
         }
     } while (take(r, ','));
-    return take(r, '}');
+    ok = take(r, '}');
+done:
+    free(seen);
+    return ok;
 }
 
 /* DESIGN: an object comes back as a new object of the class that its

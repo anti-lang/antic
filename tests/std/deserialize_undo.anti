@@ -5,7 +5,8 @@
 //! back, and `Kept` counts the blocks still lent, which is the leak check. The
 //! first text fails in the last member of the outer object, after two objects
 //! it owns. The second fails inside an owned object, whose `construct` ran
-//! already.
+//! already. The last two repeat a member, an owned object and a `str`, which
+//! fails the text rather than leaving the first value behind.
 import anti.mem;
 import anti.text;
 
@@ -152,5 +153,21 @@ fn main() -> int
 		(failed == none) as c_int, inside.lent as c_int,
 		inside.live as c_int);
 	tally("after inside");
+
+	let twice = Kept.new();
+	let repeated = Object.deserialize(
+		"{\"type\":\"Outer\",\"first\":{\"type\":\"Scratch\",\"size\":5},\"first\":{\"type\":\"Scratch\",\"size\":6}}",
+		&twice);
+	printf("repeated: none %d, %d live\n".ptr, (repeated == none) as c_int,
+		twice.live as c_int);
+	tally("after repeated");
+
+	let words = Kept.new();
+	let titled = Object.deserialize(
+		"{\"type\":\"Outer\",\"title\":\"a\",\"holder\":{\"label\":1},\"title\":\"b\"}",
+		&words);
+	printf("titled: none %d, %d live\n".ptr, (titled == none) as c_int,
+		words.live as c_int);
+	tally("after titled");
 	return 0;
 }
