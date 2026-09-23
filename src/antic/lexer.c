@@ -270,7 +270,10 @@ static struct token *push(struct lexer *lx, enum token_kind kind,
 
     if (list->count == list->capacity) {
         size_t capacity = list->capacity == 0 ? 256 : list->capacity * 2;
-        struct token *items = realloc(list->items, capacity * sizeof *items);
+        struct token *items =
+            capacity <= SIZE_MAX / sizeof *items
+                ? realloc(list->items, capacity * sizeof *items)
+                : NULL;
         if (items == NULL) {
             fputs("antic: out of memory\n", stderr);
             exit(70);
@@ -302,16 +305,7 @@ static struct token_text keep(struct lexer *lx, const struct text *bytes)
 /* Append one byte to a buffer that may hold NUL bytes. */
 static void append_byte(struct text *t, unsigned char byte)
 {
-    char one[2] = {(char)byte, '\0'};
-
-    if (byte == 0) {
-        /* text_append stops at NUL, so a zero byte goes in as a
-           placeholder that is overwritten in place. */
-        text_append(t, "?");
-        t->data[t->length - 1] = '\0';
-        return;
-    }
-    text_append(t, one);
+    text_append_bytes(t, &byte, 1);
 }
 
 static void append_utf8(struct text *t, uint32_t cp)
@@ -1236,7 +1230,9 @@ static struct format_piece *add_piece(struct piece_list *list)
     if (list->count == list->capacity) {
         size_t capacity = list->capacity == 0 ? 4 : list->capacity * 2;
         struct format_piece *items =
-            realloc(list->items, capacity * sizeof *items);
+            capacity <= SIZE_MAX / sizeof *items
+                ? realloc(list->items, capacity * sizeof *items)
+                : NULL;
         if (items == NULL) {
             fputs("antic: out of memory\n", stderr);
             exit(70);
@@ -1560,7 +1556,11 @@ void token_list_free(struct token_list *list)
 
 const char *token_kind_name(enum token_kind kind)
 {
+    /* DESIGN: the spelling of a symbol in backticks, written on its first
+       use and read after. antic runs on one thread and starts none, so no
+       two calls race on an entry. */
     static char names[TOKEN_KIND_COUNT][16];
+    int n;
 
     switch (kind) {
     case TOKEN_EOF: return "end of file";
@@ -1580,8 +1580,14 @@ const char *token_kind_name(enum token_kind kind)
     default: break;
     }
     if (names[kind][0] == '\0') {
-        snprintf(names[kind], sizeof names[kind], "`%s`",
-                 kinds[kind].spelling);
+        n = snprintf(names[kind], sizeof names[kind], "`%s`",
+                     kinds[kind].spelling);
+        /* A spelling too long for the cache is given without backticks
+           rather than cut. */
+        if (n < 0 || (size_t)n >= sizeof names[kind]) {
+            names[kind][0] = '\0';
+            return kinds[kind].spelling;
+        }
     }
     return names[kind];
 }

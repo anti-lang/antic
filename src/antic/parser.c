@@ -1,5 +1,6 @@
 #include "parser.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,7 +40,9 @@ static void list_push(struct list *l, const void *element)
 {
     if (l->count == l->capacity) {
         size_t capacity = l->capacity == 0 ? 8 : l->capacity * 2;
-        void *data = realloc(l->data, capacity * l->size);
+        void *data = capacity <= SIZE_MAX / l->size
+                         ? realloc(l->data, capacity * l->size)
+                         : NULL;
         if (data == NULL) {
             fputs("antic: out of memory\n", stderr);
             exit(70);
@@ -207,11 +210,12 @@ static bool is_doc(enum token_kind kind)
            kind == TOKEN_NOTE || kind == TOKEN_MODULE_NOTE;
 }
 
-/* The length of the doc marker at s, 4 for the two developer markers of
-   the module and 3 for the six others. */
-static size_t marker_length(const char *s)
+/* The length of the doc marker that opens the token text s of length
+   bytes, 4 for the two developer markers of the module and 3 for the six
+   others. Every marker has at least 3 bytes. */
+static size_t marker_length(const char *s, size_t length)
 {
-    return s[2] == '#' && s[3] == '!' ? 4 : 3;
+    return length >= 4 && s[2] == '#' && s[3] == '!' ? 4 : 3;
 }
 
 /* The text of the doc comments of one kind between the previous token and
@@ -2066,7 +2070,7 @@ static void may_fail_after(struct parser *p, struct item *it)
    DESIGN: `pub` and `protected` stand before a field as well as before a
    function, so the test looks past the marker. A field is a name and a
    colon, and everything else at that point opens a member. */
-static bool starts_member(struct parser *p)
+static bool starts_member(const struct parser *p)
 {
     size_t i = 0;
 
@@ -2879,7 +2883,7 @@ static bool provides_line(struct parser *p, struct list *out)
 {
     struct provides pr;
     struct name path;
-    const char *dot;
+    size_t dot;
 
     memset(&pr, 0, sizeof pr);
     pr.pos = pos_of(peek(p));
@@ -2888,12 +2892,15 @@ static bool provides_line(struct parser *p, struct list *out)
     if (!module_path(p, &path)) {
         return false;
     }
-    dot = path.length > 0 ? strrchr(path.text, '.') : NULL;
-    if (dot != NULL) {
+    dot = path.length;
+    while (dot > 0 && path.text[dot - 1] != '.') {
+        dot--;
+    }
+    if (dot > 0) {
         pr.qualifier.text = path.text;
-        pr.qualifier.length = (size_t)(dot - path.text);
-        pr.interface.text = dot + 1;
-        pr.interface.length = path.length - pr.qualifier.length - 1;
+        pr.qualifier.length = dot - 1;
+        pr.interface.text = path.text + dot;
+        pr.interface.length = path.length - dot;
     } else {
         pr.interface = path;
     }
@@ -3053,7 +3060,7 @@ bool parse(const char *source, const struct token_list *tokens,
         }
         d.pos = pos_of(t);
         d.marker.text = source + t->offset;
-        d.marker.length = marker_length(d.marker.text);
+        d.marker.length = marker_length(d.marker.text, t->length);
         d.module_form = t->kind == TOKEN_MODULE_DOC ||
                         t->kind == TOKEN_MODULE_NOTE;
         list_push(&dropped, &d);

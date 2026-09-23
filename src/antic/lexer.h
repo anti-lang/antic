@@ -145,10 +145,13 @@ struct token_list {
 
 /* Split source into tokens, ending with TOKEN_EOF. Report every error to
    diags and keep going, so that one run reports all of them. Returns true
-   when no error occurred. */
+   when no error occurred. The array of out is allocated with realloc,
+   and token_list_free releases it. The texts of the tokens lie in the
+   memory pool arena, which frees them. */
 bool lex(const char *source, size_t length, struct arena *arena,
          struct diagnostics *diags, struct token_list *out);
 
+/* Release the array of list and leave it empty. */
 void token_list_free(struct token_list *list);
 
 /* Whether the n bytes at s spell a keyword or a reserved word. */
