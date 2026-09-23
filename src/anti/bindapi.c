@@ -192,18 +192,25 @@ static const char *doc_of(struct api *a, const struct json_value *v)
     return d != NULL && d[0] != '\0' ? bind_strdup(a->b, d) : NULL;
 }
 
-static void read_structs(struct api *a)
+/* The structs, or false for a description that names one twice. */
+static bool read_structs(struct api *a)
 {
     const struct json_value *list = section(a, "structs");
     size_t i;
     size_t j;
 
-    /* Every record exists before a field names one. */
+    /* Every record exists before a field names one. The fields of an
+       entry go to the record of its name, so a name stands once. */
     for (i = 0; list != NULL && i < list->count; i++) {
         const char *name = json_member_string(list->items[i], "name");
         struct bind_record *r;
         if (name == NULL) {
             continue;
+        }
+        if (record_of(a, name) != NULL) {
+            fprintf(stderr, "anti: %s names the struct `%s` twice\n",
+                    a->b->source, name);
+            return false;
         }
         r = arena_alloc(&a->b->arena, sizeof *r);
         r->name = bind_strdup(a->b, name);
@@ -240,6 +247,7 @@ static void read_structs(struct api *a)
             r->field_count++;
         }
     }
+    return true;
 }
 
 static void read_enums(struct api *a)
@@ -506,7 +514,10 @@ bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
     a.b = b;
     a.root = tree.root;
     a.depth = 0;
-    read_structs(&a);
+    if (!read_structs(&a)) {
+        json_free(&tree);
+        return false;
+    }
     read_enums(&a);
     read_functions(&a);
     read_defines(&a);

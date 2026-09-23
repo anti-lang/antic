@@ -4,7 +4,8 @@
 #   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   WORK      a directory for the output
-#   CASE      header, clang, raymath, raylib, api or refusals
+#   CASE      header, clang, raymath, raylib, api, refusals, api_malformed,
+#             clang_malformed or ast_malformed
 #   SOURCES   tests/clib, for the case header
 #   DUMP      tests/dump, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -193,6 +194,149 @@ elseif(CASE STREQUAL "refusals")
         "${CMAKE_COMMAND}" -E env "PATH=${WORK}/fake:$ENV{PATH}"
         "${WORK}/bin/anti" bind --clang "${BIND}/layout.h" -o "${WORK}/out"
         --runtime "${RUNTIME}")
+elseif(CASE STREQUAL "api_malformed")
+    # Descriptions that are cut short, nested deep, repeat a struct or
+    # hold values nested deep. Each is refused or bound with warnings,
+    # and none crashes the reader.
+    set(api "${WORK}/raylib_api.json")
+    file(WRITE "${api}" "{\"functions\": [{\"name\": \"f\", \"params\": [")
+    expect_refusal("raylib_api.json is not JSON"
+        "${ANTI}" bind "${api}" -o "${WORK}/out")
+    string(REPEAT "[" 100000 deep)
+    file(WRITE "${api}" "${deep}")
+    expect_refusal("raylib_api.json is not JSON"
+        "${ANTI}" bind "${api}" -o "${WORK}/out")
+    set(field "{\"name\": \"x\", \"type\": \"int\"}")
+    file(WRITE "${api}" "{\"functions\": [], \"structs\": [
+        {\"name\": \"A\", \"fields\": [${field}, ${field}, ${field}]},
+        {\"name\": \"A\", \"fields\": [${field}]}]}")
+    expect_refusal("names the struct `A` twice"
+        "${ANTI}" bind "${api}" -o "${WORK}/out")
+    # A struct that holds itself, and values a million deep.
+    string(REPEAT "-" 1000000 minus)
+    string(REPEAT "*" 1000000 stars)
+    string(REPEAT "(" 1000000 open)
+    file(WRITE "${api}" "{\"functions\": [
+        {\"name\": \"g\", \"returnType\": \"void\", \"params\": [
+            {\"name\": \"p\", \"type\": \"void ${open}\"}]}],
+        \"structs\": [
+        {\"name\": \"Self\", \"fields\": [
+            {\"name\": \"s\", \"type\": \"Self\"}]},
+        {\"name\": \"Deep\", \"fields\": [
+            {\"name\": \"d\", \"type\": \"int ${stars}\"}]}],
+        \"aliases\": [{\"name\": \"Loop\", \"type\": \"Loop\"}],
+        \"defines\": [
+            {\"name\": \"MINUS\", \"type\": \"INT\", \"value\": \"${minus}1\"},
+            {\"name\": \"OPEN\", \"type\": \"INT\", \"value\": \"${open}1\"},
+            {\"name\": \"NEG\", \"type\": \"UNKNOWN\", \"value\": \"-NOTHING\"}],
+        \"enums\": 5, \"callbacks\": {\"x\": 1}}")
+    run("${ANTI}" bind "${api}" --probe -o "${WORK}/out")
+    string(REGEX REPLACE "[ \n]+" " " said "${run_err}")
+    foreach(warning "the define `MINUS` is skipped" "the define `OPEN` is skipped"
+            "the define `NEG` is skipped" "`g` is left out")
+        string(FIND "${said}" "${warning}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "no warning `${warning}`:\n${run_err}")
+        endif()
+    endforeach()
+elseif(CASE STREQUAL "clang_malformed")
+    # Valid C that a reader of the AST mishandled, and macros nested deep
+    # or chained long. Each binds with warnings.
+    set(h "${WORK}/malformed.h")
+    set(text "enum { F = 1 };\nenum Mode { M0 };\nvoid f(enum Mode m);\n")
+    string(REPEAT "-" 100000 minus)
+    string(REPEAT "(" 100000 open)
+    string(REPEAT ")" 100000 close)
+    string(APPEND text "#define MINUS ${minus}1\n#define OPEN ${open}1${close}\n")
+    foreach(i RANGE 0 4999)
+        math(EXPR n "${i} + 1")
+        string(APPEND text "#define CHAIN${i} (CHAIN${n} + 1)\n")
+    endforeach()
+    string(APPEND text "#define CHAIN5000 1\n")
+    string(APPEND text "#pragma pack(push, 99999999999)\n"
+           "struct After { int a; };\n#pragma pack(pop)\n")
+    file(WRITE "${h}" "${text}")
+    run("${ANTI}" bind --clang "${h}" --module bindtest.malformed
+        -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(READ "${WORK}/out/malformed.anti" module)
+    foreach(line "pub extern fn f(m: Mode);" "pub const F: c_int = 1;"
+            "pub const CHAIN5000: c_int = 1;")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "malformed.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
+    string(REGEX REPLACE "[ \n]+" " " said "${run_err}")
+    foreach(warning "the macro `MINUS` is no constant"
+            "the macro `OPEN` is no constant" "the macro `CHAIN0` is no constant")
+        string(FIND "${said}" "${warning}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "no warning `${warning}`:\n${run_err}")
+        endif()
+    endforeach()
+elseif(CASE STREQUAL "ast_malformed")
+    # A clang that writes a version out of range, an AST cut short or
+    # nested deep, an AST whose values have the wrong kinds and a chain
+    # of typedefs that the dump of a real clang nests. The copy of anti
+    # stands outside the checkout, so it runs the clang of fake.
+    file(MAKE_DIRECTORY "${WORK}/bin" "${WORK}/fake")
+    file(COPY_FILE "${ANTI}" "${WORK}/bin/anti")
+    file(CHMOD "${WORK}/bin/anti" PERMISSIONS OWNER_READ OWNER_WRITE
+         OWNER_EXECUTE)
+    set(h "${WORK}/fake.h")
+    file(WRITE "${h}" "")
+    file(WRITE "${WORK}/fake/clang" "#!/bin/sh
+d=`dirname \"$0\"`
+for a in \"$@\"; do
+    case \"$a\" in
+    --version) cat \"$d/version\"; exit 0 ;;
+    -print-resource-dir) echo \"$d\"; exit 0 ;;
+    -E) cat \"$d/pre\"; exit 0 ;;
+    esac
+done
+cat \"$d/ast\"
+")
+    file(CHMOD "${WORK}/fake/clang" PERMISSIONS OWNER_READ OWNER_WRITE
+         OWNER_EXECUTE)
+    set(fake "${CMAKE_COMMAND}" -E env "PATH=${WORK}/fake:$ENV{PATH}"
+        "${WORK}/bin/anti" bind --clang "${h}" --module bindtest.fake
+        -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/fake/version"
+         "clang version 99999999999999999999.1.0\nTarget: x\n")
+    expect_refusal("is clang -1, and anti bind was tested against clang 23"
+        ${fake})
+    file(WRITE "${WORK}/fake/version" "clang version 23.1.0\nTarget: x\n")
+    file(WRITE "${WORK}/fake/pre" "# 1 \"${h}\"\n#pragma pack(99999999999999999999)\n")
+    file(WRITE "${WORK}/fake/ast" "{\"kind\": \"TranslationUnitDecl\", \"inner\": [")
+    expect_refusal("the AST of clang is not JSON" ${fake})
+    string(REPEAT "[" 100000 deep)
+    file(WRITE "${WORK}/fake/ast" "${deep}")
+    expect_refusal("the AST of clang is not JSON" ${fake})
+    set(loc "\"loc\": {\"file\": \"${h}\", \"line\": 2}")
+    set(ast "{\"kind\": \"TranslationUnitDecl\", \"inner\": [
+        {\"kind\": \"EnumDecl\", ${loc}},
+        {\"kind\": \"EnumDecl\", \"id\": 5, \"inner\": 7},
+        {\"kind\": \"RecordDecl\", \"name\": 3, \"inner\": [1]},
+        {\"kind\": \"TypedefDecl\", \"name\": \"T\"},
+        {\"kind\": \"FunctionDecl\", \"name\": \"h\", \"type\": 1},
+        {\"kind\": \"RecordDecl\", \"name\": \"Packed\", \"id\": \"0x1\",
+         \"tagUsed\": \"struct\", \"completeDefinition\": true,
+         \"inner\": [{\"kind\": \"MaxFieldAlignmentAttr\"},
+                     {\"kind\": \"FieldDecl\", \"name\": \"x\",
+                      \"type\": {\"qualType\": \"int\"}}]}")
+    foreach(i RANGE 0 4999)
+        math(EXPR n "${i} + 1")
+        string(APPEND ast ",\n{\"kind\": \"TypedefDecl\", \"name\": \"T${i}\",
+            \"type\": {\"qualType\": \"T${n}\"}}")
+    endforeach()
+    string(APPEND ast ",\n{\"kind\": \"TypedefDecl\", \"name\": \"T5000\",
+        \"type\": {\"qualType\": \"int\"}},
+        {\"kind\": \"FunctionDecl\", \"name\": \"k\", ${loc},
+         \"type\": {\"qualType\": \"void (T0)\"},
+         \"inner\": [{\"kind\": \"ParmVarDecl\", \"name\": \"t\",
+                     \"type\": {\"qualType\": \"T0\"}}]}]}")
+    file(WRITE "${WORK}/fake/ast" "${ast}")
+    expect_refusal("`Packed` is packed to more than one byte" ${fake})
 else()
     message(FATAL_ERROR "unknown case ${CASE}")
 endif()

@@ -508,6 +508,15 @@ void bind_write_shim(const struct bind_module *b, struct text *out)
 
 /* The probes. */
 
+/* DESIGN: the walk of settable follows a record into its fields. A
+   struct of raylib_api.json may hold itself or hold records nested
+   without end, which C refuses and the reader does not check. The walk
+   enters no record it stands in and goes no deeper than this bound. The
+   field then has no value in the probe. A record that held no value is
+   never entered again. Records that each hold two of the next then take
+   one walk each, not two to the power of the depth. */
+#define RECORD_DEPTH 64
+
 /* One field of a probe: the path to a value inside it and the value in
    C and in Anti. A field that holds no value the probe can set, such as a
    pointer, has none. */
@@ -516,6 +525,11 @@ struct setting {
     struct text anti_path;          /* with the names the module writes */
     struct text c_value;
     struct text anti_value;
+    /* The records the walk stands in, and the records that hold no
+       value, which it does not enter again. */
+    const struct bind_record *path[RECORD_DEPTH];
+    size_t path_count;
+    struct bind_list empty;
 };
 
 static const struct bind_enum *enum_named(const struct bind_module *b,
@@ -538,6 +552,66 @@ static void cut(struct text *t, size_t length)
     if (t->data != NULL) {
         t->data[length] = '\0';
     }
+}
+
+static bool on_path(const struct setting *s, const struct bind_record *r)
+{
+    size_t i;
+
+    for (i = 0; i < s->path_count; i++) {
+        if (s->path[i] == r) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool held_none(const struct setting *s, const struct bind_record *r)
+{
+    size_t i;
+
+    for (i = 0; i < s->empty.count; i++) {
+        const void *item = s->empty.items[i];
+        if (item == r) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool settable(const struct bind_module *b, const struct bind_type *t,
+                     int64_t bits, struct setting *s);
+
+/* The first value of a field of r that is not zero, with the path to it. */
+static bool settable_record(const struct bind_module *b,
+                            const struct bind_record *r, struct setting *s)
+{
+    size_t i;
+
+    if (s->path_count == RECORD_DEPTH || on_path(s, r) || held_none(s, r)) {
+        return false;
+    }
+    s->path[s->path_count++] = r;
+    for (i = 0; i < r->field_count; i++) {
+        const struct bind_field *f = &r->fields[i];
+        size_t c_mark = s->c_path.length;
+        size_t anti_mark = s->anti_path.length;
+        if (f->name == NULL) {
+            continue;
+        }
+        text_appendf(&s->c_path, ".%s", f->name);
+        text_append(&s->anti_path, ".");
+        name_of(f->name, &s->anti_path);
+        if (settable(b, f->type, f->bits, s)) {
+            s->path_count--;
+            return true;
+        }
+        cut(&s->c_path, c_mark);
+        cut(&s->anti_path, anti_mark);
+    }
+    s->path_count--;
+    bind_list_add(&s->empty, (void *)r);
+    return false;
 }
 
 /* The first value of t that is not zero, with the path from t to it. */
@@ -581,23 +655,7 @@ static bool settable(const struct bind_module *b, const struct bind_type *t,
         text_append(&s->anti_path, "[0]");
         return settable(b, t->to, -1, s);
     case BIND_RECORD:
-        for (i = 0; i < t->record->field_count; i++) {
-            const struct bind_field *f = &t->record->fields[i];
-            size_t c_mark = s->c_path.length;
-            size_t anti_mark = s->anti_path.length;
-            if (f->name == NULL) {
-                continue;
-            }
-            text_appendf(&s->c_path, ".%s", f->name);
-            text_append(&s->anti_path, ".");
-            name_of(f->name, &s->anti_path);
-            if (settable(b, f->type, f->bits, s)) {
-                return true;
-            }
-            cut(&s->c_path, c_mark);
-            cut(&s->anti_path, anti_mark);
-        }
-        return false;
+        return settable_record(b, t->record, s);
     default:
         return false;
     }
@@ -609,6 +667,7 @@ static void setting_free(struct setting *s)
     text_free(&s->anti_path);
     text_free(&s->c_value);
     text_free(&s->anti_value);
+    free(s->empty.items);
 }
 
 /* A record the probe reaches: one the module holds and C can name. An

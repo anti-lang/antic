@@ -954,10 +954,12 @@ set(anti_bind_cc ${ANTIC_TEST_CC})
 if(APPLE)
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
 endif()
-set(anti_bind_cases header clang raymath raylib api)
+set(anti_bind_cases header clang raymath raylib api api_malformed
+    clang_malformed)
 if(NOT WIN32)
-    # The case refusals stands a shell script in for clang.
-    list(APPEND anti_bind_cases refusals)
+    # The cases refusals and ast_malformed stand a shell script in for
+    # clang.
+    list(APPEND anti_bind_cases refusals ast_malformed)
 endif()
 foreach(case IN LISTS anti_bind_cases)
     add_test(NAME anti_bind_${case}
