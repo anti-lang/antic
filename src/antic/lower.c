@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "../rt/f16.h"
+#include "arith.h"
 #include "cpu.h"
 #include "sema.h"
 #include "target.h"
@@ -627,12 +628,8 @@ static struct ir_operand lower_expr(struct lowerer *l, const struct expr *e);
 
 static double float_literal(const struct expr *literal, enum ir_type type)
 {
-    char digits[128];
-
-    snprintf(digits, sizeof digits, "%.*s", (int)literal->as.text.length,
-             literal->as.text.bytes);
-    return type == IR_F32 ? (double)strtof(digits, NULL)
-                          : strtod(digits, NULL);
+    return arith_float_literal(literal->as.text.bytes,
+                               literal->as.text.length, type == IR_F32);
 }
 
 static struct ir_operand constant(struct lowerer *l,

@@ -1119,7 +1119,6 @@ static struct type *float_literal(struct checker *c, struct expr *e,
                                   struct type *expected)
 {
     struct type *t = builtin(c, TYPE_F64);
-    char digits[128];
 
     (void)negative;
     if (expected != NULL && !is_error(expected) && expected->kind != TYPE_VOID) {
@@ -1132,10 +1131,9 @@ static struct type *float_literal(struct checker *c, struct expr *e,
             return literal->type;
         }
     }
-    snprintf(digits, sizeof digits, "%.*s", (int)literal->as.text.length,
-             literal->as.text.bytes);
-    if (t->kind == TYPE_F32 ? isinf(strtof(digits, NULL))
-                            : isinf(strtod(digits, NULL))) {
+    if (isinf(arith_float_literal(literal->as.text.bytes,
+                                  literal->as.text.length,
+                                  t->kind == TYPE_F32))) {
         error_at(c, e->pos, "`%.*s` does not fit `%s`",
                  (int)literal->spelling.length, literal->spelling.bytes, tn(t));
         t = builtin(c, TYPE_ERROR);
@@ -6848,15 +6846,11 @@ static bool eval_const(struct checker *c, struct expr *e,
         out->as.integer = e->as.integer;
         wrap(out);
         return true;
-    case EXPR_FLOAT: {
-        char digits[128];
-        snprintf(digits, sizeof digits, "%.*s", (int)e->as.text.length,
-                 e->as.text.bytes);
+    case EXPR_FLOAT:
         out->kind = CONST_FLOAT;
-        out->as.floating = e->type->kind == TYPE_F32 ? strtof(digits, NULL)
-                                                    : strtod(digits, NULL);
+        out->as.floating = arith_float_literal(
+            e->as.text.bytes, e->as.text.length, e->type->kind == TYPE_F32);
         return true;
-    }
     case EXPR_CHAR:
         out->kind = CONST_CHAR;
         out->as.character = e->as.character;

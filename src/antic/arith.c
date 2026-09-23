@@ -1,5 +1,9 @@
 #include "arith.h"
 
+#include "text.h"
+
+#include <stdlib.h>
+
 /* The value of the low n bits of v, extended by is_signed. */
 static uint64_t extend(uint64_t v, int n, bool is_signed)
 {
@@ -135,4 +139,16 @@ uint64_t arith_saturate(char op, uint64_t a, uint64_t b, int n,
     }
     a = op == '+' ? a + b : op == '-' ? a - b : a * b;
     return extend(a, n, is_signed);
+}
+
+double arith_float_literal(const char *bytes, size_t length, bool single)
+{
+    struct text digits = {0};
+    double value;
+
+    text_append_bytes(&digits, bytes, length);
+    value = single ? (double)strtof(text_cstr(&digits), NULL)
+                   : strtod(text_cstr(&digits), NULL);
+    text_free(&digits);
+    return value;
 }
