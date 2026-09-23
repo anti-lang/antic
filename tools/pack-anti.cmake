@@ -120,20 +120,33 @@ endfunction()
 
 # Compile and link antic or anti for one host. Each family of targets reads
 # its headers from a different place: the macOS stubs of SYSROOT, the musl
-# sysroot, or the Microsoft headers that xwin wrote. anti takes the sources
-# of antic but its main.c, and those of src/anti.
+# sysroot, or the Microsoft headers that xwin wrote. The sources and the
+# include directories of each program are the lists of tools/sources.cmake,
+# which the CMake build reads as well.
+# DESIGN: the sources of the compiler take its include directories alone.
+# Those of anti take anti's as well. The CMake build compiles antic_core
+# and anti the same way. src/rt holds a signal.h, which hides the one of
+# the C library from a source of the compiler that finds it.
+include("${tools_dir}/sources.cmake")
 function(build_program host output program)
     triple_of("${host}" triple)
-    file(GLOB sources "${root}/src/antic/*.c")
+    set(program_sources ${ANTIC_MAIN_SOURCES})
+    set(program_dirs "")
     if(program STREQUAL "anti")
-        list(REMOVE_ITEM sources "${root}/src/antic/main.c")
-        file(GLOB anti_sources "${root}/src/anti/*.c")
-        list(APPEND sources ${anti_sources})
+        set(program_sources ${ANTI_SOURCES})
+        set(program_dirs ${ANTI_INCLUDE_DIRS})
     endif()
+    set(core_includes "")
+    foreach(dir IN LISTS ANTIC_CORE_INCLUDE_DIRS)
+        list(APPEND core_includes -I "${root}/${dir}")
+    endforeach()
+    set(program_includes ${core_includes})
+    foreach(dir IN LISTS program_dirs)
+        list(APPEND program_includes -I "${root}/${dir}")
+    endforeach()
     set(common --target=${triple} -std=c11 -O2 -Wall -Wextra -Wpedantic
                -Werror "-ffile-prefix-map=${root}=."
-               "-DANTIC_VERSION=\"${version}\"" -I "${root}/src/antic"
-               -I "${root}/src/anti")
+               "-DANTIC_VERSION=\"${version}\"")
     set(link "")
     if(host MATCHES "^macos-")
         list(APPEND common -isysroot "${macos_sdk}")
@@ -175,25 +188,30 @@ function(build_program host output program)
         list(APPEND link -Wl,/DEBUG "-Wl,/PDBALTPATH:%_PDB%"
              -Wl,/pdbsourcepath:. -Wl,/ignore:4099)
     endif()
-    # The clang driver looks for the start files of gcc on Linux, so the
-    # objects go to ld.lld with the musl ones instead. A Windows program
-    # links from objects too, which the link names by relative paths. The
-    # objects stand outside the tree of the package, which is
-    # work/<host>/anti.
-    if(host MATCHES "^linux-|^windows-")
-        set(objects "")
-        file(MAKE_DIRECTORY "${DEST}/work/${host}/objects/${program}")
-        foreach(source IN LISTS sources)
-            get_filename_component(name "${source}" NAME_WE)
-            set(object "${DEST}/work/${host}/objects/${program}/${name}.o")
-            execute_process(COMMAND "${CLANG}" ${common} -c -o "${object}"
-                                    "${source}" RESULT_VARIABLE failed)
-            if(failed)
-                message(FATAL_ERROR "${host}: ${name}.c did not compile")
-            endif()
-            list(APPEND objects "${object}")
-        endforeach()
-    endif()
+    # Every program links from objects, which stand outside the tree of the
+    # package, work/<host>/anti. The clang driver looks for the start files
+    # of gcc on Linux, so the objects go to ld.lld with the musl ones
+    # instead. A Windows link names them by relative paths.
+    set(objects "")
+    file(MAKE_DIRECTORY "${DEST}/work/${host}/objects/${program}")
+    # An object is named after the path of its source, since two
+    # directories hold a main.c.
+    foreach(source IN LISTS ANTIC_CORE_SOURCES program_sources)
+        set(includes ${core_includes})
+        if(source IN_LIST program_sources)
+            set(includes ${program_includes})
+        endif()
+        string(REGEX REPLACE "\\.c$" "" name "${source}")
+        string(REPLACE "/" "_" name "${name}")
+        set(object "${DEST}/work/${host}/objects/${program}/${name}.o")
+        execute_process(COMMAND "${CLANG}" ${common} ${includes} -c
+                                -o "${object}" "${root}/${source}"
+                        RESULT_VARIABLE failed)
+        if(failed)
+            message(FATAL_ERROR "${host}: ${source} did not compile")
+        endif()
+        list(APPEND objects "${object}")
+    endforeach()
     if(host MATCHES "^linux-")
         set(lib "${SYSROOT}/${host}/usr/lib")
         execute_process(
@@ -223,7 +241,7 @@ function(build_program host output program)
                         WORKING_DIRECTORY "${out_dir}" RESULT_VARIABLE failed)
     else()
         execute_process(COMMAND "${CLANG}" ${common} ${link} -o "${output}"
-                                ${sources} RESULT_VARIABLE failed)
+                                ${objects} RESULT_VARIABLE failed)
     endif()
     if(failed)
         message(FATAL_ERROR "${host}: ${program} did not link")

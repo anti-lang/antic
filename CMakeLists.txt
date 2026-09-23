@@ -111,49 +111,11 @@ set(ANTIC_HOST_TARGET "${ANTIC_HOST_OS}-${ANTIC_HOST_CPU}")
 
 # The compiler's code is a library so that the unit tests link the same
 # objects as the antic executable.
-add_library(antic_core STATIC
-    src/antic/antl.c
-    src/antic/applesdk.c
-    src/antic/arith.c
-    src/antic/arm64.c
-    src/antic/coff.c
-    src/antic/arena.c
-    src/antic/ast_dump.c
-    src/antic/cpu.c
-    src/antic/debug.c
-    src/antic/diagnostic.c
-    src/antic/driver.c
-    src/antic/emit.c
-    src/antic/expand.c
-    src/antic/header.c
-    src/antic/ir.c
-    src/antic/ir_print.c
-    src/antic/ir_verify.c
-    src/antic/layout.c
-    src/antic/lexer.c
-    src/antic/linker.c
-    src/antic/lower.c
-    src/antic/mach.c
-    src/antic/modpath.c
-    src/antic/notice.c
-    src/antic/optimize.c
-    src/antic/parser.c
-    src/antic/process.c
-    src/antic/regalloc.c
-    src/antic/select.c
-    src/antic/selfpath.c
-    src/antic/sha256.c
-    src/antic/userdirs.c
-    src/antic/sema.c
-    src/antic/target.c
-    src/antic/text.c
-    src/antic/types.c
-    src/antic/whole.c
-    src/antic/x86_64.c)
-target_include_directories(antic_core PUBLIC src/antic)
+include(tools/sources.cmake)
+add_library(antic_core STATIC ${ANTIC_CORE_SOURCES})
+target_include_directories(antic_core PUBLIC ${ANTIC_CORE_INCLUDE_DIRS})
 
-add_executable(antic
-    src/antic/main.c)
+add_executable(antic ${ANTIC_MAIN_SOURCES})
 target_link_libraries(antic PRIVATE antic_core)
 
 # DESIGN: anti is the user-facing command. docs/tooling.md places it in
@@ -163,34 +125,9 @@ target_link_libraries(antic PRIVATE antic_core)
 # `tests` and `fixtures` blocks of a module. It reads the `[inject]`
 # table of anti.toml with src/rt/toml.c, the one parser that anti.toml, the
 # logger and the runtime configuration share.
-add_executable(anti
-    src/anti/main.c
-    src/anti/bind.c
-    src/anti/bindapi.c
-    src/anti/bindclang.c
-    src/anti/bindexpr.c
-    src/anti/bindtype.c
-    src/anti/bindwrite.c
-    src/anti/build.c
-    src/anti/check.c
-    src/anti/deps.c
-    src/anti/doc.c
-    src/anti/files.c
-    src/anti/fmt.c
-    src/anti/jsontree.c
-    src/anti/manifest.c
-    src/anti/repo.c
-    src/anti/sdk.c
-    src/anti/symmap.c
-    src/anti/syms.c
-    src/anti/test.c
-    src/anti/units.c
-    src/anti/zip.c
-    src/rt/json.c
-    src/rt/symbols.c
-    src/rt/toml.c)
+add_executable(anti ${ANTI_SOURCES})
 target_link_libraries(anti PRIVATE antic_core)
-target_include_directories(anti PRIVATE src/rt)
+target_include_directories(anti PRIVATE ${ANTI_INCLUDE_DIRS})
 
 target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")

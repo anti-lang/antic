@@ -99,6 +99,80 @@ if(entries MATCHES "(^|\n)anti/sysroot/macos-[^/\n]+/sdk/")
     message(FATAL_ERROR "${archive} carries stubs of Apple's SDK")
 endif()
 
+# The anti of the package runs the commands that read JSON, TOML and the
+# symbols of a binary, whose readers stand in src/rt. On a Linux host the
+# packer compiled that anti itself, which once left the three readers out.
+function(run_packed what)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env
+                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+                "${WORK}/unpacked/anti/bin/anti${suffix}" ${ARGN}
+        WORKING_DIRECTORY "${WORK}/run" RESULT_VARIABLE status
+        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the packed anti: ${what} failed with ${status}\n"
+                            "${out}${err}")
+    endif()
+    set(packed_out "${out}" PARENT_SCOPE)
+endfunction()
+file(MAKE_DIRECTORY "${WORK}/unpacked" "${WORK}/run" "${WORK}/deploy")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E tar xf "${archive}"
+                WORKING_DIRECTORY "${WORK}/unpacked" RESULT_VARIABLE unpacked)
+if(NOT unpacked EQUAL 0)
+    message(FATAL_ERROR "${archive} does not unpack")
+endif()
+run_packed("anti bind" bind "${ROOT}/tests/bind/raylib_api.json"
+           -o "${WORK}/run/bound")
+if(NOT EXISTS "${WORK}/run/bound/raylib.anti")
+    message(FATAL_ERROR "the packed anti bind wrote no raylib.anti")
+endif()
+file(COPY "${ROOT}/tests/anti-build/app" DESTINATION "${WORK}/run")
+set(project "${WORK}/run/app")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env
+            "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+            "${WORK}/unpacked/anti/bin/anti${suffix}" build --release
+            --runtime "${RUNTIME}" --llvm-mc "${LLVM_BIN}/llvm-mc${suffix}"
+    WORKING_DIRECTORY "${project}" RESULT_VARIABLE status
+    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+set(release "${project}/dist/${HOST}/release")
+if(NOT status EQUAL 0 OR NOT EXISTS "${release}/app${suffix}")
+    message(FATAL_ERROR "the packed anti did not build the project of "
+                        "anti.toml: ${status}\n${out}${err}")
+endif()
+# A Windows program keeps its functions in the PDB, which only DbgHelp
+# reads. The inventory runs on the other hosts, as anti_symbols does.
+if(NOT HOST MATCHES "^windows-")
+    file(COPY "${release}/app" "${release}/app-symbols.zip"
+         DESTINATION "${WORK}/deploy")
+    file(WRITE "${WORK}/deploy/app.toml" "")
+    file(STRINGS "${WORK}/deploy/app" id_line REGEX "^build [0-9a-f]+$")
+    list(GET id_line 0 id_line)
+    string(SUBSTRING "${id_line}" 6 -1 program_id)
+    run_packed("anti symbols inventory" symbols inventory
+               --conf "${WORK}/deploy/app.toml" --out "${WORK}/run/all.zip")
+    if(NOT packed_out MATCHES "present [^\n]*app ${program_id}\n")
+        message(FATAL_ERROR "the packed anti found no symbols of the "
+                            "program\n${packed_out}")
+    endif()
+endif()
+
+# A host that is not Linux packs linux-arm64 as well. The packer then
+# compiles a Linux anti from the source list of the CMake build, and the
+# link fails when a source is missing.
+if(NOT HOST MATCHES "^linux-")
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/linux"
+                            "-DCLANG=${CLANG}" "-DLLVM_BIN=${LLVM_BIN}"
+                            "-DHOSTS=linux-arm64" "-DSYSROOT=${WORK}/sysroot"
+                            "-DRUNTIME=${RUNTIME}"
+                            -P "${ROOT}/tools/pack-anti.cmake"
+                    RESULT_VARIABLE packed)
+    file(GLOB archive "${WORK}/linux/anti-*-linux-arm64.tar.xz")
+    if(NOT packed EQUAL 0 OR NOT archive)
+        message(FATAL_ERROR "tools/pack-anti.cmake packed no linux-arm64")
+    endif()
+endif()
+
 # A release takes the pinned compiler. The cache beside the runtime names
 # the compiler of the build, and a build with the one of the machine stops.
 set(system "${WORK}/system-build")
