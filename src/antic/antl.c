@@ -1381,7 +1381,7 @@ enum { MAP_NONE, MAP_BUSY, MAP_DONE };
    limit when it follows an index on demand. A table whose entries point
    back is read without recursion, and it is refused when it nests
    deeper. The checker, the layout and the passes walk the same nesting
-   recursively. See docs/decisions-library.md. */
+   recursively. See docs/decisions.md. */
 enum { NEST_LIMIT = 256 };
 
 /* The larger of two heights. */
