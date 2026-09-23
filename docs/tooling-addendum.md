@@ -151,6 +151,12 @@ Other rules:
   kept. A ` * ` gutter inside a block comment is removed.
 - Ordinary `//` comments keep their position.
 
+The rules move the line breaks they name and leave the others where the author wrote
+them, so no expression is re-flowed. A body whose closing brace stands on the line of
+its opening one keeps to that line, which is the form `pub enum Mode: u8 { Read, Write }`
+is written in. What the rules leave open is decided under "The formatter" in
+`docs/decisions.md`.
+
 ## Doc comment forms
 
 Every doc marker has a line form and a block form. The lexer produces the same token

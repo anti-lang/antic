@@ -4,8 +4,11 @@
 #include <string.h>
 
 #include "check.h"
+#include "files.h"
+#include "fmt.h"
 #include "linker.h"
 #include "manifest.h"
+#include "modpath.h"
 #include "sdk.h"
 #include "selfpath.h"
 #include "userdirs.h"
@@ -22,6 +25,7 @@ static int usage(FILE *out)
           "       anti check [--warn-undocumented] [--targets all]\n"
           "                  [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
           "                  [<file.anti>...]\n"
+          "       anti fmt [--check] [<file.anti>...]\n"
           "\n"
           "sdk export packs the .tbd stubs and the version of Apple's SDK into\n"
           "apple-sdk-<version>.tar.xz, on a Mac. sdk import unpacks that bundle\n"
@@ -34,6 +38,15 @@ static int usage(FILE *out)
           "same tests with the checks and the assertions off. It reads the\n"
           "`[inject]` and `[inject.test]` tables of anti.toml in the current\n"
           "directory and passes each provider to antic.\n"
+          "\n"
+          "fmt writes every source in the canonical form of the formatter\n"
+          "rules: one tab per level, an item body whose brace opens on its own\n"
+          "line, a statement block whose brace opens on the line of the\n"
+          "statement, no parentheses around a whole condition, one statement\n"
+          "per line and a doc comment re-wrapped at 80 columns. --check writes\n"
+          "nothing and lists the files that differ. Without a file it takes\n"
+          "every source under the directories that `[layout]` of anti.toml\n"
+          "names.\n"
           "\n"
           "check runs the front end on every source, compiles the `anti`\n"
           "blocks of the doc comments, reports the doc warnings and reads the\n"
@@ -129,6 +142,61 @@ int main(int argc, char **argv)
         free((void *)sources);
         free((void *)roots);
         text_free(&home);
+        return status;
+    }
+    if (argc >= 2 && strcmp(argv[1], "fmt") == 0) {
+        const char **sources = malloc((size_t)argc * sizeof *sources);
+        struct file_list found = {0};
+        struct text src = {0};
+        struct text test = {0};
+        struct text package = {0};
+        size_t count = 0;
+        bool check = false;
+        int status;
+        if (sources == NULL) {
+            fputs("anti: out of memory\n", stderr);
+            return 70;
+        }
+        for (i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "--check") == 0) {
+                check = true;
+            } else if (argv[i][0] == '-') {
+                free((void *)sources);
+                return usage(stderr);
+            } else {
+                sources[count++] = argv[i];
+            }
+        }
+        /* DESIGN: without a file the command takes the source and the
+           test directory of `[layout]`, as `anti check` does, so that the
+           two read the same files. */
+        if (count == 0) {
+            if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
+                !list_tree(text_cstr(&src), SOURCE_SUFFIX, &found) ||
+                !list_tree(text_cstr(&test), SOURCE_SUFFIX, &found)) {
+                free((void *)sources);
+                file_list_free(&found);
+                text_free(&src);
+                text_free(&test);
+                text_free(&package);
+                return 1;
+            }
+            free((void *)sources);
+            sources = malloc((found.count + 1) * sizeof *sources);
+            if (sources == NULL) {
+                fputs("anti: out of memory\n", stderr);
+                return 70;
+            }
+            for (count = 0; count < found.count; count++) {
+                sources[count] = text_cstr(&found.items[count]);
+            }
+        }
+        status = fmt_run(sources, count, check);
+        free((void *)sources);
+        file_list_free(&found);
+        text_free(&src);
+        text_free(&test);
+        text_free(&package);
         return status;
     }
     if (argc >= 2 && strcmp(argv[1], "test") == 0) {

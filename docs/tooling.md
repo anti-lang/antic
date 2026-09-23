@@ -379,11 +379,16 @@ Fenced code blocks in doc comments are rendered through `anti html` or `anti tex
 ## Formatter
 
 `anti fmt` rewrites every `.anti` file under `src/` and `test/` into the canonical
-form. `anti fmt --check` exits non-zero and lists the files that differ.
+form. `anti fmt --check` exits non-zero and lists the files that differ. Named files are
+taken instead of the two directories.
 
 The canonical form is also the form of every listing in the book. The book is rewritten
 with `anti fmt` once, after the compiler changes of these designs. The rules are in
-`docs/tooling-addendum.md`.
+`docs/tooling-addendum.md`, and the decisions behind the ones they leave open are under
+"The formatter" in `docs/decisions.md`.
+
+It is built. `tools/anti/fmt.c` holds it and `docs/notes/fmt.md` its choices. `std/` and
+`tests/` of this repository stand in the canonical form.
 
 ## Highlighters
 

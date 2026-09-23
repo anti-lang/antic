@@ -407,9 +407,9 @@ reports what it finished.
   under "The release script" in `docs/decisions.md`.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
   only. It has never run.
-- The `anti` tool holds `sdk export`, `sdk import`, `test` and `check`, and
-  nothing else of `docs/tooling.md`. `tools/scripts/format_anti.py` stands in
-  for `anti fmt`.
+- The `anti` tool holds `sdk export`, `sdk import`, `test`, `check` and `fmt`,
+  and nothing else of `docs/tooling.md`. `anti fmt` writes the canonical form
+  of the formatter rules, and `std/` and `tests/` stand in it.
 - `anti check` is built, with its four classes in the order of
   `docs/tooling-addendum.md`: the front end on every source, with
   `--targets all` once per target, the `anti` blocks of the doc comments in

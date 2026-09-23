@@ -1,0 +1,55 @@
+/*!
+ * A module written in none of the forms the canonical one asks for, so
+ * that `anti fmt` has every rule to apply: the indent, the braces, the parentheses of a condition, one statement per line and the width of a doc comment.
+ */
+import anti.lang;
+
+/// The flags of a pixel, which a bitfield holds. The width of a field stands behind a colon of its own, and the canonical form keeps the space before it.
+pub struct Pixel {
+    visible: u32 : 1,
+        layer: u32 : 4,
+  pad: u32 : 27,
+}
+
+/** One point of the plane. */
+pub struct Point
+{
+	x: f64,
+	y: f64,
+}
+
+pub enum Mode: u8 { Read, Write }
+
+/// Count down from `n` and back up, which shows every brace the rules
+/// name.
+pub fn count(n: int) -> int
+{
+  let i = n; let seen = 0;
+  while (i > 0) do
+  {
+    i = i - 1;
+    if (i == 3)
+    {
+      seen = seen + 1;
+    }
+    else
+    {
+      seen = seen + 2;
+    }
+  }
+  do {
+    i = i + 1;
+  }
+  while i < n
+  // The count stands as it was.
+  {
+    seen = seen + 0;
+  }
+  let p = Point { x: 1.0,
+      y: 2.0 };
+  let q = []f64 { ptr: none, len: 0 };
+  for k in 0..10 by -3 {
+    seen = seen + k + q.len;
+  }
+  return seen + p.x as int;
+}

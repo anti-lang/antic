@@ -789,6 +789,24 @@ add_test(NAME anti_test
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test.cmake")
 
+# The rules of the canonical form on one file, the format stability of
+# docs/tooling.md and `--check`, which writes nothing.
+add_test(NAME anti_fmt
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/fmt"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_fmt.cmake")
+
+# Every source of the standard library and of the tests stands in the
+# canonical form, so that `anti fmt` over the checkout writes nothing.
+add_test(NAME fmt_canonical
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DSTD=${CMAKE_SOURCE_DIR}/std"
+        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_fmt_canonical.cmake")
+
 # Every class of `anti check`: the front end on every source of a project,
 # the `anti` blocks of the doc comments, the doc warnings, the formatting
 # rules and the line that says the pattern check waits for PCRE2.
