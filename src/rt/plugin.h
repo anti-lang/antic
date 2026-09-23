@@ -97,6 +97,15 @@ struct anti_plugin {
     int64_t used;
 };
 
+/* Take and give back the lock of the slots. A caller of
+   anti_rt_plugin_at or anti_rt_plugin_registry holds it for as long as it
+   reads what they give. */
+void anti_rt_plugin_hold(void);
+void anti_rt_plugin_release(void);
+
+/* The count of open libraries, which is 0 while no library is open. */
+int64_t anti_rt_plugin_open(void);
+
 /* The slot at index, or NULL past the last. */
 struct anti_plugin *anti_rt_plugin_at(int64_t index);
 
@@ -117,8 +126,9 @@ const struct anti_registry *anti_rt_plugin_registry(int64_t index);
    and a failure leaves its reason in anti_rt_plugin_message. */
 void *anti_rt_plugin_load(const unsigned char *path, int64_t length);
 
-/* The reason the last call failed, empty after one that did not. The
-   bytes belong to the runtime and stand until the next failure. */
+/* The reason the last call of this thread failed, empty after one that
+   did not. The bytes belong to the runtime and stand until the next
+   failure on the same thread. */
 struct anti_text anti_rt_plugin_message(void);
 
 /* An object of the class the library provides for the interface, as a

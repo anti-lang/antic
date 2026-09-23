@@ -26,7 +26,9 @@
 
 enum { ANTI_PLUGIN_PATH = 4096 };
 
-static char message[512];
+/* DESIGN: the reason of the last failure is kept per thread, because
+   any thread may load, and each reads the reason of its own call. */
+static _Thread_local char message[512];
 
 /* Keep the reason the last call gave, which a caller may print. */
 static void fail(const char *format, ...)
@@ -81,16 +83,19 @@ static void *symbol_of(void *handle, const char *name)
 #endif
 }
 
-/* The reason the last open failed, as the platform gives it. */
-static const char *open_message(void)
+/* The reason the last open failed, as the platform gives it. Windows
+   writes it into text, of size bytes. dlerror keeps its own text per
+   thread. */
+static const char *open_message(char *text, size_t size)
 {
 #if defined(_WIN32)
-    static char text[64];
-    snprintf(text, sizeof text, "error %lu", (unsigned long)GetLastError());
+    snprintf(text, size, "error %lu", (unsigned long)GetLastError());
     return text;
 #else
-    const char *text = dlerror();
-    return text != NULL ? text : "cannot open the file";
+    const char *reason = dlerror();
+    (void)text;
+    (void)size;
+    return reason != NULL ? reason : "cannot open the file";
 #endif
 }
 
@@ -113,6 +118,8 @@ static int path_of(char *out, size_t size, const unsigned char *path,
     return 1;
 }
 
+/* The slot of the handle, or NULL. The caller holds the lock of the
+   slots. */
 static struct anti_plugin *slot_of(void *handle)
 {
     int64_t i;
@@ -384,34 +391,33 @@ static void *build(const struct anti_plugin *p,
     if (table != NULL) {
         struct anti_stubbed *head = (struct anti_stubbed *)(void *)table - 1;
         int64_t i;
+        /* Two threads may build the first two objects at once. */
+        anti_rt_plugin_hold();
         if (head->filled == 0) {
             for (i = 0; i < e->chain_length; i++) {
                 table[i] = (const void *)sub->table[i];
             }
             head->filled = 1;
         }
+        anti_rt_plugin_release();
         sub->table = (const struct anti_descriptor *const *)(const void *)
                          table;
     }
     return sub;
 }
 
-void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
+/* Take a slot for the library that open_library gave. The caller holds
+   the lock of the slots. Gives the slot, or NULL with the reason in
+   message. *same is 1 when the library is open already, in the slot it
+   gives, and the caller then closes the handle it opened. */
+static struct anti_plugin *claim(const char *name, void *handle,
+                                 const struct anti_provided *table,
+                                 const void *base, int *same)
 {
-    struct anti_text version = anti_rt_runtime_version();
-    char name[ANTI_PLUGIN_PATH];
-    const struct anti_provided *table;
     struct anti_plugin *p = NULL;
-    const void *base;
-    void *handle;
     int64_t i;
 
-    message[0] = '\0';
-    if (!path_of(name, sizeof name, path, length)) {
-        fail("the path of a library is at most %d bytes",
-             ANTI_PLUGIN_PATH - 1);
-        return NULL;
-    }
+    *same = 0;
     for (i = 0; i < ANTI_PLUGIN_MAX && p == NULL; i++) {
         struct anti_plugin *slot = anti_rt_plugin_at(i);
         if (slot->used == 0) {
@@ -423,35 +429,15 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
              ANTI_PLUGIN_MAX);
         return NULL;
     }
-    handle = open_library(name);
-    if (handle == NULL) {
-        fail("%s: %s", name, open_message());
-        return NULL;
-    }
-    table = symbol_of(handle, "anti_rt_provides");
-    if (table == NULL) {
-        close_library(handle);
-        fail("%s provides nothing and is no plugin", name);
-        return NULL;
-    }
-    if (!same_bytes(table->version, table->version_length, version.ptr,
-                    version.len)) {
-        close_library(handle);
-        fail("%s was built for runtime %.*s, and this program carries %.*s",
-             name, (int)table->version_length, table->version,
-             (int)version.len, version.ptr);
-        return NULL;
-    }
     /* The platform gives one handle per file, so a second load of the
        same library is the library that is open. */
     for (i = 0; i < ANTI_PLUGIN_MAX; i++) {
         struct anti_plugin *open = anti_rt_plugin_at(i);
         if (open->used != 0 && open->table == table) {
-            close_library(handle);
+            *same = 1;
             return open;
         }
     }
-    base = anti_rt_plugin_image(table);
     for (i = 0; i < table->count; i++) {
         const struct anti_provides *e = &table->entries[i];
         /* The interface is the host's, because the library was bound
@@ -459,13 +445,11 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
            that no `is` of the program answers for. */
         if (e->descriptor == NULL ||
             anti_rt_plugin_image(e->descriptor) == base) {
-            close_library(handle);
             fail("%s carries an `%.*s` of its own, and the host's is the one "
                  "it provides", name, (int)e->path_length, e->path);
             return NULL;
         }
         if (!checked(name, e)) {
-            close_library(handle);
             return NULL;
         }
     }
@@ -481,7 +465,6 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
         one = p->stubbed != NULL ? stubs_of(&table->entries[i]) : NULL;
         if (one == NULL) {
             free_stubs(p, table->count);
-            close_library(handle);
             fail("out of memory");
             return NULL;
         }
@@ -498,17 +481,70 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     return p;
 }
 
-void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d)
+/* DESIGN: the library is opened and closed outside the lock of the
+   slots. A constructor or a destructor of a library may then make an
+   object, whose `created` hook takes the lock, without waiting for
+   itself. */
+void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
 {
-    struct anti_plugin *p = slot_of(handle);
-    const struct anti_provides *e;
+    struct anti_text version = anti_rt_runtime_version();
+    char name[ANTI_PLUGIN_PATH];
+    char why[64];
+    const struct anti_provided *table;
+    struct anti_plugin *p;
+    void *handle;
+    int same = 0;
 
     message[0] = '\0';
+    if (!path_of(name, sizeof name, path, length)) {
+        fail("the path of a library is at most %d bytes",
+             ANTI_PLUGIN_PATH - 1);
+        return NULL;
+    }
+    handle = open_library(name);
+    if (handle == NULL) {
+        fail("%s: %s", name, open_message(why, sizeof why));
+        return NULL;
+    }
+    table = symbol_of(handle, "anti_rt_provides");
+    if (table == NULL) {
+        close_library(handle);
+        fail("%s provides nothing and is no plugin", name);
+        return NULL;
+    }
+    if (!same_bytes(table->version, table->version_length, version.ptr,
+                    version.len)) {
+        close_library(handle);
+        fail("%s was built for runtime %.*s, and this program carries %.*s",
+             name, (int)table->version_length, table->version,
+             (int)version.len, version.ptr);
+        return NULL;
+    }
+    anti_rt_plugin_hold();
+    p = claim(name, handle, table, anti_rt_plugin_image(table), &same);
+    anti_rt_plugin_release();
+    if (p == NULL || same) {
+        close_library(handle);
+    }
+    return p;
+}
+
+void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d)
+{
+    const struct anti_provides *e = NULL;
+    struct anti_plugin *p;
+
+    message[0] = '\0';
+    anti_rt_plugin_hold();
+    p = slot_of(handle);
+    if (p != NULL) {
+        e = entry_of(p, d, NULL, 0);
+    }
+    anti_rt_plugin_release();
     if (p == NULL) {
         fail("the library is not open");
         return NULL;
     }
-    e = entry_of(p, d, NULL, 0);
     if (e == NULL) {
         fail("the library provides no `%.*s`", (int)d->name_length, d->name);
         return NULL;
@@ -519,10 +555,16 @@ void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d)
 int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
                                const unsigned char *name, int64_t length)
 {
-    struct anti_plugin *p = slot_of(handle);
-    const struct anti_provides *e = p != NULL ? entry_of(p, d, NULL, 0) : NULL;
+    const struct anti_provides *e = NULL;
+    struct anti_plugin *p;
     int64_t i;
 
+    anti_rt_plugin_hold();
+    p = slot_of(handle);
+    if (p != NULL) {
+        e = entry_of(p, d, NULL, 0);
+    }
+    anti_rt_plugin_release();
     if (e == NULL) {
         return 0;
     }
@@ -537,33 +579,50 @@ int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
 
 int64_t anti_rt_plugin_live(void *handle)
 {
-    struct anti_plugin *p = slot_of(handle);
+    struct anti_plugin *p;
+    int64_t live = 0;
 
-    return p == NULL ? 0
-                     : anti_rt_atomic_load(&p->live, (int64_t)sizeof p->live);
+    anti_rt_plugin_hold();
+    p = slot_of(handle);
+    if (p != NULL) {
+        live = anti_rt_atomic_load(&p->live, (int64_t)sizeof p->live);
+    }
+    anti_rt_plugin_release();
+    return live;
 }
 
+/* DESIGN: the check of live and the release of the slot stand under one
+   hold of the lock. A `created` hook counts under the same lock. An
+   object made while the check runs is then either counted before it, or
+   finds no library open. */
 int8_t anti_rt_plugin_unload(void *handle)
 {
-    struct anti_plugin *p = slot_of(handle);
+    struct anti_plugin gone;
+    struct anti_plugin *p;
+    int8_t closed = 0;
     int64_t live;
 
     message[0] = '\0';
-    if (p == NULL) {
-        fail("the library is not open");
-        return 0;
+    anti_rt_plugin_hold();
+    p = slot_of(handle);
+    if (p != NULL) {
+        live = anti_rt_atomic_load(&p->live, (int64_t)sizeof p->live);
+        if (live != 0) {
+            fail("%lld object%s of the library %s alive", (long long)live,
+                 live == 1 ? "" : "s", live == 1 ? "is" : "are");
+        } else {
+            gone = *p;
+            memset(p, 0, sizeof *p);
+            anti_rt_plugin_closed();
+            closed = 1;
+        }
     }
-    live = anti_rt_atomic_load(&p->live, (int64_t)sizeof p->live);
-    if (live != 0) {
-        fail("%lld object%s of the library %s alive", (long long)live,
-             live == 1 ? "" : "s", live == 1 ? "is" : "are");
-        return 0;
+    anti_rt_plugin_release();
+    if (closed) {
+        free_stubs(&gone, gone.table->count);
+        close_library(gone.handle);
     }
-    free_stubs(p, p->table->count);
-    close_library(p->handle);
-    memset(p, 0, sizeof *p);
-    anti_rt_plugin_closed();
-    return 1;
+    return closed;
 }
 
 /* Discovery */
@@ -771,11 +830,14 @@ void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,
         return NULL;
     }
     p = handle;
+    anti_rt_plugin_hold();
     e = entry_of(p, NULL, path, path_length);
+    anti_rt_plugin_release();
     if (e == NULL) {
+        /* The unload clears the reason, so it comes first. */
+        anti_rt_plugin_unload(handle);
         fail("%.*s provides no `%.*s`", (int)library_length, library,
              (int)path_length, path);
-        anti_rt_plugin_unload(handle);
         return NULL;
     }
     return build(p, e);

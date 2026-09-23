@@ -21,12 +21,36 @@
 #include <windows.h>
 #else
 #include <dlfcn.h>
+#include <pthread.h>
 #endif
 
+/* DESIGN: any thread may load and unload a library. Any thread makes
+   objects, and the hooks of each look up its library. One lock guards
+   the slots. Load and unload write a slot under it. The hooks and the
+   lookup of a class by name read the slots under it. */
 static struct anti_plugin loaded[ANTI_PLUGIN_MAX];
 /* The open libraries. Every hook site reads it, so it is the first
-   thing a count asks and the only cost of a program with none. */
+   thing a count asks and the only cost of a program with none. It is
+   atomic and stands outside the lock, so a program with no library open
+   never takes the lock. */
 static int64_t open_count;
+
+#if defined(_WIN32)
+static SRWLOCK lock = SRWLOCK_INIT;
+
+void anti_rt_plugin_hold(void) { AcquireSRWLockExclusive(&lock); }
+void anti_rt_plugin_release(void) { ReleaseSRWLockExclusive(&lock); }
+#else
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+void anti_rt_plugin_hold(void) { pthread_mutex_lock(&lock); }
+void anti_rt_plugin_release(void) { pthread_mutex_unlock(&lock); }
+#endif
+
+int64_t anti_rt_plugin_open(void)
+{
+    return anti_rt_atomic_load(&open_count, (int64_t)sizeof open_count);
+}
 
 struct anti_plugin *anti_rt_plugin_at(int64_t index)
 {
@@ -75,40 +99,36 @@ const void *anti_rt_plugin_image(const void *address)
 #endif
 }
 
-/* The library the table of a class belongs to, or NULL for one of the
-   program. */
-static struct anti_plugin *owner(const void *table)
+/* Add delta to the count of live objects of the library the table of a
+   class belongs to. A class of the program counts nowhere. The image is
+   found before the lock, because the loader of the platform holds a lock
+   of its own while it answers. */
+static void count(const void *table, int64_t delta)
 {
     const void *base;
     int64_t i;
 
-    if (table == NULL ||
-        anti_rt_atomic_load(&open_count, (int64_t)sizeof open_count) == 0) {
-        return NULL;
+    if (table == NULL || anti_rt_plugin_open() == 0) {
+        return;
     }
     base = anti_rt_plugin_image(table);
+    anti_rt_plugin_hold();
     for (i = 0; i < ANTI_PLUGIN_MAX; i++) {
         if (loaded[i].used != 0 && loaded[i].base == base) {
-            return &loaded[i];
+            anti_rt_atomic_add(&loaded[i].live,
+                               (int64_t)sizeof loaded[i].live, delta);
+            break;
         }
     }
-    return NULL;
+    anti_rt_plugin_release();
 }
 
 void anti_rt_plugin_created(const void *table)
 {
-    struct anti_plugin *p = owner(table);
-
-    if (p != NULL) {
-        anti_rt_atomic_add(&p->live, (int64_t)sizeof p->live, 1);
-    }
+    count(table, 1);
 }
 
 void anti_rt_plugin_destroyed(const void *table)
 {
-    struct anti_plugin *p = owner(table);
-
-    if (p != NULL) {
-        anti_rt_atomic_sub(&p->live, (int64_t)sizeof p->live, 1);
-    }
+    count(table, -1);
 }

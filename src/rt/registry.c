@@ -65,10 +65,17 @@ const struct anti_class *anti_rt_registry_find(const unsigned char *name,
         dot--;
     }
     found = find_in(&anti_rt_registry, name, length, dot, &two);
+    if (two || anti_rt_plugin_open() == 0) {
+        return two ? NULL : found;
+    }
     /* DESIGN: a loaded library brings classes of its own, and
        `reflect.new` finds one by name as it finds a class of the
-       program. The loader holds the table of each open library, and a
-       lookup walks them after the program's own. */
+       program. The loader holds the table of each open library. A lookup
+       walks them after the program's own, under the lock of the slots.
+       No unload takes a table away during the walk. The class it finds
+       stays mapped while the program keeps its library open, as every
+       object of the library does. */
+    anti_rt_plugin_hold();
     for (i = 0; i < ANTI_PLUGIN_MAX && !two; i++) {
         const struct anti_registry *r = anti_rt_plugin_registry(i);
         const struct anti_class *c;
@@ -80,13 +87,16 @@ const struct anti_class *anti_rt_registry_find(const unsigned char *name,
             continue;
         }
         if (dot > 0) {
-            return c;
+            found = c;
+            break;
         }
         if (found != NULL) {
-            return NULL;
+            two = true;
+            break;
         }
         found = c;
     }
+    anti_rt_plugin_release();
     return two ? NULL : found;
 }
 

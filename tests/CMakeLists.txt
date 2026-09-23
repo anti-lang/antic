@@ -108,6 +108,23 @@ target_compile_definitions(rt_conf_tests PRIVATE
     ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME rt_conf_race COMMAND rt_conf_tests)
 
+# The loader of the runtime under threads that load at once, in a program
+# of its own with stand-ins for the rest of the runtime. It loads two
+# libraries that each carry an empty table of a plugin.
+foreach(which one two)
+    add_library(plugin_table_${which} SHARED unit/plugin_table.c)
+endforeach()
+add_executable(rt_plugin_tests unit/test_plugin_race.c ../src/rt/plugin.c
+    ../src/rt/loaded.c ../src/rt/atomic.c ../src/rt/digest.c
+    ../src/rt/toml.c)
+target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
+target_compile_definitions(rt_plugin_tests PRIVATE
+    "PLUGIN_ONE=\"$<TARGET_FILE:plugin_table_one>\""
+    "PLUGIN_TWO=\"$<TARGET_FILE:plugin_table_two>\"")
+add_dependencies(rt_plugin_tests plugin_table_one plugin_table_two)
+add_test(NAME rt_plugin_race COMMAND rt_plugin_tests)
+
 # The runtime archive holds the licence text of every component.
 add_test(NAME runtime_licenses
     COMMAND "${CMAKE_COMMAND}" -E cat "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt")
