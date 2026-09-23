@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>com.example.shapes</title>
+<main class="doc">
+<h1>com.example.shapes</h1>
+<p>Shapes of the plane and what they measure.</p>
+<p>Every length is a whole number of <a href="#UNIT"><code>UNIT</code></a>, so a measurement never carries a fraction. The module holds:</p>
+<ul>
+<li><a href="#Circle"><code>Circle</code></a>, the one shape with a body</li>
+<li><a href="#Figure"><code>Figure</code></a>, the variant a drawing stores</li>
+</ul>
+<pre class="code">let c = shapes.Circle { radius: 2, stroke: shapes.Stroke.Solid };
+let a = shapes.area(c);
+</pre>
+<p>The rules of the plane stand in <a href="https://example.com/plane">the handbook</a>.</p>
+<section class="item" id="Stroke">
+<h2>Stroke</h2>
+<pre class="signature">pub enum Stroke: byte</pre>
+<p>How an outline is drawn.</p>
+<ul class="fields">
+<li><code>Solid = 0</code>
+<p>A line with no gaps.</p>
+</li>
+<li><code>Dashed = 1</code>
+<p>A line with gaps.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="UNIT">
+<h2>UNIT</h2>
+<pre class="signature">pub const UNIT: int = 1</pre>
+<p>The unit every length is written in.</p>
+</section>
+<section class="item" id="Circle">
+<h2>Circle</h2>
+<pre class="signature">pub struct Circle</pre>
+<p>A circle, named by its radius.</p>
+<ul class="fields">
+<li><code>radius: int</code>
+<p>The radius, in whole units of <a href="#UNIT"><code>UNIT</code></a>.</p>
+</li>
+<li><code>stroke: Stroke</code>
+<p>How the outline is drawn.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="Figure">
+<h2>Figure</h2>
+<pre class="signature">pub variant Figure</pre>
+<p>Either of the two figures a drawing stores.</p>
+<ul class="fields">
+<li><code>Round { radius: int }</code>
+</li>
+<li><code>Empty</code>
+</li>
+</ul>
+</section>
+<section class="item" id="Canvas">
+<h2>Canvas</h2>
+<pre class="signature">pub class Canvas</pre>
+<p>A drawing that counts the shapes put on it.</p>
+<ul class="fields">
+<li><code>name: str</code>
+<p>The name of the drawing.</p>
+</li>
+</ul>
+<ul class="members">
+<li><code>pub fn new(name: str) -&gt; *Canvas</code>
+<p>A canvas with a name.</p>
+</li>
+<li><code>pub fn add(self, shape: Circle)</code>
+<p>Put <code>shape</code> on the canvas.</p>
+</li>
+<li><code>pub fn size(self) -&gt; int</code>
+<p>How many shapes stand on the canvas.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="area">
+<h2>area</h2>
+<pre class="signature">pub fn area(c: Circle) -&gt; int</pre>
+<p>The area of <code>c</code>, rounded down.</p>
+</section>
+<section class="item" id="bounds">
+<h2>bounds</h2>
+<pre class="signature">pub fn bounds(c: Circle) -&gt; (int, int)</pre>
+<p>The width and the height of <code>c</code>.</p>
+</section>
+<section class="item" id="parse">
+<h2>parse</h2>
+<pre class="signature">pub fn parse(text: str) -&gt; int may fail</pre>
+<p>The radius <code>text</code> names, or a failure when it names none.</p>
+</section>
+<section class="item" id="measure">
+<h2>measure</h2>
+<pre class="signature">pub worker fn measure(c: Circle) -&gt; int</pre>
+<p>Measure <code>c</code> on a worker.</p>
+</section>
+</main>

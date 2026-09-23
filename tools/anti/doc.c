@@ -685,8 +685,14 @@ static bool resolve_name(const struct interface *iface, const char *s,
         return false;
     }
     head = (size_t)(dot - s);
-    if (same(s, head, iface->module) || is_item(iface, s, head)) {
+    if (same(s, head, iface->module)) {
         text_appendf(href, "#%.*s", (int)(n - head - 1), dot + 1);
+        return true;
+    }
+    /* A member of an item of the documented module has no place of its
+       own on the page. The name links to the item that holds it. */
+    if (is_item(iface, s, head)) {
+        text_appendf(href, "#%.*s", (int)head, s);
         return true;
     }
     for (i = 0; i < iface->import_count; i++) {

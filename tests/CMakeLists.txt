@@ -819,6 +819,18 @@ add_test(NAME anti_check
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/check"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_check.cmake")
 
+# The documentation generator: the pages of the fixture, the doc
+# equivalence of docs/tooling.md, the two forms and the two options that
+# need the source.
+add_test(NAME anti_doc
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/doc"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_doc.cmake")
+
 # The `tests` block of a module of the standard library. The module
 # imports other modules, so the dev run links an object of each.
 add_test(NAME std_tests_trace

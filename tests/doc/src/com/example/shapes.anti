@@ -10,6 +10,11 @@
 //! let c = shapes.Circle { radius: 2, stroke: shapes.Stroke.Solid };
 //! let a = shapes.area(c);
 //! ```
+//!
+//! The rules of the plane stand in [the handbook](https://example.com/plane).
+
+//#! The module is one file. `helper` and `Canvas.secret` are the two items no
+//#! reader of the library sees.
 
 import anti.lang;
 
