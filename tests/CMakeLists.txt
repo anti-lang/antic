@@ -125,6 +125,18 @@ target_compile_definitions(rt_plugin_tests PRIVATE
 add_dependencies(rt_plugin_tests plugin_table_one plugin_table_two)
 add_test(NAME rt_plugin_race COMMAND rt_plugin_tests)
 
+# The loader against a table of a plugin with one value damaged at a time.
+add_library(plugin_bad SHARED unit/plugin_bad.c)
+add_executable(rt_plugin_table_tests unit/test_plugin_table.c
+    ../src/rt/plugin.c ../src/rt/loaded.c ../src/rt/atomic.c
+    ../src/rt/digest.c ../src/rt/toml.c)
+target_link_libraries(rt_plugin_table_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
+target_compile_definitions(rt_plugin_table_tests PRIVATE
+    "PLUGIN_BAD=\"$<TARGET_FILE:plugin_bad>\"")
+add_dependencies(rt_plugin_table_tests plugin_bad)
+add_test(NAME rt_plugin_table COMMAND rt_plugin_table_tests)
+
 # The runtime archive holds the licence text of every component.
 add_test(NAME runtime_licenses
     COMMAND "${CMAKE_COMMAND}" -E cat "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt")

@@ -5,9 +5,12 @@
    names are the host's. An object of a loaded class is then an object
    of the program like any other. The library carries one table,
    `anti_rt_provides`, which names what it offers. The loader reads that
-   table and opens nothing else. */
+   table and opens nothing else. It checks every count, length, pointer
+   and offset of the table before it uses one. A damaged or mismatched
+   library would otherwise send it outside the table. */
 #include "plugin.h"
 
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,16 +160,26 @@ static const struct anti_provides *entry_of(const struct anti_plugin *p,
 /* The version checks of "Versions" in docs/anti-language-additions.md.
    Each runs per provided interface, at load, and compiles nothing. */
 
-/* The next dotted part of a version, and the rest after it. A part that
-   is no number counts as zero, and a missing part as zero as well. */
-static int64_t version_part(const unsigned char **at, int64_t *left)
-{
-    int64_t value = 0;
+/* The digits of the next dotted part of a version without its leading
+   zeros, and the rest after it. A part that is no number counts as zero,
+   and a missing part as zero as well, which is no digits.
 
-    while (*left > 0 && **at >= '0' && **at <= '9') {
-        value = value * 10 + (**at - '0');
+   DESIGN: a part is compared by its digits rather than read into an
+   integer, so a part of any length compares exactly and never overflows.
+   The table of a library is not trusted to hold short parts. */
+static void version_part(const unsigned char **at, int64_t *left,
+                         const unsigned char **digits, int64_t *count)
+{
+    while (*left > 0 && **at == '0') {
         (*at)++;
         (*left)--;
+    }
+    *digits = *at;
+    *count = 0;
+    while (*left > 0 && **at >= '0' && **at <= '9') {
+        (*at)++;
+        (*left)--;
+        (*count)++;
     }
     while (*left > 0 && **at != '.') {
         (*at)++;
@@ -176,7 +189,6 @@ static int64_t version_part(const unsigned char **at, int64_t *left)
         (*at)++;
         (*left)--;
     }
-    return value;
 }
 
 /* Whether version a is below version b, part by part. */
@@ -186,10 +198,19 @@ static int version_below(const unsigned char *a, int64_t a_length,
     int i;
 
     for (i = 0; i < 8; i++) {
-        int64_t one = version_part(&a, &a_length);
-        int64_t two = version_part(&b, &b_length);
-        if (one != two) {
-            return one < two;
+        const unsigned char *one;
+        const unsigned char *two;
+        int64_t one_count;
+        int64_t two_count;
+        int order;
+        version_part(&a, &a_length, &one, &one_count);
+        version_part(&b, &b_length, &two, &two_count);
+        if (one_count != two_count) {
+            return one_count < two_count;
+        }
+        order = one_count > 0 ? memcmp(one, two, (size_t)one_count) : 0;
+        if (order != 0) {
+            return order < 0;
         }
         if (a_length <= 0 && b_length <= 0) {
             break;
@@ -481,6 +502,69 @@ static struct anti_plugin *claim(const char *name, void *handle,
     return p;
 }
 
+/* Whether a text of the table has a length that a message may print
+   and bytes where it has any. */
+static int text_sound(const unsigned char *text, int64_t length)
+{
+    return length >= 0 && length <= INT_MAX && (length == 0 || text != NULL);
+}
+
+/* Whether a descriptor of a class lies in an image of the process. Its
+   name, its version and its size must be ones the loader may use. */
+static int class_sound(const struct anti_descriptor *d)
+{
+    return d != NULL && anti_rt_plugin_image(d) != NULL &&
+           text_sound(d->name, d->name_length) &&
+           text_sound(d->version, d->version_length) && d->size > 0;
+}
+
+/* What is damaged in the table of a library, or NULL when every value
+   the loader reads is sound. */
+static const char *damage_of(const struct anti_provided *table)
+{
+    int64_t i;
+
+    if (!text_sound(table->version, table->version_length)) {
+        return "the runtime version";
+    }
+    if (table->count < 0 || (table->count > 0 && table->entries == NULL) ||
+        table->class_count < 0 ||
+        (table->class_count > 0 && table->classes == NULL)) {
+        return "a count";
+    }
+    for (i = 0; i < table->count; i++) {
+        const struct anti_provides *e = &table->entries[i];
+        if (!text_sound(e->path, e->path_length) ||
+            !text_sound(e->built, e->built_length)) {
+            return "a text of an entry";
+        }
+        if (e->descriptor == NULL ||
+            anti_rt_plugin_image(e->descriptor) == NULL) {
+            return "the interface of an entry";
+        }
+        if (!class_sound(e->class_of) || e->init == NULL) {
+            return "the class of an entry";
+        }
+        /* The loader writes the table pointer of the sub-object. */
+        if (e->offset < 0 ||
+            e->offset > e->class_of->size -
+                            (int64_t)sizeof(struct anti_object)) {
+            return "the offset of an entry";
+        }
+        if (e->chain_length < 1 || e->chain == NULL) {
+            return "the version chain of an entry";
+        }
+    }
+    for (i = 0; i < table->class_count; i++) {
+        const struct anti_class *c = &table->classes[i];
+        if (!class_sound(c->descriptor) || c->init == NULL ||
+            !text_sound(c->module, c->module_length)) {
+            return "a class";
+        }
+    }
+    return NULL;
+}
+
 /* DESIGN: the library is opened and closed outside the lock of the
    slots. A constructor or a destructor of a library may then make an
    object, whose `created` hook takes the lock, without waiting for
@@ -491,6 +575,7 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     char name[ANTI_PLUGIN_PATH];
     char why[64];
     const struct anti_provided *table;
+    const char *damage;
     struct anti_plugin *p;
     void *handle;
     int same = 0;
@@ -510,6 +595,13 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     if (table == NULL) {
         close_library(handle);
         fail("%s provides nothing and is no plugin", name);
+        return NULL;
+    }
+    damage = damage_of(table);
+    if (damage != NULL) {
+        close_library(handle);
+        fail("%s carries a damaged table of what it provides: %s", name,
+             damage);
         return NULL;
     }
     if (!same_bytes(table->version, table->version_length, version.ptr,
