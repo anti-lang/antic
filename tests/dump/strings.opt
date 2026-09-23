@@ -1,5 +1,7 @@
 type []byte = struct { ptr: ptr, len: i64 }
 type str = struct { ptr: ptr, len: i64 }
+type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
+type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
 type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn puts(ptr) -> i32
@@ -7,6 +9,7 @@ extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global strings.0 size 6 align 1 bytes 68 65 6c 6c 6f 00
 global strings.1 size 3 align 1 bytes 68 69 00
 global strings.2 size 37 align 1 bytes 73 74 72 69 6e 67 73 2e 61 6e 74 69 3a 31 32 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00
+global (null).anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn strings.tail(%0: agg str, %1: i64) -> agg []byte {
 b0:

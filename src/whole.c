@@ -1157,34 +1157,25 @@ static bool at_or_below(const struct whole *w, uint32_t record, uint32_t above)
    The pass counts the calls of the functions that the entries reach,
    before devirtualisation makes any of them direct. Every abstract class
    stands for an injectable interface until `inject` exists. The table
-   `anti_rt_slots` lists each abstract class with a slot reached, and a
-   program with none has no table. A library for C has none, because its
-   host program carries it. */
-/* The number of public functions in the list of the class whose
-   descriptor is the global descriptor, or 0 without a list. */
-static uint32_t function_count(const struct ir_module *m, uint32_t descriptor)
-{
-    const struct ir_const *value = m->globals[descriptor]->value;
-
-    if (value == NULL || value->kind != IR_CONST_AGG ||
-        value->item_count < 12 || value->items[10].kind != IR_CONST_INT) {
-        return 0;
-    }
-    return (uint32_t)value->items[10].integer;
-}
-
+   `anti_rt_slots` lists each abstract class with a slot reached. Every
+   program carries the table, empty where its calls reach none, because
+   the loader of a library reads it. A library for C has none, because
+   its host program carries it. */
 /* DESIGN: `reflect.call` may reach any slot of any interface, because it
-   takes the index at run time. A program that calls through reflection
-   therefore reaches every slot of every abstract class, slot 1 up to its
-   last public function. */
+   takes the index at run time. The bitmaps hold the slots the calls of
+   the program reach, and the flag `reflect` of the table says that
+   reflection may reach every other one. The loader refuses a plugin that
+   misses a slot of a bitmap, and fills a slot that reflection alone
+   reaches with a stub. */
 static void write_slots(struct whole *w, struct ir_module *m,
-                        const struct reach *r, bool every)
+                        const struct reach *r, bool every, bool force)
 {
     static const char *const slot_names[] = {"descriptor", "slot_count",
                                              "bits"};
     static const enum ir_type slot_types[] = {IR_PTR, IR_I64, IR_PTR};
-    static const char *const table_names[] = {"count", "interfaces"};
-    static const enum ir_type table_types[] = {IR_I64, IR_PTR};
+    static const char *const table_names[] = {"count", "interfaces",
+                                              "reflect"};
+    static const enum ir_type table_types[] = {IR_I64, IR_PTR, IR_I64};
     size_t classes = m->class_count;
     struct slots *slots = allocate(classes, sizeof *slots);
     size_t emitted = 0;
@@ -1215,34 +1206,28 @@ static void write_slots(struct whole *w, struct ir_module *m,
             }
         }
     }
-    for (i = 0; every && i < classes; i++) {
-        uint32_t last = (m->classes[i]->flags & IR_CLASS_ABSTRACT) != 0
-                            ? function_count(m, m->classes[i]->descriptor)
-                            : 0;
-        uint32_t slot;
-        for (slot = 1; slot <= last; slot++) {
-            mark_slot(&slots[i], slot);
-        }
-    }
     for (i = 0; i < classes; i++) {
         emitted += slots[i].count > 0 ? 1 : 0;
     }
-    if (emitted > 0) {
+    if (emitted > 0 || force) {
         uint32_t slot_agg = struct_agg(m, "anti.rt.Slots", slot_names,
                                        slot_types, 3);
         uint32_t table_agg = struct_agg(m, "anti.rt.SlotTable", table_names,
-                                        table_types, 2);
+                                        table_types, 3);
         char name[48];
         struct ir_const *list;
         struct ir_const *value;
         struct ir_global *g;
         size_t n = 0;
         snprintf(name, sizeof name, "[%zu]anti.rt.Slots", emitted);
-        list = ir_const_agg(m, ir_aggregate(ir_array_add(
-                                   m, name, ir_aggregate(slot_agg),
-                                   ir_sym_int(m, IR_I64, emitted), NULL)),
-                            emitted);
-        for (i = 0; i < classes; i++) {
+        list = emitted > 0
+                   ? ir_const_agg(m, ir_aggregate(ir_array_add(
+                                         m, name, ir_aggregate(slot_agg),
+                                         ir_sym_int(m, IR_I64, emitted),
+                                         NULL)),
+                                  emitted)
+                   : NULL;
+        for (i = 0; list != NULL && i < classes; i++) {
             struct ir_const *item;
             uint32_t bits;
             if (slots[i].count == 0) {
@@ -1257,11 +1242,16 @@ static void write_slots(struct whole *w, struct ir_module *m,
             const_addr(&item->items[2], bits);
             list->items[n++] = *item;
         }
-        value = ir_const_agg(m, ir_aggregate(table_agg), 2);
+        value = ir_const_agg(m, ir_aggregate(table_agg), 3);
         const_int(&value->items[0], IR_I64, emitted);
-        const_addr(&value->items[1],
-                   ir_global_add_value(m, "anti.rt", "slots.list",
-                                       list)->index);
+        if (list != NULL) {
+            const_addr(&value->items[1],
+                       ir_global_add_value(m, "anti.rt", "slots.list",
+                                           list)->index);
+        } else {
+            const_int(&value->items[1], IR_PTR, 0);
+        }
+        const_int(&value->items[2], IR_I64, every ? 1 : 0);
         g = ir_global_add_value(m, NULL, "anti_rt_slots", value);
         g->exported = true;
     }
@@ -1943,15 +1933,63 @@ static void write_injections(struct whole *w, struct ir_module *m,
    pointer by the offset. The table carries the version of the runtime
    the library was built against. It carries the classes of the library
    as well, which the host's registry takes over. */
+/* The constant of the global g, or NULL where it has none. A plugin
+   reads the descriptor of an interface of another module, which its
+   library file carries. */
+static const struct ir_const *global_value(const struct ir_module *m,
+                                           uint32_t g)
+{
+    return g < m->global_count ? m->globals[g]->value : NULL;
+}
+
+/* Item at of the descriptor global, or NULL where the build cannot read
+   it. */
+static const struct ir_const *descriptor_item(const struct ir_module *m,
+                                              uint32_t descriptor, size_t at)
+{
+    const struct ir_const *value = global_value(m, descriptor);
+
+    if (value == NULL || value->kind != IR_CONST_AGG ||
+        value->item_count <= at) {
+        return NULL;
+    }
+    return &value->items[at];
+}
+
+/* DESIGN: a plugin copies the chain and the version of the interface it
+   was built against into its own image. A reference to the interface's
+   own globals would resolve against the host at load. It would then give
+   the host's numbers, which are what the check compares against. */
+static uint32_t copy_chain(struct ir_module *m, const struct ir_const *from,
+                           size_t n, size_t at)
+{
+    struct ir_const *value;
+    char name[40];
+    size_t i;
+
+    snprintf(name, sizeof name, "[%zu]i64", n);
+    value = ir_const_agg(
+        m, ir_aggregate(ir_array_add(m, name, ir_scalar(IR_I64),
+                                     ir_sym_int(m, IR_I64, n), NULL)),
+        n);
+    for (i = 0; i < n; i++) {
+        const_int(&value->items[i], IR_I64, from->items[i].integer);
+    }
+    snprintf(name, sizeof name, "provides.chain.%zu", at);
+    return ir_global_add_value(m, RUNTIME_MODULE, name, value)->index;
+}
+
 static void write_provides(struct whole *w, struct ir_module *m,
                            struct text *errors)
 {
     static const char *const entry_names[] = {
         "path", "path_length", "descriptor", "class", "init", "offset",
-        "flags"
+        "flags", "chain", "chain_length", "fields", "size", "built",
+        "built_length"
     };
     static const enum ir_type entry_types[] = {
-        IR_PTR, IR_I64, IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_I64
+        IR_PTR, IR_I64, IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_I64, IR_PTR,
+        IR_I64, IR_I64, IR_I64, IR_PTR, IR_I64
     };
     static const char *const table_names[] = {
         "count", "entries", "version", "version_length", "class_count",
@@ -1961,7 +1999,7 @@ static void write_provides(struct whole *w, struct ir_module *m,
         IR_I64, IR_PTR, IR_PTR, IR_I64, IR_I64, IR_PTR
     };
     uint32_t entry_agg = struct_agg(m, "anti.rt.Provides", entry_names,
-                                    entry_types, 7);
+                                    entry_types, 13);
     uint32_t table_agg = struct_agg(m, "anti.rt.Provided", table_names,
                                     table_types, 6);
     size_t total = 0;
@@ -1997,7 +2035,7 @@ static void write_provides(struct whole *w, struct ir_module *m,
                                  (const uint8_t *)c->provides[j].interface,
                                  strlen(c->provides[j].interface) + 1,
                                  1)->index;
-            item = ir_const_agg(m, ir_aggregate(entry_agg), 7);
+            item = ir_const_agg(m, ir_aggregate(entry_agg), 13);
             const_addr(&item->items[0], text);
             const_int(&item->items[1], IR_I64,
                       strlen(c->provides[j].interface));
@@ -2016,6 +2054,54 @@ static void write_provides(struct whole *w, struct ir_module *m,
             const_int(&item->items[6], IR_I64,
                       ((c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0) |
                           ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
+            /* What the interface looked like where the library was
+               built: its chain, its fields, its size and the version of
+               its package. The loader compares each with the host's. */
+            {
+                const struct ir_const *record =
+                    descriptor_item(m, c->provides[j].descriptor, 14);
+                const struct ir_const *fields =
+                    descriptor_item(m, c->provides[j].descriptor, 6);
+                const struct ir_const *size =
+                    descriptor_item(m, c->provides[j].descriptor, 3);
+                const struct ir_const *version =
+                    descriptor_item(m, c->provides[j].descriptor, 12);
+                const struct ir_const *length =
+                    descriptor_item(m, c->provides[j].descriptor, 13);
+                const struct ir_const *chain =
+                    record != NULL && record->kind == IR_CONST_ADDR
+                        ? global_value(m, record->global)
+                        : NULL;
+                const struct ir_global *built =
+                    version != NULL && version->kind == IR_CONST_ADDR &&
+                            version->global < m->global_count
+                        ? m->globals[version->global]
+                        : NULL;
+                if (chain == NULL || chain->item_count < 2 ||
+                    fields == NULL || size == NULL || length == NULL ||
+                    built == NULL || built->bytes == NULL) {
+                    text_appendf(errors, "`%s.%s` provides `%s`, and this "
+                                 "build reads no version of it\n", c->module,
+                                 c->name, c->provides[j].interface);
+                    continue;
+                }
+                const_addr(&item->items[7],
+                           copy_chain(m, global_value(m, chain->items[0].global),
+                                      (size_t)chain->items[1].integer, n));
+                const_int(&item->items[8], IR_I64,
+                          (uint64_t)chain->items[1].integer);
+                item->items[9] = *fields;
+                item->items[9].scalar = IR_I64;
+                item->items[10] = *size;
+                item->items[10].scalar = IR_I64;
+                snprintf(name, sizeof name, "provides.built.%zu", n);
+                const_addr(&item->items[11],
+                           ir_global_add(m, RUNTIME_MODULE, name,
+                                         built->bytes, built->size,
+                                         1)->index);
+                item->items[12] = *length;
+                item->items[12].scalar = IR_I64;
+            }
             items[n++] = *item;
         }
     }
@@ -2110,8 +2196,14 @@ bool whole_program(struct ir_module *program,
         write_backtrace_default(program, options->release);
     }
     calls = calls_through_reflection(program, &reach);
+    /* The loader reads the table, and the runtime archive puts the
+       loader in every program. Every program therefore carries a table,
+       empty where its calls reach no slot. A library for C with the
+       runtime bundled carries the loader too. */
     if (!options->library && !options->plugin) {
-        write_slots(w, program, &reach, calls && options->reflect);
+        write_slots(w, program, &reach, calls && options->reflect, true);
+    } else if (options->bundled && !options->plugin) {
+        write_slots(w, program, &reach, false, true);
     }
     /* The providers of a library for C are resolved as a program's are.
        Its host is C and cannot fill a slot. */

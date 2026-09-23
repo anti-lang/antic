@@ -3,6 +3,8 @@ type measure.V2 = struct { x: f32, y: f32 }
 type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
+type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
+type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
 type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn measure.fn.0(agg str) -> i64
@@ -10,6 +12,7 @@ extern fn measure.fn.1(agg measure.V2) -> i64
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global measure.6 size 5 align 1 bytes 66 6f 75 72 00
 global measure.7 size 31 align 1 bytes 6d 65 61 73 75 72 65 2e 61 6e 74 69 3a 32 31 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global (null).anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn measure.length_of(%0: agg str) -> i64 {
 b0:

@@ -3,6 +3,8 @@ type fnptr.Op = struct { apply: ptr }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [1]anti.rt.Field = array 1 of anti.rt.Field
 type [2]fnptr.Op = array 2 of fnptr.Op
+type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
+type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
 type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn abs(i32) -> i32
@@ -10,6 +12,7 @@ extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 extern fn fnptr.fn.0(i32) -> i32
 global fnptr.5 size 29 align 1 bytes 66 6e 70 74 72 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
 global fnptr.7 size 29 align 1 bytes 66 6e 70 74 72 2e 61 6e 74 69 3a 32 31 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global (null).anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn fnptr.twice(%0: i32) -> i32 {
 b0:

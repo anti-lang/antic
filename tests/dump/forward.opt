@@ -2,11 +2,14 @@ type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, siz
 type forward.Point = struct { x: i64, y: i64 }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
+type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
+type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
 type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global forward.6 size 31 align 1 bytes 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global forward.7 size 31 align 1 bytes 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global (null).anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn forward.twice(%0: ptr) -> i64 {
 b0:

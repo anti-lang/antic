@@ -590,7 +590,7 @@ static void records_slots(void)
               "anti.rt.Slots { @main.Named.descriptor, i64 18, "
               "@anti.rt.slots.1 } }\n"
               "global (null).anti_rt_slots anti.rt.SlotTable { i64 2, "
-              "@anti.rt.slots.list }\n");
+              "@anti.rt.slots.list, i64 0 }\n");
     text_free(&errors);
     text_free(&out);
     text_free(&source);
@@ -697,18 +697,19 @@ static void writes_trampolines(void)
                   "{ i64 0, ptr 0 }\n");
 }
 
-/* A call through reflection may reach any slot of any interface, so every
-   slot of every abstract class counts as reached. */
-static void call_reaches_every_slot(void)
+/* DESIGN: a call through reflection may reach any slot of any interface,
+   because it takes the slot at run time. The bitmaps hold the slots the
+   program's own calls reach, and the flag `reflect` of the table says
+   that reflection may reach the rest. The loader then fills such a slot
+   with a stub rather than refusing the library. */
+static void reflection_marks_the_table(void)
 {
-    reflect_calls(true, true, "global anti.rt.slots.",
-                  "global anti.rt.slots.0 size 3 align 1 bytes fe ff 07\n"
-                  "global anti.rt.slots.1 size 3 align 1 bytes fe ff 03\n"
-                  "global anti.rt.slots.list [2]anti.rt.Slots { "
-                  "anti.rt.Slots { @main.Shape.descriptor, i64 19, "
-                  "@anti.rt.slots.0 }, "
-                  "anti.rt.Slots { @main.Named.descriptor, i64 18, "
-                  "@anti.rt.slots.1 } }\n");
+    reflect_calls(true, true, "global (null).anti_rt_slots",
+                  "global (null).anti_rt_slots anti.rt.SlotTable { i64 0, "
+                  "ptr 0, i64 1 }\n");
+    reflect_calls(false, true, "global (null).anti_rt_slots",
+                  "global (null).anti_rt_slots anti.rt.SlotTable { i64 0, "
+                  "ptr 0, i64 0 }\n");
 }
 
 void test_whole(void)
@@ -720,5 +721,5 @@ void test_whole(void)
     checks_singletons();
     records_slots();
     writes_trampolines();
-    call_reaches_every_slot();
+    reflection_marks_the_table();
 }

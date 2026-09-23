@@ -147,10 +147,209 @@ static const struct anti_provides *entry_of(const struct anti_plugin *p,
     return NULL;
 }
 
-/* An object of the class of the entry, as a pointer to its interface
-   sub-object. */
-static void *build(const struct anti_provides *e)
+/* The version checks of "Versions" in docs/anti-language-additions.md.
+   Each runs per provided interface, at load, and compiles nothing. */
+
+/* The next dotted part of a version, and the rest after it. A part that
+   is no number counts as zero, and a missing part as zero as well. */
+static int64_t version_part(const unsigned char **at, int64_t *left)
 {
+    int64_t value = 0;
+
+    while (*left > 0 && **at >= '0' && **at <= '9') {
+        value = value * 10 + (**at - '0');
+        (*at)++;
+        (*left)--;
+    }
+    while (*left > 0 && **at != '.') {
+        (*at)++;
+        (*left)--;
+    }
+    if (*left > 0) {
+        (*at)++;
+        (*left)--;
+    }
+    return value;
+}
+
+/* Whether version a is below version b, part by part. */
+static int version_below(const unsigned char *a, int64_t a_length,
+                         const unsigned char *b, int64_t b_length)
+{
+    int i;
+
+    for (i = 0; i < 8; i++) {
+        int64_t one = version_part(&a, &a_length);
+        int64_t two = version_part(&b, &b_length);
+        if (one != two) {
+            return one < two;
+        }
+        if (a_length <= 0 && b_length <= 0) {
+            break;
+        }
+    }
+    return 0;
+}
+
+/* The bitmap of the slots the program's calls reach through d, or NULL
+   where they reach none. */
+static const struct anti_slots *slots_of(const struct anti_descriptor *d)
+{
+    int64_t i;
+
+    for (i = 0; i < anti_rt_slots.count; i++) {
+        if (anti_rt_slots.interfaces[i].descriptor == d) {
+            return &anti_rt_slots.interfaces[i];
+        }
+    }
+    return NULL;
+}
+
+/* The name of the function at the slot of d, or `slot N`. */
+static const char *function_at(const struct anti_descriptor *d, int64_t slot,
+                               char *out, size_t size)
+{
+    int64_t i;
+
+    for (i = 0; i < d->function_count; i++) {
+        if (d->functions[i].slot == slot) {
+            snprintf(out, size, "%.*s", (int)d->functions[i].name_length,
+                     d->functions[i].name);
+            return out;
+        }
+    }
+    snprintf(out, size, "slot %lld", (long long)slot);
+    return out;
+}
+
+/* DESIGN: the three checks of one provided interface. The plugin's hash
+   stands in the program's chain. No field was added between the two
+   versions. Every slot the program reaches by a call is in the plugin's
+   table. A newer plugin in an older program passes by the same rules,
+   since the two chains agree wherever both of them reach. */
+static int checked(const char *name, const struct anti_provides *e)
+{
+    const struct anti_descriptor *d = e->descriptor;
+    const struct anti_versions *v = d != NULL ? d->versions : NULL;
+    const struct anti_slots *reached;
+    int64_t entries = e->chain_length - 1;
+    int64_t at;
+
+    if (v == NULL || v->chain_length < 1 || e->chain_length < 1) {
+        fail("%s provides `%.*s`, and this program carries no version of "
+             "it", name, (int)e->path_length, e->path);
+        return 0;
+    }
+    at = v->chain_length < e->chain_length ? v->chain_length : e->chain_length;
+    if (v->chain[at - 1] != e->chain[at - 1]) {
+        fail("`%.*s` of %s is not the interface this program carries",
+             (int)e->path_length, e->path, name);
+        return 0;
+    }
+    if (v->floor != NULL &&
+        version_below(e->built, e->built_length, v->floor, v->floor_length)) {
+        fail("%s was built for `%.*s` %.*s, and this program takes %.*s and "
+             "above", name, (int)e->path_length, e->path,
+             (int)e->built_length, e->built, (int)v->floor_length, v->floor);
+        return 0;
+    }
+    if (e->fields != d->field_count || e->size != d->size) {
+        fail("a field was added to `%.*s` after %s was built",
+             (int)e->path_length, e->path, name);
+        return 0;
+    }
+    reached = slots_of(d);
+    for (at = entries + 1; reached != NULL && at < reached->slot_count;
+         at++) {
+        char found[128];
+        if ((reached->bits[at / 8] & (1u << (at % 8))) == 0) {
+            continue;
+        }
+        fail("this program calls `%s` of `%.*s`, and %s carries no such "
+             "function", function_at(d, at, found, sizeof found),
+             (int)e->path_length, e->path, name);
+        return 0;
+    }
+    return 1;
+}
+
+/* DESIGN: a slot that `reflect.call` alone may reach and the library
+   does not carry is filled with a stub. The loader writes a table of
+   its own for the sub-object, with the library's entries and the stub
+   in the rest. The stub reads that table back through the object it was
+   called with, so one function serves every load. */
+struct anti_stubbed {
+    uint64_t magic;
+    const struct anti_provides *entry;
+    int64_t filled;             /* the library's entries are copied in */
+};
+
+#define ANTI_STUBBED_MAGIC 0x616e746973747562ULL
+
+static void stub(struct anti_object *self)
+{
+    const struct anti_stubbed *head =
+        self != NULL && self->table != NULL
+            ? (const struct anti_stubbed *)(const void *)self->table - 1
+            : NULL;
+
+    fflush(stdout);
+    if (head != NULL && head->magic == ANTI_STUBBED_MAGIC) {
+        const struct anti_descriptor *c = head->entry->class_of;
+        fprintf(stderr, "anti: `%.*s` %.*s carries no such function of "
+                "`%.*s`\n", (int)c->name_length, c->name,
+                (int)c->version_length, c->version,
+                (int)head->entry->path_length, head->entry->path);
+    } else {
+        fputs("anti: a library carries no such function of its "
+              "interface\n", stderr);
+    }
+    abort();
+}
+
+/* The table of the sub-object an object of the entry gets, with a stub
+   in every slot the library lacks. NULL where the library carries every
+   slot the program may reach. */
+static const void **stubs_of(const struct anti_provides *e)
+{
+    const struct anti_descriptor *d = e->descriptor;
+    int64_t entries = e->chain_length - 1;
+    struct anti_stubbed *head;
+    const void **table;
+    int64_t i;
+
+    if (anti_rt_slots.reflect == 0 || d->function_count <= entries) {
+        return NULL;
+    }
+    head = calloc(1, sizeof *head +
+                         (size_t)(d->function_count + 1) * sizeof(void *));
+    if (head == NULL) {
+        return NULL;
+    }
+    head->magic = ANTI_STUBBED_MAGIC;
+    head->entry = e;
+    table = (const void **)(head + 1);
+    for (i = entries + 1; i <= d->function_count; i++) {
+        union {
+            void (*from)(struct anti_object *);
+            const void *to;
+        } cast;
+        cast.from = stub;
+        table[i] = cast.to;
+    }
+    return table;
+}
+
+/* An object of the class of the entry, as a pointer to its interface
+   sub-object. The table of that sub-object is the loader's where the
+   library lacks a slot the program may reach through reflection. */
+static void *build(const struct anti_plugin *p,
+                   const struct anti_provides *e)
+{
+    const void **table = p->stubbed != NULL
+                             ? p->stubbed[e - p->table->entries]
+                             : NULL;
+    struct anti_object *sub;
     void *object;
 
     if ((e->flags & (ANTI_CLASS_ARGS | ANTI_CLASS_REQUIRED)) != 0) {
@@ -164,7 +363,20 @@ static void *build(const struct anti_provides *e)
         return NULL;
     }
     e->init(object);
-    return (unsigned char *)object + e->offset;
+    sub = (struct anti_object *)(void *)((unsigned char *)object + e->offset);
+    if (table != NULL) {
+        struct anti_stubbed *head = (struct anti_stubbed *)(void *)table - 1;
+        int64_t i;
+        if (head->filled == 0) {
+            for (i = 0; i < e->chain_length; i++) {
+                table[i] = (const void *)sub->table[i];
+            }
+            head->filled = 1;
+        }
+        sub->table = (const struct anti_descriptor *const *)(const void *)
+                         table;
+    }
+    return sub;
 }
 
 void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
@@ -235,6 +447,27 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
                  "it provides", name, (int)e->path_length, e->path);
             return NULL;
         }
+        if (!checked(name, e)) {
+            close_library(handle);
+            return NULL;
+        }
+    }
+    p->stubbed = NULL;
+    for (i = 0; i < table->count; i++) {
+        const void **one = stubs_of(&table->entries[i]);
+        if (one == NULL) {
+            continue;
+        }
+        if (p->stubbed == NULL) {
+            p->stubbed = calloc((size_t)table->count, sizeof *p->stubbed);
+            if (p->stubbed == NULL) {
+                free((struct anti_stubbed *)(void *)one - 1);
+                close_library(handle);
+                fail("out of memory");
+                return NULL;
+            }
+        }
+        p->stubbed[i] = one;
     }
     p->handle = handle;
     p->base = base;
@@ -262,7 +495,7 @@ void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d)
         fail("the library provides no `%.*s`", (int)d->name_length, d->name);
         return NULL;
     }
-    return build(e);
+    return build(p, e);
 }
 
 int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
@@ -296,6 +529,7 @@ int8_t anti_rt_plugin_unload(void *handle)
 {
     struct anti_plugin *p = slot_of(handle);
     int64_t live;
+    int64_t i;
 
     message[0] = '\0';
     if (p == NULL) {
@@ -307,6 +541,14 @@ int8_t anti_rt_plugin_unload(void *handle)
         fail("%lld object%s of the library %s alive", (long long)live,
              live == 1 ? "" : "s", live == 1 ? "is" : "are");
         return 0;
+    }
+    if (p->stubbed != NULL) {
+        for (i = 0; i < p->table->count; i++) {
+            if (p->stubbed[i] != NULL) {
+                free((struct anti_stubbed *)(void *)p->stubbed[i] - 1);
+            }
+        }
+        free(p->stubbed);
     }
     close_library(p->handle);
     memset(p, 0, sizeof *p);
@@ -526,5 +768,5 @@ void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,
         anti_rt_plugin_unload(handle);
         return NULL;
     }
-    return build(e);
+    return build(p, e);
 }

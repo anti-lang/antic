@@ -1,5 +1,8 @@
+type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
+type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
 type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
+global (null).anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn unused.used() -> i64 {
 b0:

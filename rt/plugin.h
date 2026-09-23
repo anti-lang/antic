@@ -26,7 +26,38 @@ struct anti_provides {
     void (*init)(void *object);
     int64_t offset;
     int64_t flags;              /* of the class, as the registry counts */
+    /* DESIGN: what the interface looked like where the library was
+       built, copied into the library's own image. The descriptor above
+       is the host's once the library is bound against it. The two
+       versions are then these numbers against that descriptor's. */
+    const int64_t *chain;       /* one hash per prefix of its table */
+    int64_t chain_length;
+    int64_t fields;             /* the fields the interface declared */
+    int64_t size;               /* the bytes an object of it took */
+    const unsigned char *built; /* the version of the interface's package */
+    int64_t built_length;
 };
+
+/* The slots of one abstract class that the calls of the program reach,
+   bit k of byte k / 8 for slot k. */
+struct anti_slots {
+    const struct anti_descriptor *descriptor;
+    int64_t slot_count;         /* the highest slot reached, plus one */
+    const unsigned char *bits;
+};
+
+/* DESIGN: the pass over the whole program writes anti_rt_slots into a
+   program that loads a library or injects an interface. The table is
+   empty where its calls reach no slot at all. reflect says that the
+   program calls through `reflect.call`, which takes a slot at run time
+   and may therefore reach any of them. */
+struct anti_slot_table {
+    int64_t count;
+    const struct anti_slots *interfaces;
+    int64_t reflect;
+};
+
+extern const struct anti_slot_table anti_rt_slots;
 
 /* The table a plugin exports as `anti_rt_provides`, with the version of
    the runtime it was built against and the classes it brings. */
@@ -54,6 +85,10 @@ struct anti_plugin {
     const void *base;           /* the image the library was mapped at */
     const struct anti_provided *table;
     struct anti_registry classes;
+    /* One table per entry, or NULL. The loader writes one where the
+       program may reach a slot through `reflect.call` that the library
+       does not carry, and fills that slot with a stub. */
+    const void ***stubbed;
     int64_t live;
     int64_t used;
 };
