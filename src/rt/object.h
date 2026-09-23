@@ -171,7 +171,7 @@ enum anti_entry {
    the nine hooks. That holds for the table of every allocator and of the
    sub-object of an interface. The runtime calls them there, as a call through a
    `*Allocator` does. src/std/anti/mem.anti keeps the order. */
-#define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+#define ANTI_ENTRY_ALLOC ((int)ANTI_ENTRY_HOOK + (int)ANTI_HOOK_COUNT)
 #define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
 
 /* DESIGN: the nine hooks of anti.lang.Object, in the order of
@@ -193,9 +193,12 @@ enum anti_hook {
 
 /* The entry of the hook h in the table of a class. The second gives its
    entry in the table of an anti.lang.TraceHandler, which declares the
-   same nine again with the object after `self`. */
-#define ANTI_ENTRY_OF_HOOK(h) (ANTI_ENTRY_HOOK + (h))
-#define ANTI_ENTRY_OF_HANDLER(h) (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT + (h))
+   same nine again with the object after `self`. The two enumerations are
+   added as int, since -Wconversion of the host build of a runtime refuses
+   arithmetic between them. */
+#define ANTI_ENTRY_OF_HOOK(h) ((int)ANTI_ENTRY_HOOK + (h))
+#define ANTI_ENTRY_OF_HANDLER(h) \
+    ((int)ANTI_ENTRY_HOOK + (int)ANTI_HOOK_COUNT + (h))
 
 /* Every object starts with the address of its table, and entry 0 of a
    table is the descriptor of its class. */
