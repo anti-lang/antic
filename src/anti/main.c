@@ -212,10 +212,455 @@ static bool default_runtime(struct text *out)
     return runtime_archive(out);
 }
 
-int main(int argc, char **argv)
+/* The paths of every file in found, as sources of a command. The array
+   points into found, which outlives it. */
+static const char **sources_of(const struct file_list *found)
 {
+    const char **sources = malloc((found->count + 1) * sizeof *sources);
+    size_t i;
+
+    if (sources == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < found->count; i++) {
+        sources[i] = text_cstr(&found->items[i]);
+    }
+    return sources;
+}
+
+/* `anti build` and `anti run`. */
+static int build_command(int argc, char **argv)
+{
+    struct build_request request;
+    struct text home = {0};
+    int status;
     int i;
 
+    memset(&request, 0, sizeof request);
+    request.root = ".";
+    request.run = strcmp(argv[1], "run") == 0;
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--release") == 0) {
+            request.release = true;
+        } else if (strcmp(argv[i], "--offline") == 0) {
+            request.offline = true;
+        } else if (strcmp(argv[i], "--strip-docs") == 0) {
+            request.strip_docs = true;
+        } else if (strcmp(argv[i], "--bundle-runtime") == 0) {
+            request.bundle_runtime = true;
+        } else if (strcmp(argv[i], "--soname") == 0) {
+            request.soname = true;
+        } else if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
+            request.target = argv[++i];
+        } else if (strcmp(argv[i], "--cpu") == 0 && i + 1 < argc) {
+            request.cpu = argv[++i];
+        } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+            request.runtime = argv[++i];
+        } else if (strcmp(argv[i], "--llvm-mc") == 0 && i + 1 < argc) {
+            request.llvm_mc = argv[++i];
+        } else if (strcmp(argv[i], "--llvm-ar") == 0 && i + 1 < argc) {
+            request.llvm_ar = argv[++i];
+        } else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
+            i++;
+            if (strcmp(argv[i], "static") == 0) {
+                request.lib = BUILD_LIB_STATIC;
+            } else if (strcmp(argv[i], "shared") == 0) {
+                request.lib = BUILD_LIB_SHARED;
+            } else {
+                return usage(stderr);
+            }
+        } else {
+            return usage(stderr);
+        }
+    }
+    if (request.runtime == NULL && default_runtime(&home)) {
+        request.runtime = text_cstr(&home);
+    }
+    status = build_run(&request);
+    text_free(&home);
+    return status;
+}
+
+/* `anti check`. */
+static int check_command(int argc, char **argv)
+{
+    const char **sources = malloc((size_t)argc * sizeof *sources);
+    const char **roots = malloc((size_t)argc * sizeof *roots);
+    const char *work = "build/check";
+    const char *runtime = NULL;
+    struct text home = {0};
+    size_t count = 0;
+    size_t root_count = 0;
+    bool undocumented = false;
+    bool all_targets = false;
+    int status;
+    int i;
+
+    if (sources == NULL || roots == NULL) {
+        fputs("anti: out of memory\n", stderr);
+        status = 70;
+        goto done;
+    }
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--warn-undocumented") == 0) {
+            undocumented = true;
+        } else if (strcmp(argv[i], "--targets") == 0 && i + 1 < argc &&
+                   strcmp(argv[i + 1], "all") == 0) {
+            all_targets = true;
+            i++;
+        } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
+            work = argv[++i];
+        } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+            runtime = argv[++i];
+        } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
+            roots[root_count++] = argv[++i];
+        } else if (argv[i][0] == '-') {
+            status = usage(stderr);
+            goto done;
+        } else {
+            sources[count++] = argv[i];
+        }
+    }
+    if (runtime == NULL && default_runtime(&home)) {
+        runtime = text_cstr(&home);
+    }
+    status = check_run(sources, count, roots, root_count, work, runtime,
+                       undocumented, all_targets);
+
+done:
+    free((void *)sources);
+    free((void *)roots);
+    text_free(&home);
+    return status;
+}
+
+/* `anti doc`. */
+static int doc_command(int argc, char **argv)
+{
+    const char **sources = malloc((size_t)argc * sizeof *sources);
+    const char **roots = malloc((size_t)argc * sizeof *roots);
+    const char **listed = NULL;
+    struct file_list found = {0};
+    struct text src = {0};
+    struct text test = {0};
+    struct text package = {0};
+    struct text home = {0};
+    const char *out = "build/doc";
+    const char *work = "build/doc-work";
+    const char *runtime = NULL;
+    size_t count = 0;
+    size_t root_count = 0;
+    enum doc_form form = DOC_HTML;
+    bool dev = false;
+    bool private_items = false;
+    int status;
+    int i;
+
+    if (sources == NULL || roots == NULL) {
+        fputs("anti: out of memory\n", stderr);
+        status = 70;
+        goto done;
+    }
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--dev") == 0) {
+            dev = true;
+        } else if (strcmp(argv[i], "--private") == 0) {
+            private_items = true;
+        } else if (strcmp(argv[i], "--markdown") == 0) {
+            form = DOC_MARKDOWN;
+        } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            out = argv[++i];
+        } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
+            work = argv[++i];
+        } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+            runtime = argv[++i];
+        } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
+            roots[root_count++] = argv[++i];
+        } else if (argv[i][0] == '-') {
+            status = usage(stderr);
+            goto done;
+        } else {
+            sources[count++] = argv[i];
+        }
+    }
+    if (runtime == NULL && default_runtime(&home)) {
+        runtime = text_cstr(&home);
+    }
+    /* DESIGN: without a file the command takes the source directory of
+       `[layout]`, as `anti check` and `anti fmt` do, so the three read the
+       same files. The test directory holds no module a reader of the
+       library documents. */
+    if (count == 0) {
+        if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
+            !list_tree(text_cstr(&src), SOURCE_SUFFIX, &found)) {
+            status = 1;
+            goto done;
+        }
+        listed = sources_of(&found);
+        if (listed == NULL) {
+            fputs("anti: out of memory\n", stderr);
+            status = 70;
+            goto done;
+        }
+        count = found.count;
+        if (root_count == 0) {
+            roots[root_count++] = text_cstr(&src);
+        }
+    }
+    status = doc_run(listed != NULL ? listed : sources, count, roots,
+                     root_count, out, work, runtime, form, dev,
+                     private_items);
+
+done:
+    free((void *)sources);
+    free((void *)roots);
+    free((void *)listed);
+    file_list_free(&found);
+    text_free(&src);
+    text_free(&test);
+    text_free(&package);
+    text_free(&home);
+    return status;
+}
+
+/* `anti fmt`. */
+static int fmt_command(int argc, char **argv)
+{
+    const char **sources = malloc((size_t)argc * sizeof *sources);
+    const char **listed = NULL;
+    struct file_list found = {0};
+    struct text src = {0};
+    struct text test = {0};
+    struct text package = {0};
+    size_t count = 0;
+    bool check = false;
+    int status;
+    int i;
+
+    if (sources == NULL) {
+        fputs("anti: out of memory\n", stderr);
+        status = 70;
+        goto done;
+    }
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--check") == 0) {
+            check = true;
+        } else if (argv[i][0] == '-') {
+            status = usage(stderr);
+            goto done;
+        } else {
+            sources[count++] = argv[i];
+        }
+    }
+    /* DESIGN: without a file the command takes the source and the test
+       directory of `[layout]`, as `anti check` does, so that the two read
+       the same files. */
+    if (count == 0) {
+        if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
+            !list_tree(text_cstr(&src), SOURCE_SUFFIX, &found) ||
+            !list_tree(text_cstr(&test), SOURCE_SUFFIX, &found)) {
+            status = 1;
+            goto done;
+        }
+        listed = sources_of(&found);
+        if (listed == NULL) {
+            fputs("anti: out of memory\n", stderr);
+            status = 70;
+            goto done;
+        }
+        count = found.count;
+    }
+    status = fmt_run(listed != NULL ? listed : sources, count, check);
+
+done:
+    free((void *)sources);
+    free((void *)listed);
+    file_list_free(&found);
+    text_free(&src);
+    text_free(&test);
+    text_free(&package);
+    return status;
+}
+
+/* `anti test`. */
+static int test_command(int argc, char **argv)
+{
+    const char **sources = malloc((size_t)argc * sizeof *sources);
+    const char **roots = malloc((size_t)argc * sizeof *roots);
+    const char *work = "build/tests";
+    const char *runtime = NULL;
+    const char *llvm_mc = NULL;
+    struct manifest_inject inject = {0};
+    struct text home = {0};
+    size_t count = 0;
+    size_t root_count = 0;
+    bool release = false;
+    int status;
+    int i;
+
+    if (sources == NULL || roots == NULL) {
+        fputs("anti: out of memory\n", stderr);
+        status = 70;
+        goto done;
+    }
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--release") == 0) {
+            release = true;
+        } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
+            work = argv[++i];
+        } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+            runtime = argv[++i];
+        } else if (strcmp(argv[i], "--llvm-mc") == 0 && i + 1 < argc) {
+            llvm_mc = argv[++i];
+        } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
+            roots[root_count++] = argv[++i];
+        } else if (argv[i][0] == '-') {
+            status = usage(stderr);
+            goto done;
+        } else {
+            sources[count++] = argv[i];
+        }
+    }
+    /* The runtime archive lies beside bin/, as sdk import finds it. */
+    if (runtime == NULL && default_runtime(&home)) {
+        runtime = text_cstr(&home);
+    }
+    /* DESIGN: the manifest is `anti.toml` of the project root, and
+       `anti test` runs there. A project without one injects nothing,
+       which is no error. */
+    if (!manifest_inject_read(MANIFEST_FILE, true, &inject)) {
+        status = 1;
+        goto done;
+    }
+    status = test_run(sources, count, roots, root_count, work, runtime,
+                      llvm_mc, release, inject.entries, inject.count);
+
+done:
+    manifest_inject_free(&inject);
+    free((void *)sources);
+    free((void *)roots);
+    text_free(&home);
+    return status;
+}
+
+/* `anti bind`, of an API description, of a C header with --clang, or of
+   the header of a library file with --header. */
+static int bind_command(int argc, char **argv)
+{
+    const char **roots = malloc((size_t)argc * sizeof *roots);
+    const char **defines = malloc((size_t)argc * sizeof *defines);
+    const char *header = NULL;
+    struct bind_request request;
+    struct text home = {0};
+    size_t root_count = 0;
+    int status;
+    int i;
+
+    memset(&request, 0, sizeof request);
+    if (roots == NULL || defines == NULL) {
+        fputs("anti: out of memory\n", stderr);
+        status = 70;
+        goto done;
+    }
+    request.out_dir = ".";
+    request.includes = roots;
+    request.defines = defines;
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--header") == 0 && i + 1 < argc) {
+            header = argv[++i];
+        } else if (strcmp(argv[i], "--clang") == 0 && i + 1 < argc) {
+            request.clang = true;
+            request.input = argv[++i];
+        } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            request.out_dir = argv[++i];
+        } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+            request.runtime = argv[++i];
+        } else if (strcmp(argv[i], "--module") == 0 && i + 1 < argc) {
+            request.module = argv[++i];
+        } else if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
+            request.target = argv[++i];
+        } else if (strcmp(argv[i], "--probe") == 0) {
+            request.probe = true;
+        } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
+            roots[root_count++] = argv[++i];
+        } else if (strcmp(argv[i], "-D") == 0 && i + 1 < argc) {
+            defines[request.define_count++] = argv[++i];
+        } else if (argv[i][0] != '-' && request.input == NULL) {
+            request.input = argv[i];
+        } else {
+            status = usage(stderr);
+            goto done;
+        }
+    }
+    if ((header == NULL) == (request.input == NULL)) {
+        status = usage(stderr);
+        goto done;
+    }
+    if (request.runtime == NULL && default_runtime(&home)) {
+        request.runtime = text_cstr(&home);
+    }
+    if (header != NULL) {
+        status = bind_header(header, request.out_dir, request.runtime, roots,
+                             root_count);
+    } else {
+        request.include_count = root_count;
+        status = bind_run(&request);
+    }
+
+done:
+    free((void *)roots);
+    free((void *)defines);
+    text_free(&home);
+    return status;
+}
+
+/* `anti sdk export` and `anti sdk import`. */
+static int sdk_command(int argc, char **argv)
+{
+    struct text sysroot = {0};
+    const char *sdk = NULL;
+    const char *out = ".";
+    int status;
+    int i;
+
+    if (strcmp(argv[2], "export") == 0) {
+        for (i = 3; i < argc; i++) {
+            if (strcmp(argv[i], "--sdk") == 0 && i + 1 < argc) {
+                sdk = argv[++i];
+            } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+                out = argv[++i];
+            } else {
+                return usage(stderr);
+            }
+        }
+        return sdk_export(sdk, out);
+    }
+    if (strcmp(argv[2], "import") != 0 || argc < 4) {
+        return usage(stderr);
+    }
+    for (i = 4; i < argc; i++) {
+        if (strcmp(argv[i], "--sysroot") == 0 && i + 1 < argc) {
+            text_append(&sysroot, argv[++i]);
+        } else {
+            status = usage(stderr);
+            goto done;
+        }
+    }
+    if (sysroot.length == 0 && !default_sysroot(&sysroot)) {
+        fputs("anti: the system does not say where anti is, so pass "
+              "--sysroot\n", stderr);
+        status = 1;
+        goto done;
+    }
+    status = sdk_import(argv[3], text_cstr(&sysroot));
+
+done:
+    text_free(&sysroot);
+    return status;
+}
+
+int main(int argc, char **argv)
+{
     if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
         return usage(stdout);
     }
@@ -234,403 +679,28 @@ int main(int argc, char **argv)
     }
     if (argc >= 2 && (strcmp(argv[1], "build") == 0 ||
                       strcmp(argv[1], "run") == 0)) {
-        struct build_request request;
-        struct text home = {0};
-        int status;
-        memset(&request, 0, sizeof request);
-        request.root = ".";
-        request.run = strcmp(argv[1], "run") == 0;
-        for (i = 2; i < argc; i++) {
-            if (strcmp(argv[i], "--release") == 0) {
-                request.release = true;
-            } else if (strcmp(argv[i], "--offline") == 0) {
-                request.offline = true;
-            } else if (strcmp(argv[i], "--strip-docs") == 0) {
-                request.strip_docs = true;
-            } else if (strcmp(argv[i], "--bundle-runtime") == 0) {
-                request.bundle_runtime = true;
-            } else if (strcmp(argv[i], "--soname") == 0) {
-                request.soname = true;
-            } else if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
-                request.target = argv[++i];
-            } else if (strcmp(argv[i], "--cpu") == 0 && i + 1 < argc) {
-                request.cpu = argv[++i];
-            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
-                request.runtime = argv[++i];
-            } else if (strcmp(argv[i], "--llvm-mc") == 0 && i + 1 < argc) {
-                request.llvm_mc = argv[++i];
-            } else if (strcmp(argv[i], "--llvm-ar") == 0 && i + 1 < argc) {
-                request.llvm_ar = argv[++i];
-            } else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
-                i++;
-                if (strcmp(argv[i], "static") == 0) {
-                    request.lib = BUILD_LIB_STATIC;
-                } else if (strcmp(argv[i], "shared") == 0) {
-                    request.lib = BUILD_LIB_SHARED;
-                } else {
-                    return usage(stderr);
-                }
-            } else {
-                return usage(stderr);
-            }
-        }
-        if (request.runtime == NULL && default_runtime(&home)) {
-            request.runtime = text_cstr(&home);
-        }
-        status = build_run(&request);
-        text_free(&home);
-        return status;
+        return build_command(argc, argv);
     }
     if (argc >= 2 && strcmp(argv[1], "check") == 0) {
-        const char **sources = malloc((size_t)argc * sizeof *sources);
-        const char **roots = malloc((size_t)argc * sizeof *roots);
-        const char *work = "build/check";
-        const char *runtime = NULL;
-        struct text home = {0};
-        size_t count = 0;
-        size_t root_count = 0;
-        bool undocumented = false;
-        bool all_targets = false;
-        int status;
-        if (sources == NULL || roots == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            return 70;
-        }
-        for (i = 2; i < argc; i++) {
-            if (strcmp(argv[i], "--warn-undocumented") == 0) {
-                undocumented = true;
-            } else if (strcmp(argv[i], "--targets") == 0 && i + 1 < argc &&
-                       strcmp(argv[i + 1], "all") == 0) {
-                all_targets = true;
-                i++;
-            } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
-                work = argv[++i];
-            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
-                runtime = argv[++i];
-            } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
-                roots[root_count++] = argv[++i];
-            } else if (argv[i][0] == '-') {
-                free((void *)sources);
-                free((void *)roots);
-                return usage(stderr);
-            } else {
-                sources[count++] = argv[i];
-            }
-        }
-        if (runtime == NULL && default_runtime(&home)) {
-            runtime = text_cstr(&home);
-        }
-        status = check_run(sources, count, roots, root_count, work, runtime,
-                           undocumented, all_targets);
-        free((void *)sources);
-        free((void *)roots);
-        text_free(&home);
-        return status;
+        return check_command(argc, argv);
     }
     if (argc >= 2 && strcmp(argv[1], "doc") == 0) {
-        const char **sources = malloc((size_t)argc * sizeof *sources);
-        const char **roots = malloc((size_t)argc * sizeof *roots);
-        struct file_list found = {0};
-        struct text src = {0};
-        struct text test = {0};
-        struct text package = {0};
-        struct text home = {0};
-        const char *out = "build/doc";
-        const char *work = "build/doc-work";
-        const char *runtime = NULL;
-        size_t count = 0;
-        size_t root_count = 0;
-        enum doc_form form = DOC_HTML;
-        bool dev = false;
-        bool private_items = false;
-        int status;
-        if (sources == NULL || roots == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            return 70;
-        }
-        for (i = 2; i < argc; i++) {
-            if (strcmp(argv[i], "--dev") == 0) {
-                dev = true;
-            } else if (strcmp(argv[i], "--private") == 0) {
-                private_items = true;
-            } else if (strcmp(argv[i], "--markdown") == 0) {
-                form = DOC_MARKDOWN;
-            } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
-                out = argv[++i];
-            } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
-                work = argv[++i];
-            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
-                runtime = argv[++i];
-            } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
-                roots[root_count++] = argv[++i];
-            } else if (argv[i][0] == '-') {
-                free((void *)sources);
-                free((void *)roots);
-                return usage(stderr);
-            } else {
-                sources[count++] = argv[i];
-            }
-        }
-        if (runtime == NULL && default_runtime(&home)) {
-            runtime = text_cstr(&home);
-        }
-        /* DESIGN: without a file the command takes the source directory
-           of `[layout]`, as `anti check` and `anti fmt` do, so the three
-           read the same files. The test directory holds no module a
-           reader of the library documents. */
-        if (count == 0) {
-            size_t j;
-            if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
-                !list_tree(text_cstr(&src), SOURCE_SUFFIX, &found)) {
-                free((void *)sources);
-                file_list_free(&found);
-                text_free(&src);
-                text_free(&test);
-                text_free(&package);
-                text_free(&home);
-                free((void *)roots);
-                return 1;
-            }
-            free((void *)sources);
-            sources = malloc((found.count + 1) * sizeof *sources);
-            if (sources == NULL) {
-                fputs("anti: out of memory\n", stderr);
-                return 70;
-            }
-            for (j = 0; j < found.count; j++) {
-                sources[j] = text_cstr(&found.items[j]);
-            }
-            count = found.count;
-            if (root_count == 0) {
-                roots[root_count++] = text_cstr(&src);
-            }
-        }
-        status = doc_run(sources, count, roots, root_count, out, work,
-                         runtime, form, dev, private_items);
-        free((void *)sources);
-        free((void *)roots);
-        file_list_free(&found);
-        text_free(&src);
-        text_free(&test);
-        text_free(&package);
-        text_free(&home);
-        return status;
+        return doc_command(argc, argv);
     }
     if (argc >= 2 && strcmp(argv[1], "fmt") == 0) {
-        const char **sources = malloc((size_t)argc * sizeof *sources);
-        struct file_list found = {0};
-        struct text src = {0};
-        struct text test = {0};
-        struct text package = {0};
-        size_t count = 0;
-        bool check = false;
-        int status;
-        if (sources == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            return 70;
-        }
-        for (i = 2; i < argc; i++) {
-            if (strcmp(argv[i], "--check") == 0) {
-                check = true;
-            } else if (argv[i][0] == '-') {
-                free((void *)sources);
-                return usage(stderr);
-            } else {
-                sources[count++] = argv[i];
-            }
-        }
-        /* DESIGN: without a file the command takes the source and the
-           test directory of `[layout]`, as `anti check` does, so that the
-           two read the same files. */
-        if (count == 0) {
-            if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
-                !list_tree(text_cstr(&src), SOURCE_SUFFIX, &found) ||
-                !list_tree(text_cstr(&test), SOURCE_SUFFIX, &found)) {
-                free((void *)sources);
-                file_list_free(&found);
-                text_free(&src);
-                text_free(&test);
-                text_free(&package);
-                return 1;
-            }
-            free((void *)sources);
-            sources = malloc((found.count + 1) * sizeof *sources);
-            if (sources == NULL) {
-                fputs("anti: out of memory\n", stderr);
-                return 70;
-            }
-            for (count = 0; count < found.count; count++) {
-                sources[count] = text_cstr(&found.items[count]);
-            }
-        }
-        status = fmt_run(sources, count, check);
-        free((void *)sources);
-        file_list_free(&found);
-        text_free(&src);
-        text_free(&test);
-        text_free(&package);
-        return status;
+        return fmt_command(argc, argv);
     }
     if (argc >= 2 && strcmp(argv[1], "test") == 0) {
-        const char **sources = malloc((size_t)argc * sizeof *sources);
-        const char **roots = malloc((size_t)argc * sizeof *roots);
-        const char *work = "build/tests";
-        const char *runtime = NULL;
-        const char *llvm_mc = NULL;
-        struct manifest_inject inject;
-        struct text home = {0};
-        size_t count = 0;
-        size_t root_count = 0;
-        bool release = false;
-        int status;
-        if (sources == NULL || roots == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            return 70;
-        }
-        for (i = 2; i < argc; i++) {
-            if (strcmp(argv[i], "--release") == 0) {
-                release = true;
-            } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
-                work = argv[++i];
-            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
-                runtime = argv[++i];
-            } else if (strcmp(argv[i], "--llvm-mc") == 0 && i + 1 < argc) {
-                llvm_mc = argv[++i];
-            } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
-                roots[root_count++] = argv[++i];
-            } else if (argv[i][0] == '-') {
-                free(sources);
-                free(roots);
-                return usage(stderr);
-            } else {
-                sources[count++] = argv[i];
-            }
-        }
-        /* The runtime archive lies beside bin/, as sdk import finds it. */
-        if (runtime == NULL && default_runtime(&home)) {
-            runtime = text_cstr(&home);
-        }
-        /* DESIGN: the manifest is `anti.toml` of the project root, and
-           `anti test` runs there. A project without one injects
-           nothing, which is no error. */
-        if (!manifest_inject_read(MANIFEST_FILE, true, &inject)) {
-            free(sources);
-            free(roots);
-            text_free(&home);
-            return 1;
-        }
-        status = test_run(sources, count, roots, root_count, work, runtime,
-                          llvm_mc, release, inject.entries, inject.count);
-        manifest_inject_free(&inject);
-        free(sources);
-        free(roots);
-        text_free(&home);
-        return status;
+        return test_command(argc, argv);
     }
     if (argc >= 2 && strcmp(argv[1], "bind") == 0) {
-        const char **roots = malloc((size_t)argc * sizeof *roots);
-        const char **defines = malloc((size_t)argc * sizeof *defines);
-        const char *header = NULL;
-        struct bind_request request;
-        struct text home = {0};
-        size_t root_count = 0;
-        int status;
-        if (roots == NULL || defines == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            return 70;
-        }
-        memset(&request, 0, sizeof request);
-        request.out_dir = ".";
-        request.includes = roots;
-        request.defines = defines;
-        for (i = 2; i < argc; i++) {
-            if (strcmp(argv[i], "--header") == 0 && i + 1 < argc) {
-                header = argv[++i];
-            } else if (strcmp(argv[i], "--clang") == 0 && i + 1 < argc) {
-                request.clang = true;
-                request.input = argv[++i];
-            } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
-                request.out_dir = argv[++i];
-            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
-                request.runtime = argv[++i];
-            } else if (strcmp(argv[i], "--module") == 0 && i + 1 < argc) {
-                request.module = argv[++i];
-            } else if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
-                request.target = argv[++i];
-            } else if (strcmp(argv[i], "--probe") == 0) {
-                request.probe = true;
-            } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
-                roots[root_count++] = argv[++i];
-            } else if (strcmp(argv[i], "-D") == 0 && i + 1 < argc) {
-                defines[request.define_count++] = argv[++i];
-            } else if (argv[i][0] != '-' && request.input == NULL) {
-                request.input = argv[i];
-            } else {
-                free((void *)roots);
-                free((void *)defines);
-                return usage(stderr);
-            }
-        }
-        if ((header == NULL) == (request.input == NULL)) {
-            free((void *)roots);
-            free((void *)defines);
-            return usage(stderr);
-        }
-        if (request.runtime == NULL && default_runtime(&home)) {
-            request.runtime = text_cstr(&home);
-        }
-        if (header != NULL) {
-            status = bind_header(header, request.out_dir, request.runtime,
-                                 roots, root_count);
-        } else {
-            request.include_count = root_count;
-            status = bind_run(&request);
-        }
-        free((void *)roots);
-        free((void *)defines);
-        text_free(&home);
-        return status;
+        return bind_command(argc, argv);
     }
     if (argc >= 3 && strcmp(argv[1], "symbols") == 0) {
         return symbols_command(argc, argv);
     }
-    if (argc < 3 || strcmp(argv[1], "sdk") != 0) {
-        return usage(stderr);
-    }
-    if (strcmp(argv[2], "export") == 0) {
-        const char *sdk = NULL;
-        const char *out = ".";
-        for (i = 3; i < argc; i++) {
-            if (strcmp(argv[i], "--sdk") == 0 && i + 1 < argc) {
-                sdk = argv[++i];
-            } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
-                out = argv[++i];
-            } else {
-                return usage(stderr);
-            }
-        }
-        return sdk_export(sdk, out);
-    }
-    if (strcmp(argv[2], "import") == 0 && argc >= 4) {
-        const char *bundle = argv[3];
-        struct text sysroot = {0};
-        int status;
-        for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "--sysroot") == 0 && i + 1 < argc) {
-                text_append(&sysroot, argv[++i]);
-            } else {
-                text_free(&sysroot);
-                return usage(stderr);
-            }
-        }
-        if (sysroot.length == 0 && !default_sysroot(&sysroot)) {
-            fputs("anti: the system does not say where anti is, so pass "
-                  "--sysroot\n", stderr);
-            return 1;
-        }
-        status = sdk_import(bundle, text_cstr(&sysroot));
-        text_free(&sysroot);
-        return status;
+    if (argc >= 3 && strcmp(argv[1], "sdk") == 0) {
+        return sdk_command(argc, argv);
     }
     return usage(stderr);
 }
