@@ -1515,7 +1515,14 @@ static bool build_notice(const struct options *o, const struct interface *own,
         runtime.license_text = copy;
     }
     list[n++] = &runtime;
+    /* DESIGN: the package of the compiled module is always the last
+       `package` line, even where a library of the same package came
+       first. `anti symbols` reads the version of a binary there. */
     for (i = 0; i < count; i++) {
+        if (own->package.name != NULL &&
+            strcmp(own->package.name, libraries[i]->package.name) == 0) {
+            continue;
+        }
         for (j = 0; j < n; j++) {
             if (strcmp(list[j]->name, libraries[i]->package.name) == 0) {
                 break;

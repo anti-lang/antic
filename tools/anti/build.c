@@ -212,6 +212,12 @@ static void base_options(struct build *b, struct options *o,
     o->llvm_ar = b->r->llvm_ar;
     o->inject = b->m.inject.entries;
     o->inject_count = b->m.inject.count;
+    /* The link writes the version into the notice and into the
+       descriptor of every class of the module it compiles, as a library
+       file of the project carries it. */
+    if (b->m.version.length > 0) {
+        o->package_version = text_cstr(&b->m.version);
+    }
     o->roots = b->roots;
     o->root_count = 1;
     /* DESIGN: dev mode carries the line of every statement and release
@@ -547,6 +553,7 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     size_t count = 0;
     bool ok = false;
 
+    memset(entries, 0, sizeof entries);
     archive_stem(t, deliverable, &stem);
     text_appendf(&debug_name, "%s.debug", text_cstr(&stem));
     text_appendf(&map_name, "%s.map", text_cstr(&stem));

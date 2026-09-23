@@ -14,6 +14,7 @@
 #include "modpath.h"
 #include "sdk.h"
 #include "selfpath.h"
+#include "syms.h"
 #include "userdirs.h"
 #include "test.h"
 #include "text.h"
@@ -46,7 +47,12 @@ static int usage(FILE *out)
           "                 [--module <path>] [--probe] [--target <t>]\n"
           "                 [-I <dir>] [-D <name>[=<value>]] [--runtime <dir>]\n"
           "       anti bind --header <file.antl> [-o <dir>] [-I <dir>]\n"
-          "                 [--runtime <dir>]\n",
+          "                 [--runtime <dir>]\n"
+          "       anti symbols inventory --conf <config.toml> [--from <dir>]\n"
+          "                              [--out <symbols.zip>]\n"
+          "       anti symbols check --conf <config.toml>\n"
+          "                          [--symbols <symbols.zip>]...\n"
+          "       anti symbols resolve <trace.txt> --symbols <symbols.zip>...\n",
           out);
     fputs("\n"
           "new writes a project of the default layout: anti.toml, src/ with\n"
@@ -118,9 +124,68 @@ static int usage(FILE *out)
           "shim. The layout of every struct is antic's, never clang's.\n"
           "bind --header writes <name>.h from the public interface of the\n"
           "library file <name>.antl, the header that antic --lib writes for\n"
-          "the same module.\n",
+          "the same module.\n"
+          "\n"
+          "symbols inventory reads the runtime configuration, finds the\n"
+          "program beside it, the libraries of its `plugins` directories and\n"
+          "those of `[injections]`, and folds the symbols archive of each into\n"
+          "one archive keyed by build id, with an index.toml of module, id,\n"
+          "version and source. --from names the directory of the archives,\n"
+          "which otherwise stand beside each binary. symbols check reports per\n"
+          "module whether its symbols are present, stale or missing, and\n"
+          "exits with 1 unless every one is present. symbols resolve prints a\n"
+          "raw trace with the function and the line of every frame whose\n"
+          "build id an archive holds, and leaves every other frame raw.\n",
           out);
     return out == stdout ? 0 : 2;
+}
+
+/* `anti symbols` and its three commands. */
+static int symbols_command(int argc, char **argv)
+{
+    const char **symbols = calloc((size_t)argc, sizeof *symbols);
+    const char *conf = NULL;
+    const char *from = NULL;
+    const char *out = "symbols.zip";
+    const char *trace = NULL;
+    size_t count = 0;
+    int status;
+    int i;
+
+    if (symbols == NULL) {
+        fputs("anti: out of memory\n", stderr);
+        return 70;
+    }
+    for (i = 3; i < argc; i++) {
+        if (strcmp(argv[i], "--conf") == 0 && i + 1 < argc) {
+            conf = argv[++i];
+        } else if (strcmp(argv[i], "--from") == 0 && i + 1 < argc) {
+            from = argv[++i];
+        } else if (strcmp(argv[i], "--out") == 0 && i + 1 < argc) {
+            out = argv[++i];
+        } else if (strcmp(argv[i], "--symbols") == 0 && i + 1 < argc) {
+            symbols[count++] = argv[++i];
+        } else if (argv[i][0] != '-' && trace == NULL) {
+            trace = argv[i];
+        } else {
+            free((void *)symbols);
+            return usage(stderr);
+        }
+    }
+    if (strcmp(argv[2], "inventory") == 0 && conf != NULL && trace == NULL &&
+        count == 0) {
+        status = syms_inventory(conf, from, out);
+    } else if (strcmp(argv[2], "check") == 0 && conf != NULL &&
+               trace == NULL && from == NULL) {
+        status = syms_check(conf, symbols, count);
+    } else if (strcmp(argv[2], "resolve") == 0 && trace != NULL &&
+               count > 0 && conf == NULL && from == NULL) {
+        status = syms_resolve(trace, symbols, count);
+    } else {
+        status = usage(stderr);
+    }
+    free((void *)symbols);
+    return status;
 }
 
 /* DESIGN: the sysroot of the runtime archive lies beside its lib/, so it
@@ -525,6 +590,9 @@ int main(int argc, char **argv)
         free((void *)defines);
         text_free(&home);
         return status;
+    }
+    if (argc >= 3 && strcmp(argv[1], "symbols") == 0) {
+        return symbols_command(argc, argv);
     }
     if (argc < 3 || strcmp(argv[1], "sdk") != 0) {
         return usage(stderr);

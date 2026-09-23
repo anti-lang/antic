@@ -39,6 +39,10 @@ struct file_list {
    read. */
 bool list_tree(const char *dir, const char *suffix, struct file_list *out);
 
+/* Append the path of every file of dir itself, sorted, as list_tree
+   does without going below it. */
+bool list_dir(const char *dir, struct file_list *out);
+
 void file_list_free(struct file_list *list);
 
 #endif

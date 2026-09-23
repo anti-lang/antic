@@ -1,0 +1,25 @@
+//! A program that prints the raw trace of the calls that lead to `inner`,
+//! which `anti symbols resolve` turns into names and lines.
+
+import anti.io;
+import anti.lang;
+
+/// Print the raw trace of the calls that lead here.
+fn inner(depth: int) -> int
+{
+	let t = lang.StackTrace.capture();
+	defer delete(t);
+	io.println(t.text());
+	return depth;
+}
+
+/// One call more on the trace.
+fn outer(depth: int) -> int
+{
+	return inner(depth + 1) + 1;
+}
+
+fn main() -> int
+{
+	return outer(1) - 3;
+}

@@ -9,10 +9,15 @@
    nothing, so it needs no library and writes the same bytes from one
    input on every host. */
 
-/* One entry of an archive: the name it carries and the file it holds. */
+#include "text.h"
+
+/* One entry of an archive: the name it carries and the file it holds.
+   An entry whose file is NULL holds the size bytes at bytes. */
 struct zip_entry {
     const char *name;
     const char *file;
+    const char *bytes;
+    size_t size;
     bool executable;
 };
 
@@ -21,5 +26,35 @@ struct zip_entry {
    be written. */
 bool zip_write(const char *path, const struct zip_entry *entries,
                size_t count);
+
+/* An archive read whole, with the entries of its central directory. */
+struct zip_archive {
+    struct text bytes;
+    struct zip_item *items;
+    size_t count;
+};
+
+/* One entry of the central directory. The data of the entry stands at
+   offset in bytes, packed as method says. */
+struct zip_item {
+    struct text name;
+    size_t offset;
+    size_t packed;
+    size_t size;
+    unsigned long crc;
+    unsigned method;
+};
+
+/* Read the archive at path. The reader takes the entries that a symbols
+   archive of Anti stores and the ones another tool compressed with
+   deflate, so an archive that a user packed again still opens. Returns
+   false and writes a message when the file is no such archive. */
+bool zip_read(const char *path, struct zip_archive *out);
+
+/* The bytes of the entry at index, unpacked into out. Returns false and
+   writes a message when its data is broken. */
+bool zip_unpack(const struct zip_archive *a, size_t index, struct text *out);
+
+void zip_archive_free(struct zip_archive *a);
 
 #endif

@@ -195,7 +195,8 @@ static int by_path(const void *a, const void *b)
 
 /* One directory of the walk. A name that starts with a dot is left alone,
    so a checkout's own directories are no part of a project. */
-static bool walk(const char *dir, const char *suffix, struct file_list *out)
+static bool walk(const char *dir, const char *suffix, bool deep,
+                 struct file_list *out)
 {
 #if defined(_WIN32)
     WIN32_FIND_DATAA found;
@@ -216,7 +217,9 @@ static bool walk(const char *dir, const char *suffix, struct file_list *out)
         }
         text_appendf(&child, "%s/%s", dir, found.cFileName);
         if (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            ok = walk(text_cstr(&child), suffix, out) && ok;
+            if (deep && !walk(text_cstr(&child), suffix, deep, out)) {
+                ok = false;
+            }
         } else if (ends_with(found.cFileName, suffix)) {
             list_add(out, text_cstr(&child));
         }
@@ -242,7 +245,9 @@ static bool walk(const char *dir, const char *suffix, struct file_list *out)
         if (stat(text_cstr(&child), &st) != 0) {
             ok = false;
         } else if (S_ISDIR(st.st_mode)) {
-            ok = walk(text_cstr(&child), suffix, out) && ok;
+            if (deep && !walk(text_cstr(&child), suffix, deep, out)) {
+                ok = false;
+            }
         } else if (ends_with(entry->d_name, suffix)) {
             list_add(out, text_cstr(&child));
         }
@@ -256,7 +261,19 @@ static bool walk(const char *dir, const char *suffix, struct file_list *out)
 bool list_tree(const char *dir, const char *suffix, struct file_list *out)
 {
     size_t from = out->count;
-    bool ok = walk(dir, suffix, out);
+    bool ok = walk(dir, suffix, true, out);
+
+    if (out->count > from) {
+        qsort(out->items + from, out->count - from, sizeof *out->items,
+              by_path);
+    }
+    return ok;
+}
+
+bool list_dir(const char *dir, struct file_list *out)
+{
+    size_t from = out->count;
+    bool ok = walk(dir, "", false, out);
 
     if (out->count > from) {
         qsort(out->items + from, out->count - from, sizeof *out->items,

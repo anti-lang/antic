@@ -181,6 +181,7 @@ add_executable(anti
     tools/anti/repo.c
     tools/anti/sdk.c
     tools/anti/symmap.c
+    tools/anti/syms.c
     tools/anti/test.c
     tools/anti/units.c
     tools/anti/zip.c
