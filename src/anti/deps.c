@@ -9,6 +9,8 @@
    its digest is checked at every build. */
 #include "deps.h"
 
+#include <inttypes.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,14 +53,24 @@ static bool read_file(const char *path, struct text *out)
     return true;
 }
 
-/* One part of a version, and where the next part starts. */
-static long version_part(const char **p)
+/* The largest part of a version, the one of DEPS_VERSION_DIGITS nines. */
+#define DEPS_VERSION_PART_MAX INT64_C(999999999)
+
+/* One part of a version, and where the next part starts. A part above
+   DEPS_VERSION_PART_MAX reads as one above it, so no digit string
+   overflows and `next_major` adds 1 to a bounded value. */
+static int64_t version_part(const char **p)
 {
-    long value = 0;
+    int64_t value = 0;
 
     while (**p >= '0' && **p <= '9') {
-        value = value * 10 + (**p - '0');
+        if (value <= DEPS_VERSION_PART_MAX) {
+            value = value * 10 + (**p - '0');
+        }
         (*p)++;
+    }
+    if (value > DEPS_VERSION_PART_MAX) {
+        value = DEPS_VERSION_PART_MAX + 1;
     }
     if (**p == '.') {
         (*p)++;
@@ -66,13 +78,38 @@ static long version_part(const char **p)
     return value;
 }
 
+bool deps_version_valid(const char *version)
+{
+    const char *p = version;
+    int parts = 0;
+
+    for (;;) {
+        size_t digits = 0;
+        while (p[digits] >= '0' && p[digits] <= '9') {
+            digits++;
+        }
+        if (digits == 0 || digits > DEPS_VERSION_DIGITS) {
+            return false;
+        }
+        p += digits;
+        parts++;
+        if (*p == '\0') {
+            return true;
+        }
+        if (*p != '.' || parts == 3) {
+            return false;
+        }
+        p++;
+    }
+}
+
 int deps_version_compare(const char *a, const char *b)
 {
     int i;
 
     for (i = 0; i < 3; i++) {
-        long left = version_part(&a);
-        long right = version_part(&b);
+        int64_t left = version_part(&a);
+        int64_t right = version_part(&b);
         if (left != right) {
             return left < right ? -1 : 1;
         }
@@ -85,9 +122,19 @@ int deps_version_compare(const char *a, const char *b)
 static void next_major(const char *version, struct text *out)
 {
     const char *p = version;
-    long major = version_part(&p);
+    int64_t major = version_part(&p);
 
-    text_appendf(out, "%ld.0.0", major + 1);
+    text_appendf(out, "%" PRId64 ".0.0", major + 1);
+}
+
+bool deps_constraint_valid(const char *constraint)
+{
+    if (constraint[0] == '=') {
+        constraint++;
+    } else if (constraint[0] == '>' && constraint[1] == '=') {
+        constraint += 2;
+    }
+    return deps_version_valid(constraint);
 }
 
 bool deps_satisfies(const char *constraint, const char *version)
@@ -95,8 +142,14 @@ bool deps_satisfies(const char *constraint, const char *version)
     struct text bound = {0};
     bool ok;
 
+    if (!deps_version_valid(version)) {
+        return false;
+    }
     if (constraint == NULL || constraint[0] == '\0') {
         return true;
+    }
+    if (!deps_constraint_valid(constraint)) {
+        return false;
     }
     if (constraint[0] == '=') {
         return deps_version_compare(version, constraint + 1) == 0;
@@ -493,6 +546,14 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
         if (version == NULL) {
             break;
         }
+        /* S40, S45 and M13: a version reaches the comparison, a path of
+           the cache and the lock file. */
+        if (!deps_version_valid(version)) {
+            fprintf(stderr, "anti: %s names the version %s of %s, which is "
+                            "no version\n", text_cstr(&file), version,
+                    text_cstr(&req->name));
+            goto done;
+        }
         if (yanked != NULL && strcmp(yanked, "true") == 0) {
             continue;
         }
@@ -526,6 +587,17 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
         if (module == NULL || digest == NULL) {
             break;
         }
+        if (!repo_name_valid(module)) {
+            fprintf(stderr, "anti: %s names the module %s, which is no "
+                            "module path\n", text_cstr(&file), module);
+            goto done;
+        }
+        if (!repo_digest_valid(digest)) {
+            fprintf(stderr, "anti: %s names the digest %s of %s, which is no "
+                            "SHA-256 digest\n", text_cstr(&file), digest,
+                    module);
+            goto done;
+        }
         {
             struct dep_module *m = package_module(out, module);
             m->digest.length = 0;
@@ -550,6 +622,20 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
         text_free(&head);
         if (name == NULL) {
             break;
+        }
+        if (!repo_name_valid(name)) {
+            fprintf(stderr, "anti: %s names the dependency %s, which is no "
+                            "package name\n", text_cstr(&file), name);
+            goto done;
+        }
+        if (constraint != NULL && !deps_constraint_valid(constraint)) {
+            fprintf(stderr, "anti: %s names the version %s of %s, which is "
+                            "no constraint\n", text_cstr(&file), constraint,
+                    name);
+            goto done;
+        }
+        if (url != NULL && !repo_url_allowed(url)) {
+            goto done;
         }
         require(r, name, constraint == NULL ? "" : constraint, url, NULL);
     }
@@ -691,13 +777,59 @@ static bool walk_round(struct resolver *r, bool *changed)
     return true;
 }
 
+/* Whether the strings of one package of the lock file follow the grammar
+   of their kind, which the index they came from followed. A lock file is
+   committed and cloned, so it is read as foreign input. */
+static bool lock_package_valid(const char *path, const char *name,
+                               const char *version, const char *repo)
+{
+    const char *kind = NULL;
+    const char *what = NULL;
+
+    if (!repo_name_valid(name)) {
+        kind = "package name";
+        what = name;
+    } else if (!deps_version_valid(version)) {
+        kind = "version";
+        what = version;
+    } else if (repo != NULL && strchr(repo, '"') != NULL) {
+        kind = "repository URL";
+        what = repo;
+    }
+    if (kind != NULL) {
+        fprintf(stderr, "anti: %s names %s, which is no %s, so %s is not "
+                        "read\n", path, what, kind, path);
+        return false;
+    }
+    return true;
+}
+
+static bool lock_module_valid(const char *path, const char *module,
+                              const char *digest)
+{
+    if (!repo_name_valid(module)) {
+        fprintf(stderr, "anti: %s names %s, which is no module path, so %s "
+                        "is not read\n", path, module, path);
+        return false;
+    }
+    if (!repo_digest_valid(digest)) {
+        fprintf(stderr, "anti: %s names %s, which is no SHA-256 digest, so "
+                        "%s is not read\n", path, digest, path);
+        return false;
+    }
+    return true;
+}
+
 /* Read the lock file into a graph. A file that is not there, or that no
-   longer reads, gives an empty graph and is no error. */
+   longer reads, gives an empty graph and is no error. A file that holds
+   a string that is not the grammar of its kind reads as none, with a
+   message naming it. */
 static void lock_read(const char *path, struct dep_graph *out)
 {
     struct text bytes = {0};
     struct anti_toml *doc;
     size_t i;
+    bool valid = true;
 
     memset(out, 0, sizeof *out);
     if (!read_file(path, &bytes)) {
@@ -720,6 +852,10 @@ static void lock_read(const char *path, struct dep_graph *out)
         if (name == NULL || version == NULL) {
             break;
         }
+        if (!lock_package_valid(path, name, version, repo)) {
+            deps_free(out);
+            break;
+        }
         p = graph_add(out, name);
         text_append(&p->version, version);
         if (repo != NULL) {
@@ -739,10 +875,41 @@ static void lock_read(const char *path, struct dep_graph *out)
             if (module == NULL || digest == NULL) {
                 break;
             }
+            if (!lock_module_valid(path, module, digest)) {
+                valid = false;
+                break;
+            }
             text_append(&package_module(p, module)->digest, digest);
+        }
+        if (!valid) {
+            deps_free(out);
+            break;
         }
     }
     anti_rt_toml_free(doc);
+}
+
+/* Append `key = "value"` to out. M13: the TOML that anti reads takes no
+   escape, and a backslash stands for itself, so a Windows path reads
+   back as written. A value that holds a double quote or a control byte
+   cannot be written. The lock file is then refused, and no value writes
+   a key of its own choosing. The strings of an index are refused on
+   read, so a value here that fails comes from a path on this machine. */
+static bool lock_string(struct text *out, const char *key, const char *value,
+                        const char *path)
+{
+    const char *p;
+
+    for (p = value; *p != '\0'; p++) {
+        if (*p == '"' || (unsigned char)*p < 0x20 || *p == 0x7f) {
+            fprintf(stderr, "anti: %s cannot hold the %s %s, which holds a "
+                            "double quote or a control byte\n", path, key,
+                    value);
+            return false;
+        }
+    }
+    text_appendf(out, "%s = \"%s\"", key, value);
+    return true;
 }
 
 static bool lock_write(const char *path, const struct dep_graph *g)
@@ -751,29 +918,41 @@ static bool lock_write(const char *path, const struct dep_graph *g)
     FILE *f;
     size_t i;
     size_t j;
-    bool ok;
+    bool ok = true;
 
     text_append(&out, "# Written by `anti build`. Commit it for an "
                       "application.\n");
     text_append(&out, "version = 1\n");
-    for (i = 0; i < g->count; i++) {
+    for (i = 0; ok && i < g->count; i++) {
         const struct dep_package *p = &g->packages[i];
         text_append(&out, "\n[[package]]\n");
-        text_appendf(&out, "name = \"%s\"\n", text_cstr(&p->name));
-        text_appendf(&out, "version = \"%s\"\n", text_cstr(&p->version));
-        if (p->repo.length > 0) {
-            text_appendf(&out, "repo = \"%s\"\n", text_cstr(&p->repo));
+        ok = lock_string(&out, "name", text_cstr(&p->name), path);
+        text_append(&out, "\n");
+        ok = ok && lock_string(&out, "version", text_cstr(&p->version), path);
+        text_append(&out, "\n");
+        if (ok && p->repo.length > 0) {
+            ok = lock_string(&out, "repo", text_cstr(&p->repo), path);
+            text_append(&out, "\n");
         }
-        if (p->path.length > 0) {
-            text_appendf(&out, "path = \"%s\"\n", text_cstr(&p->path));
+        if (ok && p->path.length > 0) {
+            ok = lock_string(&out, "path", text_cstr(&p->path), path);
+            text_append(&out, "\n");
         }
         text_append(&out, "modules = [\n");
-        for (j = 0; j < p->module_count; j++) {
-            text_appendf(&out, "    { path = \"%s\", sha256 = \"%s\" },\n",
-                         text_cstr(&p->modules[j].path),
-                         text_cstr(&p->modules[j].digest));
+        for (j = 0; ok && j < p->module_count; j++) {
+            text_append(&out, "    { ");
+            ok = lock_string(&out, "path", text_cstr(&p->modules[j].path),
+                             path);
+            text_append(&out, ", ");
+            ok = ok && lock_string(&out, "sha256",
+                                   text_cstr(&p->modules[j].digest), path);
+            text_append(&out, " },\n");
         }
         text_append(&out, "]\n");
+    }
+    if (!ok) {
+        text_free(&out);
+        return false;
     }
     f = fopen(path, "wb");
     if (f == NULL) {

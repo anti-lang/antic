@@ -53,6 +53,56 @@ static void constraints(void)
     CHECK(!deps_satisfies("0.3.0", "1.0.0"));
 }
 
+/* S40. A part of twenty digits is no version, and a constraint or a
+   version that is none satisfies nothing, so no arithmetic overflows. */
+static void version_bounds(void)
+{
+    CHECK(deps_version_valid("1.2.4"));
+    CHECK(deps_version_valid("2.0"));
+    CHECK(deps_version_valid("7"));
+    CHECK(deps_version_valid("999999999.0.0"));
+    CHECK(!deps_version_valid("1000000000.0.0"));
+    CHECK(!deps_version_valid("99999999999999999999.0.0"));
+    CHECK(!deps_version_valid(""));
+    CHECK(!deps_version_valid("1..2"));
+    CHECK(!deps_version_valid("1.2."));
+    CHECK(!deps_version_valid(".1.2"));
+    CHECK(!deps_version_valid("1.2.3.4"));
+    CHECK(!deps_version_valid("1.2.0/../../x"));
+    CHECK(!deps_version_valid("1.2.0\"\nx = \"y"));
+    CHECK(!deps_satisfies("99999999999999999999", "1.0.0"));
+    CHECK(!deps_satisfies(">=1.0.0", "99999999999999999999.0.0"));
+    CHECK(!deps_satisfies("1.0.0", "1.2.0/../../x"));
+    CHECK(deps_satisfies("999999999", "999999999.5.0"));
+    CHECK(deps_version_compare("99999999999999999999", "1") > 0);
+}
+
+/* S45. The parts of a cache path follow the grammar of their kind. */
+static void path_parts(void)
+{
+    CHECK(repo_name_valid("com.example.units"));
+    CHECK(repo_name_valid("a"));
+    CHECK(repo_name_valid("com.example_2.x9"));
+    CHECK(!repo_name_valid(""));
+    CHECK(!repo_name_valid(".."));
+    CHECK(!repo_name_valid("../x"));
+    CHECK(!repo_name_valid("com..example"));
+    CHECK(!repo_name_valid("com.example."));
+    CHECK(!repo_name_valid(".com"));
+    CHECK(!repo_name_valid("com/example"));
+    CHECK(!repo_name_valid("com\\example"));
+    CHECK(!repo_name_valid("Com.example"));
+    CHECK(!repo_name_valid("com.9x"));
+    CHECK(!repo_name_valid("com.ex\"ample"));
+    CHECK(repo_digest_valid(
+        "5b0c2d1e7a94f3c6b8d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6"));
+    CHECK(!repo_digest_valid(
+        "5B0C2D1E7A94F3C6B8D0E1F2A3B4C5D6E7F8091A2B3C4D5E6F708192A3B4C5D6"));
+    CHECK(!repo_digest_valid("5b0c"));
+    CHECK(!repo_digest_valid(
+        "5b0c2d1e7a94f3c6b8d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d\""));
+}
+
 static void urls(void)
 {
     CHECK(repo_url_allowed("https://anti.example.com/repo"));
@@ -61,6 +111,17 @@ static void urls(void)
     CHECK(repo_url_allowed("http://localhost/repo"));
     CHECK(!repo_url_allowed("http://example.com/repo"));
     CHECK(!repo_url_allowed("ftp://example.com/repo"));
+    CHECK(repo_url_allowed("http://localhost:8080"));
+    CHECK(repo_url_allowed("http://[::1]:80/repo"));
+    /* M12. curl reads the part before an `@` as a user, so each of these
+       names another host. */
+    fputs("anti test: the messages below are expected\n", stderr);
+    CHECK(!repo_url_allowed("http://localhost:@repo.example.com/"));
+    CHECK(!repo_url_allowed("http://localhost:@repo.example.com"));
+    CHECK(!repo_url_allowed("http://127.0.0.1@repo.example.com/"));
+    CHECK(!repo_url_allowed("http://localhost:80@repo.example.com/"));
+    CHECK(!repo_url_allowed("http://localhost:x/repo"));
+    CHECK(!repo_url_allowed("http://localhost.example.com/repo"));
 }
 
 /* Every field of the manifest, with the four directories defaulted. */
@@ -196,6 +257,8 @@ void test_deps(void)
 {
     versions();
     constraints();
+    version_bounds();
+    path_parts();
     urls();
     manifest_fields();
     manifest_layout();

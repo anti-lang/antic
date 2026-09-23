@@ -15,6 +15,14 @@
    library files of one version. */
 #define REPO_INDEX_FILE "index.toml"
 
+/* Whether name is a module path: lowercase ASCII identifiers joined by
+   single dots. A package name and the module path of a library file both
+   take this form, and a string that does not stands in no path. */
+bool repo_name_valid(const char *name);
+
+/* Whether digest is a SHA-256 digest in 64 lowercase hex digits. */
+bool repo_digest_valid(const char *digest);
+
 /* The cache of a user, which is per user and not per project. It holds
    the index files under index/<digest of the prefix>/<name>/ and the
    library files under pkg/<name>/<version>/. */

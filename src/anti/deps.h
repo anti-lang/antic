@@ -57,9 +57,23 @@ void deps_free(struct dep_graph *g);
    zero, so `2.0` and `2.0.0` are one version. */
 int deps_version_compare(const char *a, const char *b);
 
+/* Whether version is one to three parts of decimal digits joined by dots,
+   each part at most DEPS_VERSION_DIGITS digits long. A version of an
+   index, a lock file or a library header that is not stands nowhere in a
+   path or in the comparison. */
+enum { DEPS_VERSION_DIGITS = 9 };
+bool deps_version_valid(const char *version);
+
 /* Whether version satisfies constraint. The three forms are `1.2.4`,
    which is `>= 1.2.4` and `< 2.0.0`, `=1.2.4`, which is that version
-   alone, and `>=1.2.4`, which has no upper bound. */
+   alone, and `>=1.2.4`, which has no upper bound. The empty constraint
+   takes every version. A constraint or a version that is not of these
+   forms satisfies nothing. */
 bool deps_satisfies(const char *constraint, const char *version);
+
+/* Whether constraint is one of the three forms of deps_satisfies with a
+   version deps_version_valid takes. The empty constraint of a path
+   dependency is no constraint of these. */
+bool deps_constraint_valid(const char *constraint);
 
 #endif

@@ -890,6 +890,17 @@ add_test(NAME anti_build_deps
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-deps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_deps.cmake")
+# A malformed index.toml and anti.lock: names, versions, module paths and
+# digests that are not the grammar of their kind are refused before they
+# reach a path in the cache, a comparison or the lock file.
+add_test(NAME anti_build_inputs
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-inputs"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_inputs.cmake")
 
 # The rules of the canonical form on one file, the format stability of
 # docs/tooling.md and `--check`, which writes nothing.

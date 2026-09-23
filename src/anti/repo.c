@@ -15,6 +15,7 @@
 #include <time.h>
 
 #include "antl.h"
+#include "deps.h"
 #include "files.h"
 #include "process.h"
 #include "sha256.h"
@@ -63,6 +64,41 @@ static bool write_file(const char *path, const char *bytes, size_t length)
     return true;
 }
 
+bool repo_name_valid(const char *name)
+{
+    const char *p = name;
+
+    for (;;) {
+        if (!((*p >= 'a' && *p <= 'z') || *p == '_')) {
+            return false;
+        }
+        while ((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') ||
+               *p == '_') {
+            p++;
+        }
+        if (*p == '\0') {
+            return true;
+        }
+        if (*p != '.') {
+            return false;
+        }
+        p++;
+    }
+}
+
+bool repo_digest_valid(const char *digest)
+{
+    size_t i;
+
+    for (i = 0; i < 64; i++) {
+        if (!((digest[i] >= '0' && digest[i] <= '9') ||
+              (digest[i] >= 'a' && digest[i] <= 'f'))) {
+            return false;
+        }
+    }
+    return digest[64] == '\0';
+}
+
 bool repo_cache_dir(struct text *out)
 {
     if (!user_dir(out, USER_DIR_CACHE, USER_DIR_APP)) {
@@ -73,17 +109,38 @@ bool repo_cache_dir(struct text *out)
     return true;
 }
 
-/* Whether host is the loopback of the machine, the one host that a plain
-   `http://` URL may name. */
-static bool is_loopback(const char *host, size_t length)
+/* Whether the authority of a URL, the text after `http://` up to the
+   first `/`, `?` or `#`, is the loopback of the machine, the one host a
+   plain `http://` URL may name. A port of digits alone may follow it. An
+   authority with an `@` is refused whatever it holds, since curl reads
+   the text before one as a user and fetches from the host after it. */
+static bool is_loopback(const char *authority)
 {
     static const char *const names[] = {"127.0.0.1", "localhost", "[::1]"};
+    size_t length = strcspn(authority, "/?#");
     size_t i;
 
+    if (memchr(authority, '@', length) != NULL) {
+        return false;
+    }
     for (i = 0; i < sizeof names / sizeof *names; i++) {
         size_t n = strlen(names[i]);
-        if (length >= n && memcmp(host, names[i], n) == 0 &&
-            (length == n || host[n] == ':' || host[n] == '/')) {
+        size_t at;
+        if (length < n || memcmp(authority, names[i], n) != 0) {
+            continue;
+        }
+        if (length == n) {
+            return true;
+        }
+        if (authority[n] != ':') {
+            continue;
+        }
+        for (at = n + 1; at < length; at++) {
+            if (authority[at] < '0' || authority[at] > '9') {
+                break;
+            }
+        }
+        if (at == length) {
             return true;
         }
     }
@@ -98,8 +155,7 @@ bool repo_url_allowed(const char *url)
         return true;
     }
     if (strncmp(url, http, sizeof http - 1) == 0) {
-        const char *host = url + sizeof http - 1;
-        if (is_loopback(host, strlen(host))) {
+        if (is_loopback(url + sizeof http - 1)) {
             return true;
         }
         fprintf(stderr, "anti: %s: http:// names a repository of 127.0.0.1 or "
@@ -237,6 +293,11 @@ static bool index_dir(const char *prefix, const char *name, struct text *out)
     struct sha256 digest;
     char hex[65];
 
+    if (!repo_name_valid(name)) {
+        fprintf(stderr, "anti: %s names the package %s, which is no package "
+                        "name\n", prefix, name);
+        return false;
+    }
     if (!repo_cache_dir(out)) {
         return false;
     }
@@ -294,6 +355,29 @@ bool repo_module(const char *prefix, const char *name, const char *version,
     char hex[65];
     bool ok = false;
 
+    /* S45: each of the four stands in a path of the cache or in the
+       check after the fetch. Each may come from a downloaded index or a
+       cloned lock file. */
+    if (!repo_name_valid(name)) {
+        fprintf(stderr, "anti: %s names the package %s, which is no package "
+                        "name\n", prefix, name);
+        goto done;
+    }
+    if (!deps_version_valid(version)) {
+        fprintf(stderr, "anti: %s names %s %s, which is no version\n", prefix,
+                name, version);
+        goto done;
+    }
+    if (!repo_name_valid(module)) {
+        fprintf(stderr, "anti: %s names the module %s of %s, which is no "
+                        "module path\n", prefix, module, name);
+        goto done;
+    }
+    if (!repo_digest_valid(digest)) {
+        fprintf(stderr, "anti: %s names the digest %s of %s, which is no "
+                        "SHA-256 digest\n", prefix, digest, module);
+        goto done;
+    }
     if (!repo_cache_dir(&directory)) {
         goto done;
     }
@@ -325,6 +409,9 @@ bool repo_module(const char *prefix, const char *name, const char *version,
     if (strcmp(hex, digest) != 0) {
         fprintf(stderr, "anti: %s of %s %s has the digest %s and the index "
                         "names %s\n", module, name, version, hex, digest);
+        /* A cached file is fetched no second time, so one that fails its
+           digest leaves the cache and the next build fetches it again. */
+        remove(text_cstr(out));
         goto done;
     }
     ok = true;
