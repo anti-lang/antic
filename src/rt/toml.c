@@ -11,6 +11,11 @@
 
 #include "toml.h"
 
+/* The room of a dotted path, the table and the key, with its NUL. A key
+   longer than that is refused where it is read, so its length also fits
+   the precision of a format. */
+#define PATH_ROOM 320
+
 struct pair {
     char *key;
     char *value;
@@ -112,13 +117,19 @@ static void add(struct anti_toml *doc, struct reader *r, const char *key,
     pair->value_length = value_length;
     pair->line = r->line;
     if (pair->key == NULL || pair->value == NULL) {
+        /* The pair is not counted, so anti_rt_toml_free never sees
+           the half that was copied. */
+        free(pair->key);
+        free(pair->value);
         r->failed = 1;
         return;
     }
     doc->count++;
 }
 
-/* The count of `[[name]]` tables seen so far under that name. */
+/* The count of `[[name]]` tables seen so far under that name. It is -1
+   when the largest number under the name is the limit of `int64_t`,
+   which leaves no next count. */
 static int64_t repeats(const struct anti_toml *doc, const char *name,
                        size_t length)
 {
@@ -134,7 +145,7 @@ static int64_t repeats(const struct anti_toml *doc, const char *name,
             }
         }
     }
-    return seen + 1;
+    return seen == INT64_MAX ? -1 : seen + 1;
 }
 
 static void read_header(struct reader *r, struct anti_toml *doc)
@@ -142,6 +153,7 @@ static void read_header(struct reader *r, struct anti_toml *doc)
     int array = 0;
     int64_t start;
     int64_t length;
+    int64_t next;
 
     r->pos++;
     if (peek(r) == '[') {
@@ -173,9 +185,14 @@ static void read_header(struct reader *r, struct anti_toml *doc)
             return;
         }
         r->pos++;
+        next = repeats(doc, r->table, r->table_length);
+        if (next < 0) {
+            r->failed = 1;
+            return;
+        }
         r->table_length += (size_t)snprintf(
             r->table + r->table_length, sizeof r->table - r->table_length,
-            ".%lld", (long long)repeats(doc, r->table, r->table_length));
+            ".%lld", (long long)next);
     }
 }
 
@@ -207,15 +224,18 @@ static void read_key(struct reader *r, const char **key, int64_t *length)
 
     if (peek(r) == '"' || peek(r) == '\'') {
         read_quoted(r, key, length);
-        return;
+    } else {
+        start = r->pos;
+        while (!at_end(r) && is_bare(peek(r))) {
+            r->pos++;
+        }
+        *key = (const char *)r->bytes + start;
+        *length = r->pos - start;
+        if (*length == 0) {
+            r->failed = 1;
+        }
     }
-    start = r->pos;
-    while (!at_end(r) && is_bare(peek(r))) {
-        r->pos++;
-    }
-    *key = (const char *)r->bytes + start;
-    *length = r->pos - start;
-    if (*length == 0) {
+    if (!r->failed && *length >= PATH_ROOM) {
         r->failed = 1;
     }
 }
@@ -268,7 +288,7 @@ static void read_inline_table(struct reader *r, struct anti_toml *doc,
 {
     r->pos++;
     while (!r->failed) {
-        char key[320];
+        char key[PATH_ROOM];
         const char *name = NULL;
         const char *value = NULL;
         int64_t value_length = 0;
@@ -334,7 +354,7 @@ static void read_array(struct reader *r, struct anti_toml *doc,
 
     r->pos++;
     while (!r->failed) {
-        char key[320];
+        char key[PATH_ROOM];
         const char *value = NULL;
         int64_t value_length = 0;
         int length;
@@ -376,7 +396,7 @@ static void read_array(struct reader *r, struct anti_toml *doc,
 
 static void read_pair(struct reader *r, struct anti_toml *doc)
 {
-    char path[320];
+    char path[PATH_ROOM];
     const char *key = NULL;
     const char *value = NULL;
     int64_t value_length = 0;

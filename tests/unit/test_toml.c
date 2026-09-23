@@ -117,10 +117,78 @@ static void inline_table_unclosed(void)
     anti_rt_toml_free(doc);
 }
 
+/* The count of a `[[name]]` table follows the largest number under that
+   name. A number at the limit of `int64_t` leaves no next count, so the
+   document is refused. */
+static void table_repeat_limit(void)
+{
+    struct anti_toml *doc = read("[[t]]\nx = 1\n[[t]]\nx = 2\n");
+
+    CHECK(doc != NULL);
+    if (doc != NULL) {
+        CHECK_STR(value_of(doc, "t.0.x"), "1");
+        CHECK_STR(value_of(doc, "t.1.x"), "2");
+    }
+    anti_rt_toml_free(doc);
+
+    doc = read("[a]\n9223372036854775806 = 1\n[[a]]\nx = 2\n");
+    CHECK(doc != NULL);
+    if (doc != NULL) {
+        CHECK_STR(value_of(doc, "a.9223372036854775807.x"), "2");
+    }
+    anti_rt_toml_free(doc);
+
+    doc = read("[a]\n9223372036854775807 = 1\n[[a]]\n");
+    CHECK(doc == NULL);
+    anti_rt_toml_free(doc);
+    doc = read("[a]\n99999999999999999999 = 1\n[[a]]\n");
+    CHECK(doc == NULL);
+    anti_rt_toml_free(doc);
+}
+
+/* A key is at most 319 bytes, the room of a path less its NUL. The
+   bound holds bare or in quotes, and at the top level or inside an
+   inline table. */
+static void key_length(void)
+{
+    char text[1200];
+    struct anti_toml *doc;
+    size_t n;
+
+    memset(text, 'k', 319);
+    memcpy(text + 319, " = 1\n", 6);
+    doc = read(text);
+    CHECK(doc != NULL && anti_rt_toml_count(doc) == 1);
+    anti_rt_toml_free(doc);
+
+    memset(text, 'k', 320);
+    memcpy(text + 320, " = 1\n", 6);
+    doc = read(text);
+    CHECK(doc == NULL);
+    anti_rt_toml_free(doc);
+
+    text[0] = '"';
+    memset(text + 1, 'k', 1000);
+    memcpy(text + 1001, "\" = 1\n", 7);
+    doc = read(text);
+    CHECK(doc == NULL);
+    anti_rt_toml_free(doc);
+
+    memcpy(text, "a = { ", 6);
+    memset(text + 6, 'k', 1000);
+    n = 1006;
+    memcpy(text + n, " = 1 }\n", 8);
+    doc = read(text);
+    CHECK(doc == NULL);
+    anti_rt_toml_free(doc);
+}
+
 void test_toml(void)
 {
     inline_table();
     inline_table_array();
     inline_table_nested();
     inline_table_unclosed();
+    table_repeat_limit();
+    key_length();
 }
