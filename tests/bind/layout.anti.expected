@@ -1,0 +1,132 @@
+//! The binding of layout, which `anti bind` wrote from `layout.h`. Nothing in
+//! it is written by hand. Run `anti bind` again to change it.
+
+pub const LAYOUT_LOOSE_A: c_int = 3;
+
+pub const LAYOUT_LOOSE_B: c_int = 4;
+
+pub const LAYOUT_ANSWER: c_int = 42;
+
+pub const LAYOUT_HALF: c_int = 21;
+
+pub const LAYOUT_MASK: c_uint = 2147483648;
+
+pub const LAYOUT_BIG: c_ulonglong = 8589934591;
+
+pub const LAYOUT_SCALE: c_float = 0.5;
+
+pub const LAYOUT_RATIO: c_double = 0.33333333333333331;
+
+pub const LAYOUT_NAME: str = "layout";
+
+pub const LAYOUT_DEFAULT_COLOR: LayoutColor = LayoutColor.LAYOUT_GREEN;
+
+pub enum LayoutColor
+{
+	LAYOUT_RED = 1,
+	LAYOUT_GREEN = 2,
+	LAYOUT_BLUE = -3,
+}
+
+pub enum LayoutMode
+{
+	LAYOUT_READ = 0,
+	LAYOUT_WRITE = 1,
+	LAYOUT_APPEND = 8,
+	LAYOUT_CREATE = 9,
+}
+
+pub enum LayoutWide: c_uint
+{
+	LAYOUT_SMALL = 0,
+	LAYOUT_LARGE = 4294967295,
+}
+
+pub packed struct LayoutTight
+{
+	a: c_char,
+	b: c_int,
+	c: c_short,
+}
+
+pub packed struct LayoutPacked
+{
+	a: c_char,
+	b: i64,
+}
+
+pub struct LayoutAligned align(16)
+{
+	x: c_int,
+}
+
+pub struct LayoutFirst align(8)
+{
+	a: c_char,
+	b: c_int,
+}
+
+pub struct LayoutBits
+{
+	a: c_uint : 3,
+	_: c_int : 0,
+	b: c_char : 2,
+	c: u64 : 40,
+	d: u8 : 7,
+}
+
+pub union LayoutValue
+{
+	i: c_int,
+	f: c_float,
+	d: c_double,
+	n: i64,
+}
+
+pub struct LayoutNode
+{
+	next: ?*LayoutNode,
+	compare: ?fn(?*byte, ?*byte) -> c_int,
+	logger: ?*byte,
+	m: [4]c_float,
+	name: ?*byte,
+	// volatile in C
+	ticks: c_int,
+	color: LayoutColor,
+	mode: LayoutMode,
+	value: LayoutValue,
+	bits: LayoutBits,
+	size: c_size_t,
+	wide: c_wchar,
+	l: c_long,
+	ul: c_ulong,
+	on: bool,
+}
+
+pub struct LayoutHolder
+{
+	kind: c_int,
+	as_: LayoutHolder_as,
+}
+
+pub union LayoutHolder_as
+{
+	i: c_int,
+	f: c_float,
+}
+
+pub extern fn layout_open(path: ?*byte) -> ?*byte;
+
+pub extern fn layout_log(level: c_int, format: ?*byte, ...);
+
+pub extern fn layout_count(data: ?*u8, n: i64, flag: bool) -> c_size_t;
+
+pub extern fn layout_sort(items: ?*byte, n: c_size_t, compare: ?fn(?*byte, ?*byte) -> c_int) -> c_int;
+
+pub extern fn layout_fill(values: ?*c_int);
+
+pub extern fn layout_twice(x: c_int) -> c_int;
+
+pub extern fn layout_hold(kind: c_int, f: c_float) -> LayoutHolder;
+
+pub extern fn layout_half(x: c_float) -> c_float;

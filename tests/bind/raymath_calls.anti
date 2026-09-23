@@ -1,0 +1,55 @@
+//! The calls of `tests/abi/abi_raymath.anti`, made through the binding of
+//! raymath that `anti bind` writes and the shim beside it. It prints what the
+//! hand-written binding prints.
+
+import bindtest.raymath;
+
+extern fn printf(format: ?*byte, ...) -> i32;
+
+fn line(v: f32)
+{
+	let format = alloc(byte, 6) else { return; };
+	format[0] = 37;
+	format[1] = 46;
+	format[2] = 57;
+	format[3] = 103;
+	format[4] = 10;
+	format[5] = 0;
+	printf(format, v as f64);
+	free(format);
+}
+
+fn main() -> int
+{
+	let a = raymath.Vector2Add(raymath.Vector2 { x: 1.5, y: -2.0 }, raymath.Vector2 { x: 0.25, y: 8.0 });
+	line(a.x);
+	line(a.y);
+	let r = raymath.Vector2Rotate(a, 0.5);
+	line(r.x);
+	line(r.y);
+	let c = raymath.Vector3CrossProduct(raymath.Vector3 { x: 1.0, y: 2.0, z: 3.0 },
+		raymath.Vector3 { x: -4.0, y: 0.5, z: 2.0 });
+	line(c.x);
+	line(c.y);
+	line(c.z);
+	let m = raymath.MatrixMultiply(raymath.MatrixRotateZ(0.25), raymath.MatrixTranslate(3.0, -1.0, 2.0));
+	line(m.m0);
+	line(m.m4);
+	line(m.m12);
+	line(m.m13);
+	let t = raymath.Vector3Transform(c, m);
+	line(t.x);
+	line(t.y);
+	line(t.z);
+	let q = raymath.QuaternionMultiply(raymath.QuaternionFromEuler(0.1, 0.2, 0.3),
+		raymath.QuaternionFromEuler(-0.4, 0.5, 0.6));
+	line(q.x);
+	line(q.y);
+	line(q.z);
+	line(q.w);
+	let v = raymath.Vector3RotateByQuaternion(raymath.Vector3 { x: 1.0, y: 0.0, z: 0.0 }, q);
+	line(v.x);
+	line(v.y);
+	line(v.z);
+	return 0;
+}

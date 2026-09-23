@@ -42,6 +42,9 @@ static int usage(FILE *out)
           "                [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
           "                [<file.anti>|<file.antl>...]\n"
           "       anti fmt [--check] [<file.anti>...]\n"
+          "       anti bind <api.json>|--clang <header> [-o <dir>]\n"
+          "                 [--module <path>] [--probe] [--target <t>]\n"
+          "                 [-I <dir>] [-D <name>[=<value>]] [--runtime <dir>]\n"
           "       anti bind --header <file.antl> [-o <dir>] [-I <dir>]\n"
           "                 [--runtime <dir>]\n",
           out);
@@ -106,6 +109,13 @@ static int usage(FILE *out)
           "type-check on all six.\n",
           out);
     fputs("\n"
+          "bind writes a binding module from raylib_api.json, or from a C\n"
+          "header with --clang, which runs clang on it. The module is\n"
+          "anti.<name of the file> unless --module names another, and it\n"
+          "goes to <dir>/<last segment>.anti with shim_<name>.c beside it\n"
+          "when the header has inline functions. --probe writes the ABI\n"
+          "probe in C and in Anti as well. -I and -D reach clang and the\n"
+          "shim. The layout of every struct is antic's, never clang's.\n"
           "bind --header writes <name>.h from the public interface of the\n"
           "library file <name>.antl, the header that antic --lib writes for\n"
           "the same module.\n",
@@ -454,39 +464,65 @@ int main(int argc, char **argv)
     }
     if (argc >= 2 && strcmp(argv[1], "bind") == 0) {
         const char **roots = malloc((size_t)argc * sizeof *roots);
+        const char **defines = malloc((size_t)argc * sizeof *defines);
         const char *header = NULL;
-        const char *out = ".";
-        const char *runtime = NULL;
+        struct bind_request request;
         struct text home = {0};
         size_t root_count = 0;
         int status;
-        if (roots == NULL) {
+        if (roots == NULL || defines == NULL) {
             fputs("anti: out of memory\n", stderr);
             return 70;
         }
+        memset(&request, 0, sizeof request);
+        request.out_dir = ".";
+        request.includes = roots;
+        request.defines = defines;
         for (i = 2; i < argc; i++) {
             if (strcmp(argv[i], "--header") == 0 && i + 1 < argc) {
                 header = argv[++i];
+            } else if (strcmp(argv[i], "--clang") == 0 && i + 1 < argc) {
+                request.clang = true;
+                request.input = argv[++i];
             } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
-                out = argv[++i];
+                request.out_dir = argv[++i];
             } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
-                runtime = argv[++i];
+                request.runtime = argv[++i];
+            } else if (strcmp(argv[i], "--module") == 0 && i + 1 < argc) {
+                request.module = argv[++i];
+            } else if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
+                request.target = argv[++i];
+            } else if (strcmp(argv[i], "--probe") == 0) {
+                request.probe = true;
             } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
                 roots[root_count++] = argv[++i];
+            } else if (strcmp(argv[i], "-D") == 0 && i + 1 < argc) {
+                defines[request.define_count++] = argv[++i];
+            } else if (argv[i][0] != '-' && request.input == NULL) {
+                request.input = argv[i];
             } else {
                 free((void *)roots);
+                free((void *)defines);
                 return usage(stderr);
             }
         }
-        if (header == NULL) {
+        if ((header == NULL) == (request.input == NULL)) {
             free((void *)roots);
+            free((void *)defines);
             return usage(stderr);
         }
-        if (runtime == NULL && default_runtime(&home)) {
-            runtime = text_cstr(&home);
+        if (request.runtime == NULL && default_runtime(&home)) {
+            request.runtime = text_cstr(&home);
         }
-        status = bind_header(header, out, runtime, roots, root_count);
+        if (header != NULL) {
+            status = bind_header(header, request.out_dir, request.runtime,
+                                 roots, root_count);
+        } else {
+            request.include_count = root_count;
+            status = bind_run(&request);
+        }
         free((void *)roots);
+        free((void *)defines);
         text_free(&home);
         return status;
     }

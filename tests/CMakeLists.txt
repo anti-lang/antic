@@ -47,7 +47,10 @@ add_executable(antic_unit_tests
     unit/test_coff.c
     unit/test_toml.c
     unit/test_json.c
+    unit/test_bind.c
     unit/test_deps.c
+    ../tools/anti/bindexpr.c
+    ../tools/anti/bindtype.c
     ../tools/anti/deps.c
     ../tools/anti/files.c
     ../tools/anti/manifest.c
@@ -893,17 +896,35 @@ add_test(NAME anti_doc
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_doc.cmake")
 
 # anti bind --header writes the header that antic --lib writes for the
-# same module, from the library file alone.
-add_test(NAME anti_bind_header
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-        "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bind-header"
-        -DCASE=header
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_bind.cmake")
+# same module, from the library file alone. The other cases bind
+# tests/bind/layout.h and raymath through clang and a part of
+# raylib_api.json, and check the refusals.
+set(anti_bind_cc ${ANTIC_TEST_CC})
+if(APPLE)
+    list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
+endif()
+set(anti_bind_cases header clang raymath api)
+if(NOT WIN32)
+    # The case refusals stands a shell script in for clang.
+    list(APPEND anti_bind_cases refusals)
+endif()
+foreach(case IN LISTS anti_bind_cases)
+    add_test(NAME anti_bind_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+            "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+            "-DBIND=${CMAKE_CURRENT_SOURCE_DIR}/bind"
+            "-DABI=${CMAKE_CURRENT_SOURCE_DIR}/abi"
+            "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
+            "-DCC=${anti_bind_cc}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bind-${case}"
+            -DCASE=${case}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_bind.cmake")
+endforeach()
 
 # The `tests` block of a module of the standard library. The module
 # imports other modules, so the dev run links an object of each.

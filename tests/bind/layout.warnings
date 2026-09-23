@@ -1,0 +1,3 @@
+anti: layout.h: warning: the macro `LAYOUT_TWICE` takes arguments and is skipped
+anti: layout.h: warning: the macro `LAYOUT_H` has no value and is skipped
+anti: layout.h: warning: `layout_precise` is left out: Anti has no form for its result

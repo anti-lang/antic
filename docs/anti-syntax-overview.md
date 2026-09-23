@@ -692,7 +692,7 @@ link framework "CoreAudio";
 
 `anti bind raylib_api.json` and `anti bind --clang header.h` generate bindings. `anti build --lib static|shared` builds a library with a header. A class is exported with its layout, tables, `anti_<Class>_init`, `anti_<Class>_construct` for a `construct` with arguments, and the dispatch wrappers. `embed("file")` puts a file's bytes in the binary.
 
-Built: `extern`, `export`, static and shared libraries, the header, `link framework`. Not built yet: `anti bind`, `embed`.
+Built: `extern`, `export`, static and shared libraries, the header, `link framework`, `anti bind` in its three forms. Not built yet: `embed`.
 
 ## Compile-time targets
 

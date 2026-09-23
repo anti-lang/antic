@@ -165,12 +165,18 @@ target_link_libraries(antic PRIVATE antic_core)
 add_executable(anti
     tools/anti/main.c
     tools/anti/bind.c
+    tools/anti/bindapi.c
+    tools/anti/bindclang.c
+    tools/anti/bindexpr.c
+    tools/anti/bindtype.c
+    tools/anti/bindwrite.c
     tools/anti/build.c
     tools/anti/check.c
     tools/anti/deps.c
     tools/anti/doc.c
     tools/anti/files.c
     tools/anti/fmt.c
+    tools/anti/jsontree.c
     tools/anti/manifest.c
     tools/anti/repo.c
     tools/anti/sdk.c
@@ -178,6 +184,7 @@ add_executable(anti
     tools/anti/test.c
     tools/anti/units.c
     tools/anti/zip.c
+    rt/json.c
     rt/symbols.c
     rt/toml.c)
 target_link_libraries(anti PRIVATE antic_core)

@@ -1,0 +1,15 @@
+//! Calls the three inline functions of layout.h through the binding that `anti
+//! bind` writes and the shim beside it. The two static ones reach their
+//! wrappers, and the C99 inline one its external definition.
+
+import bindtest.layout;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let h = layout.layout_hold(layout.layout_twice(21), 2.5);
+	printf("%d %g %g\n".ptr, h.kind, h.as_.f as f64,
+		layout.layout_half(3.0) as f64);
+	return 0;
+}

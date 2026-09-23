@@ -1,0 +1,20 @@
+/* The shim of layout, which anti bind wrote from layout.h. It gives every
+   inline function of the header a symbol. Nothing in it is written by
+   hand. */
+#define layout_twice anti_inline_layout_twice
+#define layout_hold anti_inline_layout_hold
+#include "layout.h"
+#undef layout_twice
+#undef layout_hold
+
+int layout_twice(int a0)
+{
+    return anti_inline_layout_twice(a0);
+}
+
+struct LayoutHolder layout_hold(int a0, float a1)
+{
+    return anti_inline_layout_hold(a0, a1);
+}
+
+extern __typeof__(layout_half) layout_half;

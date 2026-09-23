@@ -408,7 +408,15 @@ reports what it finished.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
   only. It has never run.
 - The `anti` tool holds `new`, `build`, `run`, `sdk export`, `sdk import`,
-  `test`, `check`, `fmt` and `doc`, and nothing else of `docs/tooling.md`.
+  `test`, `check`, `fmt`, `doc` and `bind`, and nothing else of
+  `docs/tooling.md`.
+- `anti bind` is built. `anti bind raylib_api.json` and `anti bind --clang
+  <header>` write a binding module, a shim for the inline functions and, with
+  `--probe`, the ABI probe in C and in Anti. `--clang` runs clang with
+  `-Xclang -ast-dump=json` and reads the JSON with the scanner of
+  `rt/json.c`. `anti bind --header <name>.antl` writes the header of `--lib`.
+  `link framework "Name";` is built, and `anti` passes the names to antic.
+  See "The bind command" in `docs/decisions.md` and `docs/notes/bind.md`.
   `anti fmt` writes the canonical form of the formatter rules, and `std/` and
   `tests/` stand in it.
 - `anti build` is built. It reads `anti.toml`, resolves the dependencies into
