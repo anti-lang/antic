@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -80,6 +81,14 @@ struct checker {
 };
 
 /* Helpers */
+
+/* The bits of v read as a two's complement int64_t. C leaves the
+   conversion of a uint64_t above INT64_MAX to the implementation, so a
+   negative value is computed from its complement. */
+static int64_t signed_bits(uint64_t v)
+{
+    return v <= INT64_MAX ? (int64_t)v : -(int64_t)~v - 1;
+}
 
 static void error_at(struct checker *c, struct pos pos, const char *format,
                      ...)
@@ -254,7 +263,9 @@ static struct symbol *declare(struct checker *c, enum symbol_kind kind,
     if (s->count == s->capacity) {
         size_t capacity = s->capacity == 0 ? 16 : s->capacity * 2;
         struct scope_entry *entries =
-            realloc(s->entries, capacity * sizeof *entries);
+            capacity <= SIZE_MAX / sizeof *entries
+                ? realloc(s->entries, capacity * sizeof *entries)
+                : NULL;
         if (entries == NULL) {
             fputs("antic: out of memory\n", stderr);
             exit(70);
@@ -345,7 +356,9 @@ static void narrow(struct checker *c, struct symbol *sym, struct type *t)
         size_t capacity =
             s->narrowed_capacity == 0 ? 4 : s->narrowed_capacity * 2;
         struct narrowing *grown =
-            realloc(s->narrowed, capacity * sizeof *grown);
+            capacity <= SIZE_MAX / sizeof *grown
+                ? realloc(s->narrowed, capacity * sizeof *grown)
+                : NULL;
         if (grown == NULL) {
             fputs("antic: out of memory\n", stderr);
             exit(70);
@@ -451,7 +464,7 @@ static struct type *array_of(struct checker *c, struct expr *e,
         }
         return types_array_symbolic(c->types, element, v.as.symbolic);
     }
-    if ((int64_t)v.as.integer < 1) {
+    if (signed_bits(v.as.integer) < 1) {
         error_at(c, e->pos, "an array length is at least 1");
         return builtin(c, TYPE_ERROR);
     }
@@ -521,7 +534,7 @@ static uint8_t bitfield_width(struct checker *c, struct param *field,
     if (unit_break) {
         return 0;
     }
-    if (v.kind == CONST_SYMBOLIC || (int64_t)v.as.integer < 1 ||
+    if (v.kind == CONST_SYMBOLIC || signed_bits(v.as.integer) < 1 ||
         v.as.integer > (uint64_t)type_bits(t)) {
         error_at(c, e->pos, "a bitfield of `%s` has 1 to %d bits", tn(t),
                  type_bits(t));
@@ -612,7 +625,7 @@ static uint64_t alignment(struct checker *c, struct expr *e)
                  "from `size_of`");
         return 0;
     }
-    if ((int64_t)v.as.integer < 1 || (v.as.integer & (v.as.integer - 1)) != 0) {
+    if (signed_bits(v.as.integer) < 1 || (v.as.integer & (v.as.integer - 1)) != 0) {
         error_at(c, e->pos, "an alignment is a power of two");
         return 0;
     }
@@ -743,7 +756,7 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         return array_of(c, t->length, resolve_type(c, t->element));
     case TYPEX_FN: {
         struct type **params =
-            arena_alloc(c->arena, (t->param_count + 1) * sizeof *params);
+            types_alloc_array(c->arena, t->param_count + 1, sizeof *params);
         struct type *result = builtin(c, TYPE_VOID);
         struct type *fn;
         for (i = 0; i < t->param_count; i++) {
@@ -784,7 +797,7 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
     }
     case TYPEX_TUPLE: {
         struct type **elements =
-            arena_alloc(c->arena, t->param_count * sizeof *elements);
+            types_alloc_array(c->arena, t->param_count, sizeof *elements);
         for (i = 0; i < t->param_count; i++) {
             elements[i] = resolve_type(c, t->params[i]);
             if (is_error(elements[i])) {
@@ -1813,7 +1826,9 @@ static void walk_function(struct worker_walk *w, const struct item *it)
     if (w->queue_count == w->queue_capacity) {
         size_t capacity = w->queue_capacity == 0 ? 16 : w->queue_capacity * 2;
         const struct item **queue =
-            realloc(w->queue, capacity * sizeof *queue);
+            capacity <= SIZE_MAX / sizeof *queue
+                ? realloc(w->queue, capacity * sizeof *queue)
+                : NULL;
         if (queue == NULL) {
             fputs("antic: out of memory\n", stderr);
             exit(70);
@@ -1911,8 +1926,6 @@ static void declare_get(struct checker *c, struct item *it)
     text = arena_alloc(c->arena, qualified.length + 1);
     memcpy(text, qualified.data, qualified.length + 1);
     text_free(&qualified);
-    memset(m, 0, sizeof *m);
-    memset(sym, 0, sizeof *sym);
     m->kind = ITEM_FN;
     m->pub = true;
     m->vis = VIS_PUB;
@@ -1926,7 +1939,8 @@ static void declare_get(struct checker *c, struct item *it)
     sym->name.length = strlen(text);
     sym->item = m;
     sym->type = types_fn(c->types, NULL, 0, types_pointer(c->types, t));
-    members = arena_alloc(c->arena, (it->member_count + 1) * sizeof *members);
+    members =
+        types_alloc_array(c->arena, it->member_count + 1, sizeof *members);
     for (i = 0; i < it->member_count; i++) {
         members[i] = it->members[i];
     }
@@ -2788,13 +2802,12 @@ static bool refuse_abstract_value(struct checker *c, struct pos pos,
 static void declare_deserialize(struct checker *c, struct type *object)
 {
     struct item **members =
-        arena_alloc(c->arena, (object->member_count + 1) * sizeof *members);
+        types_alloc_array(c->arena, object->member_count + 1,
+                          sizeof *members);
     struct item *it = arena_alloc(c->arena, sizeof *it);
     struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
     struct type **params = arena_alloc(c->arena, 2 * sizeof *params);
 
-    memset(it, 0, sizeof *it);
-    memset(sym, 0, sizeof *sym);
     params[0] = builtin(c, TYPE_STR);
     params[1] = types_pointer(c->types, object);
     it->kind = ITEM_FN;
@@ -2879,8 +2892,6 @@ static void declare_root(struct checker *c)
         struct item *it = arena_alloc(c->arena, sizeof *it);
         struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
         struct type **params = arena_alloc(c->arena, 3 * sizeof *params);
-        memset(it, 0, sizeof *it);
-        memset(sym, 0, sizeof *sym);
         params[0] = types_pointer(c->types, object);
         for (k = 0; k < 2; k++) {
             switch (root[i].kinds[k]) {
@@ -3258,7 +3269,7 @@ static struct type *check_qualified(struct checker *c, struct expr *e,
 static const struct {
     const char *name;
     enum atomic_op op;
-    int args;
+    size_t args;
     bool gives_value;
     bool gives_bool;
 } atomic_ops[] = {
@@ -3273,7 +3284,7 @@ static const struct {
 };
 
 /* The type of the atomic field that e denotes, or NULL. */
-static struct type *atomic_place(struct checker *c, struct expr *e)
+static struct type *atomic_place(const struct expr *e)
 {
     const struct struct_field *f;
     struct type *s;
@@ -3292,7 +3303,6 @@ static struct type *atomic_place(struct checker *c, struct expr *e)
     }
     f = find_field(s, &e->as.field.name);
     return f != NULL && f->atomic ? f->type : NULL;
-    (void)c;
 }
 
 /* Rewrite a call on an atomic place. Returns false when the callee is no
@@ -3308,7 +3318,6 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
         callee->as.field.base->kind != EXPR_FIELD) {
         return false;
     }
-    (void)0;
     /* DESIGN: the base is checked quietly, because this is a probe. A
        call on anything else reaches the branches below, which report
        what is wrong with it. */
@@ -3322,16 +3331,16 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
     if (t == NULL || is_error(t)) {
         return false;
     }
-    if (atomic_place(c, place) == NULL) {
+    t = atomic_place(place);
+    if (t == NULL) {
         return false;
     }
-    t = atomic_place(c, place);
     for (i = 0; i < sizeof atomic_ops / sizeof atomic_ops[0]; i++) {
         if (!name_is(&callee->as.field.name, atomic_ops[i].name)) {
             continue;
         }
-        if ((int)e->as.call.arg_count != atomic_ops[i].args) {
-            error_at(c, e->pos, "`%s` takes %d argument%s", atomic_ops[i].name,
+        if (e->as.call.arg_count != atomic_ops[i].args) {
+            error_at(c, e->pos, "`%s` takes %zu argument%s", atomic_ops[i].name,
                      atomic_ops[i].args, atomic_ops[i].args == 1 ? "" : "s");
             *out = builtin(c, TYPE_ERROR);
             return true;
@@ -3541,7 +3550,8 @@ static bool method_call(struct checker *c, struct expr *call)
     callee->as.name = f->name;
     callee->symbol = f;
     callee->type = f->type;
-    args = arena_alloc(c->arena, (call->as.call.arg_count + 1) * sizeof *args);
+    args = types_alloc_array(c->arena, call->as.call.arg_count + 1,
+                             sizeof *args);
     args[0] = receiver;
     /* A call without arguments holds no array to copy. */
     if (call->as.call.arg_count > 0) {
@@ -3909,7 +3919,6 @@ static struct expr *default_argument(struct checker *c, const struct expr *call,
         return arg;
     }
     value = arena_alloc(c->arena, sizeof *value);
-    memset(value, 0, sizeof *value);
     value->kind = SYMBOL_CONST;
     value->type = t;
     value->value = (struct const_value *)d->value;
@@ -3926,7 +3935,7 @@ static void append_defaults(struct checker *c, struct expr *e,
 {
     size_t have = e->as.call.arg_count;
     struct expr **args =
-        arena_alloc(c->arena, (have + filled) * sizeof *args);
+        types_alloc_array(c->arena, have + filled, sizeof *args);
     size_t i;
 
     if (have > 0) {
@@ -4306,7 +4315,7 @@ static struct type *check_simd_value(struct checker *c, struct expr *e,
     size_t count = e->as.call.arg_count;
     struct type *lane = type_simd_lane(s);
     struct type *i64 = builtin(c, TYPE_I64);
-    struct expr **args = arena_alloc(c->arena, (count + 1) * sizeof *args);
+    struct expr **args = types_alloc_array(c->arena, count + 1, sizeof *args);
     enum simd_op op;
     size_t want;
     size_t i;
@@ -4348,7 +4357,7 @@ static struct type *check_simd_value(struct checker *c, struct expr *e,
         return builtin(c, TYPE_VOID);
     }
     case SIMD_OP_SHUFFLE: {
-        uint32_t *lanes = arena_alloc(c->arena, want * sizeof *lanes);
+        uint32_t *lanes = types_alloc_array(c->arena, want, sizeof *lanes);
         for (i = 0; i < want; i++) {
             struct const_value v;
             if (!require(c, args[i + 1], check_expr(c, args[i + 1], i64), i64)) {
@@ -4570,7 +4579,8 @@ static const struct type *plugin_call(struct checker *c, struct expr *e,
     argument->as.descriptor_of = iface;
     e->as.call.args[0] = argument;
     callee->as.field.name.text = instance ? "instance_at" : "supports_at";
-    callee->as.field.name.length = instance ? 11 : 11;
+    /* Both names are 11 bytes long. */
+    callee->as.field.name.length = sizeof "instance_at" - 1;
     *ok = true;
     return instance ? iface : NULL;
 }
@@ -4882,9 +4892,9 @@ static void declare_cases(struct checker *c, struct item *it)
     struct type *v = it->symbol->type;
     size_t count = it->case_count;
     struct struct_field *values =
-        arena_alloc(c->arena, (count + 1) * sizeof *values);
+        types_alloc_array(c->arena, count + 1, sizeof *values);
     struct type **payloads =
-        arena_alloc(c->arena, (count + 1) * sizeof *payloads);
+        types_alloc_array(c->arena, count + 1, sizeof *payloads);
     struct type *tag;
     size_t i;
     size_t j;
@@ -4900,7 +4910,6 @@ static void declare_cases(struct checker *c, struct item *it)
                                                       : TYPE_U32));
     for (i = 0; i < count; i++) {
         const struct variant_case *one = &it->cases[i];
-        memset(&values[i], 0, sizeof values[i]);
         values[i].name = one->name;
         values[i].pos = one->pos;
         values[i].doc = one->doc;
@@ -4927,9 +4936,9 @@ static void declare_cases(struct checker *c, struct item *it)
         if (one->field_count == 0) {
             continue;
         }
-        fields = arena_alloc(c->arena, one->field_count * sizeof *fields);
+        fields = types_alloc_array(c->arena, one->field_count,
+                                   sizeof *fields);
         for (j = 0; j < one->field_count; j++) {
-            memset(&fields[j], 0, sizeof fields[j]);
             fields[j].name = one->fields[j].name;
             fields[j].pos = one->fields[j].pos;
             fields[j].doc = one->fields[j].doc;
@@ -5592,7 +5601,7 @@ static struct expr *format_call(struct checker *c, struct expr *callee,
     struct expr *e = new_node(c, EXPR_CALL, callee->pos);
     e->as.call.callee = callee;
     if (count > 0) {
-        e->as.call.args = arena_alloc(c->arena, count * sizeof *args);
+        e->as.call.args = types_alloc_array(c->arena, count, sizeof *args);
         memcpy(e->as.call.args, args, count * sizeof *args);
     }
     e->as.call.arg_count = count;
@@ -6274,7 +6283,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         if (t->kind == TYPE_CLASS) {
             struct struct_field *flat;
             size_t count = chain_fields(t, NULL);
-            flat = arena_alloc(c->arena, (count + 1) * sizeof *flat);
+            flat = types_alloc_array(c->arena, count + 1, sizeof *flat);
             chain_fields(t, flat);
             return check_field_inits(c, e, e->as.struct_lit.fields,
                                      e->as.struct_lit.field_count, flat,
@@ -6337,7 +6346,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
        into. */
     case EXPR_TUPLE: {
         struct type **elements =
-            arena_alloc(c->arena, e->as.tuple.count * sizeof *elements);
+            types_alloc_array(c->arena, e->as.tuple.count, sizeof *elements);
         const struct type *want =
             expected != NULL && expected->kind == TYPE_TUPLE &&
                     expected->param_count == e->as.tuple.count
@@ -6554,8 +6563,8 @@ static bool fits_every_target(struct checker *c, const struct expr *e,
         return true;
     }
     fits = type_is_signed(v->type)
-               ? (int64_t)v->as.integer >= -((int64_t)1 << (bits - 1)) &&
-                     (int64_t)v->as.integer < ((int64_t)1 << (bits - 1))
+               ? signed_bits(v->as.integer) >= -((int64_t)1 << (bits - 1)) &&
+                     signed_bits(v->as.integer) < ((int64_t)1 << (bits - 1))
                : v->as.integer < ((uint64_t)1 << bits);
     if (!fits) {
         error_at(c, e->pos, "the value does not fit `%s` on every target",
@@ -6758,12 +6767,12 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
             found = true;
         } else if (divides && a->kind != CONST_SYMBOLIC && type_is_signed(t) &&
                    (a->as.integer & mask) == (uint64_t)1 << (bits - 1) &&
-                   (int64_t)b->as.integer == -1) {
+                   signed_bits(b->as.integer) == -1) {
             error_at(c, e->pos, "`%s %s %s` does not fit `%s`", text_cstr(&x),
                      o, text_cstr(&y), tn(t));
             found = true;
         } else if ((op == TOKEN_SHL || op == TOKEN_SHR) &&
-                   ((type_is_signed(t) && (int64_t)b->as.integer < 0) ||
+                   ((type_is_signed(t) && signed_bits(b->as.integer) < 0) ||
                     b->as.integer >= (uint64_t)bits)) {
             error_at(c, e->pos, "`%s %s %s` shifts out of range",
                      text_cstr(&x), o, text_cstr(&y));
@@ -6914,7 +6923,7 @@ static bool eval_const(struct checker *c, struct expr *e,
             out->kind = CONST_FLOAT;
             out->as.floating = a.kind == CONST_FLOAT ? a.as.floating
                                : type_is_signed(a.type)
-                                   ? (double)(int64_t)a.as.integer
+                                   ? (double)signed_bits(a.as.integer)
                                    : (double)a.as.integer;
             if (e->type->kind == TYPE_F32) {
                 out->as.floating = (float)out->as.floating;
@@ -7022,8 +7031,8 @@ static bool eval_const(struct checker *c, struct expr *e,
             } else if (a.kind == CONST_NULL || b.kind == CONST_NULL) {
                 cmp = a.kind == b.kind ? 0 : 1;
             } else if (is_signed) {
-                cmp = (int64_t)a.as.integer < (int64_t)b.as.integer ? -1
-                      : (int64_t)a.as.integer > (int64_t)b.as.integer ? 1 : 0;
+                cmp = signed_bits(a.as.integer) < signed_bits(b.as.integer) ? -1
+                      : signed_bits(a.as.integer) > signed_bits(b.as.integer) ? 1 : 0;
             } else {
                 uint64_t x = a.kind == CONST_CHAR ? a.as.character
                              : a.kind == CONST_BOOL ? a.as.boolean
@@ -7098,8 +7107,8 @@ static bool eval_const(struct checker *c, struct expr *e,
         case TOKEN_SLASH:
         case TOKEN_PERCENT: {
             if (is_signed) {
-                int64_t x = (int64_t)a.as.integer;
-                int64_t y = (int64_t)b.as.integer;
+                int64_t x = signed_bits(a.as.integer);
+                int64_t y = signed_bits(b.as.integer);
                 out->as.integer = (uint64_t)(op == TOKEN_SLASH ? x / y : x % y);
             } else {
                 out->as.integer = op == TOKEN_SLASH ? a.as.integer / b.as.integer
@@ -7112,8 +7121,12 @@ static bool eval_const(struct checker *c, struct expr *e,
             if (op == TOKEN_SHL) {
                 out->as.integer = a.as.integer << b.as.integer;
             } else if (is_signed) {
-                out->as.integer = (uint64_t)((int64_t)a.as.integer >>
-                                             b.as.integer);
+                /* An arithmetic shift in unsigned operations, since C
+                   leaves the shift of a negative value to the
+                   implementation. */
+                out->as.integer = (a.as.integer >> 63) != 0
+                                      ? ~(~a.as.integer >> b.as.integer)
+                                      : a.as.integer >> b.as.integer;
             } else {
                 uint64_t mask = bits == 64 ? UINT64_MAX
                                            : ((uint64_t)1 << bits) - 1;
@@ -7184,7 +7197,8 @@ static bool eval_const(struct checker *c, struct expr *e,
         out->kind = CONST_STRUCT;
         out->as.aggregate.count = s->field_count;
         out->as.aggregate.items =
-            arena_alloc(c->arena, s->field_count * sizeof *out->as.aggregate.items);
+            types_alloc_array(c->arena, s->field_count,
+                              sizeof *out->as.aggregate.items);
         /* A zero-width bitfield holds no value and keeps a zero. */
         for (j = 0; j < s->field_count; j++) {
             out->as.aggregate.items[j].kind = CONST_INT;
@@ -7356,7 +7370,10 @@ static void const_deps_add(struct const_deps *d, struct symbol *sym)
     }
     if (d->count == d->capacity) {
         size_t capacity = d->capacity == 0 ? 64 : d->capacity * 2;
-        struct symbol **items = realloc(d->items, capacity * sizeof *items);
+        struct symbol **items =
+            capacity <= SIZE_MAX / sizeof *items
+                ? realloc(d->items, capacity * sizeof *items)
+                : NULL;
         if (items == NULL) {
             fputs("antic: out of memory\n", stderr);
             exit(70);
@@ -7500,7 +7517,9 @@ static void const_prepare(struct checker *c, struct symbol *root)
             if (stack_count == stack_capacity) {
                 size_t capacity = stack_capacity == 0 ? 64 : stack_capacity * 2;
                 struct const_frame *grown =
-                    realloc(stack, capacity * sizeof *grown);
+                    capacity <= SIZE_MAX / sizeof *grown
+                        ? realloc(stack, capacity * sizeof *grown)
+                        : NULL;
                 if (grown == NULL) {
                     fputs("antic: out of memory\n", stderr);
                     exit(70);
@@ -7531,7 +7550,10 @@ static void const_prepare(struct checker *c, struct symbol *root)
         }
         if (order_count == order_capacity) {
             size_t capacity = order_capacity == 0 ? 64 : order_capacity * 2;
-            struct symbol **grown = realloc(order, capacity * sizeof *grown);
+            struct symbol **grown =
+                capacity <= SIZE_MAX / sizeof *grown
+                    ? realloc(order, capacity * sizeof *grown)
+                    : NULL;
             if (grown == NULL) {
                 fputs("antic: out of memory\n", stderr);
                 exit(70);
@@ -8234,7 +8256,7 @@ static void check_step(struct checker *c, struct stmt *s, struct type *element)
     if (!eval_const(c, step, &v)) {
         return;
     }
-    s->as.for_loop.step_value = (int64_t)v.as.integer;
+    s->as.for_loop.step_value = signed_bits(v.as.integer);
     heederik_guardrail(c, step, &v);
 }
 
@@ -8423,7 +8445,6 @@ static void check_flags_let(struct checker *c, struct stmt *s, struct type *t)
         }
     }
     value = arena_alloc(c->arena, sizeof *value);
-    memset(value, 0, sizeof *value);
     value->kind = SYMBOL_LOCAL;
     value->pos = s->as.let.name_pos;
     pair[0] = t;
@@ -8512,7 +8533,6 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
         refuse_owned_copy(c, s->as.let.value, t);
     }
     value = arena_alloc(c->arena, sizeof *value);
-    memset(value, 0, sizeof *value);
     value->kind = SYMBOL_LOCAL;
     value->pos = s->as.let.name_pos;
     value->type = t;
@@ -9453,8 +9473,8 @@ static void check_construct_sets(struct checker *c, const struct item *it)
     }
     r.fn = it;
     r.owner = owner;
-    r.fields = arena_alloc(c->arena, (n + 1) * sizeof *r.fields);
-    r.levels = arena_alloc(c->arena, (n + 1) * sizeof *r.levels);
+    r.fields = types_alloc_array(c->arena, n + 1, sizeof *r.fields);
+    r.levels = types_alloc_array(c->arena, n + 1, sizeof *r.levels);
     r.count = 0;
     for (up = owner; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
         for (i = 0; i < up->field_count; i++) {
@@ -9472,7 +9492,6 @@ static void check_construct_sets(struct checker *c, const struct item *it)
         return;
     }
     set = arena_alloc(c->arena, r.count + 1);
-    memset(set, 0, r.count);
     if (sets_block(c, &r, it->body, set)) {
         require_set(c, &r, set, it->body->end);
     }
@@ -9617,8 +9636,7 @@ static void check_defaults(struct checker *c, struct item *it)
             continue;
         }
         if (list == NULL) {
-            list = arena_alloc(c->arena, count * sizeof *list);
-            memset(list, 0, count * sizeof *list);
+            list = types_alloc_array(c->arena, count, sizeof *list);
         }
         if (p->value->kind == EXPR_HERE) {
             list[i + extra].here = true;
@@ -9662,8 +9680,7 @@ static void check_owned(struct checker *c, struct item *it)
             continue;
         }
         if (list == NULL) {
-            list = arena_alloc(c->arena, count * sizeof *list);
-            memset(list, 0, count * sizeof *list);
+            list = types_alloc_array(c->arena, count, sizeof *list);
         }
         list[i + extra] = true;
     }
@@ -10313,7 +10330,8 @@ bool sema_check(struct module *module, const char *module_name,
         if (it->symbol == NULL || it->kind != ITEM_ENUM) {
             continue;
         }
-        values = arena_alloc(arena, (it->param_count + 1) * sizeof *values);
+        values =
+            types_alloc_array(arena, it->param_count + 1, sizeof *values);
         for (j = 0; j < it->param_count; j++) {
             size_t k;
             memset(&values[j], 0, sizeof values[j]);
@@ -10367,8 +10385,8 @@ bool sema_check(struct module *module, const char *module_name,
            nested whole, so the C rules of chapter 18 place it at offset
            0 and the class's own fields after it. */
         base_fields = it->kind == ITEM_CLASS ? 1 : 0;
-        fields = arena_alloc(arena,
-                             (it->param_count + base_fields) * sizeof *fields);
+        fields = types_alloc_array(arena, it->param_count + base_fields,
+                                   sizeof *fields);
         if (base_fields != 0) {
             static const char super_text[] = "super";
             memset(&fields[0], 0, sizeof fields[0]);
@@ -11828,22 +11846,22 @@ void sema_interface(const struct module *module, const char *module_name,
     out->package.version = PACKAGE_VERSION_DEFAULT;
     out->package.license = "";
     out->package.license_text = "";
-    out->imports = arena_alloc(arena, (module->import_count + 1) *
-                                          sizeof *out->imports);
+    out->imports = types_alloc_array(arena, module->import_count + 1,
+                                     sizeof *out->imports);
     for (i = 0; i < module->import_count; i++) {
         out->imports[i] = keep_name(arena, module->imports[i].module.text,
                                     module->imports[i].module.length);
     }
     out->import_count = module->import_count;
-    out->frameworks = arena_alloc(arena, (module->framework_count + 1) *
-                                             sizeof *out->frameworks);
+    out->frameworks = types_alloc_array(arena, module->framework_count + 1,
+                                        sizeof *out->frameworks);
     for (i = 0; i < module->framework_count; i++) {
         out->frameworks[i] = keep_name(arena, module->frameworks[i].name.text,
                                        module->frameworks[i].name.length);
     }
     out->framework_count = module->framework_count;
-    out->items = arena_alloc(arena, (module->item_count + 1) *
-                                        sizeof *out->items);
+    out->items = types_alloc_array(arena, module->item_count + 1,
+                                   sizeof *out->items);
     for (i = 0; i < module->item_count; i++) {
         const struct item *it = module->items[i];
         struct symbol *sym;
@@ -11867,7 +11885,7 @@ void sema_interface(const struct module *module, const char *module_name,
                                ? sym->type->param_count
                                : it->param_count;
             struct name *names =
-                arena_alloc(arena, (total + 1) * sizeof *names);
+                types_alloc_array(arena, total + 1, sizeof *names);
             size_t j;
             for (j = 0; j < it->param_count && j < total; j++) {
                 names[j].text = keep_name(arena, it->params[j].name.text,
