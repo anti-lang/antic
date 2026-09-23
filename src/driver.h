@@ -7,6 +7,15 @@
 #include "linker.h"
 #include "target.h"
 
+/* DESIGN: `anti check` reports one line per class, so it needs the number
+   of the diagnostics of each kind and not their text, which antic prints
+   itself. driver_run adds them to the counts the caller gives. */
+struct diagnostic_counts {
+    size_t errors;
+    size_t warnings;            /* the warnings of the checker */
+    size_t doc_warnings;        /* the warnings of --doc-warnings */
+};
+
 struct options {
     const char *input;          /* The .anti source file. */
     const char *output;         /* NULL: input without .anti. */
@@ -24,11 +33,16 @@ struct options {
     /* --warn-undocumented, with --doc-warnings: every `pub` item without
        a `///` comment. `anti check` takes the same option. */
     bool warn_undocumented;
-    /* DESIGN: --front-end stops after semantic analysis and writes
-       nothing, which is the one build with no artifact. `anti check`
-       passes it, once per target. The module is checked as a library and
+    struct diagnostic_counts *counts;   /* NULL: count nothing. */
+    /* DESIGN: --front-end stops after semantic analysis. No pass below the
+       checker runs, so no assembly, no object and no executable is
+       written. `anti check` passes it once per target, and passes -c with
+       it where it needs the interface file that lets the next module of a
+       project resolve its imports. The module is checked as a library and
        not as a program. A check of one file cannot know which module of a
-       project fills an abstract class. */
+       project fills an abstract class. The two rules of producing a
+       library, the reserved module root and the path of one segment,
+       belong to a build and stay quiet under it. */
     bool front_end;
     bool dev;                   /* --dev, one module into its own object. */
     bool no_reflect;            /* --no-reflect, no field list in a

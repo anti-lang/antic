@@ -11,6 +11,9 @@ struct diagnostic {
     int line;
     int column;
     bool warning;
+    /* A warning about documentation, which `anti check` counts as its own
+       class. Only --doc-warnings produces one. */
+    bool doc;
     char message[160];
 };
 
@@ -30,6 +33,14 @@ void diagnostics_add(struct diagnostics *d, int line, int column,
     ;
 void diagnostics_warn(struct diagnostics *d, int line, int column,
                       const char *format, ...)
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((format(printf, 4, 5)))
+#endif
+    ;
+/* A warning about documentation, which belongs to the doc class of
+   `anti check`. */
+void diagnostics_doc(struct diagnostics *d, int line, int column,
+                     const char *format, ...)
 #if defined(__GNUC__) || defined(__clang__)
     __attribute__((format(printf, 4, 5)))
 #endif

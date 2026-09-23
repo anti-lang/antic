@@ -10883,14 +10883,14 @@ static void doc_markup_warning(const struct doc_scope *s,
                                const struct name *owner, const char *what)
 {
     if (owner == NULL) {
-        diagnostics_warn(s->diags, doc->line, doc->column,
-                         "the doc comment of the module holds %s, which the "
-                         "doc markup has not", what);
+        diagnostics_doc(s->diags, doc->line, doc->column,
+                        "the doc comment of the module holds %s, which the "
+                        "doc markup has not", what);
         return;
     }
-    diagnostics_warn(s->diags, doc->line, doc->column,
-                     "the doc comment of `%.*s` holds %s, which the doc "
-                     "markup has not", (int)owner->length, owner->text, what);
+    diagnostics_doc(s->diags, doc->line, doc->column,
+                    "the doc comment of `%.*s` holds %s, which the doc "
+                    "markup has not", (int)owner->length, owner->text, what);
 }
 
 static void doc_name_warning(const struct doc_scope *s,
@@ -10899,14 +10899,14 @@ static void doc_name_warning(const struct doc_scope *s,
                              size_t length)
 {
     if (owner == NULL) {
-        diagnostics_warn(s->diags, doc->line, doc->column,
-                         "`%.*s` in the doc comment of the module resolves to "
-                         "nothing", (int)length, name);
+        diagnostics_doc(s->diags, doc->line, doc->column,
+                        "`%.*s` in the doc comment of the module resolves to "
+                        "nothing", (int)length, name);
         return;
     }
-    diagnostics_warn(s->diags, doc->line, doc->column,
-                     "`%.*s` in the doc comment of `%.*s` resolves to nothing",
-                     (int)length, name, (int)owner->length, owner->text);
+    diagnostics_doc(s->diags, doc->line, doc->column,
+                    "`%.*s` in the doc comment of `%.*s` resolves to nothing",
+                    (int)length, name, (int)owner->length, owner->text);
 }
 
 static bool doc_same(const struct name *a, const char *text, size_t length)
@@ -11307,9 +11307,9 @@ static void doc_check_undocumented(const struct doc_scope *s,
 
     if (it->pub && it->doc.length == 0 && !it->singleton_get &&
         it->block == BLOCK_NONE) {
-        diagnostics_warn(s->diags, it->name_pos.line, it->name_pos.column,
-                         "the pub item `%.*s` has no `///` comment",
-                         (int)it->name.length, it->name.text);
+        diagnostics_doc(s->diags, it->name_pos.line, it->name_pos.column,
+                        "the pub item `%.*s` has no `///` comment",
+                        (int)it->name.length, it->name.text);
     }
     for (i = 0; i < it->member_count; i++) {
         doc_check_undocumented(s, it->members[i]);
@@ -11340,10 +11340,10 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
     for (i = 0; i < module->item_count; i++) {
         const struct item *it = module->items[i];
         if (it->pub && it->note.length > 0 && it->doc.length == 0) {
-            diagnostics_warn(diags, it->name_pos.line, it->name_pos.column,
-                             "the pub item `%.*s` has a `//#` note and no "
-                             "`///` comment", (int)it->name.length,
-                             it->name.text);
+            diagnostics_doc(diags, it->name_pos.line, it->name_pos.column,
+                            "the pub item `%.*s` has a `//#` note and no "
+                            "`///` comment", (int)it->name.length,
+                            it->name.text);
         }
     }
     if (undocumented) {
@@ -11353,13 +11353,13 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
     }
     for (i = 0; i < module->dropped_count; i++) {
         const struct dropped_doc *d = &module->dropped[i];
-        diagnostics_warn(diags, d->pos.line, d->pos.column,
-                         d->module_form
-                             ? "the `%.*s` comment is dropped, because it "
-                               "stands after the first import or item"
-                             : "the `%.*s` comment is dropped, because no "
-                               "item or field follows it",
-                         (int)d->marker.length, d->marker.text);
+        diagnostics_doc(diags, d->pos.line, d->pos.column,
+                        d->module_form
+                            ? "the `%.*s` comment is dropped, because it "
+                              "stands after the first import or item"
+                            : "the `%.*s` comment is dropped, because no "
+                              "item or field follows it",
+                        (int)d->marker.length, d->marker.text);
     }
 }
 

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 static void add(struct diagnostics *d, int line, int column, bool warning,
-                const char *format, va_list args)
+                bool doc, const char *format, va_list args)
 {
     struct diagnostic *item;
 
@@ -24,6 +24,7 @@ static void add(struct diagnostics *d, int line, int column, bool warning,
     item->line = line;
     item->column = column;
     item->warning = warning;
+    item->doc = doc;
     vsnprintf(item->message, sizeof item->message, format, args);
 }
 
@@ -33,7 +34,7 @@ void diagnostics_add(struct diagnostics *d, int line, int column,
     va_list args;
 
     va_start(args, format);
-    add(d, line, column, false, format, args);
+    add(d, line, column, false, false, format, args);
     va_end(args);
 }
 
@@ -43,7 +44,17 @@ void diagnostics_warn(struct diagnostics *d, int line, int column,
     va_list args;
 
     va_start(args, format);
-    add(d, line, column, true, format, args);
+    add(d, line, column, true, false, format, args);
+    va_end(args);
+}
+
+void diagnostics_doc(struct diagnostics *d, int line, int column,
+                     const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    add(d, line, column, true, true, format, args);
     va_end(args);
 }
 

@@ -198,13 +198,15 @@ static bool module_name(const struct options *o, struct text *out)
                 o->input, RUNTIME_MODULE);
         return false;
     }
-    if (o->library && !o->internal && module_path_reserved(text_cstr(out))) {
+    if (o->library && !o->front_end && !o->internal &&
+        module_path_reserved(text_cstr(out))) {
         fprintf(stderr, "antic: %s: the module path `%s` is reserved for the "
                         "language's own libraries\n",
                 o->input, text_cstr(out));
         return false;
     }
-    if (o->library && module_path_segments(text_cstr(out)) == 1) {
+    if (o->library && !o->front_end &&
+        module_path_segments(text_cstr(out)) == 1) {
         fprintf(stderr, "antic: %s: warning: the module path `%s` has one "
                         "segment, which is for a program's own files\n",
                 o->input, text_cstr(out));
@@ -607,6 +609,28 @@ static void print_diagnostics(const char *input,
                 diags->items[i].column,
                 diags->items[i].warning ? "warning" : "error",
                 diags->items[i].message);
+    }
+}
+
+/* Print the diagnostics of the compilation and count them for the caller
+   that asked, which is `anti check`. */
+static void report_diagnostics(const struct options *o,
+                               const struct diagnostics *diags)
+{
+    size_t i;
+
+    print_diagnostics(o->input, diags);
+    if (o->counts == NULL) {
+        return;
+    }
+    for (i = 0; i < diags->count; i++) {
+        if (!diags->items[i].warning) {
+            o->counts->errors++;
+        } else if (diags->items[i].doc) {
+            o->counts->doc_warnings++;
+        } else {
+            o->counts->warnings++;
+        }
     }
 }
 
@@ -1460,7 +1484,7 @@ static int compile(const struct options *o, struct text *source,
         return 1;
     }
     if (!lex(text_cstr(source), source->length, &arena, &diags, &tokens)) {
-        print_diagnostics(o->input, &diags);
+        report_diagnostics(o, &diags);
         goto done;
     }
     if (o->dump_tokens) {
@@ -1469,7 +1493,7 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     if (!parse(text_cstr(source), &tokens, &arena, &diags, &tree)) {
-        print_diagnostics(o->input, &diags);
+        report_diagnostics(o, &diags);
         goto done;
     }
     drop_test_blocks(tree, o->tests);
@@ -1501,21 +1525,15 @@ static int compile(const struct options *o, struct text *source,
                     paths.count, &types, &arena, &diags,
                     !o->dev && !o->library && !o->front_end &&
                         o->lib == LIB_NONE)) {
-        print_diagnostics(o->input, &diags);
+        report_diagnostics(o, &diags);
         goto done;
     }
     if (o->doc_warnings) {
         sema_doc_warnings(tree, text_cstr(module), libraries, paths.count,
                           &types, o->warn_undocumented, &diags);
     }
-    print_diagnostics(o->input, &diags);
+    report_diagnostics(o, &diags);
     diags.count = 0;
-    /* The front end ends here, before the first pass that writes a file.
-       Status 2 is the status of a command a dump finished. */
-    if (o->front_end) {
-        status = 2;
-        goto done;
-    }
     if (o->dump_types) {
         struct text dump = {0};
         ast_dump_typed(&dump, tree);
@@ -1526,6 +1544,12 @@ static int compile(const struct options *o, struct text *source,
     }
     if (o->library) {
         status = write_library(o, tree, text_cstr(module), &arena, &diags);
+        goto done;
+    }
+    /* The front end ends here, before the first pass that writes a file of
+       the program. Status 2 is the status of a command a dump finished. */
+    if (o->front_end) {
+        status = 2;
         goto done;
     }
     if (o->dump_ir || o->dump_opt) {
