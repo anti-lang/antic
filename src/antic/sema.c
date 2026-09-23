@@ -2304,6 +2304,13 @@ static struct type *check_variant_test(struct checker *c, struct expr *e,
     const struct name *which;
     int index;
 
+    /* A variant without cases has had its message and has no case to
+       give as the example. */
+    if ((target->kind != TYPEX_NAMED || target->module.length == 0) &&
+        from->base->field_count == 0) {
+        error_at(c, e->pos, "`is` on `%s` names one of its cases", tn(from));
+        return builtin(c, TYPE_ERROR);
+    }
     if (target->kind != TYPEX_NAMED || target->module.length == 0) {
         error_at(c, e->pos, "`is` on `%s` names one of its cases, as "
                  "`%s.%.*s`", tn(from), tn(from),
@@ -11274,6 +11281,11 @@ static void doc_check_text(const struct doc_scope *s,
     bool emphasis = false;
     size_t start = 0;
 
+    /* An item without a doc comment has no text, and NULL + 0 is
+       undefined. */
+    if (doc->length == 0) {
+        return;
+    }
     while (start <= doc->length) {
         const char *line = doc->text + start;
         size_t end = start;
