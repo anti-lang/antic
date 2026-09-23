@@ -44,7 +44,7 @@ No `[provisional]` decision was made.
 
 Taken after the push of the answers, before the commit of this report.
 
-```
+```text
 $ git log --oneline -3
 a4d4a79 Record Eddie's answers to the open audit questions
 895688a Report the applied provisional review
