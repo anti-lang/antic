@@ -170,6 +170,30 @@ struct parser {
     size_t word_length;
 };
 
+/* DESIGN: the parser recurses once per array, parameter list and group
+   of a declarator, and once per typedef a name leads it into. Every
+   pointer nests the type the writer then recurses into. A spelling nested
+   deeper than this bound, the parses of its typedefs counted, does not
+   parse. One level takes about 1.3 KB of stack. The bound keeps under
+   half of the 1 MB that Windows gives a main thread, and no header comes
+   near it. */
+#define TYPE_DEPTH 256
+
+/* The levels of every parse in progress. It is global because the parse
+   of a typedef starts in a callback of a reader, which cannot hand the
+   count on. anti bind runs on one thread. */
+static int nesting;
+
+/* Enter one level of the type, or refuse at the bound. */
+static bool deeper(void)
+{
+    if (nesting >= TYPE_DEPTH) {
+        return false;
+    }
+    nesting++;
+    return true;
+}
+
 static void next(struct parser *p)
 {
     const char *s = p->text;
@@ -438,10 +462,14 @@ static const struct bind_type *function_of(struct parser *p,
     const struct bind_type *params[64];
     size_t count = 0;
 
+    if (!deeper()) {
+        return NULL;
+    }
     t->to = result;
     next(p);
     if (p->kind == T_CLOSE) {
         next(p);
+        nesting--;
         return t;
     }
     for (;;) {
@@ -476,6 +504,7 @@ static const struct bind_type *function_of(struct parser *p,
         t->params = kept;
         t->param_count = count;
     }
+    nesting--;
     return t;
 }
 
@@ -487,6 +516,9 @@ static const struct bind_type *suffixes(struct parser *p,
     if (p->kind == T_LBRACKET) {
         struct bind_type *t = bind_type_new(p->b, BIND_ARRAY);
         const struct bind_type *element;
+        if (!deeper()) {
+            return NULL;
+        }
         t->length = -1;
         next(p);
         if (p->kind == T_NUMBER) {
@@ -508,6 +540,7 @@ static const struct bind_type *suffixes(struct parser *p,
             return NULL;
         }
         t->to = element;
+        nesting--;
         return t;
     }
     if (p->kind == T_OPEN) {
@@ -517,7 +550,8 @@ static const struct bind_type *suffixes(struct parser *p,
 }
 
 /* The end of the group that starts at the `(` of p, as the position
-   after its `)`, or 0. */
+   after its `)`, or 0. A group nested deeper than the bound has no end,
+   so the scan stops there. */
 static size_t group_end(const struct parser *p)
 {
     struct parser scan = *p;
@@ -526,6 +560,9 @@ static size_t group_end(const struct parser *p)
     do {
         if (scan.kind == T_OPEN) {
             depth++;
+            if (depth > TYPE_DEPTH) {
+                return 0;
+            }
         } else if (scan.kind == T_CLOSE) {
             depth--;
         } else if (scan.kind == T_END) {
@@ -539,7 +576,13 @@ static size_t group_end(const struct parser *p)
 static const struct bind_type *declarator(struct parser *p,
                                           const struct bind_type *base)
 {
+    int depth = nesting;
+    const struct bind_type *result;
+
     while (p->kind == T_STAR) {
+        if (!deeper()) {
+            return NULL;
+        }
         next(p);
         while (is_qualifier(p)) {
             next(p);
@@ -552,14 +595,14 @@ static const struct bind_type *declarator(struct parser *p,
         struct parser look = *p;
         next(&look);
         if (look.kind == T_STAR || look.kind == T_OPEN) {
-            struct parser inner = look;
+            struct parser inner;
             struct parser after = *p;
-            size_t end = group_end(p);
             const struct bind_type *outer;
-            const struct bind_type *result;
-            if (end == 0) {
+            size_t end;
+            if (!deeper() || (end = group_end(p)) == 0) {
                 return NULL;
             }
+            inner = look;
             after.pos = end;
             next(&after);
             outer = suffixes(&after, base);
@@ -571,10 +614,13 @@ static const struct bind_type *declarator(struct parser *p,
                 return NULL;
             }
             *p = after;
+            nesting = depth;
             return result;
         }
     }
-    return suffixes(p, base);
+    result = suffixes(p, base);
+    nesting = depth;
+    return result;
 }
 
 static const struct bind_type *parse_type(struct parser *p)
@@ -594,13 +640,19 @@ const struct bind_type *bind_parse_type(struct bind_module *b, const char *c,
 {
     struct parser p;
     const struct bind_type *t;
+    int depth = nesting;
 
+    if (!deeper()) {
+        return NULL;
+    }
     memset(&p, 0, sizeof p);
     p.b = b;
     p.names = names;
     p.text = c;
     next(&p);
     t = parse_type(&p);
+    /* A parse that failed inside leaves its levels counted. */
+    nesting = depth;
     if (t == NULL || p.kind != T_END || p.word == NULL) {
         return NULL;
     }

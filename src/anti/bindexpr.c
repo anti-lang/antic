@@ -8,6 +8,19 @@
 
 #include "bindexpr.h"
 
+/* DESIGN: the evaluator recurses once per prefix operator, cast and
+   parenthesis. It recurses once more per macro a name leads it into,
+   which the lookup of a reader evaluates with a bind_eval of its own. An expression nested deeper than this bound, every evaluation
+   counted, fails as one the evaluator does not know does. One level takes
+   about 3.5 KB of stack. The bound keeps under half of the 1 MB that
+   Windows gives a main thread, and no header comes near it. */
+#define EVAL_DEPTH 128
+
+/* The levels of every evaluation in progress. It is global because a
+   nested bind_eval starts in the lookup of a reader, which cannot hand
+   the count on. anti bind runs on one thread. */
+static int nesting;
+
 struct eval {
     struct bind_module *b;
     const char *s;
@@ -56,6 +69,23 @@ static bool is_unsigned_type(const char *type)
 static void fail(struct eval *e)
 {
     e->failed = true;
+}
+
+/* Enter one level of nesting, or fail at the bound. A true result is
+   followed by one call of leave. */
+static bool enter(struct eval *e)
+{
+    if (nesting >= EVAL_DEPTH) {
+        fail(e);
+        return false;
+    }
+    nesting++;
+    return true;
+}
+
+static void leave(void)
+{
+    nesting--;
 }
 
 /* An integer wraps at the width of its type, as C computes it. c_long
@@ -249,7 +279,9 @@ static struct bind_eval primary(struct eval *e)
     struct bind_eval v;
     char c;
 
+    /* A value that fails still has a type, which narrow reads. */
     memset(&v, 0, sizeof v);
+    v.type = "c_int";
     space(e);
     c = e->s[e->pos];
     if (c == '(') {
@@ -266,7 +298,11 @@ static struct bind_eval primary(struct eval *e)
             }
             if (type != NULL) {
                 e->pos += n + 2;
+                if (!enter(e)) {
+                    return v;
+                }
                 v = primary(e);
+                leave();
                 if (v.kind == BIND_EVAL_STRING) {
                     fail(e);
                 }
@@ -274,7 +310,11 @@ static struct bind_eval primary(struct eval *e)
             }
         }
         e->pos++;
+        if (!enter(e)) {
+            return v;
+        }
         v = conditional(e);
+        leave();
         if (!take(e, ")")) {
             fail(e);
         }
@@ -311,12 +351,29 @@ static struct bind_eval primary(struct eval *e)
     return v;
 }
 
+static struct bind_eval unary(struct eval *e);
+
+/* The operand of a prefix operator, one level deeper. */
+static struct bind_eval operand(struct eval *e)
+{
+    struct bind_eval v;
+
+    if (!enter(e)) {
+        memset(&v, 0, sizeof v);
+        v.type = "c_int";
+        return v;
+    }
+    v = unary(e);
+    leave();
+    return v;
+}
+
 static struct bind_eval unary(struct eval *e)
 {
     struct bind_eval v;
 
     if (take(e, "-")) {
-        v = unary(e);
+        v = operand(e);
         if (v.kind == BIND_EVAL_FLOAT) {
             v.f = -v.f;
         } else if (v.kind == BIND_EVAL_INT) {
@@ -329,12 +386,12 @@ static struct bind_eval unary(struct eval *e)
         return v;
     }
     if (take(e, "+")) {
-        v = unary(e);
+        v = operand(e);
         v.enum_type = NULL;
         return v;
     }
     if (take(e, "~")) {
-        v = unary(e);
+        v = operand(e);
         if (v.kind != BIND_EVAL_INT) {
             fail(e);
         }
@@ -494,10 +551,11 @@ bool bind_eval(struct bind_module *b, const char *expr, bind_lookup lookup,
     e.lookup = lookup;
     e.context = context;
     space(&e);
-    if (e.s[e.pos] == '\0') {
+    if (e.s[e.pos] == '\0' || !enter(&e)) {
         return false;
     }
     *out = conditional(&e);
+    leave();
     space(&e);
     return !e.failed && e.s[e.pos] == '\0';
 }

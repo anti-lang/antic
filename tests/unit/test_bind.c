@@ -137,9 +137,87 @@ static void expressions(void)
     CHECK(!value_of(&b, "(int)1e30", &v));
     CHECK(value_of(&b, "(unsigned char)300", &v) && v.i == 44);
     CHECK(!value_of(&b, "UNKNOWN", &v));
+    CHECK(!value_of(&b, "-UNKNOWN", &v));
+    CHECK(!value_of(&b, "~(int)UNKNOWN", &v));
     CHECK(!value_of(&b, "(1 + 2", &v));
     CHECK(!value_of(&b, "", &v));
     CHECK(!value_of(&b, "\"open", &v));
+    arena_free(&b.arena);
+}
+
+/* A text of head, n copies of open, middle and n copies of close. */
+static char *repeated(const char *head, const char *open, const char *middle,
+                      const char *close, size_t n)
+{
+    size_t lh = strlen(head);
+    size_t lo = strlen(open);
+    size_t lm = strlen(middle);
+    size_t lc = strlen(close);
+    char *s = malloc(lh + n * (lo + lc) + lm + 1);
+    char *at = s;
+    size_t i;
+
+    CHECK(s != NULL);
+    if (s == NULL) {
+        return NULL;
+    }
+    memcpy(at, head, lh);
+    at += lh;
+    for (i = 0; i < n; i++, at += lo) {
+        memcpy(at, open, lo);
+    }
+    memcpy(at, middle, lm);
+    at += lm;
+    for (i = 0; i < n; i++, at += lc) {
+        memcpy(at, close, lc);
+    }
+    *at = '\0';
+    return s;
+}
+
+/* Input nested a million deep fails instead of exhausting the stack, and
+   input nested thirty-two deep still reads. */
+static void deep_input(void)
+{
+    static const struct {
+        const char *head;
+        const char *open;
+        const char *middle;
+        const char *close;
+    } exprs[] = {
+        {"", "-", "1", ""},   {"", "+", "1", ""},     {"", "~", "1", ""},
+        {"", "(", "1", ")"},  {"", "(int)", "1", ""}, {"", "-(", "1", ")"},
+    }, types[] = {
+        {"int", "", "", "[1]"},        {"int", "", "", "*"},
+        {"int ", "(*", "", ")"},       {"", "void (*)(", "int", ")"},
+    };
+    struct bind_module b;
+    struct bind_eval v;
+    size_t i;
+
+    memset(&b, 0, sizeof b);
+    b.source = "test";
+    for (i = 0; i < sizeof exprs / sizeof exprs[0]; i++) {
+        char *deep = repeated(exprs[i].head, exprs[i].open, exprs[i].middle,
+                              exprs[i].close, 1000000);
+        char *shallow = repeated(exprs[i].head, exprs[i].open,
+                                 exprs[i].middle, exprs[i].close, 32);
+        CHECK(deep != NULL && !value_of(&b, deep, &v));
+        CHECK(shallow != NULL && value_of(&b, shallow, &v));
+        free(deep);
+        free(shallow);
+    }
+    for (i = 0; i < sizeof types / sizeof types[0]; i++) {
+        char *deep = repeated(types[i].head, types[i].open, types[i].middle,
+                              types[i].close, 1000000);
+        char *shallow = repeated(types[i].head, types[i].open,
+                                 types[i].middle, types[i].close, 32);
+        CHECK(deep != NULL && parse(&b, deep) == NULL);
+        CHECK(shallow != NULL && parse(&b, shallow) != NULL);
+        free(deep);
+        free(shallow);
+    }
+    free(b.records.items);
     arena_free(&b.arena);
 }
 
@@ -147,4 +225,5 @@ void test_bind(void)
 {
     spellings();
     expressions();
+    deep_input();
 }
