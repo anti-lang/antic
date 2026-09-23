@@ -16,6 +16,7 @@ enum {
     ARM64 = 0xAA64,
     CODE = 0x60500020,
     RDATA = 0x40301040,
+    DATA = 0x40300040,
     COMDAT = 0x1000,
     INFO = 0x00100A00,
     DEBUG = 0x42100040,
@@ -491,6 +492,159 @@ static void test_refusals(void)
     text_free(&error);
 }
 
+/* Join two objects given as bytes. */
+static bool join_bytes(const struct text *first, const struct text *second,
+                       struct text *out, struct text *error)
+{
+    struct coff_input inputs[2];
+
+    inputs[0].name = "a.o";
+    inputs[0].data = (const unsigned char *)first->data;
+    inputs[0].size = first->length;
+    inputs[1].name = "b.o";
+    inputs[1].data = (const unsigned char *)second->data;
+    inputs[1].size = second->length;
+    return coff_join(inputs, 2, out, error);
+}
+
+static void patch32(struct text *t, size_t at, uint32_t v)
+{
+    size_t i;
+
+    for (i = 0; i < 4; i++) {
+        t->data[at + i] = (char)(v >> (8 * i));
+    }
+}
+
+/* A section marked uninitialised holds no bytes, so the join reads none
+   at its raw pointer, even for a .drectve or a .debug$S. */
+static void test_uninitialised(void)
+{
+    struct t_object a = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                 {".drectve", INFO, "x", 1, {{0}}, 0},
+                                 {".debug$S", DEBUG, "\4\0\0\0", 4, {{0}}, 0}}, 3,
+                         {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
+                         {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct text first = {0};
+    struct text second = {0};
+    struct text out = {0};
+    struct text error = {0};
+    size_t n;
+
+    build(&a, &first);
+    build(&b, &second);
+    for (n = 2; n <= 3; n++) {
+        size_t h = section_at(n);
+        patch32(&first, h + 16, 0xFFFFFFF0u);
+        patch32(&first, h + 20, 0xFFFFFFF0u);
+        patch32(&first, h + 36, get(&first, h + 36, 4) | 0x80u);
+    }
+    CHECK(join_bytes(&first, &second, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    for (n = 1; out.length > 0 && n <= sections_of(&out); n++) {
+        CHECK(get(&out, section_at(n) + 20, 4) < out.length);
+    }
+    text_free(&first);
+    text_free(&second);
+    text_free(&out);
+    text_free(&error);
+}
+
+/* The long name of a section is `/` and the decimal offset in the string
+   table, up to the first NUL of the 7 bytes. Any other byte there is
+   refused, where strtoul would skip a space, take a sign or stop early. */
+static void test_long_names(void)
+{
+    static const char *const refused[] = {" 4", "+4", "4x", "4 ", "", "0x4"};
+    struct t_object a = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                 {".rdata$long_name", DATA, "u", 1, {{0}}, 0}}, 2,
+                         {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
+                         {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct text first = {0};
+    struct text second = {0};
+    struct text out = {0};
+    struct text error = {0};
+    size_t h = section_at(2);
+    char name[64];
+    size_t i;
+
+    build(&a, &first);
+    build(&b, &second);
+    memcpy(first.data + h, "/0000004", 8);
+    CHECK(join_bytes(&first, &second, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    if (out.length > 0) {
+        section_name(&out, 2, name);
+        CHECK_STR(name, ".rdata$long_name");
+    }
+    for (i = 0; i < sizeof refused / sizeof refused[0]; i++) {
+        memset(first.data + h + 1, 0, 7);
+        memcpy(first.data + h + 1, refused[i], strlen(refused[i]));
+        out.length = 0;
+        error.length = 0;
+        CHECK(!join_bytes(&first, &second, &out, &error));
+        CHECK(strstr(text_cstr(&error), "names a section it lacks") != NULL);
+    }
+    text_free(&first);
+    text_free(&second);
+    text_free(&out);
+    text_free(&error);
+}
+
+/* An object of count empty sections and no symbols. */
+static void build_sections(size_t count, struct text *out)
+{
+    size_t i;
+
+    put16(out, AMD64);
+    put16(out, (uint16_t)count);
+    put32(out, 0);
+    put32(out, (uint32_t)(20 + 40 * count));
+    put32(out, 0);
+    put32(out, 0);
+    for (i = 0; i < count; i++) {
+        text_append_bytes(out, ".data\0\0\0", 8);
+        put32(out, 0);
+        put32(out, 0);
+        put32(out, 0);
+        put32(out, 0);
+        put32(out, 0);
+        put32(out, 0);
+        put32(out, 0);
+        put32(out, DATA);
+    }
+    put32(out, 4);
+}
+
+/* The section count of the header takes 16 bits, and a section number of
+   a symbol stops at 0xFEFF below the reserved -2 and -1. A join of more
+   sections is refused. */
+static void test_section_limit(void)
+{
+    struct text first = {0};
+    struct text second = {0};
+    struct text more = {0};
+    struct text out = {0};
+    struct text error = {0};
+
+    build_sections(32640, &first);
+    build_sections(32639, &second);
+    build_sections(32640, &more);
+    CHECK(join_bytes(&first, &second, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    CHECK(out.length > 0 && sections_of(&out) == 0xFEFF);
+    out.length = 0;
+    CHECK(!join_bytes(&first, &more, &out, &error));
+    CHECK(strstr(text_cstr(&error), "sections") != NULL);
+    text_free(&first);
+    text_free(&second);
+    text_free(&more);
+    text_free(&out);
+    text_free(&error);
+}
+
 void test_coff(void)
 {
     test_across();
@@ -499,4 +653,7 @@ void test_coff(void)
     test_features();
     test_codeview();
     test_refusals();
+    test_uninitialised();
+    test_long_names();
+    test_section_limit();
 }

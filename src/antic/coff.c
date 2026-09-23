@@ -58,7 +58,9 @@ enum {
     CV_FILECHECKSUMS = 0xF4,
     /* The largest offset that a section name of 8 bytes can hold, as
        `/` and 7 decimal digits. */
-    LONG_NAME_LIMIT = 9999999
+    LONG_NAME_LIMIT = 9999999,
+    /* The largest section number of a symbol, IMAGE_SYM_SECTION_MAX. */
+    SECTION_MAX = 0xFEFF
 };
 
 /* A symbol with no index in the joined object, and one that takes the
@@ -354,9 +356,17 @@ static bool parse(struct join *j, struct object *o, uint16_t *machine)
         s->kept = true;
         s->leader = DROPPED;
         if (h[0] == '/') {
-            unsigned long offset = strtoul((const char *)h + 1, NULL, 10);
-            const char *end;
-            if (offset < 4 || offset >= o->strings_size ||
+            size_t offset = 0;
+            size_t digits = 1;
+            const char *end = NULL;
+            /* The 7 bytes after the slash hold decimal digits up to the
+               first NUL. Any other byte is refused. */
+            while (digits < 8 && h[digits] >= '0' && h[digits] <= '9') {
+                offset = offset * 10 + (size_t)(h[digits] - '0');
+                digits++;
+            }
+            if (digits == 1 || (digits < 8 && h[digits] != '\0') ||
+                offset < 4 || offset >= o->strings_size ||
                 (end = memchr(o->strings + offset, '\0',
                               o->strings_size - offset)) == NULL) {
                 text_appendf(j->error, "%s names a section it lacks",
@@ -449,8 +459,15 @@ static bool read_sections(struct join *j, struct object *o, bool *codeview)
 
     for (i = 0; i < o->section_count; i++) {
         struct section *s = &o->sections[i];
-        const unsigned char *data = o->in->data + get(s->header + 20, 4);
-        uint32_t size = get(s->header + 16, 4);
+        const unsigned char *data;
+        uint32_t size;
+        /* parse checks the raw data of an initialised section alone, and
+           an uninitialised one holds no bytes to read, as in the writer. */
+        if (s->flags & SCN_UNINITIALIZED) {
+            continue;
+        }
+        data = o->in->data + get(s->header + 20, 4);
+        size = get(s->header + 16, 4);
         if (is_named(s->name, s->name_length, ".drectve") &&
             (s->flags & SCN_LNK_INFO)) {
             if (j->directive_flags == 0) {
@@ -891,6 +908,16 @@ bool coff_join(const struct coff_input *inputs, size_t count,
         }
         symbols = number_symbols(&j, &features_index, &features);
         sections += j.directives.length > 0 ? 1u : 0u;
+        /* The header counts the sections in 16 bits, and a symbol numbers
+           its section up to SECTION_MAX, below the reserved -2 and -1. */
+        if (sections > SECTION_MAX) {
+            text_appendf(error, "the join holds %u sections, more than the "
+                                "%u of a COFF object",
+                         (unsigned)sections, (unsigned)SECTION_MAX);
+            ok = false;
+        }
+    }
+    if (ok) {
         headers = allocate(sections, SECTION_SIZE);
         /* The body starts after the headers, so its offsets are those of
            the file. */
