@@ -132,6 +132,7 @@ The switch is the one `assert` uses: emitted in dev mode, absent in release, dec
 - `+| -| *|` clamp at the type's minimum or maximum. Both CPUs have a two-instruction form.
 - Both families apply to integer types only, both operands of one type, and follow the precedence of the plain operator.
 - The plain operators keep their meaning: a trap on overflow in dev mode, a wrap in release.
+- Each has a compound assignment, `+%= -%= *%= <<%=` and `+|= -|= *|=`, which gives what `x = x op e` gives.
 - `mul_high(a, b) -> T` is a built-in like `size_of` and returns the upper half of the full product.
 
 ## Flags
@@ -486,6 +487,6 @@ Rules:
 - Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range, `may fail` after a signature, `simd` before `struct`.
 - String prefixes added: `rf` and `x`.
 - Labels added: an identifier and `:` before `for`, `while` or a block.
-- Tokens added: `?*`, `+% -% *% <<%`, `+| -| *|`, the two-name `let` form `let (a, b) =`.
+- Tokens added: `?*`, `+% -% *% <<%`, `+| -| *|`, `+%= -%= *%= <<%=`, `+|= -|= *|=`, the two-name `let` form `let (a, b) =`.
 - Built-in types added: `f16`, `Flags`, `Mutex`, `chan T`.
 - Built-ins added: `mul_high`.

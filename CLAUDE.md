@@ -285,12 +285,13 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 788 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 787 each, without the `no_paths` test, which needs a
+- 792 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 791 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
-  `mul_high` and the flags form `let (result, flags) = e;` are built. A
+  `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
+  the compound assignments `+%=` and `+|=` of each. A
   carry in, `a + b + f.carry`, is `adc` on x86_64 and `adcs` on ARM64, and
   the function computes the flags it reads alone. See "Wrapping and
   saturating operators and `Flags`" in `docs/decisions.md` and
@@ -494,7 +495,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 52. See "The doc
+  class body and the `worker` mark, and its format version is 53. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops

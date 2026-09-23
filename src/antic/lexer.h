@@ -75,6 +75,10 @@ enum token_kind {
        `+| -| *|`. */
     TOKEN_PLUS_WRAP, TOKEN_MINUS_WRAP, TOKEN_STAR_WRAP, TOKEN_SHL_WRAP,
     TOKEN_PLUS_SAT, TOKEN_MINUS_SAT, TOKEN_STAR_SAT,
+    /* Their compound assignments, `+%= -%= *%= <<%=` and `+|= -|= *|=`. */
+    TOKEN_PLUS_WRAP_ASSIGN, TOKEN_MINUS_WRAP_ASSIGN, TOKEN_STAR_WRAP_ASSIGN,
+    TOKEN_SHL_WRAP_ASSIGN, TOKEN_PLUS_SAT_ASSIGN, TOKEN_MINUS_SAT_ASSIGN,
+    TOKEN_STAR_SAT_ASSIGN,
     /* DESIGN: `mul_high(a, b)` is a built-in with the operands of a binary
        operator, so the checker makes a binary expression of the call with
        this kind. No source text lexes as it. */

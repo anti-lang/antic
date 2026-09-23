@@ -256,17 +256,25 @@ void test_lexer(void)
         kinds("a ?? b?.c ?*d as? *e", k, sizeof k / sizeof k[0]);
     }
     /* The wrapping and saturating operators are one token each. A `%`
-       or `|` after the plain operator joins it, and `<<%=` is `<<%`
-       and `=`. */
+       or `|` after the plain operator joins it, and a `=` after that
+       makes the compound assignment. */
     {
         static const enum token_kind k[] = {
             TOKEN_IDENT, TOKEN_PLUS_WRAP, TOKEN_IDENT, TOKEN_MINUS_WRAP,
             TOKEN_IDENT, TOKEN_STAR_WRAP, TOKEN_IDENT, TOKEN_SHL_WRAP,
             TOKEN_IDENT, TOKEN_PLUS_SAT, TOKEN_IDENT, TOKEN_MINUS_SAT,
-            TOKEN_IDENT, TOKEN_STAR_SAT, TOKEN_IDENT, TOKEN_SHL_WRAP,
-            TOKEN_ASSIGN, TOKEN_PLUS, TOKEN_PERCENT_ASSIGN, TOKEN_OR_OR};
+            TOKEN_IDENT, TOKEN_STAR_SAT, TOKEN_IDENT, TOKEN_SHL_WRAP_ASSIGN,
+            TOKEN_PLUS, TOKEN_PERCENT_ASSIGN, TOKEN_OR_OR};
         kinds("a +% b -% c *% d <<% e +| f -| g *| h <<%= + %= ||", k,
               sizeof k / sizeof k[0]);
+    }
+    {
+        static const enum token_kind k[] = {
+            TOKEN_PLUS_WRAP_ASSIGN, TOKEN_MINUS_WRAP_ASSIGN,
+            TOKEN_STAR_WRAP_ASSIGN, TOKEN_SHL_WRAP_ASSIGN,
+            TOKEN_PLUS_SAT_ASSIGN, TOKEN_MINUS_SAT_ASSIGN,
+            TOKEN_STAR_SAT_ASSIGN, TOKEN_PLUS_WRAP, TOKEN_ASSIGN};
+        kinds("+%= -%= *%= <<%= +|= -|= *|= +% =", k, sizeof k / sizeof k[0]);
     }
     {
         static const enum token_kind k[] = {

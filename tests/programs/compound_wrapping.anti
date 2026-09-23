@@ -1,0 +1,87 @@
+//! The compound assignments of the wrapping and saturating operators, `+%= -%=
+//! *%= <<%=` and `+|= -|= *|=`. Each one gives what `x = x op e` gives, on a
+//! local, a field, an element and a place behind a pointer, and none of them
+//! traps in dev mode.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A value the optimizer cannot see through.
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn line(name: str, v: int)
+{
+	printf("%s %lld\n".ptr, name.ptr, v);
+}
+
+fn uline(name: str, v: u64)
+{
+	printf("%s %llu\n".ptr, name.ptr, v);
+}
+
+struct Counter
+{
+	hits: u8,
+	total: i32,
+}
+
+/// Counts its calls in calls, so a place with a call in it is read once.
+fn slot(n: int, calls: *int) -> int
+{
+	*calls += 1;
+	return n;
+}
+
+fn main() -> int
+{
+	let a = opaque(9223372036854775807);
+	a +%= 1;
+	line("a +%= 1", a);
+	a -%= 1;
+	line("a -%= 1", a);
+	a *%= opaque(2);
+	line("a *%= 2", a);
+	let s = opaque(1);
+	s <<%= 63;
+	line("s <<%= 63", s);
+	s = opaque(3);
+	s <<%= opaque(64);
+	line("s <<%= 64", s);
+	s = opaque(1);
+	s <<%= opaque(-1);
+	line("s <<%= -1", s);
+
+	let b = opaque(250) as u8;
+	b +|= opaque(10) as u8;
+	uline("b +|= 10", b as u64);
+	b -|= opaque(255) as u8;
+	uline("b -|= 255", b as u64);
+	let m = opaque(-100) as i8;
+	m -|= opaque(100) as i8;
+	line("m -|= 100", m as int);
+	m *|= opaque(-2) as i8;
+	line("m *|= -2", m as int);
+	let p = opaque(9223372036854775807);
+	p +|= opaque(1);
+	line("p +|= 1", p);
+
+	let c = Counter { hits: 255, total: 2147483647 };
+	c.hits +%= 2;
+	c.total +|= 5;
+	uline("c.hits +%= 2", c.hits as u64);
+	line("c.total +|= 5", c.total as int);
+	let q = &c;
+	q.total *%= 2;
+	line("q.total *%= 2", c.total as int);
+
+	let cells: [4]u8 = [0, 200, 0, 0];
+	let calls = 0;
+	cells[slot(0, &calls)] -%= 1;
+	cells[slot(1, &calls)] *|= 2;
+	uline("cells[0] -%= 1", cells[0] as u64);
+	uline("cells[1] *|= 2", cells[1] as u64);
+	line("calls", calls);
+	return 0;
+}

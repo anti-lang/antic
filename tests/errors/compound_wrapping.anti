@@ -1,0 +1,13 @@
+//! The compound assignments of the wrapping and saturating operators take an
+//! integer place, as the operators take integer operands.
+
+fn main() -> int
+{
+	let f: f64 = 1.5;
+	let ok = true;
+	f +%= 1.0;
+	f *|= 2.0;
+	ok -|= false;
+	f <<%= 1.0;
+	return 0;
+}

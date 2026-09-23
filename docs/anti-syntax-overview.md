@@ -149,7 +149,7 @@ Not built yet: `undefined`.
 
 ## Operators
 
-C precedence. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`. Conversion `x as T`, checked downcast `p as *T`, nullable downcast `p as? *T`, type test `p is *T`. Wrapping `+% -% *% <<%` and saturating `+| -| *|`. Coalescing `??` and chaining `?.` over `none`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest. No `++`, no `?:`.
+C precedence. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`. Conversion `x as T`, checked downcast `p as *T`, nullable downcast `p as? *T`, type test `p is *T`. Wrapping `+% -% *% <<%` and saturating `+| -| *|`. Coalescing `??` and chaining `?.` over `none`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest, `+%=` and `+|=` among them. No `++`, no `?:`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -175,7 +175,7 @@ if f.carry { }
 
 `let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. A carry in is `a + b + f.carry`. `mul_high(a, b)` gives the upper half of the full product.
 
-Built: `x in lo..hi`, `??` and `?.`, the wrapping and saturating operators, `mul_high` and `Flags`, with `adc` and `adcs` for a carry in.
+Built: `x in lo..hi`, `??` and `?.`, the wrapping and saturating operators with their compound assignments, `mul_high` and `Flags`, with `adc` and `adcs` for a carry in.
 
 ## Statements
 

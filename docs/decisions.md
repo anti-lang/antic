@@ -745,7 +745,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - `Flags` is a struct of `anti.lang` that the compiler declares, as it declares `Object`, and a type named `Flags` in the module wins over it. It has no descriptor, as a tuple has none. The C header writes it once as `struct anti_Flags` of four `bool`, before the first exported signature or struct that names it. Reason: the specification makes `Flags` a built-in struct that C sees as such, and no module declares it.
 - The flags name assigns a local or a parameter of type `Flags` in any enclosing block. A name of another type in an enclosing block makes a new variable, and one in the same block is refused as declared already. `(result, flags) = e;` assigns two names and takes the flags form alone. Reason: the specification gives the flags name these two forms and the plain form two existing names.
 - A Flags variable reads the fields that its function names after `.`, and any other use of it reads all four. The flags form writes those alone. Reason: the specification makes unused fields cost nothing, and a use of the whole value may read any of them.
-- [provisional] The wrapping and saturating operators have no compound assignment. Reason: the keywords of the specification add their tokens and no `+%=`.
+- The wrapping and saturating operators have compound assignments, `+%= -%= *%= <<%=` and `+|= -|= *|=`. Each gives what `x = x op e` gives, reads the place once and takes an integer place, and none traps in dev mode. The library file carries the seven tokens, and its format version is 53. `programs/compound_wrapping.anti` and `errors/compound_wrapping.anti` check them. Reason: Eddie decided in the review of 2026-09-23 that they exist.
 
 ## Sum types
 

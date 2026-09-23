@@ -179,6 +179,13 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_PLUS_SAT] = {"+|", CAT_SYMBOL},
     [TOKEN_MINUS_SAT] = {"-|", CAT_SYMBOL},
     [TOKEN_STAR_SAT] = {"*|", CAT_SYMBOL},
+    [TOKEN_PLUS_WRAP_ASSIGN] = {"+%=", CAT_SYMBOL},
+    [TOKEN_MINUS_WRAP_ASSIGN] = {"-%=", CAT_SYMBOL},
+    [TOKEN_STAR_WRAP_ASSIGN] = {"*%=", CAT_SYMBOL},
+    [TOKEN_SHL_WRAP_ASSIGN] = {"<<%=", CAT_SYMBOL},
+    [TOKEN_PLUS_SAT_ASSIGN] = {"+|=", CAT_SYMBOL},
+    [TOKEN_MINUS_SAT_ASSIGN] = {"-|=", CAT_SYMBOL},
+    [TOKEN_STAR_SAT_ASSIGN] = {"*|=", CAT_SYMBOL},
     [TOKEN_MUL_HIGH] = {MUL_HIGH, CAT_OTHER},
 };
 

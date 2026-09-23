@@ -360,8 +360,8 @@ foreach(name IN ITEMS qualified_bodies qualified_chain qualified_single)
 endforeach()
 # The wrapping and saturating operators, mul_high and the flags form in
 # dev mode, whose checks trap on the plain operators and on none of these.
-foreach(name IN ITEMS wrapping saturating mul_high flags carry_chain
-        variants)
+foreach(name IN ITEMS wrapping saturating compound_wrapping mul_high flags
+        carry_chain variants)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2464,7 +2464,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "inject_provider|-S,--inject,inject_provider.Logger=inject_provider.nowhere,--inject,inject_provider.Clock=inject_provider.ticks,-o,${LISTINGS}/inject_provider.s,inject_provider.anti"
         "inject_cycle|-S,--inject,inject_cycle.Logger=inject_cycle.Console.get,--inject,inject_cycle.Clock=inject_cycle.Watch.get,-o,${LISTINGS}/inject_cycle.s,inject_cycle.anti"
         "provides_lines|-S,-o,${LISTINGS}/provides_lines.s,provides_lines.anti"
-        "plugin_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/plugin_calls.s,plugin_calls.anti")
+        "plugin_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/plugin_calls.s,plugin_calls.anti"
+        "compound_wrapping|-S,-o,${LISTINGS}/compound_wrapping.s,compound_wrapping.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

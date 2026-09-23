@@ -6658,6 +6658,13 @@ static enum token_kind compound_op(enum token_kind op)
     case TOKEN_PIPE_ASSIGN: return TOKEN_PIPE;
     case TOKEN_CARET_ASSIGN: return TOKEN_CARET;
     case TOKEN_SHL_ASSIGN: return TOKEN_SHL;
+    case TOKEN_PLUS_WRAP_ASSIGN: return TOKEN_PLUS_WRAP;
+    case TOKEN_MINUS_WRAP_ASSIGN: return TOKEN_MINUS_WRAP;
+    case TOKEN_STAR_WRAP_ASSIGN: return TOKEN_STAR_WRAP;
+    case TOKEN_SHL_WRAP_ASSIGN: return TOKEN_SHL_WRAP;
+    case TOKEN_PLUS_SAT_ASSIGN: return TOKEN_PLUS_SAT;
+    case TOKEN_MINUS_SAT_ASSIGN: return TOKEN_MINUS_SAT;
+    case TOKEN_STAR_SAT_ASSIGN: return TOKEN_STAR_SAT;
     default: return TOKEN_SHR;
     }
 }
@@ -6829,7 +6836,9 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     if (s->as.assign.op != TOKEN_ASSIGN) {
         enum token_kind op = compound_op(s->as.assign.op);
         struct ir_operand checked =
-            binary_checks(l, op, target->type, old, v, target->pos.line);
+            op == TOKEN_SHL_WRAP
+                ? shift_wrap(l, target->type, old, v)
+                : binary_checks(l, op, target->type, old, v, target->pos.line);
         v = checked.kind != IR_NONE
                 ? checked
                 : temp(l, ir_binary(l->f, l->b, binary_op(op, target->type),

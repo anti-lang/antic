@@ -1,0 +1,4 @@
+compound_wrapping.anti:8:2: error: `+%=` does not apply to `float`
+compound_wrapping.anti:9:2: error: `*|=` does not apply to `float`
+compound_wrapping.anti:10:2: error: `-|=` does not apply to `bool`
+compound_wrapping.anti:11:2: error: `<<%=` does not apply to `float`

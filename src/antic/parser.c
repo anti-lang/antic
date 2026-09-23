@@ -1193,7 +1193,8 @@ static struct expr *condition(struct parser *p)
 
 static bool is_assign_op(enum token_kind kind)
 {
-    return kind >= TOKEN_ASSIGN && kind <= TOKEN_SHR_ASSIGN;
+    return (kind >= TOKEN_ASSIGN && kind <= TOKEN_SHR_ASSIGN) ||
+           (kind >= TOKEN_PLUS_WRAP_ASSIGN && kind <= TOKEN_STAR_SAT_ASSIGN);
 }
 
 static struct stmt *new_stmt(struct parser *p, enum stmt_kind kind,
