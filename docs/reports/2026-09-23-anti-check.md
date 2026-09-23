@@ -84,8 +84,9 @@ the formatting class that reads rules instead of writing the form follow.
 
 ## Committed, pushed and green
 
-The output after the push of `cbb5258`, which carried this report. The
-commit that adds this section follows it and changes this file alone.
+The output after the push of `cbb5258`, which carried the report. The
+commit that adds the section below follows it and changes the report
+alone.
 
 ```text
 $ git log --oneline -3
