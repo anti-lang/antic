@@ -1,0 +1,15 @@
+# ./build/ubsan/antic -S -o d2.s d.anti, with d.anti:
+simd struct V { _: i64 : 0 }
+
+fn id(v: V) -> V
+{
+	return v;
+}
+
+fn main() -> int
+{
+	return 0;
+}
+# output:
+./src/antic/layout.c:71:28: runtime error: division by zero
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior ./src/antic/layout.c:71:28 

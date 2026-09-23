@@ -1,0 +1,4 @@
+src/antic/applesdk.c:25:        if (sscanf(entry->d_name, "MacOSX%d.%d%7s", &major, &minor, rest) != 3 ||
+src/anti/syms.c:961:            fields = sscanf(text, "%llx-%llx %511s %1023s", &start, &end,
+src/anti/syms.c:1148:            if (sscanf(text, "module %lld %79s %*s %n", &number, id, &used) ==
+src/anti/syms.c:1152:            } else if (sscanf(text, "%llx %lld+%llx%n", &address, &number,

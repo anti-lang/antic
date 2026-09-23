@@ -1,0 +1,790 @@
+=== [host] src/antic/antl.c
+=== [host] src/antic/applesdk.c
+=== [host] src/antic/arena.c
+=== [host] src/antic/arith.c
+=== [host] src/antic/arm64.c
+=== [host] src/antic/ast_dump.c
+=== [host] src/antic/coff.c
+=== [host] src/antic/cpu.c
+=== [host] src/antic/debug.c
+=== [host] src/antic/diagnostic.c
+src/antic/diagnostic.c:28:5: warning: diagnostic behavior may be improved by adding the 'format(printf, 6, 0)' attribute to the declaration of 'add' [-Wmissing-format-attribute]
+   28 |     vsnprintf(item->message, sizeof item->message, format, args);
+      |     ^
+<MacOSX.sdk>/usr/include/secure/_stdio.h:124:34: note: expanded from macro 'vsnprintf'
+  124 | #define vsnprintf(str, len, ...) __vsnprintf_chk_func (str, len, 0, __VA_ARGS__)
+      |                                  ^
+<MacOSX.sdk>/usr/include/secure/_stdio.h:81:75: note: expanded from macro '__vsnprintf_chk_func'
+   81 |         __builtin___vsnprintf_chk (str, len, flag, __darwin_obsz(str), format, ap)
+      |                                                                                  ^
+src/antic/diagnostic.c:7:13: note: 'add' declared here
+    7 | static void add(struct diagnostics *d, int line, int column, bool warning,
+      |             ^
+1 warning generated.
+=== [host] src/antic/driver.c
+=== [host] src/antic/emit.c
+=== [host] src/antic/expand.c
+=== [host] src/antic/header.c
+=== [host] src/antic/ir.c
+=== [host] src/antic/ir_print.c
+=== [host] src/antic/ir_verify.c
+=== [host] src/antic/layout.c
+=== [host] src/antic/lexer.c
+=== [host] src/antic/linker.c
+=== [host] src/antic/lower.c
+=== [host] src/antic/mach.c
+=== [host] src/antic/main.c
+=== [host] src/antic/modpath.c
+=== [host] src/antic/notice.c
+=== [host] src/antic/optimize.c
+=== [host] src/antic/parser.c
+=== [host] src/antic/process.c
+=== [host] src/antic/regalloc.c
+=== [host] src/antic/select.c
+=== [host] src/antic/selfpath.c
+=== [host] src/antic/sema.c
+src/antic/sema.c:250:26: warning: format string is not a string literal [-Wformat-nonliteral]
+  250 |         error_at(c, pos, duplicate_message, (int)name->length, name->text);
+      |                          ^~~~~~~~~~~~~~~~~
+1 warning generated.
+=== [host] src/antic/sha256.c
+=== [host] src/antic/target.c
+=== [host] src/antic/text.c
+=== [host] src/antic/types.c
+=== [host] src/antic/userdirs.c
+=== [host] src/antic/whole.c
+=== [host] src/antic/x86_64.c
+=== [host] src/anti/bind.c
+=== [host] src/anti/bindapi.c
+=== [host] src/anti/bindclang.c
+src/anti/bindclang.c:242:33: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'refuse' [-Wmissing-format-attribute]
+  242 |     fprintf(stderr, format, name);
+      |                                 ^
+src/anti/bindclang.c:239:13: note: 'refuse' declared here
+  239 | static void refuse(struct reader *r, const char *format, const char *name)
+      |             ^
+1 warning generated.
+=== [host] src/anti/bindexpr.c
+=== [host] src/anti/bindtype.c
+=== [host] src/anti/bindwrite.c
+=== [host] src/anti/build.c
+=== [host] src/anti/check.c
+=== [host] src/anti/deps.c
+=== [host] src/anti/doc.c
+=== [host] src/anti/files.c
+=== [host] src/anti/fmt.c
+=== [host] src/anti/jsontree.c
+=== [host] src/anti/main.c
+=== [host] src/anti/manifest.c
+=== [host] src/anti/repo.c
+=== [host] src/anti/sdk.c
+=== [host] src/anti/symmap.c
+=== [host] src/anti/syms.c
+=== [host] src/anti/test.c
+=== [host] src/anti/units.c
+=== [host] src/anti/zip.c
+=== [macos-arm64] src/rt/assert.c
+=== [linux-x86_64] src/rt/assert.c
+=== [windows-x86_64] src/rt/assert.c
+=== [macos-arm64] src/rt/atomic.c
+=== [linux-x86_64] src/rt/atomic.c
+=== [windows-x86_64] src/rt/atomic.c
+=== [macos-arm64] src/rt/backtrace.c
+=== [linux-x86_64] src/rt/backtrace.c
+=== [windows-x86_64] src/rt/backtrace.c
+=== [macos-arm64] src/rt/call.c
+=== [linux-x86_64] src/rt/call.c
+=== [windows-x86_64] src/rt/call.c
+=== [macos-arm64] src/rt/cast.c
+=== [linux-x86_64] src/rt/cast.c
+=== [windows-x86_64] src/rt/cast.c
+=== [macos-arm64] src/rt/check.c
+=== [linux-x86_64] src/rt/check.c
+=== [windows-x86_64] src/rt/check.c
+=== [macos-arm64] src/rt/conf.c
+src/rt/conf.c:82:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'startup_error' [-Wmissing-format-attribute]
+   82 |     vfprintf(stderr, format, rest);
+      |                                  ^
+src/rt/conf.c:76:13: note: 'startup_error' declared here
+   76 | static void startup_error(const char *format, ...)
+      |             ^
+1 warning generated.
+=== [linux-x86_64] src/rt/conf.c
+src/rt/conf.c:82:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'startup_error' [-Wmissing-format-attribute]
+   82 |     vfprintf(stderr, format, rest);
+      |                                  ^
+src/rt/conf.c:76:13: note: 'startup_error' declared here
+   76 | static void startup_error(const char *format, ...)
+      |             ^
+1 warning generated.
+=== [windows-x86_64] src/rt/conf.c
+src/rt/conf.c:82:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'startup_error' [-Wmissing-format-attribute]
+   82 |     vfprintf(stderr, format, rest);
+      |                                  ^
+src/rt/conf.c:76:13: note: 'startup_error' declared here
+   76 | static void startup_error(const char *format, ...)
+      |             ^
+1 warning generated.
+=== [macos-arm64] src/rt/cpu.c
+=== [linux-x86_64] src/rt/cpu.c
+=== [windows-x86_64] src/rt/cpu.c
+=== [macos-arm64] src/rt/digest.c
+=== [linux-x86_64] src/rt/digest.c
+=== [windows-x86_64] src/rt/digest.c
+=== [macos-arm64] src/rt/errno.c
+src/rt/errno.c:39:9: warning: no previous prototype for function 'anti_rt_last_error' [-Wmissing-prototypes]
+   39 | int32_t anti_rt_last_error(void)
+      |         ^
+src/rt/errno.c:39:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   39 | int32_t anti_rt_last_error(void)
+      | ^
+      | static 
+src/rt/errno.c:48:22: warning: no previous prototype for function 'anti_rt_last_error_text' [-Wmissing-prototypes]
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |                      ^
+src/rt/errno.c:48:7: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |       ^
+      | static 
+2 warnings generated.
+=== [linux-x86_64] src/rt/errno.c
+src/rt/errno.c:39:9: warning: no previous prototype for function 'anti_rt_last_error' [-Wmissing-prototypes]
+   39 | int32_t anti_rt_last_error(void)
+      |         ^
+src/rt/errno.c:39:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   39 | int32_t anti_rt_last_error(void)
+      | ^
+      | static 
+src/rt/errno.c:48:22: warning: no previous prototype for function 'anti_rt_last_error_text' [-Wmissing-prototypes]
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |                      ^
+src/rt/errno.c:48:7: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |       ^
+      | static 
+2 warnings generated.
+=== [windows-x86_64] src/rt/errno.c
+src/rt/errno.c:39:9: warning: no previous prototype for function 'anti_rt_last_error' [-Wmissing-prototypes]
+   39 | int32_t anti_rt_last_error(void)
+      |         ^
+src/rt/errno.c:39:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   39 | int32_t anti_rt_last_error(void)
+      | ^
+      | static 
+src/rt/errno.c:48:22: warning: no previous prototype for function 'anti_rt_last_error_text' [-Wmissing-prototypes]
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |                      ^
+src/rt/errno.c:48:7: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |       ^
+      | static 
+2 warnings generated.
+=== [macos-arm64] src/rt/f16.c
+=== [linux-x86_64] src/rt/f16.c
+=== [windows-x86_64] src/rt/f16.c
+=== [macos-arm64] src/rt/fs.c
+=== [linux-x86_64] src/rt/fs.c
+=== [windows-x86_64] src/rt/fs.c
+=== [macos-arm64] src/rt/hooks.c
+src/rt/hooks.c:79:43: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+   79 |     return h == NULL ? NULL : entry_of(h, ANTI_ENTRY_OF_HANDLER((int)hook));
+      |                                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.h:198:51: note: expanded from macro 'ANTI_ENTRY_OF_HANDLER'
+  198 | #define ANTI_ENTRY_OF_HANDLER(h) (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT + (h))
+      |                                   ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+1 warning generated.
+=== [linux-x86_64] src/rt/hooks.c
+src/rt/hooks.c:79:43: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+   79 |     return h == NULL ? NULL : entry_of(h, ANTI_ENTRY_OF_HANDLER((int)hook));
+      |                                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.h:198:51: note: expanded from macro 'ANTI_ENTRY_OF_HANDLER'
+  198 | #define ANTI_ENTRY_OF_HANDLER(h) (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT + (h))
+      |                                   ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+1 warning generated.
+=== [windows-x86_64] src/rt/hooks.c
+src/rt/hooks.c:79:43: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+   79 |     return h == NULL ? NULL : entry_of(h, ANTI_ENTRY_OF_HANDLER((int)hook));
+      |                                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.h:198:51: note: expanded from macro 'ANTI_ENTRY_OF_HANDLER'
+  198 | #define ANTI_ENTRY_OF_HANDLER(h) (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT + (h))
+      |                                   ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+1 warning generated.
+=== [macos-arm64] src/rt/init.c
+=== [linux-x86_64] src/rt/init.c
+=== [windows-x86_64] src/rt/init.c
+=== [macos-arm64] src/rt/io.c
+=== [linux-x86_64] src/rt/io.c
+=== [windows-x86_64] src/rt/io.c
+=== [macos-arm64] src/rt/json.c
+=== [linux-x86_64] src/rt/json.c
+=== [windows-x86_64] src/rt/json.c
+=== [macos-arm64] src/rt/license.c
+=== [linux-x86_64] src/rt/license.c
+=== [windows-x86_64] src/rt/license.c
+=== [macos-arm64] src/rt/license_stub.c
+=== [linux-x86_64] src/rt/license_stub.c
+=== [windows-x86_64] src/rt/license_stub.c
+=== [macos-arm64] src/rt/loaded.c
+=== [linux-x86_64] src/rt/loaded.c
+=== [windows-x86_64] src/rt/loaded.c
+=== [macos-arm64] src/rt/mem.c
+=== [linux-x86_64] src/rt/mem.c
+=== [windows-x86_64] src/rt/mem.c
+=== [macos-arm64] src/rt/object.c
+src/rt/object.c:624:10: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  624 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:624:39: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  624 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:642:28: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  642 |         void *)from->table[ANTI_ENTRY_FREE];
+      |                            ^~~~~~~~~~~~~~~
+src/rt/object.h:175:26: note: expanded from macro 'ANTI_ENTRY_FREE'
+  175 | #define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
+      |                          ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+src/rt/object.c:706:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  706 |             copy((struct anti_object *)at,
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:707:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  707 |                  (struct anti_object *)((char *)into + i * type->size));
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+5 warnings generated.
+=== [linux-x86_64] src/rt/object.c
+src/rt/object.c:624:10: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  624 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:624:39: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  624 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:642:28: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  642 |         void *)from->table[ANTI_ENTRY_FREE];
+      |                            ^~~~~~~~~~~~~~~
+src/rt/object.h:175:26: note: expanded from macro 'ANTI_ENTRY_FREE'
+  175 | #define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
+      |                          ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+src/rt/object.c:706:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  706 |             copy((struct anti_object *)at,
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:707:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  707 |                  (struct anti_object *)((char *)into + i * type->size));
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+5 warnings generated.
+=== [windows-x86_64] src/rt/object.c
+src/rt/object.c:624:10: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  624 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:624:39: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  624 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:642:28: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  642 |         void *)from->table[ANTI_ENTRY_FREE];
+      |                            ^~~~~~~~~~~~~~~
+src/rt/object.h:175:26: note: expanded from macro 'ANTI_ENTRY_FREE'
+  175 | #define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
+      |                          ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+src/rt/object.c:706:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  706 |             copy((struct anti_object *)at,
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:707:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+  707 |                  (struct anti_object *)((char *)into + i * type->size));
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+5 warnings generated.
+=== [macos-arm64] src/rt/platform.c
+src/rt/platform.c:10:9: warning: no previous prototype for function 'anti_rt_is_windows' [-Wmissing-prototypes]
+   10 | int64_t anti_rt_is_windows(void)
+      |         ^
+src/rt/platform.c:10:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   10 | int64_t anti_rt_is_windows(void)
+      | ^
+      | static 
+1 warning generated.
+=== [linux-x86_64] src/rt/platform.c
+src/rt/platform.c:10:9: warning: no previous prototype for function 'anti_rt_is_windows' [-Wmissing-prototypes]
+   10 | int64_t anti_rt_is_windows(void)
+      |         ^
+src/rt/platform.c:10:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   10 | int64_t anti_rt_is_windows(void)
+      | ^
+      | static 
+1 warning generated.
+=== [windows-x86_64] src/rt/platform.c
+src/rt/platform.c:10:9: warning: no previous prototype for function 'anti_rt_is_windows' [-Wmissing-prototypes]
+   10 | int64_t anti_rt_is_windows(void)
+      |         ^
+src/rt/platform.c:10:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   10 | int64_t anti_rt_is_windows(void)
+      | ^
+      | static 
+1 warning generated.
+=== [macos-arm64] src/rt/plugin.c
+src/rt/plugin.c:37:5: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute]
+   37 |     vsnprintf(message, sizeof message, format, args);
+      |     ^
+./build/host/runtime/sysroot/macos-arm64/usr/include/secure/_stdio.h:124:34: note: expanded from macro 'vsnprintf'
+  124 | #define vsnprintf(str, len, ...) __vsnprintf_chk_func (str, len, 0, __VA_ARGS__)
+      |                                  ^
+./build/host/runtime/sysroot/macos-arm64/usr/include/secure/_stdio.h:81:75: note: expanded from macro '__vsnprintf_chk_func'
+   81 |         __builtin___vsnprintf_chk (str, len, flag, __darwin_obsz(str), format, ap)
+      |                                                                                  ^
+src/rt/plugin.c:32:13: note: 'fail' declared here
+   32 | static void fail(const char *format, ...)
+      |             ^
+1 warning generated.
+=== [linux-x86_64] src/rt/plugin.c
+src/rt/plugin.c:37:52: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute]
+   37 |     vsnprintf(message, sizeof message, format, args);
+      |                                                    ^
+src/rt/plugin.c:32:13: note: 'fail' declared here
+   32 | static void fail(const char *format, ...)
+      |             ^
+1 warning generated.
+=== [windows-x86_64] src/rt/plugin.c
+src/rt/plugin.c:37:52: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute]
+   37 |     vsnprintf(message, sizeof message, format, args);
+      |                                                    ^
+src/rt/plugin.c:32:13: note: 'fail' declared here
+   32 | static void fail(const char *format, ...)
+      |             ^
+1 warning generated.
+=== [macos-arm64] src/rt/reflect.c
+=== [linux-x86_64] src/rt/reflect.c
+=== [windows-x86_64] src/rt/reflect.c
+=== [macos-arm64] src/rt/registry.c
+src/rt/registry.c:161:35: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  161 |             void *)r->from->table[ANTI_ENTRY_ALLOC];
+      |                                   ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+src/rt/registry.c:226:35: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  226 |             void *)r->from->table[ANTI_ENTRY_FREE];
+      |                                   ^~~~~~~~~~~~~~~
+src/rt/object.h:175:26: note: expanded from macro 'ANTI_ENTRY_FREE'
+  175 | #define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
+      |                          ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+2 warnings generated.
+=== [linux-x86_64] src/rt/registry.c
+src/rt/registry.c:161:35: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  161 |             void *)r->from->table[ANTI_ENTRY_ALLOC];
+      |                                   ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+src/rt/registry.c:226:35: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  226 |             void *)r->from->table[ANTI_ENTRY_FREE];
+      |                                   ^~~~~~~~~~~~~~~
+src/rt/object.h:175:26: note: expanded from macro 'ANTI_ENTRY_FREE'
+  175 | #define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
+      |                          ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+2 warnings generated.
+=== [windows-x86_64] src/rt/registry.c
+src/rt/registry.c:161:35: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  161 |             void *)r->from->table[ANTI_ENTRY_ALLOC];
+      |                                   ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+src/rt/registry.c:226:35: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+  226 |             void *)r->from->table[ANTI_ENTRY_FREE];
+      |                                   ^~~~~~~~~~~~~~~
+src/rt/object.h:175:26: note: expanded from macro 'ANTI_ENTRY_FREE'
+  175 | #define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
+      |                          ^~~~~~~~~~~~~~~~
+src/rt/object.h:174:43: note: expanded from macro 'ANTI_ENTRY_ALLOC'
+  174 | #define ANTI_ENTRY_ALLOC (ANTI_ENTRY_HOOK + ANTI_HOOK_COUNT)
+      |                           ~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
+2 warnings generated.
+=== [macos-arm64] src/rt/signal.c
+=== [linux-x86_64] src/rt/signal.c
+=== [windows-x86_64] src/rt/signal.c
+=== [macos-arm64] src/rt/start.c
+=== [linux-x86_64] src/rt/start.c
+=== [windows-x86_64] src/rt/start.c
+=== [macos-arm64] src/rt/symbols.c
+=== [linux-x86_64] src/rt/symbols.c
+=== [windows-x86_64] src/rt/symbols.c
+=== [macos-arm64] src/rt/sync.c
+src/rt/sync.c:88:7: warning: no previous prototype for function 'anti_rt_mutex_new' [-Wmissing-prototypes]
+   88 | void *anti_rt_mutex_new(void)
+      |       ^
+src/rt/sync.c:88:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   88 | void *anti_rt_mutex_new(void)
+      | ^
+      | static 
+src/rt/sync.c:100:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes]
+  100 | void anti_rt_mutex_destroy(void **place)
+      |      ^
+src/rt/sync.c:100:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  100 | void anti_rt_mutex_destroy(void **place)
+      | ^
+      | static 
+src/rt/sync.c:111:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes]
+  111 | void anti_rt_mutex_lock(void *handle)
+      |      ^
+src/rt/sync.c:111:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  111 | void anti_rt_mutex_lock(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:119:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes]
+  119 | void anti_rt_mutex_unlock(void *handle)
+      |      ^
+src/rt/sync.c:119:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  119 | void anti_rt_mutex_unlock(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:174:7: warning: no previous prototype for function 'anti_rt_chan_new' [-Wmissing-prototypes]
+  174 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      |       ^
+src/rt/sync.c:174:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  174 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      | ^
+      | static 
+src/rt/sync.c:219:6: warning: no previous prototype for function 'anti_rt_chan_send' [-Wmissing-prototypes]
+  219 | void anti_rt_chan_send(void *handle, const void *value)
+      |      ^
+src/rt/sync.c:219:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  219 | void anti_rt_chan_send(void *handle, const void *value)
+      | ^
+      | static 
+src/rt/sync.c:243:7: warning: no previous prototype for function 'anti_rt_chan_recv' [-Wmissing-prototypes]
+  243 | void *anti_rt_chan_recv(void *handle, void *out)
+      |       ^
+src/rt/sync.c:243:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  243 | void *anti_rt_chan_recv(void *handle, void *out)
+      | ^
+      | static 
+src/rt/sync.c:262:6: warning: no previous prototype for function 'anti_rt_chan_close' [-Wmissing-prototypes]
+  262 | void anti_rt_chan_close(void *handle)
+      |      ^
+src/rt/sync.c:262:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  262 | void anti_rt_chan_close(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:275:6: warning: no previous prototype for function 'anti_rt_chan_delete' [-Wmissing-prototypes]
+  275 | void anti_rt_chan_delete(void *handle)
+      |      ^
+src/rt/sync.c:275:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  275 | void anti_rt_chan_delete(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:329:9: warning: no previous prototype for function 'anti_rt_select' [-Wmissing-prototypes]
+  329 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      |         ^
+src/rt/sync.c:329:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  329 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      | ^
+      | static 
+10 warnings generated.
+=== [linux-x86_64] src/rt/sync.c
+src/rt/sync.c:88:7: warning: no previous prototype for function 'anti_rt_mutex_new' [-Wmissing-prototypes]
+   88 | void *anti_rt_mutex_new(void)
+      |       ^
+src/rt/sync.c:88:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   88 | void *anti_rt_mutex_new(void)
+      | ^
+      | static 
+src/rt/sync.c:100:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes]
+  100 | void anti_rt_mutex_destroy(void **place)
+      |      ^
+src/rt/sync.c:100:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  100 | void anti_rt_mutex_destroy(void **place)
+      | ^
+      | static 
+src/rt/sync.c:111:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes]
+  111 | void anti_rt_mutex_lock(void *handle)
+      |      ^
+src/rt/sync.c:111:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  111 | void anti_rt_mutex_lock(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:119:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes]
+  119 | void anti_rt_mutex_unlock(void *handle)
+      |      ^
+src/rt/sync.c:119:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  119 | void anti_rt_mutex_unlock(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:174:7: warning: no previous prototype for function 'anti_rt_chan_new' [-Wmissing-prototypes]
+  174 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      |       ^
+src/rt/sync.c:174:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  174 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      | ^
+      | static 
+src/rt/sync.c:219:6: warning: no previous prototype for function 'anti_rt_chan_send' [-Wmissing-prototypes]
+  219 | void anti_rt_chan_send(void *handle, const void *value)
+      |      ^
+src/rt/sync.c:219:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  219 | void anti_rt_chan_send(void *handle, const void *value)
+      | ^
+      | static 
+src/rt/sync.c:243:7: warning: no previous prototype for function 'anti_rt_chan_recv' [-Wmissing-prototypes]
+  243 | void *anti_rt_chan_recv(void *handle, void *out)
+      |       ^
+src/rt/sync.c:243:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  243 | void *anti_rt_chan_recv(void *handle, void *out)
+      | ^
+      | static 
+src/rt/sync.c:262:6: warning: no previous prototype for function 'anti_rt_chan_close' [-Wmissing-prototypes]
+  262 | void anti_rt_chan_close(void *handle)
+      |      ^
+src/rt/sync.c:262:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  262 | void anti_rt_chan_close(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:275:6: warning: no previous prototype for function 'anti_rt_chan_delete' [-Wmissing-prototypes]
+  275 | void anti_rt_chan_delete(void *handle)
+      |      ^
+src/rt/sync.c:275:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  275 | void anti_rt_chan_delete(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:329:9: warning: no previous prototype for function 'anti_rt_select' [-Wmissing-prototypes]
+  329 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      |         ^
+src/rt/sync.c:329:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  329 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      | ^
+      | static 
+10 warnings generated.
+=== [windows-x86_64] src/rt/sync.c
+src/rt/sync.c:88:7: warning: no previous prototype for function 'anti_rt_mutex_new' [-Wmissing-prototypes]
+   88 | void *anti_rt_mutex_new(void)
+      |       ^
+src/rt/sync.c:88:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   88 | void *anti_rt_mutex_new(void)
+      | ^
+      | static 
+src/rt/sync.c:100:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes]
+  100 | void anti_rt_mutex_destroy(void **place)
+      |      ^
+src/rt/sync.c:100:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  100 | void anti_rt_mutex_destroy(void **place)
+      | ^
+      | static 
+src/rt/sync.c:111:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes]
+  111 | void anti_rt_mutex_lock(void *handle)
+      |      ^
+src/rt/sync.c:111:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  111 | void anti_rt_mutex_lock(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:119:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes]
+  119 | void anti_rt_mutex_unlock(void *handle)
+      |      ^
+src/rt/sync.c:119:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  119 | void anti_rt_mutex_unlock(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:174:7: warning: no previous prototype for function 'anti_rt_chan_new' [-Wmissing-prototypes]
+  174 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      |       ^
+src/rt/sync.c:174:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  174 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      | ^
+      | static 
+src/rt/sync.c:219:6: warning: no previous prototype for function 'anti_rt_chan_send' [-Wmissing-prototypes]
+  219 | void anti_rt_chan_send(void *handle, const void *value)
+      |      ^
+src/rt/sync.c:219:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  219 | void anti_rt_chan_send(void *handle, const void *value)
+      | ^
+      | static 
+src/rt/sync.c:243:7: warning: no previous prototype for function 'anti_rt_chan_recv' [-Wmissing-prototypes]
+  243 | void *anti_rt_chan_recv(void *handle, void *out)
+      |       ^
+src/rt/sync.c:243:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  243 | void *anti_rt_chan_recv(void *handle, void *out)
+      | ^
+      | static 
+src/rt/sync.c:262:6: warning: no previous prototype for function 'anti_rt_chan_close' [-Wmissing-prototypes]
+  262 | void anti_rt_chan_close(void *handle)
+      |      ^
+src/rt/sync.c:262:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  262 | void anti_rt_chan_close(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:275:6: warning: no previous prototype for function 'anti_rt_chan_delete' [-Wmissing-prototypes]
+  275 | void anti_rt_chan_delete(void *handle)
+      |      ^
+src/rt/sync.c:275:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  275 | void anti_rt_chan_delete(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:329:9: warning: no previous prototype for function 'anti_rt_select' [-Wmissing-prototypes]
+  329 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      |         ^
+src/rt/sync.c:329:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  329 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      | ^
+      | static 
+10 warnings generated.
+=== [macos-arm64] src/rt/text.c
+=== [linux-x86_64] src/rt/text.c
+=== [windows-x86_64] src/rt/text.c
+=== [macos-arm64] src/rt/threads.c
+src/rt/threads.c:276:6: warning: no previous prototype for function 'anti_rt_parallel' [-Wmissing-prototypes]
+  276 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      |      ^
+src/rt/threads.c:276:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  276 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      | ^
+      | static 
+src/rt/threads.c:350:7: warning: no previous prototype for function 'anti_rt_dispatch' [-Wmissing-prototypes]
+  350 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      |       ^
+src/rt/threads.c:350:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  350 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      | ^
+      | static 
+src/rt/threads.c:394:6: warning: no previous prototype for function 'anti_rt_join' [-Wmissing-prototypes]
+  394 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:394:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  394 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:440:6: warning: no previous prototype for function 'anti_rt_join_all' [-Wmissing-prototypes]
+  440 | void anti_rt_join_all(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:440:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  440 | void anti_rt_join_all(void *const *handles, int64_t count)
+      | ^
+      | static 
+src/rt/threads.c:454:6: warning: no previous prototype for function 'anti_rt_join_hooked' [-Wmissing-prototypes]
+  454 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:454:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  454 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:465:6: warning: no previous prototype for function 'anti_rt_join_all_hooked' [-Wmissing-prototypes]
+  465 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:465:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  465 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      | ^
+      | static 
+6 warnings generated.
+=== [linux-x86_64] src/rt/threads.c
+src/rt/threads.c:276:6: warning: no previous prototype for function 'anti_rt_parallel' [-Wmissing-prototypes]
+  276 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      |      ^
+src/rt/threads.c:276:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  276 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      | ^
+      | static 
+src/rt/threads.c:350:7: warning: no previous prototype for function 'anti_rt_dispatch' [-Wmissing-prototypes]
+  350 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      |       ^
+src/rt/threads.c:350:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  350 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      | ^
+      | static 
+src/rt/threads.c:394:6: warning: no previous prototype for function 'anti_rt_join' [-Wmissing-prototypes]
+  394 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:394:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  394 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:440:6: warning: no previous prototype for function 'anti_rt_join_all' [-Wmissing-prototypes]
+  440 | void anti_rt_join_all(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:440:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  440 | void anti_rt_join_all(void *const *handles, int64_t count)
+      | ^
+      | static 
+src/rt/threads.c:454:6: warning: no previous prototype for function 'anti_rt_join_hooked' [-Wmissing-prototypes]
+  454 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:454:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  454 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:465:6: warning: no previous prototype for function 'anti_rt_join_all_hooked' [-Wmissing-prototypes]
+  465 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:465:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  465 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      | ^
+      | static 
+6 warnings generated.
+=== [windows-x86_64] src/rt/threads.c
+src/rt/threads.c:276:6: warning: no previous prototype for function 'anti_rt_parallel' [-Wmissing-prototypes]
+  276 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      |      ^
+src/rt/threads.c:276:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  276 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      | ^
+      | static 
+src/rt/threads.c:350:7: warning: no previous prototype for function 'anti_rt_dispatch' [-Wmissing-prototypes]
+  350 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      |       ^
+src/rt/threads.c:350:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  350 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      | ^
+      | static 
+src/rt/threads.c:394:6: warning: no previous prototype for function 'anti_rt_join' [-Wmissing-prototypes]
+  394 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:394:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  394 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:440:6: warning: no previous prototype for function 'anti_rt_join_all' [-Wmissing-prototypes]
+  440 | void anti_rt_join_all(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:440:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  440 | void anti_rt_join_all(void *const *handles, int64_t count)
+      | ^
+      | static 
+src/rt/threads.c:454:6: warning: no previous prototype for function 'anti_rt_join_hooked' [-Wmissing-prototypes]
+  454 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:454:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  454 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:465:6: warning: no previous prototype for function 'anti_rt_join_all_hooked' [-Wmissing-prototypes]
+  465 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:465:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  465 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      | ^
+      | static 
+6 warnings generated.
+=== [macos-arm64] src/rt/time.c
+=== [linux-x86_64] src/rt/time.c
+=== [windows-x86_64] src/rt/time.c
+=== [macos-arm64] src/rt/toml.c
+=== [linux-x86_64] src/rt/toml.c
+=== [windows-x86_64] src/rt/toml.c
+=== [macos-arm64] src/rt/trace.c
+src/rt/trace.c:228:62: warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  228 |     uint32_t count = (uint32_t)(header[16] | header[17] << 8 |
+      |                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+  229 |                                 header[18] << 16 | (uint32_t)header[19] << 24);
+      |                                 ~~~~~~~~~~~~~~~~ ~
+1 warning generated.
+=== [linux-x86_64] src/rt/trace.c
+=== [windows-x86_64] src/rt/trace.c
+=== [macos-arm64] src/rt/utf.c
+=== [linux-x86_64] src/rt/utf.c
+=== [windows-x86_64] src/rt/utf.c

@@ -1,0 +1,39 @@
+Tool pass of the C audit, run on 2026-09-23 at ab03345 on macOS arm64.
+Compiler: ./build/deps/clang/bin/clang, the pinned clang 23.
+Paths below are relative to the checkout. <MacOSX.sdk> is the Xcode SDK
+that build/host/CMakeCache.txt names for the host tools.
+
+Files: src/antic/*.c and src/anti/*.c once, for the host. src/rt/*.c three
+times, once per operating system, so every platform branch is read:
+  macos-arm64    --target=arm64-apple-macos11 -march=armv8.5-a
+                 -DANTI_CPU_LEVEL_ID=21 -isysroot build/host/runtime/sysroot/macos-arm64
+  linux-x86_64   --target=x86_64-linux-musl -march=x86-64-v3 -DANTI_CPU_LEVEL_ID=3
+                 -fPIC -nostdinc and the musl and clang include directories
+  windows-x86_64 --target=x86_64-pc-windows-msvc -march=x86-64-v3
+                 -DANTI_CPU_LEVEL_ID=3 -fms-runtime-lib=dll and the four
+                 include directories of the Windows sysroot
+Host flags: -std=c11 -arch arm64 -isysroot <MacOSX.sdk> -Wpedantic
+  -DANTIC_VERSION="0.1.0", with -Isrc/antic, and -Isrc/rt for src/anti.
+Runtime flags add -std=c11 -O2 -Wpedantic, as CMakeLists.txt compiles it.
+src/native/ holds only CMakeLists.txt and no C file.
+
+analyzer.txt     clang <flags> --analyze -Xanalyzer -analyzer-output=text
+analyzer-unique.txt  every warning line of analyzer.txt once, with the
+                 number of builds that reported it
+warnings.txt     clang <flags> -Wall -Wextra -Wconversion -Wshadow
+                 -Wcast-align -Wformat=2 -Wvla -Wstrict-prototypes
+                 -Wmissing-prototypes -Wnull-dereference -c, objects under
+                 build/audit/obj
+warnings-unique.txt  the same, one line per warning
+banned-calls.txt grep -nE for strcpy, strcat, sprintf, vsprintf, gets,
+                 strncpy and every scanf form, over src/rt, src/antic and
+                 src/anti, *.c and *.h
+function-metrics.txt  per function: file:line of the signature, name,
+                 lines from the signature to the closing brace, deepest
+                 nest of brace blocks inside the body with initializer
+                 braces left out, and parameter count
+file-lengths.txt lines per file
+thresholds.txt   the functions past 100 lines, a nest of 4 levels or 6
+                 parameters, longest first
+probe-simd-unit-break.txt  the program that reaches the division by
+                 zero of src/antic/layout.c:71, under the UBSan antic
