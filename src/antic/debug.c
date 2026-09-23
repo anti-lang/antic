@@ -132,6 +132,25 @@ static const char *unit_file(const struct debug *d)
     return d->m->file_count > 0 ? d->m->files[0] : d->m->name;
 }
 
+/* Append s as an assembler string in quotes. A path from Windows holds
+   `\`, which llvm-mc reads as the start of an escape, and a path may hold
+   `"`. A control byte is written as its octal escape. */
+static void quoted(struct text *out, const char *s)
+{
+    text_append(out, "\"");
+    for (; *s != '\0'; s++) {
+        unsigned char c = (unsigned char)*s;
+        if (c == '"' || c == '\\') {
+            text_appendf(out, "\\%c", c);
+        } else if (c < 0x20 || c == 0x7f) {
+            text_appendf(out, "\\%03o", c);
+        } else {
+            text_append_bytes(out, s, 1);
+        }
+    }
+    text_append(out, "\"");
+}
+
 void debug_files(struct debug *d, struct text *out)
 {
     bool codeview = target_info(d->target)->format == FORMAT_COFF;
@@ -142,8 +161,10 @@ void debug_files(struct debug *d, struct text *out)
         return;
     }
     for (i = 0; i < d->m->file_count; i++) {
-        text_appendf(out, "    %s %zu \"%s\"\n", codeview ? ".cv_file" : ".file",
-                     i + 1, d->m->files[i]);
+        text_appendf(out, "    %s %zu ", codeview ? ".cv_file" : ".file",
+                     i + 1);
+        quoted(out, d->m->files[i]);
+        text_append(out, "\n");
     }
     text_appendf(out, "%santi_debug_code:\n", local(d));
     mark(d, out, start);
@@ -295,7 +316,9 @@ static void compile_unit(struct debug *d, struct text *out)
     text_appendf(out, "    .long %santi_debug_code_end - "
                       "%santi_debug_code    /* DW_AT_high_pc */\n",
                  l, l);
-    text_appendf(out, "    .asciz \"%s\"\n", unit_file(d));
+    text_append(out, "    .asciz ");
+    quoted(out, unit_file(d));
+    text_append(out, "\n");
     text_appendf(out, "    .asciz \"antic %s\"\n", ANTIC_VERSION);
     text_appendf(out, "    .short %u          /* DW_AT_language */\n",
                  DW_LANG_assembler);

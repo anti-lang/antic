@@ -1,6 +1,7 @@
 #include "../binary_stdio.h"
 #include "check.h"
 #include "cpu.h"
+#include "debug.h"
 #include <stdlib.h>
 #include "arena.h"
 #include "ast.h"
@@ -329,12 +330,47 @@ static void symbol_records(void)
     text_free(&out);
 }
 
+/* A source path is an assembler string in the debug directives, so a
+   backslash and a quote in it are escaped. llvm-mc refuses `\U` in
+   `.file 1 "src\Users\main.anti"`, and a quote would end the string. */
+static void debug_paths(void)
+{
+    static const char path[] = "src\\Users\\ma\"in.anti";
+    static const char escaped[] = "\"src\\\\Users\\\\ma\\\"in.anti\"\n";
+    static const enum target targets[] = {TARGET_LINUX_X86_64,
+                                          TARGET_WINDOWS_X86_64};
+    size_t i;
+
+    for (i = 0; i < sizeof targets / sizeof targets[0]; i++) {
+        struct arena arena = {0};
+        struct ir_module m;
+        struct debug d;
+        struct text out = {0};
+
+        ir_module_init(&m, &arena, "main");
+        ir_file_add(&m, path);
+        debug_init(&d, targets[i], &m, "main", true, NULL);
+        debug_files(&d, &out);
+        CHECK(strstr(text_cstr(&out), escaped) != NULL);
+        /* ELF names the file again in its compile unit. */
+        if (targets[i] == TARGET_LINUX_X86_64) {
+            size_t files_end = out.length;
+            debug_sections(&d, &out, NULL);
+            CHECK(strstr(text_cstr(&out) + files_end, escaped) != NULL);
+        }
+        text_free(&out);
+        ir_module_free(&m);
+        arena_free(&arena);
+    }
+}
+
 void test_emit(void)
 {
     page_offsets();
     symbol_records();
     data_relocation();
     data_relocation_past_end();
+    debug_paths();
 
     /* Mach-O names a GOT entry with @GOTPAGE and @GOTPAGEOFF on ARM64 and
        @GOTPCREL on x86_64. */
