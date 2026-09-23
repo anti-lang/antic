@@ -34,8 +34,13 @@ static void fail(struct verifier *v, const char *format, ...)
     va_start(args, format);
     vsnprintf(message, sizeof message, format, args);
     va_end(args);
-    text_appendf(v->errors, "%s.%s b%" PRIu32 ": %s\n", v->f->module,
-                 v->f->name, v->b->index, message);
+    if (v->b != NULL) {
+        text_appendf(v->errors, "%s.%s b%" PRIu32 ": %s\n", v->f->module,
+                     v->f->name, v->b->index, message);
+    } else {
+        text_appendf(v->errors, "%s.%s: %s\n", v->f->module, v->f->name,
+                     message);
+    }
     v->ok = false;
 }
 
@@ -78,9 +83,19 @@ static bool operand_ok(struct verifier *v, const struct ir_inst *inst,
         }
         return true;
     case IR_FUNC:
-        return o->as.index < v->m->function_count;
+        if (o->as.index >= v->m->function_count) {
+            fail(v, "%s names function %" PRIu32 ", which does not exist",
+                 ir_op_name(inst->op), o->as.index);
+            return false;
+        }
+        return true;
     case IR_GLOBAL:
-        return o->as.index < v->m->global_count;
+        if (o->as.index >= v->m->global_count) {
+            fail(v, "%s names global %" PRIu32 ", which does not exist",
+                 ir_op_name(inst->op), o->as.index);
+            return false;
+        }
+        return true;
     case IR_SYM:
         if (o->as.index >= v->m->sym_count) {
             fail(v, "%s uses a symbolic value that does not exist",
@@ -90,6 +105,55 @@ static bool operand_ok(struct verifier *v, const struct ir_inst *inst,
         return true;
     default:
         return true;
+    }
+}
+
+/* Whether every index the instruction holds exists: its result, its
+   three operands and the arguments of a call. check_inst and the
+   analysis of the definitions index with them. */
+static bool indices_ok(struct verifier *v, const struct ir_inst *inst)
+{
+    bool ok = true;
+    size_t i;
+
+    if (inst->result != IR_NO_RESULT && inst->result >= v->f->temp_count) {
+        fail(v, "%s writes %%%" PRIu32 ", which does not exist",
+             ir_op_name(inst->op), inst->result);
+        ok = false;
+    }
+    ok = operand_ok(v, inst, &inst->a) && ok;
+    ok = operand_ok(v, inst, &inst->b) && ok;
+    ok = operand_ok(v, inst, &inst->c) && ok;
+    for (i = 0; i < inst->arg_count; i++) {
+        ok = operand_ok(v, inst, &inst->args[i]) && ok;
+    }
+    return ok;
+}
+
+/* Whether the temporary of every parameter exists. */
+static bool params_ok(struct verifier *v)
+{
+    bool ok = true;
+    size_t i;
+
+    for (i = 0; i < v->f->param_count; i++) {
+        if (v->f->params[i].temp >= v->f->temp_count) {
+            fail(v, "parameter %zu is %%%" PRIu32 ", which does not exist", i,
+                 v->f->params[i].temp);
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+/* A jump or a branch goes to a block, which the optimizer and the
+   analysis of the definitions index with. */
+static void target_ok(struct verifier *v, const struct ir_inst *inst,
+                      const struct ir_operand *o)
+{
+    if (o->kind != IR_BLOCK) {
+        fail(v, "%s goes to an operand that is not a block",
+             ir_op_name(inst->op));
     }
 }
 
@@ -340,20 +404,20 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
         break;
     }
     case IR_JUMP:
-        operand_ok(v, inst, &inst->a);
+        target_ok(v, inst, &inst->a);
         break;
     case IR_BRANCH:
         same_type(v, inst, &inst->a, IR_I8);
-        operand_ok(v, inst, &inst->b);
-        operand_ok(v, inst, &inst->c);
+        target_ok(v, inst, &inst->b);
+        target_ok(v, inst, &inst->c);
         break;
     case IR_BRANCH_OV:
         if (inst->a.kind != IR_TEMP) {
             fail(v, "branchov reads %s and not a temporary",
                  ir_op_name(inst->op));
         }
-        operand_ok(v, inst, &inst->b);
-        operand_ok(v, inst, &inst->c);
+        target_ok(v, inst, &inst->b);
+        target_ok(v, inst, &inst->c);
         break;
     case IR_RET:
         if (inst->type != result) {
@@ -519,14 +583,18 @@ bool ir_verify(const struct ir_module *m, struct text *errors)
 
     for (i = 0; i < m->function_count; i++) {
         v.f = m->functions[i];
+        v.b = NULL;
         if (v.f->is_extern) {
             continue;
         }
+        params_ok(&v);
         for (j = 0; j < v.f->block_count; j++) {
             const struct ir_block *b = v.f->blocks[j];
             v.b = b;
             for (k = 0; k < b->count; k++) {
-                check_inst(&v, &b->insts[k]);
+                if (indices_ok(&v, &b->insts[k])) {
+                    check_inst(&v, &b->insts[k]);
+                }
                 /* A branch on overflow reads the flags of the
                    instruction right before it, so nothing may come
                    between the two. */

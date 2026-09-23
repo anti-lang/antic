@@ -325,9 +325,79 @@ static void unassigned(void)
     arena_free(&arena);
 }
 
+/* Every index an instruction or a parameter holds names something the
+   module or the function has, and the verifier fails on one that does
+   not. */
+static void out_of_range(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *g;
+    struct ir_function *f;
+    struct ir_block *b0;
+    struct ir_operand args[1];
+    uint32_t x;
+    uint32_t loaded;
+    uint32_t copied;
+    uint32_t result;
+    struct ir_inst *inst;
+
+    ir_module_init(&m, &arena, "main");
+    g = ir_function_add(&m, "main", "g", IR_I64, IR_NO_AGG);
+    ir_param_add(g, IR_I64, IR_NO_AGG);
+    ir_ret(g, ir_block_add(g), IR_I64, ir_int_op(IR_I64, 0));
+    f = ir_function_add(&m, "main", "f", IR_I64, IR_NO_AGG);
+    x = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    loaded = ir_load(f, b0, IR_I64, ir_temp_op(f, x));
+    copied = ir_unary(f, b0, IR_COPY, IR_I64, ir_temp_op(f, loaded));
+    args[0] = ir_temp_op(f, copied);
+    result = ir_call(f, b0, IR_I64, ir_func_op(g), args, 1);
+    ir_ret(f, b0, IR_I64, ir_temp_op(f, result));
+    verified(&m, "");
+
+    /* A load of global 99, a copy into %77 and a call of function 99
+       with %50 as its argument. */
+    inst = &b0->insts[0];
+    inst->a.kind = IR_GLOBAL;
+    inst->a.type = IR_PTR;
+    inst->a.as.index = 99;
+    b0->insts[1].result = 77;
+    inst = &b0->insts[2];
+    inst->a.as.index = 99;
+    inst->args[0].as.temp = 50;
+    verified(&m, "main.f b0: load names global 99, which does not exist\n"
+                 "main.f b0: copy writes %77, which does not exist\n"
+                 "main.f b0: call names function 99, which does not exist\n"
+                 "main.f b0: call uses %50, which does not exist\n");
+
+    /* A parameter whose temporary the function does not have. */
+    b0->insts[0].a = ir_temp_op(f, x);
+    b0->insts[1].result = copied;
+    b0->insts[2].a = ir_func_op(g);
+    b0->insts[2].args[0] = ir_temp_op(f, copied);
+    verified(&m, "");
+    f->params[0].temp = 99;
+    verified(&m, "main.f: parameter 0 is %99, which does not exist\n");
+    f->params[0].temp = x;
+
+    /* A jump whose target is the integer 65536 and not a block. */
+    f = ir_function_add(&m, "main", "h", IR_VOID, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_jump(f, b0, ir_block_add(f));
+    ir_ret(f, f->blocks[1], IR_VOID, ir_int_op(IR_I64, 0));
+    f->blocks[1]->insts[0].a.kind = IR_NONE;
+    verified(&m, "");
+    b0->insts[0].a = ir_int_op(IR_I64, 65536);
+    verified(&m, "main.h b0: jump goes to an operand that is not a block\n");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 void test_ir(void)
 {
     constants();
+    out_of_range();
     indirect_arguments();
     unassigned();
     scale();
