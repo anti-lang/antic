@@ -133,13 +133,12 @@ static void set_key(struct key *k, const char *value, enum layer layer,
             startup_error("%s takes true or false, found %s", where, value);
         }
     } else if (strcmp(k->name, "threads") == 0) {
-        const char *digit = value;
-        while (*digit >= '0' && *digit <= '9') {
-            digit++;
-        }
-        if (*digit != '\0' || atoi(value) <= 0) {
-            startup_error("%s takes a count above zero, found %s", where,
-                          value);
+        struct anti_text text;
+        text.ptr = (const unsigned char *)value;
+        text.len = (int64_t)strlen(value);
+        if (anti_rt_conf_threads(text) == 0) {
+            startup_error("%s takes a count from 1 to %ld, found %s", where,
+                          (long)ANTI_RT_THREADS_MAX, value);
         }
     }
     if (k->layer > layer) {
@@ -748,6 +747,28 @@ void anti_rt_conf_configure(const unsigned char *path, int64_t length)
         return;
     }
     read_file(copy((const char *)path, (size_t)length), NULL);
+}
+
+/* DESIGN: the count is read digit by digit against its bound, so every
+   target gives the same pool for the same text. atoi leaves a number out
+   of range undefined, and the C libraries of the targets differ on it. */
+int32_t anti_rt_conf_threads(struct anti_text text)
+{
+    int64_t count = 0;
+    int64_t i;
+
+    if (text.len <= 0) {
+        return 0;
+    }
+    for (i = 0; i < text.len; i++) {
+        int digit = text.ptr[i] - '0';
+        if (digit < 0 || digit > 9 ||
+            count > (ANTI_RT_THREADS_MAX - digit) / 10) {
+            return 0;
+        }
+        count = count * 10 + digit;
+    }
+    return (int32_t)count;
 }
 
 struct anti_text anti_rt_conf_get(const unsigned char *key, int64_t length)

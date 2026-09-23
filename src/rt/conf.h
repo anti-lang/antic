@@ -63,4 +63,9 @@ void anti_rt_conf_configure(const unsigned char *path, int64_t length);
    one and the program runs as it was built. */
 struct anti_text anti_rt_conf_get(const unsigned char *key, int64_t length);
 
+/* The count the text of the `threads` key names, from 1 to
+   ANTI_RT_THREADS_MAX, or 0 for a text that is no such count. */
+#define ANTI_RT_THREADS_MAX INT32_MAX
+int32_t anti_rt_conf_threads(struct anti_text text);
+
 #endif

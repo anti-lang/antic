@@ -1944,6 +1944,17 @@ add_test(NAME table_unset
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_table.cmake")
 
+# The results of `parallel` take one value per chunk, and a count of them
+# that no size holds stops the program before a worker runs.
+add_test(NAME parallel_size
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/parallel_size.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_parallel_size.cmake")
+
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)
     add_test(NAME abi_probe
@@ -2049,6 +2060,9 @@ foreach(case
         "unknown_option|report||--anti.nonsense|empty.pattern|unknown-option.pattern|70"
         "unknown_key|report||--anti.conf=${CONF}/unknown-key.toml|empty.pattern|unknown-key.pattern|70"
         "bad_value|report||--anti.conf=${CONF}/bad-value.toml|empty.pattern|bad-value.pattern|70"
+        "threads_range|report||--anti.conf=${CONF}/threads-range.toml|empty.pattern|threads-range.pattern|70"
+        "threads_option|report||--anti.threads=99999999999|empty.pattern|threads-option.pattern|70"
+        "threads_zero|report||--anti.threads=0|empty.pattern|threads-zero.pattern|70"
         "injection|report||--anti.conf=${CONF}/injection.toml|empty.pattern|injection.pattern|70"
         "inject_option|report||--anti.inject=anti.log.Logger=lib/x.so|empty.pattern|inject-option.pattern|70")
     string(REPLACE "|" ";" parts "${case}")

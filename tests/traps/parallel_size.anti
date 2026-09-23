@@ -1,0 +1,17 @@
+//! The results of `parallel` take one value per chunk. A slice of 2^61 bytes
+//! in chunks of one byte asks for 2^64 bytes of results, which no size holds,
+//! so the runtime stops before a worker runs. The slice points at one byte,
+//! and no worker reads it.
+
+worker fn none_read(chunk: []byte) -> int
+{
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let count = 1 << 61;
+	let all = []byte { ptr: alloc(byte, 1), len: count };
+	let results = parallel all by count -> none_read;
+	return results.len as int;
+}

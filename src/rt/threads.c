@@ -14,6 +14,7 @@
 #endif
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -115,9 +116,8 @@ static int64_t finished;
    but ANTI_CONF. */
 static int worker_count(void)
 {
-    struct anti_text value =
-        anti_rt_conf_get((const unsigned char *)"threads", 7);
-    int n = value.len > 0 ? atoi((const char *)value.ptr) : 0;
+    int n = (int)anti_rt_conf_threads(
+        anti_rt_conf_get((const unsigned char *)"threads", 7));
 
     if (n > 0) {
         return n;
@@ -297,6 +297,16 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
     j.chunks = chunks;
     j.results = NULL;
     if (chunks > 0) {
+        /* The bound is the one of anti_rt_chan_new. A product past it
+           would wrap, and the workers would write past the block. */
+        if (result_size < 0 ||
+            (result_size > 0 && chunks > (INT64_MAX / 2) / result_size)) {
+            fflush(stdout);
+            fprintf(stderr, "anti: the results of %lld chunks of %lld "
+                            "bytes each do not fit in memory\n",
+                    (long long)chunks, (long long)result_size);
+            abort();
+        }
         j.results = malloc((size_t)(chunks * result_size));
         if (j.results == NULL) {
             /* DESIGN: the language has no way to report this, and a
