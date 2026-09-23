@@ -220,9 +220,16 @@ static void read_key(struct reader *r, const char **key, int64_t *length)
     }
 }
 
-/* One value, with the quotes of a string removed. Inside an array a
-   comma and the closing bracket end it as well. */
-static void read_value(struct reader *r, int in_array, const char **value,
+/* Whether c is one of the bytes that end a value here. Inside an array
+   that is a comma and `]`, and inside an inline table a comma and `}`. */
+static int stops_value(const char *stops, int c)
+{
+    return c >= 0 && strchr(stops, c) != NULL;
+}
+
+/* One value, with the quotes of a string removed. stops holds the bytes
+   that end it beside a line break and a comment. */
+static void read_value(struct reader *r, const char *stops, const char **value,
                        int64_t *length)
 {
     int64_t start;
@@ -234,7 +241,7 @@ static void read_value(struct reader *r, int in_array, const char **value,
     }
     start = r->pos;
     while (!at_end(r) && peek(r) != '\n' && peek(r) != '#' &&
-           (!in_array || (peek(r) != ',' && peek(r) != ']'))) {
+           !stops_value(stops, peek(r))) {
         r->pos++;
     }
     *length = r->pos - start;
@@ -249,9 +256,77 @@ static void read_value(struct reader *r, int in_array, const char **value,
     }
 }
 
+static void read_array(struct reader *r, struct anti_toml *doc,
+                       const char *path);
+
+/* The pairs of an inline table, each under the path of the table. The
+   value of a pair is a plain value, an array or another inline table, so
+   `{ version = "1.2.4", repo = "ff" }` at `dependencies.a` writes
+   `dependencies.a.version` and `dependencies.a.repo`. */
+static void read_inline_table(struct reader *r, struct anti_toml *doc,
+                              const char *path)
+{
+    r->pos++;
+    while (!r->failed) {
+        char key[320];
+        const char *name = NULL;
+        const char *value = NULL;
+        int64_t value_length = 0;
+        int64_t name_length = 0;
+        int length;
+        skip_blank(r);
+        if (peek(r) == '}') {
+            r->pos++;
+            return;
+        }
+        if (at_end(r)) {
+            r->failed = 1;
+            return;
+        }
+        read_key(r, &name, &name_length);
+        if (r->failed) {
+            return;
+        }
+        skip_spaces(r);
+        if (peek(r) != '=') {
+            r->failed = 1;
+            return;
+        }
+        r->pos++;
+        length = snprintf(key, sizeof key, "%s.%.*s", path, (int)name_length,
+                          name);
+        if (length <= 0 || (size_t)length >= sizeof key) {
+            r->failed = 1;
+            return;
+        }
+        skip_spaces(r);
+        if (peek(r) == '[') {
+            read_array(r, doc, key);
+        } else if (peek(r) == '{') {
+            read_inline_table(r, doc, key);
+        } else {
+            read_value(r, ",}", &value, &value_length);
+            if (r->failed) {
+                return;
+            }
+            add(doc, r, key, length, value, value_length);
+        }
+        if (r->failed) {
+            return;
+        }
+        skip_blank(r);
+        if (peek(r) == ',') {
+            r->pos++;
+        } else if (peek(r) != '}') {
+            r->failed = 1;
+        }
+    }
+}
+
 /* The elements of an array, as the keys path.0, path.1, path.2. The
    array runs over lines, and a comma after its last element is allowed.
-   An array of arrays is outside the subset. */
+   An element that opens with `{` is an inline table, so an array of them
+   writes path.0.name. An array of arrays is outside the subset. */
 static void read_array(struct reader *r, struct anti_toml *doc,
                        const char *path)
 {
@@ -272,16 +347,23 @@ static void read_array(struct reader *r, struct anti_toml *doc,
             r->failed = 1;
             return;
         }
-        read_value(r, 1, &value, &value_length);
-        if (r->failed) {
-            return;
-        }
         length = snprintf(key, sizeof key, "%s.%lld", path, (long long)index);
         if (length <= 0 || (size_t)length >= sizeof key) {
             r->failed = 1;
             return;
         }
-        add(doc, r, key, length, value, value_length);
+        if (peek(r) == '{') {
+            read_inline_table(r, doc, key);
+        } else {
+            read_value(r, ",]", &value, &value_length);
+            if (r->failed) {
+                return;
+            }
+            add(doc, r, key, length, value, value_length);
+        }
+        if (r->failed) {
+            return;
+        }
         index++;
         skip_blank(r);
         if (peek(r) == ',') {
@@ -324,7 +406,11 @@ static void read_pair(struct reader *r, struct anti_toml *doc)
         read_array(r, doc, path);
         return;
     }
-    read_value(r, 0, &value, &value_length);
+    if (peek(r) == '{') {
+        read_inline_table(r, doc, path);
+        return;
+    }
+    read_value(r, "", &value, &value_length);
     if (r->failed) {
         return;
     }

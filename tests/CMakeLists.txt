@@ -45,10 +45,12 @@ add_executable(antic_unit_tests
     unit/test_symbols.c
     unit/test_float_read.c
     unit/test_coff.c
+    unit/test_toml.c
     ../rt/cpu.c
     ../rt/f16.c
     ../rt/symbols.c
     ../rt/text.c
+    ../rt/toml.c
     ../rt/utf.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core)
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the

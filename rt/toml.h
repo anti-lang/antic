@@ -7,14 +7,16 @@
 
 /* A read of the TOML subset that anti.toml, the logger and the runtime
    configuration need. It holds bare keys and quoted keys, `[table]`
-   headers, `[[table]]` arrays, basic strings, integers, floats,
-   booleans and arrays of them. Comments run from `#` to the end of the
-   line.
+   headers, `[[table]]` arrays, inline tables, basic strings, integers,
+   floats, booleans and arrays of them. Comments run from `#` to the end
+   of the line.
 
    The document is a flat list of keys, each the path of its value with a
    dot between the parts. A repeated `[[sink]]` numbers its entries, so
    the first holds `sink.0.kind`, and an array numbers its elements the
-   same way. */
+   same way. An inline table writes one key per pair under the path of the
+   table, so `a = { b = 1 }` holds `a.b`, and an array of inline tables
+   holds `a.0.b`. */
 struct anti_toml;
 
 /* Read the document. Returns NULL when the text is not the subset. */
