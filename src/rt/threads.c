@@ -73,7 +73,7 @@ static void wait_done(void)
     SleepConditionVariableCS(&work_done, &lock, INFINITE);
 }
 static void wake_all(void) { WakeAllConditionVariable(&work_ready); }
-static void wake_caller(void) { WakeConditionVariable(&work_done); }
+static void wake_caller(void) { WakeAllConditionVariable(&work_done); }
 
 static int processors(void)
 {
@@ -92,7 +92,7 @@ static void release(void) { pthread_mutex_unlock(&lock); }
 static void wait_ready(void) { pthread_cond_wait(&work_ready, &lock); }
 static void wait_done(void) { pthread_cond_wait(&work_done, &lock); }
 static void wake_all(void) { pthread_cond_broadcast(&work_ready); }
-static void wake_caller(void) { pthread_cond_signal(&work_done); }
+static void wake_caller(void) { pthread_cond_broadcast(&work_done); }
 
 static int processors(void)
 {
@@ -102,6 +102,12 @@ static int processors(void)
 }
 
 #endif
+
+/* DESIGN: two kinds of thread wait on work_done, the caller of
+   `parallel` and each caller of `join`. The end of a chunk or of a job
+   wakes all of them, and each checks its own condition. One wake-up
+   could go to a waiter whose work is not done, and the other would
+   sleep for good. */
 
 /* The state the lock guards. */
 static struct jobs *active;

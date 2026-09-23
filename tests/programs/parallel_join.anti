@@ -1,0 +1,92 @@
+//! A joiner and the caller of `parallel` wait for the pool at once. A worker
+//! that ends a chunk or a job wakes every waiter, so neither sleeps on a
+//! wake-up that the other took. With one wake-up per chunk the caller of
+//! `parallel` sleeps for good when the joiner takes it, and the program hangs.
+
+import anti.time;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Flag
+{
+	pub n: int = 1,
+
+	/* Set once the slow chunk runs, and once the joiner is about to wait. */
+	static atomic started: int = 0;
+	static atomic joining: int = 0;
+	static atomic stop: int = 0;
+	/* 0 when the caller of `parallel` waits first, 1 when the joiner does. */
+	static atomic joiner_first: int = 0;
+}
+
+/// Runs until main says stop, so its joiner waits past the end of `parallel`.
+worker fn spin(f: *Flag) -> int
+{
+	while Flag.stop.load() == 0 do {
+		time.sleep(time.microseconds(100));
+	}
+	return f.n;
+}
+
+/// Waits for the spinner, before the caller of `parallel` waits for the slow
+/// chunk or after it. A pool may wake its waiters in either order.
+worker fn outer(f: *Flag) -> int
+{
+	let inner = alloc Flag {};
+	if Flag.joiner_first.load() == 0 {
+		while Flag.started.load() == 0 do {
+			time.sleep(time.microseconds(100));
+		}
+		time.sleep(time.milliseconds(20));
+	}
+	let job = dispatch inner -> spin();
+	Flag.joining.store(1);
+	let answer = join(job) + f.n;
+	free(inner);
+	return answer;
+}
+
+/// The chunk that starts with 5 is slow. It ends once the joiner waits, so
+/// the wake-up of its end finds two waiters. The other one takes long enough
+/// that a worker takes the slow one before the caller could.
+worker fn total(chunk: []int) -> int
+{
+	let sum = 0;
+	if chunk[0] == 1 {
+		time.sleep(time.milliseconds(5));
+	}
+	if chunk[0] == 5 {
+		Flag.started.store(1);
+		while Flag.joining.load() == 0 do {
+			time.sleep(time.microseconds(100));
+		}
+		time.sleep(time.milliseconds(20));
+	}
+	for x in chunk {
+		sum = sum + x;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
+	let all = numbers[0..8];
+	let answers = 0;
+
+	for round in 0..6 {
+		let f = alloc Flag {};
+		Flag.joiner_first.store(round % 2);
+		Flag.started.store(0);
+		Flag.joining.store(0);
+		Flag.stop.store(0);
+		let outer_job = dispatch f -> outer();
+		let parts = parallel all by 2 -> total;
+		Flag.stop.store(1);
+		answers = answers + join(outer_job) + parts[0] + parts[1];
+		free(parts.ptr);
+		free(f);
+	}
+	printf("%d\n".ptr, answers as c_int);
+	return 0;
+}

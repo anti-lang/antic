@@ -587,7 +587,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     set_tests_properties(program_nullable_macos-x86_64 PROPERTIES
         ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
     foreach(name IN ITEMS sync_exits sync_workers channels select_two
-            channel_workers)
+            channel_workers parallel_join)
         set_tests_properties(program_${name}_macos-x86_64 PROPERTIES
             TIMEOUT 120)
     endforeach()
@@ -606,9 +606,11 @@ set_tests_properties(program_nullable PROPERTIES
 # The workers of tests/programs/channel_workers.anti wait on each other, so
 # each needs a thread of the pool. Its .args file passes --anti.threads=4,
 # which every run of the program takes. A program that leaves a mutex
-# locked or a channel waiting stops, and the timeout reports it.
+# locked, a channel waiting or a waiter of the pool asleep stops, and the
+# timeout reports it. tests/programs/parallel_join.anti passes
+# --anti.threads=6 for the joiner, the job it waits for and a chunk.
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
-        channel_workers)
+        channel_workers parallel_join)
     set_tests_properties(program_${name} PROPERTIES TIMEOUT 120)
 endforeach()
 
