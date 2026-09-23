@@ -9,6 +9,7 @@
    to the default. */
 #include "trace.h"
 
+#include "atomic.h"
 #include "rt.h"
 
 struct anti_backtrace_default {
@@ -17,10 +18,15 @@ struct anti_backtrace_default {
 
 extern const struct anti_backtrace_default anti_rt_backtrace_default;
 
+/* rt.configure may set the option on one thread while another fails, so
+   the option is read atomically. */
 bool anti_rt_backtrace_on(void)
 {
-    if (anti_rt_option_backtrace >= 0) {
-        return anti_rt_option_backtrace != 0;
+    int64_t option = anti_rt_atomic_load(
+        &anti_rt_option_backtrace, (int64_t)sizeof anti_rt_option_backtrace);
+
+    if (option >= 0) {
+        return option != 0;
     }
     return anti_rt_backtrace_default.on != 0;
 }

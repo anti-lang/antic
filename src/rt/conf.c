@@ -17,8 +17,12 @@
 #include "rt.h"
 #include "toml.h"
 
+#include "atomic.h"
+
 #if defined(_WIN32)
 #include <windows.h>
+#else
+#include <pthread.h>
 #endif
 
 /* Where a value came from. A higher layer keeps its value. */
@@ -69,7 +73,33 @@ static const struct option options[] = {
 static const char *conf_path;
 static int inspect_asked;
 static int help_asked;
-static int file_read;
+/* 1 once a file was read or rt.configure began to read one. It is
+   atomic, so two calls of rt.configure read one file between them. */
+static int64_t file_read;
+
+/* DESIGN: the options and the file named at start are read before main,
+   on one thread. rt.configure of anti.runtime runs later, while any
+   thread may read a key through anti_rt_conf_get. The lock guards the
+   value, the source and the layer of every key. A reader on another
+   thread may still hold the bytes of a value that a later layer or
+   include replaces. So the list below keeps every such value until the
+   program ends. A program holds few values, and they are short. */
+#if defined(_WIN32)
+static SRWLOCK lock = SRWLOCK_INIT;
+static void hold(void) { AcquireSRWLockExclusive(&lock); }
+static void release(void) { ReleaseSRWLockExclusive(&lock); }
+#else
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static void hold(void) { pthread_mutex_lock(&lock); }
+static void release(void) { pthread_mutex_unlock(&lock); }
+#endif
+
+struct retired {
+    struct retired *next;
+    char *value;
+};
+
+static struct retired *retired;
 
 /* A startup error: the message on standard error and status 70, the
    status of every refusal at start. */
@@ -128,6 +158,9 @@ static void print_keys(FILE *stream)
 static void set_key(struct key *k, const char *value, enum layer layer,
                     const char *source, const char *where)
 {
+    struct retired *old;
+    char *kept;
+
     if (strcmp(k->name, "backtrace") == 0) {
         if (strcmp(value, "true") != 0 && strcmp(value, "false") != 0) {
             startup_error("%s takes true or false, found %s", where, value);
@@ -141,16 +174,34 @@ static void set_key(struct key *k, const char *value, enum layer layer,
                           (long)ANTI_RT_THREADS_MAX, value);
         }
     }
-    if (k->layer > layer) {
-        return;
+    kept = copy(value, strlen(value));
+    old = malloc(sizeof *old);
+    if (old == NULL) {
+        startup_error("out of memory at program start");
     }
-    free(k->value);
-    k->value = copy(value, strlen(value));
-    k->source = source;
-    k->layer = layer;
-    if (strcmp(k->name, "backtrace") == 0) {
-        anti_rt_option_backtrace = strcmp(value, "true") == 0;
+    /* A value this call does not take, and a node it does not use, are
+       freed after the lock. */
+    hold();
+    if (k->layer <= layer) {
+        if (k->value != NULL) {
+            old->value = k->value;
+            old->next = retired;
+            retired = old;
+            old = NULL;
+        }
+        k->value = kept;
+        kept = NULL;
+        k->source = source;
+        k->layer = layer;
+        if (strcmp(k->name, "backtrace") == 0) {
+            anti_rt_atomic_store(&anti_rt_option_backtrace,
+                                 (int64_t)sizeof anti_rt_option_backtrace,
+                                 strcmp(value, "true") == 0);
+        }
     }
+    release();
+    free(kept);
+    free(old);
 }
 
 /* The entry of the interface the text names, or NULL. */
@@ -580,7 +631,7 @@ static void read_file(const char *path, const struct including *from)
     read_keys(doc, path);
     anti_rt_toml_free(doc);
     free(bytes);
-    file_read = 1;
+    anti_rt_atomic_store(&file_read, (int64_t)sizeof file_read, 1);
 }
 
 /* The path of ANTI_CONF, or NULL. It is the one variable the runtime
@@ -743,7 +794,8 @@ void anti_rt_conf_start(void)
 
 void anti_rt_conf_configure(const unsigned char *path, int64_t length)
 {
-    if (file_read) {
+    if (!anti_rt_atomic_compare_swap(&file_read, (int64_t)sizeof file_read,
+                                     0, 1)) {
         return;
     }
     read_file(copy((const char *)path, (size_t)length), NULL);
@@ -778,9 +830,11 @@ struct anti_text anti_rt_conf_get(const unsigned char *key, int64_t length)
 
     text.ptr = (const unsigned char *)"";
     text.len = 0;
+    hold();
     if (k != NULL && k->value != NULL) {
         text.ptr = (const unsigned char *)k->value;
         text.len = (int64_t)strlen(k->value);
     }
+    release();
     return text;
 }

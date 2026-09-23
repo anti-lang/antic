@@ -97,6 +97,17 @@ add_executable(rt_signal_tests unit/test_signal.c ../src/rt/signal.c
 target_link_libraries(rt_signal_tests PRIVATE Threads::Threads)
 add_test(NAME rt_signal COMMAND rt_signal_tests)
 
+# rt.configure while another thread reads the keys, in a program of its own
+# with stand-ins for the loader and for anti.fs. The runtime of an Anti
+# program carries no sanitizer, and this program does in the sanitizer
+# builds.
+add_executable(rt_conf_tests unit/test_conf_race.c ../src/rt/conf.c
+    ../src/rt/toml.c ../src/rt/atomic.c)
+target_link_libraries(rt_conf_tests PRIVATE Threads::Threads)
+target_compile_definitions(rt_conf_tests PRIVATE
+    ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME rt_conf_race COMMAND rt_conf_tests)
+
 # The runtime archive holds the licence text of every component.
 add_test(NAME runtime_licenses
     COMMAND "${CMAKE_COMMAND}" -E cat "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt")

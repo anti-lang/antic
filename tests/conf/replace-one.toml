@@ -1,0 +1,3 @@
+# One of the includes of tests/conf/replace.toml.
+[runtime]
+threads = 2
