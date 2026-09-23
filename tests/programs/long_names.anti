@@ -1,0 +1,65 @@
+//! A name of any length gives each symbol a name of its own. The class
+//! names run past 160 bytes, the two classes that follow share their first
+//! 136 bytes, and so do the two interface fields of the first class.
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class First
+{
+	abstract fn label(self) -> int;
+}
+
+abstract class Second
+{
+	abstract fn label(self) -> int;
+}
+
+class Longxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+{
+	pub own counts: []i32,
+	pub id: int = 3,
+	implements fieldzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzza: First,
+	implements fieldzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzb: Second,
+
+	concrete fn First::label(self) -> int
+	{
+		return self.id * 10 + 1;
+	}
+
+	concrete fn Second::label(self) -> int
+	{
+		return self.id * 10 + 2;
+	}
+}
+
+class PrefixyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyOne
+{
+	pub v: int = 1,
+}
+
+class PrefixyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyTwo
+{
+	pub v: int = 2,
+}
+
+fn main() -> int
+{
+	let h = alloc Longxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx {
+		counts: []i32 { ptr: alloc(i32, 2), len: 2 },
+	};
+	h.counts[0] = 10;
+	h.counts[1] = 20;
+	let c = dup(h);
+	h.counts[1] = 0;
+	printf("%d %d\n".ptr, c.counts[0] as c_int, c.counts[1] as c_int);
+	let first = c as *First;
+	let second = c as *Second;
+	printf("%d %d\n".ptr, first.label() as c_int, second.label() as c_int);
+	let one = alloc PrefixyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyOne {};
+	let two = alloc PrefixyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyTwo {};
+	printf("%d %d\n".ptr, one.v as c_int, two.v as c_int);
+	delete(one);
+	delete(two);
+	delete(c);
+	delete(h);
+	return 0;
+}

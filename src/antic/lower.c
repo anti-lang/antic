@@ -2649,13 +2649,14 @@ static struct ir_global *interface_descriptor(struct lowerer *l,
     const struct ir_global *of = class_descriptor(l, t);
     struct ir_const *value;
     struct ir_global *g;
-    char label[160];
+    struct text label = {0};
     char *module;
     char *name;
 
-    snprintf(label, sizeof label, "%.*s.descriptor", (int)sub->name.length,
-             sub->name.text);
-    g = class_global(l, t, label, &module, &name);
+    text_appendf(&label, "%.*s.descriptor", (int)sub->name.length,
+                 sub->name.text);
+    g = class_global(l, t, text_cstr(&label), &module, &name);
+    text_free(&label);
     if (g != NULL) {
         return g;
     }
@@ -2704,21 +2705,22 @@ static struct ir_function *class_function(struct lowerer *l,
 {
     char *module = cstr(&t->module);
     struct ir_function *f;
-    char name[160];
+    struct text name = {0};
 
-    snprintf(name, sizeof name, "%.*s.%s", (int)t->name.length, t->name.text,
-             part);
-    f = find_function(l->m, module, name);
+    text_appendf(&name, "%.*s.%s", (int)t->name.length, t->name.text, part);
+    f = find_function(l->m, module, text_cstr(&name));
     if (f == NULL) {
         f = strcmp(module, l->module_name) == 0
-                ? ir_function_add(l->m, l->module_name, name, IR_VOID,
-                                  IR_NO_AGG)
-                : ir_declare_add(l->m, module, name, IR_VOID, IR_NO_AGG);
+                ? ir_function_add(l->m, l->module_name, text_cstr(&name),
+                                  IR_VOID, IR_NO_AGG)
+                : ir_declare_add(l->m, module, text_cstr(&name), IR_VOID,
+                                 IR_NO_AGG);
         ir_param_add(f, IR_PTR, IR_NO_AGG);
         if (strcmp(part, "copy") == 0 || strcmp(part, "destroy") == 0) {
             ir_param_add(f, IR_PTR, IR_NO_AGG);
         }
     }
+    text_free(&name);
     free(module);
     return f;
 }
@@ -2844,18 +2846,20 @@ static struct ir_function *interface_thunk(struct lowerer *l,
     struct ir_block *entry;
     struct ir_operand back;
     uint32_t value;
-    char name[192];
+    struct text name = {0};
     size_t i;
 
-    snprintf(name, sizeof name, "%.*s.%.*s.%.*s.thunk", (int)t->name.length,
-             t->name.text, (int)sub->name.length, sub->name.text,
-             (int)fn->name.length, fn->name.text);
-    f = find_function(l->m, l->module_name, name);
+    text_appendf(&name, "%.*s.%.*s.%.*s.thunk", (int)t->name.length,
+                 t->name.text, (int)sub->name.length, sub->name.text,
+                 (int)fn->name.length, fn->name.text);
+    f = find_function(l->m, l->module_name, text_cstr(&name));
     if (f != NULL) {
+        text_free(&name);
         return f;
     }
-    f = ir_function_add(l->m, l->module_name, name, ir_type_of(sig->result),
-                        result_agg(l, sig->result));
+    f = ir_function_add(l->m, l->module_name, text_cstr(&name),
+                        ir_type_of(sig->result), result_agg(l, sig->result));
+    text_free(&name);
     f->result_agg = result_agg(l, sig->result);
     for (i = 0; i < sig->param_count; i++) {
         add_param(l, f, sig->params[i]);
@@ -2902,12 +2906,13 @@ static struct ir_global *interface_table(struct lowerer *l,
     struct ir_global *g;
     char *module;
     char *name;
-    char label[160];
+    struct text label = {0};
     size_t i;
 
-    snprintf(label, sizeof label, "%.*s.table", (int)sub->name.length,
-             sub->name.text);
-    g = class_global(l, t, label, &module, &name);
+    text_appendf(&label, "%.*s.table", (int)sub->name.length,
+                 sub->name.text);
+    g = class_global(l, t, text_cstr(&label), &module, &name);
+    text_free(&label);
     if (g != NULL) {
         return g;
     }
@@ -2968,19 +2973,20 @@ static struct ir_function *reach_thunk(struct lowerer *l,
     struct ir_operand target;
     struct ir_inst *call;
     uint32_t value;
-    char name[192];
+    struct text name = {0};
     size_t i;
 
-    snprintf(name, sizeof name, "%.*s.%.*s.%.*s.reach",
-             (int)sub->home->name.length, sub->home->name.text,
-             (int)sub->name.length, sub->name.text,
-             (int)sym->item->name.length, sym->item->name.text);
-    f = find_function(l->m, l->module_name, name);
+    text_appendf(&name, "%.*s.%.*s.%.*s.reach", (int)sub->home->name.length,
+                 sub->home->name.text, (int)sub->name.length, sub->name.text,
+                 (int)sym->item->name.length, sym->item->name.text);
+    f = find_function(l->m, l->module_name, text_cstr(&name));
     if (f != NULL) {
+        text_free(&name);
         return f;
     }
-    f = ir_function_add(l->m, l->module_name, name, ir_type_of(sig->result),
-                        result_agg(l, sig->result));
+    f = ir_function_add(l->m, l->module_name, text_cstr(&name),
+                        ir_type_of(sig->result), result_agg(l, sig->result));
+    text_free(&name);
     f->result_agg = result_agg(l, sig->result);
     for (i = 0; i < sig->param_count; i++) {
         add_param(l, f, sig->params[i]);
@@ -3158,11 +3164,10 @@ static bool has_default(const struct struct_field *field)
    class gives it to C as `anti_<Class>_init`. The registry that
    `reflect.new` reads names it for the others as `<Class>.init`. An
    abstract class has no complete value and therefore none. */
-static void init_name(const struct type *t, bool exported, char *out,
-                      size_t size)
+static void init_name(const struct type *t, bool exported, struct text *out)
 {
-    snprintf(out, size, exported ? "anti_%.*s_init" : "%.*s.init",
-             (int)t->name.length, t->name.text);
+    text_appendf(out, exported ? "anti_%.*s_init" : "%.*s.init",
+                 (int)t->name.length, t->name.text);
 }
 
 /* The init function of class t, declared in the module that declares t
@@ -3172,18 +3177,20 @@ static struct ir_function *init_function(struct lowerer *l,
 {
     char *module = cstr(&t->module);
     struct ir_function *f;
-    char name[128];
+    struct text name = {0};
 
-    init_name(t, t->item_exported, name, sizeof name);
-    f = find_function(l->m, module, name);
+    init_name(t, t->item_exported, &name);
+    f = find_function(l->m, module, text_cstr(&name));
     if (f == NULL) {
         f = strcmp(module, l->module_name) == 0
-                ? ir_function_add(l->m, l->module_name, name, IR_VOID,
-                                  IR_NO_AGG)
-                : ir_declare_add(l->m, module, name, IR_VOID, IR_NO_AGG);
+                ? ir_function_add(l->m, l->module_name, text_cstr(&name),
+                                  IR_VOID, IR_NO_AGG)
+                : ir_declare_add(l->m, module, text_cstr(&name), IR_VOID,
+                                 IR_NO_AGG);
         f->exported = t->item_exported;
         ir_param_add(f, IR_PTR, IR_NO_AGG);
     }
+    text_free(&name);
     free(module);
     return f;
 }
@@ -8538,7 +8545,7 @@ static void class_construct(struct lowerer *l, const struct item *it)
     struct ir_operand *args;
     struct ir_operand self;
     uint32_t value;
-    char name[160];
+    struct text name = {0};
     size_t i;
 
     for (i = 0; i < t->member_count; i++) {
@@ -8553,10 +8560,11 @@ static void class_construct(struct lowerer *l, const struct item *it)
     }
     sig = m->symbol->type;
     target = callee_function(l, m->symbol);
-    snprintf(name, sizeof name, "anti_%.*s_construct", (int)t->name.length,
-             t->name.text);
-    f = ir_function_add(l->m, l->module_name, name, ir_type_of(sig->result),
-                        IR_NO_AGG);
+    text_appendf(&name, "anti_%.*s_construct", (int)t->name.length,
+                 t->name.text);
+    f = ir_function_add(l->m, l->module_name, text_cstr(&name),
+                        ir_type_of(sig->result), IR_NO_AGG);
+    text_free(&name);
     f->exported = true;
     for (i = 0; i < sig->param_count; i++) {
         add_param(l, f, sig->params[i]);
@@ -8868,10 +8876,11 @@ static void class_record(struct lowerer *l, const struct module *module,
     c->base = class_descriptor(l, t->base)->index;
     c->agg = agg_of(l, t);
     if (!it->is_abstract) {
-        char init[128];
+        struct text init = {0};
         const struct ir_function *f;
-        init_name(t, it->exported, init, sizeof init);
-        f = find_function(l->m, l->module_name, init);
+        init_name(t, it->exported, &init);
+        f = find_function(l->m, l->module_name, text_cstr(&init));
+        text_free(&init);
         c->init = f != NULL ? f->index : IR_NO_INDEX;
         c->table = class_table(l, t)->index;
         for (up = t; up != NULL;
