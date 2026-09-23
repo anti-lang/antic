@@ -108,6 +108,9 @@ pub worker fn measure(c: Circle) -> int
 	return area(c);
 }
 
+/// The count every canvas starts at, which the package alone sees.
+internal const START: int = 0;
+
 fn helper(n: int) -> int
 {
 	return n + 1;

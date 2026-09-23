@@ -85,6 +85,14 @@ endif()
 same_file("${WORK}/md/com.example.shapes.md" "${FIXTURE}/shapes.expected.md"
           "the Markdown page")
 
+# An `internal` item stands in the developer docs and not in the user
+# docs, which the object model asks for.
+file(READ "${WORK}/user/com.example.shapes.html" page)
+string(FIND "${page}" "START" at)
+if(NOT at LESS 0)
+    message(FATAL_ERROR "the user docs carry the internal item")
+endif()
+
 # Dev docs carry the private items and the `//#` notes.
 run_doc("--dev;-I;${SRC};--work;${WORK}/w4;-o;${WORK}/dev;${SHAPES};${APP}"
         status text)
@@ -102,7 +110,7 @@ if(NOT status EQUAL 0)
     message(FATAL_ERROR "doc --private failed with ${status}\n${text}")
 endif()
 file(READ "${WORK}/private/com.example.shapes.html" page)
-foreach(name helper secret private_note)
+foreach(name helper secret private_note START)
     string(FIND "${page}" "${name}" at)
     if(at LESS 0)
         message(FATAL_ERROR "--private left out ${name}")

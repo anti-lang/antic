@@ -464,19 +464,21 @@ static void body_entries(struct entry *item, const struct type *t, bool all)
     }
 }
 
-/* One item of the public interface. */
+/* One item of the public interface. DESIGN: an `internal` item stands in
+   the interface marked as internal, and the object model puts it in the
+   developer docs. The user docs of a library leave it out, whichever of
+   the two inputs they were built from. */
 static void interface_item(struct page *p, const struct symbol *sym)
 {
     struct entry *one;
-    const char *lead;
+    const char *lead = "pub ";
 
-    if (sym->type == NULL) {
+    if (sym->type == NULL || sym->internal) {
         return;
     }
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
     text_append_bytes(&one->name, sym->name.text, sym->name.length);
     one->doc = sym->doc;
-    lead = sym->internal ? "internal " : "pub ";
     switch (sym->kind) {
     case SYMBOL_FN:
         fn_signature(&one->signature, lead, sym->worker ? "worker fn" : "fn",

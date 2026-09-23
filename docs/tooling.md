@@ -63,7 +63,7 @@ shows none of its code.
 | `anti clean` | Delete `build/` and `dist/` |
 | `anti publish [--to <target>] [--dry-run]` | Stage, upload through the target's transport, verify over HTTPS |
 | `anti fmt [--check]` | Format source files in place, or report unformatted files |
-| `anti doc [--dev] [--private] [--markdown] [<file.antl>]` | Generate user docs or dev docs |
+| `anti doc [--dev] [--private] [--markdown] [-o <dir>] [<file.antl>]` | Generate user docs or dev docs |
 | `anti bind <api.json>\|--clang <header>` | Write a binding module and, when needed, a shim |
 | `anti bind --header <name>.antl` | Write a C header from a library file without the source |
 | `anti license [--project [--notice]] [--from <exe>] [--from-archive <lib>]` | Print or write licence and attribution text |
@@ -370,11 +370,18 @@ Dev docs need the source. `anti doc --dev` reads `src/`. `--private` includes pr
 items in the user docs and is off by default.
 
 Output is HTML per module with an index page, or Markdown with `--markdown` for
-mounting in a Hugo site.
+mounting in a Hugo site. The HTML is plain and semantic, with the class names
+`doc`, `index`, `item`, `signature`, `fields`, `members`, `internals` and
+`code` and no styling of its own.
 
 Fenced code blocks in doc comments are rendered through `anti html` or `anti tex`.
 `anti check` compiles the `anti` blocks and reports the doc warnings, see
 `docs/tooling-addendum.md`.
+
+It is built. `tools/anti/doc.c` holds it and `docs/notes/doc.md` its choices.
+The decisions behind the ones this page leaves open are under "The doc command"
+in `docs/decisions.md`. The test `anti_doc` runs the doc equivalence of the
+table below.
 
 ## Formatter
 

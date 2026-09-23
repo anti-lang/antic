@@ -247,8 +247,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 769 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 768 each, without the `no_paths` test, which needs a
+- 770 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 769 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A
@@ -407,9 +407,9 @@ reports what it finished.
   under "The release script" in `docs/decisions.md`.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
   only. It has never run.
-- The `anti` tool holds `sdk export`, `sdk import`, `test`, `check` and `fmt`,
-  and nothing else of `docs/tooling.md`. `anti fmt` writes the canonical form
-  of the formatter rules, and `std/` and `tests/` stand in it.
+- The `anti` tool holds `sdk export`, `sdk import`, `test`, `check`, `fmt` and
+  `doc`, and nothing else of `docs/tooling.md`. `anti fmt` writes the canonical
+  form of the formatter rules, and `std/` and `tests/` stand in it.
 - `anti check` is built, with its four classes in the order of
   `docs/tooling-addendum.md`: the front end on every source, with
   `--targets all` once per target, the `anti` blocks of the doc comments in
@@ -422,6 +422,15 @@ reports what it finished.
   comment, and the checker warns where the name a `catch` binds shadows a
   variable. See "The check command" in `docs/decisions.md` and
   `docs/notes/check.md`.
+- `anti doc` is built. It writes one page per module and an index of them,
+  plain semantic HTML with eight class names and no styling, or Markdown with
+  `--markdown`. User docs come from the public interface alone, so a library
+  file is enough and the page built from one equals the page built from the
+  source, which the test `anti_doc` checks. `--dev` and `--private` read the
+  syntax tree for the private items and the `//#` notes and refuse a library
+  file. The library file now carries the parameter names of a function of a
+  class body and the `worker` mark, and its format version is 51. See "The doc
+  command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
   both blocks after parsing.
