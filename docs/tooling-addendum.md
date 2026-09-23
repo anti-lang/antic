@@ -271,8 +271,9 @@ boundary: `let n = value as int;`.
 
 Other mappings in `extern fn` declarations: `char*` is `*byte`, `void*` is `*byte`, a C
 function pointer is an Anti function type, a struct by value is an Anti struct with C
-layout, an enum is a set of `const` values of `c_int`. Variadic externs are allowed:
-`extern fn printf(fmt: *byte, ...) -> c_int;`.
+layout, and a C enum is an Anti enum. A parameter that takes a combination of enum values
+as bit flags keeps the integer type of C, and the caller converts each value with `as`.
+Variadic externs are allowed: `extern fn printf(fmt: *byte, ...) -> c_int;`.
 
 ## Sizeless IR
 
