@@ -6,8 +6,8 @@
 #   OVERVIEW  docs/anti-syntax-overview.md
 #   WORK      a directory the run may write into
 #
-# A block is a mix of items and statements. A line at the start of the
-# line that opens an item, such as `fn`, `class` or `import`, begins an
+# A block is a mix of items and statements. A line that starts with a
+# word that opens an item, such as `fn`, `class` or `import`, begins an
 # item, which runs until its braces close on a line that ends in `}` or
 # `;`. Every other line is a statement. The items stand at module level
 # and the statements go into the body of one function. That function may
@@ -25,7 +25,7 @@
 #       hides a block from a reader. Its lines go before the next `anti`
 #       block and are split the same way, so they declare the names the
 #       example uses without showing them. `docs-style:ignore` keeps the
-#       checker off the `!` of the comment
+#       checker off the `!` of the comment.
 # A context that no `anti` block follows fails the run.
 
 file(REMOVE_RECURSE "${WORK}")
