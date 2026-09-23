@@ -489,9 +489,17 @@ void ir_print(struct text *out, const struct ir_module *m)
             text_appendf(out, " %02x", g->bytes[j]);
         }
         for (j = 0; j < g->reloc_count; j++) {
-            text_appendf(out, " reloc %" PRIu64 " ", g->relocs[j].offset);
-            symbol(out, m->globals[g->relocs[j].global]->module,
-                   m->globals[g->relocs[j].global]->name);
+            const struct ir_reloc *r = &g->relocs[j];
+            text_appendf(out, " reloc %" PRIu64 " ", r->offset);
+            /* A relocation with fn set holds a function index, as a
+               table entry does. */
+            if (r->fn) {
+                symbol(out, m->functions[r->global]->module,
+                       m->functions[r->global]->name);
+            } else {
+                symbol(out, m->globals[r->global]->module,
+                       m->globals[r->global]->name);
+            }
         }
         text_append(out, "\n");
     }

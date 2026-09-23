@@ -157,6 +157,34 @@ static void memory(void)
     arena_free(&arena);
 }
 
+/* A table entry names a function, and the printer takes its name from
+   the functions. A lookup among the globals read past them here, with
+   two functions and one global. */
+static void function_reloc(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *puts_fn, *putchar_fn;
+    struct ir_global *table;
+    static const uint8_t zero[16] = {0};
+
+    ir_module_init(&m, &arena, "main");
+    puts_fn = ir_extern_add(&m, "puts", IR_I32, false);
+    ir_param_add(puts_fn, IR_PTR, IR_NO_AGG);
+    putchar_fn = ir_extern_add(&m, "putchar", IR_I32, false);
+    ir_param_add(putchar_fn, IR_I32, IR_NO_AGG);
+    table = ir_global_add(&m, "main", "table", zero, sizeof zero, 8);
+    ir_global_reloc_fn(&m, table, 0, 1);
+    ir_global_reloc(&m, table, 8, 0);
+    printed(&m, "extern fn puts(ptr) -> i32\n"
+                "extern fn putchar(i32) -> i32\n"
+                "global main.table size 16 align 8 bytes 00 00 00 00 00 00 "
+                "00 00 00 00 00 00 00 00 00 00 reloc 0 @putchar "
+                "reloc 8 @main.table\n");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* The file table holds each path once, and every instruction carries the
    line of the statement the function's cursor stands on. */
 static void positions(void)
@@ -403,6 +431,7 @@ void test_ir(void)
     scale();
     loop();
     memory();
+    function_reloc();
     positions();
     symbolic();
     verifier();
