@@ -1,1 +1,1 @@
-anti: --anti\.inject: service\.Logger comes from a library, and this build of anti loads no plugin
+anti: --anti\.inject: service\.Logger comes from a library: .*

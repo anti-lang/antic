@@ -430,7 +430,7 @@ static uint32_t struct_agg(struct ir_module *m, const char *name,
                            const char *const *names,
                            const enum ir_type *types, size_t count)
 {
-    struct ir_field fields[8];
+    struct ir_field fields[16];
     size_t i;
 
     memset(fields, 0, sizeof fields);
@@ -1288,6 +1288,20 @@ struct injectable {
     bool final;                     /* an `inject final` field names it */
     uint32_t slot;                  /* the global that holds the provider */
     uint32_t provider;              /* the function the slot points at */
+    /* DESIGN: `plugin:<path>` and `discover` name a library rather than
+       a function of the program. The slot is then zero at the link and
+       the runtime fills it before `main`, from the library the path
+       names or from the first one of the search directories that
+       provides the interface. */
+    const char *library;            /* the path, or NULL */
+    bool discover;
+    /* DESIGN: a provider that comes from a library is an object, and a
+       slot holds a function. Every injectable interface therefore
+       carries one holder and one thunk. The runtime stores the object
+       in the holder and puts the thunk in the slot. A replacement at
+       start then needs no code of its own. */
+    uint32_t holder;                /* the global that holds the object */
+    uint32_t thunk;                 /* the function that gives it */
 };
 
 /* The injectable interface of path, added to the list when it is new. */
@@ -1575,6 +1589,56 @@ static void resolve_named_provider(struct whole *w, struct ir_module *m,
    overrides. The six standard interfaces are written that way, so
    `inject log: *Logger` needs no entry in the manifest. A library ships
    its own interface with a default the same way. */
+/* The holder of the object a library provides and the thunk that gives
+   it, which a replacement at start puts in the slot. */
+static void write_replacement(struct ir_module *m, struct injectable *in)
+{
+    static const uint8_t empty[8] = {0};
+    char name[256];
+    struct ir_function *f;
+    struct ir_block *b;
+    struct ir_global *g;
+    uint32_t load;
+    uint32_t at;
+
+    in->holder = IR_NO_INDEX;
+    in->thunk = IR_NO_INDEX;
+    if (strlen(in->interface) + 16 > sizeof name) {
+        return;
+    }
+    snprintf(name, sizeof name, "plugin.%s", in->interface);
+    g = ir_global_add(m, RUNTIME_MODULE, name, empty, sizeof empty, 8);
+    g->mutable = true;
+    in->holder = g->index;
+    snprintf(name, sizeof name, "provided.%s", in->interface);
+    f = ir_function_add(m, RUNTIME_MODULE, name, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    at = ir_addr(f, b, ir_global_op(g));
+    load = ir_load(f, b, IR_PTR, ir_temp_op(f, at));
+    ir_ret(f, b, IR_PTR, ir_temp_op(f, load));
+    in->thunk = f->index;
+}
+
+/* Write the slot as a mutable pointer holding nothing, which the
+   runtime fills before `main`. */
+static void empty_slot(struct ir_module *m, struct injectable *in)
+{
+    static const char *const slot_names[] = {"provider"};
+    static const enum ir_type slot_types[] = {IR_PTR};
+    uint32_t agg = struct_agg(m, "anti.rt.InjectSlot", slot_names, slot_types,
+                              1);
+    struct ir_const *value = ir_const_agg(m, ir_aggregate(agg), 1);
+    struct ir_global *g = m->globals[in->slot];
+
+    const_int(&value->items[0], IR_PTR, 0);
+    g->bytes = NULL;
+    g->size = 0;
+    g->align = 0;
+    g->value = value;
+    g->mutable = true;
+    g->is_extern = false;
+}
+
 static void resolve_provider(struct whole *w, struct ir_module *m,
                              const struct whole_options *o,
                              struct injectable *in, struct text *errors)
@@ -1583,6 +1647,24 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
     bool own = named == NULL;
     struct text fallback = {0};
 
+    /* A library is named where a function of the program would be. */
+    if (named != NULL && strcmp(named, PROVIDER_DISCOVER) == 0) {
+        in->discover = true;
+        in->library = "";
+        empty_slot(m, in);
+        return;
+    }
+    if (named != NULL &&
+        strncmp(named, PROVIDER_PLUGIN, sizeof PROVIDER_PLUGIN - 1) == 0) {
+        in->library = named + sizeof PROVIDER_PLUGIN - 1;
+        if (in->library[0] == '\0') {
+            text_appendf(errors, "the provider `%s` of `%s` names no "
+                                 "library\n", named, in->interface);
+            return;
+        }
+        empty_slot(m, in);
+        return;
+    }
     if (own) {
         text_appendf(&fallback, "%s.default", in->interface);
         named = text_cstr(&fallback);
@@ -1720,14 +1802,18 @@ static void check_cycles(const struct ir_module *m, struct injectable *list,
 static void write_injectable(struct ir_module *m,
                              const struct injectable *list, size_t count)
 {
-    static const char *const item_names[] = {"name", "class", "field",
-                                             "final", "slot"};
-    static const enum ir_type item_types[] = {IR_PTR, IR_PTR, IR_PTR, IR_I64,
-                                              IR_PTR};
+    static const char *const item_names[] = {
+        "name", "class", "field", "final", "slot", "library",
+        "library_length", "discover", "holder", "thunk"
+    };
+    static const enum ir_type item_types[] = {
+        IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_PTR, IR_PTR, IR_I64, IR_I64,
+        IR_PTR, IR_PTR
+    };
     static const char *const table_names[] = {"count", "interfaces"};
     static const enum ir_type table_types[] = {IR_I64, IR_PTR};
     uint32_t item_agg = struct_agg(m, "anti.rt.Injectable", item_names,
-                                   item_types, 5);
+                                   item_types, 10);
     uint32_t table_agg = struct_agg(m, "anti.rt.Injectables", table_names,
                                     table_types, 2);
     struct ir_const *value = ir_const_agg(m, ir_aggregate(table_agg), 2);
@@ -1744,7 +1830,7 @@ static void write_injectable(struct ir_module *m,
                              ir_sym_int(m, IR_I64, count), NULL);
         list_value = ir_const_agg(m, ir_aggregate(array), count);
         for (i = 0; i < count; i++) {
-            struct ir_const *item = ir_const_agg(m, ir_aggregate(item_agg), 5);
+            struct ir_const *item = ir_const_agg(m, ir_aggregate(item_agg), 10);
             struct text name = {0};
             char global[48];
             uint32_t text;
@@ -1767,6 +1853,28 @@ static void write_injectable(struct ir_module *m,
             const_addr(&item->items[2], text);
             const_int(&item->items[3], IR_I64, list[i].final ? 1 : 0);
             const_addr(&item->items[4], list[i].slot);
+            if (list[i].library != NULL && list[i].library[0] != '\0') {
+                snprintf(global, sizeof global, "injectable.%zu.library", i);
+                text = ir_global_add(m, "anti.rt", global,
+                                     (const uint8_t *)list[i].library,
+                                     strlen(list[i].library) + 1, 1)->index;
+                const_addr(&item->items[5], text);
+                const_int(&item->items[6], IR_I64, strlen(list[i].library));
+            } else {
+                const_int(&item->items[5], IR_PTR, 0);
+                const_int(&item->items[6], IR_I64, 0);
+            }
+            const_int(&item->items[7], IR_I64,
+                      list[i].discover || list[i].library != NULL ? 1 : 0);
+            if (list[i].holder != IR_NO_INDEX) {
+                const_addr(&item->items[8], list[i].holder);
+                item->items[9].kind = IR_CONST_FUNC;
+                item->items[9].scalar = IR_PTR;
+                item->items[9].global = list[i].thunk;
+            } else {
+                const_int(&item->items[8], IR_PTR, 0);
+                const_int(&item->items[9], IR_PTR, 0);
+            }
             list_value->items[i] = *item;
         }
         const_addr(&value->items[1],
@@ -1797,6 +1905,7 @@ static void write_injections(struct whole *w, struct ir_module *m,
     count = collect_injectables(m, list);
     for (i = 0; i < count; i++) {
         list[i].slot = slot_global(m, list[i].interface);
+        write_replacement(m, &list[i]);
     }
     for (i = 0; i < count; i++) {
         resolve_provider(w, m, o, &list[i], errors);

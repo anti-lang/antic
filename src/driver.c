@@ -860,9 +860,12 @@ static int back_end(const struct options *o, struct module *tree,
                        o->lib != LIB_NONE, o->dev, o)) {
         return 1;
     }
-    /* The `provides` lines go into the index beside the library. They
-       are read here, because the optimizer drops the class records that
+    /* A program that injects an interface or loads a library exports
+       its names. Both this and the `provides` lines of a plugin are
+       read here, because the optimizer drops the class records that
        carry them. */
+    extras->hosts_plugins = !o->closed && o->lib == LIB_NONE && !o->library &&
+                            whole_hosts_plugins(program);
     for (i = 0; is_plugin(o) && i < program->class_count; i++) {
         const struct ir_class *c = program->classes[i];
         size_t j;
@@ -919,8 +922,6 @@ static int back_end(const struct options *o, struct module *tree,
         fputs(text_cstr(&out), stdout);
         status = 2;
     } else if (ok) {
-        extras->hosts_plugins = !o->closed && o->lib == LIB_NONE &&
-                                !o->library && whole_hosts_plugins(program);
         ok = o->dev || is_plugin(o)
                  ? emit_module(assembly, o->target, o->cpu, program, functions,
                                module, extras->hosts_plugins, o->debug, error,

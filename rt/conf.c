@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "conf.h"
+#include "plugin.h"
 
 #include "rt.h"
 #include "toml.h"
@@ -191,30 +192,67 @@ static void list_injectable(char *out, size_t size)
 }
 
 /* DESIGN: a line that names an interface to take from a library. The
-   interface must be one the program injects. It must not be `inject
-   final`. A line that passes both waits for plugins, which are not
-   built. The library it names cannot be loaded, so the line is a
-   startup error that says so. */
-static void injection_error(const char *name, size_t length,
-                            const char *where)
+   interface must be one the program injects, and it must not be
+   `inject final`. The line is kept, and the library is opened once the
+   configuration has been read, because the search directories come
+   from it. The command line wins over the file, and both win over the
+   provider the build named. */
+enum { INJECTION_MAX = 16 };
+
+struct injection {
+    const struct anti_injectable *in;
+    char *library;
+    int layer;
+    char where[320];
+};
+
+static struct injection injections[INJECTION_MAX];
+static size_t injection_count;
+
+static void injection_named(const char *name, size_t length,
+                            const char *library, const char *where, int layer)
 {
     const struct anti_injectable *in = injectable_of(name, length);
+    struct injection *slot = NULL;
     char list[512];
+    size_t i;
 
     if (in == NULL) {
         list_injectable(list, sizeof list);
         startup_error("%s: %.*s is no injectable interface of this program, "
                       "which has %s",
                       where, (int)length, name, list);
-    } else if (in->final != 0) {
+    }
+    if (in->final != 0) {
         startup_error("%s: %s is `inject final` in %s and cannot be replaced",
                       where, (const char *)in->field,
                       (const char *)in->owner);
-    } else {
-        startup_error("%s: %.*s comes from a library, and this build of anti "
-                      "loads no plugin",
+    }
+    if (in->holder == NULL || in->thunk == NULL) {
+        startup_error("%s: %.*s has no place for a provider of a library",
                       where, (int)length, name);
     }
+    for (i = 0; i < injection_count; i++) {
+        if (injections[i].in == in) {
+            slot = &injections[i];
+        }
+    }
+    if (slot == NULL && injection_count == INJECTION_MAX) {
+        startup_error("%s: at most %d interfaces come from a library",
+                      where, INJECTION_MAX);
+    }
+    if (slot == NULL) {
+        slot = &injections[injection_count++];
+        slot->layer = LAYER_BUILD;
+    }
+    if (slot->layer > layer) {
+        return;
+    }
+    free(slot->library);
+    slot->in = in;
+    slot->library = copy(library, strlen(library));
+    slot->layer = layer;
+    snprintf(slot->where, sizeof slot->where, "%s", where);
 }
 
 static void unknown_option(const char *name, size_t length)
@@ -265,7 +303,9 @@ void anti_rt_conf_option(const char *name, int64_t length, const char *value)
                           "as --anti.inject=Interface=path",
                           where);
         }
-        injection_error(value, (size_t)(at - value), where);
+        injection_named(value, (size_t)(at - value), at + 1, where,
+                        LAYER_COMMAND);
+        return;
     }
     k = key_of(name, n);
     if (k == NULL) {
@@ -453,7 +493,9 @@ static void read_keys(const struct anti_toml *doc, const char *path)
             continue;
         }
         if (strncmp(name, "injections.", 11) == 0) {
-            injection_error(name + 11, strlen(name + 11), position);
+            injection_named(name + 11, strlen(name + 11),
+                            (const char *)value.ptr, position, LAYER_FILE);
+            continue;
         }
         if (strncmp(name, "runtime.", 8) != 0) {
             fprintf(stderr, "anti: %s: %s is no key of the runtime "
@@ -558,6 +600,60 @@ static const char *environment_path(void)
 #endif
 }
 
+/* DESIGN: an interface whose provider is a library gets its object
+   before `main`. The build's `plugin:` and `discover` are the lowest
+   layer. The configuration file stands above them and the command line
+   above both. The runtime stores the object in the holder of the
+   interface and puts the thunk in its slot. Every site of the program
+   then calls through one function, as it did before. */
+static void fill_injections(void)
+{
+    struct anti_text dirs = anti_rt_conf_get((const unsigned char *)"plugins",
+                                             7);
+    int64_t i;
+
+    for (i = 0; i < anti_rt_injectable.count; i++) {
+        const struct anti_injectable *in = &anti_rt_injectable.interfaces[i];
+        const char *library = "";
+        const char *where = "the build";
+        size_t length = 0;
+        int named = 0;
+        void *provider;
+        size_t k;
+        /* An empty path is `discover`, which searches the directories
+           of the `plugins` key. */
+        if (in->discover != 0) {
+            library = in->library != NULL ? (const char *)in->library : "";
+            length = (size_t)in->library_length;
+            named = 1;
+        }
+        for (k = 0; k < injection_count; k++) {
+            if (injections[k].in == in) {
+                library = injections[k].library;
+                length = strlen(library);
+                where = injections[k].where;
+                named = 1;
+            }
+        }
+        if (!named) {
+            continue;
+        }
+        provider = anti_rt_plugin_provider(in->name,
+                                           (int64_t)strlen((const char *)
+                                                           in->name),
+                                           (const unsigned char *)library,
+                                           (int64_t)length,
+                                           (const char *)dirs.ptr);
+        if (provider == NULL) {
+            struct anti_text why = anti_rt_plugin_message();
+            startup_error("%s: %s comes from a library: %.*s", where,
+                          (const char *)in->name, (int)why.len, why.ptr);
+        }
+        *in->holder = provider;
+        *in->slot = in->thunk;
+    }
+}
+
 static void inspect(void)
 {
     struct anti_text version = anti_rt_runtime_version();
@@ -587,7 +683,16 @@ static void inspect(void)
                    in->final != 0 ? ", final" : "");
         }
     }
-    printf("loaded plugins: none\n");
+    if (injection_count == 0) {
+        printf("loaded plugins: none\n");
+    } else {
+        size_t k;
+        printf("loaded plugins:\n");
+        for (k = 0; k < injection_count; k++) {
+            printf("  %s for %s\n", injections[k].library,
+                   (const char *)injections[k].in->name);
+        }
+    }
 }
 
 static void help(void)
@@ -618,6 +723,7 @@ void anti_rt_conf_start(void)
     if (path != NULL) {
         read_file(copy(path, strlen(path)), NULL);
     }
+    fill_injections();
     if (inspect_asked) {
         inspect();
         exit(0);

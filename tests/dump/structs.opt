@@ -6,7 +6,7 @@ type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, siz
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
 type [3]anti.rt.Field = array 3 of anti.rt.Field
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn take(agg structs.Pair, agg structs.Big, agg structs.Rgb, agg structs.V2) -> agg structs.Pair
 extern fn make(i64) -> agg structs.Big

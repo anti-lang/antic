@@ -3,7 +3,7 @@ type fnptr.Op = struct { apply: ptr }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [1]anti.rt.Field = array 1 of anti.rt.Field
 type [2]fnptr.Op = array 2 of fnptr.Op
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn abs(i32) -> i32
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)

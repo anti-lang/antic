@@ -1,4 +1,4 @@
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn unused.used() -> i64 {

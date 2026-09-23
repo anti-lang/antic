@@ -1,4 +1,4 @@
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn widen(i8 zeroext, i8 signext, i16 zeroext) -> i32
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)

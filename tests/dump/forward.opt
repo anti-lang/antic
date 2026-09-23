@@ -2,7 +2,7 @@ type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, siz
 type forward.Point = struct { x: i64, y: i64 }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global forward.5 size 31 align 1 bytes 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00

@@ -3,7 +3,7 @@ type measure.V2 = struct { x: f32, y: f32 }
 type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn measure.fn.0(agg str) -> i64
 extern fn measure.fn.1(agg measure.V2) -> i64

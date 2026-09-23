@@ -31,6 +31,12 @@ enum { MACOS_MIN_MAJOR = 11, MACOS_MIN_MINOR = 0 };
    holds it can host a plugin, so the link exports its symbols. */
 #define PLUGIN_LOAD "anti_rt_plugin_load"
 
+/* The two providers of the manifest that name a library rather than a
+   function of the program. `plugin:` carries the path after it, and
+   `discover` searches the directories of the `plugins` key. */
+#define PROVIDER_PLUGIN "plugin:"
+#define PROVIDER_DISCOVER "discover"
+
 /* The index file that `antic --lib shared --no-runtime` writes beside a
    plugin. Discovery reads it and opens no library to find out what is
    inside one. */

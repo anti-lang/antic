@@ -428,12 +428,12 @@ static int discover_in(const char *dir, size_t dir_length,
         if (name.len == 0 || !index_lists(doc, n, path, length)) {
             continue;
         }
-        /* A library built for another runtime is passed over, and the
-           reason goes into the message a caller may print. */
+        /* A library built for another runtime is logged and passed
+           over, as the specification asks. */
         if (!same_bytes(built.ptr, built.len, version.ptr, version.len)) {
-            fail("%.*s was built for runtime %.*s, and this program carries "
-                 "%.*s", (int)name.len, name.ptr, (int)built.len, built.ptr,
-                 (int)version.len, version.ptr);
+            fprintf(stderr, "anti: %.*s was built for runtime %.*s, and this "
+                    "program carries %.*s\n", (int)name.len, name.ptr,
+                    (int)built.len, built.ptr, (int)version.len, version.ptr);
             continue;
         }
         if (!path_of(file, sizeof file, name.ptr, name.len) ||

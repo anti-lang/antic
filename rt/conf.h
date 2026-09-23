@@ -19,6 +19,17 @@ struct anti_injectable {
     const unsigned char *field;
     int64_t final;
     void **slot;
+    /* DESIGN: `plugin:<path>` and `discover` of the manifest name a
+       library rather than a function of the program. The slot is then
+       empty at the link, and the runtime fills it before `main`. */
+    const unsigned char *library;   /* the path, or NULL for discovery */
+    int64_t library_length;
+    int64_t discover;               /* the provider names a library */
+    /* A provider that comes from a library is an object, and a slot
+       holds a function. The runtime stores the object in the holder and
+       puts the thunk, which gives it, in the slot. */
+    void **holder;
+    void *thunk;
 };
 
 struct anti_injectables {
