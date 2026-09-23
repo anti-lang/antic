@@ -46,6 +46,11 @@ add_executable(antic_unit_tests
     unit/test_float_read.c
     unit/test_coff.c
     unit/test_toml.c
+    unit/test_deps.c
+    ../tools/anti/deps.c
+    ../tools/anti/files.c
+    ../tools/anti/manifest.c
+    ../tools/anti/repo.c
     ../rt/cpu.c
     ../rt/f16.c
     ../rt/symbols.c
@@ -58,7 +63,7 @@ target_link_libraries(antic_unit_tests PRIVATE antic_core)
 if(UNIX AND NOT APPLE)
     target_link_libraries(antic_unit_tests PRIVATE m)
 endif()
-target_include_directories(antic_unit_tests PRIVATE ../rt)
+target_include_directories(antic_unit_tests PRIVATE ../rt ../tools/anti)
 # ANTI_DEV_CPU lets test_cpu.c stand a level in for the processor, so the
 # refusal of a lower machine is checked on this one. The runtime of the
 # archive is compiled without it. ANTI_CPU_LEVEL_ID is the level of a

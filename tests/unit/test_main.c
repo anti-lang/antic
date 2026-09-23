@@ -38,6 +38,7 @@ void test_symbols(void);
 void test_float_read(void);
 void test_coff(void);
 void test_toml(void);
+void test_deps(void);
 
 int main(void)
 {
@@ -76,6 +77,7 @@ int main(void)
     test_float_read();
     test_coff();
     test_toml();
+    test_deps();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;
