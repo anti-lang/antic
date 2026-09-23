@@ -1619,6 +1619,131 @@ done:
     return status;
 }
 
+/* DESIGN: `anti doc` builds user docs from the public interface of one
+   module and nothing else. The interface of a library file and the
+   interface of its source are then the same structure. The command
+   renders that one structure, so the doc-equivalence test of
+   docs/tooling.md measures the library file and not the renderer. Dev
+   docs need the private items and the `//#` notes, which live in the
+   syntax tree alone. tree is filled for a source input and left NULL for
+   a library file. */
+const struct interface *driver_interface(const struct options *o,
+                                         struct arena *arena,
+                                         struct types *types,
+                                         struct ir_module *program,
+                                         struct module **tree)
+{
+    struct diagnostics diags = {0};
+    struct token_list tokens = {0};
+    struct module *parsed = NULL;
+    struct interface *iface = NULL;
+    const struct interface **libraries = NULL;
+    struct paths paths = {0};
+    struct text source = {0};
+    struct text module = {0};
+    size_t length = strlen(o->input);
+    bool library_file = length > strlen(ANTL_SUFFIX) &&
+                        strcmp(o->input + length - strlen(ANTL_SUFFIX),
+                               ANTL_SUFFIX) == 0;
+    char error[200];
+    size_t i;
+
+    *tree = NULL;
+    types_init(types, arena);
+    if (library_file) {
+        struct options with_input = *o;
+        struct module empty;
+        struct interface header;
+        memset(&empty, 0, sizeof empty);
+        with_input.libraries =
+            malloc((o->library_count + 1) * sizeof *with_input.libraries);
+        if (with_input.libraries == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        with_input.libraries[0] = o->input;
+        memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
+               o->library_count * sizeof *o->libraries);
+        with_input.library_count = o->library_count + 1;
+        if (!read_bytes(o->input, &source) ||
+            !antl_header((const uint8_t *)source.data, source.length, arena,
+                         &header, error, sizeof error)) {
+            if (source.length > 0) {
+                fprintf(stderr, "antic: %s %s\n", o->input, error);
+            }
+            free((void *)with_input.libraries);
+            goto done;
+        }
+        text_append(&module, header.module);
+        if (!find_libraries(&with_input, &empty, arena, &paths)) {
+            free((void *)with_input.libraries);
+            goto done;
+        }
+        free((void *)with_input.libraries);
+        libraries = malloc((paths.count + 1) * sizeof *libraries);
+        if (libraries == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        if (!load_libraries(&paths, "", arena, types, program, libraries)) {
+            goto done;
+        }
+        for (i = 0; i < paths.count; i++) {
+            if (strcmp(libraries[i]->module, text_cstr(&module)) == 0) {
+                iface = (struct interface *)libraries[i];
+                break;
+            }
+        }
+        if (iface == NULL) {
+            fprintf(stderr, "antic: %s holds no module `%s`\n", o->input,
+                    text_cstr(&module));
+        }
+        goto done;
+    }
+    if (!read_source(o->input, &source)) {
+        goto done;
+    }
+    if (!lex(text_cstr(&source), source.length, arena, &diags, &tokens) ||
+        !parse(text_cstr(&source), &tokens, arena, &diags, &parsed)) {
+        report_diagnostics(o, &diags);
+        goto done;
+    }
+    drop_test_blocks(parsed, false);
+    if (!module_name(o, &module)) {
+        goto done;
+    }
+    if (!find_libraries(o, parsed, arena, &paths)) {
+        goto done;
+    }
+    libraries = malloc((paths.count + 1) * sizeof *libraries);
+    if (libraries == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    if (!load_libraries(&paths, text_cstr(&module), arena, types, program,
+                        libraries)) {
+        goto done;
+    }
+    if (!sema_check(parsed, text_cstr(&module), o->package_name, libraries,
+                    paths.count, types, arena, &diags, false)) {
+        report_diagnostics(o, &diags);
+        goto done;
+    }
+    report_diagnostics(o, &diags);
+    iface = arena_alloc(arena, sizeof *iface);
+    sema_interface(parsed, text_cstr(&module), arena, iface);
+    *tree = parsed;
+
+done:
+    free((void *)libraries);
+    free((void *)paths.items);
+    token_list_free(&tokens);
+    diagnostics_free(&diags);
+    text_free(&source);
+    text_free(&module);
+    return iface;
+}
+
 /* DESIGN: dev mode also compiles a library file of the dependency graph
    into its own object. The IR in the file is the module, and the other
    library files declare what it calls. A main module comes from source,

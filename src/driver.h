@@ -134,5 +134,25 @@ struct arena;
 bool driver_libraries(const struct options *options, struct arena *arena,
                       const char ***paths, size_t *count);
 
+struct interface;
+struct ir_module;
+struct module;
+struct types;
+
+/* The public interface of options->input, which is a source file or a
+   library file. `anti doc` renders the same structure whichever of the
+   two it was given. The doc-equivalence test of docs/tooling.md then
+   measures the library file. What the interface points at lives in the
+   memory pool, the type table and the IR module. The caller frees the
+   three after it. tree takes the syntax tree of a source input and NULL
+   for a library file. Dev docs read it for the private items and the
+   `//#` notes. Returns NULL when the module cannot be read or does not
+   check. */
+const struct interface *driver_interface(const struct options *options,
+                                         struct arena *arena,
+                                         struct types *types,
+                                         struct ir_module *program,
+                                         struct module **tree);
+
 
 #endif

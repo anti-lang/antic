@@ -321,6 +321,7 @@ static void put_symbolic(struct writer *w, const struct symbolic *s)
 static void put_type(struct writer *w, const struct type *t)
 {
     size_t i;
+    size_t j;
 
     put_u8(w, (uint8_t)t->kind);
     switch (t->kind) {
@@ -434,6 +435,20 @@ static void put_type(struct writer *w, const struct type *t)
                                     (unsigned)m->may_fail << 6));
                 put_u8(w, (uint8_t)m->vis);
                 put_doc(w, m->doc.text, m->doc.length);
+                /* DESIGN: the public interface keeps the parameter
+                   names of every function. A function of a class body is
+                   one, and `anti doc` and the generated header print
+                   them. The count is the one the declaration wrote.
+                   Neither `self` nor the out pointer of `may fail`
+                   stands among them, so the reader needs no type to take
+                   them. */
+                put_u32(w, (uint32_t)m->param_count);
+                for (j = 0; j < m->param_count; j++) {
+                    const struct name *n = m->symbol->params != NULL
+                                               ? &m->symbol->params[j]
+                                               : &m->params[j].name;
+                    put_bytes(w, n->text, n->length);
+                }
             }
         }
         break;
@@ -1525,6 +1540,24 @@ static void read_types(struct reader *r)
                 m->pub = m->vis == VIS_PUB;
                 m->has_self = true;
                 m->symbol = sym;
+                /* The parameter names the declaration wrote, which
+                   `anti doc` and the generated header print. */
+                {
+                    uint32_t total = get_count(r, 8);
+                    struct name *names = allocate(r, total, sizeof *names);
+                    struct param *list = allocate(r, total, sizeof *list);
+                    uint32_t k;
+                    for (k = 0; k < total && !r->failed; k++) {
+                        names[k] = get_name(r);
+                        memset(&list[k], 0, sizeof list[k]);
+                        list[k].name = names[k];
+                    }
+                    if (total > 0 && !r->failed) {
+                        sym->params = names;
+                        m->params = list;
+                        m->param_count = total;
+                    }
+                }
                 sym->kind = SYMBOL_FN;
                 sym->item = m;
                 sym->home = r->iface;
