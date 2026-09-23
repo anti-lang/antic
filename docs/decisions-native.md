@@ -67,6 +67,143 @@ silent and is binding until Eddie reviews it.
   offsets PCRE2 names, that `.` takes the two bytes of `ß` as one character, that a
   caseless `ö` matches `Ö`, and that `a(b` fails to compile at offset 3.
 
+## raylib and miniaudio
+
+- raylib is the release that `tools/raylib-pin` names, 6.0, the pin of the bindings.
+  `ANTIC_RAYLIB_DIR` names the extracted release, and `src/native/raylib.cmake` builds it.
+- [provisional] miniaudio 0.11.24 is pinned in `tools/miniaudio-pin` by version and by
+  the SHA-256 of the source archive of the tag. GitHub publishes no digest for a source
+  archive, so the digest is the one of the archive at its first download, as for raylib.
+  `src/native/get-miniaudio.cmake` downloads it into `build/deps/miniaudio/` and checks
+  the digest. Reason: 0.11.24 is the version raylib 6.0 bundles in
+  `src/external/miniaudio.h`, so a program carries one version of miniaudio. The test
+  `miniaudio_pin` checks the pin, refuses a copy of it in the script or the recipe, and
+  compares the version with the one raylib bundles.
+- The glibc 2.35 sysroot is extended with the X11 and OpenGL development packages of the
+  original jammy release, for amd64 and arm64. They are pinned by digest in
+  `tools/sysroot-pins` as libc6-dev is. Eddie decided this. The packages are those of
+  X11, Xrandr, Xinerama, Xcursor, Xi, Xext, Xrender, Xfixes, xorgproto and the GL headers
+  and libraries. Each development package comes with its library, 22 packages per
+  processor. Each digest is the
+  SHA-256 that the Packages index of the jammy release pocket lists. The keys start with
+  `MEDIA_`, and `MEDIA_PACKAGES` lists them.
+- [provisional] The GL packages are libgl-dev, libgl1, libglx-dev, libglx0 and libglvnd0.
+  Reason: the smallest set that holds `GL/gl.h`, `GL/glext.h`, `KHR/khrplatform.h`,
+  `GL/glx.h` and `libGL.so` with every library that `libGL.so.1` names.
+- [provisional] `src/native/get-media-sysroot.cmake` unpacks the packages over
+  `sysroot/linux-<cpu>-glibc`, and `tools/get-sysroot.cmake` stays as it was. It
+  installs the glibc sysroot first when the tree holds none. A stamp in the tree names
+  the digests it was unpacked from. Reason: the script belongs to the recipes that read
+  the packages, and `tools/get-sysroot.cmake` and its test `glibc_sysroot` lay outside
+  the fence. The fold may move the packages into `glibc_sysroot` of that script.
+- [provisional] Every absolute symbolic link of the extended sysroot becomes the relative
+  link to the same file inside the tree. Reason: libc6 names the loader
+  `/lib64/ld-linux-x86-64.so.2` by an absolute link, which lies outside the sysroot on
+  the host, and lld then refuses the `libc.so` script that names it. The same fix
+  belongs in `glibc_sysroot` of `tools/get-sysroot.cmake` at the fold.
+- [provisional] `ANTIC_GLIBC_SYSROOT_DIR` names the directory of the glibc sysroots, by
+  default `build/deps/sysroot` of the checkout. Reason: `ANTIC_SYSROOT_DIR` of a
+  worktree is the one of the main checkout, which this lane does not write.
+- raylib builds its desktop back end over GLFW, with X11 on Linux and no Wayland. Eddie
+  decided this. The configuration is `-DPLATFORM_DESKTOP_GLFW
+  -DGRAPHICS_API_OPENGL_33`, the default of raylib's own Makefile, with raylib's
+  `config.h` unchanged, `-D_GLFW_X11` on Linux, `-DGL_SILENCE_DEPRECATION` on macOS and
+  `-D_CRT_SECURE_NO_WARNINGS -DUNICODE` on Windows, all with `-std=c99 -O2` at the default
+  level of the target.
+- miniaudio compiles against the C library alone. Eddie decided this. It is
+  `miniaudio.c` of the release with no definition of ours: every back end stays in, and
+  miniaudio loads the one it uses at run time.
+- [provisional] Both Linux libraries compile for `x86_64-linux-gnu` and
+  `aarch64-linux-gnu` against the glibc sysroot, and they lie in `lib/linux-<cpu>/`
+  beside the level directories of the musl anti_rt, as the other libraries of that
+  target. Reason: "Runtime archive" in `docs/decisions.md` links a program that imports
+  either of them against glibc.
+- [provisional] Both macOS libraries compile against the Apple SDK that
+  `tools/macos-sdk-pin` names, through `tools/macos-sdk.cmake`. A host without that SDK
+  builds neither for macOS and says so at configure. Reason: the zig stubs of the macOS
+  sysroot carry no framework headers, and raylib's Cocoa back end and miniaudio's Core
+  Audio back end include them.
+- [provisional] The Windows flags of every native library put clang's own headers first.
+  The headers of the MSVC CRT follow, the order clang-cl searches. Reason: the CRT holds its own
+  `immintrin.h`, whose `__m256i` is the union of MSVC. The AVX2 constants of
+  `stb_image_resize2.h` in raylib were then initialised byte by byte from 64-bit values,
+  which clang truncated. PCRE2 builds and passes its tests under the new order.
+- [provisional] raylib compiles with `-Wall -Werror`, `-Wno-missing-braces` and
+  `-Wno-unused-function`. Reason: raylib's Makefile turns off the first, and `rtextures.c`
+  and `rtext.c` silence the second with a pragma for `__GNUC__`, which clang for MSVC does
+  not define. `-Wextra` and `-Wpedantic` raise hundreds of findings in the bundled stb
+  and GLFW sources. miniaudio takes the warnings of anti_rt, `-Wall -Wextra -Wpedantic
+  -Werror`, which raise nothing on any target.
+- [provisional] raylib compiles with `-fno-strict-aliasing`, as its Makefile does, and
+  `-fwrapv-pointer`. Reason: `stb_vorbis.c` checks a bound by comparing a pointer after
+  an addition that may overflow, and clang folds that comparison to false without it.
+- [provisional] `rglfw.c` compiles for macOS as Objective-C with
+  `-fno-objc-msgsend-class-selector-stubs`. Reason: the pinned clang calls a class
+  method through a stub `objc_msgSendClass$<selector>$<class>` that the linker writes,
+  and ld64.lld 23.1.1 writes none, so the link fails. The calls then go through
+  `objc_msgSend`.
+- [provisional] raylib keeps the copy of miniaudio that `raudio.c` compiles. Reason: the
+  smallest option, raylib as released. A program that calls raylib's audio and
+  `anti.miniaudio` at once pulls both objects and defines the `ma_` functions twice.
+  The report asks how to settle it.
+- The names are `libraylib.a` and `libminiaudio.a`, or `raylib.lib` and `miniaudio.lib`
+  on Windows, in `lib/<target>/`. The headers stay in the source trees and are not yet
+  part of the runtime archive, as for PCRE2. The build copies the licence of each to
+  `licenses/raylib.txt` and `licenses/miniaudio.txt` of the runtime tree.
+- The licence texts of raylib (zlib) and miniaudio (MIT-0, or public domain) must be
+  added to `LICENSES/` of the repository. The fence of this step did not include it.
+  So must the copyright files of the 22 X11 and GL packages if the glibc sysroot ever
+  ships in the runtime archive. The script copies them to `licenses/` of the sysroot.
+
+### The system libraries of each library
+
+A program links these beyond the C library, which antic links for every program. The
+libraries named "at run time" are loaded by the library itself and need no link.
+
+| Library | Linux, glibc | macOS | Windows |
+|---|---|---|---|
+| raylib | `X11`, `m`, `pthread`, `dl` | the frameworks `Cocoa` and `IOKit` | `gdi32`, `user32`, `shell32`, `winmm` |
+| raylib, at run time | libGL, libGLX and the X11 extensions, through GLFW | `OpenGL`, through GLFW | `opengl32.dll`, through GLFW |
+| miniaudio | `m`, `pthread`, `dl` | none | none |
+| miniaudio, at run time | ALSA, PulseAudio or JACK | `CoreAudio`, `AudioToolbox` | WASAPI, DirectSound or WinMM |
+
+- `libX11` is linked, since `rcore.c` calls it for the clipboard. GLFW loads the rest of
+  X11. Since glibc 2.34 `pthread` and `dl` lie in `libc.so.6`, and the two names stay on
+  the link line as raylib's Makefile gives them, for an older loader.
+- On macOS `Cocoa` and `IOKit` resolve every symbol. The table of `src/anti/bindtype.c`
+  names `Cocoa`, `CoreVideo`, `IOKit` and `OpenGL` for raylib, and the test links all
+  four. It names `AudioToolbox`, `CoreAudio` and `CoreFoundation` for miniaudio, which
+  links without them.
+- On Windows the probe names the four libraries with `#pragma comment(lib, ...)`, which
+  reaches lld-link as a `/DEFAULTLIB` directive. `kernel32.lib` comes with the C runtime.
+
+### Tests
+
+- [provisional] The tests are registered in `src/native/raylib.cmake`,
+  `src/native/miniaudio.cmake` and `src/native/media.cmake`, as for PCRE2. The probes are
+  `tests/abi/raylib_probe.c` and `tests/abi/miniaudio_probe.c`, and the Anti halves
+  `tests/abi/raylib_link.anti` and `tests/abi/miniaudio_link.anti`.
+- On Linux, `raylib_link_<target>` and `miniaudio_link_<target>` link the probe with its
+  own `main`, compiled against the extended sysroot, with the pinned clang and lld
+  against glibc. Eddie decided this: linking an Anti program against glibc is not this
+  step's work. `tests/run_glibc_link.cmake` names every start file and library, checks
+  that the program names the loader of glibc and `libc.so.6`, and on a host of that
+  target runs it.
+- On macOS and Windows the same tests link the Anti half with the probe and the library
+  through antic and lld, as `pcre2_link_<target>` does. `tests/run_native_link.cmake`
+  takes the options of antic, so the macOS link passes `--framework` for raylib.
+  `raylib_run` and `miniaudio_run` run the program of the host.
+- The raylib probe resizes a solid red image through the SIMD path of
+  `stb_image_resize2.h`, formats and reads a text, packs a colour, and takes the address
+  of `InitWindow`, `InitAudioDevice`, `DrawText` and `LoadModel`, so GLFW, rlgl and
+  raylib's miniaudio must link. The miniaudio probe compares the version with the
+  header, reads a square wave, counts the playback devices of the null back end, and
+  takes the address of `ma_device_init` and `ma_decoder_init_file`.
+- `media_sysroot` checks that every package the step names is pinned for both
+  processors with a digest. It then runs a copy of `get-media-sysroot.cmake` on stand-in
+  packages. The files land, an absolute link becomes relative and the licences are
+  copied. A second run changes nothing, and a package of another digest is refused.
+
 ## Lines of other documents that change at the fold
 
 - `docs/decisions.md`, "CPU levels": "Nothing in `src/native/` builds yet, so the
@@ -76,3 +213,11 @@ silent and is binding until Eddie reviews it.
   nothing builds yet" no longer holds.
 - `CLAUDE.md`, item 16 of "First sessions": the native libraries in `src/native/`, which
   nothing builds yet. PCRE2 is the first one built.
+- `docs/decisions.md`, "Runtime archive": the glibc sysroot is "three packages of the
+  jammy release pocket per processor". It is now those three and the 22 packages of X11
+  and OpenGL. The same section leaves the glibc sysroots out "until the link mode
+  against glibc exists". `src/native/media.cmake` installs them now for the two media
+  libraries.
+- `docs/decisions.md`, the entry on the frameworks of a binding: raylib links with
+  `Cocoa` and `IOKit` alone, and miniaudio with none.
+- `CLAUDE.md`, item 16 of "First sessions": raylib and miniaudio build as well.
