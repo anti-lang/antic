@@ -306,10 +306,17 @@ static void shared(enum target t, const struct link_inputs *in,
 {
     struct link_inputs at = *in;
     struct link_command c;
+    size_t i;
 
     at.cpu = cpu_default(t);
     link_shared_command(&c, t, &at, s);
     joined(&c, expected);
+    /* No string of the command reads an input the link lacks. A link
+       with lld has no crt_dir, and %s of NULL is undefined, which the C
+       libraries of macOS and Linux print as (null). */
+    for (i = 0; i < c.string_count; i++) {
+        CHECK(strstr(text_cstr(&c.strings[i]), "(null)") == NULL);
+    }
     link_command_free(&c);
 }
 

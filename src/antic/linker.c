@@ -430,9 +430,7 @@ void link_shared_command(struct link_command *c, enum target t,
     }
     case OS_LINUX: {
         const char *linker = program(c, in, "ld.lld", "ld");
-        struct text *search = next(c);
         const char *base = strrchr(in->executable, '/');
-        text_appendf(search, "-L%s", in->crt_dir);
         add(c, linker);
         add(c, "-shared");
         /* The runtime comes from an archive, and a shared library for C
@@ -454,7 +452,12 @@ void link_shared_command(struct link_command *c, enum target t,
         if (!s->plugin) {
             add(c, text_cstr(library));
         }
+        /* The platform linker searches the C library beside the start
+           files. crt_dir is set for it alone, and lld links no C
+           library. */
         if (in->linker == LINKER_PLATFORM) {
+            struct text *search = next(c);
+            text_appendf(search, "-L%s", in->crt_dir);
             add(c, text_cstr(search));
             add(c, "-lc");
         }
