@@ -75,6 +75,31 @@ static bool sdk_version(const char *sdk, struct text *out)
     return ok;
 }
 
+/* Whether version is digits in parts joined by single dots, as 15.2 is.
+   S45: the version names the directory that export empties and removes,
+   and the bundle it writes. SDKSettings.json lies under a path the user
+   names. */
+static bool sdk_version_valid(const char *version)
+{
+    const char *p = version;
+
+    for (;;) {
+        if (*p < '0' || *p > '9') {
+            return false;
+        }
+        while (*p >= '0' && *p <= '9') {
+            p++;
+        }
+        if (*p == '\0') {
+            return true;
+        }
+        if (*p != '.') {
+            return false;
+        }
+        p++;
+    }
+}
+
 static bool is_stub(const char *name)
 {
     size_t n = strlen(name);
@@ -156,6 +181,11 @@ int sdk_export(const char *sdk, const char *out)
     } else if (!apple_clt_sdk(&path, &version)) {
         fputs("anti: " APPLE_CLT_SDKS " holds no SDK. Run xcode-select "
               "--install, or name one with --sdk\n", stderr);
+        goto done;
+    }
+    if (!sdk_version_valid(text_cstr(&version))) {
+        fprintf(stderr, "anti: %s names the Version %s, which is no version\n",
+                text_cstr(&path), text_cstr(&version));
         goto done;
     }
     text_appendf(&stage, "%s/.apple-sdk-%s", out, text_cstr(&version));

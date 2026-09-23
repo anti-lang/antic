@@ -124,3 +124,24 @@ import("${WORK}/missing.tar.xz" status)
 if(status EQUAL 0)
     message(FATAL_ERROR "anti sdk import took a file that does not exist")
 endif()
+
+# S45. The Version of SDKSettings.json names the directory that export
+# empties and removes. A Version that is not digits and dots is refused,
+# and the directory it climbs to stays.
+if(CMAKE_HOST_APPLE)
+    set(hostile "${WORK}/hostile")
+    file(COPY "${sdk}/" DESTINATION "${hostile}/MacOSX.sdk")
+    file(WRITE "${hostile}/MacOSX.sdk/SDKSettings.json"
+         "{\"Version\":\"/../../victim\"}\n")
+    file(MAKE_DIRECTORY "${hostile}/out/.apple-sdk-")
+    file(WRITE "${hostile}/victim/keep" "kept\n")
+    execute_process(COMMAND "${ANTI}" sdk export --sdk "${hostile}/MacOSX.sdk"
+                            -o "${hostile}/out"
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                    ENCODING NONE)
+    if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "which is no version")
+        message(FATAL_ERROR "anti sdk export took the Version /../../victim:\n"
+                            "${out}${err}")
+    endif()
+    expect_text("${hostile}/victim/keep" "kept\n")
+endif()
