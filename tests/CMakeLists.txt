@@ -774,6 +774,14 @@ add_test(NAME sysroot_digest
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_digest.cmake")
 set_tests_properties(sysroot_digest PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# A configure with -DANTI_DEPS_DIR reads the pinned downloads of another
+# directory, and a copy of the sources builds against this tree's.
+add_test(NAME deps_dir
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/deps_dir"
+            "-DDEPS=${ANTIC_DEPS_DIR}" "-DGENERATOR=${CMAKE_GENERATOR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_deps_dir.cmake")
+
 # A Linux program of a release names no glibc symbol above the pinned
 # 2.35, which tools/pack-anti.cmake reads before it writes a package
 add_test(NAME linux_libc

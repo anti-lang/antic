@@ -49,6 +49,11 @@ AddressSanitizer and UndefinedBehaviorSanitizer. Each runs the full suite from
 its own directory, `build/asan` and `build/ubsan`, and reads the downloads of
 `build/deps`.
 
+A worktree of this repository reads the downloads of the main checkout with
+`-DANTI_DEPS_DIR=<checkout>/build/deps` on each configure, for example
+`cmake --preset host -DANTI_DEPS_DIR=../antic/build/deps`, and fetches none of its
+own. Every `get-*.cmake` script takes the same `-DANTI_DEPS_DIR`.
+
 ## Installing
 
 Anti 0.1.0 installs with one command on every host. The installers and the
