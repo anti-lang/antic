@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "antl.h"
+#include "arena.h"
 #include "cpu.h"
 #include "deps.h"
 #include "driver.h"
@@ -132,6 +133,11 @@ struct build {
     struct text lib_dir;
     struct text obj_dir;
     struct text name;
+    /* The frameworks of the `link framework` lines of every library file
+       the program reaches, which the link passes as --framework. */
+    struct arena framework_arena;
+    const char **frameworks;
+    size_t framework_count;
 };
 
 /* The cache key of one output: the digest of its input, the version of
@@ -211,6 +217,8 @@ static void base_options(struct build *b, struct options *o,
     /* DESIGN: dev mode carries the line of every statement and release
        mode never does, which is the rule of docs/tooling.md. */
     o->debug = !b->r->release;
+    o->frameworks = b->frameworks;
+    o->framework_count = b->framework_count;
 }
 
 /* The package header that every library file of this project carries. */
@@ -646,6 +654,39 @@ static bool build_c_library(struct build *b, enum target t, enum cpu_level cpu,
     return ok;
 }
 
+/* DESIGN: a binding names the frameworks of Apple's SDK it needs with
+   `link framework`, and its library file records them. The build reads
+   them from every library file the program reaches. It passes them to
+   antic as --framework, so a program never names a framework itself. */
+static bool link_frameworks(struct build *b, enum target t,
+                            enum cpu_level cpu, const struct text *files,
+                            const struct strings *shared)
+{
+    struct options search;
+    struct strings seed = {0};
+    const char **closure = NULL;
+    size_t count = 0;
+    size_t i;
+    bool ok;
+
+    for (i = 0; i < shared->count; i++) {
+        strings_add(&seed, shared->items[i]);
+    }
+    for (i = 0; i < b->unit_count; i++) {
+        strings_add(&seed, text_cstr(&files[i]));
+    }
+    b->frameworks = NULL;
+    b->framework_count = 0;
+    base_options(b, &search, t, cpu);
+    search.libraries = seed.items;
+    search.library_count = seed.count;
+    ok = driver_libraries(&search, &b->framework_arena, &closure, &count) &&
+         driver_frameworks(closure, count, &b->framework_arena,
+                           &b->frameworks, &b->framework_count);
+    strings_free(&seed);
+    return ok;
+}
+
 /* Build one target in one mode. */
 static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
 {
@@ -739,6 +780,9 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     }
     text_appendf(&b->name, "%s/%s", text_cstr(&b->build_dir),
                  text_cstr(&deliverable));
+    if (!link_frameworks(b, t, cpu, files, &shared)) {
+        goto done;
+    }
     if (b->r->lib != BUILD_PROGRAM) {
         ok = build_c_library(b, t, cpu, &libraries);
     } else if (b->r->release) {
@@ -920,6 +964,7 @@ static void build_free(struct build *b)
     }
     free(b->specs);
     strings_free(&b->spec_list);
+    arena_free(&b->framework_arena);
     strings_free(&b->attribution);
     deps_free(&b->graph);
     manifest_free(&b->m);

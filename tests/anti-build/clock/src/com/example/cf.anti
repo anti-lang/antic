@@ -1,0 +1,8 @@
+//! A binding of one function of CoreFoundation, the way `anti bind` writes one.
+//! The line below names the framework, so a program that imports the module
+//! links against it without naming it.
+
+link framework "CoreFoundation";
+
+/// The seconds since the reference date of CoreFoundation.
+pub extern fn CFAbsoluteTimeGetCurrent() -> c_double;

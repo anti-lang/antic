@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 51, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 52, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -278,6 +278,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0,                                     /* attribution */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* module */
     0, 0, 0, 0,                                     /* imports */
+    0, 0, 0, 0,                                     /* frameworks */
     0, 0, 0, 0,                                     /* module doc */
     2, 0, 0, 0,                                     /* types */
     11,                                             /* 0: uint */
@@ -1281,17 +1282,17 @@ static void damaged_files(void)
         MUL_OPERAND = 4 + 2 * 53 - 12,
         PARAM_EXT = TAIL + 4 + 1,
         RESULT_AGG = TAIL + 6 + 4 + 8 + 4,
-        /* The flags, the last byte of type 1, which starts at byte 64
+        /* The flags, the last byte of type 1, which starts at byte 68
            after the header and the one byte of type 0. */
-        FN_FLAGS = 77
+        FN_FLAGS = 81
     };
     uint8_t copy[sizeof scale_antl];
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 52;
+    copy[4] = 53;
     refuses_file(copy, sizeof copy,
-                 "has format version 52, and antic reads version 51");
+                 "has format version 53, and antic reads version 52");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1315,9 +1316,9 @@ static void damaged_files(void)
        out pointer without `may fail`. */
     memcpy(copy, scale_antl, sizeof copy);
     copy[FN_FLAGS] = 16;
-    refuses_file(copy, sizeof copy, "is damaged at byte 78");
+    refuses_file(copy, sizeof copy, "is damaged at byte 82");
     copy[FN_FLAGS] = 8;
-    refuses_file(copy, sizeof copy, "is damaged at byte 78");
+    refuses_file(copy, sizeof copy, "is damaged at byte 82");
 }
 
 /* A library file keeps the class records, the mark of a `worker fn` and

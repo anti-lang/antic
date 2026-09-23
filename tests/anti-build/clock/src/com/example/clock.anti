@@ -1,0 +1,11 @@
+//! A program that names no framework and reaches one through a binding.
+
+import com.example.cf;
+
+fn main() -> int
+{
+	if cf.CFAbsoluteTimeGetCurrent() > 0.0 {
+		return 0;
+	}
+	return 1;
+}

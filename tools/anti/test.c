@@ -369,6 +369,25 @@ static void write_runner(const struct unit *u, struct text *out)
 }
 
 /* Build the runner of one module and run it. */
+/* The frameworks that the library files below the module name, which
+   the link of the runner passes as --framework, as `anti build` does. */
+static bool runner_frameworks(const struct unit *u, const struct options *base,
+                              struct arena *arena, struct options *o)
+{
+    struct options search = *base;
+    const char *seed[1];
+    const char **paths = NULL;
+    size_t count = 0;
+
+    seed[0] = text_cstr(&u->library);
+    search.libraries = seed;
+    search.library_count = 1;
+    search.input = NULL;
+    return driver_libraries(&search, arena, &paths, &count) &&
+           driver_frameworks(paths, count, arena, &o->frameworks,
+                             &o->framework_count);
+}
+
 static bool run_unit(const struct unit *u, const struct options *base,
                      const char *work, bool release)
 {
@@ -379,6 +398,7 @@ static bool run_unit(const struct unit *u, const struct options *base,
     struct text directory = {0};
     struct text flat = {0};
     struct imports imports = {0};
+    struct arena framework_arena = {0};
     const char **objects = NULL;
     const char *argv[2];
     bool ok = false;
@@ -429,7 +449,8 @@ static bool run_unit(const struct unit *u, const struct options *base,
         o.objects = objects;
         o.object_count = imports.count + 1;
     }
-    if (driver_run(&o) != 0) {
+    if (!runner_frameworks(u, base, &framework_arena, &o) ||
+        driver_run(&o) != 0) {
         goto done;
     }
     argv[0] = text_cstr(&program);
@@ -437,6 +458,7 @@ static bool run_unit(const struct unit *u, const struct options *base,
     ok = process_run(argv) == 0;
 done:
     imports_free(&imports);
+    arena_free(&framework_arena);
     free((void *)objects);
     text_free(&source);
     text_free(&path);

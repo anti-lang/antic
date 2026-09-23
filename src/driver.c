@@ -1246,6 +1246,63 @@ bool driver_libraries(const struct options *options, struct arena *arena,
     return true;
 }
 
+bool driver_frameworks(const char *const *paths, size_t count,
+                       struct arena *arena, const char ***names,
+                       size_t *name_count)
+{
+    const char **list = NULL;
+    size_t n = 0;
+    size_t room = 0;
+    size_t i;
+    size_t j;
+    size_t k;
+    char error[200];
+
+    for (i = 0; i < count; i++) {
+        struct text bytes = {0};
+        struct interface header;
+        if (!read_bytes(paths[i], &bytes) ||
+            !antl_header((const uint8_t *)bytes.data, bytes.length, arena,
+                         &header, error, sizeof error)) {
+            if (bytes.length > 0) {
+                fprintf(stderr, "antic: %s %s\n", paths[i], error);
+            }
+            text_free(&bytes);
+            free((void *)list);
+            return false;
+        }
+        text_free(&bytes);
+        for (j = 0; j < header.framework_count; j++) {
+            for (k = 0; k < n; k++) {
+                if (strcmp(list[k], header.frameworks[j]) == 0) {
+                    break;
+                }
+            }
+            if (k < n) {
+                continue;
+            }
+            if (n == room) {
+                const char **grown;
+                room = room == 0 ? 8 : room * 2;
+                grown = realloc((void *)list, room * sizeof *list);
+                if (grown == NULL) {
+                    fputs("antic: out of memory\n", stderr);
+                    exit(70);
+                }
+                list = grown;
+            }
+            list[n++] = header.frameworks[j];
+        }
+    }
+    *names = arena_alloc(arena, (n + 1) * sizeof **names);
+    if (n > 0) {
+        memcpy((void *)*names, (void *)list, n * sizeof *list);
+    }
+    *name_count = n;
+    free((void *)list);
+    return true;
+}
+
 /* Read the library files and load each after the libraries it imports,
    whatever the order on the command line. The interfaces go to out in
    load order. */

@@ -42,7 +42,8 @@ The file carried the parameter names of the module-level functions alone, so a
 page built from one wrote `a0` and `a1` for the members of a class. It now
 carries the count the declaration wrote and one name per parameter, after the
 doc text of the member. It carries the `worker` mark of a function in the flags
-byte of an item. The format version is 51.
+byte of an item. The format version was 51 then. It is 52 since the file
+records the `link framework` lines of a module.
 
 ## The Markdown subset
 

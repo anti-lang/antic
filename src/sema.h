@@ -149,6 +149,8 @@ struct interface {
     size_t import_count;
     struct symbol **items;          /* pub fn, extern fn, struct and const */
     size_t item_count;
+    const char **frameworks;        /* of its `link framework` lines */
+    size_t framework_count;
 };
 
 /* Check one module against the rules of chapter 2: resolve every name,

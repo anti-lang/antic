@@ -2827,6 +2827,36 @@ static bool provides_line(struct parser *p, struct list *out)
     return true;
 }
 
+/* DESIGN: `link framework "Name";` names a framework of Apple's SDK at
+   module level. `link` and `framework` are contextual words there alone,
+   so both stay names everywhere else. A binding carries the line and
+   the library file records it, and `anti` passes the names to antic as
+   --framework. */
+static bool link_line(struct parser *p, struct list *out)
+{
+    struct framework_line line;
+    const struct token *t;
+
+    memset(&line, 0, sizeof line);
+    line.pos = pos_of(peek(p));
+    next(p);
+    next(p);
+    t = peek(p);
+    if (t->kind != TOKEN_STRING) {
+        error_here(p, "`link framework` takes the name of a framework as a "
+                      "string");
+        return false;
+    }
+    next(p);
+    line.name.text = t->value.text.bytes;
+    line.name.length = t->value.text.length;
+    if (!expect(p, TOKEN_SEMICOLON)) {
+        return false;
+    }
+    list_push(out, &line);
+    return true;
+}
+
 bool parse(const char *source, const struct token_list *tokens,
            struct arena *arena, struct diagnostics *diags,
            struct module **out)
@@ -2837,6 +2867,7 @@ bool parse(const char *source, const struct token_list *tokens,
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
     struct list items = {NULL, 0, 0, sizeof(struct item *)};
     struct list provides = {NULL, 0, 0, sizeof(struct provides)};
+    struct list frameworks = {NULL, 0, 0, sizeof(struct framework_line)};
     struct list dropped = {NULL, 0, 0, sizeof(struct dropped_doc)};
     struct token *kept = malloc(tokens->count * sizeof *kept);
     size_t *origin = malloc(tokens->count * sizeof *origin);
@@ -2909,6 +2940,16 @@ bool parse(const char *source, const struct token_list *tokens,
             }
             continue;
         }
+        if (is_word(&p, peek(&p), "link") &&
+            is_word(&p, peek_at(&p, 1), "framework")) {
+            if (!link_line(&p, &frameworks)) {
+                if (p.pos == before) {
+                    next(&p);
+                }
+                sync_item(&p);
+            }
+            continue;
+        }
         it = item(&p);
         if (it != NULL) {
             list_push(&items, &it);
@@ -2922,6 +2963,7 @@ bool parse(const char *source, const struct token_list *tokens,
     m->imports = list_finish(&p, &imports, &m->import_count);
     m->items = list_finish(&p, &items, &m->item_count);
     m->provides = list_finish(&p, &provides, &m->provides_count);
+    m->frameworks = list_finish(&p, &frameworks, &m->framework_count);
     for (i = 0; i < tokens->count; i++) {
         const struct token *t = &tokens->items[i];
         struct dropped_doc d;

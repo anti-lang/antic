@@ -826,6 +826,10 @@ static void put_header(struct writer *w, const struct interface *iface)
     for (i = 0; i < iface->import_count; i++) {
         put_str(w, iface->imports[i]);
     }
+    put_u32(w, (uint32_t)iface->framework_count);
+    for (i = 0; i < iface->framework_count; i++) {
+        put_str(w, iface->frameworks[i]);
+    }
     put_doc(w, iface->doc, iface->doc != NULL ? strlen(iface->doc) : 0);
 }
 
@@ -1092,6 +1096,12 @@ static void read_header(struct reader *r, struct interface *out)
     out->imports = allocate(r, out->import_count, sizeof *out->imports);
     for (i = 0; i < out->import_count && !r->failed; i++) {
         out->imports[i] = get_cstr(r);
+    }
+    out->framework_count = get_count(r, 4);
+    out->frameworks = allocate(r, out->framework_count,
+                               sizeof *out->frameworks);
+    for (i = 0; i < out->framework_count && !r->failed; i++) {
+        out->frameworks[i] = get_cstr(r);
     }
     out->doc = get_cstr(r);
 }

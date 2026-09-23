@@ -9653,6 +9653,35 @@ static bool same_qualifier(const struct item *it, const struct item *a,
 static void check_export(struct checker *c, struct item *it);
 static void check_extern_fn(struct checker *c, struct item *it);
 
+/* A framework is named once, and its name is one name of Apple's SDK:
+   no path and no empty text, since it becomes -framework <name>. */
+static void check_frameworks(struct checker *c, const struct module *module)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < module->framework_count; i++) {
+        const struct framework_line *f = &module->frameworks[i];
+        if (f->name.length == 0) {
+            error_at(c, f->pos, "`link framework` names no framework");
+        } else if (memchr(f->name.text, '/', f->name.length) ||
+            memchr(f->name.text, '\\', f->name.length) ||
+            memchr(f->name.text, ' ', f->name.length)) {
+            error_at(c, f->pos, "`link framework` names a framework of "
+                     "Apple's SDK, and `%.*s` is none",
+                     (int)f->name.length, f->name.text);
+        }
+        for (j = 0; j < i; j++) {
+            if (module->frameworks[j].name.length == f->name.length &&
+                memcmp(module->frameworks[j].name.text, f->name.text,
+                       f->name.length) == 0) {
+                error_at(c, f->pos, "the framework `%.*s` is linked twice",
+                         (int)f->name.length, f->name.text);
+            }
+        }
+    }
+}
+
 /* DESIGN: `provides Interface as Class;` says what a library offers.
    The interface is an abstract class of the module being checked or of
    one it imports. The class is a complete class of the module that
@@ -10554,6 +10583,7 @@ bool sema_check(struct module *module, const char *module_name,
         }
     }
     check_provides(&c, module);
+    check_frameworks(&c, module);
     free(c.module_scope.entries);
     return c.ok;
 }
@@ -11383,6 +11413,13 @@ void sema_interface(const struct module *module, const char *module_name,
                                     module->imports[i].module.length);
     }
     out->import_count = module->import_count;
+    out->frameworks = arena_alloc(arena, (module->framework_count + 1) *
+                                             sizeof *out->frameworks);
+    for (i = 0; i < module->framework_count; i++) {
+        out->frameworks[i] = keep_name(arena, module->frameworks[i].name.text,
+                                       module->frameworks[i].name.length);
+    }
+    out->framework_count = module->framework_count;
     out->items = arena_alloc(arena, (module->item_count + 1) *
                                         sizeof *out->items);
     for (i = 0; i < module->item_count; i++) {

@@ -1,0 +1,8 @@
+//! `link framework` takes the name of the framework as a string.
+
+link framework CoreAudio;
+
+fn main() -> int
+{
+	return 0;
+}

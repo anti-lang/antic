@@ -1,0 +1,3 @@
+link_framework.anti:6:1: error: the framework `CoreAudio` is linked twice
+link_framework.anti:7:1: error: `link framework` names no framework
+link_framework.anti:8:1: error: `link framework` names a framework of Apple's SDK, and `/System/Library/Frameworks/Cocoa` is none

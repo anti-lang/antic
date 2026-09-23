@@ -822,6 +822,21 @@ add_test(NAME anti_build
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build.cmake")
 
+# A binding names its framework with `link framework`, and `anti build`
+# passes it to antic. A Mac takes the SDK from the Command Line Tools.
+if(APPLE)
+    add_test(NAME anti_build_framework
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-framework"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_framework.cmake")
+endif()
+
 # The two shapes of a dependency, the repository layout over `file://`
 # and the two libraries for C.
 add_test(NAME anti_build_deps
@@ -2355,6 +2370,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "qualified_bodies|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_bodies.s,qualified_bodies.anti"
         "qualified_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_calls.s,qualified_calls.anti"
         "abstract_call|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/abstract_call.s,abstract_call.anti"
+        "link_framework|-S,-o,${LISTINGS}/link_framework.s,link_framework.anti"
+        "link_framework_syntax|-S,-o,${LISTINGS}/link_framework_syntax.s,link_framework_syntax.anti"
         "inherits_body|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/inherits_body.s,inherits_body.anti"
         "fail_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_forms.s,fail_forms.anti"
         "fail_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_no_import.s,fail_no_import.anti"

@@ -134,6 +134,15 @@ struct arena;
 bool driver_libraries(const struct options *options, struct arena *arena,
                       const char ***paths, size_t *count);
 
+/* The frameworks that the `link framework` lines of the library files
+   name, each once, in the order the files give them. `anti` passes them
+   to antic as --framework, so a program that imports a binding links
+   against what the binding declares. The names go into the memory pool.
+   Returns false when a file cannot be read. */
+bool driver_frameworks(const char *const *paths, size_t count,
+                       struct arena *arena, const char ***names,
+                       size_t *name_count);
+
 struct interface;
 struct ir_module;
 struct module;
