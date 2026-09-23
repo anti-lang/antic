@@ -5,6 +5,7 @@
    PCRE2. */
 #define PCRE2_CODE_UNIT_WIDTH 8
 #define PCRE2_STATIC
+#include "../binary_stdio.h"
 #include <pcre2.h>
 #include <stddef.h>
 #include <stdint.h>

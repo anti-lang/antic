@@ -1,9 +1,9 @@
-//! PCRE2 of the runtime tree, reached through the C functions of
-//! pcre2_probe.c. The library reports UTF support and no JIT. A group
-//! starts and ends where PCRE2 says, and `.` takes the two bytes of `ß`
-//! as one character. A caseless `ö` matches `Ö`, which needs the Unicode
-//! tables. A pattern with an open group fails at offset 3, and a pattern
-//! that is not in the subject does not match.
+//! PCRE2 of the runtime tree, reached through the C functions of pcre2_probe.c.
+//! The library reports UTF support and no JIT. A group starts and ends where
+//! PCRE2 says, and `.` takes the two bytes of `ß` as one character. A caseless
+//! `ö` matches `Ö`, which needs the Unicode tables. A pattern with an open
+//! group fails at offset 3, and a pattern that is not in the subject does not
+//! match.
 
 extern fn printf(format: ?*byte, ...) -> i32;
 extern fn pcre2_probe(pattern: ?*byte, subject: ?*byte, group: i32, end: i32) -> i32;
