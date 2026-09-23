@@ -94,22 +94,58 @@ static void typed(const char *source, const char *expected)
 }
 
 /* Check source and expect success without any message, then run the doc
-   warnings and expect one warning. */
-static void warns(const char *source, int line, int column,
-                  const char *message)
+   warnings with the undocumented option and expect one warning. */
+static void warns_option(const char *source, bool undocumented, int line,
+                         int column, const char *message)
 {
     struct checked c;
 
     run(&c, source);
     CHECK(c.ok);
     CHECK(c.diags.count == 0);
-    sema_doc_warnings(c.module, &c.diags);
+    sema_doc_warnings(c.module, "main", NULL, 0, &c.types, undocumented,
+                      &c.diags);
     CHECK(c.diags.count == 1);
     if (c.diags.count == 1) {
         CHECK(c.diags.items[0].warning);
         CHECK(c.diags.items[0].line == line &&
               c.diags.items[0].column == column);
         CHECK_STR(c.diags.items[0].message, message);
+    } else if (c.diags.count > 1) {
+        size_t i;
+        fprintf(stderr, "expected one warning, got %zu:\n", c.diags.count);
+        for (i = 0; i < c.diags.count; i++) {
+            fprintf(stderr, "  %d:%d: %s\n", c.diags.items[i].line,
+                    c.diags.items[i].column, c.diags.items[i].message);
+        }
+    }
+    release(&c);
+}
+
+static void warns(const char *source, int line, int column,
+                  const char *message)
+{
+    warns_option(source, false, line, column, message);
+}
+
+/* Check source and expect the doc warnings to say nothing, which is what
+   every form inside the markup subset does. */
+static void documented(const char *source)
+{
+    struct checked c;
+    size_t i;
+
+    run(&c, source);
+    CHECK(c.ok);
+    sema_doc_warnings(c.module, "main", NULL, 0, &c.types, false,
+                      &c.diags);
+    if (c.diags.count != 0) {
+        check_failures++;
+        fprintf(stderr, "the doc warnings spoke about:\n%s\n", source);
+        for (i = 0; i < c.diags.count; i++) {
+            fprintf(stderr, "  %d:%d: %s\n", c.diags.items[i].line,
+                    c.diags.items[i].column, c.diags.items[i].message);
+        }
     }
     release(&c);
 }
@@ -130,6 +166,57 @@ void test_sema(void)
     warns("fn f() {}\n//! Late.\n", 2, 1,
           "the `//!` comment is dropped, because it stands after the first "
           "import or item");
+    /* Markup outside the doc subset, one kind per comment, reported at
+       the position of the comment. */
+    warns("/// # Heading\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds a heading, which the doc markup has "
+          "not");
+    warns("/// A table:\n///\n/// | a | b |\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds a table, which the doc markup has "
+          "not");
+    warns("/// Such as *this*.\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds emphasis, which the doc markup has "
+          "not");
+    warns("/// A list:\n///\n/// 1. one\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds a numbered list, which the doc markup "
+          "has not");
+    warns("/// A picture: ![alt](p.png)\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds an image, which the doc markup has "
+          "not");
+    warns("/// Such as <b> here.\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds HTML, which the doc markup has not");
+    warns("//! A heading of the module:\n//!\n//! # Title\nfn f() {}\n", 1,
+          1, "the doc comment of the module holds a heading, which the doc "
+          "markup has not");
+    /* A fenced block holds what it likes, and the forms of the subset are
+       silent: paragraphs, inline code, `-` lists and links. */
+    documented("/// Text with `f`, a list and a link.\n"
+               "///\n"
+               "/// ```text\n"
+               "/// # not a heading, *not* emphasis, <b> no tag\n"
+               "/// ```\n"
+               "///\n"
+               "/// - an item\n"
+               "/// - [a link](https://anti-lang.com)\n"
+               "pub fn f() {}\n");
+    /* A backtick name resolves against the module, its items and the
+       names they declare. A name that resolves nowhere is a warning, and
+       inline code that is no name is none. */
+    warns("/// `nowhere` is no name of this module.\npub fn f() {}\n", 1, 1,
+          "`nowhere` in the doc comment of `f` resolves to nothing");
+    warns("//! `nowhere` is no name of this module.\nfn f() {}\n", 1, 1,
+          "`nowhere` in the doc comment of the module resolves to nothing");
+    documented("/// `f`, `n`, `Point`, `x`, `main.f`, `int`, `return`,\n"
+               "/// `f()` and `--release` all pass.\n"
+               "pub fn f(n: int) -> int { return n; }\n"
+               "struct Point { x: int, y: int }\n");
+    /* --warn-undocumented reports a `pub` item without a `///` comment,
+       and a private item is no concern of it. */
+    warns_option("pub fn f() {}\nfn g() {}\n", true, 1, 8,
+                 "the pub item `f` has no `///` comment");
+    warns_option("/// Doc.\npub class Thing { pub fn f(self) {} }\n", true,
+                 2, 26, "the pub item `f` has no `///` comment");
+
     typed("fn scale(x: int) -> int {\n"
           "    let k = 2 + 4;\n"
           "    return x * k;\n"

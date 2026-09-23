@@ -1,0 +1,50 @@
+//! The doc markup is a subset of Markdown: paragraphs, fenced code
+//! blocks, inline code, `-` lists and links. Markup outside the subset is
+//! a warning of `anti check`, and so is a backtick name that resolves
+//! nowhere. <b>
+import anti.lang;
+
+/// # Heading
+///
+/// A heading is outside the subset.
+pub const heads: int = 1;
+
+/// A table is outside the subset:
+///
+/// | one | two |
+pub const tables: int = 2;
+
+/// Emphasis such as *this* is outside the subset.
+pub const stars: int = 3;
+
+/// A numbered list is outside the subset:
+///
+/// 1. one
+pub const numbers: int = 4;
+
+/// An image is outside the subset: ![alt](picture.png)
+pub const images: int = 5;
+
+/// `nowhere` names nothing of this module.
+pub const unresolved: int = 7;
+
+/// `heads`, `plus`, `n`, `lang.Error` and `int` all resolve, and
+/// `--release`, `anti check`, `x + y` and `1` are no names at all.
+///
+/// ```text
+/// # in a fenced block, *this* is text
+/// ```
+///
+/// - a list item
+/// - [a link](https://anti-lang.com)
+pub fn plus(n: int) -> int
+{
+	return n + 1;
+}
+
+pub const undocumented: int = 8;
+
+fn main() -> int
+{
+	return plus(0) - 1;
+}

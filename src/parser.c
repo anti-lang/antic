@@ -194,7 +194,7 @@ static size_t marker_length(const char *s)
    line, the paragraph break of the doc markup, so no text is lost. */
 static struct doc_text doc_before(struct parser *p, enum token_kind kind)
 {
-    struct doc_text doc = {NULL, 0};
+    struct doc_text doc = {NULL, 0, 0, 0};
     struct text joined = {0};
     size_t i = p->pos == 0 ? 0 : p->origin[p->pos - 1] + 1;
     char *copy;
@@ -207,6 +207,9 @@ static struct doc_text doc_before(struct parser *p, enum token_kind kind)
         p->taken[i] = true;
         if (joined.length > 0) {
             text_append(&joined, "\n\n");
+        } else {
+            doc.line = t->line;
+            doc.column = t->column;
         }
         text_append_bytes(&joined, t->value.text.bytes, t->value.text.length);
     }

@@ -173,8 +173,17 @@ struct stmt *sema_arm_fallthrough(const struct stmt *body);
    class value whose class a literal may write with no field named. */
 bool sema_field_takes_literal(const struct struct_field *f);
 
-/* Warn about each pub item with a `//#` note and no `///` comment. */
-void sema_doc_warnings(const struct module *module, struct diagnostics *diags);
+/* The doc warnings of `anti check`: markup outside the doc subset, a
+   backtick name that resolves nowhere, a `pub` item with a `//#` note and
+   no `///` comment, a doc comment that documents nothing and, with
+   undocumented set, every `pub` item without a `///` comment. module_name
+   is the module path of the compilation, libraries holds the interface of
+   every loaded library and types holds the root, so a name resolves
+   against all three. */
+void sema_doc_warnings(const struct module *module, const char *module_name,
+                       const struct interface *const *libraries,
+                       size_t library_count, struct types *types,
+                       bool undocumented, struct diagnostics *diags);
 
 /* Fill out with the interface of a checked module. The items are new
    symbols whose home is out. */

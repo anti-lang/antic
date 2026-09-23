@@ -608,10 +608,14 @@ struct stmt {
 };
 
 /* The text of the doc comments before a node, empty without one. The
-   line form and the block form of a marker give the same text. */
+   line form and the block form of a marker give the same text. The
+   position is where the first comment of the text starts, which is where
+   a doc warning stands. */
 struct doc_text {
     const char *text;
     size_t length;
+    int line;
+    int column;
 };
 
 /* How a field joins its class. A plain field is its own name. A `use`

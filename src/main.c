@@ -46,6 +46,8 @@ static int usage(FILE *out)
           "  --doc-warnings       warn about documentation, for anti check\n"
           "  --front-end          run the lexer, the parser and the checker\n"
           "                       and write nothing, for anti check\n"
+          "  --warn-undocumented  with --doc-warnings: warn about every\n"
+          "                       `pub` item without a `///` comment\n"
           "  --package-name <p>   the package header of the library: name,\n"
           "  --package-version <v>  version,\n"
           "  --inject <I=P>       the provider P of the injectable "
@@ -291,6 +293,9 @@ static int run(int argc, char **argv, struct options *o)
             continue;
         } else if (strcmp(arg, "--front-end") == 0) {
             options.front_end = true;
+            continue;
+        } else if (strcmp(arg, "--warn-undocumented") == 0) {
+            options.warn_undocumented = true;
             continue;
         } else if (strcmp(arg, "--framework") == 0) {
             const char *value = value_of(argc, argv, &i);

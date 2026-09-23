@@ -1505,7 +1505,8 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     if (o->doc_warnings) {
-        sema_doc_warnings(tree, &diags);
+        sema_doc_warnings(tree, text_cstr(module), libraries, paths.count,
+                          &types, o->warn_undocumented, &diags);
     }
     print_diagnostics(o->input, &diags);
     diags.count = 0;

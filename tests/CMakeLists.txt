@@ -1001,6 +1001,32 @@ add_test(NAME silent_catch_no_shadow
 set_tests_properties(silent_catch_no_shadow PROPERTIES
     FAIL_REGULAR_EXPRESSION "shadows")
 
+# Markup outside the doc subset, a backtick name that resolves nowhere
+# and, with --warn-undocumented, a `pub` item without a `///` comment.
+# Every one of them comes with --doc-warnings and with nothing else.
+set(MARKUP "the doc comment")
+add_test(NAME warning_doc_markup
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_markup.s,doc_markup.anti"
+        "-DNEEDLES=doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:7:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:28:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
+        "-DABSENT=${MARKUP} of `plus` holds;in ${MARKUP} of `plus` resolves;has no `///` comment"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warnings.cmake")
+add_test(NAME warning_undocumented
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=--doc-warnings,--warn-undocumented,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_undocumented.s,doc_markup.anti"
+        "-DNEEDLES=warning: the pub item `undocumented` has no `///` comment"
+        "-DABSENT=the pub item `plus` has no;the pub item `heads` has no"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warnings.cmake")
+add_test(NAME silent_doc_markup
+    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/doc_markup_silent.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_markup.anti")
+set_tests_properties(silent_doc_markup PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
+
 # The front end alone, which `anti check` runs on every source. It writes
 # no assembly, no object and no library file.
 add_test(NAME front_end_only
