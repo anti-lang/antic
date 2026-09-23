@@ -18,11 +18,19 @@ class Plain
 	n: int = 0,
 }
 
+singleton class One
+{
+	implements g: Greeter,
+
+	concrete fn words(self) -> str { return "one"; }
+}
+
 provides Greeter as Fancy;
 provides Greeter as Plain;
 provides Fancy as Fancy;
 provides Greeter as Missing;
 provides other.Greeter as Fancy;
+provides Greeter as One;
 
 fn main() -> int
 {

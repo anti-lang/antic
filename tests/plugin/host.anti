@@ -3,6 +3,7 @@
 
 import anti.io;
 import anti.plugin;
+import anti.reflect;
 import anti.text;
 import net.example.greet;
 
@@ -21,6 +22,14 @@ fn main(args: []str) -> int
 	if !lib.supports(greet.Greeter, "shout") {
 		io.println("no shout");
 	}
+	/* A class of the library is a class of the program: the registry
+	   builds one by name, and `is` answers for it. */
+	let made = reflect.new("net.example.fancy.Fancy") catch fatal;
+	let d = reflect.describe(made as *byte) catch fatal;
+	let built = f"built {reflect.name(d)}";
+	io.println(built);
+	free(built.ptr);
+	delete(made);
 	let alive = f"{lib.live()} alive";
 	io.println(alive);
 	free(alive.ptr);

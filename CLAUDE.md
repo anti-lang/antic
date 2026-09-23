@@ -199,9 +199,8 @@ nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
 and the CPU levels are built. The variables of `-g` come before the first public
 release. After it, the wrapping and saturating operators with `Flags`, then
 sum types, then locking and channels, all three built. Then injection, hooks
-and tracing, plugins and runtime configuration, which belong together.
-Injection, hooks and tracing and the runtime configuration are built. Then
-generics and closures.
+and tracing, plugins and runtime configuration, which belong together. All
+four are built. Then generics and closures.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -226,7 +225,7 @@ reports what it finished.
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`,
   `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`,
-  `anti.simd` and `anti.trace`.
+  `anti.simd`, `anti.trace` and `anti.plugin`.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
@@ -248,8 +247,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 751 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 750 each, without the `no_paths` test, which needs a
+- 759 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 758 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A
@@ -313,6 +312,19 @@ reports what it finished.
   program, so `--anti.inject` reports what it may replace and refuses an
   `inject final` field. The run-time replacement waits for plugins. See
   "Injection" in `docs/decisions.md` and `docs/notes/injection.md`.
+- Plugins are built. `provides Interface as Class;` at module level says
+  what a library offers, and `antic --lib shared --no-runtime` writes one:
+  the object of its own module alone, linked without the runtime and bound
+  against the host that loads it. `plugin.load(path)` of `anti.plugin` gives
+  a `Library`, `lib.instance(Interface)` builds the class it provides,
+  `lib.supports(Interface, "f")` reads its functions, and `lib.unload()`
+  refuses while an object of the library is alive. antic writes
+  `anti-plugins.toml` beside a library, and `"plugin:path"` and `"discover"`
+  of the manifest take a provider from one. `[injections]` and
+  `--anti.inject` replace a provider at start, and `--closed` builds a
+  program a plugin cannot bind against. A program loads a library where it
+  is linked dynamically, which is macOS today. See "Plugins" in
+  `docs/decisions.md` and `docs/notes/plugins.md`.
 - The six standard interfaces are built, each an abstract class with a
   default implementation and a default provider: `anti.log.Logger` with
   `SinkLogger`, `anti.time.Clock` with `SystemClock`, `anti.random.Source`

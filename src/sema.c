@@ -9674,6 +9674,14 @@ static void check_provides(struct checker *c, struct module *module)
                      (int)pr->class_name.length, pr->class_name.text);
             continue;
         }
+        /* A singleton has one instance, which its `get` makes. A
+           library that offered one would hand the host a second. */
+        if (it->is_singleton) {
+            error_at(c, pr->class_pos, "`%.*s` is a singleton, and a "
+                     "`provides` line names a class the host builds",
+                     (int)pr->class_name.length, pr->class_name.text);
+            continue;
+        }
         if (!fills(sym->type, iface)) {
             error_at(c, pr->class_pos, "`%.*s` neither inherits `%s` nor "
                      "implements it", (int)pr->class_name.length,
