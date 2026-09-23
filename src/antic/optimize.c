@@ -959,6 +959,44 @@ struct address {
     bool known;
 };
 
+/* Whether o names temporary t. */
+static bool names_temp(struct ir_operand o, uint32_t t)
+{
+    return o.kind == IR_TEMP && o.as.temp == t;
+}
+
+/* Whether two operands name the same value. Each kind compares the member
+   of the union it writes, since the bytes of a wider member that no store
+   wrote are unspecified in C11 6.2.6.1. */
+static bool same_operand(const struct ir_operand *a,
+                         const struct ir_operand *b)
+{
+    if (a->kind != b->kind) {
+        return false;
+    }
+    switch (a->kind) {
+    case IR_NONE:
+        return true;
+    case IR_TEMP:
+        return a->as.temp == b->as.temp;
+    case IR_INT:
+        return a->as.integer == b->as.integer;
+    case IR_FLOAT:
+        return memcmp(&a->as.floating, &b->as.floating,
+                      sizeof a->as.floating) == 0;
+    case IR_GLOBAL:
+    case IR_FUNC:
+    case IR_BLOCK:
+    case IR_SYM:
+        return a->as.index == b->as.index;
+    }
+    return false;
+}
+
+/* DESIGN: the IR is not in SSA form, and `ir_assign` writes a temporary
+   again. The address of `at` is its last ptradd before upto. It is
+   unknown once the base or the offset of that ptradd is written after it.
+   A temporary written by another instruction is its own base. */
 static struct address address_of(const struct ir_block *b, size_t upto,
                                  struct ir_operand at)
 {
@@ -969,12 +1007,23 @@ static struct address address_of(const struct ir_block *b, size_t upto,
     a.base = at;
     a.offset = ir_int_op(IR_I64, 0);
     a.known = at.kind == IR_TEMP;
-    for (i = 0; a.known && i < upto; i++) {
+    for (i = 0; at.kind == IR_TEMP && i < upto; i++) {
         const struct ir_inst *inst = &b->insts[i];
-        if (inst->op == IR_PTRADD && inst->result == at.as.temp) {
-            a.base = inst->a;
-            a.offset = inst->b;
-            a.known = inst->a.kind == IR_TEMP;
+        if (inst->result == at.as.temp) {
+            a.base = at;
+            a.offset = ir_int_op(IR_I64, 0);
+            a.known = true;
+            if (inst->op == IR_PTRADD) {
+                a.base = inst->a;
+                a.offset = inst->b;
+                a.known = inst->a.kind == IR_TEMP &&
+                          !names_temp(inst->a, inst->result) &&
+                          !names_temp(inst->b, inst->result);
+            }
+        } else if (inst->result != IR_NO_RESULT &&
+                   (names_temp(a.base, inst->result) ||
+                    names_temp(a.offset, inst->result))) {
+            a.known = false;
         }
     }
     return a;
@@ -982,10 +1031,8 @@ static struct address address_of(const struct ir_block *b, size_t upto,
 
 static bool same_address(const struct address *a, const struct address *b)
 {
-    return a->known && b->known &&
-           a->base.kind == b->base.kind && a->base.as.temp == b->base.as.temp &&
-           a->offset.kind == b->offset.kind &&
-           a->offset.as.integer == b->offset.as.integer;
+    return a->known && b->known && same_operand(&a->base, &b->base) &&
+           same_operand(&a->offset, &b->offset);
 }
 
 static bool forward_stores(struct ir_function *f)
@@ -1003,6 +1050,12 @@ static bool forward_stores(struct ir_function *f)
         for (i = 0; i < block->count; i++) {
             struct ir_inst *inst = &block->insts[i];
             struct address at;
+            if (inst->result != IR_NO_RESULT &&
+                (names_temp(value, inst->result) ||
+                 names_temp(held.base, inst->result) ||
+                 names_temp(held.offset, inst->result))) {
+                memset(&held, 0, sizeof held);
+            }
             switch (inst->op) {
             case IR_LOAD:
                 at = address_of(block, i, inst->a);
@@ -1060,11 +1113,6 @@ struct slot_field {
     uint32_t temp;
 };
 
-static bool same_offset(const struct ir_operand *a, const struct ir_operand *b)
-{
-    return a->kind == b->kind && a->as.integer == b->as.integer;
-}
-
 /* The field of the slot at offset, added when it is new. Returns NULL
    when one offset carries two types, which this pass does not split. */
 static struct slot_field *field_at(struct ir_function *f,
@@ -1075,7 +1123,7 @@ static struct slot_field *field_at(struct ir_function *f,
     size_t i;
 
     for (i = 0; i < *count; i++) {
-        if (same_offset(&fields[i].offset, &offset)) {
+        if (same_operand(&fields[i].offset, &offset)) {
             return fields[i].type == type ? &fields[i] : NULL;
         }
     }
@@ -1241,7 +1289,7 @@ static bool split_slots(struct ir_function *f)
                         }
                     }
                     for (m = 0; m < count; m++) {
-                        if (!same_offset(&fields[m].offset, &offset)) {
+                        if (!same_operand(&fields[m].offset, &offset)) {
                             continue;
                         }
                         if (use->op == IR_LOAD) {

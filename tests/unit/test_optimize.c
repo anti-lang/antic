@@ -132,10 +132,137 @@ static void jump_cycle(void)
     arena_free(&arena);
 }
 
+/* Store forwarding on IR that is not in SSA form. The function stores or
+   loads through an address. It writes the held value, the base of the
+   address or its offset again, then loads the address. Case 4 writes the
+   base between the ptradd and the store. The load must stay, since the
+   held value is no longer what the memory holds. */
+static void forward_after_write(int which)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block *b;
+    struct text out = {0};
+    uint32_t p;
+    uint32_t q;
+    uint32_t v;
+    uint32_t off;
+    uint32_t at;
+    uint32_t r;
+
+    ir_module_init(&m, &arena, "main");
+    f = ir_function_add(&m, "main", "f", IR_I64, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    q = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    v = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b = ir_block_add(f);
+    off = ir_temp(f, IR_I64);
+    ir_assign(f, b, off, ir_int_op(IR_I64, 8));
+    at = ir_ptradd(f, b, ir_temp_op(f, p), ir_temp_op(f, off));
+    if (which == 4) {
+        ir_assign(f, b, p, ir_temp_op(f, q));
+    }
+    if (which == 3) {
+        v = ir_load(f, b, IR_I64, ir_temp_op(f, at));
+    } else {
+        ir_store(f, b, IR_I64, ir_temp_op(f, v), ir_temp_op(f, at));
+    }
+    if (which == 0 || which == 3) {
+        ir_assign(f, b, v, ir_int_op(IR_I64, 5));
+    } else if (which == 1) {
+        ir_assign(f, b, p, ir_temp_op(f, q));
+    } else if (which == 2) {
+        ir_assign(f, b, off, ir_int_op(IR_I64, 16));
+    }
+    at = ir_ptradd(f, b, ir_temp_op(f, p), ir_temp_op(f, off));
+    r = ir_load(f, b, IR_I64, ir_temp_op(f, at));
+    ir_ret(f, b, IR_I64, ir_temp_op(f, r));
+    ir_optimize(&m, "main");
+    ir_print(&out, &m);
+    if (strstr(text_cstr(&out), "load i64") == NULL) {
+        check_failures++;
+        fprintf(stderr, "store forwarding case %d lost the load:\n%s", which,
+                text_cstr(&out));
+    }
+    text_free(&out);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
+/* Two operands of one symbolic offset whose unused bytes of the union
+   differ, as C leaves them after `o.as.index = sym`. The optimizer names
+   them one offset, so the load reads the 7 of the store. The test runs
+   through a slot the pass splits into temporaries and through a parameter. */
+static void symbolic_offsets(bool slot)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block *b;
+    struct text out = {0};
+    struct ir_field fields[2];
+    struct ir_operand dirty;
+    struct ir_operand clean;
+    uint32_t agg;
+    uint32_t sym;
+    uint32_t base;
+    uint32_t at;
+    uint32_t r;
+
+    ir_module_init(&m, &arena, "main");
+    memset(fields, 0, sizeof fields);
+    fields[0].name = "x";
+    fields[0].type.type = IR_I64;
+    fields[1].name = "y";
+    fields[1].type.type = IR_I64;
+    agg = ir_struct_add(&m, IR_AGG_STRUCT, "main.P", fields, 2, false, 0);
+    sym = ir_sym_offset_of(&m, agg, 1);
+    memset(&dirty, 0xff, sizeof dirty);
+    dirty.kind = IR_SYM;
+    dirty.type = IR_I64;
+    dirty.as.index = sym;
+    memset(&clean, 0, sizeof clean);
+    clean.kind = IR_SYM;
+    clean.type = IR_I64;
+    clean.as.index = sym;
+    f = ir_function_add(&m, "main", "f", IR_I64, IR_NO_AGG);
+    base = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    if (slot) {
+        struct ir_vtype of;
+        of.type = IR_AGG;
+        of.agg = agg;
+        base = ir_slot(f, b, of);
+    }
+    at = ir_ptradd(f, b, ir_temp_op(f, base), dirty);
+    ir_store(f, b, IR_I64, ir_int_op(IR_I64, 7), ir_temp_op(f, at));
+    at = ir_ptradd(f, b, ir_temp_op(f, base), clean);
+    r = ir_load(f, b, IR_I64, ir_temp_op(f, at));
+    ir_ret(f, b, IR_I64, ir_temp_op(f, r));
+    ir_optimize(&m, "main");
+    ir_print(&out, &m);
+    if (strstr(text_cstr(&out), "ret i64 7") == NULL) {
+        check_failures++;
+        fprintf(stderr, "symbolic offset through a %s:\n%s",
+                slot ? "slot" : "parameter", text_cstr(&out));
+    }
+    text_free(&out);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 void test_optimize(void)
 {
+    int which;
+
     one_module();
     jump_cycle();
+    for (which = 0; which < 5; which++) {
+        forward_after_write(which);
+    }
+    symbolic_offsets(false);
+    symbolic_offsets(true);
     /* Class records serve the passes before the optimizer. Removing the
        unused globals renumbers the rest, so the records go with them. */
     optimizes("class Box\n"
