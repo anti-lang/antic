@@ -21,7 +21,7 @@ set(src_directories antic anti rt std native)
 set(tests_directories abi anti-build anti-symbols anti-test bind check checks
     clib conf doc dump emit-identity errors fmt framework inject link-identity
     modules opt plugin programs raw std trace traps unit)
-set(docs_directories notes reports site)
+set(docs_directories audit notes reports site)
 
 if(NOT GIT)
     find_program(GIT git)

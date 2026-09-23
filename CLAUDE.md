@@ -140,11 +140,14 @@ for a reader's build and never for a release.
   `.gitattributes`, `.editorconfig`, a tracked `.claude/settings.json` if
   there is one, and `r`.
 - `src/` holds exactly `antic/`, `anti/`, `rt/`, `std/` and `native/`.
+- `docs/` holds exactly the directories `audit/`, `notes/`, `reports/` and
+  `site/`. `docs/audit/` holds the reports of the code audit and their
+  machine data.
 - Every new file goes into the directory its kind already has: compiler code
   in `src/antic/`, tool code in `src/anti/`, runtime C in `src/rt/`, Anti
   library code in `src/std/`, native library recipes in `src/native/`, a test
   in the `tests/` subdirectory of its kind, a report in `docs/reports/`, a
-  note in `docs/notes/`.
+  note in `docs/notes/`, an audit report or its data in `docs/audit/`.
 - No new directory at the top level, or directly under `src/`, `tests/` or
   `docs/`, without Eddie's decision. A session that needs one stops and
   reports BLOCKED with the reason.
