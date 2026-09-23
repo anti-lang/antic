@@ -553,9 +553,16 @@ bool bind_eval_const(struct bind_module *b, const char *name,
     c->name = bind_strdup(b, name);
     c->doc = doc;
     {
+        /* The names of an enum may point into the input of a reader, which
+           goes before the module is written, so the constant keeps copies. */
         struct bind_eval *kept = arena_alloc(&b->arena, sizeof *kept);
         *kept = *v;
+        if (v->enum_type != NULL) {
+            kept->enum_type = bind_strdup(b, v->enum_type);
+            kept->enum_value = bind_strdup(b, v->enum_value);
+        }
         c->eval = kept;
+        v = kept;
     }
     switch (v->kind) {
     case BIND_EVAL_INT:
