@@ -88,8 +88,8 @@ bool unit_read(const char *source, const char *const *roots,
         fprintf(stderr, "anti: %s\n", message);
         goto done;
     }
-    if (!unit_file(work, text_cstr(&out->path), ANTL_SUFFIX,
-                     &out->library)) {
+    if (work != NULL && !unit_file(work, text_cstr(&out->path), ANTL_SUFFIX,
+                                   &out->library)) {
         goto done;
     }
     ok = true;
@@ -103,6 +103,13 @@ bool unit_read(const char *source, const char *const *roots,
         goto done;
     }
     out->parsed = true;
+    for (i = 0; i < tree->item_count; i++) {
+        const struct item *it = tree->items[i];
+        if (it->kind == ITEM_FN && it->block == BLOCK_NONE &&
+            it->name.length == 4 && memcmp(it->name.text, "main", 4) == 0) {
+            out->has_main = true;
+        }
+    }
     out->imports = calloc(tree->import_count + 1, sizeof *out->imports);
     if (out->imports == NULL) {
         out_of_memory();

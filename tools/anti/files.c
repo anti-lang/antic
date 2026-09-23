@@ -144,6 +144,23 @@ bool copy_file(const char *from, const char *to)
     return fclose(out) == 0 && ok;
 }
 
+bool copy_program(const char *from, const char *to)
+{
+#if defined(_WIN32)
+    return copy_file(from, to);
+#else
+    struct stat info;
+
+    if (!copy_file(from, to)) {
+        return false;
+    }
+    if (stat(from, &info) != 0) {
+        return false;
+    }
+    return chmod(to, info.st_mode & 07777) == 0;
+#endif
+}
+
 static void list_add(struct file_list *out, const char *path)
 {
     if (out->count == out->capacity) {

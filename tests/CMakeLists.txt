@@ -796,6 +796,43 @@ add_test(NAME anti_test
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test.cmake")
 
+# `anti build`, `anti run` and `anti new` over a two-module project: the
+# dev cache, release mode, the -g rule, --target, --cpu and the lock file.
+if(ANTIC_HOST_CPU STREQUAL "arm64")
+    set(anti_build_cpu "armv8.0")
+else()
+    set(anti_build_cpu "v1")
+endif()
+if(ANTIC_HOST_TARGET STREQUAL "linux-x86_64")
+    set(anti_build_other "macos-arm64")
+else()
+    set(anti_build_other "linux-x86_64")
+endif()
+add_test(NAME anti_build
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DOTHER=${anti_build_other}"
+        "-DCPU=${anti_build_cpu}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build.cmake")
+
+# The two shapes of a dependency, the repository layout over `file://`
+# and the two libraries for C.
+add_test(NAME anti_build_deps
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DLLVM_AR=${ANTIC_LLVM_AR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-deps"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_deps.cmake")
+
 # The rules of the canonical form on one file, the format stability of
 # docs/tooling.md and `--check`, which writes nothing.
 add_test(NAME anti_fmt

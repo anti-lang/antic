@@ -1,0 +1,7 @@
+//! A library project, whose build writes library files and no program.
+
+/// Twice `n`.
+pub fn twice(n: int) -> int
+{
+	return n * 2;
+}

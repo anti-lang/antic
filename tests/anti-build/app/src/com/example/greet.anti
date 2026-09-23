@@ -1,0 +1,13 @@
+//! The word and the status that the program of this project prints.
+
+/// The word the program prints.
+pub fn word() -> str
+{
+	return "one";
+}
+
+/// The status the program ends with.
+pub fn count() -> int
+{
+	return 7;
+}

@@ -16,6 +16,12 @@ bool remove_tree(const char *path);
 /* Copy the bytes of the file from to the new file to. */
 bool copy_file(const char *from, const char *to);
 
+/* Copy the file and give the copy the execute bits of the original. A
+   program that `anti build` copies into `dist/` is run from there, and
+   copy_file writes a plain file. Windows decides by the suffix, so the
+   call is a copy there. */
+bool copy_program(const char *from, const char *to);
+
 /* Whether path names a file or directory that exists. */
 bool path_exists(const char *path);
 

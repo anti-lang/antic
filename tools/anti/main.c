@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "build.h"
 #include "check.h"
 #include "doc.h"
 #include "files.h"
@@ -18,7 +19,15 @@
 
 static int usage(FILE *out)
 {
-    fputs("usage: anti sdk export [--sdk <MacOSX.sdk>] [-o <dir>]\n"
+    fputs("usage: anti new <name>\n"
+          "       anti build [--release] [--target <t>|all] [--offline]\n"
+          "                  [--strip-docs] [--cpu <level>]\n"
+          "                  [--lib static|shared] [--bundle-runtime]\n"
+          "                  [--soname] [--runtime <dir>] [--llvm-mc <path>]\n"
+          "                  [--llvm-ar <path>]\n"
+          "       anti run [--release] [--cpu <level>] [--offline]\n"
+          "                [--runtime <dir>] [--llvm-mc <path>]\n"
+          "       anti sdk export [--sdk <MacOSX.sdk>] [-o <dir>]\n"
           "       anti sdk import <bundle> [--sysroot <dir>]\n"
           "       anti test [--release] [--work <dir>] [-I <dir>]\n"
           "                 [--runtime <dir>] [--llvm-mc <path>]\n"
@@ -30,6 +39,25 @@ static int usage(FILE *out)
           "                [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
           "                [<file.anti>|<file.antl>...]\n"
           "       anti fmt [--check] [<file.anti>...]\n"
+          "\n"
+          "new writes a project of the default layout: anti.toml, src/ with\n"
+          "one module whose path is the package name, and test/. The name is\n"
+          "a module path of at least two segments, and the directory takes\n"
+          "its last segment.\n"
+          "\n"
+          "build reads anti.toml of the current directory, resolves the\n"
+          "dependencies into anti.lock, fetches every library file it needs\n"
+          "and compiles the project. Dev mode is the default: one object per\n"
+          "module, cached by the digest of its input, the compiler version\n"
+          "and the target, with -g and the dev-mode checks on. --release\n"
+          "compiles the whole program in one call, without -g and with the\n"
+          "checks off, and writes the symbols archive beside the program.\n"
+          "Both write build/<target>/<mode>/ and dist/<target>/<mode>/. A\n"
+          "project without `main` is a library project, whose build writes\n"
+          "the library file of each module. --lib static and --lib shared\n"
+          "write a library for C instead, with its header beside it.\n"
+          "\n"
+          "run builds for the host and runs what it wrote.\n"
           "\n"
           "sdk export packs the .tbd stubs and the version of Apple's SDK into\n"
           "apple-sdk-<version>.tar.xz, on a Mac. sdk import unpacks that bundle\n"
@@ -111,6 +139,61 @@ int main(int argc, char **argv)
     if (argc == 2 && strcmp(argv[1], "--version") == 0) {
         printf("anti %s\n", ANTIC_VERSION);
         return 0;
+    }
+    if (argc >= 3 && strcmp(argv[1], "new") == 0) {
+        if (argc != 3 || argv[2][0] == '-') {
+            return usage(stderr);
+        }
+        return build_new(argv[2]);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "build") == 0 ||
+                      strcmp(argv[1], "run") == 0)) {
+        struct build_request request;
+        struct text home = {0};
+        int status;
+        memset(&request, 0, sizeof request);
+        request.root = ".";
+        request.run = strcmp(argv[1], "run") == 0;
+        for (i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "--release") == 0) {
+                request.release = true;
+            } else if (strcmp(argv[i], "--offline") == 0) {
+                request.offline = true;
+            } else if (strcmp(argv[i], "--strip-docs") == 0) {
+                request.strip_docs = true;
+            } else if (strcmp(argv[i], "--bundle-runtime") == 0) {
+                request.bundle_runtime = true;
+            } else if (strcmp(argv[i], "--soname") == 0) {
+                request.soname = true;
+            } else if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
+                request.target = argv[++i];
+            } else if (strcmp(argv[i], "--cpu") == 0 && i + 1 < argc) {
+                request.cpu = argv[++i];
+            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+                request.runtime = argv[++i];
+            } else if (strcmp(argv[i], "--llvm-mc") == 0 && i + 1 < argc) {
+                request.llvm_mc = argv[++i];
+            } else if (strcmp(argv[i], "--llvm-ar") == 0 && i + 1 < argc) {
+                request.llvm_ar = argv[++i];
+            } else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
+                i++;
+                if (strcmp(argv[i], "static") == 0) {
+                    request.lib = BUILD_LIB_STATIC;
+                } else if (strcmp(argv[i], "shared") == 0) {
+                    request.lib = BUILD_LIB_SHARED;
+                } else {
+                    return usage(stderr);
+                }
+            } else {
+                return usage(stderr);
+            }
+        }
+        if (request.runtime == NULL && default_runtime(&home)) {
+            request.runtime = text_cstr(&home);
+        }
+        status = build_run(&request);
+        text_free(&home);
+        return status;
     }
     if (argc >= 2 && strcmp(argv[1], "check") == 0) {
         const char **sources = malloc((size_t)argc * sizeof *sources);

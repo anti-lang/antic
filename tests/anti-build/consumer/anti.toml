@@ -1,0 +1,6 @@
+[package]
+name = "com.example.consumer"
+version = "0.1.0"
+
+[dependencies]
+"com.example.units" = { path = "../units" }

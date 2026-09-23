@@ -1,0 +1,10 @@
+//! A program that takes its one dependency from a path.
+
+import anti.io;
+import com.example.units;
+
+fn main() -> int
+{
+	io.println("consumer");
+	return units.twice(4);
+}

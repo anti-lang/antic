@@ -16,6 +16,7 @@ struct unit {
     struct text *imports;       /* the module path of each import */
     size_t import_count;
     bool parsed;                /* the lexer and the parser took it */
+    bool has_main;              /* the module declares `fn main` */
 };
 
 /* The path of the file at dir/<module as directories><suffix>, with every
@@ -24,7 +25,8 @@ bool unit_file(const char *dir, const char *module, const char *suffix,
                struct text *out);
 
 /* Read one module: its path, its imports and whether the front end's
-   first two passes took it. A file the parser refuses reports here, and
+   first two passes took it. work names the directory of the interface
+   file, and NULL leaves that path empty for a caller that names its own. A file the parser refuses reports here, and
    no pass below sees it, so no message is printed twice. Returns false
    when the file cannot be read or names no module path. */
 bool unit_read(const char *source, const char *const *roots,

@@ -914,10 +914,14 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
     text_appendf(&lock_path, "%s/%s", root, LOCK_FILE);
     lock_read(text_cstr(&lock_path), &locked);
     if (lock_answers(m, &locked, root)) {
-        /* The lock file answers, so the indexes are not read at all. */
+        /* The lock file answers, so the indexes are not read at all. A
+           project with no dependency still gets one, because the file is
+           what `anti build` writes beside the manifest. */
         *out = locked;
         memset(&locked, 0, sizeof locked);
-        ok = fetch_all(out, offline);
+        ok = fetch_all(out, offline) &&
+             (path_exists(text_cstr(&lock_path)) ||
+              lock_write(text_cstr(&lock_path), out));
         goto done;
     }
     for (i = 0; i < m->dependency_count; i++) {
@@ -945,7 +949,10 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
     if (!fetch_all(&r.graph, offline)) {
         goto done;
     }
-    if (!graphs_equal(&r.graph, &locked) &&
+    /* The lock file is written when the graph differs from the one it
+       held, and when there is no lock file yet. */
+    if ((!graphs_equal(&r.graph, &locked) ||
+         !path_exists(text_cstr(&lock_path))) &&
         !lock_write(text_cstr(&lock_path), &r.graph)) {
         goto done;
     }

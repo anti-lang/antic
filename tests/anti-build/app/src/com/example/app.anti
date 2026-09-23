@@ -1,0 +1,10 @@
+//! The program of the two-module project that `anti build` builds.
+
+import anti.io;
+import com.example.greet;
+
+fn main() -> int
+{
+	io.println(greet.word());
+	return greet.count();
+}

@@ -29,7 +29,6 @@
 #include "text.h"
 
 #define ASSEMBLY_SUFFIX ".s"
-#define HEADER_SUFFIX ".h"
 #define PACKAGE_SUFFIX ".package"
 #define DEF_SUFFIX ".def"
 #define EXPORTED_SUFFIX ".exported"
