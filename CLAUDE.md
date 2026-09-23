@@ -95,37 +95,64 @@ without asking Eddie.
 ## Building
 
 ```bash
-cmake -S . -B build && cmake --build build -j8 && ctest --test-dir build -j8
+cmake --preset host && cmake --build build/host -j8 && ctest --test-dir build/host -j8
 ```
 
-`CMakePresets.json` carries the two sanitizer configurations: `cmake --preset
-asan` and `cmake --preset ubsan`, each with its own build directory. Both run
-the full suite.
+`CMakePresets.json` carries three configurations, each in `build/<preset>`:
+`host`, and the sanitizer configurations `asan` and `ubsan`. All three run the
+full suite.
 
-The pinned clang in `build/clang` compiles everything, and the configure step
-installs it and the pinned LLVM tools in `build/llvm/bin` with
+The pinned downloads lie in `build/deps/`, one copy for all three trees. The
+pinned clang in `build/deps/clang` compiles everything, and the configure step
+installs it and the pinned LLVM tools in `build/deps/llvm/bin` with
 `tools/get-clang.cmake` and `tools/get-llvm.cmake`. The build also needs the
-sysroots in `build/sysroot`, which `tools/get-sysroot.cmake` installs after
-`tools/get-clang.cmake`, and the pinned raylib source in `build/raylib`, which
-`tools/get-raylib.cmake` installs. `tools/clang-pin`, `tools/llvm-pin`,
-`tools/sysroot-pins` and `tools/raylib-pin` hold the versions and the digests.
-clang and the LLVM tools come from the releases of `anti-lang/llvm-tools`, and
-openssl checks their signature. Windows configures with `-G Ninja`.
-`-DANTIC_SYSTEM_COMPILER=ON` is for a reader's build and never for a release.
+sysroots in `build/deps/sysroot`, which `tools/get-sysroot.cmake` installs
+after `tools/get-clang.cmake`, and the pinned raylib source in
+`build/deps/raylib`, which `tools/get-raylib.cmake` installs.
+`tools/clang-pin`, `tools/llvm-pin`, `tools/sysroot-pins` and
+`tools/raylib-pin` hold the versions and the digests. clang and the LLVM tools
+come from the releases of `anti-lang/llvm-tools`, and openssl checks their
+signature. Windows configures with `-G Ninja`. `-DANTIC_SYSTEM_COMPILER=ON` is
+for a reader's build and never for a release.
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `src/` | The compiler |
-| `rt/` | anti_rt sources, starting with `rt/start.c`, 0BSD |
-| `std/` | The standard library in Anti, 0BSD |
-| `libs/` | CMake build of the third-party static libraries in the runtime archive |
+| `src/antic/` | The compiler |
+| `src/anti/` | The `anti` tool |
+| `src/rt/` | anti_rt sources, starting with `src/rt/start.c`, 0BSD |
+| `src/std/` | The standard library in Anti, 0BSD |
+| `src/native/` | The recipes that build the third-party C libraries of the runtime archive |
 | `tests/` | Test programs, expected outputs, the runner |
 | `tools/` | Helper scripts, the pins, the installers and the docs-style checker |
+| `tools/keys/` | `release.pem`, the public key that checks the LLVM tools, and the ignored `private/` |
 | `docs/` | The specifications, the decisions and the reports |
-| `keys/` | `release.pem`, the public key that checks the LLVM tools |
 | `LICENSES/` | Licence texts of bundled components |
+| `build/` | Every build tree, the downloads in `deps/` and the driver state in `drive/`. Never committed |
+
+## Repository layout
+
+- The top level holds exactly `build/`, `docs/`, `LICENSES/`, `src/`, `tests/`
+  and `tools/`, plus the root files `CLAUDE.md`, `README.md`, `CHANGELOG.md`,
+  `LICENSE`, `CMakeLists.txt`, `CMakePresets.json` and `.gitignore`.
+- Files that tools require in the root, and the release link r: `.github/`,
+  `.gitattributes`, `.editorconfig`, a tracked `.claude/settings.json` if
+  there is one, and `r`.
+- `src/` holds exactly `antic/`, `anti/`, `rt/`, `std/` and `native/`.
+- Every new file goes into the directory its kind already has: compiler code
+  in `src/antic/`, tool code in `src/anti/`, runtime C in `src/rt/`, Anti
+  library code in `src/std/`, native library recipes in `src/native/`, a test
+  in the `tests/` subdirectory of its kind, a report in `docs/reports/`, a
+  note in `docs/notes/`.
+- No new directory at the top level, or directly under `src/`, `tests/` or
+  `docs/`, without Eddie's decision. A session that needs one stops and
+  reports BLOCKED with the reason.
+- Scratch work, temporary files and generated output go under `build/` only,
+  never in the source tree. Nothing under `build/` is committed.
+
+The test `repo_layout` reads `git ls-files` and holds these lists and the
+directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
 
 ## First sessions, in order
 
@@ -164,7 +191,7 @@ openssl checks their signature. Windows configures with `-G Ninja`.
 15. Done. `f"..."` and `rf"..."` with their format specifications, as
     calls of `anti.text.Builder`. `docs/reports/2026-09-21-interpolation.md`
     reports it, and `docs/notes/interpolation.md` holds its choices.
-16. The native libraries in `libs/`, which nothing builds yet.
+16. The native libraries in `src/native/`, which nothing builds yet.
 17. Inline atomic instruction sequences, which are runtime calls today.
 18. Done. The one manifest of a release, and the installers that read its
     signature. `docs/reports/2026-09-20-one-manifest.md` reports both.
@@ -209,7 +236,7 @@ reports what it finished.
 ## State
 
 - The compiler lexes, parses and type-checks Anti across modules. Its IR holds
-  no sizes: the back end lays out types per target (`src/layout.c`) and folds
+  no sizes: the back end lays out types per target (`src/antic/layout.c`) and folds
   symbolic values. Both back ends cover all integer and float operations.
   The emitter writes assembly for all six targets, llvm-mc assembles it, and lld
   links every target against the sysroots of the runtime archive.
@@ -221,7 +248,7 @@ reports what it finished.
 - A pass over the whole program's IR runs after lowering. In dev mode it runs
   for the module that links. It holds release devirtualisation, the class
   registry, the singleton check and the used-slot bitmaps.
-- `std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
+- `src/std/` holds `anti.lang`, `anti.io`, `anti.text`, `anti.license`,
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`,
   `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`,
@@ -270,11 +297,11 @@ reports what it finished.
   nested `sync` on the same place in one function is refused. `chan int(16)`
   makes a channel, `send` and `recv` block, `recv` gives `?*T` or `none`
   once the channel is closed and empty, and `select` takes from whichever
-  channel is ready. `rt/sync.c` holds both. The warning on a field written
+  channel is ready. `src/rt/sync.c` holds both. The warning on a field written
   inside `sync` and read outside it is not built. See "Locking and channels"
   in `docs/decisions.md` and `docs/notes/locking.md`.
 - `anti.mem.Allocator` is built, with `alloc(size, align)` and `free(p)`, the
-  default `LibcAllocator` over `rt/mem.c` and `ArenaAllocator` over blocks of
+  default `LibcAllocator` over `src/rt/mem.c` and `ArenaAllocator` over blocks of
   another allocator. `alloc` and `free` name a function of a class and follow
   `.`. See "`anti.mem`" in `docs/decisions.md`.
   `Object.deserialize(input, from)` takes the object, its strings and its
@@ -365,7 +392,7 @@ reports what it finished.
   every function of anti.fs, `toml.Document.read`, `log.FileSink.new`,
   `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may
   fail. The tests `std_may_fail_only` and `tests_may_fail_only` refuse a
-  function of `std/` or `tests/` written by hand as `-> ?*Error`, apart
+  function of `src/std/` or `tests/` written by hand as `-> ?*Error`, apart
   from the tests of that form. A function fails by its `may fail`
   marking alone, and one that returns an error without it is ordinary.
   `fn(A) -> R may fail` is a type, and a call through it takes a handler.
@@ -422,10 +449,10 @@ reports what it finished.
   <header>` write a binding module, a shim for the inline functions and, with
   `--probe`, the ABI probe in C and in Anti. `--clang` runs clang with
   `-Xclang -ast-dump=json` and reads the JSON with the scanner of
-  `rt/json.c`. `anti bind --header <name>.antl` writes the header of `--lib`.
+  `src/rt/json.c`. `anti bind --header <name>.antl` writes the header of `--lib`.
   `link framework "Name";` is built, and `anti` passes the names to antic.
   See "The bind command" in `docs/decisions.md` and `docs/notes/bind.md`.
-  `anti fmt` writes the canonical form of the formatter rules, and `std/` and
+  `anti fmt` writes the canonical form of the formatter rules, and `src/std/` and
   `tests/` stand in it.
 - `anti build` is built. It reads `anti.toml`, resolves the dependencies into
   `anti.lock`, fetches every library file from a `file://` or `https://`
@@ -469,6 +496,6 @@ reports what it finished.
   target and level in `lib/<target>/<level>/`, so a program below the default
   links a runtime of its own level, and its atomics are one instruction at
   `armv8.2` and above. Every program checks the processor at start, against the
-  level of the runtime it linked, and refuses a machine below it. `src/cpu.c`
+  level of the runtime it linked, and refuses a machine below it. `src/antic/cpu.c`
   holds the table, `tools/cpu-levels` holds it for the build and
   `cpu_levels_pin` compares the two.

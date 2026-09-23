@@ -8,7 +8,7 @@
 # linux-x86_64, linux-arm64: musl from the Alpine package of
 #   tools/sysroot-pins, checked against its digest, and the compiler-rt
 #   builtins of the pinned clang in CLANG_DIR, which defaults to
-#   build/clang of the repository.
+#   build/deps/clang of the repository.
 # linux-x86_64-glibc, linux-arm64-glibc: glibc 2.35 and the kernel headers
 #   of Ubuntu 22.04 from the packages of tools/sysroot-pins, for the Linux
 #   link mode against glibc.
@@ -36,7 +36,8 @@ get_filename_component(LLVM_BIN "${LLVM_BIN}" ABSOLUTE)
 
 set(tools_dir "${CMAKE_CURRENT_LIST_DIR}")
 if(NOT DEFINED CLANG_DIR)
-    get_filename_component(CLANG_DIR "${tools_dir}/../build/clang" ABSOLUTE)
+    include("${tools_dir}/deps-dir.cmake")
+    set(CLANG_DIR "${ANTIC_DEPS_DIR}/clang")
 endif()
 file(STRINGS "${tools_dir}/sysroot-pins" pins REGEX "^[A-Z]")
 file(STRINGS "${tools_dir}/zig-stubs-pin" zig_pins REGEX "^[A-Z]")

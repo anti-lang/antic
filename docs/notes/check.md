@@ -2,7 +2,7 @@
 
 The choices inside `anti check` and its classes. The rules are in "Check
 command" of `docs/tooling-addendum.md`, and the settled points are in
-`docs/decisions.md` under "The check command". `tools/anti/check.c` holds
+`docs/decisions.md` under "The check command". `src/anti/check.c` holds
 the classes, and the formatting class calls `anti fmt`, whose choices are
 in `docs/notes/fmt.md`.
 
@@ -26,7 +26,7 @@ wins over one of the runtime archive.
 ## The front end
 
 `antic --front-end` stops after semantic analysis. `links` of
-`src/driver.c` answers false under it, so no link is demanded. A module
+`src/antic/driver.c` answers false under it, so no link is demanded. A module
 that imports nothing of the standard library then needs no runtime
 archive.
 
@@ -37,7 +37,7 @@ there when the module is checked. A cycle among the imports keeps the order
 the files came in, and the compiler reports the cycle.
 
 `--doc-warnings` rides on the same call, so the doc warnings cost no second
-pass over the sources. `report_diagnostics` of `src/driver.c` counts the
+pass over the sources. `report_diagnostics` of `src/antic/driver.c` counts the
 errors, the warnings of the checker and the doc warnings into the struct
 the caller gives. The check reports one count per class.
 
@@ -73,7 +73,7 @@ of the doc comment it came from. A reader then finds both ends.
 
 ## The doc warnings
 
-`sema_doc_warnings` of `src/sema.c` holds them, and `diagnostics_doc`
+`sema_doc_warnings` of `src/antic/sema.c` holds them, and `diagnostics_doc`
 marks each one, so the check tells them from the warnings of the checker.
 
 A backtick name is one identifier or a path of identifiers, with an
@@ -115,6 +115,6 @@ backtick around a name that no table of a module holds. Those are the name
 of an environment variable, of a key of a configuration file or of a
 function of the C library.
 
-Every source of `std/` and of `tests/` stands in the canonical form since
+Every source of `src/std/` and of `tests/` stands in the canonical form since
 `anti fmt` was run over them, so the class reports nothing there. The test
 `fmt_canonical` keeps it that way.

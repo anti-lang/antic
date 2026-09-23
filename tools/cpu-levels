@@ -1,5 +1,5 @@
 # The processor levels and the default level of each target, for the
-# build. src/cpu.c holds the same table for antic, and the test
+# build. src/antic/cpu.c holds the same table for antic, and the test
 # cpu_levels_pin compares `antic --print-cpu-levels` with this file.
 #
 # level <name> <architecture> <id> <clang -march= value> <llvm-mc -mattr= value>

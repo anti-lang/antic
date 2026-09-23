@@ -18,7 +18,7 @@
 # restarted. The preflight runs every time.
 #
 # Two steps hold a secret and stay manual. The private key that signs
-# SHA256SUMS stands at keys/private/release-key.pem, which .gitignore
+# SHA256SUMS stands at tools/keys/private/release-key.pem, which .gitignore
 # excludes and which git therefore never sees. gh holds the login that
 # the preflight reads. Without the key the run prints the two signing
 # commands and stops before the tag.
@@ -39,10 +39,10 @@ hosts='macos-arm64 macos-x86_64 linux-x86_64 linux-arm64 windows-x86_64 windows-
 cpu_levels=$root/tools/cpu-levels
 # DESIGN: the signing key has one path, which the tooling knows. A
 # release needs no environment variable for it, so no run of ./r depends
-# on a shell that was set up right. .gitignore excludes keys/private, and
+# on a shell that was set up right. .gitignore excludes tools/keys/private, and
 # check_key proves before every signature that git sees neither the file
 # nor its directory.
-key_path=keys/private/release-key.pem
+key_path=tools/keys/private/release-key.pem
 release_key=$root/$key_path
 site_row() {
     sed -n "s/^$1=//p" "$root/tools/site-base" | tr -d ' \r\n'
@@ -75,6 +75,9 @@ done
 # leaves behind stands in for the output of a step of a release. The two
 # runs share nothing but the tree they read.
 dist=$root/build/dist
+# The CMake tree of the host preset, whose cache names the downloads, and
+# the one name of that tree in an export of the commit.
+host_tree=build/host
 [ "$dry_run" = no ] || dist=$root/build/dist/dry-run
 state=$dist/state
 logs=$dist/logs
@@ -125,9 +128,9 @@ changelog_entry() {
         inside { print }' "$root/CHANGELOG.md"
 }
 
-# Print the value of a cache entry of the default build.
+# Print the value of a cache entry of the host build.
 cached() {
-    sed -n "s/^$1:[A-Z]*=//p" "$root/build/CMakeCache.txt"
+    sed -n "s/^$1:[A-Z]*=//p" "$root/$host_tree/CMakeCache.txt"
 }
 
 # Print the digest of a file, in the form SHA256SUMS holds.
@@ -264,14 +267,14 @@ preflight() {
         done
     fi
 
-    [ -f "$root/build/CMakeCache.txt" ] || {
-        say "build/ holds no cache, so the downloads run first"
-        cmake -S "$root" -B "$root/build" > "$dist/configure.log" 2>&1 ||
+    [ -f "$root/$host_tree/CMakeCache.txt" ] || {
+        say "$host_tree/ holds no cache, so the downloads run first"
+        cmake -S "$root" -B "$root/$host_tree" > "$dist/configure.log" 2>&1 ||
             die "the download step failed, and $dist/configure.log holds its output"
     }
     for name in ANTIC_CLANG_DIR ANTIC_LLVM_DIR ANTIC_SYSROOT_DIR ANTIC_RAYLIB_DIR; do
         value=$(cached "$name")
-        [ -n "$value" ] || die "build/CMakeCache.txt names no $name"
+        [ -n "$value" ] || die "$host_tree/CMakeCache.txt names no $name"
     done
     # DESIGN: a release is of one commit. The state names the commit its
     # steps ran on. A run on another one starts over, rather than
@@ -288,7 +291,7 @@ preflight() {
     sysroot_dir=$(cached ANTIC_SYSROOT_DIR)
     raylib_dir=$(cached ANTIC_RAYLIB_DIR)
     llvm_bin=$llvm_dir/bin
-    say "the downloads of build/ are in place"
+    say "the downloads of $host_tree/ are in place"
 }
 
 # Step 2. The suite of this machine, in an export of the commit, and
@@ -305,12 +308,12 @@ suite() {
     paths="-DANTIC_CLANG_DIR=$clang_dir -DANTIC_LLVM_DIR=$llvm_dir"
     paths="$paths -DANTIC_SYSROOT_DIR=$sysroot_dir -DANTIC_RAYLIB_DIR=$raylib_dir"
     # shellcheck disable=SC2086
-    cmake -S "$export_tree" -B "$export_tree/build" $paths \
+    cmake -S "$export_tree" -B "$export_tree/$host_tree" $paths \
         > "$logs/mac-configure.log" 2>&1 ||
         die "step 2: the configure failed, see $logs/mac-configure.log"
-    cmake --build "$export_tree/build" -j 8 > "$logs/mac-build.log" 2>&1 ||
+    cmake --build "$export_tree/$host_tree" -j 8 > "$logs/mac-build.log" 2>&1 ||
         die "step 2: the build failed, see $logs/mac-build.log"
-    ctest --test-dir "$export_tree/build" -j 8 > "$logs/mac.log" 2>&1 ||
+    ctest --test-dir "$export_tree/$host_tree" -j 8 > "$logs/mac.log" 2>&1 ||
         die "step 2: the suite failed, see $logs/mac.log"
     say "the Mac: $(grep 'tests passed' "$logs/mac.log")"
 
@@ -318,10 +321,10 @@ suite() {
         (cd "$export_tree" && cmake --preset "$preset") \
             > "$logs/$preset-configure.log" 2>&1 ||
             die "step 2: the $preset configure failed, see $logs/$preset-configure.log"
-        cmake --build "$export_tree/build-$preset" -j 8 \
+        cmake --build "$export_tree/build/$preset" -j 8 \
             > "$logs/$preset-build.log" 2>&1 ||
             die "step 2: the $preset build failed, see $logs/$preset-build.log"
-        ctest --test-dir "$export_tree/build-$preset" -j 8 \
+        ctest --test-dir "$export_tree/build/$preset" -j 8 \
             > "$logs/$preset.log" 2>&1 ||
             die "step 2: the $preset suite failed, see $logs/$preset.log"
         say "$preset: $(grep 'tests passed' "$logs/$preset.log")"
@@ -356,7 +359,7 @@ build_packages() {
     rm -rf "$symbols"
     cmake -DDEST="$packages" -DCLANG="$clang_dir/bin/clang" \
         -DLLVM_BIN="$llvm_bin" -DSYSROOT="$sysroot_dir" \
-        -DRUNTIME="$export_tree/build/runtime" -DHOSTS="$list" \
+        -DRUNTIME="$export_tree/$host_tree/runtime" -DHOSTS="$list" \
         -DSYMBOLS="$symbols" \
         -P "$root/tools/pack-anti.cmake" > "$logs/pack.log" 2>&1 ||
         die "step 3: the packer failed, see $logs/pack.log"
@@ -497,9 +500,9 @@ tar -xmf "\$HOME/anti-release/tree.tar"
 A=\${XDG_DATA_HOME:-\$HOME/.local/share}/anti-vm
 opts="-DANTIC_CLANG_DIR=\$A/clang -DANTIC_LLVM_DIR=\$A/toolchain"
 opts="\$opts -DANTIC_SYSROOT_DIR=\$A/sysroot -DANTIC_RAYLIB_DIR=\$A/raylib/raylib-6.0"
-cmake -S . -B build \$opts > release-configure.log 2>&1
-cmake --build build -j"\$(nproc)" > release-build.log 2>&1
-ctest --test-dir build -j"\$(nproc)" > release-ctest.log 2>&1
+cmake -S . -B $host_tree \$opts > release-configure.log 2>&1
+cmake --build $host_tree -j"\$(nproc)" > release-build.log 2>&1
+ctest --test-dir $host_tree -j"\$(nproc)" > release-ctest.log 2>&1
 grep 'tests passed' release-ctest.log
 
 # DESIGN: the install the VM checks is the one a user gets, in the
@@ -564,11 +567,11 @@ set VC=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxilia
 cd /d %USERPROFILE%\antic-check
 tar -xmf %USERPROFILE%\anti-release\tree.tar
 call "%VC%" arm64 > nul
-if exist build (cmake -S . -B build > release-configure.log 2>&1) else (cmake -S . -B build -G Ninja > release-configure.log 2>&1)
+if exist build\host (cmake -S . -B build\host > release-configure.log 2>&1) else (cmake -S . -B build\host -G Ninja > release-configure.log 2>&1)
 if errorlevel 1 (echo the configure failed & exit /b 1)
-cmake --build build > release-build.log 2>&1
+cmake --build build\host > release-build.log 2>&1
 if errorlevel 1 (echo the build failed & exit /b 1)
-ctest --test-dir build -j4 > release-ctest.log 2>&1
+ctest --test-dir build\host -j4 > release-ctest.log 2>&1
 if errorlevel 1 (echo the suite failed & findstr /R /C:"^	 *[0-9]* - " release-ctest.log & exit /b 1)
 findstr /C:"tests passed" release-ctest.log
 set ANTI_VERSION=$version
@@ -740,10 +743,10 @@ digests() {
     # key, is taken when it verifies against the manifest of this run.
     if [ -f "$packages/SHA256SUMS.sig" ]; then
         openssl dgst -sha256 -binary -out "$hashed" "$manifest"
-        if openssl pkeyutl -verify -pubin -inkey "$root/keys/release.pem" \
+        if openssl pkeyutl -verify -pubin -inkey "$root/tools/keys/release.pem" \
             -in "$hashed" -sigfile "$packages/SHA256SUMS.sig" \
             > /dev/null 2>&1; then
-            say "the signature beside the manifest verifies against keys/release.pem"
+            say "the signature beside the manifest verifies against tools/keys/release.pem"
             check_area
             finished 06 digests
             return 0
@@ -770,11 +773,11 @@ digests() {
     openssl pkeyutl -sign -inkey "$release_key" -in "$hashed" \
         -out "$packages/SHA256SUMS.sig" || die "step 6: openssl signed nothing"
     # A signature that fails the check never reaches a release.
-    openssl pkeyutl -verify -pubin -inkey "$root/keys/release.pem" \
+    openssl pkeyutl -verify -pubin -inkey "$root/tools/keys/release.pem" \
         -in "$hashed" -sigfile "$packages/SHA256SUMS.sig" \
         > /dev/null 2>&1 ||
-        die "step 6: the signature does not verify against keys/release.pem"
-    say "the signature verifies against keys/release.pem"
+        die "step 6: the signature does not verify against tools/keys/release.pem"
+    say "the signature verifies against tools/keys/release.pem"
     check_area
     finished 06 digests
 }
@@ -794,7 +797,7 @@ check_area() {
 # The SHA-256 fingerprint of the public release key, which the site
 # publishes beside the digests.
 key_fingerprint() {
-    openssl pkey -pubin -in "$root/keys/release.pem" -outform DER |
+    openssl pkey -pubin -in "$root/tools/keys/release.pem" -outform DER |
         openssl dgst -sha256 | sed 's/^.*= //'
 }
 
@@ -952,7 +955,7 @@ site() {
         say "would rsync tools/install.sh and tools/install.ps1 to ${ANTI_SITE:-\$ANTI_SITE}/"
         say "would rsync the downloads page to ${ANTI_SITE:-\$ANTI_SITE}/downloads/index.html"
         say "would rsync SHA256SUMS.sig to ${ANTI_SITE:-\$ANTI_SITE}/$signature_path"
-        say "would rsync keys/release.pem to ${ANTI_SITE:-\$ANTI_SITE}/$site_key_path"
+        say "would rsync tools/keys/release.pem to ${ANTI_SITE:-\$ANTI_SITE}/$site_key_path"
         say "would read $signature_url and $key_url back"
         say "would send nothing else, and no binary"
         say "the page it would publish stands in $page"
@@ -1001,9 +1004,9 @@ site() {
     rsync --chmod=u=rw,g=r,o= "$signature" "$destination/$signature_path" ||
         die "step 9: SHA256SUMS.sig did not reach $destination"
     say "SHA256SUMS.sig of $version stands in $destination/$signature_path"
-    rsync --chmod=u=rw,g=r,o= "$root/keys/release.pem" \
+    rsync --chmod=u=rw,g=r,o= "$root/tools/keys/release.pem" \
         "$destination/$site_key_path" ||
-        die "step 9: keys/release.pem did not reach $destination"
+        die "step 9: tools/keys/release.pem did not reach $destination"
 
     # The two files a user's installer reads from here, read back over
     # HTTPS. A release proves them rather than trusting that an earlier
@@ -1011,8 +1014,8 @@ site() {
     mkdir -p "$work"
     curl -fsSL "$key_url" > "$work/site-key.pem" ||
         die "step 9: $key_url answered nothing"
-    cmp -s "$work/site-key.pem" "$root/keys/release.pem" ||
-        die "step 9: the key at $key_url is not keys/release.pem"
+    cmp -s "$work/site-key.pem" "$root/tools/keys/release.pem" ||
+        die "step 9: the key at $key_url is not tools/keys/release.pem"
     say "$key_url is the public key of the release"
     curl -fsSL "$signature_url" > "$work/site-signature.sig" ||
         die "step 9: $signature_url answered nothing"

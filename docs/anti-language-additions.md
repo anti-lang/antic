@@ -158,7 +158,7 @@ if f.overflow {
 - The ARM64 baseline is per operating system. `macos-arm64` is `armv8.5`, since every Apple Silicon Mac is an M1 or later. `linux-arm64` is `armv8.0`, for the Pi 4 and older boards. `windows-arm64` is `armv8.2`, since every Windows-on-ARM machine sold is a Snapdragon 8cx or later. `--cpu` overrides on every target. `armv8.2` and above make atomics one instruction and add half-precision arithmetic and the dot products.
 - The runtime archive holds one `anti_rt` per target and level, in `lib/<target>/<level>/`. The runtime is small and it is what every program links, so it comes in every level its target supports. A program built with `--cpu` below its target's default links the runtime of its own level, and `--cpu v1` therefore gives a program that runs on older hardware.
 - The native libraries stay at the default level only, in `lib/<target>/`. A program below the default that imports a bundled library is refused at link: "anti.raylib is built for x86-64-v3, this program targets v1".
-- `rt/start.c` checks the processor once at start, against the level of the runtime that was linked. When the machine has less than the program needs, it exits with a message naming the level. The message reads "this program needs a processor with AVX2 (x86-64-v3, 2013 or later)".
+- `src/rt/start.c` checks the processor once at start, against the level of the runtime that was linked. When the machine has less than the program needs, it exits with a message naming the level. The message reads "this program needs a processor with AVX2 (x86-64-v3, 2013 or later)".
 - A level is a code-generation setting, not a target. The six targets stay six.
 - The vector byte cap of [Simd structs](#simd-structs) is one constant in the level table, 256 bytes to start. It caps the size of a `simd struct`, not the width of a register.
 
@@ -247,7 +247,7 @@ The release binary carries no symbol data. Every deliverable ships a symbols arc
 - `anti.lang` holds every type the compiler knows by name: `Object`, `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `Flags`, `Job`, `Mutex`, `Trace`, `TraceHandler`. `anti.rt` is the C runtime and holds no Anti module a program imports. Everything that only helps lives elsewhere: `anti.error` for error conveniences, `anti.trace` for the stock handlers, `anti.log`, `anti.time` and the rest.
 - The rule for a reader: if the compiler needs it, it is in `anti.lang`. If it only helps, it is not.
 - `anti.lang` is the root of the standard library and imports nothing. Every other module imports it and names `*anti.lang.Error`, so no import cycle forms. `anti.error` imports `anti.lang` and holds `SystemError`, `on_fatal` and `check`.
-- `std/anti/lang.anti` holds `Error`, `NoneDereference`, `SourceLocation`, `StackTrace` and the hook that `fatal` reads. The compiler declares `Object` and `Job` itself, under `anti.lang`. `Flags` and `Mutex` come into the code with their own steps.
+- `src/std/anti/lang.anti` holds `Error`, `NoneDereference`, `SourceLocation`, `StackTrace` and the hook that `fatal` reads. The compiler declares `Object` and `Job` itself, under `anti.lang`. `Flags` and `Mutex` come into the code with their own steps.
 
 ## Hooks and tracing
 

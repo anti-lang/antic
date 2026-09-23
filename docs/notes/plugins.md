@@ -7,24 +7,24 @@ settled points are in `docs/decisions.md` under the same name.
 
 ## The line
 
-`provides Interface as Class;` stands at module level. `src/parser.c`
+`provides Interface as Class;` stands at module level. `src/antic/parser.c`
 reads `provides` as a keyword and the interface as one dotted path. The
 last name is the class and the names before it are its module, written
 as the alias an `import` declared or as the whole module path.
-`interface_named` of `src/sema.c` resolves both spellings, and
+`interface_named` of `src/antic/sema.c` resolves both spellings, and
 `lib.instance(I)` and `lib.supports(I, "f")` read the same form through
 `name_path`.
 
 The checker refuses an interface that is not abstract and a class the
 module does not declare. Refused as well are an abstract class, a
 singleton, a class that neither inherits the interface nor implements
-it, and two lines for one interface. `class_record` of `src/lower.c`
+it, and two lines for one interface. `class_record` of `src/antic/lower.c`
 writes one entry per line into the record of the class, and the library
 file carries them from format version 49, and `compatible` from 50.
 
 ## The table
 
-`write_provides` of `src/whole.c` runs where the build writes a plugin,
+`write_provides` of `src/antic/whole.c` runs where the build writes a plugin,
 which is `--lib shared --no-runtime`. It writes `anti_rt_provides`, an
 entry per `provides` line with the path of the interface, the
 descriptor of the interface and of the class, the function that
@@ -65,7 +65,7 @@ there to resolve as well. A shared library for C keeps the surface that
 ## The two calls
 
 `lib.instance(I)` and `lib.supports(I, "f")` name an interface where a
-value stands. `check_call` of `src/sema.c` sees a receiver of type
+value stands. `check_call` of `src/antic/sema.c` sees a receiver of type
 `*anti.plugin.Library`. It resolves the path of the first argument to an
 abstract class and replaces that argument with an `EXPR_DESCRIPTOR`
 node. It renames the call to `instance_at` or `supports_at`, which are
@@ -77,7 +77,7 @@ source text writes one.
 
 ## The loader
 
-`rt/plugin.c` opens the library, reads `anti_rt_provides` and checks it.
+`src/rt/plugin.c` opens the library, reads `anti_rt_provides` and checks it.
 The runtime version must match the host's exactly. Every interface
 descriptor must lie in the host's image. That proves the library was
 bound against the host rather than carrying an interface of its own.
@@ -90,7 +90,7 @@ function that prepares an object and moves the pointer by the offset of
 the sub-object. A class whose `construct` takes arguments is refused
 there, because the host has none to give.
 
-`rt/loaded.c` holds the slots of the open libraries, the count of them
+`src/rt/loaded.c` holds the slots of the open libraries, the count of them
 and the two hooks that count their objects. It stands apart from the
 loader, because every hook site of every program reaches it. The owner
 of an object is the image the table of its class lies in. `dladdr` and

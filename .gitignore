@@ -1,6 +1,5 @@
-keys/private
-build/
-/build-*/
+tools/keys/private/
+/build/
 .DS_Store
 *.o
 *.obj

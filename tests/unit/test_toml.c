@@ -1,4 +1,4 @@
-/* The TOML subset of rt/toml.c, and the inline tables that `anti.toml`
+/* The TOML subset of src/rt/toml.c, and the inline tables that `anti.toml`
    writes a dependency and a version of an index with. */
 #include <string.h>
 

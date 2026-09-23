@@ -103,7 +103,7 @@ static void probe(void)
     frame.probe = true;
     frame.unwind = true;
     frame.convention = CONVENTION_WINDOWS_X64;
-    /* rbx is register 3 and xmm6 register 22, as in src/x86_64.c. */
+    /* rbx is register 3 and xmm6 register 22, as in src/antic/x86_64.c. */
     frame.saved[0] = 3;
     frame.saved_offset[0] = 8184;
     frame.saved[1] = 22;

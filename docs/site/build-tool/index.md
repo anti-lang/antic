@@ -20,7 +20,7 @@ The command `anti` is the user-facing tool of Anti, and antic stays the bare com
 
 The tool is declarative. It reads the manifest `anti.toml` and runs the steps that the file describes. Scripting, custom build steps and plugins have no place in it, and anything outside the manifest is not a build concern of `anti`.
 
-Every subcommand that reads Anti source links `antic_core`, the static library of the CMake build with every source file of antic except `src/main.c`. The formatter, the documentation generator and the highlighters therefore see the tokens and the syntax tree that antic sees. The licence of `anti` is MIT. This chapter describes what `anti` does and shows none of its code. Where `anti` hands work to the compiler, the chapter shows the antic command line that does it, run with `build/antic` on the development Mac.
+Every subcommand that reads Anti source links `antic_core`, the static library of the CMake build with every source file of antic except `src/antic/main.c`. The formatter, the documentation generator and the highlighters therefore see the tokens and the syntax tree that antic sees. The licence of `anti` is MIT. This chapter describes what `anti` does and shows none of its code. Where `anti` hands work to the compiler, the chapter shows the antic command line that does it, run with `build/antic` on the development Mac.
 
 ## Commands
 
@@ -685,7 +685,7 @@ A program that imports `anti.raylib` and `anti.miniaudio` owes no attribution. A
 
 ### Licence choices
 
-The thread-pool runtime in `rt/` and the standard library in `std/` are 0BSD, each with a `LICENSE` file. The common case of a program therefore embeds one short notice and owes nothing. The compiler antic and the tool `anti` are MIT. The site decides the licence of the book text separately.
+The thread-pool runtime in `src/rt/` and the standard library in `src/std/` are 0BSD, each with a `LICENSE` file. The common case of a program therefore embeds one short notice and owes nothing. The compiler antic and the tool `anti` are MIT. The site decides the licence of the book text separately.
 
 ## Next
 

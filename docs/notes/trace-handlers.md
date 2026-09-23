@@ -1,6 +1,6 @@
 # The stock trace handlers
 
-The choices of `std/anti/trace.anti`, the seven handlers of
+The choices of `src/std/anti/trace.anti`, the seven handlers of
 `anti.lang.TraceHandler` and the `trace` key that names one. The rules
 are in "Hooks and tracing" of `docs/anti-language-additions.md`, the
 decisions under "Hooks and tracing" of `docs/decisions.md` and the sites

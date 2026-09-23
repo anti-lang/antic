@@ -32,7 +32,7 @@ Implement every rule of the specification that the previous work order did not. 
 7. Driver and library file: `internal` and visibility bits in the interface, interfaces and thunks in the IR of a library file. The format version rises.
 8. Header generator: interface layouts and tables, `anti_Circle_as_Serializable`, `anti_Circle_construct`, `anti_Circle_delete` and `anti_Circle_destroy` renamed from the `drop` forms, `/* private */` and `/* own */`, the C++ compile check.
 9. Runtime. `Object.copy` behind `dup`, and `destruct` renamed. `anti.error.Error` with `text()`, `print()`, `fatal()`, `on_fatal` and `from_errno`. `from_win32` where a Windows host exists, and a stub with a `[provisional]` line where it does not. OS signals in `anti.os`: `signal_pending()` and `on_signal(sig, f)` with the self-pipe handler and the waiting thread, and the console control handler on Windows.
-10. `anti.reflect` in `std/`: `describe`, `fields`, `get`, `set`, `functions`, `call`, `new`, and `Value`.
+10. `anti.reflect` in `src/std/`: `describe`, `fields`, `get`, `set`, `functions`, `call`, `new`, and `Value`.
 11. `anti.text` gains `Builder`, since `e.text()` and `serialize` need it.
 
 Every item has the tests the specification implies, and every message is pinned by a test.

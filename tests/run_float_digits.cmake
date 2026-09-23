@@ -1,9 +1,9 @@
 # The runtime writes the text of a float from the digits of its exact
 # value and reads one back with its own reader, never through the C
 # library, whose rounding of a tie depends on its version. In every runtime
-# of the archive the object of rt/text.c, which holds both, and of
-# rt/object.c, which serialize writes with, name no function that prints
-# or reads a number. The object of rt/registry.c, which deserialize reads
+# of the archive the object of src/rt/text.c, which holds both, and of
+# src/rt/object.c, which serialize writes with, name no function that prints
+# or reads a number. The object of src/rt/registry.c, which deserialize reads
 # with, names none that reads a float.
 #
 #   cmake -DRUNTIME=<runtime archive> -DLLVM_AR=<llvm-ar> -DWORK=<dir>
@@ -44,7 +44,7 @@ foreach(archive IN LISTS archives)
             endif()
         endforeach()
         if(member STREQUAL "")
-            message(FATAL_ERROR "${archive} holds no object of rt/${source}.c")
+            message(FATAL_ERROR "${archive} holds no object of src/rt/${source}.c")
         endif()
         execute_process(COMMAND "${LLVM_AR}" x "${archive}" "${member}"
             WORKING_DIRECTORY "${dir}" RESULT_VARIABLE status
@@ -55,7 +55,7 @@ foreach(archive IN LISTS archives)
         endif()
         file(STRINGS "${dir}/${member}" names REGEX "${refused}")
         if(NOT names STREQUAL "")
-            string(APPEND found "${archive} rt/${source}.c: ${names}\n")
+            string(APPEND found "${archive} src/rt/${source}.c: ${names}\n")
         endif()
     endforeach()
     math(EXPR count "${count} + 1")

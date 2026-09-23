@@ -3,12 +3,12 @@
 The choices inside `anti bind`. The rules are in "Binding generator", "C
 types", "Bitfields", "Packed and aligned structs", "Inline function shims"
 and "ABI probe" of `docs/tooling-addendum.md`. The settled points are in
-`docs/decisions.md` under "The bind command". The code is in `tools/anti/`:
+`docs/decisions.md` under "The bind command". The code is in `src/anti/`:
 `bind.c` holds the command, `bindapi.c` reads a description of rlparser,
 `bindclang.c` reads a header through clang, `bindtype.c` parses a C type
 spelling, `bindexpr.c` evaluates a constant and `bindwrite.c` writes the
 module, the shim and the probes. `jsontree.c` builds a tree over the scanner
-of `rt/json.c`.
+of `src/rt/json.c`.
 
 ## One model, two readers
 

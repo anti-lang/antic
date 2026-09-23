@@ -7,7 +7,7 @@ generator" in `docs/tooling.md` with "Doc comment forms" and "Doc markup" in
 
 ## One structure, two inputs
 
-`driver_interface` of `src/driver.c` reads a source file or a library file and
+`driver_interface` of `src/antic/driver.c` reads a source file or a library file and
 gives back one `struct interface`. A source is lexed, parsed and checked, and
 `sema_interface` builds the interface of the check. A library file is loaded
 with its imports and the interface it carries is taken. The renderer sees the
@@ -63,5 +63,5 @@ renderer.
 A module of a project that imports another needs that module's interface file.
 The command writes one per source into the work directory, in the order the
 imports ask for. That directory is a search root of the run. The list of
-modules and the order are in `tools/anti/units.c`, which `anti check` reads for
+modules and the order are in `src/anti/units.c`, which `anti check` reads for
 the same reason.

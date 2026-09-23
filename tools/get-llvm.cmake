@@ -10,13 +10,13 @@
 # builds them from the LLVM source of tools/llvm-version.
 # tools/fetch-release.cmake downloads the archive of this host and checks
 # it against the pin, SHA256SUMS and its signature. DEST defaults to
-# build/llvm of the repository, and the configure step of CMakeLists.txt
+# build/deps/llvm of the repository, and the configure step of CMakeLists.txt
 # runs this script. ARCHIVE names an archive already downloaded.
 cmake_minimum_required(VERSION 3.21)
 
-get_filename_component(root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+include("${CMAKE_CURRENT_LIST_DIR}/deps-dir.cmake")
 if(NOT DEFINED DEST)
-    set(DEST "${root}/build/llvm")
+    set(DEST "${ANTIC_DEPS_DIR}/llvm")
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/fetch-release.cmake")
 fetch_release("${CMAKE_CURRENT_LIST_DIR}/llvm-pin" "${DEST}")

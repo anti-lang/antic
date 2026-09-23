@@ -1,5 +1,5 @@
-//! A program whose functions the probe of rt/symbols.c looks up in the binaries
-//! of other targets.
+//! A program whose functions the probe of src/rt/symbols.c looks up in the
+//! binaries of other targets.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

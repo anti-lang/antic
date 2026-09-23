@@ -12,7 +12,7 @@ toolchain work that came up after the freeze. It waits until a need makes it a r
   one. Windows PowerShell 5.1 can read a P-256 signature on its own, through `ECDsaCng`
   and a key blob built by hand from the PEM. Only a Windows host can test it.
 - The newest SDK of the Command Line Tools that antic takes, `APPLE_SDK_NEWEST_MAJOR` in
-  `src/applesdk.h`, follows the ld64.lld of the pin. A new LLVM pin checks whether it reads
+  `src/antic/applesdk.h`, follows the ld64.lld of the pin. A new LLVM pin checks whether it reads
   the stubs of SDK 27 and later.
 - The pinned Apple SDK of a release, `MACOS_SDK_VERSION` in `tools/macos-sdk-pin`, is 26.5
   and is bounded by the same linker. macOS SDK 27.0 names the target `arm64e.x1-macos` in

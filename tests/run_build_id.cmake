@@ -11,7 +11,7 @@
 # links of SOURCE give one id, since the digest is of the code, and OTHER
 # gives another. A -g link of SOURCE gives that same id, because the
 # digest leaves the debug directives and the debug sections out. The
-# search takes that whole form, because rt/license.c holds the constant
+# search takes that whole form, because src/rt/license.c holds the constant
 # "build " that it reads the notice with, and its object reaches every
 # program through --anti.inspect.
 

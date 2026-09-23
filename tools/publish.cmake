@@ -6,7 +6,7 @@
 # and the signature SHA256SUMS.sig. REMOTE is the directory of that
 # version on the server, which scp and ssh understand. Set CHECK_ONLY to
 # run the checks and upload nothing. KEY names the public key that the
-# signature is read against, keys/release.pem of this repository by
+# signature is read against, tools/keys/release.pem of this repository by
 # default.
 #
 # DESIGN: the download area holds the files that its manifest names and
@@ -21,7 +21,7 @@ if(NOT DEFINED DIR)
                         "-P tools/publish.cmake")
 endif()
 if(NOT DEFINED KEY)
-    set(KEY "${CMAKE_CURRENT_LIST_DIR}/../keys/release.pem")
+    set(KEY "${CMAKE_CURRENT_LIST_DIR}/keys/release.pem")
 endif()
 
 set(manifest "${DIR}/SHA256SUMS")

@@ -6,10 +6,10 @@ The rules the C code of this repository follows, and the standard the code audit
 
 The bar differs by where the code runs.
 
-- `rt/` runs inside every program a user builds. It is held to every rule without exception.
-- `src/` and `tools/anti/` run on the developer's machine and read files the developer did not write. They follow every rule. A threshold in [Structure](#structure) is reported, not enforced.
+- `src/rt/` runs inside every program a user builds. It is held to every rule without exception.
+- `src/antic/` and `src/anti/` run on the developer's machine and read files the developer did not write. They follow every rule. A threshold in [Structure](#structure) is reported, not enforced.
 - `tests/` must be correct and must not hide a failure. The structure and naming rules do not apply.
-- `std/` is Anti code and is audited against the language's own rules, not these.
+- `src/std/` is Anti code and is audited against the language's own rules, not these.
 
 ## Severity
 
@@ -36,7 +36,7 @@ The bar differs by where the code runs.
 ### Strings and copies
 
 9. No function that finds a length by scanning for a NUL writes into a buffer. `strcpy`, `strcat`, `sprintf`, `vsprintf`, `gets` and `strncpy` are banned, as is `scanf` with a bare `%s`. A copy is `memcpy` with a length the code knows, followed by an explicit NUL where one is needed. Text is formatted with `snprintf`, and its result is checked for truncation.
-10. Text inside the code carries its length, as a `str` of Anti does. A NUL-terminated string stands only at the boundary with C, where a C function expects one. A test fails the suite when a banned function appears in `rt/`, `src/` or `tools/anti/`.
+10. Text inside the code carries its length, as a `str` of Anti does. A NUL-terminated string stands only at the boundary with C, where a C function expects one. A test fails the suite when a banned function appears in `src/rt/`, `src/antic/` or `src/anti/`.
 
 ### Ownership and errors
 
@@ -60,8 +60,8 @@ The bar differs by where the code runs.
 19. A source file longer than 3000 lines is reported, with where it could split along the parts of its work. The same judgement applies as for a function.
 20. A function used in one file only is `static`.
 21. A header includes what it uses and nothing more, has an include guard, and no two headers include each other.
-22. `rt/` includes no header of `src/` or `tools/`. A platform `#if` stands only in the files of the platform layer.
-23. Mutable global state exists only where a comment says why, and code of `rt/` that threads can reach guards it.
+22. `src/rt/` includes no header of `src/antic/`, `src/anti/` or `tools/`. A platform `#if` stands only in the files of the platform layer.
+23. Mutable global state exists only where a comment says why, and code of `src/rt/` that threads can reach guards it.
 
 ### Consistency
 

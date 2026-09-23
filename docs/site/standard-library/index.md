@@ -9,14 +9,14 @@ weight: 260
 
 ## First modules
 
-The directory `std/` holds the modules of the standard library under the reserved root `anti`, under the 0BSD licence of `std/LICENSE`. The build writes each module as a library file into `std/` of the runtime archive, as the package `anti` with the version of antic. Every module of a package lies under the package root, and `anti.io`, `anti.text` and `anti.license` lie under `anti`. The notice of a program that imports one of them therefore names the package `anti`, which the test `program_licenses_std` checks. A program imports them without `-I`, because antic searches `std/` of the runtime archive after the roots of the command line.
+The directory `src/std/` holds the modules of the standard library under the reserved root `anti`, under the 0BSD licence of `src/std/LICENSE`. The build writes each module as a library file into `std/` of the runtime archive, as the package `anti` with the version of antic. Every module of a package lies under the package root, and `anti.io`, `anti.text` and `anti.license` lie under `anti`. The notice of a program that imports one of them therefore names the package `anti`, which the test `program_licenses_std` checks. A program imports them without `-I`, because antic searches `std/` of the runtime archive after the roots of the command line.
 
 | Module | Functions | C side |
 |---|---|---|
-| `anti.io` | `print`, `println`, `eprint`, `eprintln`, `exit` | `rt/io.c` |
-| `anti.text` | `equal`, `from_c`, `byte_count`, `char_count`, `slice`, `find_byte`, `parse_int`, `Align`, `Builder` | `rt/text.c` |
-| `anti.license` | `text` | `rt/license.c` |
-| `anti.fs` | `open`, `read`, `write`, `size`, `close`, `list`, `remove`, `rename`, `File`, `Mode` | `rt/fs.c` |
+| `anti.io` | `print`, `println`, `eprint`, `eprintln`, `exit` | `src/rt/io.c` |
+| `anti.text` | `equal`, `from_c`, `byte_count`, `char_count`, `slice`, `find_byte`, `parse_int`, `Align`, `Builder` | `src/rt/text.c` |
+| `anti.license` | `text` | `src/rt/license.c` |
+| `anti.fs` | `open`, `read`, `write`, `size`, `close`, `list`, `remove`, `rename`, `File`, `Mode` | `src/rt/fs.c` |
 
 The module `anti.io` writes through the C streams `stdout` and `stderr`, so its output and the output of `printf` in one program keep their order. The function `text.from_c` returns a `str` that points into the C string, because Anti builds no `str` from a pointer and a length. The function `license.text` returns the lines of the notice `anti_licenses` between its markers, without the build id. In a static library for C with a bundled runtime it returns an empty text, because an archive carries no notice, as chapter 25 describes. An `f"..."` calls the `append` functions of `text.Builder` and its `take`, whose text the program frees with `free(s.ptr)`. A text that should live in an `anti.mem.Allocator` is built with a `text.Builder` and taken with `take_in(from)`, whose text comes from `from` and goes back through it. `anti.text` imports `anti.mem` for that parameter. Every function of `anti.fs` may fail with the `SystemError` of the system, and `list` gives the names of a directory in one block that the program frees with `free(names.ptr)`. Every failing function of the standard library is written with `may fail`, which the test `std_may_fail_only` checks. Beyond `anti.text` and `anti.fs` these are `toml.Document.read`, `log.FileSink.new`, `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote`. Each module has `//!` documentation and a `///` comment on every `pub` item, and the tests `std_io`, `std_text`, `std_license` and `std_fs` run one program for each.
 

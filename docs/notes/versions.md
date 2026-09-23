@@ -8,7 +8,7 @@ the rest of the loader.
 
 ## What a descriptor carries
 
-`descriptor_agg` of `src/lower.c` gives every class descriptor three
+`descriptor_agg` of `src/antic/lower.c` gives every class descriptor three
 fields after the function list. They are the bytes of the version of the
 package that declared the class, its length, and a record. The record
 belongs to an abstract class and is NULL for every other. The record is `anti.rt.Versions`, with the
@@ -21,7 +21,7 @@ global has a name rather than a number, so adding it moves no literal.
 
 A struct descriptor carries the version as well and points at no record.
 The root `anti.lang.Object` is the runtime's own literal in
-`rt/object.c`, with no version and no record.
+`src/rt/object.c`, with no version and no record.
 
 ## The chain
 
@@ -38,7 +38,7 @@ hash per prefix and holds the empty prefix first. It is an array of
 
 ## `compatible`
 
-`compatible_line` of `src/parser.c` reads the contextual word where a
+`compatible_line` of `src/antic/parser.c` reads the contextual word where a
 field of a class body stands. The version is the source span of the
 number the lexer read, with any further `.<integer>` parts after it,
 because `1.1.0` is no number of Anti. The checker refuses the line on a
@@ -48,7 +48,7 @@ descriptor.
 
 ## What a plugin records
 
-`write_provides` of `src/whole.c` reads the descriptor of each provided
+`write_provides` of `src/antic/whole.c` reads the descriptor of each provided
 interface out of the IR, which a library file brought. It copies four
 things into the library's own image: the chain, the field count, the
 size and the version of the interface's package. A reference to the
@@ -68,7 +68,7 @@ configuration file calls the loader, so every link holds it.
 
 ## The checks
 
-`checked` of `rt/plugin.c` runs per provided interface, after the runtime
+`checked` of `src/rt/plugin.c` runs per provided interface, after the runtime
 version and the image of the interface. It compares the two chains at the
 length of the shorter. It refuses a version below the floor, and a field
 count or a size that differs. It then walks the bitmap for a slot

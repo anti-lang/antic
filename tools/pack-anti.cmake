@@ -121,19 +121,19 @@ endfunction()
 # Compile and link antic or anti for one host. Each family of targets reads
 # its headers from a different place: the macOS stubs of SYSROOT, the musl
 # sysroot, or the Microsoft headers that xwin wrote. anti takes the sources
-# of antic but its main.c, and those of tools/anti.
+# of antic but its main.c, and those of src/anti.
 function(build_program host output program)
     triple_of("${host}" triple)
-    file(GLOB sources "${root}/src/*.c")
+    file(GLOB sources "${root}/src/antic/*.c")
     if(program STREQUAL "anti")
-        list(REMOVE_ITEM sources "${root}/src/main.c")
-        file(GLOB anti_sources "${root}/tools/anti/*.c")
+        list(REMOVE_ITEM sources "${root}/src/antic/main.c")
+        file(GLOB anti_sources "${root}/src/anti/*.c")
         list(APPEND sources ${anti_sources})
     endif()
     set(common --target=${triple} -std=c11 -O2 -Wall -Wextra -Wpedantic
                -Werror "-ffile-prefix-map=${root}=."
-               "-DANTIC_VERSION=\"${version}\"" -I "${root}/src"
-               -I "${root}/tools/anti")
+               "-DANTIC_VERSION=\"${version}\"" -I "${root}/src/antic"
+               -I "${root}/src/anti")
     set(link "")
     if(host MATCHES "^macos-")
         list(APPEND common -isysroot "${macos_sdk}")

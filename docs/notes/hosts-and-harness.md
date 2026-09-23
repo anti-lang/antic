@@ -47,7 +47,7 @@ them.
 neither from the other. No host here debugs a Windows program.
 
 A sanitizer preset names no path of one machine. It takes the sysroot and the raylib
-source of the default build, from the cache of `build/`, when its own default is not on
+source of the host build, from the cache of `build/host/`, when its own default is not on
 disk. That is the `antic_shared_path` macro of `CMakeLists.txt`. The presets held the
 Mac's `build/sysroot` before, and `cmake --preset asan` on the Linux VM, whose downloads
 live in `~/.local/share/anti-vm`, then built a runtime with no sysroot and failed to link
@@ -73,7 +73,7 @@ when started by hand.
 - `tools/docs-style/check_docs.py` reads `CMakeLists.txt` as Markdown. Every comment is a
   heading to it, and code joins its sentences. Compare its count with that of HEAD.
 - To test a staged tree before a commit, run `git checkout-index -a --prefix=<dir>/` and
-  configure `<dir>` with the `ANTIC_*_DIR` values of `build/CMakeCache.txt`. A full run
+  configure `<dir>` with the `ANTIC_*_DIR` values of `build/host/CMakeCache.txt`. A full run
   takes a minute on the Mac.
 - The MSVC branch of `tests/binary_stdio.h` has never compiled. No host here builds with
   `cl`.
@@ -88,7 +88,7 @@ when started by hand.
 
 ## Test hooks
 
-- `ANTI_DEV_CPU` compiles the processor simulation into `rt/cpu.c`. With it,
+- `ANTI_DEV_CPU` compiles the processor simulation into `src/rt/cpu.c`. With it,
   `anti_cpu_level` reads the level from the environment variable `ANTI_CPU_LEVEL`
   instead of the processor, so a test on this machine sees the refusal a lower machine
   gets. The unit tests are the only build that defines it. The runtime of the archive

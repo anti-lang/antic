@@ -31,7 +31,7 @@ cmake -DDEST=$HOME/.local/share/anti-vm/raylib -P /tmp/antic/tools/get-raylib.cm
 
 The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/antic/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. `-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK that xwin downloads.
 
-A program that names a framework also needs the stubs of Apple's SDK. On the Mac, `build/anti sdk export` writes `apple-sdk-<version>.tar.xz`. Copy it to the VM and install it with `anti sdk import <bundle> --sysroot $HOME/.local/share/anti-vm/sysroot`. A copy of the SDK itself works too, as `-DAPPLE_SDK=<MacOSX.sdk>` of `get-sysroot.cmake`.
+A program that names a framework also needs the stubs of Apple's SDK. On the Mac, `build/host/anti sdk export` writes `apple-sdk-<version>.tar.xz`. Copy it to the VM and install it with `anti sdk import <bundle> --sysroot $HOME/.local/share/anti-vm/sysroot`. A copy of the SDK itself works too, as `-DAPPLE_SDK=<MacOSX.sdk>` of `get-sysroot.cmake`.
 
 ### SSH from the Mac
 
@@ -49,25 +49,25 @@ Run this command in the repository on the Mac. It exports `HEAD`, builds it and 
 
 ```sh
 git archive HEAD | ssh anti-linux 'rm -rf antic-check && mkdir antic-check && tar -x -f - -C antic-check && cd antic-check &&
-  cmake -S . -B build -DANTIC_CLANG_DIR="$HOME/.local/share/anti-vm/clang" \
+  cmake -S . -B build/host -DANTIC_CLANG_DIR="$HOME/.local/share/anti-vm/clang" \
     -DANTIC_LLVM_DIR="$HOME/.local/share/anti-vm/toolchain" \
     -DANTIC_SYSROOT_DIR="$HOME/.local/share/anti-vm/sysroot" \
     -DANTIC_RAYLIB_DIR="$HOME/.local/share/anti-vm/raylib/raylib-6.0" &&
-  cmake --build build -j"$(nproc)" &&
-  ctest --test-dir build -j"$(nproc)" --output-on-failure'
+  cmake --build build/host -j"$(nproc)" &&
+  ctest --test-dir build/host -j"$(nproc)" --output-on-failure'
 ```
 
 ### Sanitizer suites
 
-The two presets build beside `build` in the same tree, after the test run. They take the
+The two presets build beside `build/host` in `build/`, after the test run. They take the
 same four directories.
 
 ```sh
 ssh anti-linux 'cd antic-check && V="$HOME/.local/share/anti-vm" && for p in asan ubsan; do
   cmake --preset $p -DANTIC_CLANG_DIR="$V/clang" -DANTIC_LLVM_DIR="$V/toolchain" \
     -DANTIC_SYSROOT_DIR="$V/sysroot" -DANTIC_RAYLIB_DIR="$V/raylib/raylib-6.0" &&
-  cmake --build build-$p -j"$(nproc)" &&
-  ctest --test-dir build-$p -j"$(nproc)" --output-on-failure; done'
+  cmake --build build/$p -j"$(nproc)" &&
+  ctest --test-dir build/$p -j"$(nproc)" --output-on-failure; done'
 ```
 
 ### Coverage
@@ -134,9 +134,9 @@ Create `%USERPROFILE%\test.cmd` with these lines. `vcvarsall.bat arm64` sets the
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" arm64
 cd /d %USERPROFILE%\antic-check
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=%LOCALAPPDATA%/anti-vm/clang -DANTIC_LLVM_DIR=%LOCALAPPDATA%/anti-vm/toolchain -DANTIC_SYSROOT_DIR=%LOCALAPPDATA%/anti-vm/sysroot -DANTIC_RAYLIB_DIR=%LOCALAPPDATA%/anti-vm/raylib/raylib-6.0
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake -S . -B build\host -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=%LOCALAPPDATA%/anti-vm/clang -DANTIC_LLVM_DIR=%LOCALAPPDATA%/anti-vm/toolchain -DANTIC_SYSROOT_DIR=%LOCALAPPDATA%/anti-vm/sysroot -DANTIC_RAYLIB_DIR=%LOCALAPPDATA%/anti-vm/raylib/raylib-6.0
+cmake --build build\host
+ctest --test-dir build\host --output-on-failure
 ```
 
 The machine ran the whole suite on 2026-09-19 with the pinned clang and the sysroots of all
@@ -169,7 +169,7 @@ ssh anti-windows %USERPROFILE%\test.cmd
 | Untested item | Tests that run it |
 |---|---|
 | windows-arm64 programs, which the Mac only links | `program_*`, `std_*`, linked with lld-link against `LIB` |
-| The Windows branch of `rt/start.c`, compiled with MSVC | every `program_*` test, through `anti_rt.lib` |
+| The Windows branch of `src/rt/start.c`, compiled with MSVC | every `program_*` test, through `anti_rt.lib` |
 | `c_wchar` at 16 bits and `c_long` at 32 bits against MSVC | `program_abi_wchar`, `program_abi_structs` |
 | Exception unwinding through an Anti frame | The runtime test that closes the unwind data of chapter 16: an exception raised in C unwinds through an Anti frame to a handler in C. `llvm-readobj` proves that the tables parse, not that Windows walks them. The test does not exist yet. |
 | Shared libraries, `.def` files and `.CRT$XCU` constructors | `clib_shared`, `clib_exports`, `clib_loader`, `clib_two`, compiled with the pinned clang against the xwin sysroot |

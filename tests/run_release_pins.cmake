@@ -74,17 +74,17 @@ endforeach()
 
 # tools/get-llvm.cmake and tools/get-clang.cmake install into the
 # directories that tools/pinned-compiler.cmake reads by default, and each
-# spells its directory once.
+# spells its directory once, under ANTIC_DEPS_DIR of tools/deps-dir.cmake.
 foreach(pair "llvm=LLVM" "clang=CLANG")
     string(REPLACE "=" ";" pair "${pair}")
     list(GET pair 0 name)
     list(GET pair 1 upper)
     file(STRINGS "${ROOT}/tools/pinned-compiler.cmake" line
-         REGEX "^set\\(ANTIC_${upper}_DIR \"\\\${antic_root}/[^\"]+\"")
-    string(REGEX REPLACE "^.*antic_root}/([^\"]+)\".*$" "\\1" read "${line}")
+         REGEX "^set\\(ANTIC_${upper}_DIR \"\\\${ANTIC_DEPS_DIR}/[^\"]+\"")
+    string(REGEX REPLACE "^.*ANTIC_DEPS_DIR}/([^\"]+)\".*$" "\\1" read "${line}")
     file(STRINGS "${ROOT}/tools/get-${name}.cmake" line
-         REGEX "^    set\\(DEST \"\\\${root}/[^\"]+\"\\)$")
-    string(REGEX REPLACE "^.*root}/([^\"]+)\".*$" "\\1" written "${line}")
+         REGEX "^    set\\(DEST \"\\\${ANTIC_DEPS_DIR}/[^\"]+\"\\)$")
+    string(REGEX REPLACE "^.*ANTIC_DEPS_DIR}/([^\"]+)\".*$" "\\1" written "${line}")
     if(read STREQUAL "" OR NOT read STREQUAL written)
         message(FATAL_ERROR "tools/pinned-compiler.cmake reads ${name} from "
                             "`${read}`, and tools/get-${name}.cmake installs it "

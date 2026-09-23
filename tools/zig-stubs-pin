@@ -1,6 +1,6 @@
 # The release of Zig whose generated stubs of libSystem link a program for
 # macos-arm64 and macos-x86_64 on every host, and whose headers of the
-# macOS C library rt/ compiles against. The digest is the one that
+# macOS C library src/rt/ compiles against. The digest is the one that
 # ziglang.org publishes for the source archive, and @TAG@ takes the tag.
 # Zig's own files carry its MIT licence. The headers carry Apple's APSL
 # 2.0, whose text comes from a release of the SPDX licence list.

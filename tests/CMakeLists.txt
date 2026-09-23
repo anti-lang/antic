@@ -49,30 +49,30 @@ add_executable(antic_unit_tests
     unit/test_json.c
     unit/test_bind.c
     unit/test_deps.c
-    ../tools/anti/bindexpr.c
-    ../tools/anti/bindtype.c
-    ../tools/anti/deps.c
-    ../tools/anti/files.c
-    ../tools/anti/manifest.c
-    ../tools/anti/repo.c
-    ../rt/cpu.c
-    ../rt/f16.c
-    ../rt/json.c
-    ../rt/symbols.c
-    ../rt/text.c
-    ../rt/toml.c
-    ../rt/utf.c)
+    ../src/anti/bindexpr.c
+    ../src/anti/bindtype.c
+    ../src/anti/deps.c
+    ../src/anti/files.c
+    ../src/anti/manifest.c
+    ../src/anti/repo.c
+    ../src/rt/cpu.c
+    ../src/rt/f16.c
+    ../src/rt/json.c
+    ../src/rt/symbols.c
+    ../src/rt/text.c
+    ../src/rt/toml.c
+    ../src/rt/utf.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core)
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
 # CRT of Windows hold it themselves.
 if(UNIX AND NOT APPLE)
     target_link_libraries(antic_unit_tests PRIVATE m)
 endif()
-target_include_directories(antic_unit_tests PRIVATE ../rt ../tools/anti)
+target_include_directories(antic_unit_tests PRIVATE ../src/rt ../src/anti)
 # ANTI_DEV_CPU lets test_cpu.c stand a level in for the processor, so the
 # refusal of a lower machine is checked on this one. The runtime of the
 # archive is compiled without it. ANTI_CPU_LEVEL_ID is the level of a
-# runtime, which every build of rt/cpu.c names.
+# runtime, which every build of src/rt/cpu.c names.
 antic_cpu_level(unit_level "${ANTIC_HOST_TARGET}")
 target_compile_definitions(antic_unit_tests PRIVATE
     ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}" ANTI_DEV_CPU
@@ -85,7 +85,7 @@ add_test(NAME runtime_licenses
 set_tests_properties(runtime_licenses PROPERTIES
     PASS_REGULAR_EXPRESSION "^BSD Zero Clause License")
 
-# The processor levels. src/cpu.c holds the table for antic and
+# The processor levels. src/antic/cpu.c holds the table for antic and
 # tools/cpu-levels holds it for the build, so the two are compared.
 add_test(NAME cpu_levels_pin
     COMMAND "${CMAKE_COMMAND}"
@@ -264,6 +264,11 @@ add_test(NAME workflows_dispatch_only
         "-DWORKFLOWS=${PROJECT_SOURCE_DIR}/.github/workflows"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_workflows.cmake")
 
+# The layout rule of "Repository layout" in CLAUDE.md, over git ls-files.
+add_test(NAME repo_layout
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_repo_layout.cmake")
+
 # The version stands in tools/version alone, and both programs print
 # that one. Step 10 of the release reads them from a fresh install.
 add_test(NAME antic_version COMMAND antic --version)
@@ -274,7 +279,7 @@ set_tests_properties(anti_version PROPERTIES
     PASS_REGULAR_EXPRESSION "^anti ${PROJECT_VERSION}\n")
 
 # The host target name has two spellings: ANTIC_HOST_TARGET here and the
-# detection in src/target.c. This test fails when they disagree.
+# detection in src/antic/target.c. This test fails when they disagree.
 add_test(NAME antic_host_target COMMAND antic --print-host-target)
 set_tests_properties(antic_host_target PROPERTIES
     PASS_REGULAR_EXPRESSION "^${ANTIC_HOST_TARGET}\n$")
@@ -466,7 +471,7 @@ file(STRINGS "${CMAKE_SOURCE_DIR}/tools/raylib-pin" raylib_version
      REGEX "^RAYLIB_VERSION=")
 string(REGEX REPLACE "^RAYLIB_VERSION=" "" raylib_version "${raylib_version}")
 antic_shared_path(ANTIC_RAYLIB_DIR
-    "${CMAKE_BINARY_DIR}/raylib/raylib-${raylib_version}"
+    "${ANTIC_DEPS_DIR}/raylib/raylib-${raylib_version}"
     "raylib release source from tools/get-raylib.cmake")
 
 # DESIGN: the output of program_abi_wchar follows the width and signedness
@@ -597,7 +602,7 @@ foreach(name IN ITEMS sync_exits sync_workers channels select_two
     set_tests_properties(program_${name} PROPERTIES TIMEOUT 120)
 endforeach()
 
-# The modules of the standard library in std/, which the build writes as
+# The modules of the standard library in src/std/, which the build writes as
 # library files into std/ of the runtime archive. Each test program imports
 # one of them.
 file(GLOB std_sources CONFIGURE_DEPENDS
@@ -622,7 +627,7 @@ foreach(source IN LISTS std_sources)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
 
-# Every failing function of std/ is written with `may fail`, apart from
+# Every failing function of src/std/ is written with `may fail`, apart from
 # a binding, which refuses it.
 add_test(NAME std_may_fail_only
     COMMAND "${CMAKE_COMMAND}"
@@ -892,7 +897,7 @@ add_test(NAME anti_fmt
 add_test(NAME fmt_canonical
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
-        "-DSTD=${CMAKE_SOURCE_DIR}/std"
+        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
         "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_fmt_canonical.cmake")
 
@@ -904,7 +909,7 @@ add_test(NAME anti_check
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DPROJECTS=${CMAKE_CURRENT_SOURCE_DIR}/check"
-        "-DSTD=${CMAKE_SOURCE_DIR}/std"
+        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/check"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_check.cmake")
 
@@ -958,7 +963,7 @@ add_test(NAME std_tests_trace
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DSTD=${CMAKE_SOURCE_DIR}/std"
+        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
         "-DSOURCE=${ANTIC_STD_SOURCE_DIR}/trace.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-tests-trace"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_std_tests.cmake")
@@ -2141,8 +2146,8 @@ set_tests_properties(conf_environment conf_environment_option PROPERTIES
 
 # The readers of the symbol table and the line table, on the binaries
 # that this host links for the other targets.
-add_executable(symbols_probe unit/symbols_probe.c ../rt/symbols.c)
-target_include_directories(symbols_probe PRIVATE ../rt)
+add_executable(symbols_probe unit/symbols_probe.c ../src/rt/symbols.c)
+target_include_directories(symbols_probe PRIVATE ../src/rt)
 foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
     add_test(NAME trace_symbols_${target}
         COMMAND "${CMAKE_COMMAND}"

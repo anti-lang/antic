@@ -1,12 +1,12 @@
 # The symbols command
 
-The choices inside `tools/anti/syms.c`. The rules are in "Symbols
+The choices inside `src/anti/syms.c`. The rules are in "Symbols
 tooling" of `docs/anti-language-additions.md`, and the settled points are
 in `docs/decisions.md` under "The symbols command".
 
 ## Finding the binaries
 
-The runtime configuration is read the way `rt/conf.c` reads it, with
+The runtime configuration is read the way `src/rt/conf.c` reads it, with
 `anti_rt_toml_read`. The includes of a file come before its own keys and
 resolve against the directory of the file that names them. A file that
 sets `plugins` replaces what an include gave, and a line of

@@ -1,13 +1,13 @@
 # The runtime configuration
 
-The choices inside `rt/conf.c`, the pass over the arguments in
-`rt/start.c` and the readers of the keys. The rules are in "Runtime
+The choices inside `src/rt/conf.c`, the pass over the arguments in
+`src/rt/start.c` and the readers of the keys. The rules are in "Runtime
 configuration" of `docs/anti-language-additions.md`, and the settled
 points are in `docs/decisions.md` under the same name.
 
 ## The layers
 
-One table of keys lives in `rt/conf.c`, one entry per key of `[runtime]`:
+One table of keys lives in `src/rt/conf.c`, one entry per key of `[runtime]`:
 `backtrace`, `logger`, `plugins`, `threads` and `trace`. Each entry holds
 the value, the layer that set it and the file of a value of the file
 layer. The layers are `build`, `file` and `command`, in that order, and
@@ -22,7 +22,7 @@ counts the processors, and `anti.log` builds the default logger.
 
 ## The pass over the arguments
 
-`rt/start.c` walks the arguments once. An argument that does not start
+`src/rt/start.c` walks the arguments once. An argument that does not start
 with `--anti.` moves down into the slice that `main` receives, and the
 order of those is the order they came in. Everything else goes to
 `anti_rt_conf_option` with the name after the prefix and the value after
@@ -40,7 +40,7 @@ gave.
 
 ## The file
 
-`anti_rt_toml_read` of `rt/toml.c` reads the file, which is why arrays
+`anti_rt_toml_read` of `src/rt/toml.c` reads the file, which is why arrays
 and quoted keys are in that subset. The reader walks the flat list twice:
 once for `include` and `include.<n>`, which it resolves against the
 directory of the file that names them and reads depth first, and once for
@@ -52,7 +52,7 @@ A cycle is found by the paths on the stack of files being read, compared
 as text. Two spellings of one path escape that comparison, and the depth
 limit of thirty-two catches them with the same message.
 
-The file is opened through `anti_rt_fs_open` of `rt/fs.c`, so the path of
+The file is opened through `anti_rt_fs_open` of `src/rt/fs.c`, so the path of
 Windows goes through UTF-16 as every other path of the runtime does.
 
 ## Who reads a key
@@ -60,12 +60,12 @@ Windows goes through UTF-16 as every other path of the runtime does.
 `backtrace` is the one key the configuration applies itself: it writes
 `anti_rt_option_backtrace`, which `anti_rt_backtrace_on` already read for
 `--anti.backtrace`. `threads` is read by `worker_count` of
-`rt/threads.c`, and `logger` by `from_configuration` of
-`std/anti/log.anti` through `anti_rt_conf_get`. `trace` is read the same
-way by `start` of `std/anti/trace.anti`, which the program calls.
+`src/rt/threads.c`, and `logger` by `from_configuration` of
+`src/std/anti/log.anti` through `anti_rt_conf_get`. `trace` is read the same
+way by `start` of `src/std/anti/trace.anti`, which the program calls.
 Nothing reads `plugins` yet.
 
 The version that `--anti.inspect` prints comes from the notice of the
-program, through `anti_rt_runtime_version` of `rt/license.c`. That object
+program, through `anti_rt_runtime_version` of `src/rt/license.c`. That object
 therefore reaches every program, and the stub of a bundled archive
 answers for it as it answers for the licence text.

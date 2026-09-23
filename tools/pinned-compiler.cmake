@@ -1,5 +1,5 @@
 # Pick the C compiler of a build of antic, and install the LLVM tools that
-# the build and its tests take. CMakeLists.txt and libs/CMakeLists.txt
+# the build and its tests take. CMakeLists.txt and src/native/CMakeLists.txt
 # include this file before their project() command.
 #
 # DESIGN: every build of antic that is not a reader's compiles with the
@@ -12,9 +12,10 @@ option(ANTIC_SYSTEM_COMPILER
        "Build with the C compiler of this machine instead of the pinned clang"
        OFF)
 get_filename_component(antic_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
-set(ANTIC_LLVM_DIR "${antic_root}/build/llvm" CACHE PATH
+include("${antic_root}/tools/deps-dir.cmake")
+set(ANTIC_LLVM_DIR "${ANTIC_DEPS_DIR}/llvm" CACHE PATH
     "LLVM tools from tools/get-llvm.cmake")
-set(ANTIC_CLANG_DIR "${antic_root}/build/clang" CACHE PATH
+set(ANTIC_CLANG_DIR "${ANTIC_DEPS_DIR}/clang" CACHE PATH
     "the pinned clang from tools/get-clang.cmake")
 
 set(antic_fetch llvm)

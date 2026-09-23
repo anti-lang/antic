@@ -44,7 +44,7 @@ Every subcommand that reads Anti source links against the compiler front end. Th
 formatter, the documentation generator and the highlighters see the same tokens and the
 same syntax tree as `antic`.
 
-`anti` lives in `tools/anti/`, links `antic_core` and is MIT. The book describes it and
+`anti` lives in `src/anti/`, links `antic_core` and is MIT. The book describes it and
 shows none of its code.
 
 ## Commands
@@ -388,7 +388,7 @@ Fenced code blocks in doc comments are rendered through `anti html` or `anti tex
 `anti check` compiles the `anti` blocks and reports the doc warnings, see
 `docs/tooling-addendum.md`.
 
-It is built. `tools/anti/doc.c` holds it and `docs/notes/doc.md` its choices.
+It is built. `src/anti/doc.c` holds it and `docs/notes/doc.md` its choices.
 The decisions behind the ones this page leaves open are under "The doc command"
 in `docs/decisions.md`. The test `anti_doc` runs the doc equivalence of the
 table below.
@@ -404,7 +404,7 @@ with `anti fmt` once, after the compiler changes of these designs. The rules are
 `docs/tooling-addendum.md`, and the decisions behind the ones they leave open are under
 "The formatter" in `docs/decisions.md`.
 
-It is built. `tools/anti/fmt.c` holds it and `docs/notes/fmt.md` its choices. `std/` and
+It is built. `src/anti/fmt.c` holds it and `docs/notes/fmt.md` its choices. `src/std/` and
 `tests/` of this repository stand in the canonical form.
 
 ## Highlighters

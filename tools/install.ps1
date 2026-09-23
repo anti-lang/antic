@@ -86,7 +86,7 @@ function Get-AntiText($source) {
 # the package and of the LLVM tools, and neither carries a key of its own.
 # anti-lang.com serves this script, and GitHub serves both downloads. A key
 # that travelled with them could be replaced with them. anti-lang.com serves
-# the same key as keys/release.pem.
+# the same key as tools/keys/release.pem.
 $release_key = @'
 -----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEao0Di9RL8gvG6oA9x7gIDJ7/zLn6
@@ -173,7 +173,7 @@ $host_name = "windows-$arch"
 # of an application that is not roamed. The toolchain and the runtime
 # archive go in %LOCALAPPDATA%\anti, and the two executables under
 # Programs\ of it, which is where a user-local install goes. "Names and
-# publication" in docs/decisions.md holds the rule, src/userdirs.c builds
+# publication" in docs/decisions.md holds the rule, src/antic/userdirs.c builds
 # the same paths for antic, and the test installer_options pins the
 # spellings together.
 #
@@ -385,7 +385,7 @@ try {
 
     # The two executables go in the bin directory of the user, and the
     # rest of the archive stays where it is. antic finds it by the same
-    # rule that src/userdirs.c holds.
+    # rule that src/antic/userdirs.c holds.
     New-Item -ItemType Directory -Force -Path $bin | Out-Null
     foreach ($program in @("antic", "anti")) {
         Copy-Item "$home_dir\bin\$program.exe" "$bin\$program.exe" -Force

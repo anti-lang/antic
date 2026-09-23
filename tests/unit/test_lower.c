@@ -185,7 +185,7 @@ static void checks_kind_of(const char *source, int kind)
 }
 
 /* DESIGN: a failed check names the values it prints by the kind of enum
-   anti_check in rt/std.h, which the runtime reads. Lowering writes that
+   anti_check in src/rt/std.h, which the runtime reads. Lowering writes that
    number into the call, and this test pins the two together. */
 static void records_check_kinds(void)
 {
@@ -358,7 +358,7 @@ static void check_field_records(const struct ir_module *m,
 
 /* DESIGN: the nine hooks of anti.lang.Object take the entries after the
    seven of the root in the table of every class. The order is enum
-   anti_hook in rt/object.h. rt/hooks.c reads an entry there, so this
+   anti_hook in src/rt/object.h. src/rt/hooks.c reads an entry there, so this
    test pins the order and the place of each against the table the
    compiler writes. A class that replaced none holds the runtime's empty
    body at every one. */
@@ -408,7 +408,7 @@ static void records_hook_entries(void)
 }
 
 /* DESIGN: a field record names the type of its field by the type id of
-   rt/object.h and never by a width. The test pins the numbers that the
+   src/rt/object.h and never by a width. The test pins the numbers that the
    compiler writes to the ones the runtime reads. A struct that a field
    names has a descriptor with a field list of its own. */
 static void records_type_ids(void)

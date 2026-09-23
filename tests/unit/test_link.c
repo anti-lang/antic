@@ -207,7 +207,7 @@ static void relative_paths(void)
     }
 }
 
-/* rt/start.c names the runtime entry in the form that mangle writes for
+/* src/rt/start.c names the runtime entry in the form that mangle writes for
    each object format, so that the link finds it. */
 static void runtime_entry(void)
 {
@@ -216,7 +216,7 @@ static void runtime_entry(void)
     };
     struct text start = {0};
     char buffer[4096];
-    FILE *f = fopen(ANTIC_SOURCE_DIR "/rt/start.c", "rb");
+    FILE *f = fopen(ANTIC_SOURCE_DIR "/src/rt/start.c", "rb");
     size_t n;
     size_t i;
 
@@ -244,13 +244,13 @@ static void runtime_entry(void)
     text_free(&start);
 }
 
-/* rt/license.c finds the notice of the program by the markers that the
+/* src/rt/license.c finds the notice of the program by the markers that the
    emitter writes, spelled as C strings. */
 static void runtime_markers(void)
 {
     struct text source = {0};
     char buffer[4096];
-    FILE *f = fopen(ANTIC_SOURCE_DIR "/rt/license.c", "rb");
+    FILE *f = fopen(ANTIC_SOURCE_DIR "/src/rt/license.c", "rb");
     size_t n;
 
     CHECK(f != NULL);
@@ -486,8 +486,8 @@ void test_link(void)
     relative_paths();
     runtime_entry();
     runtime_markers();
-    runtime_licence(ANTIC_SOURCE_DIR "/rt/LICENSE");
-    runtime_licence(ANTIC_SOURCE_DIR "/std/LICENSE");
+    runtime_licence(ANTIC_SOURCE_DIR "/src/rt/LICENSE");
+    runtime_licence(ANTIC_SOURCE_DIR "/src/std/LICENSE");
     links(TARGET_MACOS_ARM64, &unix_inputs,
           "ld -S -arch arm64 -platform_version macos 11.0 15.4 -syslibroot /sdk "
           "-o prog prog.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");

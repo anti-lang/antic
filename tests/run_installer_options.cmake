@@ -33,16 +33,16 @@ endforeach()
 
 # DESIGN: an install of Anti follows the conventions of the platform, and
 # the four roots are spelled in five places: the two installers, the two
-# uninstallers, src/userdirs.c for antic, std/anti/os.anti for a program
+# uninstallers, src/antic/userdirs.c for antic, src/std/anti/os.anti for a program
 # and docs/decisions.md for a reader. A script necessarily repeats what
 # the binary uses, so the seam is pinned here rather than trusted. A
 # spelling that moves in one place fails this test.
 #
-# The four roots stand in src/userdirs.c, which antic reads them from,
+# The four roots stand in src/antic/userdirs.c, which antic reads them from,
 # and in docs/decisions.md, which a reader does.
 foreach(root XDG_BIN_HOME .local/bin XDG_DATA_HOME .local/share
         XDG_CONFIG_HOME .config XDG_CACHE_HOME .cache)
-    foreach(file src/userdirs.c docs/decisions.md)
+    foreach(file src/antic/userdirs.c docs/decisions.md)
         file(READ "${ROOT}/${file}" text)
         string(FIND "${text}" "${root}" found)
         if(found EQUAL -1)
@@ -55,10 +55,10 @@ endforeach()
 # directory is of an install and no program asks for it.
 foreach(root XDG_DATA_HOME .local/share XDG_CONFIG_HOME .config
         XDG_CACHE_HOME .cache)
-    file(READ "${ROOT}/std/anti/os.anti" text)
+    file(READ "${ROOT}/src/std/anti/os.anti" text)
     string(FIND "${text}" "${root}" found)
     if(found EQUAL -1)
-        message(FATAL_ERROR "std/anti/os.anti does not name ${root}, which is "
+        message(FATAL_ERROR "src/std/anti/os.anti does not name ${root}, which is "
                             "a root it gives to a program")
     endif()
 endforeach()
@@ -75,8 +75,8 @@ foreach(script install.sh uninstall.sh)
 endforeach()
 # Windows keeps everything under LOCALAPPDATA, with the executables in
 # Programs\anti\bin.
-foreach(file tools/install.ps1 tools/uninstall.ps1 src/userdirs.c
-        std/anti/os.anti docs/decisions.md)
+foreach(file tools/install.ps1 tools/uninstall.ps1 src/antic/userdirs.c
+        src/std/anti/os.anti docs/decisions.md)
     file(READ "${ROOT}/${file}" text)
     string(FIND "${text}" "LOCALAPPDATA" found)
     if(found EQUAL -1)
@@ -84,7 +84,7 @@ foreach(file tools/install.ps1 tools/uninstall.ps1 src/userdirs.c
                             "root of an install on Windows")
     endif()
 endforeach()
-foreach(file tools/install.ps1 tools/uninstall.ps1 src/userdirs.c
+foreach(file tools/install.ps1 tools/uninstall.ps1 src/antic/userdirs.c
         docs/decisions.md)
     file(READ "${ROOT}/${file}" text)
     string(FIND "${text}" "Programs" found)

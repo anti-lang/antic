@@ -1,4 +1,4 @@
-/* The JSON scanner of rt/json.c on malformed input. Every case must end
+/* The JSON scanner of src/rt/json.c on malformed input. Every case must end
    in false, with the position inside the input, and never read past it.
    The input of each case is a heap copy without a NUL, so AddressSanitizer
    reports a read past the end. */

@@ -71,7 +71,7 @@ base=${ANTI_BASE:-}
 # of the package and of the LLVM tools. Neither download carries a key of
 # its own. anti-lang.com serves the installer, and GitHub serves both
 # downloads. A key that travelled with them could be replaced with them.
-# anti-lang.com serves the same key as keys/release.pem.
+# anti-lang.com serves the same key as tools/keys/release.pem.
 release_key='-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEao0Di9RL8gvG6oA9x7gIDJ7/zLn6
 /J5i5dgtCf82Hvpro/4umWhaPA8APgrIJKLD4XDvTqhLijckvFxj0f3Bhg==
@@ -186,7 +186,7 @@ host=$os-$arch
 # conventions of the platform. The toolchain and the runtime archive go
 # in the data directory, and the two executables in the bin directory,
 # which is on the PATH. "Names and publication" in docs/decisions.md
-# holds the rule. src/userdirs.c builds the same paths for antic, anti.os
+# holds the rule. src/antic/userdirs.c builds the same paths for antic, anti.os
 # gives them to a program, and the test installer_options pins the
 # spellings together.
 #
@@ -417,7 +417,7 @@ fi
 
 # The two executables go in the bin directory of the user, and the rest
 # of the archive stays where it is. antic finds it by the same rule that
-# src/userdirs.c holds: the directory above itself when that one carries
+# src/antic/userdirs.c holds: the directory above itself when that one carries
 # lib/, and the user's data directory otherwise.
 mkdir -p "$bin_dir"
 for program in antic anti; do

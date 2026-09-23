@@ -8,13 +8,13 @@ with "Build modes and caching" in `docs/tooling-addendum.md`.
 
 ## Three files and one order
 
-`tools/anti/manifest.c` reads `anti.toml`, `tools/anti/repo.c` fetches from a
-repository into the cache of the user, `tools/anti/deps.c` resolves the graph
-and writes `anti.lock`, and `tools/anti/build.c` compiles. A build reads the
+`src/anti/manifest.c` reads `anti.toml`, `src/anti/repo.c` fetches from a
+repository into the cache of the user, `src/anti/deps.c` resolves the graph
+and writes `anti.lock`, and `src/anti/build.c` compiles. A build reads the
 manifest, checks the compiler version it asks for, resolves the graph, reads
 the modules under the source directory and then builds each target.
 
-The reader of the manifest is `rt/toml.c`, the one parser that `anti.toml`, the
+The reader of the manifest is `src/rt/toml.c`, the one parser that `anti.toml`, the
 logger and the runtime configuration share. It gained inline tables for this
 step. A dependency is written `{ version = "1.2.4", repo = "ff" }`, and the
 modules of a version of an index are an array of them.
@@ -84,13 +84,13 @@ cycle of path dependencies reports rather than running out of stack.
 
 A release binary carries no symbol data. The build therefore links the program
 a second time with the debug sections kept, and writes
-`<program>-symbols.zip` beside the binary in `dist/`. `tools/anti/zip.c` writes
+`<program>-symbols.zip` beside the binary in `dist/`. `src/anti/zip.c` writes
 the archive. Its entries are stored and never compressed, so the tool needs no
 library. Every field that would carry a clock or a machine is fixed.
 
-`tools/anti/symmap.c` writes the map: one line per function with the range of
+`src/anti/symmap.c` writes the map: one line per function with the range of
 its addresses, its name and, where the debug information gives them, its file
-and line. It reads the program with the readers of `rt/symbols.c`, the ones
+and line. It reads the program with the readers of `src/rt/symbols.c`, the ones
 `anti.lang.StackTrace.symbolize` reads a running program with. The map is
 therefore what a trace of that program would name. Those readers looked up one
 address at a time, and `anti_elf_functions` and `anti_macho_functions` walk a
@@ -99,7 +99,7 @@ whole symbol table for this.
 The binary, the debug link and the map all carry one build id, which is what
 ties a frame of a trace to this archive. The digest of an id leaves out what
 `-g` added, so a `-g` link carries the id of the plain link beside it.
-"Build ids" in `docs/decisions.md` holds the rule and `src/debug.c` records the
+"Build ids" in `docs/decisions.md` holds the rule and `src/antic/debug.c` records the
 ranges. Both links place every function at the same address, so the one map
 answers for either of them.
 

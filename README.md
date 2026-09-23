@@ -13,20 +13,20 @@ specify all of it.
 ## Building
 
 The build needs CMake 3.21 or newer and openssl. The pinned clang compiles it, and
-the configure step installs that clang into `build/clang` and the pinned LLVM tools
-into `build/llvm`. The Linux sysroots take the builtins of the pinned clang, so
+the configure step installs that clang into `build/deps/clang` and the pinned LLVM tools
+into `build/deps/llvm`. The Linux sysroots take the builtins of the pinned clang, so
 `tools/get-clang.cmake` runs before `tools/get-sysroot.cmake`:
 
 ```bash
 cmake -P tools/get-clang.cmake
 cmake -P tools/get-llvm.cmake
-cmake -DDEST=build/sysroot -DLLVM_BIN=build/llvm/bin -DACCEPT_LICENSE=yes \
+cmake -DDEST=build/deps/sysroot -DLLVM_BIN=build/deps/llvm/bin -DACCEPT_LICENSE=yes \
       -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
       -P tools/get-sysroot.cmake
-cmake -DDEST=build/raylib -P tools/get-raylib.cmake
-cmake -S . -B build
-cmake --build build -j8
-ctest --test-dir build -j8
+cmake -DDEST=build/deps/raylib -P tools/get-raylib.cmake
+cmake --preset host
+cmake --build build/host -j8
+ctest --test-dir build/host -j8
 ```
 
 `-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK, which xwin
@@ -40,13 +40,14 @@ passes `-DANTIC_SYSTEM_COMPILER=ON`, and the compiler of the machine builds it.
 `tools/clang-pin`, `tools/llvm-pin`, `tools/sysroot-pins` and `tools/raylib-pin` hold
 the versions and the SHA-256 digest of every archive. Nothing installs into a system
 location. clang and the LLVM tools come from the releases of `anti-lang/llvm-tools`.
-openssl checks their signature against `keys/release.pem`, and macOS, Linux and Git
+openssl checks their signature against `tools/keys/release.pem`, and macOS, Linux and Git
 for Windows carry it.
 
 `CMakePresets.json` carries two more configurations. `cmake --preset asan`
 builds antic under AddressSanitizer and `cmake --preset ubsan` under both
 AddressSanitizer and UndefinedBehaviorSanitizer. Each runs the full suite from
-its own build directory.
+its own directory, `build/asan` and `build/ubsan`, and reads the downloads of
+`build/deps`.
 
 ## Installing
 
@@ -69,7 +70,7 @@ of the tag. Step 9 rsyncs the two installers, the downloads page,
 `ANTI_SITE` names as `<host>:<path>`, and the run refuses without it. The
 signature and the binaries stand on two hosts, so a forged release needs both.
 The private key that signs `SHA256SUMS` stands at
-`keys/private/release-key.pem`, which `.gitignore` excludes, and a run without it
+`tools/keys/private/release-key.pem`, which `.gitignore` excludes, and a run without it
 stops before the tag.
 
 ## Documents
@@ -87,8 +88,8 @@ stops before the tag.
 
 ## Licence
 
-MIT for antic, the `anti` tool and the repository. The runtime in `rt/` and the
-standard library in `std/` are 0BSD, each with its own `LICENSE`. Bundled
+MIT for antic, the `anti` tool and the repository. The runtime in `src/rt/` and the
+standard library in `src/std/` are 0BSD, each with its own `LICENSE`. Bundled
 components keep their licences in `LICENSES/`.
 
 ## The book

@@ -1,9 +1,9 @@
 # Pack the package of this host from the antic and the anti of the build,
-# and check that the archive carries no key. The installer holds the key
-# that checks the LLVM tools, and the package holds the pin that names
-# them. Both macOS sysroots of Zig's stubs go in, and the stubs of Apple's
-# SDK in sdk/ stay out. A package of a build with the compiler of the
-# machine is refused.
+# and check that the archive carries no key and nothing of tools/keys/.
+# The installer holds the key that checks the LLVM tools, and the package
+# holds the pin that names them. Both macOS sysroots of Zig's stubs go in,
+# and the stubs of Apple's SDK in sdk/ stay out. A package of a build with
+# the compiler of the machine is refused.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DHOST=<host>
 #         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
@@ -68,6 +68,18 @@ string(REGEX MATCHALL "[^\n]+\\.(pem|gpg|asc)\n" keys "${entries}")
 if(keys)
     message(FATAL_ERROR "${archive} carries ${keys}")
 endif()
+# Nothing of tools/keys/ goes in, whatever its name or form.
+if(entries MATCHES "(^|\n)anti/tools/keys/")
+    message(FATAL_ERROR "${archive} carries tools/keys/")
+endif()
+file(GLOB_RECURSE key_files LIST_DIRECTORIES false "${ROOT}/tools/keys/*")
+foreach(key_file IN LISTS key_files)
+    get_filename_component(key_name "${key_file}" NAME)
+    string(REPLACE "." "\\." key_pattern "${key_name}")
+    if(entries MATCHES "(^|[\n/])${key_pattern}\n")
+        message(FATAL_ERROR "${archive} carries ${key_name} of tools/keys/")
+    endif()
+endforeach()
 set(suffix "")
 if(HOST MATCHES "^windows-")
     set(suffix ".exe")

@@ -6,7 +6,7 @@
 #
 # <pin> is tools/llvm-pin or tools/clang-pin. The archive is checked against
 # the digest of the pin, against its line of SHA256SUMS of the release, and
-# SHA256SUMS.sig against keys/release.pem of the checkout, which the person
+# SHA256SUMS.sig against tools/keys/release.pem of the checkout, which the person
 # who cloned it trusts. The archive unpacks into <dest>, and <dest>/.installed
 # names its digest. An archive whose digest is there already is left as it
 # is, so a configure that finds it downloads nothing. ARCHIVE names an
@@ -120,17 +120,17 @@ function(fetch_release pin dest)
                             "${downloads}/SHA256SUMS"
                     RESULT_VARIABLE hashed)
     execute_process(COMMAND "${OPENSSL}" pkeyutl -verify -pubin
-                            -inkey "${root}/keys/release.pem"
+                            -inkey "${root}/tools/keys/release.pem"
                             -in "${downloads}/SHA256SUMS.sha256"
                             -sigfile "${downloads}/SHA256SUMS.sig"
                     OUTPUT_VARIABLE out ERROR_VARIABLE err
                     RESULT_VARIABLE verified)
     if(NOT hashed EQUAL 0 OR NOT verified EQUAL 0)
         message(FATAL_ERROR "SHA256SUMS.sig of ${tag} is not a signature of the "
-                            "key in keys/release.pem: ${out}${err}")
+                            "key in tools/keys/release.pem: ${out}${err}")
     endif()
     message(STATUS "${asset}: the digest of the pin, in SHA256SUMS signed by "
-                   "the key in keys/release.pem")
+                   "the key in tools/keys/release.pem")
 
     # Every entry of the archive replaces the one of its name in <dest>.
     set(unpacked "${dest}/unpacked")

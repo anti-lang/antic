@@ -1,7 +1,7 @@
 # Install the pinned clang for this host into <dir>: bin/clang, and
 # lib/clang/<major>/ with the built-in headers and the compiler-rt builtins
 # of all six targets. It compiles antic, the runtime and the libraries of
-# libs/, and it compiles the runtime for every other target.
+# src/native/, and it compiles the runtime for every other target.
 #
 #   cmake [-DDEST=<dir>] [-DARCHIVE=<file>] -P tools/get-clang.cmake
 #
@@ -9,14 +9,14 @@
 # builds it from the LLVM source of tools/llvm-version.
 # tools/fetch-release.cmake downloads the archive of this host and checks
 # it against the pin, SHA256SUMS and its signature. DEST defaults to
-# build/clang of the repository, and the configure step of CMakeLists.txt
+# build/deps/clang of the repository, and the configure step of CMakeLists.txt
 # runs this script. The installers never run it: a user of Anti gets
 # binaries. ARCHIVE names an archive already downloaded.
 cmake_minimum_required(VERSION 3.21)
 
-get_filename_component(root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+include("${CMAKE_CURRENT_LIST_DIR}/deps-dir.cmake")
 if(NOT DEFINED DEST)
-    set(DEST "${root}/build/clang")
+    set(DEST "${ANTIC_DEPS_DIR}/clang")
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/fetch-release.cmake")
 fetch_release("${CMAKE_CURRENT_LIST_DIR}/clang-pin" "${DEST}")

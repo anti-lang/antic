@@ -29,7 +29,7 @@ tools can observe.
 - The runtime decides the chunk count when the program writes no `by`, so it also
   allocates the array of results. `anti_rt_parallel` therefore writes back both the
   pointer and the count, and the caller builds the slice from them. The results are
-  `malloc` memory that nothing frees, as the argument slices of `rt/start.c` are.
+  `malloc` memory that nothing frees, as the argument slices of `src/rt/start.c` are.
 - The split gives the first `count % chunks` chunks one element more than the rest.
   Every element then belongs to exactly one chunk, and the chunks stay contiguous. A
   count of chunks above the element count is lowered to the element count. An empty

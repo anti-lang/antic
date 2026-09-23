@@ -1,7 +1,7 @@
 # Stack traces and error origins
 
-The choices inside the runtime of `anti.lang.StackTrace`, in `rt/trace.c`,
-`rt/backtrace.c` and `rt/symbols.c`, and inside the lowering of `fail`. The
+The choices inside the runtime of `anti.lang.StackTrace`, in `src/rt/trace.c`,
+`src/rt/backtrace.c` and `src/rt/symbols.c`, and inside the lowering of `fail`. The
 rules are in "Error origin and stack traces" of
 `docs/anti-language-additions.md`, and the settled points are in
 `docs/decisions.md` under "Error origins and stack traces".
@@ -13,7 +13,7 @@ the constant location of the statement into `at` and asks
 `anti_rt_backtrace_on`. When that says yes it calls `StackTrace.capture(0)`
 and stores the trace in `frames`. The checker resolves `Error`, its two
 fields and `capture` once per statement, and lowering reads the fields by
-name, so the order of the fields in `std/anti/lang.anti` is its own.
+name, so the order of the fields in `src/std/anti/lang.anti` is its own.
 
 An error that has a position already costs a release build one load, one
 compare and one branch. The first `fail` of an error adds one call of the
@@ -25,7 +25,7 @@ A library file is compiled once and serves dev builds and release builds, so
 the `fail` in it cannot carry the mode. The pass over the whole program
 writes `anti_rt_backtrace_default`, a struct of one `int64_t`. It does so in
 a program that reaches `anti_rt_backtrace_on`, as it writes the registry. The function
-stands alone in `rt/backtrace.c`, so a program that captures a trace and
+stands alone in `src/rt/backtrace.c`, so a program that captures a trace and
 never fails links no reference to the default. `--anti.backtrace` of the
 command line wins over the default.
 
@@ -95,7 +95,7 @@ program is named `module.main` and not `anti.rt.main`.
 
 `trace_symbols_<target>` links a `-g` program for each ELF and Mach-O target
 and looks its functions up with `symbols_probe`, which compiles
-`rt/symbols.c` for the host. The readers of the Linux runtime therefore run
+`src/rt/symbols.c` for the host. The readers of the Linux runtime therefore run
 on a Mac. The `trace_*` tests run programs in release, in dev mode and with
 `--anti.backtrace`, and match their output against patterns, because a trace
 holds addresses.

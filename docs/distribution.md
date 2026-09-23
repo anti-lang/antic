@@ -68,7 +68,7 @@ https://anti-lang.com/keys/release.pem
 ```
 
 Step 9 of a release rsyncs four files there over ssh: the two installers, the downloads
-page, `SHA256SUMS.sig` of the version and `keys/release.pem`. It then reads the
+page, `SHA256SUMS.sig` of the version and `tools/keys/release.pem`. It then reads the
 signature and the key back over HTTPS, and checks that the signature covers the
 manifest of the GitHub release. The page names every asset of the release by URL and
 carries its digest. The signature of a version keeps its own directory, so the
@@ -110,12 +110,12 @@ the tools of its host, and a build of antic takes clang as well.
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
 the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives
 of clang in the same release. `tools/get-llvm.cmake` takes the
-archive of the host into `build/llvm`, and the installers take it into the install
+archive of the host into `build/deps/llvm`, and the installers take it into the install
 directory. Both check the digest of the pin, the line of `SHA256SUMS` and the
 signature. A toolchain bump is a new release there and a new pin here.
 
 The public key that checks `SHA256SUMS.sig` with `openssl pkeyutl -verify` lives in the
-installers, which anti-lang.com serves, and in `keys/release.pem` of the repository,
+installers, which anti-lang.com serves, and in `tools/keys/release.pem` of the repository,
 which `tools/get-llvm.cmake` reads. anti-lang.com serves it as `keys/release.pem`. No
 package carries a key. A key that travelled with a package could be replaced with it,
 which is why the key and the packages stand on two hosts.
@@ -129,7 +129,7 @@ tree, and one less level is one less path to get wrong.
 | Component | Files | Built by |
 |---|---|---|
 | `anti` | The runtime archive with antic per target | The release build of chapter 23 |
-| `raylib`, `pcre2`, `mbedtls`, `miniaudio` | The static library per target, with headers | The CMake build in `libs/` |
+| `raylib`, `pcre2`, `mbedtls`, `miniaudio` | The static library per target, with headers | The CMake build in `src/native/` |
 | `musl` | The Linux sysroot per processor | `tools/get-sysroot.cmake` |
 
 A Linux program of a release links the pinned sysroot and never the libc of the machine
@@ -165,7 +165,7 @@ disagree, or that holds a file the manifest does not name. It refuses one withou
 neither. It then sends the files, the signature and the manifest last, and reads the
 digests back over ssh. `CHECK_ONLY` runs the checks and sends nothing, which is what step
 6 of a release does before it tags. `KEY` names another public key than
-`keys/release.pem`.
+`tools/keys/release.pem`.
 
 ### The release script
 
@@ -421,7 +421,7 @@ plus `NOTICE.txt` supply it. This section is a statement of how the licences rea
 ## Licence choices for Anti itself
 
 - The thread-pool runtime and the standard library: 0BSD, with a `LICENSE` file in
-  `rt/` and in `std/`. Use without attribution, so the common case embeds one short
+  `src/rt/` and in `src/std/`. Use without attribution, so the common case embeds one short
   notice and owes nothing.
 - `antic` and `anti`: MIT. The compiler's licence never reaches its output.
 - The book text: decided separately on the site.

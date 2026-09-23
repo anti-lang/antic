@@ -1,7 +1,7 @@
-/* rt/text.c holds the reader of the text of a float, and
+/* src/rt/text.c holds the reader of the text of a float, and
    Object.deserialize reads a float field with it. A text rounds to the
    nearest float of the width it is read at, a tie to the even one. Every
-   text the writer of rt/text.c gives reads back as the same bits. The
+   text the writer of src/rt/text.c gives reads back as the same bits. The
    exact half-way point between two neighbours reads as the even one of
    them. Moved by one unit of its last digit, it reads as the neighbour it
    moved towards. */

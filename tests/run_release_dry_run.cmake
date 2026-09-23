@@ -153,10 +153,10 @@ done
 cache() {
     mkdir -p \"\$1\"
     cat > \"\$1/CMakeCache.txt\" <<EOF
-ANTIC_CLANG_DIR:PATH=${ROOT}/build/clang
+ANTIC_CLANG_DIR:PATH=${ROOT}/build/deps/clang
 ANTIC_LLVM_DIR:PATH=${LLVM_BIN}/..
-ANTIC_RAYLIB_DIR:PATH=${ROOT}/build/raylib
-ANTIC_SYSROOT_DIR:PATH=${ROOT}/build/sysroot
+ANTIC_RAYLIB_DIR:PATH=${ROOT}/build/deps/raylib
+ANTIC_SYSROOT_DIR:PATH=${ROOT}/build/deps/sysroot
 ANTIC_SYSTEM_COMPILER:BOOL=OFF
 EOF
     mkdir -p \"\$1/runtime/lib\" \"\$1/runtime/std\" \"\$1/runtime/licenses\"
@@ -220,7 +220,7 @@ if [ -n \"\$script\" ]; then
     esac
 fi
 if [ -n \"\$preset\" ]; then
-    cache \"\$PWD/build-\$preset\"
+    cache \"\$PWD/build/\$preset\"
     exit 0
 fi
 if [ -n \"\$source\" ] && [ -n \"\$build\" ]; then
@@ -381,7 +381,7 @@ foreach(line "would sign" "would tag v${version}" "would create the release"
         "would upload 13 files" "would upload no SHA256SUMS.sig"
         "the runner matrix, left out" "would rsync tools/install.sh"
         "would rsync the downloads page" "would rsync SHA256SUMS.sig"
-        "keys/release.pem" "would install")
+        "tools/keys/release.pem" "would install")
     if(NOT out MATCHES "${line}")
         message(FATAL_ERROR "the dry run does not say what it would do: "
                             "`${line}` is missing\n${out}${err}")
@@ -402,14 +402,14 @@ if(out MATCHES "would upload 14 files")
                         "serves the binaries\n${out}")
 endif()
 
-# DESIGN: the signing key has one path, keys/private/release-key.pem, and
+# DESIGN: the signing key has one path, tools/keys/private/release-key.pem, and
 # no environment variable names it. What a release proves before it signs
 # is that git sees neither the file nor its directory: a tracked key is a
 # published key, and a key no rule ignores is one `git add -A` from being
 # tracked. The key is plaintext, because it stands on an offline machine.
 find_program(OPENSSL openssl)
 if(OPENSSL)
-    set(key_path "keys/private/release-key.pem")
+    set(key_path "tools/keys/private/release-key.pem")
 
     # Run ./r --dry-run on the copy and answer with its output.
     function(key_run out_variable log_variable)
@@ -424,7 +424,7 @@ if(OPENSSL)
 
     # A plaintext key that .gitignore excludes and git does not track.
     # The directory is ignored, so a checkout of the tree holds none.
-    file(MAKE_DIRECTORY "${copy}/keys/private")
+    file(MAKE_DIRECTORY "${copy}/tools/keys/private")
     run("openssl wrote no plaintext key" "${OPENSSL}" ecparam -name prime256v1
         -genkey -noout -out "${copy}/${key_path}")
     key_run(failed log)
@@ -446,8 +446,8 @@ if(OPENSSL)
         message(FATAL_ERROR "./r refused an encrypted key\n${log}")
     endif()
     file(REMOVE "${copy}/${key_path}")
-    file(COPY "${WORK}/plaintext.pem" DESTINATION "${copy}/keys/private")
-    file(RENAME "${copy}/keys/private/plaintext.pem" "${copy}/${key_path}")
+    file(COPY "${WORK}/plaintext.pem" DESTINATION "${copy}/tools/keys/private")
+    file(RENAME "${copy}/tools/keys/private/plaintext.pem" "${copy}/${key_path}")
 
     # A key git tracks is refused, and the refusal names the file. The
     # add needs -f, which is the whole point: one of those publishes it.
@@ -472,9 +472,9 @@ if(OPENSSL)
     # A key that no rule of .gitignore excludes is refused as well, even
     # though it is untracked, because nothing keeps it untracked.
     file(READ "${copy}/.gitignore" ignores)
-    string(REPLACE "keys/private\n" "" without "${ignores}")
+    string(REPLACE "tools/keys/private/\n" "" without "${ignores}")
     if(without STREQUAL ignores)
-        message(FATAL_ERROR ".gitignore of the tree excludes no keys/private")
+        message(FATAL_ERROR ".gitignore of the tree excludes no tools/keys/private")
     endif()
     file(WRITE "${copy}/.gitignore" "${without}")
     run("git add failed" "${GIT}" -C "${copy}" add .gitignore)

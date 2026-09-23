@@ -1,5 +1,5 @@
 /* Look a function up in a binary of another target with the readers of
-   rt/symbols.c, which the runtime of that target uses on itself.
+   src/rt/symbols.c, which the runtime of that target uses on itself.
 
    The ELF form finds the address of the symbol in the file and adds the
    offset. It prints the function, the file and the line there. The

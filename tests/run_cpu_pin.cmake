@@ -1,5 +1,5 @@
 # The level table of antic and the one the build reads are the same.
-# src/cpu.c holds it for the compiler and tools/cpu-levels for CMake, so
+# src/antic/cpu.c holds it for the compiler and tools/cpu-levels for CMake, so
 # this test compares `antic --print-cpu-levels` with that file. Run with
 # cmake -P and these values:
 #   ANTIC   the antic executable

@@ -1,6 +1,6 @@
 # Debug information
 
-The choices inside `src/debug.c`. The rules are in "Debug information" of
+The choices inside `src/antic/debug.c`. The rules are in "Debug information" of
 `docs/anti-language-additions.md`, and the settled points are in
 `docs/decisions.md` under the same heading.
 
@@ -59,7 +59,7 @@ Mach-O in LLVM, and clang writes 0 there for the same reason.
 
 `struct ir_function` carries `at_line`, the cursor. `lower_stmt` moves it to
 the line of the statement before it emits anything of it, and every appender
-of `src/ir.c` stamps the cursor on the instruction it adds. A statement that
+of `src/antic/ir.c` stamps the cursor on the instruction it adds. A statement that
 holds a block leaves the cursor on the last line of the block, which is where
 the code after the block comes from.
 

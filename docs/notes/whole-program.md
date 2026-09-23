@@ -1,6 +1,6 @@
 # The pass over the whole program
 
-Choices made inside the passes over the IR of the whole program, `src/whole.c`. They
+Choices made inside the passes over the IR of the whole program, `src/antic/whole.c`. They
 describe the inside of the compiler. `docs/decisions.md` holds what a reader of the
 language or a user of the tools can observe.
 
@@ -64,7 +64,7 @@ language or a user of the tools can observe.
   `construct` with arguments.
 - The module paths are byte globals of module `anti.rt`, one per module, named
   `registry.<n>`.
-- `rt/registry.c` holds both readers and nothing else. A program that reaches neither does
+- `src/rt/registry.c` holds both readers and nothing else. A program that reaches neither does
   not link it, so the registry symbol is never missing. A bundled runtime holds every
   file, so a library for C with the runtime bundled gets an empty registry.
 - `Object.deserialize` is the eighth member of the root. It is not `pub`, which keeps it
@@ -104,7 +104,7 @@ language or a user of the tools can observe.
   call follows is `anti.rt.signature.<text>`. It checks the count and the kind of every
   `Value`, reads each argument at the type of its parameter, narrowing from the width the
   `Value` holds, calls the entry and widens the result back into a `Value`.
-- `rt/call.c` checks the index, the entry, the signature and the count before it calls the
+- `src/rt/call.c` checks the index, the entry, the signature and the count before it calls the
   trampoline. A trampoline that refuses the call therefore found a wrong kind.
 - A `str` argument passes the address of its bytes inside the `Value`, as lowering passes
   an aggregate.

@@ -12,7 +12,7 @@ field holds `IR_FAIL_CHECK`, and an assertion's arm holds `IR_FAIL_ASSERT`.
 a jump to the other arm, and the passes that follow remove the block, the
 call and the text.
 
-`back_end` in `src/driver.c` runs it twice, once per kind. Release mode drops
+`back_end` in `src/antic/driver.c` runs it twice, once per kind. Release mode drops
 both and dev mode keeps both. `--checks`, `--no-checks`, `--asserts` and
 `--no-asserts` override the mode. The build that compiles the program decides,
 so a library file carries every check and every assertion.
@@ -29,10 +29,10 @@ The text of a check takes a number before it is removed.
 
 ## The failure routine
 
-`anti_rt_check_failed(text, length, kind, a, b)` in `rt/check.c`. The compiler
+`anti_rt_check_failed(text, length, kind, a, b)` in `src/rt/check.c`. The compiler
 builds the text, which names the file, the line and the operation. The kind
-names the labels of the two values, and `rt/std.h` holds it as `enum
-anti_check`. `src/lower.c` mirrors it as `enum check_kind`, and the unit test
+names the labels of the two values, and `src/rt/std.h` holds it as `enum
+anti_check`. `src/antic/lower.c` mirrors it as `enum check_kind`, and the unit test
 `records_check_kinds` pins the numbers of the two together by reading the call
 that lowering writes.
 
@@ -52,7 +52,7 @@ checks, so the back end emits the arithmetic once and branches on what it left.
 value of the expression. The selector keeps the operation in `s->overflow` for
 the branch that follows it.
 
-The sequences are in `emit_overflow` of `src/arm64.c` and `src/x86_64.c`, and
+The sequences are in `emit_overflow` of `src/antic/arm64.c` and `src/antic/x86_64.c`, and
 `overflow_cond` gives the condition each one leaves. ARM64 uses the V flag of
 `adds` and `subs`. It has no arithmetic narrower than 32 bits, so a narrow type
 operates one width up and compares the result with its own sign extension. It
@@ -67,7 +67,7 @@ Dropping the checks turns every overflow operation back into its plain
 arithmetic, so a build without them emits what it emitted before the checks
 existed.
 
-Narrowing. `narrow_check` in `src/lower.c`. The value goes to the target type
+Narrowing. `narrow_check` in `src/antic/lower.c`. The value goes to the target type
 and back to the source with the target's signedness. A value the target cannot
 hold comes back changed. The round trip is blind to a change of sign alone,
 because a target of the same width keeps every bit. That case is a signed
@@ -101,7 +101,7 @@ before it, as `lower_binary` does.
 
 ## The path in the text
 
-`module_file_of_source` in `src/modpath.c` gives the path of the source under
+`module_file_of_source` in `src/antic/modpath.c` gives the path of the source under
 the first search root that holds it, and its file name alone outside every
 root. `lower_checked` records that as the module's file, which an assertion
 and a check name, while a message keeps the path the command line gave. The

@@ -1,5 +1,5 @@
 # Link the assembly of a program that returns a value with the first
-# rt/start.c of chapter 1, run it and compare the exit code with the
+# src/rt/start.c of chapter 1, run it and compare the exit code with the
 # expected file beside the source. Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   LLVM_MC   the llvm-mc executable

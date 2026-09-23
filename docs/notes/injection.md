@@ -8,7 +8,7 @@ the whole program that carry `inject`. The rules are in "Injection" of
 ## The field
 
 `inject` and `inject final` stand before the name of a field of a class
-body, and `src/parser.c` reads them as contextual words. The `final`
+body, and `src/antic/parser.c` reads them as contextual words. The `final`
 form is read first, because its second word is a name as well: the field
 `inject final: *L` is called `final`, and the field `inject: int` is
 called `inject`.
@@ -36,7 +36,7 @@ indirect call of `fn() -> *Interface`.
 
 ## The pass
 
-`write_injections` of `src/whole.c` runs where the program is whole.
+`write_injections` of `src/antic/whole.c` runs where the program is whole.
 That is every release build, and in dev mode the compilation of the
 module that links. The program holds the IR of every module in both
 modes, so the class records of every module are there. Each carries the
@@ -98,7 +98,7 @@ never refuses a program that has none.
 
 `anti_rt_injectable` names every interface the program injects, with the
 class and the field that need it and whether it is final. Every program
-carries it, empty where nothing injects, because `rt/conf.c` reads it
+carries it, empty where nothing injects, because `src/rt/conf.c` reads it
 before `main`. A `[injections]` line and a `--anti.inject` that name an
 interface the program has not are a startup error naming the ones it
 does have. One that names an `inject final` field says so. One that
@@ -114,6 +114,6 @@ the field and `final` in brackets.
 runtime's TOML reader, the one parser `anti.toml`, the logger and the
 runtime configuration share. It takes the `[inject]` table and lays
 `[inject.test]` over it, per interface, and passes each entry to every
-compilation of the run. `tools/anti/manifest.c` holds it. The reader
+compilation of the run. `src/anti/manifest.c` holds it. The reader
 gives a flat list of key paths, so `[inject.test]` arrives as keys under
 `inject.test.`, which is what TOML makes of the nested table.

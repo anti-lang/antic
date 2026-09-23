@@ -22,16 +22,17 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
-# DESIGN: the sysroots and the raylib source are downloads, and every
-# build directory of a checkout reads the same copy. A host may keep them
-# outside the tree, which the default build records in its cache. A second
-# build directory takes the path from there when its own default is not on
-# disk, as the one a sanitizer preset makes does. A preset then names no
-# path of one machine. Naming one is what broke them on the Linux VM
+# DESIGN: the sysroots and the raylib source are downloads in build/deps,
+# and every build tree of a checkout reads the same copy. A host may keep
+# them outside the tree, which the host build in build/host records in its
+# cache. A second build tree takes the path from there when its own default
+# is not on disk, as the one a sanitizer preset makes does. A preset then
+# names no path of one machine. Naming one is what broke them on the Linux VM
 set(ANTIC_SHARED_LINES "")
-if(NOT CMAKE_BINARY_DIR STREQUAL "${CMAKE_SOURCE_DIR}/build"
-   AND EXISTS "${CMAKE_SOURCE_DIR}/build/CMakeCache.txt")
-    file(STRINGS "${CMAKE_SOURCE_DIR}/build/CMakeCache.txt" ANTIC_SHARED_LINES
+set(ANTIC_HOST_TREE "${CMAKE_SOURCE_DIR}/build/host")
+if(NOT CMAKE_BINARY_DIR STREQUAL ANTIC_HOST_TREE
+   AND EXISTS "${ANTIC_HOST_TREE}/CMakeCache.txt")
+    file(STRINGS "${ANTIC_HOST_TREE}/CMakeCache.txt" ANTIC_SHARED_LINES
          REGEX "^ANTIC_[A-Z_]+:[A-Z]+=")
 endif()
 
@@ -88,7 +89,7 @@ else()
 endif()
 
 # The host target name, in the form of the runtime archive directories
-# lib/<os>-<cpu>. The file src/target.c detects the same name from the
+# lib/<os>-<cpu>. The file src/antic/target.c detects the same name from the
 # compiler's predefined macros. The antic_host_target test compares both.
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(ANTIC_HOST_OS macos)
@@ -111,85 +112,85 @@ set(ANTIC_HOST_TARGET "${ANTIC_HOST_OS}-${ANTIC_HOST_CPU}")
 # The compiler's code is a library so that the unit tests link the same
 # objects as the antic executable.
 add_library(antic_core STATIC
-    src/antl.c
-    src/applesdk.c
-    src/arith.c
-    src/arm64.c
-    src/coff.c
-    src/arena.c
-    src/ast_dump.c
-    src/cpu.c
-    src/debug.c
-    src/diagnostic.c
-    src/driver.c
-    src/emit.c
-    src/expand.c
-    src/header.c
-    src/ir.c
-    src/ir_print.c
-    src/ir_verify.c
-    src/layout.c
-    src/lexer.c
-    src/linker.c
-    src/lower.c
-    src/mach.c
-    src/modpath.c
-    src/notice.c
-    src/optimize.c
-    src/parser.c
-    src/process.c
-    src/regalloc.c
-    src/select.c
-    src/selfpath.c
-    src/sha256.c
-    src/userdirs.c
-    src/sema.c
-    src/target.c
-    src/text.c
-    src/types.c
-    src/whole.c
-    src/x86_64.c)
-target_include_directories(antic_core PUBLIC src)
+    src/antic/antl.c
+    src/antic/applesdk.c
+    src/antic/arith.c
+    src/antic/arm64.c
+    src/antic/coff.c
+    src/antic/arena.c
+    src/antic/ast_dump.c
+    src/antic/cpu.c
+    src/antic/debug.c
+    src/antic/diagnostic.c
+    src/antic/driver.c
+    src/antic/emit.c
+    src/antic/expand.c
+    src/antic/header.c
+    src/antic/ir.c
+    src/antic/ir_print.c
+    src/antic/ir_verify.c
+    src/antic/layout.c
+    src/antic/lexer.c
+    src/antic/linker.c
+    src/antic/lower.c
+    src/antic/mach.c
+    src/antic/modpath.c
+    src/antic/notice.c
+    src/antic/optimize.c
+    src/antic/parser.c
+    src/antic/process.c
+    src/antic/regalloc.c
+    src/antic/select.c
+    src/antic/selfpath.c
+    src/antic/sha256.c
+    src/antic/userdirs.c
+    src/antic/sema.c
+    src/antic/target.c
+    src/antic/text.c
+    src/antic/types.c
+    src/antic/whole.c
+    src/antic/x86_64.c)
+target_include_directories(antic_core PUBLIC src/antic)
 
 add_executable(antic
-    src/main.c)
+    src/antic/main.c)
 target_link_libraries(antic PRIVATE antic_core)
 
 # DESIGN: anti is the user-facing command. docs/tooling.md places it in
-# tools/anti/, linked against antic_core. Its commands are sdk export and
+# src/anti/, linked against antic_core. Its commands are sdk export and
 # sdk import, which move the stubs of Apple's SDK from a Mac to a host
 # that links a program naming a framework, and test, which runs the
 # `tests` and `fixtures` blocks of a module. It reads the `[inject]`
-# table of anti.toml with rt/toml.c, the one parser that anti.toml, the
+# table of anti.toml with src/rt/toml.c, the one parser that anti.toml, the
 # logger and the runtime configuration share.
 add_executable(anti
-    tools/anti/main.c
-    tools/anti/bind.c
-    tools/anti/bindapi.c
-    tools/anti/bindclang.c
-    tools/anti/bindexpr.c
-    tools/anti/bindtype.c
-    tools/anti/bindwrite.c
-    tools/anti/build.c
-    tools/anti/check.c
-    tools/anti/deps.c
-    tools/anti/doc.c
-    tools/anti/files.c
-    tools/anti/fmt.c
-    tools/anti/jsontree.c
-    tools/anti/manifest.c
-    tools/anti/repo.c
-    tools/anti/sdk.c
-    tools/anti/symmap.c
-    tools/anti/syms.c
-    tools/anti/test.c
-    tools/anti/units.c
-    tools/anti/zip.c
-    rt/json.c
-    rt/symbols.c
-    rt/toml.c)
+    src/anti/main.c
+    src/anti/bind.c
+    src/anti/bindapi.c
+    src/anti/bindclang.c
+    src/anti/bindexpr.c
+    src/anti/bindtype.c
+    src/anti/bindwrite.c
+    src/anti/build.c
+    src/anti/check.c
+    src/anti/deps.c
+    src/anti/doc.c
+    src/anti/files.c
+    src/anti/fmt.c
+    src/anti/jsontree.c
+    src/anti/manifest.c
+    src/anti/repo.c
+    src/anti/sdk.c
+    src/anti/symmap.c
+    src/anti/syms.c
+    src/anti/test.c
+    src/anti/units.c
+    src/anti/zip.c
+    src/rt/json.c
+    src/rt/symbols.c
+    src/rt/toml.c)
 target_link_libraries(anti PRIVATE antic_core)
-target_include_directories(anti PRIVATE rt)
+target_include_directories(anti PRIVATE src/rt)
 
 target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
@@ -200,7 +201,7 @@ target_compile_definitions(antic_core PRIVATE
 target_compile_definitions(anti PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
 
-# DESIGN: the levels of tools/cpu-levels are the table src/cpu.c holds, and
+# DESIGN: the levels of tools/cpu-levels are the table src/antic/cpu.c holds, and
 # the test cpu_levels_pin compares the two. The build reads the file rather
 # than repeating the names, so the runtime archive's native libraries are
 # built for the level each target defaults to.
@@ -262,7 +263,7 @@ set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu diges
     registry signal start symbols sync text threads time toml trace utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
-    list(APPEND anti_rt_files "rt/${source}.c")
+    list(APPEND anti_rt_files "src/rt/${source}.c")
 endforeach()
 # DESIGN: a macOS runtime library comes from the cross build below on every
 # host, the Mac included, so that one object links to the same bytes on
@@ -297,8 +298,8 @@ if(NOT ANTIC_HOST_OS STREQUAL "macos")
 
         # The licence stub of a bundled archive lies beside the runtime library as
         # an object of its own, so that a program never links it instead of the
-        # licence text of rt/license.c.
-        add_library(anti_rt_license_stub_${level} OBJECT rt/license_stub.c)
+        # licence text of src/rt/license.c.
+        add_library(anti_rt_license_stub_${level} OBJECT src/rt/license_stub.c)
         if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
             target_compile_options(anti_rt_license_stub_${level} PRIVATE
                 -fno-sanitize=all)
@@ -314,12 +315,12 @@ if(NOT ANTIC_HOST_OS STREQUAL "macos")
     endforeach()
 endif()
 
-configure_file(rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
+configure_file(src/rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
 
 # The sysroot of each target that lld links against, which
 # tools/get-sysroot.cmake installs, goes to sysroot/<target> of the runtime
 # archive with the licences of its components.
-antic_shared_path(ANTIC_SYSROOT_DIR "${CMAKE_SOURCE_DIR}/build/sysroot"
+antic_shared_path(ANTIC_SYSROOT_DIR "${ANTIC_DEPS_DIR}/sysroot"
     "sysroots from tools/get-sysroot.cmake")
 # The LLVM tools of this host lie in bin/ of ANTIC_LLVM_DIR, which
 # tools/pinned-compiler.cmake names and fills.
@@ -377,23 +378,23 @@ function(anti_cross_runtime_at target triple level root)
                 -Wall -Wextra -Wpedantic -Werror
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-                -c "${PROJECT_SOURCE_DIR}/rt/${source}.c" -o "${object}"
-            DEPENDS "${PROJECT_SOURCE_DIR}/rt/${source}.c"
-                "${PROJECT_SOURCE_DIR}/rt/rt.h" "${PROJECT_SOURCE_DIR}/rt/std.h"
-                "${PROJECT_SOURCE_DIR}/rt/object.h"
-                "${PROJECT_SOURCE_DIR}/rt/atomic.h"
-                "${PROJECT_SOURCE_DIR}/rt/cpu_level.h"
-                "${PROJECT_SOURCE_DIR}/rt/hooks.h"
-                "${PROJECT_SOURCE_DIR}/rt/json.h"
-                "${PROJECT_SOURCE_DIR}/rt/plugin.h"
-                "${PROJECT_SOURCE_DIR}/rt/reflect.h"
-                "${PROJECT_SOURCE_DIR}/rt/registry.h"
-                "${PROJECT_SOURCE_DIR}/rt/digest.h"
-                "${PROJECT_SOURCE_DIR}/rt/signal.h"
-                "${PROJECT_SOURCE_DIR}/rt/symbols.h"
-                "${PROJECT_SOURCE_DIR}/rt/toml.h"
-                "${PROJECT_SOURCE_DIR}/rt/trace.h"
-                "${PROJECT_SOURCE_DIR}/rt/utf.h"
+                -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
+            DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
+                "${PROJECT_SOURCE_DIR}/src/rt/rt.h" "${PROJECT_SOURCE_DIR}/src/rt/std.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/object.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/atomic.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/cpu_level.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/hooks.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/json.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/plugin.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/reflect.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/registry.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/digest.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/signal.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/symbols.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/toml.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/trace.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/utf.h"
             VERBATIM)
         list(APPEND objects "${object}")
     endforeach()
@@ -407,9 +408,9 @@ function(anti_cross_runtime_at target triple level root)
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
             -Wall -Wextra -Wpedantic -Werror
             "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-            -c "${PROJECT_SOURCE_DIR}/rt/license_stub.c" -o "${stub}"
-        DEPENDS "${PROJECT_SOURCE_DIR}/rt/license_stub.c"
-            "${PROJECT_SOURCE_DIR}/rt/std.h"
+            -c "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c" -o "${stub}"
+        DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c"
+            "${PROJECT_SOURCE_DIR}/src/rt/std.h"
         VERBATIM)
     # The stub stays beside the library, never a member of it.
     add_custom_command(OUTPUT "${library}"
@@ -446,7 +447,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
                 -isystem "${clang_resource}/include")
         elseif(target STREQUAL "macos-x86_64")
             # The minimum macOS version of the triple is 11.0, the value of
-            # MACOS_MIN_MAJOR and MACOS_MIN_MINOR in src/target.h.
+            # MACOS_MIN_MAJOR and MACOS_MIN_MINOR in src/antic/target.h.
             anti_cross_runtime(${target} x86_64-apple-macos11
                 -isysroot "${sysroot}")
         elseif(target STREQUAL "macos-arm64")
@@ -469,19 +470,19 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
     endforeach()
 endif()
 
-# The standard library in std/, written as library files into std/ of the
+# The standard library in src/std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
 set(ANTIC_STD_MODULES lang runtime mem debug io text license error time os fs reflect random collection toml config args json log simd trace plugin)
-set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/std/anti")
+set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/std/anti")
 set(std_files "")
 foreach(module IN LISTS ANTIC_STD_MODULES)
     set(output "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
     add_custom_command(OUTPUT "${output}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${ANTIC_RUNTIME_DIR}/std/anti"
-        COMMAND antic -c --anti-internal -I "${PROJECT_SOURCE_DIR}/std"
+        COMMAND antic -c --anti-internal -I "${PROJECT_SOURCE_DIR}/src/std"
             -I "${ANTIC_RUNTIME_DIR}/std"
             --package-name anti --package-version "${PROJECT_VERSION}"
-            --license 0BSD --license-text "${PROJECT_SOURCE_DIR}/std/LICENSE"
+            --license 0BSD --license-text "${PROJECT_SOURCE_DIR}/src/std/LICENSE"
             -o "${output}" "${ANTIC_STD_SOURCE_DIR}/${module}.anti"
         DEPENDS antic "${ANTIC_STD_SOURCE_DIR}/${module}.anti"
             ${std_files}

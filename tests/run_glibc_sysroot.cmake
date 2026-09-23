@@ -74,6 +74,7 @@ stand_in(headers.deb usr/include/linux/futex.h
 # A copy of the script beside pins that name the stand-ins.
 file(MAKE_DIRECTORY "${WORK}/tools")
 file(COPY_FILE "${ROOT}/tools/get-sysroot.cmake" "${WORK}/tools/get-sysroot.cmake")
+file(COPY_FILE "${ROOT}/tools/deps-dir.cmake" "${WORK}/tools/deps-dir.cmake")
 file(COPY_FILE "${ROOT}/tools/zig-stubs-pin" "${WORK}/tools/zig-stubs-pin")
 file(STRINGS "${ROOT}/tools/sysroot-pins" kept REGEX "^[^G]|^G[^L]")
 list(JOIN kept "\n" text)

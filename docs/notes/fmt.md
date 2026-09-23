@@ -3,7 +3,7 @@
 The choices inside `anti fmt`. The rules it applies are "Formatter rules" in
 `docs/tooling-addendum.md`, and the decisions behind the ones a token stream
 does not settle are under "The formatter" in `docs/decisions.md`.
-`tools/anti/fmt.c` holds the pass.
+`src/anti/fmt.c` holds the pass.
 
 ## The stream
 

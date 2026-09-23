@@ -14,7 +14,7 @@ keywords: [runtime archive, static library, llvm-ar, sysroot, musl, licence noti
 
 [Chapter 22, Threads]({{% relref "/programming/writing-a-compiler/22-threads" %}}), adds `worker` and `parallel`, the rule that keeps a
 worker away
-from memory another worker writes, and the pool in `rt/threads.c`. Its programs link
+from memory another worker writes, and the pool in `src/rt/threads.c`. Its programs link
 the runtime library of the target they are built for, which is what this chapter
 assembles.
 
@@ -91,12 +91,12 @@ programs a reader compiles.
 ## The processor level of a library
 
 The value of `march` is the `-march=` of the level being built, which
-`tools/cpu-levels` gives and `src/cpu.c` holds for antic. The same compile defines
-`ANTI_CPU_LEVEL_ID`, the id of that level, which `rt/cpu.c` reads and refuses to
+`tools/cpu-levels` gives and `src/antic/cpu.c` holds for antic. The same compile defines
+`ANTI_CPU_LEVEL_ID`, the id of that level, which `src/rt/cpu.c` reads and refuses to
 compile without. The start-up check then asks for the level of the runtime the
 program linked.
 
-A level decides what clang writes for `rt/atomic.c`. At `armv8.2` and above an atomic
+A level decides what clang writes for `src/rt/atomic.c`. At `armv8.2` and above an atomic
 operation is one instruction, `casal`, `ldaddal` or `swpal`. Below it the body is a
 load-store exclusive loop of `ldaxr` and `stlxr`. The tests `cpu_level_armv8.0`,
 `cpu_level_armv8.2` and `cpu_level_armv8.5` read the library of the target that
@@ -164,7 +164,7 @@ A bundled runtime therefore links a second object instead of this one.
 
 ```c
 /* The licence text in a static library for C. A bundled runtime carries
-   this object instead of the one of rt/license.c, because an archive has
+   this object instead of the one of src/rt/license.c, because an archive has
    no anti_licenses notice to read. The notice of such a library comes
    from its package header, which `anti license --from-archive` reads. */
 struct anti_text anti_rt_license_text(void)
@@ -201,7 +201,7 @@ That choice is what lets a program built with Anti carry a notice about musl alo
 
 ## Libraries of later chapters
 
-A second CMake build stands in `libs/`, for the third-party libraries that the archive
+A second CMake build stands in `src/native/`, for the third-party libraries that the archive
 will bundle. It builds one target at a time, named as the directory under `lib/`.
 
 ```cmake
