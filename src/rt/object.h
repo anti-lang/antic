@@ -209,6 +209,23 @@ struct anti_object {
 /* The descriptor of an object, or NULL when its table is not set. */
 const struct anti_descriptor *anti_rt_descriptor(const void *object);
 
+/* DESIGN: a table holds the descriptor and the functions of a class in
+   one array of object pointers. ISO C does not define the conversion
+   between an object pointer and a function pointer. Every target gives
+   it, as POSIX dlsym needs. The two functions below are the one place
+   the runtime makes it, so the extension stands in one file. */
+
+/* A function of no signature. The caller casts it to the type the entry
+   declares, which C defines between function pointer types. */
+typedef void (*anti_rt_body)(void);
+
+/* The function in entry `entry` of the table of object, or NULL when the
+   object or its table is NULL. */
+anti_rt_body anti_rt_entry_body(const void *object, int entry);
+
+/* The function body as an entry of a table. */
+const void *anti_rt_body_entry(anti_rt_body body);
+
 /* DESIGN: the three take the descriptor of the class the program holds
    the object as. It names that class when the table of the object is
    zero. A null object is left alone. */

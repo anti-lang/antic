@@ -25,48 +25,32 @@ static struct anti_object *handler(void)
         &installed, (int64_t)sizeof installed);
 }
 
-/* A table entry as a function of no signature. Every call below casts it
-   to the one the hook declares. The union carries the entry across,
-   because a table holds descriptors and functions in one array. */
-typedef void (*anti_body)(void);
-
-static anti_body entry_of(const struct anti_object *o, int entry)
-{
-    union {
-        const struct anti_descriptor *record;
-        anti_body body;
-    } cast;
-
-    if (o == NULL || o->table == NULL) {
-        return NULL;
-    }
-    cast.record = o->table[entry];
-    return cast.body;
-}
-
 /* The empty bodies of the root, in the order of enum anti_hook. An entry
    that holds one of them is no hook of the class. The compare is what a
    program without a hook of its own pays. */
-static anti_body root_body(int64_t hook)
+static anti_rt_body root_body(int64_t hook)
 {
+    typedef anti_rt_body body;
+
     switch (hook) {
-    case ANTI_HOOK_CREATED: return (anti_body)anti_lang_Object_created;
-    case ANTI_HOOK_DESTROYED: return (anti_body)anti_lang_Object_destroyed;
-    case ANTI_HOOK_COPIED: return (anti_body)anti_lang_Object_copied;
-    case ANTI_HOOK_DISPATCHED: return (anti_body)anti_lang_Object_dispatched;
-    case ANTI_HOOK_JOINED: return (anti_body)anti_lang_Object_joined;
-    case ANTI_HOOK_ENTER: return (anti_body)anti_lang_Object_enter;
-    case ANTI_HOOK_LEAVE: return (anti_body)anti_lang_Object_leave;
-    case ANTI_HOOK_FAILED: return (anti_body)anti_lang_Object_failed;
-    default: return (anti_body)anti_lang_Object_changed;
+    case ANTI_HOOK_CREATED: return (body)anti_lang_Object_created;
+    case ANTI_HOOK_DESTROYED: return (body)anti_lang_Object_destroyed;
+    case ANTI_HOOK_COPIED: return (body)anti_lang_Object_copied;
+    case ANTI_HOOK_DISPATCHED: return (body)anti_lang_Object_dispatched;
+    case ANTI_HOOK_JOINED: return (body)anti_lang_Object_joined;
+    case ANTI_HOOK_ENTER: return (body)anti_lang_Object_enter;
+    case ANTI_HOOK_LEAVE: return (body)anti_lang_Object_leave;
+    case ANTI_HOOK_FAILED: return (body)anti_lang_Object_failed;
+    default: return (body)anti_lang_Object_changed;
     }
 }
 
 /* The hook the object itself declares, or NULL where it kept the
    root's. */
-static anti_body own_hook(const struct anti_object *self, int64_t hook)
+static anti_rt_body own_hook(const struct anti_object *self, int64_t hook)
 {
-    anti_body body = entry_of(self, ANTI_ENTRY_OF_HOOK((int)hook));
+    anti_rt_body body =
+        anti_rt_entry_body(self, ANTI_ENTRY_OF_HOOK((int)hook));
 
     return body == root_body(hook) ? NULL : body;
 }
@@ -74,9 +58,11 @@ static anti_body own_hook(const struct anti_object *self, int64_t hook)
 /* The handler's function for the hook, or NULL when none is installed.
    anti.lang.TraceHandler declares the nine after the root's, so the
    entry stands at a place every handler shares. */
-static anti_body handler_hook(struct anti_object *h, int64_t hook)
+static anti_rt_body handler_hook(struct anti_object *h, int64_t hook)
 {
-    return h == NULL ? NULL : entry_of(h, ANTI_ENTRY_OF_HANDLER((int)hook));
+    return h == NULL
+               ? NULL
+               : anti_rt_entry_body(h, ANTI_ENTRY_OF_HANDLER((int)hook));
 }
 
 void anti_rt_hook(struct anti_object *self, int64_t hook)

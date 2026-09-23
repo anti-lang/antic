@@ -307,12 +307,7 @@ static const void **stubs_of(const struct anti_provides *e)
     head->entry = e;
     table = (const void **)(head + 1);
     for (i = entries + 1; i <= d->function_count; i++) {
-        union {
-            void (*from)(struct anti_object *);
-            const void *to;
-        } cast;
-        cast.from = stub;
-        table[i] = cast.to;
+        table[i] = anti_rt_body_entry((anti_rt_body)stub);
     }
     return table;
 }

@@ -52,6 +52,17 @@ int64_t anti_rt_fs_size(void *file)
     return -1;
 }
 
+const void *anti_rt_body_entry(anti_rt_body body)
+{
+    union {
+        const void *entry;
+        anti_rt_body body;
+    } cast;
+
+    cast.body = body;
+    return cast.entry;
+}
+
 /* The interface the library provides, as the host declares it. */
 static const int64_t chain[1] = {1};
 static struct anti_versions versions = {

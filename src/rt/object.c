@@ -573,13 +573,31 @@ void anti_lang_Object_changed(struct anti_object *self,
     (void)field;
 }
 
-/* The entry of a table, which the compiler fills with the function the
-   concrete class ended with. */
-static void *table_entry(const void *object, enum anti_entry entry)
+/* The union carries a table entry across between the two kinds of
+   pointer. */
+union entry_cast {
+    const void *entry;
+    anti_rt_body body;
+};
+
+anti_rt_body anti_rt_entry_body(const void *object, int entry)
 {
     const struct anti_object *o = object;
+    union entry_cast cast;
 
-    return o == NULL || o->table == NULL ? NULL : (void *)o->table[entry];
+    if (o == NULL || o->table == NULL) {
+        return NULL;
+    }
+    cast.entry = o->table[entry];
+    return cast.body;
+}
+
+const void *anti_rt_body_entry(anti_rt_body body)
+{
+    union entry_cast cast;
+
+    cast.body = body;
+    return cast.entry;
 }
 
 /* The bytes of the object. The copy the compiler writes for a class
@@ -604,7 +622,7 @@ void *anti_rt_dup(void *object, const struct anti_descriptor *type)
     const struct anti_descriptor *d = anti_rt_descriptor(start);
     void (*copy)(struct anti_object *, struct anti_object *) =
         (void (*)(struct anti_object *, struct anti_object *))
-            table_entry(start, ANTI_ENTRY_COPY);
+            anti_rt_entry_body(start, ANTI_ENTRY_COPY);
     char *made;
 
     if (d == NULL || copy == NULL) {
@@ -631,8 +649,8 @@ void anti_rt_give(struct anti_object *from, void *p)
         free(p);
         return;
     }
-    give = (void (*)(struct anti_object *, void *))(
-        void *)from->table[ANTI_ENTRY_FREE];
+    give = (void (*)(struct anti_object *, void *))anti_rt_entry_body(
+        from, ANTI_ENTRY_FREE);
     give(from, p);
 }
 
@@ -641,8 +659,8 @@ void anti_rt_destroy_from(void *object, const struct anti_descriptor *type,
 {
     void *start = checked_object(object, type);
     void (*teardown)(struct anti_object *, struct anti_object *) =
-        (void (*)(struct anti_object *, struct anti_object *))table_entry(
-            start, ANTI_ENTRY_DROP);
+        (void (*)(struct anti_object *, struct anti_object *))
+            anti_rt_entry_body(start, ANTI_ENTRY_DROP);
 
     if (teardown != NULL) {
         teardown(start, from);
@@ -694,7 +712,7 @@ void anti_rt_copy_elements(void *from, void *into, int64_t count,
         char *at = checked_object((char *)from + i * type->size, type);
         void (*copy)(struct anti_object *, struct anti_object *) =
             (void (*)(struct anti_object *, struct anti_object *))
-                table_entry(at, ANTI_ENTRY_COPY);
+                anti_rt_entry_body(at, ANTI_ENTRY_COPY);
         if (copy != NULL) {
             copy((struct anti_object *)at,
                  (struct anti_object *)((char *)into + i * type->size));

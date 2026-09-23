@@ -167,8 +167,8 @@ struct reader {
 static void *lend(struct reader *r, size_t size, int64_t align)
 {
     void *(*alloc)(struct anti_object *, int64_t, int64_t) =
-        (void *(*)(struct anti_object *, int64_t, int64_t))(
-            void *)r->from->table[ANTI_ENTRY_ALLOC];
+        (void *(*)(struct anti_object *, int64_t, int64_t))
+            anti_rt_entry_body(r->from, ANTI_ENTRY_ALLOC);
     struct made *m = r->made;
     void *p;
 
@@ -232,8 +232,8 @@ static void owned_by(struct made *m, void *object, void **owner)
 static void give_back(struct reader *r)
 {
     void (*give)(struct anti_object *, void *) =
-        (void (*)(struct anti_object *, void *))(
-            void *)r->from->table[ANTI_ENTRY_FREE];
+        (void (*)(struct anti_object *, void *))anti_rt_entry_body(
+            r->from, ANTI_ENTRY_FREE);
     struct made *m = r->made;
     int64_t i;
 
