@@ -255,6 +255,37 @@ static void emit_data(struct text *out, enum target t,
     }
 }
 
+/* Whether every address of g lies inside its bytes and apart from the
+   others. The pairs cost no more than the writing of g, which looks each
+   offset up among the addresses. */
+static bool relocations_fit(const struct ir_global *g, char *error,
+                            size_t error_size)
+{
+    size_t j;
+    size_t k;
+
+    for (j = 0; j < g->reloc_count; j++) {
+        uint64_t at = g->relocs[j].offset;
+        if (g->size < 8 || at > g->size - 8) {
+            ir_format(error, error_size,
+                      "the address at %" PRIu64 " of `%s.%s` ends past its "
+                      "%" PRIu64 " bytes", at, g->module, g->name, g->size);
+            return false;
+        }
+        for (k = 0; k < j; k++) {
+            uint64_t other = g->relocs[k].offset;
+            if ((at > other ? at - other : other - at) < 8) {
+                ir_format(error, error_size,
+                          "the addresses at %" PRIu64 " and %" PRIu64
+                          " of `%s.%s` overlap", at < other ? at : other,
+                          at < other ? other : at, g->module, g->name);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 static bool emit(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
                  const char *module, bool one_module, bool exports,
@@ -264,23 +295,15 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
     const struct target_info *info = target_info(t);
     struct debug debug;
     size_t i;
-    size_t j;
 
     debug_init(&debug, t, m, module, debug_info, spans);
 
     /* An address takes the eight bytes at its offset, so it lies inside
-       the data that holds it. A library file read from disk is the one
-       source of a global that does not. */
+       the data that holds it, and no two share a byte. A library file
+       read from disk is the one source of a global that breaks either. */
     for (i = 0; i < m->global_count; i++) {
-        const struct ir_global *g = m->globals[i];
-        for (j = 0; j < g->reloc_count; j++) {
-            if (g->relocs[j].offset + 8 > g->size) {
-                snprintf(error, error_size,
-                         "the address at %" PRIu64 " of `%s.%s` ends past "
-                         "its %" PRIu64 " bytes", g->relocs[j].offset,
-                         g->module, g->name, g->size);
-                return false;
-            }
+        if (!relocations_fit(m->globals[i], error, error_size)) {
+            return false;
         }
     }
     if (info->format == FORMAT_MACHO) {

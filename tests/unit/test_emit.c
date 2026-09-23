@@ -265,6 +265,31 @@ static void data_relocation_past_end(void)
     arena_free(&arena);
 }
 
+/* Two addresses less than eight bytes apart overlap, and writing the
+   first as a .quad would drop the second without a word. */
+static void data_relocation_overlap(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_global *table;
+    struct text out = {0};
+    char error[200] = "";
+    static const uint8_t zero[16] = {0};
+    struct mach_function *functions[1] = {NULL};
+
+    ir_module_init(&m, &arena, "main");
+    table = ir_global_add(&m, "main", "0", zero, sizeof zero, 8);
+    ir_global_reloc(&m, table, 0, 0);
+    ir_global_reloc(&m, table, 4, 0);
+    CHECK(!emit_program(&out, TARGET_LINUX_ARM64,
+                        cpu_default(TARGET_LINUX_ARM64), &m, functions, "main",
+                        false, false, NULL, error, sizeof error));
+    CHECK_STR(error, "the addresses at 0 and 4 of `main.0` overlap");
+    text_free(&out);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 static const char fnptr[] = "extern fn abs(x: i32) -> i32;\n"
                             "fn apply(f: fn(i32) -> i32, x: i32) -> i32 {\n"
                             "    return f(x);\n"
@@ -370,6 +395,7 @@ void test_emit(void)
     symbol_records();
     data_relocation();
     data_relocation_past_end();
+    data_relocation_overlap();
     debug_paths();
 
     /* Mach-O names a GOT entry with @GOTPAGE and @GOTPAGEOFF on ARM64 and
