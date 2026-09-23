@@ -420,7 +420,7 @@ static int run(int argc, char **argv, struct options *o)
 int main(int argc, char **argv)
 {
     struct options options = {0};
-    int status;
+    int status = 70;
 
     /* At most argc - 1 arguments are library files or link inputs. */
     options.libraries = malloc((size_t)argc * sizeof *options.libraries);
@@ -437,9 +437,10 @@ int main(int argc, char **argv)
         options.attribution == NULL || options.frameworks == NULL ||
         options.trace_patterns == NULL || options.inject == NULL) {
         fputs("antic: out of memory\n", stderr);
-        return 70;
+        goto done;
     }
     status = run(argc, argv, &options);
+done:
     free((void *)options.libraries);
     free((void *)options.objects);
     free((void *)options.roots);
