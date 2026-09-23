@@ -1200,6 +1200,16 @@ add_test(NAME front_end_only
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/front-end"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_front_end.cmake")
 
+# Every example of the syntax overview passes the front end, apart from a
+# block marked as not built.
+add_test(NAME overview_examples
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOVERVIEW=${PROJECT_SOURCE_DIR}/docs/anti-syntax-overview.md"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/overview"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_overview_examples.cmake")
+
 add_test(NAME warning_one_segment
     COMMAND antic -c -o "${CMAKE_CURRENT_BINARY_DIR}/geometry.antl"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/geometry.anti")

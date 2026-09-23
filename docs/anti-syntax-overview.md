@@ -59,16 +59,22 @@ fn main() -> int
 
 A module path is dotted lowercase identifiers that mirror a directory tree. Items are private unless marked.
 
+<!-- overview: context, docs-style:ignore
+```anti
+let a = "left";
+let b = "right";
+```
+-->
 ```anti
 import anti.text;
-import com.niese.render as r;
+import anti.io as out;
 
 pub fn area(w: f32, h: f32) -> f32 { return w * h; }
 internal fn helper() { }
 fn private_here() { }
 
 let s = text.equal(a, b);
-let c = r.Canvas.new();
+out.println("renamed");
 ```
 
 `pub` exports to every module, `internal` to modules under the same package root, none to the file. `import x as y` renames the local name. Paths under `anti.` are the language's. Third parties use a root they own.
@@ -77,6 +83,13 @@ let c = r.Canvas.new();
 
 Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Function pointers `fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. The C types `c_int`, `c_long`, `c_wchar` and the rest for bindings. No implicit conversions between numbers.
 
+<!-- overview: context, docs-style:ignore
+```anti
+struct Rect { w: f32, h: f32 }
+fn double(n: int) -> int { return 2 * n; }
+let r = Rect { w: 8.0, h: 4.0 };
+```
+-->
 ```anti
 let n: i32 = 5;
 let xs: [4]int = [1, 2, 3, 4];
@@ -93,6 +106,15 @@ Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of
 
 Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. `f"..."(from)` takes the memory of its text from the `anti.mem.Allocator` `from`. Bytes in hex `x"00 AB CC"`. The prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
 
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.mem;
+import anti.text;
+let name = "tea";
+let price = 2.5;
+let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 4096);
+```
+-->
 ```anti
 let a = 1_000_000;
 let b = 0xFF_FF;
@@ -116,6 +138,9 @@ Built: `f"..."` and `rf"..."`, each with an allocator as well.
 let x = 5;
 let y: f32 = 1.0;
 const MAX: int = 64;
+```
+
+```anti not-built
 let buf: [4096]byte = undefined;
 ```
 
@@ -125,12 +150,23 @@ Not built yet: `undefined`.
 
 C precedence. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`. Conversion `x as T`, checked downcast `p as *T`, nullable downcast `p as? *T`, type test `p is *T`. Wrapping `+% -% *% <<%` and saturating `+| -| *|`. Coalescing `??` and chaining `?.` over `none`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest. No `++`, no `?:`.
 
+<!-- overview: context, docs-style:ignore
+```anti
+struct Node { value: int, next: ?*Node }
+let a = 7;
+let b = 2;
+let c = 'q';
+let fallback = Node { value: 0, next: none };
+let maybe: ?*Node = none;
+let node: ?*Node = &fallback;
+```
+-->
 ```anti
 let q = a / b;
 let w = a +% b;
 let s = a +| b;
 let p = maybe ?? &fallback;
-let v = node?.next?.value;
+let v = node?.next?.next;
 if c in 'a'..'z' { }
 let (sum, f) = a + b;
 if f.carry { }
@@ -142,8 +178,22 @@ Built: `x in lo..hi`, `??` and `?.`, the wrapping and saturating operators, `mul
 
 ## Statements
 
-`if`, `else if`, `else`. `switch` falls through only where an arm ends in `fallthrough;`. Assignment is a statement. Blocks `{ }` are statements. `defer` and `undo`. `assert`, `show`, `unreachable`. Labels on blocks.
+`if`, `else if`, `else`. `switch` names one value per arm, and an enum value with its type, `Kind.Circle`. It falls through only where an arm ends in `fallthrough;`. Assignment is a statement. Blocks `{ }` are statements. `defer` and `undo`. `assert`, `show`, `unreachable`. Labels on blocks.
 
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.fs;
+enum Kind { Circle, Square, Rect }
+fn draw_circle() { }
+fn draw_box() { }
+let x = 3;
+let y = 0;
+let n = 1;
+let kind = Kind.Square;
+let path = "out.txt";
+let f = fs.open(path, fs.Mode.Write) catch fatal;
+```
+-->
 ```anti
 if x > 0 {
 	y = 1;
@@ -154,15 +204,22 @@ if x > 0 {
 }
 
 switch kind {
-	Circle => draw_circle(),
-	Square, Rect => draw_box(),
+	Kind.Circle => draw_circle(),
+	Kind.Square => {
+		draw_box();
+		fallthrough;
+	},
 	else => { },
 }
 
 defer fs.close(f) catch fatal;
 undo fs.remove(path) catch e { e.print(); };
 assert(n > 0, "n must be positive");
+```
+
+```anti not-built
 let v = show(compute(x));
+if x < 0 { unreachable; }
 ```
 
 `switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release. `unreachable` traps in dev and is undefined in release.
@@ -173,6 +230,13 @@ Built: `fallthrough` and `switch` on `str`. Not built yet: `show`, `unreachable`
 
 `while cond do { }` for zero or more, `do { } while cond` for at least one. `for` over ranges and slices with an optional binding and a constant step. Labels for `break` and `continue`. Everything else is a `while`.
 
+<!-- overview: context, docs-style:ignore
+```anti
+let i = 0;
+let n = 4;
+let items: [3]int = [1, 2, 3];
+```
+-->
 ```anti
 while i < n do { i = i + 1; }
 do { i = i - 1; } while i > 0
@@ -184,7 +248,9 @@ for i in 0..10 by -1 { }
 for x in items { }
 for i, x in items { }
 for p in &items { }
+```
 
+```anti not-built
 outer: for a in xs {
 	for b in ys {
 		if a == b { break outer; }
@@ -200,14 +266,31 @@ Not built yet: labels.
 
 `fn name(params) -> R { }`. `return;` in a function without a result. Default parameter values and named arguments. Function values and bound functions.
 
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.fs;
+class Circle
+{
+	r: f32 = 1.0,
+
+	pub fn area(self) -> f32 { return 3.14 * self.r * self.r; }
+}
+let c = Circle { };
+```
+-->
 ```anti
 fn add(a: int, b: int) -> int { return a + b; }
-fn open(path: str, mode: Mode = Mode.Read) -> *File may fail { }
+fn scaled(n: int, by: int = 2) -> int { return n * by; }
 
-let h = open("x", mode: Mode.Write) catch fatal;
+let h = fs.open("x", fs.Mode.Write) catch fatal;
+let k = scaled(4);
 let f = add;
 let g = c.area;         // bound to c, no captures
-let n = g();
+let a = g();
+```
+
+```anti not-built
+let h = fs.open("x", mode: fs.Mode.Write) catch fatal;
 ```
 
 Positional arguments first, named ones after in any order. No overloading by signature.
@@ -218,6 +301,11 @@ Built: default values, a constant expression or `here`, over a module boundary a
 
 An anonymous struct with C layout, for a function with two answers and no name for the pair.
 
+<!-- overview: context, docs-style:ignore
+```anti
+let items: [3]str = ["a", "b", "c"];
+```
+-->
 ```anti
 fn divmod(a: int, b: int) -> (int, int) { return (a / b, a % b); }
 
@@ -235,6 +323,19 @@ Built.
 
 Mark a function that can fail with `may fail`. It leaves on one of two channels: `return v;` with the result, `fail e;` with a `*Error`. The forms at the call are `catch`, `try` to propagate, `try { }` for a block, `catch fatal` to stop. A bare failing call is a compile error.
 
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.fs;
+import anti.log;
+import anti.text;
+struct Config { size: int }
+fn parse(f: *fs.File) -> Config may fail { return Config { size: try fs.size(f) }; }
+fn process(f: *fs.File) may fail { try fs.write(f, b"x"); }
+let s = "12";
+let t = "7";
+let path = "anti.toml";
+```
+-->
 ```anti
 let n = text.parse_int(s) catch e {
 	log.warn(f"bad number {s}");
@@ -248,7 +349,7 @@ fn load(path: str) -> Config may fail
 	let f = try fs.open(path, fs.Mode.Read);
 	defer fs.close(f) catch fatal;
 	if try f.size() == 0 { fail "empty configuration"; }
-	return parse(f);
+	return try parse(f);
 }
 
 try {
@@ -292,6 +393,8 @@ let a = r.area();       // area(&r)
 `simd struct` declares a vector whose fields are its lanes. Every field has the same primitive type and the count is a power of two. The size is a multiple of eight bytes up to the vector cap, 256 bytes to start, one constant of the CPU level table.
 
 ```anti
+import anti.simd;
+
 simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
 
 let a = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
@@ -322,6 +425,11 @@ let n = k as int;
 
 A tagged union with C layout: a tag and a union of the cases. `switch` binds the case's fields and must cover every case.
 
+<!-- overview: context, docs-style:ignore
+```anti
+let area: f32 = 0.0;
+```
+-->
 ```anti
 variant Shape
 {
@@ -370,7 +478,7 @@ final class Circle inherits Shape
 
 	fn construct(self, r: f32) may fail
 	{
-		if r <= 0.0 { fail Error.new(1, "radius"); }
+		if r <= 0.0 { fail lang.Error.new(1, "radius"); }
 		self.r = r;
 	}
 
@@ -402,6 +510,15 @@ Built.
 
 An interface is an abstract class. A class implements any number.
 
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.text;
+abstract class Shape
+{
+	pub x: f32 = 0.0,
+}
+```
+-->
 ```anti
 abstract class Serializable
 {
@@ -423,6 +540,8 @@ class Circle inherits Shape
 	concrete fn Drawable::draw(self) { }
 }
 
+let c = Circle { };
+let b = text.Builder.new();
 let s = &c as *Serializable;
 s.serialize(&b);
 ```
@@ -437,6 +556,14 @@ Built.
 
 `transient` on a `?*T` or `?fn(...)` field marks derived state, such as a cache. `dup` gives the copy `none` there, and the default `equals`, `hash` and `serialize` pass over the field. The class frees it in its own `destruct`.
 
+<!-- overview: context, docs-style:ignore
+```anti
+class Texture
+{
+	pub id: int = 0,
+}
+```
+-->
 ```anti
 class Buffer
 {
@@ -450,8 +577,14 @@ class Buffer
 
 `none` is the pointer that points to no value. It is a concept of the language, and zero is today's encoding of it. `*T` is never `none`. `?*T` may be `none` and must be checked before use. The check narrows the type for the block.
 
+<!-- overview: context, docs-style:ignore
 ```anti
-fn find(name: str) -> ?*Node { }
+struct Node { value: int }
+let default_node = Node { value: 0 };
+```
+-->
+```anti
+fn find(name: str) -> ?*Node { return none; }
 
 let n = find("root");
 if n != none {
@@ -470,20 +603,42 @@ Built.
 
 Every class has a descriptor: name, parent, size, fields with name, offset, type and ownership, functions with their table slot. `anti.reflect` reads it.
 
+<!-- overview: context, docs-style:ignore
 ```anti
-let d = reflect.describe(obj);
-for f in reflect.fields(d) {
-	io.println(f.name);
-	let v = reflect.get(obj, f);
+import anti.io;
+import anti.reflect;
+class Circle
+{
+	pub r: f64 = 1.0,
+
+	pub fn area(self) -> f64 { return 3.14 * self.r * self.r; }
 }
-reflect.set(obj, f, Value { f32: 3.0 }) catch fatal;
-let r = reflect.call(obj, m, []) catch fatal;
+let obj = alloc Circle { };
+let no_args: [1]reflect.Value = [reflect.nothing()];
+```
+-->
+```anti
+let d = reflect.describe(obj as *byte) else { return 1; };
+for i in 0..reflect.field_count(d) {
+	io.println(reflect.field(d, i).name);
+	let v = reflect.get(obj as *byte, d, i);
+}
+reflect.set(obj as *byte, d, 0, reflect.of_float(3.0)) catch fatal;
+let r = reflect.call(obj, 0, no_args[0..0]) catch fatal;
 let fresh = reflect.new("Circle");
 ```
 
 `anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `copy(self, to: *Object)` fills an object that `dup` has already allocated at its concrete size, and a replacement fills the fields and never allocates. `Object.deserialize(text, from)` reads the text of `serialize` back into an object, which comes with its strings and the objects it owns from the `anti.mem.Allocator` `from`. The caller gives them back through `from` at once. `--no-reflect` drops the field and function lists.
 
+<!-- overview: context, docs-style:ignore
 ```anti
+import anti.text;
+let b = text.Builder.new();
+```
+-->
+```anti
+import anti.mem;
+
 let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 4096);
 let back = Object.deserialize(b.text(), &arena);
 arena.free_all();
@@ -505,6 +660,8 @@ class Vec2
 	operator fn eq(self, o: Vec2) -> bool { return self.x == o.x && self.y == o.y; }
 }
 
+let a = Vec2 { x: 1.0, y: 2.0 };
+let b = Vec2 { x: 3.0, y: 4.0 };
 let v = a + b;
 if a == b { }
 ```
@@ -520,8 +677,9 @@ A static field belongs to the class and must be atomic. A singleton has one inst
 ```anti
 class Circle
 {
+	r: f32 = 1.0,
 	static atomic count: int = 0;
-	...
+
 	fn construct(self) { Circle.count.add(1); }
 }
 
@@ -544,8 +702,25 @@ Built.
 
 Structured fork-join over an array with `parallel`, and one object at a time with `dispatch`.
 
+<!-- overview: context, docs-style:ignore
 ```anti
-worker fn sum(chunk: []int) -> int { ... }
+class Sprite
+{
+	pub x: int = 0,
+}
+let numbers: [8]int = [1, 2, 3, 4, 5, 6, 7, 8];
+let data = numbers[0..8];
+let sprite = alloc Sprite { };
+let frame = 1;
+```
+-->
+```anti
+worker fn sum(chunk: []int) -> int
+{
+	let total = 0;
+	for x in chunk { total += x; }
+	return total;
+}
 let parts = parallel data -> sum;
 let parts2 = parallel data by 4 -> sum;
 
@@ -558,6 +733,14 @@ Worker parameters are pointer-free. The table pointer and `own` fields do not co
 
 `sync m { }` holds a `Mutex` for its block and unlocks it on every exit. `chan T` is a bounded queue of pointer-free values, and `select` waits on more than one channel, written like `switch` over them.
 
+<!-- overview: context, docs-style:ignore
+```anti
+fn take(x: ?*int) { }
+let total = 0;
+let a = chan int(4);
+let b = chan int(4);
+```
+-->
 ```anti
 let m = Mutex.new();
 sync m {
@@ -588,8 +771,17 @@ Built: `parallel`, `dispatch`, `join`, `Mutex`, `sync`, `chan T` with `send`, `r
 ```anti
 class Leaks inherits lang.TraceHandler
 {
-	concrete fn created(self, o: *Object) { Leaks.live.add(1); }
-	concrete fn destroyed(self, o: *Object) { Leaks.live.sub(1); }
+	atomic live: int = 0,
+
+	concrete fn created(self, o: *Object) { self.live.add(1); }
+	concrete fn destroyed(self, o: *Object) { self.live.sub(1); }
+	concrete fn copied(self, o: *Object, from: *Object) { self.live.add(1); }
+	concrete fn dispatched(self, o: *Object) { }
+	concrete fn joined(self, o: *Object) { }
+	concrete fn enter(self, o: *Object, name: str) { }
+	concrete fn leave(self, o: *Object, name: str) { }
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
 }
 
 trace class Renderer
@@ -609,10 +801,13 @@ Built: the nine hooks and their entries in the table of every class, `TraceHandl
 A class declares what it needs, the manifest says who provides it, the run-time configuration may replace it.
 
 ```anti
+import anti.log;
+import anti.mem;
+
 class Renderer
 {
-	inject log: *Logger,
-	inject final alloc: *Allocator,
+	inject log: *log.Logger,
+	inject final alloc: *mem.Allocator,
 }
 ```
 
@@ -633,13 +828,30 @@ Built: `inject name: *Interface` and `inject final name: *Interface`. The `[inje
 
 A shared library declares what it provides. A host loads it and asks by interface. The run-time configuration can replace a provider without the author's help.
 
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.log;
+pub class FancyLogger
+{
+	implements logger: log.Logger,
+
+	pub concrete fn log(self, level: log.Level, message: str) { }
+}
+```
+-->
 ```anti
 provides anti.log.Logger as FancyLogger;
 ```
 
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.log;
+import anti.plugin;
+```
+-->
 ```anti
 let lib = plugin.load("plugins/fancy.so") catch fatal;
-let log = lib.instance(anti.log.Logger) catch fatal;
+let logger = lib.instance(log.Logger) catch fatal;
 ```
 
 ```toml
@@ -655,10 +867,26 @@ Built: `provides Interface as Class;` and `antic --lib shared --no-runtime`, whi
 
 A `tests` block per module holds tests, a `fixtures` block holds their helpers. Both see the module's private items and are compiled only by `anti test`.
 
+<!-- overview: context, docs-style:ignore
+```anti
+class Stack
+{
+	pub top: int = 0,
+
+	pub fn new(size: int) -> *Stack { return alloc Stack { }; }
+	pub fn push(self, v: int) { self.top = v; }
+}
+```
+-->
 ```anti
 fixtures
 {
-	fn full_stack() -> Stack { }
+	fn full_stack() -> *Stack
+	{
+		let s = Stack.new(4);
+		s.push(1);
+		return s;
+	}
 }
 
 tests
@@ -680,11 +908,17 @@ Built.
 
 C functions in, Anti functions out, structs shared without marshalling.
 
+<!-- overview: context, docs-style:ignore
 ```anti
-extern fn printf(fmt: *byte, ...) -> c_int;
+struct Vector2 { x: f32, y: f32 }
+struct Color { r: u8, g: u8, b: u8, a: u8 }
+```
+-->
+```anti
+extern fn printf(fmt: ?*byte, ...) -> c_int;
 extern fn DrawCircleV(center: Vector2, radius: c_float, color: Color);
 
-export fn dot(a: Vec2, b: Vec2) -> c_int { }
+export fn dot(a: Vec2, b: Vec2) -> c_int { return a.x * b.x + a.y * b.y; }
 export struct Vec2 { x: c_int, y: c_int }
 
 link framework "CoreAudio";
@@ -698,12 +932,12 @@ Built: `extern`, `export`, static and shared libraries, the header, `link framew
 
 `target.os`, `target.cpu` and `target.mode` are constants. A `switch` on them is allowed at module level and must cover every value or carry `else`. The back end keeps one arm.
 
-```anti
+```anti not-built
 switch target.os {
-	Windows => {
+	Os.Windows => {
 		extern fn GetTickCount64() -> u64;
 	},
-	Linux, MacOS => {
+	else => {
 		extern fn clock_gettime(id: c_int, ts: *Timespec) -> c_int;
 	},
 }
@@ -716,7 +950,7 @@ Built: `anti check --targets all`, which runs the front end of every source once
 `here` is the position it is written at, as a `SourceLocation` with `file`, `line`, `column`, `function` and `module`. As a default parameter value it is evaluated at the call site, which is how a logger reads its caller's line without a macro.
 
 ```anti
-fn warn(msg: str, at: SourceLocation = here) { }
+fn warn(msg: str, at: lang.SourceLocation = here) { }
 
 warn("disk is full");       // at is the caller's position
 let p = here;               // the position of this expression
@@ -763,7 +997,7 @@ format Packet endian big
 }
 ```
 
-```anti
+```anti not-built
 let p = alloc Packet(data) catch fatal;
 let name = p.body.name;
 ```
@@ -774,7 +1008,7 @@ Not built yet.
 
 A file with `#!/usr/bin/env anti` runs directly. `anti file.anti` compiles into a cache keyed by digest and runs.
 
-```anti
+```anti not-built
 #!/usr/bin/env anti
 import anti.io;
 
