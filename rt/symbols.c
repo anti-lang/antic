@@ -626,6 +626,35 @@ static bool elf_nearest(void *context, const char *name, uint64_t value,
     return false;
 }
 
+/* The walk of anti_elf_functions, with the caller's function inside. */
+struct functions {
+    anti_function_fn fn;
+    void *context;
+};
+
+static bool elf_each_function(void *context, const char *name, uint64_t value,
+                              uint64_t size, unsigned type, uint64_t flags)
+{
+    struct functions *f = context;
+
+    if (name[0] == '$' || name[0] == 0 || type != ELF_STT_FUNC ||
+        (flags & ELF_SHF_EXECINSTR) == 0) {
+        return false;
+    }
+    return f->fn(f->context, name, value, size);
+}
+
+bool anti_elf_functions(const uint8_t *file, size_t size, anti_function_fn fn,
+                        void *context)
+{
+    struct bytes b = {file, size};
+    struct functions f;
+
+    f.fn = fn;
+    f.context = context;
+    return elf_symbols(&b, elf_each_function, &f);
+}
+
 bool anti_elf_function(const uint8_t *file, size_t size, uint64_t vaddr,
                        struct anti_found *out)
 {
@@ -826,6 +855,29 @@ static const char *macho_symbol(const struct anti_macho_table *t, uint32_t i,
 static const char *unprefixed(const char *name)
 {
     return name[0] == '_' ? name + 1 : name;
+}
+
+bool anti_macho_functions(const struct anti_macho_table *t,
+                          anti_function_fn fn, void *context)
+{
+    uint32_t i;
+
+    for (i = 0; i < t->count; i++) {
+        uint8_t type;
+        uint8_t sect;
+        uint64_t value;
+        const char *name = macho_symbol(t, i, &type, &sect, &value);
+        if (name == NULL || name[0] == 0 || (type & MACHO_N_STAB) != 0 ||
+            (type & MACHO_N_TYPE) != MACHO_N_SECT || sect != 1) {
+            continue;
+        }
+        /* The table of Mach-O names no size, so the caller reads the
+           end of a function from the start of the next one. */
+        if (fn(context, unprefixed(name), value, 0)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool anti_macho_function(const struct anti_macho_table *t, uint64_t vaddr,

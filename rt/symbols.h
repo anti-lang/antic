@@ -27,6 +27,18 @@ struct anti_found {
 size_t anti_coff_demangle(const char *name, size_t length, char *out,
                           size_t room);
 
+/* One function of a walk over a symbol table. It carries the name
+   without the prefix a format adds, the address and the size. The size
+   is 0 where the table names none, and a walk that returns true
+   stops. */
+typedef bool (*anti_function_fn)(void *context, const char *name,
+                                 uint64_t vaddr, uint64_t size);
+
+/* Every function of the symbol table of an ELF file. `anti build`
+   reads them for the map of a symbols archive. */
+bool anti_elf_functions(const uint8_t *file, size_t size,
+                        anti_function_fn fn, void *context);
+
 /* The function of an ELF file that holds vaddr, from its symbol table. */
 bool anti_elf_function(const uint8_t *file, size_t size, uint64_t vaddr,
                        struct anti_found *out);
@@ -50,6 +62,11 @@ struct anti_macho_table {
    size bounds every read. */
 bool anti_macho_table(const uint8_t *header, size_t size, bool mapped,
                       intptr_t slide, struct anti_macho_table *out);
+/* Every function of a Mach-O symbol table, as anti_elf_functions gives
+   the functions of an ELF file. */
+bool anti_macho_functions(const struct anti_macho_table *t,
+                          anti_function_fn fn, void *context);
+
 /* The function that holds vaddr, an address before the slide. */
 bool anti_macho_function(const struct anti_macho_table *t, uint64_t vaddr,
                          struct anti_found *out);

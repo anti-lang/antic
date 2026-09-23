@@ -173,8 +173,11 @@ add_executable(anti
     tools/anti/manifest.c
     tools/anti/repo.c
     tools/anti/sdk.c
+    tools/anti/symmap.c
     tools/anti/test.c
     tools/anti/units.c
+    tools/anti/zip.c
+    rt/symbols.c
     rt/toml.c)
 target_link_libraries(anti PRIVATE antic_core)
 target_include_directories(anti PRIVATE rt)

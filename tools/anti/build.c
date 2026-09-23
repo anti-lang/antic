@@ -23,10 +23,12 @@
 #include "modpath.h"
 #include "process.h"
 #include "sha256.h"
+#include "symmap.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
 #include "userdirs.h"
+#include "zip.h"
 
 /* A path dependency may be a project, whose build is a build of its own.
    The chain stops here, so a cycle of path dependencies reports rather
@@ -498,6 +500,102 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
     return driver_run(&o) == 0;
 }
 
+/* The name of the deliverable without the suffix of an executable, which
+   the entries of a symbols archive carry. */
+static void archive_stem(enum target t, const char *name, struct text *out)
+{
+    const char *suffix = target_info(t)->executable_suffix;
+    size_t length = strlen(suffix);
+
+    text_append(out, name);
+    if (length > 0 && out->length >= length &&
+        strcmp(out->data + out->length - length, suffix) == 0) {
+        out->length -= length;
+        out->data[out->length] = '\0';
+    }
+}
+
+/* DESIGN: a release binary carries no symbol data, so the build writes
+   the archive that names it. It holds the same link with the debug
+   sections kept and the map of that program. The map names the build id
+   of the binary beside it, which is what ties a frame of a trace to this
+   archive. The debug link carries an id of its own, because the id is
+   the digest of the assembly and `-g` writes more of it. Its addresses
+   are the addresses of the binary, so the map answers for both. A
+   Windows link writes the symbols to a PDB, which goes in as well. */
+static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
+                          size_t main_at, const struct strings *libraries,
+                          const char *deliverable)
+{
+    struct options o;
+    struct zip_entry entries[3];
+    struct text stem = {0};
+    struct text debug_path = {0};
+    struct text debug_name = {0};
+    struct text map_path = {0};
+    struct text map_name = {0};
+    struct text pdb_path = {0};
+    struct text pdb_name = {0};
+    struct text archive = {0};
+    struct text id = {0};
+    size_t count = 0;
+    bool ok = false;
+
+    archive_stem(t, deliverable, &stem);
+    text_appendf(&debug_name, "%s.debug", text_cstr(&stem));
+    text_appendf(&map_name, "%s.map", text_cstr(&stem));
+    text_appendf(&debug_path, "%s/%s", text_cstr(&b->build_dir),
+                 text_cstr(&debug_name));
+    text_appendf(&map_path, "%s/%s", text_cstr(&b->build_dir),
+                 text_cstr(&map_name));
+    text_appendf(&archive, "%s/%s-symbols.zip", text_cstr(&b->dist_dir),
+                 text_cstr(&stem));
+    base_options(b, &o, t, cpu);
+    o.input = b->units[main_at].source;
+    o.output = text_cstr(&debug_path);
+    o.libraries = libraries->items;
+    o.library_count = libraries->count;
+    o.debug = true;
+    if (driver_run(&o) != 0) {
+        goto done;
+    }
+    if (!symmap_build_id(text_cstr(&b->name), &id) ||
+        !symmap_write(text_cstr(&debug_path), t, text_cstr(&id),
+                      text_cstr(&map_path))) {
+        goto done;
+    }
+    entries[count].name = text_cstr(&debug_name);
+    entries[count].file = text_cstr(&debug_path);
+    entries[count].executable = true;
+    count++;
+    if (target_info(t)->format == FORMAT_COFF) {
+        text_appendf(&pdb_name, "%s.pdb", text_cstr(&stem));
+        text_appendf(&pdb_path, "%s.pdb", text_cstr(&debug_path));
+        if (path_exists(text_cstr(&pdb_path))) {
+            entries[count].name = text_cstr(&pdb_name);
+            entries[count].file = text_cstr(&pdb_path);
+            entries[count].executable = false;
+            count++;
+        }
+    }
+    entries[count].name = text_cstr(&map_name);
+    entries[count].file = text_cstr(&map_path);
+    entries[count].executable = false;
+    count++;
+    ok = zip_write(text_cstr(&archive), entries, count);
+done:
+    text_free(&stem);
+    text_free(&debug_path);
+    text_free(&debug_name);
+    text_free(&map_path);
+    text_free(&map_name);
+    text_free(&pdb_path);
+    text_free(&pdb_name);
+    text_free(&archive);
+    text_free(&id);
+    return ok;
+}
+
 /* The file name of a library for C on a target. */
 static void library_name(enum target t, bool shared, const char *name,
                          struct text *out)
@@ -653,6 +751,10 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     if (ok) {
         ok = copy_into(text_cstr(&b->name), text_cstr(&b->dist_dir),
                        text_cstr(&deliverable));
+    }
+    if (ok && b->r->release && b->r->lib == BUILD_PROGRAM) {
+        ok = build_symbols(b, t, cpu, main_at, &libraries,
+                           text_cstr(&deliverable));
     }
 done:
     for (i = 0; files != NULL && i < b->unit_count; i++) {

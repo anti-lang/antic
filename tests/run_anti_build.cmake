@@ -108,6 +108,50 @@ if(NOT status EQUAL 9 OR NOT out MATCHES "^one")
     message(FATAL_ERROR "the release program ended with ${status}")
 endif()
 
+# A release binary carries no symbol data, so the build writes the
+# archive that names it: the same link with the debug sections kept and
+# the map of the program, which carries the build id of the binary.
+set(archive "${project}/dist/${HOST}/release/app-symbols.zip")
+if(NOT EXISTS "${archive}")
+    message(FATAL_ERROR "the release build wrote no ${archive}")
+endif()
+file(REMOVE_RECURSE "${WORK}/symbols")
+file(MAKE_DIRECTORY "${WORK}/symbols")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E tar xf "${archive}"
+    WORKING_DIRECTORY "${WORK}/symbols"
+    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "the symbols archive did not unpack\n${err}")
+endif()
+foreach(name app.debug app.map)
+    if(NOT EXISTS "${WORK}/symbols/${name}")
+        message(FATAL_ERROR "the symbols archive holds no ${name}")
+    endif()
+endforeach()
+# The link with the debug sections is the same program at the same
+# addresses, so the map answers for the binary beside it.
+execute_process(COMMAND "${WORK}/symbols/app.debug" RESULT_VARIABLE status
+    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+if(NOT status EQUAL 9 OR NOT out MATCHES "^one")
+    message(FATAL_ERROR "app.debug ended with ${status} and wrote ${out}${err}")
+endif()
+file(STRINGS "${release}" lines REGEX "^build [0-9a-f]+$")
+string(REGEX MATCH "^build ([0-9a-f]+)$" line "${lines}")
+set(id "${CMAKE_MATCH_1}")
+file(READ "${WORK}/symbols/app.map" map)
+if(NOT map MATCHES "# build ${id}")
+    message(FATAL_ERROR "the map names no build id of the program:\n${map}")
+endif()
+foreach(name com.example.app.main com.example.greet.word)
+    if(NOT map MATCHES "${name}")
+        message(FATAL_ERROR "the map names no ${name}")
+    endif()
+endforeach()
+if(NOT map MATCHES "greet.anti:[0-9]+")
+    message(FATAL_ERROR "the map carries no file and line:\n${map}")
+endif()
+
 # `anti build` passes -g in dev mode and never in release, so the
 # assembly of a dev build carries the line of every statement.
 file(READ "${project}/build/${HOST}/dev/app.s" dev_assembly)
