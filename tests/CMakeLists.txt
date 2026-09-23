@@ -1894,6 +1894,17 @@ if(ANTIC_HOST_OS STREQUAL "macos")
             "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/host.expected"
             "-DPROVIDED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/provided.expected"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin.cmake")
+    # The three checks of "Versions": the chain of the interface, the
+    # fields it declares and the slots the program reaches through it.
+    add_test(NAME plugin_versions
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=.dylib"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_versions.cmake")
 endif()
 
 # ANTI_CONF names the file when the command line names none, and the

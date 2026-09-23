@@ -1,0 +1,15 @@
+//! The interface with a field added. Its table is the program's, and
+//! its objects are wider, which ends the compatibility.
+
+/// A greeting a program prints.
+pub abstract class Greeter
+{
+	/// How loud the greeting is.
+	pub volume: int = 1,
+
+	/// The words of the greeting.
+	pub abstract fn words(self) -> str;
+
+	/// How often the greeting was asked for.
+	pub abstract fn asked(self) -> int;
+}

@@ -1,0 +1,33 @@
+//! A library built against the later interface.
+
+import net.example.greet;
+
+provides net.example.greet.Greeter as Fancy;
+
+/// The greeting of the newer library.
+pub class Fancy
+{
+	implements g: greet.Greeter,
+
+	/// The greetings asked for so far.
+	count: int = 0,
+
+	/// The words of the greeting.
+	pub concrete fn words(self) -> str
+	{
+		self.count = self.count + 1;
+		return "from the newer library";
+	}
+
+	/// How often the greeting was asked for.
+	pub concrete fn asked(self) -> int
+	{
+		return self.count;
+	}
+
+	/// The greeting in capitals.
+	pub concrete fn shout(self) -> str
+	{
+		return "FROM THE NEWER LIBRARY";
+	}
+}

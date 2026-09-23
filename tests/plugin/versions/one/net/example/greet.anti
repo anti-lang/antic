@@ -1,0 +1,9 @@
+//! The interface as it was before `asked` joined it: one function, and
+//! the first entry of the chain the later versions carry.
+
+/// A greeting a program prints.
+pub abstract class Greeter
+{
+	/// The words of the greeting.
+	pub abstract fn words(self) -> str;
+}

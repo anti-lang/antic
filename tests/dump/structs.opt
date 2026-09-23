@@ -8,7 +8,7 @@ type [2]anti.rt.Field = array 2 of anti.rt.Field
 type [3]anti.rt.Field = array 3 of anti.rt.Field
 type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
 type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr, descriptor: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn take(agg structs.Pair, agg structs.Big, agg structs.Rgb, agg structs.V2) -> agg structs.Pair
 extern fn make(i64) -> agg structs.Big

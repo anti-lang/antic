@@ -191,9 +191,7 @@ static int version_below(const unsigned char *a, int64_t a_length,
     return 0;
 }
 
-/* The bitmap of the slots the program's calls reach through d, or NULL
-   where they reach none. */
-static const struct anti_slots *slots_of(const struct anti_descriptor *d)
+const struct anti_slots *anti_rt_plugin_slots(const struct anti_descriptor *d)
 {
     int64_t i;
 
@@ -258,7 +256,7 @@ static int checked(const char *name, const struct anti_provides *e)
              (int)e->path_length, e->path, name);
         return 0;
     }
-    reached = slots_of(d);
+    reached = anti_rt_plugin_slots(d);
     for (at = entries + 1; reached != NULL && at < reached->slot_count;
          at++) {
         char found[128];

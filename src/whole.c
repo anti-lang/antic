@@ -1802,16 +1802,16 @@ static void write_injectable(struct ir_module *m,
 {
     static const char *const item_names[] = {
         "name", "class", "field", "final", "slot", "library",
-        "library_length", "discover", "holder", "thunk"
+        "library_length", "discover", "holder", "thunk", "descriptor"
     };
     static const enum ir_type item_types[] = {
         IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_PTR, IR_PTR, IR_I64, IR_I64,
-        IR_PTR, IR_PTR
+        IR_PTR, IR_PTR, IR_PTR
     };
     static const char *const table_names[] = {"count", "interfaces"};
     static const enum ir_type table_types[] = {IR_I64, IR_PTR};
     uint32_t item_agg = struct_agg(m, "anti.rt.Injectable", item_names,
-                                   item_types, 10);
+                                   item_types, 11);
     uint32_t table_agg = struct_agg(m, "anti.rt.Injectables", table_names,
                                     table_types, 2);
     struct ir_const *value = ir_const_agg(m, ir_aggregate(table_agg), 2);
@@ -1828,7 +1828,7 @@ static void write_injectable(struct ir_module *m,
                              ir_sym_int(m, IR_I64, count), NULL);
         list_value = ir_const_agg(m, ir_aggregate(array), count);
         for (i = 0; i < count; i++) {
-            struct ir_const *item = ir_const_agg(m, ir_aggregate(item_agg), 10);
+            struct ir_const *item = ir_const_agg(m, ir_aggregate(item_agg), 11);
             struct text name = {0};
             char global[48];
             uint32_t text;
@@ -1873,6 +1873,9 @@ static void write_injectable(struct ir_module *m,
                 const_int(&item->items[8], IR_PTR, 0);
                 const_int(&item->items[9], IR_PTR, 0);
             }
+            /* `--anti.inspect` reads the version and the used slots of
+               the interface through its descriptor. */
+            const_addr(&item->items[10], list[i].descriptor);
             list_value->items[i] = *item;
         }
         const_addr(&value->items[1],

@@ -5,7 +5,7 @@ plugins =  \(build\)
 threads =  \(build\)
 trace =  \(build\)
 injectable interfaces:
-  service\.Logger \(service\.Service\.log\)
-  service\.Clock \(service\.Service\.time, final\)
-  service\.Allocator \(service\.Service\.alloc\)
+  service\.Logger \(service\.Service\.log\) version 0\.0\.0, 1 used slot
+  service\.Clock \(service\.Service\.time, final\) version 0\.0\.0, 1 used slot
+  service\.Allocator \(service\.Service\.alloc\) version 0\.0\.0, 1 used slot
 loaded plugins: none

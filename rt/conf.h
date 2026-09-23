@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 
+#include "object.h"
 #include "std.h"
 
 /* DESIGN: the link step writes the injectable interfaces of the
@@ -30,6 +31,9 @@ struct anti_injectable {
        puts the thunk, which gives it, in the slot. */
     void **holder;
     void *thunk;
+    /* The descriptor of the interface, which `--anti.inspect` reads for
+       its version and the slots the program reaches. */
+    const struct anti_descriptor *descriptor;
 };
 
 struct anti_injectables {

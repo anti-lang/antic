@@ -59,6 +59,10 @@ struct anti_slot_table {
 
 extern const struct anti_slot_table anti_rt_slots;
 
+/* The bitmap of the slots the program's calls reach through d, or NULL
+   where they reach none. */
+const struct anti_slots *anti_rt_plugin_slots(const struct anti_descriptor *d);
+
 /* The table a plugin exports as `anti_rt_provides`, with the version of
    the runtime it was built against and the classes it brings. */
 struct anti_provided {

@@ -678,9 +678,21 @@ static void inspect(void)
         for (k = 0; k < anti_rt_injectable.count; k++) {
             const struct anti_injectable *in =
                 &anti_rt_injectable.interfaces[k];
-            printf("  %s (%s.%s%s)\n", (const char *)in->name,
-                   (const char *)in->owner, (const char *)in->field,
-                   in->final != 0 ? ", final" : "");
+            const struct anti_descriptor *d = in->descriptor;
+            const struct anti_slots *reached =
+                d != NULL ? anti_rt_plugin_slots(d) : NULL;
+            int64_t used = 0;
+            int64_t slot;
+            for (slot = 0; reached != NULL && slot < reached->slot_count;
+                 slot++) {
+                used += (reached->bits[slot / 8] >> (slot % 8)) & 1;
+            }
+            printf("  %s (%s.%s%s) version %.*s, %lld used slot%s\n",
+                   (const char *)in->name, (const char *)in->owner,
+                   (const char *)in->field, in->final != 0 ? ", final" : "",
+                   d != NULL ? (int)d->version_length : 0,
+                   d != NULL ? d->version : (const unsigned char *)"",
+                   (long long)used, used == 1 ? "" : "s");
         }
     }
     if (injection_count == 0) {

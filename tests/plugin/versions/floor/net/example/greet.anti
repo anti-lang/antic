@@ -1,0 +1,14 @@
+//! The interface with a floor. A plugin built for a version below 1.1
+//! is refused, whatever its chain says.
+
+/// A greeting a program prints.
+pub abstract class Greeter
+{
+	compatible 1.1;
+
+	/// The words of the greeting.
+	pub abstract fn words(self) -> str;
+
+	/// How often the greeting was asked for.
+	pub abstract fn asked(self) -> int;
+}

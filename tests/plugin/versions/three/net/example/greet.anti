@@ -1,0 +1,15 @@
+//! The interface with one function added after the two the program
+//! carries. Its chain holds the program's as a prefix.
+
+/// A greeting a program prints.
+pub abstract class Greeter
+{
+	/// The words of the greeting.
+	pub abstract fn words(self) -> str;
+
+	/// How often the greeting was asked for.
+	pub abstract fn asked(self) -> int;
+
+	/// The greeting in capitals.
+	pub abstract fn shout(self) -> str;
+}

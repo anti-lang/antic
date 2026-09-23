@@ -5,7 +5,7 @@ type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i6
 type [2]anti.rt.Field = array 2 of anti.rt.Field
 type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
 type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr, descriptor: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn measure.fn.0(agg str) -> i64
 extern fn measure.fn.1(agg measure.V2) -> i64

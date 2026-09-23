@@ -1,0 +1,23 @@
+//! A host that loads the library its first argument names and prints
+//! the greeting it gives. A refused load prints its reason instead.
+
+import anti.io;
+import anti.plugin;
+import net.example.greet;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let g = lib.instance(greet.Greeter) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	io.println(g.words());
+	delete(g);
+	lib.unload() catch fatal;
+	delete(lib);
+	return 0;
+}

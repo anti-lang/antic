@@ -1,0 +1,25 @@
+//! A library for the interface with a floor. The version of the package
+//! that declared the interface decides, and the build of this library
+//! names it.
+
+import net.example.greet;
+
+provides net.example.greet.Greeter as Fancy;
+
+/// The greeting of the library.
+pub class Fancy
+{
+	implements g: greet.Greeter,
+
+	/// The words of the greeting.
+	pub concrete fn words(self) -> str
+	{
+		return "from the floor library";
+	}
+
+	/// How often the greeting was asked for.
+	pub concrete fn asked(self) -> int
+	{
+		return 0;
+	}
+}

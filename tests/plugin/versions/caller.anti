@@ -1,0 +1,26 @@
+//! A host that calls both functions of the interface, so the slot of
+//! each stands in the bitmap the program carries.
+
+import anti.io;
+import anti.plugin;
+import net.example.greet;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let g = lib.instance(greet.Greeter) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	io.println(g.words());
+	if g.asked() == 0 {
+		io.println("asked none");
+	}
+	delete(g);
+	lib.unload() catch fatal;
+	delete(lib);
+	return 0;
+}
