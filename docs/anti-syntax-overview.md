@@ -2,6 +2,8 @@
 
 Every feature of the language in one place, each with what it does and an example where one helps. The rules are in `docs/decisions.md`, `docs/anti-object-model.md` and `docs/anti-language-additions.md`. This overview follows them and adds nothing. Where a feature is not built yet, its section says so.
 
+The test `overview_examples` runs every `anti` block of this page through the front end of antic, so an example that stops compiling fails the suite. A block that opens with `anti not-built` shows a feature that is not built yet, and the test passes over it. The status line of its section names that feature. A hidden block before an example declares the names the example uses without showing them.
+
 Contents:
 
 - [Program structure](#program-structure)
@@ -37,6 +39,8 @@ Contents:
 - [Checks and debugging](#checks-and-debugging)
 - [Wire formats](#wire-formats)
 - [Script mode](#script-mode)
+- [Standard library](#standard-library)
+- [Later](#later)
 - [Reserved words](#reserved-words)
 
 ## Program structure
@@ -53,7 +57,7 @@ fn main() -> int
 }
 ```
 
-`main` has one of three signatures: `fn main() -> int`, `fn main(args: []str) -> int`, `fn main(args: []str, env: []str) -> int`. Comments are `//` to the end of the line and `/* */`, which do not nest. Source is UTF-8. Indentation is a tab. An item body opens `{` on its own line, a statement block opens `{` on the statement's line.
+`main` has one of three signatures: `fn main() -> int`, `fn main(args: []str) -> int`, `fn main(args: []str, env: []str) -> int`. Comments are `//` to the end of the line and `/* */`, which do not nest. `///` documents the next item and `//!` the module, and `//#` and `//#!` do the same for the developers of a library. Source is UTF-8. Indentation is a tab. An item body opens `{` on its own line, a statement block opens `{` on the statement's line.
 
 ## Modules
 
@@ -81,7 +85,7 @@ out.println("renamed");
 
 ## Types
 
-Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Function pointers `fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. The C types `c_int`, `c_long`, `c_wchar` and the rest for bindings. No implicit conversions between numbers.
+Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Function pointers `fn(i32) -> i32` and nullable ones `?fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. The built-in types `Flags`, `Mutex` and `chan T`. The C types `c_int`, `c_long`, `c_wchar` and the rest for bindings. No implicit conversions between numbers.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -601,7 +605,7 @@ Built.
 
 ## Reflection
 
-Every class has a descriptor: name, parent, size, fields with name, offset, type and ownership, functions with their table slot. `anti.reflect` reads it.
+Every class has a descriptor: name, parent, size, fields with name, offset, type and ownership, functions with their table slot. `anti.reflect` reads it. `describe` gives the descriptor of an object, `field_count` and `field` read the field list, and `function_count` and `function` the function list. `get` and `set` read and write a field by its index as a `Value`, `call` calls a function by its index, and `new` builds an object of a class it names, or gives `none`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -644,7 +648,7 @@ let back = Object.deserialize(b.text(), &arena);
 arena.free_all();
 ```
 
-Built: descriptors, `get`, `set`, `call`, `new`, `Value` and `Object.deserialize` with an `Allocator`.
+Built: descriptors, `get`, `set`, `call`, `new`, `Value` and `Object.deserialize` with an `Allocator`. Not built yet: `type_of(T)`, the descriptor of any type.
 
 ## Operators on classes
 
@@ -694,7 +698,7 @@ let n = Circle.count.load();
 Config.get().requests.add(1);
 ```
 
-Atomic operations: `load store add sub and or xor swap compare_swap`, sequentially consistent. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` fields may be written anywhere except from a worker, which the compiler checks.
+Atomic operations: `load store add sub and or swap compare_swap`, sequentially consistent. `add`, `sub`, `and`, `or` and `swap` give the value the field held before. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` fields may be written anywhere except from a worker, which the compiler checks.
 
 Built.
 
@@ -727,6 +731,8 @@ let parts2 = parallel data by 4 -> sum;
 worker fn render(s: *Sprite, frame: int) { }
 let job = dispatch sprite -> render(frame);
 join(job);
+let jobs = [dispatch sprite -> render(frame + 1)];
+join_all(jobs[0..1]);
 ```
 
 Worker parameters are pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `ANTI_THREADS` is gone. `--anti.threads` and the configuration file set the pool size.
@@ -762,7 +768,7 @@ delete(c);
 
 A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. A worker takes a `Mutex` and a `chan T` beside its values.
 
-Built: `parallel`, `dispatch`, `join`, `Mutex`, `sync`, `chan T` with `send`, `recv` and `close`, and `select`. `--anti.threads` and the `threads` key of the configuration file set the pool size, and `ANTI_THREADS` is gone. Not built yet: the warning on a field written inside `sync` and read outside it.
+Built: `parallel`, `dispatch`, `join`, `join_all`, `Mutex`, `sync`, `chan T` with `send`, `recv` and `close`, and `select`. `--anti.threads` and the `threads` key of the configuration file set the pool size, and `ANTI_THREADS` is gone. Not built yet: the warning on a field written inside `sync` and read outside it.
 
 ## Hooks and tracing
 
@@ -818,7 +824,7 @@ class Renderer
 "anti.log.Logger" = "net.niese.tests.FakeLogger.get"
 ```
 
-Six standard interfaces ship with defaults: `Logger`, `Clock`, `Source`, `FileSystem`, `Allocator`, `Config`. Standard interfaces for services come with a reference implementation: `anti.db` with SQLite, `anti.http`, `anti.serialize`, `anti.crypto`.
+Six standard interfaces ship with defaults: `Logger`, `Clock`, `Source`, `FileSystem`, `Allocator`, `Config`. Standard interfaces for services come with a reference implementation: `anti.db` with SQLite, `anti.http`, `anti.serialize`, `anti.crypto`. They wait for the native libraries of the runtime archive.
 
 A provider is a module function that gives a pointer of the interface, or the `get` of a singleton that implements it. The name of that singleton alone names its `get`.
 
@@ -962,7 +968,7 @@ Built: `here`, in an expression and as the default of a parameter, and `SourceLo
 
 ## Checks and debugging
 
-In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted. `--checks`, `--asserts`, `--trace` and `-g` override.
+In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted. `--checks`, `--asserts`, `--trace` and `-g` override.
 
 ```anti
 trace class Renderer { }
@@ -1021,12 +1027,34 @@ fn main(args: []str) -> int
 
 Not built yet.
 
+## Standard library
+
+The modules under `anti.` ship with the compiler, and a program imports them without `-I`. `anti.lang` is the root and imports nothing. It holds `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `Trace` and `TraceHandler`, and the compiler declares `Object`, `Job`, `Flags`, `Mutex` and `FieldDescriptor` there.
+
+```anti
+import anti.io;
+import anti.text;
+
+let n = text.parse_int("42") catch fatal;
+let s = f"{n} items";
+io.println(s);
+free(s.ptr);
+```
+
+Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`, `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`, `anti.simd`, `anti.trace` and `anti.plugin`. Not built yet: the modules over the native libraries of the runtime archive, `anti.net`, `anti.regex`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+
+## Later
+
+Generics and closures come after the features above, as "Timing" in `docs/anti-language-additions.md` orders them. Neither has a syntax yet, so no example of either stands here.
+
 ## Reserved words
 
-Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for in break continue return defer undo try catch yield fail assert show unreachable undefined embed here fallthrough as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join sync chan send recv select atomic true false none tests fixtures provides`.
+Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for break continue return defer undo try catch yield fail assert show unreachable undefined embed here fallthrough as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join join_all sync chan send recv select atomic true false none tests fixtures provides`.
 
-Contextual words: `packed align by final own operator mutable trace inject compatible simd`, and `may fail` after a signature.
+Contextual words: `packed align by in final own transient operator mutable trace inject compatible simd`, `fatal` after `catch`, and `may fail` after a signature. `alloc` and `free` name a function of a class after `fn` and a member after `.`.
 
 String prefixes: `r b br f rf x`.
 
-Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types.
+Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
+
+Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today.
