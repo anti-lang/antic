@@ -44,22 +44,6 @@ static void die_out_of_memory(void)
     exit(70);
 }
 
-static bool read_all(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[65536];
-    size_t n;
-
-    if (f == NULL) {
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
 static bool ends_with(const char *s, const char *suffix)
 {
     size_t a = strlen(s);
@@ -284,7 +268,7 @@ static void add_binary(struct binaries *list, const char *path)
             return;
         }
     }
-    if (!read_all(path, &bytes)) {
+    if (!read_file(path, &bytes)) {
         printf("missing %s: no such file\n", path);
         list->problems++;
         return;
@@ -355,7 +339,7 @@ static bool read_configuration(struct configuration *c, const char *path,
             return false;
         }
     }
-    if (!read_all(path, &bytes)) {
+    if (!read_file(path, &bytes)) {
         fprintf(stderr, "anti: cannot read %s\n", path);
         return false;
     }
@@ -448,7 +432,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct text id = {0};
         struct text version = {0};
         const char *path = text_cstr(&files.items[i]);
-        if (read_all(path, &bytes) && is_program(base_name(path), &bytes) &&
+        if (read_file(path, &bytes) && is_program(base_name(path), &bytes) &&
             notice_of(&bytes, &id, &version)) {
             add_binary(out, path);
         }
@@ -470,7 +454,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct anti_toml *doc = NULL;
         resolved(text_cstr(&c.dir), text_cstr(&c.plugins.items[i]), &dir);
         text_appendf(&index, "%s/%s", text_cstr(&dir), PLUGIN_INDEX);
-        if (read_all(text_cstr(&index), &bytes)) {
+        if (read_file(text_cstr(&index), &bytes)) {
             doc = anti_rt_toml_read((const unsigned char *)bytes.data,
                                     (int64_t)bytes.length);
         }
@@ -1172,7 +1156,7 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
                built. */
             if (anti_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
                 struct text bytes = {0};
-                if (read_all(object, &bytes)) {
+                if (read_file(object, &bytes)) {
                     anti_macho_relocate((uint8_t *)bytes.data, bytes.length);
                     if (anti_macho_object_line((const uint8_t *)bytes.data,
                                                bytes.length, symbol,
@@ -1220,7 +1204,7 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
             return 1;
         }
     }
-    if (!read_all(trace, &input)) {
+    if (!read_file(trace, &input)) {
         fprintf(stderr, "anti: cannot read %s\n", trace);
         units_free(&units);
         return 1;

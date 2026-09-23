@@ -24,23 +24,6 @@ static void out_of_memory(void)
     exit(70);
 }
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot read %s\n", path);
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
 bool unit_file(const char *dir, const char *module,
                         const char *suffix, struct text *out)
 {
@@ -80,7 +63,7 @@ bool unit_read(const char *source, const char *const *roots,
 
     memset(out, 0, sizeof *out);
     out->source = source;
-    if (!read_file(source, &bytes)) {
+    if (!read_file_reported(source, &bytes)) {
         goto done;
     }
     if (!module_path_of_source(source, roots, root_count, &out->path, message,

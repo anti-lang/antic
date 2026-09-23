@@ -22,6 +22,7 @@
 
 #include "arena.h"
 #include "diagnostic.h"
+#include "files.h"
 #include "lexer.h"
 #include "text.h"
 
@@ -1252,40 +1253,6 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     return true;
 }
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot read %s\n", path);
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
-static bool write_file(const char *path, const struct text *bytes)
-{
-    FILE *f = fopen(path, "wb");
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    if (bytes->length > 0 &&
-        fwrite(bytes->data, 1, bytes->length, f) != bytes->length) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        fclose(f);
-        return false;
-    }
-    return fclose(f) == 0;
-}
-
 int fmt_run(const char *const *paths, size_t count, bool check)
 {
     size_t changed = 0;
@@ -1295,7 +1262,7 @@ int fmt_run(const char *const *paths, size_t count, bool check)
     for (i = 0; i < count; i++) {
         struct text source = {0};
         struct text formed = {0};
-        if (!read_file(paths[i], &source)) {
+        if (!read_file_reported(paths[i], &source)) {
             text_free(&source);
             status = 1;
             continue;

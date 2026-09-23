@@ -31,39 +31,6 @@ enum { REPO_INDEX_SECONDS = 3600 };
 #define REPO_STAMP_SUFFIX ".checked"
 #define REPO_ETAG_SUFFIX ".etag"
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
-static bool write_file(const char *path, const char *bytes, size_t length)
-{
-    FILE *f = fopen(path, "wb");
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    if (length > 0 && fwrite(bytes, 1, length, f) != length) {
-        fclose(f);
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    fclose(f);
-    return true;
-}
-
 bool repo_name_valid(const char *name)
 {
     const char *p = name;
@@ -281,7 +248,7 @@ static void write_stamp(const char *stamp)
     struct text bytes = {0};
 
     text_appendf(&bytes, "%lld\n", (long long)time(NULL));
-    write_file(stamp, bytes.data, bytes.length);
+    write_file(stamp, &bytes);
     text_free(&bytes);
 }
 

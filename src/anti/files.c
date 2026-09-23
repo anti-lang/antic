@@ -144,6 +144,64 @@ bool copy_file(const char *from, const char *to)
     return fclose(out) == 0 && ok;
 }
 
+static void cannot_read(const char *path)
+{
+    fprintf(stderr, "anti: cannot read %s\n", path);
+}
+
+bool read_file(const char *path, struct text *out)
+{
+    FILE *f = fopen(path, "rb");
+    char buffer[65536];
+    size_t start = out->length;
+    size_t n;
+    bool ok;
+
+    if (f == NULL) {
+        return false;
+    }
+    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
+        text_append_bytes(out, buffer, n);
+    }
+    /* fread gives 0 at the end of the file and on a read error alike. */
+    ok = !ferror(f);
+    fclose(f);
+    if (!ok) {
+        out->length = start;
+        if (out->data != NULL) {
+            out->data[start] = '\0';
+        }
+    }
+    return ok;
+}
+
+bool read_file_reported(const char *path, struct text *out)
+{
+    if (!read_file(path, out)) {
+        cannot_read(path);
+        return false;
+    }
+    return true;
+}
+
+bool write_file(const char *path, const struct text *bytes)
+{
+    FILE *f = fopen(path, "wb");
+    bool ok;
+
+    if (f == NULL) {
+        fprintf(stderr, "anti: cannot write %s\n", path);
+        return false;
+    }
+    ok = bytes->length == 0 ||
+         fwrite(bytes->data, 1, bytes->length, f) == bytes->length;
+    if (fclose(f) != 0 || !ok) {
+        fprintf(stderr, "anti: cannot write %s\n", path);
+        return false;
+    }
+    return true;
+}
+
 bool copy_program(const char *from, const char *to)
 {
 #if defined(_WIN32)
@@ -194,7 +252,14 @@ static int by_path(const void *a, const void *b)
 }
 
 /* One directory of the walk. A name that starts with a dot is left alone,
-   so a checkout's own directories are no part of a project. */
+   so a checkout's own directories are no part of a project.
+
+   DESIGN: a link to a directory is not followed, as remove_tree follows
+   none, so a link to a parent cannot lead the walk round until it runs
+   out of descriptors. A link to a file is listed as the file. A directory
+   that does not exist adds nothing, and every other failure to read one
+   fails the walk, so no caller takes a tree it did not read for the
+   whole. */
 static bool walk(const char *dir, const char *suffix, bool deep,
                  struct file_list *out)
 {
@@ -202,13 +267,19 @@ static bool walk(const char *dir, const char *suffix, bool deep,
     WIN32_FIND_DATAA found;
     HANDLE search;
     struct text pattern = {0};
+    DWORD error;
     bool ok = true;
 
     text_appendf(&pattern, "%s\\*", dir);
     search = FindFirstFileA(text_cstr(&pattern), &found);
     text_free(&pattern);
     if (search == INVALID_HANDLE_VALUE) {
-        return true;
+        error = GetLastError();
+        if (error == ERROR_PATH_NOT_FOUND || error == ERROR_FILE_NOT_FOUND) {
+            return true;
+        }
+        cannot_read(dir);
+        return false;
     }
     do {
         struct text child = {0};
@@ -217,7 +288,9 @@ static bool walk(const char *dir, const char *suffix, bool deep,
         }
         text_appendf(&child, "%s/%s", dir, found.cFileName);
         if (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            if (deep && !walk(text_cstr(&child), suffix, deep, out)) {
+            bool link = (found.dwFileAttributes &
+                         FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+            if (deep && !link && !walk(text_cstr(&child), suffix, deep, out)) {
                 ok = false;
             }
         } else if (ends_with(found.cFileName, suffix)) {
@@ -225,6 +298,10 @@ static bool walk(const char *dir, const char *suffix, bool deep,
         }
         text_free(&child);
     } while (FindNextFileA(search, &found));
+    if (GetLastError() != ERROR_NO_MORE_FILES) {
+        cannot_read(dir);
+        ok = false;
+    }
     FindClose(search);
     return ok;
 #else
@@ -233,17 +310,42 @@ static bool walk(const char *dir, const char *suffix, bool deep,
     bool ok = true;
 
     if (handle == NULL) {
-        return true;
+        if (errno == ENOENT) {
+            return true;
+        }
+        cannot_read(dir);
+        return false;
     }
-    while ((entry = readdir(handle)) != NULL) {
+    for (;;) {
         struct text child = {0};
         struct stat st;
+        errno = 0;
+        entry = readdir(handle);
+        if (entry == NULL) {
+            if (errno != 0) {
+                cannot_read(dir);
+                ok = false;
+            }
+            break;
+        }
         if (entry->d_name[0] == '.') {
             continue;
         }
         text_appendf(&child, "%s/%s", dir, entry->d_name);
-        if (stat(text_cstr(&child), &st) != 0) {
+        if (lstat(text_cstr(&child), &st) != 0) {
+            cannot_read(text_cstr(&child));
             ok = false;
+        } else if (S_ISLNK(st.st_mode)) {
+            /* A link that leads nowhere names no file. */
+            if (stat(text_cstr(&child), &st) != 0) {
+                if (errno != ENOENT) {
+                    cannot_read(text_cstr(&child));
+                    ok = false;
+                }
+            } else if (!S_ISDIR(st.st_mode) &&
+                       ends_with(entry->d_name, suffix)) {
+                list_add(out, text_cstr(&child));
+            }
         } else if (S_ISDIR(st.st_mode)) {
             if (deep && !walk(text_cstr(&child), suffix, deep, out)) {
                 ok = false;

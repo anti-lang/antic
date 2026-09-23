@@ -21,32 +21,16 @@
 /* The macOS sysroots that an import fills. */
 static const char *const macos_targets[] = {"macos-arm64", "macos-x86_64"};
 
-/* Append the whole file at path to out. */
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[4096];
-    size_t n;
-
-    if (f == NULL) {
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
+/* Write line and a line feed as the whole file at path. */
 static bool write_line(const char *path, const char *line)
 {
-    FILE *f = fopen(path, "wb");
+    struct text bytes = {0};
+    bool ok;
 
-    if (f == NULL) {
-        return false;
-    }
-    fprintf(f, "%s\n", line);
-    return fclose(f) == 0;
+    text_appendf(&bytes, "%s\n", line);
+    ok = write_file(path, &bytes);
+    text_free(&bytes);
+    return ok;
 }
 
 #if defined(__APPLE__)
@@ -209,7 +193,6 @@ int sdk_export(const char *sdk, const char *out)
     }
     text_appendf(&file, "%s/%s", text_cstr(&stage), SYSROOT_SDK_VERSION);
     if (!write_line(text_cstr(&file), text_cstr(&version))) {
-        fprintf(stderr, "anti: cannot write %s\n", text_cstr(&file));
         goto done;
     }
     remove_tree(text_cstr(&bundle));

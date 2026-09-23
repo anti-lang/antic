@@ -48,40 +48,6 @@ static void die_out_of_memory(void)
     exit(70);
 }
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
-static bool write_text(const char *path, const struct text *bytes)
-{
-    FILE *f = fopen(path, "wb");
-    bool ok;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    ok = bytes->length == 0 ||
-         fwrite(bytes->data, 1, bytes->length, f) == bytes->length;
-    fclose(f);
-    if (!ok) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-    }
-    return ok;
-}
-
 /* A growing list of strings that the option lists point into. */
 struct strings {
     const char **items;
@@ -195,7 +161,7 @@ static bool write_key(const char *output, const struct text *key)
     bool ok;
 
     text_appendf(&path, "%s%s", output, BUILD_KEY_SUFFIX);
-    ok = write_text(text_cstr(&path), key);
+    ok = write_file(text_cstr(&path), key);
     text_free(&path);
     return ok;
 }
@@ -1135,12 +1101,12 @@ int build_new(const char *name)
     text_appendf(&path, "%s/src", text_cstr(&directory));
     text_appendf(&file, "%s/%s", text_cstr(&directory), MANIFEST_FILE);
     if (!make_dirs(text_cstr(&directory)) ||
-        !write_text(text_cstr(&file), &manifest)) {
+        !write_file(text_cstr(&file), &manifest)) {
         goto done;
     }
     file.length = 0;
     if (!unit_file(text_cstr(&path), name, SOURCE_SUFFIX, &file) ||
-        !write_text(text_cstr(&file), &source)) {
+        !write_file(text_cstr(&file), &source)) {
         goto done;
     }
     path.length = 0;

@@ -45,6 +45,7 @@ void test_bind(void);
 void test_deps(void);
 void test_zip(void);
 void test_syms(void);
+void test_files(void);
 
 int main(void)
 {
@@ -90,6 +91,7 @@ int main(void)
     test_deps();
     test_zip();
     test_syms();
+    test_files();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

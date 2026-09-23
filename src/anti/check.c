@@ -56,41 +56,6 @@ static void out_of_memory(void)
     exit(70);
 }
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot read %s\n", path);
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
-static bool write_file(const char *path, const struct text *bytes)
-{
-    FILE *f = fopen(path, "wb");
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    if (bytes->length > 0 &&
-        fwrite(bytes->data, 1, bytes->length, f) != bytes->length) {
-        fclose(f);
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    fclose(f);
-    return true;
-}
-
 /* The module path with `_` for every dot, which names a file of the work
    directory. */
 static void flat_path(const char *module, struct text *out)
@@ -330,7 +295,7 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
         struct text directory = {0};
         struct text original = {0};
         text_appendf(&directory, "%s/%s", work, CHECK_DEV_DIR);
-        if (!read_file(u->source, &original) ||
+        if (!read_file_reported(u->source, &original) ||
             !unit_file(text_cstr(&directory), text_cstr(&u->path),
                          SOURCE_SUFFIX, &path)) {
             text_free(&directory);
@@ -395,7 +360,7 @@ static bool unit_blocks(const struct unit *u, const struct options *base,
     size_t i;
     bool ok = true;
 
-    if (!read_file(u->source, &bytes)) {
+    if (!read_file_reported(u->source, &bytes)) {
         ok = false;
         goto done;
     }
@@ -454,7 +419,7 @@ static size_t format_class(const struct unit *units, size_t count)
     for (i = 0; i < count; i++) {
         struct text source = {0};
         struct text formed = {0};
-        if (!read_file(units[i].source, &source)) {
+        if (!read_file_reported(units[i].source, &source)) {
             findings++;
         } else if (!fmt_source(text_cstr(&source), source.length, &formed)) {
             /* A file the lexer refuses is the front-end class's to

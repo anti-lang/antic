@@ -79,24 +79,6 @@ static void out_of_memory(void)
     exit(70);
 }
 
-static bool write_file(const char *path, const struct text *bytes)
-{
-    FILE *f = fopen(path, "wb");
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    if (bytes->length > 0 &&
-        fwrite(bytes->data, 1, bytes->length, f) != bytes->length) {
-        fclose(f);
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    fclose(f);
-    return true;
-}
-
 static struct entry *entry_add(struct entry **list, size_t *count,
                                size_t *capacity)
 {

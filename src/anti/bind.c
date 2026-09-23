@@ -12,24 +12,6 @@
 #include "header.h"
 #include "text.h"
 
-static bool write_file(const char *path, const struct text *bytes)
-{
-    FILE *f = fopen(path, "wb");
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    if (bytes->length > 0 &&
-        fwrite(bytes->data, 1, bytes->length, f) != bytes->length) {
-        fclose(f);
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    fclose(f);
-    return true;
-}
-
 /* DESIGN: the header comes from the same driver call that `antic --lib`
    writes its header with, over the interfaces of the library file and
    its imports. The two cannot drift, and the test anti_bind_header
@@ -72,23 +54,6 @@ done:
     text_free(&header);
     text_free(&path);
     return status;
-}
-
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot read %s\n", path);
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
 }
 
 static const char *base_name(const char *path)
@@ -194,7 +159,7 @@ int bind_run(const struct bind_request *q)
         text_appendf(&header, "%s.h", b.library);
         b.header = bind_strdup(&b, text_cstr(&header));
         text_free(&header);
-        if (!read_file(q->input, &bytes) ||
+        if (!read_file_reported(q->input, &bytes) ||
             !bind_read_api(&b, (const unsigned char *)bytes.data,
                            bytes.length)) {
             goto done;

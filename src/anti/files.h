@@ -22,6 +22,20 @@ bool copy_file(const char *from, const char *to);
    call is a copy there. */
 bool copy_program(const char *from, const char *to);
 
+/* Append the bytes of the file at path to out. Returns false, with out as
+   it was, when the file cannot be opened or a read fails part of the way,
+   so no caller takes the part of a file for the whole. Prints nothing,
+   since a file that is not there is an answer for several callers. */
+bool read_file(const char *path, struct text *out);
+
+/* read_file, which also prints that path cannot be read when it fails. */
+bool read_file_reported(const char *path, struct text *out);
+
+/* Write bytes as the whole file at path. Returns false, and prints that
+   path cannot be written, when fopen, fwrite or fclose fails. fclose is
+   where a full disk reports the bytes of the last buffer. */
+bool write_file(const char *path, const struct text *bytes);
+
 /* Whether path names a file or directory that exists. */
 bool path_exists(const char *path);
 
@@ -35,8 +49,9 @@ struct file_list {
 /* Append the path of every file under dir, and under every directory
    below it, whose name ends with suffix. The paths are sorted, so a run
    over a tree is the same run everywhere. A directory that does not exist
-   adds nothing and is no error. Returns false when a directory cannot be
-   read. */
+   adds nothing and is no error. A link to a directory is not followed,
+   and a link to a file is listed. Returns false, and prints the path,
+   when a directory or an entry of one cannot be read. */
 bool list_tree(const char *dir, const char *suffix, struct file_list *out);
 
 /* Append the path of every file of dir itself, sorted, as list_tree

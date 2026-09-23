@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "files.h"
 #include "text.h"
 
 /* The four signatures of the format, and the version that a stored entry
@@ -66,29 +67,11 @@ static unsigned long crc32_of(const char *bytes, size_t length)
     return crc ^ 0xffffffffUL;
 }
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[65536];
-    size_t n;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot read %s\n", path);
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
 bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
 {
     struct text out = {0};
     struct text directory = {0};
     unsigned long *offsets = calloc(count + 1, sizeof *offsets);
-    FILE *f;
     size_t i;
     bool ok = true;
 
@@ -101,7 +84,7 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         unsigned long crc;
         size_t name_length = strlen(entries[i].name);
         if (entries[i].file != NULL) {
-            ok = read_file(entries[i].file, &bytes);
+            ok = read_file_reported(entries[i].file, &bytes);
         } else {
             text_append_bytes(&bytes, entries[i].bytes, entries[i].size);
         }
@@ -158,18 +141,7 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         put32(&out, (unsigned long)directory.length);
         put32(&out, start);
         put16(&out, 0);
-        f = fopen(path, "wb");
-        if (f == NULL) {
-            fprintf(stderr, "anti: cannot write %s\n", path);
-            ok = false;
-        } else {
-            ok = out.length == 0 ||
-                 fwrite(out.data, 1, out.length, f) == out.length;
-            if (fclose(f) != 0 || !ok) {
-                fprintf(stderr, "anti: cannot write %s\n", path);
-                ok = false;
-            }
-        }
+        ok = write_file(path, &out);
     }
     free(offsets);
     text_free(&out);
@@ -269,7 +241,7 @@ static bool read_directory(const char *path, struct zip_archive *out)
 bool zip_read(const char *path, struct zip_archive *out)
 {
     memset(out, 0, sizeof *out);
-    if (!read_file(path, &out->bytes) || !read_directory(path, out)) {
+    if (!read_file_reported(path, &out->bytes) || !read_directory(path, out)) {
         zip_archive_free(out);
         return false;
     }

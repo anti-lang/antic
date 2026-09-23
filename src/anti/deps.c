@@ -37,22 +37,6 @@ static void die_out_of_memory(void)
     exit(70);
 }
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
 /* The largest part of a version, the one of DEPS_VERSION_DIGITS nines. */
 #define DEPS_VERSION_PART_MAX INT64_C(999999999)
 
@@ -915,7 +899,6 @@ static bool lock_string(struct text *out, const char *key, const char *value,
 static bool lock_write(const char *path, const struct dep_graph *g)
 {
     struct text out = {0};
-    FILE *f;
     size_t i;
     size_t j;
     bool ok = true;
@@ -954,17 +937,7 @@ static bool lock_write(const char *path, const struct dep_graph *g)
         text_free(&out);
         return false;
     }
-    f = fopen(path, "wb");
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        text_free(&out);
-        return false;
-    }
-    ok = out.length == 0 || fwrite(out.data, 1, out.length, f) == out.length;
-    fclose(f);
-    if (!ok) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-    }
+    ok = write_file(path, &out);
     text_free(&out);
     return ok;
 }

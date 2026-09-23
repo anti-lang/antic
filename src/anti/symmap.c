@@ -36,41 +36,6 @@ static void die_out_of_memory(void)
     exit(70);
 }
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[65536];
-    size_t n;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot read %s\n", path);
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
-static bool write_text(const char *path, const struct text *bytes)
-{
-    FILE *f = fopen(path, "wb");
-    bool ok;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    ok = bytes->length == 0 ||
-         fwrite(bytes->data, 1, bytes->length, f) == bytes->length;
-    fclose(f);
-    if (!ok) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-    }
-    return ok;
-}
-
 static bool add_function(void *context, const char *name, uint64_t vaddr,
                          uint64_t size)
 {
@@ -145,7 +110,7 @@ static void macho_lines(struct map *m, const struct anti_macho_table *t)
             object.length = 0;
             object_path.length = 0;
             text_append(&object_path, path);
-            if (!read_file(path, &object)) {
+            if (!read_file_reported(path, &object)) {
                 object.length = 0;
                 continue;
             }
@@ -181,7 +146,7 @@ bool symmap_build_id(const char *program, struct text *out)
     size_t i;
     bool found = false;
 
-    if (!read_file(program, &bytes)) {
+    if (!read_file_reported(program, &bytes)) {
         return false;
     }
     /* The notice of every program holds the line `build <64 digits>`,
@@ -220,7 +185,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
     size_t i;
     bool ok;
 
-    if (!read_file(program, &bytes)) {
+    if (!read_file_reported(program, &bytes)) {
         return false;
     }
     if (info->format == FORMAT_ELF) {
@@ -256,7 +221,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
         }
         text_append(&out, "\n");
     }
-    ok = write_text(path, &out);
+    ok = write_file(path, &out);
     for (i = 0; i < m.count; i++) {
         text_free(&m.items[i].name);
         text_free(&m.items[i].file);

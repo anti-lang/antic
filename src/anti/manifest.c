@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "files.h"
 #include "text.h"
 #include "toml.h"
 
@@ -18,22 +19,6 @@ static void die_out_of_memory(void)
 {
     fputs("anti: out of memory\n", stderr);
     exit(70);
-}
-
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
 }
 
 /* The interface of a key under `inject.`, or NULL when the key belongs

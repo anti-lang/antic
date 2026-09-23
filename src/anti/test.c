@@ -53,41 +53,6 @@ static void die_out_of_memory(void)
     exit(70);
 }
 
-static bool read_file(const char *path, struct text *out)
-{
-    FILE *f = fopen(path, "rb");
-    char buffer[8192];
-    size_t n;
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot read %s\n", path);
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    fclose(f);
-    return true;
-}
-
-static bool write_file(const char *path, const struct text *bytes)
-{
-    FILE *f = fopen(path, "wb");
-
-    if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    if (bytes->length > 0 &&
-        fwrite(bytes->data, 1, bytes->length, f) != bytes->length) {
-        fclose(f);
-        fprintf(stderr, "anti: cannot write %s\n", path);
-        return false;
-    }
-    fclose(f);
-    return true;
-}
-
 /* The directory of the library file of a module path: work/a/b for
    a.b.c, which is where find_libraries of the compiler looks. */
 static bool library_path(const char *work, const char *module,
@@ -137,7 +102,7 @@ static bool read_unit(const char *source, const char *const *roots,
     size_t i;
 
     out->source = source;
-    if (!read_file(source, &bytes)) {
+    if (!read_file_reported(source, &bytes)) {
         goto done;
     }
     if (!module_path_of_source(source, roots, root_count, &out->path,
