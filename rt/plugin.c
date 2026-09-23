@@ -305,9 +305,17 @@ static void stub(struct anti_object *self)
     abort();
 }
 
+/* Whether the program may reach a slot through reflection that the
+   library does not carry. */
+static int needs_stubs(const struct anti_provides *e)
+{
+    return anti_rt_slots.reflect != 0 &&
+           e->descriptor->function_count > e->chain_length - 1;
+}
+
 /* The table of the sub-object an object of the entry gets, with a stub
-   in every slot the library lacks. NULL where the library carries every
-   slot the program may reach. */
+   in every slot the library lacks. NULL when there is no memory for
+   it. */
 static const void **stubs_of(const struct anti_provides *e)
 {
     const struct anti_descriptor *d = e->descriptor;
@@ -316,9 +324,6 @@ static const void **stubs_of(const struct anti_provides *e)
     const void **table;
     int64_t i;
 
-    if (anti_rt_slots.reflect == 0 || d->function_count <= entries) {
-        return NULL;
-    }
     head = calloc(1, sizeof *head +
                          (size_t)(d->function_count + 1) * sizeof(void *));
     if (head == NULL) {
@@ -336,6 +341,20 @@ static const void **stubs_of(const struct anti_provides *e)
         table[i] = cast.to;
     }
     return table;
+}
+
+/* Give back the tables the loader wrote for the count entries. */
+static void free_stubs(struct anti_plugin *p, int64_t count)
+{
+    int64_t i;
+
+    for (i = 0; p->stubbed != NULL && i < count; i++) {
+        if (p->stubbed[i] != NULL) {
+            free((struct anti_stubbed *)(void *)p->stubbed[i] - 1);
+        }
+    }
+    free(p->stubbed);
+    p->stubbed = NULL;
 }
 
 /* An object of the class of the entry, as a pointer to its interface
@@ -452,18 +471,19 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     }
     p->stubbed = NULL;
     for (i = 0; i < table->count; i++) {
-        const void **one = stubs_of(&table->entries[i]);
-        if (one == NULL) {
+        const void **one;
+        if (!needs_stubs(&table->entries[i])) {
             continue;
         }
         if (p->stubbed == NULL) {
             p->stubbed = calloc((size_t)table->count, sizeof *p->stubbed);
-            if (p->stubbed == NULL) {
-                free((struct anti_stubbed *)(void *)one - 1);
-                close_library(handle);
-                fail("out of memory");
-                return NULL;
-            }
+        }
+        one = p->stubbed != NULL ? stubs_of(&table->entries[i]) : NULL;
+        if (one == NULL) {
+            free_stubs(p, table->count);
+            close_library(handle);
+            fail("out of memory");
+            return NULL;
         }
         p->stubbed[i] = one;
     }
@@ -527,7 +547,6 @@ int8_t anti_rt_plugin_unload(void *handle)
 {
     struct anti_plugin *p = slot_of(handle);
     int64_t live;
-    int64_t i;
 
     message[0] = '\0';
     if (p == NULL) {
@@ -540,14 +559,7 @@ int8_t anti_rt_plugin_unload(void *handle)
              live == 1 ? "" : "s", live == 1 ? "is" : "are");
         return 0;
     }
-    if (p->stubbed != NULL) {
-        for (i = 0; i < p->table->count; i++) {
-            if (p->stubbed[i] != NULL) {
-                free((struct anti_stubbed *)(void *)p->stubbed[i] - 1);
-            }
-        }
-        free(p->stubbed);
-    }
+    free_stubs(p, p->table->count);
     close_library(p->handle);
     memset(p, 0, sizeof *p);
     anti_rt_plugin_closed();
