@@ -4,7 +4,9 @@
 # anti_rt and the tests. The targets, the sysroots of the runtime tree, the
 # processor levels, llvm-ar and llvm-mc come from there.
 # Libraries are added in the order of docs/decisions.md: PCRE2, then Mbed
-# TLS, miniaudio and raylib. media.cmake holds what the last two share.
+# TLS, miniaudio and raylib, with SQLite between PCRE2 and Mbed TLS as
+# docs/anti-language-additions.md places it. media.cmake holds what the
+# last two share.
 #
 # DESIGN: this is a subdirectory of the build of antic and no project of
 # its own, so one configure builds every target that has a sysroot, as the
@@ -79,6 +81,8 @@ foreach(target IN LISTS ANTIC_TARGETS)
 endforeach()
 
 include(pcre2.cmake)
+include(sqlite.cmake)
+include(mbedtls.cmake)
 include(media.cmake)
 include(miniaudio.cmake)
 include(raylib.cmake)

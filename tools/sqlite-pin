@@ -1,0 +1,8 @@
+# The pinned SQLite release that src/native/get-sqlite.cmake downloads.
+# The year is the directory of sqlite.org that holds the release. The
+# digest is the SHA3-256 of sqlite-amalgamation-<number>.zip that
+# sqlite.org/download.html publishes, where <number> is the version
+# written as 3XXYYZZ.
+SQLITE_VERSION=3.53.4
+SQLITE_YEAR=2026
+SQLITE_DIGEST=628a44cfe82c66aed1ccbbe85a562d2e33ebe64b3288981ed76285612227934e

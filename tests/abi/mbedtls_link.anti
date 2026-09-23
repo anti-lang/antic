@@ -1,0 +1,25 @@
+//! Mbed TLS of the runtime tree, reached through the C functions of
+//! mbedtls_probe.c. The library reports the version of its header, PSA hashes
+//! `abc` to the digest of FIPS 180-2, a TLS client context is set up with a
+//! seeded random generator and the name of its server, and the functions of a
+//! connection resolve at link.
+
+extern fn printf(format: ?*byte, ...) -> i32;
+extern fn mbedtls_probe_version() -> i32;
+extern fn mbedtls_probe_sha256() -> i32;
+extern fn mbedtls_probe_tls() -> i32;
+extern fn mbedtls_probe_linked() -> i32;
+
+fn show(v: i32)
+{
+	printf("%d\n".ptr, v as c_int);
+}
+
+fn main() -> int
+{
+	show(mbedtls_probe_version());
+	show(mbedtls_probe_sha256());
+	show(mbedtls_probe_tls());
+	show(mbedtls_probe_linked());
+	return 0;
+}

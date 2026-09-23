@@ -1,0 +1,29 @@
+//! SQLite of the runtime tree, reached through the C functions of
+//! sqlite_probe.c. The library reports the version of its header and the
+//! serialized threading mode. A query on an in-memory database sums and counts
+//! the rows a prepared statement inserted, takes `ß` as one character, finds no
+//! row where none matches, and a statement on a missing table fails with
+//! `SQLITE_ERROR`.
+
+extern fn printf(format: ?*byte, ...) -> i32;
+extern fn sqlite_probe_version() -> i32;
+extern fn sqlite_probe_threadsafe() -> i32;
+extern fn sqlite_probe_query(sql: ?*byte) -> i32;
+
+fn show(v: i32)
+{
+	printf("%d\n".ptr, v as c_int);
+}
+
+fn main() -> int
+{
+	show(sqlite_probe_version());
+	show(sqlite_probe_threadsafe());
+	show(sqlite_probe_query("SELECT sum(n) FROM t".ptr));
+	show(sqlite_probe_query("SELECT count(*) FROM t WHERE n > 10".ptr));
+	show(sqlite_probe_query("SELECT n FROM t WHERE name = 'zwei'".ptr));
+	show(sqlite_probe_query("SELECT length('ß')".ptr));
+	show(sqlite_probe_query("SELECT n FROM t WHERE name = 'vier'".ptr));
+	show(sqlite_probe_query("SELECT n FROM missing".ptr));
+	return 0;
+}
