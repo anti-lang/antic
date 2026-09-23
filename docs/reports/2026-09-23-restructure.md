@@ -85,7 +85,7 @@ The only build warning is the linker's `-lto_library` note, which
 
 At the push of the code, before this report:
 
-```
+```text
 1ac6185 Count repo_layout in the suite totals
 6fb5ffd Move the sources under src/ and the build trees under build/
 9f3a635 Report the repository layout step as blocked
