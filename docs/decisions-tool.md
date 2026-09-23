@@ -74,3 +74,23 @@ tool. A later step folds them into `docs/decisions.md`.
   cut them at 511, 1023 and 79 bytes.
 - [provisional] A unit of a deployment index with no `id` matches no
   entry of the archive.
+
+## Step 17, anti files and `main`
+
+- [provisional] `src/anti/files.c` holds the one file reader and the one
+  writer of `anti`. `read_file` prints nothing, since for some callers a
+  missing file is an answer. `read_file_reported` prints that the path
+  cannot be read. `write_file` prints that the path cannot be written.
+  A caller of either reporting form prints no second message.
+- [provisional] A read that fails part of the way fails the whole read,
+  and the text is left as it was before the call. A write fails when
+  `fclose` fails. A file the writer could not finish stays on disk as
+  written. `anti fmt` writes over a source in place, so removing it
+  would lose the source.
+- [provisional] The directory walk of `list_tree` and `list_dir` follows
+  no link to a directory, as `remove_tree` follows none. A link to a
+  file is listed as the file, and a link that leads nowhere is passed
+  over. On Windows a directory that is a reparse point is not entered.
+- [provisional] A directory that does not exist adds nothing to a walk.
+  Every other failure to open or read a directory, or to read an entry
+  of one, fails the walk and prints the path.
