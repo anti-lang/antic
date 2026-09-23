@@ -1,5 +1,6 @@
 exit 0
-{"type":"Every","a":-8,"b":-16,"c":-32,"d":-64,"e":200,"f":60000,"g":4000000000,"h":18446744073709551615,"x":1.5,"y":-0.25,"half":0.099975586,"on":true,"letter":"é","name":"a \"quoted\"\tline\n","counts":[1,-2,3],"view":{"address":0,"length":0},"other":null,"size":{"w":3,"h":4.5},"tag":{"type":"Tag","label":"t","weight":7},"mode":2,"spot":{"w":1,"h":2},"words":["one","tw\"o"],"sizes":[{"w":5,"h":0.5}]}
-{"type":"Every","a":-8,"b":-16,"c":-32,"d":-64,"e":200,"f":60000,"g":4000000000,"h":18446744073709551615,"x":1.5,"y":-0.25,"half":0.099975586,"on":true,"letter":"é","name":"a \"quoted\"\tline\n","counts":[1,-2,3],"view":{"address":0,"length":0},"other":null,"size":{"w":3,"h":4.5},"tag":{"type":"Tag","label":"t","weight":7},"mode":2,"spot":{"w":1,"h":2},"words":["one","tw\"o"],"sizes":[{"w":5,"h":0.5}]}
-1 1 3
+{"type":"Every","a":-8,"b":-16,"c":-32,"d":-64,"e":200,"f":60000,"g":4000000000,"h":18446744073709551615,"x":1.5,"y":-0.25,"half":0.099975586,"on":true,"letter":"é","name":"a \"quoted\"\tline\n","counts":[1,-2,3],"view":null,"other":null,"call":null,"size":{"w":3,"h":4.5},"tag":{"type":"Tag","label":"t","weight":7},"mode":2,"spot":{"w":1,"h":2},"words":["one","tw\"o"],"sizes":[{"w":5,"h":0.5}]}
+{"type":"Every","a":-8,"b":-16,"c":-32,"d":-64,"e":200,"f":60000,"g":4000000000,"h":18446744073709551615,"x":1.5,"y":-0.25,"half":0.099975586,"on":true,"letter":"é","name":"a \"quoted\"\tline\n","counts":[1,-2,3],"view":null,"other":null,"call":null,"size":{"w":3,"h":4.5},"tag":{"type":"Tag","label":"t","weight":7},"mode":2,"spot":{"w":1,"h":2},"words":["one","tw\"o"],"sizes":[{"w":5,"h":0.5}]}
+1 1 1 1 1
+1 1 1 1 1
 1 1 1 1 1

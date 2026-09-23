@@ -349,7 +349,7 @@ static void put_struct(struct anti_builder *b, const void *bytes,
 }
 
 /* A slice. One that the object owns is written as its elements, and any
-   other as its address and its length, as a pointer is. */
+   other as null, as a pointer is. */
 static void put_slice(struct anti_builder *b, const void *bytes,
                       int64_t type, const struct anti_descriptor *d,
                       int64_t owned)
@@ -359,15 +359,7 @@ static void put_slice(struct anti_builder *b, const void *bytes,
     int64_t i;
 
     memcpy(&s, bytes, sizeof s);
-    if (!owned) {
-        put(b, "{\"address\":");
-        put_integer(b, (uint64_t)(uintptr_t)s.ptr, false);
-        put(b, ",\"length\":");
-        put_signed(b, s.len);
-        put(b, "}");
-        return;
-    }
-    if (s.ptr == NULL || !anti_rt_element_walked(type, d)) {
+    if (!owned || s.ptr == NULL || !anti_rt_element_walked(type, d)) {
         put(b, "null");
         return;
     }
@@ -438,7 +430,8 @@ static void put_value(struct anti_builder *b, const void *bytes,
                    anti_rt_element_walked(type, d)) {
             put_value(b, value, ANTI_TYPE_ELEMENT(type), d, 0);
         } else {
-            put_integer(b, (uint64_t)(uintptr_t)value, false);
+            /* It refers to something outside the object. */
+            put(b, "null");
         }
         return;
     }
@@ -506,8 +499,8 @@ static void serialize_into(struct anti_builder *b, const void *object,
    true or false, a char a string of one character and a str a string.
    An inline struct or class is an object, and so is what an `own`
    pointer points at. An `own` slice is an array of its elements. A
-   pointer the object does not own is its address, and a slice it does
-   not own is an object of its address and its length. A union, an
+   pointer, a slice and a function pointer the object does not own are
+   null, since each refers to something outside the object. A union, an
    array, a bitfield and an `own` slice of class values or of slices are
    null, and a class that wants them replaces the body. */
 void anti_lang_Object_serialize(struct anti_object *self, void *out)
