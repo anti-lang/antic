@@ -77,3 +77,23 @@ A later step folds them into `docs/decisions.md`.
 - [provisional] The reason of a failed call of the loader is kept per
   thread. Reason: of the two fixes the audit gives, it changes no
   signature that `anti.plugin` calls.
+
+## Plugin table and deserialize, step 13
+
+- [provisional] The loader checks the table `anti_rt_provides` of a
+  library before it uses a value of it, and refuses the load when one
+  is damaged. The message names the damage. The checks cover each
+  length, which must lie between 0 and `INT_MAX`, and each text, which
+  needs bytes when its length is above 0. They cover each count and
+  its array, and each descriptor, which must lie in an image of the
+  process. A class needs a size, the table pointer of the sub-object
+  must lie inside its object, and the version chain must not be empty.
+  Reason: the finding asks that each value be checked as the index
+  values are. Every other refusal of the loader fails the load as well.
+- A part of a version compares by its digits after its leading zeros,
+  so a part of any length compares exactly. Reason: a part read into an
+  `int64_t` overflowed at 20 digits.
+- [provisional] A member of the text of `Object.deserialize` that names
+  a field read before fails the whole text. Reason: the first value
+  would stay behind with no field to hold it, and the audit's fix is to
+  refuse it. Every other malformed member fails the text as well.
