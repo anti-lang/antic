@@ -15,7 +15,6 @@
 #endif
 
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -26,6 +25,7 @@
 #endif
 
 #include "atomic.h"
+#include "std.h"
 
 #if defined(_WIN32)
 
@@ -76,11 +76,9 @@ static void wake_all(cond_t *c) { pthread_cond_broadcast(c); }
 
 /* DESIGN: the language has no way to report these, and a program that
    reaches one cannot go on, as src/rt/threads.c decides for memory. */
-static void fatal(const char *message)
+static _Noreturn void fatal(const char *message)
 {
-    fflush(stdout);
-    fprintf(stderr, "anti: %s\n", message);
-    abort();
+    anti_rt_fail_abort("anti: %s", message);
 }
 
 /* Mutex */
@@ -174,21 +172,18 @@ static struct channel *channel_of(void *handle, const char *what)
 void *anti_rt_chan_new(int64_t size, int64_t capacity)
 {
     struct channel *ch = NULL;
-    char message[96];
 
     if (capacity < 1) {
-        snprintf(message, sizeof message, "a channel holds one value or "
-                 "more, and this one was made for %lld",
-                 (long long)capacity);
-        fatal(message);
+        anti_rt_fail_abort("anti: a channel holds one value or more, and "
+                           "this one was made for %lld",
+                           (long long)capacity);
     }
     if (size >= 0 && (size == 0 || capacity <= (INT64_MAX / 2) / size)) {
         ch = malloc(sizeof *ch + (size_t)(size * capacity));
     }
     if (ch == NULL) {
-        snprintf(message, sizeof message, "no memory for a channel of %lld "
-                 "values", (long long)capacity);
-        fatal(message);
+        anti_rt_fail_abort("anti: no memory for a channel of %lld values",
+                           (long long)capacity);
     }
     if (lock_init(&ch->lock) != 0 || cond_init(&ch->not_empty) != 0 ||
         cond_init(&ch->not_full) != 0) {

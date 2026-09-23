@@ -8,6 +8,7 @@
    Windows on ARM64 answers up to the ARMv8.2 dot products and has no
    query above them, so armv8.5 passes there. */
 #include "cpu_level.h"
+#include "std.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -316,6 +317,5 @@ void anti_cpu_check(void)
     if (missing == 0) {
         return;
     }
-    fprintf(stderr, "anti: %s\n", anti_cpu_level_message(missing));
-    exit(70);
+    anti_rt_fail_exit(70, "anti: %s", anti_cpu_level_message(missing));
 }

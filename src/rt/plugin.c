@@ -265,18 +265,15 @@ static void stub(struct anti_object *self)
             ? (const struct anti_stubbed *)(const void *)self->table - 1
             : NULL;
 
-    fflush(stdout);
     if (head != NULL && head->magic == ANTI_STUBBED_MAGIC) {
         const struct anti_descriptor *c = head->entry->class_of;
-        fprintf(stderr, "anti: `%.*s` %.*s carries no such function of "
-                "`%.*s`\n", (int)c->name_length, c->name,
-                (int)c->version_length, c->version,
-                (int)head->entry->path_length, head->entry->path);
-    } else {
-        fputs("anti: a library carries no such function of its "
-              "interface\n", stderr);
+        anti_rt_fail_abort("anti: `%.*s` %.*s carries no such function of "
+                           "`%.*s`", (int)c->name_length, c->name,
+                           (int)c->version_length, c->version,
+                           (int)head->entry->path_length, head->entry->path);
     }
-    abort();
+    anti_rt_fail_abort("anti: a library carries no such function of its "
+                       "interface");
 }
 
 /* Whether the program may reach a slot through reflection that the
@@ -784,9 +781,10 @@ static int discover_in(const char *dir, size_t dir_length,
         /* A library built for another runtime is logged and passed
            over, as the specification asks. */
         if (!same_bytes(built.ptr, built.len, version.ptr, version.len)) {
-            fprintf(stderr, "anti: %.*s was built for runtime %.*s, and this "
-                    "program carries %.*s\n", (int)name.len, name.ptr,
-                    (int)built.len, built.ptr, (int)version.len, version.ptr);
+            anti_rt_note("anti: %.*s was built for runtime %.*s, and this "
+                         "program carries %.*s", (int)name.len, name.ptr,
+                         (int)built.len, built.ptr, (int)version.len,
+                         version.ptr);
             continue;
         }
         if (!path_of(file, sizeof file, name.ptr, name.len) ||

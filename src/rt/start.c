@@ -9,6 +9,7 @@
 #include "conf.h"
 #include "cpu_level.h"
 #include "rt.h"
+#include "std.h"
 #include "utf.h"
 
 #if defined(_WIN32)
@@ -87,8 +88,7 @@ static void *allocate(size_t size)
     void *p = malloc(size == 0 ? 1 : size);
 
     if (p == NULL) {
-        fputs("anti: out of memory at program start\n", stderr);
-        exit(70);
+        anti_rt_fail_exit(70, "anti: out of memory at program start");
     }
     return p;
 }

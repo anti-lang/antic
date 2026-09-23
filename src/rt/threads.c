@@ -21,6 +21,7 @@
 #include "conf.h"
 #include "hooks.h"
 #include "object.h"
+#include "std.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -307,17 +308,16 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
            would wrap, and the workers would write past the block. */
         if (result_size < 0 ||
             (result_size > 0 && chunks > (INT64_MAX / 2) / result_size)) {
-            fflush(stdout);
-            fprintf(stderr, "anti: the results of %lld chunks of %lld "
-                            "bytes each do not fit in memory\n",
-                    (long long)chunks, (long long)result_size);
-            abort();
+            anti_rt_fail_abort("anti: the results of %lld chunks of %lld "
+                               "bytes each do not fit in memory",
+                               (long long)chunks, (long long)result_size);
         }
         j.results = malloc((size_t)(chunks * result_size));
         if (j.results == NULL) {
             /* DESIGN: the language has no way to report this, and a
                program that cannot hold its results cannot go on. */
-            abort();
+            anti_rt_fail_abort("anti: no memory for the results of %lld "
+                               "chunks", (long long)chunks);
         }
     }
     *results_out = j.results;
@@ -371,7 +371,7 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
     struct one *at;
 
     if (job == NULL) {
-        abort();
+        anti_rt_fail_abort("anti: no memory for a job of dispatch");
     }
     job->run = run;
     job->context = context;
@@ -379,7 +379,7 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
     if (result_size > 0) {
         job->result = malloc((size_t)result_size);
         if (job->result == NULL) {
-            abort();
+            anti_rt_fail_abort("anti: no memory for the result of a job");
         }
     }
     start();

@@ -62,6 +62,7 @@ add_executable(antic_unit_tests
     ../src/anti/symmap.c
     ../src/anti/syms.c
     ../src/anti/zip.c
+    ../src/rt/assert.c
     ../src/rt/atomic.c
     ../src/rt/cpu.c
     ../src/rt/f16.c
@@ -102,8 +103,8 @@ add_test(NAME rt_signal COMMAND rt_signal_tests)
 # program carries no sanitizer, and this program does in the sanitizer
 # builds.
 add_executable(rt_conf_tests unit/test_conf_race.c ../src/rt/conf.c
-    ../src/rt/toml.c ../src/rt/atomic.c ../src/rt/platform_posix.c
-    ../src/rt/platform_windows.c)
+    ../src/rt/assert.c ../src/rt/toml.c ../src/rt/atomic.c
+    ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_conf_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_conf_tests PRIVATE
@@ -117,8 +118,9 @@ foreach(which one two)
     add_library(plugin_table_${which} SHARED unit/plugin_table.c)
 endforeach()
 add_executable(rt_plugin_tests unit/test_plugin_race.c ../src/rt/plugin.c
-    ../src/rt/loaded.c ../src/rt/atomic.c ../src/rt/digest.c
-    ../src/rt/toml.c ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
+    ../src/rt/assert.c ../src/rt/loaded.c ../src/rt/atomic.c
+    ../src/rt/digest.c ../src/rt/toml.c ../src/rt/platform_posix.c
+    ../src/rt/platform_windows.c)
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_plugin_tests PRIVATE
@@ -149,9 +151,9 @@ add_test(NAME rt_platform COMMAND rt_platform_tests)
 # The loader against a table of a plugin with one value damaged at a time.
 add_library(plugin_bad SHARED unit/plugin_bad.c)
 add_executable(rt_plugin_table_tests unit/test_plugin_table.c
-    ../src/rt/plugin.c ../src/rt/loaded.c ../src/rt/atomic.c
-    ../src/rt/digest.c ../src/rt/toml.c ../src/rt/platform_posix.c
-    ../src/rt/platform_windows.c)
+    ../src/rt/plugin.c ../src/rt/assert.c ../src/rt/loaded.c
+    ../src/rt/atomic.c ../src/rt/digest.c ../src/rt/toml.c
+    ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_plugin_table_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_plugin_table_tests PRIVATE

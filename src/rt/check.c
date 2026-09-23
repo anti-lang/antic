@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "std.h"
 
 /* DESIGN: the compiler builds the text that names the file, the line and
@@ -10,34 +8,27 @@
 void anti_rt_check_failed(const unsigned char *text, int64_t length,
                           int32_t kind, int64_t a, int64_t b)
 {
-    fflush(stdout);
-    fwrite(text, 1, (size_t)length, stderr);
+    int n = (int)length;
+    const char *at = (const char *)text;
+
     switch (kind) {
     case ANTI_CHECK_BOUNDS:
-        fprintf(stderr, ": index %lld, length %lld", (long long)a,
-                (long long)b);
-        break;
+        anti_rt_fail_abort("%.*s: index %lld, length %lld", n, at,
+                           (long long)a, (long long)b);
     case ANTI_CHECK_OVERFLOW:
-        fprintf(stderr, ": left %lld, right %lld", (long long)a,
-                (long long)b);
-        break;
+        anti_rt_fail_abort("%.*s: left %lld, right %lld", n, at,
+                           (long long)a, (long long)b);
     case ANTI_CHECK_VALUE:
-        fprintf(stderr, ": value %lld", (long long)a);
-        break;
+        anti_rt_fail_abort("%.*s: value %lld", n, at, (long long)a);
     case ANTI_CHECK_VALUE_U:
-        fprintf(stderr, ": value %llu", (unsigned long long)a);
-        break;
+        anti_rt_fail_abort("%.*s: value %llu", n, at,
+                           (unsigned long long)a);
     case ANTI_CHECK_LEFT:
-        fprintf(stderr, ": left %lld", (long long)a);
-        break;
+        anti_rt_fail_abort("%.*s: left %lld", n, at, (long long)a);
     case ANTI_CHECK_LEFT_U:
-        fprintf(stderr, ": left %llu", (unsigned long long)a);
-        break;
+        anti_rt_fail_abort("%.*s: left %llu", n, at, (unsigned long long)a);
     default:
-        fprintf(stderr, ": count %lld, width %lld", (long long)a,
-                (long long)b);
-        break;
+        anti_rt_fail_abort("%.*s: count %lld, width %lld", n, at,
+                           (long long)a, (long long)b);
     }
-    fputc('\n', stderr);
-    abort();
 }

@@ -90,18 +90,51 @@ struct retired {
 
 static struct retired *retired;
 
-/* A startup error: the message on standard error and status 70, the
-   status of every refusal at start. */
-static void startup_error(const char *format, ...)
+/* A startup error: the message through the failure routine and status
+   70, the status of every refusal at start. The format is a literal. */
+#define startup_error(...) anti_rt_fail_exit(70, "anti: " __VA_ARGS__)
+
+/* The text the format and its values give, in memory of its own that
+   the caller frees. */
+static char *format_text(const char *format, ...)
 {
     va_list rest;
+    char *out;
+    int n;
 
-    fputs("anti: ", stderr);
     va_start(rest, format);
-    vfprintf(stderr, format, rest);
+    n = vsnprintf(NULL, 0, format, rest);
     va_end(rest);
-    fputs("\n", stderr);
-    exit(70);
+    if (n < 0) {
+        startup_error("a message of the configuration cannot be written");
+    }
+    out = malloc((size_t)n + 1);
+    if (out == NULL) {
+        startup_error("out of memory at program start");
+    }
+    va_start(rest, format);
+    if (vsnprintf(out, (size_t)n + 1, format, rest) != n) {
+        startup_error("a message of the configuration cannot be written");
+    }
+    va_end(rest);
+    return out;
+}
+
+/* The text of a list, with its last entry after `and`. before gives
+   what stands before each entry, as ` ` or ` --anti.`. */
+static char *list_text(const char *const *names, size_t count,
+                       const char *before)
+{
+    char *out = format_text("%s", "");
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        const char *comma = i == 0 ? "" : (i + 1 == count ? " and" : ",");
+        char *longer = format_text("%s%s%s%s", out, comma, before, names[i]);
+        free(out);
+        out = longer;
+    }
+    return out;
 }
 
 static char *copy(const char *text, size_t length)
@@ -131,14 +164,15 @@ static struct key *key_of(const char *name, size_t length)
 }
 
 /* The keys of [runtime], for the message of one that is not there. */
-static void print_keys(FILE *stream)
+static char *key_names(void)
 {
+    const char *names[KEY_COUNT];
     size_t i;
 
     for (i = 0; i < KEY_COUNT; i++) {
-        const char *before = i == 0 ? "" : (i + 1 == KEY_COUNT ? " and" : ",");
-        fprintf(stream, "%s %s", before, keys[i].name);
+        names[i] = keys[i].name;
     }
+    return list_text(names, KEY_COUNT, " ");
 }
 
 /* Take the value into the key, unless a higher layer named it. `where`
@@ -294,20 +328,17 @@ static void injection_named(const char *name, size_t length,
     snprintf(slot->where, sizeof slot->where, "%s", where);
 }
 
-static void unknown_option(const char *name, size_t length)
+static _Noreturn void unknown_option(const char *name, size_t length)
 {
+    const char *names[OPTION_COUNT];
     size_t i;
 
-    fprintf(stderr,
-            "anti: --anti.%.*s is no option of the runtime, which takes",
-            (int)length, name);
     for (i = 0; i < OPTION_COUNT; i++) {
-        const char *before =
-            i == 0 ? "" : (i + 1 == OPTION_COUNT ? " and" : ",");
-        fprintf(stderr, "%s --anti.%s", before, options[i].name);
+        names[i] = options[i].name;
     }
-    fputs("\n", stderr);
-    exit(70);
+    startup_error("--anti.%.*s is no option of the runtime, which takes%s",
+                  (int)length, name,
+                  list_text(names, OPTION_COUNT, " --anti."));
 }
 
 void anti_rt_conf_option(const char *name, int64_t length, const char *value)
@@ -520,13 +551,10 @@ static void read_keys(const struct anti_toml *doc, const char *path)
             continue;
         }
         if (strncmp(name, "runtime.", 8) != 0) {
-            fprintf(stderr, "anti: %s: %s is no key of the runtime "
-                            "configuration, which takes include, the table "
-                            "injections and the keys",
-                    position, name);
-            print_keys(stderr);
-            fputs(" of the table runtime\n", stderr);
-            exit(70);
+            startup_error("%s: %s is no key of the runtime configuration, "
+                          "which takes include, the table injections and "
+                          "the keys%s of the table runtime",
+                          position, name, key_names());
         }
         /* An array value stands as <key>.0, <key>.1 and further. The
            first element takes the whole array, and the rest of them
@@ -542,13 +570,9 @@ static void read_keys(const struct anti_toml *doc, const char *path)
         }
         k = key_of(name, length);
         if (k == NULL) {
-            fprintf(stderr,
-                    "anti: %s: %.*s is no key of the table runtime, which "
-                    "takes",
-                    position, (int)length, name);
-            print_keys(stderr);
-            fputs("\n", stderr);
-            exit(70);
+            startup_error("%s: %.*s is no key of the table runtime, which "
+                          "takes%s",
+                          position, (int)length, name, key_names());
         }
         snprintf(where, sizeof where, "%s: %s", position, k->name);
         if (element == NULL) {
