@@ -326,6 +326,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
         text_free(&bytes);
         fprintf(stderr, "anti: %s: no manifest here, so there is no project. "
                         "`anti new <name>` writes one\n", path);
+        manifest_free(out);
         return false;
     }
     doc = anti_rt_toml_read((const unsigned char *)bytes.data,
@@ -333,6 +334,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     text_free(&bytes);
     if (doc == NULL) {
         fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
+        manifest_free(out);
         return false;
     }
     text_of_key(doc, "package.name", &out->name);
