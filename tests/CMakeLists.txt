@@ -46,6 +46,7 @@ add_executable(antic_unit_tests
     unit/test_float_read.c
     unit/test_coff.c
     unit/test_toml.c
+    unit/test_rt_bounds.c
     unit/test_json.c
     unit/test_bind.c
     unit/test_deps.c
@@ -61,6 +62,7 @@ add_executable(antic_unit_tests
     ../src/anti/symmap.c
     ../src/anti/syms.c
     ../src/anti/zip.c
+    ../src/rt/atomic.c
     ../src/rt/cpu.c
     ../src/rt/f16.c
     ../src/rt/json.c

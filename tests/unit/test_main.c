@@ -40,6 +40,7 @@ void test_symbols(void);
 void test_float_read(void);
 void test_coff(void);
 void test_toml(void);
+void test_rt_bounds(void);
 void test_json(void);
 void test_bind(void);
 void test_deps(void);
@@ -86,6 +87,7 @@ int main(void)
     test_float_read();
     test_coff();
     test_toml();
+    test_rt_bounds();
     test_json();
     test_bind();
     test_deps();

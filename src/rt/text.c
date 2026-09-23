@@ -25,18 +25,24 @@ struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len)
 }
 
 /* Make room for count more bytes and the NUL after them. Returns false
-   when the memory runs out, and the builder keeps what it holds. */
+   when the memory runs out or no size holds them, and the builder keeps
+   what it holds. */
 static int reserve(struct anti_builder *b, int64_t count)
 {
+    int64_t need;
     int64_t size;
     unsigned char *room;
 
-    if (b->length + count + 1 <= b->capacity) {
+    if (count > INT64_MAX - 1 - b->length) {
+        return 0;
+    }
+    need = b->length + count + 1;
+    if (need <= b->capacity) {
         return 1;
     }
     size = b->capacity == 0 ? 32 : b->capacity;
-    while (size < b->length + count + 1) {
-        size *= 2;
+    while (size < need) {
+        size = size > INT64_MAX / 2 ? need : size * 2;
     }
     room = malloc((size_t)size);
     if (room == NULL) {

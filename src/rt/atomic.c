@@ -51,6 +51,23 @@ int64_t anti_rt_atomic_add(void *address, int64_t width, int64_t value)
     }
 }
 
+/* The Interlocked functions have no subtraction, so the value is added
+   negated. The negation is of the unsigned value, which has no overflow
+   at the minimum of the width. */
+int64_t anti_rt_atomic_sub(void *address, int64_t width, int64_t value)
+{
+    uint64_t negated = 0 - (uint64_t)value;
+
+    switch (width) {
+    case 1: return _InterlockedExchangeAdd8((char *)address, (char)negated);
+    case 2: return _InterlockedExchangeAdd16((short *)address,
+                                             (short)negated);
+    case 4: return _InterlockedExchangeAdd((long *)address, (long)negated);
+    default: return _InterlockedExchangeAdd64((long long *)address,
+                                              (long long)negated);
+    }
+}
+
 int64_t anti_rt_atomic_and(void *address, int64_t width, int64_t value)
 {
     switch (width) {
@@ -136,6 +153,14 @@ int64_t anti_rt_atomic_add(void *address, int64_t width, int64_t value)
 #undef ADD
 }
 
+int64_t anti_rt_atomic_sub(void *address, int64_t width, int64_t value)
+{
+#define SUB(T)                                                                \
+    return __atomic_fetch_sub((T *)address, (T)value, __ATOMIC_SEQ_CST)
+    WIDTHS(SUB);
+#undef SUB
+}
+
 int64_t anti_rt_atomic_and(void *address, int64_t width, int64_t value)
 {
 #define AND(T)                                                                \
@@ -166,8 +191,3 @@ int8_t anti_rt_atomic_compare_swap(void *address, int64_t width,
 }
 
 #endif
-
-int64_t anti_rt_atomic_sub(void *address, int64_t width, int64_t value)
-{
-    return anti_rt_atomic_add(address, width, -value);
-}
