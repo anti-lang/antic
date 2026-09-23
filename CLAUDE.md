@@ -247,8 +247,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 770 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 769 each, without the `no_paths` test, which needs a
+- 772 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 771 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A
@@ -407,9 +407,20 @@ reports what it finished.
   under "The release script" in `docs/decisions.md`.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
   only. It has never run.
-- The `anti` tool holds `sdk export`, `sdk import`, `test`, `check`, `fmt` and
-  `doc`, and nothing else of `docs/tooling.md`. `anti fmt` writes the canonical
-  form of the formatter rules, and `std/` and `tests/` stand in it.
+- The `anti` tool holds `new`, `build`, `run`, `sdk export`, `sdk import`,
+  `test`, `check`, `fmt` and `doc`, and nothing else of `docs/tooling.md`.
+  `anti fmt` writes the canonical form of the formatter rules, and `std/` and
+  `tests/` stand in it.
+- `anti build` is built. It reads `anti.toml`, resolves the dependencies into
+  `anti.lock`, fetches every library file from a `file://` or `https://`
+  repository into the cache of the user and compiles the project. Dev mode
+  writes one object per module, cached by the digest of its input, the compiler
+  version, the target and the level, with `-g` on. `--release` compiles the
+  whole program in one call and writes `<program>-symbols.zip` beside it.
+  `--target`, `--cpu`, `--offline`, `--strip-docs` and `--lib static|shared`
+  are built, and a project without `main` is a library project. `anti run`
+  builds for the host and runs it, and `anti new` writes a starter project. See
+  "The build command" in `docs/decisions.md` and `docs/notes/build.md`.
 - `anti check` is built, with its four classes in the order of
   `docs/tooling-addendum.md`: the front end on every source, with
   `--targets all` once per target, the `anti` blocks of the doc comments in
