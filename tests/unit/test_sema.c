@@ -967,3 +967,63 @@ void test_sema(void)
             "fn f(c: *Counter) -> int { return c.n; }\n", 2, 35,
             "`n` is private to `Counter`");
 }
+
+/* A type that contains itself, or a class that inherits itself, is
+   refused with one message. No walk over fields or bases after it
+   recurses or loops without end. */
+void test_sema_cycles(void)
+{
+    static const char vec4[] =
+        "simd struct V { x: f32, y: f32, z: f32, w: f32 }\n";
+    char source[512];
+
+    rejects("class A { a: A, }", 1, 7, "class `A` contains itself");
+    rejects("class A { x: int, a: A, }", 1, 7, "class `A` contains itself");
+    rejects("class A { b: B, }\nclass B { a: A, }\n"
+            "fn f() { let c = chan A(1); }", 1, 7,
+            "class `A` contains itself");
+    rejects("class A { a: A }\nfn f() { let x = A { }; }", 1, 7,
+            "class `A` contains itself");
+    rejects("class A { use a: A }\nfn f(p: *A) -> int { return p.zz; }", 1,
+            7, "class `A` contains itself");
+    rejects("struct T { s: S }\nstruct S { t: T }\n"
+            "class C { s: S }\nfn f() { let x = C { }; }", 1, 8,
+            "struct `T` contains itself");
+    rejects("variant V { A { v: V }, Empty }\n"
+            "fn g(a: V.A) -> int { return 1; }\n"
+            "fn f(x: V) -> int { switch x { A a => g(a), Empty => g(x) } "
+            "return 0; }", 1, 9,
+            "variant `V` contains itself");
+    snprintf(source, sizeof source,
+             "struct S { a: S }\n%s"
+             "fn f(v: V) -> int { let s = v as S; return 0; }", vec4);
+    rejects(source, 1, 8, "struct `S` contains itself");
+    rejects("class A inherits A { }", 1, 9, "class `A` inherits itself");
+    rejects("class A inherits B { }\nclass B inherits A { }\n"
+            "fn f(b: *B) -> *A { return b; }", 2, 9,
+            "class `B` inherits itself");
+    rejects("class A inherits C { }\nclass B inherits A { }\n"
+            "class C inherits B { n: int = 0, }\n"
+            "fn f(a: *A) -> int { return a.n; }", 3, 9,
+            "class `C` inherits itself");
+    /* A refused base leaves the base field without a type, which the
+       search for a cycle passes over. */
+    rejects("class A inherits N { a: A, }", 1, 9, "`N` is not a class");
+    /* A unit break is a bitfield of no width, and a lane is no
+       bitfield. */
+    rejects("simd struct V { _: i64 : 0 }", 1, 17,
+            "a lane of a `simd struct` is no bitfield");
+    /* A size past 2^64 bytes is no size, where it wrapped to 16. */
+    snprintf(source, sizeof source,
+             "%sfn f(v: V) { let s = v as [16][1152921504606846977]u8; }",
+             vec4);
+    rejects(source, 2, 22, "cannot convert `V` to "
+            "`[16][1152921504606846977]byte`, a `simd struct` converts to "
+            "an array or a plain struct of the same bytes");
+    snprintf(source, sizeof source,
+             "struct P { a: [4611686018427387904][2]u8, "
+             "b: [4611686018427387912][2]u8 }\n"
+             "%sfn f(v: V) { let s = v as P; }", vec4);
+    rejects(source, 3, 22, "cannot convert `V` to `P`, a `simd struct` "
+            "converts to an array or a plain struct of the same bytes");
+}

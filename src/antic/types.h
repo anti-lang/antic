@@ -501,6 +501,12 @@ void types_set_fields(struct types *types, struct type *s,
    Returns NULL, or the struct that contains itself. */
 struct type *types_find_cycle(struct type *s);
 
+/* DESIGN: a struct that contains itself has been reported, and the
+   checker goes on to find more. Every field of s, or of a struct inside
+   it, that closes a cycle takes the type error. No later walk over fields
+   then recurses without end, and each use of such a field is quiet. */
+void types_break_cycles(struct type *s, struct type *error);
+
 /* The name of t as a program writes it, with int, float and byte for the
    aliased types. */
 void type_name(struct text *out, const struct type *t);

@@ -974,12 +974,13 @@ static struct type *cycle_in_symbolic(const struct symbolic *s)
 }
 
 /* A struct inside a value of type t that contains itself. Pointers,
-   slices and function pointers hold no value of their element. */
+   slices and function pointers hold no value of their element. t is NULL
+   for the base field of a class whose base was refused. */
 static struct type *cycle_in(struct type *t)
 {
     struct type *cycle;
 
-    while (t->kind == TYPE_ARRAY) {
+    while (t != NULL && t->kind == TYPE_ARRAY) {
         if ((cycle = cycle_in_symbolic(t->length_of)) != NULL) {
             return cycle;
         }
@@ -1008,6 +1009,35 @@ struct type *types_find_cycle(struct type *s)
     }
     s->layout = LAYOUT_DONE;
     return NULL;
+}
+
+/* A walk in depth from s. A field closes a cycle when its value holds a
+   struct still on the path, or its array length measures a struct that
+   contains itself. */
+void types_break_cycles(struct type *s, struct type *error)
+{
+    size_t i;
+
+    if (s->layout != LAYOUT_NONE) {
+        return;
+    }
+    s->layout = LAYOUT_BUSY;
+    for (i = 0; i < s->field_count; i++) {
+        struct type *t = s->fields[i].type;
+        bool closes = false;
+        while (t != NULL && t->kind == TYPE_ARRAY && !closes) {
+            closes = cycle_in_symbolic(t->length_of) != NULL;
+            t = t->element;
+        }
+        if (!closes && type_has_fields(t)) {
+            closes = t->layout == LAYOUT_BUSY;
+            types_break_cycles(t, error);
+        }
+        if (closes) {
+            s->fields[i].type = error;
+        }
+    }
+    s->layout = LAYOUT_DONE;
 }
 
 void type_name(struct text *out, const struct type *t)

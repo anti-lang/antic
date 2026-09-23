@@ -108,7 +108,7 @@ static void error_at(struct checker *c, struct pos pos, const char *format,
 static const char *tn(const struct type *t)
 {
     static char buffers[4][96];
-    static int next;
+    static size_t next;
     struct text text = {0};
     char *buffer = buffers[next++ % 4];
 
@@ -554,7 +554,8 @@ static void check_simd_struct(struct checker *c, struct item *it)
         return;
     }
     for (i = 0; i < t->field_count; i++) {
-        if (t->fields[i].bits != 0) {
+        if (t->fields[i].bits != 0 ||
+            type_field_is_unit_break(&t->fields[i])) {
             error_at(c, t->fields[i].pos, "a lane of a `simd struct` is no "
                      "bitfield");
             return;
@@ -2362,7 +2363,8 @@ static bool fixed_layout(const struct type *t, uint64_t *size,
     case TYPE_ENUM:
         return fixed_layout(t->base, size, align);
     case TYPE_ARRAY:
-        if (t->length_of != NULL || !fixed_layout(t->element, size, align)) {
+        if (t->length_of != NULL || !fixed_layout(t->element, size, align) ||
+            (t->length != 0 && *size > UINT64_MAX / t->length)) {
             return false;
         }
         *size *= t->length;
@@ -2380,6 +2382,9 @@ static bool fixed_layout(const struct type *t, uint64_t *size,
             most = a > most ? a : most;
             if (t->is_union) {
                 offset = n > offset ? n : offset;
+            } else if (offset > UINT64_MAX - (a - 1) ||
+                       (offset + a - 1) / a * a > UINT64_MAX - n) {
+                return false;
             } else {
                 offset = (offset + a - 1) / a * a + n;
             }
@@ -2388,6 +2393,9 @@ static bool fixed_layout(const struct type *t, uint64_t *size,
             most = offset < 16 ? offset : 16;
         }
         most = t->align > most ? t->align : most;
+        if (offset > UINT64_MAX - (most - 1)) {
+            return false;
+        }
         *size = (offset + most - 1) / most * most;
         *align = most;
         return true;
@@ -5247,9 +5255,11 @@ static bool check_field_inits(struct checker *c, struct expr *e,
     for (j = 0; j < field_count; j++) {
         /* An interface sub-object is the compiler's field. It carries a
            table pointer that the literal never writes, so a literal that
-           leaves it out is complete. */
+           leaves it out is complete. A field of the error type has had
+           its message already. */
         if (type_field_is_unit_break(&fields[j]) ||
-            fields[j].form == FIELD_IMPL || fields[j].injected) {
+            fields[j].form == FIELD_IMPL || fields[j].injected ||
+            is_error(fields[j].type)) {
             continue;
         }
         for (i = 0; i < count; i++) {
@@ -9903,6 +9913,16 @@ bool sema_check(struct module *module, const char *module_name,
                      (int)it->base_name.length, it->base_name.text);
             continue;
         }
+        /* The bases of the module are set in the order of the items.
+           A chain therefore ends at a base not yet set. A cycle is found
+           at the class that would close it, which keeps the root, so
+           every walk up a chain ends. */
+        if (descends_from(base_type, it->symbol->type)) {
+            error_at(&c, it->base_pos, "class `%.*s` inherits itself",
+                     (int)it->name.length, it->name.text);
+            it->symbol->type->base = types_object(types);
+            continue;
+        }
         it->symbol->type->base = base_type;
     }
 
@@ -10116,17 +10136,16 @@ bool sema_check(struct module *module, const char *module_name,
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        if (it->symbol != NULL &&
-            (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION) &&
+        const char *kind = it->kind == ITEM_STRUCT    ? "struct"
+                           : it->kind == ITEM_UNION   ? "union"
+                           : it->kind == ITEM_CLASS   ? "class"
+                           : it->kind == ITEM_VARIANT ? "variant"
+                                                      : NULL;
+        if (it->symbol != NULL && kind != NULL &&
             types_find_cycle(it->symbol->type) != NULL) {
-            error_at(&c, it->name_pos, "%s `%.*s` contains itself",
-                     it->kind == ITEM_UNION ? "union" : "struct",
+            error_at(&c, it->name_pos, "%s `%.*s` contains itself", kind,
                      (int)it->name.length, it->name.text);
-        }
-        if (it->symbol != NULL && it->kind == ITEM_VARIANT &&
-            types_find_cycle(it->symbol->type) != NULL) {
-            error_at(&c, it->name_pos, "variant `%.*s` contains itself",
-                     (int)it->name.length, it->name.text);
+            types_break_cycles(it->symbol->type, builtin(&c, TYPE_ERROR));
         }
     }
 
