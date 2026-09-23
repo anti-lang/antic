@@ -247,8 +247,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 772 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 771 each, without the `no_paths` test, which needs a
+- 780 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 779 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built. A
