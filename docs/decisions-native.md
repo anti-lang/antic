@@ -204,6 +204,106 @@ libraries named "at run time" are loaded by the library itself and need no link.
   packages. The files land, an absolute link becomes relative and the licences are
   copied. A second run changes nothing, and a package of another digest is refused.
 
+## SQLite and Mbed TLS
+
+- SQLite is built between PCRE2 and Mbed TLS, the order of "Standard interfaces" in
+  `docs/anti-language-additions.md`. `src/native/CMakeLists.txt` includes the recipes in
+  that order.
+- [provisional] Mbed TLS follows the LTS line of version 3.6, and the pin names its newest
+  release. Reason: "Runtime archive" in `docs/decisions.md` names two options. The 4.x
+  line keeps its crypto in the second library TF-PSA-Crypto. The 3.6 LTS line is one
+  source tree and one project, the smaller of the two. The release notes of 3.6.7 support the line
+  until at least March 2027. The choice needs a review before then. `net_sockets.c`, which
+  `anti.net` wraps, exists in both lines.
+- Mbed TLS is pinned in `tools/mbedtls-pin` by version and by the SHA-256 of
+  `mbedtls-<version>.tar.bz2` that the release publishes in
+  `mbedtls-<version>-sha256sum.txt`. `src/native/get-mbedtls.cmake` downloads it over
+  HTTPS into `build/deps/mbedtls/`, checks the digest and unpacks it, as for PCRE2.
+- SQLite is pinned in `tools/sqlite-pin` by version, by the year of the directory of
+  sqlite.org that holds the release and by the digest of the amalgamation.
+  `src/native/get-sqlite.cmake` downloads `sqlite-amalgamation-<number>.zip` over HTTPS
+  into `build/deps/sqlite/`, where `<number>` is the version in the form 3XXYYZZ.
+- [provisional] The digest of SQLite is the SHA3-256 that `sqlite.org/download.html`
+  publishes, and not a SHA-256. The script checks it with `EXPECTED_HASH SHA3_256`.
+  Reason: the publisher gives no other digest. The other pins take the publisher's digest
+  where one exists.
+- The tests `mbedtls_pin` and `sqlite_pin` check each pin and refuse a copy of its
+  version or digest in the script or the recipe. They check that the script downloads
+  over HTTPS against the pinned digest.
+- [provisional] The three libraries of the Mbed TLS release, mbedcrypto, mbedx509 and
+  mbedtls, go into one archive, `libmbedtls.a`, or `mbedtls.lib` on Windows. The sources
+  are the lists `src_crypto`, `src_x509` and `src_tls` of `library/CMakeLists.txt` in the
+  release, 107 files. Reason: `docs/distribution.md` lists one static library per target
+  for `mbedtls`, and one archive keeps the link line of a program at one name.
+- [provisional] Mbed TLS compiles with `include/mbedtls/mbedtls_config.h` of the release
+  unchanged and no definition of ours. That configuration holds TLS 1.2 and 1.3, the PSA
+  crypto API, `net_sockets.c`, the timing module, file access and the entropy of the
+  operating system, with no threading. Reason: the smallest option, the library as
+  released. `anti.net` may need `MBEDTLS_THREADING_C` when it is built, since a context
+  shared between workers needs a lock.
+- [provisional] SQLite is `sqlite3.c` of the amalgamation with no compile-time option of
+  ours: serialized threading and extensions loaded at run time, as released. The name is
+  `libsqlite3.a`, or `sqlite3.lib` on Windows, the name of SQLite's own builds. Reason:
+  the smallest option, and a C project that links the published file finds it under its
+  usual name.
+- [provisional] Both compile as C99 with the warnings of anti_rt, `-Wall -Wextra
+  -Wpedantic -Werror`, which raise nothing for Mbed TLS on any target and nothing for
+  SQLite on Linux and macOS. On Windows SQLite turns four off:
+  `-Wlanguage-extension-token`, which `__int64` in `sqlite3.h` and the `__try` blocks of
+  `SQLITE_USE_SEH` raise, and `-Wsign-compare`, `-Wunused-variable` and
+  `-Wunused-function`, which the exception filter and the lock check of those blocks
+  raise. Reason: SQLite writes that code for `_MSC_VER`, which clang for MSVC defines.
+  The probe keeps the first off too, since it includes `sqlite3.h`.
+- [provisional] Both Linux libraries compile against musl, as PCRE2 does, and a program
+  links them in the default static mode. Reason: neither loads a library of the system
+  at run time, so the glibc mode of "Runtime archive" does not apply to them.
+- The build copies `LICENSE` of Mbed TLS to `licenses/mbedtls.txt` of the runtime tree.
+- [provisional] SQLite ships no licence file. The build writes `licenses/sqlite.txt`
+  from the dedication to the public domain at the top of `sqlite3.h`, and fails when the
+  header holds none. Reason: the directory holds one file per component.
+- The licence text of Mbed TLS (Apache 2.0) must be added to `LICENSES/` of the
+  repository, as those of PCRE2, raylib and miniaudio. The fence of this step did not
+  include it. SQLite, in the public domain, needs no text there.
+- The headers stay in the source trees and are not yet part of the runtime archive, as
+  for PCRE2.
+- `lib/cacert.pem`, Mozilla's CA bundle that "Runtime archive" places beside Mbed TLS, is
+  not part of this step.
+
+### The system libraries of each library
+
+A program links these beyond the C library, which antic links for every program.
+
+| Library | Linux, musl | macOS | Windows |
+|---|---|---|---|
+| SQLite | none | none | none |
+| Mbed TLS | none | none | `bcrypt`, `ws2_32` |
+
+- On Windows `entropy_poll.c` calls `BCryptGenRandom` and does not name its library. The
+  probe names `bcrypt.lib` with `#pragma comment(lib, ...)`, which `anti.net` must do as
+  well. `net_sockets.c` and `x509_crt.c` name `ws2_32.lib` themselves.
+
+### Tests
+
+- [provisional] The tests are registered in `src/native/sqlite.cmake` and
+  `src/native/mbedtls.cmake`, as for PCRE2. The probes are `tests/abi/sqlite_probe.c` and
+  `tests/abi/mbedtls_probe.c`, and the Anti halves `tests/abi/sqlite_link.anti` and
+  `tests/abi/mbedtls_link.anti`.
+- `sqlite_link_<target>` and `mbedtls_link_<target>` link the Anti half with the probe
+  and the library for each of the six targets through antic and lld, as a program of
+  that target links. A missing symbol fails the link. `sqlite_run` and `mbedtls_run` run
+  the program of the host.
+- The SQLite probe compares the version with the header and reads the serialized
+  threading mode. It opens an in-memory database and inserts three rows through a
+  prepared statement with bound values. The queries give a sum, a count with a condition,
+  a row by its text and `length('ß')` as one character. A query without a row gives
+  none, and a query on a missing table fails with `SQLITE_ERROR`.
+- The Mbed TLS probe compares the version with the header and hashes `abc` through PSA
+  against the SHA-256 digest of FIPS 180-2. It then sets up a TLS client context: a
+  CTR-DRBG seeded from the entropy of the system, the default configuration of a client
+  over a stream with verification required, `mbedtls_ssl_setup` and the name of the
+  server. It takes the address of `mbedtls_net_connect`, `mbedtls_ssl_handshake` and
+  `mbedtls_x509_crt_parse_file`, so the sockets and the reading of a CA bundle must link.
+
 ## Lines of other documents that change at the fold
 
 - `docs/decisions.md`, "CPU levels": "Nothing in `src/native/` builds yet, so the
@@ -221,3 +321,7 @@ libraries named "at run time" are loaded by the library itself and need no link.
 - `docs/decisions.md`, the entry on the frameworks of a binding: raylib links with
   `Cocoa` and `IOKit` alone, and miniaudio with none.
 - `CLAUDE.md`, item 16 of "First sessions": raylib and miniaudio build as well.
+- `docs/decisions.md`, "Runtime archive": the contents name no SQLite, which
+  `docs/anti-language-additions.md` adds, and the version line of Mbed TLS is 3.6 LTS.
+  The order of the native libraries under the same heading gains SQLite after PCRE2.
+- `CLAUDE.md`, item 16 of "First sessions": SQLite and Mbed TLS build as well.
