@@ -1,6 +1,6 @@
-//! A name of any length gives each symbol a name of its own. The class
-//! names run past 160 bytes, the two classes that follow share their first
-//! 136 bytes, and so do the two interface fields of the first class.
+//! A name of any length gives each symbol a name of its own. The class names
+//! run past 160 bytes, the two classes that follow share their first 136 bytes,
+//! and so do the two interface fields of the first class.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class First
@@ -54,8 +54,8 @@ fn main() -> int
 	let first = c as *First;
 	let second = c as *Second;
 	printf("%d %d\n".ptr, first.label() as c_int, second.label() as c_int);
-	let one = alloc PrefixyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyOne {};
-	let two = alloc PrefixyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyTwo {};
+	let one = alloc PrefixyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyOne { };
+	let two = alloc PrefixyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyTwo { };
 	printf("%d %d\n".ptr, one.v as c_int, two.v as c_int);
 	delete(one);
 	delete(two);

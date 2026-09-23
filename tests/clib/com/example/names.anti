@@ -1,6 +1,6 @@
-//! What the header of a library writes for C: two field names that share
-//! their first 136 bytes, a float constant with a whole value, and a class
-//! whose table holds more than 64 public functions.
+//! What the header of a library writes for C: two field names that share their
+//! first 136 bytes, a float constant with a whole value, and a class whose
+//! table holds more than 64 public functions.
 
 import anti.lang;
 
