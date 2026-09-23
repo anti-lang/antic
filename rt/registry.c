@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "json.h"
 #include "plugin.h"
 #include "registry.h"
 #include "utf.h"
@@ -118,7 +119,7 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
 /* The longest member name or class name the reader keeps. */
 #define NAME_ROOM 256
 /* How deep objects and arrays may nest. */
-#define DEPTH_LIMIT 64
+#define DEPTH_LIMIT ANTI_JSON_DEPTH
 
 /* DESIGN: anti.mem.Allocator declares alloc and free as its first two
    functions. They take the two entries after the seven of the root and
@@ -146,8 +147,7 @@ struct made {
 };
 
 struct reader {
-    const unsigned char *at;
-    const unsigned char *end;
+    struct anti_json scan;
     struct anti_object *from;   /* the anti.mem.Allocator */
     struct made *made;
 };
@@ -197,155 +197,33 @@ static void give_back(struct reader *r)
     }
 }
 
+/* The scanner of rt/json.c, over the input of the reader. */
+
 static void skip_space(struct reader *r)
 {
-    while (r->at < r->end && (*r->at == ' ' || *r->at == '\t' ||
-                              *r->at == '\n' || *r->at == '\r')) {
-        r->at++;
-    }
+    anti_rt_json_space(&r->scan);
 }
 
-/* Skip white space and take c when it comes next. */
 static bool take(struct reader *r, unsigned char c)
 {
-    skip_space(r);
-    if (r->at < r->end && *r->at == c) {
-        r->at++;
-        return true;
-    }
-    return false;
+    return anti_rt_json_take(&r->scan, c);
 }
 
 static bool take_word(struct reader *r, const char *word)
 {
-    size_t n = strlen(word);
-
-    skip_space(r);
-    if ((size_t)(r->end - r->at) >= n && memcmp(r->at, word, n) == 0) {
-        r->at += n;
-        return true;
-    }
-    return false;
+    return anti_rt_json_word(&r->scan, word);
 }
 
-static int hex_digit(unsigned char c)
-{
-    if (c >= '0' && c <= '9') {
-        return c - '0';
-    }
-    if (c >= 'a' && c <= 'f') {
-        return c - 'a' + 10;
-    }
-    if (c >= 'A' && c <= 'F') {
-        return c - 'A' + 10;
-    }
-    return -1;
-}
-
-/* Append one byte to out, or fail when out holds room bytes already. A
-   NULL out keeps nothing and counts the bytes. */
-static bool put_byte(unsigned char *out, size_t room, size_t *length,
-                     unsigned char b)
-{
-    if (out != NULL) {
-        if (*length >= room) {
-            return false;
-        }
-        out[*length] = b;
-    }
-    (*length)++;
-    return true;
-}
-
-/* A JSON string, decoded into out when out is not NULL, and refused when
-   it takes more than room bytes there. A \u escape of a surrogate half is
-   refused, since the serializer writes none. */
 static bool read_string(struct reader *r, unsigned char *out, size_t room,
                         size_t *length)
 {
-    *length = 0;
-    if (!take(r, '"')) {
-        return false;
-    }
-    while (r->at < r->end && *r->at != '"') {
-        unsigned char c = *r->at++;
-        if (c < 0x20) {
-            return false;
-        }
-        if (c != '\\') {
-            if (!put_byte(out, room, length, c)) {
-                return false;
-            }
-            continue;
-        }
-        if (r->at >= r->end) {
-            return false;
-        }
-        c = *r->at++;
-        switch (c) {
-        case '"': case '\\': case '/':
-            break;
-        case 'b': c = '\b'; break;
-        case 'f': c = '\f'; break;
-        case 'n': c = '\n'; break;
-        case 'r': c = '\r'; break;
-        case 't': c = '\t'; break;
-        case 'u': {
-            unsigned long code = 0;
-            int k;
-            for (k = 0; k < 4; k++) {
-                int d = r->at < r->end ? hex_digit(*r->at++) : -1;
-                if (d < 0) {
-                    return false;
-                }
-                code = code * 16 + (unsigned long)d;
-            }
-            if (code >= 0xD800 && code <= 0xDFFF) {
-                return false;
-            }
-            if (code < 0x80) {
-                c = (unsigned char)code;
-                break;
-            }
-            if (code < 0x800) {
-                if (!put_byte(out, room, length,
-                              (unsigned char)(0xC0 | (code >> 6)))) {
-                    return false;
-                }
-            } else if (!put_byte(out, room, length,
-                                 (unsigned char)(0xE0 | (code >> 12))) ||
-                       !put_byte(out, room, length, (unsigned char)(
-                           0x80 | ((code >> 6) & 0x3F)))) {
-                return false;
-            }
-            c = (unsigned char)(0x80 | (code & 0x3F));
-            break;
-        }
-        default:
-            return false;
-        }
-        if (!put_byte(out, room, length, c)) {
-            return false;
-        }
-    }
-    return r->at < r->end && *r->at++ == '"';
+    return anti_rt_json_string(&r->scan, out, room, length);
 }
 
-/* The bytes of a JSON number, which stay in the input. A float has any
-   number of digits. */
 static bool number_span(struct reader *r, const unsigned char **start,
                         int64_t *length)
 {
-    skip_space(r);
-    *start = r->at;
-    while (r->at < r->end &&
-           ((*r->at >= '0' && *r->at <= '9') || *r->at == '-' ||
-            *r->at == '+' || *r->at == '.' || *r->at == 'e' ||
-            *r->at == 'E')) {
-        r->at++;
-    }
-    *length = r->at - *start;
-    return *length > 0;
+    return anti_rt_json_number(&r->scan, start, length);
 }
 
 /* Copy a JSON number into out as a C string. */
@@ -364,47 +242,7 @@ static bool read_number(struct reader *r, char *out, size_t size)
 
 static bool skip_value(struct reader *r, int depth)
 {
-    const unsigned char *number;
-    int64_t digits;
-    size_t length;
-
-    if (depth > DEPTH_LIMIT) {
-        return false;
-    }
-    skip_space(r);
-    if (r->at >= r->end) {
-        return false;
-    }
-    switch (*r->at) {
-    case '"':
-        return read_string(r, NULL, 0, &length);
-    case '{':
-        r->at++;
-        if (take(r, '}')) {
-            return true;
-        }
-        do {
-            if (!read_string(r, NULL, 0, &length) || !take(r, ':') ||
-                !skip_value(r, depth + 1)) {
-                return false;
-            }
-        } while (take(r, ','));
-        return take(r, '}');
-    case '[':
-        r->at++;
-        if (take(r, ']')) {
-            return true;
-        }
-        do {
-            if (!skip_value(r, depth + 1)) {
-                return false;
-            }
-        } while (take(r, ','));
-        return take(r, ']');
-    default:
-        return take_word(r, "true") || take_word(r, "false") ||
-               take_word(r, "null") || number_span(r, &number, &digits);
-    }
+    return anti_rt_json_skip(&r->scan, depth);
 }
 
 /* The value of the member "type" of the object that r stands before,
@@ -761,7 +599,7 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
     }
     case ANTI_TYPE_STRUCT:
     case ANTI_TYPE_CLASS:
-        if (d != NULL && r->at < r->end && *r->at == '{') {
+        if (d != NULL && r->scan.at < r->scan.end && *r->scan.at == '{') {
             return fill(r, bytes, d, t == ANTI_TYPE_CLASS, depth + 1);
         }
         /* A struct without a descriptor was written as null, and keeps
@@ -848,13 +686,13 @@ void *anti_lang_Object_deserialize(struct anti_text input,
     if (from == NULL) {
         return NULL;
     }
-    r.at = input.ptr;
-    r.end = input.ptr + (input.len > 0 ? input.len : 0);
+    r.scan.at = input.ptr;
+    r.scan.end = input.ptr + (input.len > 0 ? input.len : 0);
     r.from = from;
     r.made = &made;
     object = read_object(&r, NULL, 0);
     skip_space(&r);
-    if (object == NULL || r.at != r.end) {
+    if (object == NULL || r.scan.at != r.scan.end) {
         give_back(&r);
         object = NULL;
     }

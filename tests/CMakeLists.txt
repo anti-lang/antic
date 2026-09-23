@@ -46,6 +46,7 @@ add_executable(antic_unit_tests
     unit/test_float_read.c
     unit/test_coff.c
     unit/test_toml.c
+    unit/test_json.c
     unit/test_deps.c
     ../tools/anti/deps.c
     ../tools/anti/files.c
@@ -53,6 +54,7 @@ add_executable(antic_unit_tests
     ../tools/anti/repo.c
     ../rt/cpu.c
     ../rt/f16.c
+    ../rt/json.c
     ../rt/symbols.c
     ../rt/text.c
     ../rt/toml.c
