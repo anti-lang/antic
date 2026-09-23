@@ -83,6 +83,74 @@ static void allocates(const char *source, enum target target,
     text_free(&out);
 }
 
+/* Select and allocate module m for target without the optimizer, and
+   append the machine code of every function, or the error. */
+static void run_ir(struct ir_module *m, enum target target, struct text *out)
+{
+    struct mach_function **functions = NULL;
+    char error[200] = "";
+    bool ok;
+    size_t i;
+
+    functions = calloc(m->function_count + 1, sizeof *functions);
+    ok = select_module(target, cpu_default(target), m, functions, error,
+                       sizeof error);
+    for (i = 0; ok && i < m->function_count; i++) {
+        if (functions[i] != NULL) {
+            ok = regalloc_function(target, functions[i], error,
+                                   sizeof error);
+        }
+    }
+    for (i = 0; ok && i < m->function_count; i++) {
+        if (functions[i] != NULL) {
+            mach_print(out, target_desc(target), cpu_default(target), m,
+                       functions[i]);
+        }
+    }
+    if (!ok) {
+        text_append(out, error);
+    }
+    for (i = 0; i < m->function_count; i++) {
+        if (functions[i] != NULL) {
+            mach_function_free(functions[i]);
+            free(functions[i]);
+        }
+    }
+    free(functions);
+}
+
+/* Temporary 0 of a function without parameters is register 0. It holds
+   a constant, and a jump that defines nothing follows it. The constant
+   is written again before its use in the next block. */
+static void constant_in_register_0(enum target target)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block *b0;
+    struct ir_block *b1;
+    struct text out = {0};
+    uint32_t k;
+
+    ir_module_init(&m, &arena, "main");
+    f = ir_function_add(&m, "main", "f", IR_I64, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    b1 = ir_block_add(f);
+    k = ir_temp(f, IR_I64);
+    ir_assign(f, b0, k, ir_int_op(IR_I64, 12345));
+    ir_jump(f, b0, b1);
+    ir_ret(f, b1, IR_I64, ir_temp_op(f, k));
+    run_ir(&m, target, &out);
+    if (strstr(text_cstr(&out), "12345") == NULL) {
+        check_failures++;
+        fprintf(stderr, "the constant of register 0 is lost:\n%s",
+                text_cstr(&out));
+    }
+    text_free(&out);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 static const char scale[] = "fn scale(x: int) -> int {\n"
                             "    let k = 2 + 4;\n"
                             "    return x * k;\n"
@@ -107,6 +175,8 @@ static const char cell[] = "fn cell(a: int, b: int) -> int {\n"
 
 void test_regalloc(void)
 {
+    constant_in_register_0(TARGET_MACOS_ARM64);
+    constant_in_register_0(TARGET_LINUX_X86_64);
     /* The instructions of the assembly listing in chapter 1. */
     allocates(scale, TARGET_MACOS_ARM64,
               "main.scale:\n"

@@ -1,0 +1,67 @@
+//! An ARM64 `msub` of `a % b` reads three registers. Here all three are
+//! spilled, since thirty values stay live across the loop and twelve more
+//! outweigh them in it. The third spilled read needs a register beyond the two
+//! scratch registers, and a register that holds a live value must keep it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The sum of the loop, with a remainder in every round.
+fn f(n: int, m: int) -> int
+{
+	let v0 = n * 3;
+	let v1 = n * 4;
+	let v2 = n * 5;
+	let v3 = n * 6;
+	let v4 = n * 7;
+	let v5 = n * 8;
+	let v6 = n * 9;
+	let v7 = n * 10;
+	let v8 = n * 11;
+	let v9 = n * 12;
+	let v10 = n * 13;
+	let v11 = n * 14;
+	let v12 = n * 15;
+	let v13 = n * 16;
+	let v14 = n * 17;
+	let v15 = n * 18;
+	let v16 = n * 19;
+	let v17 = n * 20;
+	let v18 = n * 21;
+	let v19 = n * 22;
+	let v20 = n * 23;
+	let v21 = n * 24;
+	let v22 = n * 25;
+	let v23 = n * 26;
+	let v24 = n * 27;
+	let v25 = n * 28;
+	let v26 = n * 29;
+	let v27 = n * 30;
+	let v28 = n * 31;
+	let v29 = n * 32;
+	let s = 0;
+	for i in 0..n {
+		s = s + i + v0 + v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8 + v9 + v10 + v11 + v12 + v13 + v14 + v15 + v16 + v17 + v18 + v19 + v20 + v21 + v22 + v23 + v24 + v25 + v26 + v27 + v28 + v29;
+		let w0 = s * 7;
+		let w1 = s * 8;
+		let w2 = s * 9;
+		let w3 = s * 10;
+		let w4 = s * 11;
+		let w5 = s * 12;
+		let w6 = s * 13;
+		let w7 = s * 14;
+		let w8 = s * 15;
+		let w9 = s * 16;
+		let w10 = s * 17;
+		let w11 = s * 18;
+		let a = s * 3 + m;
+		let b = s + m;
+		s = s + a % b + (w0 ^ w0) + (w0 & w0) + (w0 | w0) + (w1 ^ w1) + (w1 & w1) + (w1 | w1) + (w2 ^ w2) + (w2 & w2) + (w2 | w2) + (w3 ^ w3) + (w3 & w3) + (w3 | w3) + (w4 ^ w4) + (w4 & w4) + (w4 | w4) + (w5 ^ w5) + (w5 & w5) + (w5 | w5) + (w6 ^ w6) + (w6 & w6) + (w6 | w6) + (w7 ^ w7) + (w7 & w7) + (w7 | w7) + (w8 ^ w8) + (w8 & w8) + (w8 | w8) + (w9 ^ w9) + (w9 & w9) + (w9 | w9) + (w10 ^ w10) + (w10 & w10) + (w10 | w10) + (w11 ^ w11) + (w11 & w11) + (w11 | w11);
+	}
+	return s + v0 + v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8 + v9 + v10 + v11 + v12 + v13 + v14 + v15 + v16 + v17 + v18 + v19 + v20 + v21 + v22 + v23 + v24 + v25 + v26 + v27 + v28 + v29;
+}
+
+fn main() -> int
+{
+	printf("%lld\n".ptr, f(3, 5));
+	return 0;
+}

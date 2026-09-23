@@ -17,6 +17,10 @@
 
 enum { NONE = -1, PREG_LIMIT = 64 };
 
+/* The registers one instruction may read: each operand, and the base and
+   the index of a memory operand. */
+enum { BORROW_LIMIT = 2 * MACH_MAX_OPERANDS };
+
 static void *allocate(size_t count, size_t size)
 {
     void *p = calloc(count + 1, size);
@@ -84,6 +88,10 @@ struct alloc {
     size_t words;
     struct interval *intervals;     /* indexed by virtual register */
     struct fixed fixed[PREG_LIMIT];
+    /* The slot that saves each borrowed register, per class: integer,
+       float. NONE until an instruction needs it. */
+    int borrow_slot[2][BORROW_LIMIT];
+    bool refused;           /* an instruction found no register to borrow */
 };
 
 static bool is_reg(const struct mach_operand *o)
@@ -332,8 +340,8 @@ static void record_hint(struct alloc *a, const struct mach_inst *inst)
 }
 
 /* DESIGN: a constant never spills. Its definition reads nothing, so it
-   can be written again anywhere, and re-emitting it at each use costs one
-   instruction where a spill costs a store, a slot and a load. Each use
+   can be written again anywhere. Re-emitting it at each use costs one
+   instruction, where a spill costs a store, a slot and a load. Each use
    gets a definition of its own, which leaves every live range one
    instruction long. */
 static bool defines_constant(const struct target_desc *target,
@@ -385,14 +393,14 @@ static void rematerialise_constants(struct alloc *a)
                     once[inst->operands[j].reg] = true;
                 }
             }
+            /* A vreg defined more than once is in many, so an instruction
+               that defines no constant clears nothing here. */
             if (defines_constant(a->target, inst, &v)) {
                 definition[v] = *inst;
-            } else if (v < f->vreg_count) {
-                definition[v].count = 0;
             }
         }
     }
-    /* Give every use a definition of its own, just before it. */
+    /* Give every use a definition of its own, right before it. */
     for (b = 0; b < f->block_count; b++) {
         struct mach_block rebuilt;
         memset(&rebuilt, 0, sizeof rebuilt);
@@ -401,10 +409,11 @@ static void rematerialise_constants(struct alloc *a)
             struct mach_inst *inst = &f->blocks[b].insts[i];
             const struct mach_opcode *op = &a->target->opcodes[inst->op];
             uint32_t made = 0;
-            bool skip = false;
             for (j = 0; j < inst->count; j++) {
                 struct mach_operand *o = &inst->operands[j];
+                struct mach_inst *copy;
                 uint32_t v;
+                size_t k;
                 if (o->kind != MACH_VREG || (op->roles[j] & ROLE_USE) == 0) {
                     continue;
                 }
@@ -413,23 +422,19 @@ static void rematerialise_constants(struct alloc *a)
                     continue;
                 }
                 made = mach_vreg_add(f, f->fp[v]);
-                *mach_append(&rebuilt) = definition[v];
-                for (skip = false; !skip;) {
-                    size_t k;
-                    struct mach_inst *copy =
-                        &rebuilt.insts[rebuilt.count - 1];
-                    for (k = 0; k < copy->count; k++) {
-                        if ((a->target->opcodes[copy->op].roles[k] &
-                             ROLE_DEF) != 0) {
-                            copy->operands[k].reg = made;
-                        }
+                copy = mach_append(&rebuilt);
+                *copy = definition[v];
+                for (k = 0; k < copy->count; k++) {
+                    if ((a->target->opcodes[copy->op].roles[k] & ROLE_DEF) !=
+                        0) {
+                        copy->operands[k].reg = made;
                     }
-                    skip = true;
                 }
                 o->reg = made;
             }
             /* The original definition goes, since every use has one. */
-            if (defines_constant(a->target, inst, &made) && !many[made]) {
+            if (defines_constant(a->target, inst, &made) && !many[made] &&
+                definition[made].count != 0) {
                 continue;
             }
             *mach_append(&rebuilt) = *inst;
@@ -586,8 +591,8 @@ static int choose(const struct alloc *a, struct interval **active,
 /* DESIGN: when no register is free, the interval of the lowest spill
    cost gives up its register. That is the new interval itself, or an
    active one whose register the new interval can take. The cost counts
-   every use and definition, ten times over for each enclosing loop, so a
-   counter of a loop keeps its register and a value used once outside one
+   every use and definition, ten times over for each enclosing loop. So a
+   counter of a loop keeps its register, and a value used once outside one
    gives it up. */
 static void linear_scan(struct alloc *a)
 {
@@ -676,6 +681,8 @@ struct spill_map {
     uint8_t scratch[MACH_MAX_OPERANDS];
     size_t count;
     size_t loads[2];        /* per class: integer, float */
+    uint8_t borrowed[2][BORROW_LIMIT];  /* per class, after the scratch */
+    size_t borrow_count[2];
 };
 
 static int find_spill(const struct spill_map *map, uint32_t vreg)
@@ -708,9 +715,15 @@ static uint32_t place(struct rewrite *rw, struct spill_map *map, uint32_t vreg,
     k = find_spill(map, vreg);
     if (k == NONE) {
         const uint8_t *scratch = iv->fp ? a->abi->fp_scratch : a->abi->scratch;
+        size_t n = reads ? map->loads[iv->fp] : 0;
         k = (int)map->count++;
         map->vreg[k] = vreg;
-        map->scratch[k] = scratch[reads ? map->loads[iv->fp] : 0];
+        map->scratch[k] = scratch[0];
+        if (n < sizeof a->abi->scratch) {
+            map->scratch[k] = scratch[n];
+        } else if (n - sizeof a->abi->scratch < map->borrow_count[iv->fp]) {
+            map->scratch[k] = map->borrowed[iv->fp][n - sizeof a->abi->scratch];
+        }
         if (reads) {
             a->target->load_spill(&rw->out, map->scratch[k],
                                   a->f->slots[iv->slot].offset);
@@ -718,6 +731,134 @@ static uint32_t place(struct rewrite *rw, struct spill_map *map, uint32_t vreg,
         }
     }
     return map->scratch[k];
+}
+
+/* Both classes have as many scratch registers, which place counts with
+   the size of the integer array. */
+_Static_assert(sizeof ((struct abi *)0)->scratch ==
+                   sizeof ((struct abi *)0)->fp_scratch,
+               "one count of scratch registers per class");
+
+/* What one instruction needs of the registers. named holds the physical
+   registers it names, its own and those of its virtual registers in a
+   register. spilled holds the distinct spilled ones it reads, per class. */
+struct needs {
+    const struct alloc *a;
+    uint64_t named;
+    uint32_t spilled[2][BORROW_LIMIT];
+    size_t count[2];
+};
+
+static void note_register(void *ctx, const struct mach_operand *o, bool write)
+{
+    struct needs *n = ctx;
+    const struct interval *iv;
+    size_t i;
+
+    if (o->kind == MACH_PREG) {
+        if (o->reg < PREG_LIMIT) {
+            n->named |= (uint64_t)1 << o->reg;
+        }
+        return;
+    }
+    iv = &n->a->intervals[o->reg];
+    if (iv->slot == NONE) {
+        if (iv->preg != NONE) {
+            n->named |= (uint64_t)1 << iv->preg;
+        }
+        return;
+    }
+    if (write) {
+        return;
+    }
+    for (i = 0; i < n->count[iv->fp]; i++) {
+        if (n->spilled[iv->fp][i] == o->reg) {
+            return;
+        }
+    }
+    if (n->count[iv->fp] < BORROW_LIMIT) {
+        n->spilled[iv->fp][n->count[iv->fp]++] = o->reg;
+    }
+}
+
+static struct needs needs_of(const struct alloc *a,
+                             const struct mach_inst *inst)
+{
+    struct needs n;
+
+    memset(&n, 0, sizeof n);
+    n.a = a;
+    each_register(a, inst, note_register, &n);
+    return n;
+}
+
+/* A slot for each register that an instruction borrows, taken before the
+   frame is laid out. */
+static void reserve_borrow_slots(struct alloc *a)
+{
+    struct mach_function *f = a->f;
+    size_t b;
+    size_t i;
+    size_t k;
+    int c;
+
+    for (b = 0; b < f->block_count; b++) {
+        for (i = 0; i < f->blocks[b].count; i++) {
+            struct needs n = needs_of(a, &f->blocks[b].insts[i]);
+            for (c = 0; c < 2; c++) {
+                for (k = sizeof a->abi->scratch; k < n.count[c]; k++) {
+                    int *slot =
+                        &a->borrow_slot[c][k - sizeof a->abi->scratch];
+                    if (*slot == NONE) {
+                        *slot = (int)mach_slot_add(f, 8, 8);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* DESIGN: an instruction may read more spilled registers of one class
+   than the target has scratch registers. ARM64's msub of a remainder
+   reads three. Each read past the scratch registers borrows an
+   allocatable register that the instruction names nowhere and that the
+   caller does not expect preserved. Its value goes to a slot of its own
+   before the instruction. It comes back after the instruction and after
+   the store of a spilled result, so every scratch register is free at
+   both points. An
+   instruction that leaves the block cannot restore it and is refused. */
+static void borrow(struct rewrite *rw, const struct mach_inst *inst,
+                   struct spill_map *map)
+{
+    struct alloc *a = rw->a;
+    const struct mach_opcode *op = &a->target->opcodes[inst->op];
+    struct needs n = needs_of(a, inst);
+    uint64_t taken = n.named | a->abi->callee_saved;
+    size_t k;
+    int c;
+
+    for (c = 0; c < 2; c++) {
+        const uint8_t *regs = c ? a->abi->fp_allocatable : a->abi->allocatable;
+        size_t regs_count =
+            c ? a->abi->fp_allocatable_count : a->abi->allocatable_count;
+        size_t r = 0;
+        for (k = sizeof a->abi->scratch; k < n.count[c]; k++) {
+            int slot = a->borrow_slot[c][k - sizeof a->abi->scratch];
+            while (r < regs_count && ((taken >> regs[r]) & 1) != 0) {
+                r++;
+            }
+            if (r == regs_count || slot == NONE ||
+                (op->flags & (FLAG_JUMP | FLAG_BRANCH | FLAG_RET |
+                              FLAG_CALL)) != 0) {
+                a->refused = true;
+                return;
+            }
+            map->borrowed[c][map->borrow_count[c]++] = regs[r];
+            a->target->store_spill(&rw->out, regs[r],
+                                   a->f->slots[slot].offset);
+            r++;
+        }
+    }
 }
 
 /* Replace the virtual registers of inst, drop a move of a register into
@@ -734,8 +875,10 @@ static void rewrite_inst(struct rewrite *rw, const struct mach_inst *inst)
     struct spill_map map;
     size_t i;
     int k;
+    int c;
 
     memset(&map, 0, sizeof map);
+    borrow(rw, inst, &map);
     for (i = 0; i < copy.count; i++) {
         struct mach_operand *o = &copy.operands[i];
         if (o->kind == MACH_MEM && o->base_vreg) {
@@ -760,9 +903,9 @@ static void rewrite_inst(struct rewrite *rw, const struct mach_inst *inst)
     }
     /* DESIGN: a move of a register into itself does nothing, so it goes.
        The store that follows a spilled result does not go with it. Two
-       spilled values may share one scratch register, and the move
-       between them is then a move into itself while the store is still
-       the only thing that writes the slot. */
+       spilled values may share one scratch register. The move between
+       them is then a move into itself, while the store is still the only
+       thing that writes the slot. */
     if (!((op->flags & FLAG_MOVE) && copy.count == 2 &&
           copy.operands[0].kind == MACH_PREG &&
           copy.operands[1].kind == MACH_PREG &&
@@ -784,6 +927,13 @@ static void rewrite_inst(struct rewrite *rw, const struct mach_inst *inst)
             a->target->store_spill(
                 &rw->out, map.scratch[k],
                 a->f->slots[a->intervals[o->reg].slot].offset);
+        }
+    }
+    for (c = 0; c < 2; c++) {
+        for (i = 0; i < map.borrow_count[c]; i++) {
+            a->target->load_spill(
+                &rw->out, map.borrowed[c][i],
+                a->f->slots[a->borrow_slot[c][i]].offset);
         }
     }
     for (i = first; i < rw->out.count; i++) {
@@ -886,12 +1036,18 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
     a.target = target_desc(t);
     a.abi = a.target->abi(target_info(t)->convention);
     a.f = f;
+    for (b = 0; b < 2; b++) {
+        for (k = 0; k < BORROW_LIMIT; k++) {
+            a.borrow_slot[b][k] = NONE;
+        }
+    }
     /* Constants are re-emitted before liveness, so their ranges are one
        instruction long and the scan never has to spill one. */
     rematerialise_constants(&a);
     compute_liveness(&a);
     build_intervals(&a);
     linear_scan(&a);
+    reserve_borrow_slots(&a);
     layout_frame(&a, &frame);
     frame.convention = target_info(t)->convention;
     frame.unwind = target_info(t)->format == FORMAT_COFF;
@@ -923,6 +1079,12 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
         }
         free(f->blocks[b].insts);
         f->blocks[b] = rw.out;
+    }
+    if (ok && a.refused) {
+        snprintf(error, error_size, "an instruction of `%s.%s` reads more "
+                 "spilled registers than %s can load for it", f->ir->module,
+                 f->ir->name, a.target->name);
+        ok = false;
     }
     for (b = 0; b < f->block_count; b++) {
         free(a.use[b].bits);
