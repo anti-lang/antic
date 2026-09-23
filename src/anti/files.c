@@ -255,9 +255,9 @@ static int by_path(const void *a, const void *b)
    so a checkout's own directories are no part of a project.
 
    DESIGN: a link to a directory is not followed, as remove_tree follows
-   none, so a link to a parent cannot lead the walk round until it runs
+   none. A link to a parent then cannot lead the walk round until it runs
    out of descriptors. A link to a file is listed as the file. A directory
-   that does not exist adds nothing, and every other failure to read one
+   that does not exist adds nothing. Every other failure to read one
    fails the walk, so no caller takes a tree it did not read for the
    whole. */
 static bool walk(const char *dir, const char *suffix, bool deep,

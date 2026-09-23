@@ -252,9 +252,9 @@ static bool manifest_empty(const struct manifest *m)
 }
 
 /* A manifest that is not there is no project. M17: the reader wrote the
-   four default directories and returned false without freeing them, both
-   here and for a file that is no TOML, so a caller that frees nothing on
-   failure leaked them. */
+   four default directories and returned false without freeing them. It
+   did so here and for a file that is no TOML. A caller that frees
+   nothing on failure leaked them. */
 static void manifest_missing(void)
 {
     static const char not_toml[] = "[package\nname = \"x\"\n";

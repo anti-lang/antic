@@ -22,10 +22,10 @@ bool copy_file(const char *from, const char *to);
    call is a copy there. */
 bool copy_program(const char *from, const char *to);
 
-/* Append the bytes of the file at path to out. Returns false, with out as
-   it was, when the file cannot be opened or a read fails part of the way,
-   so no caller takes the part of a file for the whole. Prints nothing,
-   since a file that is not there is an answer for several callers. */
+/* Append the bytes of the file at path to out. Returns false when the
+   file cannot be opened or a read fails part of the way, and out is then
+   as it was. No caller takes the part of a file for the whole. Prints
+   nothing, since for some callers a missing file is an answer. */
 bool read_file(const char *path, struct text *out);
 
 /* read_file, which also prints that path cannot be read when it fails. */

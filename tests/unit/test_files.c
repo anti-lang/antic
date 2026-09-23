@@ -1,7 +1,7 @@
-/* The file helpers of anti: the one reader and writer, and the walk over
-   a directory tree. A read that fails part of the way, a write the disk
-   refuses, a directory that cannot be read and a link that leads back
-   up the tree each fail or end, where the copies before them passed. */
+/* The file helpers of anti, the one reader and writer and the walk over
+   a directory tree. A read that fails part of the way now fails. So do a
+   write the disk refuses and a directory that cannot be read. A link
+   back up the tree now ends the walk. */
 #if !defined(_WIN32)
 /* chmod, symlink and geteuid are POSIX, outside the C11 library. */
 #define _POSIX_C_SOURCE 200809L

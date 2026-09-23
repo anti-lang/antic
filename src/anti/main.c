@@ -19,8 +19,8 @@
 #include "test.h"
 #include "text.h"
 
-/* The text stands in several literals, since C99 guarantees a length of
-   4095 bytes for one. */
+/* The text stands in more than one literal, since C99 guarantees a
+   length of 4095 bytes for one. */
 static int usage(FILE *out)
 {
     fputs("usage: anti new <name>\n"
