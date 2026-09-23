@@ -1,4 +1,4 @@
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }
 type fnptr.Op = struct { apply: ptr }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [1]anti.rt.Field = array 1 of anti.rt.Field
@@ -8,8 +8,8 @@ type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn abs(i32) -> i32
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 extern fn fnptr.fn.0(i32) -> i32
-global fnptr.4 size 29 align 1 bytes 66 6e 70 74 72 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
-global fnptr.6 size 29 align 1 bytes 66 6e 70 74 72 2e 61 6e 74 69 3a 32 31 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global fnptr.5 size 29 align 1 bytes 66 6e 70 74 72 2e 61 6e 74 69 3a 31 30 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
+global fnptr.7 size 29 align 1 bytes 66 6e 70 74 72 2e 61 6e 74 69 3a 32 31 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn fnptr.twice(%0: i32) -> i32 {
 b0:
@@ -17,7 +17,7 @@ b0:
     branchov %1, b1, b2
 b1:
     %2 = sext i64 %0
-    %3 = addr @fnptr.4
+    %3 = addr @fnptr.5
     call void @anti_rt_check_failed(%3, 28, 1, %2, 2)
     jump b2
 b2:
@@ -46,7 +46,7 @@ b0:
     %10 = addov i64 %6, %9
     branchov %10, b1, b2
 b1:
-    %11 = addr @fnptr.6
+    %11 = addr @fnptr.7
     call void @anti_rt_check_failed(%11, 28, 1, %6, %9)
     jump b2
 b2:

@@ -62,6 +62,10 @@ struct package_dependency {
     const char *url;                /* the repository */
 };
 
+/* The version of a package whose build names none. It stands in the
+   package header of a library file and in every class descriptor. */
+#define PACKAGE_VERSION_DEFAULT "0.0.0"
+
 /* The package header of a library file. antic alone writes the module
    path as the name, version 0.0.0 and empty licence fields. */
 struct package {

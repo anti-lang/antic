@@ -105,6 +105,21 @@ struct anti_function {
     const unsigned char *signature;
 };
 
+/* DESIGN: the chain of an abstract class holds one hash per prefix of
+   its table, the empty prefix first. Entry k is the hash of the version
+   whose table held k entries. A plugin records the chain of the
+   interface it was built against, and the loader compares the two at the
+   length of the shorter. Equal there, the plugin's structure is the one
+   this program carries. floor is the version a `compatible` line names,
+   the lowest a plugin may have been built for. It is NULL without
+   one. */
+struct anti_versions {
+    const int64_t *chain;
+    int64_t chain_length;
+    const unsigned char *floor;
+    int64_t floor_length;
+};
+
 /* The record at entry 0 of the table of a class. The destruct entry is the
    body the class declares, not the one it inherits. The teardown that the
    compiler writes for a class calls the body of each level. */
@@ -124,6 +139,13 @@ struct anti_descriptor {
     int64_t offset;
     int64_t function_count;
     const struct anti_function *functions;
+    /* The version of the package that declared the class, which the
+       module that declares it writes. */
+    const unsigned char *version;
+    int64_t version_length;
+    /* The chain and the floor of an abstract class, NULL for every
+       other. */
+    const struct anti_versions *versions;
 };
 
 /* DESIGN: the seven functions of the root take the entries after the

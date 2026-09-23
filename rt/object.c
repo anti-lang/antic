@@ -25,7 +25,7 @@ const struct anti_descriptor *const anti_lang_Object_ancestors[1] = {
 
 const struct anti_descriptor anti_lang_Object_descriptor = {
     object_name, 6, NULL, (int64_t)sizeof(struct anti_object), 0,
-    anti_lang_Object_ancestors, 0, NULL, NULL, 0, 0, NULL
+    anti_lang_Object_ancestors, 0, NULL, NULL, 0, 0, NULL, NULL, 0, NULL
 };
 
 const struct anti_descriptor *anti_rt_descriptor(const void *object)

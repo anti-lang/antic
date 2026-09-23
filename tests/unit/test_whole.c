@@ -54,7 +54,7 @@ static struct module *compile(struct program *p, const char *name,
               parse(source, tokens, &p->arena, &p->diags, &module) &&
               sema_check(module, name, NULL, p->libraries, p->library_count,
                          &p->types, &p->arena, &p->diags, true) &&
-              lower_module(module, name, out, &p->diags, 0, NULL, 0);
+              lower_module(module, name, out, &p->diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
 
     if (!ok) {
         check_failures++;
@@ -307,7 +307,7 @@ static void devirtualises(void)
            "    %13 = addov i64 %7, %12\n"
            "    branchov %13, b1, b2\n"
            "b1:\n"
-           "    %14 = addr @main.57\n"
+           "    %14 = addr @main.62\n"
            "    call void @anti_rt_check_failed(%14, 22, 1, %7, %12)\n"
            "    jump b2\n"
            "b2:\n"
@@ -319,7 +319,7 @@ static void devirtualises(void)
            "    %20 = addov i64 %13, %19\n"
            "    branchov %20, b3, b4\n"
            "b3:\n"
-           "    %21 = addr @main.57\n"
+           "    %21 = addr @main.62\n"
            "    call void @anti_rt_check_failed(%21, 22, 1, %13, %19)\n"
            "    jump b4\n"
            "b4:\n"
@@ -331,7 +331,7 @@ static void devirtualises(void)
            "    %27 = addov i64 %20, %26\n"
            "    branchov %27, b5, b6\n"
            "b5:\n"
-           "    %28 = addr @main.57\n"
+           "    %28 = addr @main.62\n"
            "    call void @anti_rt_check_failed(%28, 22, 1, %20, %26)\n"
            "    jump b6\n"
            "b6:\n"
@@ -353,7 +353,7 @@ static void devirtualises(void)
            "    %13 = addov i64 %7, %12\n"
            "    branchov %13, b1, b2\n"
            "b1:\n"
-           "    %14 = addr @main.57\n"
+           "    %14 = addr @main.62\n"
            "    call void @anti_rt_check_failed(%14, 22, 1, %7, %12)\n"
            "    jump b2\n"
            "b2:\n"
@@ -365,7 +365,7 @@ static void devirtualises(void)
            "    %20 = addov i64 %13, %19\n"
            "    branchov %20, b3, b4\n"
            "b3:\n"
-           "    %21 = addr @main.57\n"
+           "    %21 = addr @main.62\n"
            "    call void @anti_rt_check_failed(%21, 22, 1, %13, %19)\n"
            "    jump b4\n"
            "b4:\n"
@@ -377,7 +377,7 @@ static void devirtualises(void)
            "    %27 = addov i64 %20, %26\n"
            "    branchov %27, b5, b6\n"
            "b5:\n"
-           "    %28 = addr @main.57\n"
+           "    %28 = addr @main.62\n"
            "    call void @anti_rt_check_failed(%28, 22, 1, %20, %26)\n"
            "    jump b6\n"
            "b6:\n"

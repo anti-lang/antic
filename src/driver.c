@@ -659,14 +659,14 @@ static bool lower_checked(const char *input, const char *file,
                           struct module *tree, const char *module,
                           struct ir_module *ir, struct diagnostics *diags,
                           unsigned options, const char *const *patterns,
-                          size_t pattern_count)
+                          size_t pattern_count, const char *version)
 {
     struct text errors = {0};
     bool ok = false;
 
     tree->file = file;
     if (!lower_module(tree, module, ir, diags, options, patterns,
-                      pattern_count)) {
+                      pattern_count, version)) {
         print_diagnostics(input, diags);
     } else if (!ir_verify(ir, &errors)) {
         fprintf(stderr, "antic: internal error, the IR of %s fails "
@@ -729,7 +729,7 @@ static int dump_ir(const char *input, const char *file, struct module *tree,
     struct text errors = {0};
 
     if (!lower_checked(input, file, tree, module, program, diags, options,
-                       patterns, pattern_count)) {
+                       patterns, pattern_count, o->package_version)) {
         return 1;
     }
     if (optimize) {
@@ -848,7 +848,7 @@ static int back_end(const struct options *o, struct module *tree,
     if (tree != NULL &&
         !lower_checked(o->input, recorded_file(o), tree, module, program,
                        diags, lower_options(o), o->trace_patterns,
-                       o->trace_pattern_count)) {
+                       o->trace_pattern_count, o->package_version)) {
         return 1;
     }
     /* DESIGN: the passes over the whole program run where the program is
@@ -1038,7 +1038,7 @@ static int write_library(const struct options *o, struct module *tree,
     ir_module_init(&ir, arena, module);
     if (lower_checked(o->input, recorded_file(o), tree, module, &ir, diags,
                       lower_options(o), o->trace_patterns,
-                      o->trace_pattern_count) &&
+                      o->trace_pattern_count, o->package_version) &&
         own_interface(o, tree, module, arena, &iface)) {
         antl_write(&bytes, &iface, &ir, o->strip_docs);
         if (o->output != NULL) {

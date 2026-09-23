@@ -385,6 +385,11 @@ static void put_type(struct writer *w, const struct type *t)
                                 (unsigned)t->is_final << 3 |
                                 (unsigned)t->simd << 4 |
                                 (unsigned)t->traced << 5));
+            /* The `compatible` line of an abstract class, empty where
+               the body has none. Every module that names the class
+               writes the same descriptor, so the floor travels with
+               it. */
+            put_bytes(w, t->compatible.text, t->compatible.length);
             put_u64(w, t->align);
             put_u32(w, (uint32_t)t->field_count);
             for (i = 0; i < t->field_count; i++) {
@@ -788,7 +793,7 @@ static void put_header(struct writer *w, const struct interface *iface)
     text_append_bytes(out, magic, sizeof magic);
     put_u32(w, ANTL_VERSION);
     put_str(w, p->name != NULL ? p->name : iface->module);
-    put_str(w, p->version != NULL ? p->version : "0.0.0");
+    put_str(w, p->version != NULL ? p->version : PACKAGE_VERSION_DEFAULT);
     put_u32(w, (uint32_t)p->dependency_count);
     for (i = 0; i < p->dependency_count; i++) {
         put_str(w, p->dependencies[i].name);
@@ -1453,6 +1458,7 @@ static void read_types(struct reader *r)
             t->is_final = (flags & 8) != 0;
             t->simd = (flags & 16) != 0;
             t->traced = (flags & 32) != 0;
+            t->compatible = get_name(r);
             t->align = get_u64(r);
             if (flags > 63 || (t->align & (t->align - 1)) != 0) {
                 damaged(r);

@@ -2138,6 +2138,40 @@ static struct item *member(struct parser *p, const struct item *owner)
     return (m->body = block(p)) == NULL ? NULL : m;
 }
 
+/* DESIGN: `compatible 1.1;` in the body of an abstract class names the
+   lowest version a plugin may have been built for. `compatible` is a
+   contextual word in that position alone, so a field may still carry
+   the name. The version is the source text of the number the lexer read
+   as an integer or a float, with any further `.<integer>` parts after
+   it, since `1.1.0` is no number of Anti. */
+static bool compatible_line(struct parser *p, struct item *it)
+{
+    const struct token *start;
+    size_t end;
+
+    next(p);
+    if (it->compatible.length > 0) {
+        error_here(p, "a class has one `compatible` line");
+        return false;
+    }
+    it->compatible_pos = pos_of(peek(p));
+    start = peek(p);
+    if (start->kind != TOKEN_INT && start->kind != TOKEN_FLOAT) {
+        error_here(p, "`compatible` names a version, as `compatible 1.1;`");
+        return false;
+    }
+    next(p);
+    end = start->offset + start->length;
+    while (check(p, TOKEN_DOT) && peek_at(p, 1)->kind == TOKEN_INT) {
+        next(p);
+        end = peek(p)->offset + peek(p)->length;
+        next(p);
+    }
+    it->compatible.text = p->source + start->offset;
+    it->compatible.length = end - start->offset;
+    return expect(p, TOKEN_SEMICOLON);
+}
+
 /* `inherits` in a class body, where the base stood before it moved to
    the header. The message writes the header the programmer means, with
    the base as the body named it. The base and a comma after it are read
@@ -2289,6 +2323,14 @@ static struct item *class_item(struct parser *p, struct item *it)
         field.pos = pos_of(peek(p));
         if (check(p, TOKEN_INHERITS)) {
             if (!inherits_in_body(p, it)) {
+                break;
+            }
+            continue;
+        }
+        if (is_word(p, peek(p), "compatible") &&
+            (peek_at(p, 1)->kind == TOKEN_INT ||
+             peek_at(p, 1)->kind == TOKEN_FLOAT)) {
+            if (!compatible_line(p, it)) {
                 break;
             }
             continue;

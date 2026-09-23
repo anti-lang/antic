@@ -1,18 +1,19 @@
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }
 type bitfields.Flags = struct { visible: i32 : 1 zeroext, layer: i32 : 4 zeroext, level: i8 : 3 signext, pad: i16 : 9 zeroext }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [4]anti.rt.Field = array 4 of anti.rt.Field
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global bitfields.Flags.descriptor anti.rt.Descriptor { @bitfields.1, i64 5, ptr 0, size_of bitfields.Flags, i64 0, ptr 0, i64 4, @bitfields.Flags.fields, ptr 0, i64 0, i64 0, ptr 0 }
+global bitfields.Flags.descriptor anti.rt.Descriptor { @bitfields.1, i64 5, ptr 0, size_of bitfields.Flags, i64 0, ptr 0, i64 4, @bitfields.Flags.fields, ptr 0, i64 0, i64 0, ptr 0, @bitfields.package.version, i64 5, ptr 0 }
 global bitfields.1 size 6 align 1 bytes 46 6c 61 67 73 00
 global bitfields.2 size 8 align 1 bytes 76 69 73 69 62 6c 65 00
 global bitfields.3 size 6 align 1 bytes 6c 61 79 65 72 00
 global bitfields.4 size 6 align 1 bytes 6c 65 76 65 6c 00
 global bitfields.5 size 4 align 1 bytes 70 61 64 00
 global bitfields.Flags.fields [4]anti.rt.Field { anti.rt.Field { @bitfields.2, i64 7, offset_of bitfields.Flags.visible, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.3, i64 5, offset_of bitfields.Flags.layer, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.4, i64 5, offset_of bitfields.Flags.level, i64 0, i64 0, ptr 0 }, anti.rt.Field { @bitfields.5, i64 3, offset_of bitfields.Flags.pad, i64 0, i64 0, ptr 0 } }
-global bitfields.7 size 33 align 1 bytes 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
-global bitfields.8 size 33 align 1 bytes 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
-global bitfields.9 size 33 align 1 bytes 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global bitfields.package.version size 6 align 1 bytes 30 2e 30 2e 30 00
+global bitfields.8 size 33 align 1 bytes 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
+global bitfields.9 size 33 align 1 bytes 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
+global bitfields.10 size 33 align 1 bytes 62 69 74 66 69 65 6c 64 73 2e 61 6e 74 69 3a 31 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 fn bitfields.main() -> i64 {
 b0:
     %0 = slot bitfields.Flags
@@ -29,7 +30,7 @@ b0:
 b1:
     %5 = sext i64 %3
     %6 = sext i64 1
-    %7 = addr @bitfields.7
+    %7 = addr @bitfields.8
     call void @anti_rt_check_failed(%7, 32, 1, %5, %6)
     jump b2
 b2:
@@ -41,14 +42,14 @@ b2:
     %12 = mulov i64 %11, 10
     branchov %12, b3, b4
 b3:
-    %13 = addr @bitfields.8
+    %13 = addr @bitfields.9
     call void @anti_rt_check_failed(%13, 32, 1, %11, 10)
     jump b4
 b4:
     %14 = addov i64 %9, %12
     branchov %14, b5, b6
 b5:
-    %15 = addr @bitfields.9
+    %15 = addr @bitfields.10
     call void @anti_rt_check_failed(%15, 32, 1, %9, %12)
     jump b6
 b6:
@@ -57,14 +58,14 @@ b6:
     %18 = mulov i64 %17, 100
     branchov %18, b7, b8
 b7:
-    %19 = addr @bitfields.8
+    %19 = addr @bitfields.9
     call void @anti_rt_check_failed(%19, 32, 1, %17, 100)
     jump b8
 b8:
     %20 = addov i64 %14, %18
     branchov %20, b9, b10
 b9:
-    %21 = addr @bitfields.9
+    %21 = addr @bitfields.10
     call void @anti_rt_check_failed(%21, 32, 1, %14, %18)
     jump b10
 b10:
@@ -73,7 +74,7 @@ b10:
     %24 = addov i64 %20, %23
     branchov %24, b11, b12
 b11:
-    %25 = addr @bitfields.9
+    %25 = addr @bitfields.10
     call void @anti_rt_check_failed(%25, 32, 1, %20, %23)
     jump b12
 b12:

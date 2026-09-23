@@ -29,7 +29,7 @@ static void optimizes(const char *source, const char *expected)
     if (!lex(source, strlen(source), &arena, &diags, &tokens) ||
         !parse(source, &tokens, &arena, &diags, &module) ||
         !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
-        !lower_module(module, "main", &ir, &diags, 0, NULL, 0)) {
+        !lower_module(module, "main", &ir, &diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT)) {
         check_failures++;
         fprintf(stderr, "test source does not lower: %s\n%s\n",
                 diags.count > 0 ? diags.items[0].message : "", source);
@@ -150,7 +150,7 @@ void test_optimize(void)
               "type anti.rt.Descriptor = struct { name: ptr, "
               "name_length: i64, parent: ptr, size: i64, depth: i64, "
               "ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, "
-              "offset: i64, function_count: i64, functions: ptr }\n"
+              "offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }\n"
               "type anti.lang.Object = struct { table: ptr }\n"
               "type main.Box = struct { super: anti.lang.Object, n: i64 }\n"
               "type [2]ptr = array 2 of ptr\n"
@@ -225,35 +225,35 @@ void test_optimize(void)
               "    let n = size_of(H);\n"
               "    return n * 1 + 4 - 4;\n"
               "}\n",
-              "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }\n"
+              "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }\n"
               "type main.H = struct { tag: i8, n: i32 }\n"
               "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
               "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
-              "global main.5 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
-              "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-              "global main.7 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
+              "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
+              "global main.7 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
+              "global main.8 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
               "fn main.f() -> i64 {\n"
               "b0:\n"
               "    %0 = copy i64 size_of main.H\n"
               "    %1 = mulov i64 size_of main.H, 1\n"
               "    branchov %1, b1, b2\n"
               "b1:\n"
-              "    %2 = addr @main.5\n"
+              "    %2 = addr @main.6\n"
               "    call void @anti_rt_check_failed(%2, 21, 1, %0, 1)\n"
               "    jump b2\n"
               "b2:\n"
               "    %3 = addov i64 %1, 4\n"
               "    branchov %3, b3, b4\n"
               "b3:\n"
-              "    %4 = addr @main.6\n"
+              "    %4 = addr @main.7\n"
               "    call void @anti_rt_check_failed(%4, 21, 1, %1, 4)\n"
               "    jump b4\n"
               "b4:\n"
               "    %5 = subov i64 %3, 4\n"
               "    branchov %5, b5, b6\n"
               "b5:\n"
-              "    %6 = addr @main.7\n"
+              "    %6 = addr @main.8\n"
               "    call void @anti_rt_check_failed(%6, 21, 1, %3, 4)\n"
               "    jump b6\n"
               "b6:\n"

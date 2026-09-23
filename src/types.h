@@ -164,6 +164,13 @@ struct type {
        it, so a write to a field of a class of another module is
        instrumented where the write stands. */
     bool traced;                    /* TYPE_CLASS: written `trace class` */
+    /* DESIGN: `compatible 1.1;` in the body of an abstract class names
+       the lowest version a plugin may have been built for. The
+       descriptor of the class carries it, so the loader reads it where
+       the program runs, and a library file carries it, so every module
+       writes the same descriptor. It is empty where the body has no
+       such line. */
+    struct name compatible;         /* TYPE_CLASS: `compatible <version>` */
 
     /* DESIGN: a `simd struct` is a struct whose fields are its lanes, of
        one primitive type. The checker gives its operators, and the back

@@ -35,7 +35,7 @@ static void run(const char *source, enum target target, struct text *out)
     if (!lex(source, strlen(source), &arena, &diags, &tokens) ||
         !parse(source, &tokens, &arena, &diags, &module) ||
         !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
-        !lower_module(module, "main", &ir, &diags, 0, NULL, 0)) {
+        !lower_module(module, "main", &ir, &diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT)) {
         check_failures++;
         fprintf(stderr, "test source does not lower: %s\n%s\n",
                 diags.count > 0 ? diags.items[0].message : "", source);
@@ -97,7 +97,7 @@ static void data(const char *source, enum target target, struct text *out)
     if (!lex(source, strlen(source), &arena, &diags, &tokens) ||
         !parse(source, &tokens, &arena, &diags, &module) ||
         !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
-        !lower_module(module, "main", &ir, &diags, 0, NULL, 0)) {
+        !lower_module(module, "main", &ir, &diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT)) {
         check_failures++;
         fprintf(stderr, "test source does not lower: %s\n%s\n",
                 diags.count > 0 ? diags.items[0].message : "", source);
@@ -228,7 +228,7 @@ void test_select(void)
             "    addq %t1, %t5\n"
             "    jno b2\n"
             "b1:\n"
-            "    leaq main.8(%rip), %t6\n"
+            "    leaq main.9(%rip), %t6\n"
             "    movq %t6, %rdi\n"
             "    movq $21, %rsi\n"
             "    movl $1, %edx\n"
@@ -250,7 +250,7 @@ void test_select(void)
             "    addq %t4, %t5\n"
             "    jno b2\n"
             "b1:\n"
-            "    leaq main.9(%rip), %t6\n"
+            "    leaq main.10(%rip), %t6\n"
             "    movq %t6, %rdi\n"
             "    movq $21, %rsi\n"
             "    movl $1, %edx\n"
@@ -262,7 +262,7 @@ void test_select(void)
             "    addq %t2, %t7\n"
             "    jno b4\n"
             "b3:\n"
-            "    leaq main.9(%rip), %t8\n"
+            "    leaq main.10(%rip), %t8\n"
             "    movq %t8, %rdi\n"
             "    movq $21, %rsi\n"
             "    movl $1, %edx\n"
@@ -287,8 +287,8 @@ void test_select(void)
             "    adds t5, t4, t1\n"
             "    b.vc b2\n"
             "b1:\n"
-            "    adrp t6, main.8\n"
-            "    add t6, t6, :lo12:main.8\n"
+            "    adrp t6, main.9\n"
+            "    add t6, t6, :lo12:main.9\n"
             "    mov x0, t6\n"
             "    mov x1, #21\n"
             "    mov w2, #1\n"
@@ -310,8 +310,8 @@ void test_select(void)
             "    adds t5, t0, t4\n"
             "    b.vc b2\n"
             "b1:\n"
-            "    adrp t6, main.9\n"
-            "    add t6, t6, :lo12:main.9\n"
+            "    adrp t6, main.10\n"
+            "    add t6, t6, :lo12:main.10\n"
             "    mov x0, t6\n"
             "    mov x1, #21\n"
             "    mov w2, #1\n"
@@ -322,8 +322,8 @@ void test_select(void)
             "    adds t7, t5, t2\n"
             "    b.vc b4\n"
             "b3:\n"
-            "    adrp t8, main.9\n"
-            "    add t8, t8, :lo12:main.9\n"
+            "    adrp t8, main.10\n"
+            "    add t8, t8, :lo12:main.10\n"
             "    mov x0, t8\n"
             "    mov x1, #21\n"
             "    mov w2, #1\n"
@@ -346,8 +346,8 @@ void test_select(void)
             "    adds t5, t4, t1\n"
             "    b.vc b2\n"
             "b1:\n"
-            "    adrp t6, main.8\n"
-            "    add t6, t6, :lo12:main.8\n"
+            "    adrp t6, main.9\n"
+            "    add t6, t6, :lo12:main.9\n"
             "    mov x0, t6\n"
             "    mov x1, #21\n"
             "    mov w2, #1\n"
@@ -369,8 +369,8 @@ void test_select(void)
             "    adds t5, t0, t4\n"
             "    b.vc b2\n"
             "b1:\n"
-            "    adrp t6, main.9\n"
-            "    add t6, t6, :lo12:main.9\n"
+            "    adrp t6, main.10\n"
+            "    add t6, t6, :lo12:main.10\n"
             "    mov x0, t6\n"
             "    mov x1, #21\n"
             "    mov w2, #1\n"
@@ -381,8 +381,8 @@ void test_select(void)
             "    adds t7, t5, t2\n"
             "    b.vc b4\n"
             "b3:\n"
-            "    adrp t8, main.9\n"
-            "    add t8, t8, :lo12:main.9\n"
+            "    adrp t8, main.10\n"
+            "    add t8, t8, :lo12:main.10\n"
             "    mov x0, t8\n"
             "    mov x1, #21\n"
             "    mov w2, #1\n"
@@ -1060,11 +1060,11 @@ void test_select(void)
              "    *out = GAP;\n"
              "}\n",
              TARGET_LINUX_X86_64,
-             "main.Gap.descriptor size 96 align 8 00 00 00 00 00 00 00 00 03 "
+             "main.Gap.descriptor size 120 align 8 00 00 00 00 00 00 00 00 03 "
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 08 00 00 00 00 00 "
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00 00 "
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 "
              "00 00 00\n"
              "main.1 size 4 align 1 47 61 70 00\n"
              "main.2 size 2 align 1 61 00\n"
@@ -1075,7 +1075,7 @@ void test_select(void)
              "00 00 00 01 00 00 00 00 00 00 00 04 00 00 00 00 00 00 00 05 00 "
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
              "00\n"
-             "main.5 size 8 align 4 01 00 00 00 02 00 00 00\n");
+             "main.package.version size 6 align 1 30 2e 30 2e 30 00\nmain.6 size 8 align 4 01 00 00 00 02 00 00 00\n");
     /* A bitfield constant holds the bits of the unit it lies in. */
     lays_out("struct Bits { a: u8, _: u32 : 0, b: u8 : 3, c: u8 : 5 }\n"
              "const BITS: Bits = Bits { a: 1, b: 2, c: 3 };\n"
@@ -1083,11 +1083,11 @@ void test_select(void)
              "    *out = BITS;\n"
              "}\n",
              TARGET_LINUX_X86_64,
-             "main.Bits.descriptor size 96 align 8 00 00 00 00 00 00 00 00 04 "
+             "main.Bits.descriptor size 120 align 8 00 00 00 00 00 00 00 00 04 "
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00 00 00 "
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 04 00 00 "
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 "
              "00 00 00\n"
              "main.1 size 5 align 1 42 69 74 73 00\n"
              "main.2 size 2 align 1 61 00\n"
@@ -1104,5 +1104,5 @@ void test_select(void)
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00 00 "
              "00 00 00 04 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
              "00 00 00 00 00 00 00 00 00 00 00 00 00 00\n"
-             "main.7 size 5 align 1 01 00 00 00 1a\n");
+             "main.package.version size 6 align 1 30 2e 30 2e 30 00\nmain.8 size 5 align 1 01 00 00 00 1a\n");
 }

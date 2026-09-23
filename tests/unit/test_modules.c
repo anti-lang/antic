@@ -214,7 +214,7 @@ static void lowers_imports(void)
     module = check_module(&s, "main", source, &ok);
     CHECK(ok);
     ir_module_init(&ir, &s.arena, "main");
-    CHECK(ok && lower_module(module, "main", &ir, &s.diags, 0, NULL, 0));
+    CHECK(ok && lower_module(module, "main", &ir, &s.diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT));
     ir_print(&out, &ir);
     CHECK_STR(text_cstr(&out),
               "extern fn geometry.make() -> ptr\n"
@@ -248,7 +248,7 @@ static bool build_library(struct session *s, const char *name,
 
     module = check_module(s, name, source, &ok);
     ir_module_init(&ir, &s->arena, name);
-    ok = ok && lower_module(module, name, &ir, &s->diags, 0, NULL, 0);
+    ok = ok && lower_module(module, name, &ir, &s->diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
     if (!ok) {
         check_failures++;
         fprintf(stderr, "library %s does not compile:\n", name);
@@ -269,7 +269,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 49, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 50, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -391,7 +391,7 @@ static void round_trip(void)
                   "type anti.rt.Descriptor = struct { name: ptr, name_length: "
                   "i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, "
                   "field_count: i64, fields: ptr, destruct: ptr, offset: i64, "
-                  "function_count: i64, functions: ptr }\n"
+                  "function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }\n"
                   "type vec.V2 = struct { x: i64, y: i64 }\n"
                   "type anti.rt.Field = struct { name: ptr, name_length: i64, "
                   "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
@@ -400,7 +400,7 @@ static void round_trip(void)
                   "extern fn malloc(i64) -> ptr\n"
                   "global vec.V2.descriptor anti.rt.Descriptor { @vec.1, i64 "
                   "2, ptr 0, size_of vec.V2, i64 0, ptr 0, i64 2, "
-                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
+                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0 }\n"
                   "global vec.1 size 3 align 1 bytes 56 32 00\n"
                   "global vec.2 size 2 align 1 bytes 78 00\n"
                   "global vec.3 size 2 align 1 bytes 79 00\n"
@@ -408,15 +408,15 @@ static void round_trip(void)
                   "@vec.2, i64 1, offset_of vec.V2.x, i64 6, i64 0, ptr 0 }, "
                   "anti.rt.Field { @vec.3, i64 1, offset_of vec.V2.y, i64 6, "
                   "i64 0, ptr 0 } }\n"
-                  "global vec.Hidden.descriptor anti.rt.Descriptor { @vec.6, "
+                  "global vec.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\nglobal vec.Hidden.descriptor anti.rt.Descriptor { @vec.7, "
                   "i64 6, ptr 0, size_of vec.Hidden, i64 0, ptr 0, i64 2, "
-                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
-                  "global vec.6 size 7 align 1 bytes 48 69 64 64 65 6e 00\n"
-                  "global vec.7 size 2 align 1 bytes 76 00\n"
-                  "global vec.8 size 5 align 1 bytes 6e 65 78 74 00\n"
+                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0 }\n"
+                  "global vec.7 size 7 align 1 bytes 48 69 64 64 65 6e 00\n"
+                  "global vec.8 size 2 align 1 bytes 76 00\n"
+                  "global vec.9 size 5 align 1 bytes 6e 65 78 74 00\n"
                   "global vec.Hidden.fields [2]anti.rt.Field { anti.rt.Field { "
-                  "@vec.7, i64 1, offset_of vec.Hidden.v, i64 21, i64 0, "
-                  "@vec.V2.descriptor }, anti.rt.Field { @vec.8, i64 4, "
+                  "@vec.8, i64 1, offset_of vec.Hidden.v, i64 21, i64 0, "
+                  "@vec.V2.descriptor }, anti.rt.Field { @vec.9, i64 4, "
                   "offset_of vec.Hidden.next, i64 5393, i64 0, "
                   "@vec.Hidden.descriptor } }\n"
                   "fn vec.make() -> ptr {\n"
@@ -518,7 +518,7 @@ static void keeps_symbolic_sizes(void)
                           "    return b.data.len;\n"
                           "}\n",
                           &ok);
-    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0));
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT));
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
               "type sized.H = struct { tag: i8, n: i32 }\n"
@@ -669,7 +669,7 @@ static void write_with(struct session *s, const char *source,
 
     module = check_module(s, "com.example.geo", source, &ok);
     ir_module_init(&ir, &s->arena, "com.example.geo");
-    CHECK(ok && lower_module(module, "com.example.geo", &ir, &s->diags, 0, NULL, 0));
+    CHECK(ok && lower_module(module, "com.example.geo", &ir, &s->diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT));
     sema_interface(module, "com.example.geo", &s->arena, iface);
     if (package != NULL) {
         iface->package = *package;
@@ -932,7 +932,7 @@ static void keeps_literals(void)
                           "    return words.hi().len + \"hi\".len;\n"
                           "}\n",
                           &ok);
-    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0));
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT));
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
               "type str = struct { ptr: ptr, len: i64 }\n"
@@ -1010,10 +1010,10 @@ static void keeps_constants(void)
                           "    return pair.base().b as int;\n"
                           "}\n",
                           &ok);
-    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0));
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT));
     ir_print(&ir, &program);
     CHECK(strstr(text_cstr(&ir),
-                 "global pair.5 pair.Pair { i8 7, i32 11 }\n") != NULL);
+                 "global pair.6 pair.Pair { i8 7, i32 11 }\n") != NULL);
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
@@ -1053,7 +1053,7 @@ static void keeps_halves(void)
                           "    return (t.u + t.v) as int;\n"
                           "}\n",
                           &ok);
-    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0));
+    CHECK(ok && lower_module(module, "main", &program, &b.diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT));
     ir_print(&ir, &program);
     CHECK(strstr(text_cstr(&ir), "hext f32 15360\n") != NULL);
     text_free(&bytes);
@@ -1186,7 +1186,7 @@ static void dependencies(void)
                   "type anti.rt.Descriptor = struct { name: ptr, name_length: "
                   "i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, "
                   "field_count: i64, fields: ptr, destruct: ptr, offset: i64, "
-                  "function_count: i64, functions: ptr }\n"
+                  "function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }\n"
                   "type vec.V2 = struct { x: i64, y: i64 }\n"
                   "type anti.rt.Field = struct { name: ptr, name_length: i64, "
                   "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
@@ -1197,7 +1197,7 @@ static void dependencies(void)
                   "extern fn malloc(i64) -> ptr\n"
                   "global vec.V2.descriptor anti.rt.Descriptor { @vec.1, i64 "
                   "2, ptr 0, size_of vec.V2, i64 0, ptr 0, i64 2, "
-                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
+                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0 }\n"
                   "global vec.1 size 3 align 1 bytes 56 32 00\n"
                   "global vec.2 size 2 align 1 bytes 78 00\n"
                   "global vec.3 size 2 align 1 bytes 79 00\n"
@@ -1205,27 +1205,27 @@ static void dependencies(void)
                   "@vec.2, i64 1, offset_of vec.V2.x, i64 6, i64 0, ptr 0 }, "
                   "anti.rt.Field { @vec.3, i64 1, offset_of vec.V2.y, i64 6, "
                   "i64 0, ptr 0 } }\n"
-                  "global vec.Hidden.descriptor anti.rt.Descriptor { @vec.6, "
+                  "global vec.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\nglobal vec.Hidden.descriptor anti.rt.Descriptor { @vec.7, "
                   "i64 6, ptr 0, size_of vec.Hidden, i64 0, ptr 0, i64 2, "
-                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
-                  "global vec.6 size 7 align 1 bytes 48 69 64 64 65 6e 00\n"
-                  "global vec.7 size 2 align 1 bytes 76 00\n"
-                  "global vec.8 size 5 align 1 bytes 6e 65 78 74 00\n"
+                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0 }\n"
+                  "global vec.7 size 7 align 1 bytes 48 69 64 64 65 6e 00\n"
+                  "global vec.8 size 2 align 1 bytes 76 00\n"
+                  "global vec.9 size 5 align 1 bytes 6e 65 78 74 00\n"
                   "global vec.Hidden.fields [2]anti.rt.Field { anti.rt.Field { "
-                  "@vec.7, i64 1, offset_of vec.Hidden.v, i64 21, i64 0, "
-                  "@vec.V2.descriptor }, anti.rt.Field { @vec.8, i64 4, "
+                  "@vec.8, i64 1, offset_of vec.Hidden.v, i64 21, i64 0, "
+                  "@vec.V2.descriptor }, anti.rt.Field { @vec.9, i64 4, "
                   "offset_of vec.Hidden.next, i64 5393, i64 0, "
                   "@vec.Hidden.descriptor } }\n"
                   "global shapes.Box.descriptor anti.rt.Descriptor { "
                   "@shapes.1, i64 3, ptr 0, size_of shapes.Box, i64 0, ptr 0, "
-                  "i64 1, @shapes.Box.fields, ptr 0, i64 0, i64 0, ptr 0 }\n"
+                  "i64 1, @shapes.Box.fields, ptr 0, i64 0, i64 0, ptr 0, @shapes.package.version, i64 5, ptr 0 }\n"
                   "global shapes.1 size 4 align 1 bytes 42 6f 78 00\n"
                   "global shapes.2 size 7 align 1 bytes 63 6f 72 6e 65 72 00\n"
                   "global vec.V2.descriptor size 0 align 1 bytes\n"
                   "global shapes.Box.fields [1]anti.rt.Field { anti.rt.Field { "
                   "@shapes.2, i64 6, offset_of shapes.Box.corner, i64 21, i64 "
                   "0, @vec.V2.descriptor } }\n"
-                  "fn vec.make() -> ptr {\n"
+                  "global shapes.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\nfn vec.make() -> ptr {\n"
                   "b0:\n"
                   "    %0 = mul i64 1, size_of vec.V2\n"
                   "    %1 = call ptr @malloc(%0)\n"
@@ -1289,9 +1289,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 50;
+    copy[4] = 51;
     refuses_file(copy, sizeof copy,
-                 "has format version 50, and antic reads version 49");
+                 "has format version 51, and antic reads version 50");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1376,7 +1376,7 @@ static void keeps_classes(void)
     open_session(&a);
     module = check_module(&a, "shapes", source, &ok);
     ir_module_init(&ir, &a.arena, "shapes");
-    ok = ok && lower_module(module, "shapes", &ir, &a.diags, 0, NULL, 0);
+    ok = ok && lower_module(module, "shapes", &ir, &a.diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
     CHECK(ok);
     iface = arena_alloc(&a.arena, sizeof *iface);
     if (ok) {
@@ -1448,7 +1448,7 @@ static void one_struct_descriptor(void)
     open_session(&s);
     module = check_module(&s, "vec", vec, &ok);
     ir_module_init(&lib, &s.arena, "vec");
-    ok = ok && lower_module(module, "vec", &lib, &s.diags, 0, NULL, 0);
+    ok = ok && lower_module(module, "vec", &lib, &s.diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
     CHECK(ok);
     g = global_in(&lib, "vec", "V2.descriptor");
     CHECK(g != NULL && !g->is_extern && g->value != NULL);
@@ -1463,7 +1463,7 @@ static void one_struct_descriptor(void)
 
     module = check_module(&s, "main", source, &ok);
     ir_module_init(&ir, &s.arena, "main");
-    ok = ok && lower_module(module, "main", &ir, &s.diags, 0, NULL, 0);
+    ok = ok && lower_module(module, "main", &ir, &s.diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
     CHECK(ok);
     g = global_in(&ir, "vec", "V2.descriptor");
     CHECK(g != NULL && g->is_extern && g->value == NULL);

@@ -28,10 +28,12 @@ enum lower_option {
 };
 
 /* patterns holds the `--trace <pattern>` arguments, which instrument a
-   package or a class by name whether it asked or not. */
+   package or a class by name whether it asked or not. version is the
+   version of the package being built, `--package-version`, which the
+   descriptor of every class the module declares carries. */
 bool lower_module(struct module *module, const char *module_name,
                   struct ir_module *out, struct diagnostics *diags,
                   unsigned options, const char *const *patterns,
-                  size_t pattern_count);
+                  size_t pattern_count, const char *version);
 
 #endif

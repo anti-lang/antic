@@ -718,6 +718,11 @@ struct item {
     struct name base_module;        /* ITEM_CLASS: the module of the base,
                                        empty when unqualified. */
     struct pos base_pos;
+    /* `compatible <version>;` in the body of an abstract class: the
+       lowest version a plugin may have been built for. Empty where the
+       body has no such line. */
+    struct name compatible;         /* ITEM_CLASS */
+    struct pos compatible_pos;
     bool is_abstract;               /* ITEM_CLASS, or ITEM_FN in a body */
     bool is_final;                  /* ITEM_CLASS, ITEM_FN */
     bool is_static;                 /* a static atomic field of a class. */

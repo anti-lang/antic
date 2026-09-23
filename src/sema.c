@@ -9748,6 +9748,14 @@ bool sema_check(struct module *module, const char *module_name,
             it->symbol->type->has_abstract = it->is_abstract;
             it->symbol->type->traced = it->trace;
             it->symbol->type->is_final = it->is_final;
+            /* DESIGN: `compatible` names the floor of a plugin's
+               version, which only an abstract class has a table for. */
+            if (it->compatible.length > 0 && !it->is_abstract) {
+                error_at(&c, it->compatible_pos,
+                         "`compatible` names the versions a plugin may carry, "
+                         "and belongs to an abstract class");
+            }
+            it->symbol->type->compatible = it->compatible;
         } else if (it->kind == ITEM_VARIANT) {
             it->symbol->type = types_struct(types, c.module_name, it->name);
             it->symbol->type->kind = TYPE_VARIANT;
@@ -10864,7 +10872,7 @@ void sema_interface(const struct module *module, const char *module_name,
     out->doc = keep_name(arena, module->doc.length > 0 ? module->doc.text : "",
                          module->doc.length);
     out->package.name = out->module;
-    out->package.version = "0.0.0";
+    out->package.version = PACKAGE_VERSION_DEFAULT;
     out->package.license = "";
     out->package.license_text = "";
     out->imports = arena_alloc(arena, (module->import_count + 1) *

@@ -101,6 +101,7 @@ struct lowerer {
     bool trace_writes;          /* --trace writes: the changed hook. */
     const char *const *patterns;    /* --trace <pattern>. */
     size_t pattern_count;
+    const char *version;        /* --package-version, of the descriptors. */
     /* The function being lowered when it is instrumented: the literal of
        its full name and the `self` it hooks. NULL where it is not. */
     const struct ir_global *trace_name;
@@ -1752,7 +1753,7 @@ static uint32_t fields_agg(struct lowerer *l, size_t n)
 static uint32_t descriptor_agg(struct lowerer *l)
 {
     static const char name[] = "anti.rt.Descriptor";
-    struct ir_field fields[12];
+    struct ir_field fields[15];
     uint32_t agg = ir_agg_find(l->m, name);
 
     if (agg != IR_NO_AGG) {
@@ -1788,7 +1789,16 @@ static uint32_t descriptor_agg(struct lowerer *l)
     fields[10].type = ir_scalar(IR_I64);
     fields[11].name = "functions";
     fields[11].type = ir_scalar(IR_PTR);
-    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 12, false, 0);
+    /* DESIGN: every descriptor carries the version of the package that
+       declared the class. An abstract class points at the record of its
+       chain and its floor. The loader of a plugin reads both. */
+    fields[12].name = "version";
+    fields[12].type = ir_scalar(IR_PTR);
+    fields[13].name = "version_length";
+    fields[13].type = ir_scalar(IR_I64);
+    fields[14].name = "versions";
+    fields[14].type = ir_scalar(IR_PTR);
+    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 15, false, 0);
 }
 
 /* The depth of a class in its chain. The root anti.lang.Object is 0. */
@@ -2174,27 +2184,36 @@ static const char *value_type_name(const struct type *t)
    the whole program writes one trampoline per such text, so equal
    signatures share one. A signature holding a type that a Value cannot
    carry has no text, and reflect.call refuses the function. */
+static bool signature_code(const struct type *fn, struct text *code)
+{
+    const char *name;
+    size_t i;
+
+    if (fn == NULL || fn->kind != TYPE_FN ||
+        (name = value_type_name(fn->result)) == NULL) {
+        return false;
+    }
+    text_append(code, name);
+    for (i = 1; i < fn->param_count; i++) {
+        name = value_type_name(fn->params[i]);
+        if (name == NULL || strcmp(name, "void") == 0) {
+            return false;
+        }
+        text_appendf(code, ".%s", name);
+    }
+    return true;
+}
+
 static const struct ir_global *signature_text(struct lowerer *l,
                                               const struct type *fn)
 {
     struct token_text text;
     struct text code = {0};
-    const char *name;
     const struct ir_global *g;
-    size_t i;
 
-    if (fn == NULL || fn->kind != TYPE_FN ||
-        (name = value_type_name(fn->result)) == NULL) {
+    if (!signature_code(fn, &code)) {
+        text_free(&code);
         return NULL;
-    }
-    text_append(&code, name);
-    for (i = 1; i < fn->param_count; i++) {
-        name = value_type_name(fn->params[i]);
-        if (name == NULL || strcmp(name, "void") == 0) {
-            text_free(&code);
-            return NULL;
-        }
-        text_appendf(&code, ".%s", name);
     }
     text.bytes = text_cstr(&code);
     text.length = code.length;
@@ -2271,6 +2290,173 @@ static struct ir_global *class_functions(struct lowerer *l,
     return g;
 }
 
+/* The global that holds the version of the package being built, one per
+   module. It has a name of its own rather than a number, so that adding
+   it moves no literal of the module. */
+static const struct ir_global *version_global(struct lowerer *l)
+{
+    static const char name[] = "package.version";
+    struct ir_module *m = l->m;
+    size_t length = strlen(l->version);
+    uint8_t *bytes;
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->module != NULL && l->module_name != NULL &&
+            strcmp(m->globals[i]->module, l->module_name) == 0 &&
+            strcmp(m->globals[i]->name, name) == 0) {
+            return m->globals[i];
+        }
+    }
+    bytes = arena_alloc(m->arena, length + 1);
+    memcpy(bytes, l->version, length + 1);
+    return ir_global_add(m, l->module_name, name, bytes, length + 1, 1);
+}
+
+/* DESIGN: the structural hash of an abstract class covers the entries of
+   its table in order, each with its name and its signature. The hash
+   after k entries is the hash of the version whose table held k of them.
+   The array of the hashes is therefore the chain of its earlier versions
+   with the slots each had. A plugin records the chain of the interface
+   it was built against, and the loader compares the two at the length of
+   the shorter. An entry whose signature no reflect.Value carries hashes
+   its count of parameters instead. That still tells two entries of one
+   name apart. */
+static uint64_t hash_bytes(uint64_t h, const char *bytes, size_t length)
+{
+    size_t i;
+
+    for (i = 0; i < length; i++) {
+        h = (h ^ (uint8_t)bytes[i]) * 0x100000001b3ULL;
+    }
+    return h;
+}
+
+/* The chain of an abstract class: one hash per prefix of its table, the
+   empty prefix first. Entry k is the hash of a table of k entries. */
+static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
+                                     size_t *count_out)
+{
+    struct table table = {0};
+    struct ir_const *value;
+    struct ir_global *g;
+    char array[24];
+    char *module;
+    char *name;
+    uint64_t h = 0xcbf29ce484222325ULL;
+    size_t i;
+
+    table_of(t, &table);
+    *count_out = table.count + 1;
+    g = class_global(l, t, "chain", &module, &name);
+    if (g != NULL) {
+        free(table.entries);
+        return g;
+    }
+    snprintf(array, sizeof array, "[%zu]i64", table.count + 1);
+    value = ir_const_agg(
+        l->m,
+        ir_aggregate(ir_array_add(l->m, array, ir_scalar(IR_I64),
+                                  ir_sym_int(l->m, IR_I64, table.count + 1),
+                                  NULL)),
+        table.count + 1);
+    value->items[0].kind = IR_CONST_INT;
+    value->items[0].scalar = IR_I64;
+    value->items[0].integer = h;
+    for (i = 0; i < table.count; i++) {
+        const struct item *fn = table.entries[i].fn;
+        struct text code = {0};
+        char params[24];
+        h = hash_bytes(h, table.entries[i].name.text,
+                       table.entries[i].name.length);
+        h = hash_bytes(h, ":", 1);
+        if (fn != NULL && fn->symbol != NULL &&
+            signature_code(fn->symbol->type, &code)) {
+            h = hash_bytes(h, text_cstr(&code), code.length);
+        } else {
+            snprintf(params, sizeof params, "%zu", table.entries[i].params);
+            h = hash_bytes(h, params, strlen(params));
+        }
+        text_free(&code);
+        h = hash_bytes(h, ";", 1);
+        value->items[i + 1].kind = IR_CONST_INT;
+        value->items[i + 1].scalar = IR_I64;
+        value->items[i + 1].integer = h;
+    }
+    free(table.entries);
+    g = ir_global_add_value(l->m, module, name, value);
+    free(module);
+    free(name);
+    return g;
+}
+
+/* The aggregate of the version record of an abstract class. */
+static uint32_t versions_agg(struct lowerer *l)
+{
+    static const char name[] = "anti.rt.Versions";
+    struct ir_field fields[4];
+    uint32_t agg = ir_agg_find(l->m, name);
+
+    if (agg != IR_NO_AGG) {
+        return agg;
+    }
+    memset(fields, 0, sizeof fields);
+    fields[0].name = "chain";
+    fields[0].type = ir_scalar(IR_PTR);
+    fields[1].name = "chain_length";
+    fields[1].type = ir_scalar(IR_I64);
+    fields[2].name = "floor";
+    fields[2].type = ir_scalar(IR_PTR);
+    fields[3].name = "floor_length";
+    fields[3].type = ir_scalar(IR_I64);
+    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 4, false, 0);
+}
+
+/* DESIGN: the version record of an abstract class holds its chain and
+   the floor a `compatible` line names. The descriptor of a class that
+   is no interface points at none. */
+static struct ir_global *class_versions(struct lowerer *l,
+                                        const struct type *t)
+{
+    struct ir_const *value;
+    struct ir_global *g;
+    const struct ir_global *chain;
+    char *module;
+    char *name;
+    size_t count = 0;
+
+    g = class_global(l, t, "versions", &module, &name);
+    if (g != NULL) {
+        return g;
+    }
+    chain = class_chain(l, t, &count);
+    value = ir_const_agg(l->m, ir_aggregate(versions_agg(l)), 4);
+    value->items[0].kind = IR_CONST_ADDR;
+    value->items[0].scalar = IR_PTR;
+    value->items[0].global = chain->index;
+    value->items[1].kind = IR_CONST_INT;
+    value->items[1].scalar = IR_I64;
+    value->items[1].integer = count;
+    value->items[2].scalar = IR_PTR;
+    value->items[3].kind = IR_CONST_INT;
+    value->items[3].scalar = IR_I64;
+    value->items[3].integer = t->compatible.length;
+    if (t->compatible.length > 0) {
+        struct token_text floor;
+        floor.bytes = t->compatible.text;
+        floor.length = t->compatible.length;
+        value->items[2].kind = IR_CONST_ADDR;
+        value->items[2].global = literal_global(l, &floor)->index;
+    } else {
+        value->items[2].kind = IR_CONST_INT;
+        value->items[2].integer = 0;
+    }
+    g = ir_global_add_value(l->m, module, name, value);
+    free(module);
+    free(name);
+    return g;
+}
+
 /* DESIGN: the descriptor of a class is read-only data at entry 0 of its
    table. It names the class and points at the descriptor of its base. It
    holds the size of the class and its depth in the chain, and points at
@@ -2296,7 +2482,7 @@ static struct ir_global *class_descriptor(struct lowerer *l,
     }
     /* The global is added before its ancestors, so a chain that comes
        back around finds it and does not build it twice. */
-    value = ir_const_agg(l->m, ir_aggregate(descriptor_agg(l)), 12);
+    value = ir_const_agg(l->m, ir_aggregate(descriptor_agg(l)), 15);
     g = ir_global_add_value(l->m, module, name, value);
     g->exported = t->item_exported;
     free(module);
@@ -2376,6 +2562,24 @@ static struct ir_global *class_descriptor(struct lowerer *l,
             value->items[11].integer = 0;
         }
     }
+    /* The version of the package that declares the class. The module
+       that declares it writes the descriptor, and every other module
+       refers to the one it wrote. The version of this build is then the
+       class's own. */
+    value->items[12].kind = IR_CONST_ADDR;
+    value->items[12].scalar = IR_PTR;
+    value->items[12].global = version_global(l)->index;
+    value->items[13].kind = IR_CONST_INT;
+    value->items[13].scalar = IR_I64;
+    value->items[13].integer = (uint64_t)strlen(l->version);
+    value->items[14].scalar = IR_PTR;
+    if (t->has_abstract) {
+        value->items[14].kind = IR_CONST_ADDR;
+        value->items[14].global = class_versions(l, t)->index;
+    } else {
+        value->items[14].kind = IR_CONST_INT;
+        value->items[14].integer = 0;
+    }
     return g;
 }
 
@@ -2409,11 +2613,11 @@ static struct ir_global *struct_descriptor(struct lowerer *l,
     }
     /* The global is added before the field list, so a struct that
        points at itself finds it. */
-    value = ir_const_agg(l->m, ir_aggregate(descriptor_agg(l)), 12);
+    value = ir_const_agg(l->m, ir_aggregate(descriptor_agg(l)), 15);
     g = ir_global_add_value(l->m, module, name, value);
     free(module);
     free(name);
-    for (k = 0; k < 12; k++) {
+    for (k = 0; k < 15; k++) {
         value->items[k].kind = IR_CONST_INT;
         value->items[k].scalar = l->m->aggs[descriptor_agg(l)]
                                      ->fields[k].type.type;
@@ -2431,6 +2635,9 @@ static struct ir_global *struct_descriptor(struct lowerer *l,
         value->items[7].kind = IR_CONST_ADDR;
         value->items[7].global = class_fields(l, t)->index;
     }
+    value->items[12].kind = IR_CONST_ADDR;
+    value->items[12].global = version_global(l)->index;
+    value->items[13].integer = (uint64_t)strlen(l->version);
     return g;
 }
 
@@ -2455,9 +2662,9 @@ static struct ir_global *interface_descriptor(struct lowerer *l,
     if (g != NULL) {
         return g;
     }
-    value = ir_const_agg(l->m, ir_aggregate(descriptor_agg(l)), 12);
+    value = ir_const_agg(l->m, ir_aggregate(descriptor_agg(l)), 15);
     memcpy(value->items, l->m->globals[of->index]->value->items,
-           12 * sizeof *value->items);
+           15 * sizeof *value->items);
     value->items[9].kind = IR_CONST_SYM;
     value->items[9].scalar = IR_I64;
     value->items[9].sym =
@@ -8670,7 +8877,7 @@ static void class_record(struct lowerer *l, const struct module *module,
 bool lower_module(struct module *module, const char *module_name,
                   struct ir_module *out, struct diagnostics *diags,
                   unsigned options, const char *const *patterns,
-                  size_t pattern_count)
+                  size_t pattern_count, const char *version)
 {
     struct lowerer l;
     /* Every function of the module sits past the ones the library files
@@ -8692,6 +8899,7 @@ bool lower_module(struct module *module, const char *module_name,
     l.trace_writes = l.hooks && (options & LOWER_TRACE_WRITES) != 0;
     l.patterns = patterns;
     l.pattern_count = patterns != NULL ? pattern_count : 0;
+    l.version = version != NULL ? version : PACKAGE_VERSION_DEFAULT;
     /* A function of a struct body is a function of the module with one
        more segment in its name. It is declared and lowered like a free
        function. */

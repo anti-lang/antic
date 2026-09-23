@@ -2,7 +2,7 @@ type structs.Pair = struct { a: i64, b: f64 }
 type structs.Big = struct { a: i64, b: i64, c: i64 }
 type structs.Rgb = struct { r: i8, g: i8, b: i8 }
 type structs.V2 = struct { x: f32, y: f32 }
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
 type [3]anti.rt.Field = array 3 of anti.rt.Field
@@ -11,7 +11,7 @@ type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn take(agg structs.Pair, agg structs.Big, agg structs.Rgb, agg structs.V2) -> agg structs.Pair
 extern fn make(i64) -> agg structs.Big
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global structs.19 size 31 align 1 bytes 73 74 72 75 63 74 73 2e 61 6e 74 69 3a 33 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global structs.20 size 31 align 1 bytes 73 74 72 75 63 74 73 2e 61 6e 74 69 3a 33 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn structs.call(%0: agg structs.Pair, %1: agg structs.Big, %2: agg structs.Rgb, %3: agg structs.V2) -> agg structs.Pair {
 b0:
@@ -28,7 +28,7 @@ b0:
     %12 = addov i64 %9, %11
     branchov %12, b1, b2
 b1:
-    %13 = addr @structs.19
+    %13 = addr @structs.20
     call void @anti_rt_check_failed(%13, 30, 1, %9, %11)
     jump b2
 b2:
