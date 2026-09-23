@@ -984,6 +984,34 @@ add_test(NAME silent_dropped
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
 set_tests_properties(silent_dropped PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
 
+# `catch e` shadowing a name of an outer scope is a warning. The three
+# forms that bind a name each report it, and a handler whose name is free
+# reports nothing.
+add_test(NAME warning_catch_shadow
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/catch_shadow.s,catch_shadow.anti"
+        "-DNEEDLES=catch_shadow.anti:22:25: warning: `e` shadows a variable in scope;catch_shadow.anti:26:21: warning: `e` shadows a variable in scope;catch_shadow.anti:31:10: warning: `e` shadows a variable in scope"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warnings.cmake")
+add_test(NAME silent_catch_no_shadow
+    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/catch_exits.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/catch_exits.anti")
+set_tests_properties(silent_catch_no_shadow PROPERTIES
+    FAIL_REGULAR_EXPRESSION "shadows")
+
+# The front end alone, which `anti check` runs on every source. It writes
+# no assembly, no object and no library file.
+add_test(NAME front_end_only
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DGOOD=${CMAKE_CURRENT_SOURCE_DIR}/programs/catch_exits.anti"
+        "-DBAD=${CMAKE_CURRENT_SOURCE_DIR}/errors/errors.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/front-end"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_front_end.cmake")
+
 add_test(NAME warning_one_segment
     COMMAND antic -c -o "${CMAKE_CURRENT_BINARY_DIR}/geometry.antl"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/geometry.anti")

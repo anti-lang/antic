@@ -271,6 +271,30 @@ static struct symbol *declare(struct checker *c, enum symbol_kind kind,
     return sym;
 }
 
+/* DESIGN: the name after `catch` is any identifier, and the object model
+   makes a name that an outer scope holds a warning of the checker rather
+   than an error. Only a variable is reported, because that is what the
+   message names: a function or a constant of the module is no variable.
+   The call stands inside the handler's own scope, so the lookup starts
+   at the scope above it. */
+static void warn_catch_shadow(struct checker *c, const struct name *name,
+                              struct pos pos)
+{
+    const struct symbol *outer;
+
+    if (c->quiet > 0 || name->length == 0) {
+        return;
+    }
+    outer = lookup(c, name);
+    if (outer == NULL ||
+        (outer->kind != SYMBOL_LOCAL && outer->kind != SYMBOL_PARAM)) {
+        return;
+    }
+    diagnostics_warn(c->diags, pos.line, pos.column,
+                     "`%.*s` shadows a variable in scope",
+                     (int)name->length, name->text);
+}
+
 static void enter_scope(struct checker *c, struct scope *s)
 {
     memset(s, 0, sizeof *s);
@@ -3688,6 +3712,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
     case HANDLE_BLOCK:
         enter_scope(c, &scope);
         if (h->name.length > 0) {
+            warn_catch_shadow(c, &h->name, h->pos);
             h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
                                 "`%.*s` is already declared in this block");
             if (h->symbol != NULL) {
@@ -7829,6 +7854,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     }
     enter_scope(c, &scope);
     if (h->name.length > 0) {
+        warn_catch_shadow(c, &h->name, h->pos);
         h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
                             "`%.*s` is already declared in this block");
         if (h->symbol != NULL) {
@@ -8416,6 +8442,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         enter_scope(c, &try_scope);
         if (h->name.length > 0) {
+            warn_catch_shadow(c, &h->name, h->pos);
             h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
                                 "`%.*s` is already declared in this block");
             if (h->symbol != NULL) {

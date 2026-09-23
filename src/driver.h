@@ -21,6 +21,12 @@ struct options {
     bool internal;              /* --anti-internal, allow anti. paths. */
     bool strip_docs;            /* --strip-docs, no doc text with -c. */
     bool doc_warnings;          /* --doc-warnings, as anti check passes. */
+    /* DESIGN: --front-end stops after semantic analysis and writes
+       nothing, which is the one build with no artifact. `anti check`
+       passes it, once per target. The module is checked as a library and
+       not as a program, because a check of one file cannot know which
+       module of a project fills an abstract class. */
+    bool front_end;
     bool dev;                   /* --dev, one module into its own object. */
     bool no_reflect;            /* --no-reflect, no field list in a
                                    class descriptor. */

@@ -1,0 +1,35 @@
+//! `catch e` binds the error in its handler. Where an outer scope holds
+//! that name, the binding shadows it, and the checker warns. The three
+//! forms that bind a name are here: the handler of a call, the handler
+//! of a pointer and the handler of a `try` block.
+
+import anti.lang;
+
+fn value(n: int) -> int may fail
+{
+	if n < 0 { fail "negative"; }
+	return n;
+}
+
+fn touch(n: int) may fail
+{
+	if n < 0 { fail "negative"; }
+}
+
+fn main() -> int
+{
+	let e = 1;
+	let n = value(2) catch e {
+		yield 0;
+	};
+	let p: ?*int = none;
+	let held = p catch e {
+		yield &n;
+	};
+	try {
+		touch(3);
+	} catch e {
+		return 1;
+	}
+	return n + e;
+}

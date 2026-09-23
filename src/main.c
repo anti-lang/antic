@@ -44,6 +44,8 @@ static int usage(FILE *out)
           "  --anti-internal      allow -c for a module under anti.\n"
           "  --strip-docs         leave the doc text out of the library\n"
           "  --doc-warnings       warn about documentation, for anti check\n"
+          "  --front-end          run the lexer, the parser and the checker\n"
+          "                       and write nothing, for anti check\n"
           "  --package-name <p>   the package header of the library: name,\n"
           "  --package-version <v>  version,\n"
           "  --inject <I=P>       the provider P of the injectable "
@@ -286,6 +288,9 @@ static int run(int argc, char **argv, struct options *o)
             continue;
         } else if (strcmp(arg, "--doc-warnings") == 0) {
             options.doc_warnings = true;
+            continue;
+        } else if (strcmp(arg, "--front-end") == 0) {
+            options.front_end = true;
             continue;
         } else if (strcmp(arg, "--framework") == 0) {
             const char *value = value_of(argc, argv, &i);

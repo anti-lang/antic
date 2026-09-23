@@ -263,7 +263,8 @@ static bool links(const struct options *o)
 {
     return !o->assembly_only && !o->dump_tokens && !o->dump_ast &&
            !o->dump_types && !o->dump_ir && !o->dump_opt && !o->dump_select &&
-           !o->dump_alloc && !o->library && o->lib == LIB_NONE;
+           !o->dump_alloc && !o->library && !o->front_end &&
+           o->lib == LIB_NONE;
 }
 
 /* DESIGN: lld links for every target from any host, with the sysroot of
@@ -1498,7 +1499,8 @@ static int compile(const struct options *o, struct text *source,
     }
     if (!sema_check(tree, text_cstr(module), o->package_name, libraries,
                     paths.count, &types, &arena, &diags,
-                    !o->dev && !o->library && o->lib == LIB_NONE)) {
+                    !o->dev && !o->library && !o->front_end &&
+                        o->lib == LIB_NONE)) {
         print_diagnostics(o->input, &diags);
         goto done;
     }
@@ -1507,6 +1509,12 @@ static int compile(const struct options *o, struct text *source,
     }
     print_diagnostics(o->input, &diags);
     diags.count = 0;
+    /* The front end ends here, before the first pass that writes a file.
+       Status 2 is the status of a command a dump finished. */
+    if (o->front_end) {
+        status = 2;
+        goto done;
+    }
     if (o->dump_types) {
         struct text dump = {0};
         ast_dump_typed(&dump, tree);
