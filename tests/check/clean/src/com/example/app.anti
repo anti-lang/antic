@@ -1,0 +1,9 @@
+//! The program that reports one distance.
+
+import com.example.geometry;
+
+fn main() -> int
+{
+	let p = geometry.Point { x: 3, y: -4 };
+	return geometry.taxicab(p);
+}

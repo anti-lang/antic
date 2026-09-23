@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "check.h"
 #include "linker.h"
 #include "manifest.h"
 #include "sdk.h"
@@ -18,6 +19,9 @@ static int usage(FILE *out)
           "       anti test [--release] [--work <dir>] [-I <dir>]\n"
           "                 [--runtime <dir>] [--llvm-mc <path>]\n"
           "                 <file.anti>...\n"
+          "       anti check [--warn-undocumented] [--targets all]\n"
+          "                  [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
+          "                  [<file.anti>...]\n"
           "\n"
           "sdk export packs the .tbd stubs and the version of Apple's SDK into\n"
           "apple-sdk-<version>.tar.xz, on a Mac. sdk import unpacks that bundle\n"
@@ -29,7 +33,16 @@ static int usage(FILE *out)
           "runs it. Every other build drops both blocks. --release runs the\n"
           "same tests with the checks and the assertions off. It reads the\n"
           "`[inject]` and `[inject.test]` tables of anti.toml in the current\n"
-          "directory and passes each provider to antic.\n",
+          "directory and passes each provider to antic.\n"
+          "\n"
+          "check runs the front end on every source, compiles the `anti`\n"
+          "blocks of the doc comments, reports the doc warnings and reads the\n"
+          "layout of every file against the formatter rules. It writes no\n"
+          "artifact of a program and reports one line per class. Without a\n"
+          "file it takes every source under the directories that `[layout]`\n"
+          "of anti.toml names. --targets all runs the front end once per\n"
+          "target, so a program that type-checks on the host is proven to\n"
+          "type-check on all six.\n",
           out);
     return out == stdout ? 0 : 2;
 }
@@ -71,6 +84,52 @@ int main(int argc, char **argv)
     if (argc == 2 && strcmp(argv[1], "--version") == 0) {
         printf("anti %s\n", ANTIC_VERSION);
         return 0;
+    }
+    if (argc >= 2 && strcmp(argv[1], "check") == 0) {
+        const char **sources = malloc((size_t)argc * sizeof *sources);
+        const char **roots = malloc((size_t)argc * sizeof *roots);
+        const char *work = "build/check";
+        const char *runtime = NULL;
+        struct text home = {0};
+        size_t count = 0;
+        size_t root_count = 0;
+        bool undocumented = false;
+        bool all_targets = false;
+        int status;
+        if (sources == NULL || roots == NULL) {
+            fputs("anti: out of memory\n", stderr);
+            return 70;
+        }
+        for (i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "--warn-undocumented") == 0) {
+                undocumented = true;
+            } else if (strcmp(argv[i], "--targets") == 0 && i + 1 < argc &&
+                       strcmp(argv[i + 1], "all") == 0) {
+                all_targets = true;
+                i++;
+            } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
+                work = argv[++i];
+            } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
+                runtime = argv[++i];
+            } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
+                roots[root_count++] = argv[++i];
+            } else if (argv[i][0] == '-') {
+                free((void *)sources);
+                free((void *)roots);
+                return usage(stderr);
+            } else {
+                sources[count++] = argv[i];
+            }
+        }
+        if (runtime == NULL && default_runtime(&home)) {
+            runtime = text_cstr(&home);
+        }
+        status = check_run(sources, count, roots, root_count, work, runtime,
+                           undocumented, all_targets);
+        free((void *)sources);
+        free((void *)roots);
+        text_free(&home);
+        return status;
     }
     if (argc >= 2 && strcmp(argv[1], "test") == 0) {
         const char **sources = malloc((size_t)argc * sizeof *sources);

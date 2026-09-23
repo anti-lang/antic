@@ -36,13 +36,13 @@ struct options {
     struct diagnostic_counts *counts;   /* NULL: count nothing. */
     /* DESIGN: --front-end stops after semantic analysis. No pass below the
        checker runs, so no assembly, no object and no executable is
-       written. `anti check` passes it once per target, and passes -c with
-       it where it needs the interface file that lets the next module of a
-       project resolve its imports. The module is checked as a library and
-       not as a program. A check of one file cannot know which module of a
-       project fills an abstract class. The two rules of producing a
-       library, the reserved module root and the path of one segment,
-       belong to a build and stay quiet under it. */
+       written. `anti check` passes it once per target. It passes -c with
+       it where it needs the interface file of a module, which lets the
+       next module of a project resolve its imports. The module is checked
+       as a library and not as a program. A check of one file cannot know
+       which module of a project fills an abstract class. Two rules belong
+       to a build alone and stay quiet under it: the reserved module root
+       and the path of one segment. */
     bool front_end;
     bool dev;                   /* --dev, one module into its own object. */
     bool no_reflect;            /* --no-reflect, no field list in a

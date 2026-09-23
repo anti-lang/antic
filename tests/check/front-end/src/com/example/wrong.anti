@@ -1,0 +1,7 @@
+//! A module the checker refuses, so no class below the front end runs.
+
+fn main() -> int
+{
+	let n: int = "text";
+	return n;
+}

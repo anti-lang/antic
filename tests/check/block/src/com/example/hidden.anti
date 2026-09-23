@@ -1,0 +1,17 @@
+//! A user block reaches the public items alone.
+
+/// The doubled value of `n`.
+///
+/// ```anti
+/// let n = hidden.twice(2);
+/// let m = hidden.helper(3);
+/// ```
+pub fn twice(n: int) -> int
+{
+	return helper(n) + helper(n);
+}
+
+fn helper(n: int) -> int
+{
+	return n;
+}

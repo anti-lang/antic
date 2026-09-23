@@ -126,6 +126,55 @@ bool manifest_inject_read(const char *path, bool tests,
     return true;
 }
 
+/* The value of one key of the document, or NULL. */
+static const char *value_of(const struct anti_toml *doc, const char *key)
+{
+    int64_t at = anti_rt_toml_find(doc, (const unsigned char *)key,
+                                   (int64_t)strlen(key));
+    struct anti_text value;
+
+    if (at < 0) {
+        return NULL;
+    }
+    value = anti_rt_toml_value(doc, at);
+    return value.len > 0 ? (const char *)value.ptr : NULL;
+}
+
+bool manifest_layout_read(const char *path, struct text *src,
+                          struct text *test, struct text *package)
+{
+    struct text bytes = {0};
+    struct anti_toml *doc;
+    const char *value;
+
+    text_append(src, "src");
+    text_append(test, "test");
+    if (!read_file(path, &bytes)) {
+        text_free(&bytes);
+        return true;
+    }
+    doc = anti_rt_toml_read((const unsigned char *)bytes.data,
+                            (int64_t)bytes.length);
+    text_free(&bytes);
+    if (doc == NULL) {
+        fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
+        return false;
+    }
+    if ((value = value_of(doc, "layout.src")) != NULL) {
+        src->length = 0;
+        text_append(src, value);
+    }
+    if ((value = value_of(doc, "layout.test")) != NULL) {
+        test->length = 0;
+        text_append(test, value);
+    }
+    if ((value = value_of(doc, "package.name")) != NULL) {
+        text_append(package, value);
+    }
+    anti_rt_toml_free(doc);
+    return true;
+}
+
 void manifest_inject_free(struct manifest_inject *table)
 {
     size_t i;

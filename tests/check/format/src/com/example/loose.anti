@@ -1,0 +1,7 @@
+//! A module whose layout is not the form the formatter writes.
+
+fn main() -> int
+{
+    let n = 1; let m = 2;
+	return n + m;
+}

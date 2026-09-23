@@ -58,7 +58,7 @@ bool module_path_of_source(const char *source, const char *const *roots,
 {
     const char *rest = NULL;
     const char *dot = strrchr(source, '.');
-    const char *end = dot != NULL && strcmp(dot, ".anti") == 0
+    const char *end = dot != NULL && strcmp(dot, SOURCE_SUFFIX) == 0
                           ? dot
                           : source + strlen(source);
     size_t i;

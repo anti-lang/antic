@@ -28,7 +28,6 @@
 #include "process.h"
 #include "text.h"
 
-#define SOURCE_SUFFIX ".anti"
 #define ASSEMBLY_SUFFIX ".s"
 #define HEADER_SUFFIX ".h"
 #define PACKAGE_SUFFIX ".package"

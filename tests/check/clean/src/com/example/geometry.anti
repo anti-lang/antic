@@ -1,0 +1,30 @@
+//! Points of the plane and the distance along the axes.
+//!
+//! ```anti
+//! let p = geometry.Point { x: 1, y: 2 };
+//! let n = geometry.taxicab(p);
+//! ```
+
+/// A point of the plane.
+pub struct Point
+{
+	x: int,
+	y: int,
+}
+
+//# The sum runs through `absolute`, which no other module sees.
+//#
+//# ```anti
+//# let n = absolute(-3) + absolute(4);
+//# ```
+/// The distance of `p` from the origin along the axes.
+pub fn taxicab(p: Point) -> int
+{
+	return absolute(p.x) + absolute(p.y);
+}
+
+fn absolute(n: int) -> int
+{
+	if n < 0 { return -n; }
+	return n;
+}

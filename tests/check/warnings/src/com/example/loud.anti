@@ -1,0 +1,31 @@
+//! Every warning of a check at once, and no error.
+//!
+//! # A heading, which the doc markup has not
+
+import anti.lang;
+
+/// Nothing of this module fails, which is a warning of the checker.
+pub fn close_it(n: int) may fail
+{
+	if n < 0 { return; }
+}
+
+pub fn undocumented() -> int
+{
+	return 1;
+}
+
+/// `nowhere` names nothing of this module.
+pub fn handler() -> int
+{
+	let e = 1;
+	close_it(2) catch e {
+		return 1;
+	};
+	return e;
+}
+
+fn main() -> int
+{
+	return handler() + undocumented();
+}

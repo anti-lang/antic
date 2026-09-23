@@ -9,6 +9,10 @@
 /* A module path names a module: lowercase identifiers joined by dots, as
    com.niese.geo, that mirror the directories under a search root. */
 
+/* The suffix of an Anti source file. It stands here alone, so the driver,
+   the module path and every tool that walks a project spell it once. */
+#define SOURCE_SUFFIX ".anti"
+
 /* Append the module path of source file source to out. The path is the
    file's path under the first root that holds it, with dots for slashes
    and without the suffix. Outside every root it is the file name alone.

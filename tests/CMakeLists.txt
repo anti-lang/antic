@@ -789,6 +789,18 @@ add_test(NAME anti_test
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test.cmake")
 
+# Every class of `anti check`: the front end on every source of a project,
+# the `anti` blocks of the doc comments, the doc warnings, the formatting
+# rules and the line that says the pattern check waits for PCRE2.
+add_test(NAME anti_check
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DPROJECTS=${CMAKE_CURRENT_SOURCE_DIR}/check"
+        "-DSTD=${CMAKE_SOURCE_DIR}/std"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/check"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_check.cmake")
+
 # The `tests` block of a module of the standard library. The module
 # imports other modules, so the dev run links an object of each.
 add_test(NAME std_tests_trace

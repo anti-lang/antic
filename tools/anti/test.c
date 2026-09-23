@@ -399,8 +399,8 @@ static bool run_unit(const struct unit *u, const struct options *base,
             flat.data[i] = '_';
         }
     }
-    text_appendf(&path, "%s/%s.anti", text_cstr(&directory),
-                 text_cstr(&flat));
+    text_appendf(&path, "%s/%s%s", text_cstr(&directory), text_cstr(&flat),
+                 SOURCE_SUFFIX);
     text_appendf(&program, "%s/%s.runner", work, text_cstr(&flat));
     if (!write_file(text_cstr(&path), &source)) {
         goto done;
