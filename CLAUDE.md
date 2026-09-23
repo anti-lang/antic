@@ -223,6 +223,14 @@ directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
     of a class body goes through its unit, which
     `programs/class_bitfields.anti` checks.
     `docs/reports/2026-09-22-first-sessions-20-to-24.md` reports 20 to 24.
+25. A variant gets a descriptor with its tag and each case's fields, so
+    `serialize`, `deserialize` and `reflect` handle it. It replaces the
+    entry under "Sum types" in `docs/decisions.md` that gives a variant
+    none.
+26. Plugins on Linux and Windows. On Linux a program that loads plugins
+    links in the dynamic glibc mode. On Windows the host links with an
+    import library its plugins resolve against. It extends the entry under
+    "Plugins" in `docs/decisions.md` that loads a library on macOS alone.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures

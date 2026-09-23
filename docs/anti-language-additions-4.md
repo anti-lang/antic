@@ -358,6 +358,8 @@ pub concurrent class Queue
 
 `Mutex` is one word of the program's own memory, and the operating system keeps nothing for it until a thread has to wait: a `futex` word on Linux, `os_unfair_lock` on macOS, `SRWLOCK` on Windows. A lock in every node of a large structure therefore costs memory alone, four or eight bytes each, and `size_of(Mutex)` is documented per target. Where even that is too much, a fixed set of locks shared by address, lock striping, keeps the count constant.
 
+A `Mutex` cannot be copied or assigned. A class that holds one follows the ownership rules for values that cannot be copied.
+
 ### Operations that decide for themselves
 
 Locking every function makes each call safe, never a sequence of calls. Between `list.size()` and `list.remove(0)` another thread can empty the list. A thread-safe class therefore takes criteria, not positions: `list.remove(fn(p) { return p.age >= 65; })` finds and removes under one lock, where an index returned by one call can be stale by the next. The compiler cannot tell a position from a count in an `int`, so this is a design rule for the standard library and for every thread-safe class, and the guide teaches it.
