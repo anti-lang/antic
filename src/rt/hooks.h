@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #include "object.h"
-#include "std.h"
 
 /* DESIGN: a hook site does two things. It calls the installed handler
    when there is one, and then it dispatches the object's own hook. On

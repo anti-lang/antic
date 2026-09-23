@@ -1,5 +1,6 @@
-/* The C functions behind the modules anti.io, anti.text and anti.license of
-   the standard library. */
+/* The C functions behind the modules anti.io, anti.text, anti.license,
+   anti.time, anti.mem and anti.fs of the standard library, and the
+   failure routines of the runtime. */
 #ifndef ANTI_STD_H
 #define ANTI_STD_H
 
@@ -104,8 +105,6 @@ struct anti_text anti_rt_license_text(void);
    is empty when the program carries no notice. */
 struct anti_text anti_rt_runtime_version(void);
 
-#endif
-
 /* The value of errno, which is a macro and therefore not an Anti
    extern. */
 int32_t anti_rt_errno(void);
@@ -154,3 +153,5 @@ int32_t anti_rt_fs_remove(const unsigned char *path, int64_t len);
 /* Give the file at from the path to, and give 0 or -1. */
 int32_t anti_rt_fs_rename(const unsigned char *from, int64_t from_len,
                           const unsigned char *to, int64_t to_len);
+
+#endif

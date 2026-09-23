@@ -4,6 +4,7 @@
 #ifndef ANTI_OBJECT_H
 #define ANTI_OBJECT_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "std.h"
