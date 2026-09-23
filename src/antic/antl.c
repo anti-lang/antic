@@ -1373,6 +1373,165 @@ static void read_param_owned(struct reader *r, struct symbol *sym)
     sym->owned_count = count;
 }
 
+enum { MAP_NONE, MAP_BUSY, MAP_DONE };
+
+/* DESIGN: one limit bounds how deep the tables of a library file nest.
+   It covers the structs of the type table and the aggregates and the
+   symbolic values of the IR. The reader recurses no deeper than the
+   limit when it follows an index on demand. A table whose entries point
+   back is read without recursion, and it is refused when it nests
+   deeper. The checker, the layout and the passes walk the same nesting
+   recursively. See docs/decisions-library.md. */
+enum { NEST_LIMIT = 256 };
+
+/* The larger of two heights. */
+static uint32_t nest_max(uint32_t height, uint32_t h)
+{
+    return h > height ? h : height;
+}
+
+/* The types of a type table that hold fields, each once and sorted by
+   address, with how deep each nests. */
+struct nest {
+    const struct type **types;
+    uint32_t *heights;
+    uint8_t *states;
+    size_t count;
+};
+
+static int compare_types(const void *a, const void *b)
+{
+    uintptr_t x = (uintptr_t)*(const struct type *const *)a;
+    uintptr_t y = (uintptr_t)*(const struct type *const *)b;
+
+    return x < y ? -1 : x > y ? 1 : 0;
+}
+
+/* The place of t in n, or SIZE_MAX for a type of a library read before,
+   whose reader bounded it. */
+static size_t nest_find(const struct nest *n, const struct type *t)
+{
+    size_t low = 0;
+    size_t high = n->count;
+
+    while (low < high) {
+        size_t mid = low + (high - low) / 2;
+        if ((uintptr_t)n->types[mid] < (uintptr_t)t) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    return low < n->count && n->types[low] == t ? low : SIZE_MAX;
+}
+
+static uint32_t fields_height(struct nest *n, const struct type *t,
+                              uint32_t depth);
+
+static uint32_t value_height(struct nest *n, const struct type *t,
+                             uint32_t depth);
+
+/* How deep the structs that a symbolic value measures nest. Its own
+   depth is bounded by read_symbolic. */
+static uint32_t symbolic_height(struct nest *n, const struct symbolic *s,
+                                uint32_t depth)
+{
+    uint32_t a;
+
+    if (s == NULL) {
+        return 0;
+    }
+    if (s->kind == SYMBOLIC_SIZE_OF) {
+        return value_height(n, s->of, depth);
+    }
+    a = symbolic_height(n, s->a, depth);
+    return nest_max(a, symbolic_height(n, s->b, depth));
+}
+
+/* How deep the structs inside a value of type t nest, 0 for none. The
+   elements of an array are walked without recursion. */
+static uint32_t value_height(struct nest *n, const struct type *t,
+                             uint32_t depth)
+{
+    uint32_t height = 0;
+
+    while (t->kind == TYPE_ARRAY) {
+        height = nest_max(height, symbolic_height(n, t->length_of, depth));
+        t = t->element;
+    }
+    return type_has_fields(t) ? nest_max(height, fields_height(n, t, depth))
+                              : height;
+}
+
+/* How deep the struct t nests: 1 when no field holds a struct. A cycle,
+   or a nesting deeper than NEST_LIMIT, gives UINT32_MAX. */
+static uint32_t fields_height(struct nest *n, const struct type *t,
+                              uint32_t depth)
+{
+    size_t at = nest_find(n, t);
+    uint32_t height = 0;
+    size_t i;
+
+    if (at == SIZE_MAX) {
+        return 1;
+    }
+    if (n->states[at] == MAP_DONE) {
+        return n->heights[at];
+    }
+    if (n->states[at] == MAP_BUSY || depth >= NEST_LIMIT) {
+        return UINT32_MAX;
+    }
+    n->states[at] = MAP_BUSY;
+    for (i = 0; i < t->field_count && height != UINT32_MAX; i++) {
+        height = nest_max(height, value_height(n, t->fields[i].type,
+                                               depth + 1));
+    }
+    if (height == UINT32_MAX) {
+        return UINT32_MAX;
+    }
+    n->states[at] = MAP_DONE;
+    n->heights[at] = height + 1;
+    return height + 1;
+}
+
+/* Refuse a type table whose structs, tuples and variants nest deeper
+   than NEST_LIMIT or hold themselves. types_find_cycle then recurses no
+   deeper than the limit. */
+static void check_nesting(struct reader *r, uint32_t count)
+{
+    struct nest n;
+    size_t kept = 0;
+    uint32_t i;
+
+    n.types = calloc((size_t)count + 1, sizeof *n.types);
+    n.heights = calloc((size_t)count + 1, sizeof *n.heights);
+    n.states = calloc((size_t)count + 1, sizeof *n.states);
+    if (n.types == NULL || n.heights == NULL || n.states == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    for (i = 0; i < count; i++) {
+        if (type_has_fields(r->table[i])) {
+            n.types[kept++] = r->table[i];
+        }
+    }
+    qsort((void *)n.types, kept, sizeof *n.types, compare_types);
+    n.count = 0;
+    for (i = 0; i < kept; i++) {
+        if (n.count == 0 || n.types[n.count - 1] != n.types[i]) {
+            n.types[n.count++] = n.types[i];
+        }
+    }
+    for (i = 0; i < n.count && !r->failed; i++) {
+        if (fields_height(&n, n.types[i], 0) > NEST_LIMIT) {
+            damaged(r);
+        }
+    }
+    free((void *)n.types);
+    free(n.heights);
+    free(n.states);
+}
+
 static void read_types(struct reader *r)
 {
     uint32_t count = get_count(r, 1);
@@ -1733,6 +1892,9 @@ static void read_types(struct reader *r)
             read_param_owned(r, structs[i].members[j]->symbol);
         }
     }
+    if (!r->failed) {
+        check_nesting(r, count);
+    }
     for (i = 0; i < struct_count && !r->failed; i++) {
         if (types_find_cycle(structs[i].s) != NULL) {
             damaged(r);
@@ -1906,27 +2068,30 @@ struct ir_maps {
     struct ir_aggtype *aggs;        /* as read, with indices of the file */
     uint32_t *agg_map;
     uint8_t *agg_state;
+    uint32_t *agg_height;           /* how deep each aggregate nests */
     uint32_t agg_count;
     struct ir_sym *syms;            /* as read, with indices of the file */
     uint32_t *sym_map;
     uint8_t *sym_state;
+    uint32_t *sym_height;           /* how deep each value nests */
     uint32_t sym_count;
 };
 
-enum { MAP_NONE, MAP_BUSY, MAP_DONE };
-
-static uint32_t map_sym(struct reader *r, struct ir_module *program,
-                        struct ir_maps *maps, uint32_t sym);
+static uint32_t map_sym_at(struct reader *r, struct ir_module *program,
+                           struct ir_maps *maps, uint32_t sym, uint32_t depth);
 
 /* The program's index of aggregate agg of the file. The types an
-   aggregate is built from are added before it. */
-static uint32_t map_agg(struct reader *r, struct ir_module *program,
-                        struct ir_maps *maps, uint32_t agg)
+   aggregate is built from are added before it. depth counts the
+   aggregates and values this call is mapped for. */
+static uint32_t map_agg_at(struct reader *r, struct ir_module *program,
+                           struct ir_maps *maps, uint32_t agg, uint32_t depth)
 {
     struct ir_aggtype *t;
+    uint32_t height = 0;
     size_t i;
 
-    if (agg >= maps->agg_count || maps->agg_state[agg] == MAP_BUSY) {
+    if (agg >= maps->agg_count || maps->agg_state[agg] == MAP_BUSY ||
+        depth >= NEST_LIMIT) {
         damaged(r);
         return 0;
     }
@@ -1937,15 +2102,22 @@ static uint32_t map_agg(struct reader *r, struct ir_module *program,
     t = &maps->aggs[agg];
     for (i = 0; i < t->field_count && !r->failed; i++) {
         if (t->fields[i].type.type == IR_AGG) {
-            t->fields[i].type.agg = map_agg(r, program, maps,
-                                            t->fields[i].type.agg);
+            uint32_t of = t->fields[i].type.agg;
+            t->fields[i].type.agg = map_agg_at(r, program, maps, of,
+                                               depth + 1);
+            if (!r->failed) {
+                height = nest_max(height, maps->agg_height[of]);
+            }
         }
     }
     if (r->failed) {
         return 0;
     }
     if (t->kind == IR_AGG_ARRAY) {
-        uint32_t length = map_sym(r, program, maps, t->length);
+        uint32_t length = map_sym_at(r, program, maps, t->length, depth + 1);
+        if (!r->failed) {
+            height = nest_max(height, maps->sym_height[t->length]);
+        }
         maps->agg_map[agg] = r->failed ? 0
                                        : ir_array_add(program, t->name,
                                                       t->fields[0].type,
@@ -1959,15 +2131,21 @@ static uint32_t map_agg(struct reader *r, struct ir_module *program,
                                            t->align);
     }
     maps->agg_state[agg] = MAP_DONE;
+    maps->agg_height[agg] = height + 1;
+    if (height + 1 > NEST_LIMIT) {
+        damaged(r);
+    }
     return maps->agg_map[agg];
 }
 
-static uint32_t map_sym(struct reader *r, struct ir_module *program,
-                        struct ir_maps *maps, uint32_t sym)
+static uint32_t map_sym_at(struct reader *r, struct ir_module *program,
+                           struct ir_maps *maps, uint32_t sym, uint32_t depth)
 {
     struct ir_sym s;
+    uint32_t height = 0;
 
-    if (sym >= maps->sym_count || maps->sym_state[sym] == MAP_BUSY) {
+    if (sym >= maps->sym_count || maps->sym_state[sym] == MAP_BUSY ||
+        depth >= NEST_LIMIT) {
         damaged(r);
         return 0;
     }
@@ -1978,7 +2156,10 @@ static uint32_t map_sym(struct reader *r, struct ir_module *program,
     s = maps->syms[sym];
     if (s.kind == IR_SYM_SIZE_OF || s.kind == IR_SYM_OFFSET_OF) {
         if (s.of.type == IR_AGG) {
-            s.of.agg = map_agg(r, program, maps, s.of.agg);
+            s.of.agg = map_agg_at(r, program, maps, s.of.agg, depth + 1);
+            if (!r->failed) {
+                height = maps->agg_height[maps->syms[sym].of.agg];
+            }
         }
         if (!r->failed && s.kind == IR_SYM_OFFSET_OF &&
             (s.of.type != IR_AGG ||
@@ -1986,9 +2167,15 @@ static uint32_t map_sym(struct reader *r, struct ir_module *program,
             damaged(r);
         }
     } else if (s.kind == IR_SYM_OP) {
-        s.a = map_sym(r, program, maps, s.a);
+        s.a = map_sym_at(r, program, maps, s.a, depth + 1);
+        if (!r->failed) {
+            height = maps->sym_height[maps->syms[sym].a];
+        }
         if (s.b != IR_NO_AGG) {
-            s.b = map_sym(r, program, maps, s.b);
+            s.b = map_sym_at(r, program, maps, s.b, depth + 1);
+            if (!r->failed) {
+                height = nest_max(height, maps->sym_height[maps->syms[sym].b]);
+            }
         }
     }
     if (r->failed) {
@@ -2010,7 +2197,23 @@ static uint32_t map_sym(struct reader *r, struct ir_module *program,
         break;
     }
     maps->sym_state[sym] = MAP_DONE;
+    maps->sym_height[sym] = height + 1;
+    if (height + 1 > NEST_LIMIT) {
+        damaged(r);
+    }
     return maps->sym_map[sym];
+}
+
+static uint32_t map_agg(struct reader *r, struct ir_module *program,
+                        struct ir_maps *maps, uint32_t agg)
+{
+    return map_agg_at(r, program, maps, agg, 0);
+}
+
+static uint32_t map_sym(struct reader *r, struct ir_module *program,
+                        struct ir_maps *maps, uint32_t sym)
+{
+    return map_sym_at(r, program, maps, sym, 0);
 }
 
 static struct ir_vtype read_vtype(struct reader *r, bool scalar_only)
@@ -2106,6 +2309,7 @@ static void read_tables(struct reader *r, struct ir_module *program,
     maps->syms = allocate(r, maps->sym_count, sizeof *maps->syms);
     maps->sym_map = allocate(r, maps->sym_count, sizeof *maps->sym_map);
     maps->sym_state = allocate(r, maps->sym_count, sizeof *maps->sym_state);
+    maps->sym_height = allocate(r, maps->sym_count, sizeof *maps->sym_height);
     for (i = 0; i < maps->sym_count && !r->failed; i++) {
         struct ir_sym *s = &maps->syms[i];
         uint8_t kind = get_u8(r);
@@ -2130,6 +2334,7 @@ static void read_tables(struct reader *r, struct ir_module *program,
     maps->aggs = allocate(r, maps->agg_count, sizeof *maps->aggs);
     maps->agg_map = allocate(r, maps->agg_count, sizeof *maps->agg_map);
     maps->agg_state = allocate(r, maps->agg_count, sizeof *maps->agg_state);
+    maps->agg_height = allocate(r, maps->agg_count, sizeof *maps->agg_height);
     for (i = 0; i < maps->agg_count && !r->failed; i++) {
         struct ir_aggtype *t = &maps->aggs[i];
         uint8_t kind = get_u8(r);

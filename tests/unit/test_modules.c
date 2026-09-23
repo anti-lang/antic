@@ -1715,8 +1715,162 @@ static void one_struct_descriptor(void)
     close_session(&s);
 }
 
+static void put_u8(struct text *b, uint8_t v)
+{
+    text_append_bytes(b, &v, 1);
+}
+
+static void put_u32(struct text *b, uint32_t v)
+{
+    uint8_t out[4];
+
+    poke_u32(out, v);
+    text_append_bytes(b, out, 4);
+}
+
+static void put_u64(struct text *b, uint64_t v)
+{
+    put_u32(b, (uint32_t)v);
+    put_u32(b, (uint32_t)(v >> 32));
+}
+
+static void put_str(struct text *b, const char *s)
+{
+    put_u32(b, (uint32_t)strlen(s));
+    text_append_bytes(b, s, strlen(s));
+}
+
+/* Where the tables sit in scale_antl. The count of the type table comes
+   first and the items follow the table. Then come the counts of the
+   symbolic values and of the aggregates of the IR. */
+enum { SCALE_TYPES = 63, SCALE_ITEMS = 82, SCALE_SYMS = 159, SCALE_AGGS = 163 };
+
+/* The index of link k of a chain of n: each link names the next one
+   forward, or the one before it backward. The end of the chain is the
+   link that names none. */
+static uint32_t chain_next(uint32_t k, uint32_t n, bool forward)
+{
+    if (forward) {
+        return k + 1 < n ? k + 1 : UINT32_MAX;
+    }
+    return k > 0 ? k - 1 : UINT32_MAX;
+}
+
+/* scale_antl with n symbolic values, each the negation of the next. */
+static void sym_chain(struct text *b, uint32_t n, bool forward)
+{
+    uint32_t k;
+
+    text_append_bytes(b, scale_antl, SCALE_SYMS);
+    put_u32(b, n);
+    for (k = 0; k < n; k++) {
+        uint32_t next = chain_next(k, n, forward);
+        put_u8(b, next == UINT32_MAX ? IR_SYM_INT : IR_SYM_OP);
+        put_u8(b, IR_I64);
+        put_u64(b, 1);
+        put_u8(b, IR_VOID);
+        put_u32(b, IR_NO_AGG);
+        put_u32(b, 0);
+        put_u8(b, next == UINT32_MAX ? 0 : IR_NEG);
+        put_u32(b, next == UINT32_MAX ? 0 : next);
+        put_u32(b, IR_NO_AGG);
+    }
+    text_append_bytes(b, scale_antl + SCALE_AGGS,
+                      sizeof scale_antl - SCALE_AGGS);
+}
+
+/* scale_antl with n IR structs, each holding the next. */
+static void agg_chain(struct text *b, uint32_t n, bool forward)
+{
+    char name[16];
+    uint32_t k;
+
+    text_append_bytes(b, scale_antl, SCALE_AGGS);
+    put_u32(b, n);
+    for (k = 0; k < n; k++) {
+        uint32_t next = chain_next(k, n, forward);
+        snprintf(name, sizeof name, "a%u", (unsigned)k);
+        put_u8(b, IR_AGG_STRUCT);
+        put_str(b, name);
+        put_u8(b, 0);
+        put_u64(b, 0);
+        put_u32(b, IR_NO_AGG);
+        put_str(b, "");
+        put_u32(b, 1);
+        put_str(b, "f");
+        put_u8(b, next == UINT32_MAX ? IR_I64 : IR_AGG);
+        put_u32(b, next);
+        put_u8(b, 0);
+        put_u8(b, 0);
+    }
+    text_append_bytes(b, scale_antl + SCALE_AGGS + 4,
+                      sizeof scale_antl - SCALE_AGGS - 4);
+}
+
+/* scale_antl with n structs after its two types, each holding the next,
+   and the last a uint. */
+static void struct_chain(struct text *b, uint32_t n, bool forward)
+{
+    char name[16];
+    uint32_t k;
+
+    text_append_bytes(b, scale_antl, SCALE_TYPES);
+    put_u32(b, 2 + n);
+    text_append_bytes(b, scale_antl + SCALE_TYPES + 4,
+                      SCALE_ITEMS - SCALE_TYPES - 4);
+    for (k = 0; k < n; k++) {
+        uint32_t next = chain_next(k, n, forward);
+        snprintf(name, sizeof name, "s%u", (unsigned)k);
+        put_u8(b, TYPE_STRUCT);
+        put_str(b, "scale");
+        put_str(b, name);
+        put_u8(b, 0);
+        put_str(b, "");
+        put_u64(b, 0);
+        put_u32(b, 1);
+        put_str(b, "f");
+        put_u32(b, next == UINT32_MAX ? 0 : 2 + next);
+        put_u8(b, 0);
+        put_u8(b, FIELD_PLAIN);
+        put_u8(b, VIS_PUB);
+        put_u8(b, 0);
+        put_str(b, "");
+        put_u32(b, 0);
+    }
+    /* No field has a default value. */
+    for (k = 0; k < n; k++) {
+        put_u8(b, 0);
+    }
+    text_append_bytes(b, scale_antl + SCALE_ITEMS,
+                      sizeof scale_antl - SCALE_ITEMS);
+}
+
+/* S13: a table of a library file that nests deeper than the reader
+   allows is refused. Its entries may point forward, which the reader
+   follows on demand, or back. A short chain reads either way. */
+static void deep_tables(void)
+{
+    void (*const chains[])(struct text *, uint32_t, bool) = {
+        sym_chain, agg_chain, struct_chain};
+    size_t i;
+
+    for (i = 0; i < sizeof chains / sizeof chains[0]; i++) {
+        int forward;
+        for (forward = 0; forward < 2; forward++) {
+            struct text b = {0};
+            chains[i](&b, 16, forward != 0);
+            CHECK(reads_file(&b));
+            text_free(&b);
+            chains[i](&b, 300000, forward != 0);
+            refuses_file((const uint8_t *)b.data, b.length, NULL);
+            text_free(&b);
+        }
+    }
+}
+
 void test_modules(void)
 {
+    deep_tables();
     imports();
     cycles();
     lowers_imports();
