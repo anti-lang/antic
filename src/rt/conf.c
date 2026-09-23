@@ -6,6 +6,7 @@
    built. The layers are the command line, then the file with its
    includes, then the build. A key takes the value of the highest layer
    that named it. */
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,17 +28,18 @@ enum layer { LAYER_BUILD, LAYER_FILE, LAYER_COMMAND };
 struct key {
     const char *name;
     char *value;        /* what the layer set, NULL while no layer did */
+    size_t length;      /* the bytes of value */
     const char *source; /* the file of a value of the file layer */
     enum layer layer;
 };
 
 /* The keys of [runtime], in the order --anti.inspect prints them. */
 static struct key keys[] = {
-    {"backtrace", NULL, NULL, LAYER_BUILD},
-    {"logger", NULL, NULL, LAYER_BUILD},
-    {"plugins", NULL, NULL, LAYER_BUILD},
-    {"threads", NULL, NULL, LAYER_BUILD},
-    {"trace", NULL, NULL, LAYER_BUILD}
+    {"backtrace", NULL, 0, NULL, LAYER_BUILD},
+    {"logger", NULL, 0, NULL, LAYER_BUILD},
+    {"plugins", NULL, 0, NULL, LAYER_BUILD},
+    {"threads", NULL, 0, NULL, LAYER_BUILD},
+    {"trace", NULL, 0, NULL, LAYER_BUILD}
 };
 
 /* One option under --anti., what follows its name and what it does.
@@ -175,29 +177,40 @@ static char *key_names(void)
     return list_text(names, KEY_COUNT, " ");
 }
 
-/* Take the value into the key, unless a higher layer named it. `where`
-   names the option or the line of the file, for a message about a value
-   the key does not take. */
-static void set_key(struct key *k, const char *value, enum layer layer,
-                    const char *source, const char *where)
+/* Whether the length bytes at text are the word. */
+static int same_word(const char *text, size_t length, const char *word)
 {
+    return strlen(word) == length && memcmp(text, word, length) == 0;
+}
+
+/* Take the value, of length bytes, into the key, unless a higher layer
+   named it. `where` names the option or the line of the file, for a
+   message about a value the key does not take. */
+static void set_key(struct key *k, const char *value, size_t length,
+                    enum layer layer, const char *source, const char *where)
+{
+    int on = same_word(value, length, "true");
     struct retired *old;
     char *kept;
 
+    if (length > INT_MAX) {
+        startup_error("%s takes no value this long", where);
+    }
     if (strcmp(k->name, "backtrace") == 0) {
-        if (strcmp(value, "true") != 0 && strcmp(value, "false") != 0) {
-            startup_error("%s takes true or false, found %s", where, value);
+        if (!on && !same_word(value, length, "false")) {
+            startup_error("%s takes true or false, found %.*s", where,
+                          (int)length, value);
         }
     } else if (strcmp(k->name, "threads") == 0) {
         struct anti_text text;
         text.ptr = (const unsigned char *)value;
-        text.len = (int64_t)strlen(value);
+        text.len = (int64_t)length;
         if (anti_rt_conf_threads(text) == 0) {
-            startup_error("%s takes a count from 1 to %ld, found %s", where,
-                          (long)ANTI_RT_THREADS_MAX, value);
+            startup_error("%s takes a count from 1 to %ld, found %.*s", where,
+                          (long)ANTI_RT_THREADS_MAX, (int)length, value);
         }
     }
-    kept = copy(value, strlen(value));
+    kept = copy(value, length);
     old = malloc(sizeof *old);
     if (old == NULL) {
         startup_error("out of memory at program start");
@@ -213,13 +226,14 @@ static void set_key(struct key *k, const char *value, enum layer layer,
             old = NULL;
         }
         k->value = kept;
+        k->length = length;
         kept = NULL;
         k->source = source;
         k->layer = layer;
         if (strcmp(k->name, "backtrace") == 0) {
             anti_rt_atomic_store(&anti_rt_option_backtrace,
                                  (int64_t)sizeof anti_rt_option_backtrace,
-                                 strcmp(value, "true") == 0);
+                                 on);
         }
     }
     release();
@@ -245,23 +259,26 @@ static const struct anti_injectable *injectable_of(const char *name,
 
 /* The interfaces the program does carry, for the message of a line that
    names one it has not. */
-static void list_injectable(char *out, size_t size)
+static char *list_injectable(void)
 {
-    size_t at = 0;
+    char *out = format_text("%s", "");
     int64_t i;
 
     if (anti_rt_injectable.count == 0) {
-        snprintf(out, size, "none");
-        return;
+        free(out);
+        return format_text("%s", "none");
     }
-    for (i = 0; i < anti_rt_injectable.count && at + 1 < size; i++) {
+    for (i = 0; i < anti_rt_injectable.count; i++) {
         const char *before = i == 0 ? ""
                              : i + 1 == anti_rt_injectable.count ? " and "
                                                                  : ", ";
-        at += (size_t)snprintf(out + at, size - at, "%s%s", before,
-                               (const char *)
-                                   anti_rt_injectable.interfaces[i].name);
+        char *longer = format_text(
+            "%s%s%s", out, before,
+            (const char *)anti_rt_injectable.interfaces[i].name);
+        free(out);
+        out = longer;
     }
+    return out;
 }
 
 /* DESIGN: a line that names an interface to take from a library. The
@@ -276,7 +293,7 @@ struct injection {
     const struct anti_injectable *in;
     char *library;
     int layer;
-    char where[320];
+    char *where;
 };
 
 static struct injection injections[INJECTION_MAX];
@@ -287,14 +304,12 @@ static void injection_named(const char *name, size_t length,
 {
     const struct anti_injectable *in = injectable_of(name, length);
     struct injection *slot = NULL;
-    char list[512];
     size_t i;
 
     if (in == NULL) {
-        list_injectable(list, sizeof list);
         startup_error("%s: %.*s is no injectable interface of this program, "
                       "which has %s",
-                      where, (int)length, name, list);
+                      where, (int)length, name, list_injectable());
     }
     if (in->final != 0) {
         startup_error("%s: %s is `inject final` in %s and cannot be replaced",
@@ -322,10 +337,11 @@ static void injection_named(const char *name, size_t length,
         return;
     }
     free(slot->library);
+    free(slot->where);
     slot->in = in;
     slot->library = copy(library, strlen(library));
     slot->layer = layer;
-    snprintf(slot->where, sizeof slot->where, "%s", where);
+    slot->where = copy(where, strlen(where));
 }
 
 static _Noreturn void unknown_option(const char *name, size_t length)
@@ -344,29 +360,25 @@ static _Noreturn void unknown_option(const char *name, size_t length)
 void anti_rt_conf_option(const char *name, int64_t length, const char *value)
 {
     size_t n = (size_t)length;
-    char where[64];
+    char *where;
     struct key *k;
 
-    if (n >= sizeof where - sizeof "--anti.") {
+    /* No option is as long as this, and the bound keeps the length
+       within the int that %.*s takes. */
+    if (n >= 64) {
         unknown_option(name, n);
     }
-    snprintf(where, sizeof where, "--anti.%.*s", (int)n, name);
+    where = format_text("--anti.%.*s", (int)n, name);
     if (n == 4 && memcmp(name, "conf", n) == 0) {
         if (value == NULL) {
             startup_error("%s takes the path of a file", where);
         }
         conf_path = value;
-        return;
-    }
-    if (n == 7 && memcmp(name, "inspect", n) == 0) {
+    } else if (n == 7 && memcmp(name, "inspect", n) == 0) {
         inspect_asked = 1;
-        return;
-    }
-    if (n == 4 && memcmp(name, "help", n) == 0) {
+    } else if (n == 4 && memcmp(name, "help", n) == 0) {
         help_asked = 1;
-        return;
-    }
-    if (n == 6 && memcmp(name, "inject", n) == 0) {
+    } else if (n == 6 && memcmp(name, "inject", n) == 0) {
         const char *at = value == NULL ? NULL : strchr(value, '=');
         if (at == NULL) {
             startup_error("%s takes an interface and the path of a library, "
@@ -375,19 +387,20 @@ void anti_rt_conf_option(const char *name, int64_t length, const char *value)
         }
         injection_named(value, (size_t)(at - value), at + 1, where,
                         LAYER_COMMAND);
-        return;
-    }
-    k = key_of(name, n);
-    if (k == NULL) {
-        unknown_option(name, n);
-    }
-    if (value == NULL) {
-        if (strcmp(k->name, "backtrace") != 0) {
+    } else {
+        k = key_of(name, n);
+        if (k == NULL) {
+            unknown_option(name, n);
+        }
+        if (value == NULL && strcmp(k->name, "backtrace") != 0) {
             startup_error("%s takes a value", where);
         }
-        value = "true";
+        if (value == NULL) {
+            value = "true";
+        }
+        set_key(k, value, strlen(value), LAYER_COMMAND, NULL, where);
     }
-    set_key(k, value, LAYER_COMMAND, NULL, where);
+    free(where);
 }
 
 /* The bytes of the file, NUL after them, or NULL when it cannot be
@@ -454,6 +467,33 @@ struct including {
 
 static void read_file(const char *path, const struct including *from);
 
+/* Whether the key is the word, or starts with it and a dot. */
+static int key_under(struct anti_text key, const char *word)
+{
+    size_t length = strlen(word);
+
+    return (size_t)key.len >= length &&
+           memcmp(key.ptr, word, length) == 0 &&
+           ((size_t)key.len == length || key.ptr[length] == '.');
+}
+
+/* The value of the key at index of the document, in memory of its own
+   that the caller frees. DESIGN: every value of the file layer ends up
+   in a C string: a path, or a key that anti_rt_conf_get hands on. A NUL
+   byte in it would cut it short without a word, so the file is refused
+   with the position of the value. */
+static char *value_text(const struct anti_toml *doc, int64_t index,
+                        const char *path)
+{
+    struct anti_text value = anti_rt_toml_value(doc, index);
+
+    if (value.len > 0 && memchr(value.ptr, 0, (size_t)value.len) != NULL) {
+        startup_error("%s:%lld: the value holds a NUL byte", path,
+                      (long long)anti_rt_toml_line(doc, index));
+    }
+    return copy((const char *)value.ptr, (size_t)value.len);
+}
+
 /* The includes of the document, in order, each relative to the file
    that names it. */
 static void read_includes(const struct anti_toml *doc, const char *path,
@@ -463,50 +503,82 @@ static void read_includes(const struct anti_toml *doc, const char *path,
     int64_t i;
 
     for (i = 0; i < count; i++) {
-        struct anti_text key = anti_rt_toml_key(doc, i);
-        struct anti_text value = anti_rt_toml_value(doc, i);
-        const char *name = (const char *)key.ptr;
-        if (strcmp(name, "include") != 0 &&
-            strncmp(name, "include.", 8) != 0) {
+        char *value;
+        if (!key_under(anti_rt_toml_key(doc, i), "include")) {
             continue;
         }
-        read_file(resolve(path, (const char *)value.ptr), from);
+        value = value_text(doc, i, path);
+        read_file(resolve(path, value), from);
+        free(value);
     }
 }
 
-/* Whether every byte of text is a digit, and there is one. */
-static int digits_only(const char *text)
+/* Whether every one of the length bytes at text is a digit, and there is
+   one. */
+static int digits_only(const unsigned char *text, size_t length)
 {
-    const char *at = text;
+    size_t i;
 
-    while (*at >= '0' && *at <= '9') {
-        at++;
+    for (i = 0; i < length; i++) {
+        if (text[i] < '0' || text[i] > '9') {
+            return 0;
+        }
     }
-    return at != text && *at == '\0';
+    return length > 0;
+}
+
+/* The element number of the key, which is the name of a key of
+   [runtime] and `.<digits>`, and name_length the bytes of that name.
+   Gives 0 for a key without a number. */
+static int element_of(struct anti_text name, size_t *name_length)
+{
+    const unsigned char *dot = memchr(name.ptr, '.', (size_t)name.len);
+    size_t before;
+
+    *name_length = (size_t)name.len;
+    if (dot == NULL) {
+        return 0;
+    }
+    before = (size_t)(dot - name.ptr);
+    if (!digits_only(dot + 1, (size_t)name.len - before - 1)) {
+        return 0;
+    }
+    *name_length = before;
+    return 1;
 }
 
 /* The elements of an array value, joined with `:`, the separator that
    --anti.plugins=dir:dir writes. The reader numbers the elements, so
-   they stand in order under the keys <prefix>.0 and further. */
+   they stand in order under the keys runtime.<name>.0 and further. The
+   length of the result goes to length. */
 static char *join_elements(const struct anti_toml *doc, int64_t from,
-                           const char *prefix)
+                           const char *name, const char *path,
+                           size_t *length)
 {
-    size_t length = strlen(prefix);
+    size_t name_length = strlen(name);
     int64_t count = anti_rt_toml_count(doc);
     char *out = copy("", 0);
+    size_t held = 0;
     int64_t i;
 
     for (i = from; i < count; i++) {
         struct anti_text key = anti_rt_toml_key(doc, i);
-        struct anti_text value = anti_rt_toml_value(doc, i);
-        const char *name = (const char *)key.ptr;
-        size_t held = strlen(out);
+        char *value;
+        size_t value_length;
+        size_t element;
         char *grown;
-        if (strncmp(name, prefix, length) != 0 || name[length] != '.' ||
-            !digits_only(name + length + 1)) {
+        if (!key_under(key, "runtime") || key.len <= 8) {
             break;
         }
-        grown = malloc(held + (size_t)value.len + 2);
+        key.ptr += 8;
+        key.len -= 8;
+        if (!element_of(key, &element) || element != name_length ||
+            memcmp(key.ptr, name, name_length) != 0) {
+            break;
+        }
+        value = value_text(doc, i, path);
+        value_length = strlen(value);
+        grown = malloc(held + value_length + 2);
         if (grown == NULL) {
             startup_error("out of memory at program start");
         }
@@ -514,12 +586,71 @@ static char *join_elements(const struct anti_toml *doc, int64_t from,
         if (held > 0) {
             grown[held++] = ':';
         }
-        memcpy(grown + held, value.ptr, (size_t)value.len);
-        grown[held + (size_t)value.len] = '\0';
+        memcpy(grown + held, value, value_length);
+        held += value_length;
+        grown[held] = '\0';
+        free(value);
         free(out);
         out = grown;
     }
+    *length = held;
     return out;
+}
+
+/* The key at index of [runtime], or [injections], of the document. It
+   ends the program on any other. */
+static void read_key(const struct anti_toml *doc, int64_t i,
+                     const char *path, const char *position)
+{
+    struct anti_text name = anti_rt_toml_key(doc, i);
+    size_t length;
+    char *value;
+    char *where;
+    struct key *k;
+
+    if (name.len > INT_MAX) {
+        startup_error("%s: the key is too long", position);
+    }
+    if (key_under(name, "injections") && name.len > 11) {
+        value = value_text(doc, i, path);
+        injection_named((const char *)name.ptr + 11, (size_t)name.len - 11,
+                        value, position, LAYER_FILE);
+        free(value);
+        return;
+    }
+    if (!key_under(name, "runtime") || name.len <= 8) {
+        startup_error("%s: %.*s is no key of the runtime configuration, "
+                      "which takes include, the table injections and "
+                      "the keys%s of the table runtime",
+                      position, (int)name.len, (const char *)name.ptr,
+                      key_names());
+    }
+    /* An array value stands as <key>.0, <key>.1 and further. The first
+       element takes the whole array, and the rest of them are then
+       done. */
+    name.ptr += 8;
+    name.len -= 8;
+    element_of(name, &length);
+    k = key_of((const char *)name.ptr, length);
+    if (k == NULL) {
+        startup_error("%s: %.*s is no key of the table runtime, which "
+                      "takes%s",
+                      position, (int)length, (const char *)name.ptr,
+                      key_names());
+    }
+    where = format_text("%s: %s", position, k->name);
+    if (length == (size_t)name.len) {
+        value = value_text(doc, i, path);
+        set_key(k, value, strlen(value), LAYER_FILE, path, where);
+        free(value);
+    } else if (same_word((const char *)name.ptr + length + 1,
+                         (size_t)name.len - length - 1, "0")) {
+        size_t joined;
+        value = join_elements(doc, i, k->name, path, &joined);
+        set_key(k, value, joined, LAYER_FILE, path, where);
+        free(value);
+    }
+    free(where);
 }
 
 /* The keys of the document, after its includes. */
@@ -529,63 +660,14 @@ static void read_keys(const struct anti_toml *doc, const char *path)
     int64_t i;
 
     for (i = 0; i < count; i++) {
-        struct anti_text key = anti_rt_toml_key(doc, i);
-        struct anti_text value = anti_rt_toml_value(doc, i);
-        const char *name = (const char *)key.ptr;
-        const char *element;
-        char position[280];
-        char where[320];
-        char prefix[64];
-        char *elements;
-        size_t length;
-        struct key *k;
-        snprintf(position, sizeof position, "%s:%lld", path,
-                 (long long)anti_rt_toml_line(doc, i));
-        if (strcmp(name, "include") == 0 ||
-            strncmp(name, "include.", 8) == 0) {
+        char *position;
+        if (key_under(anti_rt_toml_key(doc, i), "include")) {
             continue;
         }
-        if (strncmp(name, "injections.", 11) == 0) {
-            injection_named(name + 11, strlen(name + 11),
-                            (const char *)value.ptr, position, LAYER_FILE);
-            continue;
-        }
-        if (strncmp(name, "runtime.", 8) != 0) {
-            startup_error("%s: %s is no key of the runtime configuration, "
-                          "which takes include, the table injections and "
-                          "the keys%s of the table runtime",
-                          position, name, key_names());
-        }
-        /* An array value stands as <key>.0, <key>.1 and further. The
-           first element takes the whole array, and the rest of them
-           are then done. */
-        name += 8;
-        element = strchr(name, '.');
-        length = strlen(name);
-        if (element != NULL && !digits_only(element + 1)) {
-            element = NULL;
-        }
-        if (element != NULL) {
-            length = (size_t)(element - name);
-        }
-        k = key_of(name, length);
-        if (k == NULL) {
-            startup_error("%s: %.*s is no key of the table runtime, which "
-                          "takes%s",
-                          position, (int)length, name, key_names());
-        }
-        snprintf(where, sizeof where, "%s: %s", position, k->name);
-        if (element == NULL) {
-            set_key(k, (const char *)value.ptr, LAYER_FILE, path, where);
-            continue;
-        }
-        if (strcmp(element + 1, "0") != 0) {
-            continue;
-        }
-        snprintf(prefix, sizeof prefix, "runtime.%s", k->name);
-        elements = join_elements(doc, i, prefix);
-        set_key(k, elements, LAYER_FILE, path, where);
-        free(elements);
+        position = format_text("%s:%lld", path,
+                               (long long)anti_rt_toml_line(doc, i));
+        read_key(doc, i, path, position);
+        free(position);
     }
 }
 
@@ -756,10 +838,11 @@ static void help(void)
     printf("anti: the options of the runtime, which it takes before the "
            "program sees its arguments\n");
     for (i = 0; i < OPTION_COUNT; i++) {
-        char form[64];
-        snprintf(form, sizeof form, "--anti.%s%s", options[i].name,
-                 options[i].value);
-        printf("  %-34s %s\n", form, options[i].what);
+        size_t used = sizeof "--anti." - 1 + strlen(options[i].name) +
+                      strlen(options[i].value);
+        int pad = used < 34 ? 34 - (int)used : 0;
+        printf("  --anti.%s%s%*s %s\n", options[i].name, options[i].value,
+               pad, "", options[i].what);
     }
 }
 
@@ -790,6 +873,13 @@ void anti_rt_conf_configure(const unsigned char *path, int64_t length)
     if (!anti_rt_atomic_compare_swap(&file_read, (int64_t)sizeof file_read,
                                      0, 1)) {
         return;
+    }
+    /* The path goes on as a C string, which would end at a NUL inside
+       it and name another file. */
+    if (length > 0 && memchr(path, 0, (size_t)length) != NULL) {
+        startup_error("the path of the configuration file %s holds a NUL "
+                      "byte",
+                      (const char *)path);
     }
     read_file(copy((const char *)path, (size_t)length), NULL);
 }
@@ -826,7 +916,7 @@ struct anti_text anti_rt_conf_get(const unsigned char *key, int64_t length)
     hold();
     if (k != NULL && k->value != NULL) {
         text.ptr = (const unsigned char *)k->value;
-        text.len = (int64_t)strlen(k->value);
+        text.len = (int64_t)k->length;
     }
     release();
     return text;

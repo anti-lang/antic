@@ -1,0 +1,17 @@
+//! `rt.configure(path)` refuses a path with a NUL byte inside it at start. The
+//! bytes before the NUL name a file that is there, which the runtime must not
+//! open in place of the whole path.
+
+import anti.lang;
+import anti.runtime as rt;
+import anti.text;
+
+fn main(args: []str) -> int
+{
+	let b = text.Builder.new();
+	b.append(args[1]);
+	b.append_byte(0);
+	b.append("x");
+	rt.configure(b.text());
+	return 0;
+}
