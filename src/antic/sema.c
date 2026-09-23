@@ -75,6 +75,7 @@ struct checker {
     int deferring;              /* above 0, a `defer` or `undo` is checked */
     const struct expr *field_base; /* the base of the field checked now */
     const struct held_mutex *held; /* the `sync` blocks around it */
+    int const_depth;            /* constants evaluated inside each other */
     bool ok;
 };
 
@@ -1548,12 +1549,70 @@ static const char *operator_name(enum token_kind op)
    can reach. A worker may not `delete` its object, and it may not touch
    a `mutable` field of a singleton, because another worker may hold the
    same one. The walk is over the checked tree of this compilation. */
+/* A set of pointers, open addressed and at most half full. The owner
+   frees slots with free(). */
+struct ptr_set {
+    const void **slots;
+    size_t capacity;
+    size_t count;
+};
+
+static size_t ptr_slot(const void *p, size_t capacity)
+{
+    uint64_t h = (uint64_t)(uintptr_t)p;
+
+    h ^= h >> 33;
+    h *= UINT64_C(0xff51afd7ed558ccd);
+    h ^= h >> 33;
+    return (size_t)(h & (capacity - 1));
+}
+
+/* Add p to s. True when p was not in s before. */
+static bool ptr_set_add(struct ptr_set *s, const void *p)
+{
+    size_t i;
+
+    if ((s->count + 1) * 2 > s->capacity) {
+        size_t capacity = s->capacity == 0 ? 64 : s->capacity * 2;
+        const void **slots = calloc(capacity, sizeof *slots);
+        if (slots == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        for (i = 0; i < s->capacity; i++) {
+            if (s->slots[i] != NULL) {
+                size_t at = ptr_slot(s->slots[i], capacity);
+                while (slots[at] != NULL) {
+                    at = (at + 1) & (capacity - 1);
+                }
+                slots[at] = s->slots[i];
+            }
+        }
+        free(s->slots);
+        s->slots = slots;
+        s->capacity = capacity;
+    }
+    for (i = ptr_slot(p, s->capacity); s->slots[i] != NULL;
+         i = (i + 1) & (s->capacity - 1)) {
+        if (s->slots[i] == p) {
+            return false;
+        }
+    }
+    s->slots[i] = p;
+    s->count++;
+    return true;
+}
+
+/* DESIGN: the walk keeps the functions still to walk in a queue and not
+   on the stack. A chain of calls of any length then costs no depth. A
+   function is walked once per worker, after the body that calls it. */
 struct worker_walk {
     struct checker *c;
     const struct item *worker;      /* the worker the path started at */
-    const struct item **seen;
-    size_t seen_count;
-    size_t seen_capacity;
+    struct ptr_set seen;
+    const struct item **queue;      /* every function seen, in order */
+    size_t queue_count;
+    size_t queue_capacity;
 };
 
 static void walk_block(struct worker_walk *w, const struct block *b);
@@ -1746,30 +1805,42 @@ static void walk_block(struct worker_walk *w, const struct block *b)
     }
 }
 
+/* Queue it to be walked, once. */
 static void walk_function(struct worker_walk *w, const struct item *it)
 {
-    size_t i;
-
-    if (it == NULL || it->kind != ITEM_FN || it->body == NULL) {
+    if (it == NULL || it->kind != ITEM_FN || it->body == NULL ||
+        !ptr_set_add(&w->seen, it)) {
         return;
     }
-    for (i = 0; i < w->seen_count; i++) {
-        if (w->seen[i] == it) {
-            return;
+    if (w->queue_count == w->queue_capacity) {
+        size_t capacity = w->queue_capacity == 0 ? 16 : w->queue_capacity * 2;
+        const struct item **queue =
+            realloc(w->queue, capacity * sizeof *queue);
+        if (queue == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
         }
+        w->queue = queue;
+        w->queue_capacity = capacity;
     }
-    if (w->seen_count == w->seen_capacity) {
-        size_t capacity = w->seen_capacity == 0 ? 16 : w->seen_capacity * 2;
-        const struct item **seen =
-            realloc(w->seen, capacity * sizeof *seen);
-        if (seen == NULL) {
-            return;
-        }
-        w->seen = seen;
-        w->seen_capacity = capacity;
+    w->queue[w->queue_count++] = it;
+}
+
+/* Walk worker and every function it reaches. */
+static void walk_worker(struct checker *c, const struct item *worker)
+{
+    struct worker_walk w;
+    size_t next;
+
+    memset(&w, 0, sizeof w);
+    w.c = c;
+    w.worker = worker;
+    walk_function(&w, worker);
+    for (next = 0; next < w.queue_count; next++) {
+        walk_block(&w, w.queue[next]->body);
     }
-    w->seen[w->seen_count++] = it;
-    walk_block(w, it->body);
+    free(w.queue);
+    free(w.seen.slots);
 }
 
 /* Whether some class of the program inherits t or implements it. */
@@ -6727,6 +6798,39 @@ static bool undefined_on_constants(struct checker *c, struct expr *e,
                              e->kind == EXPR_CAST ? NULL : &b);
 }
 
+/* DESIGN: a constant holds one value per element, and lowering writes
+   one item per element into the data of the module. A repeated array of
+   more than 2^20 elements is refused before the checker allocates them.
+   The count goes through nested arrays and the fields of structs. The
+   product of a length and a size then cannot wrap. */
+#define CONST_ELEMENTS_MAX (1 << 20)
+
+/* The scalar elements of a value of type t, or UINT64_MAX once the count
+   passes that. */
+static uint64_t const_elements(const struct type *t)
+{
+    uint64_t total = 0;
+    uint64_t one;
+    size_t i;
+
+    if (t == NULL) {
+        return 1;
+    }
+    if (t->kind == TYPE_ARRAY) {
+        one = const_elements(t->element);
+        return one != 0 && t->length > UINT64_MAX / one ? UINT64_MAX
+                                                       : t->length * one;
+    }
+    if (!type_has_fields(t) || t->kind == TYPE_CLASS) {
+        return 1;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        one = const_elements(t->fields[i].type);
+        total = one > UINT64_MAX - total ? UINT64_MAX : total + one;
+    }
+    return total;
+}
+
 /* Evaluate a checked expression. The expression must use only what
    chapter 2 allows in a constant. */
 static bool eval_const(struct checker *c, struct expr *e,
@@ -7053,6 +7157,11 @@ static bool eval_const(struct checker *c, struct expr *e,
         if (e->type->length_of != NULL) {
             return fail_const(c, e, "an array with a length from `size_of`");
         }
+        if (const_elements(e->type) > CONST_ELEMENTS_MAX) {
+            error_at(c, e->pos, "an array of more than %d elements is not a "
+                     "constant expression", CONST_ELEMENTS_MAX);
+            return false;
+        }
         if (!eval_const(c, e->as.array_repeat.value, &a)) {
             return false;
         }
@@ -7111,11 +7220,21 @@ static bool eval_const(struct checker *c, struct expr *e,
         if (base == NULL) {
             return fail_const(c, e, "this field");
         }
+        /* The value of a class literal keeps the filler above in its
+           base, its tables and the fields it does not name. A field of
+           it is therefore read only at run time. */
+        if (base->kind == TYPE_CLASS) {
+            return fail_const(c, e, "a field of a class");
+        }
         if (type_has_fields(base)) {
             if (!eval_const(c, e->as.field.base, &a)) {
                 return false;
             }
             f = find_field(base, &e->as.field.name);
+            if (f == NULL || a.kind != CONST_STRUCT ||
+                (size_t)(f - base->fields) >= a.as.aggregate.count) {
+                return fail_const(c, e, "this field");
+            }
             *out = a.as.aggregate.items[f - base->fields];
             return true;
         }
@@ -7212,6 +7331,233 @@ static bool eval_const(struct checker *c, struct expr *e,
     return false;
 }
 
+/* DESIGN: a constant that names another evaluates that one first, and
+   the checker recursed once per link of a chain. A chain deeper than
+   CONST_CHAIN_DIRECT links is taken apart first. A walk with a stack of
+   its own finds the constants the first one depends on. Each is then
+   evaluated after the ones it names, so no evaluation goes more than one
+   link deep. A shallower chain is evaluated as it is met, which keeps
+   the order of the messages. CONST_DEPTH_MAX bounds what is left: a
+   cycle through a long chain, or a form the walk does not follow. */
+#define CONST_CHAIN_DIRECT 16
+#define CONST_DEPTH_MAX 64
+
+/* The constants that expressions name, collected on one stack. */
+struct const_deps {
+    struct checker *c;
+    struct symbol **items;
+    size_t count;
+    size_t capacity;
+};
+
+static void const_deps_add(struct const_deps *d, struct symbol *sym)
+{
+    if (sym == NULL || sym->kind != SYMBOL_CONST || sym->state != EVAL_NONE) {
+        return;
+    }
+    if (d->count == d->capacity) {
+        size_t capacity = d->capacity == 0 ? 64 : d->capacity * 2;
+        struct symbol **items = realloc(d->items, capacity * sizeof *items);
+        if (items == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        d->items = items;
+        d->capacity = capacity;
+    }
+    d->items[d->count++] = sym;
+}
+
+/* Collect the constants e names that have no value yet. The walk
+   follows the forms of a constant expression. */
+static void const_deps_of(struct const_deps *d, const struct expr *e)
+{
+    size_t i;
+
+    if (e == NULL) {
+        return;
+    }
+    switch (e->kind) {
+    case EXPR_NAME:
+        const_deps_add(d, lookup(d->c, &e->as.name));
+        return;
+    case EXPR_FIELD:
+        const_deps_of(d, e->as.field.base);
+        return;
+    case EXPR_UNARY:
+        const_deps_of(d, e->as.unary.operand);
+        return;
+    case EXPR_BINARY:
+        const_deps_of(d, e->as.binary.left);
+        const_deps_of(d, e->as.binary.right);
+        return;
+    case EXPR_CAST:
+        const_deps_of(d, e->as.cast.operand);
+        return;
+    case EXPR_INDEX:
+        const_deps_of(d, e->as.index.base);
+        const_deps_of(d, e->as.index.index);
+        return;
+    case EXPR_IN:
+        const_deps_of(d, e->as.in.value);
+        const_deps_of(d, e->as.in.low);
+        const_deps_of(d, e->as.in.high);
+        return;
+    case EXPR_ARRAY_LIT:
+        for (i = 0; i < e->as.array_lit.count; i++) {
+            const_deps_of(d, e->as.array_lit.elements[i]);
+        }
+        return;
+    case EXPR_TUPLE:
+        for (i = 0; i < e->as.tuple.count; i++) {
+            const_deps_of(d, e->as.tuple.elements[i]);
+        }
+        return;
+    case EXPR_ARRAY_REPEAT:
+        const_deps_of(d, e->as.array_repeat.value);
+        return;
+    case EXPR_STRUCT_LIT:
+        for (i = 0; i < e->as.struct_lit.field_count; i++) {
+            const_deps_of(d, e->as.struct_lit.fields[i].value);
+        }
+        return;
+    default:
+        return;
+    }
+}
+
+/* Add the constants the value of sym names to d, in the scope the value
+   is checked in. */
+static void const_deps_of_symbol(struct const_deps *d, struct symbol *sym)
+{
+    struct scope *saved = d->c->scope;
+
+    if (sym->item != NULL) {
+        d->c->scope = &d->c->module_scope;
+        const_deps_of(d, sym->item->value);
+    } else {
+        const_deps_of(d, sym->stmt->as.let.value);
+    }
+    d->c->scope = saved;
+}
+
+/* Whether a value of type t holds a class, itself or in a field or an
+   element. */
+static bool holds_class(const struct type *t)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return false;
+    }
+    if (t->kind == TYPE_CLASS) {
+        return true;
+    }
+    if (t->kind == TYPE_ARRAY) {
+        return holds_class(t->element);
+    }
+    if (!type_has_fields(t)) {
+        return false;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (holds_class(t->fields[i].type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* One constant on the stack of const_prepare, and its range of deps. */
+struct const_frame {
+    struct symbol *sym;
+    size_t start;
+    size_t next;
+    size_t end;
+};
+
+/* Evaluate the constants root depends on, each after the ones it names,
+   when the chain below root is deeper than CONST_CHAIN_DIRECT. */
+static void const_prepare(struct checker *c, struct symbol *root)
+{
+    struct const_deps deps;
+    struct ptr_set seen;
+    struct const_frame *stack = NULL;
+    size_t stack_count = 0;
+    size_t stack_capacity = 0;
+    size_t deepest = 0;
+    struct symbol **order = NULL;
+    size_t order_count = 0;
+    size_t order_capacity = 0;
+    struct symbol *next = root;
+    size_t i;
+
+    memset(&deps, 0, sizeof deps);
+    memset(&seen, 0, sizeof seen);
+    deps.c = c;
+    ptr_set_add(&seen, root);
+    for (;;) {
+        struct const_frame *top;
+        if (next != NULL) {
+            if (stack_count == stack_capacity) {
+                size_t capacity = stack_capacity == 0 ? 64 : stack_capacity * 2;
+                struct const_frame *grown =
+                    realloc(stack, capacity * sizeof *grown);
+                if (grown == NULL) {
+                    fputs("antic: out of memory\n", stderr);
+                    exit(70);
+                }
+                stack = grown;
+                stack_capacity = capacity;
+            }
+            top = &stack[stack_count++];
+            top->sym = next;
+            top->start = deps.count;
+            const_deps_of_symbol(&deps, next);
+            top->next = top->start;
+            top->end = deps.count;
+            deepest = stack_count > deepest ? stack_count : deepest;
+            next = NULL;
+            continue;
+        }
+        if (stack_count == 0) {
+            break;
+        }
+        top = &stack[stack_count - 1];
+        if (top->next < top->end) {
+            struct symbol *dep = deps.items[top->next++];
+            if (dep->state == EVAL_NONE && ptr_set_add(&seen, dep)) {
+                next = dep;
+            }
+            continue;
+        }
+        if (order_count == order_capacity) {
+            size_t capacity = order_capacity == 0 ? 64 : order_capacity * 2;
+            struct symbol **grown = realloc(order, capacity * sizeof *grown);
+            if (grown == NULL) {
+                fputs("antic: out of memory\n", stderr);
+                exit(70);
+            }
+            order = grown;
+            order_capacity = capacity;
+        }
+        order[order_count++] = top->sym;
+        deps.count = top->start;
+        stack_count--;
+    }
+    /* The last in the order is root, which the caller evaluates. */
+    if (deepest > CONST_CHAIN_DIRECT) {
+        for (i = 0; i + 1 < order_count; i++) {
+            if (order[i]->state == EVAL_NONE) {
+                const_symbol(c, order[i], order[i]->pos);
+            }
+        }
+    }
+    free(order);
+    free(stack);
+    free(deps.items);
+    free(seen.slots);
+}
+
 /* Give a constant symbol its type and value, once. */
 static bool const_symbol(struct checker *c, struct symbol *sym,
                          struct pos use)
@@ -7230,6 +7576,22 @@ static bool const_symbol(struct checker *c, struct symbol *sym,
                  sym->name.text);
         return false;
     }
+    if (c->const_depth == 0) {
+        c->const_depth++;
+        const_prepare(c, sym);
+        c->const_depth--;
+        if (sym->state == EVAL_DONE) {
+            return sym->value != NULL;
+        }
+    }
+    if (c->const_depth >= CONST_DEPTH_MAX) {
+        error_at(c, use, "`%.*s` needs a chain of more than %d constants",
+                 (int)sym->name.length, sym->name.text, CONST_DEPTH_MAX);
+        sym->type = builtin(c, TYPE_ERROR);
+        sym->state = EVAL_DONE;
+        return false;
+    }
+    c->const_depth++;
     sym->state = EVAL_BUSY;
     if (sym->item != NULL) {
         type_expr = sym->item->type;
@@ -7240,7 +7602,17 @@ static bool const_symbol(struct checker *c, struct symbol *sym,
         value = sym->stmt->as.let.value;
     }
     t = resolve_type(c, type_expr);
-    ok = !is_error(t) && require(c, value, check_expr(c, value, t), t);
+    ok = !is_error(t);
+    /* DESIGN: a class holds its base, its tables and the defaults of
+       its fields, which the value of a constant does not carry. A
+       constant that holds a class is refused. A default of a field
+       still takes a class literal, which lowering writes from the
+       expression. */
+    if (ok && holds_class(t)) {
+        error_at(c, value->pos, "a class is not a constant expression");
+        ok = false;
+    }
+    ok = ok && require(c, value, check_expr(c, value, t), t);
     if (ok) {
         sym->value = arena_alloc(c->arena, sizeof *sym->value);
         ok = eval_const(c, value, sym->value);
@@ -7250,6 +7622,7 @@ static bool const_symbol(struct checker *c, struct symbol *sym,
     }
     sym->type = ok ? t : builtin(c, TYPE_ERROR);
     sym->state = EVAL_DONE;
+    c->const_depth--;
     c->scope = saved;
     return ok;
 }
@@ -10592,15 +10965,10 @@ bool sema_check(struct module *module, const char *module_name,
        same program. */
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        struct worker_walk walk;
         if (it->kind != ITEM_FN || !it->worker || it->body == NULL) {
             continue;
         }
-        memset(&walk, 0, sizeof walk);
-        walk.c = &c;
-        walk.worker = it;
-        walk_function(&walk, it);
-        free(walk.seen);
+        walk_worker(&c, it);
     }
     /* An abstract class that no class of the program fills has no value
        and no use. A build that writes a program sees every class, so it

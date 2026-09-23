@@ -6,6 +6,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "sema.h"
+#include "text.h"
 #include "types.h"
 
 struct checked {
@@ -74,6 +75,34 @@ static void rejects(const char *source, int line, int column,
         fprintf(stderr, "expected %d:%d: %s\ngot      %d:%d: %s\n%s\n", line,
                 column, message, c.diags.items[0].line,
                 c.diags.items[0].column, c.diags.items[0].message, source);
+    }
+    release(&c);
+}
+
+/* Check source and expect a failure with message at line:column among
+   its messages, which need not be the first. */
+static void rejects_also(const char *source, int line, int column,
+                         const char *message)
+{
+    struct checked c;
+    size_t i;
+
+    run(&c, source);
+    for (i = 0; i < c.diags.count; i++) {
+        if (c.diags.items[i].line == line &&
+            c.diags.items[i].column == column &&
+            strcmp(c.diags.items[i].message, message) == 0) {
+            break;
+        }
+    }
+    if (c.ok || i == c.diags.count) {
+        check_failures++;
+        fprintf(stderr, "no message %d:%d: %s\n%s\n", line, column, message,
+                source);
+        for (i = 0; i < c.diags.count; i++) {
+            fprintf(stderr, "  %d:%d: %s\n", c.diags.items[i].line,
+                    c.diags.items[i].column, c.diags.items[i].message);
+        }
     }
     release(&c);
 }
@@ -1026,4 +1055,80 @@ void test_sema_cycles(void)
              "%sfn f(v: V) { let s = v as P; }", vec4);
     rejects(source, 3, 22, "cannot convert `V` to `P`, a `simd struct` "
             "converts to an array or a plain struct of the same bytes");
+}
+
+/* A chain of constants and a chain of calls from a worker are checked
+   without a recursion per link. A constant never reads a value its
+   literal did not fill. */
+void test_sema_constants(void)
+{
+    struct text source = {0};
+    int i;
+
+    /* Each constant names the next, so the first needs the whole chain. */
+    for (i = 0; i < 3000; i++) {
+        text_appendf(&source, "const C%d: i64 = C%d + 1;\n", i, i + 1);
+    }
+    text_append(&source, "const C3000: i64 = 0;\n"
+                         "fn f() -> i64 { return C0; }\n");
+    accepts(text_cstr(&source));
+    text_free(&source);
+    /* A cycle through the whole chain is refused where the evaluation
+       nests too deep. */
+    for (i = 0; i < 3000; i++) {
+        text_appendf(&source, "const C%d: i64 = C%d + 1;\n", i,
+                     (i + 1) % 3000);
+    }
+    rejects(text_cstr(&source), 62, 18,
+            "`C62` needs a chain of more than 64 constants");
+    text_free(&source);
+    /* A worker that starts a chain of 60000 calls, whose last function
+       deletes an object. */
+    text_append(&source, "class Cell { pub n: int = 0, }\n"
+                         "worker fn w(chunk: []int) -> int { g0(); "
+                         "return 0; }\n");
+    for (i = 0; i < 60000; i++) {
+        text_appendf(&source, "fn g%d() { g%d(); }\n", i, i + 1);
+    }
+    text_append(&source, "fn g60000() { let c = alloc Cell { n: 1 }; "
+                         "delete(c); }\n");
+    rejects(text_cstr(&source), 60003, 44,
+            "`w` is a `worker fn` and cannot `delete` an object another "
+            "one may hold");
+    text_free(&source);
+
+    /* A class holds its table and its base, which no constant carries,
+       and it read the defaults as 0. */
+    rejects("class P { pub x: i64 = 3, pub y: i64, }\n"
+            "const Q: P = P { y: 1 };\n"
+            "const X: i64 = Q.x;\n",
+            2, 14, "a class is not a constant expression");
+    rejects("struct In { x: i64 }\n"
+            "class Out { pub inner: In = In { x: 1 }, }\n"
+            "const O: Out = Out { };\n"
+            "const Z: i64 = O.inner.x;\n",
+            3, 16, "a class is not a constant expression");
+    rejects("class P { pub x: i64 = 3, pub y: i64, }\n"
+            "struct S { p: P, n: i64 }\n"
+            "const Q: S = S { p: P { y: 1 }, n: 2 };\n",
+            3, 14, "a class is not a constant expression");
+    rejects("class P { pub x: i64 = 3, pub y: i64, }\n"
+            "const X: i64 = P { y: 1 }.x;\n",
+            2, 16, "a field of a class is not a constant expression");
+    accepts("struct In { x: i64 }\nstruct Out { inner: In, y: i64 }\n"
+            "const O: Out = Out { inner: In { x: 5 }, y: 2 };\n"
+            "const Z: i64 = O.inner.x + O.y;\n");
+
+    /* The product of the length and the size of an item wrapped to 0. */
+    rejects("const A: [576460752303423488]i64 = [0; 576460752303423488];\n",
+            1, 36, "an array of more than 1048576 elements is not a "
+            "constant expression");
+    rejects("const A: [1025][1024]u8 = [[0; 1024]; 1025];\n", 1, 27,
+            "an array of more than 1048576 elements is not a constant "
+            "expression");
+    accepts("const A: [1024][1024]u8 = [[0; 1024]; 1024];\n");
+
+    /* A variant without cases has no case to name as the example. */
+    rejects_also("variant V { }\nfn f(v: V) -> bool { return v is X; }\n",
+                 2, 29, "`is` on `V` names one of its cases");
 }

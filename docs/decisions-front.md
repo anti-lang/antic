@@ -52,3 +52,44 @@ Decisions made while fixing step 2.
 - [provisional] A size or an offset of `fixed_layout` past 2^64 bytes is
   no fixed layout. A conversion of a simd struct to such a type is then
   refused with the message for a type of other bytes.
+
+## Constants and walks
+
+Decisions made while fixing step 3.
+
+- [provisional] A constant whose type holds a class is refused with "a
+  class is not a constant expression" at its value. The class may be
+  the type, a field or an element. A constant expression that reads a field
+  through a class value is refused with "a field of a class is not a
+  constant expression". A field default still takes a class literal.
+  Reason: a class carries its base, its tables and the defaults of its
+  fields, which the value of a constant does not hold. `eval_const`
+  filled them with an integer 0, so a read gave 0 in place of the
+  default and lowering stopped on the filler. Field defaults of class
+  type are in the test suite, and lowering writes them from the
+  expression.
+- [provisional] A repeated array in a constant holds at most 2^20
+  elements. The count goes through nested arrays and struct fields.
+  The bound is `CONST_ELEMENTS_MAX` in the checker. A longer array is
+  refused with "an array of more than 1048576 elements is not a
+  constant expression" at the array. Reason: the checker keeps one
+  value per element, and lowering writes one item per element. The
+  product of the length and the size of an item wrapped.
+- [provisional] A chain of constants deeper than 16 links is taken
+  apart first by a walk with a stack of its own. Each constant of it is
+  then evaluated after the ones it names. A shallower chain is
+  evaluated as before, so its messages keep their order. An
+  evaluation nested more than 64 constants deep is refused with "`C`
+  needs a chain of more than 64 constants", which a cycle through a
+  long chain reaches. Reason: the audit asks for a worklist or a depth
+  limit. A limit alone refuses long chains that are valid, and under
+  AddressSanitizer one link costs about 14 KB of stack.
+- [provisional] The walk over the functions a `worker fn` reaches keeps
+  a queue and a hashed set of the functions seen. A function is walked
+  after the body that calls it, where it was walked at the call. Its
+  messages come after those of the caller. Reason: the walk recursed
+  once per call of a chain, and its scan of the functions seen was
+  quadratic.
+- [provisional] `v is X` on a variant without cases says "`is` on `V`
+  names one of its cases" with no example case. Reason: such a variant
+  has no case to give, and it has had its own message.
