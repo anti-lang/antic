@@ -1,4 +1,5 @@
 #include "../binary_stdio.h"
+#include <stdlib.h>
 #include "check.h"
 #include "antl.h"
 #include "modpath.h"
@@ -1319,6 +1320,239 @@ static void damaged_files(void)
     refuses_file(copy, sizeof copy, "is damaged at byte 82");
     copy[FN_FLAGS] = 8;
     refuses_file(copy, sizeof copy, "is damaged at byte 82");
+    /* S16: a body without a block. The count of blocks follows the
+       temporaries, and the classes follow the blocks. */
+    n = sizeof scale_antl - TAIL + 6;
+    memcpy(copy, scale_antl, n);
+    memset(copy + n, 0, 4);
+    memcpy(copy + n + 4, scale_antl + sizeof scale_antl - 4, 4);
+    refuses_file(copy, n + 8, NULL);
+}
+
+/* A file writes a name as a 32-bit length and the bytes. This is the
+   offset past the first copy of name, or past the last when last is set.
+   SIZE_MAX when there is none. */
+static size_t name_end(const struct text *bytes, const char *name, bool last)
+{
+    size_t n = strlen(name);
+    size_t found = SIZE_MAX;
+    size_t i;
+
+    for (i = 0; i + 4 + n <= bytes->length; i++) {
+        const uint8_t *p = (const uint8_t *)bytes->data + i;
+        if (p[0] == n && p[1] == 0 && p[2] == 0 && p[3] == 0 &&
+            memcmp(p + 4, name, n) == 0) {
+            found = i + 4 + n;
+            if (!last) {
+                break;
+            }
+        }
+    }
+    CHECK(found != SIZE_MAX);
+    return found;
+}
+
+/* The unsigned 32-bit number at byte at. */
+static uint32_t u32_at(const struct text *bytes, size_t at)
+{
+    const uint8_t *p = (const uint8_t *)bytes->data + at;
+
+    return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 |
+           (uint32_t)p[3] << 24;
+}
+
+static bool reads_file(const struct text *bytes)
+{
+    struct session s;
+    struct ir_module program;
+    char error[160] = "";
+    bool ok;
+
+    open_session(&s);
+    ir_module_init(&program, &s.arena, "main");
+    ok = antl_read((const uint8_t *)bytes->data, bytes->length, NULL, 0, &s.types, &s.arena,
+                   &program, error, sizeof error) != NULL;
+    if (!ok) {
+        fprintf(stderr, "  %s\n", error);
+    }
+    ir_module_free(&program);
+    close_session(&s);
+    return ok;
+}
+
+/* The file with the count bytes of value written at byte at is refused. */
+static void refuses_poke(const struct text *bytes, size_t at,
+                         const void *value, size_t count)
+{
+    uint8_t *copy;
+
+    if (at == SIZE_MAX || at + count > bytes->length) {
+        check_failures++;
+        fprintf(stderr, "no place to poke at %zu\n", at);
+        return;
+    }
+    copy = malloc(bytes->length);
+    CHECK(copy != NULL);
+    if (copy == NULL) {
+        return;
+    }
+    memcpy(copy, bytes->data, bytes->length);
+    memcpy(copy + at, value, count);
+    refuses_file(copy, bytes->length, NULL);
+    free(copy);
+}
+
+static void poke_u32(uint8_t out[4], uint32_t v)
+{
+    out[0] = (uint8_t)v;
+    out[1] = (uint8_t)(v >> 8);
+    out[2] = (uint8_t)(v >> 16);
+    out[3] = (uint8_t)(v >> 24);
+}
+
+/* A library whose records name what a well-formed file never does. Each
+   file below is written from source and read back first, then refused
+   with one record changed. */
+static const char record_source[] =
+    "pub const ZZK: int = 1;\n"
+    "pub const ZZF: f64 = 1.5;\n"
+    "pub const ZZT: []u8 = b\"abc\";\n"
+    "pub enum ZE: u8 { A, B }\n"
+    "pub struct ZB { zw: i8 : 3, zv: i8 : 2 }\n"
+    "pub simd struct ZV { q: f32, r: f32 }\n"
+    "pub class ZC\n"
+    "{\n"
+    "    n: int = 0,\n"
+    "    pub fn zzm(self) -> int\n"
+    "    {\n"
+    "        return self.n;\n"
+    "    }\n"
+    "}\n"
+    "pub fn zbits(b: ZB) -> int { return b.zw as int; }\n"
+    "pub fn zlane(v: ZV) -> f32 { return v.q; }\n"
+    "pub fn zloop(x: int) -> int\n"
+    "{\n"
+    "    let t = 0;\n"
+    "    for i in 0..x {\n"
+    "        if i > 2 {\n"
+    "            return i;\n"
+    "        }\n"
+    "    }\n"
+    "    return t;\n"
+    "}\n";
+
+/* The first instruction of op at or after from whose operand number
+   operand is a block, or SIZE_MAX. An instruction starts with its op,
+   its type, its line and its result, and each operand is 10 bytes. */
+static size_t block_operand(const struct text *bytes, uint8_t op,
+                            int operand)
+{
+    const uint8_t *p = (const uint8_t *)bytes->data;
+    size_t at = (size_t)(10 + 10 * operand);
+    size_t i;
+
+    for (i = 0; i + 40 <= bytes->length; i++) {
+        if (p[i] == op && p[i + 1] == IR_VOID && p[i + 6] == 0xff &&
+            p[i + 7] == 0xff && p[i + 8] == 0xff && p[i + 9] == 0xff &&
+            p[i + at] == IR_BLOCK && p[i + at + 1] == IR_VOID) {
+            return i + at;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no block operand of op %u\n", op);
+    return SIZE_MAX;
+}
+
+/* The element index of the first slice record before end, which is the
+   one slice of record_source. */
+static size_t find_slice(const struct text *bytes, size_t end)
+{
+    const uint8_t *p = (const uint8_t *)bytes->data;
+    size_t i;
+
+    for (i = 0; i + 5 <= end; i++) {
+        if (p[i] == TYPE_SLICE && p[i + 2] == 0 && p[i + 3] == 0 &&
+            p[i + 4] == 0 && p[i + 1] < 16) {
+            return i + 1;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no slice record\n");
+    return SIZE_MAX;
+}
+
+static void damaged_records(void)
+{
+    struct session s;
+    struct text bytes = {0};
+    uint8_t value[10];
+    size_t at;
+    uint32_t int_type;
+    uint32_t f64_type;
+    uint32_t fn_type;
+
+    open_session(&s);
+    if (!build_library(&s, "zz", record_source, &bytes)) {
+        close_session(&s);
+        return;
+    }
+    CHECK(reads_file(&bytes));
+    int_type = u32_at(&bytes, name_end(&bytes, "ZZK", false));
+    f64_type = u32_at(&bytes, name_end(&bytes, "ZZF", false));
+    fn_type = u32_at(&bytes, name_end(&bytes, "zbits", false));
+
+    /* S12: a member of a class body whose type is `int`, and one whose
+       type has a parameter the declaration did not write. */
+    at = name_end(&bytes, "zzm", false) + 4;
+    poke_u32(value, int_type);
+    refuses_poke(&bytes, at, value, 4);
+    poke_u32(value, fn_type);
+    refuses_poke(&bytes, at, value, 4);
+
+    /* S15: a jump and a branch whose target is the integer 65536. */
+    memset(value, 0, sizeof value);
+    value[0] = IR_INT;
+    value[1] = IR_VOID;
+    value[4] = 1;
+    refuses_poke(&bytes, block_operand(&bytes, IR_JUMP, 0), value, 10);
+    refuses_poke(&bytes, block_operand(&bytes, IR_BRANCH, 1), value, 10);
+    refuses_poke(&bytes, block_operand(&bytes, IR_BRANCH, 2), value, 10);
+
+    /* S1: a simd aggregate of the IR whose lane is the unit break `_`,
+       and one whose lane is a bitfield. */
+    at = name_end(&bytes, "q", true);
+    refuses_poke(&bytes, at - 1, "_", 1);
+    value[0] = 4;
+    refuses_poke(&bytes, at + 5, value, 1);
+
+    /* M3: a bitfield of 40 bits on an `i8` field, in the type table and
+       in the aggregate of the IR. */
+    value[0] = 40;
+    refuses_poke(&bytes, name_end(&bytes, "zw", false) + 4, value, 1);
+    refuses_poke(&bytes, name_end(&bytes, "zw", true) + 5, value, 1);
+
+    /* M4: an aggregate of the IR aligned to 3. Before its first field
+       stand the count, the empty length text, the length and the
+       alignment. */
+    at = name_end(&bytes, "zw", true) - 6 - 4 - 4 - 4 - 8;
+    memset(value, 0, sizeof value);
+    value[0] = 3;
+    refuses_poke(&bytes, at, value, 8);
+
+    /* M5: the text constant of `ZZT` typed as a slice of `int`. The
+       slice is the one record of its kind in the type table, which ends
+       before the items. */
+    at = find_slice(&bytes, name_end(&bytes, "ZZK", false));
+    poke_u32(value, int_type);
+    refuses_poke(&bytes, at, value, 4);
+
+    /* M6: the enum `ZE` over `f64`. */
+    at = name_end(&bytes, "ZE", false);
+    poke_u32(value, f64_type);
+    refuses_poke(&bytes, at, value, 4);
+
+    text_free(&bytes);
+    close_session(&s);
 }
 
 /* A library file keeps the class records, the mark of a `worker fn` and
@@ -1505,4 +1739,5 @@ void test_modules(void)
     one_struct_descriptor();
     dependencies();
     damaged_files();
+    damaged_records();
 }

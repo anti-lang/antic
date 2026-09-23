@@ -1121,6 +1121,25 @@ bool antl_header(const uint8_t *data, size_t size, struct arena *arena,
     return !r.failed;
 }
 
+/* Whether the function type fn of a member of class takes `self`: its
+   first parameter is `*class`. */
+static bool takes_self(const struct type *fn, const struct type *class)
+{
+    const struct type *first = fn->param_count > 0 ? fn->params[0] : NULL;
+
+    return first != NULL && first->kind == TYPE_POINTER &&
+           !first->nullable && first->element == class;
+}
+
+/* A bitfield as the checker admits one. Its type is an integer of a fixed
+   width, it has no more bits than the integer, and it is not `_`. */
+static bool bitfield_fits(const struct struct_field *f)
+{
+    return !type_field_is_unit_break(f) && type_is_integer(f->type) &&
+           !type_is_target_sized(f->type) &&
+           f->bits <= (unsigned)type_bits(f->type);
+}
+
 static struct type *type_ref(struct reader *r, uint32_t limit)
 {
     uint32_t index = get_u32(r);
@@ -1550,7 +1569,6 @@ static void read_types(struct reader *r)
                 m->doc.length = note.length;
                 m->kind = ITEM_FN;
                 m->pub = m->vis == VIS_PUB;
-                m->has_self = true;
                 m->symbol = sym;
                 /* The parameter names the declaration wrote, which
                    `anti doc` and the generated header print. */
@@ -1592,7 +1610,10 @@ static void read_types(struct reader *r)
             base = type_ref(r, i);
             n = get_count(r, 8);
             values = allocate(r, n, sizeof *values);
-            t = base != NULL ? types_enum(r->types, module, name, base) : NULL;
+            /* The values of an enum are integers. */
+            t = base != NULL && type_is_integer(base)
+                    ? types_enum(r->types, module, name, base)
+                    : NULL;
             for (j = 0; j < n && !r->failed; j++) {
                 struct name doc;
                 memset(&values[j], 0, sizeof values[j]);
@@ -1633,6 +1654,10 @@ static void read_types(struct reader *r)
                 break;
             }
             s->fields[j].type = r->table[s->types[j]];
+            if (s->fields[j].bits != 0 && !bitfield_fits(&s->fields[j])) {
+                damaged(r);
+                break;
+            }
         }
         if (!r->failed) {
             types_set_fields(r->types, s->s, s->fields, s->count);
@@ -1650,11 +1675,28 @@ static void read_types(struct reader *r)
            reaches the symbol the library defines. */
         for (j = 0; j < s->member_count && !r->failed; j++) {
             struct item *m = s->members[j];
+            struct type *fn;
             if (s->member_types[j] >= count) {
                 damaged(r);
                 break;
             }
-            m->symbol->type = r->table[s->member_types[j]];
+            /* A member is a function. It takes `self` when its first
+               parameter is a pointer to the class, as the checker makes
+               it, and a `get` of a singleton takes none. The names the
+               declaration wrote are the rest, less the out pointer of
+               `may fail`. */
+            fn = r->table[s->member_types[j]];
+            if (fn->kind != TYPE_FN || fn->bound) {
+                damaged(r);
+                break;
+            }
+            m->has_self = takes_self(fn, s->s);
+            if (fn->param_count != m->param_count + (m->has_self ? 1u : 0u) +
+                                       (fn->has_out ? 1u : 0u)) {
+                damaged(r);
+                break;
+            }
+            m->symbol->type = fn;
             m->symbol->name.text =
                 types_member_symbol(r->arena, &s->s->name, m);
             m->symbol->name.length = strlen(m->symbol->name.text);
@@ -1737,7 +1779,10 @@ static bool read_value(struct reader *r, struct type *t, struct const_value *v,
         struct name bytes = get_name(r);
         v->as.text.bytes = bytes.text;
         v->as.text.length = bytes.length;
-        return !r->failed && (t->kind == TYPE_STR || t->kind == TYPE_SLICE);
+        /* Text is a `str` or the bytes of `b"..."`. */
+        return !r->failed &&
+               (t->kind == TYPE_STR ||
+                (t->kind == TYPE_SLICE && t->element->kind == TYPE_U8));
     }
     case CONST_SYMBOLIC:
         v->as.symbolic = read_symbolic(r, r->table_count, 0);
@@ -2022,6 +2067,26 @@ static bool sym_ready(const struct ir_maps *maps, uint32_t sym)
 
 /* The aggregate and symbolic tables of the file. They refer to each other
    by index, so both are read before either is added to the program. */
+/* A bitfield of the IR has an integer type of a fixed width and no more
+   bits than it. */
+static bool ir_bitfield_fits(const struct ir_field *f)
+{
+    switch (f->type.type) {
+    case IR_I8: return f->bits <= 8;
+    case IR_I16: return f->bits <= 16;
+    case IR_I32: return f->bits <= 32;
+    case IR_I64: return f->bits <= 64;
+    default: return false;
+    }
+}
+
+/* Every field of a simd aggregate is a lane: a whole value, and not the
+   unit break `_`, which has no bytes. */
+static bool ir_lane(const struct ir_field *f)
+{
+    return f->bits == 0 && strcmp(f->name, "_") != 0;
+}
+
 static void read_tables(struct reader *r, struct ir_module *program,
                         struct ir_maps *maps)
 {
@@ -2074,10 +2139,10 @@ static void read_tables(struct reader *r, struct ir_module *program,
         flags = get_u8(r);
         t->packed = (flags & 1) != 0;
         t->simd = (flags & 2) != 0;
-        if (flags > 3) {
+        t->align = get_u64(r);
+        if (flags > 3 || (t->align & (t->align - 1)) != 0) {
             damaged(r);
         }
-        t->align = get_u64(r);
         t->length = get_u32(r);
         t->length_text = get_cstr(r);
         t->field_count = get_count(r, 10);
@@ -2089,7 +2154,9 @@ static void read_tables(struct reader *r, struct ir_module *program,
             t->fields[j].bits = get_u8(r);
             ext = get_u8(r);
             t->fields[j].ext = (enum ir_ext)ext;
-            if (ext > IR_EXT_ZERO || t->fields[j].type.type == IR_VOID) {
+            if (ext > IR_EXT_ZERO || t->fields[j].type.type == IR_VOID ||
+                (t->fields[j].bits != 0 && !ir_bitfield_fits(&t->fields[j])) ||
+                (t->simd && !ir_lane(&t->fields[j]))) {
                 damaged(r);
             }
         }
@@ -2237,6 +2304,19 @@ static void remap_const(struct reader *r, struct ir_const *c,
     }
 }
 
+/* The targets of a jump and of a branch are blocks. read_operand has
+   checked the index of each block. */
+static bool targets_blocks(const struct ir_inst *inst)
+{
+    if (inst->op == IR_JUMP) {
+        return inst->a.kind == IR_BLOCK;
+    }
+    if (inst->op == IR_BRANCH || inst->op == IR_BRANCH_OV) {
+        return inst->b.kind == IR_BLOCK && inst->c.kind == IR_BLOCK;
+    }
+    return true;
+}
+
 static struct ir_operand read_operand(struct reader *r,
                                       const struct ir_function *f,
                                       const struct ir_maps *maps)
@@ -2329,6 +2409,10 @@ static void read_body(struct reader *r, struct ir_module *program,
         damaged(r);
     }
     blocks = get_count(r, 4);
+    /* A body starts at block 0, so it has one. */
+    if (blocks == 0) {
+        damaged(r);
+    }
     for (i = 0; i < blocks && !r->failed; i++) {
         ir_block_add(f);
     }
@@ -2354,6 +2438,10 @@ static void read_body(struct reader *r, struct ir_module *program,
             inst.a = read_operand(r, f, maps);
             inst.b = read_operand(r, f, maps);
             inst.c = read_operand(r, f, maps);
+            if (!targets_blocks(&inst)) {
+                damaged(r);
+                break;
+            }
             inst.of = read_vtype(r, false);
             inst.field = get_u32(r);
             if (!r->failed && inst.of.type == IR_AGG) {
