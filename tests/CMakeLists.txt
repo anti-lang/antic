@@ -589,6 +589,8 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
         set_tests_properties(program_${name}_macos-x86_64 PROPERTIES
             TIMEOUT 120)
     endforeach()
+    set_tests_properties(program_by_unsigned_macos-x86_64 PROPERTIES
+        TIMEOUT 60)
 endif()
 
 # The environment variable that tests/programs/args.anti looks for.
@@ -607,6 +609,10 @@ foreach(name IN ITEMS sync_exits sync_workers channels select_two
         channel_workers)
     set_tests_properties(program_${name} PROPERTIES TIMEOUT 120)
 endforeach()
+
+# A step that reads as negative walks tests/programs/by_unsigned.anti in
+# a loop without end, and the timeout reports it.
+set_tests_properties(program_by_unsigned PROPERTIES TIMEOUT 60)
 
 # The modules of the standard library in src/std/, which the build writes as
 # library files into std/ of the runtime archive. Each test program imports

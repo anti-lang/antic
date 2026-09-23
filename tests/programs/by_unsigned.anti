@@ -1,0 +1,31 @@
+//! A step of an unsigned range is never negative. `by 9223372036854775808`
+//! on a `u64` walks up once and stops, and does not read as the `-2^63` of
+//! an `int`. An unsigned range that crosses 2^63 compares its values
+//! unsigned, and a signed step of `-2^63` walks down.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("half:".ptr);
+	for i in 0 as u64..5 by 9223372036854775808 {
+		printf(" %llu".ptr, i);
+	}
+	printf("\n".ptr);
+	printf("across:".ptr);
+	for i in 9223372036854775806 as u64..9223372036854775809 {
+		printf(" %llu".ptr, i);
+	}
+	printf("\n".ptr);
+	printf("bytes:".ptr);
+	for i in 126 as u8..130 {
+		printf(" %u".ptr, i as c_uint);
+	}
+	printf("\n".ptr);
+	printf("lowest:".ptr);
+	for i in -5..0 by -9223372036854775807 - 1 {
+		printf(" %lld".ptr, i);
+	}
+	printf("\n".ptr);
+	return 0;
+}

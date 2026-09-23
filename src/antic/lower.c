@@ -6503,8 +6503,17 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
     const struct type *seq = NULL;
     enum ir_type counter_type = IR_I64;
     uint32_t counter;
+    /* DESIGN: the step keeps its sign apart from its magnitude. The
+       checker stores `by k` as an int64_t, so a step of 2^63 on an
+       unsigned range reads as INT64_MIN. A range of an unsigned type
+       walks up, since the checker refuses a negative step on it, and its
+       test compares unsigned. The magnitude is negated in uint64_t,
+       where -2^63 has one. */
     int64_t stride = s->as.for_loop.step_value;
-    bool down = stride < 0;
+    bool unsigned_range =
+        over == NULL && !type_is_signed(s->as.for_loop.low->type);
+    bool down = stride < 0 && !unsigned_range;
+    uint64_t k = down ? 0 - (uint64_t)stride : (uint64_t)stride;
 
     /* The bound is read once, before the loop. */
     if (over != NULL) {
@@ -6544,7 +6553,6 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
            on an unsigned type. An empty range leaves the counter at
            `low`, where the first test already fails. */
         if (down) {
-            uint64_t k = (uint64_t)-stride;
             struct ir_block *first = new_block(l);
             struct ir_operand span =
                 temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type, high, low));
@@ -6586,8 +6594,11 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
     ir_jump(l->f, l->b, test);
     l->b = test;
     ir_branch(l->f, l->b,
-              temp(l, ir_binary(l->f, l->b, down ? IR_SGE : IR_SLT, IR_I8,
-                                temp(l, counter), limit)),
+              temp(l, ir_binary(l->f, l->b,
+                                down             ? IR_SGE
+                                : unsigned_range ? IR_ULT
+                                                 : IR_SLT,
+                                IR_I8, temp(l, counter), limit)),
               body, exit);
     l->loop = &loop;
     l->b = body;
@@ -6599,7 +6610,7 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
             ir_assign(l->f, l->b, counter,
                       temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
                                         temp(l, counter),
-                                        ir_int_op(counter_type, (uint64_t)-stride))));
+                                        ir_int_op(counter_type, k))));
         }
         if (sym != NULL) {
             sym->ir = ir_unary(l->f, l->b, IR_COPY, counter_type,
@@ -6640,7 +6651,7 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
         ir_assign(l->f, l->b, counter,
                   temp(l, ir_binary(l->f, l->b, IR_ADD, counter_type,
                                     temp(l, counter),
-                                    ir_int_op(counter_type, (uint64_t)stride))));
+                                    ir_int_op(counter_type, k))));
     }
     ir_jump(l->f, l->b, test);
     l->b = exit;
