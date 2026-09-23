@@ -1,0 +1,9 @@
+struct Big
+{
+	a: [2305843009213693953]u64,
+}
+
+fn main() -> int
+{
+	return size_of(Big);
+}

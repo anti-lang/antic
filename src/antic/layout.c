@@ -66,9 +66,39 @@ static uint64_t scalar_size(const struct layouts *l, enum ir_type type)
     }
 }
 
-static uint64_t round_up(uint64_t n, uint64_t align)
+/* The arithmetic of a size in bytes or bits, which sets overflow where
+   the result needs more than 64 bits. The result is then UINT64_MAX,
+   which stays nonzero for a later division. */
+static uint64_t add_size(uint64_t a, uint64_t b, bool *overflow)
 {
-    return (n + align - 1) / align * align;
+    if (b > UINT64_MAX - a) {
+        *overflow = true;
+        return UINT64_MAX;
+    }
+    return a + b;
+}
+
+static uint64_t mul_size(uint64_t a, uint64_t b, bool *overflow)
+{
+    if (a != 0 && b > UINT64_MAX / a) {
+        *overflow = true;
+        return UINT64_MAX;
+    }
+    return a * b;
+}
+
+/* The bytes that hold bit bits. */
+static uint64_t whole_bytes(uint64_t bit)
+{
+    return bit / 8 + (bit % 8 != 0);
+}
+
+/* n rounded up to a multiple of align. */
+static uint64_t round_up(uint64_t n, uint64_t align, bool *overflow)
+{
+    uint64_t last = add_size(n, align - 1, overflow);
+
+    return last / align * align;
 }
 
 static void compute(struct layouts *l, uint32_t agg);
@@ -161,6 +191,17 @@ static bool bit_unit(struct layouts *l, const struct ir_aggtype *t,
              t->fields[i].name, t->name, target_name(l->target));
         return false;
     }
+    /* DESIGN: a unit larger than the aggregate would start before it,
+       which only a packed aggregate of 3, 5, 6 or 7 bytes allows. It is
+       an error, as a field of more than 8 bytes is, since one integer
+       cannot read it. */
+    if (bytes > out->size) {
+        fail(l, "the bitfield `%s` of `%s` is read as %" PRIu64 " bytes, "
+                "and `%s` has %" PRIu64 " on %s",
+             t->fields[i].name, t->name, bytes, t->name, out->size,
+             target_name(l->target));
+        return false;
+    }
     b->unit_offset = b->pos / 8;
     if (b->unit_offset + bytes > out->size) {
         b->unit_offset = out->size - bytes;
@@ -194,6 +235,7 @@ static void compute(struct layouts *l, uint32_t agg)
     uint64_t unit_size = 0;
     uint64_t unit_used = 0;
     uint64_t length;
+    bool overflow = false;
     struct members members;
     size_t i;
 
@@ -215,7 +257,8 @@ static void compute(struct layouts *l, uint32_t agg)
                  t->length_text, (int64_t)length, target_name(l->target));
             length = 1;
         }
-        bit = length * layout_size(l, element) * 8;
+        bit = mul_size(mul_size(length, layout_size(l, element), &overflow),
+                       8, &overflow);
         align = layout_align(l, element);
         out->unaligned = element.type == IR_AGG &&
                          layout_agg(l, element.agg)->unaligned;
@@ -224,7 +267,9 @@ static void compute(struct layouts *l, uint32_t agg)
         struct ir_vtype type = t->fields[i].type;
         uint64_t width = t->fields[i].bits;
         uint64_t size = layout_size(l, type);
+        uint64_t size_bits = mul_size(size, 8, &overflow);
         uint64_t natural = layout_align(l, type);
+        uint64_t natural_bits = mul_size(natural, 8, &overflow);
         uint64_t field_align = t->packed ? 1 : natural;
         uint64_t end = 0;
         if (is_unit_break(&t->fields[i])) {
@@ -232,10 +277,12 @@ static void compute(struct layouts *l, uint32_t agg)
                System V aligns the next field to T, AAPCS64 outside Apple
                also the struct, and MSVC acts only after a bitfield. */
             if (!msvc) {
-                bit = round_up(bit, natural * 8);
+                bit = round_up(bit, natural_bits, &overflow);
                 align = aapcs64 && natural > align ? natural : align;
             } else if (unit_size != 0) {
-                bit = round_up((bit + 7) / 8, field_align) * 8;
+                bit = mul_size(round_up(whole_bytes(bit), field_align,
+                                        &overflow),
+                               8, &overflow);
                 align = field_align > align ? field_align : align;
                 unit_size = 0;
             }
@@ -244,26 +291,30 @@ static void compute(struct layouts *l, uint32_t agg)
         }
         if (t->kind == IR_AGG_UNION) {
             out->offsets[i] = 0;
-            end = width == 0 || msvc ? size * 8 : width;
+            end = width == 0 || msvc ? size_bits : width;
         } else if (width == 0) {
             unit_size = 0;
-            out->offsets[i] = round_up((bit + 7) / 8, field_align);
-            bit = (out->offsets[i] + size) * 8;
-        } else if (msvc && unit_size == size && unit_used + width <= size * 8) {
+            out->offsets[i] = round_up(whole_bytes(bit), field_align,
+                                       &overflow);
+            bit = mul_size(add_size(out->offsets[i], size, &overflow), 8,
+                           &overflow);
+        } else if (msvc && unit_size == size && unit_used + width <= size_bits) {
             out->bits[i].pos = unit_start + unit_used;
             unit_used += width;
         } else if (msvc) {
-            unit_start = round_up((bit + 7) / 8, field_align) * 8;
+            unit_start = mul_size(round_up(whole_bytes(bit), field_align,
+                                           &overflow),
+                                  8, &overflow);
             unit_size = size;
             unit_used = width;
             out->bits[i].pos = unit_start;
-            bit = unit_start + size * 8;
+            bit = add_size(unit_start, size_bits, &overflow);
         } else {
-            if (!t->packed && bit % (natural * 8) + width > size * 8) {
-                bit = round_up(bit, natural * 8);
+            if (!t->packed && bit % natural_bits + width > size_bits) {
+                bit = round_up(bit, natural_bits, &overflow);
             }
             out->bits[i].pos = bit;
-            bit += width;
+            bit = add_size(bit, width, &overflow);
         }
         if (width != 0 && t->kind != IR_AGG_UNION) {
             out->offsets[i] = out->bits[i].pos / 8;
@@ -279,7 +330,7 @@ static void compute(struct layouts *l, uint32_t agg)
        is less, as the vector types of C do. Its lanes leave no padding,
        so the size is the bytes of its lanes. */
     if (t->simd) {
-        uint64_t bytes = (bit + 7) / 8;
+        uint64_t bytes = whole_bytes(bit);
         align = bytes < 16 ? bytes : 16;
     }
     /* DESIGN: align(N) raises the alignment, as C's _Alignas does, and a
@@ -291,7 +342,16 @@ static void compute(struct layouts *l, uint32_t agg)
         align = t->align;
     }
     out->align = align;
-    out->size = round_up((bit + 7) / 8, align);
+    out->size = round_up(whole_bytes(bit), align, &overflow);
+    /* DESIGN: every size in bits fits 64 bits. The offset of a bitfield
+       and the sum of an offset and a size then hold in a uint64_t. */
+    if (overflow || out->size > UINT64_MAX / 8) {
+        fail(l, "the size of `%s` in bits does not fit 64 bits on %s",
+             t->name, target_name(l->target));
+        out->size = out->align = 1;
+        l->agg_state[agg] = DONE;
+        return;
+    }
     out->vector = t->simd && out->size == 16;
     for (i = 0; t->kind != IR_AGG_ARRAY && i < t->field_count; i++) {
         if (t->fields[i].bits != 0 && !bit_unit(l, t, out, i)) {
@@ -341,6 +401,14 @@ static bool fold_op(struct layouts *l, const struct ir_sym *s,
 
     if (divides && trim(type, b) == 0) {
         fail(l, "a size expression divides by zero on %s",
+             target_name(l->target));
+        return false;
+    }
+    if ((s->op == IR_SDIV || s->op == IR_SREM) &&
+        trim(type, a) == (uint64_t)1 << (bits(type) - 1) &&
+        signed_value(type, b) == -1) {
+        fail(l, "a size expression divides the least value of its type by "
+                "-1 on %s",
              target_name(l->target));
         return false;
     }

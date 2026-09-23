@@ -277,6 +277,109 @@ static void bitfields(void)
     arena_free(&arena);
 }
 
+/* Lay out m for target and check that it fails with expected. */
+static void refused(struct ir_module *m, enum target target,
+                    const char *expected)
+{
+    struct layouts layouts;
+    char error[200] = "";
+
+    CHECK(!layouts_init(&layouts, target, m, error, sizeof error));
+    CHECK_STR(error, expected);
+    layouts_free(&layouts);
+}
+
+/* The least signed value divided by -1 has no value at the width of the
+   operation. A size expression of a library file can hold it, and the
+   fold refuses it as the checker refuses it in source. */
+static void least_by_minus_one(void)
+{
+    static const enum ir_op ops[] = {IR_SDIV, IR_SREM};
+    static const enum ir_type types[] = {IR_I64, IR_I32};
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < sizeof ops / sizeof ops[0]; i++) {
+        for (j = 0; j < sizeof types / sizeof types[0]; j++) {
+            struct arena arena = {0};
+            struct ir_module m;
+            uint64_t least = (uint64_t)1 << (types[j] == IR_I64 ? 63 : 31);
+            uint32_t quotient;
+
+            ir_module_init(&m, &arena, "main");
+            quotient = ir_sym_op(&m, ops[i], types[j],
+                                 ir_sym_int(&m, types[j], least),
+                                 ir_sym_int(&m, types[j], UINT64_MAX));
+            ir_array_add(&m, "[n]u8", ir_scalar(IR_I8), quotient, "n");
+            refused(&m, TARGET_LINUX_X86_64,
+                    "a size expression divides the least value of its type "
+                    "by -1 on linux-x86_64");
+            ir_module_free(&m);
+            arena_free(&arena);
+        }
+    }
+}
+
+/* A bitfield is read as one integer of 1, 2, 4 or 8 bytes inside its
+   aggregate. A packed aggregate of 3 bytes holds a 20-bit field but no
+   4-byte integer, and a unit moved back to fit would start before the
+   aggregate. */
+static void unit_past_aggregate(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_field fields[2];
+
+    ir_module_init(&m, &arena, "main");
+    fields[0] = bitfield("a", IR_I32, 20);
+    ir_struct_add(&m, IR_AGG_STRUCT, "main.P", fields, 1, true, 0);
+    refused(&m, TARGET_MACOS_ARM64,
+            "the bitfield `a` of `main.P` is read as 4 bytes, and `main.P` "
+            "has 3 on macos-arm64");
+    ir_module_free(&m);
+    arena_free(&arena);
+    ir_module_init(&m, &arena, "main");
+    fields[0] = bitfield("b", IR_I64, 36);
+    ir_struct_add(&m, IR_AGG_UNION, "main.U", fields, 1, true, 0);
+    refused(&m, TARGET_LINUX_X86_64,
+            "the bitfield `b` of `main.U` is read as 8 bytes, and `main.U` "
+            "has 5 on linux-x86_64");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
+/* A size in bits that needs more than 64 bits is refused. It used to
+   wrap, and a type of 2^61 + 1 elements of 8 bytes had the size 8. */
+static void size_overflows(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_field fields[2];
+    uint32_t big;
+
+    ir_module_init(&m, &arena, "main");
+    ir_array_add(&m, "[2305843009213693953]u64", ir_scalar(IR_I64),
+                 ir_sym_int(&m, IR_I64, 2305843009213693953u), "n");
+    refused(&m, TARGET_MACOS_ARM64,
+            "the size of `[2305843009213693953]u64` in bits does not fit "
+            "64 bits on macos-arm64");
+    ir_module_free(&m);
+    arena_free(&arena);
+    /* The array fits by 8 bits, and the field after it does not. */
+    ir_module_init(&m, &arena, "main");
+    big = ir_array_add(&m, "[2305843009213693951]u8", ir_scalar(IR_I8),
+                       ir_sym_int(&m, IR_I64, 2305843009213693951u), "n");
+    fields[0] = field("a", IR_I8);
+    fields[0].type = ir_aggregate(big);
+    fields[1] = field("b", IR_I8);
+    ir_struct_add(&m, IR_AGG_STRUCT, "main.S", fields, 2, false, 0);
+    refused(&m, TARGET_LINUX_ARM64,
+            "the size of `main.S` in bits does not fit 64 bits on "
+            "linux-arm64");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* The facts that clang 21.0.0 gives for a zero-width bitfield, for one
    target of each rule. S1 is `i8 a, i32 : 0, i8 b`, and S3 is `i8 a : 3,
    i64 : 0, i8 b : 3`. S4 is `i32 a : 3, i8 : 0, i32 b : 3`. S7 is `i16 a
@@ -364,6 +467,9 @@ static void zero_width(void)
 
 void test_layout(void)
 {
+    least_by_minus_one();
+    unit_past_aggregate();
+    size_overflows();
     zero_width();
     bitfields();
     unaligned();

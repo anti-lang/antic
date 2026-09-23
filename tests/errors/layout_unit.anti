@@ -1,0 +1,9 @@
+packed struct P
+{
+	a: u32 : 20,
+}
+
+fn main() -> int
+{
+	return size_of(P);
+}

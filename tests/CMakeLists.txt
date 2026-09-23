@@ -2467,6 +2467,8 @@ endforeach()
 set(LISTINGS "${CMAKE_CURRENT_BINARY_DIR}/listings")
 file(MAKE_DIRECTORY "${LISTINGS}")
 foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.anti"
+        "layout_unit|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_unit.s,layout_unit.anti"
+        "layout_size|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_size.s,layout_size.anti"
         "sizeof|-S,-o,${LISTINGS}/sizeof.s,sizeof.anti"
         "modifiers|-S,-o,${LISTINGS}/modifiers.s,modifiers.anti"
         "geo|-S,-o,${LISTINGS}/geo.s,geo.anti"
