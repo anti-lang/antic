@@ -87,6 +87,16 @@ target_compile_definitions(antic_unit_tests PRIVATE
     ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}})
 add_test(NAME unit COMMAND antic_unit_tests)
 
+# The signal table of the runtime, in a program of its own. src/rt/signal.h
+# shares its name with the header of C, so the include path of the unit
+# tests would hide the one of C from src/rt/signal.c. The test starts
+# threads, and so does the reader of the runtime.
+find_package(Threads REQUIRED)
+add_executable(rt_signal_tests unit/test_signal.c ../src/rt/signal.c
+    ../src/rt/atomic.c)
+target_link_libraries(rt_signal_tests PRIVATE Threads::Threads)
+add_test(NAME rt_signal COMMAND rt_signal_tests)
+
 # The runtime archive holds the licence text of every component.
 add_test(NAME runtime_licenses
     COMMAND "${CMAKE_COMMAND}" -E cat "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt")
