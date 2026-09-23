@@ -963,6 +963,13 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] A doc comment is filled to 80 columns, where a tab counts the four columns `anti html` and `anti tex` render it as. A fenced block is written as it stands and an empty line separates two paragraphs. A `- ` item carries its continuation two columns in, and a line of a deeper indent opens a paragraph of its own. Reason: the addendum asks for 80 columns and for the markup subset. A fill that crossed a fence or joined two paragraphs would write markup the subset has not.
 - [provisional] A source the lexer refuses stays as it is, and `anti fmt` names it and ends with a non-zero status. Reason: the canonical form of a source that does not lex is unknown, and the front-end class of `anti check` is what reports the error.
 
+## The bind command
+
+- `anti bind --clang <header>` does not use libclang. It runs clang with `-Xclang -ast-dump=json -fsyntax-only` on the header and reads the JSON with the scanner of `rt/json.c`, the one that `Object.deserialize` reads with. Reason: no pinned artefact carries libclang, and the output of clang is its own parser's without a library to ship.
+- `anti bind` runs the pinned clang in a development tree, and otherwise the first `clang` on `PATH`. It reads the major version from `clang --version` and refuses a clang it has not been tested against, with a message that names the versions it accepts.
+- The installers ship no clang. A user needs one for `--clang` alone, because a binding is generated once and committed.
+- The C layout of a bound struct is not read from clang. antic computes it, as it does for every struct.
+
 ## Open
 
 - The native libraries of `libs/`, which nothing builds yet, are published "under `downloads/resources/<library>/<version>/`" by the entry above them. The site serves text alone since 2026-09-20, so that path no longer exists. They follow the packages onto a GitHub release when step 16 builds them. The entry stays as Eddie wrote it until he says which release holds them. The same question stands for the mirror of the LLVM tools that the site serves today under `downloads/resources/llvm/`.

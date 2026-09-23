@@ -370,8 +370,17 @@ generator writes shim and binding in one run, so they cannot drift.
 `anti bind` writes an ordinary `.anti` module from a C API description:
 
 - `anti bind raylib_api.json` for raylib, as the module `anti.raylib`.
-- `anti bind --clang miniaudio.h` for headers without a JSON description, using
-  libclang, as the module `anti.miniaudio`.
+- `anti bind --clang miniaudio.h` for headers without a JSON description, as the
+  module `anti.miniaudio`.
+
+`--clang` does not use libclang. It runs clang with
+`-Xclang -ast-dump=json -fsyntax-only` on the header and reads the JSON with the JSON
+scanner that `anti` already has. It runs the pinned clang in a development tree, and
+otherwise the first `clang` on `PATH`. It checks the major version of that clang and
+refuses one it has not been tested against, naming the versions it accepts. The
+installers ship no clang, so a user needs one for `--clang` only. A binding is generated
+once and committed. C layout is not read from clang: antic computes it, as it does for
+every struct.
 
 The output uses the C type names from [C types](#c-types). Unions, bitfields, packed
 and aligned structs are emitted one to one. The shim file is written when needed. Macro
