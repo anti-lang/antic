@@ -1,0 +1,22 @@
+//! `lib.instance(I)` and `lib.supports(I, "f")` name an interface. A
+//! value in that place, a class that is not abstract and the wrong
+//! count of arguments are each refused.
+import anti.plugin;
+
+class Local
+{
+	n: int = 0,
+}
+
+fn main() -> int
+{
+	let lib = plugin.load("x.so") catch fatal;
+	let a = lib.instance(Local) catch fatal;
+	let b = lib.instance() catch fatal;
+	let c = lib.supports(Local, "f");
+	let d = lib.instance(lib) catch fatal;
+	if a == none || b == none || c || d == none {
+		return 1;
+	}
+	return 0;
+}

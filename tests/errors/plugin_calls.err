@@ -1,0 +1,4 @@
+plugin_calls.anti:14:23: error: `Local` is not abstract, and a library provides an interface
+plugin_calls.anti:15:10: error: `instance` of a library takes 1 argument, found 0
+plugin_calls.anti:16:23: error: `Local` is not abstract, and a library provides an interface
+plugin_calls.anti:17:23: error: cannot find class `lib`

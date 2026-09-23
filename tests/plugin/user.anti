@@ -1,0 +1,25 @@
+//! A program whose class injects the interface, whose provider the
+//! build takes from a library.
+
+import anti.io;
+import net.example.greet;
+
+/// A page that prints the greeting of whatever provides it.
+class Page
+{
+	inject g: *greet.Greeter,
+
+	/// Print the greeting.
+	pub fn show(self)
+	{
+		io.println(self.g.words());
+	}
+}
+
+fn main() -> int
+{
+	let p = alloc Page { };
+	p.show();
+	delete(p);
+	return 0;
+}

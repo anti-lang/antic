@@ -9650,7 +9650,7 @@ static void check_provides(struct checker *c, struct module *module)
             if (module->provides[j].type != NULL &&
                 module->provides[j].type == iface) {
                 error_at(c, pr->interface_pos,
-                         "`%s` is provided twice by this module",
+                         "`%s` is provided twice",
                          tn((struct type *)iface));
             }
         }
@@ -9664,9 +9664,8 @@ static void check_provides(struct checker *c, struct module *module)
             continue;
         }
         if (it == NULL || it->kind != ITEM_CLASS || sym->type == NULL) {
-            error_at(c, pr->class_pos, "cannot find class `%.*s` of this "
-                     "module", (int)pr->class_name.length,
-                     pr->class_name.text);
+            error_at(c, pr->class_pos, "the module declares no class `%.*s`",
+                     (int)pr->class_name.length, pr->class_name.text);
             continue;
         }
         if (it->is_abstract || sym->type->has_abstract) {

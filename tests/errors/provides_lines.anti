@@ -1,0 +1,31 @@
+//! A `provides` line names an interface and a complete class of the
+//! module that inherits it or implements it. Anything else is refused,
+//! and one interface is provided once.
+abstract class Greeter
+{
+	abstract fn words(self) -> str;
+}
+
+class Fancy
+{
+	implements g: Greeter,
+
+	concrete fn words(self) -> str { return "fancy"; }
+}
+
+class Plain
+{
+	n: int = 0,
+}
+
+provides Greeter as Fancy;
+provides Greeter as Plain;
+provides Fancy as Fancy;
+provides Greeter as Missing;
+provides other.Greeter as Fancy;
+
+fn main() -> int
+{
+	let x = Fancy { };
+	return x.words().len as int;
+}

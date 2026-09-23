@@ -1,0 +1,35 @@
+//! A host that loads the library its first argument names, asks it for
+//! a `Greeter` and closes it.
+
+import anti.io;
+import anti.plugin;
+import anti.text;
+import net.example.greet;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch fatal;
+	let g = lib.instance(greet.Greeter) catch fatal;
+	io.println(g.words());
+	io.println(g.words());
+	let asked = f"asked {g.asked()}";
+	io.println(asked);
+	free(asked.ptr);
+	if lib.supports(greet.Greeter, "words") {
+		io.println("supports words");
+	}
+	if !lib.supports(greet.Greeter, "shout") {
+		io.println("no shout");
+	}
+	let alive = f"{lib.live()} alive";
+	io.println(alive);
+	free(alive.ptr);
+	lib.unload() catch e {
+		io.println(e.message);
+	};
+	delete(g);
+	lib.unload() catch fatal;
+	io.println("unloaded");
+	delete(lib);
+	return 0;
+}

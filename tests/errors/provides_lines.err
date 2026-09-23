@@ -1,0 +1,6 @@
+provides_lines.anti:22:10: error: `Greeter` is provided twice
+provides_lines.anti:22:21: error: `Plain` neither inherits `Greeter` nor implements it
+provides_lines.anti:23:10: error: `Fancy` is not abstract, and a `provides` line names an interface
+provides_lines.anti:24:10: error: `Greeter` is provided twice
+provides_lines.anti:24:21: error: the module declares no class `Missing`
+provides_lines.anti:25:10: error: cannot find module `other`

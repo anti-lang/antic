@@ -1872,6 +1872,30 @@ foreach(mode dev release)
         PASS_REGULAR_EXPRESSION "1 tests in 1 modules, 0 modules failed")
 endforeach()
 
+# Plugins. The library of tests/plugin is built with --lib shared
+# --no-runtime, so it carries no runtime and is bound against the host
+# that loads it. The host asks it for the interface, counts what it made
+# and closes it, and two programs take the provider of an injected field
+# from it, one by path and one through the index of its directory.
+#
+# DESIGN: a program of this runtime archive loads a library only where
+# it is linked dynamically. A Linux program is static against musl on
+# purpose, and a Windows DLL needs an import library of its host, so the
+# test runs on a macOS host alone.
+if(ANTIC_HOST_OS STREQUAL "macos")
+    add_test(NAME plugin_host
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=.dylib"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/host.expected"
+            "-DPROVIDED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/provided.expected"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin.cmake")
+endif()
+
 # ANTI_CONF names the file when the command line names none, and the
 # command line wins when both name one. It is the one environment
 # variable the runtime reads.
@@ -2192,7 +2216,9 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "inject_missing|-S,-o,${LISTINGS}/inject_missing.s,inject_missing.anti"
         "inject_wrong|-S,--inject,inject_wrong.Clock=inject_wrong.Console.get,-o,${LISTINGS}/inject_wrong.s,inject_wrong.anti"
         "inject_provider|-S,--inject,inject_provider.Logger=inject_provider.nowhere,--inject,inject_provider.Clock=inject_provider.ticks,-o,${LISTINGS}/inject_provider.s,inject_provider.anti"
-        "inject_cycle|-S,--inject,inject_cycle.Logger=inject_cycle.Console.get,--inject,inject_cycle.Clock=inject_cycle.Watch.get,-o,${LISTINGS}/inject_cycle.s,inject_cycle.anti")
+        "inject_cycle|-S,--inject,inject_cycle.Logger=inject_cycle.Console.get,--inject,inject_cycle.Clock=inject_cycle.Watch.get,-o,${LISTINGS}/inject_cycle.s,inject_cycle.anti"
+        "provides_lines|-S,-o,${LISTINGS}/provides_lines.s,provides_lines.anti"
+        "plugin_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/plugin_calls.s,plugin_calls.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)
