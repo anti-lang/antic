@@ -1,0 +1,25 @@
+//! miniaudio of the runtime tree, reached through the C functions of
+//! miniaudio_probe.c. The library reports the version of its header, a square
+//! wave of 1000 Hz at 8000 Hz is positive for four of its first eight frames,
+//! the null back end has one playback device, and the functions that open a
+//! device and read a file resolve at link.
+
+extern fn printf(format: ?*byte, ...) -> i32;
+extern fn miniaudio_probe_version() -> i32;
+extern fn miniaudio_probe_square() -> i32;
+extern fn miniaudio_probe_null_devices() -> i32;
+extern fn miniaudio_probe_linked() -> i32;
+
+fn show(v: i32)
+{
+	printf("%d\n".ptr, v as c_int);
+}
+
+fn main() -> int
+{
+	show(miniaudio_probe_version());
+	show(miniaudio_probe_square());
+	show(miniaudio_probe_null_devices());
+	show(miniaudio_probe_linked());
+	return 0;
+}

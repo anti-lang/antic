@@ -1,0 +1,7 @@
+# The pinned miniaudio release that src/native/get-miniaudio.cmake
+# downloads. It is the version raylib's pinned release bundles in
+# src/external/miniaudio.h. GitHub publishes no digest for a source
+# archive, so the digest below is the one of the archive at its first
+# download.
+MINIAUDIO_VERSION=0.11.24
+MINIAUDIO_DIGEST=3fdeb62a9387a3164e901475c663f5ab5c8318de268fd2c64af937c6a65980bd

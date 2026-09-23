@@ -9,15 +9,21 @@
 #   OBJECTS   the objects and libraries to link, separated by commas
 #   WORK      a directory for the executable
 #   TARGET    the target name
+#   OPTIONS   optional options of antic, separated by commas
 
 file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(program "${SOURCE}" NAME_WE)
 set(exe "${WORK}/${program}-${TARGET}")
 string(REPLACE "," ";" objects "${OBJECTS}")
+set(options "")
+if(DEFINED OPTIONS)
+    string(REPLACE "," ";" options "${OPTIONS}")
+endif()
 file(REMOVE "${exe}")
 execute_process(
     COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}" ${objects}
+            --runtime "${RUNTIME}" ${options} -o "${exe}" "${SOURCE}"
+            ${objects}
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
     ENCODING NONE)
 if(NOT status EQUAL 0)

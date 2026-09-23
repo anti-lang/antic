@@ -4,7 +4,7 @@
 # anti_rt and the tests. The targets, the sysroots of the runtime tree, the
 # processor levels, llvm-ar and llvm-mc come from there.
 # Libraries are added in the order of docs/decisions.md: PCRE2, then Mbed
-# TLS, miniaudio and raylib.
+# TLS, miniaudio and raylib. media.cmake holds what the last two share.
 #
 # DESIGN: this is a subdirectory of the build of antic and no project of
 # its own, so one configure builds every target that has a sysroot, as the
@@ -42,8 +42,14 @@ function(antic_native_target out_triple out_flags target)
         set(triple "${arch}-apple-macos11")
         set(flags -isysroot "${sysroot}")
     else()
+        # DESIGN: the headers of clang come before those of the MSVC CRT,
+        # the order clang-cl searches. The CRT holds its own immintrin.h,
+        # whose __m256i is the union of MSVC, and the SIMD constants of
+        # stb_image_resize2.h in raylib are then initialised byte by byte
+        # from 64-bit values, which clang truncates.
         set(triple "${arch}-pc-windows-msvc")
         set(flags -fms-runtime-lib=dll
+            -isystem "${antic_native_resource}/include"
             -isystem "${sysroot}/crt/include"
             -isystem "${sysroot}/sdk/include/ucrt"
             -isystem "${sysroot}/sdk/include/um"
@@ -73,3 +79,6 @@ foreach(target IN LISTS ANTIC_TARGETS)
 endforeach()
 
 include(pcre2.cmake)
+include(media.cmake)
+include(miniaudio.cmake)
+include(raylib.cmake)
