@@ -1,7 +1,7 @@
-//! A library for C whose signatures name simd structs. One of 16 bytes
-//! crosses as the vector type of C, which the header writes per
-//! architecture, and one of another size as the struct of its lanes,
-//! aligned to its size or to sixteen.
+//! A library for C whose signatures name simd structs. One of 16 bytes crosses
+//! as the vector type of C, which the header writes per architecture, and one
+//! of another size as the struct of its lanes, aligned to its size or to
+//! sixteen.
 
 import anti.simd;
 

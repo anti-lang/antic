@@ -1,8 +1,8 @@
-//! Each standard interface ships a default provider, so a class that
-//! injects one links with no entry in the manifest. One class injects
-//! all six and asks each: the logger of the program, the clock of the
-//! machine, the one generator, the file system, the allocator over the
-//! C library and the settings read from a TOML file.
+//! Each standard interface ships a default provider, so a class that injects
+//! one links with no entry in the manifest. One class injects all six and asks
+//! each: the logger of the program, the clock of the machine, the one
+//! generator, the file system, the allocator over the C library and the
+//! settings read from a TOML file.
 import anti.config;
 import anti.fs;
 import anti.io;

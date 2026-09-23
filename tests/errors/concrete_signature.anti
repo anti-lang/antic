@@ -1,6 +1,6 @@
-//! A `concrete fn` takes the signature of the function it fills exactly:
-//! the type and the `own` of each parameter, the result and `may fail`.
-//! The first difference is the message.
+//! A `concrete fn` takes the signature of the function it fills exactly: the
+//! type and the `own` of each parameter, the result and `may fail`. The first
+//! difference is the message.
 
 import anti.lang;
 import anti.log;

@@ -1,5 +1,5 @@
-//! The interface with a floor. A plugin built for a version below 1.1
-//! is refused, whatever its chain says.
+//! The interface with a floor. A plugin built for a version below 1.1 is
+//! refused, whatever its chain says.
 
 /// A greeting a program prints.
 pub abstract class Greeter

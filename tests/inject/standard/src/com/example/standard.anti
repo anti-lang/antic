@@ -1,8 +1,7 @@
 //! One class injects all six standard interfaces. The manifest names no
-//! provider for the build, which takes the default of each, and
-//! `[inject.test]` lays a fake over every one of them. Each fake answers
-//! with a value no default gives, so a test says which one filled the
-//! field.
+//! provider for the build, which takes the default of each, and `[inject.test]`
+//! lays a fake over every one of them. Each fake answers with a value no
+//! default gives, so a test says which one filled the field.
 import anti.config;
 import anti.fs;
 import anti.lang;

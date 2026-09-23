@@ -1,9 +1,9 @@
-//! Each case reads the table of an element of `alloc(T, n)` that the
-//! program never filled, so its table is zero. `delete`, `destroy` and
-//! `dup` trap in every mode. A dispatch, `is` and `as` trap in dev mode.
-//! The teardown and the copy of a holder trap in every mode on a class
-//! value held inline whose table is zero, which the cases make by writing
-//! over it. The argument names the case.
+//! Each case reads the table of an element of `alloc(T, n)` that the program
+//! never filled, so its table is zero. `delete`, `destroy` and `dup` trap in
+//! every mode. A dispatch, `is` and `as` trap in dev mode. The teardown and the
+//! copy of a holder trap in every mode on a class value held inline whose table
+//! is zero, which the cases make by writing over it. The argument names the
+//! case.
 
 abstract class Shape
 {
@@ -91,7 +91,7 @@ fn run(case: str, items: *Square) -> int
 
 fn main(args: []str, env: []str) -> int
 {
-	let round = Round {};
+	let round = Round { };
 	let items = alloc(Square, 2) else { return 1; };
 	items[0] = Square { side: 2 };
 	return run(args[1], items) + (&round as *Shape).area() * 0;

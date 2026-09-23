@@ -1,7 +1,7 @@
-//! The two conversions of `f16` and nothing else of floats but `f32`. A
-//! read widens the sixteen bits to an `f32`, and `as f16` narrows an `f32`
-//! to them. ARM64 and x86-64-v3 have an instruction for each, and v1 and
-//! v2 call the runtime.
+//! The two conversions of `f16` and nothing else of floats but `f32`. A read
+//! widens the sixteen bits to an `f32`, and `as f16` narrows an `f32` to them.
+//! ARM64 and x86-64-v3 have an instruction for each, and v1 and v2 call the
+//! runtime.
 
 struct Pixel
 {

@@ -1,12 +1,11 @@
-//! Every place a failing call writes its result into, beside the `*p`
-//! of out_through_pointer.anti. A local the back end keeps in a
-//! temporary, a bitfield and a compound assignment have no address to
-//! give the call, so it writes a slot of its own and the value moves
-//! from there into the place.
+//! Every place a failing call writes its result into, beside the `*p` of
+//! out_through_pointer.anti. A local the back end keeps in a temporary, a
+//! bitfield and a compound assignment have no address to give the call, so it
+//! writes a slot of its own and the value moves from there into the place.
 //!
-//! Each place carries both forms. `try` hands the error to the caller,
-//! and a `catch` handler takes it here, where `yield` puts a value of
-//! its own in the place.
+//! Each place carries both forms. `try` hands the error to the caller, and a
+//! `catch` handler takes it here, where `yield` puts a value of its own in the
+//! place.
 
 import anti.lang;
 

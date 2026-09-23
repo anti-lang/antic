@@ -1,8 +1,8 @@
-//! A channel is a bounded queue of values. `recv` gives a pointer to the
-//! value it took, and `none` once the channel is closed and empty.
-//! `close` ends what the channel takes, and what it holds is still
-//! received. Workers fill a channel that holds every value they send,
-//! so the program runs on a pool of any size.
+//! A channel is a bounded queue of values. `recv` gives a pointer to the value
+//! it took, and `none` once the channel is closed and empty. `close` ends what
+//! the channel takes, and what it holds is still received. Workers fill a
+//! channel that holds every value they send, so the program runs on a pool of
+//! any size.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

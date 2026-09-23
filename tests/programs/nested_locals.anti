@@ -1,9 +1,9 @@
-//! A local that needs a place in the frame, declared in every block a
-//! statement holds: a `try` block and its handler, an arm of a `switch`
-//! and its `else`, a `defer` and an `undo`, the `else` of a `let`, and
-//! the handler of a failing call in a `let`, in an assignment and in a
-//! statement. Each block holds a `str`, which is an aggregate, a local
-//! whose address is taken, and the result of a failing call.
+//! A local that needs a place in the frame, declared in every block a statement
+//! holds: a `try` block and its handler, an arm of a `switch` and its `else`, a
+//! `defer` and an `undo`, the `else` of a `let`, and the handler of a failing
+//! call in a `let`, in an assignment and in a statement. Each block holds a
+//! `str`, which is an aggregate, a local whose address is taken, and the result
+//! of a failing call.
 
 import anti.lang;
 

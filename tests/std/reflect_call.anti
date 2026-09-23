@@ -1,9 +1,8 @@
-//! `reflect.call` calls a public function through the table of the
-//! object's class. The arguments and the result are `Value`s, and the
-//! compiler writes one trampoline per signature of the program. A call
-//! that cannot be made gives an error whose code names the reason, and
-//! kind `None` means only that the function has no result. `try`
-//! forwards the error of a call.
+//! `reflect.call` calls a public function through the table of the object's
+//! class. The arguments and the result are `Value`s, and the compiler writes
+//! one trampoline per signature of the program. A call that cannot be made
+//! gives an error whose code names the reason, and kind `None` means only that
+//! the function has no result. `try` forwards the error of a call.
 import anti.lang;
 import anti.reflect;
 

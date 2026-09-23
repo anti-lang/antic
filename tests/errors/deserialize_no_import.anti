@@ -1,5 +1,5 @@
-//! `Object.deserialize` takes an `anti.mem.Allocator`, and this module
-//! does not import `anti.mem`.
+//! `Object.deserialize` takes an `anti.mem.Allocator`, and this module does not
+//! import `anti.mem`.
 
 fn read(from: *Object) -> int
 {

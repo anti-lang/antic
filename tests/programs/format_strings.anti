@@ -1,7 +1,7 @@
 //! `f"..."` embeds expressions in a text, each with an optional format
-//! specification after a colon, and `rf"..."` does the same without
-//! escapes. Each line below prints one form, between bars where the
-//! width of a field matters.
+//! specification after a colon, and `rf"..."` does the same without escapes.
+//! Each line below prints one form, between bars where the width of a field
+//! matters.
 
 import anti.io;
 import anti.text;
@@ -17,8 +17,8 @@ class Point
 	}
 }
 
-/// Count the calls in `counter` and name each one, so the order in which
-/// a literal computes its values shows in the text.
+/// Count the calls in `counter` and name each one, so the order in which a
+/// literal computes its values shows in the text.
 fn tick(counter: *int, label: str) -> str
 {
 	*counter += 1;

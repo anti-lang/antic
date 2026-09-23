@@ -1,5 +1,5 @@
-//! A sum with a carry in that leaves the range of int. The plain `+`
-//! keeps its check with a carry in, over the whole sum.
+//! A sum with a carry in that leaves the range of int. The plain `+` keeps its
+//! check with a carry in, over the whole sum.
 
 fn opaque(n: int) -> int
 {

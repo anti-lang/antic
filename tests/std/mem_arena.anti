@@ -1,10 +1,9 @@
 //! `ArenaAllocator` hands out memory from blocks it takes from another
-//! allocator and gives every block back at once. Many small requests
-//! share a block, and no two of them overlap. `free` of one of them
-//! gives nothing back. A request larger than a block, and an alignment
-//! above the one the blocks have, take a block of their own. The
-//! allocator stays usable after `free_all`, and its `destruct` gives
-//! back what is left.
+//! allocator and gives every block back at once. Many small requests share a
+//! block, and no two of them overlap. `free` of one of them gives nothing back.
+//! A request larger than a block, and an alignment above the one the blocks
+//! have, take a block of their own. The allocator stays usable after
+//! `free_all`, and its `destruct` gives back what is left.
 import anti.mem;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
@@ -16,8 +15,8 @@ union Address
 	n: u64,
 }
 
-/// An allocator that counts the blocks it lends and hands every call on
-/// to the C library.
+/// An allocator that counts the blocks it lends and hands every call on to the
+/// C library.
 class Counting inherits mem.Allocator
 {
 	pub live: int = 0,
@@ -71,8 +70,8 @@ fn holds(p: *byte, n: int, value: byte) -> bool
 	return true;
 }
 
-/// The requests of one `ArenaAllocator`, which its `destruct` ends at
-/// the return.
+/// The requests of one `ArenaAllocator`, which its `destruct` ends at the
+/// return.
 fn run(blocks: *Counting) -> int
 {
 	let arena = mem.ArenaAllocator.new(blocks, 256);

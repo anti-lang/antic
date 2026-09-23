@@ -1,7 +1,7 @@
-//! The link step writes a registry of every class of the program.
-//! `reflect.new` builds an object of a class it names, and
-//! `Object.deserialize` builds one from the JSON that `serialize` writes,
-//! in memory of an arena that gives it all back at the end.
+//! The link step writes a registry of every class of the program. `reflect.new`
+//! builds an object of a class it names, and `Object.deserialize` builds one
+//! from the JSON that `serialize` writes, in memory of an arena that gives it
+//! all back at the end.
 import anti.io;
 import anti.lang;
 import anti.mem;

@@ -1,5 +1,5 @@
-//! A product of two 64-bit values that leaves the range of int. ARM64
-//! reads the high half of the product for this one.
+//! A product of two 64-bit values that leaves the range of int. ARM64 reads the
+//! high half of the product for this one.
 
 fn opaque(n: int) -> int
 {

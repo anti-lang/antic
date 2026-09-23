@@ -1,8 +1,8 @@
-//! The allocator over the C library gives memory at every alignment that
-//! is a power of two, up to a page, and the bytes it gives hold what the
-//! program writes. A size below zero and an alignment that is no power
-//! of two give `none`, and a size of zero gives memory that `free`
-//! takes. `LibcAllocator.get()` is one object, which a program holds as
+//! The allocator over the C library gives memory at every alignment that is a
+//! power of two, up to a page, and the bytes it gives hold what the program
+//! writes. A size below zero and an alignment that is no power of two give
+//! `none`, and a size of zero gives memory that `free` takes.
+//! `LibcAllocator.get()` is one object, which a program holds as
 //! `*mem.Allocator`.
 import anti.mem;
 

@@ -1,6 +1,6 @@
 //! A library whose interface holds a class and an enum. The library file
-//! carries the layout of both, the table and the descriptor of the class,
-//! and the chain back to the root.
+//! carries the layout of both, the table and the descriptor of the class, and
+//! the chain back to the root.
 
 pub enum Kind: u8 { Round, Square }
 

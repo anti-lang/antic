@@ -1,6 +1,6 @@
-//! `Object.deserialize` reads the registry of every class of the
-//! program, which the module that links writes. The test
-//! `program_deserialize_dev` builds this program in dev mode as well.
+//! `Object.deserialize` reads the registry of every class of the program, which
+//! the module that links writes. The test `program_deserialize_dev` builds this
+//! program in dev mode as well.
 import anti.mem;
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;

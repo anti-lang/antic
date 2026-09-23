@@ -1,8 +1,8 @@
-//! `dup` gives an `own` field memory of its own and copies what it holds:
-//! every element of an `own` slice, and the whole object behind an `own`
-//! pointer to a class, at the size of its own class. A pointer to an
-//! interface points into the new object, as it did into the old one, and
-//! `delete` frees the object it points into.
+//! `dup` gives an `own` field memory of its own and copies what it holds: every
+//! element of an `own` slice, and the whole object behind an `own` pointer to a
+//! class, at the size of its own class. A pointer to an interface points into
+//! the new object, as it did into the old one, and `delete` frees the object it
+//! points into.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 class Shape

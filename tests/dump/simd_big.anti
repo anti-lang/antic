@@ -1,13 +1,14 @@
-//! A simd struct above the vector cap of 256 bytes is an array, and
-//! every operation on it is a loop over its lanes. The compiler says so
-//! with a warning at the declaration. This program checks that the loops
-//! give what the instructions give below the cap.
+//! A simd struct above the vector cap of 256 bytes is an array, and every
+//! operation on it is a loop over its lanes. The compiler says so with a
+//! warning at the declaration. This program checks that the loops give what the
+//! instructions give below the cap.
 
 import anti.simd;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-simd struct F64x64 {
+simd struct F64x64
+{
 	l0: float, l1: float, l2: float, l3: float, l4: float, l5: float, l6: float, l7: float,
 	l8: float, l9: float, l10: float, l11: float, l12: float, l13: float, l14: float, l15: float,
 	l16: float, l17: float, l18: float, l19: float, l20: float, l21: float, l22: float, l23: float,
@@ -39,7 +40,7 @@ fn main() -> int
 	printf("%g %g %g %g\n".ptr, sum.l0, sum.l63, product.l7, picked.l9);
 	printf("%g %g %g\n".ptr, sum.sum(), a.min(), a.max());
 	printf("%d %d %d %g %g\n".ptr, simd.any(mask) as c_int,
-	       simd.all(mask) as c_int, mask.l3 as c_int, reversed.l0,
-	       loaded.l31);
+		simd.all(mask) as c_int, mask.l3 as c_int, reversed.l0,
+		loaded.l31);
 	return 0;
 }

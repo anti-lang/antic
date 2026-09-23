@@ -1,6 +1,6 @@
 //! The runtime takes every `--anti.` argument before `main` sees them, and
-//! hands the rest on in their order. `--anti.backtrace` turns the frames
-//! of an error on in a release build.
+//! hands the rest on in their order. `--anti.backtrace` turns the frames of an
+//! error on in a release build.
 
 import anti.lang;
 

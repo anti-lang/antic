@@ -1,6 +1,6 @@
-//! `switch` runs one arm, and none of these arms ends in `fallthrough;`.
-//! An arm is a block or a single call or assignment, and `else` takes the
-//! rest. A switch on an enum without `else` covers every value.
+//! `switch` runs one arm, and none of these arms ends in `fallthrough;`. An arm
+//! is a block or a single call or assignment, and `else` takes the rest. A
+//! switch on an enum without `else` covers every value.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

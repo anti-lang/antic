@@ -1,16 +1,15 @@
-//! The call hooks of an instrumented class: `enter` and `leave` around
-//! every `pub` function, `failed` when one gives an error, and `changed`
-//! after a write under `--trace writes`.
+//! The call hooks of an instrumented class: `enter` and `leave` around every
+//! `pub` function, `failed` when one gives an error, and `changed` after a
+//! write under `--trace writes`.
 //!
-//! `trace` marks the code whose author wants them. It follows the
-//! `assert` rule, so release mode without `--trace` instruments nothing
-//! and this program then prints its results alone. `--trace` turns the
-//! marked code on, `--trace <pattern>` reaches a class that did not ask,
-//! and `--trace writes` adds the writes.
+//! `trace` marks the code whose author wants them. It follows the `assert`
+//! rule, so release mode without `--trace` instruments nothing and this program
+//! then prints its results alone. `--trace` turns the marked code on, `--trace
+//! <pattern>` reaches a class that did not ask, and `--trace writes` adds the
+//! writes.
 //!
-//! `leave` reverses the order of the two calls, so the handler and the
-//! object's own hook nest around the call: the handler enters first and
-//! leaves last.
+//! `leave` reverses the order of the two calls, so the handler and the object's
+//! own hook nest around the call: the handler enters first and leaves last.
 
 import anti.lang;
 
@@ -46,8 +45,7 @@ trace class Store
 	}
 }
 
-/// A class that asks for nothing, with one function that asks for
-/// itself.
+/// A class that asks for nothing, with one function that asks for itself.
 class Quiet
 {
 	pub n: int = 0,

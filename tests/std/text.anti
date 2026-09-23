@@ -1,12 +1,12 @@
-//! The lengths and the comparison of a `str`, and `parse_int`, which may
-//! fail: a text that spells no `int` leaves on the error channel, and a
-//! caller handles it with `catch` or forwards it with `try`.
+//! The lengths and the comparison of a `str`, and `parse_int`, which may fail:
+//! a text that spells no `int` leaves on the error channel, and a caller
+//! handles it with `catch` or forwards it with `try`.
 import anti.io;
 import anti.lang;
 import anti.text;
 
-/// The sum of the integers `a` and `b` spell, or the error of the first
-/// that spells none.
+/// The sum of the integers `a` and `b` spell, or the error of the first that
+/// spells none.
 fn sum(a: str, b: str) -> int may fail
 {
 	let x = try text.parse_int(a);

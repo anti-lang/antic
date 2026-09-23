@@ -1,11 +1,10 @@
-//! `Object.deserialize` takes the object, every string and every owned
-//! object it makes from the allocator it is given, and the caller gives
-//! the memory back through that allocator. `Kept` remembers each block
-//! it lends, so the test sees that the strings of the object are among
-//! them and that none is left once they all go back. A text that fails
-//! gives back what it made. `Lender` lends through the sub-object of an
-//! interface. Over an `ArenaAllocator`, `free_all` gives back every block
-//! at once.
+//! `Object.deserialize` takes the object, every string and every owned object
+//! it makes from the allocator it is given, and the caller gives the memory
+//! back through that allocator. `Kept` remembers each block it lends, so the
+//! test sees that the strings of the object are among them and that none is
+//! left once they all go back. A text that fails gives back what it made.
+//! `Lender` lends through the sub-object of an interface. Over an
+//! `ArenaAllocator`, `free_all` gives back every block at once.
 import anti.mem;
 import anti.text;
 
@@ -14,8 +13,8 @@ extern fn printf(fmt: ?*byte, ...) -> c_int;
 /// The most blocks that `Kept` lends.
 const ROOM: int = 32;
 
-/// An allocator over the C library that remembers every block it lends
-/// until the block comes back.
+/// An allocator over the C library that remembers every block it lends until
+/// the block comes back.
 class Kept inherits mem.Allocator
 {
 	blocks: ?*?*byte = none,
@@ -72,8 +71,8 @@ class Kept inherits mem.Allocator
 		return false;
 	}
 
-	/// Give back every block still lent, as the caller of
-	/// `Object.deserialize` does when the object's life ends.
+	/// Give back every block still lent, as the caller of `Object.deserialize`
+	/// does when the object's life ends.
 	pub fn free_all(self)
 	{
 		let blocks = self.blocks else { return; };
@@ -90,8 +89,8 @@ class Kept inherits mem.Allocator
 	}
 }
 
-/// An allocator through the sub-object of an interface, which hands
-/// every call on to a `Kept`.
+/// An allocator through the sub-object of an interface, which hands every call
+/// on to a `Kept`.
 class Lender
 {
 	implements lending: mem.Allocator,
@@ -149,8 +148,8 @@ class Tree
 	pub leaf: Leaf = Leaf { },
 }
 
-/// The text that the default `serialize` writes for a tree with a
-/// string in every place that can hold one.
+/// The text that the default `serialize` writes for a tree with a string in
+/// every place that can hold one.
 fn written(b: *text.Builder) -> str
 {
 	let made = alloc Tree {

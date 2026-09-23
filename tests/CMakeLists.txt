@@ -1040,7 +1040,7 @@ add_test(NAME warning_doc_markup
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
         "-DCOMMAND=--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_markup.s,doc_markup.anti"
-        "-DNEEDLES=doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:7:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:28:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
+        "-DNEEDLES=doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:6:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:27:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
         "-DABSENT=${MARKUP} of `plus` holds;in ${MARKUP} of `plus` resolves;has no `///` comment"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warnings.cmake")
 add_test(NAME warning_undocumented

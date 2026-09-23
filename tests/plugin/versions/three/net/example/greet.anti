@@ -1,5 +1,5 @@
-//! The interface with one function added after the two the program
-//! carries. Its chain holds the program's as a prefix.
+//! The interface with one function added after the two the program carries. Its
+//! chain holds the program's as a prefix.
 
 /// A greeting a program prints.
 pub abstract class Greeter

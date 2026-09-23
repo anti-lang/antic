@@ -1,5 +1,5 @@
-//! The provider of one interface needs the other, whose provider needs
-//! the first. The link refuses the cycle.
+//! The provider of one interface needs the other, whose provider needs the
+//! first. The link refuses the cycle.
 abstract class Logger
 {
 	abstract fn say(self) -> int;

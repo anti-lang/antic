@@ -1,6 +1,6 @@
-//! Each specification below is not of the form an `f"..."` reads, and
-//! each is refused with the text of its placeholder. The last placeholder
-//! holds two values.
+//! Each specification below is not of the form an `f"..."` reads, and each is
+//! refused with the text of its placeholder. The last placeholder holds two
+//! values.
 
 import anti.text;
 

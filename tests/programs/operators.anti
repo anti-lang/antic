@@ -1,6 +1,6 @@
-//! An operator calls the function of its name on the left operand's
-//! type. `!=`, `>`, `<=` and `>=` derive from `eq` and `lt`, and a
-//! struct takes its operators from free functions of its module.
+//! An operator calls the function of its name on the left operand's type. `!=`,
+//! `>`, `<=` and `>=` derive from `eq` and `lt`, and a struct takes its
+//! operators from free functions of its module.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 class Vec2

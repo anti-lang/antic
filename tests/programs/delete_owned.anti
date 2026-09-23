@@ -1,15 +1,13 @@
-//! `delete` destroys every object the deleted one owns. An object behind
-//! an `own` pointer runs its whole chain and is freed, and so does every
-//! object that one owns in turn. A pointer to an interface frees the
-//! object it points into. A class value held inline, as a plain field or
-//! as a `use` field, runs its chain in place. `dup` gives such a value
-//! fresh copies of what it owns, so the copy and the original each free
-//! their own. The elements of an `own` slice of class values run their
-//! chains, last to first, before the buffer is freed, and `dup` copies
-//! each of them.
-//! `dup` of a pointer to an interface gives one into the copy. A local
-//! whose inline field needs a teardown is torn down at the end of its
-//! block.
+//! `delete` destroys every object the deleted one owns. An object behind an
+//! `own` pointer runs its whole chain and is freed, and so does every object
+//! that one owns in turn. A pointer to an interface frees the object it points
+//! into. A class value held inline, as a plain field or as a `use` field, runs
+//! its chain in place. `dup` gives such a value fresh copies of what it owns,
+//! so the copy and the original each free their own. The elements of an `own`
+//! slice of class values run their chains, last to first, before the buffer is
+//! freed, and `dup` copies each of them. `dup` of a pointer to an interface
+//! gives one into the copy. A local whose inline field needs a teardown is torn
+//! down at the end of its block.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -94,8 +92,12 @@ class Plain
 
 fn main() -> int
 {
-	let chain = alloc Leaf { n: 1, next: alloc Leaf { n: 2,
-		next: alloc Leaf { n: 3 } } };
+	let chain = alloc Leaf {
+		n: 1, next: alloc Leaf {
+			n: 2,
+			next: alloc Leaf { n: 3 }
+		}
+	};
 	delete(chain);
 
 	let tag = alloc Tag { id: 6 };

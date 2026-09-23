@@ -1,6 +1,6 @@
-//! `lib.instance(I)` and `lib.supports(I, "f")` name an interface. A
-//! value in that place, a class that is not abstract and the wrong
-//! count of arguments are each refused.
+//! `lib.instance(I)` and `lib.supports(I, "f")` name an interface. A value in
+//! that place, a class that is not abstract and the wrong count of arguments
+//! are each refused.
 import anti.plugin;
 
 class Local

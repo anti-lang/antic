@@ -1,11 +1,11 @@
 //! Operations on `str` values.
 //!
 //! A `str` holds UTF-8 bytes and their count. `from_c` makes one from a C
-//! string, and `equal` compares two by their bytes. `Builder` collects
-//! bytes and gives the `str` of what it collected. It writes numbers,
-//! truth values, characters and texts into fields of a width, which is
-//! what an `f"..."` calls. `parse_int` reads the integer a text spells
-//! and may fail, and every other function of the module cannot.
+//! string, and `equal` compares two by their bytes. `Builder` collects bytes
+//! and gives the `str` of what it collected. It writes numbers, truth values,
+//! characters and texts into fields of a width, which is what an `f"..."`
+//! calls. `parse_int` reads the integer a text spells and may fail, and every
+//! other function of the module cannot.
 
 import anti.lang;
 import anti.mem;
@@ -41,8 +41,7 @@ pub fn from_c(bytes: ?*byte) -> str
 
 /// The bytes as text, which share their memory.
 ///
-/// The bytes must outlive the `str`, and nothing checks that they are
-/// UTF-8.
+/// The bytes must outlive the `str`, and nothing checks that they are UTF-8.
 pub fn from_bytes(bytes: []byte) -> str
 {
 	return anti_rt_text_slice(bytes.ptr, bytes.len);
@@ -54,8 +53,8 @@ pub fn byte_count(s: str) -> int
 	return s.len;
 }
 
-/// The number of characters of `s`, counted as the bytes that start a
-/// UTF-8 sequence.
+/// The number of characters of `s`, counted as the bytes that start a UTF-8
+/// sequence.
 pub fn char_count(s: str) -> int
 {
 	let count = 0;
@@ -74,13 +73,13 @@ pub enum Align: u8 { Left, Right, Center }
 
 /// A growing buffer of bytes that gives a `str`.
 ///
-/// `append` copies the bytes of a `str` into the buffer, and `text`
-/// gives the whole of it. The buffer always keeps one byte past its
-/// length for the NUL that every `str` has.
+/// `append` copies the bytes of a `str` into the buffer, and `text` gives the
+/// whole of it. The buffer always keeps one byte past its length for the NUL
+/// that every `str` has.
 ///
-/// The runtime holds the buffer, because the default `serialize` of the
-/// root class writes an object into one. The three fields below are the
-/// `struct anti_builder` of `rt/std.h`, in that order.
+/// The runtime holds the buffer, because the default `serialize` of the root
+/// class writes an object into one. The three fields below are the `struct
+/// anti_builder` of `rt/std.h`, in that order.
 pub class Builder
 {
 	own room: ?*byte,
@@ -127,22 +126,21 @@ pub class Builder
 	/// The bytes collected so far, which now belong to the caller.
 	///
 	/// The `str` holds memory of its own from the C library, which
-	/// `free(s.ptr)` returns. The builder is empty afterwards and may
-	/// collect again.
+	/// `free(s.ptr)` returns. The builder is empty afterwards and may collect
+	/// again.
 	pub fn take(self) -> str
 	{
 		return anti_rt_builder_take(self);
 	}
 
-	/// The bytes collected so far, in memory of `from`, which now belong
-	/// to the caller.
+	/// The bytes collected so far, in memory of `from`, which now belong to the
+	/// caller.
 	///
-	/// `from.free(s.ptr)` gives the memory back, and so does anything
-	/// that gives back every block of `from` at once. The text keeps its
-	/// NUL. When `from` gives no memory, the text is the empty literal,
-	/// as `take` gives it when the C library has none. The builder is
-	/// empty afterwards and may collect again. `f"..."(from)` ends with
-	/// this call.
+	/// `from.free(s.ptr)` gives the memory back, and so does anything that
+	/// gives back every block of `from` at once. The text keeps its NUL. When
+	/// `from` gives no memory, the text is the empty literal, as `take` gives
+	/// it when the C library has none. The builder is empty afterwards and may
+	/// collect again. `f"..."(from)` ends with this call.
 	pub fn take_in(self, from: *mem.Allocator) -> str
 	{
 		let collected = anti_rt_builder_text(self);
@@ -159,13 +157,11 @@ pub class Builder
 		return made;
 	}
 
-	/// Write `value` in base `radix` into a field `width` characters
-	/// wide.
+	/// Write `value` in base `radix` into a field `width` characters wide.
 	///
-	/// A negative value starts with `-`. A radix outside 2 to 36 counts
-	/// as 10, and `upper` writes the digits above 9 as capitals. `zero`
-	/// fills the field with `0` after the sign, and `align` then does
-	/// not apply.
+	/// A negative value starts with `-`. A radix outside 2 to 36 counts as 10,
+	/// and `upper` writes the digits above 9 as capitals. `zero` fills the
+	/// field with `0` after the sign, and `align` then does not apply.
 	pub fn append_int(self, value: int, radix: int = 10, upper: bool = false,
 		width: int = 0, align: Align = Align.Right, zero: bool = false)
 	{
@@ -182,8 +178,8 @@ pub class Builder
 		self.pad(start, width, align, zero);
 	}
 
-	/// Write `value` in base `radix` into a field `width` characters
-	/// wide, as `append_int` does for an `int`.
+	/// Write `value` in base `radix` into a field `width` characters wide, as
+	/// `append_int` does for an `int`.
 	pub fn append_uint(self, value: u64, radix: int = 10,
 		upper: bool = false, width: int = 0, align: Align = Align.Right,
 		zero: bool = false)
@@ -196,13 +192,12 @@ pub class Builder
 	/// Write `value` with `precision` digits after the point into a field
 	/// `width` characters wide.
 	///
-	/// A negative `precision` writes the fewest digits that read back as
-	/// the same value. They stand in positional form when the first
-	/// digit is worth 10 to the power -4 up to 15, and in the form
-	/// `d.ddde+XX` otherwise. `exponent` writes that form always. `nan`,
-	/// `inf` and `-inf` stand for the values without digits. `zero`
-	/// fills the field with `0` after the sign, and `align` then does
-	/// not apply.
+	/// A negative `precision` writes the fewest digits that read back as the
+	/// same value. They stand in positional form when the first digit is worth
+	/// 10 to the power -4 up to 15, and in the form `d.ddde+XX` otherwise.
+	/// `exponent` writes that form always. `nan`, `inf` and `-inf` stand for
+	/// the values without digits. `zero` fills the field with `0` after the
+	/// sign, and `align` then does not apply.
 	pub fn append_float(self, value: f64, precision: int = -1,
 		exponent: bool = false, width: int = 0, align: Align = Align.Right,
 		zero: bool = false)
@@ -212,8 +207,8 @@ pub class Builder
 		self.pad(start, width, align, zero);
 	}
 
-	/// Write `value` as `append_float` does, where the fewest digits are
-	/// the ones that read back as the same `f32`.
+	/// Write `value` as `append_float` does, where the fewest digits are the
+	/// ones that read back as the same `f32`.
 	pub fn append_f32(self, value: f32, precision: int = -1,
 		exponent: bool = false, width: int = 0, align: Align = Align.Right,
 		zero: bool = false)
@@ -235,8 +230,7 @@ pub class Builder
 		}
 	}
 
-	/// Write the UTF-8 bytes of `value` into a field `width` characters
-	/// wide.
+	/// Write the UTF-8 bytes of `value` into a field `width` characters wide.
 	pub fn append_char(self, value: char, width: int = 0,
 		align: Align = Align.Left)
 	{
@@ -301,9 +295,9 @@ pub class Builder
 		}
 	}
 
-	/// Widen the text written since `start` to `width` characters, with
-	/// spaces on the sides `align` names, or with `0` after a leading
-	/// `-` when `zero` is set.
+	/// Widen the text written since `start` to `width` characters, with spaces
+	/// on the sides `align` names, or with `0` after a leading `-` when `zero`
+	/// is set.
 	fn pad(self, start: int, width: int, align: Align, zero: bool)
 	{
 		let whole = anti_rt_builder_text(self);
@@ -331,8 +325,8 @@ pub class Builder
 
 /// The bytes of `s` from `from` up to `to`, which share its memory.
 ///
-/// A range outside the text gives an empty `str`, and `to` past the end
-/// stops at the end.
+/// A range outside the text gives an empty `str`, and `to` past the end stops
+/// at the end.
 pub fn slice(s: str, from: int, to: int) -> str
 {
 	let high = to;
@@ -361,9 +355,9 @@ pub fn find_byte(s: str, b: byte) -> int
 
 /// The integer `s` spells, which may fail.
 ///
-/// A leading `+` or `-` is read. The call fails for a text without a
-/// digit, for any other byte outside the digits and for a value outside
-/// the range of `int`.
+/// A leading `+` or `-` is read. The call fails for a text without a digit, for
+/// any other byte outside the digits and for a value outside the range of
+/// `int`.
 pub fn parse_int(s: str) -> int may fail
 {
 	let i = 0;

@@ -1,8 +1,8 @@
 //! `=` into a place that holds a value needing a teardown destroys the old
-//! value first, then moves the new one in. An unfilled element of
-//! `alloc(T, n)` has a zero table, holds no value, and nothing is
-//! destroyed there. An array is replaced element by element, last to
-//! first, and so is a class value held inline.
+//! value first, then moves the new one in. An unfilled element of `alloc(T, n)`
+//! has a zero table, holds no value, and nothing is destroyed there. An array
+//! is replaced element by element, last to first, and so is a class value held
+//! inline.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

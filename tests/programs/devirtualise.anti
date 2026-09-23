@@ -1,7 +1,7 @@
-//! Release mode calls a function directly when every table that a call
-//! may read holds that one function at its slot. Dev mode reads the
-//! table. The test `program_devirtualise_dev` runs this program in dev
-//! mode, and both print the same line.
+//! Release mode calls a function directly when every table that a call may read
+//! holds that one function at its slot. Dev mode reads the table. The test
+//! `program_devirtualise_dev` runs this program in dev mode, and both print the
+//! same line.
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 

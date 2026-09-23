@@ -1,15 +1,14 @@
 //! Allocators, which a library or a class takes to make its memory.
 //!
-//! `Allocator` is the standard interface. `alloc(size, align)` gives
-//! `size` bytes at an address that is a multiple of `align`, and
-//! `free(p)` gives them back to the allocator that gave them. The
-//! language's own `alloc` and `free` stay bound to the C library. A class
-//! whose user chooses where its memory comes from takes a `*Allocator`
-//! and asks it.
+//! `Allocator` is the standard interface. `alloc(size, align)` gives `size`
+//! bytes at an address that is a multiple of `align`, and `free(p)` gives them
+//! back to the allocator that gave them. The language's own `alloc` and `free`
+//! stay bound to the C library. A class whose user chooses where its memory
+//! comes from takes a `*Allocator` and asks it.
 //!
-//! `LibcAllocator` is the default, over the C library. `ArenaAllocator`
-//! hands out memory from blocks that it takes from another allocator,
-//! and gives every block back at once.
+//! `LibcAllocator` is the default, over the C library. `ArenaAllocator` hands
+//! out memory from blocks that it takes from another allocator, and gives every
+//! block back at once.
 
 extern fn anti_rt_mem_alloc(size: int, align: int) -> ?*byte;
 extern fn anti_rt_mem_free(p: ?*byte);
@@ -17,8 +16,8 @@ extern fn anti_rt_mem_free(p: ?*byte);
 /// The largest `int`, which the bytes of a block never pass.
 const LARGEST: int = 0x7FFFFFFFFFFFFFFF;
 
-/// The alignment of a block of `ArenaAllocator`, which serves every
-/// request up to it from a block that other requests share.
+/// The alignment of a block of `ArenaAllocator`, which serves every request up
+/// to it from a block that other requests share.
 const BLOCK_ALIGN: int = 16;
 
 /// Memory on request, given back to the allocator that gave it.
@@ -28,12 +27,11 @@ pub abstract class Allocator
 	   runtime as the two table entries after the seven of the root, in
 	   rt/registry.c. They stay the first two functions, in this order. */
 
-	/// `size` bytes at an address that is a multiple of `align`, or
-	/// `none`.
+	/// `size` bytes at an address that is a multiple of `align`, or `none`.
 	///
-	/// `align` is a power of two. A `size` below zero, an `align` that is
-	/// no power of two and memory that has run out give `none`. A `size`
-	/// of zero gives an address that `free` takes.
+	/// `align` is a power of two. A `size` below zero, an `align` that is no
+	/// power of two and memory that has run out give `none`. A `size` of zero
+	/// gives an address that `free` takes.
 	abstract fn alloc(self, size: int, align: int) -> ?*byte;
 
 	/// Give back `p`, which `alloc` of this allocator gave.
@@ -41,20 +39,19 @@ pub abstract class Allocator
 	/// `none` does nothing.
 	abstract fn free(self, p: ?*byte);
 
-	/// The provider the link takes where the build names none, which is
-	/// the allocator over the C library.
+	/// The provider the link takes where the build names none, which is the
+	/// allocator over the C library.
 	pub fn default() -> *Allocator
 	{
 		return LibcAllocator.get();
 	}
 }
 
-/// The allocator over the C library, which is the default of
-/// `Allocator`.
+/// The allocator over the C library, which is the default of `Allocator`.
 ///
 /// Its memory goes back through its own `free` and never through the
-/// language's, since Windows gives aligned memory back with a function of
-/// its own.
+/// language's, since Windows gives aligned memory back with a function of its
+/// own.
 pub singleton class LibcAllocator inherits Allocator
 {
 	concrete fn alloc(self, size: int, align: int) -> ?*byte
@@ -74,16 +71,16 @@ struct Block
 	next: ?*byte,
 }
 
-/// An allocator that hands out memory from blocks and gives them all
-/// back at once.
+/// An allocator that hands out memory from blocks and gives them all back at
+/// once.
 ///
-/// The blocks come from another allocator. Each holds `block` bytes, or
-/// a larger request alone. A request at an alignment above 16, the one
-/// of the blocks, takes a block of its own at its alignment. `free` of
-/// one allocation gives nothing back. `free_all` gives back every block
-/// and leaves the allocator empty and ready for more, and `destruct`
-/// gives back what is left. A copy would give the blocks back twice, so
-/// a program passes the address of the one it made.
+/// The blocks come from another allocator. Each holds `block` bytes, or a
+/// larger request alone. A request at an alignment above 16, the one of the
+/// blocks, takes a block of its own at its alignment. `free` of one allocation
+/// gives nothing back. `free_all` gives back every block and leaves the
+/// allocator empty and ready for more, and `destruct` gives back what is left.
+/// A copy would give the blocks back twice, so a program passes the address of
+/// the one it made.
 pub class ArenaAllocator inherits Allocator
 {
 	from: *Allocator,
@@ -93,8 +90,8 @@ pub class ArenaAllocator inherits Allocator
 	limit: int = 0,
 	head_align: int = 0,
 
-	/// An allocator without blocks, whose blocks come from `from` and
-	/// hold `block` bytes.
+	/// An allocator without blocks, whose blocks come from `from` and hold
+	/// `block` bytes.
 	pub fn new(from: *Allocator, block: int) -> ArenaAllocator
 	{
 		return ArenaAllocator { from: from, block: block };
@@ -123,8 +120,8 @@ pub class ArenaAllocator inherits Allocator
 	{
 	}
 
-	/// Give back every block, after which the allocator holds none and
-	/// hands out memory again.
+	/// Give back every block, after which the allocator holds none and hands
+	/// out memory again.
 	pub fn free_all(self)
 	{
 		let at = self.head;

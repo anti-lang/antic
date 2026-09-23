@@ -1,6 +1,6 @@
-inject_type.anti:18:2: error: `inject` needs a pointer to an abstract class, and `a` has type `int`
-inject_type.anti:19:2: error: `inject` needs a pointer to an abstract class, and `b` has type `?*Logger`
-inject_type.anti:20:2: error: `inject` needs a pointer to an abstract class, and `c` has type `*Console`
-inject_type.anti:21:2: error: `d` is `inject`, so its provider owns what it gives and it is not `own`
-inject_type.anti:22:2: error: `e` is `inject`, so its provider fills it and it has no default
-inject_type.anti:22:22: error: `*Logger` cannot hold `none`
+inject_type.anti:17:2: error: `inject` needs a pointer to an abstract class, and `a` has type `int`
+inject_type.anti:18:2: error: `inject` needs a pointer to an abstract class, and `b` has type `?*Logger`
+inject_type.anti:19:2: error: `inject` needs a pointer to an abstract class, and `c` has type `*Console`
+inject_type.anti:20:2: error: `d` is `inject`, so its provider owns what it gives and it is not `own`
+inject_type.anti:21:2: error: `e` is `inject`, so its provider fills it and it has no default
+inject_type.anti:21:22: error: `*Logger` cannot hold `none`

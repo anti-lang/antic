@@ -1,8 +1,8 @@
-//! `fn(A) -> R may fail` is a type of its own. A value of it holds a
-//! `may fail` function, and a call through it is handled as a direct call
-//! is: with `catch`, with `try`, inside a `try` block and with `catch
-//! fatal`. A variable, a parameter, a field, a `?fn`, a bound function
-//! and a result each hold one.
+//! `fn(A) -> R may fail` is a type of its own. A value of it holds a `may fail`
+//! function, and a call through it is handled as a direct call is: with
+//! `catch`, with `try`, inside a `try` block and with `catch fatal`. A
+//! variable, a parameter, a field, a `?fn`, a bound function and a result each
+//! hold one.
 
 import anti.lang;
 
@@ -30,8 +30,8 @@ fn twice(f: fn(int) -> int may fail, n: int) -> int may fail
 	return try f(once);
 }
 
-/// A function that cannot fail and gives one that may. The `may fail`
-/// at the end of the signature belongs to the type of the result.
+/// A function that cannot fail and gives one that may. The `may fail` at the
+/// end of the signature belongs to the type of the result.
 fn chooser() -> fn(int) -> int may fail
 {
 	return half;
@@ -97,7 +97,7 @@ fn main() -> int
 	let x = s.step(20) catch fatal;
 	printf("x %d\n".ptr, x as c_int);
 	printf("checked %d %d\n".ptr, checked(&s, 4) as c_int,
-	       checked(&s, 5) as c_int);
+		checked(&s, 5) as c_int);
 	s.check = none;
 	printf("unchecked %d\n".ptr, checked(&s, 5) as c_int);
 	let counter = Counter { };

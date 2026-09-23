@@ -1,13 +1,12 @@
 //! Tests a class of module `com.example.points` from another module. The
-//! program and the library name one descriptor and one table, so `is`,
-//! `==`, `equals`, `reflect.new` and `reflect.call` agree whichever
-//! module made the object. `reflect.call` through a pointer to an
-//! interface calls the function of the object's class that the index
-//! names. A class of each module holds the struct `Extent`, whose one
-//! descriptor the library writes, and `serialize` walks it from both.
-//! A class of the library with qualified bodies keeps its tables here,
-//! and a class of the program inherits them. The one qualified body of
-//! `Crate` is reached through its table from here, by a call, a bound
+//! program and the library name one descriptor and one table, so `is`, `==`,
+//! `equals`, `reflect.new` and `reflect.call` agree whichever module made the
+//! object. `reflect.call` through a pointer to an interface calls the function
+//! of the object's class that the index names. A class of each module holds the
+//! struct `Extent`, whose one descriptor the library writes, and `serialize`
+//! walks it from both. A class of the library with qualified bodies keeps its
+//! tables here, and a class of the program inherits them. The one qualified
+//! body of `Crate` is reached through its table from here, by a call, a bound
 //! function and `points.Crate.size`, and a class here replaces it.
 
 import com.example.points;

@@ -1,5 +1,5 @@
-//! A Mutex inside a struct of a library, which the program holds with
-//! `sync`, and channels that pass between the program and the library.
+//! A Mutex inside a struct of a library, which the program holds with `sync`,
+//! and channels that pass between the program and the library.
 
 import com.example.queue;
 

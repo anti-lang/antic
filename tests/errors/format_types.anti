@@ -1,5 +1,5 @@
-//! Each value below has a type its specification does not apply to, or
-//! a type an `f"..."` cannot write. A literal is no constant either.
+//! Each value below has a type its specification does not apply to, or a type
+//! an `f"..."` cannot write. A literal is no constant either.
 
 import anti.io;
 import anti.text;

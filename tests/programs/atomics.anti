@@ -1,6 +1,6 @@
-//! An atomic field is read and written by calls alone, so every access is
-//! one sequentially consistent operation. `static atomic` declares a
-//! field of the class, which is a global with the class's symbol.
+//! An atomic field is read and written by calls alone, so every access is one
+//! sequentially consistent operation. `static atomic` declares a field of the
+//! class, which is a global with the class's symbol.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

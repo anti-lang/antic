@@ -1,6 +1,6 @@
 //! The nearest body wins. A plain body of a class below replaces every
-//! qualified body of its name that it inherits, in each table, and a
-//! class below that qualifies its own takes that one table back.
+//! qualified body of its name that it inherits, in each table, and a class
+//! below that qualifies its own takes that one table back.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class Drawable

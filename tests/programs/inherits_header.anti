@@ -1,6 +1,6 @@
-//! A class names its base in its header, after `abstract`, `final`,
-//! `singleton` or `pub`, and after `align(N)`. A base of another module
-//! is qualified by the module.
+//! A class names its base in its header, after `abstract`, `final`, `singleton`
+//! or `pub`, and after `align(N)`. A base of another module is qualified by the
+//! module.
 
 import anti.lang;
 
@@ -62,7 +62,7 @@ fn main() -> int
 	let s: *Shape = &b;
 	printf("%d %d %d\n".ptr, s.area() as c_int, b.super.depth as c_int,
 		size_of(Box) as c_int);
-	let c = Counted {};
+	let c = Counted { };
 	printf("%d %d\n".ptr, c.twice() as c_int, c.more as c_int);
 	printf("%d %s\n".ptr, Registry.get().twice() as c_int,
 		Registry.get().label.ptr);

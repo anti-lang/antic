@@ -1,9 +1,9 @@
-//! `f16` is sixteen bits of storage. A read gives an `f32`, and a write
-//! takes `as f16`. The program keeps values in a field, a field default,
-//! an array, a slice, a variable, a constant and a place behind a pointer.
-//! It prints each value it reads back with the bits that hold it, so the
-//! rounding of every conversion shows: ties go to the even neighbour, a
-//! value past 65504 is infinite, and a NaN keeps its payload.
+//! `f16` is sixteen bits of storage. A read gives an `f32`, and a write takes
+//! `as f16`. The program keeps values in a field, a field default, an array, a
+//! slice, a variable, a constant and a place behind a pointer. It prints each
+//! value it reads back with the bits that hold it, so the rounding of every
+//! conversion shows: ties go to the even neighbour, a value past 65504 is
+//! infinite, and a NaN keeps its payload.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

@@ -1,6 +1,6 @@
-//! A library for C whose signatures name a variant. The header writes the
-//! tags of each variant as an enum, and the variant as a struct of the tag
-//! and a union of its cases, which C builds and reads.
+//! A library for C whose signatures name a variant. The header writes the tags
+//! of each variant as an enum, and the variant as a struct of the tag and a
+//! union of its cases, which C builds and reads.
 
 /// A shape of the plane.
 export variant Shape

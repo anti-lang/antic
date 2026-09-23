@@ -1,10 +1,10 @@
 //! Shared libraries a program loads while it runs.
 //!
-//! A library is built with `antic --lib shared --no-runtime`. It uses
-//! the runtime, the heap and the descriptors of the host that loads it,
-//! so an object of one of its classes is an object of the program like
-//! any other. `provides Interface as Class;` at module level says what
-//! the library offers, and `load` gives a `Library` to ask.
+//! A library is built with `antic --lib shared --no-runtime`. It uses the
+//! runtime, the heap and the descriptors of the host that loads it, so an
+//! object of one of its classes is an object of the program like any other.
+//! `provides Interface as Class;` at module level says what the library offers,
+//! and `load` gives a `Library` to ask.
 //!
 //! ```anti
 //! import anti.plugin;
@@ -22,8 +22,8 @@
 //! }
 //! ```
 //!
-//! `instance` and `supports` name an interface where a value stands, so
-//! the compiler carries them. Every other function is ordinary Anti.
+//! `instance` and `supports` name an interface where a value stands, so the
+//! compiler carries them. Every other function is ordinary Anti.
 
 import anti.lang;
 
@@ -38,39 +38,38 @@ extern fn anti_rt_plugin_unload(handle: ?*byte) -> bool;
 /// The code of an error of a library that cannot be opened or read.
 pub const NOT_LOADED: int = 1;
 
-/// The code of an error of an `unload` that objects of the library
-/// still keep open.
+/// The code of an error of an `unload` that objects of the library still keep
+/// open.
 pub const IN_USE: int = 2;
 
 /// A shared library the program has opened.
 ///
 /// `instance` builds the class the library provides for an interface,
-/// `supports` asks what that class carries, and `unload` closes the
-/// library once nothing of it is alive.
+/// `supports` asks what that class carries, and `unload` closes the library
+/// once nothing of it is alive.
 pub class Library
 {
 	/// What the loader of the platform gave for the library.
 	handle: ?*byte = none,
 
-	/// The library of a handle the loader gave. `load` is the one
-	/// caller.
+	/// The library of a handle the loader gave. `load` is the one caller.
 	fn construct(self, handle: *byte)
 	{
 		self.handle = handle;
 	}
 
-	/// The object of the class the library provides for the interface,
-	/// or `none`.
+	/// The object of the class the library provides for the interface, or
+	/// `none`.
 	///
-	/// The compiler writes this call for `lib.instance(Interface)` and
-	/// gives it the type `?*Interface`.
+	/// The compiler writes this call for `lib.instance(Interface)` and gives it
+	/// the type `?*Interface`.
 	pub fn instance_at(self, d: *byte) -> ?*Object
 	{
 		return anti_rt_plugin_instance(self.handle, d);
 	}
 
-	/// Whether the class the library provides for the interface carries
-	/// a public function of that name.
+	/// Whether the class the library provides for the interface carries a
+	/// public function of that name.
 	///
 	/// The compiler writes this call for `lib.supports(Interface, n)`.
 	pub fn supports_at(self, d: *byte, name: str) -> bool
@@ -86,8 +85,8 @@ pub class Library
 
 	/// Close the library.
 	///
-	/// It fails with `IN_USE` while an object of one of its classes is
-	/// alive, and the library stays open.
+	/// It fails with `IN_USE` while an object of one of its classes is alive,
+	/// and the library stays open.
 	pub fn unload(self) may fail
 	{
 		if !anti_rt_plugin_unload(self.handle) {
@@ -99,11 +98,10 @@ pub class Library
 
 /// Open the shared library at `path`.
 ///
-/// It fails with `NOT_LOADED` when the file is no library of this
-/// runtime, or provides nothing, or carries an interface of its own
-/// where the host's is the one it must provide. The message of the
-/// error belongs to the runtime and stands until the next failure, as
-/// the message of a `SystemError` does.
+/// It fails with `NOT_LOADED` when the file is no library of this runtime, or
+/// provides nothing, or carries an interface of its own where the host's is the
+/// one it must provide. The message of the error belongs to the runtime and
+/// stands until the next failure, as the message of a `SystemError` does.
 pub fn load(path: str) -> *Library may fail
 {
 	let opened = anti_rt_plugin_load(path.ptr, path.len);

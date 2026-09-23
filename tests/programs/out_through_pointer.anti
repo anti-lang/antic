@@ -1,8 +1,8 @@
-//! `*into = try f();` stores the result of a failing call through a
-//! pointer. The out pointer the compiler supplies for that call is the
-//! pointer's target, read once before the call. The callee therefore
-//! writes where the program asked. Binding the result to a local first
-//! is the same program and was the only form that ran.
+//! `*into = try f();` stores the result of a failing call through a pointer.
+//! The out pointer the compiler supplies for that call is the pointer's target,
+//! read once before the call. The callee therefore writes where the program
+//! asked. Binding the result to a local first is the same program and was the
+//! only form that ran.
 
 import anti.lang;
 

@@ -1,9 +1,9 @@
-//! A loop counter and a value used once outside the loop. The counter is
-//! read on every pass and the other value once, so the counter keeps its
-//! register and the other one gives it up when registers run out.
+//! A loop counter and a value used once outside the loop. The counter is read
+//! on every pass and the other value once, so the counter keeps its register
+//! and the other one gives it up when registers run out.
 
 extern fn use12(a: int, b: int, c: int, d: int, e: int, f: int, g: int,
-                h: int, i: int, j: int, k: int, l: int) -> int;
+	h: int, i: int, j: int, k: int, l: int) -> int;
 
 pub fn hot(n: int) -> int
 {

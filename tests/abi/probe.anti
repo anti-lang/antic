@@ -1,8 +1,8 @@
-//! The ABI probe in Anti. It prints what probe.c prints for the same
-//! types, so any difference in layout shows as a difference in the output.
-//! Every byte image it prints is of an object it cleared first, and the
-//! one case that cannot clear the object prints the fields instead. See
-//! the design note at the head of probe.c.
+//! The ABI probe in Anti. It prints what probe.c prints for the same types, so
+//! any difference in layout shows as a difference in the output. Every byte
+//! image it prints is of an object it cleared first, and the one case that
+//! cannot clear the object prints the fields instead. See the design note at
+//! the head of probe.c.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

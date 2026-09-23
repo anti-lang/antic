@@ -1,11 +1,11 @@
 //! The handlers of `anti.trace` at the real hook sites.
 //!
-//! `trace.install` takes the names of the runtime key and gives the
-//! handler that `Trace.install` now holds. The five always-on hooks fire
-//! in every build, so `LeakTracker` and `ThreadMonitor` count in this
-//! program whatever the options are. The call hooks need tracing and the
-//! `changed` hook needs `--trace writes`, so `ErrorMonitor`, `Profiler`
-//! and `ChangeJournal` count nothing in a release build without them.
+//! `trace.install` takes the names of the runtime key and gives the handler
+//! that `Trace.install` now holds. The five always-on hooks fire in every
+//! build, so `LeakTracker` and `ThreadMonitor` count in this program whatever
+//! the options are. The call hooks need tracing and the `changed` hook needs
+//! `--trace writes`, so `ErrorMonitor`, `Profiler` and `ChangeJournal` count
+//! nothing in a release build without them.
 
 import anti.lang;
 import anti.trace;

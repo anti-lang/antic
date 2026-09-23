@@ -1,6 +1,6 @@
-//! The base of a class stands in its header. `inherits` in the body,
-//! where it stood before, is refused with the header it means, for a
-//! base of the module and for one qualified by another module.
+//! The base of a class stands in its header. `inherits` in the body, where it
+//! stood before, is refused with the header it means, for a base of the module
+//! and for one qualified by another module.
 
 import anti.lang;
 

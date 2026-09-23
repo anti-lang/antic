@@ -1,9 +1,9 @@
 //! A failing call that is an operand, and not the whole of a `let`, an
-//! assignment or a statement. `try` stands after `return`, as an
-//! argument, inside an operator and as a condition, with a scalar, a
-//! `str` and a tuple for its result, and so does a call inside a `try`
-//! block. The call writes a slot of its own, and its value is read from
-//! there. The `catch` of each result below is the form of a `let`.
+//! assignment or a statement. `try` stands after `return`, as an argument,
+//! inside an operator and as a condition, with a scalar, a `str` and a tuple
+//! for its result, and so does a call inside a `try` block. The call writes a
+//! slot of its own, and its value is read from there. The `catch` of each
+//! result below is the form of a `let`.
 
 import anti.lang;
 

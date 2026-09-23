@@ -1,6 +1,6 @@
-//! A worker calls a function of another module that writes a `mutable`
-//! field of a singleton. The checker of this module cannot see that
-//! function. The pass over the whole program reports it.
+//! A worker calls a function of another module that writes a `mutable` field of
+//! a singleton. The checker of this module cannot see that function. The pass
+//! over the whole program reports it.
 import com.example.board;
 
 worker fn tally(part: []int) -> int

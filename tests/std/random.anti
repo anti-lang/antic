@@ -1,5 +1,5 @@
-//! One seed gives one sequence, and two generators of one seed agree.
-//! `below` stays inside its limit and `fraction` inside the unit range.
+//! One seed gives one sequence, and two generators of one seed agree. `below`
+//! stays inside its limit and `fraction` inside the unit range.
 import anti.io;
 import anti.random;
 

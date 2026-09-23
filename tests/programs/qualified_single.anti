@@ -1,7 +1,7 @@
-//! One qualified body of a name. A call, a bound function and `T.f` on
-//! the class reach it through the table of its interface, so a class
-//! below that replaces it is honoured, with a plain body or a qualified
-//! one. A value has its concrete class and calls the body directly.
+//! One qualified body of a name. A call, a bound function and `T.f` on the
+//! class reach it through the table of its interface, so a class below that
+//! replaces it is honoured, with a plain body or a qualified one. A value has
+//! its concrete class and calls the body directly.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class Drawable

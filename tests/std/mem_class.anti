@@ -1,15 +1,14 @@
-//! A class that takes an allocator makes its memory with it and gives
-//! the memory back to it. `Stack` keeps integers in room it asks of the
-//! allocator it was given, grows by asking for more, and gives the room
-//! back in `destruct`. It runs over the C library, over a counting
-//! allocator, which sees every block come back, and over an
-//! `ArenaAllocator`.
+//! A class that takes an allocator makes its memory with it and gives the
+//! memory back to it. `Stack` keeps integers in room it asks of the allocator
+//! it was given, grows by asking for more, and gives the room back in
+//! `destruct`. It runs over the C library, over a counting allocator, which
+//! sees every block come back, and over an `ArenaAllocator`.
 import anti.mem;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-/// An allocator that counts the blocks it lends and hands every call on
-/// to the C library.
+/// An allocator that counts the blocks it lends and hands every call on to the
+/// C library.
 class Counting inherits mem.Allocator
 {
 	pub live: int = 0,
@@ -101,8 +100,8 @@ class Stack
 	}
 }
 
-/// Push the numbers below 1000 onto a stack over `from` and give their
-/// sum, or -1 when a push fails. The stack ends at the return.
+/// Push the numbers below 1000 onto a stack over `from` and give their sum, or
+/// -1 when a push fails. The stack ends at the return.
 fn thousand(from: *mem.Allocator) -> int
 {
 	let s = Stack.new(from);
@@ -116,9 +115,9 @@ fn thousand(from: *mem.Allocator) -> int
 	return s.sum();
 }
 
-/// The stack over a counting allocator, which sees it grow by doubling,
-/// each time giving back the room it leaves. The stack ends at the
-/// return, and its `destruct` gives back the last room.
+/// The stack over a counting allocator, which sees it grow by doubling, each
+/// time giving back the room it leaves. The stack ends at the return, and its
+/// `destruct` gives back the last room.
 fn counted(counting: *Counting) -> bool
 {
 	let s = Stack.new(counting);

@@ -1,22 +1,21 @@
 //! Logging through a level, a sink and a format.
 //!
-//! A program writes with `log.info("...")` and the like, which reach the
-//! logger of the `Log` singleton. `log.set` replaces that logger. Each
-//! line is one `write` call of the sink, so two threads never interleave
-//! one line with another.
+//! A program writes with `log.info("...")` and the like, which reach the logger
+//! of the `Log` singleton. `log.set` replaces that logger. Each line is one
+//! `write` call of the sink, so two threads never interleave one line with
+//! another.
 //!
-//! `Logger` is the standard interface, and `SinkLogger` is its default,
-//! the logger that writes through a `Sink`. A class that takes a
-//! `*Logger` runs under a fake logger in a test.
+//! `Logger` is the standard interface, and `SinkLogger` is its default, the
+//! logger that writes through a `Sink`. A class that takes a `*Logger` runs
+//! under a fake logger in a test.
 //!
-//! The `logger` key of the runtime configuration names a file of the
-//! TOML subset that the first call reads. `--anti.logger=<path>` and
-//! the `[runtime]` table of the configuration file set that key. The
-//! file holds `level`, `format` and `[[sink]]` entries with `kind`,
-//! `path` and `level`. A file that is missing or outside the subset
-//! writes one line to standard error, and the program goes on with the
-//! default, which is standard error at level `info` in text. A `log.set`
-//! in the program takes precedence over the file.
+//! The `logger` key of the runtime configuration names a file of the TOML
+//! subset that the first call reads. `--anti.logger=<path>` and the `[runtime]`
+//! table of the configuration file set that key. The file holds `level`,
+//! `format` and `[[sink]]` entries with `kind`, `path` and `level`. A file that
+//! is missing or outside the subset writes one line to standard error, and the
+//! program goes on with the default, which is standard error at level `info` in
+//! text. A `log.set` in the program takes precedence over the file.
 
 import anti.error as failure;
 import anti.lang;
@@ -73,8 +72,8 @@ pub class FileSink inherits Sink
 
 	/// A sink that appends to the file at `path`, which may fail.
 	///
-	/// A file that will not open fails with the `SystemError` of the
-	/// number the system gave.
+	/// A file that will not open fails with the `SystemError` of the number the
+	/// system gave.
 	pub fn new(path: str) -> *FileSink may fail
 	{
 		/* Binary, so a line ends with LF on Windows as well. */
@@ -120,12 +119,12 @@ pub class CallbackSink inherits Sink
 	}
 }
 
-/// Where a program writes its lines, which a class takes so that a test
-/// can collect them.
+/// Where a program writes its lines, which a class takes so that a test can
+/// collect them.
 ///
-/// A name, a level and a format stand here, because every logger
-/// carries them and `log.logger().level` reads and writes one.
-/// `SinkLogger` is the default, which writes through a `Sink`.
+/// A name, a level and a format stand here, because every logger carries them
+/// and `log.logger().level` reads and writes one. `SinkLogger` is the default,
+/// which writes through a `Sink`.
 pub abstract class Logger
 {
 	/// The name that every line of this logger carries.
@@ -138,11 +137,11 @@ pub abstract class Logger
 	/// Write `message` at `level`, unless the logger drops that level.
 	abstract fn log(self, level: Level, message: str);
 
-	/// The provider the link takes where the build names none, which is
-	/// the logger of the program.
+	/// The provider the link takes where the build names none, which is the
+	/// logger of the program.
 	///
-	/// A `log.set` after the field was filled does not reach it, since
-	/// the provider runs once, before `construct`.
+	/// A `log.set` after the field was filled does not reach it, since the
+	/// provider runs once, before `construct`.
 	pub fn default() -> *Logger
 	{
 		return logger();
@@ -185,8 +184,8 @@ pub abstract class Logger
 	}
 }
 
-/// A logger that writes each line to a sink it owns, which is the
-/// default of `Logger`.
+/// A logger that writes each line to a sink it owns, which is the default of
+/// `Logger`.
 pub class SinkLogger inherits Logger
 {
 	own sink: *Sink,
@@ -234,8 +233,8 @@ pub class SinkLogger inherits Logger
 
 /// The logger of the program.
 ///
-/// The first call to `get` builds it, from the file the `logger` key
-/// names and from the default otherwise.
+/// The first call to `get` builds it, from the file the `logger` key names and
+/// from the default otherwise.
 pub singleton class Log
 {
 	atomic logger: ?*Logger = none,
@@ -268,8 +267,8 @@ pub fn logger() -> *Logger
 
 /// Replace the logger of the program, and give back the one before it.
 ///
-/// The caller owns the logger it gets back and deletes it when nothing
-/// else holds it.
+/// The caller owns the logger it gets back and deletes it when nothing else
+/// holds it.
 pub fn set(next: *Logger) -> ?*Logger
 {
 	return Log.get().logger.swap(next);
@@ -372,9 +371,9 @@ class Kind
 
 /// Add a kind of sink that a configuration file may name.
 ///
-/// `make` takes the `path` of the entry and gives the sink. A file that
-/// names a kind nothing registered writes one line to standard error and
-/// the entry is left out. The kinds `stderr` and `file` are always there.
+/// `make` takes the `path` of the entry and gives the sink. A file that names a
+/// kind nothing registered writes one line to standard error and the entry is
+/// left out. The kinds `stderr` and `file` are always there.
 pub fn register(name: str, make: fn(str) -> *Sink)
 {
 	let one = alloc Kind { name: name, make: make, next: none };
@@ -411,8 +410,8 @@ fn made(name: str, path: str) -> ?*Sink
 	return none;
 }
 
-/// The logger the `logger` key of the runtime configuration asks for,
-/// or the default one.
+/// The logger the `logger` key of the runtime configuration asks for, or the
+/// default one.
 fn from_configuration() -> *Logger
 {
 	let path = anti_rt_conf_get("logger".ptr, 6);

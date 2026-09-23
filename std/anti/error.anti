@@ -1,9 +1,9 @@
 //! The conveniences of the error convention.
 //!
 //! `Error` and the convention itself live in `anti.lang`, the root of the
-//! standard library. `anti.error` adds `SystemError`, the error of a
-//! failing system call, `on_fatal`, which registers the function that
-//! runs before `fatal` ends the program, and `check`.
+//! standard library. `anti.error` adds `SystemError`, the error of a failing
+//! system call, `on_fatal`, which registers the function that runs before
+//! `fatal` ends the program, and `check`.
 
 import anti.lang;
 
@@ -16,8 +16,8 @@ extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
 /// The error of a failing system call, with the number the system gave.
 pub class SystemError inherits lang.Error
 {
-	/// The number of the failure: `errno`, or the Win32 error code. The
-	/// code of the error holds it as well.
+	/// The number of the failure: `errno`, or the Win32 error code. The code of
+	/// the error holds it as well.
 	pub errno: int = 0,
 
 	/// The error of the last failing C call, from `errno`.
@@ -32,8 +32,8 @@ pub class SystemError inherits lang.Error
 
 	/// The error of the last failing Win32 call.
 	///
-	/// Every other system gives an error with code 0 and an empty
-	/// message, because it has no Win32 to ask.
+	/// Every other system gives an error with code 0 and an empty message,
+	/// because it has no Win32 to ask.
 	pub fn from_win32() -> *SystemError
 	{
 		let number = anti_rt_last_error() as int;
@@ -47,8 +47,8 @@ pub class SystemError inherits lang.Error
 
 /// Register the function that runs before `fatal` ends the program.
 ///
-/// One function is registered at a time, and a later call replaces the
-/// one before it.
+/// One function is registered at a time, and a later call replaces the one
+/// before it.
 pub fn on_fatal(f: fn())
 {
 	/* The singleton is bound to a local first. The checker refuses the
@@ -60,9 +60,8 @@ pub fn on_fatal(f: fn())
 
 /// Call `fatal` on an error, and return on `none`.
 ///
-/// It takes the result of a function written by hand as `-> ?*Error`,
-/// such as a binding. A call of a `may fail` function writes
-/// `catch fatal` instead.
+/// It takes the result of a function written by hand as `-> ?*Error`, such as a
+/// binding. A call of a `may fail` function writes `catch fatal` instead.
 pub fn check(e: ?*lang.Error)
 {
 	if e != none {

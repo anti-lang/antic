@@ -1,7 +1,7 @@
 //! A class carries its base at offset 0 and the table pointer of the root
 //! before it. A literal names the fields of the whole chain in any order,
-//! defaults from every level apply, and a member function reaches an
-//! inherited field through `self`.
+//! defaults from every level apply, and a member function reaches an inherited
+//! field through `self`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

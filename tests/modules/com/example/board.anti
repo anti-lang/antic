@@ -1,5 +1,5 @@
-//! A singleton with a `mutable` field and a function that writes it.
-//! The worker of `tests/errors/worker_reach.anti` calls the function.
+//! A singleton with a `mutable` field and a function that writes it. The worker
+//! of `tests/errors/worker_reach.anti` calls the function.
 
 /// The score of a game.
 pub singleton class Board

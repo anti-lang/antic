@@ -1,5 +1,5 @@
-//! An interface with no provider is refused at link, and the message
-//! names the class and the field that need one.
+//! An interface with no provider is refused at link, and the message names the
+//! class and the field that need one.
 abstract class Logger
 {
 	abstract fn say(self) -> int;

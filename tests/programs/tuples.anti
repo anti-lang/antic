@@ -1,8 +1,8 @@
-//! Tuples. A tuple type is an anonymous struct with C layout, a tuple
-//! value is `(a, b)`, its elements are `t.0` and `t.1`, and the two forms
-//! that destructure one are `let (a, b) = e;` and `for i, x in items`.
-//! A `may fail` function gives its tuple through the out pointer, which
-//! `catch`, `try` and `yield` reach as they reach any other result.
+//! Tuples. A tuple type is an anonymous struct with C layout, a tuple value is
+//! `(a, b)`, its elements are `t.0` and `t.1`, and the two forms that
+//! destructure one are `let (a, b) = e;` and `for i, x in items`. A `may fail`
+//! function gives its tuple through the out pointer, which `catch`, `try` and
+//! `yield` reach as they reach any other result.
 
 import anti.lang;
 
@@ -52,7 +52,7 @@ fn main() -> int
 
 	let pair = counted(2);
 	printf("mixed %d %.*s\n".ptr, pair.0 as c_int, pair.1.len as c_int,
-	       pair.1.ptr);
+		pair.1.ptr);
 	let (n, word) = counted(3);
 	printf("mixed let %d %.*s\n".ptr, n as c_int, word.len as c_int, word.ptr);
 

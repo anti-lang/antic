@@ -1,8 +1,8 @@
-//! The forms of `construct` the checker refuses. A `construct` that can
-//! fail is written `may fail`, one without arguments cannot fail, and the
-//! base's `construct` is called at the top of the body of the one below.
-//! A class that declares no `construct` is built by a literal, although
-//! its base declares one with arguments.
+//! The forms of `construct` the checker refuses. A `construct` that can fail is
+//! written `may fail`, one without arguments cannot fail, and the base's
+//! `construct` is called at the top of the body of the one below. A class that
+//! declares no `construct` is built by a literal, although its base declares
+//! one with arguments.
 import anti.lang;
 
 class Written

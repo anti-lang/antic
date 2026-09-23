@@ -1,7 +1,7 @@
 //! The rules of "Nullable pointers" at run time.
 //!
-//! `*T` never holds `none` and `?*T` may. The checks below are the ones
-//! this program wrote, and nothing else is emitted for the difference.
+//! `*T` never holds `none` and `?*T` may. The checks below are the ones this
+//! program wrote, and nothing else is emitted for the difference.
 
 import anti.io;
 import anti.lang;

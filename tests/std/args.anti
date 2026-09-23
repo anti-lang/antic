@@ -1,7 +1,7 @@
 //! A declared command line reads a flag, a value in three forms and the
-//! arguments that are no option, and writes its own help text. An
-//! unknown option and an option without its value each fail with their
-//! code, and `try` forwards the error of `parse`.
+//! arguments that are no option, and writes its own help text. An unknown
+//! option and an option without its value each fail with their code, and `try`
+//! forwards the error of `parse`.
 import anti.args;
 import anti.io;
 import anti.lang;

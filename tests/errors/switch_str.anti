@@ -1,5 +1,5 @@
-//! The arms of a `switch` on a `str` are constants of type `str`, each
-//! value at most once.
+//! The arms of a `switch` on a `str` are constants of type `str`, each value at
+//! most once.
 
 import anti.text;
 

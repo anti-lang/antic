@@ -1,14 +1,14 @@
 //! Command-line options declared once and read by name.
 //!
-//! A program declares its options, parses the arguments of `main` and
-//! asks for each one by its long name. The help text comes from the same
-//! declarations, so it never falls behind them.
+//! A program declares its options, parses the arguments of `main` and asks for
+//! each one by its long name. The help text comes from the same declarations,
+//! so it never falls behind them.
 //!
-//! An option has a long name and one letter. A flag stands for itself.
-//! An option that takes a value reads `--name value`, `--name=value` or
-//! `-n value`. A bare `--` ends the options, and every argument after it
-//! is a positional one, as is any argument that does not start with `-`.
-//! `--help` and `-h` are declared for every parser.
+//! An option has a long name and one letter. A flag stands for itself. An
+//! option that takes a value reads `--name value`, `--name=value` or `-n
+//! value`. A bare `--` ends the options, and every argument after it is a
+//! positional one, as is any argument that does not start with `-`. `--help`
+//! and `-h` are declared for every parser.
 
 import anti.lang;
 import anti.text;
@@ -40,10 +40,12 @@ pub class Parser
 	/// A parser for `program`, which `about` describes in one line.
 	pub fn new(program: str, about: str) -> Parser
 	{
-		let p = Parser { program: program, about: about,
+		let p = Parser {
+			program: program, about: about,
 			options: []Option { ptr: none, len: 0 }, count: 0,
 			rest: []str { ptr: none, len: 0 }, rest_count: 0,
-			said: text.Builder.new() };
+			said: text.Builder.new()
+		};
 		p.flag("help", 0x68, "write this text and stop");
 		return p;
 	}
@@ -58,18 +60,18 @@ pub class Parser
 
 	/// Declare an option that takes a value.
 	///
-	/// `fallback` is the value of the option when the command line
-	/// leaves it out.
+	/// `fallback` is the value of the option when the command line leaves it
+	/// out.
 	pub fn value(self, name: str, letter: byte, help: str, fallback: str)
 	{
 		self.declare(name, letter, help, true, fallback);
 	}
 
-	/// Read `argv` as the command line, from its second entry on, which
-	/// may fail.
+	/// Read `argv` as the command line, from its second entry on, which may
+	/// fail.
 	///
-	/// An unknown option fails with an error of code 1, and an option
-	/// that takes a value and has none with code 2.
+	/// An unknown option fails with an error of code 1, and an option that
+	/// takes a value and has none with code 2.
 	pub fn parse(self, argv: []str) may fail
 	{
 		let only_rest = false;
@@ -179,8 +181,8 @@ pub class Parser
 
 	/// The message `head` and `tail` spell, kept by the parser.
 	///
-	/// An error of `parse` points its message here, so the parser lives
-	/// as long as the error the program reads.
+	/// An error of `parse` points its message here, so the parser lives as long
+	/// as the error the program reads.
 	fn say(self, head: str, tail: str) -> str
 	{
 		self.said.clear();
@@ -219,8 +221,8 @@ pub class Parser
 		return -1;
 	}
 
-	/// Read the option at `i` of `argv` and give the number of entries
-	/// it took, which may fail.
+	/// Read the option at `i` of `argv` and give the number of entries it took,
+	/// which may fail.
 	fn read_option(self, arg: str, argv: []str, i: int) -> int may fail
 	{
 		let body = text.slice(arg, 1, arg.len);
@@ -269,8 +271,10 @@ pub class Parser
 		fallback: str)
 	{
 		self.reserve(self.count + 1);
-		self.options[self.count] = Option { name: name, letter: letter,
-			help: help, takes: takes, given: false, value: fallback };
+		self.options[self.count] = Option {
+			name: name, letter: letter,
+			help: help, takes: takes, given: false, value: fallback
+		};
 		self.count = self.count + 1;
 	}
 

@@ -1,5 +1,5 @@
-//! A library of shared state: a struct that holds a Mutex, and functions
-//! that make, drain and merge channels.
+//! A library of shared state: a struct that holds a Mutex, and functions that
+//! make, drain and merge channels.
 
 /// A count that threads share under its mutex.
 pub struct Tally

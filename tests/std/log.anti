@@ -1,7 +1,7 @@
 //! A logger reads its level, its format and its sink from the file that
-//! `ANTI_LOGGER` names. It drops what its level drops and writes a text
-//! line and a JSON line. A file sink fails where no file opens, and `try`
-//! forwards its error.
+//! `ANTI_LOGGER` names. It drops what its level drops and writes a text line
+//! and a JSON line. A file sink fails where no file opens, and `try` forwards
+//! its error.
 import anti.io;
 import anti.json;
 import anti.lang;

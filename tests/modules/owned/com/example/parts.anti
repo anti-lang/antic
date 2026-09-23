@@ -1,5 +1,5 @@
-//! Classes that own memory, which the test `owned_modules` holds and
-//! extends in a program. Each prints when it is destroyed.
+//! Classes that own memory, which the test `owned_modules` holds and extends in
+//! a program. Each prints when it is destroyed.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

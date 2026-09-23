@@ -1,7 +1,7 @@
-//! A call on a class reached through a pointer goes through the table of
-//! the object, so the concrete class decides which body runs. A call on a
-//! value knows its class and goes direct. An abstract class has no value
-//! of its own and appears only behind a pointer.
+//! A call on a class reached through a pointer goes through the table of the
+//! object, so the concrete class decides which body runs. A call on a value
+//! knows its class and goes direct. An abstract class has no value of its own
+//! and appears only behind a pointer.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

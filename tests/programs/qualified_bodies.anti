@@ -1,8 +1,8 @@
-//! Qualified bodies. Two bodies of one name fill the tables of two
-//! interfaces whose signatures differ, and an unqualified body beside a
-//! qualified one fills every table of its name that no qualified body
-//! fills. A call through each interface pointer reaches the body of that
-//! table, and a call on the class reaches the unqualified body.
+//! Qualified bodies. Two bodies of one name fill the tables of two interfaces
+//! whose signatures differ, and an unqualified body beside a qualified one
+//! fills every table of its name that no qualified body fills. A call through
+//! each interface pointer reaches the body of that table, and a call on the
+//! class reaches the unqualified body.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class Drawable

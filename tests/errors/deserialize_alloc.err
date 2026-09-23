@@ -1,2 +1,2 @@
-deserialize_alloc.anti:9:10: error: `deserialize` takes 2 arguments, found 1
-deserialize_alloc.anti:10:35: error: expected `*Allocator`, found `*int`
+deserialize_alloc.anti:8:10: error: `deserialize` takes 2 arguments, found 1
+deserialize_alloc.anti:9:35: error: expected `*Allocator`, found `*int`

@@ -1,7 +1,7 @@
-//! `switch` on a `str` compares the value with each arm in the order of
-//! the text, through `text.equal`, and runs the first arm that matches.
-//! The value is computed once, an arm may be a constant, and an arm may
-//! end in `fallthrough;` as on an integer.
+//! `switch` on a `str` compares the value with each arm in the order of the
+//! text, through `text.equal`, and runs the first arm that matches. The value
+//! is computed once, an arm may be a constant, and an arm may end in
+//! `fallthrough;` as on an integer.
 
 import anti.text;
 

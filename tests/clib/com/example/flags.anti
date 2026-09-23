@@ -1,6 +1,6 @@
-//! A library for C whose signatures name Flags. Flags crosses as the
-//! struct of four bools that the header writes for it, by value, as a
-//! parameter, a result and a field.
+//! A library for C whose signatures name Flags. Flags crosses as the struct of
+//! four bools that the header writes for it, by value, as a parameter, a result
+//! and a field.
 
 /// The flags of a sum of two words and the carry of an earlier sum.
 export fn flags_carry(a: u64, b: u64, f: Flags) -> Flags

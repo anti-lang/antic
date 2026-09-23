@@ -1,6 +1,6 @@
-//! A class implements two interfaces. Each sub-object carries its own
-//! table, whose entries are thunks into the class's own functions, so a
-//! call through an interface pointer and a direct call reach one body.
+//! A class implements two interfaces. Each sub-object carries its own table,
+//! whose entries are thunks into the class's own functions, so a call through
+//! an interface pointer and a direct call reach one body.
 import anti.io;
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;

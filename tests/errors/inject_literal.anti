@@ -1,5 +1,5 @@
-//! The provider of an interface fills an `inject` field, so a literal
-//! that names it is refused and one that leaves it out is complete.
+//! The provider of an interface fills an `inject` field, so a literal that
+//! names it is refused and one that leaves it out is complete.
 abstract class Logger
 {
 	abstract fn say(self);

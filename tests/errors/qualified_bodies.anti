@@ -1,5 +1,5 @@
-//! The forms of qualified bodies that stay refused, and the tables a
-//! class leaves empty when a qualified body fills another one.
+//! The forms of qualified bodies that stay refused, and the tables a class
+//! leaves empty when a qualified body fills another one.
 
 abstract class Drawable
 {

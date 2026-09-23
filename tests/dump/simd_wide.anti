@@ -1,6 +1,6 @@
-//! One add of a simd struct of 32 bytes. The back end maps it to the
-//! native width: one instruction on registers of 32 bytes at x86-64-v3,
-//! and two on the 16 bytes of every other level and of ARM64.
+//! One add of a simd struct of 32 bytes. The back end maps it to the native
+//! width: one instruction on registers of 32 bytes at x86-64-v3, and two on the
+//! 16 bytes of every other level and of ARM64.
 
 export simd struct F32x8 { a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32 }
 

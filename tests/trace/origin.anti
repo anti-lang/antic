@@ -1,8 +1,8 @@
-//! `fail` writes the position of its statement into the error it gives,
-//! when the error has none yet, and captures the frames there when
-//! backtraces are on. The first `fail` wins, so an error that `try`
-//! forwards or a handler fails again keeps its origin. `e.text()` names
-//! the position, then the cause chain, then the trace.
+//! `fail` writes the position of its statement into the error it gives, when
+//! the error has none yet, and captures the frames there when backtraces are
+//! on. The first `fail` wins, so an error that `try` forwards or a handler
+//! fails again keeps its origin. `e.text()` names the position, then the cause
+//! chain, then the trace.
 
 import anti.lang;
 
@@ -41,9 +41,9 @@ fn show(e: *lang.Error)
 {
 	let at = e.at;
 	printf("at %.*s:%d:%d %.*s %.*s\n".ptr, at.file.len as c_int,
-	       at.file.ptr, at.line as c_int, at.column as c_int,
-	       at.function.len as c_int, at.function.ptr, at.module.len as c_int,
-	       at.module.ptr);
+		at.file.ptr, at.line as c_int, at.column as c_int,
+		at.function.len as c_int, at.function.ptr, at.module.len as c_int,
+		at.module.ptr);
 	let t = e.text();
 	printf("%.*s\n".ptr, t.len as c_int, t.ptr);
 }

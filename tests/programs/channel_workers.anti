@@ -1,9 +1,9 @@
-//! Workers that wait on each other through channels smaller than what
-//! passes through them. A dispatched consumer takes a thousand values
-//! from a channel of four while `main` sends them, and `main` selects
-//! over two channels of two while dispatched producers fill them. `send`
-//! blocks while a channel is full and `recv` while it is empty. The test
-//! runs with --anti.threads=4, so the pool holds a thread for each worker.
+//! Workers that wait on each other through channels smaller than what passes
+//! through them. A dispatched consumer takes a thousand values from a channel
+//! of four while `main` sends them, and `main` selects over two channels of two
+//! while dispatched producers fill them. `send` blocks while a channel is full
+//! and `recv` while it is empty. The test runs with --anti.threads=4, so the
+//! pool holds a thread for each worker.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

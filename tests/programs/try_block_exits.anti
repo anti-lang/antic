@@ -1,6 +1,6 @@
-//! The first error in a `try` block leaves every block between the call
-//! and the handler. Each runs its `undo` and `defer` statements on the
-//! way out, the innermost block first, before the handler runs.
+//! The first error in a `try` block leaves every block between the call and the
+//! handler. Each runs its `undo` and `defer` statements on the way out, the
+//! innermost block first, before the handler runs.
 
 import anti.lang;
 

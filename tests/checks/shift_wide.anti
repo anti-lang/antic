@@ -1,5 +1,5 @@
-//! A shift by the width of the type. Each target reads a different part
-//! of the count, so the value without the checks is not compared.
+//! A shift by the width of the type. Each target reads a different part of the
+//! count, so the value without the checks is not compared.
 
 fn opaque(n: int) -> int
 {

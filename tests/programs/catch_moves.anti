@@ -1,9 +1,8 @@
-//! A handler that passes the error it binds to an `own` parameter moves
-//! it there, and the handler leaves it alone on every exit after the
-//! move. `Error.wrap` takes its cause so. Each case runs under a leak
-//! check, the count of the errors alive, which `Counted` keeps. Each
-//! error prints its own delete, so a second delete shows as a second
-//! line.
+//! A handler that passes the error it binds to an `own` parameter moves it
+//! there, and the handler leaves it alone on every exit after the move.
+//! `Error.wrap` takes its cause so. Each case runs under a leak check, the
+//! count of the errors alive, which `Counted` keeps. Each error prints its own
+//! delete, so a second delete shows as a second line.
 
 import anti.lang;
 
@@ -79,8 +78,8 @@ fn by_yield() -> int
 	return v;
 }
 
-/// A move on one path. The other path deletes the error at the end of
-/// the handler.
+/// A move on one path. The other path deletes the error at the end of the
+/// handler.
 fn on_one_path(moves: bool) -> int
 {
 	let h = Holder { };

@@ -1,6 +1,6 @@
 //! A program that calls functions of another module and leaves out the
-//! parameters that have a default. The position a default `here` gives is
-//! the call in this file.
+//! parameters that have a default. The position a default `here` gives is the
+//! call in this file.
 
 import com.example.greeter;
 

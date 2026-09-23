@@ -1,6 +1,6 @@
-//! An object writes itself as JSON, a class writes its own members, and
-//! a member of a JSON object is read back by name. `unquote` fails on a
-//! text that is no JSON string, and `try` forwards its error.
+//! An object writes itself as JSON, a class writes its own members, and a
+//! member of a JSON object is read back by name. `unquote` fails on a text that
+//! is no JSON string, and `try` forwards its error.
 import anti.io;
 import anti.json;
 import anti.lang;

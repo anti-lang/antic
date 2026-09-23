@@ -1,13 +1,13 @@
-//! A call on a class pointer reads the entry of a table, because the
-//! object may be of a class below the static type. A `final class` and
-//! a `final fn` have no class below them, so both call directly. The
-//! two modes lower the same calls, because lowering never makes a call
-//! direct by a scan of the classes one module can see.
+//! A call on a class pointer reads the entry of a table, because the object may
+//! be of a class below the static type. A `final class` and a `final fn` have
+//! no class below them, so both call directly. The two modes lower the same
+//! calls, because lowering never makes a call direct by a scan of the classes
+//! one module can see.
 //!
-//! The pass over the whole program runs after lowering. In release mode
-//! it calls `Dog.speak` directly, because every table a `*Speaker` may
-//! point at holds it. `Base.value` stays a call through the table, since
-//! `Derived` replaces it. Dev mode keeps every call through a table.
+//! The pass over the whole program runs after lowering. In release mode it
+//! calls `Dog.speak` directly, because every table a `*Speaker` may point at
+//! holds it. `Base.value` stays a call through the table, since `Derived`
+//! replaces it. Dev mode keeps every call through a table.
 
 final class Only
 {

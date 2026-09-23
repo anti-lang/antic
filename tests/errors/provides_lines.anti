@@ -1,6 +1,6 @@
-//! A `provides` line names an interface and a complete class of the
-//! module that inherits it or implements it. Anything else is refused,
-//! and one interface is provided once.
+//! A `provides` line names an interface and a complete class of the module that
+//! inherits it or implements it. Anything else is refused, and one interface is
+//! provided once.
 abstract class Greeter
 {
 	abstract fn words(self) -> str;

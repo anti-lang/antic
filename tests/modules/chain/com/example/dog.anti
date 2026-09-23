@@ -1,5 +1,5 @@
-//! The middle of a chain of classes over three modules. It inherits a
-//! class of `com.example.animal`, and a program inherits it in turn.
+//! The middle of a chain of classes over three modules. It inherits a class of
+//! `com.example.animal`, and a program inherits it in turn.
 
 import com.example.animal;
 

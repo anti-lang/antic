@@ -1,10 +1,10 @@
 //! `let (result, flags) = e;` gives the wrapped result of one arithmetic
-//! operation and its four flags, and never traps. `carry` is the carry
-//! out of `+`, the borrow of `-` and the last bit a shift moved out, and
-//! for `*` it tells that the unsigned product does not fit. `overflow`
-//! tells that the signed result does not fit. `zero` and `negative` read
-//! the wrapped result. Each operation runs on values that the program
-//! reads at run time, at several widths.
+//! operation and its four flags, and never traps. `carry` is the carry out of
+//! `+`, the borrow of `-` and the last bit a shift moved out, and for `*` it
+//! tells that the unsigned product does not fit. `overflow` tells that the
+//! signed result does not fit. `zero` and `negative` read the wrapped result.
+//! Each operation runs on values that the program reads at run time, at several
+//! widths.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -22,15 +22,15 @@ fn uopaque(n: u64) -> u64
 fn show(name: str, r: int, f: Flags)
 {
 	printf("%s %lld o%d c%d z%d n%d\n".ptr, name.ptr, r,
-	       f.overflow as c_int, f.carry as c_int, f.zero as c_int,
-	       f.negative as c_int);
+		f.overflow as c_int, f.carry as c_int, f.zero as c_int,
+		f.negative as c_int);
 }
 
 fn ushow(name: str, r: u64, f: Flags)
 {
 	printf("%s %llu o%d c%d z%d n%d\n".ptr, name.ptr, r,
-	       f.overflow as c_int, f.carry as c_int, f.zero as c_int,
-	       f.negative as c_int);
+		f.overflow as c_int, f.carry as c_int, f.zero as c_int,
+		f.negative as c_int);
 }
 
 fn sums()
@@ -176,8 +176,7 @@ fn add_into(a: u64, b: u64, f: Flags) -> Flags
 	return f;
 }
 
-/// The function reads the carry alone, so the other three are never
-/// computed.
+/// The function reads the carry alone, so the other three are never computed.
 fn carry_only(a: u64, b: u64) -> u64
 {
 	let (sum, f) = a + b;
@@ -186,13 +185,15 @@ fn carry_only(a: u64, b: u64) -> u64
 
 fn main() -> int
 {
-	let set = Flags { overflow: false, carry: true, zero: false,
-	                  negative: false };
+	let set = Flags {
+		overflow: false, carry: true, zero: false,
+		negative: false
+	};
 	ushow("add_into max + 0 + 1", 0, add_into(uopaque(18446744073709551615),
-	                                          uopaque(0), set));
+		uopaque(0), set));
 	printf("carry_only %llu %llu\n".ptr,
-	       carry_only(uopaque(18446744073709551615), uopaque(2)),
-	       carry_only(uopaque(1), uopaque(2)));
+		carry_only(uopaque(18446744073709551615), uopaque(2)),
+		carry_only(uopaque(1), uopaque(2)));
 	sums();
 	differences();
 	products();

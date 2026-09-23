@@ -1,6 +1,5 @@
-//! A list and two maps hold objects. Anti has no generics, so a
-//! collection holds the root class and the program casts what it takes
-//! out.
+//! A list and two maps hold objects. Anti has no generics, so a collection
+//! holds the root class and the program casts what it takes out.
 import anti.collection;
 import anti.io;
 

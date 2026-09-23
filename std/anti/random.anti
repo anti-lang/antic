@@ -1,21 +1,20 @@
 //! A seedable source of pseudorandom numbers.
 //!
-//! `Random` is a class, so a program holds one per thread or one per
-//! task and never shares a hidden global. The generator is xoshiro256**,
-//! which passes the usual statistical tests and needs eight words of
-//! state. It is not a cryptographic generator, and `anti.crypto` will
-//! hold one of those.
+//! `Random` is a class, so a program holds one per thread or one per task and
+//! never shares a hidden global. The generator is xoshiro256**, which passes
+//! the usual statistical tests and needs eight words of state. It is not a
+//! cryptographic generator, and `anti.crypto` will hold one of those.
 //!
-//! `Source` is the standard interface. It draws everything from `next`,
-//! so a fake that counts out a list of numbers makes a test
-//! deterministic. `SharedRandom` is the default, one generator of the
-//! program seeded from the wall clock.
+//! `Source` is the standard interface. It draws everything from `next`, so a
+//! fake that counts out a list of numbers makes a test deterministic.
+//! `SharedRandom` is the default, one generator of the program seeded from the
+//! wall clock.
 
 import anti.lang;
 import anti.time;
 
-/// A stream of pseudorandom numbers, which a class takes so that a test
-/// can count out the numbers it draws.
+/// A stream of pseudorandom numbers, which a class takes so that a test can
+/// count out the numbers it draws.
 pub abstract class Source
 {
 	/// The next number, which uses the whole range of `u64`.
@@ -23,8 +22,8 @@ pub abstract class Source
 
 	/// The next number from 0 up to but not including `limit`.
 	///
-	/// A `limit` of 0 gives 0. The result is unbiased, because a draw
-	/// that falls in the short tail of the range is taken again.
+	/// A `limit` of 0 gives 0. The result is unbiased, because a draw that
+	/// falls in the short tail of the range is taken again.
 	pub fn below(self, limit: u64) -> u64
 	{
 		if limit == 0 {
@@ -60,8 +59,8 @@ pub abstract class Source
 		return (self.next() >> 11) as f64 * 0.00000000000000011102230246251565;
 	}
 
-	/// The provider the link takes where the build names none, which is
-	/// the one generator of the program.
+	/// The provider the link takes where the build names none, which is the one
+	/// generator of the program.
 	pub fn default() -> *Source
 	{
 		return SharedRandom.get();
@@ -131,10 +130,10 @@ fn rotate(x: u64, n: u64) -> u64
 
 /// The one generator of the program, which is the default of `Source`.
 ///
-/// Its seed is the wall clock at the first draw, so two runs of a
-/// program draw two sequences. A program that wants one sequence again
-/// makes its own `Random` from a seed it holds. Every draw takes a
-/// mutex, because one generator serves every thread.
+/// Its seed is the wall clock at the first draw, so two runs of a program draw
+/// two sequences. A program that wants one sequence again makes its own
+/// `Random` from a seed it holds. Every draw takes a mutex, because one
+/// generator serves every thread.
 pub singleton class SharedRandom inherits Random
 {
 	lock: Mutex,

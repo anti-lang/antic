@@ -1,6 +1,5 @@
-//! `inject` needs a pointer to an abstract class. A nullable pointer, a
-//! pointer to a complete class, a default beside it and `own` are each
-//! refused.
+//! `inject` needs a pointer to an abstract class. A nullable pointer, a pointer
+//! to a complete class, a default beside it and `own` are each refused.
 abstract class Logger
 {
 	abstract fn say(self);

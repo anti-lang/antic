@@ -1,7 +1,7 @@
-//! The wrapping operators `+% -% *% <<%` give the result modulo 2^N in
-//! every build and never trap. Each one runs on values that the program
-//! reads at run time and again on constants. `<<%` gives 0 for a count
-//! at or above the width, and a negative count counts as one above it.
+//! The wrapping operators `+% -% *% <<%` give the result modulo 2^N in every
+//! build and never trap. Each one runs on values that the program reads at run
+//! time and again on constants. `<<%` gives 0 for a count at or above the
+//! width, and a negative count counts as one above it.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

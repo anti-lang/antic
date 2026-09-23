@@ -1,6 +1,6 @@
-//! The functions of `text.Builder` that write a value into a field of a
-//! width, which an `f"..."` calls, called by a program with the defaults
-//! of their last parameters, and `take`, which hands the bytes over.
+//! The functions of `text.Builder` that write a value into a field of a width,
+//! which an `f"..."` calls, called by a program with the defaults of their last
+//! parameters, and `take`, which hands the bytes over.
 import anti.io;
 import anti.text;
 

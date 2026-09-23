@@ -1,6 +1,6 @@
-//! The runtime takes every `--anti.` argument before `main` sees the
-//! list and hands the rest on in their order. `--anti.inspect` and
-//! `--anti.help` end the program before this `main` runs at all.
+//! The runtime takes every `--anti.` argument before `main` sees the list and
+//! hands the rest on in their order. `--anti.inspect` and `--anti.help` end the
+//! program before this `main` runs at all.
 
 import anti.lang;
 

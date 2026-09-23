@@ -1,5 +1,5 @@
-//! A `switch` on a `str` calls `anti.text.equal`, which this module does
-//! not import.
+//! A `switch` on a `str` calls `anti.text.equal`, which this module does not
+//! import.
 
 fn code(word: str) -> int
 {

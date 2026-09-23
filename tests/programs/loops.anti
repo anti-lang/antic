@@ -1,6 +1,6 @@
-//! The loop forms of the core: a range with and without a binding, a
-//! slice by value and by pointer, and `by` with a positive and a
-//! negative step. A negative step walks the same values backwards.
+//! The loop forms of the core: a range with and without a binding, a slice by
+//! value and by pointer, and `by` with a positive and a negative step. A
+//! negative step walks the same values backwards.
 import anti.io;
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;

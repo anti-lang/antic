@@ -1,7 +1,7 @@
 //! `rt.configure(path)` as the first statement of `main` names the
 //! configuration file of the program. The file this test passes holds
-//! `backtrace = true`, so the `fail` after the call carries the frames
-//! of its trace in a release build, which is off without a file.
+//! `backtrace = true`, so the `fail` after the call carries the frames of its
+//! trace in a release build, which is off without a file.
 
 import anti.lang;
 import anti.runtime as rt;

@@ -1,6 +1,5 @@
-//! A `for` over an array or a slice of an aggregate copies the element
-//! into a place of its own, so a body that reads the sequence again sees
-//! what it held.
+//! A `for` over an array or a slice of an aggregate copies the element into a
+//! place of its own, so a body that reads the sequence again sees what it held.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

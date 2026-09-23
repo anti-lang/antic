@@ -1,6 +1,6 @@
-//! A class that wraps a C struct from a binding. The class owns the
-//! handle the C library gave it, its `destruct` body hands the handle back,
-//! and `delete` runs that body before it frees the object.
+//! A class that wraps a C struct from a binding. The class owns the handle the
+//! C library gave it, its `destruct` body hands the handle back, and `delete`
+//! runs that body before it frees the object.
 
 extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
 extern fn fclose(file: ?*byte) -> c_int;

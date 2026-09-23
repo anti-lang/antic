@@ -1,5 +1,5 @@
-//! The example of docs/anti-object-model.md, which uses every part
-//! of the object model at once.
+//! The example of docs/anti-object-model.md, which uses every part of the
+//! object model at once.
 import anti.io;
 import anti.text;
 import anti.lang;

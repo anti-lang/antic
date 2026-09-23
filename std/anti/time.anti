@@ -1,12 +1,12 @@
 //! Clocks and durations.
 //!
 //! A `Duration` is a count of nanoseconds. The monotonic clock measures a
-//! duration and never moves backwards. The wall clock gives a date and may
-//! move either way when the machine corrects itself.
+//! duration and never moves backwards. The wall clock gives a date and may move
+//! either way when the machine corrects itself.
 //!
-//! `Clock` is the standard interface over the three readings, and
-//! `SystemClock` is its default. A class that takes a `*Clock` runs
-//! under a fake clock in a test.
+//! `Clock` is the standard interface over the three readings, and `SystemClock`
+//! is its default. A class that takes a `*Clock` runs under a fake clock in a
+//! test.
 
 extern fn anti_rt_monotonic() -> int;
 extern fn anti_rt_wall() -> int;
@@ -67,8 +67,8 @@ pub fn between(a: int, b: int) -> Duration
 	return Duration { nanoseconds: a - b };
 }
 
-/// A reading of the monotonic clock, in nanoseconds. Its zero has no
-/// meaning, so two readings are only ever subtracted.
+/// A reading of the monotonic clock, in nanoseconds. Its zero has no meaning,
+/// so two readings are only ever subtracted.
 pub fn now() -> int
 {
 	return anti_rt_monotonic();
@@ -86,11 +86,11 @@ pub fn sleep(d: Duration)
 	anti_rt_sleep(d.nanoseconds);
 }
 
-/// The time a program reads, which a class takes so that a test can
-/// hold it still.
+/// The time a program reads, which a class takes so that a test can hold it
+/// still.
 ///
-/// `SystemClock` is the default. A fake gives a reading the test picked
-/// and returns from `sleep` at once.
+/// `SystemClock` is the default. A fake gives a reading the test picked and
+/// returns from `sleep` at once.
 pub abstract class Clock
 {
 	/// A reading of the monotonic clock, in nanoseconds. Its zero has no
@@ -109,8 +109,8 @@ pub abstract class Clock
 		return between(self.now(), reading);
 	}
 
-	/// The provider the link takes where the build names none, which is
-	/// the clock of the machine.
+	/// The provider the link takes where the build names none, which is the
+	/// clock of the machine.
 	pub fn default() -> *Clock
 	{
 		return SystemClock.get();

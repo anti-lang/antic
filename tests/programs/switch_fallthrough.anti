@@ -1,7 +1,7 @@
-//! `fallthrough;` as the last statement of an arm enters the next arm's
-//! body without testing its values. The next arm is the one the text
-//! writes next, `else` included. The arm's `defer` runs before the next
-//! body, and a `construct` counts what the next arm assigns.
+//! `fallthrough;` as the last statement of an arm enters the next arm's body
+//! without testing its values. The next arm is the one the text writes next,
+//! `else` included. The arm's `defer` runs before the next body, and a
+//! `construct` counts what the next arm assigns.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

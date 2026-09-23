@@ -1,7 +1,7 @@
-//! `x in lo..hi` is `x >= lo && x < hi`. The value is computed once, the
-//! high bound only when the value reaches the low one, and the form is a
-//! constant when its operands are. A type with an `lt` operator takes it
-//! as the two comparisons do.
+//! `x in lo..hi` is `x >= lo && x < hi`. The value is computed once, the high
+//! bound only when the value reaches the low one, and the form is a constant
+//! when its operands are. A type with an `lt` operator takes it as the two
+//! comparisons do.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

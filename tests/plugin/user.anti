@@ -1,5 +1,5 @@
-//! A program whose class injects the interface, whose provider the
-//! build takes from a library.
+//! A program whose class injects the interface, whose provider the build takes
+//! from a library.
 
 import anti.io;
 import net.example.greet;

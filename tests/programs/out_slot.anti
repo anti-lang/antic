@@ -1,15 +1,15 @@
 //! The out pointer the compiler supplies for `let n = f(args) catch e { }`
-//! points at storage that holds no value yet, so its table is zero before
-//! the call. The frame the binding sits in is dirtied first, so the bytes
-//! a previous call left there stand where the binding goes.
+//! points at storage that holds no value yet, so its table is zero before the
+//! call. The frame the binding sits in is dirtied first, so the bytes a
+//! previous call left there stand where the binding goes.
 //!
-//! `Box.make` may fail, and a `may fail` function builds its result in
-//! that storage without reading it, so the output no longer shows the
-//! zero table. It shows the teardown of the binding.
+//! `Box.make` may fail, and a `may fail` function builds its result in that
+//! storage without reading it, so the output no longer shows the zero table. It
+//! shows the teardown of the binding.
 //!
-//! The binding is a local of its type and is torn down at the end of its
-//! block. On the error path the callee writes nothing, the handler leaves
-//! the block, and the zero table it leaves behind reaches no teardown.
+//! The binding is a local of its type and is torn down at the end of its block.
+//! On the error path the callee writes nothing, the handler leaves the block,
+//! and the zero table it leaves behind reaches no teardown.
 
 import anti.lang;
 

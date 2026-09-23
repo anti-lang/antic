@@ -1,7 +1,7 @@
-//! A local array whose element class declares `destruct` or has `own`
-//! fields destroys its elements at the end of its block, last to first.
-//! An array of such arrays does the same over all its elements. An
-//! element frees what it owns. An array of plain values is left alone.
+//! A local array whose element class declares `destruct` or has `own` fields
+//! destroys its elements at the end of its block, last to first. An array of
+//! such arrays does the same over all its elements. An element frees what it
+//! owns. An array of plain values is left alone.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

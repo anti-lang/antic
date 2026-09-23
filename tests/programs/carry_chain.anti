@@ -1,8 +1,8 @@
-//! A carry chain across the four words of a 256-bit number, lowest word
-//! first. Each word takes the carry of the word below it, which is `adc`
-//! on x86_64 and `adcs` on ARM64, and a difference takes the borrow, which
-//! is `sbb` and `sbcs`. The flags of the top word tell whether the whole
-//! number carried out and whether it overflowed as a signed number.
+//! A carry chain across the four words of a 256-bit number, lowest word first.
+//! Each word takes the carry of the word below it, which is `adc` on x86_64 and
+//! `adcs` on ARM64, and a difference takes the borrow, which is `sbb` and
+//! `sbcs`. The flags of the top word tell whether the whole number carried out
+//! and whether it overflowed as a signed number.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -19,8 +19,8 @@ fn number(w3: u64, w2: u64, w1: u64, w0: u64) -> Wide
 fn show(name: str, v: Wide, f: Flags)
 {
 	printf("%s %016llx %016llx %016llx %016llx carry %d overflow %d\n".ptr,
-	       name.ptr, v.w[3], v.w[2], v.w[1], v.w[0], f.carry as c_int,
-	       f.overflow as c_int);
+		name.ptr, v.w[3], v.w[2], v.w[1], v.w[0], f.carry as c_int,
+		f.overflow as c_int);
 }
 
 /// The chain written out, word by word, with one flags name.
@@ -42,8 +42,8 @@ fn subtract(a: Wide, b: Wide) -> (Wide, Flags)
 	return (number(w3, w2, w1, w0), f);
 }
 
-/// The same chain as a loop. The flags name of the loop body is the one
-/// of the function, which each word assigns.
+/// The same chain as a loop. The flags name of the loop body is the one of the
+/// function, which each word assigns.
 fn add_loop(a: Wide, b: Wide) -> (Wide, Flags)
 {
 	let sum = number(0, 0, 0, 0);

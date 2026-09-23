@@ -1,8 +1,8 @@
-//! `may fail` and `fail`. A function declared `may fail` returns `?*Error`
-//! and writes what it computed through an out pointer, which is the
-//! convention a program used to write by hand. `fail e;` and `fail "text";`
-//! leave on the error channel, `try` forwards inside another `may fail`
-//! function, and `undo` runs on the fail path and not on `return`.
+//! `may fail` and `fail`. A function declared `may fail` returns `?*Error` and
+//! writes what it computed through an out pointer, which is the convention a
+//! program used to write by hand. `fail e;` and `fail "text";` leave on the
+//! error channel, `try` forwards inside another `may fail` function, and `undo`
+//! runs on the fail path and not on `return`.
 
 import anti.lang;
 
@@ -35,8 +35,8 @@ fn ensure_even(n: int) may fail
 	printf("even %d\n".ptr, n as c_int);
 }
 
-/// `undo` runs in reverse order of declaration, before the `defer` of the
-/// same block, and only when the block leaves through an error.
+/// `undo` runs in reverse order of declaration, before the `defer` of the same
+/// block, and only when the block leaves through an error.
 fn guarded(n: int) -> int may fail
 {
 	undo printf("undo first\n".ptr);
@@ -58,8 +58,8 @@ fn nested(n: int) -> int may fail
 	return n;
 }
 
-/// `try` forwards the error of a call, and the error a handler binds is
-/// handed on with `fail`.
+/// `try` forwards the error of a call, and the error a handler binds is handed
+/// on with `fail`.
 fn forwarded(n: int) -> int may fail
 {
 	let p = split(n) catch e {
@@ -75,7 +75,7 @@ fn main() -> int
 	printf("h %d\n".ptr, h as c_int);
 	let odd = halve(7) catch e {
 		printf("odd %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
-		       e.message.ptr);
+			e.message.ptr);
 		yield -1;
 	};
 	printf("odd %d\n".ptr, odd as c_int);
@@ -119,7 +119,7 @@ fn main() -> int
 		printf("unreached %d\n".ptr, b as c_int);
 	} catch e {
 		printf("block caught %.*s\n".ptr, e.message.len as c_int,
-		       e.message.ptr);
+			e.message.ptr);
 	}
 	return 0;
 }

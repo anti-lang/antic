@@ -1,5 +1,5 @@
-//! A `may fail` function converts to `fn(A) -> R may fail` alone, and a
-//! call through a value of that type must handle the error.
+//! A `may fail` function converts to `fn(A) -> R may fail` alone, and a call
+//! through a value of that type must handle the error.
 
 import anti.lang;
 

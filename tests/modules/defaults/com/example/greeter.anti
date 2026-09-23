@@ -1,6 +1,6 @@
-//! Functions whose parameters have default values. The library file
-//! carries each default, so a call from another module leaves them out,
-//! and `here` is the position of that call.
+//! Functions whose parameters have default values. The library file carries
+//! each default, so a call from another module leaves them out, and `here` is
+//! the position of that call.
 
 import anti.lang;
 
@@ -12,8 +12,8 @@ pub fn greet(name: str, times: int = 2, at: lang.SourceLocation = here)
 	let i = 0;
 	while i < times do {
 		printf("hello %.*s from %.*s:%d %.*s\n".ptr, name.len as c_int,
-		       name.ptr, at.file.len as c_int, at.file.ptr, at.line as c_int,
-		       at.function.len as c_int, at.function.ptr);
+			name.ptr, at.file.len as c_int, at.file.ptr, at.line as c_int,
+			at.function.len as c_int, at.function.ptr);
 		i += 1;
 	}
 }

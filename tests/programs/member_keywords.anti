@@ -1,9 +1,8 @@
-//! `alloc` and `free` name a function of a class and follow `.`, which
-//! is what `anti.mem.Allocator` needs. Each is declared abstract in a
-//! base, filled by a `concrete fn`, one of them qualified, and called
-//! through the table, directly by the class name and as a bound
-//! function. The built-in `alloc` and `free` work beside them, inside
-//! the functions of those names too.
+//! `alloc` and `free` name a function of a class and follow `.`, which is what
+//! `anti.mem.Allocator` needs. Each is declared abstract in a base, filled by a
+//! `concrete fn`, one of them qualified, and called through the table, directly
+//! by the class name and as a bound function. The built-in `alloc` and `free`
+//! work beside them, inside the functions of those names too.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

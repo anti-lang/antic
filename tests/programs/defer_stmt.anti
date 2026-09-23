@@ -1,6 +1,6 @@
-//! `defer` runs its statement at every exit of the enclosing block, in
-//! reverse order of declaration. A return, a break and a continue each
-//! leave through the statements they pass.
+//! `defer` runs its statement at every exit of the enclosing block, in reverse
+//! order of declaration. A return, a break and a continue each leave through
+//! the statements they pass.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

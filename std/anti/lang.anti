@@ -1,21 +1,20 @@
 //! The root of the standard library, which imports nothing.
 //!
-//! It holds the types the compiler knows by name, so every other module
-//! can name them without an import cycle. `Object` and `Job` belong to
-//! it as well, and the compiler declares both itself.
+//! It holds the types the compiler knows by name, so every other module can
+//! name them without an import cycle. `Object` and `Job` belong to it as well,
+//! and the compiler declares both itself.
 //!
-//! `Error` is the error convention of the language. A function that can
-//! fail is declared `-> R may fail`, or `may fail` when it has no result.
-//! It returns its result with `return`, and it leaves on the error channel
-//! with `fail e;` or with `fail "text";`, which builds an `Error` of code
-//! 0. Two answers come back as a tuple. The compiler gives it the ABI
-//! `?*Error f(args, R *out)`: `none` on success, with the result written
-//! through `out`. A binding writes that form by hand, and a call handles
-//! it the same way.
+//! `Error` is the error convention of the language. A function that can fail is
+//! declared `-> R may fail`, or `may fail` when it has no result. It returns
+//! its result with `return`, and it leaves on the error channel with `fail e;`
+//! or with `fail "text";`, which builds an `Error` of code 0. Two answers come
+//! back as a tuple. The compiler gives it the ABI `?*Error f(args, R *out)`:
+//! `none` on success, with the result written through `out`. A binding writes
+//! that form by hand, and a call handles it the same way.
 //!
-//! A function that cannot fail returns its value. A function whose only
-//! failure is "not present" returns `?*T` or `bool`. The error a handler
-//! binds is deleted when the handler exits, unless the handler returns it.
+//! A function that cannot fail returns its value. A function whose only failure
+//! is "not present" returns `?*T` or `bool`. The error a handler binds is
+//! deleted when the handler exits, unless the handler returns it.
 
 extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
 extern fn anti_rt_exit(status: c_int);
@@ -31,10 +30,9 @@ const TRACE_DEPTH: int = 64;
 
 /// A position in the source, which `here` gives.
 ///
-/// `file` is the path under the search root that holds the source, the
-/// one a failed check names. `function` is the full name of the function
-/// the position stands in, `module.Class.f`. A location that no `here`
-/// wrote has line 0.
+/// `file` is the path under the search root that holds the source, the one a
+/// failed check names. `function` is the full name of the function the position
+/// stands in, `module.Class.f`. A location that no `here` wrote has line 0.
 pub struct SourceLocation
 {
 	file: str,
@@ -46,10 +44,9 @@ pub struct SourceLocation
 
 /// One return address of a trace, as the capture took it.
 ///
-/// `module` is the path of the executable or the library the address
-/// lies in, `build_id` the build id of that module and `base` the
-/// address it was loaded at. Outside every module both texts are empty
-/// and the base is 0.
+/// `module` is the path of the executable or the library the address lies in,
+/// `build_id` the build id of that module and `base` the address it was loaded
+/// at. Outside every module both texts are empty and the base is 0.
 pub struct RawFrame
 {
 	address: u64,
@@ -60,9 +57,9 @@ pub struct RawFrame
 
 /// One frame of a trace with its names.
 ///
-/// `function` comes from the symbol table, which every build carries.
-/// `file` and `line` come from the line table of a `-g` build, and are
-/// empty and 0 without one.
+/// `function` comes from the symbol table, which every build carries. `file`
+/// and `line` come from the line table of a `-g` build, and are empty and 0
+/// without one.
 pub struct Frame
 {
 	address: u64,
@@ -71,12 +68,12 @@ pub struct Frame
 	line: int,
 }
 
-/// The return addresses of the calls that lead to a point of a program,
-/// the innermost first.
+/// The return addresses of the calls that lead to a point of a program, the
+/// innermost first.
 ///
-/// The capture walks the frames and names nothing. `symbolize` reads the
-/// names when a program asks for them, so a trace that nobody reads costs
-/// the walk alone.
+/// The capture walks the frames and names nothing. `symbolize` reads the names
+/// when a program asks for them, so a trace that nobody reads costs the walk
+/// alone.
 pub class StackTrace
 {
 	/// The frames as the capture took them, the innermost first.
@@ -116,9 +113,9 @@ pub class StackTrace
 	/// The raw form: one line per module, `module <n> <build id> <base>
 	/// <path>`, then one per frame, its address and `<n>+<offset>`.
 	///
-	/// A resolver matches the frames to the symbols of each module by the
-	/// build id. The text is formed at the first call, and the trace keeps
-	/// its bytes until it is deleted.
+	/// A resolver matches the frames to the symbols of each module by the build
+	/// id. The text is formed at the first call, and the trace keeps its bytes
+	/// until it is deleted.
 	pub fn text(self) -> str
 	{
 		let made = self.text_cache;
@@ -132,11 +129,11 @@ pub class StackTrace
 		return anti_rt_text_from_c(room);
 	}
 
-	/// The frames with their functions, and with their files and lines in
-	/// a `-g` build.
+	/// The frames with their functions, and with their files and lines in a
+	/// `-g` build.
 	///
-	/// The names are read at the first call, and the trace keeps them
-	/// until it is deleted.
+	/// The names are read at the first call, and the trace keeps them until it
+	/// is deleted.
 	pub fn symbolize(self) -> []Frame
 	{
 		if self.symbolized || self.frames.len == 0 {
@@ -163,9 +160,9 @@ pub class StackTrace
 
 /// A failure, with a code, a message and the error that caused it.
 ///
-/// The first `fail` of an error writes where it stands into `at`, and
-/// captures the frames there when backtraces are on. They are on in dev
-/// mode, and `--anti.backtrace` turns them on in a release build.
+/// The first `fail` of an error writes where it stands into `at`, and captures
+/// the frames there when backtraces are on. They are on in dev mode, and
+/// `--anti.backtrace` turns them on in a release build.
 pub class Error
 {
 	/// The code of the failure, which the caller may switch on.
@@ -184,8 +181,8 @@ pub class Error
 	},
 	/// The frames at the first `fail` when backtraces are on, or `none`.
 	own frames: ?*StackTrace = none,
-	/// The bytes `text` gave, ended by a NUL. `dup` leaves the copy
-	/// without them, and it formats its own.
+	/// The bytes `text` gave, ended by a NUL. `dup` leaves the copy without
+	/// them, and it formats its own.
 	transient text_cache: ?*byte = none,
 
 	/// An error with a code and a message and no cause.
@@ -194,8 +191,8 @@ pub class Error
 		return alloc Error { code: code, message: message, cause: none };
 	}
 
-	/// An error that wraps the one below it and takes it over. The error
-	/// a handler binds moves here, and the handler deletes it no longer.
+	/// An error that wraps the one below it and takes it over. The error a
+	/// handler binds moves here, and the handler deletes it no longer.
 	pub fn wrap(code: int, message: str, own cause: ?*Error) -> *Error
 	{
 		return alloc Error { code: code, message: message, cause: cause };
@@ -203,13 +200,12 @@ pub class Error
 
 	/// This error and every cause below it, in one text, and its trace.
 	///
-	/// Each error is `error N: message`, or the message alone when its
-	/// code is 0, after `file:line:column: ` when a `fail` gave it a
-	/// position. Every cause follows on a line of its own after
-	/// `  caused by: `, and the trace of this error follows the causes
-	/// when it has one. The text is formed at the first call, and the
-	/// error keeps its bytes until it is deleted. When the memory for them
-	/// runs out, the text is the message alone.
+	/// Each error is `error N: message`, or the message alone when its code is
+	/// 0, after `file:line:column: ` when a `fail` gave it a position. Every
+	/// cause follows on a line of its own after ` caused by: `, and the trace
+	/// of this error follows the causes when it has one. The text is formed at
+	/// the first call, and the error keeps its bytes until it is deleted. When
+	/// the memory for them runs out, the text is the message alone.
 	pub fn text(self) -> str
 	{
 		let made = self.text_cache;
@@ -283,9 +279,8 @@ pub class Error
 
 /// The error of a `?*T` that held `none` where a pointer was needed.
 ///
-/// `p catch fatal` and `p catch e { }` on a `?*T` give one of these. It
-/// is an `Error` like any other, so a handler that takes an `*Error`
-/// takes it too.
+/// `p catch fatal` and `p catch e { }` on a `?*T` give one of these. It is an
+/// `Error` like any other, so a handler that takes an `*Error` takes it too.
 pub class NoneDereference inherits Error
 {
 	/// The error a `catch` on a `none` pointer gives.
@@ -300,17 +295,17 @@ pub class NoneDereference inherits Error
 
 /// The nine hooks of `Object`, each taking the object they stand for.
 ///
-/// `Trace.install` stores one handler, and every hook site calls it
-/// before it dispatches the object's own hook. `leave` reverses the two,
-/// so the handler and the object's hook nest around the call.
+/// `Trace.install` stores one handler, and every hook site calls it before it
+/// dispatches the object's own hook. `leave` reverses the two, so the handler
+/// and the object's hook nest around the call.
 ///
-/// `created`, `destroyed`, `copied`, `dispatched` and `joined` are
-/// compiled into every build. `enter`, `leave` and `failed` need
-/// tracing, which the contextual `trace` asks for and `--trace` decides,
-/// and `changed` needs `--trace writes`. `--no-hooks` drops them all.
+/// `created`, `destroyed`, `copied`, `dispatched` and `joined` are compiled
+/// into every build. `enter`, `leave` and `failed` need tracing, which the
+/// contextual `trace` asks for and `--trace` decides, and `changed` needs
+/// `--trace writes`. `--no-hooks` drops them all.
 ///
-/// A handler fills every one of the nine. One it has nothing to say
-/// about is an empty body.
+/// A handler fills every one of the nine. One it has nothing to say about is an
+/// empty body.
 pub abstract class TraceHandler
 {
 	/// `o` was constructed.
@@ -338,9 +333,9 @@ pub class Trace
 {
 	/// Install `h`, or `none` to leave the hooks to the objects alone.
 	///
-	/// The handler stands in one atomic word, so a program replaces it
-	/// without a data race. It is not deleted here: the program owns it
-	/// and outlives its installation.
+	/// The handler stands in one atomic word, so a program replaces it without
+	/// a data race. It is not deleted here: the program owns it and outlives
+	/// its installation.
 	pub fn install(h: ?*TraceHandler)
 	{
 		anti_rt_trace_install(h);
@@ -370,8 +365,8 @@ fn line_length(origin: SourceLocation, code: int, message: str) -> int
 	return length;
 }
 
-/// Write one error of a chain at `at`, after its position when it has
-/// one, and give the index after it.
+/// Write one error of a chain at `at`, after its position when it has one, and
+/// give the index after it.
 fn put_line(room: *byte, at: int, origin: SourceLocation, code: int,
 	message: str) -> int
 {

@@ -1,6 +1,6 @@
-//! `self.super` is the base part of the object as a value. A call on it
-//! reaches the base's body directly, so a concrete function can add to
-//! what the function it replaces does.
+//! `self.super` is the base part of the object as a value. A call on it reaches
+//! the base's body directly, so a concrete function can add to what the
+//! function it replaces does.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

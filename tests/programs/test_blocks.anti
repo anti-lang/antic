@@ -1,7 +1,7 @@
-//! The `tests` and `fixtures` blocks are compiled only by `anti test`.
-//! Every other build drops them, so this program holds neither the
-//! functions they declare nor anything they name. The run prints what
-//! `main` prints and nothing of the blocks.
+//! The `tests` and `fixtures` blocks are compiled only by `anti test`. Every
+//! other build drops them, so this program holds neither the functions they
+//! declare nor anything they name. The run prints what `main` prints and
+//! nothing of the blocks.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

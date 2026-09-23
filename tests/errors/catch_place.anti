@@ -17,8 +17,8 @@ fn filled(p: *int) -> int
 	return n + *p;
 }
 
-/// A `catch` that guards a pointer binds the one it proved, and an
-/// assignment has no name for it.
+/// A `catch` that guards a pointer binds the one it proved, and an assignment
+/// has no name for it.
 fn guarded(q: ?*int) -> int
 {
 	let n = 0;

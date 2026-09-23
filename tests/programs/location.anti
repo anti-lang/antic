@@ -1,6 +1,6 @@
-//! `here` is the position it is written at, as an
-//! `anti.lang.SourceLocation`. As the default value of a parameter it is
-//! the position of the call, so a function reads the line of its caller.
+//! `here` is the position it is written at, as an `anti.lang.SourceLocation`.
+//! As the default value of a parameter it is the position of the call, so a
+//! function reads the line of its caller.
 
 import anti.lang;
 
@@ -10,9 +10,9 @@ extern fn printf(format: ?*byte, ...) -> c_int;
 fn put(label: str, at: lang.SourceLocation)
 {
 	printf("%.*s %.*s:%d:%d %.*s %.*s\n".ptr, label.len as c_int, label.ptr,
-	       at.file.len as c_int, at.file.ptr, at.line as c_int,
-	       at.column as c_int, at.function.len as c_int, at.function.ptr,
-	       at.module.len as c_int, at.module.ptr);
+		at.file.len as c_int, at.file.ptr, at.line as c_int,
+		at.column as c_int, at.function.len as c_int, at.function.ptr,
+		at.module.len as c_int, at.module.ptr);
 }
 
 /// The position of the call, which the default fills.

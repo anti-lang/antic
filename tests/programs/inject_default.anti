@@ -1,7 +1,7 @@
-//! An interface carries its own default provider in a static `default`,
-//! and a program that injects it needs no entry in the manifest. The
-//! build's table overrides that function where it names the interface,
-//! which the tests of `tests/inject` cover.
+//! An interface carries its own default provider in a static `default`, and a
+//! program that injects it needs no entry in the manifest. The build's table
+//! overrides that function where it names the interface, which the tests of
+//! `tests/inject` cover.
 import anti.io;
 
 abstract class Greeter

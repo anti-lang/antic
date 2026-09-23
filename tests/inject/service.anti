@@ -1,10 +1,9 @@
-//! `inject` fills a field from the provider of its interface before
-//! `construct` runs. The provider of `Logger` is the `get` of a
-//! singleton that implements it, the provider of `Clock` is a module
-//! function, and the one of `Allocator` is the name of a singleton that
-//! inherits it, whose `get` the provider is. `inject final` marks a
-//! field the run-time configuration may not replace, and a field of an
-//! interface may be called `alloc`.
+//! `inject` fills a field from the provider of its interface before `construct`
+//! runs. The provider of `Logger` is the `get` of a singleton that implements
+//! it, the provider of `Clock` is a module function, and the one of `Allocator`
+//! is the name of a singleton that inherits it, whose `get` the provider is.
+//! `inject final` marks a field the run-time configuration may not replace, and
+//! a field of an interface may be called `alloc`.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class Logger

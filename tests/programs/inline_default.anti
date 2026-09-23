@@ -1,7 +1,6 @@
-//! An inline class field without a default takes `T { }` when every field
-//! of `T` has a default or `T` has none, and `construct` runs on it. A
-//! `use` field does the same. A literal that names the field gives its
-//! own value instead.
+//! An inline class field without a default takes `T { }` when every field of
+//! `T` has a default or `T` has none, and `construct` runs on it. A `use` field
+//! does the same. A literal that names the field gives its own value instead.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

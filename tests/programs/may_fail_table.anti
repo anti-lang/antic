@@ -1,7 +1,7 @@
-//! A `may fail` function through a table entry. An abstract entry carries
-//! the flag, every replacement declares it, and a call through the pointer
-//! is handled where it stands. The ABI is `?*Error f(self, R *out)`, so the
-//! entry has the shape every other failing function has.
+//! A `may fail` function through a table entry. An abstract entry carries the
+//! flag, every replacement declares it, and a call through the pointer is
+//! handled where it stands. The ABI is `?*Error f(self, R *out)`, so the entry
+//! has the shape every other failing function has.
 
 import anti.lang;
 
@@ -50,13 +50,13 @@ fn main() -> int
 	printf("a %d\n".ptr, a as c_int);
 	let b = twice(d, -1) catch e {
 		printf("b %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
-		       e.message.ptr);
+			e.message.ptr);
 		yield -1;
 	};
 	printf("b %d\n".ptr, b as c_int);
 	let c = twice(r, 1) catch e {
 		printf("c %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
-		       e.message.ptr);
+			e.message.ptr);
 		yield -2;
 	};
 	printf("c %d\n".ptr, c as c_int);

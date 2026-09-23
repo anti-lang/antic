@@ -1,6 +1,6 @@
-//! A `construct` with arguments may fail. `alloc T(args)` runs it on
-//! the heap and frees the object when it fails, and a handler may put
-//! another pointer in its place. `T(args)` builds a value the same way.
+//! A `construct` with arguments may fail. `alloc T(args)` runs it on the heap
+//! and frees the object when it fails, and a handler may put another pointer in
+//! its place. `T(args)` builds a value the same way.
 import anti.io;
 import anti.lang;
 

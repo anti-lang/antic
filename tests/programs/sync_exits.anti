@@ -1,7 +1,8 @@
 //! `sync m { }` unlocks m on every exit of its block: the closing brace,
-//! `return`, `break`, `continue`, `fail`, `try`, a handler that returns
-//! and the error that leaves for the handler of a `try` block. A `sync` on the same mutex follows each case, and it would
-//! wait for ever if the exit had left the mutex locked.
+//! `return`, `break`, `continue`, `fail`, `try`, a handler that returns and the
+//! error that leaves for the handler of a `try` block. A `sync` on the same
+//! mutex follows each case, and it would wait for ever if the exit had left the
+//! mutex locked.
 
 import anti.lang;
 

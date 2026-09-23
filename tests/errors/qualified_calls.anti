@@ -1,8 +1,8 @@
-//! A call on the class of a name that only bodies qualified by two or
-//! more interfaces fill is ambiguous, and the message names the
-//! interfaces. A call through a sub-object or an interface pointer names
-//! its table. A name that bodies qualified by one interface fill is not
-//! ambiguous, so `p.read()` is accepted.
+//! A call on the class of a name that only bodies qualified by two or more
+//! interfaces fill is ambiguous, and the message names the interfaces. A call
+//! through a sub-object or an interface pointer names its table. A name that
+//! bodies qualified by one interface fill is not ambiguous, so `p.read()` is
+//! accepted.
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 

@@ -1,7 +1,7 @@
-//! `catch e` binds the error in its handler. Where an outer scope holds
-//! that name, the binding shadows it, and the checker warns. The three
-//! forms that bind a name are here: the handler of a call, the handler
-//! of a pointer and the handler of a `try` block.
+//! `catch e` binds the error in its handler. Where an outer scope holds that
+//! name, the binding shadows it, and the checker warns. The three forms that
+//! bind a name are here: the handler of a call, the handler of a pointer and
+//! the handler of a `try` block.
 
 import anti.lang;
 

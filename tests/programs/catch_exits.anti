@@ -1,10 +1,9 @@
-//! The error a handler binds is deleted once on every exit of the
-//! handler: `yield`, the end of the handler, `break`, `continue` and a
-//! `return` of another value. `return e` and `fail e` hand it on, and
-//! the handler leaves it alone. Each exit runs under a leak check, the
-//! count of the errors alive, which `Counted` keeps. The handler of a
-//! call, the handler of a `try` block and a handler without a name each
-//! take the exits that can leave them.
+//! The error a handler binds is deleted once on every exit of the handler:
+//! `yield`, the end of the handler, `break`, `continue` and a `return` of
+//! another value. `return e` and `fail e` hand it on, and the handler leaves it
+//! alone. Each exit runs under a leak check, the count of the errors alive,
+//! which `Counted` keeps. The handler of a call, the handler of a `try` block
+//! and a handler without a name each take the exits that can leave them.
 
 import anti.lang;
 

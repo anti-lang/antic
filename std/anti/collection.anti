@@ -1,9 +1,9 @@
 //! A list and two maps over objects.
 //!
 //! Anti has no generics, so a collection holds `*anti.lang.Object` and the
-//! program casts what it takes out with `as` or `as?`. Every class
-//! descends from that root, so any object goes in. A collection owns its
-//! own memory and never the objects, which the program still deletes.
+//! program casts what it takes out with `as` or `as?`. Every class descends
+//! from that root, so any object goes in. A collection owns its own memory and
+//! never the objects, which the program still deletes.
 
 import anti.text;
 
@@ -103,8 +103,8 @@ class Entry
 
 /// A map from `str` keys to objects.
 ///
-/// The keys are compared by their bytes, and the map keeps the `str` it
-/// was given rather than a copy of the bytes.
+/// The keys are compared by their bytes, and the map keeps the `str` it was
+/// given rather than a copy of the bytes.
 pub class Map
 {
 	own buckets: []?*Entry,
@@ -135,8 +135,10 @@ pub class Map
 			}
 			e = e.next;
 		}
-		let made = alloc Entry { key: key, value: value,
-			next: self.buckets[at as int] };
+		let made = alloc Entry {
+			key: key, value: value,
+			next: self.buckets[at as int]
+		};
 		self.buckets[at as int] = made;
 		self.count = self.count + 1;
 	}
@@ -230,8 +232,10 @@ pub class IntMap
 			}
 			e = e.next;
 		}
-		let made = alloc Entry { number: key, value: value,
-			next: self.buckets[at] };
+		let made = alloc Entry {
+			number: key, value: value,
+			next: self.buckets[at]
+		};
 		self.buckets[at] = made;
 		self.count = self.count + 1;
 	}

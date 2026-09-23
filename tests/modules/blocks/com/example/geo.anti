@@ -1,19 +1,19 @@
 /*!
-    Plane geometry.
+Plane geometry.
 */
 /*#!
-    Built for the tests.
+Built for the tests.
 */
 /**
-  A point.
+A point.
 
-      Two fields.
+    Two fields.
 */
 pub struct Point
 {
 	/**
-        Across.
-    */
+	Across.
+	*/
 	x: f64,
 	y: f64,
 }
@@ -22,7 +22,7 @@ pub struct Point
 Dot product.
 */
 /*#
-  Not a note in the file.
+Not a note in the file.
 */
 pub fn dot(a: Point, b: Point) -> f64
 {
@@ -30,7 +30,7 @@ pub fn dot(a: Point, b: Point) -> f64
 }
 
 /**
-  Private, not in the file.
+Private, not in the file.
 */
 fn hidden() -> f64
 {

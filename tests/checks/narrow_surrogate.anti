@@ -1,5 +1,4 @@
-//! A surrogate is no Unicode scalar value, though it is below the last
-//! of them.
+//! A surrogate is no Unicode scalar value, though it is below the last of them.
 
 fn opaque(n: u32) -> u32
 {

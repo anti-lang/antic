@@ -1,7 +1,6 @@
-//! An aggregate constant, which is read-only data of the module. The
-//! `str` field holds the address of the literal, so the data carries a
-//! relocation and the emitter writes it in the section for data the
-//! loader fills in.
+//! An aggregate constant, which is read-only data of the module. The `str`
+//! field holds the address of the literal, so the data carries a relocation and
+//! the emitter writes it in the section for data the loader fills in.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

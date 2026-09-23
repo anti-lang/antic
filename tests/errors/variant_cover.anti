@@ -1,6 +1,6 @@
-//! A `switch` on a variant without `else` names every case, and the
-//! message names each case it misses. An arm binds the fields of a case
-//! that has some, and `fallthrough` never enters an arm that binds.
+//! A `switch` on a variant without `else` names every case, and the message
+//! names each case it misses. An arm binds the fields of a case that has some,
+//! and `fallthrough` never enters an arm that binds.
 
 variant Shape
 {

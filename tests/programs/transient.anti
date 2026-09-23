@@ -1,6 +1,6 @@
-//! A `transient` field is derived state. `dup` leaves it `none` in the
-//! copy, and the default `equals`, `hash` and `serialize` pass over it.
-//! The class frees what it holds in its own `destruct`.
+//! A `transient` field is derived state. `dup` leaves it `none` in the copy,
+//! and the default `equals`, `hash` and `serialize` pass over it. The class
+//! frees what it holds in its own `destruct`.
 import anti.io;
 import anti.text;
 

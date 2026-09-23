@@ -1,6 +1,5 @@
-//! The pointer-free test of `parallel` exempts the table pointer and
-//! the `own` fields of a class, so a slice of class values chunks
-//! like any array.
+//! The pointer-free test of `parallel` exempts the table pointer and the `own`
+//! fields of a class, so a slice of class values chunks like any array.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 class Circle

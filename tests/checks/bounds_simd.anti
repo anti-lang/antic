@@ -1,6 +1,6 @@
-//! A `load` of a simd struct reads the lanes from the elements of a
-//! slice from an index on. The check covers the last of them, which
-//! lies past the end here while the first one does not.
+//! A `load` of a simd struct reads the lanes from the elements of a slice from
+//! an index on. The check covers the last of them, which lies past the end here
+//! while the first one does not.
 
 simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
 

@@ -1,9 +1,9 @@
 //! A program that installs a handler and uses a class of another module.
 //!
-//! The library file carries the `trace` marking of `Store`, so the write
-//! `s.n = 7` here calls `changed` under this build's `--trace writes`.
-//! The `enter` and `leave` of `Store.put` come from the build of the
-//! library, which the call reaches wherever it stands.
+//! The library file carries the `trace` marking of `Store`, so the write `s.n =
+//! 7` here calls `changed` under this build's `--trace writes`. The `enter` and
+//! `leave` of `Store.put` come from the build of the library, which the call
+//! reaches wherever it stands.
 
 import anti.lang;
 import com.example.store;

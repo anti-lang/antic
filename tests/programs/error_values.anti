@@ -1,9 +1,9 @@
-//! A function is failing when it is written `may fail`, and never by its
-//! result type. A function that returns `*Error` or `?*Error` without the
-//! marking is an ordinary function. Its call needs no handler, and the
-//! error it gives is a value like any other, which the caller owns. A
-//! handler in such a function hands its error to the caller with
-//! `return e`, and nothing deletes it on the way.
+//! A function is failing when it is written `may fail`, and never by its result
+//! type. A function that returns `*Error` or `?*Error` without the marking is
+//! an ordinary function. Its call needs no handler, and the error it gives is a
+//! value like any other, which the caller owns. A handler in such a function
+//! hands its error to the caller with `return e`, and nothing deletes it on the
+//! way.
 
 import anti.lang;
 

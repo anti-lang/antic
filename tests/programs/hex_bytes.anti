@@ -1,5 +1,5 @@
-//! `x"..."` is a `[]byte` of hex pairs. It ignores whitespace, so a literal
-//! may span lines, and it holds the bytes that the escapes of `b"..."` write.
+//! `x"..."` is a `[]byte` of hex pairs. It ignores whitespace, so a literal may
+//! span lines, and it holds the bytes that the escapes of `b"..."` write.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

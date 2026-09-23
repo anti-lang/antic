@@ -1,6 +1,5 @@
-//! A library for the interface with a floor. The version of the package
-//! that declared the interface decides, and the build of this library
-//! names it.
+//! A library for the interface with a floor. The version of the package that
+//! declared the interface decides, and the build of this library names it.
 
 import net.example.greet;
 

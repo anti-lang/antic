@@ -1,6 +1,6 @@
-//! A library whose functions give tuples. The library file carries the
-//! tuple of each signature, so a program that imports this module takes
-//! the elements apart without seeing this source.
+//! A library whose functions give tuples. The library file carries the tuple of
+//! each signature, so a program that imports this module takes the elements
+//! apart without seeing this source.
 
 import anti.lang;
 

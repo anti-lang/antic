@@ -1,5 +1,5 @@
-//! A program that takes apart the tuples of another module. The type
-//! comes from the library file, so the two modules name one type.
+//! A program that takes apart the tuples of another module. The type comes from
+//! the library file, so the two modules name one type.
 
 import anti.lang;
 import com.example.pairs;

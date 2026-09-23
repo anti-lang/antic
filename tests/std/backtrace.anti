@@ -1,6 +1,5 @@
-//! `anti.debug.backtrace` is the short form of
-//! `anti.lang.StackTrace.capture`. Its first frame is its caller, and a
-//! skip leaves out that many frames more.
+//! `anti.debug.backtrace` is the short form of `anti.lang.StackTrace.capture`.
+//! Its first frame is its caller, and a skip leaves out that many frames more.
 
 import anti.debug;
 import anti.io;

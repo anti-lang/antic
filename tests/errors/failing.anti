@@ -27,8 +27,8 @@ fn bad_value() -> int may fail
 	fail 7;
 }
 
-/// A function that returns an error as a value is no failing function,
-/// whatever its result type, so it can neither forward nor fail.
+/// A function that returns an error as a value is no failing function, whatever
+/// its result type, so it can neither forward nor fail.
 fn by_hand() -> ?*lang.Error
 {
 	let n = try risky();

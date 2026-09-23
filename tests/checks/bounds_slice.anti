@@ -1,5 +1,5 @@
-//! An index past the end of a slice, whose length is a field of the
-//! value and not of its type.
+//! An index past the end of a slice, whose length is a field of the value and
+//! not of its type.
 
 fn opaque(n: int) -> int
 {

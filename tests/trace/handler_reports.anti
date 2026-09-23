@@ -1,18 +1,18 @@
-//! The reports of the handlers of `anti.trace`, and the lines a
-//! `CallLogger` writes.
+//! The reports of the handlers of `anti.trace`, and the lines a `CallLogger`
+//! writes.
 //!
-//! Every report goes to standard error and is written by the program.
-//! A report from inside a hook would count the objects of its own text.
-//! The spans a `Profiler` reports differ from run to run, so the
-//! expected files are patterns.
+//! Every report goes to standard error and is written by the program. A report
+//! from inside a hook would count the objects of its own text. The spans a
+//! `Profiler` reports differ from run to run, so the expected files are
+//! patterns.
 
 import anti.lang;
 import anti.trace;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-/// A class that asks for the call hooks, with one function that calls
-/// another, so the lines of a `CallLogger` nest.
+/// A class that asks for the call hooks, with one function that calls another,
+/// so the lines of a `CallLogger` nest.
 trace class Cell
 {
 	pub n: int = 0,

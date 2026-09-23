@@ -1,6 +1,5 @@
-//! A provider that names neither a function of the program nor a
-//! singleton with a `get` is refused. So is one that takes arguments or
-//! gives no pointer.
+//! A provider that names neither a function of the program nor a singleton with
+//! a `get` is refused. So is one that takes arguments or gives no pointer.
 abstract class Logger
 {
 	abstract fn say(self) -> int;

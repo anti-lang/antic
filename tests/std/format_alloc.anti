@@ -1,10 +1,9 @@
-//! `f"..."(from)` and `rf"..."(from)` take the memory of their text from
-//! the allocator `from`, and `f"..."` keeps the C library. `Kept`
-//! remembers each block it lends, so the test sees that each text is one
-//! of them and that none is left once they all go back. The allocator is
-//! computed after the values of the literal. `Lender` lends through the
-//! sub-object of an interface, and an `ArenaAllocator` gives every text
-//! back at once.
+//! `f"..."(from)` and `rf"..."(from)` take the memory of their text from the
+//! allocator `from`, and `f"..."` keeps the C library. `Kept` remembers each
+//! block it lends, so the test sees that each text is one of them and that none
+//! is left once they all go back. The allocator is computed after the values of
+//! the literal. `Lender` lends through the sub-object of an interface, and an
+//! `ArenaAllocator` gives every text back at once.
 import anti.mem;
 import anti.text;
 
@@ -13,8 +12,8 @@ extern fn printf(fmt: ?*byte, ...) -> c_int;
 /// The most blocks that `Kept` lends.
 const ROOM: int = 8;
 
-/// An allocator over the C library that remembers every block it lends
-/// until the block comes back.
+/// An allocator over the C library that remembers every block it lends until
+/// the block comes back.
 class Kept inherits mem.Allocator
 {
 	blocks: ?*?*byte = none,
@@ -88,8 +87,8 @@ class Kept inherits mem.Allocator
 	}
 }
 
-/// An allocator through the sub-object of an interface, which counts
-/// the blocks it lends.
+/// An allocator through the sub-object of an interface, which counts the blocks
+/// it lends.
 class Lender
 {
 	implements lending: mem.Allocator,
@@ -140,7 +139,7 @@ fn main() -> int
 	printf("kept: %d lent, %d live, texts kept %d\n".ptr,
 		kept.lent as c_int, kept.live as c_int,
 		(kept.holds(a.ptr) && kept.holds(b.ptr) && kept.holds(c.ptr))
-			as c_int);
+		as c_int);
 
 	let plain = f"{n}";
 	printf("plain: %s, kept %d\n".ptr, plain.ptr,

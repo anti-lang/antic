@@ -1,6 +1,6 @@
-//! The saturating operators `+| -| *|` clamp at the minimum or the maximum
-//! of the type, signed and unsigned, at every width. Each one runs on
-//! values that the program reads at run time and again on constants.
+//! The saturating operators `+| -| *|` clamp at the minimum or the maximum of
+//! the type, signed and unsigned, at every width. Each one runs on values that
+//! the program reads at run time and again on constants.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

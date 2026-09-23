@@ -1,7 +1,7 @@
-//! Every class inherits the seven public functions of `anti.lang.Object`.
-//! Their bodies live in the runtime and read the descriptor, so
-//! `type_name` gives the class name and `equals` and `hash` walk the
-//! fields of the chain. A class replaces one with a `concrete fn`.
+//! Every class inherits the seven public functions of `anti.lang.Object`. Their
+//! bodies live in the runtime and read the descriptor, so `type_name` gives the
+//! class name and `equals` and `hash` walk the fields of the chain. A class
+//! replaces one with a `concrete fn`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

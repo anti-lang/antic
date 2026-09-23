@@ -1,6 +1,6 @@
-//! A program registers a function for a signal and raises it. The
-//! runtime calls the function on a thread of its own, so the function
-//! does what any other function may.
+//! A program registers a function for a signal and raises it. The runtime calls
+//! the function on a thread of its own, so the function does what any other
+//! function may.
 import anti.io;
 import anti.os;
 

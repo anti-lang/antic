@@ -1,5 +1,5 @@
-//! A host that loads the library its first argument names, asks it for
-//! a `Greeter` and closes it.
+//! A host that loads the library its first argument names, asks it for a
+//! `Greeter` and closes it.
 
 import anti.io;
 import anti.plugin;

@@ -1,14 +1,13 @@
 //! Reading a subset of TOML.
 //!
-//! The subset holds bare keys and quoted keys, `[table]` headers,
-//! `[[table]]` arrays, basic strings, integers, floats, booleans and
-//! arrays of them. A comment runs from `#` to the end of its line.
-//! Writing TOML is not here.
+//! The subset holds bare keys and quoted keys, `[table]` headers, `[[table]]`
+//! arrays, basic strings, integers, floats, booleans and arrays of them. A
+//! comment runs from `#` to the end of its line. Writing TOML is not here.
 //!
-//! A document is a flat list of keys, each the path of its value with a
-//! dot between the parts. A repeated `[[sink]]` numbers its entries, so
-//! the first holds `sink.0.kind`, and an array numbers its elements the
-//! same way, so `hosts = ['a', 'b']` holds `hosts.0` and `hosts.1`.
+//! A document is a flat list of keys, each the path of its value with a dot
+//! between the parts. A repeated `[[sink]]` numbers its entries, so the first
+//! holds `sink.0.kind`, and an array numbers its elements the same way, so
+//! `hosts = ['a', 'b']` holds `hosts.0` and `hosts.1`.
 
 import anti.lang;
 import anti.text;
@@ -23,8 +22,8 @@ extern fn anti_rt_toml_free(doc: ?*byte);
 
 /// One read document.
 ///
-/// The document owns its keys and values, so `delete` ends it and every
-/// `str` it gave out ends with it.
+/// The document owns its keys and values, so `delete` ends it and every `str`
+/// it gave out ends with it.
 pub class Document
 {
 	own handle: ?*byte,
@@ -69,8 +68,8 @@ pub class Document
 		return anti_rt_toml_value(self.handle, at);
 	}
 
-	/// The integer under `path`, or `fallback` when the document has
-	/// none and when the value is no integer.
+	/// The integer under `path`, or `fallback` when the document has none and
+	/// when the value is no integer.
 	pub fn int_of(self, path: str, fallback: int) -> int
 	{
 		let at = anti_rt_toml_find(self.handle, path.ptr, path.len);
@@ -119,8 +118,8 @@ pub class Document
 
 	/// Read `source` as a document the caller owns and deletes.
 	///
-	/// It is `read` for a program that holds the document in a field,
-	/// where a value would end with the block that made it.
+	/// It is `read` for a program that holds the document in a field, where a
+	/// value would end with the block that made it.
 	pub fn open(source: str) -> *Document may fail
 	{
 		let handle = anti_rt_toml_read(source.ptr, source.len);

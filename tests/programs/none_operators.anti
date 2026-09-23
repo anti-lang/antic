@@ -1,8 +1,8 @@
-//! `p ?? q` gives `p` as `*T` when it is not `none` and `q` otherwise.
-//! `p?.x` and `p?.f(args)` give `none` when `p` is `none`, and the field
-//! or the call otherwise. Each computes `p` once, and what stands right
-//! of the operator runs only when the answer needs it. A function value
-//! follows the pointer rule.
+//! `p ?? q` gives `p` as `*T` when it is not `none` and `q` otherwise. `p?.x`
+//! and `p?.f(args)` give `none` when `p` is `none`, and the field or the call
+//! otherwise. Each computes `p` once, and what stands right of the operator
+//! runs only when the answer needs it. A function value follows the pointer
+//! rule.
 
 import anti.lang;
 

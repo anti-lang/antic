@@ -1,8 +1,8 @@
-//! `select` waits on two channels and takes a value from one that holds
-//! one. An arm binds `none` once its channel is closed and empty, and the
-//! loop ends when both are. Two chunks of a `parallel` fill the channels
-//! and a third drains them. Each channel holds every value sent to it, so
-//! the chunks may run in turn on a pool of one thread.
+//! `select` waits on two channels and takes a value from one that holds one. An
+//! arm binds `none` once its channel is closed and empty, and the loop ends
+//! when both are. Two chunks of a `parallel` fill the channels and a third
+//! drains them. Each channel holds every value sent to it, so the chunks may
+//! run in turn on a pool of one thread.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

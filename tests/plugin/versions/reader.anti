@@ -1,5 +1,5 @@
-//! A host that loads the library its first argument names and prints
-//! the greeting it gives. A refused load prints its reason instead.
+//! A host that loads the library its first argument names and prints the
+//! greeting it gives. A refused load prints its reason instead.
 
 import anti.io;
 import anti.plugin;

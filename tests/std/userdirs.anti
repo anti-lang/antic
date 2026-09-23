@@ -1,9 +1,9 @@
-//! The per-user directories of the platform, which are the ones an
-//! install of Anti uses. The test of the suite sets the XDG variables and
-//! LOCALAPPDATA, so one expected output stands on every host of a family.
-//! The test std_userdirs_no_home unsets them and reads the failure, whose
-//! message names the variable that is absent. Each function may fail,
-//! and the last call forwards the error with `try`.
+//! The per-user directories of the platform, which are the ones an install of
+//! Anti uses. The test of the suite sets the XDG variables and LOCALAPPDATA, so
+//! one expected output stands on every host of a family. The test
+//! std_userdirs_no_home unsets them and reads the failure, whose message names
+//! the variable that is absent. Each function may fail, and the last call
+//! forwards the error with `try`.
 import anti.io;
 import anti.lang;
 import anti.os;

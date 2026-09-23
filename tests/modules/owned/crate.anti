@@ -1,7 +1,7 @@
 //! A class whose base, inline field and `own` slice come from
-//! `com.example.parts`. Its teardown and its copy, which the compiler
-//! writes in this module, reach the ones that module writes, in release
-//! mode and in dev mode.
+//! `com.example.parts`. Its teardown and its copy, which the compiler writes in
+//! this module, reach the ones that module writes, in release mode and in dev
+//! mode.
 
 import com.example.parts;
 

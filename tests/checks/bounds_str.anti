@@ -1,5 +1,4 @@
-//! An index past the end of a str, which carries its length as a slice
-//! does.
+//! An index past the end of a str, which carries its length as a slice does.
 
 fn opaque(n: int) -> int
 {

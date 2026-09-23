@@ -1,16 +1,16 @@
 //! The operating system around the program.
 //!
-//! `on_signal` registers the function that runs when a signal arrives,
-//! and `signal_pending` reads the signal that arrived since the last
-//! call. A handler of the operating system runs on a stack the program
-//! knows nothing about, so the runtime writes the signal into a pipe and
-//! a thread of its own calls the function.
+//! `on_signal` registers the function that runs when a signal arrives, and
+//! `signal_pending` reads the signal that arrived since the last call. A
+//! handler of the operating system runs on a stack the program knows nothing
+//! about, so the runtime writes the signal into a pipe and a thread of its own
+//! calls the function.
 //!
-//! `user_config_dir`, `user_data_dir` and `user_cache_dir` give the
-//! per-user directories of the platform. They are the directories an
-//! install of Anti itself uses, and nothing outside the user's profile
-//! is among them. Each of them may fail, when the environment names no
-//! home, and the message names the variable that is absent.
+//! `user_config_dir`, `user_data_dir` and `user_cache_dir` give the per-user
+//! directories of the platform. They are the directories an install of Anti
+//! itself uses, and nothing outside the user's profile is among them. Each of
+//! them may fail, when the environment names no home, and the message names the
+//! variable that is absent.
 
 import anti.lang;
 import anti.text;
@@ -31,9 +31,9 @@ pub const TERMINATE: int = 15;
 
 /// Register the function that runs when `sig` arrives.
 ///
-/// One function per signal, and a later call replaces the one before it.
-/// The function runs on a thread of the runtime, not inside the
-/// handler, so it may do anything an ordinary function does.
+/// One function per signal, and a later call replaces the one before it. The
+/// function runs on a thread of the runtime, not inside the handler, so it may
+/// do anything an ordinary function does.
 pub fn on_signal(sig: int, f: fn(int))
 {
 	anti_rt_on_signal(sig, f);
@@ -59,8 +59,8 @@ fn variable(name: str) -> str
 
 /// The bytes of `b`, in memory of their own.
 ///
-/// The three directory functions give memory the caller owns, so the
-/// text of a builder, which the builder frees, does not leave here.
+/// The three directory functions give memory the caller owns, so the text of a
+/// builder, which the builder frees, does not leave here.
 fn owned(b: *text.Builder) -> str may fail
 {
 	let s = b.text();
@@ -81,9 +81,9 @@ fn owned(b: *text.Builder) -> str may fail
 
 /// Whether this program follows the conventions of Windows.
 ///
-/// The runtime is compiled once per target and answers from its own
-/// build. Reading `LOCALAPPDATA` instead would take the layout of
-/// Windows on any machine that happens to carry that variable.
+/// The runtime is compiled once per target and answers from its own build.
+/// Reading `LOCALAPPDATA` instead would take the layout of Windows on any
+/// machine that happens to carry that variable.
 fn windows() -> bool
 {
 	return anti_rt_is_windows() != 0;
@@ -91,8 +91,8 @@ fn windows() -> bool
 
 /// An XDG root counts only when it holds an absolute path.
 ///
-/// A relative value would resolve against the working directory of
-/// whoever started the program, which is no directory of the user.
+/// A relative value would resolve against the working directory of whoever
+/// started the program, which is no directory of the user.
 fn xdg(name: str) -> str
 {
 	let value = variable(name);
@@ -154,9 +154,9 @@ fn windows_dir(app: str, tail: str) -> str may fail
 /// The per-user configuration directory of `app`.
 ///
 /// `$XDG_CONFIG_HOME/<app>` on Linux and macOS, which falls back to
-/// `~/.config/<app>`, and `config\` of `%LOCALAPPDATA%\<app>` on
-/// Windows. It fails when the environment names no home, and the message
-/// names the variable that is absent.
+/// `~/.config/<app>`, and `config\` of `%LOCALAPPDATA%\<app>` on Windows. It
+/// fails when the environment names no home, and the message names the variable
+/// that is absent.
 pub fn user_config_dir(app: str) -> str may fail
 {
 	if windows() {
@@ -168,8 +168,8 @@ pub fn user_config_dir(app: str) -> str may fail
 /// The per-user data directory of `app`, which holds what it installs.
 ///
 /// `$XDG_DATA_HOME/<app>` on Linux and macOS, which falls back to
-/// `~/.local/share/<app>`, and `%LOCALAPPDATA%\<app>` on Windows. It
-/// fails as `user_config_dir` does.
+/// `~/.local/share/<app>`, and `%LOCALAPPDATA%\<app>` on Windows. It fails as
+/// `user_config_dir` does.
 pub fn user_data_dir(app: str) -> str may fail
 {
 	if windows() {
@@ -181,8 +181,8 @@ pub fn user_data_dir(app: str) -> str may fail
 /// The per-user cache directory of `app`, which it may lose at any time.
 ///
 /// `$XDG_CACHE_HOME/<app>` on Linux and macOS, which falls back to
-/// `~/.cache/<app>`, and `cache\` of `%LOCALAPPDATA%\<app>` on Windows.
-/// It fails as `user_config_dir` does.
+/// `~/.cache/<app>`, and `cache\` of `%LOCALAPPDATA%\<app>` on Windows. It
+/// fails as `user_config_dir` does.
 pub fn user_cache_dir(app: str) -> str may fail
 {
 	if windows() {

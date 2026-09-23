@@ -1,9 +1,9 @@
-//! A bitfield of a class body sits in a unit with its neighbours, as in
-//! a struct. A read masks and shifts it out of the unit, and a write
-//! leaves the other bitfields of the unit alone. So does every writer of
-//! a default: a literal, the preparation that `alloc` and `reflect.new`
-//! share, and `T(args)`. A bitfield of a base class is reached from the
-//! object, where every class of the chain starts.
+//! A bitfield of a class body sits in a unit with its neighbours, as in a
+//! struct. A read masks and shifts it out of the unit, and a write leaves the
+//! other bitfields of the unit alone. So does every writer of a default: a
+//! literal, the preparation that `alloc` and `reflect.new` share, and
+//! `T(args)`. A bitfield of a base class is reached from the object, where
+//! every class of the chain starts.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

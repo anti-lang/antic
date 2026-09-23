@@ -1,5 +1,5 @@
-//! A library that provides a `Greeter`, built with
-//! `antic --lib shared --no-runtime`.
+//! A library that provides a `Greeter`, built with `antic --lib shared
+//! --no-runtime`.
 
 import net.example.greet;
 

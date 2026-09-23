@@ -1,8 +1,8 @@
-//! A direct call of an abstract function has no body to reach. The
-//! checker refuses `self.super.area()`, a call of `Shape.area` and the
-//! function value `Shape.area`, which would call the function at index 0
-//! of the module. A call through a pointer or a sub-object reads the
-//! table, and `self.super.area()` of a base that fills it is direct.
+//! A direct call of an abstract function has no body to reach. The checker
+//! refuses `self.super.area()`, a call of `Shape.area` and the function value
+//! `Shape.area`, which would call the function at index 0 of the module. A call
+//! through a pointer or a sub-object reads the table, and `self.super.area()`
+//! of a base that fills it is direct.
 
 abstract class Shape
 {

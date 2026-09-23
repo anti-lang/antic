@@ -1,6 +1,5 @@
-//! The `for` statement over a range, an array, a slice and a slice by
-//! pointer. `continue` runs the step, so a loop that skips a value still
-//! ends.
+//! The `for` statement over a range, an array, a slice and a slice by pointer.
+//! `continue` runs the step, so a loop that skips a value still ends.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

@@ -1,8 +1,7 @@
-//! A derived `construct` initialises its base with
-//! `self.super.construct(args)` at the top of its body. `try` forwards
-//! the error of the base, so the derived body stops there and no object
-//! is made. A derived `construct` that leaves the call out keeps the
-//! defaults of the base's fields.
+//! A derived `construct` initialises its base with `self.super.construct(args)`
+//! at the top of its body. `try` forwards the error of the base, so the derived
+//! body stops there and no object is made. A derived `construct` that leaves
+//! the call out keeps the defaults of the base's fields.
 import anti.io;
 import anti.lang;
 

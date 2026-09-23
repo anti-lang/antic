@@ -1,6 +1,5 @@
-//! A library whose public variant another module builds, takes apart and
-//! passes back. The cases, their fields and the tag come from the library
-//! file.
+//! A library whose public variant another module builds, takes apart and passes
+//! back. The cases, their fields and the tag come from the library file.
 
 /// A shape of the plane.
 pub variant Shape

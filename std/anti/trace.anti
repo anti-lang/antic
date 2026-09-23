@@ -1,21 +1,19 @@
-//! The stock handlers of the nine hooks, and the `trace` key that names
-//! one.
+//! The stock handlers of the nine hooks, and the `trace` key that names one.
 //!
-//! `anti.lang.TraceHandler` declares the nine hooks with the object
-//! after `self`, and `anti.lang.Trace.install` stores one handler. This
-//! module ships seven that fill it: `LeakTracker` counts the objects a
-//! program makes and frees, `Profiler` times the calls of an
-//! instrumented class, `CallLogger` writes a line per call,
-//! `ErrorMonitor` keeps the last failure, `ThreadMonitor` counts the
-//! jobs in flight, `ChangeJournal` keeps the last field writes and
-//! `Composite` holds several handlers at once.
+//! `anti.lang.TraceHandler` declares the nine hooks with the object after
+//! `self`, and `anti.lang.Trace.install` stores one handler. This module ships
+//! seven that fill it: `LeakTracker` counts the objects a program makes and
+//! frees, `Profiler` times the calls of an instrumented class, `CallLogger`
+//! writes a line per call, `ErrorMonitor` keeps the last failure,
+//! `ThreadMonitor` counts the jobs in flight, `ChangeJournal` keeps the last
+//! field writes and `Composite` holds several handlers at once.
 //!
-//! `start` reads the `trace` key of the runtime configuration and
-//! installs the handler it names, one of `leaks`, `profile`, `calls`,
-//! `errors`, `threads` and `writes`. A key of several names, separated
-//! by commas, gives a `Composite` of them. The program calls it, as it
-//! calls `rt.configure`, because the handlers live in this module and a
-//! program that does not import it links none of them.
+//! `start` reads the `trace` key of the runtime configuration and installs the
+//! handler it names, one of `leaks`, `profile`, `calls`, `errors`, `threads`
+//! and `writes`. A key of several names, separated by commas, gives a
+//! `Composite` of them. The program calls it, as it calls `rt.configure`,
+//! because the handlers live in this module and a program that does not import
+//! it links none of them.
 //!
 //! ```anti
 //! import anti.trace;
@@ -27,11 +25,10 @@
 //! }
 //! ```
 //!
-//! A hook runs wherever the object it stands for runs, so a handler
-//! counts with atomic fields. It allocates no object of its own inside a
-//! hook: an `alloc` under `created` would call `created` again. The
-//! reports are written by the program, not by a hook, and each goes to
-//! standard error.
+//! A hook runs wherever the object it stands for runs, so a handler counts with
+//! atomic fields. It allocates no object of its own inside a hook: an `alloc`
+//! under `created` would call `created` again. The reports are written by the
+//! program, not by a hook, and each goes to standard error.
 
 import anti.io;
 import anti.lang;
@@ -52,10 +49,10 @@ pub const COMPOSITE_SLOTS: int = 8;
 
 /// The number of objects a program made and the number it freed.
 ///
-/// `created` and `copied` each count one object made, because `dup`
-/// builds an object without running `construct`. `destroyed` counts one
-/// freed. `live` is the difference, and a program that ends with a
-/// positive one kept objects it never deleted.
+/// `created` and `copied` each count one object made, because `dup` builds an
+/// object without running `construct`. `destroyed` counts one freed. `live` is
+/// the difference, and a program that ends with a positive one kept objects it
+/// never deleted.
 pub class LeakTracker inherits lang.TraceHandler
 {
 	atomic builds: int = 0,
@@ -128,15 +125,15 @@ pub class LeakTracker inherits lang.TraceHandler
 
 /// The calls and the time of every function an instrumented class ran.
 ///
-/// One slot per function name. `enter` counts a call and reads the
-/// clock when the function was not already running, and the matching
-/// `leave` adds the span, so a function that calls itself is measured
-/// once per outermost call. The names come from the compiler as
-/// constants, so a slot keeps the `str` it was given.
+/// One slot per function name. `enter` counts a call and reads the clock when
+/// the function was not already running, and the matching `leave` adds the
+/// span, so a function that calls itself is measured once per outermost call.
+/// The names come from the compiler as constants, so a slot keeps the `str` it
+/// was given.
 ///
-/// The slots are of the whole program and the stack of a call is not,
-/// so the spans of a function that two threads run at once overlap in
-/// one slot. The counts stay right.
+/// The slots are of the whole program and the stack of a call is not, so the
+/// spans of a function that two threads run at once overlap in one slot. The
+/// counts stay right.
 pub class Profiler inherits lang.TraceHandler
 {
 	names: [PROFILE_SLOTS]str,
@@ -229,8 +226,8 @@ pub class Profiler inherits lang.TraceHandler
 		return -1;
 	}
 
-	/// The slot of `name`, a free one when it has none, or -1 when every
-	/// slot is taken.
+	/// The slot of `name`, a free one when it has none, or -1 when every slot
+	/// is taken.
 	fn slot(self, name: str) -> int
 	{
 		let at = self.find(name);
@@ -289,10 +286,10 @@ pub class Profiler inherits lang.TraceHandler
 
 /// A line per call of an instrumented class, on standard error.
 ///
-/// `enter` writes `-> name` and `leave` writes `<- name`, each indented
-/// by the depth of the call. A function that gave an error writes
-/// `!! name error <code>` between the two. `quiet` counts the lines
-/// without writing them, which is what a test of the handler wants.
+/// `enter` writes `-> name` and `leave` writes `<- name`, each indented by the
+/// depth of the call. A function that gave an error writes `!! name error
+/// <code>` between the two. `quiet` counts the lines without writing them,
+/// which is what a test of the handler wants.
 pub class CallLogger inherits lang.TraceHandler
 {
 	atomic depth: int = 0,
@@ -377,10 +374,10 @@ pub class CallLogger inherits lang.TraceHandler
 
 /// The failures of instrumented functions, with the last one kept.
 ///
-/// `failed` carries the error that a function left with, and the error
-/// is deleted once its handler exits. The monitor therefore copies the
-/// message into itself and keeps the code and the name of the function,
-/// never the pointer.
+/// `failed` carries the error that a function left with, and the error is
+/// deleted once its handler exits. The monitor therefore copies the message
+/// into itself and keeps the code and the name of the function, never the
+/// pointer.
 pub class ErrorMonitor inherits lang.TraceHandler
 {
 	atomic total: int = 0,
@@ -470,8 +467,8 @@ pub class ErrorMonitor inherits lang.TraceHandler
 
 /// The jobs a program dispatched and joined.
 ///
-/// `running` is the difference, the jobs the pool still holds, and
-/// `peak` is the highest that difference ever was.
+/// `running` is the difference, the jobs the pool still holds, and `peak` is
+/// the highest that difference ever was.
 pub class ThreadMonitor inherits lang.TraceHandler
 {
 	atomic starts: int = 0,
@@ -556,10 +553,10 @@ pub class ThreadMonitor inherits lang.TraceHandler
 
 /// The last `JOURNAL_SLOTS` writes to a field of an instrumented class.
 ///
-/// `changed` carries the record of the field, whose name stands in
-/// read-only data, and the journal reads the name of the object's class
-/// from its descriptor. It keeps both names and never the object, which
-/// the program may delete before the journal is read.
+/// `changed` carries the record of the field, whose name stands in read-only
+/// data, and the journal reads the name of the object's class from its
+/// descriptor. It keeps both names and never the object, which the program may
+/// delete before the journal is read.
 pub class ChangeJournal inherits lang.TraceHandler
 {
 	classes: [JOURNAL_SLOTS]str,
@@ -661,10 +658,10 @@ pub class ChangeJournal inherits lang.TraceHandler
 
 /// Several handlers under the one that `Trace.install` holds.
 ///
-/// Each hook reaches every handler in the order they were added, and
-/// `leave` reaches them in the other order, so the handlers nest around
-/// a call as the handler and the object's own hook do. A composite owns
-/// the handlers it holds and deletes them with itself.
+/// Each hook reaches every handler in the order they were added, and `leave`
+/// reaches them in the other order, so the handlers nest around a call as the
+/// handler and the object's own hook do. A composite owns the handlers it holds
+/// and deletes them with itself.
 pub class Composite inherits lang.TraceHandler
 {
 	handlers: [COMPOSITE_SLOTS]?*lang.TraceHandler,
@@ -825,12 +822,12 @@ pub class Composite inherits lang.TraceHandler
 	}
 }
 
-/// Install the handler that the `trace` key of the runtime
-/// configuration names, and give it back.
+/// Install the handler that the `trace` key of the runtime configuration names,
+/// and give it back.
 ///
 /// The key is empty in a program that was given none, and the call then
-/// installs nothing and gives `none`. The program owns what it gets
-/// back and deletes it once it has installed `none` in its place.
+/// installs nothing and gives `none`. The program owns what it gets back and
+/// deletes it once it has installed `none` in its place.
 pub fn start() -> ?*lang.TraceHandler
 {
 	return install(anti_rt_conf_get("trace".ptr, 5));
@@ -839,9 +836,9 @@ pub fn start() -> ?*lang.TraceHandler
 /// Install the handlers that `what` names, and give back the one that
 /// `Trace.install` now holds.
 ///
-/// `what` is one name, or several separated by commas, which give a
-/// `Composite` in the order they stand. A name that no handler has
-/// writes one line to standard error and is passed over.
+/// `what` is one name, or several separated by commas, which give a `Composite`
+/// in the order they stand. A name that no handler has writes one line to
+/// standard error and is passed over.
 pub fn install(what: str) -> ?*lang.TraceHandler
 {
 	let made = handlers_of(what);
@@ -953,8 +950,8 @@ fn eprint_int(n: int)
 
 fixtures
 {
-	/// An error to stand for the object a hook takes. Its code and its
-	/// message are what an `ErrorMonitor` reads.
+	/// An error to stand for the object a hook takes. Its code and its message
+	/// are what an `ErrorMonitor` reads.
 	fn an_object() -> *lang.Error
 	{
 		return lang.Error.new(3, "a message");

@@ -1,7 +1,7 @@
 //! A module whose second test fails, to show the report of an assertion.
 //!
-//! The runtime names the test before it prints the position the compiler
-//! built, so the two lines together name the test, the file and the line.
+//! The runtime names the test before it prints the position the compiler built,
+//! so the two lines together name the test, the file and the line.
 
 fixtures
 {

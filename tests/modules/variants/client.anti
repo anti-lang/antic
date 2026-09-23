@@ -1,6 +1,6 @@
-//! A program that builds the variant of another module, switches on it
-//! with every case named, tests it with `is` and `if let`, and hands it
-//! back by value inside a struct of that module.
+//! A program that builds the variant of another module, switches on it with
+//! every case named, tests it with `is` and `if let`, and hands it back by
+//! value inside a struct of that module.
 
 import com.example.geo;
 

@@ -1,7 +1,7 @@
-//! The default `serialize` writes each field by the type its record
-//! names, and `Object.deserialize` reads the text back. `Every` holds a
-//! field of every kind. An `own` slice is written as its elements, and a
-//! pointer or a slice that the object does not own as its address.
+//! The default `serialize` writes each field by the type its record names, and
+//! `Object.deserialize` reads the text back. `Every` holds a field of every
+//! kind. An `own` slice is written as its elements, and a pointer or a slice
+//! that the object does not own as its address.
 import anti.io;
 import anti.mem;
 import anti.text;

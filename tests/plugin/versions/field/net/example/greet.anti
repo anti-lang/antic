@@ -1,5 +1,5 @@
-//! The interface with a field added. Its table is the program's, and
-//! its objects are wider, which ends the compatibility.
+//! The interface with a field added. Its table is the program's, and its
+//! objects are wider, which ends the compatibility.
 
 /// A greeting a program prints.
 pub abstract class Greeter

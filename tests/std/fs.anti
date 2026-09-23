@@ -1,11 +1,10 @@
-//! Files and directories. A file is written, read back four bytes at a
-//! time, measured, found in the listing of its directory, renamed and
-//! removed. Every function of `anti.fs` may fail, and the calls that must
-//! fail read a `SystemError` with the number of a missing file, which is
-//! 2 on every system.
+//! Files and directories. A file is written, read back four bytes at a time,
+//! measured, found in the listing of its directory, renamed and removed. Every
+//! function of `anti.fs` may fail, and the calls that must fail read a
+//! `SystemError` with the number of a missing file, which is 2 on every system.
 //!
-//! The test runs in the build directory of the suite and leaves nothing
-//! there when it passes.
+//! The test runs in the build directory of the suite and leaves nothing there
+//! when it passes.
 import anti.error;
 import anti.fs;
 import anti.io;

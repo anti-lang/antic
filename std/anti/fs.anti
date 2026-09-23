@@ -1,15 +1,13 @@
 //! Files and directories.
 //!
-//! `open` gives a `File`, which `read`, `write` and `size` take and
-//! `close` ends. `list` gives the names of a directory, and `remove` and
-//! `rename` change what a directory holds. Every function of the module
-//! may fail, and the error is a `SystemError` with the number the system
-//! gave. A path goes to the system as the program wrote it, and Windows
-//! takes `/` as well as `\`.
+//! `open` gives a `File`, which `read`, `write` and `size` take and `close`
+//! ends. `list` gives the names of a directory, and `remove` and `rename`
+//! change what a directory holds. Every function of the module may fail, and
+//! the error is a `SystemError` with the number the system gave. A path goes to
+//! the system as the program wrote it, and Windows takes `/` as well as `\`.
 //!
-//! `FileSystem` is the standard interface. It works in whole files, so a
-//! fake of it holds the bytes of each path, and `SystemFileSystem` is
-//! its default.
+//! `FileSystem` is the standard interface. It works in whole files, so a fake
+//! of it holds the bytes of each path, and `SystemFileSystem` is its default.
 
 import anti.error;
 import anti.lang;
@@ -42,8 +40,7 @@ pub struct File
 	handle: ?*byte,
 }
 
-/// Open the file at `path` in `mode`, which reads when the call leaves it
-/// out.
+/// Open the file at `path` in `mode`, which reads when the call leaves it out.
 pub fn open(path: str, mode: Mode = Mode.Read) -> *File may fail
 {
 	let writing: c_int = 0;
@@ -59,8 +56,8 @@ pub fn open(path: str, mode: Mode = Mode.Read) -> *File may fail
 
 /// Read up to `into.len` bytes of `f` into `into`, and give their count.
 ///
-/// The count is below `into.len` only at the end of the file, and it is
-/// 0 once nothing is left.
+/// The count is below `into.len` only at the end of the file, and it is 0 once
+/// nothing is left.
 pub fn read(f: *File, into: []byte) -> int may fail
 {
 	let count = fread(into.ptr, 1 as c_size_t, into.len as c_size_t,
@@ -73,8 +70,8 @@ pub fn read(f: *File, into: []byte) -> int may fail
 
 /// Write every byte of `bytes` to `f`.
 ///
-/// The bytes may wait in a buffer until `close`, which is where a
-/// failure to store them shows.
+/// The bytes may wait in a buffer until `close`, which is where a failure to
+/// store them shows.
 pub fn write(f: *File, bytes: []byte) may fail
 {
 	let count = fwrite(bytes.ptr, 1 as c_size_t, bytes.len as c_size_t,
@@ -112,9 +109,9 @@ pub fn close(f: *File) may fail
 
 /// The names of the entries of the directory `path`.
 ///
-/// The names leave out `.` and `..` and come in the order the system
-/// gives. The slice and its names are one block, which the caller frees
-/// with `free(names.ptr)`.
+/// The names leave out `.` and `..` and come in the order the system gives. The
+/// slice and its names are one block, which the caller frees with
+/// `free(names.ptr)`.
 pub fn list(path: str) -> []str may fail
 {
 	let count = 0;
@@ -135,8 +132,8 @@ pub fn remove(path: str) may fail
 
 /// Give the file at `from` the path `to`.
 ///
-/// This is `rename` of the C library. A file already at `to` is replaced
-/// on Linux and macOS, and Windows refuses the call.
+/// This is `rename` of the C library. A file already at `to` is replaced on
+/// Linux and macOS, and Windows refuses the call.
 pub fn rename(from: str, to: str) may fail
 {
 	if anti_rt_fs_rename(from.ptr, from.len, to.ptr, to.len) != 0 {
@@ -146,8 +143,8 @@ pub fn rename(from: str, to: str) may fail
 
 /// The bytes of the whole file at `path`.
 ///
-/// The caller frees them with `free(bytes.ptr)`. An empty file gives a
-/// slice of no bytes, whose `ptr` is `none`.
+/// The caller frees them with `free(bytes.ptr)`. An empty file gives a slice of
+/// no bytes, whose `ptr` is `none`.
 pub fn read_file(path: str) -> []byte may fail
 {
 	let f = try open(path, Mode.Read);
@@ -166,8 +163,8 @@ pub fn read_file(path: str) -> []byte may fail
 	return []byte { ptr: room, len: got };
 }
 
-/// Write `bytes` as the whole file at `path`, which it creates or
-/// empties first.
+/// Write `bytes` as the whole file at `path`, which it creates or empties
+/// first.
 pub fn write_file(path: str, bytes: []byte) may fail
 {
 	let f = try open(path, Mode.Write);
@@ -178,23 +175,23 @@ pub fn write_file(path: str, bytes: []byte) may fail
 	try close(f);
 }
 
-/// The files a program reads and writes, which a class takes so that a
-/// test can hold them in memory.
+/// The files a program reads and writes, which a class takes so that a test can
+/// hold them in memory.
 ///
-/// The interface works in whole files, since a fake of it holds the
-/// bytes of each path. A program that reads a file in pieces calls
-/// `open` and `read` of the module instead.
+/// The interface works in whole files, since a fake of it holds the bytes of
+/// each path. A program that reads a file in pieces calls `open` and `read` of
+/// the module instead.
 pub abstract class FileSystem
 {
-	/// The bytes of the whole file at `path`, which the caller frees
-	/// with `free(bytes.ptr)`.
+	/// The bytes of the whole file at `path`, which the caller frees with
+	/// `free(bytes.ptr)`.
 	abstract fn read_file(self, path: str) -> []byte may fail;
 
 	/// Write `bytes` as the whole file at `path`.
 	abstract fn write_file(self, path: str, bytes: []byte) may fail;
 
-	/// The names of the entries of the directory `path`, which the
-	/// caller frees with `free(names.ptr)`.
+	/// The names of the entries of the directory `path`, which the caller frees
+	/// with `free(names.ptr)`.
 	abstract fn list(self, path: str) -> []str may fail;
 
 	/// Remove the file at `path`.
@@ -203,16 +200,15 @@ pub abstract class FileSystem
 	/// Give the file at `from` the path `to`.
 	abstract fn rename(self, from: str, to: str) may fail;
 
-	/// The provider the link takes where the build names none, which is
-	/// the file system of the machine.
+	/// The provider the link takes where the build names none, which is the
+	/// file system of the machine.
 	pub fn default() -> *FileSystem
 	{
 		return SystemFileSystem.get();
 	}
 }
 
-/// The file system of the machine, which is the default of
-/// `FileSystem`.
+/// The file system of the machine, which is the default of `FileSystem`.
 pub singleton class SystemFileSystem inherits FileSystem
 {
 	concrete fn read_file(self, path: str) -> []byte may fail

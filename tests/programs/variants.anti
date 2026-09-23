@@ -1,8 +1,8 @@
-//! A variant is a tag and a union of its cases, laid out by the C rules.
-//! A literal names its case, `switch` binds the fields of the case it
-//! takes, `if let` takes one case, `is` tests the tag and `tag` reads it.
-//! A variant is a value: a field, an element, a parameter and a result,
-//! passed and returned by value.
+//! A variant is a tag and a union of its cases, laid out by the C rules. A
+//! literal names its case, `switch` binds the fields of the case it takes, `if
+//! let` takes one case, `is` tests the tag and `tag` reads it. A variant is a
+//! value: a field, an element, a parameter and a result, passed and returned by
+//! value.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

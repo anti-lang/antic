@@ -1,13 +1,13 @@
-//! The text of a float is the same on every target. Each line writes one
-//! value in the shortest form and with a precision, in positional form and
-//! with an exponent. The values hold exact ties, which round to the even
-//! digit, the smallest and the largest double and float, and precisions
-//! that write every digit of the exact value.
+//! The text of a float is the same on every target. Each line writes one value
+//! in the shortest form and with a precision, in positional form and with an
+//! exponent. The values hold exact ties, which round to the even digit, the
+//! smallest and the largest double and float, and precisions that write every
+//! digit of the exact value.
 import anti.io;
 import anti.text;
 
-/// 2 to the power n, for n from -1074 to 1023, by halving or doubling,
-/// which is exact in every step.
+/// 2 to the power n, for n from -1074 to 1023, by halving or doubling, which is
+/// exact in every step.
 fn power(n: int) -> f64
 {
 	let v = 1.0;

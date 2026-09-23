@@ -1,6 +1,6 @@
-//! `alloc` and `free` name a function of a class and follow `.`, and
-//! stay keywords everywhere else. A module function, a field, a
-//! parameter and a local of either name are refused.
+//! `alloc` and `free` name a function of a class and follow `.`, and stay
+//! keywords everywhere else. A module function, a field, a parameter and a
+//! local of either name are refused.
 
 class Holder
 {

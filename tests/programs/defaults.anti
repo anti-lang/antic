@@ -1,6 +1,6 @@
-//! Default values of parameters. A call leaves out the parameters at the
-//! end that have a default, and each default fills its parameter. The
-//! default is a constant expression.
+//! Default values of parameters. A call leaves out the parameters at the end
+//! that have a default, and each default fills its parameter. The default is a
+//! constant expression.
 
 import anti.lang;
 
@@ -12,15 +12,15 @@ const LIMIT: int = 10;
 
 /// Every kind of constant as a default.
 fn open(path: str, mode: Mode = Mode.Write, retries: int = LIMIT * 2,
-        loud: bool = true, ratio: f64 = 0.5, tag: str = "plain")
+	loud: bool = true, ratio: f64 = 0.5, tag: str = "plain")
 {
 	printf("%.*s %d %d %d %.2f %.*s\n".ptr, path.len as c_int, path.ptr,
-	       mode as c_int, retries as c_int, loud as c_int, ratio,
-	       tag.len as c_int, tag.ptr);
+		mode as c_int, retries as c_int, loud as c_int, ratio,
+		tag.len as c_int, tag.ptr);
 }
 
-/// A default of a function that may fail, which has an out parameter
-/// after the ones it writes.
+/// A default of a function that may fail, which has an out parameter after the
+/// ones it writes.
 fn bounded(n: int, limit: int = 4) -> int may fail
 {
 	if n > limit { fail "n is over the limit"; }

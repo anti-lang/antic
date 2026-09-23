@@ -1,6 +1,6 @@
-//! `fatal` runs the function that `error.on_fatal` registered, prints the
-//! error to standard error and ends the program with its code. The hook
-//! lives in `anti.lang`, and `anti.error` stores into it.
+//! `fatal` runs the function that `error.on_fatal` registered, prints the error
+//! to standard error and ends the program with its code. The hook lives in
+//! `anti.lang`, and `anti.error` stores into it.
 import anti.error;
 import anti.io;
 import anti.lang;

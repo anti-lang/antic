@@ -1,8 +1,8 @@
-//! `anti.lang` is the root of the standard library and imports nothing.
-//! `Error` gives its text with the code and every cause below it, keeps
-//! the bytes until it is deleted, and leaves them out of `dup`, `equals`,
-//! `hash` and `serialize`. `NoneDereference` is the error of a `catch` on
-//! a `none` pointer.
+//! `anti.lang` is the root of the standard library and imports nothing. `Error`
+//! gives its text with the code and every cause below it, keeps the bytes until
+//! it is deleted, and leaves them out of `dup`, `equals`, `hash` and
+//! `serialize`. `NoneDereference` is the error of a `catch` on a `none`
+//! pointer.
 import anti.io;
 import anti.lang;
 import anti.text;

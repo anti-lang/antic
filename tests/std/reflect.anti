@@ -1,8 +1,8 @@
-//! A program reads its own classes. The descriptor of an object names
-//! the class, lists the fields it declares and the public functions of
-//! the whole chain. Each field record names the type of its field, and
-//! `get` and `set` reach one field by its index as a `Value`, and `try`
-//! forwards the error of `set`.
+//! A program reads its own classes. The descriptor of an object names the
+//! class, lists the fields it declares and the public functions of the whole
+//! chain. Each field record names the type of its field, and `get` and `set`
+//! reach one field by its index as a `Value`, and `try` forwards the error of
+//! `set`.
 import anti.io;
 import anti.lang;
 import anti.reflect;

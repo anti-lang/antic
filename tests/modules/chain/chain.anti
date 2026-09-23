@@ -1,8 +1,8 @@
-//! A class whose base is `dog.Dog`, whose base is `animal.Animal`: a
-//! chain over three modules. Dispatch, `super`, `is`, the fields,
-//! `construct` and `destruct` follow the chain across the modules. `Cat`
-//! calls the `construct` of its base in another module with an argument,
-//! through `self.super`, and passes its error on.
+//! A class whose base is `dog.Dog`, whose base is `animal.Animal`: a chain over
+//! three modules. Dispatch, `super`, `is`, the fields, `construct` and
+//! `destruct` follow the chain across the modules. `Cat` calls the `construct`
+//! of its base in another module with an argument, through `self.super`, and
+//! passes its error on.
 
 import anti.lang;
 import com.example.animal;

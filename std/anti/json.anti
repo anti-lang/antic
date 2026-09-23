@@ -1,16 +1,16 @@
 //! The JSON that `serialize` writes and `deserialize` reads.
 //!
-//! Every object writes itself as a JSON object. The default body of
-//! `serialize` writes the class name under `type`, then one member per
-//! field of the chain, the root's first. A field the field list cannot
-//! read is written as `null`, and a class that wants more replaces
-//! `serialize` and writes its members with the functions here.
+//! Every object writes itself as a JSON object. The default body of `serialize`
+//! writes the class name under `type`, then one member per field of the chain,
+//! the root's first. A field the field list cannot read is written as `null`,
+//! and a class that wants more replaces `serialize` and writes its members with
+//! the functions here.
 //!
-//! `Object.deserialize(input, from)` builds an object back from the JSON
-//! of the default `serialize`, in memory of the `anti.mem.Allocator`
-//! `from`. The functions here read the text of one member,
-//! for a class that writes its own members. `member` gives `false` for a
-//! member the object does not hold, and `unquote` may fail.
+//! `Object.deserialize(input, from)` builds an object back from the JSON of the
+//! default `serialize`, in memory of the `anti.mem.Allocator` `from`. The
+//! functions here read the text of one member, for a class that writes its own
+//! members. `member` gives `false` for a member the object does not hold, and
+//! `unquote` may fail.
 
 import anti.lang;
 import anti.text;
@@ -95,8 +95,8 @@ pub fn write_bool(value: bool, out: *text.Builder)
 
 /// The text of the member `name` of the JSON object `source`.
 ///
-/// The text is the member as it stands, quotes included for a string.
-/// The result is false when the object holds no such member.
+/// The text is the member as it stands, quotes included for a string. The
+/// result is false when the object holds no such member.
 pub fn member(source: str, name: str, out: *str) -> bool
 {
 	let i = skip_space(source, 0);
@@ -138,13 +138,11 @@ pub fn member(source: str, name: str, out: *str) -> bool
 	return false;
 }
 
-/// Write the bytes of the JSON string `source` into `out`, which may
-/// fail.
+/// Write the bytes of the JSON string `source` into `out`, which may fail.
 ///
-/// A `source` that is no JSON string fails with code 0, and `out` keeps
-/// the bytes written before the fault. The escapes `\"`, `\\`, `\/`,
-/// `\n`, `\r`, `\t`, `\b` and `\f` are read, and a `\u` escape is left as
-/// it stands.
+/// A `source` that is no JSON string fails with code 0, and `out` keeps the
+/// bytes written before the fault. The escapes `\"`, `\\`, `\/`, `\n`, `\r`,
+/// `\t`, `\b` and `\f` are read, and a `\u` escape is left as it stands.
 pub fn unquote(source: str, out: *text.Builder) may fail
 {
 	if source.len < 2 || source[0] != 0x22 {

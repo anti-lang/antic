@@ -1,6 +1,6 @@
-//! Four dispatched workers add to one counter, each addition inside a
-//! `sync` on the counter's mutex, so the total counts every one. A worker
-//! takes a Mutex beside its values, and a copy names the same mutex.
+//! Four dispatched workers add to one counter, each addition inside a `sync` on
+//! the counter's mutex, so the total counts every one. A worker takes a Mutex
+//! beside its values, and a copy names the same mutex.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

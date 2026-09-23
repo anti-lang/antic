@@ -1,6 +1,6 @@
-//! A class names the interfaces it needs, and the manifest names who
-//! provides each. `[inject.test]` replaces the provider of `Logger`
-//! for `anti test` and leaves the one of `Clock` as the build has it.
+//! A class names the interfaces it needs, and the manifest names who provides
+//! each. `[inject.test]` replaces the provider of `Logger` for `anti test` and
+//! leaves the one of `Clock` as the build has it.
 pub abstract class Logger
 {
 	pub abstract fn label(self) -> int;

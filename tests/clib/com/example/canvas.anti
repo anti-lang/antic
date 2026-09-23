@@ -1,6 +1,6 @@
-//! Shapes a C program can build, measure and end. The class carries its
-//! table pointer first, so C reads the layout as nested structs and calls
-//! the entry through the table.
+//! Shapes a C program can build, measure and end. The class carries its table
+//! pointer first, so C reads the layout as nested structs and calls the entry
+//! through the table.
 
 import anti.lang;
 

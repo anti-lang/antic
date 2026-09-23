@@ -1,7 +1,7 @@
-//! A library for C whose signatures name tuples. A tuple crosses as the
-//! struct the header writes for it, one per distinct tuple of an
-//! exported signature. A function that may fail gives its tuple through
-//! one out pointer, the last parameter, and not one per element.
+//! A library for C whose signatures name tuples. A tuple crosses as the struct
+//! the header writes for it, one per distinct tuple of an exported signature. A
+//! function that may fail gives its tuple through one out pointer, the last
+//! parameter, and not one per element.
 
 import anti.lang;
 

@@ -1,7 +1,7 @@
-//! `by -k` walks the values of `by k` in reverse. `for i in 0..10 by -3`
-//! gives `9 6 3 0`, the values of `by 3` from the last, and not `7 4 1`,
-//! which a walk down from the high bound would give. Each range runs with
-//! constant bounds and again with bounds the loop reads at run time.
+//! `by -k` walks the values of `by k` in reverse. `for i in 0..10 by -3` gives
+//! `9 6 3 0`, the values of `by 3` from the last, and not `7 4 1`, which a walk
+//! down from the high bound would give. Each range runs with constant bounds
+//! and again with bounds the loop reads at run time.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

@@ -1,5 +1,5 @@
-//! A host that calls both functions of the interface, so the slot of
-//! each stands in the bitmap the program carries.
+//! A host that calls both functions of the interface, so the slot of each
+//! stands in the bitmap the program carries.
 
 import anti.io;
 import anti.plugin;

@@ -1,6 +1,6 @@
-//! An index past the end of an array. A build with the checks prints the
-//! file, the line, the operation and the values, then aborts. A build
-//! without them reads the memory and exits with 7.
+//! An index past the end of an array. A build with the checks prints the file,
+//! the line, the operation and the values, then aborts. A build without them
+//! reads the memory and exits with 7.
 
 fn opaque(n: int) -> int
 {

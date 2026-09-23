@@ -1,10 +1,10 @@
-//! The error convention: a function that can fail is declared `may fail`,
-//! and every call of one handles the error. `catch` handles it at the
-//! call, `try` hands it to the caller, and a `try` block gives one handler
-//! to a whole block. `fail "text";` builds an `Error` with code 0.
+//! The error convention: a function that can fail is declared `may fail`, and
+//! every call of one handles the error. `catch` handles it at the call, `try`
+//! hands it to the caller, and a `try` block gives one handler to a whole
+//! block. `fail "text";` builds an `Error` with code 0.
 //!
-//! `Error` lives in `anti.lang`. `anti.error` adds `SystemError`, the
-//! error of a failing system call, and `check` for a hand-written result.
+//! `Error` lives in `anti.lang`. `anti.error` adds `SystemError`, the error of
+//! a failing system call, and `check` for a hand-written result.
 import anti.error;
 import anti.io;
 import anti.lang;
@@ -34,8 +34,8 @@ fn size_of_file(path: str) -> int may fail
 
 /// A failing function whose result is itself a `?*T`.
 ///
-/// Its `catch` handles the error of the call, not the pointer, and the
-/// handler yields a pointer of the same type.
+/// Its `catch` handles the error of the call, not the pointer, and the handler
+/// yields a pointer of the same type.
 fn first_line(path: str) -> ?*byte may fail
 {
 	let file = fopen(path.ptr, "r".ptr);

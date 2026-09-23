@@ -1,7 +1,6 @@
-//! A singleton has one instance, which `get` makes on the first call
-//! and every later call reads. A field is read-only after creation,
-//! `mutable` marks one the program writes, and an atomic field has
-//! its own operations.
+//! A singleton has one instance, which `get` makes on the first call and every
+//! later call reads. A field is read-only after creation, `mutable` marks one
+//! the program writes, and an atomic field has its own operations.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 singleton class Config
