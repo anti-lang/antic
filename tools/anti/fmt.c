@@ -1115,8 +1115,15 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     case TOKEN_SEMICOLON:
         append_piece(e, p, space_before(e, p));
         if (e->brackets == 0 && e->inlined == 0) {
-            flush(e);
-            e->cont = false;
+            /* One statement per line ends the line here, unless an
+               ordinary comment stands behind the `;`. A comment keeps
+               its position, so the line ends after it. */
+            if (index + 1 >= l->count ||
+                l->items[index + 1].kind != PIECE_COMMENT ||
+                l->items[index + 1].line != p->end_line) {
+                flush(e);
+                e->cont = false;
+            }
             reset_statement(e);
             e->do_tail = false;
             e->after_do = false;

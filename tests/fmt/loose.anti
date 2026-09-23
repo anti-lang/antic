@@ -47,7 +47,7 @@ pub fn count(n: int) -> int
   }
   let p = Point { x: 1.0,
       y: 2.0 };
-  let q = []f64 { ptr: none, len: 0 };
+  let q = []f64 { ptr: none, len: 0 };      // an empty slice
   for k in 0..10 by -3 {
     seen = seen + k + q.len;
   }

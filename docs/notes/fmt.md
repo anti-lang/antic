@@ -29,7 +29,8 @@ one, and the rules move the breaks they name:
 - The brace of a statement block joins the line of its statement, so a break
   before it goes.
 - `else` after `}` and the `while` of a `do` block after `}` join that line.
-- A `;` outside brackets ends the line.
+- A `;` outside brackets ends the line, unless an ordinary comment stands
+  behind it. A comment keeps its position, so the line ends after it.
 
 A line that carries an open statement takes one extra tab, which is the wrapped
 continuation line of the rules. The level of a line is the number of open
