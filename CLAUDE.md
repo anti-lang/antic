@@ -247,8 +247,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 783 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 782 each, without the `no_paths` test, which needs a
+- 786 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 785 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -278,9 +278,11 @@ reports what it finished.
   another allocator. `alloc` and `free` name a function of a class and follow
   `.`. See "`anti.mem`" in `docs/decisions.md`.
   `Object.deserialize(input, from)` takes the object, its strings and its
-  owned objects from the `Allocator` `from`, and `f"..."(from)` takes its
-  text from one. The runtime calls `alloc` and `free` as table entries 8
-  and 9.
+  owned objects from the `Allocator` `from`. `destroy(p, from)` and
+  `delete(p, from)` run the destruct chain and give the owned memory back
+  to `from`, and `delete` the object as well. `text.Builder.take_in(from)`
+  gives a text in memory of one, and `f"..."` takes none. The runtime
+  calls `alloc` and `free` as table entries 8 and 9.
 - Simd structs are built. `simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }`
   declares a vector whose fields are its lanes. The element-wise operators,
   the masks of the comparisons, `simd.select`, `simd.any` and `simd.all` of
