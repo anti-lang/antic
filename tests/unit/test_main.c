@@ -43,6 +43,7 @@ void test_toml(void);
 void test_json(void);
 void test_bind(void);
 void test_deps(void);
+void test_zip(void);
 
 int main(void)
 {
@@ -86,6 +87,7 @@ int main(void)
     test_json();
     test_bind();
     test_deps();
+    test_zip();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

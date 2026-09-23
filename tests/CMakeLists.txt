@@ -49,12 +49,14 @@ add_executable(antic_unit_tests
     unit/test_json.c
     unit/test_bind.c
     unit/test_deps.c
+    unit/test_zip.c
     ../src/anti/bindexpr.c
     ../src/anti/bindtype.c
     ../src/anti/deps.c
     ../src/anti/files.c
     ../src/anti/manifest.c
     ../src/anti/repo.c
+    ../src/anti/zip.c
     ../src/rt/cpu.c
     ../src/rt/f16.c
     ../src/rt/json.c

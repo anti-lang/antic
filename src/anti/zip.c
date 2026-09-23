@@ -209,19 +209,15 @@ static bool find_end(const struct text *bytes, size_t *at)
     }
 }
 
-bool zip_read(const char *path, struct zip_archive *out)
+/* The central directory of the archive in out->bytes into out->items. */
+static bool read_directory(const char *path, struct zip_archive *out)
 {
-    const unsigned char *p;
+    const unsigned char *p = (const unsigned char *)out->bytes.data;
     size_t end;
     size_t at;
     size_t count;
     size_t i;
 
-    memset(out, 0, sizeof *out);
-    if (!read_file(path, &out->bytes)) {
-        return false;
-    }
-    p = (const unsigned char *)out->bytes.data;
     if (!find_end(&out->bytes, &end)) {
         fprintf(stderr, "anti: %s is no zip archive\n", path);
         return false;
@@ -253,16 +249,29 @@ bool zip_read(const char *path, struct zip_archive *out)
             fprintf(stderr, "anti: %s has a broken entry\n", path);
             return false;
         }
-        text_append_bytes(&item->name, p + at + 46, name_length);
         item->offset = local + 30 + get16(p + local + 26) +
                        get16(p + local + 28);
         if (item->offset + item->packed > at) {
-            fprintf(stderr, "anti: %s: the data of %s runs past its end\n",
-                    path, text_cstr(&item->name));
+            fprintf(stderr, "anti: %s: the data of %.*s runs past its end\n",
+                    path, (int)name_length, (const char *)p + at + 46);
             return false;
         }
+        /* The entry is counted with its name, so that
+           zip_archive_free frees every name the loop took. */
+        text_append_bytes(&item->name, p + at + 46, name_length);
         out->count++;
         at += 46 + name_length + get16(p + at + 30) + get16(p + at + 32);
+    }
+    return true;
+}
+
+/* On failure out is left empty, so a caller frees nothing. */
+bool zip_read(const char *path, struct zip_archive *out)
+{
+    memset(out, 0, sizeof *out);
+    if (!read_file(path, &out->bytes) || !read_directory(path, out)) {
+        zip_archive_free(out);
+        return false;
     }
     return true;
 }
@@ -283,7 +292,12 @@ void zip_archive_free(struct zip_archive *a)
    does. A table holds the count of codes per length and the symbols in
    order of their code. The decoder walks it one bit at a time. It is
    the slow form and the short one, and an archive of symbols is
-   unpacked once. */
+   unpacked once.
+
+   The output is bounded by the size the entry declares. A copy of 258
+   bytes costs a few bits, so a stream of a few megabytes would
+   otherwise ask for gigabytes. out holds from bytes before the entry,
+   which no copy reaches back into. */
 struct inflate {
     const unsigned char *in;
     size_t length;
@@ -291,7 +305,20 @@ struct inflate {
     unsigned long bits;
     int held;
     struct text *out;
+    size_t from;
+    size_t limit;
 };
+
+/* Append n bytes to the output, or return false when the entry would
+   pass its declared size. */
+static bool emit(struct inflate *s, const void *bytes, size_t n)
+{
+    if (n > s->limit - (s->out->length - s->from)) {
+        return false;
+    }
+    text_append_bytes(s->out, bytes, n);
+    return true;
+}
 
 struct huffman {
     short count[16];
@@ -395,7 +422,9 @@ static bool codes(struct inflate *s, const struct huffman *lengths,
         }
         if (symbol < 256) {
             char byte = (char)symbol;
-            text_append_bytes(s->out, &byte, 1);
+            if (!emit(s, &byte, 1)) {
+                return false;
+            }
             continue;
         }
         if (symbol == 256) {
@@ -411,12 +440,14 @@ static bool codes(struct inflate *s, const struct huffman *lengths,
             return false;
         }
         distance = (size_t)dbase[symbol] + more;
-        if (distance > s->out->length) {
+        if (distance > s->out->length - s->from) {
             return false;
         }
         for (i = 0; i < length; i++) {
             char byte = s->out->data[s->out->length - distance];
-            text_append_bytes(s->out, &byte, 1);
+            if (!emit(s, &byte, 1)) {
+                return false;
+            }
         }
     }
 }
@@ -537,15 +568,15 @@ static bool stored(struct inflate *s)
         return false;
     }
     s->at += 4;
-    if (s->at + length > s->length) {
+    if (s->at + length > s->length || !emit(s, s->in + s->at, length)) {
         return false;
     }
-    text_append_bytes(s->out, s->in + s->at, length);
     s->at += length;
     return true;
 }
 
-static bool inflate(const unsigned char *in, size_t length, struct text *out)
+static bool inflate(const unsigned char *in, size_t length, size_t limit,
+                    struct text *out)
 {
     struct inflate s;
     unsigned long last;
@@ -558,6 +589,8 @@ static bool inflate(const unsigned char *in, size_t length, struct text *out)
     s.bits = 0;
     s.held = 0;
     s.out = out;
+    s.from = out->length;
+    s.limit = limit;
     do {
         if (!need(&s, 1, &last) || !need(&s, 2, &type)) {
             return false;
@@ -584,7 +617,7 @@ bool zip_unpack(const struct zip_archive *a, size_t index, struct text *out)
             text_append_bytes(out, data, item->size);
         }
     } else if (item->method == 8) {
-        ok = inflate(data, item->packed, out) &&
+        ok = inflate(data, item->packed, item->size, out) &&
              out->length - from == item->size;
     } else {
         fprintf(stderr, "anti: %s is packed with method %u, and the reader "
