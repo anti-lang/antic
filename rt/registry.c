@@ -126,13 +126,24 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
    that before deserialize took an allocator. A string takes one. */
 #define OBJECT_ALIGN 16
 
+/* An object whose construct ran, and the field of the object that owns
+   it, or NULL before the reader stores it there. */
+struct built {
+    void *object;
+    void **owner;
+};
+
 /* The blocks that one deserialize took from its allocator, which a
-   failure gives back. The list is memory of the runtime and goes before
+   failure gives back, and the objects it prepared, which a failure
+   destroys first. The lists are memory of the runtime and go before
    deserialize returns. */
 struct made {
     void **blocks;
     int64_t count;
     int64_t room;
+    struct built *objects;
+    int64_t object_count;
+    int64_t object_room;
 };
 
 struct reader {
@@ -172,15 +183,59 @@ static void *lend(struct reader *r, size_t size, int64_t align)
     return p;
 }
 
-/* Give every block the reader took back to its allocator, the last
-   first. */
+/* Room for one more prepared object, taken before its construct runs,
+   so that every object whose construct ran is on the list. */
+static bool room_for_object(struct made *m)
+{
+    if (m->object_count == m->object_room) {
+        int64_t room = m->object_room == 0 ? 8 : m->object_room * 2;
+        struct built *objects =
+            realloc(m->objects, (size_t)room * sizeof *objects);
+        if (objects == NULL) {
+            return false;
+        }
+        m->objects = objects;
+        m->object_room = room;
+    }
+    return true;
+}
+
+/* Record that owner, a field of another object, holds object. */
+static void owned_by(struct made *m, void *object, void **owner)
+{
+    int64_t i;
+
+    for (i = m->object_count - 1; i >= 0; i--) {
+        if (m->objects[i].object == object) {
+            m->objects[i].owner = owner;
+            return;
+        }
+    }
+}
+
+/* DESIGN: a text that fails undoes what the reader built. Every object
+   whose construct ran is destroyed, the newest first, and only then does
+   every block go back to the allocator. Each owning field is cleared
+   first. The teardown of an object then reaches none of the objects the
+   reader made for it, which have their own place on the list. The
+   teardowns give nothing back, since the blocks go back afterwards. */
 static void give_back(struct reader *r)
 {
     void (*give)(struct anti_object *, void *) =
         (void (*)(struct anti_object *, void *))(
             void *)r->from->table[ANTI_ENTRY_FREE];
     struct made *m = r->made;
+    int64_t i;
 
+    for (i = m->object_count - 1; i >= 0; i--) {
+        if (m->objects[i].owner != NULL) {
+            *m->objects[i].owner = NULL;
+        }
+    }
+    while (m->object_count > 0) {
+        anti_rt_destroy_from(m->objects[--m->object_count].object, NULL,
+                             &anti_rt_give_nothing);
+    }
     while (m->count > 0) {
         give(r->from, m->blocks[--m->count]);
     }
@@ -558,6 +613,7 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
             if (!read_owned(r, &value, type, d, depth)) {
                 return false;
             }
+            owned_by(r->made, value, (void **)bytes);
         } else {
             unsigned long long address;
             if (!read_number(r, number, sizeof number) || number[0] == '-') {
@@ -638,8 +694,8 @@ static bool fill(struct reader *r, void *object,
    "type" member names, in memory of the allocator. It is prepared as a
    literal of the class would be and then filled from the other members.
    A construct with arguments does not run, because the fields come from
-   the text. A failure leaves what was built to deserialize, which gives
-   every block back without a destruct. On success the caller runs the
+   the text. A failure leaves what was built to deserialize, which
+   destroys it and gives every block back. On success the caller runs the
    destructs with destroy(p, from), which gives the owned memory back to
    the same allocator. */
 static void *read_object(struct reader *r,
@@ -658,18 +714,24 @@ static void *read_object(struct reader *r,
         (c->flags & ANTI_CLASS_REQUIRED) != 0) {
         return NULL;
     }
+    if (!room_for_object(r->made)) {
+        return NULL;
+    }
     object = lend(r, (size_t)c->descriptor->size, OBJECT_ALIGN);
     if (object == NULL) {
         return NULL;
     }
     c->init(object);
+    r->made->objects[r->made->object_count].object = object;
+    r->made->objects[r->made->object_count].owner = NULL;
+    r->made->object_count++;
     return fill(r, object, c->descriptor, true, depth) ? object : NULL;
 }
 
 void *anti_lang_Object_deserialize(struct anti_text input,
                                    struct anti_object *from)
 {
-    struct made made = {NULL, 0, 0};
+    struct made made = {NULL, 0, 0, NULL, 0, 0};
     struct reader r;
     void *object;
 
@@ -687,5 +749,6 @@ void *anti_lang_Object_deserialize(struct anti_text input,
         object = NULL;
     }
     free(made.blocks);
+    free(made.objects);
     return object;
 }

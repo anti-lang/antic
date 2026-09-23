@@ -1,0 +1,156 @@
+//! A text that fails late undoes what `Object.deserialize` built. The reader
+//! runs the destruct of every object whose `construct` already ran, newest
+//! first, and only then gives every block back to the allocator. `Tally` counts
+//! the memory and the resources each `construct` took and each `destruct` gave
+//! back, and `Kept` counts the blocks still lent, which is the leak check. The
+//! first text fails in the last member of the outer object, after two objects
+//! it owns. The second fails inside an owned object, whose `construct` ran
+//! already.
+import anti.mem;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+/// The most blocks that `Kept` lends.
+const ROOM: int = 32;
+
+/// An allocator over the C library that remembers every block it lends until
+/// the block comes back.
+class Kept inherits mem.Allocator
+{
+	blocks: ?*?*byte = none,
+	pub lent: int = 0,
+	pub live: int = 0,
+
+	/// An allocator with room to remember `ROOM` blocks.
+	pub fn new() -> Kept
+	{
+		return Kept { blocks: alloc(?*byte, ROOM) };
+	}
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let blocks = self.blocks else { return none; };
+		if self.lent == ROOM {
+			return none;
+		}
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		blocks[self.lent] = p;
+		self.lent += 1;
+		self.live += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		let blocks = self.blocks else { return; };
+		let i = 0;
+		while i < self.lent do {
+			if p != none && blocks[i] == p {
+				blocks[i] = none;
+				self.live -= 1;
+				mem.LibcAllocator.get().free(p);
+				return;
+			}
+			i += 1;
+		}
+	}
+
+	fn destruct(self)
+	{
+		free(self.blocks);
+	}
+}
+
+/// What the classes below take and give back.
+singleton class Tally
+{
+	pub mutable taken: int = 0,
+	pub mutable given: int = 0,
+	pub mutable opened: int = 0,
+	pub mutable closed: int = 0,
+}
+
+/// A class whose `construct` takes memory of its own from the C library, which
+/// its `destruct` gives back there.
+class Scratch
+{
+	pub size: int = 0,
+	transient buffer: ?*byte = none,
+
+	fn construct(self)
+	{
+		self.buffer = alloc(byte, 64);
+		Tally.get().taken += 1;
+	}
+
+	fn destruct(self)
+	{
+		printf("destruct Scratch %d\n".ptr, self.size as c_int);
+		free(self.buffer);
+		Tally.get().given += 1;
+	}
+}
+
+/// A class that holds a resource from its `construct` to its `destruct`.
+class Holder
+{
+	pub label: int = 0,
+
+	fn construct(self)
+	{
+		Tally.get().opened += 1;
+	}
+
+	fn destruct(self)
+	{
+		printf("destruct Holder %d\n".ptr, self.label as c_int);
+		Tally.get().closed += 1;
+	}
+}
+
+class Outer
+{
+	pub title: str = "",
+	pub own first: ?*Scratch = none,
+	pub own second: ?*Holder = none,
+	pub holder: Holder = Holder { },
+	pub count: int = 0,
+
+	fn destruct(self)
+	{
+		printf("destruct Outer\n".ptr);
+	}
+}
+
+/// Print what `Tally` has counted so far.
+fn tally(when: str)
+{
+	let t = Tally.get();
+	printf("%s: taken %d, given %d, opened %d, closed %d\n".ptr, when.ptr,
+		t.taken as c_int, t.given as c_int, t.opened as c_int,
+		t.closed as c_int);
+}
+
+fn main() -> int
+{
+	let late = Kept.new();
+	let refused = Object.deserialize(
+		"{\"type\":\"Outer\",\"title\":\"oak\",\"first\":{\"type\":\"Scratch\",\"size\":1},\"second\":{\"type\":\"Holder\",\"label\":2},\"holder\":{\"label\":3},\"count\":\"x\"}",
+		&late);
+	printf("late: none %d, %d lent, %d live\n".ptr, (refused == none) as c_int,
+		late.lent as c_int, late.live as c_int);
+	tally("after late");
+
+	let inside = Kept.new();
+	let failed = Object.deserialize(
+		"{\"type\":\"Outer\",\"first\":{\"type\":\"Scratch\",\"size\":4},\"second\":{\"type\":\"Holder\",\"label\":\"x\"}}",
+		&inside);
+	printf("inside: none %d, %d lent, %d live\n".ptr,
+		(failed == none) as c_int, inside.lent as c_int,
+		inside.live as c_int);
+	tally("after inside");
+	return 0;
+}

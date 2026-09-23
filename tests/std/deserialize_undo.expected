@@ -1,0 +1,13 @@
+exit 0
+destruct Holder 2
+destruct Scratch 1
+destruct Outer
+destruct Holder 3
+late: none 1, 4 lent, 0 live
+after late: taken 1, given 1, opened 2, closed 2
+destruct Holder 0
+destruct Scratch 4
+destruct Outer
+destruct Holder 0
+inside: none 1, 3 lent, 0 live
+after inside: taken 2, given 2, opened 4, closed 4

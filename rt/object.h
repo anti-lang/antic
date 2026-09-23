@@ -223,6 +223,10 @@ void *anti_rt_dup(void *object, const struct anti_descriptor *type);
    NULL. */
 void anti_rt_give(struct anti_object *from, void *p);
 
+/* The allocator that takes nothing back. A teardown given it runs every
+   destruct and leaves the memory where it is. */
+extern struct anti_object anti_rt_give_nothing;
+
 /* Run the destruct body of each class of the chain, destroy every object
    the chain owns, free every buffer it owns, and free the object. */
 void anti_rt_delete(void *object, const struct anti_descriptor *type);

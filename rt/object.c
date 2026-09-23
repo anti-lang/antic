@@ -625,10 +625,15 @@ void *anti_rt_dup(void *object, const struct anti_descriptor *type)
     return made + ((char *)object - start);
 }
 
+struct anti_object anti_rt_give_nothing = {NULL};
+
 void anti_rt_give(struct anti_object *from, void *p)
 {
     void (*give)(struct anti_object *, void *);
 
+    if (from == &anti_rt_give_nothing) {
+        return;
+    }
     if (from == NULL) {
         free(p);
         return;
