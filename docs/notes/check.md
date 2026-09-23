@@ -1,10 +1,10 @@
 # The check command
 
-The choices inside `anti check`, its classes and the formatting rules it
-reads. The rules are in "Check command" of `docs/tooling-addendum.md`, and
-the settled points are in `docs/decisions.md` under "The check command".
-`tools/anti/check.c` holds the classes and `tools/anti/format.c` the
-formatting rules.
+The choices inside `anti check` and its classes. The rules are in "Check
+command" of `docs/tooling-addendum.md`, and the settled points are in
+`docs/decisions.md` under "The check command". `tools/anti/check.c` holds
+the classes, and the formatting class calls `anti fmt`, whose choices are
+in `docs/notes/fmt.md`.
 
 ## The run
 
