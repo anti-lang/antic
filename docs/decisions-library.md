@@ -1,0 +1,7 @@
+# Decisions of the library reader
+
+Decisions made while fixing the library reader, `src/antic/antl.c`, in step 4 of the fix steps of `docs/audit/summary.md`. A later step folds them into `docs/decisions.md`.
+
+- [provisional] A member of a class body read from a library file takes `self` when the first parameter of its function type is `*C`, where `C` is the class. The file does not record the mark. The reader refuses a member whose type is not a function, a bound function type, and one whose parameter count differs from the names the declaration wrote plus `self` plus the out pointer of `may fail`. Reason: the reader used to set `self` on every member, and the `get` of a singleton takes none, so the mark has to come from somewhere. The type is the one source that needs no change of the format. A function of a class body that takes no `self` and whose first parameter is `*C` reads as one that takes `self`. A flag in the marks byte of the member removes that case, with a new format version.
+- [provisional] A text constant read from a library file has the type `str` or `[]u8`. Reason: those are the types the checker gives a text literal and a bytes literal.
+- [provisional] Every field of a simd aggregate of the IR is a lane: no bitfield, and not the unit break `_`. Reason: the checker makes each field of a `simd struct` a whole lane, and layout divides by the bytes of the lanes.
