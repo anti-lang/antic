@@ -506,7 +506,7 @@ bool bind_eval(struct bind_module *b, const char *expr, bind_lookup lookup,
    value. printf's %g needs 9 of them for a c_float and 17 for a
    c_double. Anti reads a literal with a `.` or an exponent as a float, so one
    without either gains `.0`. */
-static void float_text(double f, const char *type, struct text *out)
+void bind_float_text(double f, const char *type, struct text *out)
 {
     char digits[64];
 
@@ -580,7 +580,7 @@ bool bind_eval_const(struct bind_module *b, const char *name,
         break;
     case BIND_EVAL_FLOAT:
         c->type = v->type;
-        float_text(v->f, v->type, &value);
+        bind_float_text(v->f, v->type, &value);
         break;
     case BIND_EVAL_STRING:
         c->type = "str";

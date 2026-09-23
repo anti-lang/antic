@@ -4,7 +4,7 @@
 #   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   WORK      a directory for the output
-#   CASE      header, clang, raymath, api or refusals
+#   CASE      header, clang, raymath, raylib, api or refusals
 #   SOURCES   tests/clib, for the case header
 #   DUMP      tests/dump, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -144,6 +144,23 @@ elseif(CASE STREQUAL "raymath")
     file(WRITE "${WORK}/raymath_calls.expected" "${printed}\n")
     expect_calls(raymath "${RAYLIB}/src" "${BIND}/raymath_calls.anti"
                  "${WORK}/raymath_calls.expected")
+elseif(CASE STREQUAL "raylib")
+    # anti.raylib comes from raylib.h of the pinned raylib, the header that
+    # raylib compiles. It compiles, names its frameworks, turns the colour
+    # macros into constants of Color, and its two probes agree.
+    run("${ANTI}" bind --clang "${RAYLIB}/src/raylib.h" --probe
+        -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(READ "${WORK}/out/raylib.anti" module)
+    foreach(line "link framework \"Cocoa\";"
+            "pub const RAYWHITE: Color = Color { r: 245, g: 245, b: 245, a: 255 };"
+            "pub extern fn SetConfigFlags(flags: c_uint);")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "raylib.anti holds no line `${line}`")
+        endif()
+    endforeach()
+    compile_binding(raylib anti.raylib --anti-internal)
+    compare_probes(raylib "${RAYLIB}/src")
 elseif(CASE STREQUAL "api")
     # A description in the format of rlparser, a part of raylib_api.json,
     # binds as anti.raylib with its frameworks and compiles. The file of

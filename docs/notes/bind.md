@@ -62,6 +62,11 @@ for a `c_double`. A macro that is one enumerator
 becomes a constant of the enum. Every other macro is skipped with a
 warning.
 
+A compound literal of a bound struct, `(Color){ 200, 200, 200, 255 }`,
+becomes a constant of the struct when it gives one constant per field in
+field order. A leading call of a macro whose body is its one parameter, as
+raylib's `CLITERAL(Color)` is, is put in place first.
+
 rlparser gives each define a kind. `INT`, `FLOAT`, `FLOAT_MATH`, `STRING`
 and `UNKNOWN` go through the same evaluator, so a define and a macro give
 the same constant. `COLOR` becomes a struct literal of the struct it names.

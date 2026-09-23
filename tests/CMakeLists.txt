@@ -903,7 +903,7 @@ set(anti_bind_cc ${ANTIC_TEST_CC})
 if(APPLE)
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
 endif()
-set(anti_bind_cases header clang raymath api)
+set(anti_bind_cases header clang raymath raylib api)
 if(NOT WIN32)
     # The case refusals stands a shell script in for clang.
     list(APPEND anti_bind_cases refusals)

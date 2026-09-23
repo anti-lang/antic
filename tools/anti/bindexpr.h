@@ -34,6 +34,10 @@ typedef bool (*bind_lookup)(void *context, const char *name,
 bool bind_eval(struct bind_module *b, const char *expr, bind_lookup lookup,
                void *context, struct bind_eval *out);
 
+/* Append a float as Anti writes it, with the digits of type that give
+   the same value back. Digits without a point gain `.0`. */
+void bind_float_text(double f, const char *type, struct text *out);
+
 /* Add a `pub const` of the value to b. */
 bool bind_eval_const(struct bind_module *b, const char *name,
                      const struct bind_eval *v, const char *doc);

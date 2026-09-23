@@ -199,6 +199,14 @@ struct macro {
     struct bind_eval value;
 };
 
+/* A macro of one parameter, which a compound literal may name, as
+   raylib's `CLITERAL(type)` is. */
+struct fn_macro {
+    const char *name;
+    const char *param;
+    const char *body;
+};
+
 struct pack {
     long line;
     int value;                  /* 0: no pack */
@@ -222,6 +230,7 @@ struct reader {
     struct bind_list macros;    /* struct macro * */
     struct bind_list packs;     /* struct pack * */
     struct bind_list fns;       /* struct fn_entry * */
+    struct bind_list fn_macros; /* struct fn_macro * */
     const char *file;           /* of the last location clang wrote */
     long line;
     bool failed;
@@ -1011,6 +1020,15 @@ static void read_preprocessed(struct reader *r, char *text)
                     n++;
                 }
                 if (name[n] == '(') {
+                    const char *close = strchr(name + n, ')');
+                    if (close != NULL && close[1] == ' ') {
+                        struct fn_macro *f = arena_alloc(&r->b->arena, sizeof *f);
+                        f->name = bind_strndup(r->b, name, n);
+                        f->param = bind_strndup(r->b, name + n + 1,
+                                                (size_t)(close - name) - n - 1);
+                        f->body = bind_strdup(r->b, close + 2);
+                        bind_list_add(&r->fn_macros, f);
+                    }
                     bind_warn(r->b, "the macro `%.*s` takes arguments and is "
                               "skipped", (int)n, name);
                 } else if (n > 0) {
@@ -1065,6 +1083,140 @@ static void read_preprocessed(struct reader *r, char *text)
     }
 }
 
+static const char *skip_space(const char *s)
+{
+    while (*s == ' ' || *s == '\t') {
+        s++;
+    }
+    return s;
+}
+
+/* The text of a macro with its leading call expanded. The call names a
+   macro of one parameter whose body is that parameter, bare or in
+   parentheses. `CLITERAL(Color){ 1, 2 }` becomes `(Color){ 1, 2 }`. */
+static const char *expand_identity(struct reader *r, const char *text)
+{
+    size_t i;
+
+    for (i = 0; i < r->fn_macros.count; i++) {
+        const struct fn_macro *f = r->fn_macros.items[i];
+        size_t n = strlen(f->name);
+        const char *arg;
+        const char *close;
+        struct text out = {0};
+        const char *result;
+        char paren[160];
+        if (strncmp(text, f->name, n) != 0 || text[n] != '(') {
+            continue;
+        }
+        snprintf(paren, sizeof paren, "(%s)", f->param);
+        if (strcmp(f->body, f->param) != 0 && strcmp(f->body, paren) != 0) {
+            continue;
+        }
+        arg = text + n + 1;
+        close = strchr(arg, ')');
+        if (close == NULL) {
+            return text;
+        }
+        text_appendf(&out, "%s%.*s%s%s", f->body[0] == '(' ? "(" : "",
+                     (int)(close - arg), arg, f->body[0] == '(' ? ")" : "",
+                     close + 1);
+        result = bind_strdup(r->b, text_cstr(&out));
+        text_free(&out);
+        return result;
+    }
+    return text;
+}
+
+/* DESIGN: a macro may be a compound literal of a bound struct, with one
+   constant per field in the order of the fields. It becomes a constant of
+   the struct. raylib writes its colours so. An integer field takes an
+   integer and a float field a number, and any other field or form leaves
+   the macro out. */
+static bool compound_literal(struct reader *r, const struct macro *m)
+{
+    const char *s = skip_space(expand_identity(r, m->text));
+    const char *close;
+    const struct bind_type *t;
+    const struct bind_record *rec;
+    struct text literal = {0};
+    struct bind_const *c;
+    char type[128];
+    size_t field = 0;
+
+    if (*s != '(' || (close = strchr(s, ')')) == NULL ||
+        (size_t)(close - s - 1) >= sizeof type) {
+        return false;
+    }
+    memcpy(type, s + 1, (size_t)(close - s - 1));
+    type[close - s - 1] = '\0';
+    t = parse(r, type);
+    s = skip_space(close + 1);
+    if (t == NULL || t->kind != BIND_RECORD || *s != '{') {
+        return false;
+    }
+    rec = t->record;
+    s++;
+    text_appendf(&literal, "%s { ", rec->name);
+    for (;;) {
+        const char *end = s;
+        char element[128];
+        struct bind_eval v;
+        const struct bind_field *f;
+        int depth = 0;
+        while (*end != '\0' && (depth > 0 || (*end != ',' && *end != '}'))) {
+            depth += *end == '(' ? 1 : *end == ')' ? -1 : 0;
+            end++;
+        }
+        if (*end == '\0' || field >= rec->field_count ||
+            (size_t)(end - s) >= sizeof element) {
+            text_free(&literal);
+            return false;
+        }
+        memcpy(element, s, (size_t)(end - s));
+        element[end - s] = '\0';
+        f = &rec->fields[field];
+        if (f->name == NULL || f->bits >= 0 || f->type->kind != BIND_SCALAR ||
+            !bind_eval(r->b, element, lookup, r, &v) ||
+            v.kind == BIND_EVAL_STRING) {
+            text_free(&literal);
+            return false;
+        }
+        text_appendf(&literal, "%s%s: ", field > 0 ? ", " : "", f->name);
+        if (strcmp(f->type->name, "c_float") == 0 ||
+            strcmp(f->type->name, "c_double") == 0) {
+            bind_float_text(v.kind == BIND_EVAL_FLOAT ? v.f : (double)v.i,
+                            f->type->name, &literal);
+        } else if (v.kind == BIND_EVAL_INT) {
+            text_appendf(&literal, "%lld", (long long)v.i);
+        } else {
+            text_free(&literal);
+            return false;
+        }
+        field++;
+        if (*end == '}') {
+            break;
+        }
+        s = end + 1;
+        if (*skip_space(s) == '}') {
+            break;
+        }
+    }
+    if (field != rec->field_count) {
+        text_free(&literal);
+        return false;
+    }
+    text_append(&literal, " }");
+    c = arena_alloc(&r->b->arena, sizeof *c);
+    c->name = m->name;
+    c->type = rec->name;
+    c->value = bind_strdup(r->b, text_cstr(&literal));
+    c->record = rec;
+    bind_list_add(&r->b->consts, c);
+    text_free(&literal);
+    return true;
+}
+
 static void read_macros(struct reader *r)
 {
     size_t i;
@@ -1082,6 +1234,9 @@ static void read_macros(struct reader *r)
         if (bind_is_keyword(m->name)) {
             bind_warn(r->b, "the macro `%s` is a word of Anti and is skipped",
                       m->name);
+            continue;
+        }
+        if (compound_literal(r, m)) {
             continue;
         }
         if (!evaluate(r, m) || !bind_eval_const(r->b, m->name, &m->value, NULL)) {
@@ -1263,5 +1418,6 @@ done:
     free(r.macros.items);
     free(r.packs.items);
     free(r.fns.items);
+    free(r.fn_macros.items);
     return ok;
 }
