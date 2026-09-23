@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ir.h"
+
 /* DESIGN: lld-link and link.exe write no relocatable object, and the
    pinned LLVM release holds no other tool that joins COFF objects. antic
    joins them itself, for --bundle-runtime, so that a Windows archive holds
@@ -141,17 +143,6 @@ static void put(unsigned char *p, uint32_t v, int n)
     }
 }
 
-static void *allocate(size_t count, size_t size)
-{
-    void *p = calloc(count > 0 ? count : 1, size);
-
-    if (p == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    return p;
-}
-
 static uint64_t hash(const char *name, size_t length)
 {
     uint64_t h = 1469598103934665603u;
@@ -172,7 +163,7 @@ static struct entry *find(struct table *t, const char *name, size_t length,
     if (insert && 2 * (t->count + 1) > t->capacity) {
         struct table grown = {0};
         grown.capacity = t->capacity > 0 ? 2 * t->capacity : 64;
-        grown.items = allocate(grown.capacity, sizeof *grown.items);
+        grown.items = ir_alloc(grown.capacity, sizeof *grown.items);
         for (i = 0; i < t->capacity; i++) {
             if (t->items[i].name != NULL) {
                 *find(&grown, t->items[i].name, t->items[i].length, true) =
@@ -343,9 +334,9 @@ static bool parse(struct join *j, struct object *o, uint16_t *machine)
         text_appendf(j->error, "%s has a damaged string table", o->in->name);
         return false;
     }
-    o->sections = allocate(o->section_count, sizeof *o->sections);
-    o->map = allocate(o->symbol_count, sizeof *o->map);
-    o->emits = allocate(o->symbol_count, sizeof *o->emits);
+    o->sections = ir_alloc(o->section_count, sizeof *o->sections);
+    o->map = ir_alloc(o->symbol_count, sizeof *o->map);
+    o->emits = ir_alloc(o->symbol_count, sizeof *o->emits);
     for (i = 0; i < o->section_count; i++) {
         struct section *s = &o->sections[i];
         const unsigned char *h = d + HEADER_SIZE + SECTION_SIZE * i;
@@ -697,13 +688,15 @@ static bool name_field(struct join *j, unsigned char *field, const char *name,
     }
     if (section) {
         char digits[9];
-        if (offset > LONG_NAME_LIMIT) {
+        int n = offset <= LONG_NAME_LIMIT
+                    ? snprintf(digits, sizeof digits, "/%zu", offset)
+                    : -1;
+        if (n < 0 || (size_t)n >= sizeof digits) {
             text_append(j->error, "the joined object has too many long "
                                   "section names");
             return false;
         }
-        snprintf(digits, sizeof digits, "/%zu", offset);
-        memcpy(field, digits, strlen(digits));
+        memcpy(field, digits, (size_t)n);
     } else {
         put(field + 4, (uint32_t)offset, 4);
     }
@@ -881,7 +874,7 @@ bool coff_join(const struct coff_input *inputs, size_t count,
     size_t k;
 
     memset(&j, 0, sizeof j);
-    j.objects = allocate(count, sizeof *j.objects);
+    j.objects = ir_alloc(count, sizeof *j.objects);
     j.count = count;
     j.error = error;
     for (k = 0; ok && k < count; k++) {
@@ -918,7 +911,7 @@ bool coff_join(const struct coff_input *inputs, size_t count,
         }
     }
     if (ok) {
-        headers = allocate(sections, SECTION_SIZE);
+        headers = ir_alloc(sections, SECTION_SIZE);
         /* The body starts after the headers, so its offsets are those of
            the file. */
         text_append_bytes(&body, headers, HEADER_SIZE);

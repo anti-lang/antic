@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "attributes.h"
 #include "expand.h"
 #include "optimize.h"
 
@@ -12,7 +13,7 @@
    machine code keeps the numbers of the IR. Registers that selection adds,
    such as one for a constant, take the numbers after the temporaries. */
 
-struct mach_operand mach_vreg(uint32_t vreg, uint8_t width)
+static struct mach_operand mach_vreg(uint32_t vreg, uint8_t width)
 {
     struct mach_operand o;
 
@@ -73,7 +74,10 @@ bool select_is_float(enum ir_type type)
     return type == IR_F32 || type == IR_F64;
 }
 
-struct mach_operand select_part_register(uint8_t reg, unsigned bytes)
+/* The register of physical register reg with the width of bytes of an
+   aggregate part: 64 bits above 4 bytes. */
+static struct mach_operand select_part_register(uint8_t reg,
+                                                unsigned bytes)
 {
     return mach_preg(reg, bytes > 4 ? 64 : 32);
 }
@@ -215,10 +219,7 @@ bool select_is_next(const struct selector *s, const struct ir_operand *block)
 }
 
 static void fail(struct selector *s, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 2, 3)))
-#endif
-    ;
+    ATTRIBUTE_PRINTF(2, 3);
 
 static void fail(struct selector *s, const char *format, ...)
 {
@@ -228,17 +229,12 @@ static void fail(struct selector *s, const char *format, ...)
         return;
     }
     va_start(args, format);
-    vsnprintf(s->error, s->error_size, format, args);
+    ir_vformat(s->error, s->error_size, format, args);
     va_end(args);
     s->failed = true;
 }
 
-void select_fail(struct selector *s, const char *message)
-{
-    fail(s, "%s", message);
-}
-
-void select_refuse(struct selector *s, const struct ir_inst *inst)
+static void select_refuse(struct selector *s, const struct ir_inst *inst)
 {
     fail(s, "instruction selection for `%s` on %s arrives in chapter %d",
          ir_op_name(inst->op), s->target->name, s->target->chapter);
@@ -267,7 +263,7 @@ static bool is_comparison(enum ir_op op)
 /* An overflow test fuses with the branch after it the way a comparison
    does. The target leaves the answer in its flags and never builds the
    byte. */
-bool select_is_overflow(enum ir_op op)
+static bool select_is_overflow(enum ir_op op)
 {
     return op == IR_ADD_OV || op == IR_SUB_OV || op == IR_MUL_OV;
 }
@@ -293,11 +289,7 @@ static void count_uses(struct selector *s)
     size_t i;
     size_t k;
 
-    s->uses = calloc(f->temp_count + 1, sizeof *s->uses);
-    if (s->uses == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    s->uses = ir_alloc(f->temp_count, sizeof *s->uses);
     for (b = 0; b < f->block_count; b++) {
         for (i = 0; i < f->blocks[b]->count; i++) {
             const struct ir_inst *inst = &f->blocks[b]->insts[i];
@@ -386,16 +378,12 @@ static size_t fold_address(struct selector *s, const struct ir_block *b,
 static void select_params(struct selector *s)
 {
     const struct ir_function *f = s->f;
-    enum ir_type *types = calloc(f->param_count + 1, sizeof *types);
+    enum ir_type *types = ir_alloc(f->param_count, sizeof *types);
     struct arg_location *locations =
-        calloc(f->param_count + 1, sizeof *locations);
+        ir_alloc(f->param_count, sizeof *locations);
     struct arg_location result;
     size_t i;
 
-    if (types == NULL || locations == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     for (i = 0; i < f->param_count; i++) {
         types[i] = f->params[i].type;
     }
@@ -451,11 +439,7 @@ static void select_function(struct selector *s)
         mach_vreg_add(s->out, select_is_float(f->temps[v]));
     }
     s->out->block_count = f->block_count;
-    s->out->blocks = calloc(f->block_count + 1, sizeof *s->out->blocks);
-    if (s->out->blocks == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    s->out->blocks = ir_alloc(f->block_count, sizeof *s->out->blocks);
     count_uses(s);
     s->b = &s->out->blocks[0];
     select_params(s);
@@ -571,11 +555,7 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
         if (m->functions[i]->is_extern) {
             continue;
         }
-        out[i] = calloc(1, sizeof *out[i]);
-        if (out[i] == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+        out[i] = ir_alloc(1, sizeof *out[i]);
         s.f = m->functions[i];
         s.out = out[i];
         select_function(&s);

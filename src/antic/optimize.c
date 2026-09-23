@@ -19,17 +19,6 @@
 
 /* Helpers */
 
-static void *allocate(size_t count, size_t size)
-{
-    void *p = calloc(count + 1, size);
-
-    if (p == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    return p;
-}
-
 static int bits(enum ir_type type)
 {
     switch (type) {
@@ -137,10 +126,10 @@ static void count(const struct ir_function *f, struct counts *c)
     size_t i;
     size_t k;
 
-    c->defs = allocate(f->temp_count, sizeof *c->defs);
-    c->uses = allocate(f->temp_count, sizeof *c->uses);
-    c->block = allocate(f->temp_count, sizeof *c->block);
-    c->index = allocate(f->temp_count, sizeof *c->index);
+    c->defs = ir_alloc(f->temp_count, sizeof *c->defs);
+    c->uses = ir_alloc(f->temp_count, sizeof *c->uses);
+    c->block = ir_alloc(f->temp_count, sizeof *c->block);
+    c->index = ir_alloc(f->temp_count, sizeof *c->index);
     for (i = 0; i < f->param_count; i++) {
         c->defs[f->params[i].temp]++;
     }
@@ -450,8 +439,8 @@ static bool replace_uses(struct ir_function *f, uint32_t temp,
    definition of x or of v reads v. */
 static bool propagate_in_block(struct ir_function *f, struct ir_block *b)
 {
-    struct ir_operand *known = allocate(f->temp_count, sizeof *known);
-    uint32_t *active = allocate(f->temp_count, sizeof *active);
+    struct ir_operand *known = ir_alloc(f->temp_count, sizeof *known);
+    uint32_t *active = ir_alloc(f->temp_count, sizeof *active);
     size_t active_count = 0;
     bool changed = false;
     size_t i;
@@ -771,8 +760,8 @@ static void mark_reachable(const struct ir_function *f, uint32_t b,
    others again in their order. */
 static bool remove_unreachable_blocks(struct ir_function *f)
 {
-    bool *reached = allocate(f->block_count, sizeof *reached);
-    uint32_t *map = allocate(f->block_count, sizeof *map);
+    bool *reached = ir_alloc(f->block_count, sizeof *reached);
+    uint32_t *map = ir_alloc(f->block_count, sizeof *map);
     size_t n = 0;
     size_t b;
     size_t i;
@@ -814,7 +803,7 @@ static bool remove_unreachable_blocks(struct ir_function *f)
    takes over that block's instructions. */
 static bool merge_blocks(struct ir_function *f)
 {
-    uint32_t *preds = allocate(f->block_count, sizeof *preds);
+    uint32_t *preds = ir_alloc(f->block_count, sizeof *preds);
     bool changed = false;
     size_t b;
 
@@ -848,12 +837,8 @@ static bool merge_blocks(struct ir_function *f)
             next->count == 0) {
             continue;
         }
-        insts = realloc(block->insts,
-                        (block->count - 1 + next->count) * sizeof *insts);
-        if (insts == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+        insts = ir_resize(block->insts, block->count - 1 + next->count,
+                          sizeof *insts);
         memcpy(insts + block->count - 1, next->insts,
                next->count * sizeof *insts);
         block->insts = insts;
@@ -887,8 +872,8 @@ static bool remove_dead_code(struct ir_function *f)
    temporary in the order of its first appearance. */
 static void renumber_temps(struct ir_function *f)
 {
-    uint32_t *map = allocate(f->temp_count, sizeof *map);
-    enum ir_type *types = allocate(f->temp_count, sizeof *types);
+    uint32_t *map = ir_alloc(f->temp_count, sizeof *map);
+    enum ir_type *types = ir_alloc(f->temp_count, sizeof *types);
     uint32_t next = 0;
     size_t b;
     size_t i;
@@ -1423,10 +1408,10 @@ static void remap_const(struct ir_const *c, const uint32_t *map,
 static void remove_unused_functions(struct ir_module *m, const char *entry,
                                     bool all)
 {
-    bool *live = allocate(m->function_count, sizeof *live);
-    bool *live_globals = allocate(m->global_count, sizeof *live_globals);
-    uint32_t *map = allocate(m->function_count, sizeof *map);
-    uint32_t *global_map = allocate(m->global_count, sizeof *global_map);
+    bool *live = ir_alloc(m->function_count, sizeof *live);
+    bool *live_globals = ir_alloc(m->global_count, sizeof *live_globals);
+    uint32_t *map = ir_alloc(m->function_count, sizeof *map);
+    uint32_t *global_map = ir_alloc(m->global_count, sizeof *global_map);
     bool has_main = false;
     bool grew = true;
     size_t n = 0;
@@ -1568,17 +1553,7 @@ static void drop_body(struct ir_function *f)
 {
     size_t i;
 
-    for (i = 0; i < f->block_count; i++) {
-        ir_block_free(f->blocks[i]);
-    }
-    free(f->blocks);
-    free(f->temps);
-    f->blocks = NULL;
-    f->block_count = 0;
-    f->block_capacity = 0;
-    f->temps = NULL;
-    f->temp_count = 0;
-    f->temp_capacity = 0;
+    ir_function_free_body(f);
     for (i = 0; i < f->param_count; i++) {
         f->params[i].temp = IR_NO_RESULT;
     }

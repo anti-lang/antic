@@ -7,41 +7,24 @@
 #include <string.h>
 
 #include "arith.h"
+#include "attributes.h"
 
 enum { UNSEEN, BUSY, DONE };
 
-static void *allocate(size_t count, size_t size)
-{
-    void *p = calloc(count + 1, size);
-
-    if (p == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    return p;
-}
-
 static void fail(struct layouts *l, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 2, 3)))
-#endif
-    ;
+    ATTRIBUTE_PRINTF(2, 3);
 
 static void fail(struct layouts *l, const char *format, ...)
 {
     va_list args;
-    int n;
 
     if (l->failed) {
         return;
     }
     va_start(args, format);
-    n = vsnprintf(l->error, l->error_size, format, args);
+    /* ir_vformat marks a message cut to fit with three dots. */
+    ir_vformat(l->error, l->error_size, format, args);
     va_end(args);
-    /* A message cut to fit ends in "...". */
-    if (n >= 0 && (size_t)n >= l->error_size && l->error_size >= 4) {
-        memcpy(l->error + l->error_size - 4, "...", 4);
-    }
     l->failed = true;
 }
 
@@ -252,8 +235,8 @@ static void compute(struct layouts *l, uint32_t agg)
         return;
     }
     l->agg_state[agg] = BUSY;
-    out->offsets = allocate(t->field_count, sizeof *out->offsets);
-    out->bits = allocate(t->field_count, sizeof *out->bits);
+    out->offsets = ir_alloc(t->field_count, sizeof *out->offsets);
+    out->bits = ir_alloc(t->field_count, sizeof *out->bits);
     if (t->kind == IR_AGG_ARRAY) {
         struct ir_vtype element = t->fields[0].type;
         if (!layout_fold(l, t->length, &length)) {
@@ -370,7 +353,7 @@ static void compute(struct layouts *l, uint32_t agg)
     if (out->size <= LAYOUT_MEMBER_LIMIT) {
         members.count = 0;
         flatten(l, ir_aggregate(agg), 0, &members);
-        out->members = allocate(members.count, sizeof *out->members);
+        out->members = ir_alloc(members.count, sizeof *out->members);
         memcpy(out->members, members.items,
                members.count * sizeof *out->members);
         out->member_count = members.count;
@@ -535,10 +518,10 @@ bool layouts_init(struct layouts *l, enum target t, const struct ir_module *m,
     l->m = m;
     l->error = error;
     l->error_size = error_size;
-    l->aggs = allocate(m->agg_count, sizeof *l->aggs);
-    l->agg_state = allocate(m->agg_count, sizeof *l->agg_state);
-    l->values = allocate(m->sym_count, sizeof *l->values);
-    l->sym_state = allocate(m->sym_count, sizeof *l->sym_state);
+    l->aggs = ir_alloc(m->agg_count, sizeof *l->aggs);
+    l->agg_state = ir_alloc(m->agg_count, sizeof *l->agg_state);
+    l->values = ir_alloc(m->sym_count, sizeof *l->values);
+    l->sym_state = ir_alloc(m->sym_count, sizeof *l->sym_state);
     for (i = 0; i < m->agg_count && !l->failed; i++) {
         layout_agg(l, (uint32_t)i);
     }

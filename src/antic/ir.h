@@ -1,11 +1,13 @@
 #ifndef ANTIC_IR_H
 #define ANTIC_IR_H
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "arena.h"
+#include "attributes.h"
 #include "text.h"
 
 /* The intermediate representation of antic: typed three-address code in
@@ -284,10 +286,9 @@ struct ir_function {
     size_t block_capacity;
     enum ir_type *temps;            /* the type of each temporary */
     uint32_t temp_count;
-    uint32_t temp_capacity;
+    size_t temp_capacity;
 };
 
-/* A pointer inside global data to another global. */
 /* An address the linker writes into a global. It names another global,
    or a function when fn is set, as a table entry does. */
 struct ir_reloc {
@@ -441,13 +442,48 @@ struct ir_module {
     size_t class_capacity;
 };
 
+/* Checked heap memory for the back end. The compiler cannot continue
+   after an allocation fails. These functions then write "antic: out of
+   memory" and end the run with status 70, and never return NULL. A size
+   whose product overflows size_t fails the same way. */
+_Noreturn void ir_out_of_memory(void);
+
+/* Return a * b, and end the run as an allocation failure does when the
+   product overflows size_t. */
+size_t ir_product(size_t a, size_t b);
+
+/* Return zeroed memory for count items of size bytes, or for one item when
+   count is 0, so the result is never NULL. The caller frees it with
+   free. */
+void *ir_alloc(size_t count, size_t size);
+
+/* Resize items to count items of size bytes, as realloc does. The caller
+   frees the result with free. */
+void *ir_resize(void *items, size_t count, size_t size);
+
+/* Return items with room for at least count + 1 items. *capacity starts
+   at 8 and doubles. The caller frees the result with free. */
+void *ir_grow(void *items, size_t *capacity, size_t count, size_t size);
+
+/* Format a message into buffer of size bytes, as vsnprintf does. A
+   message cut to fit ends in three dots, so a reader sees that the rest
+   is missing. */
+void ir_vformat(char *buffer, size_t size, const char *format, va_list args)
+    ATTRIBUTE_PRINTF(3, 0);
+void ir_format(char *buffer, size_t size, const char *format, ...)
+    ATTRIBUTE_PRINTF(3, 4);
+
 void ir_module_init(struct ir_module *m, struct arena *arena,
                     const char *name);
 void ir_module_free(struct ir_module *m);
 
-/* Release the heap memory of a block, or of the body of a function. The
-   optimizer uses them for blocks and functions it removes. */
+/* Release the heap memory of a block, of the blocks and temporaries of a
+   function, or of both and the parameters. The two for a function leave
+   its counts and capacities at 0, so it takes new blocks and temporaries
+   afterwards. The optimizer uses them for blocks and functions it
+   removes. */
 void ir_block_free(struct ir_block *b);
+void ir_function_free_body(struct ir_function *f);
 void ir_function_free(struct ir_function *f);
 
 struct ir_vtype ir_scalar(enum ir_type type);

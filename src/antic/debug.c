@@ -90,16 +90,7 @@ static void mark(const struct debug *d, const struct text *out, size_t start)
         s->items[s->count - 1].end = out->length;
         return;
     }
-    if (s->count == s->capacity) {
-        size_t capacity = s->capacity == 0 ? 64 : s->capacity * 2;
-        struct debug_span *items = realloc(s->items, capacity * sizeof *items);
-        if (items == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        s->items = items;
-        s->capacity = capacity;
-    }
+    s->items = ir_grow(s->items, &s->capacity, s->count, sizeof *s->items);
     s->items[s->count].start = start;
     s->items[s->count].end = out->length;
     s->count++;

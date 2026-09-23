@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ir.h"
+
 static bool ends_with(const char *s, const char *suffix)
 {
     size_t n = strlen(s);
@@ -25,14 +27,23 @@ static void add_inputs(struct link_command *c, const struct link_inputs *in);
 
 static void add(struct link_command *c, const char *arg)
 {
+    c->argv = ir_grow(c->argv, &c->capacity, c->argc + 1, sizeof *c->argv);
     c->argv[c->argc++] = arg;
     c->argv[c->argc] = NULL;
 }
 
 /* The string of the next argument that the command builds. Add it with
-   add once it is complete, because appending moves its bytes. */
+   add once it is complete, because appending moves its bytes. A caller
+   holds the pointer while it builds, so the array cannot move, and
+   LINK_MAX_STRINGS bounds the strings of the longest command. */
 static struct text *next(struct link_command *c)
 {
+    if (c->string_count >= LINK_MAX_STRINGS) {
+        /* Unreachable while LINK_MAX_STRINGS covers every command. */
+        fputs("antic: a link command needs more than LINK_MAX_STRINGS "
+              "strings\n", stderr);
+        abort();
+    }
     return &c->strings[c->string_count++];
 }
 
@@ -337,13 +348,6 @@ void link_command(struct link_command *c, enum target t,
                   const struct link_inputs *in)
 {
     memset(c, 0, sizeof *c);
-    c->argv = calloc(LINK_FIXED_ARGS + in->extra_count +
-                         2 * in->framework_count + 1,
-                     sizeof *c->argv);
-    if (c->argv == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     switch (target_info(t)->os) {
     case OS_MACOS: macos(c, t, in); break;
     case OS_LINUX:
@@ -367,14 +371,9 @@ void link_command_free(struct link_command *c)
     free((void *)c->argv);
 }
 
-static struct link_command *start(struct link_command *c, size_t extra)
+static struct link_command *start(struct link_command *c)
 {
     memset(c, 0, sizeof *c);
-    c->argv = calloc(LINK_FIXED_ARGS + extra + 1, sizeof *c->argv);
-    if (c->argv == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     return c;
 }
 
@@ -384,7 +383,7 @@ void link_shared_command(struct link_command *c, enum target t,
 {
     struct text *library;
 
-    start(c, in->extra_count + 2 * in->framework_count);
+    start(c);
     library = next(c);
     if (!s->plugin) {
         link_runtime_library(library, in->runtime, t, in->cpu);
@@ -498,7 +497,7 @@ void archive_command(struct link_command *c, enum target t,
     };
     size_t i;
 
-    start(c, count);
+    start(c);
     add(c, llvm_ar);
     add(c, formats[target_info(t)->format]);
     add(c, "rcs");
@@ -518,7 +517,7 @@ void relocatable_command(struct link_command *c, enum target t,
 {
     size_t i;
 
-    start(c, count);
+    start(c);
     add(c, target_info(t)->os == OS_MACOS ? "ld"
                                           : program(c, in, "ld.lld", "ld"));
     add(c, "-r");

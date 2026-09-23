@@ -732,7 +732,7 @@ static void emit_memcopy(struct selector *s, const struct ir_inst *inst)
 
 /* DESIGN: a simd operation works on its values in memory, one register
    of 16 bytes at a time, or of 8 bytes for a simd struct of 8. A wide
-   value is several registers. Each one takes the instruction of the
+   value spans more than one register. Each one takes the instruction of the
    operation, so an f32x8 is two. The registers are v16 and v17, which
    allocation never gives out, and v18 to v23, which the instructions
    name. No value of the allocator lives in them across the operation. A
@@ -1832,10 +1832,10 @@ static void emit_call(struct selector *s, const struct ir_inst *inst)
     bool indirect = inst->b.kind == IR_FUNC;
     struct mach_operand target = indirect ? select_reg(s, &inst->a)
                                           : mach_imm(0);
-    enum ir_type *types = calloc(inst->arg_count + 1, sizeof *types);
+    enum ir_type *types = ir_alloc(inst->arg_count, sizeof *types);
     struct arg_location *locations =
-        calloc(inst->arg_count + 1, sizeof *locations);
-    struct mach_operand *copies = calloc(inst->arg_count + 1, sizeof *copies);
+        ir_alloc(inst->arg_count, sizeof *locations);
+    struct mach_operand *copies = ir_alloc(inst->arg_count, sizeof *copies);
     struct arg_location result;
     struct mach_operand result_address;
     struct mach_operand f = mach_imm(inst->a.as.index);
@@ -1845,10 +1845,6 @@ static void emit_call(struct selector *s, const struct ir_inst *inst)
     size_t i;
 
     memset(&result_address, 0, sizeof result_address);
-    if (types == NULL || locations == NULL || copies == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     for (i = 0; i < inst->arg_count; i++) {
         types[i] = i < callee->param_count ? callee->params[i].type
                                            : inst->args[i].type;

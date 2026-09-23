@@ -44,17 +44,6 @@ struct whole {
     size_t entry_count;
 };
 
-static void *allocate(size_t count, size_t size)
-{
-    void *p = calloc(count == 0 ? 1 : count, size);
-
-    if (p == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    return p;
-}
-
 static uint64_t hash_text(uint64_t h, const char *s)
 {
     for (; s != NULL && *s != '\0'; s++) {
@@ -110,7 +99,7 @@ static void add_table(struct whole *w, uint32_t table, uint32_t record)
         depth++;
     }
     t->table = table;
-    t->classes = allocate(depth, sizeof *t->classes);
+    t->classes = ir_alloc(depth, sizeof *t->classes);
     for (up = record; up != IR_NO_INDEX && t->class_count < depth;
          up = class_of(w, w->m->classes[up]->base)) {
         t->classes[t->class_count++] = up;
@@ -119,7 +108,7 @@ static void add_table(struct whole *w, uint32_t table, uint32_t record)
 
 struct whole *whole_build(const struct ir_module *program)
 {
-    struct whole *w = allocate(1, sizeof *w);
+    struct whole *w = ir_alloc(1, sizeof *w);
     size_t tables = 0;
     size_t i;
     size_t j;
@@ -129,7 +118,7 @@ struct whole *whole_build(const struct ir_module *program)
     while (w->slot_count < 2 * program->class_count + 1) {
         w->slot_count *= 2;
     }
-    w->slots = allocate(w->slot_count, sizeof *w->slots);
+    w->slots = ir_alloc(w->slot_count, sizeof *w->slots);
     for (i = 0; i < program->class_count; i++) {
         const struct ir_class *c = program->classes[i];
         const struct ir_global *d = program->globals[c->descriptor];
@@ -141,7 +130,7 @@ struct whole *whole_build(const struct ir_module *program)
             tables += 1 + c->subtable_count;
         }
     }
-    w->tables = allocate(tables, sizeof *w->tables);
+    w->tables = ir_alloc(tables, sizeof *w->tables);
     for (i = 0; i < program->class_count; i++) {
         const struct ir_class *c = program->classes[i];
         if (c->table == IR_NO_INDEX) {
@@ -222,7 +211,7 @@ size_t whole_entries(struct whole *w, uint32_t descriptor, uint32_t slot,
     size_t k;
 
     free(w->entries);
-    w->entries = allocate(w->table_count, sizeof *w->entries);
+    w->entries = ir_alloc(w->table_count, sizeof *w->entries);
     w->entry_count = 0;
     for (i = 0; i < w->table_count; i++) {
         uint32_t f;
@@ -340,9 +329,9 @@ static void reach_program(struct reach *r, const struct ir_module *m,
     size_t b;
     size_t k;
 
-    r->functions = allocate(m->function_count, sizeof *r->functions);
-    r->globals = allocate(m->global_count, sizeof *r->globals);
-    r->work = allocate(m->function_count + m->global_count, sizeof *r->work);
+    r->functions = ir_alloc(m->function_count, sizeof *r->functions);
+    r->globals = ir_alloc(m->global_count, sizeof *r->globals);
+    r->work = ir_alloc(m->function_count + m->global_count, sizeof *r->work);
     for (i = 0; entry != NULL && i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
         has_main = has_main || (!f->is_extern && f->module != NULL &&
@@ -500,10 +489,10 @@ static uint32_t write_class_list(struct ir_module *m, bool reflect,
     uint32_t class_agg = struct_agg(m, "anti.rt.Class", class_names,
                                     class_types, 5);
     size_t class_count = m->class_count;
-    const char **seen = allocate(class_count, sizeof *seen);
-    uint32_t *texts = allocate(class_count, sizeof *texts);
+    const char **seen = ir_alloc(class_count, sizeof *seen);
+    uint32_t *texts = ir_alloc(class_count, sizeof *texts);
     struct ir_const *items =
-        allocate(class_count, sizeof *items);
+        ir_alloc(class_count, sizeof *items);
     uint32_t list_global = IR_NO_INDEX;
     size_t modules = 0;
     size_t n = 0;
@@ -843,22 +832,30 @@ static const char *signature_of(const struct ir_module *m,
                : NULL;
 }
 
+/* The function list of the class record c, item 11 of its descriptor,
+   or NULL when it has none. */
+static const struct ir_const *function_list(const struct ir_module *m,
+                                            const struct ir_class *c)
+{
+    const struct ir_const *descriptor = m->globals[c->descriptor]->value;
+
+    if (descriptor == NULL || descriptor->kind != IR_CONST_AGG ||
+        descriptor->item_count < 12 ||
+        descriptor->items[11].kind != IR_CONST_ADDR) {
+        return NULL;
+    }
+    return m->globals[descriptor->items[11].global]->value;
+}
+
 /* Add each signature of the function list of the class record c to
    seen, once. */
 static void add_signatures(const struct ir_module *m, const struct ir_class *c,
                            const char **seen, size_t *count, size_t max)
 {
-    const struct ir_const *descriptor = m->globals[c->descriptor]->value;
-    const struct ir_const *list;
+    const struct ir_const *list = function_list(m, c);
     size_t i;
     size_t k;
 
-    if (descriptor == NULL || descriptor->kind != IR_CONST_AGG ||
-        descriptor->item_count < 12 ||
-        descriptor->items[11].kind != IR_CONST_ADDR) {
-        return;
-    }
-    list = m->globals[descriptor->items[11].global]->value;
     for (i = 0; list != NULL && i < list->item_count; i++) {
         const char *text = signature_of(m, &list->items[i]);
         for (k = 0; text != NULL && k < *count; k++) {
@@ -898,15 +895,18 @@ static void write_trampolines(struct ir_module *m, bool full)
     size_t n = 0;
     size_t i;
 
+    /* The bound counts the items of each list, which lie in memory. The
+       count of item 10 comes from a library file unchecked. */
     for (i = 0; i < m->class_count; i++) {
-        const struct ir_const *d = m->globals[m->classes[i]->descriptor]->value;
-        max += d != NULL && d->item_count >= 12 &&
-                       d->items[10].kind == IR_CONST_INT
-                   ? (size_t)d->items[10].integer
-                   : 0;
+        const struct ir_const *list = function_list(m, m->classes[i]);
+        size_t n_items = list != NULL ? list->item_count : 0;
+        if (n_items > SIZE_MAX - max) {
+            ir_out_of_memory();
+        }
+        max += n_items;
     }
-    seen = allocate(max, sizeof *seen);
-    items = allocate(max, sizeof *items);
+    seen = ir_alloc(max, sizeof *seen);
+    items = ir_alloc(max, sizeof *items);
     for (i = 0; full && value_agg != IR_NO_AGG && str_agg != IR_NO_AGG &&
                 i < m->class_count;
          i++) {
@@ -1042,7 +1042,7 @@ static bool check_singletons(struct whole *w, const struct ir_module *m,
     if (count == 0) {
         return true;
     }
-    fields = allocate(count, sizeof *fields);
+    fields = ir_alloc(count, sizeof *fields);
     count = 0;
     for (i = 0; i < m->class_count; i++) {
         for (j = 0; j < m->classes[i]->mutable_count; j++) {
@@ -1052,8 +1052,8 @@ static bool check_singletons(struct whole *w, const struct ir_module *m,
             count++;
         }
     }
-    seen = allocate(m->function_count, sizeof *seen);
-    work = allocate(m->function_count, sizeof *work);
+    seen = ir_alloc(m->function_count, sizeof *seen);
+    work = ir_alloc(m->function_count, sizeof *work);
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *worker = m->functions[i];
         size_t pending = 0;
@@ -1118,11 +1118,7 @@ static void mark_slot(struct slots *s, uint32_t slot)
 {
     if (slot >= s->count) {
         uint32_t bytes = slot / 8 + 1;
-        uint8_t *grown = realloc(s->bits, bytes);
-        if (grown == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+        uint8_t *grown = ir_resize(s->bits, bytes, 1);
         memset(grown + (s->count + 7) / 8, 0, bytes - (s->count + 7) / 8);
         s->bits = grown;
         s->count = slot + 1;
@@ -1177,7 +1173,7 @@ static void write_slots(struct whole *w, struct ir_module *m,
                                               "reflect"};
     static const enum ir_type table_types[] = {IR_I64, IR_PTR, IR_I64};
     size_t classes = m->class_count;
-    struct slots *slots = allocate(classes, sizeof *slots);
+    struct slots *slots = ir_alloc(classes, sizeof *slots);
     size_t emitted = 0;
     size_t i;
     size_t b;
@@ -1743,12 +1739,12 @@ static bool cycle_from(const bool *edges, size_t count, size_t node,
 static void check_cycles(const struct ir_module *m, struct injectable *list,
                          size_t count, struct text *errors)
 {
-    bool *edges = allocate(count * count, sizeof *edges);
-    bool *seen = allocate(m->function_count, sizeof *seen);
-    bool *globals = allocate(m->global_count, sizeof *globals);
-    uint32_t *work = allocate(m->function_count, sizeof *work);
-    uint8_t *state = allocate(count, sizeof *state);
-    size_t *stack = allocate(count + 1, sizeof *stack);
+    bool *edges = ir_alloc(ir_product(count, count), sizeof *edges);
+    bool *seen = ir_alloc(m->function_count, sizeof *seen);
+    bool *globals = ir_alloc(m->global_count, sizeof *globals);
+    uint32_t *work = ir_alloc(m->function_count, sizeof *work);
+    uint8_t *state = ir_alloc(count, sizeof *state);
+    size_t *stack = ir_alloc(count + 1, sizeof *stack);
     size_t depth = 0;
     size_t i;
     size_t j;
@@ -1902,7 +1898,7 @@ static void write_injections(struct whole *w, struct ir_module *m,
     for (i = 0; i < m->class_count; i++) {
         total += m->classes[i]->inject_count;
     }
-    list = allocate(total, sizeof *list);
+    list = ir_alloc(total, sizeof *list);
     count = collect_injectables(m, list);
     for (i = 0; i < count; i++) {
         list[i].slot = slot_global(m, list[i].interface);
@@ -2054,7 +2050,7 @@ static void write_provides(struct whole *w, struct ir_module *m,
     for (i = 0; i < m->class_count; i++) {
         total += m->classes[i]->provides_count;
     }
-    items = allocate(total + 1, sizeof *items);
+    items = ir_alloc(total + 1, sizeof *items);
     for (i = 0; i < m->class_count; i++) {
         const struct ir_class *c = m->classes[i];
         for (j = 0; j < c->provides_count; j++) {

@@ -65,13 +65,14 @@ struct link_inputs {
 #define LINK_COFF_OBJECT_SUFFIX ".obj"
 #define LINK_COFF_ARCHIVE_SUFFIX ".lib"
 
-enum { LINK_FIXED_ARGS = 24, LINK_MAX_STRINGS = 12 };
+enum { LINK_MAX_STRINGS = 12 };
 
 /* A linker command line. The arguments that it builds live in strings,
    and argv holds the fixed arguments and every extra input. */
 struct link_command {
     const char **argv;
     size_t argc;
+    size_t capacity;
     struct text strings[LINK_MAX_STRINGS];
     size_t string_count;
 };

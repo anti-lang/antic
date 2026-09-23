@@ -21,17 +21,6 @@ enum { NONE = -1, PREG_LIMIT = 64 };
    the index of a memory operand. */
 enum { BORROW_LIMIT = 2 * MACH_MAX_OPERANDS };
 
-static void *allocate(size_t count, size_t size)
-{
-    void *p = calloc(count + 1, size);
-
-    if (p == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    return p;
-}
-
 /* Sets of virtual registers */
 
 struct set {
@@ -209,16 +198,16 @@ static void compute_liveness(struct alloc *a)
     bool changed = true;
 
     a->words = a->f->vreg_count / 64 + 1;
-    a->use = allocate(n, sizeof *a->use);
-    a->def = allocate(n, sizeof *a->def);
-    a->live_in = allocate(n, sizeof *a->live_in);
-    a->live_out = allocate(n, sizeof *a->live_out);
+    a->use = ir_alloc(n, sizeof *a->use);
+    a->def = ir_alloc(n, sizeof *a->def);
+    a->live_in = ir_alloc(n, sizeof *a->live_in);
+    a->live_out = ir_alloc(n, sizeof *a->live_out);
     for (b = 0; b < n; b++) {
         struct block_ctx ctx;
-        a->use[b].bits = allocate(a->words, sizeof(uint64_t));
-        a->def[b].bits = allocate(a->words, sizeof(uint64_t));
-        a->live_in[b].bits = allocate(a->words, sizeof(uint64_t));
-        a->live_out[b].bits = allocate(a->words, sizeof(uint64_t));
+        a->use[b].bits = ir_alloc(a->words, sizeof(uint64_t));
+        a->def[b].bits = ir_alloc(a->words, sizeof(uint64_t));
+        a->live_in[b].bits = ir_alloc(a->words, sizeof(uint64_t));
+        a->live_out[b].bits = ir_alloc(a->words, sizeof(uint64_t));
         ctx.a = a;
         ctx.block = b;
         for (i = 0; i < a->f->blocks[b].count; i++) {
@@ -272,16 +261,8 @@ struct scan_ctx {
 
 static void add_range(struct fixed *fx, int from, int to)
 {
-    if (fx->count == fx->capacity) {
-        size_t capacity = fx->capacity == 0 ? 8 : fx->capacity * 2;
-        struct range *ranges = realloc(fx->ranges, capacity * sizeof *ranges);
-        if (ranges == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        fx->ranges = ranges;
-        fx->capacity = capacity;
-    }
+    fx->ranges = ir_grow(fx->ranges, &fx->capacity, fx->count,
+                         sizeof *fx->ranges);
     fx->ranges[fx->count].from = from;
     fx->ranges[fx->count].to = to;
     fx->count++;
@@ -372,9 +353,9 @@ static void rematerialise_constants(struct alloc *a)
 {
     struct mach_function *f = a->f;
     struct mach_inst *definition =
-        allocate(f->vreg_count, sizeof *definition);
-    bool *once = allocate(f->vreg_count, sizeof *once);
-    bool *many = allocate(f->vreg_count, sizeof *many);
+        ir_alloc(f->vreg_count, sizeof *definition);
+    bool *once = ir_alloc(f->vreg_count, sizeof *once);
+    bool *many = ir_alloc(f->vreg_count, sizeof *many);
     size_t b;
     size_t i;
     size_t j;
@@ -456,7 +437,7 @@ static void build_intervals(struct alloc *a)
     uint32_t v;
     int k = 0;
 
-    a->intervals = allocate(f->vreg_count, sizeof *a->intervals);
+    a->intervals = ir_alloc(f->vreg_count, sizeof *a->intervals);
     for (v = 0; v < f->vreg_count; v++) {
         a->intervals[v].vreg = v;
         a->intervals[v].start = INT_MAX;
@@ -597,8 +578,8 @@ static int choose(const struct alloc *a, struct interval **active,
 static void linear_scan(struct alloc *a)
 {
     struct mach_function *f = a->f;
-    struct interval **order = allocate(f->vreg_count, sizeof *order);
-    struct interval **active = allocate(f->vreg_count, sizeof *active);
+    struct interval **order = ir_alloc(f->vreg_count, sizeof *order);
+    struct interval **active = ir_alloc(f->vreg_count, sizeof *active);
     size_t count = 0;
     size_t active_count = 0;
     size_t i;

@@ -2,6 +2,8 @@
 #define ANTIC_SELECT_H
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "cpu.h"
 #include "ir.h"
@@ -192,16 +194,12 @@ uint64_t select_size(const struct selector *s, struct ir_vtype v);
 uint64_t select_align(const struct selector *s, struct ir_vtype v);
 
 /* Helpers for the pattern tables of the targets. */
-struct mach_operand mach_vreg(uint32_t vreg, uint8_t width);
 struct mach_operand mach_preg(uint32_t preg, uint8_t width);
 struct mach_operand mach_imm(int64_t value);
 struct mach_operand select_result(struct selector *s, const struct ir_inst *inst);
 struct mach_operand select_new_vreg(struct selector *s, uint8_t width);
 struct mach_operand select_new_fp_vreg(struct selector *s, uint8_t width);
 bool select_is_float(enum ir_type type);
-/* The register of physical register reg with the width of bytes of an
-   aggregate part: 64 bits above 4 bytes. */
-struct mach_operand select_part_register(uint8_t reg, unsigned bytes);
 /* Store the register parts of an aggregate into the memory at address. */
 void select_store_parts(struct selector *s, const struct arg_location *loc,
                         struct mach_operand address);
@@ -209,7 +207,6 @@ void select_store_parts(struct selector *s, const struct arg_location *loc,
    registers it loads as a set. */
 uint64_t select_load_parts(struct selector *s, const struct arg_location *loc,
                            struct mach_operand address);
-/* An aggregate result of a call: memory in a new slot for its value. */
 /* The function whose parameters and result a call follows: the callee of
    a direct call, or the signature of a call through a pointer. */
 const struct ir_function *select_callee(const struct selector *s,
@@ -218,6 +215,7 @@ const struct ir_function *select_callee(const struct selector *s,
    library through its GOT entry. Windows links the C runtime statically,
    so its C functions lie in the executable. */
 bool select_uses_got(const struct selector *s, const struct ir_operand *o);
+/* An aggregate result of a call: memory in a new slot for its value. */
 struct mach_operand select_result_slot(struct selector *s,
                                        const struct ir_inst *inst,
                                        const struct layout *agg);
@@ -232,9 +230,6 @@ struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,
                               const struct mach_operand *operands);
 enum mach_cond select_cond(enum ir_op op);
 enum mach_cond select_negate(enum mach_cond cond);
-bool select_is_overflow(enum ir_op op);
 bool select_is_next(const struct selector *s, const struct ir_operand *block);
-void select_refuse(struct selector *s, const struct ir_inst *inst);
-void select_fail(struct selector *s, const char *message);
 
 #endif

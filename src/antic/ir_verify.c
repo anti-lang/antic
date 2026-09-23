@@ -1,6 +1,11 @@
 #include "ir.h"
 
 #include <inttypes.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "attributes.h"
 
 /* Check what every later stage relies on. Each block ends with exactly
    one terminator. Every operand refers to something that exists, and
@@ -16,15 +21,7 @@ struct verifier {
 };
 
 static void fail(struct verifier *v, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 2, 3)))
-#endif
-    ;
-
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+    ATTRIBUTE_PRINTF(2, 3);
 
 static void fail(struct verifier *v, const char *format, ...)
 {
@@ -32,7 +29,7 @@ static void fail(struct verifier *v, const char *format, ...)
     va_list args;
 
     va_start(args, format);
-    vsnprintf(message, sizeof message, format, args);
+    ir_vformat(message, sizeof message, format, args);
     va_end(args);
     if (v->b != NULL) {
         text_appendf(v->errors, "%s.%s b%" PRIu32 ": %s\n", v->f->module,
@@ -493,17 +490,13 @@ static void check_definitions(struct verifier *v)
     const struct ir_function *f = v->f;
     size_t words = f->temp_count / 64 + 1;
     size_t n = f->block_count;
-    uint64_t *out = malloc((n + 1) * words * sizeof *out);
-    uint64_t *in = malloc(words * sizeof *in);
+    uint64_t *out = ir_alloc(ir_product(n + 1, words), sizeof *out);
+    uint64_t *in = ir_alloc(words, sizeof *in);
     bool changed = true;
     size_t b;
     size_t i;
     size_t k;
 
-    if (out == NULL || in == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     memset(out, 0xff, n * words * sizeof *out);
     while (changed) {
         changed = false;

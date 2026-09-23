@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ir.h"
+
 /* The C name of a scalar type. DESIGN: a sized type maps to its <stdint.h>
    name, and int, uint and float to int64_t, uint64_t and double. c_long,
    c_ulong and c_wchar map to long, unsigned long and wchar_t. The other c_
@@ -319,17 +321,7 @@ static bool was_emitted(const struct emitted *e, const struct type *t)
    bounds them. */
 static void mark_emitted(struct emitted *e, const struct type *t)
 {
-    if (e->count == e->capacity) {
-        size_t capacity = e->capacity == 0 ? 16 : e->capacity * 2;
-        const struct type **items =
-            realloc((void *)e->items, capacity * sizeof *items);
-        if (items == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        e->items = items;
-        e->capacity = capacity;
-    }
+    e->items = ir_grow(e->items, &e->capacity, e->count, sizeof *e->items);
     e->items[e->count++] = t;
 }
 
@@ -786,7 +778,7 @@ static void class_view(struct text *out, const struct symbol *sym)
 {
     const struct type *t = sym->type;
     size_t limit = chain_members(t);
-    const struct item **entries = malloc((limit + 1) * sizeof *entries);
+    const struct item **entries = ir_alloc(limit, sizeof *entries);
     int name_length = (int)t->name.length;
     const char *name_text = t->name.text;
     size_t count;
@@ -796,10 +788,6 @@ static void class_view(struct text *out, const struct symbol *sym)
     size_t i;
     size_t j;
 
-    if (entries == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     count = chain_functions(t, entries, limit);
     /* The table pointer sits in the root, so a wrapper reaches it
        through one `base` per level of the chain. */

@@ -193,11 +193,7 @@ static char *name_of_type(const struct type *t, bool qualified)
     } else {
         type_name(&name, t);
     }
-    copy = malloc(name.length + 1);
-    if (copy == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    copy = ir_alloc(name.length + 1, 1);
     memcpy(copy, text_cstr(&name), name.length + 1);
     text_free(&name);
     return copy;
@@ -220,11 +216,7 @@ static uint32_t agg_of(struct lowerer *l, const struct type *t)
         free(name);
         return agg;
     }
-    fields = calloc(count + 1, sizeof *fields);
-    if (fields == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    fields = ir_alloc(count + 1, sizeof *fields);
     if (t->kind == TYPE_ARRAY) {
         struct text text = {0};
         struct ir_vtype element = vtype_of(l, t->element);
@@ -240,11 +232,7 @@ static uint32_t agg_of(struct lowerer *l, const struct type *t)
         text_free(&text);
     } else if (type_has_fields(t)) {
         for (i = 0; i < count; i++) {
-            char *field = malloc(t->fields[i].name.length + 1);
-            if (field == NULL) {
-                fputs("antic: out of memory\n", stderr);
-                exit(70);
-            }
+            char *field = ir_alloc(t->fields[i].name.length + 1, 1);
             memcpy(field, t->fields[i].name.text, t->fields[i].name.length);
             field[t->fields[i].name.length] = '\0';
             fields[i].name = field;
@@ -333,15 +321,12 @@ static struct ir_block *new_block(struct lowerer *l)
     return b;
 }
 
-/* Names in the tree point into the source and carry a length. */
+/* Names in the tree point into the source and carry a length. Return a
+   NUL-terminated copy of name, which the caller frees with free. */
 static char *cstr(const struct name *name)
 {
-    char *s = malloc(name->length + 1);
+    char *s = ir_alloc(name->length + 1, 1);
 
-    if (s == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     memcpy(s, name->text, name->length);
     s[name->length] = '\0';
     return s;
@@ -1438,7 +1423,7 @@ static const struct const_value *location_value(struct lowerer *l,
     v->type = (struct type *)t;
     v->as.aggregate.count = t->field_count;
     v->as.aggregate.items =
-        arena_alloc(l->m->arena, (t->field_count + 1) * sizeof *v);
+        arena_alloc(l->m->arena, ir_product(t->field_count + 1, sizeof *v));
     if (l->f != NULL) {
         text_appendf(&function, "%s.%s", l->module_name, l->f->name);
     }
@@ -1579,17 +1564,8 @@ static void table_add(struct table *t, struct name name, size_t params,
             return;
         }
     }
-    if (t->count == t->capacity) {
-        size_t capacity = t->capacity == 0 ? 8 : t->capacity * 2;
-        struct entry *entries =
-            realloc(t->entries, capacity * sizeof *entries);
-        if (entries == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        t->entries = entries;
-        t->capacity = capacity;
-    }
+    t->entries = ir_grow(t->entries, &t->capacity, t->count,
+                         sizeof *t->entries);
     t->entries[t->count].name = name;
     t->entries[t->count].params = params;
     t->entries[t->count].fn = m;
@@ -1827,11 +1803,7 @@ static struct ir_global *class_global(struct lowerer *l, const struct type *t,
        other class, and every struct, keeps the name `Type.part` of its
        module. */
     size = t->name.length + strlen(suffix) + 8;
-    name = malloc(size);
-    if (name == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    name = ir_alloc(size, 1);
     if (t->item_exported && t->kind == TYPE_CLASS &&
         (strcmp(suffix, "table") == 0 || strcmp(suffix, "descriptor") == 0)) {
         snprintf(name, size, "anti_%.*s_%s", (int)t->name.length,
@@ -1893,11 +1865,7 @@ static struct ir_global *struct_global(struct lowerer *l,
             return m->globals[i];
         }
     }
-    *name_out = malloc(name.length + 1);
-    if (*name_out == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    *name_out = ir_alloc(name.length + 1, 1);
     memcpy(*name_out, text_cstr(&name), name.length + 1);
     text_free(&name);
     /* DESIGN: a struct's descriptor belongs to the module that declares
@@ -2867,11 +2835,7 @@ static struct ir_function *interface_thunk(struct lowerer *l,
     entry = ir_block_add(f);
     l->f = f;
     l->b = entry;
-    args = malloc((sig->param_count + 1) * sizeof *args);
-    if (args == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    args = ir_alloc(sig->param_count + 1, sizeof *args);
     back = temp(l, ir_binary(f, entry, IR_SUB, IR_I64, ir_int_op(IR_I64, 0),
                              field_offset(l, sub->home, &sub->name)));
     args[0] = temp(l, ir_ptradd(f, entry, temp(l, f->params[0].temp), back));
@@ -2993,11 +2957,7 @@ static struct ir_function *reach_thunk(struct lowerer *l,
     }
     l->f = f;
     l->b = ir_block_add(f);
-    args = malloc((sig->param_count + 1) * sizeof *args);
-    if (args == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    args = ir_alloc(sig->param_count + 1, sizeof *args);
     args[0] = offset_address(l, temp(l, f->params[0].temp),
                              field_offset(l, sub->home, &sub->name));
     for (i = 1; i < sig->param_count; i++) {
@@ -5254,11 +5214,7 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     } else if (!direct) {
         target = lower_expr(l, callee);
     }
-    args = malloc((n + 2) * sizeof *args);
-    if (args == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    args = ir_alloc(n + 2, sizeof *args);
     if (bound.kind != IR_NONE) {
         args[0] = bound;
     }
@@ -5421,17 +5377,9 @@ static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
     size_t n = call->as.call.arg_count;
     size_t i;
 
-    fields = malloc(n * sizeof *fields);
-    if (fields == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    fields = ir_alloc(n, sizeof *fields);
     for (i = 0; i < n; i++) {
-        char *field = malloc(24);
-        if (field == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+        char *field = ir_alloc(24, 1);
         snprintf(field, 24, "a%zu", i);
         fields[i].name = field;
         fields[i].type = vtype_of(l, call->as.call.args[i]->type);
@@ -5486,11 +5434,7 @@ static struct ir_function *parallel_thunk(struct lowerer *l,
              offset_address(l, temp(l, slot),
                             field_offset(l, slice, &len_name)));
 
-    args = malloc((extra + 1) * sizeof *args);
-    if (args == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    args = ir_alloc(extra + 1, sizeof *args);
     args[0] = temp(l, slot);
     for (i = 0; i < extra; i++) {
         const struct type *t = call->as.call.args[i]->type;
@@ -5552,11 +5496,7 @@ static struct ir_function *dispatch_thunk(struct lowerer *l,
     l->f = f;
     l->b = entry;
 
-    args = malloc((extra + 1) * sizeof *args);
-    if (args == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    args = ir_alloc(extra + 1, sizeof *args);
     args[0] = temp(l, f->params[1].temp);
     for (i = 0; i < extra; i++) {
         const struct type *t = call->as.call.args[i]->type;
@@ -6201,19 +6141,9 @@ static bool has_defers(const struct lowerer *l)
 /* Room for one more exit action in scope. */
 static struct exit_action *grow_defers(struct defers *scope)
 {
-    struct exit_action *items;
-
-    if (scope->count < scope->capacity) {
-        return scope->items;
-    }
-    scope->capacity = scope->capacity == 0 ? 4 : scope->capacity * 2;
-    items = realloc(scope->items, scope->capacity * sizeof *items);
-    if (items == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    scope->items = items;
-    return items;
+    scope->items = ir_grow(scope->items, &scope->capacity, scope->count,
+                           sizeof *scope->items);
+    return scope->items;
 }
 
 /* Record one exit action of the innermost block. Every field is written
@@ -7206,11 +7136,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
         hook_object(l, HOOK_CREATED, dest);
         return none();
     }
-    args = malloc((e->as.call.arg_count + 1) * sizeof *args);
-    if (args == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    args = ir_alloc(e->as.call.arg_count + 1, sizeof *args);
     args[0] = dest;
     for (i = 0; i < e->as.call.arg_count; i++) {
         args[i + 1] = lower_argument(l, e->as.call.args[i]);
@@ -7772,11 +7698,11 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         const struct stmt *otherwise = s->as.switch_stmt.otherwise;
         size_t arms = s->as.switch_stmt.count + (otherwise != NULL ? 1 : 0);
         struct ir_block **entry =
-            arena_alloc(l->m->arena, (arms + 1) * sizeof *entry);
+            arena_alloc(l->m->arena, ir_product(arms + 1, sizeof *entry));
         struct ir_block **tail =
-            arena_alloc(l->m->arena, (arms + 1) * sizeof *tail);
+            arena_alloc(l->m->arena, ir_product(arms + 1, sizeof *tail));
         const struct stmt **falls =
-            arena_alloc(l->m->arena, (arms + 1) * sizeof *falls);
+            arena_alloc(l->m->arena, ir_product(arms + 1, sizeof *falls));
         uint32_t line;
         size_t i;
         size_t k;
@@ -8573,11 +8499,7 @@ static void class_construct(struct lowerer *l, const struct item *it)
     l->b = ir_block_add(f);
     self = temp(l, f->params[0].temp);
     ir_call(l->f, l->b, IR_VOID, ir_func_op(init_function(l, t)), &self, 1);
-    args = malloc(sig->param_count * sizeof *args);
-    if (args == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    args = ir_alloc(sig->param_count, sizeof *args);
     for (i = 0; i < sig->param_count; i++) {
         args[i] = temp(l, f->params[i].temp);
     }
