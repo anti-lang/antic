@@ -935,10 +935,12 @@ add_test(NAME anti_check
 # The documentation generator: the pages of the fixture, the doc
 # equivalence of docs/tooling.md, the two forms and the two options that
 # need the source.
+add_executable(antl_rename doc/antl_rename.c)
 add_test(NAME anti_doc
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRENAME=$<TARGET_FILE:antl_rename>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/doc"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc"

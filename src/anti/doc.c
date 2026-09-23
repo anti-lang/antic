@@ -24,6 +24,7 @@
 #include "driver.h"
 #include "files.h"
 #include "ir.h"
+#include "repo.h"
 #include "sema.h"
 #include "target.h"
 #include "text.h"
@@ -968,9 +969,12 @@ static void entry_page(struct text *out, const struct entry *e,
                        const struct interface *iface, enum doc_form form)
 {
     if (form == DOC_HTML) {
-        text_appendf(out, "<section class=\"" DOC_CLASS_ITEM "\" id=\"%s\">\n",
-                     text_cstr(&e->name));
-        text_appendf(out, "<h2>%s</h2>\n", text_cstr(&e->name));
+        /* M14: a name of a library file reaches the page as text. */
+        text_append(out, "<section class=\"" DOC_CLASS_ITEM "\" id=\"");
+        escape_html(out, text_cstr(&e->name), e->name.length);
+        text_append(out, "\">\n<h2>");
+        escape_html(out, text_cstr(&e->name), e->name.length);
+        text_append(out, "</h2>\n");
         text_append(out, "<pre class=\"" DOC_CLASS_SIGNATURE "\">");
         escape_html(out, text_cstr(&e->signature), e->signature.length);
         text_append(out, "</pre>\n");
@@ -1006,9 +1010,13 @@ static void page_render(struct text *out, const struct page *p,
 
     if (form == DOC_HTML) {
         text_append(out, "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n");
-        text_appendf(out, "<title>%s</title>\n", text_cstr(&p->module));
+        text_append(out, "<title>");
+        escape_html(out, text_cstr(&p->module), p->module.length);
+        text_append(out, "</title>\n");
         text_append(out, "<main class=\"" DOC_CLASS_PAGE "\">\n");
-        text_appendf(out, "<h1>%s</h1>\n", text_cstr(&p->module));
+        text_append(out, "<h1>");
+        escape_html(out, text_cstr(&p->module), p->module.length);
+        text_append(out, "</h1>\n");
     } else {
         text_appendf(out, "# %s\n\n", text_cstr(&p->module));
     }
@@ -1075,8 +1083,11 @@ static void index_render(struct text *out, const struct page *pages,
     for (i = 0; i < count; i++) {
         const char *name = text_cstr(&pages[i].module);
         if (form == DOC_HTML) {
-            text_appendf(out, "<li><a href=\"%s%s\">%s</a>", name,
-                         DOC_HTML_SUFFIX, name);
+            text_append(out, "<li><a href=\"");
+            escape_html(out, name, pages[i].module.length);
+            text_append(out, DOC_HTML_SUFFIX "\">");
+            escape_html(out, name, pages[i].module.length);
+            text_append(out, "</a>");
             if (pages[i].doc.length > 0) {
                 text_append(out, "\n<p>");
                 first_paragraph(out, &pages[i].doc, pages[i].iface, form);
@@ -1242,6 +1253,14 @@ int doc_run(const char **sources, size_t count, const char **roots,
         iface = driver_interface(&o, &arenas[i], &tables[i], &programs[i],
                                  &tree);
         if (iface == NULL) {
+            status = 1;
+            goto done;
+        }
+        /* M14: the module path of a library file names the file of its
+           page, and a library file may come from a repository. */
+        if (!repo_name_valid(iface->module)) {
+            fprintf(stderr, "anti: %s names the module %s, which is no module "
+                            "path\n", sources[i], iface->module);
             status = 1;
             goto done;
         }

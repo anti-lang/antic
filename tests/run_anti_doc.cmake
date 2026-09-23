@@ -2,6 +2,7 @@
 # Run with cmake -P and these values:
 #   ANTI     the anti executable
 #   ANTIC    the antic executable
+#   RENAME   the antl_rename helper, which writes a hostile library file
 #   RUNTIME  the runtime archive, which holds the library file of anti.lang
 #   FIXTURE  the directory that holds src/ and the expected pages
 #   WORK     a directory for the pages this run writes
@@ -131,4 +132,52 @@ endif()
 string(FIND "${text}" "needs the source" at)
 if(at LESS 0)
     message(FATAL_ERROR "--dev on a library file said: ${text}")
+endif()
+
+# M14. A library file from a repository names its own module path and its
+# item names. A module path that is not the grammar of one becomes no file
+# name, and an item name with markup reaches the page escaped.
+set(hostile "${WORK}/hostile")
+file(MAKE_DIRECTORY "${hostile}/lib/com/example" "${hostile}/out/a/b")
+execute_process(
+    COMMAND "${RENAME}" "${WORK}/lib/com/example/shapes.antl"
+            "${hostile}/lib/com/example/shapes.antl"
+            "com.example.shapes" "../../../escaped.x"
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+    ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "antl_rename failed\n${out}${err}")
+endif()
+run_doc("--work;${hostile}/w1;-o;${hostile}/out/a/b;${hostile}/lib/com/example/shapes.antl"
+        status text)
+if(status EQUAL 0 OR NOT text MATCHES "which is no module path")
+    message(FATAL_ERROR "doc took the module path ../../../escaped.x: ${text}")
+endif()
+file(GLOB escaped "${hostile}/escaped*" "${hostile}/out/escaped*"
+     "${hostile}/out/a/escaped*")
+if(NOT escaped STREQUAL "")
+    message(FATAL_ERROR "doc wrote ${escaped}")
+endif()
+
+execute_process(
+    COMMAND "${RENAME}" "${WORK}/lib/com/example/shapes.antl"
+            "${hostile}/lib/com/example/shapes.antl" "Canvas" "<i>Cv<"
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+    ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "antl_rename failed\n${out}${err}")
+endif()
+run_doc("--work;${hostile}/w2;-o;${hostile}/marked;${hostile}/lib/com/example/shapes.antl"
+        status text)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "doc on the renamed item failed with ${status}\n${text}")
+endif()
+file(READ "${hostile}/marked/com.example.shapes.html" page)
+string(FIND "${page}" "<i>" at)
+if(NOT at LESS 0)
+    message(FATAL_ERROR "the page carries the markup of an item name:\n${page}")
+endif()
+string(FIND "${page}" "&lt;i&gt;Cv&lt;" at)
+if(at LESS 0)
+    message(FATAL_ERROR "the page lacks the escaped item name:\n${page}")
 endif()
