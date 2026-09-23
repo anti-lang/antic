@@ -32,3 +32,23 @@ A later step folds them into `docs/decisions.md`.
   One that does not open still adds nothing, and the linker reports it.
   Reason: a digest of part of a file gives the program the id of other
   code.
+
+## Types that contain themselves
+
+Decisions made while fixing step 2.
+
+- [provisional] After "contains itself" the checker goes on, and every
+  field that closes the cycle takes the error type. A use of such a
+  field adds no message. A cycle is reported once, at its first item.
+  Before, every item on it was reported. Reason: the audit
+  names two fixes, an error type or a stop before the bodies. A stop
+  would drop the later messages that `tests/errors/sizeof.err` expects.
+- [provisional] A class whose base already descends from it is refused
+  with "class `B` inherits itself" at its `inherits`, and it keeps the
+  root `anti.lang.Object` as its base. Reason: every walk up a chain
+  then ends, as it does for a base that is refused for another reason.
+- [provisional] A `simd struct` refuses the unit break `_` with the
+  message of a bitfield lane, since `_` is a bitfield of no width.
+- [provisional] A size or an offset of `fixed_layout` past 2^64 bytes is
+  no fixed layout. A conversion of a simd struct to such a type is then
+  refused with the message for a type of other bytes.
