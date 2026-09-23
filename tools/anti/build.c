@@ -213,8 +213,8 @@ static void base_options(struct build *b, struct options *o,
     o->inject = b->m.inject.entries;
     o->inject_count = b->m.inject.count;
     /* The link writes the version into the notice and into the
-       descriptor of every class of the module it compiles, as a library
-       file of the project carries it. */
+       descriptor of every class of the module it compiles. A library
+       file of the project carries the same version. */
     if (b->m.version.length > 0) {
         o->package_version = text_cstr(&b->m.version);
     }

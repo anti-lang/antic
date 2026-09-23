@@ -1,5 +1,5 @@
-//! A program that prints the raw trace of the calls that lead to `inner`,
-//! which `anti symbols resolve` turns into names and lines.
+//! A program that prints the raw trace of the calls that lead to `inner`, which
+//! `anti symbols resolve` turns into names and lines.
 
 import anti.io;
 import anti.lang;

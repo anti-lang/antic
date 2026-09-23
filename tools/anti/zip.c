@@ -280,9 +280,10 @@ void zip_archive_free(struct zip_archive *a)
 }
 
 /* DESIGN: deflate as RFC 1951 gives it, decoded the way zlib's puff
-   does: a table of the count of codes per length and the symbols in
-   order of their code, walked one bit at a time. It is the slow form
-   and the short one, and an archive of symbols is unpacked once. */
+   does. A table holds the count of codes per length and the symbols in
+   order of their code. The decoder walks it one bit at a time. It is
+   the slow form and the short one, and an archive of symbols is
+   unpacked once. */
 struct inflate {
     const unsigned char *in;
     size_t length;

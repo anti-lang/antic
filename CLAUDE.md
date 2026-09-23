@@ -408,8 +408,13 @@ reports what it finished.
 - `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
   only. It has never run.
 - The `anti` tool holds `new`, `build`, `run`, `sdk export`, `sdk import`,
-  `test`, `check`, `fmt`, `doc` and `bind`, and nothing else of
+  `test`, `check`, `fmt`, `doc`, `bind` and `symbols`, and nothing else of
   `docs/tooling.md`.
+- `anti symbols inventory`, `check` and `resolve` are built. They read the
+  runtime configuration, find the program beside it and the libraries of
+  `plugins` and `[injections]`, and match every binary to an archive by its
+  build id. See "The symbols command" in `docs/decisions.md` and
+  `docs/notes/symbols.md`.
 - `anti bind` is built. `anti bind raylib_api.json` and `anti bind --clang
   <header>` write a binding module, a shim for the inline functions and, with
   `--probe`, the ABI probe in C and in Anti. `--clang` runs clang with

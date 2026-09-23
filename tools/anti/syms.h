@@ -6,10 +6,10 @@
 /* `anti symbols`, the three commands over the symbols archives of a
    deployment. Each returns the exit status of the command. */
 
-/* Read the runtime configuration at conf, find the program beside it,
+/* Read the runtime configuration at conf. Find the program beside it,
    the libraries of the `plugins` directories and those of
-   `[injections]`, and fold the symbols archive of each into the one
-   archive out, keyed by build id, with an `index.toml`. from names the
+   `[injections]`. Fold the symbols archive of each into the archive
+   out, keyed by build id, with an `index.toml`. from names the
    directory that holds the archives, or NULL for the directory of each
    binary. */
 int syms_inventory(const char *conf, const char *from, const char *out);

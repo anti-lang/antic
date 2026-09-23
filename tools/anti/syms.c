@@ -1,12 +1,13 @@
 /* `anti symbols inventory`, `check` and `resolve`.
 
-   DESIGN: a binary is known by the build id in its licence notice, and
-   an archive by the id of the debug twin it holds, which the notice of
-   that twin carries as well. Nothing else ties the two together, so a
-   renamed binary still finds its symbols and a rebuilt one never finds
-   the symbols of its predecessor. The readers of rt/symbols.c answer
-   for the twin, as they do for `anti.lang.StackTrace.symbolize`, and the
-   map answers where the twin does not. */
+   DESIGN: a binary is known by the build id in its licence notice. An
+   archive is known by the id of the debug twin it holds, which the
+   notice of that twin carries as well. Nothing else ties the two
+   together, so a renamed binary still finds its symbols and a rebuilt
+   one never finds the symbols of its predecessor. The readers of
+   rt/symbols.c answer for the twin, as they do for
+   `anti.lang.StackTrace.symbolize`, and the map answers where the twin
+   does not. */
 #include "syms.h"
 
 #include <inttypes.h>
@@ -22,9 +23,8 @@
 #include "toml.h"
 #include "zip.h"
 
-/* The name of the archive a build writes beside a binary is its stem
-   with this suffix, and the index of a deployment archive has this
-   name. */
+/* A build names the archive beside a binary after its stem with this
+   suffix. The index of a deployment archive has the second name. */
 #define ARCHIVE_SUFFIX "-symbols.zip"
 #define INDEX_NAME "index.toml"
 #define PLUGIN_INDEX "anti-plugins.toml"
@@ -1106,10 +1106,10 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
     return out->function.length > 0;
 }
 
-/* DESIGN: every line of the trace comes out as it went in, and a frame
+/* DESIGN: every line of the trace comes out as it went in. A frame
    whose module has symbols gains its function and its line after it. A
-   frame no archive answers for stays raw, and so does every line that
-   is no frame, such as the message of an error before its trace. */
+   frame no archive answers for stays raw. So does every line that is no
+   frame, such as the message of an error before its trace. */
 int syms_resolve(const char *trace, const char *const *symbols, size_t count)
 {
     struct units units = {0};

@@ -825,6 +825,31 @@ add_test(NAME anti_build
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build.cmake")
 
+# `anti symbols` over a deployment of a release program, with a plugin
+# on a macOS host. It takes the inventory, the check of present, stale
+# and missing symbols and a release trace resolved into names and lines. A
+# Windows program keeps its functions in the PDB, which only DbgHelp
+# reads, so the test runs on the other hosts.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    if(ANTIC_HOST_OS STREQUAL "macos")
+        set(anti_symbols_plugin "-DSUFFIX=.dylib")
+    else()
+        set(anti_symbols_plugin "-DSUFFIX=")
+    endif()
+    add_test(NAME anti_symbols
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DPLUGIN=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "${anti_symbols_plugin}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_symbols.cmake")
+endif()
+
 # A binding names its framework with `link framework`, and `anti build`
 # passes it to antic. A Mac takes the SDK from the Command Line Tools.
 if(APPLE)

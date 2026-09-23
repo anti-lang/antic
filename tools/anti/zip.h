@@ -45,9 +45,9 @@ struct zip_item {
     unsigned method;
 };
 
-/* Read the archive at path. The reader takes the entries that a symbols
-   archive of Anti stores and the ones another tool compressed with
-   deflate, so an archive that a user packed again still opens. Returns
+/* Read the archive at path. The reader takes the stored entries of a
+   symbols archive of Anti. It takes the ones another tool compressed
+   with deflate as well, so an archive a user packed again opens. Returns
    false and writes a message when the file is no such archive. */
 bool zip_read(const char *path, struct zip_archive *out);
 
