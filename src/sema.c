@@ -1629,9 +1629,6 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
             walk_expr(w, e->as.format.parts[i].value);
             walk_expr(w, e->as.format.parts[i].value_call);
         }
-        for (i = 0; i < e->as.format.from_count; i++) {
-            walk_expr(w, e->as.format.from[i]);
-        }
         return;
     /* The test holds both bounds and any `lt` it calls. */
     case EXPR_IN:
@@ -5461,10 +5458,9 @@ static struct type *check_join(struct checker *c, struct expr *e)
 /* DESIGN: an `f"..."` is checked as the calls it makes on a local
    `anti.text.Builder`: `new` makes it, `append` writes each text, one
    `append_*` of the value's type writes each `{expr}` and `take` gives
-   the `str`. `f"..."(from)` calls `take_in(from)` instead, which takes
-   the text from an allocator. The checker writes those calls as nodes and
-   checks them as it checks any call, so the functions are found, and
-   their arguments converted, by the rules a program's own call follows. The names they
+   the `str`. The checker writes those calls as nodes and checks them as
+   it checks any call, so the functions are found, and their arguments
+   converted, by the rules a program's own call follows. The names they
    use cannot be written in a program: `<text>` is the module, `<builder>`
    the local and `<value>` the value of one `{expr}`, which is checked
    once and bound to that local. Each lives in a scope of its own. The
@@ -5687,15 +5683,11 @@ static bool format_api(struct checker *c, const struct expr *e,
     static const char *const names[] = {
         TEXT_NEW, TEXT_APPEND, TEXT_APPEND_INT, TEXT_APPEND_UINT,
         TEXT_APPEND_FLOAT, TEXT_APPEND_F32, TEXT_APPEND_BOOL,
-        TEXT_APPEND_CHAR, TEXT_APPEND_TEXT, TEXT_TAKE, TEXT_TAKE_IN
+        TEXT_APPEND_CHAR, TEXT_APPEND_TEXT, TEXT_TAKE
     };
     size_t count = sizeof names / sizeof names[0];
     size_t i;
 
-    /* `take_in` is called by the form with an allocator alone. */
-    if (!e->as.format.has_from) {
-        count--;
-    }
     for (i = 0; i < count; i++) {
         struct name name;
         name.text = names[i];
@@ -5731,11 +5723,6 @@ static struct type *check_format(struct checker *c, struct expr *e)
                  format_name(e));
         return builtin(c, TYPE_ERROR);
     }
-    if (e->as.format.has_from && e->as.format.from_count != 1) {
-        error_at(c, e->pos, "%s takes 1 argument, found %zu", format_name(e),
-                 e->as.format.from_count);
-        return builtin(c, TYPE_ERROR);
-    }
     if (!format_api(c, e, builder->type)) {
         return builtin(c, TYPE_ERROR);
     }
@@ -5765,10 +5752,7 @@ static struct type *check_format(struct checker *c, struct expr *e)
             ok = check_format_value(c, e, part) && ok;
         }
     }
-    e->as.format.take =
-        e->as.format.has_from
-            ? builder_call(c, e->pos, TEXT_TAKE_IN, e->as.format.from, 1)
-            : builder_call(c, e->pos, TEXT_TAKE, NULL, 0);
+    e->as.format.take = builder_call(c, e->pos, TEXT_TAKE, NULL, 0);
     ok = !is_error(check_expr(c, e->as.format.take, NULL)) && ok;
     leave_scope(c, &scope);
     return ok ? builtin(c, TYPE_STR) : builtin(c, TYPE_ERROR);

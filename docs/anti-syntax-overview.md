@@ -108,15 +108,13 @@ Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of
 
 ## Literals
 
-Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. `f"..."(from)` takes the memory of its text from the `anti.mem.Allocator` `from`. Bytes in hex `x"00 AB CC"`. The prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
+Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. The prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
 
 <!-- overview: context, docs-style:ignore
 ```anti
-import anti.mem;
 import anti.text;
 let name = "tea";
 let price = 2.5;
-let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 4096);
 ```
 -->
 ```anti
@@ -127,12 +125,11 @@ let d = r#"a "quoted" string"#;
 let e = b"\x00\x01";
 let g = f"{name:>10} costs {price:8.2f}";
 let h = rf"C:\tools\{name}";
-let t = f"{name} at {price}"(&arena);
 let i = x"00 AB CC";
 let x: i8 = -128;
 ```
 
-Built: `f"..."` and `rf"..."`, each with an allocator as well.
+Built: `f"..."` and `rf"..."`.
 
 ## Variables and constants
 

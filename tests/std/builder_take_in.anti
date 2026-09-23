@@ -1,8 +1,9 @@
-//! `f"..."(from)` and `rf"..."(from)` take the memory of their text from the
-//! allocator `from`, and `f"..."` keeps the C library. `Kept` remembers each
-//! block it lends, so the test sees that each text is one of them and that none
-//! is left once they all go back. The allocator is computed after the values of
-//! the literal. `Lender` lends through the sub-object of an interface, and an
+//! `text.Builder.take_in(from)` gives the collected text in memory of the
+//! allocator `from`, and `take` keeps the C library. Text that should live in
+//! an arena is built this way, since an `f"..."` takes its memory from the C
+//! library alone. `Kept` remembers each block it lends, so the test sees that
+//! each text is one of them and that none is left once they all go back.
+//! `Lender` lends through the sub-object of an interface, and an
 //! `ArenaAllocator` gives every text back at once.
 import anti.mem;
 import anti.text;
@@ -113,53 +114,46 @@ class Lender
 	}
 }
 
-/// Print `what` and give 7, to show when a value is computed.
-fn step(what: str) -> int
-{
-	printf("%s\n".ptr, what.ptr);
-	return 7;
-}
-
-/// Print that the allocator is computed and give `k`.
-fn pick(k: *Kept) -> *Kept
-{
-	printf("allocator\n".ptr);
-	return k;
-}
-
 fn main() -> int
 {
 	let kept = Kept.new();
 	let n = 42;
 	let name = "pear";
-	let a = f"{name:>6} costs {n:x}"(&kept);
-	let b = rf"C:\{name}"(&kept);
-	let c = f""(&kept);
-	printf("%s|%s|%d\n".ptr, a.ptr, b.ptr, c.len as c_int);
+	let b = text.Builder.new();
+	b.append_text(name, 6, text.Align.Right);
+	b.append(" costs ");
+	b.append_int(n, 16);
+	let a = b.take_in(&kept);
+	b.append("C:\\");
+	b.append(name);
+	let r = b.take_in(&kept);
+	let c = b.take_in(&kept);
+	printf("%s|%s|%d\n".ptr, a.ptr, r.ptr, c.len as c_int);
 	printf("kept: %d lent, %d live, texts kept %d\n".ptr,
 		kept.lent as c_int, kept.live as c_int,
-		(kept.holds(a.ptr) && kept.holds(b.ptr) && kept.holds(c.ptr))
+		(kept.holds(a.ptr) && kept.holds(r.ptr) && kept.holds(c.ptr))
 		as c_int);
 
 	let plain = f"{n}";
 	printf("plain: %s, kept %d\n".ptr, plain.ptr,
 		kept.holds(plain.ptr) as c_int);
 	free(plain.ptr);
-
-	let ordered = f#"{step("value")}"#(pick(&kept));
-	printf("ordered: %s\n".ptr, ordered.ptr);
 	kept.free_all();
 	printf("after free_all: %d live\n".ptr, kept.live as c_int);
 
 	let lender = Lender { };
-	let d = f"{n} lent"(&lender);
+	b.append_int(n);
+	b.append(" lent");
+	let d = b.take_in(&lender);
 	printf("lender: %s, %d live\n".ptr, d.ptr, lender.live as c_int);
 	lender.lending.free(d.ptr);
 	printf("after free: %d live\n".ptr, lender.live as c_int);
 
 	let counting = Lender { };
 	let arena = mem.ArenaAllocator.new(&counting, 1024);
-	let e = f"{n} in an arena"(&arena);
+	b.append_int(n);
+	b.append(" in an arena");
+	let e = b.take_in(&arena);
 	printf("arena: %s, %d live\n".ptr, e.ptr, counting.live as c_int);
 	arena.free_all();
 	printf("after free_all: %d live\n".ptr, counting.live as c_int);

@@ -346,11 +346,6 @@ struct expr {
             struct format_part *parts;
             size_t count;
             bool raw;               /* `rf"..."` */
-            /* `f"..."(from)`: the arguments after the literal, which the
-               checker takes as the allocator of the text. */
-            bool has_from;
-            struct expr **from;
-            size_t from_count;
             /* Set by the checker: the local `anti.text.Builder` that
                collects the text, the call that makes it and the call
                that gives its bytes. */

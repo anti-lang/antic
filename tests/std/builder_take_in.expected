@@ -2,9 +2,6 @@ exit 0
   pear costs 2a|C:\pear|0
 kept: 3 lent, 3 live, texts kept 1
 plain: 42, kept 0
-value
-allocator
-ordered: 7
 after free_all: 0 live
 lender: 42 lent, 1 live
 after free: 0 live

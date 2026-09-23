@@ -1,0 +1,2 @@
+format_call.anti:10:10: error: cannot call `str`
+format_call.anti:11:10: error: cannot call `str`

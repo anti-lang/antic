@@ -327,9 +327,6 @@ struct type *types_object(struct types *types);
 #define TEXT_APPEND_CHAR "append_char"
 #define TEXT_APPEND_TEXT "append_text"
 #define TEXT_TAKE "take"
-/* `f"..."(from)` ends with `take_in`, which copies the text into memory
-   of the allocator. */
-#define TEXT_TAKE_IN "take_in"
 #define TEXT_ALIGN "Align"
 #define TEXT_ALIGN_LEFT "Left"
 #define TEXT_ALIGN_RIGHT "Right"
@@ -339,7 +336,8 @@ struct type *types_object(struct types *types);
 #define TEXT_EQUAL "equal"
 #define ROOT_TO_TEXT "to_text"
 /* `Object.deserialize` takes its memory from an allocator of this
-   class, and so does `f"..."(from)` through `take_in`. */
+   class, and `delete(p, from)` and `destroy(p, from)` give memory back
+   to one. */
 #define MEM_MODULE "anti.mem"
 #define MEM_ALLOCATOR "Allocator"
 #define ROOT_DESERIALIZE "deserialize"

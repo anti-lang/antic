@@ -253,9 +253,6 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
                 dump_expr(d, depth + 1, e->as.format.parts[i].value);
             }
         }
-        for (i = 0; i < e->as.format.from_count; i++) {
-            dump_expr(d, depth + 1, e->as.format.from[i]);
-        }
         break;
     case EXPR_NAME:
         label_name(d, "ident", NULL, &e->as.name);

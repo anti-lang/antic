@@ -932,22 +932,6 @@ static struct expr *postfix(struct parser *p)
         const struct token *t = peek(p);
         struct expr *outer;
 
-        /* DESIGN: an argument list right after `f"..."` belongs to the
-           literal, as the allocator of its text. A `str` takes no call,
-           so the form has no other reading. */
-        if (e->kind == EXPR_FORMAT && !e->as.format.has_from &&
-            accept(p, TOKEN_LPAREN)) {
-            bool saved = p->no_struct_literal;
-            p->no_struct_literal = false;
-            e->as.format.has_from = true;
-            e->as.format.from =
-                expressions(p, TOKEN_RPAREN, &e->as.format.from_count);
-            p->no_struct_literal = saved;
-            if (p->panic) {
-                return NULL;
-            }
-            continue;
-        }
         if (accept(p, TOKEN_LPAREN)) {
             bool saved = p->no_struct_literal;
             outer = new_expr(p, EXPR_CALL, t);

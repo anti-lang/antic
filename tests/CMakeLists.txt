@@ -2443,7 +2443,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "format_spec|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_spec.s,format_spec.anti"
         "format_types|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_types.s,format_types.anti"
         "format_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_no_import.s,format_no_import.anti"
-        "format_alloc|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_alloc.s,format_alloc.anti"
+        "format_call|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/format_call.s,format_call.anti"
         "deserialize_alloc|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/deserialize_alloc.s,deserialize_alloc.anti"
         "deserialize_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/deserialize_no_import.s,deserialize_no_import.anti"
         "destroy_from|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/destroy_from.s,destroy_from.anti"

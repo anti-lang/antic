@@ -1,0 +1,13 @@
+//! An `f"..."` is a `str`, which takes no call, so an argument list after the
+//! literal is refused. Text that lives in an allocator is built with
+//! `anti.text.Builder` and `take_in`.
+import anti.mem;
+import anti.text;
+
+fn main() -> int
+{
+	let n = 1;
+	let a = f"{n}"(mem.LibcAllocator.get());
+	let b = rf"{n}"();
+	return 0;
+}
