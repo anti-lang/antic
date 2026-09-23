@@ -88,6 +88,10 @@ struct shared_options {
     const char *def_file;
     const char *major;          /* --soname: the compatibility version */
     const char *version;        /* --soname: the full version */
+    /* macOS: the file of the exported symbols. Only the export
+       functions and anti_licenses stand in it, so a shared library for
+       C shows the documented surface and no name of the runtime. */
+    const char *exported_file;
     /* DESIGN: --no-runtime writes a plugin. It links no runtime and no
        standard library, and every name it needs is resolved against the
        host that loads it. */

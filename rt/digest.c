@@ -1,7 +1,7 @@
 /* The SHA-256 of FIPS 180-4. Discovery digests a library before it
    opens one, against the digest that the index of its directory
    records. */
-#include "sha256.h"
+#include "digest.h"
 
 #include <stdint.h>
 #include <stdio.h>

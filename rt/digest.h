@@ -1,7 +1,7 @@
 /* The SHA-256 of FIPS 180-4, fed in pieces. Discovery digests a library
    before it opens one. */
-#ifndef ANTI_RT_SHA256_H
-#define ANTI_RT_SHA256_H
+#ifndef ANTI_RT_DIGEST_H
+#define ANTI_RT_DIGEST_H
 
 #include <stddef.h>
 #include <stdint.h>

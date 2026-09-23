@@ -136,7 +136,8 @@ enum expr_kind {
     EXPR_IN,                        /* `x in lo..hi` */
     EXPR_OPTIONAL,                  /* `p?.x` and `p?.f(args)`, checked */
     EXPR_SYNC_OP,                   /* an operation of a mutex or a channel */
-    EXPR_SIMD                       /* a built-in of a simd struct */
+    EXPR_SIMD,                      /* a built-in of a simd struct */
+    EXPR_DESCRIPTOR                 /* the descriptor of a class, as `*byte` */
 };
 
 /* The format specification after the colon of an `{expr}`, as the
@@ -395,6 +396,10 @@ struct expr {
             const struct type *simd;
             uint32_t *lanes;
         } simd;                     /* EXPR_SIMD */
+        /* EXPR_DESCRIPTOR: the class whose descriptor the expression
+           gives. `lib.instance(I)` and `lib.supports(I, n)` write one,
+           and no source text does. */
+        const struct type *descriptor_of;
     } as;
 };
 

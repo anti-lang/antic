@@ -1441,6 +1441,12 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
     for (i = 0; i < m->class_count; i++) {
         free(m->classes[i]->subtables);
         free(m->classes[i]->mutable_fields);
+        free(m->classes[i]->injects);
+        free(m->classes[i]->provides);
+        m->classes[i]->subtables = NULL;
+        m->classes[i]->mutable_fields = NULL;
+        m->classes[i]->injects = NULL;
+        m->classes[i]->provides = NULL;
     }
     m->class_count = 0;
     for (i = 0; i < m->function_count; i++) {

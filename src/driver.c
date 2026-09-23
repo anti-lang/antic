@@ -33,6 +33,7 @@
 #define HEADER_SUFFIX ".h"
 #define PACKAGE_SUFFIX ".package"
 #define DEF_SUFFIX ".def"
+#define EXPORTED_SUFFIX ".exported"
 
 /* DESIGN: a bundled runtime holds every member of the runtime library
    except two. The object of rt/start.c has the C main of executables. The
@@ -859,6 +860,17 @@ static int back_end(const struct options *o, struct module *tree,
                        o->lib != LIB_NONE, o->dev, o)) {
         return 1;
     }
+    /* The `provides` lines go into the index beside the library. They
+       are read here, because the optimizer drops the class records that
+       carry them. */
+    for (i = 0; is_plugin(o) && i < program->class_count; i++) {
+        const struct ir_class *c = program->classes[i];
+        size_t j;
+        for (j = 0; j < c->provides_count; j++) {
+            text_appendf(&extras->provides, "%s\t%s.%s\n",
+                         c->provides[j].interface, c->module, c->name);
+        }
+    }
     /* The build that compiles the program decides, so an assertion of a
        library file follows this build and not the one that wrote it. */
     if (o->asserts == ASSERTS_OFF ||
@@ -923,14 +935,6 @@ static int back_end(const struct options *o, struct module *tree,
            brings no constructor of its own. */
         if (ok && o->lib == LIB_SHARED && !is_plugin(o)) {
             emit_constructor(assembly, o->target, "anti_rt_init");
-        }
-        for (i = 0; ok && is_plugin(o) && i < program->class_count; i++) {
-            const struct ir_class *c = program->classes[i];
-            size_t j;
-            for (j = 0; j < c->provides_count; j++) {
-                text_appendf(&extras->provides, "%s\t%s.%s\n",
-                             c->provides[j].interface, c->module, c->name);
-            }
         }
         if (ok && extras->notice.length > 0 && status != 3 &&
             !o->assembly_only && o->lib != LIB_STATIC) {
@@ -2037,10 +2041,11 @@ static bool build_c_library(const struct options *o, const char *object,
     } else if (ok) {
         struct link_inputs in;
         struct link_command c;
-        struct shared_options s = {NULL, NULL, NULL, is_plugin(o)};
+        struct shared_options s = {NULL, NULL, NULL, NULL, is_plugin(o)};
         struct link_facts facts;
         struct windows_link w;
         struct text def = {0};
+        struct text exported = {0};
         struct text versioned = {0};
         memset(&in, 0, sizeof in);
         in.object = object;
@@ -2064,6 +2069,25 @@ static bool build_c_library(const struct options *o, const char *object,
             text_appendf(&versioned, "%s.%s", text_cstr(&path),
                          text_cstr(&major));
             in.executable = text_cstr(&versioned);
+        }
+        /* DESIGN: the exported surface of a shared library for C is
+           the export functions and anti_licenses. Windows takes it as
+           a .def file and macOS as an -exported_symbols_list. Linux
+           takes --exclude-libs, because the runtime is an archive. */
+        if (ok && info->os == OS_MACOS && !s.plugin) {
+            struct text content = {0};
+            const char *p = text_cstr(&extras->exports);
+            text_appendf(&exported, "%s%s%s", text_cstr(&dir), name,
+                         EXPORTED_SUFFIX);
+            while (*p != '\0') {
+                size_t n = strcspn(p, "\n");
+                text_appendf(&content, "_%.*s\n", (int)n, p);
+                p += n + (p[n] == '\n');
+            }
+            text_append(&content, "_anti_licenses\n");
+            ok = write_file(text_cstr(&exported), &content);
+            s.exported_file = text_cstr(&exported);
+            text_free(&content);
         }
         if (ok && info->os == OS_WINDOWS && !s.plugin) {
             struct text content = {0};
@@ -2107,6 +2131,7 @@ static bool build_c_library(const struct options *o, const char *object,
         }
         link_facts_free(&facts);
         text_free(&def);
+        text_free(&exported);
         text_free(&versioned);
     }
     text_free(&dir);

@@ -129,11 +129,8 @@ static void macos(struct link_command *c, enum target t,
     add(c, "-o");
     add(c, in->executable);
     /* DESIGN: a plugin is bound against the host at load, so the host
-       keeps every name its own objects define. -keep_private_externs
-       holds the names of the runtime, which is compiled with hidden
-       visibility, and -export_dynamic puts them in the export table. */
+       keeps every name its own objects define in its export table. */
     if (in->exports) {
-        add(c, "-keep_private_externs");
         add(c, "-export_dynamic");
     }
     add_inputs(c, in);
@@ -417,6 +414,12 @@ void link_shared_command(struct link_command *c, enum target t,
             add(c, "-undefined");
             add(c, "dynamic_lookup");
         }
+        /* A shared library for C shows its export functions and
+           anti_licenses, and no name of the runtime. */
+        if (s->exported_file != NULL) {
+            add(c, "-exported_symbols_list");
+            add(c, s->exported_file);
+        }
         add_inputs(c, in);
         if (!s->plugin) {
             add(c, text_cstr(library));
@@ -432,6 +435,12 @@ void link_shared_command(struct link_command *c, enum target t,
         text_appendf(search, "-L%s", in->crt_dir);
         add(c, linker);
         add(c, "-shared");
+        /* The runtime comes from an archive, and a shared library for C
+           shows its export functions alone. */
+        if (!s->plugin) {
+            add(c, "--exclude-libs");
+            add(c, "ALL");
+        }
         if (!in->debug) {
             add(c, "--strip-debug");
         }

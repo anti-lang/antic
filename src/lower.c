@@ -5741,6 +5741,12 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         return lower_sync_op(l, e);
     case EXPR_SIMD:
         return lower_simd(l, e);
+    /* The address of the descriptor of a class, which `lib.instance(I)`
+       and `lib.supports(I, f)` pass to the loader. */
+    case EXPR_DESCRIPTOR:
+        return temp(l, ir_addr(l->f, l->b,
+                               ir_global_op(class_descriptor(
+                                   l, e->as.descriptor_of))));
     case EXPR_FIELD:
         if (e->symbol != NULL && e->symbol->kind == SYMBOL_CONST) {
             return constant(l, e->symbol->value, type);

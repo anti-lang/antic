@@ -4292,6 +4292,145 @@ static struct type *check_sync_op(struct checker *c, struct expr *e)
     }
 }
 
+/* The class a dotted path names. It is a class of the module being
+   checked when the qualifier is empty, and a pub class of another
+   module otherwise. The qualifier names that module by its alias or by
+   its whole path. NULL when neither answers. */
+static const struct type *interface_named(struct checker *c,
+                                          const struct name *qualifier,
+                                          const struct name *name,
+                                          struct pos pos)
+{
+    const struct interface *lib;
+    struct symbol *sym;
+
+    if (qualifier->length == 0) {
+        sym = scope_find_local(&c->module_scope, name);
+        if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
+            error_at(c, pos, "cannot find class `%.*s`", (int)name->length,
+                     name->text);
+            return NULL;
+        }
+        return sym->type;
+    }
+    sym = scope_find_local(&c->module_scope, qualifier);
+    lib = sym != NULL && sym->kind == SYMBOL_MODULE ? sym->home
+                                                    : find_library(c, qualifier);
+    if (lib == NULL) {
+        error_at(c, pos, "cannot find module `%.*s`", (int)qualifier->length,
+                 qualifier->text);
+        return NULL;
+    }
+    sym = library_item(c, lib, name);
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
+        error_at(c, pos, "`%.*s` has no public class `%.*s`",
+                 (int)qualifier->length, qualifier->text, (int)name->length,
+                 name->text);
+        return NULL;
+    }
+    return sym->type;
+}
+
+/* The module and the class of `anti.plugin.Library`, whose two calls
+   the compiler carries because each names an interface. */
+#define PLUGIN_MODULE "anti.plugin"
+#define PLUGIN_LIBRARY "Library"
+
+static bool plugin_library(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_CLASS &&
+           name_is(&t->name, PLUGIN_LIBRARY) &&
+           name_is(&t->module, PLUGIN_MODULE);
+}
+
+/* The dotted path an expression of names spells, as `anti.log.Logger`
+   writes one. The last name goes to `last` and the ones before it to
+   `qualifier`. Returns false for any other expression. */
+enum { PATH_PARTS = 8 };
+
+static bool name_path(struct checker *c, const struct expr *e,
+                      struct name *qualifier, struct name *last)
+{
+    const struct name *parts[PATH_PARTS];
+    struct text path = {0};
+    size_t count = 0;
+    const char *dot;
+    char *copy;
+    size_t i;
+
+    for (; e->kind == EXPR_FIELD && !e->as.field.optional;
+         e = e->as.field.base) {
+        if (count == PATH_PARTS) {
+            return false;
+        }
+        parts[count++] = &e->as.field.name;
+    }
+    if (e->kind != EXPR_NAME) {
+        return false;
+    }
+    text_appendf(&path, "%.*s", (int)e->as.name.length, e->as.name.text);
+    for (i = count; i > 0; i--) {
+        text_appendf(&path, ".%.*s", (int)parts[i - 1]->length,
+                     parts[i - 1]->text);
+    }
+    copy = arena_alloc(c->arena, path.length + 1);
+    memcpy(copy, text_cstr(&path), path.length + 1);
+    text_free(&path);
+    dot = strrchr(copy, '.');
+    qualifier->text = copy;
+    qualifier->length = dot != NULL ? (size_t)(dot - copy) : 0;
+    last->text = dot != NULL ? dot + 1 : copy;
+    last->length = strlen(last->text);
+    return true;
+}
+
+/* DESIGN: `lib.instance(I)` and `lib.supports(I, "f")` name an
+   interface where a value stands, so the compiler carries them. Each
+   becomes the call of an ordinary function of `anti.plugin.Library`
+   with the descriptor of the interface in the place of the name.
+   `instance` then has the type `?*I`, which `catch fatal` narrows. */
+static const struct type *plugin_call(struct checker *c, struct expr *e,
+                                      bool *ok)
+{
+    struct expr *callee = e->as.call.callee;
+    bool instance = name_is(&callee->as.field.name, "instance");
+    size_t wanted = instance ? 1 : 2;
+    struct expr *argument;
+    const struct type *iface;
+    struct name qualifier;
+    struct name last;
+    struct expr *given;
+
+    *ok = false;
+    if (e->as.call.arg_count != wanted) {
+        error_at(c, e->pos, "`%s` of a library takes %zu argument%s, found "
+                 "%zu", instance ? "instance" : "supports", wanted,
+                 wanted == 1 ? "" : "s", e->as.call.arg_count);
+        return NULL;
+    }
+    given = e->as.call.args[0];
+    if (!name_path(c, given, &qualifier, &last)) {
+        error_at(c, given->pos, "the first argument names an interface");
+        return NULL;
+    }
+    iface = interface_named(c, &qualifier, &last, given->pos);
+    if (iface == NULL) {
+        return NULL;
+    }
+    if (iface->kind != TYPE_CLASS || !iface->has_abstract) {
+        error_at(c, given->pos, "`%s` is not abstract, and a library "
+                 "provides an interface", tn((struct type *)iface));
+        return NULL;
+    }
+    argument = new_node(c, EXPR_DESCRIPTOR, given->pos);
+    argument->as.descriptor_of = iface;
+    e->as.call.args[0] = argument;
+    callee->as.field.name.text = instance ? "instance_at" : "supports_at";
+    callee->as.field.name.length = instance ? 11 : 11;
+    *ok = true;
+    return instance ? iface : NULL;
+}
+
 static struct type *check_call(struct checker *c, struct expr *e,
                                struct type *expected)
 {
@@ -4305,6 +4444,9 @@ static struct type *check_call(struct checker *c, struct expr *e,
     size_t i;
     bool ok = true;
     const struct symbol *module;
+    /* `lib.instance(I)` gives `?*I`, which the function it becomes does
+       not say. NULL for every other call. */
+    const struct type *provided = NULL;
 
     /* An operation on an atomic field becomes one node of its own. */
     if (atomic_call(c, e, &fn)) {
@@ -4404,6 +4546,15 @@ static struct type *check_call(struct checker *c, struct expr *e,
             simd_value_name(&callee->as.field.name) &&
             !simd_method_declared(c, s, &callee->as.field.name)) {
             return check_simd_value(c, e, base, s);
+        }
+        if (plugin_library(s) &&
+            (name_is(&callee->as.field.name, "instance") ||
+             name_is(&callee->as.field.name, "supports"))) {
+            bool rewritten;
+            provided = plugin_call(c, e, &rewritten);
+            if (!rewritten) {
+                return builtin(c, TYPE_ERROR);
+            }
         }
         /* DESIGN: a union has no methods, so v.f(args) on a union is
            always a call of the function pointer in field f. */
@@ -4523,6 +4674,10 @@ static struct type *check_call(struct checker *c, struct expr *e,
             return builtin(c, TYPE_ERROR);
         }
         e->as.call.guards_pointer = true;
+    }
+    if (provided != NULL) {
+        return types_with_none(
+            c->types, types_pointer(c->types, (struct type *)provided));
     }
     return fn->result;
 }
@@ -5860,6 +6015,9 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_HERE:
         t = location_type(c, e->pos);
         return t != NULL ? t : builtin(c, TYPE_ERROR);
+    case EXPR_DESCRIPTOR:
+        /* The checker writes the node with its class already set. */
+        return types_pointer(c->types, builtin(c, TYPE_U8));
     case EXPR_FORMAT:
         return check_format(c, e);
     case EXPR_IN:
@@ -6944,6 +7102,7 @@ static bool eval_const(struct checker *c, struct expr *e,
     case EXPR_JOIN:
     case EXPR_SYNC_OP:
     case EXPR_SIMD:
+    case EXPR_DESCRIPTOR:
         return fail_const(c, e, "a call");
     case EXPR_SLICE:
     case EXPR_SLICE_LIT:
@@ -9467,44 +9626,6 @@ static bool same_qualifier(const struct item *it, const struct item *a,
 static void check_export(struct checker *c, struct item *it);
 static void check_extern_fn(struct checker *c, struct item *it);
 
-/* The interface a `provides` line names. It is a class of the module
-   being checked, or a pub class of another. The qualifier names that
-   module by its alias or by its whole path. NULL when neither
-   answers. */
-static const struct type *provides_interface(struct checker *c,
-                                             const struct provides *pr)
-{
-    const struct interface *lib;
-    struct symbol *sym;
-
-    if (pr->qualifier.length == 0) {
-        sym = scope_find_local(&c->module_scope, &pr->interface);
-        if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
-            error_at(c, pr->interface_pos, "cannot find class `%.*s`",
-                     (int)pr->interface.length, pr->interface.text);
-            return NULL;
-        }
-        return sym->type;
-    }
-    sym = scope_find_local(&c->module_scope, &pr->qualifier);
-    lib = sym != NULL && sym->kind == SYMBOL_MODULE
-              ? sym->home
-              : find_library(c, &pr->qualifier);
-    if (lib == NULL) {
-        error_at(c, pr->interface_pos, "cannot find module `%.*s`",
-                 (int)pr->qualifier.length, pr->qualifier.text);
-        return NULL;
-    }
-    sym = library_item(c, lib, &pr->interface);
-    if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
-        error_at(c, pr->interface_pos, "`%.*s` has no public class `%.*s`",
-                 (int)pr->qualifier.length, pr->qualifier.text,
-                 (int)pr->interface.length, pr->interface.text);
-        return NULL;
-    }
-    return sym->type;
-}
-
 /* DESIGN: `provides Interface as Class;` says what a library offers.
    The interface is an abstract class of the module being checked or of
    one it imports. The class is a complete class of the module that
@@ -9518,7 +9639,9 @@ static void check_provides(struct checker *c, struct module *module)
 
     for (i = 0; i < module->provides_count; i++) {
         struct provides *pr = &module->provides[i];
-        const struct type *iface = provides_interface(c, pr);
+        const struct type *iface =
+            interface_named(c, &pr->qualifier, &pr->interface,
+                            pr->interface_pos);
         const struct symbol *sym =
             scope_find_local(&c->module_scope, &pr->class_name);
         const struct item *it = sym != NULL ? sym->item : NULL;

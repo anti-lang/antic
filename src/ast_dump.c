@@ -218,6 +218,12 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
                      e->spelling.bytes);
         end(d, start, type);
         break;
+    case EXPR_DESCRIPTOR:
+        text_appendf(d->out, "descriptor %.*s",
+                     (int)e->as.descriptor_of->name.length,
+                     e->as.descriptor_of->name.text);
+        end(d, start, type);
+        break;
     case EXPR_STRING:
     case EXPR_BYTES:
         text_appendf(d->out, "string_lit %.*s", (int)e->spelling.length,

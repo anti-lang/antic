@@ -14,7 +14,7 @@
 #include <string.h>
 
 #include "atomic.h"
-#include "sha256.h"
+#include "digest.h"
 #include "std.h"
 #include "toml.h"
 

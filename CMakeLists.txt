@@ -238,9 +238,9 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # DESIGN: one list of runtime sources. The host library and the cross
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
-set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu errno f16 fs
-    hooks init io license loaded mem object platform plugin reflect registry sha256
-    signal start symbols sync text threads time toml trace utf)
+set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
+    errno f16 fs hooks init io license loaded mem object platform plugin reflect
+    registry signal start symbols sync text threads time toml trace utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "rt/${source}.c")
@@ -252,11 +252,14 @@ if(NOT ANTIC_HOST_OS STREQUAL "macos")
     antic_cpu_levels(host_levels "${ANTIC_HOST_TARGET}")
     foreach(level IN LISTS host_levels)
         set(out "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}/${level}")
+        # DESIGN: the runtime carries no hidden visibility. A program
+        # that hosts a plugin exports its runtime symbols, and a plugin
+        # is bound against them at load. A shared library for C keeps
+        # the documented surface through the export list of its link.
         add_library(anti_rt_${level} STATIC ${anti_rt_files})
         set_target_properties(anti_rt_${level} PROPERTIES
             OUTPUT_NAME anti_rt
-            ARCHIVE_OUTPUT_DIRECTORY "${out}"
-            C_VISIBILITY_PRESET hidden)
+            ARCHIVE_OUTPUT_DIRECTORY "${out}")
         target_compile_definitions(anti_rt_${level} PRIVATE
             ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}})
         # DESIGN: sanitizers check antic. Anti programs link the runtime without a
@@ -281,8 +284,6 @@ if(NOT ANTIC_HOST_OS STREQUAL "macos")
             target_compile_options(anti_rt_license_stub_${level} PRIVATE
                 -fno-sanitize=all)
         endif()
-        set_target_properties(anti_rt_license_stub_${level} PROPERTIES
-            C_VISIBILITY_PRESET hidden)
         add_custom_target(anti_rt_license_stub_copy_${level} ALL
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
@@ -354,7 +355,7 @@ function(anti_cross_runtime_at target triple level root)
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
+                -Wall -Wextra -Wpedantic -Werror
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                 -c "${PROJECT_SOURCE_DIR}/rt/${source}.c" -o "${object}"
@@ -367,7 +368,7 @@ function(anti_cross_runtime_at target triple level root)
                 "${PROJECT_SOURCE_DIR}/rt/plugin.h"
                 "${PROJECT_SOURCE_DIR}/rt/reflect.h"
                 "${PROJECT_SOURCE_DIR}/rt/registry.h"
-                "${PROJECT_SOURCE_DIR}/rt/sha256.h"
+                "${PROJECT_SOURCE_DIR}/rt/digest.h"
                 "${PROJECT_SOURCE_DIR}/rt/signal.h"
                 "${PROJECT_SOURCE_DIR}/rt/symbols.h"
                 "${PROJECT_SOURCE_DIR}/rt/toml.h"
@@ -384,7 +385,7 @@ function(anti_cross_runtime_at target triple level root)
     add_custom_command(OUTPUT "${stub}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-            -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
+            -Wall -Wextra -Wpedantic -Werror
             "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
             -c "${PROJECT_SOURCE_DIR}/rt/license_stub.c" -o "${stub}"
         DEPENDS "${PROJECT_SOURCE_DIR}/rt/license_stub.c"
@@ -450,7 +451,7 @@ endif()
 
 # The standard library in std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
-set(ANTIC_STD_MODULES lang runtime mem debug io text license error time os fs reflect random collection toml config args json log simd trace)
+set(ANTIC_STD_MODULES lang runtime mem debug io text license error time os fs reflect random collection toml config args json log simd trace plugin)
 set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/std/anti")
 set(std_files "")
 foreach(module IN LISTS ANTIC_STD_MODULES)

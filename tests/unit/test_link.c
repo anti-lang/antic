@@ -96,7 +96,7 @@ static void strips_debug(void)
         TARGET_LINUX_X86_64, TARGET_LINUX_ARM64, TARGET_MACOS_X86_64,
         TARGET_MACOS_ARM64, TARGET_WINDOWS_X86_64, TARGET_WINDOWS_ARM64
     };
-    struct shared_options none = {NULL, NULL, NULL, false};
+    struct shared_options none = {NULL, NULL, NULL, NULL, false};
     size_t i;
 
     for (i = 0; i < sizeof targets / sizeof targets[0]; i++) {
@@ -320,9 +320,9 @@ static void libraries(void)
     static const char *const members[] = {"geo.o", "geo.package.o"};
     static const char *const joined_inputs[] = {"geo.o", "init.c.o",
                                                 "utf.c.o"};
-    struct shared_options none = {NULL, NULL, NULL, false};
-    struct shared_options versioned = {NULL, "1", "1.2.4", false};
-    struct shared_options def = {"geo.def", NULL, NULL, false};
+    struct shared_options none = {NULL, NULL, NULL, NULL, false};
+    struct shared_options versioned = {NULL, "1", "1.2.4", NULL, false};
+    struct shared_options def = {"geo.def", NULL, NULL, NULL, false};
     struct link_inputs in = unix_inputs;
     struct link_inputs win = windows_inputs;
     struct link_command c;
@@ -354,11 +354,11 @@ static void libraries(void)
            "/rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem");
     in.executable = "libgeo.so.1";
     shared(TARGET_LINUX_X86_64, &in, &versioned,
-           "ld -shared --strip-debug -o libgeo.so.1 -soname libgeo.so.1 geo.o "
+           "ld -shared --exclude-libs ALL --strip-debug -o libgeo.so.1 -soname libgeo.so.1 geo.o "
            "/rt/lib/linux-x86_64/v3/libanti_rt.a -L/usr/lib/x86_64-linux-gnu -lc");
     in.executable = "libgeo.so";
     shared(TARGET_LINUX_ARM64, &in, &none,
-           "ld -shared --strip-debug -o libgeo.so geo.o "
+           "ld -shared --exclude-libs ALL --strip-debug -o libgeo.so geo.o "
            "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
            "-L/usr/lib/x86_64-linux-gnu -lc");
     win.object = "geo.obj";
@@ -393,7 +393,7 @@ static void libraries(void)
            "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
     in.executable = "libgeo.so.1";
     shared(TARGET_LINUX_X86_64, &in, &versioned,
-           "/rt/bin/ld.lld -shared --strip-debug -o libgeo.so.1 -soname "
+           "/rt/bin/ld.lld -shared --exclude-libs ALL --strip-debug -o libgeo.so.1 -soname "
            "libgeo.so.1 geo.o "
            "/rt/lib/linux-x86_64/v3/libanti_rt.a");
     win = lld_windows_inputs;
