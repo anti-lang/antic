@@ -96,11 +96,12 @@ therefore what a trace of that program would name. Those readers looked up one
 address at a time, and `anti_elf_functions` and `anti_macho_functions` walk a
 whole symbol table for this.
 
-The map names the build id of the binary beside it, which is what ties a frame
-of a trace to this archive. The debug link carries an id of its own, because
-the id is the digest of the assembly and `-g` writes more of it. Both links
-place every function at the same address, so the map answers for the binary as
-well as for the debug link beside it.
+The binary, the debug link and the map all carry one build id, which is what
+ties a frame of a trace to this archive. The digest of an id leaves out what
+`-g` added, so a `-g` link carries the id of the plain link beside it.
+"Build ids" in `docs/decisions.md` holds the rule and `src/debug.c` records the
+ranges. Both links place every function at the same address, so the one map
+answers for either of them.
 
 A Windows program carries no symbol table, because lld-link writes the symbols
 to a PDB. The archive holds that PDB, and the map says so.
