@@ -325,6 +325,17 @@ reports what it finished.
   program a plugin cannot bind against. A program loads a library where it
   is linked dynamically, which is macOS today. See "Plugins" in
   `docs/decisions.md` and `docs/notes/plugins.md`.
+- Interface versioning is built. Every class descriptor carries the version
+  of the package that declared the class, `--package-version` and `0.0.0`
+  without one. An abstract class carries the chain of its structural hashes,
+  one per prefix of its table, and the floor a `compatible 1.1;` line names.
+  A plugin records the chain, the fields, the size and the version of each
+  interface it was built against. The load compares the two chains at the
+  length of the shorter, refuses a field added between the versions and
+  refuses a slot the program's calls reach and the library lacks.
+  `anti_rt_slots` keeps the slots of the calls and a flag for
+  `reflect.call`, and a slot only reflection may reach is filled with a
+  stub. See "Versions" in `docs/decisions.md` and `docs/notes/versions.md`.
 - The six standard interfaces are built, each an abstract class with a
   default implementation and a default provider: `anti.log.Logger` with
   `SinkLogger`, `anti.time.Clock` with `SystemClock`, `anti.random.Source`

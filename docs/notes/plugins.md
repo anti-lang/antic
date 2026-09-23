@@ -20,7 +20,7 @@ module does not declare. Refused as well are an abstract class, a
 singleton, a class that neither inherits the interface nor implements
 it, and two lines for one interface. `class_record` of `src/lower.c`
 writes one entry per line into the record of the class, and the library
-file carries them from format version 49.
+file carries them from format version 49, and `compatible` from 50.
 
 ## The table
 
@@ -81,6 +81,7 @@ source text writes one.
 The runtime version must match the host's exactly. Every interface
 descriptor must lie in the host's image. That proves the library was
 bound against the host rather than carrying an interface of its own.
+The version checks of each interface follow, in `docs/notes/versions.md`.
 The classes of the library then join the host's registry, so
 `reflect.new` finds one by name.
 
