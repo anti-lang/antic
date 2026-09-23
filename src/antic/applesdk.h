@@ -18,4 +18,9 @@
    one, so elsewhere it returns false. */
 bool apple_clt_sdk(struct text *path, struct text *version);
 
+/* Read the version of an SDK directory name of the form
+   MacOSX<major>.<minor>.sdk. Each number is decimal digits alone and
+   fits an int. Any other name returns false. */
+bool apple_sdk_version(const char *name, int *major, int *minor);
+
 #endif

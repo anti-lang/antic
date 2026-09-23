@@ -1,10 +1,50 @@
 #include "applesdk.h"
 
-#include <stdio.h>
+#include <limits.h>
 #include <string.h>
 #if defined(__APPLE__)
 #include <dirent.h>
 #endif
+
+/* Read the decimal digits at *s into *value and move *s past them. At
+   least one digit, and a value that fits an int. */
+static bool version_number(const char **s, int *value)
+{
+    int n = 0;
+
+    if (**s < '0' || **s > '9') {
+        return false;
+    }
+    while (**s >= '0' && **s <= '9') {
+        int digit = **s - '0';
+        if (n > (INT_MAX - digit) / 10) {
+            return false;
+        }
+        n = n * 10 + digit;
+        (*s)++;
+    }
+    *value = n;
+    return true;
+}
+
+/* DESIGN: the numbers are read digit by digit. The %d of sscanf is
+   undefined on a value that does not fit an int, and it takes a sign
+   and leading spaces as well. */
+bool apple_sdk_version(const char *name, int *major, int *minor)
+{
+    static const char prefix[] = "MacOSX";
+    const char *s = name;
+
+    if (strncmp(s, prefix, sizeof prefix - 1) != 0) {
+        return false;
+    }
+    s += sizeof prefix - 1;
+    if (!version_number(&s, major) || *s != '.') {
+        return false;
+    }
+    s++;
+    return version_number(&s, minor) && strcmp(s, ".sdk") == 0;
+}
 
 bool apple_clt_sdk(struct text *path, struct text *version)
 {
@@ -20,10 +60,9 @@ bool apple_clt_sdk(struct text *path, struct text *version)
     while ((entry = readdir(dir)) != NULL) {
         int major;
         int minor;
-        char rest[8];
 
-        if (sscanf(entry->d_name, "MacOSX%d.%d%7s", &major, &minor, rest) != 3 ||
-            strcmp(rest, ".sdk") != 0 || major > APPLE_SDK_NEWEST_MAJOR ||
+        if (!apple_sdk_version(entry->d_name, &major, &minor) ||
+            major > APPLE_SDK_NEWEST_MAJOR ||
             major < best_major || (major == best_major && minor <= best_minor)) {
             continue;
         }

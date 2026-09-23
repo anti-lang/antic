@@ -2,6 +2,7 @@
 #include "check.h"
 #include <stdio.h>
 #include <string.h>
+#include "applesdk.h"
 #include "cpu.h"
 #include "linker.h"
 #include "notice.h"
@@ -478,8 +479,48 @@ static void frameworks(void)
           "/rt/sysroot/t/usr/lib/crtn.o");
 }
 
+/* The version of an SDK directory name, or a refusal of the name. */
+static void sdk_name(const char *name, bool ok, int major, int minor)
+{
+    int got_major = -1;
+    int got_minor = -1;
+
+    if (apple_sdk_version(name, &got_major, &got_minor) != ok) {
+        check_failures++;
+        fprintf(stderr, "%s: expected %s\n", name,
+                ok ? "a version" : "a refusal");
+        return;
+    }
+    if (ok) {
+        CHECK(got_major == major && got_minor == minor);
+    }
+}
+
+/* Numbers that do not fit an int are refused, as are signs, spaces and
+   names that carry more than the version. */
+static void sdk_names(void)
+{
+    sdk_name("MacOSX15.4.sdk", true, 15, 4);
+    sdk_name("MacOSX26.0.sdk", true, 26, 0);
+    sdk_name("MacOSX99999999999999999999.0.sdk", false, 0, 0);
+    sdk_name("MacOSX15.99999999999999999999.sdk", false, 0, 0);
+    sdk_name("MacOSX2147483648.0.sdk", false, 0, 0);
+    sdk_name("MacOSX-1.0.sdk", false, 0, 0);
+    sdk_name("MacOSX+15.0.sdk", false, 0, 0);
+    sdk_name("MacOSX 15.0.sdk", false, 0, 0);
+    sdk_name("MacOSX15. 4.sdk", false, 0, 0);
+    sdk_name("MacOSX15.sdk", false, 0, 0);
+    sdk_name("MacOSX15.4.sdkx", false, 0, 0);
+    sdk_name("MacOSX15.4", false, 0, 0);
+    sdk_name("MacOSX.4.sdk", false, 0, 0);
+    sdk_name("MacOSX15.4.5.sdk", false, 0, 0);
+    sdk_name("iPhoneOS15.4.sdk", false, 0, 0);
+    sdk_name("", false, 0, 0);
+}
+
 void test_link(void)
 {
+    sdk_names();
     libraries();
     frameworks();
     strips_debug();
