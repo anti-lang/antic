@@ -8,6 +8,12 @@
 #include "diagnostic.h"
 #include "lexer.h"
 
+/* DESIGN: the parser descends at most this many levels into nested
+   expressions, types and statements, and refuses a deeper source with a
+   diagnostic. The checker, the dump and the symbolic walks recurse over
+   the same tree, so the one limit keeps each of them on the stack. */
+#define PARSE_DEPTH_MAX 256
+
 /* Build the syntax tree of one module from its tokens. Nodes go into the
    memory pool. Every syntax error goes to diags, one per mistake, and
    parsing continues after it. Returns true when no error occurred. The

@@ -5,6 +5,9 @@
 #include "diagnostic.h"
 #include "lexer.h"
 #include "parser.h"
+#include "text.h"
+
+#include <stdlib.h>
 
 struct parsed {
     struct arena arena;
@@ -76,8 +79,84 @@ static void errors(const char *source, const struct expected_error *expected,
     release(&p);
 }
 
+/* head, then open n times, then middle, then close n times, then tail. */
+static char *nested(const char *head, const char *open, size_t n,
+                    const char *middle, const char *close, const char *tail)
+{
+    struct text out = {0};
+    size_t i;
+
+    text_append(&out, head);
+    for (i = 0; i < n; i++) {
+        text_append(&out, open);
+    }
+    text_append(&out, middle);
+    for (i = 0; i < n; i++) {
+        text_append(&out, close);
+    }
+    text_append(&out, tail);
+    return out.data;
+}
+
+/* The parser takes source when deep is false, and refuses it with the
+   message of the depth limit first when deep is true. */
+static void depth(char *source, bool deep)
+{
+    struct parsed p;
+
+    parse_source(&p, source);
+    if (deep) {
+        CHECK(!p.ok);
+        CHECK(p.diags.count >= 1);
+        if (p.diags.count >= 1) {
+            CHECK_STR(p.diags.items[0].message,
+                      "nesting deeper than 256 levels");
+        }
+    } else {
+        CHECK(p.ok);
+    }
+    release(&p);
+    free(source);
+}
+
+/* Each form that nests, once below the limit and once 200000 levels
+   deep, which would overflow the stack without it. */
+static void depth_limit(void)
+{
+    static const size_t levels[2] = {100, 200000};
+    size_t i;
+
+    for (i = 0; i < 2; i++) {
+        bool deep = i == 1;
+        size_t n = levels[i];
+        depth(nested("fn f() -> int { return ", "(", n, "1", ")", "; }\n"),
+              deep);
+        depth(nested("fn f() -> int { return ", "-", n, "1", "", "; }\n"),
+              deep);
+        depth(nested("fn f() { ", "{ ", n, "", "} ", "}\n"), deep);
+        depth(nested("fn f(p: ", "*", n, "int", "", ") { }\n"), deep);
+        depth(nested("fn f(p: ", "[]", n, "int", "", ") { }\n"), deep);
+        depth(nested("fn f(p: ?*int) -> *int { return ", "p ?? ", n, "q",
+                     "", "; }\n"),
+              deep);
+        /* `defer defer` is refused after the inner statement is read,
+           so only the deep form reaches the limit first. */
+        if (deep) {
+            depth(nested("fn f() { ", "defer ", n, "g();", "", " }\n"),
+                  deep);
+        }
+        depth(nested("fn f(s: S) { if let A a = s { } ",
+                     "else if let A a = s { } ", n, "", "", "}\n"),
+              deep);
+        depth(nested("fn f() -> int { return f\"{", "(", n, "1", ")",
+                     "}\"; }\n"),
+              deep);
+    }
+}
+
 void test_parser(void)
 {
+    depth_limit();
     tree("fn scale(x: int) -> int {\n"
          "    let k = 2 + 4;\n"
          "    return x * k;\n"

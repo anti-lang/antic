@@ -23,6 +23,7 @@ struct parser {
     bool panic;
     bool ok;
     bool no_struct_literal;         /* inside a condition */
+    int depth;                      /* levels entered by descend */
 };
 
 /* A growable array of fixed-size elements, copied into the memory pool
@@ -118,6 +119,30 @@ static void error_here(struct parser *p, const char *message)
     }
     p->panic = true;
     diagnostics_add(p->diags, peek(p)->line, peek(p)->column, "%s", message);
+}
+
+/* Enter one level of nesting. Past PARSE_DEPTH_MAX it reports the
+   source and returns false, and the caller returns NULL without
+   entering. Each true return is paired with one ascend. */
+static bool descend(struct parser *p)
+{
+    if (p->depth >= PARSE_DEPTH_MAX) {
+        p->ok = false;
+        if (!p->panic) {
+            p->panic = true;
+            diagnostics_add(p->diags, peek(p)->line, peek(p)->column,
+                            "nesting deeper than %d levels",
+                            PARSE_DEPTH_MAX);
+        }
+        return false;
+    }
+    p->depth++;
+    return true;
+}
+
+static void ascend(struct parser *p)
+{
+    p->depth--;
 }
 
 static bool expect(struct parser *p, enum token_kind kind)
@@ -304,7 +329,7 @@ static bool is_builtin_type(enum token_kind kind)
     return kind >= TOKEN_BOOL_TYPE && kind <= TOKEN_C_WCHAR;
 }
 
-static struct type_expr *type(struct parser *p)
+static struct type_expr *type_level(struct parser *p)
 {
     const struct token *t = peek(p);
     struct type_expr *ty = node(p, sizeof *ty);
@@ -420,6 +445,18 @@ static struct type_expr *type(struct parser *p)
         error_here(p, "expected a type");
         return NULL;
     }
+    return ty;
+}
+
+static struct type_expr *type(struct parser *p)
+{
+    struct type_expr *ty;
+
+    if (!descend(p)) {
+        return NULL;
+    }
+    ty = type_level(p);
+    ascend(p);
     return ty;
 }
 
@@ -996,7 +1033,9 @@ static struct expr *postfix(struct parser *p)
     return NULL;
 }
 
-static struct expr *unary(struct parser *p)
+static struct expr *unary(struct parser *p);
+
+static struct expr *unary_level(struct parser *p)
 {
     const struct token *t = peek(p);
 
@@ -1033,6 +1072,20 @@ static struct expr *unary(struct parser *p)
     default:
         return postfix(p);
     }
+}
+
+/* Every operand passes here, so a `(` or a prefix operator is one
+   level. */
+static struct expr *unary(struct parser *p)
+{
+    struct expr *e;
+
+    if (!descend(p)) {
+        return NULL;
+    }
+    e = unary_level(p);
+    ascend(p);
+    return e;
 }
 
 /* unary { "as" type }: as binds tighter than the binary operators. */
@@ -1160,9 +1213,18 @@ static struct expr *binary(struct parser *p, int min)
         e->pos = left->pos;
         e->as.binary.op = op->kind;
         e->as.binary.left = left;
-        e->as.binary.right =
-            binary(p, precedence(op->kind) +
-                          (op->kind == TOKEN_QUESTION_QUESTION ? 0 : 1));
+        /* The right operand of `??` is one level deeper, since `??`
+           groups from the right. Any other operator's right operand
+           takes a higher precedence, which bounds its nesting. */
+        if (op->kind == TOKEN_QUESTION_QUESTION) {
+            if (!descend(p)) {
+                return NULL;
+            }
+            e->as.binary.right = binary(p, precedence(op->kind));
+            ascend(p);
+        } else {
+            e->as.binary.right = binary(p, precedence(op->kind) + 1);
+        }
         if (e->as.binary.right == NULL) {
             return NULL;
         }
@@ -1415,7 +1477,7 @@ static struct stmt *if_let(struct parser *p, const struct token *t)
     return s;
 }
 
-static struct stmt *if_statement(struct parser *p)
+static struct stmt *if_level(struct parser *p)
 {
     const struct token *t = next(p);
     struct stmt *s;
@@ -1458,6 +1520,19 @@ static struct stmt *if_statement(struct parser *p)
     return s;
 }
 
+/* An `else if let` holds the rest of its chain, so each is one level. */
+static struct stmt *if_statement(struct parser *p)
+{
+    struct stmt *s;
+
+    if (!descend(p)) {
+        return NULL;
+    }
+    s = if_level(p);
+    ascend(p);
+    return s;
+}
+
 /* `catch e { }`, `catch { }` or `catch fatal`. With required set the
    handler must be there. */
 static bool read_handler(struct parser *p, struct handler *out, bool required)
@@ -1486,7 +1561,9 @@ static bool read_handler(struct parser *p, struct handler *out, bool required)
     return (out->body = block(p)) != NULL;
 }
 
-static struct stmt *statement(struct parser *p)
+static struct stmt *statement(struct parser *p);
+
+static struct stmt *statement_level(struct parser *p)
 {
     const struct token *t = peek(p);
     struct stmt *s;
@@ -1862,6 +1939,20 @@ static struct stmt *statement(struct parser *p)
         }
         return expect(p, TOKEN_SEMICOLON) ? s : NULL;
     }
+}
+
+/* A nested block, `defer` and `undo` each hold a statement, so each
+   statement is one level. */
+static struct stmt *statement(struct parser *p)
+{
+    struct stmt *s;
+
+    if (!descend(p)) {
+        return NULL;
+    }
+    s = statement_level(p);
+    ascend(p);
+    return s;
 }
 
 static struct block *block(struct parser *p)
@@ -2852,7 +2943,7 @@ bool parse(const char *source, const struct token_list *tokens,
            struct module **out)
 {
     struct parser p = {source, NULL, tokens->items, NULL, NULL, 0, arena,
-                       diags, false, true, false};
+                       diags, false, true, false, 0};
     struct module *m = arena_alloc(arena, sizeof *m);
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
     struct list items = {NULL, 0, 0, sizeof(struct item *)};
