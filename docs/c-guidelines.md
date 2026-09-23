@@ -14,7 +14,7 @@ The bar differs by where the code runs.
 ## Severity
 
 - Severe: undefined behaviour, a read or write outside an object, a use after free, or a double free. Also any way for malformed input to cause one of these.
-- Major: a leak, or an error path that skips cleanup. Also a boundary between parts of the code crossed, or a result that differs between targets.
+- Major: a leak, or an error path that skips cleanup. Also a boundary between parts of the code crossed, or a result that differs between targets. Also a reader of untrusted input under rule 14 that has no malformed-input test under rule 15.
 - Minor: a threshold passed, a naming or `const` inconsistency, dead code, duplication.
 
 ## Rules
@@ -60,13 +60,13 @@ The bar differs by where the code runs.
 19. A source file longer than 3000 lines is reported, with where it could split along the parts of its work. The same judgement applies as for a function.
 20. A function used in one file only is `static`.
 21. A header includes what it uses and nothing more, has an include guard, and no two headers include each other.
-22. `src/rt/` includes no header of `src/antic/`, `src/anti/` or `tools/`. A platform `#if` stands only in the files of the platform layer.
+22. `src/rt/` includes no header of `src/antic/`, `src/anti/` or `tools/`. A `#if` on the host system stands only in the files of the platform layer. The platform layer is the files named platform: `src/rt/platform.h` with `src/rt/platform_posix.c` and `src/rt/platform_windows.c` for the runtime, and `src/antic/platform.c` and `src/anti/platform.c` for the tools. The rule concerns the host. Code that chooses by target through run-time values is not affected.
 23. Mutable global state exists only where a comment says why, and code of `src/rt/` that threads can reach guards it.
 
 ### Consistency
 
 24. A pointer to data a function does not change is `const`.
-25. The names of a module share its prefix. The runtime's exported names start with `anti_rt_` or the prefix its layer documents.
+25. The names of a module share its prefix. Every exported symbol of the runtime starts with `anti_rt_`, with no other prefix.
 26. No function is unused, and no block of code is repeated where one helper would serve.
 
 ### Comments

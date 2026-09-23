@@ -71,8 +71,8 @@ Merged, they are 141.
 - The missing platform layer (M29) is minor in `rt` and major in
   `cross-cutting`. Major here, as a crossed boundary.
 - The missing malformed-input tests (M31) are major in `input-readers` and
-  minor in `front-end` and `anti-tool`. The guidelines name no grade.
-  Major here, since most readers without a test carry a severe finding.
+  minor in `front-end` and `anti-tool`. The guidelines now grade it
+  major, as Eddie decided.
 - The right shift of a negative constant in `bindexpr.c:438` is major in
   `anti-tool` and minor in `input-readers`. No target differs, as for the
   same shift in `sema.c:6995`, so it is minor here.
@@ -289,16 +289,30 @@ Paths without a directory are in `src/antic/`.
 `front-end` also lists six defects no rule names, and `anti-tool` a
 question of resolution. Neither is counted here.
 
-## Open for Eddie
+## Answered by Eddie
 
-- S32. `Object.deserialize` takes addresses from the text because the
-  entry under "Object model" in `docs/decisions.md` says so. Rule 14
-  forbids it. The fix waits for a choice between the two.
-- M29. Rule 22 cannot be checked until a list of the platform files of
-  `src/rt/` and of the host exists.
-- The runtime prefixes of rule 25, `anti_cpu_`, `anti_utf8_`, `anti_elf_`
-  and the rest, are either renamed or named in the guidelines.
-- Rule 15 has no grade in the guidelines, and M31 is graded major here.
+- S32. `Object.deserialize` never takes an address from the text.
+  `serialize` writes a pointer, a slice or a function pointer that the
+  object does not own as `null`, since it refers to something outside the
+  object. `deserialize` accepts only `null` there, which gives `none` or
+  an empty slice, and fails on anything else. Owned data is written by
+  content, as now. The entry under "Object model" in `docs/decisions.md`
+  says so, and fix step 13 changes the code.
+- M29. The platform layer is the files named platform:
+  `src/rt/platform.h` with `src/rt/platform_posix.c` and
+  `src/rt/platform_windows.c`, and `src/antic/platform.c` and
+  `src/anti/platform.c` for the tools. A `#if` on the host system stands
+  only there. Rule 22 concerns the host, and code that chooses by target
+  through run-time values is not affected. Rule 22 of
+  `docs/c-guidelines.md` and "Repository layout" in `docs/decisions.md`
+  say so.
+- Rule 25. Every exported symbol of the runtime starts with `anti_rt_`,
+  with no other prefix. Rule 25 of `docs/c-guidelines.md` says so. The
+  renaming of `anti_cpu_`, `anti_utf8_`, `anti_elf_` and the rest is a
+  minor step later.
+- Rule 15. A reader of untrusted input without a malformed-input test is
+  a major finding, which confirms the grade of M31 here. "Severity" in
+  `docs/c-guidelines.md` says so.
 
 ## Fix steps
 
@@ -339,8 +353,8 @@ reader. Severe steps come first.
 12. runtime shared state. S33, S34, S35, M19, M22 and M30. Files:
     `conf.c`, `loaded.c`, `plugin.c`, `signal.c`, `threads.c`,
     `atomic.c`.
-13. runtime plugin table and `Object.deserialize`. S38 and M10, and S32
-    once Eddie has chosen. Files: `plugin.c`, `registry.c`.
+13. runtime plugin table and `Object.deserialize`. S38 and M10, and S32 as
+    Eddie answered it. Files: `plugin.c`, `registry.c`.
 14. anti repository inputs. S45, S40, M12, M13, M14, with a malformed
     `index.toml` and `anti.lock` as tests. Files: `repo.c`, `deps.c`,
     `sdk.c`, `doc.c`.
@@ -360,12 +374,12 @@ reader. Severe steps come first.
 18. antic output text. M24 with one helper for float literals, M25 with
     names built in a `struct text`, M32, M33 and M34. Files: `lower.c`,
     `header.c`, `debug.c`, `sema.c`.
-19. runtime on Windows. M20 and M27, and M29 once the platform files are
+19. runtime on Windows. M20 and M27, and M29 in the platform files Eddie
     named. Files: `conf.c`, `plugin.c`, `time.c`.
 20. The minor findings, one session per area. The order is antic front
     end, antic back end, runtime and anti tool. Each session takes the
     rows of the minor table whose places lie in its area. The code both sides
-    write twice under rule 26, and rule 25 once Eddie has settled it,
+    write twice under rule 26, and rule 25 as Eddie settled it,
     are one further session, since they cross the boundary.
 21. The splits of rules 18 and 19, last and one file per session:
     `sema.c`, with `sema_check` split into its passes, then `lower.c`,
