@@ -1791,6 +1791,17 @@ if(NOT WIN32)
     set_tests_properties(dev_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 endif()
 
+add_executable(poke_byte modules/poke_byte.c)
+add_test(NAME dev_library_verify
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DPOKE=$<TARGET_FILE:poke_byte>"
+        "-DLIBS=${LIBS}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/dev-verify"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antl_verify.cmake")
+set_tests_properties(dev_library_verify PROPERTIES FIXTURES_REQUIRED scale_antl)
+
 # The singleton check follows a worker into another module, in release
 # mode and in the dev compilation of the module that links.
 add_test(NAME antl_board

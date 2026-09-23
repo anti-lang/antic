@@ -1957,6 +1957,7 @@ static int compile_library_file(const struct options *o,
     struct options with_input = *o;
     struct interface header;
     struct text bytes = {0};
+    struct text verify_errors = {0};
     const struct interface **libraries = NULL;
     struct paths paths = {0};
     char error[200];
@@ -1994,6 +1995,14 @@ static int compile_library_file(const struct options *o,
     if (!load_libraries(&paths, "", &arena, &types, &program, libraries)) {
         goto done;
     }
+    /* No module is lowered here, so lower_checked does not verify the
+       program. The passes and the optimizer rely on the verifier, and a
+       library file may come from anywhere. */
+    if (!ir_verify(&program, &verify_errors)) {
+        fprintf(stderr, "antic: the IR of the library files fails "
+                        "verification\n%s", text_cstr(&verify_errors));
+        goto done;
+    }
     status = back_end(o, NULL, header.module, &program, &diags, assembly,
                       extras);
     if (status == 0 || status == 3) {
@@ -2013,6 +2022,7 @@ done:
     free((void *)paths.items);
     free((void *)with_input.libraries);
     text_free(&bytes);
+    text_free(&verify_errors);
     diagnostics_free(&diags);
     arena_free(&arena);
     return status;
