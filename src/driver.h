@@ -60,6 +60,16 @@ struct options {
     enum { LIB_NONE, LIB_STATIC, LIB_SHARED } lib; /* --lib static|shared */
     bool bundle_runtime;        /* --bundle-runtime, with --lib static. */
     bool soname;                /* --soname, with --lib shared. */
+    /* DESIGN: --no-runtime, with --lib shared, writes a plugin. It links
+       no runtime and no standard library. The host it is loaded into
+       holds both, and the loader resolves every symbol of the plugin
+       against the host at load. The library then carries the table of
+       what it provides and nothing of the runtime. */
+    bool no_runtime;
+    /* DESIGN: --closed builds a program without the dynamic exports of
+       its runtime symbols and its descriptors. It then loads no plugin,
+       because a plugin resolves those symbols against its host. */
+    bool closed;
     const char *llvm_ar;        /* NULL: llvm-ar from PATH. */
     const char **frameworks;    /* --framework, macOS frameworks of Apple's
                                    SDK. */

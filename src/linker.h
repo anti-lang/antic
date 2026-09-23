@@ -53,6 +53,9 @@ struct link_inputs {
        them, because the only source of them would be the C library of the
        target. No line of Anti would be in them. */
     bool debug;
+    /* DESIGN: a program that can host a plugin exports the names in its
+       symbol table, so the loader binds the plugin against them. */
+    bool exports;
 };
 
 /* The suffixes of the object files and archives that antic passes to the
@@ -85,6 +88,10 @@ struct shared_options {
     const char *def_file;
     const char *major;          /* --soname: the compatibility version */
     const char *version;        /* --soname: the full version */
+    /* DESIGN: --no-runtime writes a plugin. It links no runtime and no
+       standard library, and every name it needs is resolved against the
+       host that loads it. */
+    bool plugin;
 };
 
 /* Build the command line of a shared library of in->object at

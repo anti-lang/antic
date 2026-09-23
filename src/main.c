@@ -30,6 +30,10 @@ static int usage(FILE *out)
           "  --lib static|shared  write a library for C and its header\n"
           "  --bundle-runtime     put the runtime into the static library\n"
           "  --soname             give the shared library the major version\n"
+          "  --no-runtime         with --lib shared: a plugin, which links\n"
+          "                       no runtime and uses the host's\n"
+          "  --closed             a program without the dynamic exports\n"
+          "                       that a plugin resolves against\n"
           "  --llvm-ar <path>     the llvm-ar executable\n"
           "  --linker lld|platform  link with lld of the runtime archive, the\n"
           "                       default, or with the platform linker\n"
@@ -207,6 +211,12 @@ static int run(int argc, char **argv, struct options *o)
             continue;
         } else if (strcmp(arg, "--soname") == 0) {
             options.soname = true;
+            continue;
+        } else if (strcmp(arg, "--no-runtime") == 0) {
+            options.no_runtime = true;
+            continue;
+        } else if (strcmp(arg, "--closed") == 0) {
+            options.closed = true;
             continue;
         } else if (strcmp(arg, "--llvm-ar") == 0) {
             slot = &options.llvm_ar;

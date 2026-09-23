@@ -128,6 +128,14 @@ static void macos(struct link_command *c, enum target t,
     macos_start(c, t, in, false);
     add(c, "-o");
     add(c, in->executable);
+    /* DESIGN: a plugin is bound against the host at load, so the host
+       keeps every name its own objects define. -keep_private_externs
+       holds the names of the runtime, which is compiled with hidden
+       visibility, and -export_dynamic puts them in the export table. */
+    if (in->exports) {
+        add(c, "-keep_private_externs");
+        add(c, "-export_dynamic");
+    }
     add_inputs(c, in);
     add(c, text_cstr(library));
     add(c, "-lSystem");
@@ -267,6 +275,9 @@ static void linux_ld(struct link_command *c, enum target t,
     text_appendf(crtn, "%s/crtn.o", in->crt_dir);
     add(c, "ld");
     add(c, "-pie");
+    if (in->exports) {
+        add(c, "--export-dynamic");
+    }
     if (!in->debug) {
         add(c, "--strip-debug");
     }
@@ -378,7 +389,9 @@ void link_shared_command(struct link_command *c, enum target t,
 
     start(c, in->extra_count + 2 * in->framework_count);
     library = next(c);
-    link_runtime_library(library, in->runtime, t, in->cpu);
+    if (!s->plugin) {
+        link_runtime_library(library, in->runtime, t, in->cpu);
+    }
     switch (target_info(t)->os) {
     case OS_MACOS: {
         struct text *install = next(c);
@@ -398,8 +411,16 @@ void link_shared_command(struct link_command *c, enum target t,
             add(c, "-current_version");
             add(c, s->version);
         }
+        /* A plugin names what the host defines, so the link leaves
+           every such name to the loader. */
+        if (s->plugin) {
+            add(c, "-undefined");
+            add(c, "dynamic_lookup");
+        }
         add_inputs(c, in);
-        add(c, text_cstr(library));
+        if (!s->plugin) {
+            add(c, text_cstr(library));
+        }
         add(c, "-lSystem");
         macos_frameworks(c, in);
         break;
@@ -421,7 +442,9 @@ void link_shared_command(struct link_command *c, enum target t,
             add(c, base != NULL ? base + 1 : in->executable);
         }
         add_inputs(c, in);
-        add(c, text_cstr(library));
+        if (!s->plugin) {
+            add(c, text_cstr(library));
+        }
         if (in->linker == LINKER_PLATFORM) {
             add(c, text_cstr(search));
             add(c, "-lc");

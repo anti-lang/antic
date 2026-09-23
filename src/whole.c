@@ -483,7 +483,11 @@ static uint32_t module_text(struct ir_module *m, const char *module,
    registry for a reader that remains. A library for C with the runtime
    bundled holds every file of the runtime, the readers among them. It
    gets an empty registry when nothing reads it. */
-static void write_registry(struct ir_module *m, bool reflect)
+/* The list of the classes that `reflect.new` may build, as a global of
+   an array of `anti.rt.Class`. Returns IR_NO_INDEX and 0 where the
+   program lists none. */
+static uint32_t write_class_list(struct ir_module *m, bool reflect,
+                                 size_t *out_count)
 {
     static const char *const class_names[] = {
         "descriptor", "init", "module", "module_length", "flags"
@@ -491,19 +495,14 @@ static void write_registry(struct ir_module *m, bool reflect)
     static const enum ir_type class_types[] = {
         IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_I64
     };
-    static const char *const registry_names[] = {"count", "classes"};
-    static const enum ir_type registry_types[] = {IR_I64, IR_PTR};
     uint32_t class_agg = struct_agg(m, "anti.rt.Class", class_names,
                                     class_types, 5);
-    uint32_t registry_agg = struct_agg(m, "anti.rt.Registry", registry_names,
-                                       registry_types, 2);
     size_t class_count = m->class_count;
     const char **seen = allocate(class_count, sizeof *seen);
     uint32_t *texts = allocate(class_count, sizeof *texts);
     struct ir_const *items =
         allocate(class_count, sizeof *items);
-    struct ir_const *value;
-    struct ir_global *g;
+    uint32_t list_global = IR_NO_INDEX;
     size_t modules = 0;
     size_t n = 0;
     size_t i;
@@ -528,8 +527,6 @@ static void write_registry(struct ir_module *m, bool reflect)
                       ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
         items[n++] = *item;
     }
-    value = ir_const_agg(m, ir_aggregate(registry_agg), 2);
-    const_int(&value->items[0], IR_I64, n);
     if (n > 0) {
         char length[32];
         struct ir_const *list;
@@ -539,17 +536,36 @@ static void write_registry(struct ir_module *m, bool reflect)
                                    ir_sym_int(m, IR_I64, n), NULL)),
                             n);
         memcpy(list->items, items, n * sizeof *items);
-        const_addr(&value->items[1],
-                   ir_global_add_value(m, "anti.rt", "registry.classes",
-                                       list)->index);
+        list_global = ir_global_add_value(m, "anti.rt", "registry.classes",
+                                          list)->index;
+    }
+    free(seen);
+    free(texts);
+    free(items);
+    *out_count = n;
+    return list_global;
+}
+
+static void write_registry(struct ir_module *m, bool reflect)
+{
+    static const char *const registry_names[] = {"count", "classes"};
+    static const enum ir_type registry_types[] = {IR_I64, IR_PTR};
+    uint32_t registry_agg = struct_agg(m, "anti.rt.Registry", registry_names,
+                                       registry_types, 2);
+    struct ir_const *value;
+    struct ir_global *g;
+    size_t n = 0;
+    uint32_t list = write_class_list(m, reflect, &n);
+
+    value = ir_const_agg(m, ir_aggregate(registry_agg), 2);
+    const_int(&value->items[0], IR_I64, n);
+    if (list != IR_NO_INDEX) {
+        const_addr(&value->items[1], list);
     } else {
         const_int(&value->items[1], IR_PTR, 0);
     }
     g = ir_global_add_value(m, NULL, "anti_rt_registry", value);
     g->exported = true;
-    free(seen);
-    free(texts);
-    free(items);
 }
 
 /* The runtime function that every `fail` asks whether backtraces are
@@ -1794,6 +1810,148 @@ static void write_injections(struct whole *w, struct ir_module *m,
     free(list);
 }
 
+/* DESIGN: a plugin carries one table of what it provides. An entry
+   names the interface by its path. It holds the descriptor of the
+   interface and of the class, the function that prepares an object and
+   the offset of the interface sub-object. The loader allocates the size
+   the class descriptor gives. It calls that function and moves the
+   pointer by the offset. The table carries the version of the runtime
+   the library was built against. It carries the classes of the library
+   as well, which the host's registry takes over. */
+static void write_provides(struct whole *w, struct ir_module *m,
+                           struct text *errors)
+{
+    static const char *const entry_names[] = {
+        "interface", "interface_length", "descriptor", "class", "init",
+        "offset", "flags"
+    };
+    static const enum ir_type entry_types[] = {
+        IR_PTR, IR_I64, IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_I64
+    };
+    static const char *const table_names[] = {
+        "count", "entries", "version", "version_length", "class_count",
+        "classes"
+    };
+    static const enum ir_type table_types[] = {
+        IR_I64, IR_PTR, IR_PTR, IR_I64, IR_I64, IR_PTR
+    };
+    uint32_t entry_agg = struct_agg(m, "anti.rt.Provides", entry_names,
+                                    entry_types, 7);
+    uint32_t table_agg = struct_agg(m, "anti.rt.Provided", table_names,
+                                    table_types, 6);
+    size_t total = 0;
+    struct ir_const *items;
+    struct ir_const *value;
+    struct ir_global *g;
+    size_t classes = 0;
+    uint32_t list_global;
+    size_t n = 0;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < m->class_count; i++) {
+        total += m->classes[i]->provides_count;
+    }
+    items = allocate(total + 1, sizeof *items);
+    for (i = 0; i < m->class_count; i++) {
+        const struct ir_class *c = m->classes[i];
+        for (j = 0; j < c->provides_count; j++) {
+            uint32_t offset = interface_offset(w, m, (uint32_t)i,
+                                               c->provides[j].descriptor);
+            struct ir_const *item;
+            char name[32];
+            uint32_t text;
+            if (c->init == IR_NO_INDEX || offset == IR_NO_INDEX) {
+                text_appendf(errors, "`%s.%s` provides `%s` and is no such "
+                             "interface\n", c->module, c->name,
+                             c->provides[j].interface);
+                continue;
+            }
+            snprintf(name, sizeof name, "provides.%zu", n);
+            text = ir_global_add(m, RUNTIME_MODULE, name,
+                                 (const uint8_t *)c->provides[j].interface,
+                                 strlen(c->provides[j].interface) + 1,
+                                 1)->index;
+            item = ir_const_agg(m, ir_aggregate(entry_agg), 7);
+            const_addr(&item->items[0], text);
+            const_int(&item->items[1], IR_I64,
+                      strlen(c->provides[j].interface));
+            const_addr(&item->items[2], c->provides[j].descriptor);
+            const_addr(&item->items[3], c->descriptor);
+            item->items[4].kind = IR_CONST_FUNC;
+            item->items[4].scalar = IR_PTR;
+            item->items[4].global = c->init;
+            if (offset == INJECT_AT_ZERO) {
+                const_int(&item->items[5], IR_I64, 0);
+            } else {
+                item->items[5].kind = IR_CONST_SYM;
+                item->items[5].scalar = IR_I64;
+                item->items[5].sym = offset;
+            }
+            const_int(&item->items[6], IR_I64,
+                      ((c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0) |
+                          ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
+            items[n++] = *item;
+        }
+    }
+    if (n == 0) {
+        text_append(errors, "a plugin has at least one `provides` line\n");
+    }
+    list_global = write_class_list(m, true, &classes);
+    value = ir_const_agg(m, ir_aggregate(table_agg), 6);
+    const_int(&value->items[0], IR_I64, n);
+    if (n > 0) {
+        char length[32];
+        struct ir_const *list;
+        snprintf(length, sizeof length, "[%zu]anti.rt.Provides", n);
+        list = ir_const_agg(m, ir_aggregate(ir_array_add(
+                                   m, length, ir_aggregate(entry_agg),
+                                   ir_sym_int(m, IR_I64, n), NULL)),
+                            n);
+        memcpy(list->items, items, n * sizeof *items);
+        const_addr(&value->items[1],
+                   ir_global_add_value(m, RUNTIME_MODULE, "provides.entries",
+                                       list)->index);
+    } else {
+        const_int(&value->items[1], IR_PTR, 0);
+    }
+    const_addr(&value->items[2],
+               ir_global_add(m, RUNTIME_MODULE, "provides.version",
+                             (const uint8_t *)ANTIC_VERSION,
+                             strlen(ANTIC_VERSION) + 1, 1)->index);
+    const_int(&value->items[3], IR_I64, strlen(ANTIC_VERSION));
+    const_int(&value->items[4], IR_I64, classes);
+    if (list_global != IR_NO_INDEX) {
+        const_addr(&value->items[5], list_global);
+    } else {
+        const_int(&value->items[5], IR_PTR, 0);
+    }
+    g = ir_global_add_value(m, NULL, "anti_rt_provides", value);
+    g->exported = true;
+    free(items);
+}
+
+/* DESIGN: a program that injects an interface or loads a library is a
+   host. Its symbols are what a plugin resolves against, so the link
+   exports them and the emitter writes every name global. `--closed`
+   turns both off, and the program then loads no plugin. */
+bool whole_hosts_plugins(const struct ir_module *m)
+{
+    size_t i;
+
+    for (i = 0; i < m->class_count; i++) {
+        if (m->classes[i]->inject_count > 0) {
+            return true;
+        }
+    }
+    for (i = 0; i < m->function_count; i++) {
+        if (strcmp(m->functions[i]->name, PLUGIN_LOAD) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool whole_program(struct ir_module *program,
                    const struct whole_options *options, struct text *errors)
 {
@@ -1814,22 +1972,33 @@ bool whole_program(struct ir_module *program,
     ok = check_singletons(w, program, errors);
     memset(&reach, 0, sizeof reach);
     reach_program(&reach, program, options->entry);
-    if (reads_registry(program, &reach) || partial) {
+    if (options->plugin) {
+        /* The host holds the registry, the default of the backtraces and
+           the slots. A plugin reads all three through the host. */
+    } else if (reads_registry(program, &reach) || partial) {
         write_registry(program, options->reflect);
     } else if (options->bundled) {
         write_registry(program, false);
     }
-    if (asks_backtrace(program, &reach) || options->bundled || partial) {
+    if (!options->plugin &&
+        (asks_backtrace(program, &reach) || options->bundled || partial)) {
         write_backtrace_default(program, options->release);
     }
     calls = calls_through_reflection(program, &reach);
-    if (!options->library) {
+    if (!options->library && !options->plugin) {
         write_slots(w, program, &reach, calls && options->reflect);
     }
     /* The providers of a library for C are resolved as a program's are.
        Its host is C and cannot fill a slot. */
     inject_errors = errors->length;
-    write_injections(w, program, options, errors);
+    /* A plugin fills no slot: the host holds them, and its own `inject`
+       fields read the host's. It carries the table of what it provides
+       instead. */
+    if (options->plugin) {
+        write_provides(w, program, errors);
+    } else {
+        write_injections(w, program, options, errors);
+    }
     ok = ok && errors->length == inject_errors;
     reach_free(&reach);
     /* The trampolines come after every reader of the reach, because they

@@ -51,6 +51,12 @@ struct extras {
     struct text package;
     struct text notice;
     struct text exports;
+    /* The program can host a plugin, so the link exports its symbols.
+       The compilation decides it and the link reads it. */
+    bool hosts_plugins;
+    /* The `provides` lines of a plugin, one per line as
+       `<interface>\t<class>`, which the index file carries. */
+    struct text provides;
 };
 
 static void extras_free(struct extras *e)
@@ -60,6 +66,7 @@ static void extras_free(struct extras *e)
     text_free(&e->package);
     text_free(&e->notice);
     text_free(&e->exports);
+    text_free(&e->provides);
 }
 
 
@@ -240,6 +247,13 @@ static bool find_crt_dir(enum target t, struct text *out)
     fprintf(stderr, "antic: cannot find Scrt1.o of the C library in %s, %s "
                     "or %s\n", dirs[0], dirs[1], dirs[2]);
     return false;
+}
+
+/* Whether the build writes a plugin: a shared library that links no
+   runtime and is bound against the host that loads it. */
+static bool is_plugin(const struct options *o)
+{
+    return o->lib == LIB_SHARED && o->no_runtime;
 }
 
 /* Whether the command ends with a link, rather than a dump, a library
@@ -550,7 +564,7 @@ static bool run_link(const struct windows_link *w, const struct link_command *c)
 }
 
 static bool link_program(const struct options *o, const char *object,
-                         const char *executable)
+                         const char *executable, bool exports)
 {
     struct link_inputs in;
     struct link_command command;
@@ -566,6 +580,7 @@ static bool link_program(const struct options *o, const char *object,
     in.extra_count = o->object_count;
     in.frameworks = o->frameworks;
     in.framework_count = o->framework_count;
+    in.exports = exports;
     memset(&w, 0, sizeof w);
     ok = link_facts(o, &in, &facts) &&
          (target_info(o->target)->os != OS_WINDOWS ||
@@ -681,6 +696,7 @@ static bool whole_checked(const char *input, struct ir_module *program,
     options.bundled = bundled;
     options.library = library;
     options.dev = dev;
+    options.plugin = is_plugin(o);
     options.inject = o->inject;
     options.inject_count = o->inject_count;
     ok = whole_program(program, &options, &errors);
@@ -852,7 +868,10 @@ static int back_end(const struct options *o, struct module *tree,
     if (o->checks == CHECKS_OFF || (o->checks == CHECKS_MODE && !o->dev)) {
         ir_drop_failures(program, IR_FAIL_CHECK);
     }
-    if (o->dev) {
+    /* A plugin holds the code of its own module alone. Every other
+       module of the program it was checked against belongs to the host,
+       which defines it. */
+    if (o->dev || is_plugin(o)) {
         ir_optimize_module(program, module);
     } else {
         ir_optimize(program, module);
@@ -888,17 +907,30 @@ static int back_end(const struct options *o, struct module *tree,
         fputs(text_cstr(&out), stdout);
         status = 2;
     } else if (ok) {
-        ok = o->dev ? emit_module(assembly, o->target, o->cpu, program,
-                                  functions, module, o->debug, error,
-                                  sizeof error)
-                    : emit_program(assembly, o->target, o->cpu, program,
-                                   functions, module, o->debug, error,
-                                   sizeof error);
+        extras->hosts_plugins = !o->closed && o->lib == LIB_NONE &&
+                                !o->library && whole_hosts_plugins(program);
+        ok = o->dev || is_plugin(o)
+                 ? emit_module(assembly, o->target, o->cpu, program, functions,
+                               module, extras->hosts_plugins, o->debug, error,
+                               sizeof error)
+                 : emit_program(assembly, o->target, o->cpu, program,
+                                functions, module, extras->hosts_plugins,
+                                o->debug, error, sizeof error);
         if (ok && o->dev && !has_main(program, module)) {
             status = 3;
         }
-        if (ok && o->lib == LIB_SHARED) {
+        /* The host has run the runtime's start already, so a plugin
+           brings no constructor of its own. */
+        if (ok && o->lib == LIB_SHARED && !is_plugin(o)) {
             emit_constructor(assembly, o->target, "anti_rt_init");
+        }
+        for (i = 0; ok && is_plugin(o) && i < program->class_count; i++) {
+            const struct ir_class *c = program->classes[i];
+            size_t j;
+            for (j = 0; j < c->provides_count; j++) {
+                text_appendf(&extras->provides, "%s\t%s.%s\n",
+                             c->provides[j].interface, c->module, c->name);
+            }
         }
         if (ok && extras->notice.length > 0 && status != 3 &&
             !o->assembly_only && o->lib != LIB_STATIC) {
@@ -1850,6 +1882,96 @@ static bool assemble_package(const struct options *o, const struct text *bytes,
     return ok;
 }
 
+/* DESIGN: `anti-plugins.toml` beside a plugin lists every library of
+   the directory. Each entry holds the interfaces, the runtime version
+   it was built against and the digest of its bytes. Discovery reads it
+   and opens no library to find out what is inside one. antic writes the
+   file, because `anti build` is not built, and it keeps the entries of
+   the other libraries as they stand. */
+static void index_entry(struct text *out, const char *name, const char *digest,
+                        const struct text *provides)
+{
+    const char *line = text_cstr(provides);
+    bool first = true;
+
+    text_appendf(out, "[[library]]\npath = '%s'\nruntime = '%s'\n"
+                 "digest = '%s'\ninterfaces = [", name, ANTIC_VERSION,
+                 digest);
+    while (*line != '\0') {
+        size_t n = strcspn(line, "\t");
+        text_appendf(out, "%s'%.*s'", first ? "" : ", ", (int)n, line);
+        first = false;
+        line += strcspn(line, "\n");
+        line += *line == '\n';
+    }
+    text_append(out, "]\n");
+}
+
+/* Whether the entry of length bytes at block names the library `name`. */
+static bool index_names(const char *block, size_t length, const char *name)
+{
+    struct text wanted = {0};
+    const char *found;
+    bool named;
+
+    text_appendf(&wanted, "\npath = '%s'\n", name);
+    found = strstr(block, text_cstr(&wanted));
+    named = found != NULL && (size_t)(found - block) < length;
+    text_free(&wanted);
+    return named;
+}
+
+/* The entries of the index that name another library, as they stand. A
+   file that is no index of this form is replaced. */
+static void index_others(struct text *out, const char *path, const char *name)
+{
+    struct text file = {0};
+    const char *block;
+    FILE *f = fopen(path, "rb");
+
+    if (f == NULL) {
+        return;
+    }
+    fclose(f);
+    if (!read_source(path, &file)) {
+        text_free(&file);
+        return;
+    }
+    block = strstr(text_cstr(&file), "[[library]]\n");
+    while (block != NULL) {
+        const char *next = strstr(block + 11, "[[library]]\n");
+        size_t n = next != NULL ? (size_t)(next - block) : strlen(block);
+        if (!index_names(block, n, name)) {
+            text_appendf(out, "%.*s", (int)n, block);
+        }
+        block = next;
+    }
+    text_free(&file);
+}
+
+static bool write_plugin_index(const char *dir, const char *name,
+                               const char *library,
+                               const struct text *provides)
+{
+    struct text path = {0};
+    struct text content = {0};
+    char digest[65];
+    bool ok;
+
+    text_appendf(&path, "%s%s", dir, PLUGIN_INDEX);
+    ok = sha256_file(library, digest);
+    if (ok) {
+        index_others(&content, text_cstr(&path), name);
+        index_entry(&content, name, digest, provides);
+        ok = write_file(text_cstr(&path), &content);
+    } else {
+        fprintf(stderr, "antic: cannot read %s\n", library);
+    }
+    text_free(&path);
+    text_free(&content);
+    return ok;
+}
+
 /* Write a library for C from object: its header, and the static archive
    with the copy of the package header, or the shared library. A static
    library prints the line that links a C program with it. */
@@ -1882,7 +2004,9 @@ static bool build_c_library(const struct options *o, const char *object,
                      text_cstr(&dir), name);
     }
     text_appendf(&header, "%s%s%s", text_cstr(&dir), name, HEADER_SUFFIX);
-    ok = write_file(text_cstr(&header), &extras->header);
+    /* A plugin is loaded by an Anti host and never by C, so it carries
+       no header of its own. */
+    ok = is_plugin(o) || write_file(text_cstr(&header), &extras->header);
     if (ok && o->lib == LIB_STATIC) {
         struct arena arena = {0};
         struct text package = {0};
@@ -1913,7 +2037,7 @@ static bool build_c_library(const struct options *o, const char *object,
     } else if (ok) {
         struct link_inputs in;
         struct link_command c;
-        struct shared_options s = {NULL, NULL, NULL};
+        struct shared_options s = {NULL, NULL, NULL, is_plugin(o)};
         struct link_facts facts;
         struct windows_link w;
         struct text def = {0};
@@ -1941,7 +2065,7 @@ static bool build_c_library(const struct options *o, const char *object,
                          text_cstr(&major));
             in.executable = text_cstr(&versioned);
         }
-        if (ok && info->os == OS_WINDOWS) {
+        if (ok && info->os == OS_WINDOWS && !s.plugin) {
             struct text content = {0};
             const char *p = text_cstr(&extras->exports);
             text_appendf(&def, "%s%s%s", text_cstr(&dir), name, DEF_SUFFIX);
@@ -1974,6 +2098,12 @@ static bool build_c_library(const struct options *o, const char *object,
             argv[2] = link_name != NULL ? link_name + 1 : text_cstr(&versioned);
             argv[3] = text_cstr(&path);
             ok = process_run(argv) == 0;
+        }
+        if (ok && s.plugin) {
+            const char *file = strrchr(text_cstr(&path), '/');
+            ok = write_plugin_index(text_cstr(&dir),
+                                    file != NULL ? file + 1 : text_cstr(&path),
+                                    text_cstr(&path), &extras->provides);
         }
         link_facts_free(&facts);
         text_free(&def);
@@ -2094,7 +2224,8 @@ int driver_run(const struct options *o)
     if (o->output == NULL) {
         text_append(&base, target_info(o->target)->executable_suffix);
     }
-    if (link_program(o, text_cstr(&obj_path), text_cstr(&base))) {
+    if (link_program(o, text_cstr(&obj_path), text_cstr(&base),
+                     extras.hosts_plugins)) {
         status = 0;
     }
 

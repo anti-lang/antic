@@ -12,33 +12,34 @@ static const char *const extra_windows[] = {"shapes.obj"};
 
 static const struct link_inputs unix_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/x86_64-linux-gnu",
-    NULL, 0, LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false
+    NULL, 0, LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false
 };
 
 static const struct link_inputs windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, NULL, 0,
-    LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false
+    LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false
 };
 
 static const struct link_inputs extra_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/aarch64-linux-gnu",
-    extra_unix, 2, LINKER_PLATFORM, CPU_ARMV8_5, NULL, NULL, NULL, 0, false
+    extra_unix, 2, LINKER_PLATFORM, CPU_ARMV8_5, NULL, NULL, NULL, 0, false,
+    false
 };
 
 static const struct link_inputs extra_windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, extra_windows, 1,
-    LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false
+    LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false
 };
 
 /* lld of the runtime archive with the sysroot of the target. */
 static const struct link_inputs lld_inputs = {
     "prog.o", "prog", "/rt", NULL, "26.5", NULL, extra_unix, 1, LINKER_LLD,
-    CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false
+    CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false
 };
 
 static const struct link_inputs lld_windows_inputs = {
     "prog.obj", "prog.exe", "/rt", NULL, NULL, NULL, NULL, 0, LINKER_LLD,
-    CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false
+    CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false
 };
 
 /* Build the command line of target t and compare it, joined by spaces.
@@ -95,7 +96,7 @@ static void strips_debug(void)
         TARGET_LINUX_X86_64, TARGET_LINUX_ARM64, TARGET_MACOS_X86_64,
         TARGET_MACOS_ARM64, TARGET_WINDOWS_X86_64, TARGET_WINDOWS_ARM64
     };
-    struct shared_options none = {NULL, NULL, NULL};
+    struct shared_options none = {NULL, NULL, NULL, false};
     size_t i;
 
     for (i = 0; i < sizeof targets / sizeof targets[0]; i++) {
@@ -319,9 +320,9 @@ static void libraries(void)
     static const char *const members[] = {"geo.o", "geo.package.o"};
     static const char *const joined_inputs[] = {"geo.o", "init.c.o",
                                                 "utf.c.o"};
-    struct shared_options none = {NULL, NULL, NULL};
-    struct shared_options versioned = {NULL, "1", "1.2.4"};
-    struct shared_options def = {"geo.def", NULL, NULL};
+    struct shared_options none = {NULL, NULL, NULL, false};
+    struct shared_options versioned = {NULL, "1", "1.2.4", false};
+    struct shared_options def = {"geo.def", NULL, NULL, false};
     struct link_inputs in = unix_inputs;
     struct link_inputs win = windows_inputs;
     struct link_command c;

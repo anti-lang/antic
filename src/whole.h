@@ -41,11 +41,18 @@ struct whole_options {
     bool bundled;                   /* the runtime joins the output */
     bool dev;                       /* one object per module. */
     bool library;                   /* a library for C */
+    /* --lib shared --no-runtime: a plugin. It carries the table of what
+       it provides, and the host holds the registry and the slots. */
+    bool plugin;
     /* The `--inject Interface=Provider` arguments of the build, which
        name the provider of every injectable interface. */
     const char *const *inject;
     size_t inject_count;
 };
+
+/* Whether the program can host a plugin: it injects an interface, or it
+   calls the loader. Such a program exports its symbols. */
+bool whole_hosts_plugins(const struct ir_module *m);
 
 /* Run the passes over program. Each error goes to errors as one line.
    Returns true when there is none. */

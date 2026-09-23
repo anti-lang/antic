@@ -27,6 +27,15 @@ enum { MACOS_MIN_MAJOR = 11, MACOS_MIN_MINOR = 0 };
    library takes such a name. */
 #define INJECT_SLOT_PREFIX "inject."
 
+/* The runtime function that `anti.plugin.load` calls. A program that
+   holds it can host a plugin, so the link exports its symbols. */
+#define PLUGIN_LOAD "anti_rt_plugin_load"
+
+/* The index file that `antic --lib shared --no-runtime` writes beside a
+   plugin. Discovery reads it and opens no library to find out what is
+   inside one. */
+#define PLUGIN_INDEX "anti-plugins.toml"
+
 enum target {
     TARGET_LINUX_X86_64,
     TARGET_LINUX_ARM64,

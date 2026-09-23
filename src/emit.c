@@ -13,7 +13,7 @@
 static void emit_function(struct text *out, enum target t, enum cpu_level cpu,
                           const struct ir_module *m,
                           const struct mach_function *f, bool module,
-                          struct debug *debug)
+                          bool exports, struct debug *debug)
 {
     const struct target_desc *desc = target_desc(t);
     struct text symbol = {0};
@@ -24,14 +24,15 @@ static void emit_function(struct text *out, enum target t, enum cpu_level cpu,
     mach_function_symbol(&symbol, t, f->ir);
     names.target = t;
     names.function = text_cstr(&symbol);
-    if (f->ir->exported || module) {
+    if (f->ir->exported || module || exports) {
         text_appendf(out, "    .globl %s\n", text_cstr(&symbol));
     }
     /* DESIGN: in an object of one module, every function is global for the
        other modules and hidden. A shared library then exports only the
        export fns. COFF has no hidden symbols, and the .def file of a DLL
-       names its exports. */
-    if (module && !f->ir->exported &&
+       names its exports. A program that hosts a plugin leaves the
+       hidden mark off, so the loader resolves the plugin against it. */
+    if (module && !exports && !f->ir->exported &&
         target_info(t)->format != FORMAT_COFF) {
         text_appendf(out, "    %s %s\n",
                      target_info(t)->format == FORMAT_MACHO ? ".private_extern"
@@ -147,7 +148,7 @@ static bool reloc_at(struct text *out, enum target t,
    names, so that the linker fills in the eight bytes. */
 static void emit_global(struct text *out, enum target t,
                         const struct ir_module *m, const struct ir_global *g,
-                        bool module)
+                        bool module, bool exports)
 {
     struct text name = {0};
     uint64_t align;
@@ -168,10 +169,12 @@ static void emit_global(struct text *out, enum target t,
         mangle(&name, t, g->module, g->name);
     }
     /* DESIGN: in an object of one module, a datum is global and hidden,
-       as a function is, so the other modules name the one copy. */
-    if (module && !g->exported) {
+       as a function is, so the other modules name the one copy. A
+       program that hosts a plugin leaves the hidden mark off, so the
+       descriptors it holds are the ones the plugin reaches. */
+    if ((module || exports) && !g->exported) {
         text_appendf(out, "    .globl %s\n", text_cstr(&name));
-        if (target_info(t)->format != FORMAT_COFF) {
+        if (!exports && target_info(t)->format != FORMAT_COFF) {
             text_appendf(out, "    %s %s\n",
                          target_info(t)->format == FORMAT_MACHO
                              ? ".private_extern"
@@ -210,7 +213,7 @@ static void emit_global(struct text *out, enum target t,
    loader writes, and every other global to the read-only section. The two
    are written in one pass each, so each section is named once. */
 static void emit_data(struct text *out, enum target t,
-                      const struct ir_module *m, bool module)
+                      const struct ir_module *m, bool module, bool exports)
 {
     enum object_format format = target_info(t)->format;
     bool relocated = false;
@@ -230,13 +233,13 @@ static void emit_data(struct text *out, enum target t,
             relocated = true;
             continue;
         }
-        emit_global(out, t, m, m->globals[i], module);
+        emit_global(out, t, m, m->globals[i], module, exports);
     }
     if (written) {
         text_appendf(out, "    .section %s\n", mutable_sections[format]);
         for (i = 0; i < m->global_count; i++) {
             if (m->globals[i]->mutable && !m->globals[i]->is_extern) {
-                emit_global(out, t, m, m->globals[i], module);
+                emit_global(out, t, m, m->globals[i], module, exports);
             }
         }
     }
@@ -247,15 +250,15 @@ static void emit_data(struct text *out, enum target t,
     for (i = 0; i < m->global_count; i++) {
         if (!m->globals[i]->mutable && m->globals[i]->reloc_count > 0 &&
             !m->globals[i]->is_extern) {
-            emit_global(out, t, m, m->globals[i], module);
+            emit_global(out, t, m, m->globals[i], module, exports);
         }
     }
 }
 
 static bool emit(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
-                 const char *module, bool one_module, bool debug_info,
-                 char *error, size_t error_size)
+                 const char *module, bool one_module, bool exports,
+                 bool debug_info, char *error, size_t error_size)
 {
     const struct target_info *info = target_info(t);
     struct debug debug;
@@ -288,7 +291,7 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
     debug_files(&debug, out);
     for (i = 0; i < m->function_count; i++) {
         if (functions[i] != NULL) {
-            emit_function(out, t, cpu, m, functions[i], one_module,
+            emit_function(out, t, cpu, m, functions[i], one_module, exports,
                           &debug);
         }
     }
@@ -296,7 +299,7 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
        the code is the range of the functions written above it. */
     debug_sections(&debug, out, functions);
     if (m->global_count > 0) {
-        emit_data(out, t, m, one_module);
+        emit_data(out, t, m, one_module, exports);
     }
     /* Without this note GNU ld may mark the stack executable. */
     if (info->format == FORMAT_ELF) {
@@ -307,20 +310,20 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
 
 bool emit_program(struct text *out, enum target t, enum cpu_level cpu,
                   const struct ir_module *m, struct mach_function **functions,
-                  const char *module, bool debug_info, char *error,
-                  size_t error_size)
+                  const char *module, bool exports, bool debug_info,
+                  char *error, size_t error_size)
 {
-    return emit(out, t, cpu, m, functions, module, false, debug_info, error,
-                error_size);
+    return emit(out, t, cpu, m, functions, module, false, exports, debug_info,
+                error, error_size);
 }
 
 bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
-                 const char *module, bool debug_info, char *error,
-                 size_t error_size)
+                 const char *module, bool exports, bool debug_info,
+                 char *error, size_t error_size)
 {
-    return emit(out, t, cpu, m, functions, module, true, debug_info, error,
-                error_size);
+    return emit(out, t, cpu, m, functions, module, true, exports, debug_info,
+                error, error_size);
 }
 
 /* DESIGN: a shared library initialises the runtime in a constructor. The
