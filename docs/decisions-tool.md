@@ -34,3 +34,26 @@ tool. A later step folds them into `docs/decisions.md`.
 - [provisional] `anti doc` refuses a library file whose module path is not
   lowercase identifiers joined by dots, and escapes every name it writes
   into HTML.
+
+## Step 15, anti bind readers
+
+- [provisional] An API description that names one struct twice is
+  refused as a whole, with a message naming the struct.
+- [provisional] The evaluator of macros and defines fails an expression
+  nested deeper than 128 levels. A level is a prefix operator, a cast, a
+  parenthesis or a macro a name leads into, counted across the nested
+  evaluations. A failed macro is skipped with a warning, as before.
+- [provisional] The C type parser does not parse a spelling nested
+  deeper than 256 levels. A level is a pointer, an array, a parameter
+  list, a group or a typedef a name leads into, counted across the nested
+  parses. The field, parameter or function is then left out with a
+  warning, as for another type Anti cannot name.
+- [provisional] Both counts are global to their file, since a nested
+  evaluation or parse starts in a callback of a reader. `anti bind` runs
+  on one thread.
+- [provisional] The ABI probe walks at most 64 records deep into a field
+  and enters no record it stands in. It enters a record that held no
+  value once. A field past that has no value in the probe.
+- [provisional] A version of clang that does not fit an `int` reads as
+  -1 and is refused as a version not tested. A `#pragma pack` value that
+  does not fit an `int` leaves the pack as it was, as clang ignores it.
