@@ -21,7 +21,8 @@ static void builder_bounds(void)
     CHECK(b.length == 4);
     anti_rt_builder_fill(&b, 2, ' ', INT64_MAX - 4);
     CHECK(b.length == 4);
-    anti_rt_builder_fill(&b, 4, ' ', INT64_MAX - 5);
+    /* The bytes fit and their NUL does not. */
+    anti_rt_builder_fill(&b, 4, ' ', INT64_MAX - 4);
     CHECK(b.length == 4);
     anti_rt_builder_append(&b, four, INT64_MAX - 3);
     CHECK(b.length == 4);

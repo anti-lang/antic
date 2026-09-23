@@ -25,3 +25,22 @@ A later step folds them into `docs/decisions.md`.
   entry of the file without bytes for the life of the program. A file
   that does not open is kept the same way. Reason: the cache of files already keeps a
   failed open that way, and a second rule for one error is not needed.
+
+## Integer bounds, step 11
+
+- A count of bytes that the size of a text builder cannot hold is
+  treated as memory that ran out. The builder keeps what it holds, and a
+  pad or an append of that count writes nothing.
+- The results of `parallel` take the bound of `anti_rt_chan_new`. A
+  count of chunks times the result size past `INT64_MAX / 2` stops the
+  program with a message on standard error, before a worker runs.
+- [provisional] The `threads` key takes decimal digits naming a count
+  from 1 to `INT32_MAX`, from the file, from `--anti.threads` and from
+  `rt.configure`. Any other text is a startup error. Reason: the pool
+  counts its workers in `int`, and the smallest bound that changes no
+  count accepted before is the largest `int` of every target.
+- A `[[name]]` table whose name holds the number `INT64_MAX` under it
+  already has no next count, and the document is refused.
+- A TOML key is at most 319 bytes, the room of a path less its NUL. A
+  longer key was refused before by the length of the path it wrote, and
+  it is now refused where it is read.
