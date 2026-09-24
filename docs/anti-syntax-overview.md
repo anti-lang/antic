@@ -15,6 +15,7 @@ Contents:
 - [Statements](#statements)
 - [Loops](#loops)
 - [Functions](#functions)
+- [Anonymous functions and closures](#anonymous-functions-and-closures)
 - [Tuples](#tuples)
 - [Errors](#errors)
 - [Structs](#structs)
@@ -29,6 +30,7 @@ Contents:
 - [Operators on classes](#operators-on-classes)
 - [Static fields and singletons](#static-fields-and-singletons)
 - [Threads](#threads)
+- [Concurrent classes](#concurrent-classes)
 - [Hooks and tracing](#hooks-and-tracing)
 - [Injection](#injection)
 - [Plugins](#plugins)
@@ -37,8 +39,11 @@ Contents:
 - [Compile-time targets](#compile-time-targets)
 - [Source locations](#source-locations)
 - [Checks and debugging](#checks-and-debugging)
+- [Warnings and safety checks](#warnings-and-safety-checks)
 - [Wire formats](#wire-formats)
 - [Script mode](#script-mode)
+- [Regular expressions](#regular-expressions)
+- [Bytes](#bytes)
 - [Standard library](#standard-library)
 - [Later](#later)
 - [Reserved words](#reserved-words)
@@ -108,7 +113,7 @@ Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of
 
 ## Literals
 
-Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. The prefixes are `r`, `b`, `br`, `f`, `rf` and `x`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
+Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. A pattern literal `re"..."`, see [Regular expressions](#regular-expressions). The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -129,7 +134,7 @@ let i = x"00 AB CC";
 let x: i8 = -128;
 ```
 
-Built: `f"..."` and `rf"..."`.
+Built: `f"..."` and `rf"..."`. Not built yet: `re"..."`.
 
 ## Variables and constants
 
@@ -261,7 +266,21 @@ outer: for a in xs {
 
 `by` takes a constant expression. `by -k` visits the same values as `by k` in reverse order. `by 0` is a compile error, the Heederik guardrail.
 
-Not built yet: labels.
+`for x in e` also walks a collection. The collection has `operator fn iter(self)`, which gives a new iterator on every call, and the iterator has `operator fn next(self) -> bool` and `operator fn value(self) -> T`. Nothing allocates, and nested loops each keep their own position. `while` calls the same hooks by name when the iterator is needed after the loop.
+
+```anti not-built
+for p in people { }
+
+let it = people.iter();
+while it.next() do {
+	let p = it.value();
+	if p.age >= 65 {
+		break;
+	}
+}
+```
+
+Not built yet: labels, and `for` over a collection through `iter`, `next` and `value`.
 
 ## Functions
 
@@ -298,6 +317,32 @@ Positional arguments first, named ones after in any order. No overloading by sig
 
 Built: default values, a constant expression or `here`, over a module boundary as well. Not built yet: named arguments.
 
+## Anonymous functions and closures
+
+`fn(params) -> R { body }` as an expression is an anonymous function. At a parameter of function type it may leave out its types, which come from that parameter. One that uses a local of the enclosing function is a closure, and captures that local by reference.
+
+```anti not-built
+fn censor(text: str, words: Regex) -> (str, int)
+{
+	let hits = 0;
+	let clean = text.replace(words, fn(m: Match) -> str {
+		hits += 1;
+		return "*".repeat(m.all.char_count());
+	});
+	return (clean, hits);
+}
+
+fn on_click(b: *Button, keep f: fn(Event)) { }
+fn each(items: []int, concurrent f: fn(int)) { }
+
+let name = "report";
+on_click(b, snapshot fn(e) { save(name); });
+```
+
+A closure never outlives what it captures. It is passed to a parameter that does not keep it, or held in a local used the same way, and never stored in a field, a return value, a global or a `keep` parameter. Creating one allocates nothing. A parameter that passes its function on to `parallel` or `dispatch` is marked `concurrent`, and a closure there may change a captured variable only when its type is thread-safe. `snapshot fn` copies what it uses when it is made, is read-only, holds numbers, `bool`, `char`, structs of those and `str`, and is accepted at a `keep` or a `concurrent` parameter. A parameter that does not keep its argument is two words, the code and a context pointer, and a kept function value stays one C function pointer.
+
+Not built yet: anonymous functions, closures, `keep`, `concurrent` parameters and `snapshot fn`.
+
 ## Tuples
 
 An anonymous struct with C layout, for a function with two answers and no name for the pair.
@@ -322,7 +367,7 @@ Built.
 
 ## Errors
 
-Mark a function that can fail with `may fail`. It leaves on one of two channels: `return v;` with the result, `fail e;` with a `*Error`. The forms at the call are `catch`, `try` to propagate, `try { }` for a block, `catch fatal` to stop. A bare failing call is a compile error.
+Mark a function that can fail with `may fail`. It leaves on one of two channels: `return v;` with the result, `fail e;` with a `*Error`. The forms at the call are `catch`, `try` to propagate, `try { }` for a block, `catch fatal` to stop, and `catch none` to count a failure as `none` where the result can be `none`. A bare failing call is a compile error.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -366,7 +411,7 @@ A handler ends with `yield v` or leaves the block. The name after `catch` is any
 
 The ABI of a `may fail` function is `?*Error f(args, R *out)`, with the result through an out pointer. `fn(A) -> R may fail` is its type as a value, a call through it is handled as a direct call is, and the header writes the ABI form. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. `may fail` is the one failing form. A C binding returns its error as an ordinary value, and a `may fail` wrapper turns it into a `fail`.
 
-Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail`, `may fail` on a `construct` with arguments, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`. Every test program uses `may fail`, and `errors/construct_forms.anti` checks that a `construct` refuses `-> ?*Error`. A function fails by its `may fail` marking alone, and one that returns `*Error` or `?*Error` without it gives the error as a value. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. The three user directories of `anti.os` may fail, and so does every function of `anti.fs`: `open`, `read`, `write`, `size`, `close`, `list`, `remove` and `rename`. `toml.Document.read`, `log.FileSink.new`, `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may fail. `try` stands wherever the call stands, after `return` and inside an expression as well. `fn(A) -> R may fail` is a type, and a call through a value of it takes a handler. A handler moves its error into an `own` parameter, and `Error.wrap` takes its cause so. The first `fail` of an error writes its origin `at` and, when backtraces are on, its frames, and `e.text()` names the position, the causes and the trace. `--anti.backtrace` and `backtrace = true` of the runtime configuration turn the frames on in a release build. `anti check` warns where the name a `catch` binds shadows a variable in scope, and where a `may fail` function holds no `fail` and no `try`.
+Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail`, `may fail` on a `construct` with arguments, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`. Every test program uses `may fail`, and `errors/construct_forms.anti` checks that a `construct` refuses `-> ?*Error`. A function fails by its `may fail` marking alone, and one that returns `*Error` or `?*Error` without it gives the error as a value. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. The three user directories of `anti.os` may fail, and so does every function of `anti.fs`: `open`, `read`, `write`, `size`, `close`, `list`, `remove` and `rename`. `toml.Document.read`, `log.FileSink.new`, `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may fail. `try` stands wherever the call stands, after `return` and inside an expression as well. `fn(A) -> R may fail` is a type, and a call through a value of it takes a handler. A handler moves its error into an `own` parameter, and `Error.wrap` takes its cause so. The first `fail` of an error writes its origin `at` and, when backtraces are on, its frames, and `e.text()` names the position, the causes and the trace. `--anti.backtrace` and `backtrace = true` of the runtime configuration turn the frames on in a release build. `anti check` warns where the name a `catch` binds shadows a variable in scope, and where a `may fail` function holds no `fail` and no `try`. Not built yet: `catch none`.
 
 ## Structs
 
@@ -505,7 +550,22 @@ c.move(1.0, 1.0);
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
 - `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
 
-Built.
+A class may declare a `struct`, `enum` or `class` inside its body. The nested type is private: only the enclosing class names it, and a public signature that names it is a compile error. Its full name is `PeopleList.Node` in the symbols and the header. A type that users work with directly stays at module level.
+
+```anti not-built
+class PeopleList
+{
+	struct Node
+	{
+		person: Person,
+		next: ?*Node,
+	}
+
+	head: ?*Node = none,
+}
+```
+
+Built: everything above but nested types. Not built yet: nested types.
 
 ## Interfaces
 
@@ -670,7 +730,9 @@ if a == b { }
 
 The names: `add sub mul div rem neg eq lt and or xor shl shr not`. `!=`, `>`, `<=`, `>=` and compound assignments derive. For a struct the operator is a free function in the declaring module.
 
-Built.
+The same table holds the language hooks: `iter`, `next` and `value` for `for x in e`, and `index` and `set_index` for `e[i]` and `e[i] = v`. A name outside the table is an error that lists the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is `a + b`. `f"..."` writes a class through `to_text`.
+
+Built: the operators. Not built yet: `iter`, `next`, `value`, `index` and `set_index`.
 
 ## Static fields and singletons
 
@@ -767,6 +829,39 @@ delete(c);
 A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. A worker takes a `Mutex` and a `chan T` beside its values.
 
 Built: `parallel`, `dispatch`, `join`, `join_all`, `Mutex`, `sync`, `chan T` with `send`, `recv` and `close`, and `select`. `--anti.threads` and the `threads` key of the configuration file set the pool size, and `ANTI_THREADS` is gone. Not built yet: the warning on a field written inside `sync` and read outside it.
+
+## Concurrent classes
+
+Any value may be read from more than one thread at once. Changing one from more than one thread needs a thread-safe type: `Mutex`, `chan T`, the atomics, or a class declared thread-safe, which the compiler checks.
+
+```anti not-built
+pub synchronized class Counter
+{
+	count: int = 0,
+
+	pub fn add(self, n: int) { self.count += n; }
+}
+
+pub concurrent class PeopleList
+{
+	struct Node
+	{
+		lock: Mutex,
+		person: Person guarded by lock,
+		next: ?*Node guarded by PeopleList.lock,
+	}
+
+	lock: Mutex,
+	head: ?*Node = none guarded by lock,
+	tail: ?*Node unchecked(unguarded-field, "swapped with compare_swap"),
+}
+
+let hits: atomic int = 0;
+```
+
+A `synchronized class` gives each object a hidden lock that every public function runs under, released on every exit, and `sync obj { }` holds it for a block. A `concurrent class` leaves the locking to the programmer, and every field is guarded by a `Mutex`, atomic, or fixed after `construct`. `unchecked(unguarded-field, "reason")` after a field's type or in the class header overrules the check. A public function of either never gives out a pointer or a slice into the object's fields. A worker may take a pointer to a thread-safe object, and `atomic` marks a local as well. A `Mutex` is one word of the program's memory and cannot be copied. A dev build records the order in which each thread takes locks and reports two orders that conflict.
+
+Not built yet: `synchronized class`, `concurrent class`, `guarded by`, `unchecked`, atomic locals, the pointer to a thread-safe object in a worker, the one-word `Mutex` and the report of lock orders.
 
 ## Hooks and tracing
 
@@ -980,6 +1075,22 @@ The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `arm
 
 Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, the build id in `anti_licenses` of every executable and shared library, the backtraces, with `StackTrace`, `anti.debug.backtrace` and `--anti.backtrace`, and the CPU levels, with `--cpu`, the start-up check and the runtime archive with one runtime per target and level. `symbolize` names the function of a frame in every build and its file and line in a `-g` build. `trace` and the options that decide it are built, and "Hooks and tracing" above names them. The symbols archive of `anti build --release` is built: `<program>-symbols.zip` beside the program, with the same link with its debug sections kept, the map of the program's functions and, on Windows, the PDB. `anti symbols inventory`, `check` and `resolve` are built. They read the runtime configuration and the build id of every binary it reaches, and `resolve` names a frame from the debug link and fills what it lacks from the map. Not built yet: the variables of `-g`, the symbols archive of a shared library and of a plugin, which `anti build` does not write, and the names of a Windows frame in `resolve`, which reads no PDB and leaves the frame raw. Windows has not run a trace.
 
+## Warnings and safety checks
+
+The compiler reports four kinds of problem. An error stops every build and nothing silences it. A warning prints and carries on in a dev build and stops a release build, and `allow(name, "reason")` silences it. A safety check stops every build, and `unchecked(name, "reason")` overrules it. A run-time check traps with file and line in a dev build and is not compiled in release unless `--checks` asks.
+
+```anti not-built
+fn parse_all(lines: []str) may fail
+	allow(shadowed-catch, "handlers reuse e on purpose")
+{
+	for l in lines { }
+}
+```
+
+Every warning and every safety check has a stable name at the end of its message, as in `` `e` shadows the outer `e` [shadowed-catch] ``. `allow` and `unchecked` stand before a statement, last in a declaration's header, or at the top of the file ending with `;`, and `unchecked` also after a field's type. Each takes one name and a required reason, and is not part of a signature. One that silences nothing is the warning `unused-allow` or `unused-unchecked`. `antic --warnings-as-errors` gives the release behaviour in a dev build, and `anti check` uses it. The first safety checks are `unguarded-field` and `exponential-pattern`.
+
+Not built yet: the names of warnings, `allow`, `unchecked`, the safety checks, `--warnings-as-errors` and a release build that refuses a warning.
+
 ## Wire formats
 
 A description of bytes in a `.fmt` file, from which `anti format` generates a parser, a writer and the classes. Not part of the language.
@@ -1025,6 +1136,46 @@ fn main(args: []str) -> int
 
 Not built yet.
 
+## Regular expressions
+
+A pattern literal `re"..."` is raw and has type `Regex`. The compiler checks it, knows its groups and compiles it once before `main`. `Regex.compile(text)` compiles one at run time and may fail. The engine is PCRE2, linked only when a program uses a pattern.
+
+```anti not-built
+let m = line.matches(re"(?<year>\d{4})-(?<month>\d\d)");
+if m == none {
+	fail "no date";
+}
+io.println(f"{m.year} / {m.month}");
+
+for m in line.find_all(re"\d+") { }
+let parts = line.split(re",\s*").to_slice();
+let d = "2026-09-23".replace(re"(?<y>\d{4})-(?<m>\d\d)-(?<d>\d\d)", "${d}/${m}/${y}");
+
+let r = Regex.compile(input) catch fatal;
+let n = line.matches(r) catch none;
+```
+
+`matches`, `find_all`, `replace` and `split` are methods of `str`, and `limit` takes that many matches from the start, or from the end when negative. A match behaves as a `?*T` does and stands alone as a condition. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, and a function may give each replacement. A call with a pattern literal never fails. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
+
+Not built yet: `re"..."`, `Regex`, the methods of `str` and `catch none`.
+
+## Bytes
+
+The same methods work on `[]byte` with a `ByteRegex`, where `.` matches any byte and nothing needs to be valid UTF-8. A pattern literal takes its mode from where it is used. `patch` writes bytes over part of what it finds, in place, and allocates nothing.
+
+```anti not-built
+data.patch(x"80 10 20 30", x"81");
+data.patch(x"80 10 20 30", x"FF", at: 2);
+
+let v = "version: 1.10.1".to_bytes();
+v.patch(re"version: \d+\.\d+\.(\d+)", b"2");
+let s = v.to_text() catch fatal;
+```
+
+`s.to_bytes()` copies a `str` into new bytes, and `data.to_text()` checks for valid UTF-8 and may fail. A match's fields are slices of the searched bytes. `replace` returns new bytes, and `patch` never changes the length, so a `with` that does not fit its span is a compile error or a `LengthMismatch` failure by the origin of its operands. `str` has no `patch`.
+
+Not built yet: `ByteRegex`, the methods of `[]byte`, `patch`, `to_bytes` and `to_text`.
+
 ## Standard library
 
 The modules under `anti.` ship with the compiler, and a program imports them without `-I`. `anti.lang` is the root and imports nothing. It holds `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `Trace` and `TraceHandler`, and the compiler declares `Object`, `Job`, `Flags`, `Mutex` and `FieldDescriptor` there.
@@ -1043,16 +1194,16 @@ Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.
 
 ## Later
 
-Generics and closures come after the features above, as "Timing" in `docs/anti-language-additions.md` orders them. Neither has a syntax yet, so no example of either stands here.
+Generics come after the features above, as "Timing" in `docs/anti-language-additions.md` orders them. They have no syntax yet, so no example stands here. With them come `anti.collection.Iterable[T]` and `Iterator[T]`, which a class with the `iter` hook implements. Closures have a syntax, in [Anonymous functions and closures](#anonymous-functions-and-closures).
 
 ## Reserved words
 
 Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for break continue return defer undo try catch yield fail assert show unreachable undefined embed here fallthrough as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join join_all sync chan send recv select atomic true false none tests fixtures provides`.
 
-Contextual words: `packed align by in final own transient operator mutable trace inject compatible simd`, `fatal` after `catch`, and `may fail` after a signature. `alloc` and `free` name a function of a class after `fn` and a member after `.`.
+Contextual words: `packed align by in final own transient operator mutable trace inject compatible simd`, `fatal` and `none` after `catch`, and `may fail` after a signature. Round four adds `snapshot keep concurrent synchronized unchecked allow` and `guarded by`. `alloc` and `free` name a function of a class after `fn` and a member after `.`.
 
-String prefixes: `r b br f rf x`.
+String prefixes: `r b br f rf x re`.
 
 Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
 
-Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today.
+Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today, the prefix `re` and the contextual words of round four.

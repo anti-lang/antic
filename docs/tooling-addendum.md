@@ -89,7 +89,8 @@ What the command does today, with the reasons under "The check command" in
 - The formatting class writes the canonical text of each file with `anti fmt` and
   compares the bytes. It reports the first line that differs, one finding per file.
 - The pattern check of `regex.compile` waits for PCRE2. The last status line says that the
-  class was skipped and names PCRE2.
+  class was skipped and names PCRE2. Round four replaced the check: the compiler checks
+  every pattern literal itself, and the class goes when that is built.
 
 ## Formatter rules
 
@@ -169,7 +170,7 @@ with the same text for both.
 Block form rules:
 
 - A block of one line holds its text between the opener and `*/`.
-- Over several lines the text starts on the line after the opener and ends on the
+- Over more than one line the text starts on the line after the opener and ends on the
   line before `*/`. Text on a delimiter line is an error.
 - Common leading whitespace is stripped. Nothing else is stripped.
 - Block comments do not nest. A fenced code block inside a block comment must not

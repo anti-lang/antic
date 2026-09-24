@@ -83,7 +83,9 @@ class Circle inherits Shape
 }
 ```
 
-- `class Name { }` declares a class. The body holds, in this order by convention and in any order by grammar: `implements` lines, `use` lines, fields, constants, static fields, functions.
+- `class Name { }` declares a class. The body holds, in this order by convention and in any order by grammar: `implements` lines, `use` lines, nested types, fields, constants, static fields, functions.
+- A class body may declare a `struct`, `enum` or `class`. The nested type is private to the class, only the enclosing class can name it, and a public signature that names it is a compile error. Its full name is the enclosing class's name followed by its own, `PeopleList.Node`, which the symbols and the C header use. A type that users work with directly stays at module level. "Nested types" in `docs/anti-language-additions.md` gives the rules. Eddie reversed the rule that every type is declared at module level on 2026-09-23.
+- `synchronized class Name { }` and `concurrent class Name { }` declare a thread-safe class. "Concurrent classes" in `docs/anti-language-additions.md` gives both.
 - `class Name inherits Base { }` names the base class in the header. At most one. Without it the class inherits `anti.lang.Object`, the root. The base is nested whole at offset 0, trailing padding included, and the class's own fields follow at `size_of(Base)`. The base part is reached as `self.super`.
 - The base is no member of the body. It sits at offset 0, has no name of its own, is reached as `self.super`, and a class has at most one, so it belongs to the header. `implements` and `use` stay in the body, because each is a named sub-object with a place in the layout. `inherits` in the body is refused: `inherits belongs in the class header: class Circle inherits Shape`.
 - A base of another module is qualified by it: `class Circle inherits shapes.Shape { }`. The header takes the base after every modifier: `abstract class`, `final class`, `singleton class`, `pub class` and `packed class`.
@@ -267,15 +269,16 @@ Four levels, and each applies where it makes sense:
 | `a >> b` | `shr` | |
 | `~a` | `not` | unary |
 
-- `a op b` rewrites to `a.f(b)` when the left operand's type declares `operator fn f`. Only the left operand's type is looked up. Compound assignments derive from the binary form. `operator fn` with a name outside the table is an error listing the fourteen.
+- `a op b` rewrites to `a.f(b)` when the left operand's type declares `operator fn f`. Only the left operand's type is looked up. Compound assignments derive from the binary form.
+- The language hooks extend the table beyond the operators: `iter` on a collection and `next` and `value` on its iterator for `for x in e`, and `index` and `set_index` for `e[i]` and `e[i] = v`. "Language hooks" and "Iteration" in `docs/anti-language-additions.md` give them. `operator fn` with a name outside the table is an error listing the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is the same call as `a + b`.
 - For a struct the operator is a free function in the module that declares the type: `operator fn add(a: Vector2, b: Vector2) -> Vector2`.
-- Not overloadable: `=`, `&&`, `||`, `.`, `()`, `[]`, `as`.
+- Not overloadable: `=`, `&&`, `||`, `.`, `()`, `as`.
 - Without an `operator fn eq`, `==` on a class value or a struct value is undefined, as before. `==` on class pointers is identity, see [Pointers and conversions](#pointers-and-conversions).
 
 ## Static fields and singletons
 
 - `static atomic count: int = 0;` declares a field of the class, reached as `Class.count`. It is a global with the class's mangled symbol. A `static` field must be `atomic`. Mutable globals exist only as atomics, so `parallel` keeps its guarantee.
-- `atomic` applies to integer types, `bool` and pointers, on static and on instance fields. An atomic field has no `=` and no `+=`. It has `load()`, `store(v)`, `add(v)`, `sub(v)`, `and(v)`, `or(v)`, `swap(v)` and `compare_swap(expected, new) -> bool`. `add`, `sub`, `and`, `or` and `swap` return the value the field held before the operation. Each operation is a call into the runtime, compiled per target, and the closing guide lists inline sequences as a later optimisation. Reading it without `load()` is refused. Memory order is sequentially consistent, always.
+- `atomic` applies to integer types, `bool` and pointers, on static and on instance fields. An atomic field has no `=` and no `+=`. It has `load()`, `store(v)`, `add(v)`, `sub(v)`, `and(v)`, `or(v)`, `swap(v)` and `compare_swap(expected, new) -> bool`. `add`, `sub`, `and`, `or` and `swap` return the value the field held before the operation. Each operation is a call into the runtime, compiled per target, and the closing guide lists inline sequences as a later optimisation. Reading it without `load()` is refused. Memory order is sequentially consistent, always. `atomic` also marks a local, `let hits: atomic int = 0;`, as "Concurrent classes" in `docs/anti-language-additions.md` gives.
 - A static field is the one kind of global the program writes, so it goes to the writable data section of its object format. The sections that hold literals and relocated constants are both protected, and a write to either faults.
 - `singleton class Config { }` declares a class with one instance. `Config.get() -> *Config` is generated: lazy, created once with `compare_swap`, from `construct` when the class declares one without arguments and from the defaults otherwise. No `alloc` of a singleton by the program, no literal of it outside the class, and `delete` on it is refused.
 - In a singleton, a field without a marker is read-only after creation. It may be set in `construct` and nowhere else. `atomic` fields are as above. `mutable` fields are ordinary fields the program may write anywhere. `mutable` is a contextual word allowed only in a singleton.
@@ -285,6 +288,7 @@ Four levels, and each applies where it makes sense:
 
 - The pointer-free test of `parallel` exempts the table pointer and `own` fields. A class value whose other fields are pointer-free is pointer-free, so `[]Circle` chunks like any array. `[]*Shape` is refused with a message that points at `dispatch`.
 - `dispatch obj -> f(args)` submits one object to the pool for `worker fn f(o: *T, args...) -> R`. The other arguments follow the pointer-free rule. It returns a `Job` struct. The pool records the object's address in an in-flight map before running and removes it after. A `dispatch` of an object already in flight returns a job whose handle is `none`. `join(job) -> R` blocks and returns the result. `join_all(jobs: []Job)` waits for a set. A dispatched worker may not `delete` its object. Same pool, same inline fallback, same `threads` key of the runtime configuration as `parallel`. The object header stays one word, and the in-flight state is the pool's.
+- A worker may take a pointer to a thread-safe object, the one exception to the rule that its parameters hold no pointer. "Concurrent classes" in `docs/anti-language-additions.md` defines a thread-safe class.
 - Analysis that only reports runs on the whole program's IR in every build mode. It runs after the last module compiles and before the link. The singleton check, an abstract class no concrete class fills, and a `delete` inside a worker live there. Optimisation that changes code runs on the whole program in release mode only.
 
 ## Errors
@@ -295,7 +299,7 @@ Four levels, and each applies where it makes sense:
 - `anti.error` holds the conveniences. `error.SystemError` inherits `Error` and adds `pub errno: int`, the number the system gave. `SystemError.from_errno()` and `SystemError.from_win32()` build one, with the number in both `errno` and `code`. `error.on_fatal(f)` registers one function that runs before `fatal` exits. It stores the function in an `internal` singleton of `anti.lang`, which `fatal` reads. `error.check(e)` calls `fatal` on an error that is not `none`.
 - A function that can fail is written with `may fail`, which "Failing functions" in `docs/anti-language-additions.md` gives. A function that cannot fail returns its value. A function whose only failure is "not present" may return `bool`.
 - A call to a failing function must handle the error. A bare call that drops it is a compile error.
-- `let n = f(args) catch e { ... };` handles it at the call. The compiler supplies the out pointer for `n`, over storage whose table it zeroes first, so the `=` the callee writes destroys nothing. The handler either leaves the enclosing block or ends with `yield v`, a value of `n`'s type that takes the place of the result. `n` is a local of its type and is destroyed at the end of its block, as any other is. A handler that leaves the block instead passes over it, since the call wrote nothing there. `catch { }` binds no name. `catch fatal` prints and exits.
+- `let n = f(args) catch e { ... };` handles it at the call. The compiler supplies the out pointer for `n`, over storage whose table it zeroes first, so the `=` the callee writes destroys nothing. The handler either leaves the enclosing block or ends with `yield v`, a value of `n`'s type that takes the place of the result. `n` is a local of its type and is destroyed at the end of its block, as any other is. A handler that leaves the block instead passes over it, since the call wrote nothing there. `catch { }` binds no name. `catch fatal` prints and exits. `catch none` counts a failure as `none`, where the result can be `none`.
 - `try f(args)` is `f(args) catch e { fail e; }` and is allowed only in a function that may fail. The error a handler binds is the `*Error` of that result, since the handler runs on the failure alone.
 - `try { ... } catch e { ... }` handles every unhandled failing call in the block. The first error abandons the rest of the block and runs `defer` statements on the way out. Then the handler runs, and execution continues after the block unless the handler left the function. Nothing crosses a function boundary, so nothing is unwound. Nested blocks bind inward.
 - The name after `catch` is any identifier, scoped to the handler. It shadows an outer name, and `anti check` warns when it does.
@@ -347,12 +351,12 @@ Four levels, and each applies where it makes sense:
 ## Keywords
 
 - Keywords: `class`, `self`, `super`, `abstract`, `concrete`, `enum`, `use`, `inherits`, `implements`, `is`, `dup`, `delete`, `destroy`, `static`, `singleton`, `internal`, `protected`, `catch`, `try`, `yield`. `atomic`, `dispatch`, `join` and `yield` were reserved already.
-- Contextual words: `final`, `own`, `transient`, `operator`, `mutable`. They join `packed`, `align`, `by`, `in` after a `for` binding and `fatal` after `catch`.
+- Contextual words: `final`, `own`, `transient`, `operator`, `mutable`. They join `packed`, `align`, `by`, `in` after a `for` binding and `fatal` and `none` after `catch`. The contextual words of round four are listed under "Keywords" in `docs/anti-language-additions.md`.
 - Tokens: `::` in a `concrete fn` qualifier, `as?`, `=>` in `switch`.
 
 ## Not in the language
 
-Multiple concrete bases and virtual bases. An `interface` keyword. `virtual` and `override`. Overloading by signature. Closures with captures and generics, which are on the roadmap after the book as compile-time features. Retroactive conformance, a type gaining an interface from outside its declaration. Value polymorphism. Exceptions. Properties and annotations. Nested and anonymous classes. Covariant return types beyond `dup`.
+Multiple concrete bases and virtual bases. An `interface` keyword. `virtual` and `override`. Overloading by signature. Generics, which are on the roadmap after the book as a compile-time feature. Closures are specified under "Anonymous functions and closures" in `docs/anti-language-additions.md`. Retroactive conformance, a type gaining an interface from outside its declaration. Value polymorphism. Exceptions. Properties and annotations. Anonymous classes. Covariant return types beyond `dup`.
 
 ## Example
 
