@@ -234,26 +234,37 @@ int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
 #endif
 
 #if defined(__APPLE__)
+/* The bytes of a 32-bit field of a header, little-endian. */
+static uint32_t field32(const uint8_t *at)
+{
+    return (uint32_t)at[0] | (uint32_t)at[1] << 8 | (uint32_t)at[2] << 16 |
+           (uint32_t)at[3] << 24;
+}
+
 /* The distance between where the image lies and where it was linked:
-   its header against the address of its __TEXT segment. */
+   its header against the address of its __TEXT segment. The walk keeps
+   every command inside the size the header gives them, as the reader of
+   src/rt/symbols.c does, and gives 0 where one leaves it. */
 static intptr_t image_slide(const uint8_t *header)
 {
-    uint32_t count = (uint32_t)(header[16] | header[17] << 8 |
-                                header[18] << 16 | (uint32_t)header[19] << 24);
-    const uint8_t *command = header + 32;
+    uint32_t count = field32(header + 16);
+    uint64_t end = 32 + (uint64_t)field32(header + 20);
+    uint64_t at = 32;
     uint32_t i;
 
-    for (i = 0; i < count; i++) {
-        uint32_t kind;
-        uint32_t size;
+    for (i = 0; i < count && at + 8 <= end; i++) {
+        uint32_t kind = field32(header + at);
+        uint32_t size = field32(header + at + 4);
         uint64_t vmaddr;
-        memcpy(&kind, command, 4);
-        memcpy(&size, command + 4, 4);
-        if (kind == 0x19 && strncmp((const char *)command + 8, "__TEXT", 16) == 0) {
-            memcpy(&vmaddr, command + 24, 8);
+        if (size < 8 || at + size > end) {
+            return 0;
+        }
+        if (kind == 0x19 && size >= 72 &&
+            strncmp((const char *)header + at + 8, "__TEXT", 16) == 0) {
+            memcpy(&vmaddr, header + at + 24, 8);
             return (intptr_t)((uintptr_t)header - (uintptr_t)vmaddr);
         }
-        command += size;
+        at += size;
     }
     return 0;
 }
