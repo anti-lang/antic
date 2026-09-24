@@ -2,7 +2,7 @@
 //! the parameter it is passed to, one that captures nothing is an ordinary
 //! function value, a closure reads and changes the variables of its frame by
 //! reference, a `keep` parameter stores a named function, and a `concurrent`
-//! parameter passes a closure on to the workers of `parallel`.
+//! parameter passes a closure on to the workers of `parallel` and `dispatch`.
 
 import anti.lang;
 
@@ -141,6 +141,16 @@ worker fn scaled(chunk: []int, concurrent f: fn(int) -> int) -> int
 	return sum;
 }
 
+class Tally
+{
+	pub n: int = 0,
+}
+
+worker fn weigh(t: *Tally, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
 fn map_sum(items: []int, concurrent f: fn(int) -> int) -> int
 {
 	let parts = parallel items by 2 -> scaled(f);
@@ -229,6 +239,12 @@ fn main() -> int
 	printf("%lld\n".ptr, map_sum(all, fn(n) { return n * factor; }));
 	let scale = fn(n: int) -> int { return n * factor + 1; };
 	printf("%lld\n".ptr, map_sum(all, scale));
+
+	// A closure reaches a dispatched worker the same way.
+	let t = alloc Tally { n: 7 };
+	let job = dispatch t -> weigh(fn(n) { return n * factor; });
+	printf("%lld\n".ptr, join(job));
+	delete(t);
 
 	// A captured Mutex is thread-safe, so a `concurrent` closure holds it.
 	let m = Mutex.new();
