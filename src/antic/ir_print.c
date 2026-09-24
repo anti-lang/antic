@@ -12,6 +12,7 @@ const char *ir_type_name(enum ir_type type)
         [IR_I32] = "i32", [IR_I64] = "i64", [IR_F32] = "f32",
         [IR_F64] = "f64", [IR_PTR] = "ptr", [IR_AGG] = "agg",
         [IR_CLONG] = "clong", [IR_CWCHAR] = "cwchar",
+        [IR_LOCK] = "lock",
     };
     return names[type];
 }
@@ -80,7 +81,7 @@ static void ir_vtype_print(struct text *out, const struct ir_module *m,
 static void integer(struct text *out, enum ir_type type, uint64_t value)
 {
     if (type == IR_I64 || type == IR_PTR || type == IR_CLONG ||
-        type == IR_CWCHAR) {
+        type == IR_CWCHAR || type == IR_LOCK) {
         text_appendf(out, "%" PRId64, arith_signed(value, 64));
     } else {
         text_appendf(out, "%" PRId64,

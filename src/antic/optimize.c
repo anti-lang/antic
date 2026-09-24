@@ -334,7 +334,7 @@ static bool fold_conversion(const struct ir_inst *inst, struct ir_operand *out)
 
 static bool is_target_sized(enum ir_type type)
 {
-    return type == IR_CLONG || type == IR_CWCHAR;
+    return type == IR_CLONG || type == IR_CWCHAR || type == IR_LOCK;
 }
 
 /* DESIGN: an operation on c_long or c_wchar wraps at a width that only the

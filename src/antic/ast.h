@@ -630,10 +630,12 @@ struct stmt {
         struct expr *return_value;  /* STMT_RETURN, NULL for return; */
         struct block *block;        /* STMT_BLOCK */
         /* `sync m { }`: the mutex, a `Mutex` or a pointer to one, and the
-           block that holds it. */
+           block that holds it. object marks a synchronized object in
+           place of the mutex, whose hidden lock the block holds. */
         struct {
             struct expr *mutex;
             struct block *body;
+            bool object;
         } sync;                     /* STMT_SYNC */
         /* `select { a x => stmt, b => stmt }`. The value of an arm is its
            channel, and binds names what the channel gives, a `?*T`. */

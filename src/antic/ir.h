@@ -33,7 +33,8 @@ enum ir_type {
     IR_PTR,
     IR_AGG,     /* a struct, union, array, str or slice passed by value */
     IR_CLONG,   /* c_long and c_ulong: 32 bits on Windows, else 64 */
-    IR_CWCHAR   /* c_wchar: 16 bits on Windows, else 32 */
+    IR_CWCHAR,  /* c_wchar: 16 bits on Windows, else 32 */
+    IR_LOCK     /* the word of a Mutex: 64 bits on Windows, else 32 */
 };
 
 #define IR_NO_AGG UINT32_MAX

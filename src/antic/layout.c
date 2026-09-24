@@ -28,7 +28,8 @@ static void fail(struct layouts *l, const char *format, ...)
     l->failed = true;
 }
 
-/* The fixed-width IR type of c_long or c_wchar on the target, or type. */
+/* The fixed-width IR type of c_long, c_wchar or the word of a Mutex on
+   the target, or type. */
 static enum ir_type target_type(const struct layouts *l, enum ir_type type)
 {
     bool windows = target_info(l->target)->os == OS_WINDOWS;
@@ -38,6 +39,12 @@ static enum ir_type target_type(const struct layouts *l, enum ir_type type)
     }
     if (type == IR_CWCHAR) {
         return windows ? IR_I16 : IR_I32;
+    }
+    /* DESIGN: a Mutex is the lock word of the system: an SRWLOCK of one
+       pointer on Windows, a futex word or an os_unfair_lock of 32 bits
+       elsewhere. src/rt/lock.c declares the same. */
+    if (type == IR_LOCK) {
+        return windows ? IR_I64 : IR_I32;
     }
     return type;
 }

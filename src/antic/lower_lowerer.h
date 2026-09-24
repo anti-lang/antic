@@ -47,7 +47,8 @@ struct exit_action {
     uint32_t error_temp;
     const struct type *error_type;
     bool unlock;                /* `sync`: unlock the mutex in mutex */
-    uint32_t mutex;
+    uint32_t mutex;             /* the address of the lock */
+    const char *unlock_fn;      /* the function of the runtime that does */
     /* DESIGN: the `leave` hook of an instrumented function is an exit
        action of a scope around its body. Every exit therefore runs it,
        after the locals of the body are gone. An exit that gives an error
@@ -250,6 +251,11 @@ const struct struct_field *lower_field_of(const struct type *s,
 const struct type *lower_field_owner(const struct type *t,
                                      const struct name *name);
 bool lower_name_is(const struct name *name, const char *text);
+struct ir_operand lower_object_lock_address(struct lowerer *l,
+                                            const struct type *t,
+                                            struct ir_operand object);
+void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
+                     int line);
 extern const struct name lower_len_name;
 extern const struct name lower_entry_name;
 struct ir_operand lower_field_offset(struct lowerer *l, const struct type *s,

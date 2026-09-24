@@ -343,7 +343,8 @@ void test_sync(void)
     let_type("fn f() { let m = Mutex.new(); }\n", "Mutex");
 
     rejects("fn main() -> int { let n = 1; sync n { } return 0; }\n", 1, 36,
-            "`sync` takes a `Mutex` or a pointer to one, found `int`");
+            "`sync` takes a `Mutex`, a synchronized object or a pointer to "
+            "either, found `int`");
     rejects("fn main() -> int {\n"
             "    let m = Mutex.new();\n"
             "    sync m {\n"

@@ -103,6 +103,7 @@ struct symbol {
     bool may_fail;                  /* SYMBOL_FN written `may fail` */
     bool internal;                  /* `internal`: the package alone sees it */
     bool caught;                    /* the error a `catch` binds */
+    bool atomic;                    /* a local declared `atomic T` */
     /* The error a `catch` binds: the loops its handler stands in, the
        function it moved into, and whether a `defer` or an `undo` of the
        handler names it. */

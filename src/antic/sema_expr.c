@@ -299,7 +299,7 @@ static const struct capture *unsafe_capture(const struct item *it)
 
     for (i = 0; it != NULL && i < it->capture_count; i++) {
         const struct capture *cap = &it->captures[i];
-        if ((cap->written && !sema_thread_safe(cap->symbol->type)) ||
+        if ((cap->written && !sema_thread_safe_symbol(cap->symbol)) ||
             cap->called) {
             return cap;
         }
@@ -417,7 +417,7 @@ static void refuse_not_concurrent(struct checker *c, const struct expr *e)
     const struct capture *cap = unsafe_capture(closure);
 
     if (cap != NULL && cap->written &&
-        !sema_thread_safe(cap->symbol->type)) {
+        !sema_thread_safe_symbol(cap->symbol)) {
         sema_error_at(c, cap->write, "`%.*s` is changed in a closure at a "
                       "`concurrent` parameter, and `%s` is not thread-safe, "
                       "so a `snapshot fn` reads a copy of it instead",

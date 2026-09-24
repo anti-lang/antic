@@ -635,12 +635,14 @@ struct type *types_field_descriptor(struct types *types)
     return types->field_record;
 }
 
-/* The struct of one handle that a Mutex and a channel are. */
+/* The struct of one field that a Mutex and a channel are: the lock word
+   of a Mutex, or the handle of a channel. */
 static struct type *handle_struct(struct types *types, const char *name,
                                   struct type *element)
 {
     static const char module_text[] = LANG_MODULE;
     static const char field_text[] = SYNC_HANDLE;
+    static const char word_text[] = MUTEX_WORD;
     struct struct_field field;
     struct type *t;
 
@@ -654,9 +656,21 @@ static struct type *handle_struct(struct types *types, const char *name,
     t->next = types->derived;
     types->derived = t;
     memset(&field, 0, sizeof field);
-    field.name.text = field_text;
-    field.name.length = sizeof field_text - 1;
-    field.type = types_pointer(types, types_builtin(types, TYPE_U8));
+    /* DESIGN: the word of a Mutex is `u32` to the checker, which never
+       reads it. Lowering gives the field the IR type of the lock word,
+       whose width the layout of each target decides. */
+    if (element == NULL) {
+        struct type *word = arena_alloc(types->arena, sizeof *word);
+        *word = *types_builtin(types, TYPE_U32);
+        word->lock_word = true;
+        field.name.text = word_text;
+        field.name.length = sizeof word_text - 1;
+        field.type = word;
+    } else {
+        field.name.text = field_text;
+        field.name.length = sizeof field_text - 1;
+        field.type = types_pointer(types, types_builtin(types, TYPE_U8));
+    }
     types_set_fields(types, t, &field, 1);
     t->layout = LAYOUT_DONE;
     return t;
@@ -670,6 +684,47 @@ struct type *types_mutex(struct types *types)
         types->mutex = handle_struct(types, name_text, NULL);
     }
     return types->mutex;
+}
+
+/* DESIGN: the hidden lock of a synchronized class is a struct of
+   `anti.lang` that the compiler declares: a Mutex, the thread that holds
+   it and how often, in the order of `struct object_lock` of
+   `src/rt/lock.c`. A thread that holds it takes it again without
+   waiting, so a function of the object that calls another does not wait
+   for itself. */
+struct type *types_object_lock(struct types *types)
+{
+    static const char module_text[] = LANG_MODULE;
+    static const char name_text[] = LANG_OBJECT_LOCK;
+    static const char *const names[] = {"word", "owner", "depth"};
+    struct struct_field fields[3];
+    struct name module;
+    struct name name;
+    size_t i;
+
+    if (types->object_lock != NULL) {
+        return types->object_lock;
+    }
+    module.text = module_text;
+    module.length = sizeof module_text - 1;
+    name.text = name_text;
+    name.length = sizeof name_text - 1;
+    types->object_lock = types_struct(types, module, name);
+    memset(fields, 0, sizeof fields);
+    for (i = 0; i < 3; i++) {
+        fields[i].name.text = names[i];
+        fields[i].name.length = strlen(names[i]);
+        fields[i].type = types_builtin(types, TYPE_I64);
+    }
+    fields[0].type = types_mutex(types);
+    types_set_fields(types, types->object_lock, fields, 3);
+    types->object_lock->layout = LAYOUT_DONE;
+    return types->object_lock;
+}
+
+bool types_is_object_lock(const struct type *t)
+{
+    return lang_item(t, TYPE_STRUCT, LANG_OBJECT_LOCK);
 }
 
 struct type *types_chan(struct types *types, struct type *element)
@@ -1264,9 +1319,11 @@ bool type_pointer_free(const struct type *t)
     case TYPE_CLASS:
     case TYPE_TUPLE:
     case TYPE_VARIANT:
-        /* DESIGN: a Mutex and a channel are handles of objects made to
-           be shared between threads, so a worker takes them beside its
-           values. A worker that holds a copy names the same one. */
+        /* DESIGN: a Mutex and a channel exist to be shared between
+           threads. A worker takes a channel beside its values, and a
+           copy names the same one. A Mutex cannot be copied, so a worker
+           takes a pointer to one, and a class that holds one stays
+           pointer-free. */
         if (types_is_mutex(t) || types_is_chan(t)) {
             return true;
         }

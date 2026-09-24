@@ -30,6 +30,9 @@ enum ir_type lower_ir_type_of(const struct type *t)
     if (t->kind == TYPE_ENUM) {
         t = t->base;
     }
+    if (t->lock_word) {
+        return IR_LOCK;
+    }
     switch (t->kind) {
     case TYPE_BOOL:
     case TYPE_I8:
@@ -212,6 +215,7 @@ static int min_bits(enum ir_type type)
     case IR_I16:
     case IR_CWCHAR: return 16;
     case IR_I32:
+    case IR_LOCK:
     case IR_CLONG: return 32;
     default: return 64;
     }
@@ -219,7 +223,9 @@ static int min_bits(enum ir_type type)
 
 static int max_bits(enum ir_type type)
 {
-    return type == IR_CLONG ? 64 : type == IR_CWCHAR ? 32 : min_bits(type);
+    return type == IR_CLONG || type == IR_LOCK ? 64
+           : type == IR_CWCHAR                ? 32
+                                              : min_bits(type);
 }
 
 /* DESIGN: a conversion between integer types truncates when the target
@@ -740,6 +746,19 @@ const struct type *lower_field_owner(const struct type *t,
         }
     }
     return t;
+}
+
+/* The address of the hidden lock of the synchronized object at object,
+   whose class is t or inherits the class that declares the lock. */
+struct ir_operand lower_object_lock_address(struct lowerer *l,
+                                            const struct type *t,
+                                            struct ir_operand object)
+{
+    static const struct name lock = {HIDDEN_LOCK, sizeof HIDDEN_LOCK - 1};
+    const struct type *owner = lower_field_owner(t, &lock);
+
+    return lower_offset_address(l, object,
+                                lower_field_offset(l, owner, &lock));
 }
 
 bool lower_name_is(const struct name *name, const char *text)

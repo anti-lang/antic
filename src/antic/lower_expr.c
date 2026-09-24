@@ -2404,15 +2404,15 @@ static struct ir_operand lower_parallel(struct lowerer *l,
 
 /* Locking and channels */
 
-/* DESIGN: a Mutex and a channel are structs of one handle. The handle
-   names the object the runtime made. Each operation passes the handle to
-   a function of the runtime, which holds the platform's mutex and the
-   queue. A value that `send` puts and `recv` takes goes through a slot
+/* DESIGN: a channel is a struct of one handle, which names the object
+   the runtime made. Each operation passes the handle to a function of
+   the runtime, which holds the queue. A Mutex is the lock word itself,
+   and each operation passes its address. A value that `send` puts and `recv` takes goes through a slot
    of the frame. The IR then names no size but the one of the element
    type. */
 
-/* The handle that the Mutex or the channel e holds. A pointer to a
-   Mutex points at its handle. */
+/* The handle that the channel e holds. A pointer to a channel points at
+   its handle. */
 struct ir_operand lower_load_handle(struct lowerer *l, const struct expr *e)
 {
     struct ir_operand at = e->type->kind == TYPE_POINTER ? lower_expr(l, e)
@@ -2448,16 +2448,20 @@ static struct ir_operand lower_sync_op(struct lowerer *l,
     uint32_t slot;
 
     switch (e->as.sync_op.op) {
+    /* A new Mutex is the zero word, which is unlocked on every
+       system. */
     case SYNC_MUTEX_NEW:
-        handle = lower_sync_call(l, "anti_rt_mutex_new", IR_PTR, NULL, NULL, 0);
-        break;
+        slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
+        ir_store(l->f, l->b, IR_LOCK, ir_int_op(IR_LOCK, 0),
+                 lower_temp(l, slot));
+        return lower_temp(l, slot);
     case SYNC_CHAN_NEW:
         args[0] = lower_size_operand(l, e->type->element);
         args[1] = lower_expr(l, e->as.sync_op.value);
         handle = lower_sync_call(l, "anti_rt_chan_new", IR_PTR, sizes, args, 2);
         break;
-    /* The runtime clears the handle it frees, so a second `destroy`
-       frees nothing. */
+    /* The word holds nothing of the system, and a dev build forgets the
+       orders it recorded for the lock. */
     case SYNC_MUTEX_DESTROY:
         args[0] = target->type->kind == TYPE_POINTER
                       ? lower_expr(l, target)
@@ -2489,7 +2493,7 @@ static struct ir_operand lower_sync_op(struct lowerer *l,
                         IR_VOID, one, args, 1);
         return lower_none();
     }
-    /* A new Mutex or channel is a slot that holds the handle. */
+    /* A new channel is a slot that holds the handle. */
     slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
     ir_store(l->f, l->b, IR_PTR, handle, lower_temp(l, slot));
     return lower_temp(l, slot);

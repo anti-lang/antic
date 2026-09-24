@@ -83,6 +83,17 @@ struct struct_field {
        run-time configuration from replacing the provider. */
     bool injected;
     bool inject_final;
+    /* DESIGN: `guarded by lock` names the Mutex field that a `sync`
+       holds wherever the field is reached. guard_class is NULL for a
+       lock of the same object, and the enclosing class for
+       `guarded by PeopleList.lock`. unchecked marks a field that
+       `unchecked(unguarded-field)` follows, which the check passes over.
+       hidden marks the lock of a synchronized class, which no program
+       names. */
+    struct name guard;
+    const struct type *guard_class;
+    bool unchecked;
+    bool hidden;
     const struct expr *value;       /* a field default or an enum value */
     /* DESIGN: the value of a field default, which the checker evaluates.
        A library file carries it, so a module that builds a class of
@@ -92,6 +103,8 @@ struct struct_field {
 };
 
 enum layout_state { LAYOUT_NONE, LAYOUT_BUSY, LAYOUT_DONE };
+
+enum thread_safety { SAFETY_NONE, SAFETY_SYNCHRONIZED, SAFETY_CONCURRENT };
 
 enum symbolic_kind {
     SYMBOLIC_INT,
@@ -182,6 +195,17 @@ struct type {
        it, so a write to a field of a class of another module is
        instrumented where the write stands. */
     bool traced;                    /* TYPE_CLASS: written `trace class` */
+    /* DESIGN: a thread-safe class. A synchronized class runs every
+       function that is not private under one hidden lock. A concurrent
+       class has every field guarded, atomic or fixed, and a type nested
+       in one carries the mark so its fields are checked the same way.
+       unchecked_fields marks `unchecked(unguarded-field)` in the class
+       header, which the check of every field passes over. */
+    enum thread_safety safety;      /* TYPE_CLASS, TYPE_STRUCT */
+    bool unchecked_fields;
+    /* The TYPE_U32 that is the word of a Mutex, which lowering gives the
+       IR type of the lock word of each target. */
+    bool lock_word;
     /* DESIGN: `compatible 1.1;` in the body of an abstract class names
        the lowest version a plugin may have been built for. The
        descriptor of the class carries it, so the loader reads it where
@@ -210,6 +234,7 @@ struct types {
     struct type *object;            /* anti.lang.Object, the class root */
     struct type *flags;             /* anti.lang.Flags */
     struct type *mutex;             /* anti.lang.Mutex */
+    struct type *object_lock;       /* the hidden lock of a class */
     struct type *field_record;      /* anti.lang.FieldDescriptor */
 };
 
@@ -316,14 +341,21 @@ struct type *types_object(struct types *types);
 /* DESIGN: `Mutex` is the built-in struct of `sync`, which the compiler
    declares in `anti.lang` as it does `Flags`. A channel is `chan T`, a
    struct of `anti.lang` per element type, whose name is the keyword, so
-   no module declares one. Both hold one field, the handle of the object
-   the runtime makes, so a copy names the same mutex or channel. A type
+   no module declares one. A Mutex holds one field, the lock word of the
+   system, and cannot be copied. A channel holds the handle of the object
+   the runtime makes, so a copy names the same channel. A type
    named `Mutex` in the module wins over the built-in one, and so does a
    function named `close` over the built-in `close(c)`. Neither carries a
    descriptor, since no module declares them. */
 #define LANG_MUTEX "Mutex"
 #define LANG_CHAN "chan"
 #define SYNC_HANDLE "handle"
+#define MUTEX_WORD "word"
+/* The struct of the hidden lock of a synchronized class, and the name of
+   its field. Neither is a name the lexer reads, so no program spells
+   them. */
+#define LANG_OBJECT_LOCK "Object lock"
+#define HIDDEN_LOCK "(lock)"
 #define MUTEX_NEW "new"
 #define MUTEX_DESTROY "destroy"
 #define CHAN_CLOSE "close"
@@ -457,6 +489,8 @@ struct type *types_field_descriptor(struct types *types);
 bool types_is_field_descriptor(const struct type *t);
 /* The struct `anti.lang.Mutex`, one for the compilation. */
 struct type *types_mutex(struct types *types);
+struct type *types_object_lock(struct types *types);
+bool types_is_object_lock(const struct type *t);
 /* Whether t is the struct that types_mutex made. */
 bool types_is_mutex(const struct type *t);
 /* `chan T`, one per element type. */

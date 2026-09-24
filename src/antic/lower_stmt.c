@@ -49,6 +49,7 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->error_type = NULL;
     action->unlock = false;
     action->mutex = 0;
+    action->unlock_fn = NULL;
     action->leave = false;
     action->snapshot = false;
 }
@@ -93,13 +94,16 @@ static void push_error_action(struct lowerer *l, const struct symbol *sym,
     action->error_type = error_type;
     action->unlock = false;
     action->mutex = 0;
+    action->unlock_fn = NULL;
     action->leave = false;
     action->snapshot = false;
 }
 
-/* Record the unlock of the mutex whose handle is in mutex, which a `sync`
-   holds until its block ends. */
-static void push_unlock_action(struct lowerer *l, uint32_t mutex)
+/* Record the unlock of the lock whose address is in mutex, which a
+   `sync` holds until its block ends and a synchronized function until
+   it returns. unlock_fn names the function of the runtime. */
+static void push_unlock_action(struct lowerer *l, uint32_t mutex,
+                               const char *unlock_fn)
 {
     struct exit_action *action;
 
@@ -113,6 +117,7 @@ static void push_unlock_action(struct lowerer *l, uint32_t mutex)
     action->error_type = NULL;
     action->unlock = true;
     action->mutex = mutex;
+    action->unlock_fn = unlock_fn;
     action->leave = false;
     action->snapshot = false;
 }
@@ -130,24 +135,67 @@ static void jump_to_join(struct lowerer *l, struct ir_block **join)
 
 static void lower_stmt(struct lowerer *l, const struct stmt *s);
 
-/* DESIGN: `sync m { }` reads the handle of m once, locks it, and records
-   its unlock as the first exit action of a scope around the block. Every
-   exit of the block runs the actions of the scopes it leaves, `return`,
-   `break`, `continue` and the error forms among them, so each unlocks
-   after the statements of the block's own `defer` have run. */
-static void lower_sync(struct lowerer *l, const struct stmt *s)
+/* DESIGN: a lock is taken by its address: the word of a Mutex, or the
+   hidden lock of a synchronized object, which a thread that holds it
+   takes again without waiting. A dev build passes the site of each lock
+   as well, `file:line`, so the runtime records the order in which each
+   thread takes its locks and reports two orders that conflict. The
+   unlock is an exit action of the scope that l->defers holds. */
+void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
+                     int line)
 {
     static const enum ir_type one[] = {IR_PTR};
-    struct ir_operand handle = lower_load_handle(l, s->as.sync.mutex);
-    struct defers scope;
-    uint32_t mutex;
+    static const enum ir_type two[] = {IR_PTR, IR_PTR};
+    struct ir_operand args[2];
+    uint32_t lock = ir_unary(l->f, l->b, IR_COPY, IR_PTR, at);
 
-    mutex = ir_unary(l->f, l->b, IR_COPY, IR_PTR, handle);
-    lower_sync_call(l, "anti_rt_mutex_lock", IR_VOID, one, &handle, 1);
+    args[0] = lower_temp(l, lock);
+    if (l->dev) {
+        struct text site = {0};
+        struct token_text text;
+        text_appendf(&site, "%s:%d", l->file, line);
+        text.bytes = text_cstr(&site);
+        text.length = site.length;
+        args[1] = lower_literal_address(l, &text);
+        text_free(&site);
+        lower_sync_call(l, object ? "anti_rt_object_lock_at"
+                                  : "anti_rt_mutex_lock_at",
+                        IR_VOID, two, args, 2);
+        push_unlock_action(l, lock, object ? "anti_rt_object_unlock_at"
+                                           : "anti_rt_mutex_unlock_at");
+        return;
+    }
+    lower_sync_call(l, object ? "anti_rt_object_lock" : "anti_rt_mutex_lock",
+                    IR_VOID, one, args, 1);
+    push_unlock_action(l, lock, object ? "anti_rt_object_unlock"
+                                       : "anti_rt_mutex_unlock");
+}
+
+/* DESIGN: `sync m { }` takes the address of m once, locks it, and
+   records its unlock as the first exit action of a scope around the
+   block. Every exit of the block runs the actions of the scopes it
+   leaves, `return`, `break`, `continue` and the error forms among them,
+   so each unlocks after the statements of the block's own `defer` have
+   run. `sync obj { }` on a synchronized object takes its hidden lock. */
+static void lower_sync(struct lowerer *l, const struct stmt *s)
+{
+    const struct expr *m = s->as.sync.mutex;
+    struct ir_operand at = m->type->kind == TYPE_POINTER ? lower_expr(l, m)
+                                                         : lower_address(l, m);
+    struct defers scope;
+
     memset(&scope, 0, sizeof scope);
     scope.outer = l->defers;
     l->defers = &scope;
-    push_unlock_action(l, mutex);
+    if (s->as.sync.object) {
+        const struct type *t = m->type->kind == TYPE_POINTER
+                                   ? m->type->element
+                                   : m->type;
+        lower_hold_lock(l, lower_object_lock_address(l, t, at), true,
+                        s->pos.line);
+    } else {
+        lower_hold_lock(l, at, false, s->pos.line);
+    }
     lower_block(l, s->as.sync.body);
     lower_run_defers(l, &scope, false);
     l->defers = scope.outer;
@@ -1926,7 +1974,7 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
             static const enum ir_type handle[] = {IR_PTR};
             struct ir_operand mutex = lower_temp(l, action->mutex);
             ir_call(l->f, l->b, IR_VOID,
-                    ir_func_op(lower_rt_function(l, "anti_rt_mutex_unlock",
+                    ir_func_op(lower_rt_function(l, action->unlock_fn,
                                                  handle,
                                                  1)),
                     &mutex, 1);

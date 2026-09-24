@@ -270,9 +270,13 @@ struct type *sema_proved_type(struct checker *c, const struct symbol *sym);
 bool sema_type_owns(const struct type *t);
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             struct type *t);
+bool sema_holds_mutex(const struct type *t);
+void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
+                           const struct type *t);
 void sema_check_block(struct checker *c, struct block *b);
 const struct item *sema_named_function(const struct checker *c);
 bool sema_thread_safe(const struct type *t);
+bool sema_thread_safe_symbol(const struct symbol *sym);
 void sema_capture(struct checker *c, struct symbol *sym);
 void sema_note_write(struct checker *c, const struct expr *e);
 void sema_note_call(struct checker *c, const struct expr *callee);

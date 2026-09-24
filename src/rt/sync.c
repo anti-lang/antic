@@ -1,13 +1,10 @@
-/* The mutex of `sync` and the channels of `chan T`. antic lowers each
-   operation to one call here with the handle that the Mutex or the
-   channel holds, the object that anti_rt_mutex_new or anti_rt_chan_new
-   made.
+/* The channels of `chan T`. antic lowers each operation to one call here
+   with the handle that the channel holds, the object that
+   anti_rt_chan_new made. src/rt/lock.c holds the Mutex.
 
-   DESIGN: both stand on the platform layer of the threading chapter.
-   That is the one src/rt/threads.c uses, a lock and a condition variable of
-   the system. Windows takes an SRWLOCK, which a thread cannot take twice.
-   A nested `sync` on one mutex therefore deadlocks there, as it does on a
-   pthread mutex of the default type. */
+   DESIGN: a channel stands on the platform layer of the threading
+   chapter. That is the one src/rt/threads.c uses, a lock and a condition
+   variable of the system. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)
@@ -79,46 +76,6 @@ static void wake_all(cond_t *c) { pthread_cond_broadcast(c); }
 static _Noreturn void fatal(const char *message)
 {
     anti_rt_fail_abort("anti: %s", message);
-}
-
-/* Mutex */
-
-/* The lock of a new Mutex, on the heap. anti_rt_mutex_destroy frees it,
-   which `m.destroy()` calls. */
-void *anti_rt_mutex_new(void)
-{
-    lock_t *m = malloc(sizeof *m);
-
-    if (m == NULL || lock_init(m) != 0) {
-        fatal("no memory for a Mutex");
-    }
-    return m;
-}
-
-/* Release the mutex of the Mutex at place and clear its handle, so a
-   second `destroy` releases nothing. */
-void anti_rt_mutex_destroy(void **place)
-{
-    if (*place != NULL) {
-        lock_end(*place);
-        free(*place);
-        *place = NULL;
-    }
-}
-
-/* A Mutex whose handle is zero was destroyed, or it lies in memory that
-   no `Mutex.new()` wrote, such as the zeroed memory of `alloc(T, n)`. */
-void anti_rt_mutex_lock(void *handle)
-{
-    if (handle == NULL) {
-        fatal("`sync` on a Mutex that holds no mutex");
-    }
-    hold(handle);
-}
-
-void anti_rt_mutex_unlock(void *handle)
-{
-    release(handle);
 }
 
 /* Channels */

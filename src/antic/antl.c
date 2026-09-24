@@ -16,7 +16,7 @@ _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
 _Static_assert(TOKEN_KIND_COUNT == 177, "raise ANTL_VERSION, then update this");
-_Static_assert(IR_CWCHAR == 10, "raise ANTL_VERSION, then update this");
+_Static_assert(IR_LOCK == 11, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_RET == 85, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_SYM == 7, "raise ANTL_VERSION, then update this");
@@ -102,7 +102,8 @@ static uint64_t float_bits(double d)
     return bits;
 }
 
-/* DESIGN: the root class, a Job, Flags, a Mutex and a channel carry the
+/* DESIGN: the root class, a Job, Flags, a Mutex, a channel and the hidden
+   lock of a synchronized class carry the
    path `anti.lang`, and the compiler declares all of them. The library
    file of `anti.lang` names them as it names a struct of another module
    and declares none, so a reader takes the compiler's own. The root is
@@ -113,7 +114,7 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
 
     if ((t->kind == TYPE_CLASS && t->base == NULL) || types_is_job(t) ||
         types_is_flags(t) || types_is_mutex(t) || types_is_chan(t) ||
-        types_is_field_descriptor(t)) {
+        types_is_object_lock(t) || types_is_field_descriptor(t)) {
         return false;
     }
     return type_has_fields(t) && t->module.length == strlen(module) &&
@@ -415,6 +416,10 @@ static void put_type(struct writer *w, const struct type *t)
                                 (unsigned)t->is_final << 3 |
                                 (unsigned)t->simd << 4 |
                                 (unsigned)t->traced << 5));
+            /* A thread-safe class, and `unchecked(unguarded-field)` in
+               its header. */
+            put_u8(w, (uint8_t)((unsigned)t->safety |
+                                (unsigned)t->unchecked_fields << 2));
             /* The `compatible` line of an abstract class, empty where
                the body has none. Every module that names the class
                writes the same descriptor, so the floor travels with
@@ -438,7 +443,15 @@ static void put_type(struct writer *w, const struct type *t)
                    slot, and `anti build` reports what a dependency
                    needs. */
                 put_u8(w, (uint8_t)((unsigned)t->fields[i].injected |
-                                    (unsigned)t->fields[i].inject_final << 1));
+                                    (unsigned)t->fields[i].inject_final << 1 |
+                                    (unsigned)t->fields[i].hidden << 2 |
+                                    (unsigned)t->fields[i].unchecked << 3));
+                /* DESIGN: the lock that guards the field travels by its
+                   name. A lock of an enclosing class guards a field of
+                   a nested type alone, which no other module reaches,
+                   so the class it names stays behind. */
+                put_bytes(w, t->fields[i].guard.text,
+                          t->fields[i].guard.length);
                 /* DESIGN: /// on a private item is never stored, and
                    the fields of a private struct are private items. */
                 put_doc(w, t->fields[i].doc.text,
@@ -1662,6 +1675,7 @@ static void read_types(struct reader *r)
             struct name module = get_name(r);
             struct name name = get_name(r);
             uint8_t flags;
+            uint8_t safety;
             if (r->failed) {
                 break;
             }
@@ -1674,6 +1688,11 @@ static void read_types(struct reader *r)
             }
             if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_MUTEX)) {
                 t = types_mutex(r->types);
+                break;
+            }
+            if (kind == TYPE_STRUCT &&
+                names_lang(&module, &name, LANG_OBJECT_LOCK)) {
+                t = types_object_lock(r->types);
                 break;
             }
             /* The root carries the path of `anti.lang` and is still
@@ -1695,6 +1714,12 @@ static void read_types(struct reader *r)
             t->is_final = (flags & 8) != 0;
             t->simd = (flags & 16) != 0;
             t->traced = (flags & 32) != 0;
+            safety = get_u8(r);
+            t->safety = (enum thread_safety)(safety & 3);
+            t->unchecked_fields = (safety >> 2 & 1) != 0;
+            if ((safety & 3) > SAFETY_CONCURRENT || safety > 7) {
+                damaged(r);
+            }
             t->compatible = get_name(r);
             t->align = get_u64(r);
             if (flags > 63 || (t->align & (t->align - 1)) != 0) {
@@ -1721,8 +1746,11 @@ static void read_types(struct reader *r)
                 marks = get_u8(r);
                 s->fields[j].injected = (marks & 1) != 0;
                 s->fields[j].inject_final = (marks >> 1 & 1) != 0;
+                s->fields[j].hidden = (marks >> 2 & 1) != 0;
+                s->fields[j].unchecked = (marks >> 3 & 1) != 0;
+                s->fields[j].guard = get_name(r);
                 if ((form & 15) > FIELD_IMPL || s->fields[j].vis > VIS_PUB ||
-                    marks > 3) {
+                    marks > 15) {
                     damaged(r);
                 }
                 doc = get_name(r);
@@ -2084,7 +2112,7 @@ static void read_items(struct reader *r)
 
 static bool valid_type(uint8_t type)
 {
-    return type <= IR_CWCHAR;
+    return type <= IR_LOCK;
 }
 
 /* Where each function, global, aggregate and symbolic value of the file
@@ -2354,7 +2382,8 @@ static void read_tables(struct reader *r, struct ir_module *program,
         s->a = get_u32(r);
         s->b = get_u32(r);
         if (kind > IR_SYM_OP || type < IR_I8 ||
-            (type > IR_I64 && type != IR_CLONG && type != IR_CWCHAR) ||
+            (type > IR_I64 && type != IR_CLONG && type != IR_CWCHAR &&
+             type != IR_LOCK) ||
             s->op > IR_RET ||
             ((kind == IR_SYM_SIZE_OF || kind == IR_SYM_OFFSET_OF) &&
              s->of.type == IR_VOID)) {

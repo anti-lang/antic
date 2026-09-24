@@ -140,7 +140,6 @@ pub singleton class SharedRandom inherits Random
 
 	fn construct(self)
 	{
-		self.lock = Mutex.new();
 		self.reseed(time.wall() as u64);
 	}
 

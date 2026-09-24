@@ -1310,6 +1310,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
         struct expr *arg = e->as.call.args[i];
         ok = sema_require(c, arg, sema_check_expr(c, arg, fn->params[i + 1]),
                           fn->params[i + 1]) && ok;
+        sema_refuse_lock_copy(c, arg, fn->params[i + 1]);
         note_move(c, m->symbol, i + 1, arg);
     }
     if (!ok) {
@@ -2136,6 +2137,7 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
         if (i < fn->param_count) {
             ok = sema_require(c, arg, sema_check_expr(c, arg, fn->params[i]),
                               fn->params[i]) && ok;
+            sema_refuse_lock_copy(c, arg, fn->params[i]);
             if (sym != NULL && sym->worker) {
                 sema_refuse_worker_closure(c, arg, fn->params[i]);
             }
@@ -2722,7 +2724,16 @@ static bool worker_args(struct checker *c, struct expr *call,
         ok = sema_require(c, args[i],
                           sema_check_expr(c, args[i], fn->params[i + 1]),
                           fn->params[i + 1]) && ok;
+        sema_refuse_lock_copy(c, args[i], param);
         sema_refuse_worker_closure(c, args[i], param);
+        /* DESIGN: a worker may take a pointer to a thread-safe object,
+           the one exception to the rule that its parameters hold no
+           pointer. A Mutex counts, since a worker cannot take a copy of
+           one. */
+        if (param->kind == TYPE_POINTER && sema_thread_safe(param->element) &&
+            !types_is_chan(param->element)) {
+            continue;
+        }
         if (param->kind != TYPE_FN || param->bound) {
             ok = worker_type(c, args[i]->pos, "an argument of a worker",
                              fn->params[i + 1]) && ok;

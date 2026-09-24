@@ -1,6 +1,6 @@
 //! Four dispatched workers add to one counter, each addition inside a `sync` on
-//! the counter's mutex, so the total counts every one. A worker takes a Mutex
-//! beside its values, and a copy names the same mutex.
+//! the counter's mutex, so the total counts every one. A worker takes a pointer
+//! to a Mutex beside its values, since a Mutex cannot be copied.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -25,8 +25,8 @@ worker fn add(t: *Task, times: int) -> int
 	return times;
 }
 
-/// The mutex arrives as a value, and holding it holds the counter's.
-worker fn add_with(t: *Task, lock: Mutex, times: int) -> int
+/// The mutex arrives as a pointer, and holding it holds the counter's.
+worker fn add_with(t: *Task, lock: *Mutex, times: int) -> int
 {
 	for 0..times {
 		sync lock {
@@ -44,8 +44,8 @@ fn main() -> int
 	let t2 = alloc Task { counter: c };
 	let t3 = alloc Task { counter: c };
 	let jobs = [dispatch t0 -> add(20000), dispatch t1 -> add(20000),
-		dispatch t2 -> add_with(c.lock, 10000),
-		dispatch t3 -> add_with(c.lock, 10000)];
+		dispatch t2 -> add_with(&c.lock, 10000),
+		dispatch t3 -> add_with(&c.lock, 10000)];
 
 	join_all(jobs[0..4]);
 	printf("%d\n".ptr, c.n as c_int);

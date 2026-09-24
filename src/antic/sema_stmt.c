@@ -583,6 +583,54 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
         sema_error_at(c, value->pos, "`%s` has `own` fields, use `dup` instead "
                       "of `=`", sema_tn(t));
     }
+    sema_refuse_lock_copy(c, value, t);
+}
+
+/* Whether a value of t holds a Mutex: the Mutex itself, or a struct, a
+   class, a tuple, a variant or an array with one inside it. A pointer
+   holds none. */
+bool sema_holds_mutex(const struct type *t)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return false;
+    }
+    if (types_is_mutex(t)) {
+        return true;
+    }
+    if (t->kind == TYPE_ARRAY) {
+        return sema_holds_mutex(t->element);
+    }
+    if (t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS &&
+        t->kind != TYPE_TUPLE && t->kind != TYPE_VARIANT) {
+        return false;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (sema_holds_mutex(t->fields[i].type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: a Mutex is the lock word itself, so a copy would be a second
+   lock that guards nothing. A value that holds one is never copied out
+   of the place it lives in: not by `=`, not into a parameter and not by
+   `return`. A fresh value, a literal, a call or `Mutex.new()`, moves. */
+void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
+                           const struct type *t)
+{
+    if (!sema_is_error(t) && sema_holds_mutex(t) && reads_existing(value)) {
+        if (types_is_mutex(t)) {
+            sema_error_at(c, value->pos, "a `" LANG_MUTEX "` cannot be "
+                          "copied, pass a pointer to it");
+        } else {
+            sema_error_at(c, value->pos, "`%s` holds a `" LANG_MUTEX "` and "
+                          "cannot be copied, pass a pointer to it",
+                          sema_tn(t));
+        }
+    }
 }
 
 static void check_flags_assign(struct checker *c, struct stmt *s);
@@ -704,6 +752,19 @@ static void check_assign(struct checker *c, struct stmt *s)
     if (target->kind == EXPR_NAME && target->symbol != NULL &&
         type_is_nullable(target->symbol->type)) {
         t = target->symbol->type;
+    }
+    /* A Mutex cannot be assigned, as it cannot be copied: the lock a
+       thread holds would change under it. */
+    if (sema_holds_mutex(t)) {
+        if (types_is_mutex(t)) {
+            sema_error_at(c, target->pos, "a `" LANG_MUTEX "` cannot be "
+                          "assigned");
+        } else {
+            sema_error_at(c, target->pos, "`%s` holds a `" LANG_MUTEX "` and "
+                          "cannot be assigned", sema_tn(t));
+        }
+        sema_check_expr(c, s->as.assign.value, NULL);
+        return;
     }
     /* The variable of a `for` is read-only, so the loop keeps its step
        and the sequence it walks. */
@@ -1408,21 +1469,31 @@ static void spell_mutex(struct text *out, const struct expr *e)
 
 /* `sync m { }` holds m, a Mutex or a pointer to one, for the block. A
    `sync` on the mutex that an enclosing one of the function holds would
-   wait for itself. */
+   wait for itself. `sync obj { }` holds the hidden lock of a
+   synchronized object, which its thread takes again without waiting. */
 static void check_sync(struct checker *c, struct stmt *s)
 {
     struct type *t = sema_check_expr(c, s->as.sync.mutex, NULL);
     const struct held_mutex *h;
     struct held_mutex here;
+    bool pointer = !sema_is_error(t) && t->kind == TYPE_POINTER;
 
-    if (!sema_is_error(t) && t->kind == TYPE_POINTER) {
+    if (pointer) {
         t = sema_usable_pointer(c, s->as.sync.mutex, t)->element;
     }
-    if (!sema_is_error(t) && !types_is_mutex(t)) {
+    if (!sema_is_error(t) && t->kind == TYPE_CLASS &&
+        t->safety == SAFETY_SYNCHRONIZED) {
+        s->as.sync.object = true;
+    } else if (!sema_is_error(t) && !types_is_mutex(t)) {
         sema_error_at(c, s->as.sync.mutex->pos, "`sync` takes a `" LANG_MUTEX
-                      "` or a pointer to one, found `%s`", sema_tn(t));
+                      "`, a synchronized object or a pointer to either, "
+                      "found `%s`", sema_tn(t));
+    } else if (!sema_is_error(t) && !pointer &&
+               !reads_existing(s->as.sync.mutex)) {
+        sema_error_at(c, s->as.sync.mutex->pos, "`sync` takes a `" LANG_MUTEX
+                      "` that lives in a place, or a pointer to one");
     }
-    for (h = c->held; h != NULL; h = h->outer) {
+    for (h = c->held; h != NULL && !s->as.sync.object; h = h->outer) {
         if (same_mutex(h->mutex, s->as.sync.mutex)) {
             struct text inner = {0};
             struct text outer = {0};
@@ -2020,8 +2091,11 @@ static void check_stmt(struct checker *c, struct stmt *s)
                           c->function->name.text);
             return;
         }
-        sema_require(c, s->as.return_value,
-                     sema_check_expr(c, s->as.return_value, result), result);
+        if (sema_require(c, s->as.return_value,
+                         sema_check_expr(c, s->as.return_value, result),
+                         result)) {
+            sema_refuse_lock_copy(c, s->as.return_value, result);
+        }
         return;
     case STMT_BLOCK:
         sema_check_block(c, s->as.block);
@@ -2443,12 +2517,20 @@ const struct item *sema_named_function(const struct checker *c)
 }
 
 /* DESIGN: a type is thread-safe when it is built to be changed from more
-   than one thread at once. Of the types that are built, a `Mutex` and a
-   channel are. The atomics are fields and not the type of a variable,
-   and concurrent classes are not built yet. */
+   than one thread at once: a `Mutex`, a channel, a synchronized class
+   and a concurrent class. An atomic is a field or a local marked
+   `atomic`, so sema_thread_safe_symbol asks the variable as well. */
 bool sema_thread_safe(const struct type *t)
 {
-    return t != NULL && (types_is_mutex(t) || types_is_chan(t));
+    return t != NULL &&
+           (types_is_mutex(t) || types_is_chan(t) ||
+            ((t->kind == TYPE_CLASS || t->kind == TYPE_STRUCT) &&
+             t->safety != SAFETY_NONE));
+}
+
+bool sema_thread_safe_symbol(const struct symbol *sym)
+{
+    return sym->atomic || sema_thread_safe(sym->type);
 }
 
 /* The capture of sym in the anonymous function it, added when it is not
@@ -2837,7 +2919,7 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
     }
     for (i = 0; i < it->capture_count; i++) {
         const struct capture *cap = &it->captures[i];
-        if ((cap->written && !sema_thread_safe(cap->symbol->type)) ||
+        if ((cap->written && !sema_thread_safe_symbol(cap->symbol)) ||
             cap->called) {
             safe = false;
         }
