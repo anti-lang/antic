@@ -72,4 +72,17 @@ linker prints only the `-lto_library` warning that `docs/notes/linker.md` explai
   them an installed Anti cannot link a Linux program that loads a plugin. The same
   holds for one that reaches a `link linux` line.
 - The two unit test files and the 11 failing tests of the Windows VM need a session
-  of their own, and so do the 14 of the Linux VM.
+  of their own. So do the 14 of the Linux VM.
+
+## Proof at the push of the code
+
+```text
+$ git log --oneline -3
+796db35 Report the glibc link mode and plugins on Linux and Windows
+45d8fcb Record the glibc link mode and plugins on Linux and Windows
+e7abc78 Write every link of a glibc sysroot as a copy of its file
+$ git status --short
+$ git rev-parse HEAD origin/main
+796db35da8732242550908b2a4907465cbd9bf5a
+796db35da8732242550908b2a4907465cbd9bf5a
+```
