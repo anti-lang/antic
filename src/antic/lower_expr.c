@@ -530,6 +530,122 @@ void lower_bind_value(struct lowerer *l, struct symbol *sym,
                        v);
 }
 
+/* The hidden local of an iteration takes the iterator its start gives:
+   an object in a slot of the frame, or a pointer. */
+void lower_bind_cursor(struct lowerer *l, const struct iteration *it)
+{
+    struct symbol *cursor = it->cursor;
+
+    if (lower_is_aggregate(cursor->type)) {
+        cursor->ir = ir_entry_slot(l->f, lower_vtype_of(l, cursor->type));
+        lower_build_into(l, it->start, lower_temp(l, cursor->ir));
+        return;
+    }
+    lower_bind_value(l, cursor, lower_expr(l, it->start));
+}
+
+/* The value of an iteration's `value` call written to at, an element of
+   memory that holds the type t. */
+static void store_value(struct lowerer *l, const struct expr *current,
+                        struct ir_operand at)
+{
+    struct ir_operand v;
+
+    if (lower_is_aggregate(current->type)) {
+        lower_build_into(l, current, at);
+        return;
+    }
+    /* The call may end the block it starts in, so the store goes into
+       the block that follows it. */
+    v = lower_expr(l, current);
+    ir_store(l->f, l->b, lower_ir_type_of(current->type), v, at);
+}
+
+/* DESIGN: `to_slice` walks the iterator as `for` does and writes each
+   value into memory from `realloc`. The room doubles plus four elements
+   whenever it is full, so a walk of n values moves O(n) bytes. The
+   memory is never shrunk, and the program frees it with
+   `free(result.ptr)`. An iterator that gives nothing gives an empty
+   slice whose ptr is zero, which `free` accepts. */
+static struct ir_operand lower_collect(struct lowerer *l, const struct expr *e)
+{
+    static const enum ir_type grow_params[] = {IR_PTR, IR_I64};
+    const struct iteration *it = &e->as.collect;
+    const struct type *element = e->type->element;
+    uint32_t slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
+    struct ir_operand size = lower_size_operand(l, element);
+    struct ir_block *test = lower_new_block(l);
+    struct ir_block *body = lower_new_block(l);
+    struct ir_block *grow = lower_new_block(l);
+    struct ir_block *put = lower_new_block(l);
+    struct ir_block *exit = lower_new_block(l);
+    struct ir_operand args[2];
+    struct ir_operand bytes;
+    struct ir_operand room;
+    struct ir_operand result;
+    uint32_t data;
+    uint32_t count;
+    uint32_t capacity;
+
+    lower_bind_cursor(l, it);
+    data = ir_unary(l->f, l->b, IR_COPY, IR_PTR, ir_int_op(IR_PTR, 0));
+    count = ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));
+    capacity = ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    lower_branch(l, it->advance, body, exit);
+    l->b = body;
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
+                                      lower_temp(l, count),
+                                      lower_temp(l, capacity))),
+              grow, put);
+    l->b = grow;
+    room = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64,
+                                   lower_temp(l, ir_binary(
+                                                     l->f, l->b, IR_MUL,
+                                                     IR_I64,
+                                                     lower_temp(l, capacity),
+                                                     ir_int_op(IR_I64, 2))),
+                                   ir_int_op(IR_I64, 4)));
+    ir_assign(l->f, l->b, capacity, room);
+    bytes = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                    lower_temp(l, capacity), size));
+    args[0] = lower_temp(l, data);
+    args[1] = bytes;
+    ir_assign(l->f, l->b, data,
+              lower_temp(l, ir_call(l->f, l->b, IR_PTR,
+                                    ir_func_op(lower_rt_function_giving(
+                                        l, "realloc", IR_PTR, grow_params,
+                                        2)),
+                                    args, 2)));
+    ir_jump(l->f, l->b, put);
+    l->b = put;
+    store_value(l, it->current,
+                lower_temp(l, ir_ptradd(
+                                  l->f, l->b, lower_temp(l, data),
+                                  lower_temp(l, ir_binary(
+                                                    l->f, l->b, IR_MUL,
+                                                    IR_I64,
+                                                    lower_temp(l, count),
+                                                    size)))));
+    if (l->b != NULL) {
+        ir_assign(l->f, l->b, count,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64,
+                                          lower_temp(l, count),
+                                          ir_int_op(IR_I64, 1))));
+        ir_jump(l->f, l->b, test);
+    }
+    l->b = exit;
+    result = lower_temp(l, slot);
+    ir_store(l->f, l->b, IR_PTR, lower_temp(l, data), result);
+    ir_store(l->f, l->b, IR_I64, lower_temp(l, count),
+             lower_offset_address(l, result,
+                                  lower_field_offset(l, e->type,
+                                                     &lower_len_name)));
+    return result;
+}
+
 /* DESIGN: an `f"..."` is a local `anti.text.Builder` in a slot of the
    frame, the calls the checker wrote on it, and the `str` its `take`
    gives. Each value is bound to the local the checker declared for it
@@ -628,6 +744,8 @@ struct ir_operand lower_address(struct lowerer *l,
                                    e->type);
     case EXPR_FORMAT:
         return lower_format(l, e);
+    case EXPR_COLLECT:
+        return lower_collect(l, e);
     default:
         slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
         lower_build_into(l, e, lower_temp(l, slot));

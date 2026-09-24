@@ -1,0 +1,117 @@
+//! A language hook carries a name of the table and the signature the table
+//! gives it. A misspelled name lists the valid ones, a wrong signature states
+//! the right one, and a construct refuses a type without its hook.
+
+import anti.lang;
+
+class Misspelled
+{
+	operator fn nxt(self) -> bool
+	{
+		return false;
+	}
+}
+
+class Signatures
+{
+	operator fn next(self) -> int
+	{
+		return 0;
+	}
+
+	operator fn value(self, n: int) -> int
+	{
+		return n;
+	}
+
+	operator fn iter(self) -> int
+	{
+		return 0;
+	}
+
+	operator fn index(self) -> int
+	{
+		return 0;
+	}
+}
+
+class Failing
+{
+	operator fn next(self) -> bool may fail
+	{
+		fail "no next";
+	}
+
+	operator fn value(self)
+	{
+	}
+}
+
+class Table
+{
+	operator fn index(self, i: int) -> int
+	{
+		return i;
+	}
+
+	operator fn set_index(self, i: int, v: str)
+	{
+	}
+}
+
+class ReadOnly
+{
+	operator fn index(self, i: int) -> int
+	{
+		return i;
+	}
+}
+
+class Cells
+{
+	operator fn index(self, i: int) -> int
+	{
+		return i;
+	}
+
+	operator fn set_index(self, i: int, v: int)
+	{
+	}
+}
+
+class Steps
+{
+	operator fn next(self) -> bool
+	{
+		return false;
+	}
+
+	operator fn value(self) -> int
+	{
+		return 0;
+	}
+}
+
+struct Plain
+{
+	n: int,
+}
+
+operator fn nxt(p: *Plain) -> bool
+{
+	return false;
+}
+
+fn main() -> int
+{
+	let plain = Plain { n: 0 };
+	for x in plain {
+	}
+	let r = ReadOnly { };
+	r[0] = 1;
+	let cells = Cells { };
+	cells[0] += 1;
+	for i, k in (Steps { }) {
+	}
+	return 0;
+}

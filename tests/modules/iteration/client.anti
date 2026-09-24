@@ -1,0 +1,26 @@
+//! A program that walks, indexes and collects a collection of another module.
+
+import com.example.bag;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b = bag.Bag { };
+	b.add(2);
+	b.add(4);
+	b.add(6);
+	let total = 0;
+	for n in b {
+		for m in b {
+			total = total + n * m;
+		}
+	}
+	printf("total %d\n".ptr, total as c_int);
+	b[0] = b[2] + 1;
+	printf("first %d\n".ptr, b[0] as c_int);
+	let all = b.iter().to_slice();
+	printf("all %d %d\n".ptr, all.len as c_int, all[0] as c_int);
+	free(all.ptr);
+	return 0;
+}

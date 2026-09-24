@@ -1,0 +1,174 @@
+//! The language hooks of iteration and indexing. `for x in e` walks a
+//! collection through `iter` and an iterator through `next` and `value`,
+//! nested loops over one collection keep their own positions, `while` calls
+//! the hooks by name, `to_slice` collects an iterator, and `e[i]` reads with
+//! `index` and writes with `set_index`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Numbers
+{
+	pub items: [8]int = [0; 8],
+	pub count: int = 0,
+
+	pub fn push(self, n: int)
+	{
+		self.items[self.count] = n;
+		self.count = self.count + 1;
+	}
+
+	operator fn iter(self) -> NumbersIter
+	{
+		return NumbersIter { list: self, at: -1 };
+	}
+
+	operator fn index(self, i: int) -> int
+	{
+		return self.items[i];
+	}
+
+	operator fn set_index(self, i: int, v: int)
+	{
+		self.items[i] = v;
+	}
+}
+
+class NumbersIter
+{
+	pub list: *Numbers,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < self.list.count;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.list.items[self.at];
+	}
+}
+
+/// Walks the words of a fixed table, so the element is a `str`.
+class Words
+{
+	at: int = -1,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < 3;
+	}
+
+	operator fn value(self) -> str
+	{
+		if self.at == 0 {
+			return "one";
+		}
+		if self.at == 1 {
+			return "two";
+		}
+		return "three";
+	}
+}
+
+/// A struct takes its hooks from free functions of its module.
+struct Countdown
+{
+	left: int,
+}
+
+operator fn next(c: *Countdown) -> bool
+{
+	c.left = c.left - 1;
+	return c.left >= 0;
+}
+
+operator fn value(c: *Countdown) -> int
+{
+	return c.left;
+}
+
+fn main() -> int
+{
+	let nums = Numbers { };
+	nums.push(3);
+	nums.push(5);
+	nums.push(8);
+
+	let total = 0;
+	for n in nums {
+		total = total + n;
+	}
+	printf("sum %d\n".ptr, total as c_int);
+
+	// Two loops over one collection, each at its own position.
+	let pairs = 0;
+	for a in nums {
+		for b in nums {
+			if a < b {
+				pairs = pairs + 1;
+			}
+		}
+	}
+	printf("pairs %d\n".ptr, pairs as c_int);
+
+	// `continue` calls `next` again, and `break` leaves.
+	for n in nums {
+		if n == 5 {
+			continue;
+		}
+		if n == 8 {
+			break;
+		}
+		printf("seen %d\n".ptr, n as c_int);
+	}
+
+	// The iterator itself is needed after the loop.
+	let it = nums.iter();
+	while it.next() do {
+		if it.value() >= 5 {
+			break;
+		}
+	}
+	printf("stopped at %d\n".ptr, it.value() as c_int);
+
+	// A `for` over an iterator place advances that iterator.
+	for n in it {
+		printf("rest %d\n".ptr, n as c_int);
+	}
+
+	// An iterator made in place, with an aggregate element.
+	for w in (Words { }) {
+		printf("word %.*s\n".ptr, w.len as c_int, w.ptr);
+	}
+
+	for k in (Countdown { left: 3 }) {
+		printf("count %d\n".ptr, k as c_int);
+	}
+
+	// `e[i]` and `e[i] = v`, on a value and through a pointer.
+	nums[1] = nums[1] * 10;
+	printf("index %d %d %d\n".ptr, nums[0] as c_int, nums[1] as c_int,
+		nums.index(2) as c_int);
+	let held = alloc Numbers { };
+	held.push(4);
+	held[0] = held[0] + 1;
+	printf("held %d\n".ptr, held[0] as c_int);
+	delete(held);
+
+	// `to_slice` collects what remains into memory of its own.
+	let all = nums.iter().to_slice();
+	printf("slice %d:".ptr, all.len as c_int);
+	for x in all {
+		printf(" %d".ptr, x as c_int);
+	}
+	printf("\n".ptr);
+	free(all.ptr);
+	let words = Words { }.to_slice();
+	printf("words %d %.*s\n".ptr, words.len as c_int, words[2].len as c_int,
+		words[2].ptr);
+	free(words.ptr);
+	return 0;
+}

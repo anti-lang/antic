@@ -1,0 +1,13 @@
+hooks.anti:108:11: error: `for` walks a range, a slice, an array, a collection or an iterator, found `Plain`
+hooks.anti:111:2: error: `ReadOnly` has no `operator fn set_index`, which `e[i] = v` calls
+hooks.anti:113:2: error: `+=` takes no `operator fn set_index`, and `e[i] = e[i] + v` writes it
+hooks.anti:114:6: error: `for i, x` binds the index and the element of a slice or an array
+hooks.anti:100:13: error: `operator fn` takes one of `add sub mul div rem neg eq lt and or xor shl shr not iter next value index set_index`
+hooks.anti:9:14: error: `operator fn` takes one of `add sub mul div rem neg eq lt and or xor shl shr not iter next value index set_index`
+hooks.anti:17:14: error: `operator fn next` is written `operator fn next(self) -> bool`
+hooks.anti:22:14: error: `operator fn value` is written `operator fn value(self) -> T`
+hooks.anti:27:14: error: `operator fn iter` is written `operator fn iter(self) -> I`, where `I` has `operator fn next` and `operator fn value`
+hooks.anti:32:14: error: `operator fn index` is written `operator fn index(self, i: I) -> T`
+hooks.anti:40:14: error: `operator fn next` is written `operator fn next(self) -> bool`
+hooks.anti:45:14: error: `operator fn value` is written `operator fn value(self) -> T`
+hooks.anti:57:14: error: `operator fn set_index` is written `operator fn set_index(self, i: int, v: int)`, as `index` reads

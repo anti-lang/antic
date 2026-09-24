@@ -94,6 +94,16 @@ struct checker {
    The longest is `mul_high`. */
 #define OP_TEXT 16
 
+/* The language hooks of the operator table. `for x in e` calls the
+   first three, `e[i]` and `e[i] = v` the last two. */
+#define LANG_HOOK_ITER "iter"
+#define LANG_HOOK_NEXT "next"
+#define LANG_HOOK_VALUE "value"
+#define LANG_HOOK_INDEX "index"
+#define LANG_HOOK_SET_INDEX "set_index"
+/* Not a hook: the function every iterator has, which collects it. */
+#define LANG_HOOK_TO_SLICE "to_slice"
+
 /* A set of pointers, open addressed and at most half full. The owner
    frees slots with free(). */
 struct ptr_set {
@@ -167,6 +177,13 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
 bool sema_simd_numeric(const struct type *lane);
 const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT]);
 bool sema_operator_named(const struct name *name);
+struct symbol *sema_hook(struct checker *c, struct type *t, const char *text);
+bool sema_is_iterator(struct checker *c, struct type *t);
+struct expr *sema_hook_call(struct checker *c, struct expr *base,
+                            const char *name, struct expr **args,
+                            size_t count);
+bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
+                  struct iteration *it, struct type **element);
 struct type *sema_check_binary(struct checker *c, struct expr *e,
                                struct type *expected);
 bool sema_descends_from(const struct type *a, const struct type *b);

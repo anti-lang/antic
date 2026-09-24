@@ -343,6 +343,7 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
                       struct ir_operand dest);
 void lower_bind_value(struct lowerer *l, struct symbol *sym,
                       struct ir_operand v);
+void lower_bind_cursor(struct lowerer *l, const struct iteration *it);
 struct ir_operand lower_address(struct lowerer *l,
                                 const struct expr *e);
 struct ir_operand lower_read_place(struct lowerer *l, const struct place *p);

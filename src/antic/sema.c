@@ -2666,20 +2666,127 @@ static void require_filled_chain(struct checker *c, const struct item *it,
     }
 }
 
-/* An `operator fn` carries one of the fourteen names the table holds,
-   and nothing else. */
-static void check_operator_names(struct checker *c, const struct item *it)
+/* DESIGN: a language hook has the signature its construct calls, and
+   the message states that signature. No hook may fail, since the
+   construct that calls it has no place for a handler. `set_index` takes
+   the index and the element that `index` of the same type reads, so
+   `e[i] = e[i]` holds for every type that has both. A class writes the
+   receiver `self`, and a free function of a struct its first parameter
+   as declared. */
+static void check_hook(struct checker *c, const struct item *m,
+                       struct type *owner)
+{
+    const struct type *sig = m->symbol != NULL ? m->symbol->type : NULL;
+    char self[128];
+    bool ok;
+
+    if (sig == NULL || sig->kind != TYPE_FN) {
+        return;
+    }
+    if (m->has_self || m->param_count == 0) {
+        snprintf(self, sizeof self, "self");
+    } else {
+        snprintf(self, sizeof self, "%.*s: %s", (int)m->params[0].name.length,
+                 m->params[0].name.text, sema_tn(sig->params[0]));
+    }
+    if (sema_name_is(&m->name, LANG_HOOK_NEXT)) {
+        ok = !sig->may_fail && sig->param_count == 1 &&
+             sig->result->kind == TYPE_BOOL;
+        if (!ok) {
+            sema_error_at(c, m->name_pos, "`operator fn next` is written "
+                          "`operator fn next(%s) -> bool`", self);
+        }
+    } else if (sema_name_is(&m->name, LANG_HOOK_VALUE)) {
+        ok = !sig->may_fail && sig->param_count == 1 &&
+             sig->result->kind != TYPE_VOID;
+        if (!ok) {
+            sema_error_at(c, m->name_pos, "`operator fn value` is written "
+                          "`operator fn value(%s) -> T`", self);
+        }
+    } else if (sema_name_is(&m->name, LANG_HOOK_ITER)) {
+        ok = !sig->may_fail && sig->param_count == 1 &&
+             sema_is_iterator(c, sig->result);
+        if (!ok) {
+            sema_error_at(c, m->name_pos, "`operator fn iter` is written "
+                          "`operator fn iter(%s) -> I`, where `I` has "
+                          "`operator fn next` and `operator fn value`", self);
+        }
+    } else if (sema_name_is(&m->name, LANG_HOOK_INDEX)) {
+        ok = !sig->may_fail && sig->param_count == 2 &&
+             sig->result->kind != TYPE_VOID;
+        if (!ok) {
+            sema_error_at(c, m->name_pos, "`operator fn index` is written "
+                          "`operator fn index(%s, i: I) -> T`", self);
+        }
+    } else if (sema_name_is(&m->name, LANG_HOOK_SET_INDEX)) {
+        struct symbol *index = sema_hook(c, owner, LANG_HOOK_INDEX);
+        const struct type *read = index != NULL ? index->type : NULL;
+        bool paired = read != NULL && read->kind == TYPE_FN &&
+                      !read->may_fail && read->param_count == 2 &&
+                      read->result->kind != TYPE_VOID;
+        ok = !sig->may_fail && sig->param_count == 3 &&
+             sig->result->kind == TYPE_VOID &&
+             (!paired || (sig->params[1] == read->params[1] &&
+                          sig->params[2] == read->result));
+        if (!ok && paired) {
+            sema_error_at(c, m->name_pos, "`operator fn set_index` is "
+                          "written `operator fn set_index(%s, i: %s, v: "
+                          "%s)`, as `index` reads", self,
+                          sema_tn(read->params[1]), sema_tn(read->result));
+        } else if (!ok) {
+            sema_error_at(c, m->name_pos, "`operator fn set_index` is "
+                          "written `operator fn set_index(%s, i: I, v: T)`",
+                          self);
+        }
+    }
+}
+
+/* An `operator fn` carries one of the nineteen names the table holds,
+   and nothing else, and a hook the signature its construct calls. owner
+   is the type the functions belong to. */
+static void check_operator_item(struct checker *c, const struct item *m,
+                                struct type *owner)
+{
+    if (m->kind != ITEM_FN || !m->is_operator) {
+        return;
+    }
+    if (!sema_operator_named(&m->name)) {
+        sema_error_at(c, m->name_pos, "`operator fn` takes one of `add sub "
+                      "mul div rem neg eq lt and or xor shl shr not iter "
+                      "next value index set_index`");
+        return;
+    }
+    check_hook(c, m, owner);
+}
+
+static void check_operator_names(struct checker *c, const struct item *it,
+                                 struct type *t)
 {
     size_t j;
 
     for (j = 0; j < it->member_count; j++) {
-        const struct item *m = it->members[j];
-        if (m->kind == ITEM_FN && m->is_operator &&
-            !sema_operator_named(&m->name)) {
-            sema_error_at(c, m->name_pos, "`operator fn` takes one of `add`, "
-                          "`sub`, `mul`, `div`, `rem`, `neg`, `eq`, `lt`, "
-                          "`and`, `or`, `xor`, `shl`, `shr` and `not`");
+        check_operator_item(c, it->members[j], t);
+    }
+}
+
+/* The operators of a struct are free functions of its module, and the
+   type they belong to is the one their first parameter names. */
+static void check_free_operators(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        const struct item *it = module->items[i];
+        struct type *owner = NULL;
+        if (it->kind != ITEM_FN || !it->is_operator || it->symbol == NULL ||
+            it->symbol->type == NULL || it->symbol->type->kind != TYPE_FN) {
+            continue;
         }
+        if (it->symbol->type->param_count > 0) {
+            owner = it->symbol->type->params[0];
+        }
+        check_operator_item(c, it, owner);
     }
 }
 
@@ -2908,6 +3015,7 @@ static void check_types(struct checker *c)
             refuse_abstract_fields(c, t);
         }
     }
+    check_free_operators(c);
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
@@ -2917,7 +3025,7 @@ static void check_types(struct checker *c)
         check_contracts(c, it, t);
         refuse_redeclared(c, it, t);
         require_filled_chain(c, it, t);
-        check_operator_names(c, it);
+        check_operator_names(c, it, t);
         check_one_construct(c, it);
         check_qualifiers(c, it, t);
         require_filled_interfaces(c, it, t);

@@ -1,0 +1,16 @@
+exit 0
+sum 16
+pairs 3
+seen 3
+stopped at 5
+rest 8
+word one
+word two
+word three
+count 2
+count 1
+count 0
+index 3 50 8
+held 5
+slice 3: 3 50 8
+words 3 three

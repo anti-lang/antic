@@ -566,12 +566,14 @@ static const char *operator_name(enum token_kind op)
     }
 }
 
-/* Whether name is one of the fourteen the operator table holds. */
+/* Whether name is one of the nineteen the operator table holds: the
+   fourteen operators and the five language hooks. */
 bool sema_operator_named(const struct name *name)
 {
     static const char *const names[] = {
         "add", "sub", "mul", "div", "rem", "neg", "eq",
-        "lt", "and", "or", "xor", "shl", "shr", "not"
+        "lt", "and", "or", "xor", "shl", "shr", "not",
+        LANG_HOOK_ITER, LANG_HOOK_NEXT, LANG_HOOK_VALUE, LANG_HOOK_INDEX, LANG_HOOK_SET_INDEX
     };
     size_t i;
 
@@ -606,6 +608,175 @@ static struct symbol *operator_symbol(struct checker *c, struct type *t,
         return sym;
     }
     return NULL;
+}
+
+static struct expr *format_word(struct checker *c, struct pos pos,
+                                const struct name *name);
+static struct expr *format_field(struct checker *c, struct expr *base,
+                                 const char *name);
+static struct expr *format_call(struct checker *c, struct expr *callee,
+                                struct expr **args, size_t count);
+
+/* DESIGN: a language hook belongs to the type t, or to the type that a
+   `*T` points to. A collection is mostly reached through a pointer, and
+   a pointer walks nothing of its own. A function of a class body is the
+   class's own, inherited ones among them. A free function of the module
+   of a struct is its hook when its first parameter is the struct or a
+   pointer to it. A hook of another struct of the module is not taken
+   for it. */
+struct symbol *sema_hook(struct checker *c, struct type *t, const char *text)
+{
+    struct name name;
+    struct item *m;
+    struct symbol *sym;
+    const struct type *first;
+
+    if (t != NULL && t->kind == TYPE_POINTER && !t->nullable) {
+        t = t->element;
+    }
+    if (t == NULL || !type_has_fields(t) || type_is_simd(t)) {
+        return NULL;
+    }
+    name.text = text;
+    name.length = strlen(text);
+    m = sema_find_member(t, &name);
+    if (m != NULL) {
+        return m->kind == ITEM_FN && m->is_operator ? m->symbol : NULL;
+    }
+    sym = sema_method_symbol(c, t, &name);
+    if (sym == NULL || sym->item == NULL || !sym->item->is_operator ||
+        sym->type == NULL || sym->type->kind != TYPE_FN ||
+        sym->type->param_count == 0) {
+        return NULL;
+    }
+    first = sym->type->params[0];
+    if (first != t && !(first->kind == TYPE_POINTER && first->element == t)) {
+        return NULL;
+    }
+    return sym;
+}
+
+/* Whether the type t, or the type a `*T` points to, has the hooks of an
+   iterator. */
+bool sema_is_iterator(struct checker *c, struct type *t)
+{
+    return sema_hook(c, t, LANG_HOOK_NEXT) != NULL &&
+           sema_hook(c, t, LANG_HOOK_VALUE) != NULL;
+}
+
+/* The call `base.name(args)` that a construct of the language writes
+   for a hook. */
+struct expr *sema_hook_call(struct checker *c, struct expr *base,
+                            const char *name, struct expr **args,
+                            size_t count)
+{
+    struct expr *callee = format_field(c, base, name);
+
+    callee->as.field.promoted = true;
+    return format_call(c, callee, args, count);
+}
+
+static const struct name hidden_iterator = {"<iterator>", 10};
+
+/* A call of the hook name on the hidden local of an iteration. */
+static struct expr *cursor_call(struct checker *c, struct pos pos,
+                                const char *name)
+{
+    return sema_hook_call(c, format_word(c, pos, &hidden_iterator), name,
+                          NULL, 0);
+}
+
+/* DESIGN: an iteration binds its iterator to a hidden local and calls
+   `next` and `value` on that local by name, as the `while` form of the
+   same loop does. A collection gives a new iterator from `iter`, so every
+   loop starts at the beginning and nested loops each keep their own. An
+   iterator that stands in a place is walked in that place through its
+   address, so the loop advances it and the program reads it afterwards,
+   the `post` of `find_all` among them. Any other iterator, a pointer
+   among them, is held by the local itself. e has been checked, and t is
+   its type. It gives false and writes nothing when t is neither a
+   collection nor an iterator. The caller has entered the scope that
+   holds the local. */
+bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
+                  struct iteration *it, struct type **element)
+{
+    struct expr *start = e;
+
+    if (sema_hook(c, t, LANG_HOOK_ITER) != NULL) {
+        start = sema_hook_call(c, e, LANG_HOOK_ITER, NULL, 0);
+        t = sema_check_expr(c, start, NULL);
+        if (sema_is_error(t)) {
+            *element = t;
+            return true;
+        }
+        if (!sema_is_iterator(c, t)) {
+            sema_error_at(c, e->pos, "`operator fn iter` gives `%s`, which "
+                          "has no `operator fn next` and `operator fn value`",
+                          sema_tn(t));
+            *element = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
+    } else if (!sema_is_iterator(c, t)) {
+        return false;
+    } else if (t->kind != TYPE_POINTER && sema_is_place(e)) {
+        start = sema_new_node(c, EXPR_UNARY, e->pos);
+        start->as.unary.op = TOKEN_AMP;
+        start->as.unary.operand = e;
+        t = types_pointer(c->types, t);
+        start->type = t;
+        sema_mark_address_taken(e);
+    }
+    it->start = start;
+    it->cursor = sema_declare(c, SYMBOL_LOCAL, &hidden_iterator, e->pos,
+                              "`%.*s` is already declared");
+    it->cursor->type = t;
+    it->advance = cursor_call(c, e->pos, LANG_HOOK_NEXT);
+    it->current = cursor_call(c, e->pos, LANG_HOOK_VALUE);
+    if (sema_is_error(sema_check_expr(c, it->advance, NULL))) {
+        *element = sema_builtin(c, TYPE_ERROR);
+        return true;
+    }
+    *element = sema_check_expr(c, it->current, NULL);
+    return true;
+}
+
+/* DESIGN: `it.to_slice()` collects an iterator into a new `[]T` of the
+   type its `value` gives, freed with `free(result.ptr)`. Every iterator
+   has it without generics, as `find_all` and `split` return iterators
+   that have it. A type that declares a function `to_slice` of its own
+   keeps it. The call is the iteration of a `for` whose body appends. */
+static bool check_collect(struct checker *c, struct expr *e)
+{
+    struct expr *callee = e->as.call.callee;
+    struct expr *base = callee->as.field.base;
+    struct type *t;
+    struct type *owner;
+    struct type *element = NULL;
+    struct iteration it;
+    struct scope scope;
+
+    if (e->as.call.arg_count != 0 ||
+        !sema_name_is(&callee->as.field.name, LANG_HOOK_TO_SLICE)) {
+        return false;
+    }
+    t = sema_check_expr(c, base, NULL);
+    owner = t;
+    if (owner->kind == TYPE_POINTER && !owner->nullable) {
+        owner = owner->element;
+    }
+    if (sema_is_error(t) || !type_has_fields(owner) ||
+        sema_method_symbol(c, owner, &callee->as.field.name) != NULL ||
+        !sema_is_iterator(c, t)) {
+        return false;
+    }
+    memset(&it, 0, sizeof it);
+    sema_enter_scope(c, &scope);
+    sema_iterate(c, base, t, &it, &element);
+    sema_leave_scope(c, &scope);
+    e->kind = EXPR_COLLECT;
+    e->as.collect = it;
+    e->type = sema_is_error(element) ? NULL : types_slice(c->types, element);
+    return true;
 }
 
 /* Rewrite `a op b` into the call the operator names. `!=`, `>`, `<=` and
@@ -1823,7 +1994,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             e->as.call.callee->as.field.optional) {
             return check_optional(c, e);
         }
+        if (e->as.call.callee->kind == EXPR_FIELD && check_collect(c, e)) {
+            return e->type != NULL ? e->type : sema_builtin(c, TYPE_ERROR);
+        }
         return sema_check_call(c, e, expected);
+    case EXPR_COLLECT:
+        return e->type != NULL ? e->type : sema_builtin(c, TYPE_ERROR);
     case EXPR_PARALLEL:
         return sema_check_parallel(c, e);
     case EXPR_DISPATCH:
@@ -1842,6 +2018,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return check_in(c, e);
     case EXPR_INDEX:
         t = sema_check_expr(c, e->as.index.base, NULL);
+        /* DESIGN: `e[i]` on a type with the `index` hook is the call
+           `e.index(i)`, and the index takes the type the hook names. */
+        if (!sema_is_error(t) && sema_hook(c, t, LANG_HOOK_INDEX) != NULL) {
+            struct expr *index = e->as.index.index;
+            *e = *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX, &index, 1);
+            return sema_check_expr(c, e, expected);
+        }
         if (!sema_require(c, e->as.index.index,
                           sema_check_expr(c, e->as.index.index,
                                           sema_builtin(c, TYPE_I64)),

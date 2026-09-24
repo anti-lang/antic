@@ -1942,6 +1942,25 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# A collection, its iterator and a struct with the language hooks in a
+# library, which another module walks, indexes and collects.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME iteration_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/iteration"
+            "-DLIBRARIES=bag"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/iteration-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.
 foreach(mode release dev)
@@ -2779,7 +2798,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "nested_public|-S,-o,${LISTINGS}/nested_public.s,nested_public.anti"
         "nested_outside|-S,-o,${LISTINGS}/nested_outside.s,nested_outside.anti"
         "nested_forms|-S,-o,${LISTINGS}/nested_forms.s,nested_forms.anti"
-        "nested_export|-S,-o,${LISTINGS}/nested_export.s,nested_export.anti")
+        "nested_export|-S,-o,${LISTINGS}/nested_export.s,nested_export.anti"
+        "hooks|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/hooks.s,hooks.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

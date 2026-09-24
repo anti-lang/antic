@@ -224,6 +224,12 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
                      e->as.descriptor_of->name.text);
         end(d, start, type);
         break;
+    /* The iterator that `to_slice` walks follows as a child. */
+    case EXPR_COLLECT:
+        text_append(d->out, "to_slice");
+        end(d, start, type);
+        dump_expr(d, depth + 1, e->as.collect.start);
+        break;
     case EXPR_STRING:
     case EXPR_BYTES:
         text_appendf(d->out, "string_lit %.*s", (int)e->spelling.length,

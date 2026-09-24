@@ -1,0 +1,46 @@
+//! A public collection with the language hooks and its iterator. Another
+//! module walks, indexes and collects them through the library file alone.
+
+pub class Bag
+{
+	pub items: [4]int = [0; 4],
+	pub count: int = 0,
+
+	pub fn add(self, n: int)
+	{
+		self.items[self.count] = n;
+		self.count = self.count + 1;
+	}
+
+	operator fn iter(self) -> BagIter
+	{
+		return BagIter { bag: self, at: -1 };
+	}
+
+	operator fn index(self, i: int) -> int
+	{
+		return self.items[i];
+	}
+
+	operator fn set_index(self, i: int, v: int)
+	{
+		self.items[i] = v;
+	}
+}
+
+pub class BagIter
+{
+	pub bag: *Bag,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < self.bag.count;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.bag.items[self.at];
+	}
+}

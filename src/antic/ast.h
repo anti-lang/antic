@@ -137,7 +137,8 @@ enum expr_kind {
     EXPR_OPTIONAL,                  /* `p?.x` and `p?.f(args)`, checked */
     EXPR_SYNC_OP,                   /* an operation of a mutex or a channel */
     EXPR_SIMD,                      /* a built-in of a simd struct */
-    EXPR_DESCRIPTOR                 /* the descriptor of a class, as `*byte` */
+    EXPR_DESCRIPTOR,                /* the descriptor of a class, as `*byte` */
+    EXPR_COLLECT                    /* `it.to_slice()` of an iterator */
 };
 
 /* The format specification after the colon of an `{expr}`, as the
@@ -194,6 +195,18 @@ struct handler {
        `yield none;`. The checker refuses it where the result cannot be
        `none`. */
     bool none;
+};
+
+/* Written by the checker for `for x in e` over a collection or an
+   iterator, and for `to_slice`: the hidden local that holds the
+   iterator, the expression that gives it, and the calls of `next` and
+   `value` on that local. The local holds the iterator itself when start
+   makes one, and a pointer to it when e is an iterator in a place. */
+struct iteration {
+    struct symbol *cursor;
+    struct expr *start;
+    struct expr *advance;
+    struct expr *current;
 };
 
 struct expr {
@@ -357,6 +370,9 @@ struct expr {
             struct expr *start;
             struct expr *take;
         } format;                   /* EXPR_FORMAT */
+        /* `it.to_slice()`: the iterator and the loop over it, which
+           collects every value into new memory. */
+        struct iteration collect;   /* EXPR_COLLECT */
         /* `value in low..high`. The checker binds the value to a local
            of its own and writes `value >= low && value < high` over
            it. */
@@ -542,6 +558,10 @@ struct stmt {
             int64_t step_value;         /* the folded `by k`, or 1 */
             bool by_pointer;
             struct block *body;
+            /* Set by the checker where e is a collection or an
+               iterator. cursor is NULL for a range, a slice and an
+               array. */
+            struct iteration hooks;
         } for_loop;
         struct stmt *deferred;      /* STMT_DEFER, STMT_UNDO */
         /* `fail e;` and `fail "text";`. The second form names the

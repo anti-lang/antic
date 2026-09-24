@@ -293,6 +293,77 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
     l->b = exit;
 }
 
+static bool local_needs_teardown(const struct type *t);
+
+/* DESIGN: `for x in e` over a collection or an iterator is the loop of
+   its `while` form. It binds the iterator once, calls `next` in the test
+   and `value` at the head of the body, and `continue` goes to the test.
+   The iterator lives in a scope around the loop and each value in a scope
+   around one pass of the body, so each is torn down as a `let` of its
+   type is, the value on every exit of the pass. */
+static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
+{
+    const struct iteration *it = &s->as.for_loop.hooks;
+    struct symbol *sym = s->as.for_loop.names[0].symbol;
+    struct ir_block *test = lower_new_block(l);
+    struct ir_block *body = lower_new_block(l);
+    struct ir_block *exit = lower_new_block(l);
+    struct defers around;
+    struct defers pass;
+    struct loop loop;
+
+    memset(&around, 0, sizeof around);
+    around.outer = l->defers;
+    l->defers = &around;
+    lower_bind_cursor(l, it);
+    if (local_needs_teardown(it->cursor->type)) {
+        push_exit_action(l, NULL, it->cursor, false);
+    }
+    loop.continue_to = test;
+    loop.break_to = exit;
+    loop.outer = l->loop;
+    loop.defers_at = l->defers;
+    l->loop_depth++;
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    lower_branch(l, it->advance, body, exit);
+    l->loop = &loop;
+    l->b = body;
+    memset(&pass, 0, sizeof pass);
+    pass.outer = l->defers;
+    l->defers = &pass;
+    if (lower_is_aggregate(sym->type)) {
+        lower_build_into(l, it->current, lower_temp(l, sym->ir));
+    } else {
+        /* The call may end the block it starts in, so the value is
+           bound in the block that follows it. */
+        struct ir_operand v = lower_expr(l, it->current);
+        if (sym->address_taken) {
+            ir_store(l->f, l->b, lower_ir_type_of(sym->type), v,
+                     lower_temp(l, sym->ir));
+        } else {
+            sym->ir = ir_unary(l->f, l->b, IR_COPY,
+                               lower_ir_type_of(sym->type), v);
+        }
+    }
+    if (local_needs_teardown(sym->type)) {
+        push_exit_action(l, NULL, sym, false);
+    }
+    lower_block(l, s->as.for_loop.body);
+    lower_run_defers(l, &pass, false);
+    if (l->b != NULL) {
+        ir_jump(l->f, l->b, test);
+    }
+    l->defers = pass.outer;
+    free(pass.items);
+    l->loop = loop.outer;
+    l->loop_depth--;
+    l->b = exit;
+    lower_run_defers(l, &around, false);
+    l->defers = around.outer;
+    free(around.items);
+}
+
 /* DESIGN: `for` is a loop of its own rather than a rewrite into `while`,
    because the step is the target of `continue`. A textual rewrite would
    put the step after the body, where `continue` jumps over it and the
@@ -491,7 +562,6 @@ static enum token_kind compound_op(enum token_kind op)
 /* Chapter 2 evaluates the place first and the value second. A compound
    assignment reads the old value before it evaluates the new operand, as
    x = x + e reads x first. */
-static bool local_needs_teardown(const struct type *t);
 
 static void destroy_value(struct lowerer *l, struct ir_operand p,
                           const struct type *t, bool replaced);
@@ -1553,6 +1623,10 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         lower_loop(l, s);
         return;
     case STMT_FOR:
+        if (s->as.for_loop.hooks.cursor != NULL) {
+            lower_for_hooks(l, s);
+            return;
+        }
         lower_for(l, s);
         return;
     /* DESIGN: a switch lowers to a chain of comparisons, one block per

@@ -152,6 +152,11 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
             walk_expr(w, e->as.format.parts[i].value_call);
         }
         return;
+    case EXPR_COLLECT:
+        walk_expr(w, e->as.collect.start);
+        walk_expr(w, e->as.collect.advance);
+        walk_expr(w, e->as.collect.current);
+        return;
     /* The test holds both bounds and any `lt` it calls. */
     case EXPR_IN:
         walk_expr(w, e->as.in.value);
@@ -214,7 +219,11 @@ static void walk_stmt(struct worker_walk *w, const struct stmt *s)
         walk_block(w, s->as.loop.body);
         return;
     case STMT_FOR:
-        walk_expr(w, s->as.for_loop.over);
+        walk_expr(w, s->as.for_loop.hooks.start != NULL
+                         ? s->as.for_loop.hooks.start
+                         : s->as.for_loop.over);
+        walk_expr(w, s->as.for_loop.hooks.advance);
+        walk_expr(w, s->as.for_loop.hooks.current);
         walk_block(w, s->as.for_loop.body);
         return;
     case STMT_DEFER:
@@ -578,6 +587,46 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
 
 static void check_flags_assign(struct checker *c, struct stmt *s);
 
+/* DESIGN: `e[i] = v` on a type with the `index` or the `set_index` hook
+   is the call `e.set_index(i, v)`, and the statement becomes that call.
+   A type with `index` alone is read-only through `e[i]`. A compound
+   assignment would compute e and i once for the read and once for the
+   write, so it is refused, and `e[i] = e[i] + v` says what runs. */
+static bool check_set_index(struct checker *c, struct stmt *s)
+{
+    struct expr *target = s->as.assign.target;
+    struct expr *base = target->as.index.base;
+    struct expr *args[2];
+    struct type *t = sema_check_expr(c, base, NULL);
+    char spelling[OP_TEXT];
+
+    if (sema_is_error(t) || (sema_hook(c, t, LANG_HOOK_INDEX) == NULL &&
+                             sema_hook(c, t, LANG_HOOK_SET_INDEX) == NULL)) {
+        return false;
+    }
+    if (sema_hook(c, t, LANG_HOOK_SET_INDEX) == NULL) {
+        sema_error_at(c, target->pos, "`%s` has no `operator fn set_index`, "
+                      "which `e[i] = v` calls", sema_tn(t));
+        sema_check_expr(c, s->as.assign.value, NULL);
+        return true;
+    }
+    if (s->as.assign.op != TOKEN_ASSIGN) {
+        /* Every compound spelling is its binary operator and `=`. */
+        const char *o = sema_op_text(s->as.assign.op, spelling);
+        sema_error_at(c, s->pos, "`%s` takes no `operator fn set_index`, "
+                      "and `e[i] = e[i] %.*s v` writes it", o,
+                      (int)strlen(o) - 1, o);
+        sema_check_expr(c, s->as.assign.value, NULL);
+        return true;
+    }
+    args[0] = target->as.index.index;
+    args[1] = s->as.assign.value;
+    s->kind = STMT_EXPR;
+    s->as.expr = sema_hook_call(c, base, LANG_HOOK_SET_INDEX, args, 2);
+    sema_check_expr(c, s->as.expr, NULL);
+    return true;
+}
+
 static void check_assign(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
@@ -587,6 +636,9 @@ static void check_assign(struct checker *c, struct stmt *s)
 
     if (target->kind == EXPR_TUPLE) {
         check_flags_assign(c, s);
+        return;
+    }
+    if (target->kind == EXPR_INDEX && check_set_index(c, s)) {
         return;
     }
     t = sema_check_storage(c, target);
@@ -893,6 +945,7 @@ static bool expr_calls(const struct expr *e)
     case EXPR_DISPATCH:
     case EXPR_JOIN:
     case EXPR_FORMAT:
+    case EXPR_COLLECT:
     case EXPR_SYNC_OP:
     case EXPR_SIMD:
         return true;
@@ -1619,10 +1672,20 @@ static void check_stmt(struct checker *c, struct stmt *s)
             }
             if (!sema_is_error(over) && over->kind != TYPE_SLICE &&
                 over->kind != TYPE_ARRAY) {
-                sema_error_at(c, s->as.for_loop.over->pos,
-                              "`for` walks a slice or an array, found `%s`",
-                              sema_tn(over));
-                element = sema_builtin(c, TYPE_ERROR);
+                if (!sema_iterate(c, s->as.for_loop.over, over,
+                                  &s->as.for_loop.hooks, &element)) {
+                    sema_error_at(c, s->as.for_loop.over->pos,
+                                  "`for` walks a range, a slice, an array, a "
+                                  "collection or an iterator, found `%s`",
+                                  sema_tn(over));
+                    element = sema_builtin(c, TYPE_ERROR);
+                } else if (s->as.for_loop.by_pointer) {
+                    sema_error_at(c, s->as.for_loop.over->pos,
+                                  "`for x in &e` walks a slice or an array, "
+                                  "and a collection gives its elements by "
+                                  "`value`");
+                    element = sema_builtin(c, TYPE_ERROR);
+                }
             } else if (!sema_is_error(over)) {
                 element = over->element;
                 if (s->as.for_loop.by_pointer) {
@@ -1660,7 +1723,8 @@ static void check_stmt(struct checker *c, struct stmt *s)
            read. */
         if (names > 1) {
             struct type *pair[2];
-            if (names > 2 || s->as.for_loop.over == NULL) {
+            if (names > 2 || s->as.for_loop.over == NULL ||
+                s->as.for_loop.hooks.cursor != NULL) {
                 sema_error_at(c, s->as.for_loop.names[0].pos,
                               "`for i, x` binds the index and the element of a "
                               "slice or an array");

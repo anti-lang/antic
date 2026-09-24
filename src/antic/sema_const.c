@@ -810,6 +810,9 @@ bool sema_eval_const(struct checker *c, struct expr *e,
     /* The text is built at run time, into memory of its own. */
     case EXPR_FORMAT:
         return fail_const(c, e, sema_format_name(e));
+    /* The slice is collected at run time, into memory of its own. */
+    case EXPR_COLLECT:
+        return fail_const(c, e, "`to_slice`");
     /* The two comparisons of numbers fold, with the value in both. An
        `lt` operator is a call and never a constant. */
     case EXPR_IN: {
