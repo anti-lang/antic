@@ -366,10 +366,10 @@ static void append_imm12(struct mach_block *b, enum a64_op op, size_t count,
     if (v > 4095) {
         ops[count] = mach_imm(v >> 12);
         ops[count + 1] = mach_imm(12);
-        mach_add(b, op, count + 2, ops);
+        mach_add(b, (unsigned)op, count + 2, ops);
     } else {
         ops[count] = mach_imm(v);
-        mach_add(b, op, count + 1, ops);
+        mach_add(b, (unsigned)op, count + 1, ops);
     }
 }
 
@@ -2403,7 +2403,7 @@ static void unwind(struct mach_block *b, const struct frame *frame,
                    const struct mach_operand *operands)
 {
     if (frame->unwind) {
-        mach_add(b, op, count, operands);
+        mach_add(b, (unsigned)op, count, operands);
     }
 }
 

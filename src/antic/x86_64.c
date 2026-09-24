@@ -2841,7 +2841,7 @@ static void unwind(struct mach_block *b, const struct frame *frame,
                    const struct mach_operand *operands)
 {
     if (frame->unwind) {
-        mach_add(b, op, count, operands);
+        mach_add(b, (unsigned)op, count, operands);
     }
 }
 
