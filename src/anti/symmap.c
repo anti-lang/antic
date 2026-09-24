@@ -110,7 +110,7 @@ static void macho_lines(struct map *m, const struct anti_macho_table *t)
             object.length = 0;
             object_path.length = 0;
             text_append(&object_path, path);
-            if (!read_file_reported(path, &object)) {
+            if (!files_read_reported(path, &object)) {
                 object.length = 0;
                 continue;
             }
@@ -146,7 +146,7 @@ bool symmap_build_id(const char *program, struct text *out)
     size_t i;
     bool found = false;
 
-    if (!read_file_reported(program, &bytes)) {
+    if (!files_read_reported(program, &bytes)) {
         return false;
     }
     /* The notice of every program holds the line `build <64 digits>`,
@@ -185,7 +185,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
     size_t i;
     bool ok;
 
-    if (!read_file_reported(program, &bytes)) {
+    if (!files_read_reported(program, &bytes)) {
         return false;
     }
     if (info->format == FORMAT_ELF) {
@@ -221,7 +221,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
         }
         text_append(&out, "\n");
     }
-    ok = write_file(path, &out);
+    ok = files_write(path, &out);
     for (i = 0; i < m.count; i++) {
         text_free(&m.items[i].name);
         text_free(&m.items[i].file);

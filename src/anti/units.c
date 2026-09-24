@@ -44,7 +44,7 @@ bool unit_file(const char *dir, const char *module,
     if (directory.length > 0) {
         directory.data[--directory.length] = '\0';
     }
-    ok = directory.length == 0 || make_dirs(text_cstr(&directory));
+    ok = directory.length == 0 || files_make_dirs(text_cstr(&directory));
     text_free(&directory);
     return ok;
 }
@@ -63,7 +63,7 @@ bool unit_read(const char *source, const char *const *roots,
 
     memset(out, 0, sizeof *out);
     out->source = source;
-    if (!read_file_reported(source, &bytes)) {
+    if (!files_read_reported(source, &bytes)) {
         goto done;
     }
     if (!module_path_of_source(source, roots, root_count, &out->path, message,

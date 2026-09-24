@@ -37,7 +37,7 @@ int bind_header(const char *library, const char *out_dir,
         return 2;
     }
     o.cpu = cpu_default(o.target);
-    if (!make_dirs(out_dir) || !driver_library_header(&o, &header)) {
+    if (!files_make_dirs(out_dir) || !driver_library_header(&o, &header)) {
         goto done;
     }
     base = strrchr(library, '/');
@@ -46,7 +46,7 @@ int bind_header(const char *library, const char *out_dir,
     text_appendf(&path, "%s/%.*s%s", out_dir,
                  (int)(dot != NULL ? (size_t)(dot - base) : strlen(base)),
                  base, HEADER_SUFFIX);
-    if (write_file(text_cstr(&path), &header)) {
+    if (files_write(text_cstr(&path), &header)) {
         status = 0;
     }
 
@@ -91,7 +91,7 @@ static bool write_named(const char *dir, const char *name,
     bool ok;
 
     text_appendf(&path, "%s/%s", dir, name);
-    ok = write_file(text_cstr(&path), bytes);
+    ok = files_write(text_cstr(&path), bytes);
     text_free(&path);
     return ok;
 }
@@ -159,14 +159,14 @@ int bind_run(const struct bind_request *q)
         text_appendf(&header, "%s.h", b.library);
         b.header = bind_strdup(&b, text_cstr(&header));
         text_free(&header);
-        if (!read_file_reported(q->input, &bytes) ||
+        if (!files_read_reported(q->input, &bytes) ||
             !bind_read_api(&b, (const unsigned char *)bytes.data,
                            bytes.length)) {
             goto done;
         }
     }
     bind_settle(&b);
-    if (!make_dirs(q->out_dir)) {
+    if (!files_make_dirs(q->out_dir)) {
         goto done;
     }
     bind_write_module(&b, &out);

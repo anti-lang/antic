@@ -295,7 +295,7 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
         struct text directory = {0};
         struct text original = {0};
         text_appendf(&directory, "%s/%s", work, CHECK_DEV_DIR);
-        if (!read_file_reported(u->source, &original) ||
+        if (!files_read_reported(u->source, &original) ||
             !unit_file(text_cstr(&directory), text_cstr(&u->path),
                          SOURCE_SUFFIX, &path)) {
             text_free(&directory);
@@ -311,7 +311,7 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
     } else {
         struct text directory = {0};
         text_appendf(&directory, "%s/%s", work, CHECK_DOCS_DIR);
-        if (!make_dirs(text_cstr(&directory))) {
+        if (!files_make_dirs(text_cstr(&directory))) {
             text_free(&directory);
             goto done;
         }
@@ -327,7 +327,7 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
         }
         wrap_block(one, "main", &source);
     }
-    if (!write_file(text_cstr(&path), &source)) {
+    if (!files_write(text_cstr(&path), &source)) {
         goto done;
     }
     o.input = text_cstr(&path);
@@ -360,7 +360,7 @@ static bool unit_blocks(const struct unit *u, const struct options *base,
     size_t i;
     bool ok = true;
 
-    if (!read_file_reported(u->source, &bytes)) {
+    if (!files_read_reported(u->source, &bytes)) {
         ok = false;
         goto done;
     }
@@ -419,7 +419,7 @@ static size_t format_class(const struct unit *units, size_t count)
     for (i = 0; i < count; i++) {
         struct text source = {0};
         struct text formed = {0};
-        if (!read_file_reported(units[i].source, &source)) {
+        if (!files_read_reported(units[i].source, &source)) {
             findings++;
         } else if (!fmt_source(text_cstr(&source), source.length, &formed)) {
             /* A file the lexer refuses is the front-end class's to
@@ -444,10 +444,10 @@ static size_t format_class(const struct unit *units, size_t count)
 /* The sources of the project: every `.anti` file under the source and the
    test directory the manifest names. */
 static bool project_sources(const char *src, const char *test,
-                            struct file_list *out)
+                            struct files_list *out)
 {
-    bool ok = list_tree(src, SOURCE_SUFFIX, out) &&
-              list_tree(test, SOURCE_SUFFIX, out);
+    bool ok = files_list_tree(src, SOURCE_SUFFIX, out) &&
+              files_list_tree(test, SOURCE_SUFFIX, out);
 
     if (out->count == 0) {
         fprintf(stderr, "anti: no %s file under %s or %s\n", SOURCE_SUFFIX,
@@ -462,7 +462,7 @@ int check_run(const char *const *sources, size_t source_count,
               const char *runtime, bool undocumented, bool all_targets)
 {
     struct diagnostic_counts counts;
-    struct file_list found = {0};
+    struct files_list found = {0};
     struct options base;
     struct options blocks;
     const char **search;
@@ -497,15 +497,15 @@ int check_run(const char *const *sources, size_t source_count,
     }
     if (source_count == 0 &&
         !project_sources(text_cstr(&src), text_cstr(&test), &found)) {
-        file_list_free(&found);
+        files_list_free(&found);
         text_free(&src);
         text_free(&test);
         text_free(&package);
         return 1;
     }
     count = source_count > 0 ? source_count : found.count;
-    if (!make_dirs(work)) {
-        file_list_free(&found);
+    if (!files_make_dirs(work)) {
+        files_list_free(&found);
         text_free(&src);
         text_free(&test);
         text_free(&package);
@@ -612,6 +612,6 @@ done:
     text_free(&package);
     text_free(&src);
     text_free(&test);
-    file_list_free(&found);
+    files_list_free(&found);
     return status;
 }

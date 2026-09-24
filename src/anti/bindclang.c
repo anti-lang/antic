@@ -41,7 +41,7 @@ static void find_clang(struct text *out)
             struct text pinned = {0};
             text_appendf(&pinned, "%.*s/deps/clang/bin/clang%s",
                          (int)(slash - dir.data), dir.data, suffix);
-            if (path_exists(text_cstr(&pinned))) {
+            if (files_exists(text_cstr(&pinned))) {
                 text_append(out, text_cstr(&pinned));
                 text_free(&pinned);
                 text_free(&dir);

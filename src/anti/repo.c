@@ -176,7 +176,7 @@ static bool fetch(const char *url, const char *destination, const char *etag)
     text_appendf(&temporary, "%s.new", destination);
     if (strncmp(url, "file://", 7) == 0) {
         if (file_url_path(url, &source)) {
-            ok = copy_file(text_cstr(&source), text_cstr(&temporary));
+            ok = files_copy(text_cstr(&source), text_cstr(&temporary));
             if (!ok) {
                 fprintf(stderr, "anti: %s holds no %s\n", url,
                         text_cstr(&source));
@@ -189,7 +189,7 @@ static bool fetch(const char *url, const char *destination, const char *etag)
         argv[argc++] = "curl";
         argv[argc++] = "-fsSL";
         if (etag != NULL) {
-            if (path_exists(etag)) {
+            if (files_exists(etag)) {
                 text_appendf(&compare, "%s", etag);
                 argv[argc++] = "--etag-compare";
                 argv[argc++] = text_cstr(&compare);
@@ -211,11 +211,11 @@ static bool fetch(const char *url, const char *destination, const char *etag)
         struct text bytes = {0};
         /* An answer of no change writes no byte, and the cached file
            stays as it was. */
-        if (read_file(text_cstr(&temporary), &bytes) && bytes.length == 0 &&
-            path_exists(destination)) {
+        if (files_read(text_cstr(&temporary), &bytes) && bytes.length == 0 &&
+            files_exists(destination)) {
             ok = true;
         } else {
-            ok = copy_file(text_cstr(&temporary), destination);
+            ok = files_copy(text_cstr(&temporary), destination);
         }
         text_free(&bytes);
     }
@@ -234,7 +234,7 @@ static bool checked_recently(const char *stamp)
     struct text bytes = {0};
     bool fresh = false;
 
-    if (read_file(stamp, &bytes) && bytes.length > 0) {
+    if (files_read(stamp, &bytes) && bytes.length > 0) {
         long long then = strtoll(text_cstr(&bytes), NULL, 10);
         long long now = (long long)time(NULL);
         fresh = now >= then && now - then < REPO_INDEX_SECONDS;
@@ -248,7 +248,7 @@ static void write_stamp(const char *stamp)
     struct text bytes = {0};
 
     text_appendf(&bytes, "%lld\n", (long long)time(NULL));
-    write_file(stamp, &bytes);
+    files_write(stamp, &bytes);
     text_free(&bytes);
 }
 
@@ -272,7 +272,7 @@ static bool index_dir(const char *prefix, const char *name, struct text *out)
     sha256_update(&digest, prefix, strlen(prefix));
     sha256_hex(&digest, hex);
     text_appendf(out, "/index/%s/%s", hex, name);
-    return make_dirs(text_cstr(out));
+    return files_make_dirs(text_cstr(out));
 }
 
 bool repo_index(const char *prefix, const char *name, bool offline,
@@ -290,7 +290,7 @@ bool repo_index(const char *prefix, const char *name, bool offline,
     text_appendf(out, "%s/%s", text_cstr(&directory), REPO_INDEX_FILE);
     text_appendf(&stamp, "%s%s", text_cstr(out), REPO_STAMP_SUFFIX);
     text_appendf(&etag, "%s%s", text_cstr(out), REPO_ETAG_SUFFIX);
-    if (path_exists(text_cstr(out)) &&
+    if (files_exists(text_cstr(out)) &&
         (offline || checked_recently(text_cstr(&stamp)))) {
         ok = true;
         goto done;
@@ -349,13 +349,13 @@ bool repo_module(const char *prefix, const char *name, const char *version,
         goto done;
     }
     text_appendf(&directory, "/pkg/%s/%s", name, version);
-    if (!make_dirs(text_cstr(&directory))) {
+    if (!files_make_dirs(text_cstr(&directory))) {
         goto done;
     }
     text_appendf(out, "%s/%s%s", text_cstr(&directory), module, ANTL_SUFFIX);
     /* A package file is immutable once cached, so a file that is there
        and carries its digest is fetched no second time. */
-    if (!path_exists(text_cstr(out))) {
+    if (!files_exists(text_cstr(out))) {
         if (offline) {
             fprintf(stderr, "anti: --offline and no cached %s of %s %s\n",
                     module, name, version);

@@ -78,7 +78,7 @@ static bool library_path(const char *work, const char *module,
     }
     if (directory.length > 0) {
         directory.data[--directory.length] = '\0';
-        if (!make_dirs(text_cstr(&directory))) {
+        if (!files_make_dirs(text_cstr(&directory))) {
             text_free(&directory);
             return false;
         }
@@ -102,7 +102,7 @@ static bool read_unit(const char *source, const char *const *roots,
     size_t i;
 
     out->source = source;
-    if (!read_file_reported(source, &bytes)) {
+    if (!files_read_reported(source, &bytes)) {
         goto done;
     }
     if (!module_path_of_source(source, roots, root_count, &out->path,
@@ -256,7 +256,7 @@ static bool compile_imports(const struct unit *u, const struct options *base,
         return false;
     }
     text_appendf(&directory, "%s/anti/test/imports/%s", work, flat);
-    if (!make_dirs(text_cstr(&directory))) {
+    if (!files_make_dirs(text_cstr(&directory))) {
         text_free(&directory);
         arena_free(&arena);
         return false;
@@ -375,7 +375,7 @@ static bool run_unit(const struct unit *u, const struct options *base,
        `_`, since a dot in the file name is a segment of its own. */
     write_runner(u, &source);
     text_appendf(&directory, "%s/anti/test", work);
-    if (!make_dirs(text_cstr(&directory))) {
+    if (!files_make_dirs(text_cstr(&directory))) {
         goto done;
     }
     text_appendf(&flat, "%s", text_cstr(&u->path));
@@ -387,7 +387,7 @@ static bool run_unit(const struct unit *u, const struct options *base,
     text_appendf(&path, "%s/%s%s", text_cstr(&directory), text_cstr(&flat),
                  SOURCE_SUFFIX);
     text_appendf(&program, "%s/%s.runner", work, text_cstr(&flat));
-    if (!write_file(text_cstr(&path), &source)) {
+    if (!files_write(text_cstr(&path), &source)) {
         goto done;
     }
     o.input = text_cstr(&path);
@@ -450,7 +450,7 @@ int test_run(const char *const *sources, size_t source_count,
         fputs("anti: test takes one or more .anti files\n", stderr);
         return 2;
     }
-    if (!make_dirs(work)) {
+    if (!files_make_dirs(work)) {
         return 1;
     }
     units = calloc(source_count, sizeof *units);

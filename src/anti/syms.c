@@ -268,7 +268,7 @@ static void add_binary(struct binaries *list, const char *path)
             return;
         }
     }
-    if (!read_file(path, &bytes)) {
+    if (!files_read(path, &bytes)) {
         printf("missing %s: no such file\n", path);
         list->problems++;
         return;
@@ -339,7 +339,7 @@ static bool read_configuration(struct configuration *c, const char *path,
             return false;
         }
     }
-    if (!read_file(path, &bytes)) {
+    if (!files_read(path, &bytes)) {
         fprintf(stderr, "anti: cannot read %s\n", path);
         return false;
     }
@@ -416,7 +416,7 @@ static bool read_configuration(struct configuration *c, const char *path,
 static bool find_binaries(const char *conf, struct binaries *out)
 {
     struct configuration c;
-    struct file_list files = {0};
+    struct files_list files = {0};
     size_t programs;
     size_t i;
 
@@ -426,13 +426,13 @@ static bool find_binaries(const char *conf, struct binaries *out)
         configuration_free(&c);
         return false;
     }
-    list_dir(text_cstr(&c.dir), &files);
+    files_list_dir(text_cstr(&c.dir), &files);
     for (i = 0; i < files.count; i++) {
         struct text bytes = {0};
         struct text id = {0};
         struct text version = {0};
         const char *path = text_cstr(&files.items[i]);
-        if (read_file(path, &bytes) && is_program(base_name(path), &bytes) &&
+        if (files_read(path, &bytes) && is_program(base_name(path), &bytes) &&
             notice_of(&bytes, &id, &version)) {
             add_binary(out, path);
         }
@@ -446,7 +446,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
                text_cstr(&c.dir));
         out->problems++;
     }
-    file_list_free(&files);
+    files_list_free(&files);
     for (i = 0; i < c.plugins.count; i++) {
         struct text dir = {0};
         struct text index = {0};
@@ -454,7 +454,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct anti_toml *doc = NULL;
         resolved(text_cstr(&c.dir), text_cstr(&c.plugins.items[i]), &dir);
         text_appendf(&index, "%s/%s", text_cstr(&dir), PLUGIN_INDEX);
-        if (read_file(text_cstr(&index), &bytes)) {
+        if (files_read(text_cstr(&index), &bytes)) {
             doc = anti_rt_toml_read((const unsigned char *)bytes.data,
                                     (int64_t)bytes.length);
         }
@@ -811,7 +811,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
         const struct unit *found = NULL;
         enum state s = MISSING;
         archive_of(text_cstr(&b->path), from, &archive);
-        if (path_exists(text_cstr(&archive)) &&
+        if (files_exists(text_cstr(&archive)) &&
             load_archive(text_cstr(&archive), &units)) {
             s = state_of(b, &units, &found);
         }
@@ -900,7 +900,7 @@ int syms_check(const char *conf, const char *const *symbols, size_t count)
             s = state_of(b, &given, &found);
         } else {
             archive_of(text_cstr(&b->path), NULL, &archive);
-            if (path_exists(text_cstr(&archive)) &&
+            if (files_exists(text_cstr(&archive)) &&
                 load_archive(text_cstr(&archive), &beside)) {
                 s = state_of(b, &beside, &found);
             }
@@ -1156,7 +1156,7 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
                built. */
             if (anti_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
                 struct text bytes = {0};
-                if (read_file(object, &bytes)) {
+                if (files_read(object, &bytes)) {
                     anti_macho_relocate((uint8_t *)bytes.data, bytes.length);
                     if (anti_macho_object_line((const uint8_t *)bytes.data,
                                                bytes.length, symbol,
@@ -1204,7 +1204,7 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
             return 1;
         }
     }
-    if (!read_file(trace, &input)) {
+    if (!files_read(trace, &input)) {
         fprintf(stderr, "anti: cannot read %s\n", trace);
         units_free(&units);
         return 1;

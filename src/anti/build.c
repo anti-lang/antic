@@ -87,7 +87,7 @@ struct build {
     struct text src;
     struct text runtime;
     struct text license;            /* the licence file of the manifest */
-    struct file_list sources;       /* the source files under src */
+    struct files_list sources;       /* the source files under src */
     const char *roots[1];           /* the search root of the module paths */
     struct text *specs;             /* one `--dependency` entry per package */
     size_t spec_count;
@@ -118,7 +118,7 @@ static void cache_key(const char *input, enum target t, enum cpu_level cpu,
     char hex[65];
 
     sha256_init(&digest);
-    if (read_file(input, &bytes)) {
+    if (files_read(input, &bytes)) {
         sha256_update(&digest, bytes.data, bytes.length);
     }
     sha256_hex(&digest, hex);
@@ -136,7 +136,7 @@ static bool cached(const char *output, const struct text *key)
     bool same;
 
     text_appendf(&path, "%s%s", output, BUILD_KEY_SUFFIX);
-    same = path_exists(output) && read_file(text_cstr(&path), &stored) &&
+    same = files_exists(output) && files_read(text_cstr(&path), &stored) &&
            stored.length == key->length &&
            memcmp(stored.data, key->data, key->length) == 0;
     text_free(&path);
@@ -161,7 +161,7 @@ static bool write_key(const char *output, const struct text *key)
     bool ok;
 
     text_appendf(&path, "%s%s", output, BUILD_KEY_SUFFIX);
-    ok = write_file(text_cstr(&path), key);
+    ok = files_write(text_cstr(&path), key);
     text_free(&path);
     return ok;
 }
@@ -318,7 +318,7 @@ static bool library_module(const char *file, struct text *out)
     char error[256];
     bool ok = false;
 
-    if (!read_file(file, &bytes)) {
+    if (!files_read(file, &bytes)) {
         fprintf(stderr, "anti: cannot read %s\n", file);
         goto done;
     }
@@ -343,7 +343,7 @@ static bool copy_into(const char *from, const char *to, const char *name)
     bool ok;
 
     text_appendf(&path, "%s/%s", to, name);
-    ok = make_dirs(to) && copy_program(from, text_cstr(&path));
+    ok = files_make_dirs(to) && files_copy_program(from, text_cstr(&path));
     if (!ok) {
         fprintf(stderr, "anti: cannot write %s\n", text_cstr(&path));
     }
@@ -550,7 +550,7 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     if (target_info(t)->format == FORMAT_COFF) {
         text_appendf(&pdb_name, "%s.pdb", text_cstr(&stem));
         text_appendf(&pdb_path, "%s.pdb", text_cstr(&debug_path));
-        if (path_exists(text_cstr(&pdb_path))) {
+        if (files_exists(text_cstr(&pdb_path))) {
             entries[count].name = text_cstr(&pdb_name);
             entries[count].file = text_cstr(&pdb_path);
             entries[count].executable = false;
@@ -685,8 +685,8 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
                  text_cstr(&b->m.dist), target_name(t), mode);
     text_appendf(&b->lib_dir, "%s/lib", text_cstr(&b->build_dir));
     text_appendf(&b->obj_dir, "%s/obj", text_cstr(&b->build_dir));
-    if (!make_dirs(text_cstr(&b->build_dir)) ||
-        !make_dirs(text_cstr(&b->dist_dir))) {
+    if (!files_make_dirs(text_cstr(&b->build_dir)) ||
+        !files_make_dirs(text_cstr(&b->dist_dir))) {
         goto done;
     }
     graph_libraries(b, &shared);
@@ -718,7 +718,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
             bool written =
                 unit_file(text_cstr(&b->dist_dir), text_cstr(&b->units[i].path),
                           ANTL_SUFFIX, &out) &&
-                copy_file(text_cstr(&files[i]), text_cstr(&out));
+                files_copy(text_cstr(&files[i]), text_cstr(&out));
             if (!written) {
                 fprintf(stderr, "anti: cannot write %s\n", text_cstr(&out));
             }
@@ -802,7 +802,7 @@ static bool path_dependency(void *context, const char *directory,
     bool ok = false;
 
     text_appendf(&manifest_path, "%s/%s", directory, MANIFEST_FILE);
-    if (!path_exists(text_cstr(&manifest_path))) {
+    if (!files_exists(text_cstr(&manifest_path))) {
         text_append(out, directory);
         text_free(&manifest_path);
         return true;
@@ -897,7 +897,7 @@ static bool read_units(struct build *b)
     size_t i;
 
     b->roots[0] = text_cstr(&b->src);
-    if (!list_tree(text_cstr(&b->src), SOURCE_SUFFIX, &b->sources)) {
+    if (!files_list_tree(text_cstr(&b->src), SOURCE_SUFFIX, &b->sources)) {
         return false;
     }
     if (b->sources.count == 0) {
@@ -930,7 +930,7 @@ static void build_free(struct build *b)
         unit_free(&b->units[i]);
     }
     free(b->units);
-    file_list_free(&b->sources);
+    files_list_free(&b->sources);
     free(b->order);
     for (i = 0; i < b->spec_count; i++) {
         text_free(&b->specs[i]);
@@ -1039,7 +1039,7 @@ static int build_project(const struct build_request *r, int depth)
                          r->release ? "release" : "dev",
                          module_path_last(text_cstr(&b.m.name)),
                          target_info(host)->executable_suffix);
-            if (!path_exists(text_cstr(&program))) {
+            if (!files_exists(text_cstr(&program))) {
                 fprintf(stderr, "anti: %s was not built, so there is nothing "
                                 "to run\n", text_cstr(&program));
                 status = 1;
@@ -1089,7 +1089,7 @@ int build_new(const char *name)
         goto done;
     }
     text_append(&directory, last);
-    if (path_exists(text_cstr(&directory))) {
+    if (files_exists(text_cstr(&directory))) {
         fprintf(stderr, "anti: %s is there already\n", text_cstr(&directory));
         goto done;
     }
@@ -1100,18 +1100,18 @@ int build_new(const char *name)
        path is the package name, and `test/`. */
     text_appendf(&path, "%s/src", text_cstr(&directory));
     text_appendf(&file, "%s/%s", text_cstr(&directory), MANIFEST_FILE);
-    if (!make_dirs(text_cstr(&directory)) ||
-        !write_file(text_cstr(&file), &manifest)) {
+    if (!files_make_dirs(text_cstr(&directory)) ||
+        !files_write(text_cstr(&file), &manifest)) {
         goto done;
     }
     file.length = 0;
     if (!unit_file(text_cstr(&path), name, SOURCE_SUFFIX, &file) ||
-        !write_file(text_cstr(&file), &source)) {
+        !files_write(text_cstr(&file), &source)) {
         goto done;
     }
     path.length = 0;
     text_appendf(&path, "%s/test", text_cstr(&directory));
-    if (!make_dirs(text_cstr(&path))) {
+    if (!files_make_dirs(text_cstr(&path))) {
         goto done;
     }
     printf("anti: %s holds the project %s\n", text_cstr(&directory), name);

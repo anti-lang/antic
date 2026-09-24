@@ -324,7 +324,7 @@ static bool library_header(const char *file, struct text *name,
     size_t i;
     bool ok = false;
 
-    if (!read_file(file, &bytes)) {
+    if (!files_read(file, &bytes)) {
         fprintf(stderr, "anti: cannot read %s\n", file);
         goto done;
     }
@@ -386,7 +386,7 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
 {
     struct text directory = {0};
     struct text given = {0};
-    struct file_list files = {0};
+    struct files_list files = {0};
     size_t i;
     size_t found = 0;
     bool ok = false;
@@ -398,7 +398,7 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
     if (!r->path_of(r->context, text_cstr(&given), &directory)) {
         goto done;
     }
-    if (!list_tree(text_cstr(&directory), ANTL_SUFFIX, &files)) {
+    if (!files_list_tree(text_cstr(&directory), ANTL_SUFFIX, &files)) {
         goto done;
     }
     for (i = 0; i < files.count; i++) {
@@ -461,7 +461,7 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
     }
     ok = true;
 done:
-    file_list_free(&files);
+    files_list_free(&files);
     text_free(&directory);
     text_free(&given);
     return ok;
@@ -513,7 +513,7 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
     if (!repo_index(prefix, text_cstr(&req->name), r->offline, &file)) {
         goto done;
     }
-    if (!read_file(text_cstr(&file), &bytes)) {
+    if (!files_read(text_cstr(&file), &bytes)) {
         fprintf(stderr, "anti: cannot read %s\n", text_cstr(&file));
         goto done;
     }
@@ -816,7 +816,7 @@ static void lock_read(const char *path, struct dep_graph *out)
     bool valid = true;
 
     memset(out, 0, sizeof *out);
-    if (!read_file(path, &bytes)) {
+    if (!files_read(path, &bytes)) {
         text_free(&bytes);
         return;
     }
@@ -937,7 +937,7 @@ static bool lock_write(const char *path, const struct dep_graph *g)
         text_free(&out);
         return false;
     }
-    ok = write_file(path, &out);
+    ok = files_write(path, &out);
     text_free(&out);
     return ok;
 }
@@ -1072,7 +1072,7 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
         *out = locked;
         memset(&locked, 0, sizeof locked);
         ok = fetch_all(out, offline) &&
-             (path_exists(text_cstr(&lock_path)) ||
+             (files_exists(text_cstr(&lock_path)) ||
               lock_write(text_cstr(&lock_path), out));
         goto done;
     }
@@ -1104,7 +1104,7 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
     /* The lock file is written when the graph differs from the one it
        held, and when there is no lock file yet. */
     if ((!graphs_equal(&r.graph, &locked) ||
-         !path_exists(text_cstr(&lock_path))) &&
+         !files_exists(text_cstr(&lock_path))) &&
         !lock_write(text_cstr(&lock_path), &r.graph)) {
         goto done;
     }

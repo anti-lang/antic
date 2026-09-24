@@ -28,7 +28,7 @@ static bool write_line(const char *path, const char *line)
     bool ok;
 
     text_appendf(&bytes, "%s\n", line);
-    ok = write_file(path, &bytes);
+    ok = files_write(path, &bytes);
     text_free(&bytes);
     return ok;
 }
@@ -45,7 +45,7 @@ static bool sdk_version(const char *sdk, struct text *out)
     bool ok = false;
 
     text_appendf(&path, "%s/SDKSettings.json", sdk);
-    if (read_file(text_cstr(&path), &json)) {
+    if (files_read(text_cstr(&path), &json)) {
         key = strstr(text_cstr(&json), "\"Version\"");
         start = key != NULL ? strchr(key + strlen("\"Version\""), '"') : NULL;
         end = start != NULL ? strchr(start + 1, '"') : NULL;
@@ -123,8 +123,8 @@ static bool copy_stubs(const char *dir, const char *rel, const char *stage)
                 struct text parent = {0};
                 text_appendf(&to, "%s/%s", stage, text_cstr(&inside));
                 text_appendf(&parent, "%s/%s", stage, rel);
-                ok = make_dirs(text_cstr(&parent)) &&
-                     copy_file(text_cstr(&from), text_cstr(&to));
+                ok = files_make_dirs(text_cstr(&parent)) &&
+                     files_copy(text_cstr(&from), text_cstr(&to));
                 text_free(&to);
                 text_free(&parent);
             }
@@ -174,8 +174,8 @@ int sdk_export(const char *sdk, const char *out)
     }
     text_appendf(&stage, "%s/.apple-sdk-%s", out, text_cstr(&version));
     text_appendf(&bundle, "%s/apple-sdk-%s.tar.xz", out, text_cstr(&version));
-    remove_tree(text_cstr(&stage));
-    if (!make_dirs(text_cstr(&stage))) {
+    files_remove_tree(text_cstr(&stage));
+    if (!files_make_dirs(text_cstr(&stage))) {
         fprintf(stderr, "anti: cannot make %s\n", text_cstr(&stage));
         goto done;
     }
@@ -195,7 +195,7 @@ int sdk_export(const char *sdk, const char *out)
     if (!write_line(text_cstr(&file), text_cstr(&version))) {
         goto done;
     }
-    remove_tree(text_cstr(&bundle));
+    files_remove_tree(text_cstr(&bundle));
     {
         const char *argv[] = {"tar", "-cJf", text_cstr(&bundle), "-C",
                               text_cstr(&stage), ".", NULL};
@@ -209,7 +209,7 @@ int sdk_export(const char *sdk, const char *out)
     status = 0;
 done:
     if (stage.length > 0) {
-        remove_tree(text_cstr(&stage));
+        files_remove_tree(text_cstr(&stage));
     }
     text_free(&path);
     text_free(&version);
@@ -232,8 +232,8 @@ static bool unpack(const char *bundle, const char *dir, const char *digest)
     text_appendf(&part, "%s/%s.part", dir, SYSROOT_APPLE_SDK_DIR);
     text_appendf(&final, "%s/%s", dir, SYSROOT_APPLE_SDK_DIR);
     text_appendf(&marker, "%s/%s", text_cstr(&part), SYSROOT_SDK_VERSION);
-    remove_tree(text_cstr(&part));
-    if (!make_dirs(text_cstr(&part))) {
+    files_remove_tree(text_cstr(&part));
+    if (!files_make_dirs(text_cstr(&part))) {
         fprintf(stderr, "anti: cannot make %s\n", text_cstr(&part));
         goto done;
     }
@@ -244,12 +244,12 @@ static bool unpack(const char *bundle, const char *dir, const char *digest)
             goto done;
         }
     }
-    if (!path_exists(text_cstr(&marker))) {
+    if (!files_exists(text_cstr(&marker))) {
         fprintf(stderr, "anti: %s holds no %s, so anti sdk export did not "
                         "write it\n", bundle, SYSROOT_SDK_VERSION);
         goto done;
     }
-    if (!remove_tree(text_cstr(&final)) ||
+    if (!files_remove_tree(text_cstr(&final)) ||
         rename(text_cstr(&part), text_cstr(&final)) != 0) {
         fprintf(stderr, "anti: cannot replace %s\n", text_cstr(&final));
         goto done;
@@ -258,7 +258,7 @@ static bool unpack(const char *bundle, const char *dir, const char *digest)
     text_appendf(&marker, "%s/digest", text_cstr(&final));
     ok = write_line(text_cstr(&marker), digest);
 done:
-    remove_tree(text_cstr(&part));
+    files_remove_tree(text_cstr(&part));
     text_free(&part);
     text_free(&final);
     text_free(&marker);
@@ -280,7 +280,8 @@ int sdk_import(const char *bundle, const char *sysroot)
         struct text dir = {0};
         bool ok;
         text_appendf(&dir, "%s/%s", sysroot, macos_targets[i]);
-        ok = make_dirs(text_cstr(&dir)) && unpack(bundle, text_cstr(&dir), digest);
+        ok = files_make_dirs(text_cstr(&dir)) &&
+             unpack(bundle, text_cstr(&dir), digest);
         text_free(&dir);
         if (!ok) {
             return 1;
@@ -288,7 +289,7 @@ int sdk_import(const char *bundle, const char *sysroot)
     }
     text_appendf(&path, "%s/%s/%s/%s", sysroot, macos_targets[0],
                  SYSROOT_APPLE_SDK_DIR, SYSROOT_SDK_VERSION);
-    read_file(text_cstr(&path), &version);
+    files_read(text_cstr(&path), &version);
     while (version.length > 0 && (version.data[version.length - 1] == '\n' ||
                                    version.data[version.length - 1] == '\r')) {
         version.data[--version.length] = '\0';

@@ -1201,7 +1201,7 @@ int doc_run(const char **sources, size_t count, const char **roots,
         search[search_count++] = roots[i];
     }
     search[search_count++] = work;
-    if (!make_dirs(out) || !make_dirs(work) ||
+    if (!files_make_dirs(out) || !files_make_dirs(work) ||
         !write_interfaces(sources, count, search, search_count, work, runtime,
                           units, order)) {
         status = 1;
@@ -1270,7 +1270,7 @@ int doc_run(const char **sources, size_t count, const char **roots,
         page_render(&body, &pages[i], form);
         text_appendf(&path, "%s/%s%s", out, text_cstr(&pages[i].module),
                      suffix_of(form));
-        if (!write_file(text_cstr(&path), &body)) {
+        if (!files_write(text_cstr(&path), &body)) {
             status = 1;
             goto done;
         }
@@ -1279,7 +1279,7 @@ int doc_run(const char **sources, size_t count, const char **roots,
     path.length = 0;
     index_render(&body, pages, count, form);
     text_appendf(&path, "%s/index%s", out, suffix_of(form));
-    if (!write_file(text_cstr(&path), &body)) {
+    if (!files_write(text_cstr(&path), &body)) {
         status = 1;
         goto done;
     }

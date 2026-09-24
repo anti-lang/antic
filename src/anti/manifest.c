@@ -71,7 +71,7 @@ bool manifest_inject_read(const char *path, bool tests,
     int64_t i;
 
     memset(out, 0, sizeof *out);
-    if (!read_file(path, &bytes)) {
+    if (!files_read(path, &bytes)) {
         text_free(&bytes);
         return true;
     }
@@ -134,7 +134,7 @@ bool manifest_layout_read(const char *path, struct text *src,
 
     text_append(src, "src");
     text_append(test, "test");
-    if (!read_file(path, &bytes)) {
+    if (!files_read(path, &bytes)) {
         text_free(&bytes);
         return true;
     }
@@ -322,7 +322,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     text_append(&out->test, "test");
     text_append(&out->build, "build");
     text_append(&out->dist, "dist");
-    if (!read_file(path, &bytes)) {
+    if (!files_read(path, &bytes)) {
         text_free(&bytes);
         fprintf(stderr, "anti: %s: no manifest here, so there is no project. "
                         "`anti new <name>` writes one\n", path);

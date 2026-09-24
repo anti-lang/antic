@@ -84,7 +84,7 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         unsigned long crc;
         size_t name_length = strlen(entries[i].name);
         if (entries[i].file != NULL) {
-            ok = read_file_reported(entries[i].file, &bytes);
+            ok = files_read_reported(entries[i].file, &bytes);
         } else {
             text_append_bytes(&bytes, entries[i].bytes, entries[i].size);
         }
@@ -141,7 +141,7 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         put32(&out, (unsigned long)directory.length);
         put32(&out, start);
         put16(&out, 0);
-        ok = write_file(path, &out);
+        ok = files_write(path, &out);
     }
     free(offsets);
     text_free(&out);
@@ -241,7 +241,7 @@ static bool read_directory(const char *path, struct zip_archive *out)
 bool zip_read(const char *path, struct zip_archive *out)
 {
     memset(out, 0, sizeof *out);
-    if (!read_file_reported(path, &out->bytes) || !read_directory(path, out)) {
+    if (!files_read_reported(path, &out->bytes) || !read_directory(path, out)) {
         zip_archive_free(out);
         return false;
     }

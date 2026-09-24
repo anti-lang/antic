@@ -214,7 +214,7 @@ static bool default_runtime(struct text *out)
 
 /* The paths of every file in found, as sources of a command. The array
    points into found, which outlives it. */
-static const char **sources_of(const struct file_list *found)
+static const char **sources_of(const struct files_list *found)
 {
     const char **sources = malloc((found->count + 1) * sizeof *sources);
     size_t i;
@@ -340,7 +340,7 @@ static int doc_command(int argc, char **argv)
     const char **sources = malloc((size_t)argc * sizeof *sources);
     const char **roots = malloc((size_t)argc * sizeof *roots);
     const char **listed = NULL;
-    struct file_list found = {0};
+    struct files_list found = {0};
     struct text src = {0};
     struct text test = {0};
     struct text package = {0};
@@ -392,7 +392,7 @@ static int doc_command(int argc, char **argv)
        library documents. */
     if (count == 0) {
         if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
-            !list_tree(text_cstr(&src), SOURCE_SUFFIX, &found)) {
+            !files_list_tree(text_cstr(&src), SOURCE_SUFFIX, &found)) {
             status = 1;
             goto done;
         }
@@ -415,7 +415,7 @@ done:
     free((void *)sources);
     free((void *)roots);
     free((void *)listed);
-    file_list_free(&found);
+    files_list_free(&found);
     text_free(&src);
     text_free(&test);
     text_free(&package);
@@ -428,7 +428,7 @@ static int fmt_command(int argc, char **argv)
 {
     const char **sources = malloc((size_t)argc * sizeof *sources);
     const char **listed = NULL;
-    struct file_list found = {0};
+    struct files_list found = {0};
     struct text src = {0};
     struct text test = {0};
     struct text package = {0};
@@ -457,8 +457,8 @@ static int fmt_command(int argc, char **argv)
        the same files. */
     if (count == 0) {
         if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
-            !list_tree(text_cstr(&src), SOURCE_SUFFIX, &found) ||
-            !list_tree(text_cstr(&test), SOURCE_SUFFIX, &found)) {
+            !files_list_tree(text_cstr(&src), SOURCE_SUFFIX, &found) ||
+            !files_list_tree(text_cstr(&test), SOURCE_SUFFIX, &found)) {
             status = 1;
             goto done;
         }
@@ -475,7 +475,7 @@ static int fmt_command(int argc, char **argv)
 done:
     free((void *)sources);
     free((void *)listed);
-    file_list_free(&found);
+    files_list_free(&found);
     text_free(&src);
     text_free(&test);
     text_free(&package);

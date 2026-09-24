@@ -1262,7 +1262,7 @@ int fmt_run(const char *const *paths, size_t count, bool check)
     for (i = 0; i < count; i++) {
         struct text source = {0};
         struct text formed = {0};
-        if (!read_file_reported(paths[i], &source)) {
+        if (!files_read_reported(paths[i], &source)) {
             text_free(&source);
             status = 1;
             continue;
@@ -1282,7 +1282,7 @@ int fmt_run(const char *const *paths, size_t count, bool check)
                 0) {
             changed++;
             printf("%s\n", paths[i]);
-            if (!check && !write_file(paths[i], &formed)) {
+            if (!check && !files_write(paths[i], &formed)) {
                 status = 1;
             }
         }

@@ -36,8 +36,8 @@ static void read_whole(void)
         char c = (char)('a' + (char)(i % 26));
         text_append_bytes(&bytes, &c, 1);
     }
-    CHECK(write_file(FILE_NAME, &bytes));
-    CHECK(read_file(FILE_NAME, &back));
+    CHECK(files_write(FILE_NAME, &bytes));
+    CHECK(files_read(FILE_NAME, &back));
     CHECK(back.length == bytes.length);
     CHECK(back.length == bytes.length &&
           memcmp(back.data, bytes.data, bytes.length) == 0);
@@ -53,17 +53,17 @@ static void read_error(void)
 {
     struct text back = {0};
 
-    remove_tree(TREE);
-    CHECK(make_dirs(TREE));
+    files_remove_tree(TREE);
+    CHECK(files_make_dirs(TREE));
     text_append(&back, "kept");
-    CHECK(!read_file(TREE, &back));
+    CHECK(!files_read(TREE, &back));
     CHECK_STR(text_cstr(&back), "kept");
     fputs("anti test: the message below is expected\n", stderr);
-    CHECK(!read_file_reported(TREE, &back));
+    CHECK(!files_read_reported(TREE, &back));
     CHECK_STR(text_cstr(&back), "kept");
     remove("unit-files-absent.bin");
-    CHECK(!read_file("unit-files-absent.bin", &back));
-    remove_tree(TREE);
+    CHECK(!files_read("unit-files-absent.bin", &back));
+    files_remove_tree(TREE);
     text_free(&back);
 }
 
@@ -75,12 +75,12 @@ static void write_errors(void)
     struct text bytes = {0};
 
     text_append(&bytes, "anti");
-    remove_tree(TREE);
+    files_remove_tree(TREE);
     fputs("anti test: the message below is expected\n", stderr);
-    CHECK(!write_file(TREE "/absent/file.bin", &bytes));
+    CHECK(!files_write(TREE "/absent/file.bin", &bytes));
 #if defined(__linux__)
     fputs("anti test: the message below is expected\n", stderr);
-    CHECK(!write_file("/dev/full", &bytes));
+    CHECK(!files_write("/dev/full", &bytes));
 #endif
     text_free(&bytes);
 }
@@ -90,30 +90,30 @@ static void touch(const char *path)
 {
     struct text empty = {0};
 
-    CHECK(write_file(path, &empty));
+    CHECK(files_write(path, &empty));
 }
 
 /* M15. A directory without permission to read failed nothing and added
    nothing. A superuser reads it anyway, so the case is passed over. */
 static void walk_unreadable(void)
 {
-    struct file_list found = {0};
+    struct files_list found = {0};
 
-    remove_tree(TREE);
-    CHECK(make_dirs(TREE "/closed"));
+    files_remove_tree(TREE);
+    CHECK(files_make_dirs(TREE "/closed"));
     touch(TREE "/closed/a.anti");
     CHECK(chmod(TREE "/closed", 0) == 0);
     if (geteuid() != 0) {
         fputs("anti test: the message below is expected\n", stderr);
-        CHECK(!list_tree(TREE, ".anti", &found));
+        CHECK(!files_list_tree(TREE, ".anti", &found));
     }
     CHECK(chmod(TREE "/closed", 0755) == 0);
-    file_list_free(&found);
+    files_list_free(&found);
     /* A directory that does not exist adds nothing and is no error. */
-    CHECK(list_tree(TREE "/absent", ".anti", &found));
+    CHECK(files_list_tree(TREE "/absent", ".anti", &found));
     CHECK(found.count == 0);
-    file_list_free(&found);
-    remove_tree(TREE);
+    files_list_free(&found);
+    files_remove_tree(TREE);
 }
 
 /* M15. A link to a parent directory led the walk round until opendir ran
@@ -121,21 +121,21 @@ static void walk_unreadable(void)
    link to a file is listed as the file. */
 static void walk_links(void)
 {
-    struct file_list found = {0};
+    struct files_list found = {0};
 
-    remove_tree(TREE);
-    CHECK(make_dirs(TREE "/src"));
+    files_remove_tree(TREE);
+    CHECK(files_make_dirs(TREE "/src"));
     touch(TREE "/src/a.anti");
     CHECK(symlink("..", TREE "/src/up") == 0);
     CHECK(symlink("a.anti", TREE "/src/b.anti") == 0);
-    CHECK(list_tree(TREE, ".anti", &found));
+    CHECK(files_list_tree(TREE, ".anti", &found));
     CHECK(found.count == 2);
     if (found.count == 2) {
         CHECK_STR(text_cstr(&found.items[0]), TREE "/src/a.anti");
         CHECK_STR(text_cstr(&found.items[1]), TREE "/src/b.anti");
     }
-    file_list_free(&found);
-    remove_tree(TREE);
+    files_list_free(&found);
+    files_remove_tree(TREE);
 }
 #endif
 

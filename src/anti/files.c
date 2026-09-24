@@ -28,7 +28,7 @@ static bool make_one(const char *path)
 #endif
 }
 
-bool make_dirs(const char *path)
+bool files_make_dirs(const char *path)
 {
     struct text t = {0};
     char *p;
@@ -50,7 +50,7 @@ bool make_dirs(const char *path)
     return ok;
 }
 
-bool remove_tree(const char *path)
+bool files_remove_tree(const char *path)
 {
 #if defined(_WIN32)
     DWORD attributes = GetFileAttributesA(path);
@@ -81,7 +81,7 @@ bool remove_tree(const char *path)
                 continue;
             }
             text_appendf(&child, "%s\\%s", path, found.cFileName);
-            ok = remove_tree(text_cstr(&child)) && ok;
+            ok = files_remove_tree(text_cstr(&child)) && ok;
             text_free(&child);
         } while (FindNextFileA(search, &found));
         FindClose(search);
@@ -109,7 +109,7 @@ bool remove_tree(const char *path)
             continue;
         }
         text_appendf(&child, "%s/%s", path, entry->d_name);
-        ok = remove_tree(text_cstr(&child)) && ok;
+        ok = files_remove_tree(text_cstr(&child)) && ok;
         text_free(&child);
     }
     closedir(dir);
@@ -117,7 +117,7 @@ bool remove_tree(const char *path)
 #endif
 }
 
-bool copy_file(const char *from, const char *to)
+bool files_copy(const char *from, const char *to)
 {
     FILE *in = fopen(from, "rb");
     FILE *out;
@@ -149,7 +149,7 @@ static void cannot_read(const char *path)
     fprintf(stderr, "anti: cannot read %s\n", path);
 }
 
-bool read_file(const char *path, struct text *out)
+bool files_read(const char *path, struct text *out)
 {
     FILE *f = fopen(path, "rb");
     char buffer[65536];
@@ -175,16 +175,16 @@ bool read_file(const char *path, struct text *out)
     return ok;
 }
 
-bool read_file_reported(const char *path, struct text *out)
+bool files_read_reported(const char *path, struct text *out)
 {
-    if (!read_file(path, out)) {
+    if (!files_read(path, out)) {
         cannot_read(path);
         return false;
     }
     return true;
 }
 
-bool write_file(const char *path, const struct text *bytes)
+bool files_write(const char *path, const struct text *bytes)
 {
     FILE *f = fopen(path, "wb");
     bool ok;
@@ -202,14 +202,14 @@ bool write_file(const char *path, const struct text *bytes)
     return true;
 }
 
-bool copy_program(const char *from, const char *to)
+bool files_copy_program(const char *from, const char *to)
 {
 #if defined(_WIN32)
-    return copy_file(from, to);
+    return files_copy(from, to);
 #else
     struct stat info;
 
-    if (!copy_file(from, to)) {
+    if (!files_copy(from, to)) {
         return false;
     }
     if (stat(from, &info) != 0) {
@@ -219,7 +219,7 @@ bool copy_program(const char *from, const char *to)
 #endif
 }
 
-static void list_add(struct file_list *out, const char *path)
+static void list_add(struct files_list *out, const char *path)
 {
     if (out->count == out->capacity) {
         size_t capacity = out->capacity == 0 ? 32 : out->capacity * 2;
@@ -254,14 +254,14 @@ static int by_path(const void *a, const void *b)
 /* One directory of the walk. A name that starts with a dot is left alone,
    so a checkout's own directories are no part of a project.
 
-   DESIGN: a link to a directory is not followed, as remove_tree follows
+   DESIGN: a link to a directory is not followed, as files_remove_tree follows
    none. A link to a parent then cannot lead the walk round until it runs
    out of descriptors. A link to a file is listed as the file. A directory
    that does not exist adds nothing. Every other failure to read one
    fails the walk, so no caller takes a tree it did not read for the
    whole. */
 static bool walk(const char *dir, const char *suffix, bool deep,
-                 struct file_list *out)
+                 struct files_list *out)
 {
 #if defined(_WIN32)
     WIN32_FIND_DATAA found;
@@ -360,7 +360,8 @@ static bool walk(const char *dir, const char *suffix, bool deep,
 #endif
 }
 
-bool list_tree(const char *dir, const char *suffix, struct file_list *out)
+bool files_list_tree(const char *dir, const char *suffix,
+                     struct files_list *out)
 {
     size_t from = out->count;
     bool ok = walk(dir, suffix, true, out);
@@ -372,7 +373,7 @@ bool list_tree(const char *dir, const char *suffix, struct file_list *out)
     return ok;
 }
 
-bool list_dir(const char *dir, struct file_list *out)
+bool files_list_dir(const char *dir, struct files_list *out)
 {
     size_t from = out->count;
     bool ok = walk(dir, "", false, out);
@@ -384,7 +385,7 @@ bool list_dir(const char *dir, struct file_list *out)
     return ok;
 }
 
-void file_list_free(struct file_list *list)
+void files_list_free(struct files_list *list)
 {
     size_t i;
 
@@ -397,7 +398,7 @@ void file_list_free(struct file_list *list)
     list->capacity = 0;
 }
 
-bool path_exists(const char *path)
+bool files_exists(const char *path)
 {
 #if defined(_WIN32)
     return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
