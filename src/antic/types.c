@@ -1123,22 +1123,22 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         size_t shown = t->param_count - (t->has_out ? 1 : 0);
         const struct type *result =
             t->has_out ? t->params[shown]->element : t->result;
-        if (t->concurrent) {
-            text_append(out, "concurrent ");
-        }
         if (t->nullable) {
             text_append(out, "?");
         }
         text_append(out, t->bound ? "bound fn(" : "fn(");
         /* A parameter of function type keeps its argument only when it
-           says so, so the plain form is the one a list marks. */
+           says so. A list therefore marks the plain form, and the
+           `concurrent` one as well. */
         for (i = 0; i < shown; i++) {
             const struct type *p = t->params[i];
             if (i > 0) {
                 text_append(out, ", ");
             }
-            if (p->kind == TYPE_FN && !p->bound && !p->context) {
-                text_append(out, "keep ");
+            if (p->kind == TYPE_FN && !p->bound) {
+                text_append(out, !p->context    ? "keep "
+                                 : p->concurrent ? "concurrent "
+                                                 : "");
             }
             print_type(out, p, qualified);
         }

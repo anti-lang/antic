@@ -93,6 +93,19 @@ pub fn bounds(c: Circle) -> (int, int)
 	return (c.radius * 2, c.radius * 2);
 }
 
+/// Give `each` every circle of `list`, add up what `weigh` says of them and
+/// keep `done` for later.
+pub fn visit(list: []Circle, each: fn(Circle), concurrent weigh: fn(Circle) -> int,
+	keep done: fn(int)) -> int
+{
+	let total = 0;
+	for c in list {
+		each(c);
+		total += weigh(c);
+	}
+	return total;
+}
+
 /// The radius `text` names, or a failure when it names none.
 pub fn parse(text: str) -> int may fail
 {

@@ -94,6 +94,15 @@ pub fn bounds(c: Circle) -> (int, int)
 
 The width and the height of `c`.
 
+## visit
+
+```anti
+pub fn visit(list: []Circle, each: fn(Circle), concurrent weigh: fn(Circle) -> int, keep done: fn(int)) -> int
+```
+
+Give `each` every circle of `list`, add up what `weigh` says of them and
+keep `done` for later.
+
 ## parse
 
 ```anti

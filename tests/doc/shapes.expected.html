@@ -86,6 +86,11 @@ let a = shapes.area(c);
 <pre class="signature">pub fn bounds(c: Circle) -&gt; (int, int)</pre>
 <p>The width and the height of <code>c</code>.</p>
 </section>
+<section class="item" id="visit">
+<h2>visit</h2>
+<pre class="signature">pub fn visit(list: []Circle, each: fn(Circle), concurrent weigh: fn(Circle) -&gt; int, keep done: fn(int)) -&gt; int</pre>
+<p>Give <code>each</code> every circle of <code>list</code>, add up what <code>weigh</code> says of them and keep <code>done</code> for later.</p>
+</section>
 <section class="item" id="parse">
 <h2>parse</h2>
 <pre class="signature">pub fn parse(text: str) -&gt; int may fail</pre>

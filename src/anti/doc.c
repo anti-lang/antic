@@ -160,10 +160,18 @@ static size_t declared_params(const struct type *t, bool self)
 }
 
 /* DESIGN: a signature carries the visibility, the form word, the name,
-   the name and type of every parameter, the result and `may fail`. It
+   the name, the mark and the type of every parameter, the result and
+   `may fail`. It
    carries no default value, no `own` and no body. The library file keeps
    the first set for every function and the rest for some. A page built
    from the file reads as the page built from the source. */
+/* Whether keyword declares a function of C, whose parameters of function
+   type are C function pointers without a mark. */
+static bool c_function(const char *keyword)
+{
+    return strstr(keyword, "extern") != NULL;
+}
+
 static void fn_signature(struct text *out, const char *lead,
                          const char *keyword, const struct name *name,
                          const struct type *t, const struct name *params,
@@ -179,7 +187,15 @@ static void fn_signature(struct text *out, const char *lead,
         text_append(out, "self");
     }
     for (i = 0; i < param_count && first + i < t->param_count; i++) {
+        const struct type *p = t->params[first + i];
         text_append(out, i > 0 || self ? ", " : "");
+        /* A parameter of function type carries its mark in its type. An
+           `extern fn` takes C function pointers alone and writes none. */
+        if (p->kind == TYPE_FN && !p->bound && !c_function(keyword)) {
+            text_append(out, !p->context    ? "keep "
+                             : p->concurrent ? "concurrent "
+                                             : "");
+        }
         if (params != NULL && params[i].length > 0) {
             text_appendf(out, "%.*s: ", (int)params[i].length,
                          params[i].text);
