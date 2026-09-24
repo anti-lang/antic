@@ -18,6 +18,24 @@
 #include "parser.h"
 #include "text.h"
 
+/* The compiler keeps its own copy of this test private, so the tool has
+   one too rather than widening a header for three calls. */
+static bool named(const struct name *a, const char *text)
+{
+    size_t n = strlen(text);
+
+    return a->length == n && memcmp(a->text, text, n) == 0;
+}
+
+void unit_flat_path(const char *module, struct text *out)
+{
+    const char *p;
+
+    for (p = module; *p != '\0'; p++) {
+        text_appendf(out, "%c", *p == '.' ? '_' : *p);
+    }
+}
+
 bool unit_file(const char *dir, const char *module,
                         const char *suffix, struct text *out)
 {
@@ -80,11 +98,21 @@ bool unit_read(const char *source, const char *const *roots,
         goto done;
     }
     out->parsed = true;
+    out->tests = files_array(tree->item_count + 1, sizeof *out->tests);
     for (i = 0; i < tree->item_count; i++) {
         const struct item *it = tree->items[i];
-        if (it->kind == ITEM_FN && it->block == BLOCK_NONE &&
-            it->name.length == 4 && memcmp(it->name.text, "main", 4) == 0) {
-            out->has_main = true;
+        if (it->kind != ITEM_FN) {
+            continue;
+        }
+        if (it->block == BLOCK_NONE) {
+            out->has_main = out->has_main || named(&it->name, "main");
+        } else if (it->block == BLOCK_FIXTURES) {
+            out->setup = out->setup || named(&it->name, "setup");
+            out->teardown = out->teardown || named(&it->name, "teardown");
+        } else {
+            char *name = files_array(it->name.length + 1, 1);
+            memcpy(name, it->name.text, it->name.length);
+            out->tests[out->test_count++] = name;
         }
     }
     out->imports = files_array(tree->import_count + 1, sizeof *out->imports);
@@ -109,6 +137,10 @@ void unit_free(struct unit *u)
         text_free(&u->imports[i]);
     }
     free(u->imports);
+    for (i = 0; i < u->test_count; i++) {
+        free(u->tests[i]);
+    }
+    free(u->tests);
     text_free(&u->path);
     text_free(&u->library);
 }

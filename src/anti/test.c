@@ -12,131 +12,29 @@
 #include <string.h>
 
 #include "arena.h"
-#include "ast.h"
 #include "cpu.h"
-#include "diagnostic.h"
 #include "driver.h"
 #include "files.h"
-#include "lexer.h"
 #include "modpath.h"
-#include "parser.h"
 #include "process.h"
 #include "target.h"
 #include "text.h"
+#include "units.h"
 
-/* One module of the run: where it came from, what it is called and the
-   tests it holds. */
-struct unit {
-    const char *source;
-    struct text path;           /* the module path, dots and all */
-    const char *last;           /* the segment an import declares */
-    struct text library;        /* the .antl this run wrote */
+/* One module of the run and the object a dev build writes for it. */
+struct test_unit {
+    struct unit unit;
     struct text object;         /* the .o of a dev build */
-    char **tests;
-    size_t test_count;
-    bool setup;
-    bool teardown;
 };
 
-/* The compiler keeps its own copy of this test private, so the tool has
-   one too rather than widening a header for four calls. */
-static bool named(const struct name *a, const char *text)
-{
-    size_t n = strlen(text);
-
-    return a->length == n && memcmp(a->text, text, n) == 0;
-}
-
-/* The directory of the library file of a module path: work/a/b for
-   a.b.c, which is where find_libraries of the compiler looks. */
-static bool library_path(const char *work, const char *module,
-                         struct text *out)
-{
-    struct text directory = {0};
-    const char *p;
-
-    text_append(&directory, work);
-    text_append(&directory, "/");
-    for (p = module; *p != '\0'; p++) {
-        if (*p == '.') {
-            text_append(&directory, "/");
-        } else {
-            text_append_bytes(&directory, p, 1);
-        }
-    }
-    text_append(out, text_cstr(&directory));
-    text_append(out, ".antl");
-    /* The directories above the file, which the compiler does not make. */
-    while (directory.length > 0 && directory.data[directory.length - 1] != '/') {
-        directory.length--;
-    }
-    if (directory.length > 0) {
-        directory.data[--directory.length] = '\0';
-        if (!files_make_dirs(text_cstr(&directory))) {
-            text_free(&directory);
-            return false;
-        }
-    }
-    text_free(&directory);
-    return true;
-}
-
-/* Read one module and collect the names its `tests` block declares and
-   whether its `fixtures` block declares setup and teardown. */
+/* Read one module of the run. A module the parser refuses has been
+   reported, and fails the run. */
 static bool read_unit(const char *source, const char *const *roots,
-                      size_t root_count, const char *work, struct unit *out)
+                      size_t root_count, const char *work,
+                      struct test_unit *out)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *tree = NULL;
-    struct text bytes = {0};
-    char message[256];
-    bool ok = false;
-    size_t i;
-
-    out->source = source;
-    if (!files_read_reported(source, &bytes)) {
-        goto done;
-    }
-    if (!module_path_of_source(source, roots, root_count, &out->path,
-                               message, sizeof message)) {
-        fprintf(stderr, "anti: %s\n", message);
-        goto done;
-    }
-    out->last = module_path_last(text_cstr(&out->path));
-    if (!lex(text_cstr(&bytes), bytes.length, &arena, &diags, &tokens) ||
-        !parse(text_cstr(&bytes), &tokens, &arena, &diags, &tree)) {
-        for (i = 0; i < diags.count; i++) {
-            fprintf(stderr, "%s:%d:%d: %s\n", source, diags.items[i].line,
-                    diags.items[i].column, diags.items[i].message);
-        }
-        goto done;
-    }
-    out->tests = files_array(tree->item_count + 1, sizeof *out->tests);
-    for (i = 0; i < tree->item_count; i++) {
-        const struct item *it = tree->items[i];
-        char *name;
-        if (it->kind != ITEM_FN || it->block == BLOCK_NONE) {
-            continue;
-        }
-        if (it->block == BLOCK_FIXTURES) {
-            out->setup = out->setup || named(&it->name, "setup");
-            out->teardown = out->teardown || named(&it->name, "teardown");
-            continue;
-        }
-        name = files_array(it->name.length + 1, 1);
-        memcpy(name, it->name.text, it->name.length);
-        name[it->name.length] = '\0';
-        out->tests[out->test_count++] = name;
-    }
-    ok = library_path(work, text_cstr(&out->path), &out->library);
-done:
-    token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
-    text_free(&bytes);
-    return ok;
+    return unit_read(source, roots, root_count, work, &out->unit) &&
+           out->unit.parsed;
 }
 
 /* The options every call of this run shares. */
@@ -164,18 +62,19 @@ static void base_options(struct options *o, const char *runtime,
 }
 
 /* Write the library file of a module, which the runner imports. */
-static bool compile_library(const struct unit *u, const struct options *base)
+static bool compile_library(const struct test_unit *u,
+                            const struct options *base)
 {
     struct options o = *base;
 
-    o.input = u->source;
-    o.output = text_cstr(&u->library);
+    o.input = u->unit.source;
+    o.output = text_cstr(&u->unit.library);
     o.library = true;
     return driver_run(&o) == 0;
 }
 
 /* Write the object of a module, which a dev build links. */
-static bool compile_object(struct unit *u, const struct options *base,
+static bool compile_object(struct test_unit *u, const struct options *base,
                            const char *work)
 {
     struct options o = *base;
@@ -185,10 +84,10 @@ static bool compile_object(struct unit *u, const struct options *base,
     /* DESIGN: antic takes -o as the base of a dev build and adds the
        suffix of each file it writes. The suffix of an object is the
        target's, `.obj` on Windows and `.o` everywhere else. */
-    text_appendf(&base_path, "%s/%s", work, text_cstr(&u->path));
+    text_appendf(&base_path, "%s/%s", work, text_cstr(&u->unit.path));
     text_appendf(&u->object, "%s%s", text_cstr(&base_path),
                  target_info(base->target)->object_suffix);
-    o.input = u->source;
+    o.input = u->unit.source;
     o.output = text_cstr(&base_path);
     o.dev = true;
     /* A module without `main` stops at its object, which is status 3. */
@@ -222,7 +121,8 @@ static void imports_free(struct imports *list)
    what lets a module of the standard library carry a `tests` block. The
    release run takes the whole program from the library files and needs
    none of this. */
-static bool compile_imports(const struct unit *u, const struct options *base,
+static bool compile_imports(const struct test_unit *u,
+                            const struct options *base,
                             const char *work, const char *flat,
                             struct imports *out)
 {
@@ -235,7 +135,7 @@ static bool compile_imports(const struct unit *u, const struct options *base,
     size_t i;
     bool ok = true;
 
-    seed[0] = text_cstr(&u->library);
+    seed[0] = text_cstr(&u->unit.library);
     search.libraries = seed;
     search.library_count = 1;
     search.input = NULL;
@@ -287,27 +187,29 @@ static bool compile_imports(const struct unit *u, const struct options *base,
    of a test that returned. A failed assertion prints the name and its
    position from the runtime, then ends the process. The last line of a
    run that stopped names the test that stopped it. */
-static void write_runner(const struct unit *u, struct text *out)
+static void write_runner(const struct test_unit *u, struct text *out)
 {
+    const char *last = module_path_last(text_cstr(&u->unit.path));
     size_t i;
 
     text_append(out, "//! The runner `anti test` wrote for one module.\n");
-    text_appendf(out, "import %s;\n\n", text_cstr(&u->path));
+    text_appendf(out, "import %s;\n\n", text_cstr(&u->unit.path));
     text_append(out, "extern fn printf(format: ?*byte, ...) -> c_int;\n");
     text_append(out, "extern fn anti_rt_test_running(name: ?*byte, "
                      "length: int);\n\n");
     text_append(out, "fn main() -> int\n{\n");
-    for (i = 0; i < u->test_count; i++) {
+    for (i = 0; i < u->unit.test_count; i++) {
         struct text name = {0};
-        text_appendf(&name, "%s.%s", text_cstr(&u->path), u->tests[i]);
+        text_appendf(&name, "%s.%s", text_cstr(&u->unit.path),
+                     u->unit.tests[i]);
         text_appendf(out, "\tanti_rt_test_running(\"%s\".ptr, %zu);\n",
                      text_cstr(&name), name.length);
-        if (u->setup) {
-            text_appendf(out, "\t%s.setup();\n", u->last);
+        if (u->unit.setup) {
+            text_appendf(out, "\t%s.setup();\n", last);
         }
-        text_appendf(out, "\t%s.%s();\n", u->last, u->tests[i]);
-        if (u->teardown) {
-            text_appendf(out, "\t%s.teardown();\n", u->last);
+        text_appendf(out, "\t%s.%s();\n", last, u->unit.tests[i]);
+        if (u->unit.teardown) {
+            text_appendf(out, "\t%s.teardown();\n", last);
         }
         text_appendf(out, "\tprintf(\"ok %%.*s\\n\".ptr, %zu as c_int, "
                           "\"%s\".ptr);\n",
@@ -318,10 +220,10 @@ static void write_runner(const struct unit *u, struct text *out)
     text_append(out, "\treturn 0;\n}\n");
 }
 
-/* Build the runner of one module and run it. */
 /* The frameworks that the library files below the module name, which
    the link of the runner passes as --framework, as `anti build` does. */
-static bool runner_frameworks(const struct unit *u, const struct options *base,
+static bool runner_frameworks(const struct test_unit *u,
+                              const struct options *base,
                               struct arena *arena, struct options *o)
 {
     struct options search = *base;
@@ -329,7 +231,7 @@ static bool runner_frameworks(const struct unit *u, const struct options *base,
     const char **paths = NULL;
     size_t count = 0;
 
-    seed[0] = text_cstr(&u->library);
+    seed[0] = text_cstr(&u->unit.library);
     search.libraries = seed;
     search.library_count = 1;
     search.input = NULL;
@@ -338,7 +240,8 @@ static bool runner_frameworks(const struct unit *u, const struct options *base,
                              &o->framework_count);
 }
 
-static bool run_unit(const struct unit *u, const struct options *base,
+/* Build the runner of one module and run it. */
+static bool run_unit(const struct test_unit *u, const struct options *base,
                      const char *work, bool release)
 {
     struct options o = *base;
@@ -363,12 +266,7 @@ static bool run_unit(const struct unit *u, const struct options *base,
     if (!files_make_dirs(text_cstr(&directory))) {
         goto done;
     }
-    text_appendf(&flat, "%s", text_cstr(&u->path));
-    for (i = 0; i < flat.length; i++) {
-        if (flat.data[i] == '.') {
-            flat.data[i] = '_';
-        }
-    }
+    unit_flat_path(text_cstr(&u->unit.path), &flat);
     text_appendf(&path, "%s/%s%s", text_cstr(&directory), text_cstr(&flat),
                  SOURCE_SUFFIX);
     text_appendf(&program, "%s/%s.runner", work, text_cstr(&flat));
@@ -422,11 +320,10 @@ int test_run(const char *const *sources, size_t source_count,
 {
     struct options base;
     const char **search;
-    struct unit *units;
+    struct test_unit *units;
     size_t total = 0;
     size_t failed = 0;
     size_t i;
-    size_t j;
 
     if (source_count == 0) {
         fputs("anti: test takes one or more .anti files\n", stderr);
@@ -455,7 +352,7 @@ int test_run(const char *const *sources, size_t source_count,
             failed = source_count;
             goto done;
         }
-        total += units[i].test_count;
+        total += units[i].unit.test_count;
     }
     /* Every library file first, so a module that imports another of the
        run finds it however the files were ordered. */
@@ -467,7 +364,7 @@ int test_run(const char *const *sources, size_t source_count,
         }
     }
     for (i = 0; i < source_count; i++) {
-        if (units[i].test_count == 0) {
+        if (units[i].unit.test_count == 0) {
             continue;
         }
         if (!run_unit(&units[i], &base, work, release)) {
@@ -478,12 +375,7 @@ int test_run(const char *const *sources, size_t source_count,
            total, source_count, failed, failed == 1 ? "" : "s");
 done:
     for (i = 0; i < source_count; i++) {
-        for (j = 0; j < units[i].test_count; j++) {
-            free(units[i].tests[j]);
-        }
-        free(units[i].tests);
-        text_free(&units[i].path);
-        text_free(&units[i].library);
+        unit_free(&units[i].unit);
         text_free(&units[i].object);
     }
     free(units);

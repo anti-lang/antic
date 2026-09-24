@@ -50,17 +50,6 @@ struct doc_blocks {
     size_t capacity;
 };
 
-/* The module path with `_` for every dot, which names a file of the work
-   directory. */
-static void flat_path(const char *module, struct text *out)
-{
-    const char *p;
-
-    for (p = module; *p != '\0'; p++) {
-        text_appendf(out, "%c", *p == '.' ? '_' : *p);
-    }
-}
-
 /* The options every call of the run shares. */
 static void base_options(struct options *o, const char *runtime,
                          const char **roots, size_t root_count)
@@ -279,7 +268,7 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
     struct text name = {0};
     bool ok = false;
 
-    flat_path(text_cstr(&u->path), &flat);
+    unit_flat_path(text_cstr(&u->path), &flat);
     if (one->dev) {
         struct text directory = {0};
         struct text original = {0};
