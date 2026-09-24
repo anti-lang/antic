@@ -131,6 +131,20 @@ struct mach_opcode {
 struct target_desc;
 
 struct mach_inst *mach_append(struct mach_block *b);
+/* Append an instruction of op with count operands, which the two back
+   ends write in their prologues, epilogues and spills. */
+struct mach_inst *mach_add(struct mach_block *b, unsigned op, size_t count,
+                           const struct mach_operand *operands);
+
+/* Operands both back ends build. mach_widened gives o with the width w
+   when it is a register. mach_mem gives memory of width bits at offset
+   after the address in register base. mach_cond_op gives a condition
+   code, and mach_block_op the label of the IR block o names. */
+struct mach_operand mach_widened(struct mach_operand o, uint8_t w);
+struct mach_operand mach_mem(struct mach_operand base, int64_t offset,
+                             uint8_t bits);
+struct mach_operand mach_cond_op(enum mach_cond c);
+struct mach_operand mach_block_op(const struct ir_operand *o);
 uint32_t mach_slot_add(struct mach_function *f, uint64_t size,
                        uint64_t align);
 /* Add a virtual register to f, of the float class when fp is set and of

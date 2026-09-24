@@ -266,16 +266,6 @@ static void move(struct selector *s, struct mach_operand dst,
     emit2(s, fp ? A64_FMOV : A64_MOV, dst, src);
 }
 
-static void append(struct mach_block *b, enum a64_op op, size_t count,
-                   const struct mach_operand *operands)
-{
-    struct mach_inst *inst = mach_append(b);
-
-    inst->op = (uint16_t)op;
-    inst->count = (uint8_t)count;
-    memcpy(inst->operands, operands, count * sizeof *operands);
-}
-
 /* An instruction holds a 16-bit immediate. mov takes a value that fits,
    or whose bitwise inverse fits. Other values go in as 16-bit pieces with
    movz and movk. */
@@ -292,7 +282,7 @@ static void load_into(struct mach_block *b, struct mach_operand dst,
     ops[0] = dst;
     if (v <= 0xffff || (~v & mask) <= 0xffff) {
         ops[1] = mach_imm(v <= 0xffff ? (int64_t)v : signed_v);
-        append(b, A64_MOV, 2, ops);
+        mach_add(b, A64_MOV, 2, ops);
         return;
     }
     for (shift = 0; shift < dst.width; shift += 16) {
@@ -302,7 +292,7 @@ static void load_into(struct mach_block *b, struct mach_operand dst,
         }
         ops[1] = mach_imm((int64_t)piece);
         ops[2] = mach_imm(shift);
-        append(b, first ? A64_MOVZ : A64_MOVK, shift == 0 ? 2 : 3, ops);
+        mach_add(b, first ? A64_MOVZ : A64_MOVK, shift == 0 ? 2 : 3, ops);
         first = false;
     }
 }
@@ -376,10 +366,10 @@ static void append_imm12(struct mach_block *b, enum a64_op op, size_t count,
     if (v > 4095) {
         ops[count] = mach_imm(v >> 12);
         ops[count + 1] = mach_imm(12);
-        append(b, op, count + 2, ops);
+        mach_add(b, op, count + 2, ops);
     } else {
         ops[count] = mach_imm(v);
-        append(b, op, count + 1, ops);
+        mach_add(b, op, count + 1, ops);
     }
 }
 
@@ -480,14 +470,6 @@ static void emit_binary(struct selector *s, const struct ir_inst *inst)
     emit3(s, op, r, a, select_reg(s, &inst->b));
 }
 
-static struct mach_operand widened(struct mach_operand o, uint8_t w)
-{
-    if (o.kind == MACH_VREG || o.kind == MACH_PREG) {
-        o.width = w;
-    }
-    return o;
-}
-
 /* The register that holds operand o extended to at least 32 bits. */
 static struct mach_operand extended(struct selector *s,
                                     const struct ir_operand *o,
@@ -552,19 +534,6 @@ static void emit_shift(struct selector *s, const struct ir_inst *inst)
     }
 }
 
-/* Memory of width bits at offset after the address in register base. */
-static struct mach_operand memory_at(struct mach_operand base, int64_t offset,
-                                     uint8_t width_bits)
-{
-    struct mach_operand m = base;
-
-    m.kind = MACH_MEM;
-    m.base_vreg = base.kind == MACH_VREG;
-    m.width = width_bits;
-    m.value = offset;
-    return m;
-}
-
 /* A call of a C library function by name with integer arguments. */
 static void call_c(struct selector *s, const char *name,
                    const struct mach_operand *args, size_t count)
@@ -606,8 +575,8 @@ static void copy_memory(struct selector *s, struct mach_operand dst,
         uint64_t left = size - offset;
         uint8_t n = left >= 8 ? 64 : left >= 4 ? 32 : left >= 2 ? 16 : 8;
         struct mach_operand t = select_new_vreg(s, n == 64 ? 64 : 32);
-        emit2(s, A64_LDR, t, memory_at(src, (int64_t)offset, n));
-        emit2(s, A64_STR, t, memory_at(dst, (int64_t)offset, n));
+        emit2(s, A64_LDR, t, mach_mem(src, (int64_t)offset, n));
+        emit2(s, A64_STR, t, mach_mem(dst, (int64_t)offset, n));
         offset += n / 8;
     }
 }
@@ -628,17 +597,17 @@ static void load_bytes(struct selector *s, struct mach_operand dst,
     struct mach_operand rest;
 
     if (is_float_register(s, dst) || bytes == 8) {
-        emit2(s, A64_LDR, widened(dst, (uint8_t)(bytes * 8)),
-              memory_at(base, offset, (uint8_t)(bytes * 8)));
+        emit2(s, A64_LDR, mach_widened(dst, (uint8_t)(bytes * 8)),
+              mach_mem(base, offset, (uint8_t)(bytes * 8)));
     } else if (bytes == 4 || bytes == 2 || bytes == 1) {
-        emit2(s, A64_LDR, widened(dst, 32),
-              memory_at(base, offset, (uint8_t)(bytes * 8)));
+        emit2(s, A64_LDR, mach_widened(dst, 32),
+              mach_mem(base, offset, (uint8_t)(bytes * 8)));
     } else {
         load_bytes(s, dst, base, offset, low);
         rest = select_new_vreg(s, 64);
         load_bytes(s, rest, base, offset + low, bytes - low);
         emit3(s, A64_LSL, rest, rest, mach_imm(8 * low));
-        emit3(s, A64_ORR, widened(dst, 64), widened(dst, 64), rest);
+        emit3(s, A64_ORR, mach_widened(dst, 64), mach_widened(dst, 64), rest);
     }
 }
 
@@ -651,15 +620,15 @@ static void store_bytes(struct selector *s, struct mach_operand src,
     struct mach_operand rest;
 
     if (is_float_register(s, src) || bytes == 8) {
-        emit2(s, A64_STR, widened(src, (uint8_t)(bytes * 8)),
-              memory_at(base, offset, (uint8_t)(bytes * 8)));
+        emit2(s, A64_STR, mach_widened(src, (uint8_t)(bytes * 8)),
+              mach_mem(base, offset, (uint8_t)(bytes * 8)));
     } else if (bytes == 4 || bytes == 2 || bytes == 1) {
-        emit2(s, A64_STR, widened(src, 32),
-              memory_at(base, offset, (uint8_t)(bytes * 8)));
+        emit2(s, A64_STR, mach_widened(src, 32),
+              mach_mem(base, offset, (uint8_t)(bytes * 8)));
     } else {
         store_bytes(s, src, base, offset, low);
         rest = select_new_vreg(s, 64);
-        emit3(s, A64_LSR, rest, widened(src, 64), mach_imm(8 * low));
+        emit3(s, A64_LSR, rest, mach_widened(src, 64), mach_imm(8 * low));
         store_bytes(s, rest, base, offset + low, bytes - low);
     }
 }
@@ -670,7 +639,7 @@ static void slot_address(struct selector *s, struct mach_operand dst,
     struct mach_operand o = mach_imm(slot);
 
     o.kind = MACH_SLOT;
-    emit3(s, A64_ADD, widened(dst, 64), mach_preg(SP, 64), o);
+    emit3(s, A64_ADD, mach_widened(dst, 64), mach_preg(SP, 64), o);
 }
 
 /* The address of an aggregate in the argument area of the caller, 16
@@ -681,7 +650,7 @@ static void incoming_address(struct selector *s, struct mach_operand dst,
     struct mach_operand ops[4];
 
     s->out->stack_params = true;
-    ops[0] = widened(dst, 64);
+    ops[0] = mach_widened(dst, 64);
     ops[1] = mach_preg(X29, 64);
     emit_imm12(s, A64_ADD, 2, ops, 16 + offset);
 }
@@ -702,7 +671,7 @@ static struct mach_operand copy_argument(struct selector *s,
         copy_memory(s, address, value, agg->size);
         if (loc->stack) {
             emit2(s, A64_STR, address,
-                  memory_at(mach_preg(SP, 64), loc->offset, 64));
+                  mach_mem(mach_preg(SP, 64), loc->offset, 64));
         }
         return address;
     }
@@ -821,7 +790,7 @@ static void vector_load(struct selector *s, uint8_t reg,
                         unsigned bytes)
 {
     emit2(s, A64_VLDR, mach_preg(reg, (uint8_t)(bytes * 8)),
-          memory_at(base, offset, (uint8_t)(bytes * 8)));
+          mach_mem(base, offset, (uint8_t)(bytes * 8)));
 }
 
 static void vector_store(struct selector *s, uint8_t reg,
@@ -829,7 +798,7 @@ static void vector_store(struct selector *s, uint8_t reg,
                          unsigned bytes)
 {
     emit2(s, A64_VSTR, mach_preg(reg, (uint8_t)(bytes * 8)),
-          memory_at(base, offset, (uint8_t)(bytes * 8)));
+          mach_mem(base, offset, (uint8_t)(bytes * 8)));
 }
 
 /* The instruction of the lane operation op, which is not a comparison. */
@@ -988,7 +957,7 @@ static void emit_vsplat(struct selector *s, const struct ir_inst *inst)
     if (select_is_float(sh.lane)) {
         value = element_of(value, sh.lane_bytes * 8, 0);
     } else {
-        value = widened(value, sh.lane_bytes == 8 ? 64 : 32);
+        value = mach_widened(value, sh.lane_bytes == 8 ? 64 : 32);
     }
     emit2(s, A64_DUP, vector_of(V(16), arr), value);
     for (k = 0; k < sh.chunks; k++) {
@@ -1118,7 +1087,7 @@ static void emit_vreduce(struct selector *s, const struct ir_inst *inst)
     if (select_is_float(sh.lane)) {
         emit2(s, A64_FMOV, result, mach_preg(V(16), result.width));
     } else {
-        emit2(s, A64_UMOV, widened(result, sh.lane_bytes == 8 ? 64 : 32),
+        emit2(s, A64_UMOV, mach_widened(result, sh.lane_bytes == 8 ? 64 : 32),
               element_of(mach_preg(V(16), 128), sh.lane_bytes * 8, 0));
     }
 }
@@ -1153,7 +1122,6 @@ static bool vector_native(const struct ir_inst *inst,
 
 /* Floats */
 
-static struct mach_operand cond(enum mach_cond c);
 
 static bool match_float(const struct selector *s, const struct ir_inst *inst)
 {
@@ -1216,7 +1184,7 @@ static void emit_float_compare(struct selector *s, const struct ir_inst *inst)
     struct mach_operand b = select_reg(s, &inst->b);
 
     emit2(s, A64_FCMP, a, b);
-    emit2(s, A64_CSET, select_result(s, inst), cond(c));
+    emit2(s, A64_CSET, select_result(s, inst), mach_cond_op(c));
 }
 
 /* scvtf and ucvtf convert a w or x register, fcvtzs and fcvtzu truncate
@@ -1256,10 +1224,10 @@ static void emit_half_convert(struct selector *s, const struct ir_inst *inst)
     struct mach_operand half = select_new_fp_vreg(s, 32);
 
     if (inst->op == IR_HEXT) {
-        emit2(s, A64_FMOV, half, widened(a, 32));
-        emit2(s, A64_FCVT, r, widened(half, 16));
+        emit2(s, A64_FMOV, half, mach_widened(a, 32));
+        emit2(s, A64_FCVT, r, mach_widened(half, 16));
     } else {
-        emit2(s, A64_FCVT, widened(half, 16), a);
+        emit2(s, A64_FCVT, mach_widened(half, 16), a);
         emit2(s, A64_FMOV, r, half);
     }
 }
@@ -1299,16 +1267,16 @@ static void emit_convert(struct selector *s, const struct ir_inst *inst)
                        ? (uint64_t)select_signed(inst->a.as.integer, from)
                        : inst->a.as.integer);
     } else if (inst->op == IR_TRUNC) {
-        move(s, widened(r, 32), widened(select_reg(s, &inst->a), 32));
+        move(s, mach_widened(r, 32), mach_widened(select_reg(s, &inst->a), 32));
     } else if (inst->op == IR_ZEXT && from == 32) {
-        emit2(s, A64_MOVW, widened(r, 32),
-              widened(select_reg(s, &inst->a), 32));
+        emit2(s, A64_MOVW, mach_widened(r, 32),
+              mach_widened(select_reg(s, &inst->a), 32));
     } else if (inst->op == IR_SEXT) {
         emit2(s, sext[from == 8 ? 0 : from == 16 ? 1 : 2], r,
-              widened(select_reg(s, &inst->a), 32));
+              mach_widened(select_reg(s, &inst->a), 32));
     } else {
-        emit2(s, from == 8 ? A64_UXTB : A64_UXTH, widened(r, 32),
-              widened(select_reg(s, &inst->a), 32));
+        emit2(s, from == 8 ? A64_UXTB : A64_UXTH, mach_widened(r, 32),
+              mach_widened(select_reg(s, &inst->a), 32));
     }
 }
 
@@ -1374,26 +1342,11 @@ static void compare(struct selector *s, const struct ir_inst *inst)
     emit2(s, A64_CMP, a, select_reg(s, &inst->b));
 }
 
-static struct mach_operand cond(enum mach_cond c)
-{
-    struct mach_operand o = mach_imm(c);
-
-    o.kind = MACH_COND;
-    return o;
-}
-
-static struct mach_operand block(const struct ir_operand *o)
-{
-    struct mach_operand b = mach_imm(o->as.index);
-
-    b.kind = MACH_BLOCK;
-    return b;
-}
-
 static void emit_set(struct selector *s, const struct ir_inst *inst)
 {
     compare(s, inst);
-    emit2(s, A64_CSET, select_result(s, inst), cond(select_cond(inst->op)));
+    emit2(s, A64_CSET, select_result(s, inst),
+          mach_cond_op(select_cond(inst->op)));
 }
 
 /* The condition that holds when the operation left the range of its
@@ -1432,7 +1385,7 @@ static void emit_overflow(struct selector *s, const struct ir_inst *inst)
                  : inst->op == IR_SUB_OV ? A64_SUB
                                          : A64_MUL,
               wide, wa, wb);
-        emit2(s, A64_MOV, r, widened(wide, n));
+        emit2(s, A64_MOV, r, mach_widened(wide, n));
         emit2(s, extension(n, true), back, wide);
         emit2(s, A64_CMP, wide, back);
         return;
@@ -1445,8 +1398,8 @@ static void emit_overflow(struct selector *s, const struct ir_inst *inst)
         struct mach_operand wide = select_new_vreg(s, 64);
         back = select_new_vreg(s, 64);
         emit3(s, A64_SMULL, wide, a, b);
-        emit2(s, A64_MOV, r, widened(wide, 32));
-        emit2(s, A64_SXTW, back, widened(wide, 32));
+        emit2(s, A64_MOV, r, mach_widened(wide, 32));
+        emit2(s, A64_SXTW, back, mach_widened(wide, 32));
         emit2(s, A64_CMP, wide, back);
         return;
     }
@@ -1486,7 +1439,7 @@ static void emit_mul_high(struct selector *s, const struct ir_inst *inst)
         emit3(s, A64_MUL, wide, a, b);
     }
     emit3(s, is_signed ? A64_ASR : A64_LSR, wide, wide, mach_imm(n));
-    move(s, r, widened(wide, 32));
+    move(s, r, mach_widened(wide, 32));
 }
 
 /* DESIGN: adds, adcs, subs, sbcs and negs set the four flags of 32 and 64
@@ -1530,7 +1483,8 @@ static void emit_flag_op(struct selector *s, const struct ir_inst *inst)
         return;
     }
     bit = select_new_vreg(s, 32);
-    emit3(s, A64_AND, bit, widened(select_reg(s, &inst->c), 32), mach_imm(1));
+    emit3(s, A64_AND, bit, mach_widened(select_reg(s, &inst->c), 32),
+          mach_imm(1));
     if (add) {
         ops[1] = bit;
         emit_imm12(s, A64_CMP, 1, ops + 1, 1);
@@ -1551,12 +1505,12 @@ static void emit_flag(struct selector *s, const struct ir_inst *inst)
                        : s->flags->op == IR_ADD_FL       ? COND_HS
                                                          : COND_LO;
 
-    emit2(s, A64_CSET, select_result(s, inst), cond(c));
+    emit2(s, A64_CSET, select_result(s, inst), mach_cond_op(c));
 }
 
 static void jump(struct selector *s, const struct ir_operand *target)
 {
-    struct mach_operand b = block(target);
+    struct mach_operand b = mach_block_op(target);
 
     if (!select_is_next(s, target)) {
         select_emit(s, A64_B, 1, &b);
@@ -1575,10 +1529,11 @@ static void conditional(struct selector *s, const struct ir_inst *inst,
                         enum mach_cond c)
 {
     if (select_is_next(s, &inst->b)) {
-        emit2(s, A64_BCOND, cond(select_negate(c)), block(&inst->c));
+        emit2(s, A64_BCOND, mach_cond_op(select_negate(c)),
+              mach_block_op(&inst->c));
         return;
     }
-    emit2(s, A64_BCOND, cond(c), block(&inst->b));
+    emit2(s, A64_BCOND, mach_cond_op(c), mach_block_op(&inst->b));
     jump(s, &inst->c);
 }
 
@@ -1602,10 +1557,10 @@ static void emit_branch(struct selector *s, const struct ir_inst *inst)
     struct mach_operand c = select_reg(s, &inst->a);
 
     if (select_is_next(s, &inst->b)) {
-        emit2(s, A64_CBZ, c, block(&inst->c));
+        emit2(s, A64_CBZ, c, mach_block_op(&inst->c));
         return;
     }
-    emit2(s, A64_CBNZ, c, block(&inst->b));
+    emit2(s, A64_CBNZ, c, mach_block_op(&inst->b));
     jump(s, &inst->c);
 }
 
@@ -1809,7 +1764,7 @@ static void load_value(struct selector *s, struct mach_operand reg,
                  : value->as.integer);
     } else if (select_is_float(value->type)) {
         struct mach_operand v = select_reg(s, value);
-        emit2(s, A64_FMOV, fp_reg ? reg : widened(reg, v.width), v);
+        emit2(s, A64_FMOV, fp_reg ? reg : mach_widened(reg, v.width), v);
     } else if (ext != IR_EXT_NONE) {
         emit2(s, extension(bits(value->type), ext == IR_EXT_SIGN), reg,
               select_reg(s, value));
@@ -2360,7 +2315,7 @@ static void load_spill(struct mach_block *b, uint8_t reg, int64_t offset)
         load_into(b, mach_preg(index, 64), (uint64_t)offset);
         ops[1] = stack_indexed(index);
     }
-    append(b, A64_LDR, 2, ops);
+    mach_add(b, A64_LDR, 2, ops);
 }
 
 static void store_spill(struct mach_block *b, uint8_t reg, int64_t offset)
@@ -2374,7 +2329,7 @@ static void store_spill(struct mach_block *b, uint8_t reg, int64_t offset)
         load_into(b, mach_preg(other, 64), (uint64_t)offset);
         ops[1] = stack_indexed(other);
     }
-    append(b, A64_STR, 2, ops);
+    mach_add(b, A64_STR, 2, ops);
 }
 
 /* The address of a slot is add dst, sp, #offset. An offset that no 12-bit
@@ -2399,7 +2354,7 @@ static void expand(struct mach_block *b, const struct mach_inst *inst)
     }
     load_into(b, ops[0], (uint64_t)offset);
     ops[2] = ops[0];
-    append(b, A64_ADD, 3, ops);
+    mach_add(b, A64_ADD, 3, ops);
 }
 
 /* Move sp down by size bytes of the frame, through x16 when no 12-bit
@@ -2416,7 +2371,7 @@ static void allocate_frame(struct mach_block *b, const struct frame *frame,
         memset(ops, 0, sizeof ops);
         ops[0].kind = MACH_NAME;
         ops[0].name = "__chkstk";
-        append(b, A64_BL, 1, ops);
+        mach_add(b, A64_BL, 1, ops);
     }
     ops[0] = mach_preg(SP, 64);
     ops[1] = mach_preg(SP, 64);
@@ -2426,7 +2381,7 @@ static void allocate_frame(struct mach_block *b, const struct frame *frame,
     }
     load_into(b, mach_preg(X16, 64), bytes);
     ops[2] = mach_preg(X16, 64);
-    append(b, A64_SUB, 3, ops);
+    mach_add(b, A64_SUB, 3, ops);
 }
 
 static void resolve_slot(struct mach_operand *o, int64_t offset)
@@ -2442,7 +2397,7 @@ static void unwind(struct mach_block *b, const struct frame *frame,
                    const struct mach_operand *operands)
 {
     if (frame->unwind) {
-        append(b, op, count, operands);
+        mach_add(b, op, count, operands);
     }
 }
 
@@ -2493,13 +2448,13 @@ static void prologue(struct mach_block *b, const struct frame *frame)
     ops[0] = mach_preg(X29, 64);
     ops[1] = mach_preg(X30, 64);
     ops[2] = stack(-16, INDEX_PRE);
-    append(b, A64_STP, 3, ops);
+    mach_add(b, A64_STP, 3, ops);
     ops[0] = mach_imm(16);
     unwind(b, frame, A64_SEH_SAVE_FPLR_X, 1, ops);
     ops[0] = mach_preg(X29, 64);
     ops[1] = mach_preg(SP, 64);
     if (!frame->unwind) {
-        append(b, A64_MOV, 2, ops);
+        mach_add(b, A64_MOV, 2, ops);
         if (frame->size > 0) {
             allocate_frame(b, frame, frame->size);
         }
@@ -2509,7 +2464,7 @@ static void prologue(struct mach_block *b, const struct frame *frame)
         return;
     }
     if (area == 0) {
-        append(b, A64_MOV, 2, ops);
+        mach_add(b, A64_MOV, 2, ops);
         unwind(b, frame, A64_SEH_SET_FP, 0, ops);
     } else {
         ops[0] = mach_preg(SP, 64);
@@ -2556,7 +2511,7 @@ static void free_stack(struct mach_block *b, const struct frame *frame,
         }
         free(load.insts);
         ops[2] = mach_preg(X16, 64);
-        append(b, A64_ADD, 3, ops);
+        mach_add(b, A64_ADD, 3, ops);
     }
     ops[0] = mach_imm((int64_t)bytes);
     unwind(b, frame, A64_SEH_STACKALLOC, 1, ops);
@@ -2591,7 +2546,7 @@ static void epilogue(struct mach_block *b, const struct frame *frame)
         ops[0] = mach_preg(X29, 64);
         ops[1] = mach_preg(X30, 64);
         ops[2] = stack(16, INDEX_POST);
-        append(b, A64_LDP, 3, ops);
+        mach_add(b, A64_LDP, 3, ops);
         ops[0] = mach_imm(16);
         unwind(b, frame, A64_SEH_SAVE_FPLR_X, 1, ops);
         unwind(b, frame, A64_SEH_ENDEPILOGUE, 0, ops);
@@ -2603,12 +2558,12 @@ static void epilogue(struct mach_block *b, const struct frame *frame)
     if (frame->size > 0) {
         ops[0] = mach_preg(SP, 64);
         ops[1] = mach_preg(X29, 64);
-        append(b, A64_MOV, 2, ops);
+        mach_add(b, A64_MOV, 2, ops);
     }
     ops[0] = mach_preg(X29, 64);
     ops[1] = mach_preg(X30, 64);
     ops[2] = stack(16, INDEX_POST);
-    append(b, A64_LDP, 3, ops);
+    mach_add(b, A64_LDP, 3, ops);
 }
 
 /* A parameter beyond x7 lies in the argument area of the caller, which

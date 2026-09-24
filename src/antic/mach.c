@@ -18,6 +18,70 @@ struct mach_inst *mach_append(struct mach_block *b)
     return inst;
 }
 
+struct mach_inst *mach_add(struct mach_block *b, unsigned op, size_t count,
+                           const struct mach_operand *operands)
+{
+    struct mach_inst *inst;
+
+    if (count > MACH_MAX_OPERANDS) {
+        /* Unreachable: every caller passes an array of its own size. */
+        fputs("antic: an instruction takes more than MACH_MAX_OPERANDS "
+              "operands\n", stderr);
+        abort();
+    }
+    inst = mach_append(b);
+    inst->op = (uint16_t)op;
+    inst->count = (uint8_t)count;
+    if (count > 0) {
+        memcpy(inst->operands, operands, count * sizeof *operands);
+    }
+    return inst;
+}
+
+struct mach_operand mach_widened(struct mach_operand o, uint8_t w)
+{
+    if (o.kind == MACH_VREG || o.kind == MACH_PREG) {
+        o.width = w;
+    }
+    return o;
+}
+
+struct mach_operand mach_mem(struct mach_operand base, int64_t offset,
+                             uint8_t bits)
+{
+    struct mach_operand m = base;
+
+    m.kind = MACH_MEM;
+    m.base_vreg = base.kind == MACH_VREG;
+    m.width = bits;
+    m.value = offset;
+    return m;
+}
+
+/* A condition and a block are immediates of another kind, of width 64
+   as every immediate is. */
+struct mach_operand mach_cond_op(enum mach_cond c)
+{
+    struct mach_operand o;
+
+    memset(&o, 0, sizeof o);
+    o.kind = MACH_COND;
+    o.width = 64;
+    o.value = c;
+    return o;
+}
+
+struct mach_operand mach_block_op(const struct ir_operand *o)
+{
+    struct mach_operand b;
+
+    memset(&b, 0, sizeof b);
+    b.kind = MACH_BLOCK;
+    b.width = 64;
+    b.value = o->as.index;
+    return b;
+}
+
 /* Slots and virtual registers are 32-bit indices in an operand. A
    function that needs more than that many ends the run as an allocation
    failure does. */
