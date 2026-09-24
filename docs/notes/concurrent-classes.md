@@ -66,6 +66,13 @@ channels.
 - A field that code outside the class reaches and that carries `unchecked` is
   reported at its declaration as well, where the clause silences it. The clause
   is therefore used, since another module may write the field.
+- `compare_swap` on a plain field is `unchecked_swap` in `sema_call.c`. It takes
+  a field of one word of a concurrent class, or of a type nested in one, that
+  `unchecked(unguarded-field)` marks after its type or in the class header, and
+  builds the node of an atomic field. It calls `sema_note_field_write`, so the
+  field is reported at its declaration and the clause is used. Any other plain
+  field is refused with both fixes. The parser reads the clauses after the type
+  of a struct's field, which the node of a lock-free queue needs.
 - The library file writes the name of a field's guard and two marks, `hidden`
   and `unchecked`, in the byte of `inject`. The class that a nested type's guard
   names stays behind, since no other module reaches a nested type. The format is

@@ -505,7 +505,8 @@ add_test(NAME dev_object_lang
             "${ANTIC_RUNTIME_DIR}/std/anti/lang.antl")
 set_tests_properties(dev_object_lang PROPERTIES FIXTURES_SETUP lang_dev_object)
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
-        channel_workers synchronized concurrent)
+        channel_workers synchronized concurrent
+        lock_free_queue)
     set(objects "")
     if(name STREQUAL "sync_exits")
         set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o")
@@ -701,7 +702,8 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     set_tests_properties(program_nullable_macos-x86_64 PROPERTIES
         ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
     foreach(name IN ITEMS sync_exits sync_workers channels select_two
-            channel_workers parallel_join synchronized concurrent)
+            channel_workers parallel_join synchronized concurrent
+        lock_free_queue)
         set_tests_properties(program_${name}_macos-x86_64 PROPERTIES
             TIMEOUT 120)
     endforeach()
@@ -724,7 +726,8 @@ set_tests_properties(program_nullable PROPERTIES
 # timeout reports it. tests/programs/parallel_join.anti passes
 # --anti.threads=6 for the joiner, the job it waits for and a chunk.
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
-        channel_workers parallel_join synchronized concurrent)
+        channel_workers parallel_join synchronized concurrent
+        lock_free_queue)
     set_tests_properties(program_${name} PROPERTIES TIMEOUT 120)
 endforeach()
 
@@ -2899,7 +2902,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "concurrent|-S,-o,${LISTINGS}/concurrent.s,concurrent.anti"
         "concurrent_forms|-S,-o,${LISTINGS}/concurrent_forms.s,concurrent_forms.anti"
         "pointer_leak|-S,-o,${LISTINGS}/pointer_leak.s,pointer_leak.anti"
-        "mutex_copy|-S,-o,${LISTINGS}/mutex_copy.s,mutex_copy.anti")
+        "mutex_copy|-S,-o,${LISTINGS}/mutex_copy.s,mutex_copy.anti"
+        "compare_swap|-S,-o,${LISTINGS}/compare_swap.s,compare_swap.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

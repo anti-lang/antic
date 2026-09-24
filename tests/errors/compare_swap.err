@@ -1,0 +1,4 @@
+compare_swap.anti:44:2: error: `compare_swap` takes an atomic field, and `x` is a plain one: mark it `atomic`, or `unchecked(unguarded-field, "reason")` in a concurrent class
+compare_swap.anti:20:4: error: `compare_swap` takes an atomic field, and `n` is a plain one: mark it `atomic`, or `unchecked(unguarded-field, "reason")` in a concurrent class
+compare_swap.anti:22:3: error: `compare_swap` on a field that `unchecked` marks takes one word, an integer, a `bool` or a pointer, found `float`
+compare_swap.anti:27:3: error: `compare_swap` takes an atomic field, and `plain` is a plain one: mark it `atomic`, or `unchecked(unguarded-field, "reason")` in a concurrent class

@@ -1,0 +1,120 @@
+//! The queue of "Concurrent classes" in the additions document, without a lock
+//! on its links. `head` and `tail` are plain fields that `unchecked` marks,
+//! swapped with `compare_swap`, as is the `next` of each node. The chunks of a
+//! `parallel` push their values and then pop as many, so each value crosses to
+//! whichever thread takes it. A popped node stays linked from `first` until
+//! `destruct`, so no thread reads a node another freed.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Queue
+{
+	struct Node
+	{
+		value: int,
+		next: ?*Node unchecked(unguarded-field, "swapped with compare_swap, see push and pop"),
+	}
+
+	head: ?*Node = none unchecked(unguarded-field, "swapped with compare_swap, see push and pop"),
+	tail: ?*Node = none unchecked(unguarded-field, "swapped with compare_swap, see push and pop"),
+	lock: Mutex,
+	count: int = 0 guarded by lock,
+	first: ?*Node = none,
+
+	fn construct(self)
+	{
+		let d = alloc Node { value: 0, next: none };
+		self.first = d;
+		self.head = d;
+		self.tail = d;
+	}
+
+	fn destruct(self)
+	{
+		let n = self.first;
+		while n != none do {
+			let next = n.next;
+			free(n);
+			n = next;
+		}
+	}
+
+	pub fn push(self, v: int)
+	{
+		let n = alloc Node { value: v, next: none };
+		while true do {
+			let t = self.tail else { return; };
+			let next = t.next;
+			if next == none {
+				if t.next.compare_swap(none, n) {
+					self.tail.compare_swap(t, n);
+					break;
+				}
+			} else {
+				self.tail.compare_swap(t, next);
+			}
+		}
+		sync self.lock {
+			self.count += 1;
+		}
+	}
+
+	/// The oldest value, or -1 when the queue is empty.
+	pub fn pop(self) -> int
+	{
+		while true do {
+			let h = self.head else { return -1; };
+			let t = self.tail;
+			let next = h.next else { return -1; };
+			if h == t {
+				self.tail.compare_swap(t, next);
+			} else if self.head.compare_swap(h, next) {
+				return next.value;
+			}
+		}
+		return -1;
+	}
+
+	pub fn pushed(self) -> int
+	{
+		sync self.lock {
+			return self.count;
+		}
+	}
+}
+
+worker fn trade(chunk: []int, queue: *Queue) -> int
+{
+	for v in chunk {
+		queue.push(v);
+	}
+	let sum = 0;
+	for i in 0..chunk.len {
+		let v = queue.pop();
+		while v < 0 do {
+			v = queue.pop();
+		}
+		sum += v;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let queue = alloc Queue { };
+	let values = alloc([8000]int, 1) else { return 1; };
+	for i in 0..8000 {
+		(*values)[i] = i + 1;
+	}
+	let parts = parallel (*values)[0..8000] by 8 -> trade(queue);
+	let sum = 0;
+	for s in parts {
+		sum += s;
+	}
+	free(parts.ptr);
+	printf("%d %d %d\n".ptr, queue.pushed() as c_int, sum as c_int,
+		queue.pop() as c_int);
+	free(values);
+	delete(queue);
+	return 0;
+}

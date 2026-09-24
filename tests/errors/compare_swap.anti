@@ -1,0 +1,52 @@
+//! `compare_swap` takes an atomic field, and a field of one machine word that
+//! `unchecked` marks in a concurrent class, after its type or in the class
+//! header. On any other field the message names both fixes.
+
+struct Point
+{
+	x: int,
+}
+
+concurrent class Counter
+{
+	lock: Mutex,
+	n: int = 0 guarded by lock,
+	plain: int = 0,
+	wide: f64 = 0.0 unchecked(unguarded-field, "swapped with compare_swap"),
+
+	pub fn bump(self)
+	{
+		sync self.lock {
+			self.n.compare_swap(0, 1);
+		}
+		self.wide.compare_swap(0.0, 1.0);
+	}
+
+	fn construct(self)
+	{
+		self.plain.compare_swap(0, 1);
+	}
+}
+
+concurrent class Flag unchecked(unguarded-field, "raised once with compare_swap")
+{
+	raised: bool = false,
+
+	pub fn raise(self) -> bool
+	{
+		return self.raised.compare_swap(false, true);
+	}
+}
+
+fn main() -> int
+{
+	let p = Point { x: 0 };
+	p.x.compare_swap(0, 1);
+	let c = alloc Counter { };
+	c.bump();
+	delete(c);
+	let f = alloc Flag { };
+	f.raise();
+	delete(f);
+	return 0;
+}

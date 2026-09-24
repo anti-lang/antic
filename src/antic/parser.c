@@ -3281,6 +3281,7 @@ static struct item *item_level(struct parser *p)
            default or a base belongs to a class. */
         do {
             struct param field;
+            size_t mark;
             memset(&field, 0, sizeof field);
             field.doc = doc_before(p, TOKEN_DOC);
             field.note = doc_before(p, TOKEN_NOTE);
@@ -3289,13 +3290,17 @@ static struct item *item_level(struct parser *p)
                 free(fields.data);
                 return NULL;
             }
+            mark = p->clauses->count;
             if (!expect_name(p, &field.name) || !expect(p, TOKEN_COLON) ||
                 (field.type = type(p)) == NULL || !guard_clause(p, &field) ||
+                !field_clauses(p) ||
                 (accept(p, TOKEN_COLON) &&
                  (field.bits = expression(p)) == NULL)) {
                 free(fields.data);
                 return NULL;
             }
+            field.unchecked = unchecks_guard(p, mark);
+            close_clauses(p, mark, field.pos);
             if (check(p, TOKEN_ASSIGN)) {
                 error_here(p, "a field of a struct has no default, which "
                               "belongs to a class");

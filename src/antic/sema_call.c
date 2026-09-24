@@ -597,6 +597,88 @@ static struct type *atomic_place(const struct expr *e)
     return f != NULL && f->atomic ? f->type : NULL;
 }
 
+/* Whether t is one word an atomic operation of the runtime moves: an
+   integer, a `bool` or a pointer. */
+static bool swaps_as_word(const struct type *t)
+{
+    return type_is_integer(t) || t->kind == TYPE_BOOL ||
+           t->kind == TYPE_POINTER;
+}
+
+/* DESIGN: `compare_swap` also takes a plain field of one word that
+   `unchecked(unguarded-field)` marks in a concurrent class, after the
+   field's type or in the class header. That is the lock-free structure
+   of "Concurrent classes", whose fields the checker cannot follow. The
+   call is the node of an atomic field, and it counts as a write, so the
+   clause covers the field it marks. A field of a class that declares
+   its own `compare_swap`, or of a pointer to one, keeps the call of that
+   function. Any other field is refused, and the message names both
+   fixes. */
+static bool unchecked_swap(struct checker *c, struct expr *e,
+                           struct type **out)
+{
+    struct expr *callee = e->as.call.callee;
+    struct expr *place = callee->as.field.base;
+    const struct type *s;
+    const struct struct_field *f = NULL;
+    const struct type *home;
+    size_t i;
+
+    if (place->kind != EXPR_FIELD || place->type == NULL) {
+        return false;
+    }
+    s = sema_struct_of(place->type);
+    if (s != NULL && sema_method_symbol(c, s, &callee->as.field.name) != NULL) {
+        return false;
+    }
+    s = sema_struct_of(place->as.field.base->type);
+    for (; s != NULL && f == NULL; s = s->kind == TYPE_CLASS ? s->base : NULL) {
+        f = sema_find_field(s, &place->as.field.name);
+    }
+    if (f == NULL || f->form != FIELD_PLAIN) {
+        return false;
+    }
+    home = f->home;
+    if (home == NULL || home->safety != SAFETY_CONCURRENT ||
+        !(f->unchecked || home->unchecked_fields)) {
+        sema_error_at(c, callee->pos, "`compare_swap` takes an atomic field, "
+                      "and `%.*s` is a plain one: mark it `atomic`, or "
+                      "`unchecked(unguarded-field, \"reason\")` in a "
+                      "concurrent class",
+                      (int)f->name.length, f->name.text);
+        *out = sema_builtin(c, TYPE_ERROR);
+        return true;
+    }
+    if (f->bits != 0 || !swaps_as_word(f->type)) {
+        sema_error_at(c, callee->pos, "`compare_swap` on a field that "
+                      "`unchecked` marks takes one word, an integer, a "
+                      "`bool` or a pointer, found `%s`", sema_tn(f->type));
+        *out = sema_builtin(c, TYPE_ERROR);
+        return true;
+    }
+    if (e->as.call.arg_count != 2) {
+        sema_error_at(c, e->pos, "`compare_swap` takes 2 arguments");
+        *out = sema_builtin(c, TYPE_ERROR);
+        return true;
+    }
+    sema_note_field_write(c, place);
+    e->as.atomic.a = e->as.call.args[0];
+    e->as.atomic.b = e->as.call.args[1];
+    e->as.atomic.op = ATOMIC_CAS;
+    e->as.atomic.place = place;
+    e->kind = EXPR_ATOMIC;
+    for (i = 0; i < 2; i++) {
+        struct expr *arg = i == 0 ? e->as.atomic.a : e->as.atomic.b;
+        if (!sema_require(c, arg, sema_check_expr(c, arg, f->type),
+                          f->type)) {
+            *out = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
+    }
+    *out = sema_builtin(c, TYPE_BOOL);
+    return true;
+}
+
 /* Rewrite a call on an atomic place. Returns false when the callee is no
    such call, and reports nothing then. */
 static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
@@ -635,7 +717,8 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
     }
     t = atomic_place(place);
     if (t == NULL) {
-        return false;
+        return sema_name_is(&callee->as.field.name, "compare_swap") &&
+               unchecked_swap(c, e, out);
     }
     for (i = 0; i < sizeof atomic_ops / sizeof atomic_ops[0]; i++) {
         if (!sema_name_is(&callee->as.field.name, atomic_ops[i].name)) {
