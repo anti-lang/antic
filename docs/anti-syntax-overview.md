@@ -342,27 +342,37 @@ Built: default values, a constant expression or `here`, over a module boundary a
 
 `fn(params) -> R { body }` as an expression is an anonymous function. At a parameter of function type it may leave out its types, which come from that parameter. One that uses a local of the enclosing function is a closure, and captures that local by reference.
 
-```anti not-built
-fn censor(text: str, words: Regex) -> (str, int)
+```anti
+fn each(items: []int, f: fn(int))
 {
-	let hits = 0;
-	let clean = text.replace(words, fn(m: Match) -> str {
-		hits += 1;
-		return "*".repeat(m.all.char_count());
-	});
-	return (clean, hits);
+	for x in items {
+		f(x);
+	}
 }
 
-fn on_click(b: *Button, keep f: fn(Event)) { }
-fn each(items: []int, concurrent f: fn(int)) { }
+fn count_even(items: []int) -> int
+{
+	let hits = 0;
+	each(items, fn(n) {
+		if n % 2 == 0 {
+			hits += 1;
+		}
+	});
+	return hits;
+}
 
+fn on_click(keep f: fn(int)) { }
+fn map_sum(items: []int, concurrent f: fn(int) -> int) -> int { return 0; }
+```
+
+```anti not-built
 let name = "report";
 on_click(b, snapshot fn(e) { save(name); });
 ```
 
-A closure never outlives what it captures. It is passed to a parameter that does not keep it, or held in a local used the same way, and never stored in a field, a return value, a global or a `keep` parameter. Creating one allocates nothing. A parameter that passes its function on to `parallel` or `dispatch` is marked `concurrent`, and a closure there may change a captured variable only when its type is thread-safe. `snapshot fn` copies what it uses when it is made, is read-only, holds numbers, `bool`, `char`, structs of those and `str`, and is accepted at a `keep` or a `concurrent` parameter. A parameter that does not keep its argument is two words, the code and a context pointer, and a kept function value stays one C function pointer.
+A closure never outlives what it captures. It is passed to a parameter that does not keep it, or held in a local used the same way, and never stored in a field, a return value, a global or a `keep` parameter. Creating one allocates nothing. A parameter that passes its function on to `parallel` or `dispatch` is marked `concurrent`, and a closure there may change a captured variable only when its type is thread-safe. A worker takes a closure through a `concurrent` parameter alone. `snapshot fn` copies what it uses when it is made, is read-only, holds numbers, `bool`, `char`, structs of those and `str`, and is accepted at a `keep` or a `concurrent` parameter. A parameter that does not keep its argument is two words, the code and a context pointer, and a kept function value stays one C function pointer. The header writes the two words as a callback and a `void *` context, and an `extern fn` takes C function pointers alone.
 
-Not built yet: anonymous functions, closures, `keep`, `concurrent` parameters and `snapshot fn`.
+Built: anonymous functions with their types from the target, closures that capture by reference, `keep` and `concurrent` with the checks on both sides, the two words of a parameter that does not keep its argument, and the rule of the worker. `programs/closures.anti` runs them, and `errors/closures.anti` holds the refusals. Not built yet: `snapshot fn`.
 
 ## Tuples
 
@@ -1229,7 +1239,7 @@ Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.
 
 ## Later
 
-Generics come after the features above, as "Timing" in `docs/anti-language-additions.md` orders them. They have no syntax yet, so no example stands here. With them come `anti.collection.Iterable[T]` and `Iterator[T]`, which a class with the `iter` hook implements. Closures have a syntax, in [Anonymous functions and closures](#anonymous-functions-and-closures).
+Generics come after the features above, as "Timing" in `docs/anti-language-additions.md` orders them. They have no syntax yet, so no example stands here. With them come `anti.collection.Iterable[T]` and `Iterator[T]`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
 
 ## Reserved words
 
@@ -1241,4 +1251,4 @@ String prefixes: `r b br f rf x re`.
 
 Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
 
-Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today, the prefix `re` and the contextual words of round four.
+Built of round four: `keep`, `concurrent`, `unchecked` and `allow`. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today, the prefix `re`, and `snapshot`, `synchronized` and `guarded by` of round four.
