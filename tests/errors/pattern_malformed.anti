@@ -1,0 +1,20 @@
+//! A pattern literal that PCRE2 does not compile is an error at the byte
+//! PCRE2 names, with PCRE2's message. The byte is found in the file through
+//! the hash delimiters and across the lines of the literal. A pattern literal
+//! is compiled at start, so it is no constant.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let open = re"ab(c";
+	let bracket = re#"x"y[z"#;
+	let order = re"x{2,1}";
+	let escape = re"a\ky";
+	let lines = re"first
+second(?<";
+	let fine = re"(\d{4})-(\d\d)";
+	return 0;
+}
+
+const WORDS: Regex = re"\w+";

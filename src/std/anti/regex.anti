@@ -1,14 +1,14 @@
 //! The failures of a pattern, and the compile of a pattern at run time.
 //!
-//! A pattern literal, `re"..."`, is checked by the compiler and compiled
-//! before `main`, and a module that writes one imports this module.
+//! A pattern literal, `re"..."`, is checked by the compiler and compiled before
+//! `main`, and a module that writes one imports this module.
 //! `Regex.compile(text)` compiles a pattern at run time through `compile`.
 //! `Regex` is declared by the compiler in `anti.lang`. The engine is PCRE2.
 //!
 //! Every error of a pattern is an `Error` of this module: `BadPattern` for a
 //! pattern that does not compile, `TooExpensive` for a match that reaches the
-//! match limit and `MissingGroup` for a template that names a group the
-//! pattern lacks.
+//! match limit and `MissingGroup` for a template that names a group the pattern
+//! lacks.
 
 import anti.lang;
 

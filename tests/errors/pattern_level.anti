@@ -1,0 +1,11 @@
+//! PCRE2 and the glue of the patterns are built for the default level of
+//! their target alone, so a program below that level that holds `anti.regex`
+//! is refused at link with the two levels.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let digits = re"\d+";
+	return 0;
+}

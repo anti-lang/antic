@@ -1,0 +1,55 @@
+//! Every pattern literal is compiled once, before `main`, into a global of its
+//! module, so the first use finds it compiled and every use reads the same
+//! pattern. Two literals of the same text share one. A pattern that can take
+//! exponential time compiles and runs where `unchecked(exponential-pattern)`
+//! overrules the check, and a `Regex` passes to a worker as a `str` does.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn pcre2_pattern_info_8(code: ?*byte, what: u32, out: ?*u32) -> c_int;
+
+/// The number of groups of r, which PCRE2 names PCRE2_INFO_CAPTURECOUNT.
+fn groups(r: Regex) -> int
+{
+	let n: u32 = 0;
+	pcre2_pattern_info_8(r.handle, 4, &n);
+	return n as int;
+}
+
+fn date() -> Regex
+{
+	return re"(\d{4})-(\d\d)-(\d\d)";
+}
+
+fn same_text() -> Regex
+{
+	return re"(\d{4})-(\d\d)-(\d\d)";
+}
+
+worker fn count(chunk: []int, r: Regex) -> int
+{
+	return groups(r) * chunk.len;
+}
+
+fn main() -> int
+{
+	let first = date();
+	let again = date();
+	printf("groups %d\n".ptr, groups(first) as c_int);
+	printf("one pattern %d\n".ptr, (first.handle == again.handle) as c_int);
+	printf("shared %d\n".ptr, (first.handle == same_text().handle) as c_int);
+	unchecked(exponential-pattern, "a line of a configuration file is short")
+	let words = re"^(\w+\s?)*$";
+	printf("unchecked %d\n".ptr, groups(words) as c_int);
+	let items = [1, 2, 3, 4];
+	let parts = parallel items[0..4] by 2 -> count(words);
+	let total = 0;
+	for p in parts {
+		total += p;
+	}
+	free(parts.ptr);
+	printf("workers %d\n".ptr, total as c_int);
+	return 0;
+}

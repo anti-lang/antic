@@ -650,15 +650,15 @@ static bool host_exports(const struct options *o, const char *object,
     return ok;
 }
 
-/* DESIGN: a program that holds `anti.regex` links PCRE2 from lib/<target>/
-   of the runtime archive after its own objects. The library is built for
-   the default level of the target alone. A program below that level is
-   refused with the level of each, in the words of "CPU levels" in
-   docs/anti-language-additions.md. out holds the objects of the command
-   line and the library. */
+/* DESIGN: a program that holds `anti.regex` links the glue of the patterns
+   and PCRE2 from lib/<target>/ of the runtime archive after its own
+   objects. Both are built for the default level of the target alone. A
+   program below that level is refused with the level of each, in the
+   words of "CPU levels" in docs/anti-language-additions.md. out holds the
+   objects of the command line and the two libraries. */
 static bool native_inputs(const struct options *o, const struct extras *extras,
-                          struct text *pcre2, const char ***out,
-                          size_t *count)
+                          struct text *glue, struct text *pcre2,
+                          const char ***out, size_t *count)
 {
     enum cpu_level level = cpu_default(o->target);
     const char **list;
@@ -675,8 +675,9 @@ static bool native_inputs(const struct options *o, const struct extras *extras,
                 cpu_name(level), cpu_name(o->cpu));
         return false;
     }
+    link_native_library(glue, o->runtime, o->target, NATIVE_REGEX_GLUE);
     link_native_library(pcre2, o->runtime, o->target, NATIVE_PCRE2);
-    list = malloc((o->object_count + 1) * sizeof *list);
+    list = malloc((o->object_count + 2) * sizeof *list);
     if (list == NULL) {
         fputs("antic: out of memory\n", stderr);
         return false;
@@ -684,15 +685,17 @@ static bool native_inputs(const struct options *o, const struct extras *extras,
     if (o->object_count > 0) {
         memcpy(list, o->objects, o->object_count * sizeof *list);
     }
-    list[o->object_count] = text_cstr(pcre2);
+    list[o->object_count] = text_cstr(glue);
+    list[o->object_count + 1] = text_cstr(pcre2);
     *out = list;
-    *count = o->object_count + 1;
+    *count = o->object_count + 2;
     return true;
 }
 
 static bool link_program(const struct options *o, const char *object,
                          const char *executable, const struct extras *extras)
 {
+    struct text glue = {0};
     struct text pcre2 = {0};
     const char **extra;
     size_t extra_count;
@@ -705,7 +708,9 @@ static bool link_program(const struct options *o, const char *object,
     enum target_os os = target_info(o->target)->os;
     bool ok = true;
 
-    if (!native_inputs(o, extras, &pcre2, &extra, &extra_count)) {
+    if (!native_inputs(o, extras, &glue, &pcre2, &extra, &extra_count)) {
+        text_free(&glue);
+        text_free(&pcre2);
         return false;
     }
     memset(&in, 0, sizeof in);
@@ -746,6 +751,7 @@ static bool link_program(const struct options *o, const char *object,
     if (extra != o->objects) {
         free((void *)extra);
     }
+    text_free(&glue);
     text_free(&pcre2);
     return ok;
 }
@@ -2678,11 +2684,21 @@ static bool build_c_library(const struct options *o, const char *object,
         struct text def = {0};
         struct text exported = {0};
         struct text versioned = {0};
+        struct text glue = {0};
+        struct text pcre2 = {0};
+        const char **extra = o->objects;
+        size_t extra_count = o->object_count;
+        /* A library for C links PCRE2 as a program does. A plugin links
+           no runtime, and the glue it calls is the host's. */
+        if (!s.plugin) {
+            ok = native_inputs(o, extras, &glue, &pcre2, &extra,
+                               &extra_count);
+        }
         memset(&in, 0, sizeof in);
         in.object = object;
         in.runtime = o->runtime;
-        in.extra = o->objects;
-        in.extra_count = o->object_count;
+        in.extra = extra;
+        in.extra_count = extra_count;
         in.executable = text_cstr(&path);
         if (o->soname) {
             const char *version = o->package_version;
@@ -2776,6 +2792,11 @@ static bool build_c_library(const struct options *o, const char *object,
         text_free(&def);
         text_free(&exported);
         text_free(&versioned);
+        if (extra != o->objects) {
+            free((void *)extra);
+        }
+        text_free(&glue);
+        text_free(&pcre2);
     }
     text_free(&dir);
     text_free(&path);

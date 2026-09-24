@@ -128,6 +128,33 @@ endfunction()
 # and anti the same way. src/rt holds a signal.h, which hides the one of
 # the C library from a source of the compiler that finds it.
 include("${tools_dir}/sources.cmake")
+
+# DESIGN: antic checks every pattern literal with PCRE2, so antic and anti,
+# which links the same compiler, compile the PCRE2 sources of the build
+# beside RUNTIME with the flags of each host. The list and the flags are
+# those of src/native/pcre2-files.cmake, and the headers are the ones the
+# build wrote. The library of the runtime tree is not taken: it is built
+# for the default level of its target, and antic runs on every level.
+include("${root}/src/native/pcre2-files.cmake")
+set(pcre2_work "${build_dir}/native/pcre2")
+set(pcre2_files "")
+if(NOT DEFINED ANTIC)
+    file(STRINGS "${build_dir}/CMakeCache.txt" pcre2_dir
+         REGEX "^ANTIC_PCRE2_DIR:[A-Z]+=")
+    string(REGEX REPLACE "^ANTIC_PCRE2_DIR:[A-Z]+=" "" pcre2_dir "${pcre2_dir}")
+    file(STRINGS "${tools_dir}/pcre2-pin" pcre2_version REGEX "^PCRE2_VERSION=")
+    string(REGEX REPLACE "^PCRE2_VERSION=" "" pcre2_version "${pcre2_version}")
+    set(pcre2_source "${pcre2_dir}/pcre2-${pcre2_version}")
+    if(pcre2_dir STREQUAL "" OR NOT EXISTS "${pcre2_source}/src")
+        message(FATAL_ERROR "${build_dir} names no PCRE2 source, which antic "
+                            "compiles")
+    endif()
+    foreach(source IN LISTS ANTIC_PCRE2_SOURCES)
+        list(APPEND pcre2_files "${pcre2_source}/src/pcre2_${source}.c")
+    endforeach()
+    list(APPEND pcre2_files "${pcre2_work}/pcre2_chartables.c")
+endif()
+
 function(build_program host output program)
     triple_of("${host}" triple)
     set(program_sources ${ANTIC_MAIN_SOURCES})
@@ -136,7 +163,7 @@ function(build_program host output program)
         set(program_sources ${ANTI_SOURCES})
         set(program_dirs ${ANTI_INCLUDE_DIRS})
     endif()
-    set(core_includes "")
+    set(core_includes -I "${pcre2_work}/include")
     foreach(dir IN LISTS ANTIC_CORE_INCLUDE_DIRS)
         list(APPEND core_includes -I "${root}/${dir}")
     endforeach()
@@ -206,6 +233,22 @@ function(build_program host output program)
         set(object "${DEST}/work/${host}/objects/${program}/${name}.o")
         execute_process(COMMAND "${CLANG}" ${common} ${includes} -c
                                 -o "${object}" "${root}/${source}"
+                        RESULT_VARIABLE failed)
+        if(failed)
+            message(FATAL_ERROR "${host}: ${source} did not compile")
+        endif()
+        list(APPEND objects "${object}")
+    endforeach()
+    foreach(source IN LISTS pcre2_files)
+        get_filename_component(name "${source}" NAME_WE)
+        set(object "${DEST}/work/${host}/objects/${program}/${name}.o")
+        execute_process(COMMAND "${CLANG}" ${common} -Wno-overlength-strings
+                                ${ANTIC_PCRE2_DEFINES}
+                                "-ffile-prefix-map=${pcre2_source}=."
+                                "-ffile-prefix-map=${build_dir}=."
+                                -I "${pcre2_work}/include"
+                                -I "${pcre2_source}/src" -c
+                                -o "${object}" "${source}"
                         RESULT_VARIABLE failed)
         if(failed)
             message(FATAL_ERROR "${host}: ${source} did not compile")

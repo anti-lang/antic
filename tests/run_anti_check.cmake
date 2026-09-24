@@ -8,9 +8,10 @@
 #
 # The run covers each class of the check command: the front end on every
 # source of a project, the `anti` blocks of the doc comments in their two
-# contexts, the doc warnings, the formatting rules and the line that says
-# the pattern check waits for PCRE2. It then shows that the first failing
-# class ends the run, and it reads the whole standard library.
+# contexts, the doc warnings and the formatting rules. No line reports a
+# class of patterns, since the front end checks every pattern literal. It
+# then shows that the first failing class ends the run, and it reads the
+# whole standard library.
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
@@ -43,8 +44,7 @@ function(refuse text needle what)
 endfunction()
 
 # A project every class accepts. The check reads the source and the test
-# directory of the manifest, compiles the two doc blocks and says that the
-# pattern check waits for PCRE2.
+# directory of the manifest and compiles the two doc blocks.
 run(clean "" status text)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "the clean project failed with ${status}\n${text}")
@@ -53,7 +53,7 @@ expect("${text}" "front end: 3 files, 1 target, 0 warnings" "the front end")
 expect("${text}" "doc blocks: 2 blocks" "the doc blocks")
 expect("${text}" "doc warnings: 0" "the doc warnings")
 expect("${text}" "formatting: 3 files" "the formatting")
-expect("${text}" "patterns: skipped, the check of a `regex.compile` pattern waits for PCRE2" "the pattern line")
+refuse("${text}" "patterns:" "a class of patterns")
 
 # --targets all runs the front end once per target.
 run(clean "--targets;all" status text)
@@ -147,5 +147,5 @@ set(text "${out}${err}")
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "the standard library failed with ${status}\n${text}")
 endif()
-expect("${text}" "front end: 22 files, 6 targets" "the front end of std")
-expect("${text}" "formatting: 22 files\n" "the formatting of std")
+expect("${text}" "front end: 23 files, 6 targets" "the front end of std")
+expect("${text}" "formatting: 23 files\n" "the formatting of std")

@@ -525,6 +525,27 @@ foreach(name IN ITEMS sync_exits sync_workers channels select_two
 endforeach()
 set_tests_properties(program_sync_exits_dev PROPERTIES
     FIXTURES_REQUIRED lang_dev_object)
+# The pattern literals in dev mode, where the object of each module runs
+# the constructor that compiles its own literals. The link names the
+# objects of anti.lang and anti.regex, whose classes the registry holds.
+add_test(NAME dev_object_regex
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/regex.antl")
+set_tests_properties(dev_object_regex PROPERTIES FIXTURES_SETUP regex_dev_object)
+add_test(NAME program_pattern_literals_dev
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/pattern_literals.anti"
+        "-DOPTIONS=--dev"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev.o"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+set_tests_properties(program_pattern_literals_dev PROPERTIES
+    FIXTURES_REQUIRED "lang_dev_object;regex_dev_object")
 # The registry of the classes in dev mode, where the module that links
 # writes it. The program takes its allocator from anti.mem. A dev link
 # names the object of anti.mem on the command line.
@@ -685,7 +706,14 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
             "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    foreach(source IN LISTS program_sources)
+    # DESIGN: a program that holds anti.regex links PCRE2, which stands at
+    # the default level x86-64-v3 alone, and a program below it is refused
+    # at link. Rosetta runs no v3 program, so the programs of patterns run
+    # on the host target alone. errors/pattern_level.anti holds the
+    # refusal.
+    set(rosetta_sources ${program_sources})
+    list(FILTER rosetta_sources EXCLUDE REGEX "/(pattern_literals|regex_compile)\\.anti$")
+    foreach(source IN LISTS rosetta_sources)
         get_filename_component(name "${source}" NAME_WE)
         add_test(NAME program_${name}_macos-x86_64
             COMMAND "${CMAKE_COMMAND}"
@@ -2907,7 +2935,11 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "concurrent_forms|-S,-o,${LISTINGS}/concurrent_forms.s,concurrent_forms.anti"
         "pointer_leak|-S,-o,${LISTINGS}/pointer_leak.s,pointer_leak.anti"
         "mutex_copy|-S,-o,${LISTINGS}/mutex_copy.s,mutex_copy.anti"
-        "compare_swap|-S,-o,${LISTINGS}/compare_swap.s,compare_swap.anti")
+        "compare_swap|-S,-o,${LISTINGS}/compare_swap.s,compare_swap.anti"
+        "pattern_malformed|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_malformed.s,pattern_malformed.anti"
+        "pattern_exponential|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_exponential.s,pattern_exponential.anti"
+        "pattern_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_import.s,pattern_import.anti"
+        "pattern_level|--target,linux-x86_64,--cpu,v1,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_level,pattern_level.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

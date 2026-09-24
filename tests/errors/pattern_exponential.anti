@@ -1,0 +1,22 @@
+//! A pattern literal that nests a repeat inside an unbounded repeat over text
+//! that overlaps fails the safety check `exponential-pattern`, at the inner
+//! repeat. A possessive quantifier, an atomic group or text that cannot
+//! overlap passes, and `unchecked` overrules the check where the input is
+//! known to be short.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let nested = re"(a+)+b";
+	let optional = re"^(\w+\s?)*$";
+	let alternative = re"(?:x|y+)*z";
+	let caseless = re"(?i)(?:[a-z]+A)+!";
+	let possessive = re"(a++)+b";
+	let grouped = re"(?>a+)+b";
+	let separated = re"(\d+\.)+\d+";
+	let bounded = re"(ab+){3}";
+	unchecked(exponential-pattern, "a line of the file is short")
+	let overruled = re"(a*)*b";
+	return 0;
+}

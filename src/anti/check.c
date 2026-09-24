@@ -569,12 +569,9 @@ int check_run(const char *const *sources, size_t source_count,
     }
     printf("\n");
 
-    /* The pattern check of `regex.compile` waits for PCRE2, which nothing
-       builds yet. "Small items, round three" in
-       docs/anti-language-additions.md holds the rule, and the line says
-       that the class was skipped rather than passed. */
-    printf("anti check: patterns: skipped, the check of a `regex.compile` "
-           "pattern waits for PCRE2 in the runtime archive\n");
+    /* DESIGN: no class of its own checks the patterns. The front end
+       compiles every pattern literal with PCRE2, as antic does in every
+       build, so a malformed one fails the first class. */
 
 done:
     for (i = 0; i < count; i++) {

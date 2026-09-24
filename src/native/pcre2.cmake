@@ -51,7 +51,41 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         DEPENDS "${PROJECT_SOURCE_DIR}/tests/abi/pcre2_probe.c"
             "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
         VERBATIM)
-    add_custom_target(pcre2_${target} ALL DEPENDS "${library}" "${probe}")
+    # DESIGN: the glue of anti.regex, src/rt/regex.c and src/rt/patterns.c,
+    # is a runtime library of its own beside PCRE2 and no part of anti_rt.
+    # It stands at the default level of the target, as PCRE2 does, and a
+    # program that holds anti.regex links both. anti_rt stays the same
+    # bytes for every program that writes no pattern.
+    antic_native_library(glue_name "${target}" anti_rt_regex)
+    set(glue "${ANTIC_RUNTIME_DIR}/lib/${target}/${glue_name}")
+    set(glue_objects "")
+    foreach(source regex patterns)
+        set(object "${work}/rt_${source}.o")
+        add_custom_command(OUTPUT "${object}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
+            COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
+                -Wall -Wextra -Wpedantic -Werror ${flags}
+                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
+                -I "${ANTIC_PCRE2_INCLUDE}"
+                -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
+            DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
+                "${PROJECT_SOURCE_DIR}/src/rt/regex.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/std.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/atomic.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/cpu_level.h"
+                "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
+            VERBATIM)
+        list(APPEND glue_objects "${object}")
+    endforeach()
+    add_custom_command(OUTPUT "${glue}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory
+            "${ANTIC_RUNTIME_DIR}/lib/${target}"
+        COMMAND "${CMAKE_COMMAND}" -E rm -f "${glue}"
+        COMMAND "${ANTIC_LLVM_AR}" rcs "${glue}" ${glue_objects}
+        DEPENDS ${glue_objects}
+        VERBATIM)
+    add_custom_target(pcre2_${target} ALL
+        DEPENDS "${library}" "${probe}" "${glue}")
 
     # The library links for every target, and on the host the program runs.
     if(target STREQUAL ANTIC_HOST_TARGET)

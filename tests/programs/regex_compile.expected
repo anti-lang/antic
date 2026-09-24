@@ -1,0 +1,17 @@
+exit 0
+ascii digit                1
+arabic-indic digit         0
+ucp digit                  1
+unicode digit              1
+ascii word                 0
+ucp word                   1
+ascii space                1
+caseless                   1
+caseless group, b          0
+caseless group, B          1
+hash form                  1
+^\d{4}$                    1
+^\d{5}$                    0
+bad a(b: missing closing parenthesis, code 114 at 3, regex.Error 1
+bad [z: missing terminating ] for character class, code 106 at 2, regex.Error 1
+bad x{2,1}: numbers out of order in {} quantifier, code 104 at 5, regex.Error 1

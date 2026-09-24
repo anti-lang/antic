@@ -145,8 +145,11 @@ bool link_is_input(const char *path);
 void link_runtime_library(struct text *out, const char *runtime, enum target t,
                           enum cpu_level cpu);
 
-/* The native library of `anti.regex`, PCRE2 as src/native/ names it. */
+/* The native library of `anti.regex`, PCRE2 as src/native/ names it, and
+   the runtime library of its glue, which src/native/pcre2.cmake builds
+   beside it. */
 #define NATIVE_PCRE2 "pcre2-8"
+#define NATIVE_REGEX_GLUE "anti_rt_regex"
 
 /* Append the path of the native library name of target t below runtime,
    which stays at the default level of the target. */

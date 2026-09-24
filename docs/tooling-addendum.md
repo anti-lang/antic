@@ -91,9 +91,9 @@ What the command does today, with the reasons under "The check command" in
   holds a name of the system as often as a name of the program.
 - The formatting class writes the canonical text of each file with `anti fmt` and
   compares the bytes. It reports the first line that differs, one finding per file.
-- The pattern check of `regex.compile` waits for PCRE2. The last status line says that the
-  class was skipped and names PCRE2. Round four replaced the check: the compiler checks
-  every pattern literal itself, and the class goes when that is built.
+- No class checks the patterns. Round four replaced the check of `regex.compile`, and the
+  compiler checks every pattern literal itself. The front-end class therefore reports a
+  malformed one and a pattern that fails `exponential-pattern`.
 
 ## Formatter rules
 

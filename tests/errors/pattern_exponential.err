@@ -1,0 +1,4 @@
+pattern_exponential.anti:11:19: error: the repeat `a+` inside `(a+)+` can take exponential time, write a possessive quantifier, `a++`, or an atomic group, `(?>...)` [exponential-pattern]
+pattern_exponential.anti:12:22: error: the repeat `\w+` inside `(\w+\s?)*` can take exponential time, write a possessive quantifier, `a++`, or an atomic group, `(?>...)` [exponential-pattern]
+pattern_exponential.anti:13:28: error: the repeat `y+` inside `(?:x|y+)*` can take exponential time, write a possessive quantifier, `a++`, or an atomic group, `(?>...)` [exponential-pattern]
+pattern_exponential.anti:14:27: error: the repeat `[a-z]+` inside `(?:[a-z]+A)+` can take exponential time, write a possessive quantifier, `a++`, or an atomic group, `(?>...)` [exponential-pattern]

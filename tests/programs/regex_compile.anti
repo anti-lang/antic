@@ -1,0 +1,68 @@
+//! `Regex.compile(text)` compiles a pattern at run time. A pattern that does
+//! not compile fails with `regex.BadPattern`, which carries PCRE2's message,
+//! its number as the code and the byte where PCRE2 stopped, and which is a
+//! `regex.Error`. A literal and a compiled pattern read `\d`, `\w` and `\s` as
+//! their ASCII sets, `(*UCP)` gives the three their Unicode meaning, and
+//! `\p{Nd}` names any decimal digit. The inline flags change the whole pattern
+//! or one group. The methods of `str` are not built yet, so the program asks
+//! PCRE2 through the handle whether a pattern matches.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn pcre2_match_data_create_from_pattern_8(code: ?*byte,
+	context: ?*byte) -> ?*byte;
+extern fn pcre2_match_8(code: ?*byte, subject: ?*byte, length: c_size_t,
+	start: c_size_t, options: u32, data: ?*byte, context: ?*byte) -> c_int;
+extern fn pcre2_match_data_free_8(data: ?*byte);
+
+fn matches(r: Regex, s: str) -> bool
+{
+	let data = pcre2_match_data_create_from_pattern_8(r.handle, none);
+	let n = pcre2_match_8(r.handle, s.ptr, s.len as c_size_t, 0, 0, data, none);
+	pcre2_match_data_free_8(data);
+	return n > 0;
+}
+
+fn show(what: str, r: Regex, s: str)
+{
+	printf("%-26.*s %d\n".ptr, what.len as c_int, what.ptr,
+		matches(r, s) as c_int);
+}
+
+fn compiled(text: str)
+{
+	let r = Regex.compile(text) catch e {
+		if e is *regex.BadPattern {
+			let bad = e as *regex.BadPattern;
+			printf("bad %.*s: %.*s, code %d at %d, regex.Error %d\n".ptr,
+				text.len as c_int, text.ptr, bad.message.len as c_int,
+				bad.message.ptr, bad.code as c_int, bad.position as c_int,
+				(e is *regex.Error) as c_int);
+		}
+		return;
+	};
+	show(text, r, "2026");
+}
+
+fn main() -> int
+{
+	show("ascii digit", re"^\d+$", "2026");
+	show("arabic-indic digit", re"^\d$", "٣");
+	show("ucp digit", re"(*UCP)^\d$", "٣");
+	show("unicode digit", re"^\p{Nd}$", "٣");
+	show("ascii word", re"^\w+$", "straße");
+	show("ucp word", re"(*UCP)^\w+$", "straße");
+	show("ascii space", re"^\s$", "\t");
+	show("caseless", re"(?i)abc", "ABC");
+	show("caseless group, b", re"^(?i:a)B$", "Ab");
+	show("caseless group, B", re"^(?i:a)B$", "AB");
+	show("hash form", re#"^"\d"$"#, "\"7\"");
+	compiled(r"^\d{4}$");
+	compiled(r"^\d{5}$");
+	compiled("a(b");
+	compiled("[z");
+	compiled("x{2,1}");
+	return 0;
+}

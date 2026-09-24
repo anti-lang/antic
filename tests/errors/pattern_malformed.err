@@ -1,0 +1,6 @@
+pattern_malformed.anti:20:22: error: a pattern literal is not a constant expression
+pattern_malformed.anti:10:20: error: malformed pattern: missing closing parenthesis
+pattern_malformed.anti:11:25: error: malformed pattern: missing terminating ] for character class
+pattern_malformed.anti:12:22: error: malformed pattern: numbers out of order in {} quantifier
+pattern_malformed.anti:13:21: error: malformed pattern: \k is not followed by a braced, angle-bracketed, or quoted name
+pattern_malformed.anti:15:10: error: malformed pattern: subpattern name expected

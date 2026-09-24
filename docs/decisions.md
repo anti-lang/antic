@@ -278,7 +278,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - antic takes the package header from `--package-name`, `--package-version`, `--dependency <name>,<constraint>,<url>`, `--license`, `--license-text <file>` and `--attribution`. Without them it writes the module path, version `0.0.0` and empty licence fields. Reason: `anti` passes what `anti.toml` holds, and antic keeps working without a manifest.
 - The public interface of a library file also holds the `//!` text of the module, and `--strip-docs` removes it with the rest. Reason: user docs are built from a `.antl` alone.
 - Doc warnings belong to `anti check`. It passes `--doc-warnings` to antic, which then warns about a `//#` note on a `pub` item without a `///` comment, and about a doc comment that documents nothing. Without the option antic is silent about documentation.
-- The library format has a version, `ANTL_VERSION` in `src/antic/antl.h`, which is 56 today. Every change of the format raises it, and antic refuses a file with another number.
+- The library format has a version, `ANTL_VERSION` in `src/antic/antl.h`, which is 58 today. Every change of the format raises it, and antic refuses a file with another number.
 - Libraries are distributed as serialised IR. Object files would need six variants. Source alone would force a full front-end run on every import. `antic -c geometry.anti` writes `geometry.antl`, one library file per module. The file holds a format version, a package header, the public interface with the text of each `///` comment, and the unoptimised IR of all function bodies. The package header holds the package name, version, dependencies with repository URLs, `license`, the full licence text and `attribution`. antic refuses mismatched versions. `antic main.anti geometry.antl` type-checks against the interface and loads the IR. It then optimises the whole program, emits one assembly file, assembles and links.
 - The IR is target-independent. It records types, never sizes, offsets or register classes. `size_of`, field offsets and array strides are symbolic values that the optimizer never folds. The back end computes layout and ABI per target and replaces them with immediates. Library files are byte-identical whichever host produced them. The test suite checks that.
 - The IR writes an array stride as `size_of` of the element type. Reason: C's stride is the element size, and one form serves arrays, slices and pointers.
@@ -372,8 +372,9 @@ about structs, enums, classes, interfaces and errors lives there, and
   clang, which compiles every target, takes it. No other warning is raised on any of the
   six targets.
 - [provisional] `pcre2.h` stays in `build/<preset>/native/pcre2/include/` and is not yet
-  part of the runtime archive. Reason: nothing in the archive reads it before
-  `anti.regex` binds it, and the directory of headers in the archive is not decided.
+  part of the runtime archive. Reason: antic and the glue of `anti.regex` compile against
+  it in the build, and no program of a user reads it. The directory of headers in the
+  archive is not decided.
 - [provisional] The build copies `LICENCE.md` of the release to `licenses/pcre2.txt` of
   the runtime tree, the directory of one licence file per component that "Licences that
   travel" describes.
@@ -855,7 +856,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - On Linux and macOS the runtime reads `argv` and the POSIX variable `environ`. `src/rt/utf.c` replaces each maximal subpart of an ill-formed UTF-8 sequence with U+FFFD, the practice of section 3.9.6 of the Unicode Standard.
 - On Windows the runtime splits `GetCommandLineW` by the rules of Microsoft's page "Parsing C command-line arguments", reads `GetEnvironmentStringsW` and converts UTF-16 to UTF-8 with U+FFFD for an unpaired surrogate. The conversions have unit tests on the development Mac. The Windows branch of `src/rt/start.c` is only syntax-checked with clang against a stub `windows.h`.
 - Decided and not implemented: selection computes the address of a stack slot at each use. Lowering computes all of them in the entry block today. The addresses of a function with many address-taken locals then stay alive across its calls and spill. A function with 520 such locals on linux-arm64 saves ten callee-saved registers and spills the rest.
-- Decided and not implemented: the `anti` tool, with `anti syntax`, `anti license`, the resolver, the cache, publishing and the two GitHub templates, and the standard library modules `anti.net`, `anti.regex`, `anti.raylib` and `anti.miniaudio`, which wait for the native libraries of the runtime archive. The tests of `docs/tooling.md` that need those parts wait for them: header consistency with `anti.toml`, highlighter coverage, the resolver and the offline build. `anti fmt`, `anti check`, `anti test` and `anti doc` are built. The format stability of the table is the test `anti_fmt` and the doc equivalence is the test `anti_doc`.
+- Decided and not implemented: the `anti` tool, with `anti syntax`, `anti license`, the resolver, the cache, publishing and the two GitHub templates, and the standard library modules `anti.net`, `anti.raylib` and `anti.miniaudio`, which wait for the native libraries of the runtime archive. `anti.regex` holds the failures of a pattern and `compile`, and the methods of `str` wait. The tests of `docs/tooling.md` that need those parts wait for them: header consistency with `anti.toml`, highlighter coverage, the resolver and the offline build. `anti fmt`, `anti check`, `anti test` and `anti doc` are built. The format stability of the table is the test `anti_fmt` and the doc equivalence is the test `anti_doc`.
 - Untested off the development Mac: the MSVC bitfield rule and `c_long` and `c_wchar` at 32 and 16 bits run only as layout unit tests checked against clang's sizes. Shared libraries, `.def` files and `.CRT$XCU` constructors on Windows, `.init_array` and `--soname` on Linux, and the 16-aligned register rule of AAPCS64 outside Apple are assembled with llvm-mc and pinned by unit tests, not linked or run.
 - The platform command lines come from the GNU ld manual, the glibc sources and Microsoft's linker and CRT pages. The lld command lines come from the ld.lld manual and the musl and xwin sources. Unit tests pin both. Whether `link.exe` needs `kernel32.lib` or other libraries beside the CRT ones is unknown, because lld-link is what runs. The runtime objects are compiled for the dynamic Universal CRT, `/MD` in the terms of MSVC, which matches the `msvcrt.lib` and `ucrt.lib` of the link line. The executables that lld writes for Linux and Windows now run on the two virtual machines, and all 22 program tests pass on Windows ARM64.
 - macos-x86_64 programs link on the development Mac with lld against the runtime library that clang builds for macos-x86_64, which the test `cross_link_macos-x86_64` checks by format. The next item covers running them.
@@ -1027,7 +1028,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The refusal exits with 70, the status the runtime already uses when it cannot start. Reason: the section gives the message and not the status, and a second status for a second start-up failure would say nothing more.
 - The simulation of a lower machine is compiled under `ANTI_DEV_CPU`, which reads the level from the environment variable `ANTI_CPU_LEVEL`. The unit tests are the only build that defines it, and the runtime of the archive is compiled without it. Reason: a shipped program reads no variable of its own, so the one-environment-variable rule holds. `docs/notes/hosts-and-harness.md` records it as a test hook.
 - The runtime archive holds one `anti_rt` per target and level, in `lib/<target>/<level>/`, with the licence stub of a bundled archive beside it. antic links the one that `--cpu` names. `--cpu v1` therefore gives a program that runs on hardware without AVX2. Reason: the runtime is small and it is what every program links. A level that reached the program's own code and not its runtime would keep none of the section's promise.
-- The native libraries stay at the default level, in `lib/<target>/`. A program below the default that imports a bundled library is refused at link, with `anti.raylib is built for x86-64-v3, this program targets v1`. Reason: a native library is large and is built once. The refusal states the limit rather than linking instructions the machine cannot run. `src/native/` builds PCRE2, SQLite, Mbed TLS, miniaudio and raylib, and no module imports one yet, so the refusal has no site until the first module arrives. The message above is the one it writes.
+- The native libraries stay at the default level, in `lib/<target>/`. A program below the default that imports a bundled library is refused at link, with `anti.raylib is built for x86-64-v3, this program targets v1`. Reason: a native library is large and is built once. The refusal states the limit rather than linking instructions the machine cannot run. `src/native/` builds PCRE2, SQLite, Mbed TLS, miniaudio and raylib. `anti.regex` is the first module that imports one, and a program that holds it is refused below the default level with `anti.regex is built for x86-64-v3, this program targets v1`.
 - The processor check reads the level of the runtime that was linked. The build compiles `src/rt/cpu.c` once per level, with `ANTI_CPU_LEVEL_ID` set to that level's id. `src/rt/cpu.c` refuses to compile without it. antic writes no level into the program. Reason: the runtime carries the level's instructions on every path. The check and the code it guards therefore come from one build. A level that antic wrote and a runtime that disagreed would check the wrong thing.
 - `driver_run` refuses a level of the other architecture. Reason: the zero value of `enum cpu_level` is v1. A caller that builds its own options and forgets the level then asks for a directory that does not exist. `anti test` was that caller, and the guard turns a link error into a message.
 - The suite's macos-x86_64 programs, which a macos-arm64 host runs under Rosetta, compile with `--cpu v1` and link the archive's v1 runtime. Reason: Rosetta has no AVX2 and runs no program of the default level. With a runtime per level those 85 programs need nothing of their own.
@@ -1089,7 +1090,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 
 ## String prefixes
 
-- The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, and the lexer reads them from one table. Round four added `re` on 2026-09-23, and the table of the lexer does not hold it yet. `fr` stands in the table as well, refused with `` `fr"` is not a prefix, write `rf"` ``. A word that is not in the table stays an identifier before a quote, so `u"a"` and `rb"a"` are an identifier and a string.
+- The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, and the lexer reads them from one table. Round four added `re` on 2026-09-23, and the table of the lexer holds it. `fr` stands in the table as well, refused with `` `fr"` is not a prefix, write `rf"` ``. A word that is not in the table stays an identifier before a quote, so `u"a"` and `rb"a"` are an identifier and a string.
 - `fr#"..."#` is refused like `fr"..."`, and the literal is then read as an `rf"..."`, so the one mistake gives one message. Reason: the prefix takes hash delimiters as every prefix but `x` does, and a literal read another way would report its content as further errors.
 
 ## Interpolation
@@ -1352,7 +1353,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] The two messages of an unused clause are `` `allow(shadowed-catch)` silences nothing `` and `` `unchecked(unguarded-field)` overrules nothing ``.
 - `catch none` counts a failure as `none` where the result can be `none`. It is `catch { yield none; }`, so it deletes the error as every handler does, and it stands wherever a handler of a call stands: after a `let`, an assignment and a call statement. A `let` that names `?*T` over a call that gives `*T` takes it, as `yield none` does. `programs/catch_none.anti` runs it under a leak check.
 - [provisional] `catch none` is refused on a call that gives a value that cannot be `none` or no result, after a `try` block, on a `catch` that guards a pointer and on a call that cannot fail. Reason: each has no failure to count or no `none` to give.
-- The safety check `unguarded-field` is built with concurrent classes, and `exponential-pattern` is not. It waits for regular expressions, so an `unchecked` of it overrules nothing and is `unused-unchecked` today. A safety check is an error with a name, which leaves the checker going and which a clause drops. Before 2026-09-24 neither check was built.
+- The safety check `unguarded-field` is built with concurrent classes, and `exponential-pattern` with pattern literals, as "Regular expressions" below records. A safety check is an error with a name, which leaves the checker going and which a clause drops. Before 2026-09-24 neither check was built.
 
 ## Nested types
 
@@ -1435,7 +1436,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 ## The check command
 
 - `anti check` is built. It runs the four classes of "Check command" in `docs/tooling-addendum.md` in order, reports one line per class, and the first failing class ends the run. `src/anti/check.c` holds the classes and `--front-end` of antic the front end without a pass below it. The formatting class calls `fmt_source` of `anti fmt`. `docs/notes/check.md` holds the choices.
-- Round four replaced the pattern check of `regex.compile` on 2026-09-23: the compiler checks every pattern literal itself. Until that is built, the class stays as it is, waiting for PCRE2, which nothing builds yet. The last status line says that the class was skipped and names PCRE2, so a run never reads as if the patterns had passed.
+- Round four replaced the pattern check of `regex.compile` on 2026-09-23: the compiler checks every pattern literal itself. The class of patterns is gone since 2026-09-24. The front-end class reports a malformed pattern literal and one that fails `exponential-pattern`, as every build of antic does.
 - The front-end class writes the interface file of every module into the work directory, in the order the imports of the project ask for, and passes `--front-end` together with `-c`. Reason: a module that imports another of the project needs that module's interface, and `antic -c` is what writes one. The interface files are the only thing the command writes, and no assembly, object or executable is produced. The two rules of producing a library, the reserved module root and the module path of one segment, stay quiet under `--front-end`, because a check of `src/main.anti` would otherwise warn on every run.
 - A module under `--front-end` is checked as a library and not as a program. Reason: a check of one file cannot know which module of a project fills an abstract class. The whole-program report of an abstract class that nothing fills would then fire on every interface of a project.
 - The front-end class and the doc blocks run with `--warnings-as-errors`, so a warning of the checker fails the class, as it fails a release build. Reason: "Errors, warnings and checks" in `docs/anti-language-additions.md` says `anti check` uses the option.
@@ -1557,6 +1558,100 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] `anti bind` refuses a literal that no 64-bit integer, no double or, with the suffix `f`, no float holds, where it took the saturated value. The define or macro is skipped with the usual warning. A float literal below the smallest double reads as zero or nearly so, as C reads it.
 - [provisional] An array length of a C type past `INT64_MAX` does not parse, and a field of a `COLOR` define past a `long long` skips the define.
 - [provisional] A message of the JSON reader of `anti bind` that the caller's buffer cannot hold is cut and ends in `...`.
+
+## Regular expressions
+
+- The pattern literal `re"..."` is built. It is raw, it takes hash delimiters, and its type
+  is `Regex`. "Patterns", "Failures, by where a pattern comes from" and "Thread safety" of
+  "Regular expressions" in `docs/anti-language-additions.md` are built as far as they
+  reach without the methods of `str`.
+- antic links PCRE2 and compiles every pattern literal with the options the program uses
+  at start. A pattern that does not compile is the error `` malformed pattern: missing
+  closing parenthesis ``, PCRE2's message, at the byte PCRE2 names. The column counts
+  bytes, as the lexer does, and a CR LF inside the literal is one byte of the pattern.
+- The safety check `exponential-pattern` is built. `unchecked(exponential-pattern,
+  "reason")` overrules it. The message is `` the repeat `a+` inside `(a+)+` can take
+  exponential time, write a possessive quantifier, `a++`, or an atomic group, `(?>...)` ``,
+  at the inner repeat.
+- A pattern of text compiles in UTF mode without `PCRE2_UCP`, so `\d`, `\w` and `\s` are
+  their ASCII sets and `(*UCP)` changes them. The flags are PCRE2's inline flags and no
+  option of the compile.
+- Every pattern literal is compiled once, before `main`, into a global of its module. A use
+  reads the global, so no flag guards a first use.
+- `Regex.compile(text)` is built and fails with `regex.BadPattern`. `anti.regex` declares
+  `Error`, which inherits `lang.Error`, and `BadPattern`, `TooExpensive` and
+  `MissingGroup`, which inherit `Error`.
+- [provisional] `Regex` is a struct of `anti.lang` that the compiler declares, as it does
+  `Mutex`. It holds one field, `handle: *u8`, the pattern the runtime compiled, and a copy
+  names the same pattern. A type named `Regex` in the module wins over it, and
+  `Regex { handle: h }` builds one. It has no descriptor, and `serialize` and `reflect`
+  pass over it. A worker takes it as it takes a `str`. Reason: the specification names
+  `Regex` beside `str` without a module, and `anti.lang` imports nothing, while the
+  failures of a pattern are classes of `anti.regex`.
+- [provisional] A module that writes a pattern literal or `Regex.compile` imports
+  `anti.regex`. Without the import the literal is refused with `` a pattern literal is
+  compiled by `anti.regex`, so the module imports `anti.regex` `` and the call with ``
+  `Regex.compile` calls `anti.regex.compile`, so the module imports `anti.regex` ``.
+  Reason: an `f"..."` asks the same of `anti.text`, and the import names what the program
+  links.
+- [provisional] `Regex.compile(text)` is the call `compile(text)` of `anti.regex`, checked as
+  any call. `Regex` has no other function, and `Regex.parse(x)` is refused with ``
+  `Regex` has no function `parse` ``. Reason: the specification gives `Regex` one
+  function, and the error classes it fails with live in `anti.regex`.
+- [provisional] A `BadPattern` carries PCRE2's message as its `message`, PCRE2's number of
+  the error as its `code` and the byte where PCRE2 stopped as `position`. The text of each
+  number is made once and kept for the life of the program. `TooExpensive` and
+  `MissingGroup` carry nothing beyond `Error`. Reason: the specification names the
+  message and the position, a `str` owns no memory, and nothing raises the other two
+  before the methods of `str` exist.
+- [provisional] The check `exponential-pattern` fires on a repeat whose count varies, `+`,
+  `*`, `?` or `{n,m}` with m above n, that stands inside an unbounded repeat, `*`, `+` or
+  `{n,}`, with no atomic group, lookaround or possessive repeat between them. It fires when
+  the first characters of the inner repeat meet the characters that can follow it inside
+  one round of the outer repeat or start its next round. `(a+)+`, `(\w+\s?)*` and
+  `(?:x|y+)*` fire, and `(\d+\.)+`, `(a++)+`, `(?>a+)+` and `(ab+){3}` pass. Sets are exact
+  for ASCII, and two characters outside ASCII always meet. Reason: the specification
+  names nested repeats over text that overlaps and gives `(a+)+`. A bounded outer repeat
+  gives polynomial time, which the match limit covers.
+- [provisional] A pattern literal is no constant expression, and `const R: Regex = re"a";`
+  is refused with `a pattern literal is not a constant expression`. Reason: the pattern
+  is compiled at start into memory of the runtime.
+- [provisional] Each module that holds a pattern literal gets the function
+  `patterns.start`, which compiles its literals into one global per distinct pattern. The
+  back end writes it as a constructor of the object: `.init_array` on Linux,
+  `__mod_init_func` on macOS and `.CRT$XCU` on Windows. It runs before `main` in a program,
+  in dev mode and in release mode alike, and when a shared library loads. The runtime
+  checks the processor before the first compile, since a constructor runs before `main`
+  does. Reason: a constructor per object needs no table of the whole program, so one
+  object per module in dev mode compiles its own literals.
+- [provisional] The glue of the patterns, `src/rt/regex.c` and `src/rt/patterns.c`, is the
+  library `anti_rt_regex` in `lib/<target>/` beside `libpcre2-8.a`, at the default level of
+  the target, and no part of `anti_rt`. A program or a library for C that holds
+  `anti.regex` links both after its own objects. Reason: `anti_rt` then stays the same
+  bytes for every program that writes no pattern, and the glue links nowhere PCRE2 does
+  not.
+- [provisional] antic compiles PCRE2 from the pinned source with its own compiler and the
+  warnings of `anti_rt`, and `tools/pack-anti.cmake` compiles the same files into the
+  `antic` and `anti` of a package. `src/native/pcre2-files.cmake` holds the list and the
+  flags, and `src/native/pcre2-source.cmake` the download and the library of antic.
+  Reason: the check and the program read a pattern with one library, and the library of
+  the runtime archive is built for the default level of its target, while antic runs on
+  every level.
+- [provisional] A compiled `Regex` is never given back. A literal lives as long as the
+  program, and so does a pattern from `Regex.compile`. Reason: the specification gives no
+  function that frees one, and a copy names the same pattern.
+- [provisional] A program of patterns runs on the host target alone in the suite, and not
+  under Rosetta as `macos-x86_64 --cpu v1`, where the link refuses it. Reason: PCRE2 stands
+  at x86-64-v3, which Rosetta does not run.
+- The library format is version 58, since the token of a pattern literal raises the count
+  of token kinds. It stands after every earlier kind, so no stored value moves.
+- Not built yet: the methods `matches`, `find_all`, `replace` and `split`, the match and its
+  fields, the groups of a literal as fields, templates, the match limit and the failures
+  `TooExpensive` and `MissingGroup` raise, `ByteRegex` and the byte methods. The link line
+  that `antic --lib static` prints names no PCRE2, and a plugin that holds a pattern
+  literal calls the glue of its host, which holds it only when the host holds
+  `anti.regex`. `anti_licenses` of a program that links PCRE2 names no PCRE2 yet, as it
+  names no musl.
 
 ## Names and shared code of the runtime
 

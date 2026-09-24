@@ -1,0 +1,6 @@
+exit 0
+groups 3
+one pattern 1
+shared 1
+unchecked 1
+workers 4

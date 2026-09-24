@@ -134,7 +134,7 @@ let i = x"00 AB CC";
 let x: i8 = -128;
 ```
 
-Built: `f"..."` and `rf"..."`. Not built yet: `re"..."`.
+Built: `f"..."`, `rf"..."` and `re"..."`.
 
 ## Variables and constants
 
@@ -1158,7 +1158,7 @@ fn sum_all(lines: []str) -> int may fail
 
 Every warning and every safety check has a stable name at the end of its message, as in `` `e` shadows the outer `e` [shadowed-catch] ``. `allow` and `unchecked` stand before a statement, last in a declaration's header, or at the top of the file ending with `;`, and `unchecked` also after a field's type. Each takes one name and a required reason, and is not part of a signature. One that silences nothing is the warning `unused-allow` or `unused-unchecked`. `antic --warnings-as-errors` gives the release behaviour in a dev build, and `anti check` uses it. The first safety checks are `unguarded-field` and `exponential-pattern`.
 
-Built: the name of every warning, `allow` and `unchecked` at every level, `unused-allow` and `unused-unchecked`, the refusal of a clause that names an error, `--warnings-as-errors`, `anti check` with it, and a release build that refuses a warning. `docs/notes/warnings.md` lists the names with their meaning and their fix. The safety check `unguarded-field` is built with concurrent classes. Not built yet: `exponential-pattern`, which waits for regular expressions, so an `unchecked` of it overrules nothing today.
+Built: the name of every warning, `allow` and `unchecked` at every level, `unused-allow` and `unused-unchecked`, the refusal of a clause that names an error, `--warnings-as-errors`, `anti check` with it, and a release build that refuses a warning. `docs/notes/warnings.md` lists the names with their meaning and their fix. The safety check `unguarded-field` is built with concurrent classes, and `exponential-pattern` with pattern literals.
 
 ## Wire formats
 
@@ -1226,7 +1226,7 @@ let n = line.matches(r) catch none;
 
 `matches`, `find_all`, `replace` and `split` are methods of `str`, and `limit` takes that many matches from the start, or from the end when negative. A match behaves as a `?*T` does and stands alone as a condition. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, and a function may give each replacement. A call with a pattern literal never fails. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
 
-Built: `catch none`, as a form of every failing call. Not built yet: `re"..."`, `Regex` and the methods of `str`.
+Built: `catch none`, as a form of every failing call, the pattern literal `re"..."` with its check at compile time and the safety check `exponential-pattern`, the literals compiled once before `main`, `Regex.compile`, the inline flags, the ASCII meaning of `\d`, `\w` and `\s` with `(*UCP)` for the Unicode one, and the classes `Error`, `BadPattern`, `TooExpensive` and `MissingGroup` of `anti.regex`. A module that writes a pattern imports `anti.regex`. Not built yet: the methods of `str`, the match, templates, the match limit and `ByteRegex`.
 
 ## Bytes
 

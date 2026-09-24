@@ -200,9 +200,9 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
-    errno f16 fs hooks init io json license loaded lock mem object patterns
-    platform_posix platform_windows plugin reflect regex registry signal snapshot start
-    symbols sync text threads toml trace utf)
+    errno f16 fs hooks init io json license loaded lock mem object platform_posix
+    platform_windows plugin reflect registry signal snapshot start symbols sync
+    text threads toml trace utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "src/rt/${source}.c")
@@ -224,8 +224,6 @@ if(NOT ANTIC_HOST_OS STREQUAL "macos")
             ARCHIVE_OUTPUT_DIRECTORY "${out}")
         target_compile_definitions(anti_rt_${level} PRIVATE
             ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}})
-        target_include_directories(anti_rt_${level} PRIVATE
-            "${ANTIC_PCRE2_INCLUDE}")
         # DESIGN: sanitizers check antic. Anti programs link the runtime without a
         # sanitizer runtime, so the runtime carries no sanitizer instrumentation,
         # whatever CMAKE_C_FLAGS holds in a sanitizer configuration.
@@ -326,10 +324,8 @@ function(anti_cross_runtime_at target triple level root)
                 -Wall -Wextra -Wpedantic -Werror
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-                -I "${ANTIC_PCRE2_INCLUDE}"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
-                "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/rt.h" "${PROJECT_SOURCE_DIR}/src/rt/std.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/object.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/atomic.h"
@@ -339,7 +335,6 @@ function(anti_cross_runtime_at target triple level root)
                 "${PROJECT_SOURCE_DIR}/src/rt/platform.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/plugin.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/reflect.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/regex.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/registry.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/digest.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/signal.h"
