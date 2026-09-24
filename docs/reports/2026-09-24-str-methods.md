@@ -81,3 +81,17 @@ host:  100% tests passed out of 967
 asan:  100% tests passed out of 966
 ubsan: 100% tests passed out of 966
 ```
+
+The state after the push of the report, before this proof was added:
+
+```text
+$ git log --oneline -3
+ba4e63b Report the methods of str, the match and replacement
+8007ee0 Pin the assembly of the programs of the methods of str
+42629d0 Record the methods of str, the match and replacement
+$ git status --short
+(no output)
+$ git rev-parse HEAD origin/main
+ba4e63b11ee971f721deb6ff38a7aeb14373067d
+ba4e63b11ee971f721deb6ff38a7aeb14373067d
+```
