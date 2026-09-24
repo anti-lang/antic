@@ -1,0 +1,58 @@
+//! The fields of a concurrent class: each is guarded, atomic or fixed, and a
+//! field that is none of the three fails the safety check `unguarded-field`.
+//! Two threads that add to `hits` outside the lock would lose an update, so
+//! the write is refused. `unchecked` overrules the check for one field or one
+//! statement, and one that overrules nothing is a warning.
+
+concurrent class Counter
+{
+	lock: Mutex,
+	count: int = 0 guarded by lock,
+	hits: int = 0,
+	atomic calls: int = 0,
+	pub start: int,
+	skipped: int = 0 unchecked(unguarded-field, "only one thread writes it"),
+	spare: int = 0 unchecked(unguarded-field, "nothing writes it"),
+
+	fn construct(self, start: int)
+	{
+		self.start = start;
+		self.count = start;
+	}
+
+	pub fn add(self)
+	{
+		sync self.lock {
+			self.count += 1;
+		}
+		self.hits += 1;
+		self.calls.add(1);
+		self.skipped += 1;
+	}
+
+	pub fn read(self) -> int
+	{
+		return self.count;
+	}
+
+	pub fn other(self, c: *Counter) -> int
+	{
+		sync self.lock {
+			return c.count;
+		}
+	}
+
+	pub fn allowed(self) -> int
+	{
+		unchecked(unguarded-field, "a snapshot that may be stale")
+		return self.count;
+	}
+}
+
+fn main() -> int
+{
+	let c = alloc Counter(1);
+	c.add();
+	c.start = 5;
+	return 0;
+}

@@ -540,6 +540,9 @@ struct stmt {
                come from and stands in no scope. */
             struct binding *names;
             size_t name_count;
+            /* `let hits: atomic int = 0;`, a local reached through the
+               atomic operations alone. */
+            bool atomic;
         } let;                      /* STMT_LET, STMT_CONST */
         struct expr *expr;          /* STMT_EXPR */
         struct {
@@ -695,6 +698,14 @@ struct param {
        `concurrent` may call it from more than one thread at once. */
     bool keep;
     bool concurrent;
+    /* `guarded by lock` or `guarded by PeopleList.lock` after a field's
+       type: the Mutex field, and the enclosing class that holds it or
+       an empty name. unchecked marks a field that
+       `unchecked(unguarded-field)` follows. */
+    struct name guard;
+    struct name guard_class;
+    struct pos guard_pos;
+    bool unchecked;
 };
 
 /* DESIGN: a variable of an enclosing function that an anonymous function
@@ -797,6 +808,14 @@ struct item {
        `assert` rule: on in dev mode and off in release, with `--trace`
        and `--no-trace` deciding instead. */
     bool trace;                     /* ITEM_CLASS, ITEM_FN in a body */
+    /* DESIGN: `synchronized class` runs every function that is not
+       private under a hidden lock of the object, and `concurrent class`
+       has the checker prove every field guarded, atomic or fixed. Both
+       are contextual words before `class`. unchecked_fields marks
+       `unchecked(unguarded-field)` in the class header. */
+    bool synchronized;              /* ITEM_CLASS */
+    bool concurrent;                /* ITEM_CLASS */
+    bool unchecked_fields;          /* ITEM_CLASS */
     enum visibility vis;
     struct name qualifier;          /* `concrete fn X::f`, the X */
     struct pos qualifier_pos;

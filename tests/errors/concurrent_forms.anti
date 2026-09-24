@@ -1,0 +1,39 @@
+//! The forms `guarded by` and `unchecked` refuse: a field of a plain struct, a
+//! lock that is no Mutex field, a class that stands around no field, and the
+//! header clause of a class that is not concurrent.
+
+struct Plain
+{
+	n: int guarded by lock,
+}
+
+concurrent class Counter
+{
+	lock: Mutex,
+	start: int = 0,
+	wrong: int = 0 guarded by start,
+	lost: int = 0 guarded by nothing,
+}
+
+class Loose
+	unchecked(unguarded-field, "no concurrent class")
+{
+	n: int = 0,
+}
+
+concurrent class Outer
+{
+	struct Inner
+	{
+		lock: Mutex,
+		value: int guarded by lock,
+		link: int guarded by Nowhere.lock,
+	}
+
+	lock: Mutex,
+}
+
+fn main() -> int
+{
+	return 0;
+}

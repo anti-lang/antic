@@ -2182,6 +2182,14 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         if (sym->caught && c->deferring > 0) {
             sym->deferred = true;
         }
+        /* An atomic local is read and written by its own calls alone,
+           as an atomic field is. */
+        if (sym->atomic && !c->atomic_place) {
+            sema_error_at(c, e->pos, "`%.*s` is atomic, so it is read with "
+                          "`load()` and written with `store(v)`",
+                          (int)e->as.name.length, e->as.name.text);
+            return sema_builtin(c, TYPE_ERROR);
+        }
         if (sym->snapshot_moved) {
             sema_error_at(c, e->pos, "`%.*s` has moved into an owner on line "
                           "%u and is not named after it",

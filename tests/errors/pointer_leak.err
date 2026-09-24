@@ -1,0 +1,6 @@
+pointer_leak.anti:24:10: error: `origin` of the thread-safe class `Shape` gives out a pointer into its fields, return a copy
+pointer_leak.anti:29:10: error: `corners` of the thread-safe class `Shape` gives out a pointer into its fields, return a copy
+pointer_leak.anti:34:10: error: `list` of the thread-safe class `Shape` gives out a pointer into its fields, return a copy
+pointer_leak.anti:40:10: error: `x` of the thread-safe class `Shape` gives out a pointer into its fields, return a copy
+pointer_leak.anti:45:5: error: `visit` of the thread-safe class `Shape` passes a pointer into its fields to a function value, pass a copy
+pointer_leak.anti:67:11: error: `first` of the thread-safe class `Store` gives out a pointer into its fields, return a copy

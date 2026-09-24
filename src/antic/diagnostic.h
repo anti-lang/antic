@@ -66,6 +66,13 @@ void diagnostics_warn(struct diagnostics *d, enum diag_name name, int line,
     __attribute__((format(printf, 5, 6)))
 #endif
     ;
+/* A safety check, an error with a name, which `unchecked` overrules. */
+void diagnostics_check(struct diagnostics *d, enum diag_name name, int line,
+                       int column, const char *format, ...)
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((format(printf, 5, 6)))
+#endif
+    ;
 /* A warning about documentation, which belongs to the doc class of
    `anti check`. */
 void diagnostics_doc(struct diagnostics *d, enum diag_name name, int line,

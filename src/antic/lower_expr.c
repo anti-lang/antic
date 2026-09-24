@@ -139,6 +139,11 @@ void lower_store_default(struct lowerer *l, const struct struct_field *field,
         ir_store(l->f, l->b, IR_PTR, object, address);
         return;
     }
+    /* A Mutex, and the hidden lock of a synchronized class, start free. */
+    if (types_is_mutex(field->type) || types_is_object_lock(field->type)) {
+        lower_zero_lock(l, field->type, address);
+        return;
+    }
     /* An inline class field without a default is written as `T { }`
        would write it, which the init of T does. */
     if (field->value == NULL && field->constant == NULL) {

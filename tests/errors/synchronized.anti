@@ -1,0 +1,49 @@
+//! A field of a synchronized class is reached by the functions of the class
+//! alone. A function outside it that read or wrote one would race with the
+//! functions that hold the lock, and a static function holds none. A class of
+//! another kind neither inherits a synchronized class nor is inherited by one.
+
+synchronized class Account
+{
+	pub balance: int = 0,
+
+	pub fn deposit(self, n: int)
+	{
+		self.balance += n;
+	}
+
+	pub fn peek(a: *Account) -> int
+	{
+		return a.balance;
+	}
+}
+
+class Plain
+{
+	n: int = 0,
+}
+
+synchronized class Wrapped inherits Plain
+{
+	m: int = 0,
+}
+
+class Loose inherits Account
+{
+	k: int = 0,
+}
+
+fn main() -> int
+{
+	let a = alloc Account { };
+	a.deposit(5);
+	a.balance += 1;
+	let seen = a.balance;
+	sync a {
+		a.deposit(1);
+	}
+	let p = alloc Plain { };
+	sync p {
+	}
+	return seen;
+}

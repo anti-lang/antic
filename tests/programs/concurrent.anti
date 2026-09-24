@@ -1,0 +1,145 @@
+//! A concurrent class leaves the locking to the program, and the checker
+//! proves every field guarded, atomic or fixed. The chunks of a `parallel`
+//! add people to one list and count them in an atomic field. The list's lock
+//! guards the links, and each node's own lock guards its person, so a change
+//! to one person holds that node's lock alone. An atomic local counts the
+//! calls of a `concurrent` closure.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Person
+{
+	age: int,
+}
+
+concurrent class People
+{
+	struct Node
+	{
+		lock: Mutex,
+		person: Person guarded by lock,
+		next: ?*Node guarded by People.lock,
+	}
+
+	lock: Mutex,
+	head: ?*Node = none guarded by lock,
+	size: int = 0 guarded by lock,
+	atomic added: int = 0,
+	limit: int,
+
+	fn construct(self, limit: int)
+	{
+		self.limit = limit;
+	}
+
+	fn destruct(self)
+	{
+		let n = self.head;
+		while n != none do {
+			let next = n.next;
+			free(n);
+			n = next;
+		}
+	}
+
+	pub fn add(self, p: Person)
+	{
+		let n = alloc Node { person: p, next: none };
+		sync self.lock {
+			n.next = self.head;
+			self.head = n;
+			self.size += 1;
+		}
+		self.added.add(1);
+	}
+
+	/// Every person one year older, each under the lock of its node.
+	pub fn birthday(self)
+	{
+		sync self.lock {
+			let n = self.head;
+			while n != none do {
+				sync n.lock {
+					n.person.age += 1;
+				}
+				n = n.next;
+			}
+		}
+	}
+
+	pub fn count(self) -> int
+	{
+		sync self.lock {
+			return self.size;
+		}
+	}
+
+	pub fn total_age(self) -> int
+	{
+		let sum = 0;
+		sync self.lock {
+			let n = self.head;
+			while n != none do {
+				sync n.lock {
+					sum += n.person.age;
+				}
+				n = n.next;
+			}
+		}
+		return sum;
+	}
+
+	pub fn adds(self) -> int
+	{
+		return self.added.load();
+	}
+
+	pub fn most(self) -> int
+	{
+		return self.limit;
+	}
+}
+
+worker fn fill(chunk: []int, people: *People) -> int
+{
+	for age in chunk {
+		people.add(Person { age: age });
+	}
+	return chunk.len;
+}
+
+fn each(items: []int, concurrent f: fn(int)) -> int
+{
+	let parts = parallel items by 4 -> run(f);
+	free(parts.ptr);
+	return items.len;
+}
+
+worker fn run(chunk: []int, concurrent f: fn(int)) -> int
+{
+	for n in chunk {
+		f(n);
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let people = alloc People(100);
+	let ages = alloc([8000]int, 1) else { return 1; };
+	for i in 0..8000 {
+		(*ages)[i] = 1;
+	}
+	let parts = parallel (*ages)[0..8000] by 8 -> fill(people);
+	free(parts.ptr);
+	people.birthday();
+	printf("%d %d %d %d\n".ptr, people.count() as c_int,
+		people.adds() as c_int, people.total_age() as c_int,
+		people.most() as c_int);
+	let calls: atomic int = 0;
+	each((*ages)[0..8000], fn(n) { calls.add(n); });
+	printf("%d\n".ptr, calls.load() as c_int);
+	free(ages);
+	delete(people);
+	return 0;
+}

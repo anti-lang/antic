@@ -1476,8 +1476,16 @@ static struct stmt *let_or_const(struct parser *p)
         if (p->panic) {
             return NULL;
         }
-    } else if ((s->as.let.type = type(p)) == NULL) {
-        return NULL;
+    } else {
+        /* DESIGN: `atomic` before the type of a local makes it an
+           atomic local, which the atomic operations alone reach. */
+        if (t->kind == TOKEN_LET && check(p, TOKEN_ATOMIC)) {
+            next(p);
+            s->as.let.atomic = true;
+        }
+        if ((s->as.let.type = type(p)) == NULL) {
+            return NULL;
+        }
     }
     if (!expect(p, TOKEN_ASSIGN) || (s->as.let.value = expression(p)) == NULL) {
         return NULL;
@@ -2806,6 +2814,47 @@ static bool struct_field_only(struct parser *p, const struct item *it)
     return false;
 }
 
+/* DESIGN: `guarded by lock` after a field's type or its default names
+   the Mutex that a `sync` holds wherever the field is reached, and
+   `guarded by PeopleList.lock` names the lock of an enclosing object by
+   its class. `guarded` and `by` are contextual words. */
+static bool guard_clause(struct parser *p, struct param *field)
+{
+    if (field->guard.length > 0 || !is_word(p, peek(p), "guarded") ||
+        !is_word(p, peek_at(p, 1), "by")) {
+        return true;
+    }
+    field->guard_pos = pos_of(peek(p));
+    next(p);
+    next(p);
+    if (!expect_name(p, &field->guard)) {
+        return false;
+    }
+    if (accept(p, TOKEN_DOT)) {
+        field->guard_class = field->guard;
+        if (!expect_name(p, &field->guard)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* Whether a clause read since mark is `unchecked(unguarded-field)`. */
+static bool unchecks_guard(const struct parser *p, size_t mark)
+{
+    const struct clause *all = p->clauses->data;
+    size_t i;
+
+    for (i = mark; i < p->clauses->count; i++) {
+        if (all[i].unchecked &&
+            warnings_find(all[i].name.text, all[i].name.length) ==
+                NAME_UNGUARDED_FIELD) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* `unchecked(name, "reason")` after a field's type overrules a safety
    check for that field alone. A warning of a field is one of its class,
    so `allow` stands in the class header. */
@@ -2866,9 +2915,11 @@ static struct item *class_item(struct parser *p, struct item *it)
             return NULL;
         }
     }
+    mark = p->clauses->count;
     if (!header_clauses(p) || !expect(p, TOKEN_LBRACE)) {
         return NULL;
     }
+    it->unchecked_fields = unchecks_guard(p, mark);
     /* Fields first, comma separated, then the constants and functions,
        each ended by its own `;` or block. */
     while (!check(p, TOKEN_RBRACE) && !check(p, TOKEN_EOF) &&
@@ -2959,15 +3010,18 @@ static struct item *class_item(struct parser *p, struct item *it)
         if (!(field.injected ? expect_member_name(p, &field.name)
                              : expect_name(p, &field.name)) ||
             !expect(p, TOKEN_COLON) ||
-            (field.type = type(p)) == NULL || !field_clauses(p) ||
+            (field.type = type(p)) == NULL || !guard_clause(p, &field) ||
+            !field_clauses(p) ||
             (accept(p, TOKEN_COLON) &&
              (field.bits = expression(p)) == NULL) ||
             (accept(p, TOKEN_ASSIGN) &&
-             (field.value = expression(p)) == NULL)) {
+             (field.value = expression(p)) == NULL) ||
+            !guard_clause(p, &field) || !field_clauses(p)) {
             free(fields.data);
             free(nested.data);
             return NULL;
         }
+        field.unchecked = unchecks_guard(p, mark);
         close_clauses(p, mark, field.pos);
         list_push(&fields, &field);
         if (!accept(p, TOKEN_COMMA)) {
@@ -3050,6 +3104,17 @@ static struct item *variant_item(struct parser *p, struct item *it)
     return expect(p, TOKEN_RBRACE) ? it : NULL;
 }
 
+/* Whether `class` stands at the token ahead, or `synchronized class` or
+   `concurrent class` does. */
+static bool class_ahead(const struct parser *p, size_t ahead)
+{
+    const struct token *t = peek_at(p, ahead);
+
+    return t->kind == TOKEN_CLASS ||
+           ((is_word(p, t, "synchronized") || is_word(p, t, "concurrent")) &&
+            peek_at(p, ahead + 1)->kind == TOKEN_CLASS);
+}
+
 static struct item *item_level(struct parser *p)
 {
     const struct token *start = peek(p);
@@ -3088,26 +3153,35 @@ static struct item *item_level(struct parser *p)
        before `fn` in a class body, where it marks one function. A module
        function has no object to hook, so `trace` before one is refused. */
     if (is_word(p, peek(p), "trace") &&
-        (peek_at(p, 1)->kind == TOKEN_CLASS ||
-         peek_at(p, 1)->kind == TOKEN_FN)) {
+        (class_ahead(p, 1) || peek_at(p, 1)->kind == TOKEN_FN)) {
         next(p);
-        if (peek(p)->kind != TOKEN_CLASS) {
+        if (!class_ahead(p, 0)) {
             error_here(p, "`trace` marks a class or a function of one");
             return NULL;
         }
         it->trace = true;
     }
-    if (peek(p)->kind == TOKEN_ABSTRACT && peek_at(p, 1)->kind == TOKEN_CLASS) {
+    if (peek(p)->kind == TOKEN_ABSTRACT && class_ahead(p, 1)) {
         next(p);
         it->is_abstract = true;
-    } else if (is_word(p, peek(p), "final") &&
-               peek_at(p, 1)->kind == TOKEN_CLASS) {
+    } else if (is_word(p, peek(p), "final") && class_ahead(p, 1)) {
         next(p);
         it->is_final = true;
-    } else if (peek(p)->kind == TOKEN_SINGLETON &&
-               peek_at(p, 1)->kind == TOKEN_CLASS) {
+    } else if (peek(p)->kind == TOKEN_SINGLETON && class_ahead(p, 1)) {
         next(p);
         it->is_singleton = true;
+    }
+    /* DESIGN: `synchronized` and `concurrent` are contextual words
+       directly before `class`, so a parameter or a field may still carry
+       either name. */
+    if (is_word(p, peek(p), "synchronized") &&
+        peek_at(p, 1)->kind == TOKEN_CLASS) {
+        next(p);
+        it->synchronized = true;
+    } else if (is_word(p, peek(p), "concurrent") &&
+               peek_at(p, 1)->kind == TOKEN_CLASS) {
+        next(p);
+        it->concurrent = true;
     }
     /* `operator fn` at module level gives a struct its operators, since
        a struct holds no functions of its own. */
@@ -3216,7 +3290,7 @@ static struct item *item_level(struct parser *p)
                 return NULL;
             }
             if (!expect_name(p, &field.name) || !expect(p, TOKEN_COLON) ||
-                (field.type = type(p)) == NULL ||
+                (field.type = type(p)) == NULL || !guard_clause(p, &field) ||
                 (accept(p, TOKEN_COLON) &&
                  (field.bits = expression(p)) == NULL)) {
                 free(fields.data);

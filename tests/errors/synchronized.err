@@ -1,0 +1,6 @@
+synchronized.anti:26:28: error: the synchronized class `Wrapped` inherits `Plain`, which is neither of its kind nor an abstract class without fields
+synchronized.anti:31:13: error: `Loose` inherits the synchronized class `Account`, and is written `synchronized class`
+synchronized.anti:40:2: error: `balance` is a field of the synchronized class `Account`, which its own functions reach alone
+synchronized.anti:41:13: error: `balance` is a field of the synchronized class `Account`, which its own functions reach alone
+synchronized.anti:46:7: error: `sync` takes a `Mutex`, a synchronized object or a pointer to either, found `Plain`
+synchronized.anti:17:10: error: `balance` is a field of the synchronized class `Account`, which its own functions reach alone

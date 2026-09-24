@@ -1,0 +1,89 @@
+//! A synchronized class runs every function that is not private under one
+//! hidden lock of its object. The chunks of two `parallel` add to one tally,
+//! which each worker takes as a pointer to a thread-safe object, and no
+//! addition is lost. A
+//! public function that calls another on the same object takes the lock again
+//! without waiting, and so do a closure the object runs and `sync obj { }`
+//! around two calls.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Tally
+{
+	count: int = 0,
+	twice: int = 0,
+
+	pub fn add(self, n: int)
+	{
+		self.count += n;
+	}
+
+	/// Calls `add` on its own object, under the lock it holds already.
+	pub fn add_twice(self, n: int)
+	{
+		self.add(n);
+		self.add(n);
+		self.bump();
+	}
+
+	/// A private function runs inside the lock of its caller.
+	fn bump(self)
+	{
+		self.twice += 1;
+	}
+
+	pub fn total(self) -> int
+	{
+		return self.count;
+	}
+
+	pub fn pairs(self) -> int
+	{
+		return self.twice;
+	}
+
+	/// The closure runs inside the lock, and may call the object again.
+	pub fn update(self, change: fn(int) -> int)
+	{
+		self.count = change(self.count);
+	}
+}
+
+worker fn fill(chunk: []int, t: *Tally) -> int
+{
+	for n in chunk {
+		t.add(n);
+	}
+	return chunk.len;
+}
+
+worker fn fill_twice(chunk: []int, t: *Tally) -> int
+{
+	for n in chunk {
+		t.add_twice(n);
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let t = alloc Tally { };
+	let ones = alloc([40000]int, 1) else { return 1; };
+	for i in 0..40000 {
+		(*ones)[i] = 1;
+	}
+	let parts = parallel (*ones)[0..40000] by 8 -> fill(t);
+	free(parts.ptr);
+	let pairs = parallel (*ones)[0..20000] by 8 -> fill_twice(t);
+	free(pairs.ptr);
+	free(ones);
+	printf("%d %d\n".ptr, t.total() as c_int, t.pairs() as c_int);
+	t.update(fn(n) { return n + 1; });
+	sync t {
+		t.add(10);
+		t.add_twice(5);
+	}
+	printf("%d\n".ptr, t.total() as c_int);
+	free(t);
+	return 0;
+}

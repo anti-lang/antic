@@ -1654,6 +1654,23 @@ static void check_stmt(struct checker *c, struct stmt *s)
             sym->type = t;
             s->as.let.symbol = sym;
             sym->holds = held_deepest(s->as.let.value);
+            sym->into_fields = sema_points_into_fields(s->as.let.value,
+                                                       c->function, t);
+            /* DESIGN: an atomic local lives in memory, where the atomic
+               operations reach it through its address. It holds what
+               one operation of the runtime moves: an integer, a `bool`,
+               a `char` or a pointer. */
+            if (s->as.let.atomic) {
+                sym->atomic = true;
+                sym->address_taken = true;
+                if (!sema_is_error(t) && !type_is_integer(t) &&
+                    t->kind != TYPE_BOOL && t->kind != TYPE_CHAR &&
+                    t->kind != TYPE_POINTER) {
+                    sema_error_at(c, s->as.let.name_pos, "an atomic local "
+                                  "holds an integer, a `bool`, a `char` or "
+                                  "a pointer, found `%s`", sema_tn(t));
+                }
+            }
             if (s->as.let.value->kind == EXPR_FN) {
                 sym->closure = s->as.let.value->as.fn;
             }
@@ -2095,6 +2112,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
                          sema_check_expr(c, s->as.return_value, result),
                          result)) {
             sema_refuse_lock_copy(c, s->as.return_value, result);
+            sema_check_leak_return(c, s->as.return_value, result);
         }
         return;
     case STMT_BLOCK:
@@ -2610,6 +2628,7 @@ void sema_note_write(struct checker *c, const struct expr *e)
     struct symbol *sym = captured_root(c, e);
     struct item *it;
 
+    sema_note_field_write(c, e);
     for (it = c->function; sym != NULL && it != NULL && it != sym->frame;
          it = it->enclosing) {
         struct capture *cap = capture_in(it, sym);

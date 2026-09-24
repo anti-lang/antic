@@ -47,6 +47,12 @@ struct scope {
     int depth;                  /* the blocks around it, 0 for a module */
 };
 
+/* A field of a concurrent class of the module that a write outside
+   `construct` made none of guarded, atomic or fixed. */
+struct written_field {
+    const struct struct_field *field;
+};
+
 /* One `sync` that the statement being checked stands in, innermost
    first. */
 struct held_mutex {
@@ -89,6 +95,11 @@ struct checker {
        place, a parameter of it included. The signature of an `extern fn`
        is checked so. */
     int plain_fns;
+    /* The fields of concurrent classes that the module writes after
+       `construct`, reported at their declarations at the end. */
+    struct written_field *written;
+    size_t written_count;
+    size_t written_capacity;
     bool ok;
 };
 
@@ -125,6 +136,11 @@ void sema_format_to(char *out, size_t size, const char *format, ...)
 void sema_error_at(struct checker *c, struct pos pos, const char *format,
                    ...)
     ATTRIBUTE_PRINTF(3, 4);
+/* A safety check at pos, which `unchecked(name, "reason")` overrules. It
+   stops the build unless a clause covers it, so it leaves c->ok. */
+void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
+                   const char *format, ...)
+    ATTRIBUTE_PRINTF(4, 5);
 const char *sema_tn(const struct type *t);
 struct type *sema_builtin(struct checker *c, enum type_kind kind);
 bool sema_is_error(const struct type *t);
@@ -277,6 +293,26 @@ void sema_check_block(struct checker *c, struct block *b);
 const struct item *sema_named_function(const struct checker *c);
 bool sema_thread_safe(const struct type *t);
 bool sema_thread_safe_symbol(const struct symbol *sym);
+
+/* sema_safety.c */
+
+void sema_safety_declare(struct checker *c, struct item *it);
+void sema_safety_base(struct checker *c, const struct item *it,
+                      const struct type *base);
+bool sema_needs_hidden_lock(const struct item *it);
+void sema_hidden_lock(struct checker *c, const struct item *it,
+                      struct struct_field *f);
+void sema_check_guards(struct checker *c);
+bool sema_check_reach(struct checker *c, const struct expr *e,
+                      const struct struct_field *f);
+void sema_note_field_write(struct checker *c, const struct expr *e);
+void sema_report_unfixed(struct checker *c);
+bool sema_points_into_fields(const struct expr *e, const struct item *fn,
+                             const struct type *to);
+void sema_check_leak_return(struct checker *c, const struct expr *value,
+                            const struct type *result);
+void sema_check_leak_arg(struct checker *c, const struct expr *callee,
+                         const struct expr *arg, const struct type *param);
 void sema_capture(struct checker *c, struct symbol *sym);
 void sema_note_write(struct checker *c, const struct expr *e);
 void sema_note_call(struct checker *c, const struct expr *callee);

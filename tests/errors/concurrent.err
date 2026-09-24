@@ -1,0 +1,5 @@
+concurrent.anti:35:10: error: `count` is guarded by `lock`, and no `sync` holds it here [unguarded-field]
+concurrent.anti:41:11: error: `count` is guarded by `lock`, and no `sync` holds it here [unguarded-field]
+concurrent.anti:11:2: error: `hits` is not guarded, atomic or fixed [unguarded-field]
+concurrent.anti:13:2: error: `start` is not guarded, atomic or fixed [unguarded-field]
+concurrent.anti:15:17: error: `unchecked(unguarded-field)` overrules nothing [unused-unchecked]

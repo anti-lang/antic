@@ -1,0 +1,50 @@
+//! A Mutex is one word of the program's memory and cannot be copied or
+//! assigned: a copy would be a second lock that guards nothing. A value that
+//! holds one follows the same rule, and a worker takes a pointer to one. An
+//! atomic local is reached through the atomic operations alone.
+
+struct Guarded
+{
+	lock: Mutex,
+	n: int,
+}
+
+fn take(m: Mutex)
+{
+}
+
+fn give(g: *Guarded) -> Guarded
+{
+	return *g;
+}
+
+worker fn count(chunk: []int, m: Mutex) -> int
+{
+	return chunk.len;
+}
+
+fn fresh() -> Guarded
+{
+	return Guarded { lock: Mutex.new(), n: 0 };
+}
+
+fn main() -> int
+{
+	let g = Guarded { lock: Mutex.new(), n: 1 };
+	let copy = g.lock;
+	let whole = g;
+	g.lock = Mutex.new();
+	take(g.lock);
+	let items = [1, 2];
+	let parts = parallel items[0..2] by 2 -> count(g.lock);
+	free(parts.ptr);
+	let made = fresh();
+	sync Mutex.new() {
+	}
+	let hits: atomic int = 0;
+	let seen = hits;
+	hits = 2;
+	let ratio: atomic f64 = 0.5;
+	hits.add(1);
+	return made.n + seen;
+}

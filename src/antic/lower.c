@@ -748,6 +748,28 @@ const struct type *lower_field_owner(const struct type *t,
     return t;
 }
 
+/* Write a free lock at at: the zero word of a Mutex, or the hidden lock
+   of a synchronized object with no thread that holds it. */
+void lower_zero_lock(struct lowerer *l, const struct type *t,
+                     struct ir_operand at)
+{
+    size_t i;
+
+    if (types_is_mutex(t)) {
+        ir_store(l->f, l->b, IR_LOCK, ir_int_op(IR_LOCK, 0), at);
+        return;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        struct ir_operand into = lower_offset_address(
+            l, at, lower_field_offset(l, t, &t->fields[i].name));
+        if (types_is_mutex(t->fields[i].type)) {
+            lower_zero_lock(l, t->fields[i].type, into);
+        } else {
+            ir_store(l->f, l->b, IR_I64, ir_int_op(IR_I64, 0), into);
+        }
+    }
+}
+
 /* The address of the hidden lock of the synchronized object at object,
    whose class is t or inherits the class that declares the lock. */
 struct ir_operand lower_object_lock_address(struct lowerer *l,
@@ -1598,6 +1620,18 @@ static void take_trace_name(struct lowerer *l)
 static void snapshot_entry(struct lowerer *l, const struct item *it,
                            struct ir_block *entry);
 
+/* Whether it is a function of a synchronized class that takes the hidden
+   lock of its object. */
+static bool synchronized_function(const struct item *it)
+{
+    return it->owner != NULL && it->owner->symbol != NULL &&
+           it->owner->symbol->type->kind == TYPE_CLASS &&
+           it->owner->symbol->type->safety == SAFETY_SYNCHRONIZED &&
+           it->has_self && it->vis != VIS_PRIVATE &&
+           !lower_name_is(&it->name, "construct") &&
+           !lower_name_is(&it->name, "destruct");
+}
+
 static void lower_function(struct lowerer *l, const struct item *it)
 {
     struct defers around;
@@ -1713,6 +1747,19 @@ static void lower_function(struct lowerer *l, const struct item *it)
         l->trace_self = lower_temp(l, l->f->params[0].temp);
         lower_hook_call(l, HOOK_ENTER);
         lower_push_leave_action(l);
+    }
+    /* DESIGN: a function of a synchronized class that code outside the
+       class calls takes the hidden lock of its object when it starts,
+       and every exit gives it back, as the unlock of `sync` does. A
+       private function runs inside the lock of the one that called it,
+       and `construct` and `destruct` run where no other thread sees the
+       object. */
+    if (synchronized_function(it)) {
+        lower_hold_lock(l,
+                        lower_object_lock_address(
+                            l, it->owner->symbol->type,
+                            lower_temp(l, l->f->params[0].temp)),
+                        true, it->pos.line);
     }
     lower_block(l, it->body);
     if (l->b != NULL) {
@@ -2294,6 +2341,13 @@ static void copy_field(struct lowerer *l, const struct type *up,
     struct ir_operand args[4];
 
     if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
+        return;
+    }
+    /* A lock of the object is its own, and the copy gets one that is
+       free, whatever the lock of the original held. */
+    if (types_is_mutex(f->type) || types_is_object_lock(f->type)) {
+        offset = lower_field_offset(l, up, &f->name);
+        lower_zero_lock(l, f->type, lower_offset_address(l, to, offset));
         return;
     }
     /* A `transient` field is derived state, and the copy derives its

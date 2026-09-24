@@ -51,6 +51,16 @@ void diagnostics_warn(struct diagnostics *d, enum diag_name name, int line,
     va_end(args);
 }
 
+void diagnostics_check(struct diagnostics *d, enum diag_name name, int line,
+                       int column, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    add(d, name, line, column, false, false, format, args);
+    va_end(args);
+}
+
 void diagnostics_doc(struct diagnostics *d, enum diag_name name, int line,
                      int column, const char *format, ...)
 {

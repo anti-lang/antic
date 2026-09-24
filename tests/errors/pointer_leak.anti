@@ -1,0 +1,75 @@
+//! A public function of a thread-safe class never gives out a pointer or a
+//! slice into the object's fields. A caller that held one would reach the data
+//! without the lock. It returns and passes copies.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+synchronized class Shape
+{
+	origin: Point = Point { x: 0, y: 0 },
+	corners: [4]int = [0, 0, 0, 0],
+	list: []int,
+
+	fn construct(self, list: []int)
+	{
+		self.list = list;
+	}
+
+	pub fn origin(self) -> *Point
+	{
+		return &self.origin;
+	}
+
+	pub fn corners(self) -> []int
+	{
+		return self.corners[0..4];
+	}
+
+	pub fn list(self) -> []int
+	{
+		return self.list;
+	}
+
+	pub fn x(self) -> *int
+	{
+		let at = &self.origin.x;
+		return at;
+	}
+
+	pub fn visit(self, f: fn(*Point))
+	{
+		f(&self.origin);
+	}
+
+	pub fn place(self) -> Point
+	{
+		return self.origin;
+	}
+
+	fn inside(self) -> *Point
+	{
+		return &self.origin;
+	}
+}
+
+concurrent class Store
+{
+	lock: Mutex,
+	items: [8]int = [0, 0, 0, 0, 0, 0, 0, 0] guarded by lock,
+
+	pub fn first(self) -> *int
+	{
+		sync self.lock {
+			return &self.items[0];
+		}
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

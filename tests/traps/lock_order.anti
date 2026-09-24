@@ -1,0 +1,79 @@
+//! Two threads take two locks in opposite orders, one after the other, so the
+//! program never hangs. A dev build records the order in which each thread
+//! takes its locks and reports the conflict with the four sites. The hidden
+//! lock of a synchronized object takes part as a Mutex does. A release build
+//! records nothing and reports nothing.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+synchronized class Box
+{
+	n: int = 0,
+
+	/// Takes the lock of pair while the object's lock is held.
+	pub fn touch(self, pair: *Pair)
+	{
+		sync pair.a {
+			self.n += 1;
+		}
+	}
+
+	pub fn bump(self)
+	{
+		self.n += 1;
+	}
+}
+
+class Task
+{
+	pub pair: *Pair,
+}
+
+worker fn forward(t: *Task, box: *Box) -> int
+{
+	sync t.pair.a {
+		sync t.pair.b {
+			t.pair.n += 1;
+		}
+	}
+	box.touch(t.pair);
+	return 0;
+}
+
+worker fn backward(t: *Task, box: *Box) -> int
+{
+	sync t.pair.b {
+		sync t.pair.a {
+			t.pair.n += 1;
+		}
+	}
+	sync t.pair.a {
+		box.bump();
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let pair = alloc Pair { n: 0 };
+	let box = alloc Box { };
+	let first = alloc Task { pair: pair };
+	let second = alloc Task { pair: pair };
+	let one = dispatch first -> forward(box);
+	join(one);
+	let two = dispatch second -> backward(box);
+	join(two);
+	printf("%d\n".ptr, pair.n as c_int);
+	free(first);
+	free(second);
+	free(box);
+	free(pair);
+	return 0;
+}

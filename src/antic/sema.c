@@ -65,6 +65,21 @@ void sema_error_at(struct checker *c, struct pos pos, const char *format,
     c->ok = false;
 }
 
+void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
+                   const char *format, ...)
+{
+    char message[160];
+    va_list args;
+
+    if (c->quiet > 0) {
+        return;
+    }
+    va_start(args, format);
+    vformat_to(message, sizeof message, format, args);
+    va_end(args);
+    diagnostics_check(c->diags, name, pos.line, pos.column, "%s", message);
+}
+
 /* A type name for a message, kept in one of four rotating buffers so
    that one message can name up to four types. */
 const char *sema_tn(const struct type *t)
@@ -1965,12 +1980,14 @@ static void declare_items(struct checker *c)
             it->symbol->type = types_struct(c->types, c->module_name, it->name);
             it->symbol->type->is_union = it->kind == ITEM_UNION;
             it->symbol->type->simd = it->simd;
+            sema_safety_declare(c, it);
         } else if (it->kind == ITEM_CLASS) {
             it->symbol->type = types_struct(c->types, c->module_name, it->name);
             it->symbol->type->kind = TYPE_CLASS;
             it->symbol->type->has_abstract = it->is_abstract;
             it->symbol->type->traced = it->trace;
             it->symbol->type->is_final = it->is_final;
+            sema_safety_declare(c, it);
             /* DESIGN: `compatible` names the floor of a plugin's
                version, which only an abstract class has a table for. */
             if (it->compatible.length > 0 && !it->is_abstract) {
@@ -2054,6 +2071,7 @@ static void resolve_base(struct checker *c, struct item *it)
         return;
     }
     it->symbol->type->base = base_type;
+    sema_safety_base(c, it, base_type);
 }
 
 static void resolve_bases(struct checker *c)
@@ -2269,6 +2287,7 @@ static void declare_fields(struct checker *c, struct item *it)
 {
     struct struct_field *fields;
     size_t base_fields;
+    size_t hidden;
     size_t j;
 
     /* DESIGN: a class carries its base as field 0, named `super`.
@@ -2277,7 +2296,9 @@ static void declare_fields(struct checker *c, struct item *it)
        nested whole, so the C rules of chapter 18 place it at offset
        0 and the class's own fields after it. */
     base_fields = it->kind == ITEM_CLASS ? 1 : 0;
-    fields = types_alloc_array(c->arena, it->param_count + base_fields,
+    hidden = it->kind == ITEM_CLASS && sema_needs_hidden_lock(it) ? 1 : 0;
+    fields = types_alloc_array(c->arena,
+                               it->param_count + base_fields + hidden,
                                sizeof *fields);
     if (base_fields != 0) {
         static const char super_text[] = "super";
@@ -2317,8 +2338,13 @@ static void declare_fields(struct checker *c, struct item *it)
             fields[j].constant = v;
         }
     }
+    /* The hidden lock of a synchronized class follows the fields the
+       class declares. */
+    if (hidden != 0) {
+        sema_hidden_lock(c, it, &fields[it->param_count]);
+    }
     types_set_fields(c->types, it->symbol->type, fields - base_fields,
-                     it->param_count + base_fields);
+                     it->param_count + base_fields + hidden);
     it->symbol->type->packed = it->packed;
     if (it->align != NULL) {
         it->symbol->type->align = alignment(c, it->align);
@@ -3233,6 +3259,7 @@ bool sema_check(struct module *module, const char *module_name,
     resolve_bases(&c);
     declare_enums_and_variants(&c);
     declare_all_fields(&c);
+    sema_check_guards(&c);
     declare_function_types(&c);
     declare_all_members(&c);
     check_signatures(&c);
@@ -3241,6 +3268,7 @@ bool sema_check(struct module *module, const char *module_name,
     check_member_functions(&c);
     report_program(&c);
     check_boundary(&c);
+    sema_report_unfixed(&c);
     free(c.module_scope.entries);
     return c.ok;
 }

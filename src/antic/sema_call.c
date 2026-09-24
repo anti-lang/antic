@@ -450,11 +450,15 @@ struct stmt *sema_arm_fallthrough(const struct stmt *body)
                : NULL;
 }
 
+/* DESIGN: a Mutex field without a default starts free, as `Mutex.new()`
+   gives it, so a literal and `construct` may leave it out. So does the
+   hidden lock of a synchronized class. */
 bool sema_field_takes_literal(const struct struct_field *f)
 {
     return f->value == NULL && f->constant == NULL &&
            (f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-           literal_complete(f->type);
+           (literal_complete(f->type) || types_is_mutex(f->type) ||
+            types_is_object_lock(f->type));
 }
 
 /* DESIGN: every field of a struct is readable and writable everywhere,
@@ -568,12 +572,15 @@ static const struct {
     {"compare_swap", ATOMIC_CAS, 2, false, true}
 };
 
-/* The type of the atomic field that e denotes, or NULL. */
+/* The type of the atomic field or local that e denotes, or NULL. */
 static struct type *atomic_place(const struct expr *e)
 {
     const struct struct_field *f;
     struct type *s;
 
+    if (e->kind == EXPR_NAME) {
+        return e->symbol != NULL && e->symbol->atomic ? e->symbol->type : NULL;
+    }
     if (e->kind != EXPR_FIELD) {
         return NULL;
     }
@@ -599,20 +606,30 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
     struct type *t;
     size_t i;
 
-    if (callee->kind != EXPR_FIELD ||
-        callee->as.field.base->kind != EXPR_FIELD) {
+    bool was;
+
+    if (callee->kind != EXPR_FIELD) {
+        return false;
+    }
+    place = callee->as.field.base;
+    if (place->kind == EXPR_NAME) {
+        const struct symbol *sym = sema_lookup(c, &place->as.name);
+        if (sym == NULL || !sym->atomic) {
+            return false;
+        }
+    } else if (place->kind != EXPR_FIELD) {
         return false;
     }
     /* DESIGN: the base is checked quietly, because this is a probe. A
        call on anything else reaches the branches below, which report
-       what is wrong with it. */
-    place = callee->as.field.base;
+       what is wrong with it. A probe inside another keeps its flag. */
+    was = c->atomic_place;
     c->atomic_place = true;
     c->quiet++;
     /* The place is storage, so an f16 there stays an f16. */
     t = sema_check_storage(c, place);
     c->quiet--;
-    c->atomic_place = false;
+    c->atomic_place = was;
     if (t == NULL || sema_is_error(t)) {
         return false;
     }
@@ -661,7 +678,8 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
                                            : sema_builtin(c, TYPE_VOID);
         return true;
     }
-    sema_error_at(c, callee->pos, "an atomic field has no `%.*s`",
+    sema_error_at(c, callee->pos, "an atomic %s has no `%.*s`",
+                  place->kind == EXPR_NAME ? "local" : "field",
                   (int)callee->as.field.name.length,
                   callee->as.field.name.text);
     *out = sema_builtin(c, TYPE_ERROR);
@@ -2138,6 +2156,7 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
             ok = sema_require(c, arg, sema_check_expr(c, arg, fn->params[i]),
                               fn->params[i]) && ok;
             sema_refuse_lock_copy(c, arg, fn->params[i]);
+            sema_check_leak_arg(c, e->as.call.callee, arg, fn->params[i]);
             if (sym != NULL && sym->worker) {
                 sema_refuse_worker_closure(c, arg, fn->params[i]);
             }
@@ -2493,6 +2512,9 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                           (int)name->length, name->text);
             return sema_builtin(c, TYPE_ERROR);
         }
+        if (!sema_check_reach(c, e, f)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
         return f->type;
     }
     if (sema_name_is(name, "len") && (base->kind == TYPE_STR ||
@@ -2540,7 +2562,7 @@ size_t sema_chain_fields(const struct type *t, struct struct_field *out)
     }
     for (i = 0; i < t->field_count; i++) {
         if (t->fields[i].form == FIELD_BASE ||
-            t->fields[i].form == FIELD_TABLE) {
+            t->fields[i].form == FIELD_TABLE || t->fields[i].hidden) {
             continue;
         }
         if (out != NULL) {

@@ -251,6 +251,8 @@ const struct struct_field *lower_field_of(const struct type *s,
 const struct type *lower_field_owner(const struct type *t,
                                      const struct name *name);
 bool lower_name_is(const struct name *name, const char *text);
+void lower_zero_lock(struct lowerer *l, const struct type *t,
+                     struct ir_operand at);
 struct ir_operand lower_object_lock_address(struct lowerer *l,
                                             const struct type *t,
                                             struct ir_operand object);

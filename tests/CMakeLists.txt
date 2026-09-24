@@ -505,7 +505,7 @@ add_test(NAME dev_object_lang
             "${ANTIC_RUNTIME_DIR}/std/anti/lang.antl")
 set_tests_properties(dev_object_lang PROPERTIES FIXTURES_SETUP lang_dev_object)
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
-        channel_workers)
+        channel_workers synchronized concurrent)
     set(objects "")
     if(name STREQUAL "sync_exits")
         set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o")
@@ -701,7 +701,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     set_tests_properties(program_nullable_macos-x86_64 PROPERTIES
         ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
     foreach(name IN ITEMS sync_exits sync_workers channels select_two
-            channel_workers parallel_join)
+            channel_workers parallel_join synchronized concurrent)
         set_tests_properties(program_${name}_macos-x86_64 PROPERTIES
             TIMEOUT 120)
     endforeach()
@@ -724,7 +724,7 @@ set_tests_properties(program_nullable PROPERTIES
 # timeout reports it. tests/programs/parallel_join.anti passes
 # --anti.threads=6 for the joiner, the job it waits for and a chunk.
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
-        channel_workers parallel_join)
+        channel_workers parallel_join synchronized concurrent)
     set_tests_properties(program_${name} PROPERTIES TIMEOUT 120)
 endforeach()
 
@@ -2220,6 +2220,18 @@ add_test(NAME parallel_size
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_parallel_size.cmake")
 
+# Two threads that take two locks in opposite orders: a dev build reports
+# the conflict with its four sites, and a release build says nothing.
+add_test(NAME lock_order
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/lock_order.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_lock_order.cmake")
+set_tests_properties(lock_order PROPERTIES TIMEOUT 120)
+
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)
     add_test(NAME abi_probe
@@ -2851,7 +2863,12 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "nested_export|-S,-o,${LISTINGS}/nested_export.s,nested_export.anti"
         "hooks|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/hooks.s,hooks.anti"
         "closures|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/closures.s,closures.anti"
-        "snapshots|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/snapshots.s,snapshots.anti")
+        "snapshots|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/snapshots.s,snapshots.anti"
+        "synchronized|-S,-o,${LISTINGS}/synchronized.s,synchronized.anti"
+        "concurrent|-S,-o,${LISTINGS}/concurrent.s,concurrent.anti"
+        "concurrent_forms|-S,-o,${LISTINGS}/concurrent_forms.s,concurrent_forms.anti"
+        "pointer_leak|-S,-o,${LISTINGS}/pointer_leak.s,pointer_leak.anti"
+        "mutex_copy|-S,-o,${LISTINGS}/mutex_copy.s,mutex_copy.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

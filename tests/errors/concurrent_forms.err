@@ -1,0 +1,5 @@
+concurrent_forms.anti:18:7: error: `unchecked(unguarded-field)` in a class header belongs to a concurrent class
+concurrent_forms.anti:7:9: error: `guarded by` marks a field of a concurrent class or of a type nested in one
+concurrent_forms.anti:14:17: error: `start` is no `Mutex` field of `Counter`
+concurrent_forms.anti:15:16: error: `nothing` is no `Mutex` field of `Counter`
+concurrent_forms.anti:30:13: error: `Nowhere` is no class around `link`
