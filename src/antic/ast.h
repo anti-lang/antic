@@ -787,9 +787,9 @@ struct link_name {
 /* DESIGN: `allow(name, "reason")` silences one warning and
    `unchecked(name, "reason")` overrules one safety check. The parser
    reads each where it applies and records the source it covers, both
-   ends included: the statement after it, the declaration whose header
-   holds it with its doc comment, the field whose type it follows, or the
-   whole file. A warning stands at a position, so covering is a compare
+   ends included. That is the statement after it, the declaration whose
+   header holds it, the field whose type it follows, or the whole file.
+   A warning stands at a position, so covering is a compare
    of positions, and no pass below the parser needs the clauses. Neither
    is part of a signature, so the library file, the header and `anti doc`
    leave them out. */

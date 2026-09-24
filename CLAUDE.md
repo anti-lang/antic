@@ -419,6 +419,14 @@ reports what it finished.
   `for i, x in items` are the two forms that take one apart. The header writes
   one struct per distinct tuple of an exported signature, and the `.antl`
   carries the elements.
+- Every warning carries a stable name at the end of its message.
+  `allow(name, "reason")` silences a warning and `unchecked(name, "reason")`
+  overrules a safety check, before a statement, last in a header, after a
+  field's type or at the top of the file. A clause that silences nothing is
+  `unused-allow` or `unused-unchecked`. A release build refuses every
+  warning, `--warnings-as-errors` gives a dev build the same, and `anti check`
+  passes it. `catch none` counts a failure as `none`. See "Errors, warnings
+  and checks" in `docs/decisions.md` and `docs/notes/warnings.md`.
 - `f"..."` and `rf"..."` are built. Each text and each `{expr}` is a call
   on an `anti.text.Builder`, the format specification after a colon gives
   the arguments of the call, and the text is memory of its own that the

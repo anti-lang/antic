@@ -346,7 +346,7 @@ Four levels, and each applies where it makes sense:
 - `` `e` outlives its `catch`, use `dup` ``
 - `` `[]Shape` holds no complete values, use `[]*Shape` ``
 - `` `Sprite` replaces `equals` without `hash` `` as a warning
-- `` `e` shadows a variable in scope `` as a warning from `anti check`
+- `` `e` shadows the outer `e` [shadowed-catch] `` as a warning
 
 ## Keywords
 

@@ -63,8 +63,8 @@ endif()
 expect("${text}" "front end: 3 files, 6 targets, 0 warnings" "the six targets")
 
 # A project whose checker warns. The check passes --warnings-as-errors, as a
-# release build refuses every warning, so the front end fails with each named
-# and no class below it runs.
+# release build refuses every warning. The front end fails with each warning
+# named, and no class below it runs.
 run(warnings "" status text)
 if(status EQUAL 0)
     message(FATAL_ERROR "the warnings project passed\n${text}")

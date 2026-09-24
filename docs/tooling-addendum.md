@@ -68,7 +68,9 @@ failing class and reports every failure in that class:
 4. Formatting, the same test as `anti fmt --check`.
 
 `anti check` runs antic with `--doc-warnings` for the note warning and the dropped
-comment warning. antic without that option is silent about documentation.
+comment warning. antic without that option is silent about documentation. It runs the
+front end with `--warnings-as-errors`, so a warning of the checker fails the first class,
+as it fails a release build.
 
 `anti fmt --check` remains for a pre-commit hook that only checks layout.
 
@@ -84,7 +86,8 @@ What the command does today, with the reasons under "The check command" in
   in the order the imports ask for. A module that imports another of the project needs
   it, and those files are the only thing the command writes.
 - The doc-warning class reports and fails nothing. The front end, the doc blocks and the
-  formatting decide the status. Every finding of the class is a warning, and a backtick
+  formatting decide the status. A doc warning stays a warning under
+  `--warnings-as-errors`. Every finding of the class is a warning, and a backtick
   holds a name of the system as often as a name of the program.
 - The formatting class writes the canonical text of each file with `anti fmt` and
   compares the bytes. It reports the first line that differs, one finding per file.

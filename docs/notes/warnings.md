@@ -32,7 +32,7 @@ A name stands at the end of its message, `` `e` shadows the outer `e`
 | `unused-unchecked` | An `unchecked` overrules nothing. | Remove the clause. |
 
 The five doc warnings come with `--doc-warnings` alone, which `anti check`
-passes, and belong to its doc class, which fails nothing. They stay warnings
+passes. They belong to its doc class, which fails nothing. They stay warnings
 under `--warnings-as-errors` and in a release build.
 
 ## Safety checks
@@ -50,9 +50,8 @@ expressions. An `unchecked` of either overrules nothing until then.
 
 The parser reads each clause where it applies and records the source it
 covers, both ends included. A clause before a statement covers the statement.
-A clause last in the header of a function, a class or a struct covers the
-declaration from its doc comment to its closing brace, since a doc warning
-stands at the comment. A clause after a field's type covers the field. A
+A clause last in a header covers the function, class or struct. The range
+opens at the doc comment, where a doc warning stands, and closes at the brace. A clause after a field's type covers the field. A
 clause at the top of the file covers every line. A warning stands at a
 position, so the pass that applies the clauses compares positions and needs
 no tree. `src/antic/warnings.c` holds the pass, and the driver runs it after

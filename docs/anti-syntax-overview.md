@@ -411,7 +411,7 @@ A handler ends with `yield v` or leaves the block. The name after `catch` is any
 
 The ABI of a `may fail` function is `?*Error f(args, R *out)`, with the result through an out pointer. `fn(A) -> R may fail` is its type as a value, a call through it is handled as a direct call is, and the header writes the ABI form. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. `may fail` is the one failing form. A C binding returns its error as an ordinary value, and a `may fail` wrapper turns it into a `fail`.
 
-Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail`, `may fail` on a `construct` with arguments, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`. Every test program uses `may fail`, and `errors/construct_forms.anti` checks that a `construct` refuses `-> ?*Error`. A function fails by its `may fail` marking alone, and one that returns `*Error` or `?*Error` without it gives the error as a value. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. The three user directories of `anti.os` may fail, and so does every function of `anti.fs`: `open`, `read`, `write`, `size`, `close`, `list`, `remove` and `rename`. `toml.Document.read`, `log.FileSink.new`, `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may fail. `try` stands wherever the call stands, after `return` and inside an expression as well. `fn(A) -> R may fail` is a type, and a call through a value of it takes a handler. A handler moves its error into an `own` parameter, and `Error.wrap` takes its cause so. The first `fail` of an error writes its origin `at` and, when backtraces are on, its frames, and `e.text()` names the position, the causes and the trace. `--anti.backtrace` and `backtrace = true` of the runtime configuration turn the frames on in a release build. `anti check` warns where the name a `catch` binds shadows a variable in scope, and where a `may fail` function holds no `fail` and no `try`. Not built yet: `catch none`.
+Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail`, `may fail` on a `construct` with arguments, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`. Every test program uses `may fail`, and `errors/construct_forms.anti` checks that a `construct` refuses `-> ?*Error`. A function fails by its `may fail` marking alone, and one that returns `*Error` or `?*Error` without it gives the error as a value. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. The three user directories of `anti.os` may fail, and so does every function of `anti.fs`: `open`, `read`, `write`, `size`, `close`, `list`, `remove` and `rename`. `toml.Document.read`, `log.FileSink.new`, `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may fail. `try` stands wherever the call stands, after `return` and inside an expression as well. `fn(A) -> R may fail` is a type, and a call through a value of it takes a handler. A handler moves its error into an `own` parameter, and `Error.wrap` takes its cause so. The first `fail` of an error writes its origin `at` and, when backtraces are on, its frames, and `e.text()` names the position, the causes and the trace. `--anti.backtrace` and `backtrace = true` of the runtime configuration turn the frames on in a release build. The checker warns where the name a `catch` binds shadows a variable in scope, `shadowed-catch`, and where a `may fail` function holds no `fail` and no `try`, `never-fails`. `catch none` counts a failure as `none` where the result can be `none`, and deletes the error as every handler does. `programs/catch_none.anti` runs it and `errors/catch_none.anti` holds the refusals.
 
 ## Structs
 
@@ -1079,17 +1079,26 @@ Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the lin
 
 The compiler reports four kinds of problem. An error stops every build and nothing silences it. A warning prints and carries on in a dev build and stops a release build, and `allow(name, "reason")` silences it. A safety check stops every build, and `unchecked(name, "reason")` overrules it. A run-time check traps with file and line in a dev build and is not compiled in release unless `--checks` asks.
 
-```anti not-built
-fn parse_all(lines: []str) may fail
-	allow(shadowed-catch, "handlers reuse e on purpose")
+```anti
+import anti.text;
+
+fn sum_all(lines: []str) -> int may fail
+	allow(shadowed-catch, "the handler hands the error on")
 {
-	for l in lines { }
+	let e = 0;
+	for l in lines {
+		let n = text.parse_int(l) catch e {
+			fail e;
+		};
+		e = e + n;
+	}
+	return e;
 }
 ```
 
 Every warning and every safety check has a stable name at the end of its message, as in `` `e` shadows the outer `e` [shadowed-catch] ``. `allow` and `unchecked` stand before a statement, last in a declaration's header, or at the top of the file ending with `;`, and `unchecked` also after a field's type. Each takes one name and a required reason, and is not part of a signature. One that silences nothing is the warning `unused-allow` or `unused-unchecked`. `antic --warnings-as-errors` gives the release behaviour in a dev build, and `anti check` uses it. The first safety checks are `unguarded-field` and `exponential-pattern`.
 
-Not built yet: the names of warnings, `allow`, `unchecked`, the safety checks, `--warnings-as-errors` and a release build that refuses a warning.
+Built: the name of every warning, `allow` and `unchecked` at every level, `unused-allow` and `unused-unchecked`, the refusal of a clause that names an error, `--warnings-as-errors`, `anti check` with it, and a release build that refuses a warning. `docs/notes/warnings.md` lists the names with their meaning and their fix. Not built yet: the two safety checks, which wait for concurrent classes and regular expressions, so an `unchecked` of either overrules nothing today.
 
 ## Wire formats
 
@@ -1157,7 +1166,7 @@ let n = line.matches(r) catch none;
 
 `matches`, `find_all`, `replace` and `split` are methods of `str`, and `limit` takes that many matches from the start, or from the end when negative. A match behaves as a `?*T` does and stands alone as a condition. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, and a function may give each replacement. A call with a pattern literal never fails. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
 
-Not built yet: `re"..."`, `Regex`, the methods of `str` and `catch none`.
+Built: `catch none`, as a form of every failing call. Not built yet: `re"..."`, `Regex` and the methods of `str`.
 
 ## Bytes
 
