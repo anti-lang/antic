@@ -1007,6 +1007,20 @@ if(APPLE)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_framework.cmake")
 endif()
 
+# A binding names its Linux libraries with `link linux`, and `anti build`
+# passes them to antic. The program that reaches them links dynamically
+# against glibc, and one that does not links statically against musl.
+add_test(NAME linux_modes
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DREADOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/linux-modes"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_linux_modes.cmake")
+
 # The two shapes of a dependency, the repository layout over `file://`
 # and the two libraries for C.
 add_test(NAME anti_build_deps
@@ -2298,34 +2312,41 @@ endforeach()
 # and closes it, and two programs take the provider of an injected field
 # from it, one by path and one through the index of its directory.
 #
-# DESIGN: a program of this runtime archive loads a library only where
-# it is linked dynamically. A Linux program is static against musl on
-# purpose, and a Windows DLL needs an import library of its host, so the
-# test runs on a macOS host alone.
-if(ANTIC_HOST_OS STREQUAL "macos")
-    add_test(NAME plugin_host
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-            "-DSUFFIX=.dylib"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/host.expected"
-            "-DPROVIDED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/provided.expected"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin.cmake")
-    # The three checks of "Versions": the chain of the interface, the
-    # fields it declares and the slots the program reaches through it.
-    add_test(NAME plugin_versions
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-            "-DSUFFIX=.dylib"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_versions.cmake")
+# DESIGN: a Linux host links dynamically against glibc, because it can
+# host a plugin, and a Windows plugin links against the import library of
+# its host. The test runs on all three systems.
+set(plugin_suffix ".dylib")
+set(plugin_exe "")
+if(ANTIC_HOST_OS STREQUAL "linux")
+    set(plugin_suffix ".so")
+elseif(ANTIC_HOST_OS STREQUAL "windows")
+    set(plugin_suffix ".dll")
+    set(plugin_exe ".exe")
 endif()
+add_test(NAME plugin_host
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/host.expected"
+        "-DPROVIDED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/provided.expected"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin.cmake")
+# The three checks of "Versions": the chain of the interface, the
+# fields it declares and the slots the program reaches through it.
+add_test(NAME plugin_versions
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_versions.cmake")
 
 # ANTI_CONF names the file when the command line names none, and the
 # command line wins when both name one. It is the one environment

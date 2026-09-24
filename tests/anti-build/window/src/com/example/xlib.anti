@@ -1,0 +1,12 @@
+//! A binding of one function of libX11 and one of libGL, the way `anti bind`
+//! writes one. The lines below name the two libraries, so a program that
+//! imports the module links against glibc without naming them.
+
+link linux "X11";
+link linux "GL";
+
+/// Open the connection to the X server of the display that name gives.
+pub extern fn XOpenDisplay(name: ?*byte) -> ?*byte;
+
+/// The text of a property of the current GL context, or none without one.
+pub extern fn glGetString(name: c_uint) -> ?*byte;

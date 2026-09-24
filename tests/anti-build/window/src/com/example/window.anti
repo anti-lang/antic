@@ -1,0 +1,16 @@
+//! A program that names no library and reaches libX11 and libGL through a
+//! binding. No X server serves display 117, and no GL context is current.
+
+import anti.io;
+import com.example.xlib;
+
+fn main() -> int
+{
+	if xlib.XOpenDisplay(":117".ptr) == none {
+		io.println("no display");
+	}
+	if xlib.glGetString(0x1F00) == none {
+		io.println("no context");
+	}
+	return 0;
+}

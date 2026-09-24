@@ -1,3 +1,3 @@
-link_linux.anti:6:1: error: the library `X11` is linked twice
-link_linux.anti:7:1: error: `link linux` names no library
-link_linux.anti:8:1: error: `link linux` names a library of the glibc sysroot, and `/usr/lib/libGL.so` is none
+link_linux.anti:5:1: error: the library `X11` is linked twice
+link_linux.anti:6:1: error: `link linux` names no library
+link_linux.anti:7:1: error: `link linux` names a library of the glibc sysroot, and `/usr/lib/libGL.so` is none

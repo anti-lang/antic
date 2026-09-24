@@ -492,6 +492,88 @@ static void frameworks(void)
           "/rt/sysroot/t/usr/lib/crtn.o");
 }
 
+/* A Linux program that names a library with `link linux`, or that can
+   host a plugin, links dynamically against the glibc sysroot and the
+   glibc runtime. The platform linker takes the libraries too. A Windows
+   program that can host a plugin exports the names of its .def file and
+   writes the import library of its plugins. */
+static void dynamic_modes(void)
+{
+    static const char *const names[] = {"X11", "GL"};
+    struct link_inputs in = lld_inputs;
+    struct link_command c;
+
+    in.linux_libraries = names;
+    in.linux_library_count = 2;
+    in.glibc = true;
+    links(TARGET_LINUX_ARM64, &in,
+          "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
+          "--dynamic-linker=/lib/ld-linux-aarch64.so.1 --strip-debug -o prog "
+          "/rt/sysroot/t/usr/lib/aarch64-linux-gnu/Scrt1.o "
+          "/rt/sysroot/t/usr/lib/aarch64-linux-gnu/crti.o prog.o shapes.o "
+          "/rt/lib/linux-arm64-glibc/armv8.0/libanti_rt.a "
+          "-L/rt/sysroot/t/usr/lib/aarch64-linux-gnu "
+          "-L/rt/sysroot/t/lib/aarch64-linux-gnu -l X11 -l GL -lm -lc "
+          "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "/rt/sysroot/t/usr/lib/aarch64-linux-gnu/crtn.o");
+    in.linux_library_count = 0;
+    in.exports = true;
+    in.debug = true;
+    links(TARGET_LINUX_X86_64, &in,
+          "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
+          "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --export-dynamic "
+          "-o prog /rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
+          "/rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
+          "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
+          "-L/rt/sysroot/t/lib/x86_64-linux-gnu -lm -lc "
+          "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
+    in = extra_inputs;
+    in.linux_libraries = names;
+    in.linux_library_count = 1;
+    links(TARGET_LINUX_ARM64, &in,
+          "ld -pie --strip-debug --dynamic-linker=/lib/ld-linux-aarch64.so.1 -o prog "
+          "/usr/lib/aarch64-linux-gnu/Scrt1.o /usr/lib/aarch64-linux-gnu/crti.o "
+          "prog.o shapes.o libm.a /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "-L/usr/lib/aarch64-linux-gnu -l X11 -lc "
+          "/usr/lib/aarch64-linux-gnu/crtn.o");
+    in = lld_windows_inputs;
+    in.exports = true;
+    in.def_file = "prog.def";
+    in.import_library = "prog.lib";
+    links(TARGET_WINDOWS_ARM64, &in,
+          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
+          "/PDB:prog.pdb /DEF:prog.def /IMPLIB:prog.lib "
+          "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
+          "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
+          "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 prog.obj "
+          "/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
+          "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+    /* A plugin links the import library of its host among its inputs,
+       no runtime and no start of the C runtime. */
+    {
+        static const char *const host[] = {"host.lib"};
+        struct shared_options plugin = {"fancy.def", NULL, NULL, NULL, true};
+        in = lld_windows_inputs;
+        in.object = "fancy.obj";
+        in.executable = "fancy.dll";
+        in.extra = host;
+        in.extra_count = 1;
+        link_shared_command(&c, TARGET_WINDOWS_ARM64, &in, &plugin);
+        joined(&c, "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
+                   "/pdbsourcepath:. /ignore:4099 /DLL /NOENTRY "
+                   "/MACHINE:ARM64 /OUT:fancy.dll /PDB:fancy.pdb "
+                   "/DEF:fancy.def /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
+                   "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
+                   "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 fancy.obj "
+                   "host.lib libvcruntime.lib ucrt.lib "
+                   "legacy_stdio_definitions.lib");
+        link_command_free(&c);
+    }
+}
+
 /* The version of an SDK directory name, or a refusal of the name. */
 static void sdk_name(const char *name, bool ok, int major, int minor)
 {
@@ -536,6 +618,7 @@ void test_link(void)
     sdk_names();
     libraries();
     frameworks();
+    dynamic_modes();
     strips_debug();
     relative_paths();
     runtime_entry();
