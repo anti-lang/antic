@@ -144,7 +144,6 @@ static void quoted(struct text *out, const char *s)
 
 void debug_files(struct debug *d, struct text *out)
 {
-    bool codeview = target_info(d->target)->format == FORMAT_COFF;
     size_t start = out->length;
     size_t i;
 
@@ -152,7 +151,7 @@ void debug_files(struct debug *d, struct text *out)
         return;
     }
     for (i = 0; i < d->m->file_count; i++) {
-        text_appendf(out, "    %s %zu ", codeview ? ".cv_file" : ".file",
+        text_appendf(out, "    %s %zu ", codeview(d) ? ".cv_file" : ".file",
                      i + 1);
         quoted(out, d->m->files[i]);
         text_append(out, "\n");

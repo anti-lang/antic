@@ -153,6 +153,22 @@ void ir_function_free(struct ir_function *f)
     f->param_capacity = 0;
 }
 
+void ir_class_free(struct ir_class *c)
+{
+    free(c->subtables);
+    free(c->mutable_fields);
+    free(c->injects);
+    free(c->provides);
+    c->subtables = NULL;
+    c->subtable_count = 0;
+    c->mutable_fields = NULL;
+    c->mutable_count = 0;
+    c->injects = NULL;
+    c->inject_count = 0;
+    c->provides = NULL;
+    c->provides_count = 0;
+}
+
 void ir_module_free(struct ir_module *m)
 {
     size_t i;
@@ -161,10 +177,7 @@ void ir_module_free(struct ir_module *m)
         ir_function_free(m->functions[i]);
     }
     for (i = 0; i < m->class_count; i++) {
-        free(m->classes[i]->subtables);
-        free(m->classes[i]->mutable_fields);
-        free(m->classes[i]->injects);
-        free(m->classes[i]->provides);
+        ir_class_free(m->classes[i]);
     }
     free(m->classes);
     free(m->functions);

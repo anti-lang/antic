@@ -484,6 +484,8 @@ void ir_module_free(struct ir_module *m);
    removes. */
 void ir_block_free(struct ir_block *b);
 void ir_function_free_body(struct ir_function *f);
+/* Release the lists of a class record and leave them empty. */
+void ir_class_free(struct ir_class *c);
 void ir_function_free(struct ir_function *f);
 
 struct ir_vtype ir_scalar(enum ir_type type);

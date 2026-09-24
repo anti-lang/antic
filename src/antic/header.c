@@ -1045,6 +1045,23 @@ static void prototype(struct text *out, const struct symbol *sym)
     text_free(&decl);
 }
 
+/* The include guard of the header name: the name in capitals, every
+   other character but a digit as `_`, and `_H`. */
+static void guard_name(struct text *out, const char *name)
+{
+    size_t i;
+
+    for (i = 0; name[i] != '\0'; i++) {
+        char c = name[i];
+        text_appendf(out, "%c", (c >= 'a' && c <= 'z') ? (char)(c - 32)
+                                : ((c >= 'A' && c <= 'Z') ||
+                                   (c >= '0' && c <= '9'))
+                                    ? c
+                                    : '_');
+    }
+    text_append(out, "_H");
+}
+
 void header_write(struct text *out, const char *name,
                   const struct interface *const *ifaces, size_t count,
                   bool bundled)
@@ -1063,24 +1080,10 @@ void header_write(struct text *out, const char *name,
                            "program."
                          : "");
     text_append(out, "#ifndef ");
-    for (i = 0; name[i] != '\0'; i++) {
-        char c = name[i];
-        text_appendf(out, "%c", (c >= 'a' && c <= 'z') ? (char)(c - 32)
-                                : ((c >= 'A' && c <= 'Z') ||
-                                   (c >= '0' && c <= '9'))
-                                    ? c
-                                    : '_');
-    }
-    text_append(out, "_H\n#define ");
-    for (i = 0; name[i] != '\0'; i++) {
-        char c = name[i];
-        text_appendf(out, "%c", (c >= 'a' && c <= 'z') ? (char)(c - 32)
-                                : ((c >= 'A' && c <= 'Z') ||
-                                   (c >= '0' && c <= '9'))
-                                    ? c
-                                    : '_');
-    }
-    text_append(out, "_H\n\n"
+    guard_name(out, name);
+    text_append(out, "\n#define ");
+    guard_name(out, name);
+    text_append(out, "\n\n"
                      "#include <stdbool.h>\n"
                      "#include <stddef.h>\n"
                      "#include <stdint.h>\n\n"

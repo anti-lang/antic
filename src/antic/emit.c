@@ -2,6 +2,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "debug.h"
@@ -9,6 +10,56 @@
 
 /* DESIGN: one assembly file holds the whole program. Every Anti function
    is a local symbol, and only the runtime entry is global. */
+
+/* DESIGN: in an object of one module, every function and every datum is
+   global for the other modules and hidden. A shared library then exports
+   only the export fns, and the other modules name the one copy of a
+   datum. COFF has no hidden symbols, and the .def file of a DLL names its
+   exports. A program that hosts a plugin leaves the hidden mark off. The
+   loader then resolves the plugin against it, and the descriptors it
+   holds are the ones the plugin reaches. */
+static void visibility(struct text *out, enum target t, const char *symbol,
+                       bool exported, bool module, bool exports)
+{
+    if (!exported && !module && !exports) {
+        return;
+    }
+    text_appendf(out, "    .globl %s\n", symbol);
+    if (module && !exports && !exported &&
+        target_info(t)->format != FORMAT_COFF) {
+        text_appendf(out, "    %s %s\n",
+                     target_info(t)->format == FORMAT_MACHO ? ".private_extern"
+                                                           : ".hidden",
+                     symbol);
+    }
+}
+
+/* Write bytes from to up to to as .byte lines. A line ends after each
+   offset that is 15 modulo 16, so the rows of one global line up however
+   its addresses split them, and at to. */
+static void byte_rows(struct text *out, const unsigned char *bytes,
+                      uint64_t from, uint64_t to)
+{
+    uint64_t k;
+
+    for (k = from; k < to; k++) {
+        text_appendf(out, "%s0x%02x",
+                     k == from || k % 16 == 0 ? "    .byte " : ", ", bytes[k]);
+        if (k % 16 == 15 || k + 1 == to) {
+            text_append(out, "\n");
+        }
+    }
+}
+
+/* The Mach-O line of the least macOS version, which every object of the
+   target carries. */
+static void build_version(struct text *out, enum target t)
+{
+    if (target_info(t)->format == FORMAT_MACHO) {
+        text_appendf(out, "    .build_version macos, %d, %d\n",
+                     MACOS_MIN_MAJOR, MACOS_MIN_MINOR);
+    }
+}
 
 static void emit_function(struct text *out, enum target t, enum cpu_level cpu,
                           const struct ir_module *m,
@@ -24,21 +75,8 @@ static void emit_function(struct text *out, enum target t, enum cpu_level cpu,
     mach_function_symbol(&symbol, t, f->ir);
     names.target = t;
     names.function = text_cstr(&symbol);
-    if (f->ir->exported || module || exports) {
-        text_appendf(out, "    .globl %s\n", text_cstr(&symbol));
-    }
-    /* DESIGN: in an object of one module, every function is global for the
-       other modules and hidden. A shared library then exports only the
-       export fns. COFF has no hidden symbols, and the .def file of a DLL
-       names its exports. A program that hosts a plugin leaves the
-       hidden mark off, so the loader resolves the plugin against it. */
-    if (module && !exports && !f->ir->exported &&
-        target_info(t)->format != FORMAT_COFF) {
-        text_appendf(out, "    %s %s\n",
-                     target_info(t)->format == FORMAT_MACHO ? ".private_extern"
-                                                           : ".hidden",
-                     text_cstr(&symbol));
-    }
+    visibility(out, t, text_cstr(&symbol), f->ir->exported, module,
+               exports);
     /* An ARM64 instruction is 4 bytes, and a function starts on one. */
     if (target_info(t)->arch == ARCH_ARM64) {
         text_append(out, "    .p2align 2\n");
@@ -154,7 +192,7 @@ static void emit_global(struct text *out, enum target t,
     uint64_t align;
     uint64_t k;
     int log2;
-    bool open = false;
+    uint64_t from = 0;
 
     for (log2 = 0, align = g->align; align > 1; align /= 2) {
         log2++;
@@ -164,49 +202,23 @@ static void emit_global(struct text *out, enum target t,
     }
     if (g->exported) {
         c_symbol(&name, t, g->name);
-        text_appendf(out, "    .globl %s\n", text_cstr(&name));
     } else {
         mangle(&name, t, g->module, g->name);
     }
-    /* DESIGN: in an object of one module, a datum is global and hidden,
-       as a function is, so the other modules name the one copy. A
-       program that hosts a plugin leaves the hidden mark off, so the
-       descriptors it holds are the ones the plugin reaches. */
-    if ((module || exports) && !g->exported) {
-        text_appendf(out, "    .globl %s\n", text_cstr(&name));
-        if (!exports && target_info(t)->format != FORMAT_COFF) {
-            text_appendf(out, "    %s %s\n",
-                         target_info(t)->format == FORMAT_MACHO
-                             ? ".private_extern"
-                             : ".hidden",
-                         text_cstr(&name));
-        }
-    }
+    visibility(out, t, text_cstr(&name), g->exported, module, exports);
     text_appendf(out, "%s:\n", text_cstr(&name));
     text_free(&name);
     for (k = 0; k < g->size; k++) {
         struct text symbol = {0};
         if (reloc_at(&symbol, t, m, g, k)) {
-            if (open) {
-                text_append(out, "\n");
-                open = false;
-            }
+            byte_rows(out, g->bytes, from, k);
             text_appendf(out, "    .quad %s\n", text_cstr(&symbol));
-            text_free(&symbol);
             k += 7;
-            continue;
+            from = k + 1;
         }
         text_free(&symbol);
-        text_appendf(out, "%s0x%02x", open ? ", " : "    .byte ", g->bytes[k]);
-        open = true;
-        if (k % 16 == 15 || k + 1 == g->size) {
-            text_append(out, "\n");
-            open = false;
-        }
     }
-    if (open) {
-        text_append(out, "\n");
-    }
+    byte_rows(out, g->bytes, from, g->size);
 }
 
 /* DESIGN: a global that holds an address goes to the section for data the
@@ -306,10 +318,7 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
             return false;
         }
     }
-    if (info->format == FORMAT_MACHO) {
-        text_appendf(out, "    .build_version macos, %d, %d\n",
-                     MACOS_MIN_MAJOR, MACOS_MIN_MINOR);
-    }
+    build_version(out, t);
     text_append(out, "    .text\n");
     emit_entry(out, t, m, module);
     debug_files(&debug, out);
@@ -372,19 +381,18 @@ void emit_licenses(struct text *out, enum target t, const char *bytes,
                    size_t length)
 {
     struct text symbol = {0};
-    size_t k;
+    unsigned char *text = ir_alloc(length + 1, 1);
 
+    /* The texts end in a NUL, which ir_alloc left there. */
+    if (length > 0) {
+        memcpy(text, bytes, length);
+    }
     c_symbol(&symbol, t, "anti_licenses");
     text_appendf(out, "    .section %s\n    .globl %s\n%s:\n",
                  data_sections[target_info(t)->format], text_cstr(&symbol),
                  text_cstr(&symbol));
-    for (k = 0; k <= length; k++) {
-        unsigned char c = k < length ? (unsigned char)bytes[k] : 0;
-        text_appendf(out, "%s0x%02x", k % 16 == 0 ? "    .byte " : ", ", c);
-        if (k % 16 == 15 || k == length) {
-            text_append(out, "\n");
-        }
-    }
+    byte_rows(out, text, 0, length + 1);
+    free(text);
     text_free(&symbol);
 }
 
@@ -399,18 +407,7 @@ void emit_package(struct text *out, enum target t, const char *bytes,
         [FORMAT_MACHO] = "__DATA,__anti_package",
         [FORMAT_COFF] = ".anti_package,\"dr\"",
     };
-    size_t k;
-
-    if (target_info(t)->format == FORMAT_MACHO) {
-        text_appendf(out, "    .build_version macos, %d, %d\n",
-                     MACOS_MIN_MAJOR, MACOS_MIN_MINOR);
-    }
+    build_version(out, t);
     text_appendf(out, "    .section %s\n", sections[target_info(t)->format]);
-    for (k = 0; k < length; k++) {
-        text_appendf(out, "%s0x%02x", k % 16 == 0 ? "    .byte " : ", ",
-                     (unsigned char)bytes[k]);
-        if (k % 16 == 15 || k + 1 == length) {
-            text_append(out, "\n");
-        }
-    }
+    byte_rows(out, (const unsigned char *)bytes, 0, length);
 }

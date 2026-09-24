@@ -1483,6 +1483,33 @@ static uint32_t write_provider_thunk(struct ir_module *m, uint32_t provider,
     return f->index;
 }
 
+/* Write the slot of in as a mutable `anti.rt.InjectSlot` that holds the
+   function provider, or a null pointer for IR_NO_INDEX. */
+static void write_slot(struct ir_module *m, struct injectable *in,
+                       uint32_t provider)
+{
+    static const char *const slot_names[] = {"provider"};
+    static const enum ir_type slot_types[] = {IR_PTR};
+    uint32_t agg = struct_agg(m, "anti.rt.InjectSlot", slot_names, slot_types,
+                              1);
+    struct ir_const *value = ir_const_agg(m, ir_aggregate(agg), 1);
+    struct ir_global *g = m->globals[in->slot];
+
+    if (provider == IR_NO_INDEX) {
+        const_int(&value->items[0], IR_PTR, 0);
+    } else {
+        value->items[0].kind = IR_CONST_FUNC;
+        value->items[0].scalar = IR_PTR;
+        value->items[0].global = provider;
+    }
+    g->bytes = NULL;
+    g->size = 0;
+    g->align = 0;
+    g->value = value;
+    g->mutable = true;
+    g->is_extern = false;
+}
+
 /* Resolve one provider, named by the build or by the interface itself,
    and fill the slot. `own` says the name came from the interface, which
    is what the message of a missing provider tells apart. */
@@ -1490,14 +1517,9 @@ static void resolve_named_provider(struct whole *w, struct ir_module *m,
                                    struct injectable *in, const char *text,
                                    bool own, struct text *errors)
 {
-    static const char *const slot_names[] = {"provider"};
-    static const enum ir_type slot_types[] = {IR_PTR};
     bool ambiguous = false;
     uint32_t function;
     uint32_t record;
-    uint32_t agg;
-    struct ir_const *value;
-    struct ir_global *g;
 
     function = function_named(m, text, &ambiguous);
     /* A class name alone names the `get` of its singleton, which is the
@@ -1558,18 +1580,7 @@ static void resolve_named_provider(struct whole *w, struct ir_module *m,
         }
     }
     in->provider = function;
-    agg = struct_agg(m, "anti.rt.InjectSlot", slot_names, slot_types, 1);
-    value = ir_const_agg(m, ir_aggregate(agg), 1);
-    value->items[0].kind = IR_CONST_FUNC;
-    value->items[0].scalar = IR_PTR;
-    value->items[0].global = function;
-    g = m->globals[in->slot];
-    g->bytes = NULL;
-    g->size = 0;
-    g->align = 0;
-    g->value = value;
-    g->mutable = true;
-    g->is_extern = false;
+    write_slot(m, in, function);
 }
 
 /* DESIGN: an interface carries its own default provider in a static
@@ -1611,20 +1622,7 @@ static void write_replacement(struct ir_module *m, struct injectable *in)
    runtime fills before `main`. */
 static void empty_slot(struct ir_module *m, struct injectable *in)
 {
-    static const char *const slot_names[] = {"provider"};
-    static const enum ir_type slot_types[] = {IR_PTR};
-    uint32_t agg = struct_agg(m, "anti.rt.InjectSlot", slot_names, slot_types,
-                              1);
-    struct ir_const *value = ir_const_agg(m, ir_aggregate(agg), 1);
-    struct ir_global *g = m->globals[in->slot];
-
-    const_int(&value->items[0], IR_PTR, 0);
-    g->bytes = NULL;
-    g->size = 0;
-    g->align = 0;
-    g->value = value;
-    g->mutable = true;
-    g->is_extern = false;
+    write_slot(m, in, IR_NO_INDEX);
 }
 
 static void resolve_provider(struct whole *w, struct ir_module *m,
