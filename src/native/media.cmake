@@ -5,24 +5,15 @@
 # DESIGN: a program that imports anti.raylib or anti.miniaudio links
 # dynamically against glibc 2.35 on Linux, as "Runtime archive" in
 # docs/decisions.md settles, so both Linux libraries compile against the
-# glibc sysroot and not against musl. get-media-sysroot.cmake extends that
-# sysroot with the X11 and OpenGL development files of tools/sysroot-pins.
+# glibc sysroot and not against musl. tools/get-sysroot.cmake installs
+# that sysroot with the X11 and OpenGL development files of
+# tools/sysroot-pins, and the build copies it to sysroot/ of the runtime
+# tree. A Linux target whose glibc sysroot is missing builds neither
+# library, as the other native libraries skip a target without a sysroot.
 # On macOS both libraries compile against the Apple SDK that
 # tools/macos-sdk-pin names, since the zig stubs of the sysroot carry no
 # framework headers. A host without that SDK builds no macOS library of
 # the two.
-
-antic_shared_path(ANTIC_GLIBC_SYSROOT_DIR "${ANTIC_DEPS_DIR}/sysroot"
-    "glibc sysroots from src/native/get-media-sysroot.cmake")
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${ANTIC_GLIBC_SYSROOT_DIR}"
-                        "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-                        "-DTARGETS=linux-x86_64-glibc;linux-arm64-glibc"
-                        -P "${CMAKE_CURRENT_SOURCE_DIR}/get-media-sysroot.cmake"
-                RESULT_VARIABLE antic_media_fetched)
-if(NOT antic_media_fetched EQUAL 0)
-    message(FATAL_ERROR "src/native/get-media-sysroot.cmake failed, so the "
-                        "build has no glibc sysroot for raylib and miniaudio")
-endif()
 
 execute_process(COMMAND "${CMAKE_COMMAND}"
                         "-DPIN=${PROJECT_SOURCE_DIR}/tools/macos-sdk-pin"
@@ -38,7 +29,17 @@ endif()
 set(ANTIC_MEDIA_TARGETS "")
 foreach(target IN LISTS ANTIC_TARGETS)
     if(target MATCHES "^linux-")
-        list(APPEND ANTIC_MEDIA_TARGETS "${target}")
+        set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}-glibc")
+        if(NOT EXISTS "${sysroot}")
+            message(STATUS "raylib and miniaudio for ${target}: skipped, "
+                           "there is no glibc sysroot")
+        elseif(NOT EXISTS "${sysroot}/usr/include/X11/Xlib.h")
+            message(FATAL_ERROR "${sysroot} holds no X11 headers. Run "
+                                "tools/get-sysroot.cmake for ${target}-glibc "
+                                "again.")
+        else()
+            list(APPEND ANTIC_MEDIA_TARGETS "${target}")
+        endif()
     elseif(NOT target IN_LIST ANTIC_NATIVE_TARGETS)
         # antic links the test of the library, which needs the sysroot.
     elseif(target MATCHES "^macos-")
@@ -56,7 +57,7 @@ endforeach()
 # The glibc sysroot of a Linux target, and the directory of its libraries
 # under the multiarch name of Debian.
 function(antic_media_glibc out_sysroot out_libdir target)
-    set(sysroot "${ANTIC_GLIBC_SYSROOT_DIR}/${target}-glibc")
+    set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}-glibc")
     if(target STREQUAL "linux-x86_64")
         set(multiarch x86_64-linux-gnu)
     else()
@@ -112,9 +113,3 @@ function(antic_media_glibc_test name target object library libs expected)
             "-DWORK=${CMAKE_BINARY_DIR}/native/link/${name}"
             -P "${PROJECT_SOURCE_DIR}/tests/run_glibc_link.cmake")
 endfunction()
-
-add_test(NAME media_sysroot
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-            "-DWORK=${CMAKE_BINARY_DIR}/native/media_sysroot"
-            "-DLLVM_AR=${ANTIC_LLVM_AR}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_media_sysroot.cmake")

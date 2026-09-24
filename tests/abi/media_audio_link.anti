@@ -1,8 +1,7 @@
-//! raylib and miniaudio of the runtime tree in one program, reached through
-//! the C functions of media_audio_probe.c. raylib resamples a wave through
-//! the ma_ functions of the miniaudio library, and the program calls a
-//! generator of that library itself. The link holds one copy of each ma_
-//! function.
+//! raylib and miniaudio of the runtime tree in one program, reached through the
+//! C functions of media_audio_probe.c. raylib resamples a wave through the ma_
+//! functions of the miniaudio library, and the program calls a generator of
+//! that library itself. The link holds one copy of each ma_ function.
 
 extern fn printf(format: ?*byte, ...) -> i32;
 extern fn media_audio_probe_raylib() -> i32;

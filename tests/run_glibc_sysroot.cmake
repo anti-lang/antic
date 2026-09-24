@@ -1,9 +1,10 @@
 # tools/sysroot-pins names glibc 2.35, the kernel headers and the X11 and
-# GL libraries of Ubuntu 22.04, seven packages of the jammy release pocket
-# per processor. tools/get-sysroot.cmake unpacks them into
-# sysroot/linux-<cpu>-glibc for the Linux link mode against glibc, turns
-# every link into a copy of its file and adds the builtins of the pinned
-# clang.
+# OpenGL development files of Ubuntu 22.04, the packages of GLIBC_PACKAGES
+# from the jammy release pocket for each processor. tools/get-sysroot.cmake
+# unpacks them into sysroot/linux-<cpu>-glibc for the Linux link mode
+# against glibc and for raylib and miniaudio, turns every absolute link
+# relative and then every link into a copy of its file, and adds the
+# builtins of the pinned clang.
 # Stand-in packages served from file:// URLs and a stand-in clang take the
 # place of the real ones in a copy of the script.
 #
@@ -23,15 +24,42 @@ if(NOT GLIBC_X86_64_URL STREQUAL "https://archive.ubuntu.com/ubuntu/pool/main" O
     message(FATAL_ERROR "tools/sysroot-pins takes glibc from ${GLIBC_X86_64_URL} "
                         "and ${GLIBC_AARCH64_URL}, not the Ubuntu archive")
 endif()
+separate_arguments(packages UNIX_COMMAND "${GLIBC_PACKAGES}")
+# glibc comes first, and every library that raylib's X11 back end and
+# OpenGL need is pinned, the headers and the library alike. The one list
+# of packages serves both.
+list(SUBLIST packages 0 3 first)
+if(NOT first STREQUAL "LIBC_DEV;LIBC;HEADERS")
+    message(FATAL_ERROR "GLIBC_PACKAGES starts with ${first}, not glibc")
+endif()
+foreach(package LIBX11_DEV LIBX11 X11PROTO LIBXRANDR_DEV LIBXRANDR
+                LIBXINERAMA_DEV LIBXINERAMA LIBXCURSOR_DEV LIBXCURSOR
+                LIBXI_DEV LIBXI LIBXEXT_DEV LIBXEXT LIBXRENDER_DEV LIBXRENDER
+                LIBXFIXES_DEV LIBXFIXES LIBGL_DEV LIBGL LIBGLX_DEV LIBGLX
+                LIBGLVND)
+    if(NOT package IN_LIST packages)
+        message(FATAL_ERROR "GLIBC_PACKAGES lacks ${package}")
+    endif()
+endforeach()
+file(STRINGS "${ROOT}/tools/sysroot-pins" blocks REGEX "^MEDIA_")
+if(blocks)
+    message(FATAL_ERROR "tools/sysroot-pins holds a second block of X11 "
+                        "and OpenGL pins")
+endif()
 foreach(arch X86_64 AARCH64)
     set(deb amd64)
     if(arch STREQUAL "AARCH64")
         set(deb arm64)
     endif()
-    foreach(package LIBC_DEV LIBC HEADERS X11 X11_DEV GL GL_DEV)
+    foreach(package IN LISTS packages)
         set(name "${GLIBC_${arch}_${package}}")
         set(digest "${GLIBC_${arch}_${package}_DIGEST}")
-        if(NOT name MATCHES "^(g/glibc/libc6(-dev)?_2\\.35-0ubuntu3|l/linux/linux-libc-dev_5\\.15\\.0-25\\.25|libx/libx11/libx11-(6|dev)_1\\.7\\.5-1|libg/libglvnd/libgl(1|-dev)_1\\.4\\.0-1)_${deb}\\.deb$")
+        if(package MATCHES "^(LIBC_DEV|LIBC|HEADERS)$")
+            set(form "^(g/glibc/libc6(-dev)?_2\\.35-0ubuntu3|l/linux/linux-libc-dev_5\\.15\\.0-25\\.25)_${deb}\\.deb$")
+        else()
+            set(form "^[a-z0-9]+/[a-z0-9.+-]+/[a-z0-9.+-]+_[^_/]+_(${deb}|all)\\.deb$")
+        endif()
+        if(NOT name MATCHES "${form}")
             message(FATAL_ERROR "GLIBC_${arch}_${package} is '${name}', not a "
                                 "package of the jammy release for ${deb}")
         endif()
@@ -73,18 +101,19 @@ stand_in(libc-dev.deb usr/include/features.h usr/lib/x86_64-linux-gnu/libc.so
 stand_in(libc.deb lib/x86_64-linux-gnu/libc.so.6 usr/share/doc/libc6/copyright)
 stand_in(headers.deb usr/include/linux/futex.h
          usr/share/doc/linux-libc-dev/copyright)
-stand_in(x11.deb usr/lib/x86_64-linux-gnu/libX11.so.6
+stand_in(libx11-6_1_amd64.deb usr/lib/x86_64-linux-gnu/libX11.so.6
          usr/share/doc/libx11-6/copyright)
-stand_in(x11-dev.deb usr/include/X11/Xlib.h)
-stand_in(gl.deb usr/lib/x86_64-linux-gnu/libGL.so.1
+stand_in(libgl1_1_amd64.deb usr/lib/x86_64-linux-gnu/libGL.so.1
          usr/share/doc/libgl1/copyright)
-stand_in(gl-dev.deb usr/include/GL/gl.h)
-# A development link that names the absolute path of its library, as
-# libm.so of libc6-dev does, and one that names the library of another
-# package through a relative path, as libGL.so of libgl-dev does.
+stand_in(libgl-dev_1_amd64.deb usr/include/GL/gl.h)
+# The X11 headers, with a development link that names the absolute path
+# of its library, as libm.so of libc6-dev does, and one that names the
+# library of another package through a relative path, as libGL.so of
+# libgl-dev does.
 set(stage "${WORK}/stage-links")
 file(MAKE_DIRECTORY "${stage}/data/usr/lib/x86_64-linux-gnu"
      "${stage}/data/lib/x86_64-linux-gnu")
+file(WRITE "${stage}/data/usr/include/X11/Xlib.h" "usr/include/X11/Xlib.h\n")
 file(WRITE "${stage}/data/lib/x86_64-linux-gnu/libm.so.6"
      "lib/x86_64-linux-gnu/libm.so.6\n")
 file(CREATE_LINK /lib/x86_64-linux-gnu/libm.so.6
@@ -97,7 +126,7 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf ../data.tar.zst --zstd
                 WORKING_DIRECTORY "${stage}/data" COMMAND_ERROR_IS_FATAL ANY)
 file(COPY_FILE "${stage}/data.tar.zst" "${stage}/control.tar.zst")
 execute_process(COMMAND "${LLVM_AR}" rc --format=gnu
-                        "${WORK}/packages/links.deb" debian-binary
+                        "${WORK}/packages/libx11-dev_1_amd64.deb" debian-binary
                         control.tar.zst data.tar.zst
                 WORKING_DIRECTORY "${stage}" COMMAND_ERROR_IS_FATAL ANY)
 # The builtins and the licence of a stand-in clang.
@@ -113,9 +142,12 @@ file(COPY_FILE "${ROOT}/tools/deps-dir.cmake" "${WORK}/tools/deps-dir.cmake")
 file(COPY_FILE "${ROOT}/tools/zig-stubs-pin" "${WORK}/tools/zig-stubs-pin")
 file(STRINGS "${ROOT}/tools/sysroot-pins" kept REGEX "^[^G]|^G[^L]")
 list(JOIN kept "\n" text)
-string(APPEND text "\nGLIBC_X86_64_URL=file://${WORK}/packages\n")
+string(APPEND text "\nGLIBC_X86_64_URL=file://${WORK}/packages\n"
+       "GLIBC_PACKAGES=LIBC_DEV LIBC HEADERS LIBX11_DEV LIBX11 LIBGL_DEV "
+       "LIBGL\n")
 foreach(pair LIBC_DEV=libc-dev.deb LIBC=libc.deb HEADERS=headers.deb
-             X11=x11.deb X11_DEV=links.deb GL=gl.deb GL_DEV=gl-dev.deb)
+             LIBX11_DEV=libx11-dev_1_amd64.deb LIBX11=libx11-6_1_amd64.deb
+             LIBGL_DEV=libgl-dev_1_amd64.deb LIBGL=libgl1_1_amd64.deb)
     string(REPLACE "=" ";" pair "${pair}")
     list(GET pair 0 package)
     list(GET pair 1 name)
@@ -144,7 +176,8 @@ set(tree "${WORK}/sysroot/linux-x86_64-glibc")
 foreach(path usr/include/features.h usr/lib/x86_64-linux-gnu/libc.so
              lib/x86_64-linux-gnu/libc.so.6 usr/include/linux/futex.h
              usr/lib/x86_64-linux-gnu/libX11.so.6
-             usr/lib/x86_64-linux-gnu/libGL.so.1 usr/include/GL/gl.h)
+             usr/lib/x86_64-linux-gnu/libGL.so.1 usr/include/GL/gl.h
+             usr/include/X11/Xlib.h)
     if(NOT EXISTS "${tree}/${path}")
         message(FATAL_ERROR "${tree} lacks ${path}")
     endif()
@@ -176,8 +209,8 @@ if(EXISTS "${tree}/debian-binary")
 endif()
 foreach(pair glibc.txt=usr/share/doc/libc6/copyright
              linux-headers.txt=usr/share/doc/linux-libc-dev/copyright
-             libx11.txt=usr/share/doc/libx11-6/copyright
-             libglvnd.txt=usr/share/doc/libgl1/copyright)
+             libx11-6.txt=usr/share/doc/libx11-6/copyright
+             libgl1.txt=usr/share/doc/libgl1/copyright)
     string(REPLACE "=" ";" pair "${pair}")
     list(GET pair 0 licence)
     list(GET pair 1 source)

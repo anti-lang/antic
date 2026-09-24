@@ -304,12 +304,12 @@ about structs, enums, classes, interfaces and errors lives there, and
 - Every C file of the repository and of the cross builds is compiled with `-ffile-prefix-map`, which replaces the source and build directories with a dot. The test `no_paths` reads the runtime libraries and antic and fails on a path of this checkout. Reason: debug information and `__FILE__` otherwise carry an absolute path of the machine that built a file into every program that links it.
 - A C file compiled for a Windows host also takes `-fdebug-compilation-dir=.` and `-gno-codeview-command-line`. Reason: CodeView names the object in `S_OBJNAME`, which clang makes absolute against the directory of the compile, and records the command line in `LF_BUILDINFO`. The map reaches neither, so a Debug runtime of the Windows VM put the path of the checkout into every PDB that linked it, which `pdb_names` found.
 - System libraries cannot be bundled: OpenGL, X11 or Wayland, Cocoa frameworks, gdi32 and winmm, CoreAudio. They go on the driver's link line per imported module and into the install list.
-- Linux has two link modes. The default is the static PIE against musl. A program that imports `anti.raylib` or `anti.miniaudio`, or that can load a plugin, links dynamically against glibc instead. Its sysroot is glibc 2.35 with the kernel headers of Ubuntu 22.04 and the X11 and GL libraries of the same release. They are seven packages of the jammy release pocket per processor that `tools/sysroot-pins` pins, and the system libraries stand on the link line. `anti-lang/llvm-tools` builds the sanitizer runtimes of the pinned clang against the first three, so the project has one glibc pin. Ubuntu 22.04 is the oldest LTS in support, so a program linked against its glibc runs on every newer one. Reason: raylib and miniaudio load X11, Wayland, OpenGL and ALSA or PulseAudio at run time. Those libraries are built against glibc, and a static musl executable cannot use them at all. Every Linux game ships the second way, and chapter 23 says so in a paragraph.
+- Linux has two link modes. The default is the static PIE against musl. A program that imports `anti.raylib` or `anti.miniaudio`, or that can load a plugin, links dynamically against glibc instead. Its sysroot is glibc 2.35 with the kernel headers of Ubuntu 22.04 and the X11 and GL libraries of the same release. They are 25 packages of the jammy release pocket per processor that `tools/sysroot-pins` pins: glibc, its development files and the kernel headers, and the 22 packages of X11 and OpenGL that raylib compiles against. The system libraries stand on the link line. `anti-lang/llvm-tools` builds the sanitizer runtimes of the pinned clang against the first three, so the project has one glibc pin. Ubuntu 22.04 is the oldest LTS in support, so a program linked against its glibc runs on every newer one. Reason: raylib and miniaudio load X11, Wayland, OpenGL and ALSA or PulseAudio at run time. Those libraries are built against glibc, and a static musl executable cannot use them at all. Every Linux game ships the second way, and chapter 23 says so in a paragraph.
 - `tools/get-sysroot.cmake` installs the glibc sysroots as the targets `linux-x86_64-glibc` and `linux-arm64-glibc`, beside the musl ones, and the build steps of the README install all four. Reason: a name of its own keeps the two Linux sysroots of one processor apart.
 - The link mode against glibc is built. A module names a library of the glibc sysroot with `link linux "X11";`. A Linux program that reaches such a line, or that can load a plugin, links with ld.lld as a PIE against the glibc sysroot. The link names its dynamic linker, the named libraries, libm and libc. It takes a runtime built against the headers of glibc 2.35. Every other Linux program stays static against musl. The test `linux_modes` builds a program of each mode and runs both on a Linux host.
 - [provisional] `link linux "Name";` is the form of the declaration. `link` and `linux` are contextual words at module level, and the checker takes the rules of `link framework`. The library file records the names after the frameworks, and the format version is 54. `anti build` and `anti test` pass them to antic as `--linux-lib <name>`, and antic alone takes none from a library file, as for frameworks. `--linux-lib` changes nothing for a macOS or Windows target. `anti bind` writes `GL`, `m`, `pthread`, `dl`, `rt` and `X11` for raylib and `dl`, `pthread` and `m` for miniaudio, the Linux link lines the two projects give. Reason: the task gave the form of a binding's frameworks as the model, and a library name is what the link needs. Each system gets a word of its own, because the libraries of one program have other names on each.
 - [provisional] The glibc mode has a sysroot and a runtime of its own per processor, `sysroot/linux-<cpu>-glibc` and `lib/linux-<cpu>-glibc/<level>/` of the runtime archive. The runtime is built against the headers of the sysroot on every host, the Linux one as well. Every program of the mode links libm. Reason: a runtime built against the glibc of the machine names symbol versions above 2.35. musl carries libm inside libc.a, so a program of the static mode reaches it without a line.
-- [provisional] The glibc sysroot holds libX11 and libGL of jammy, `libx11-6`, `libx11-dev`, `libgl1` and `libgl-dev`, and the installer writes every symbolic link of the packages as a copy of the file it reaches. A link that reaches no file goes. Reason: the -dev packages carry the names `libX11.so` and `libGL.so` that `-l` finds. libc6-dev links `libm.so` to an absolute path of the machine it installs on, and lld on the Windows VM reads no link the installer writes.
+- [provisional] The glibc sysroot holds libX11 and libGL of jammy, among the 22 packages of X11 and OpenGL that "raylib and miniaudio" below names, and the installer writes every symbolic link of the packages as a copy of the file it reaches. It first turns every absolute link relative, as it does in every sysroot it builds. A link that reaches no file goes. Reason: the -dev packages carry the names `libX11.so` and `libGL.so` that `-l` finds. libc6-dev links `libm.so` to an absolute path of the machine it installs on, and lld on the Windows VM reads no link the installer writes.
 - [provisional] The published package still holds the two musl sysroots and no glibc sysroot and no glibc runtime. Reason: what a package holds is Eddie's decision, and the entry on the published package names the two Linux sysroots alone.
 - The native libraries are built in the order PCRE2, SQLite, Mbed TLS, miniaudio, raylib. SQLite stands after PCRE2, where "Standard interfaces" in `docs/anti-language-additions.md` places it. Reason: the awkward one comes last, and the first three unblock `anti.regex` and `anti.net` early.
 - Bindings: `anti bind --clang raylib.h` writes `anti.raylib`, and `anti bind --clang miniaudio.h` writes `anti.miniaudio`. Nothing in a binding is hand-written. `static inline` C functions get exported wrappers in a generated shim. An ABI probe compares sizes, alignments, offsets and bitfield bytes between C and Anti on every target. Struct-by-value calls into raylib double as the ABI test suite.
@@ -413,25 +413,34 @@ about structs, enums, classes, interfaces and errors lives there, and
   X11, Xrandr, Xinerama, Xcursor, Xi, Xext, Xrender, Xfixes, xorgproto and the GL headers
   and libraries. Each development package comes with its library, 22 packages per
   processor. Each digest is the
-  SHA-256 that the Packages index of the jammy release pocket lists. The keys start with
-  `MEDIA_`, and `MEDIA_PACKAGES` lists them.
+  SHA-256 that the Packages index of the jammy release pocket lists. The keys are
+  `GLIBC_<arch>_<package>`, as those of glibc, and `GLIBC_PACKAGES` lists them after the
+  three packages of glibc. Eddie decided that one set of these pins serves the link mode
+  against glibc and the native libraries alike.
 - [provisional] The GL packages are libgl-dev, libgl1, libglx-dev, libglx0 and libglvnd0.
   Reason: the smallest set that holds `GL/gl.h`, `GL/glext.h`, `KHR/khrplatform.h`,
   `GL/glx.h` and `libGL.so` with every library that `libGL.so.1` names.
-- [provisional] `src/native/get-media-sysroot.cmake` unpacks the packages over
-  `sysroot/linux-<cpu>-glibc`, and `tools/get-sysroot.cmake` stays as it was. It
-  installs the glibc sysroot first when the tree holds none. A stamp in the tree names
-  the digests it was unpacked from. Reason: the script belongs to the recipes that read
-  the packages, and `tools/get-sysroot.cmake` and its test `glibc_sysroot` lay outside
-  the fence. The fold may move the packages into `glibc_sysroot` of that script.
-- [provisional] Every absolute symbolic link of the extended sysroot becomes the relative
-  link to the same file inside the tree. Reason: libc6 names the loader
-  `/lib64/ld-linux-x86-64.so.2` by an absolute link, which lies outside the sysroot on
-  the host, and lld then refuses the `libc.so` script that names it. The same fix
-  belongs in `glibc_sysroot` of `tools/get-sysroot.cmake` at the fold.
-- [provisional] `ANTIC_GLIBC_SYSROOT_DIR` names the directory of the glibc sysroots, by
-  default `build/deps/sysroot` of the checkout. Reason: `ANTIC_SYSROOT_DIR` of a
-  worktree is the one of the main checkout, which this lane does not write.
+- `glibc_sysroot` of `tools/get-sysroot.cmake` unpacks the packages of `GLIBC_PACKAGES`
+  into `sysroot/linux-<cpu>-glibc`, glibc first, and `src/native/get-media-sysroot.cmake`
+  is gone. Eddie decided this. The copyright of glibc and of the kernel headers go to
+  `licenses/` as `glibc.txt` and `linux-headers.txt`, as before. The one of each X11 and
+  OpenGL package goes under the name of its package, as the native lane wrote them.
+  `libx11.txt` and `libglvnd.txt` are gone with the four keys of the link step, since
+  `libx11-6.txt` and `libgl1.txt` hold the same texts.
+- Every absolute symbolic link of a sysroot that `tools/get-sysroot.cmake` builds becomes
+  the relative link to the same path inside the tree. Eddie decided this, for every
+  sysroot. The glibc sysroot then copies each link as before. Reason: libc6 names the
+  loader `/lib64/ld-linux-x86-64.so.2` by an absolute link. That path lies outside the
+  sysroot on the host, and lld then refuses the `libc.so` script that names it.
+- [provisional] A host that cannot write a symbolic link gets a copy of the file an
+  absolute link names. Reason: Windows writes one only with a privilege a user may
+  lack. The glibc sysroot copies every link anyway.
+- [provisional] raylib and miniaudio read the glibc sysroot of the runtime tree. The
+  build copies it from `ANTIC_SYSROOT_DIR` as for anti_rt of the glibc mode. A Linux
+  target without that sysroot builds neither library. A glibc sysroot without the X11
+  headers stops the configure with the command that installs them. Reason: a
+  sysroot installed before the fold lacks the packages, and a build that skipped the
+  libraries would pass without them.
 - raylib builds its desktop back end over GLFW, with X11 on Linux and no Wayland. Eddie
   decided this. The configuration is `-DPLATFORM_DESKTOP_GLFW
   -DGRAPHICS_API_OPENGL_33`, the default of raylib's own Makefile, with raylib's
@@ -548,10 +557,13 @@ libraries named "at run time" are loaded by the library itself and need no link.
   wave through `ma_waveform`, which raylib's build of miniaudio leaves out. With the copy
   in `raudio.c` the link defined every `ma_` function twice. Reason: `anti.miniaudio` is
   not built, so the probe calls miniaudio as the module will.
-- `media_sysroot` checks that every package the step names is pinned for both
-  processors with a digest. It then runs a copy of `get-media-sysroot.cmake` on stand-in
-  packages. The files land, an absolute link becomes relative and the licences are
-  copied. A second run changes nothing, and a package of another digest is refused.
+- `glibc_sysroot` checks that `GLIBC_PACKAGES` starts with glibc and names every
+  package of X11 and OpenGL, that each is pinned for both processors with a digest, and
+  that `tools/sysroot-pins` holds no second block of them. It runs a copy of
+  `tools/get-sysroot.cmake` on stand-in packages: the files land, an absolute link and
+  a relative one become copies, the licences are copied and a package of another digest
+  is refused. `sysroot_links` installs a musl sysroot from a stand-in package whose
+  header is linked by an absolute path, and the link lands relative.
 
 ### SQLite and Mbed TLS
 

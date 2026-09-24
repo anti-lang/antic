@@ -10,9 +10,10 @@
 #   builtins of the pinned clang in CLANG_DIR, which defaults to
 #   build/deps/clang of the repository.
 # linux-x86_64-glibc, linux-arm64-glibc: glibc 2.35, the kernel headers and
-#   the X11 and GL libraries of Ubuntu 22.04 from the packages of
-#   tools/sysroot-pins, and the compiler-rt builtins of the pinned clang,
-#   for the Linux link mode against glibc.
+#   the X11 and OpenGL development files of Ubuntu 22.04 from the packages
+#   of GLIBC_PACKAGES in tools/sysroot-pins, and the compiler-rt builtins of
+#   the pinned clang, for the Linux link mode against glibc and for the
+#   native libraries raylib and miniaudio.
 # macos-arm64, macos-x86_64: the stubs of libSystem that Zig generates and
 #   the headers of the macOS C library, from the release of Zig that
 #   tools/zig-stubs-pin names, on every host. They link every program that
@@ -22,6 +23,9 @@
 #   libraries, which xwin downloads at the versions of tools/sysroot-pins.
 #   Microsoft licenses them to the user, so the script runs xwin only with
 #   ACCEPT_LICENSE=yes. It installs the pinned xwin when the path has none.
+#
+# Every absolute symbolic link of a sysroot becomes the relative link to the
+# same path inside it.
 cmake_minimum_required(VERSION 3.20)
 
 if(NOT DEFINED DEST OR NOT DEFINED LLVM_BIN OR NOT DEFINED TARGETS)
@@ -101,17 +105,60 @@ function(tree_digest dir out)
     set("${out}" "${digest}" PARENT_SCOPE)
 endfunction()
 
+# DESIGN: a package names some links by an absolute path, as libc6-dev
+# links libm.so to /lib/x86_64-linux-gnu/libm.so.6. On the host that path
+# lies outside the sysroot, so lld finds nothing behind the link. Every
+# absolute link under <root> becomes the relative link to the same path
+# inside <root>. A host that cannot write a link, as Windows may not, gets
+# a copy of the file instead.
+function(relative_links root)
+    file(GLOB_RECURSE entries LIST_DIRECTORIES true "${root}/*")
+    foreach(entry IN LISTS entries)
+        if(NOT IS_SYMLINK "${entry}")
+            continue()
+        endif()
+        file(READ_SYMLINK "${entry}" destination)
+        if(NOT IS_ABSOLUTE "${destination}")
+            continue()
+        endif()
+        get_filename_component(directory "${entry}" DIRECTORY)
+        file(RELATIVE_PATH relative "${directory}" "${root}${destination}")
+        file(REMOVE "${entry}")
+        file(CREATE_LINK "${relative}" "${entry}" RESULT failed SYMBOLIC)
+        if(failed AND EXISTS "${root}${destination}" AND
+           NOT IS_DIRECTORY "${root}${destination}")
+            file(COPY_FILE "${root}${destination}" "${entry}")
+        endif()
+    endforeach()
+endfunction()
+
 # Unpack the glibc packages of <arch> into <target>. A package is an ar
-# archive whose data.tar.zst holds the files. The copyright files of
-# glibc, of the kernel headers, of libX11 and of libglvnd go to licenses/.
+# archive whose data.tar.zst holds the files. The copyright files of glibc
+# and of the kernel headers go to licenses/ as glibc.txt and
+# linux-headers.txt, and the one of each X11 and OpenGL package under the
+# name of its package.
 function(glibc_sysroot target arch triple)
     set(root "${DEST}/${target}")
     set(work "${DEST}/.download/${target}")
     file(REMOVE_RECURSE "${root}")
     file(MAKE_DIRECTORY "${work}" "${root}")
-    foreach(package LIBC_DEV LIBC HEADERS X11 X11_DEV GL GL_DEV)
+    separate_arguments(packages UNIX_COMMAND "${GLIBC_PACKAGES}")
+    if(NOT packages)
+        message(FATAL_ERROR "tools/sysroot-pins has no GLIBC_PACKAGES")
+    endif()
+    set(copyrights "")
+    foreach(package IN LISTS packages)
         set(name "${GLIBC_${arch}_${package}}")
+        if(name STREQUAL "" OR "${GLIBC_${arch}_${package}_DIGEST}" STREQUAL "")
+            message(FATAL_ERROR "tools/sysroot-pins has no GLIBC_${arch}_${package}")
+        endif()
         get_filename_component(asset "${name}" NAME)
+        # The name of the package is the part of the file before the first
+        # underscore, and its copyright lies under that name.
+        if(NOT package MATCHES "^(LIBC_DEV|LIBC|HEADERS)$")
+            string(REGEX REPLACE "_.*$" "" debian "${asset}")
+            list(APPEND copyrights "${debian}")
+        endif()
         fetch("${GLIBC_${arch}_URL}/${name}" "${work}/${asset}"
               "${GLIBC_${arch}_${package}_DIGEST}")
         file(REMOVE_RECURSE "${work}/deb")
@@ -124,26 +171,23 @@ function(glibc_sysroot target arch triple)
         file(ARCHIVE_EXTRACT INPUT "${data}" DESTINATION "${root}")
     endforeach()
     file(REMOVE_RECURSE "${work}/deb")
+    relative_links("${root}")
     # DESIGN: a package links a development name such as libm.so to the
-    # library, and libc6-dev links it to the absolute path of the machine
-    # it installs on. Every link becomes a copy of the file it reaches in
-    # the sysroot. lld then reads libm.so as the libm of the sysroot, and
-    # a Windows host, where lld reads no link the script can write, holds
-    # the same tree. A link that reaches no file goes, as the changelog of
-    # a -dev package does, which names the one of a package not installed.
-    # A library link among them would fail the link that names it.
+    # library. Every link becomes a copy of the file it reaches in the
+    # sysroot, once relative_links has turned the absolute ones relative.
+    # lld then reads libm.so as the libm of the sysroot, and a Windows host,
+    # where lld reads no link the script can write, holds the same tree. A
+    # link that reaches no file goes, as the changelog of a -dev package
+    # does, which names the one of a package not installed. A library link
+    # among them would fail the link that names it.
     file(GLOB_RECURSE links LIST_DIRECTORIES false "${root}/*")
     foreach(link IN LISTS links)
         set(at "${link}")
         set(steps 0)
         while(IS_SYMLINK "${at}" AND steps LESS 8)
             file(READ_SYMLINK "${at}" points)
-            if(IS_ABSOLUTE "${points}")
-                set(at "${root}${points}")
-            else()
-                get_filename_component(dir "${at}" DIRECTORY)
-                set(at "${dir}/${points}")
-            endif()
+            get_filename_component(dir "${at}" DIRECTORY)
+            set(at "${dir}/${points}")
             math(EXPR steps "${steps} + 1")
         endwhile()
         if(NOT at STREQUAL link)
@@ -163,10 +207,12 @@ function(glibc_sysroot target arch triple)
          "${DEST}/licenses/glibc.txt")
     file(COPY_FILE "${root}/usr/share/doc/linux-libc-dev/copyright"
          "${DEST}/licenses/linux-headers.txt")
-    file(COPY_FILE "${root}/usr/share/doc/libx11-6/copyright"
-         "${DEST}/licenses/libx11.txt")
-    file(COPY_FILE "${root}/usr/share/doc/libgl1/copyright"
-         "${DEST}/licenses/libglvnd.txt")
+    foreach(debian IN LISTS copyrights)
+        if(EXISTS "${root}/usr/share/doc/${debian}/copyright")
+            file(COPY_FILE "${root}/usr/share/doc/${debian}/copyright"
+                 "${DEST}/licenses/${debian}.txt")
+        endif()
+    endforeach()
     file(COPY_FILE "${CLANG_DIR}/licenses/llvm.txt"
          "${DEST}/licenses/compiler-rt.txt")
 endfunction()
@@ -524,6 +570,7 @@ foreach(target IN LISTS TARGETS)
         message(FATAL_ERROR "unknown target ${target}")
     endif()
     if(NOT (target MATCHES "^windows-" AND SPLAT STREQUAL "script"))
+        relative_links("${DEST}/${target}")
         message(STATUS "${DEST}/${target}")
     endif()
 endforeach()
