@@ -320,6 +320,9 @@ about structs, enums, classes, interfaces and errors lives there, and
 - [provisional] A lock the runtime keeps at file scope is a name of `enum anti_rt_lock` in `platform.h`, whose storage and initializer stand in the platform file. `conf.c` holds `ANTI_RT_LOCK_CONF`. Reason: the lock must be ready before `main` without a `#if` outside the layer.
 - [provisional] A sleep on Windows is a loop of `Sleep` steps of at most a day, each rounded up to the whole millisecond. A wait is then never shorter than asked, as `nanosleep` guarantees elsewhere, and a wait below a millisecond sleeps one. Reason: the audit asks for a loop of bounded calls with the rounding stated, and no document names the rounding.
 - `ANTI_CONF` is read through `GetEnvironmentVariableW` into a buffer of the length it reports and converted to UTF-8. A plugin loads through `LoadLibraryW` from its UTF-8 path. A value or a path that is no valid UTF-8 or UTF-16 counts as unset or fails the load. Reason: M20, and `anti_rt_fs_open` reads a path as UTF-8 on Windows already.
+- [provisional] `antl_write` and `antl_write_header` return false when a count or an index of the library file does not fit in its 32 bits. antic then reports `antic: <source> is too large for a library file` and writes no file. Reason: rule 17 wants a refusal rather than a damaged file, and the format keeps its fixed width.
+- [provisional] The reader uses some strings of a library file as C strings, such as a module path or a package name. Such a string with a NUL inside makes the file damaged. Reason: `strcmp` would compare the text before the NUL, so `foo\0x` would match `foo`.
+- [provisional] The start flag of `init.c` is atomic, since a static library for C sets it on first use from any thread of the host. Reason: rule 23.
 
 ## Threading
 
@@ -416,6 +419,11 @@ These decisions are the language's, not the book's. They are recorded here and d
 - [provisional] A read that fails part of the way fails the whole read, and the text is left as it was before the call. A write fails when `fclose` fails. A file the writer could not finish stays on disk as written. `anti fmt` writes over a source in place, so removing it would lose the source.
 - [provisional] The directory walk of `list_tree` and `list_dir` follows no link to a directory, as `remove_tree` follows none. A link to a file is listed as the file, and a link that leads nowhere is passed over. On Windows a directory that is a reparse point is not entered.
 - [provisional] A directory that does not exist adds nothing to a walk. Every other failure to open or read a directory, or to read an entry of one, fails the walk and prints the path.
+- [provisional] The COFF join refuses an offset or a length past 4 GiB with an error instead of cutting it to 32 bits.
+- [provisional] The functions of `src/anti/files.c` carry the prefix `files_`, the name of the module, as `units.c` carries `unit_`. The module `jsontree` keeps `json_`, which all its names share.
+- [provisional] Every allocation of `anti` goes through `files_array`, `files_resize` or `files_grow` of `files.c`. A product that overflows and a failed allocation both end the tool through `files_out_of_memory` with status 70, as the ten copies did before. A command of `main.c` now exits there instead of returning 70. The JSON reader of `anti bind` keeps its own growth, since it reports a failed allocation as an error of the document.
+- [provisional] `files_base_name` takes `/` and `\` as separators on every host, as the copy in `syms.c` did. A path that names a Windows directory splits the same way on the machine that reads it.
+- [provisional] `zip_write` refuses a name above 65535 bytes, a size or an offset above 4 GiB and more than 65535 entries, and writes no file. The zip64 extension is not written.
 
 ## Optimizer and register allocation
 
@@ -509,6 +517,13 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] The parser descends at most 256 levels, `PARSE_DEPTH_MAX` of `src/antic/parser.h`, and refuses a deeper source with "nesting deeper than 256 levels". One level is each operand that passes `unary`, which counts a `(` and a prefix operator, each right operand of `??`, each type, each statement and each `if`. Reason: the parser and every walk over its tree recurse once per level. The limit is well above the nesting of real code, and a program within four levels of it compiles under AddressSanitizer on the main thread's stack.
 - [provisional] An SDK directory name is `MacOSX<major>.<minor>.sdk` with each number decimal digits alone that fit an `int`. A name with a sign, a space or a number out of range is no SDK. So was a name of any other form before. Reason: `sscanf` with `%d` is undefined on a value out of range.
 - [provisional] `anti sdk export` takes a `Version` of `SDKSettings.json` that is digits in parts joined by single dots, and refuses another.
+- [provisional] The checked allocator of the back end is `ir_alloc`, `ir_resize`, `ir_grow`, `ir_product` and `ir_out_of_memory` in `src/antic/ir.c`. Every file of the back end includes `ir.h`, and a new source file would change `tools/sources.cmake`, which lies outside the step. The front end keeps its own copies until a step that crosses the boundary moves them.
+- [provisional] `src/antic/attributes.h` is the file of antic that holds a compiler extension, the format attribute, as `ATTRIBUTE_PRINTF`. It is a header alone, so the source list does not change. `diagnostic.h` and `antl.c` still write the attribute out.
+- [provisional] A message that a fixed buffer cuts ends in three dots, which `ir_vformat` writes.
+- [provisional] The checker, the library reader and the layout pass format some messages into fixed buffers. A message that does not fit ends in `...` where it was cut. Reason: rule 9 asks for the check of every formatted text, and a mark is the smallest change that shows the cut without growing any buffer.
+- [provisional] `token_kind_name` gives the bare spelling of a symbol when the spelling in backticks does not fit its 16-byte cache entry. No spelling is that long today. Reason: a cut spelling would name another token.
+- [provisional] The verifier refuses a call that passes an aggregate among the variadic arguments. The checker never writes one, and the back ends look an aggregate up among the parameters.
+- [provisional] `mach_add` and the `next` string of a link command abort with a message past `MACH_MAX_OPERANDS` and `LINK_MAX_STRINGS`. Every caller stays below them, so the state cannot be reached, which rule 13 allows.
 
 ## Nullable pointers
 
@@ -865,6 +880,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] The `threads` key takes decimal digits naming a count from 1 to `INT32_MAX`, from the file, from `--anti.threads` and from `rt.configure`. Any other text is a startup error. Reason: the pool counts its workers in `int`, and the smallest bound that changes no count accepted before is the largest `int` of every target.
 - [provisional] A later layer or include may replace the value of a configuration key. The value it replaces is kept until the program ends, never freed. Reason: `anti_rt_conf_get` hands out the bytes of a value to any thread. Of the two fixes the audit gives, this one keeps `rt.configure` usable after threads start.
 - A second call of `rt.configure` returns at once while the first one reads its file, as it did after the first one ended.
+- [provisional] A value of the configuration file with a NUL byte inside it ends the program with status 70 and the position of the value. `rt.configure` refuses a path with a NUL byte inside it the same way. Reason: every value reaches a C string, and rule 14 refuses input the runtime does not understand. A cut value would name another file.
 
 ## Hooks and tracing
 
@@ -943,6 +959,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - One lock in `src/rt/loaded.c` guards the slots of the open libraries. Load and unload write a slot under it. The two hooks that count the objects of a library read the slots under it, and so does the lookup of a class by name. The library is opened and closed outside it.
 - A lookup by name may find a class of a library. The class stays valid while the program keeps that library open, as the handle of the library does.
 - [provisional] The reason of a failed call of the loader is kept per thread. Reason: of the two fixes the audit gives, it changes no signature that `anti.plugin` calls.
+- [provisional] The reason of a failed plugin load, and the name of a function in it, end in `...` when they do not fit their buffer. Reason: rule 9 asks for a check, and a reason cut short without a mark reads as whole.
 
 ## Versions
 
@@ -1019,6 +1036,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] The deflate reader stops at the size the central directory declares for the entry, and the entry is broken. A copy may not reach back into bytes the output buffer held before the entry.
 - [provisional] Each number in a line of a symbols map, and in a frame or `module` line of a trace, is digits alone. `0x` may lead a hex number, and no sign may. A number above 64 bits refuses the line, which is then passed over as another line that is no frame. Blanks may lead a line. A name, a location or an id has no length bound, where `sscanf` cut them at 511, 1023 and 79 bytes.
 - [provisional] A unit of a deployment index with no `id` matches no entry of the archive.
+- [provisional] `anti symbols` decides whether a path of a runtime configuration is absolute by the rules of the host, through `path_is_absolute` of `src/antic/selfpath.c`. A drive path such as `C:\x` read on macOS or Linux is relative there.
 
 ## The doc command
 
@@ -1080,6 +1098,9 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] Both counts are global to their file, since a nested evaluation or parse starts in a callback of a reader. `anti bind` runs on one thread.
 - [provisional] The ABI probe walks at most 64 records deep into a field and enters no record it stands in. It enters a record that held no value once. A field past that has no value in the probe.
 - [provisional] A version of clang that does not fit an `int` reads as -1 and is refused as a version not tested. A `#pragma pack` value that does not fit an `int` leaves the pack as it was, as clang ignores it.
+- [provisional] `anti bind` refuses a literal that no 64-bit integer, no double or, with the suffix `f`, no float holds, where it took the saturated value. The define or macro is skipped with the usual warning. A float literal below the smallest double reads as zero or nearly so, as C reads it.
+- [provisional] An array length of a C type past `INT64_MAX` does not parse, and a field of a `COLOR` define past a `long long` skips the define.
+- [provisional] A message of the JSON reader of `anti bind` that the caller's buffer cannot hold is cut and ends in `...`.
 
 ## Names and shared code of the runtime
 
@@ -1088,6 +1109,8 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] `anti_licenses` keeps its name. Reason: the program defines it and the runtime only reads it, and `docs/distribution.md` and `docs/libraries-for-c.md` name it as the symbol that a tool reads.
 - [provisional] Code that the runtime and the host both need stands once in `src/rt/`, and the host compiles it. `antic_core` compiles `src/rt/digest.c` and `src/rt/utf.c`, as `anti` compiles `json.c`, `symbols.c` and `toml.c`. `src/rt/cpu_level.h` gives the names of the processor levels as an inline function, as `f16.h` gives the conversions. A shared file calls nothing of the platform, so `anti_rt_sha256_stream` digests a stream that its caller opened, through anti.fs in the runtime and with `fopen` in the host. Reason: SHA-256, UTF-8, the `__TEXT` walk of a Mach-O header and the names of the levels were each written twice, and `f16.h` and `cpu_level.h` already showed the form.
 - [provisional] `anti_rt_fs_read` of `src/rt/fs.c` is the one reader of a whole file in the runtime, for the configuration, discovery and the trace. It sets `errno` to `ENOMEM` when the memory runs out, and the configuration then stops with its out-of-memory message. Reason: the three readers differed in that message alone.
+- [provisional] `anti_rt_entry_body` and `anti_rt_body_entry` of `src/rt/object.c` are the one place the runtime converts a table entry between an object pointer and a function pointer, through a union. Every other file calls them. Reason: rule 1 keeps the extension in one file, and `object.c` owns the tables. A file of its own would change the list of runtime sources outside `src/rt/`.
+- [provisional] The failure routine of the runtime is `anti_rt_fail_exit(status, format, ...)` and `anti_rt_fail_abort(format, ...)` in `src/rt/assert.c`, declared in `std.h`. Each flushes standard output, writes the text and a newline to standard error and ends the program. `anti_rt_note` writes a line in the same form and goes on, for the library that discovery passes over. Every message keeps the text it had, `anti: ` included where it stood before. Reason: rule 13 asks for one routine with an exit and an abort form, and the decision on `assert` names the file.
 
 ## Repository layout
 
@@ -1109,6 +1132,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 
 - [provisional] Lowering stands in five files along its parts. `lower.c` holds the helpers every part uses and lowers the items of a module, with the functions a class carries and the sites of the hooks. `lower_desc.c` writes the descriptors and the tables of classes, structs and interfaces, `lower_expr.c` lowers expressions and calls, `lower_simd.c` the operations of simd structs, and `lower_stmt.c` statements, loops and the exits of a block. `src/antic/lower_lowerer.h` holds `struct lowerer` and the functions the files share. The helpers stay with the module code in `lower.c`, as the declarations stay with the passes in `sema.c`. `hook_name` moved into `lower_desc.c` beside `root_names`, the array it counts. Reason: rule 19 of `docs/c-guidelines.md`, and the parts the tool-pass report of the audit names.
 - [provisional] A function that the files of lowering share takes the prefix `lower_`, as `lower_temp` and `lower_rt_call`, one whose name already begins with it keeps that name, and one used in a single file stays `static` under its name. The structs, enums and macros of `lower_lowerer.h` keep their names. Reason: the same as for the checker under "Files of the checker".
+- [provisional] `lower_module` keeps its `bool` result and its `diags` parameter. It reports nothing and returns true, since the flag that decided the result was never set. Removing both changes `driver.c` and every unit test that calls it.
 
 ## Open
 
