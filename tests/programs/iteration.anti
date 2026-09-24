@@ -1,8 +1,8 @@
 //! The language hooks of iteration and indexing. `for x in e` walks a
-//! collection through `iter` and an iterator through `next` and `value`,
-//! nested loops over one collection keep their own positions, `while` calls
-//! the hooks by name, `to_slice` collects an iterator, and `e[i]` reads with
-//! `index` and writes with `set_index`.
+//! collection through `iter` and an iterator through `next` and `value`, nested
+//! loops over one collection keep their own positions, `while` calls the hooks
+//! by name, `to_slice` collects an iterator, and `e[i]` reads with `index` and
+//! writes with `set_index`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -90,6 +90,16 @@ operator fn value(c: *Countdown) -> int
 	return c.left;
 }
 
+fn words() -> Words
+{
+	return Words { };
+}
+
+fn countdown(from: int) -> Countdown
+{
+	return Countdown { left: from };
+}
+
 fn main() -> int
 {
 	let nums = Numbers { };
@@ -139,12 +149,12 @@ fn main() -> int
 		printf("rest %d\n".ptr, n as c_int);
 	}
 
-	// An iterator made in place, with an aggregate element.
-	for w in (Words { }) {
+	// An iterator that a call gives, with an aggregate element.
+	for w in words() {
 		printf("word %.*s\n".ptr, w.len as c_int, w.ptr);
 	}
 
-	for k in (Countdown { left: 3 }) {
+	for k in countdown(3) {
 		printf("count %d\n".ptr, k as c_int);
 	}
 

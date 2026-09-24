@@ -1,5 +1,5 @@
-//! A public collection with the language hooks and its iterator. Another
-//! module walks, indexes and collects them through the library file alone.
+//! A public collection with the language hooks and its iterator. Another module
+//! walks, indexes and collects them through the library file alone.
 
 pub class Bag
 {
