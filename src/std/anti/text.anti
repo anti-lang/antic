@@ -4,10 +4,10 @@
 //! string, and `equal` compares two by their bytes. `Builder` collects bytes
 //! and gives the `str` of what it collected. It writes numbers, truth values,
 //! characters and texts into fields of a width, which is what an `f"..."`
-//! calls. `parse_int` reads the integer a text spells and may fail.
-//! `to_bytes` copies a text into new bytes, and `to_text` copies bytes into a
-//! new text and fails when they are no valid UTF-8. `s.to_bytes()` and
-//! `data.to_text()` call them. Every other function of the module cannot fail.
+//! calls. `parse_int` reads the integer a text spells and may fail. `to_bytes`
+//! copies a text into new bytes, and `to_text` copies bytes into a new text and
+//! fails when they are no valid UTF-8. `s.to_bytes()` and `data.to_text()` call
+//! them. Every other function of the module cannot fail.
 
 import anti.lang;
 import anti.mem;

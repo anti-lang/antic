@@ -2,10 +2,11 @@
 //! mode from where it stands, so a literal at a method of `[]byte` or in a
 //! `ByteRegex` variable is a byte pattern, where `.` matches any byte and
 //! `\x89` is the byte 0x89. A character outside ASCII stands for its UTF-8
-//! bytes, and a class that lists one becomes a choice of byte sequences. A match
-//! gives `[]byte` slices of the searched data. `ByteRegex.compile` refuses a
-//! negated class and a range that hold a character outside ASCII. `to_bytes`
-//! and `to_text` copy, and `to_text` fails on bytes that are no valid UTF-8.
+//! bytes, and a class that lists one becomes a choice of byte sequences. A
+//! match gives `[]byte` slices of the searched data. `ByteRegex.compile`
+//! refuses a negated class and a range that hold a character outside ASCII.
+//! `to_bytes` and `to_text` copy, and `to_text` fails on bytes that are no
+//! valid UTF-8.
 
 import anti.lang;
 import anti.regex;

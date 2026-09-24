@@ -1,10 +1,10 @@
 //! Byte patterns and `patch`: a negated class and a range that hold a character
 //! outside ASCII, `(*UCP)` in a byte pattern, a `Regex` passed to a method of
-//! `[]byte` and a `ByteRegex` to a method of `str`, a `with` that does not fit a
-//! byte sequence, a group of a literal or the offset `at`, a pattern of several
-//! groups without `into`, a group the pattern lacks, `into` beside a byte
-//! sequence, `patch` of a `str`, `to_text` of a `str` and a `Match` read as a
-//! `ByteMatch`.
+//! `[]byte` and a `ByteRegex` to a method of `str`, a `with` that does not fit
+//! a byte sequence, a group of a literal or the offset `at`, a pattern of
+//! several groups without `into`, a group the pattern lacks, `into` beside a
+//! byte sequence, `patch` of a `str`, `to_text` of a `str` and a `Match` read
+//! as a `ByteMatch`.
 
 import anti.lang;
 import anti.regex;

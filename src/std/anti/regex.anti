@@ -126,8 +126,8 @@ pub fn compile(text: str) -> Regex may fail
 /// Compile the byte pattern `text`. `ByteRegex.compile(text)` calls it.
 ///
 /// `.` matches any byte, and a character outside ASCII stands for its UTF-8
-/// bytes. It fails with `BadPattern` when the pattern does not compile, and
-/// for a negated class or a range that holds a character outside ASCII.
+/// bytes. It fails with `BadPattern` when the pattern does not compile, and for
+/// a negated class or a range that holds a character outside ASCII.
 pub fn compile_bytes(text: str) -> ByteRegex may fail
 {
 	let code: i32 = 0;
@@ -892,8 +892,8 @@ fn missing_into() -> *MissingGroup
 	return e;
 }
 
-/// Write `with` at `offset` inside the group `into`, or the group named
-/// `name`, of every match of `r` in `data`, and give the number of places.
+/// Write `with` at `offset` inside the group `into`, or the group named `name`,
+/// of every match of `r` in `data`, and give the number of places.
 /// `data.patch(r, with)` calls it.
 ///
 /// `into` 0 takes the one group of a pattern with one and the whole match of a
@@ -919,10 +919,11 @@ pub fn patch(data: []byte, r: ByteRegex, with: []byte, into: int, name: str,
 }
 
 /// `patch` with the byte pattern literal `r`, whose text is `pattern`, where
-/// `with`, `offset` or `into` is computed. `data.patch(re"...", with)` calls it.
+/// `with`, `offset` or `into` is computed. `data.patch(re"...", with)` calls
+/// it.
 ///
-/// It fails with `LengthMismatch` alone. The program stops at `at` at the
-/// match limit, or when a computed `into` names no group of the literal.
+/// It fails with `LengthMismatch` alone. The program stops at `at` at the match
+/// limit, or when a computed `into` names no group of the literal.
 pub fn patch_literal(data: []byte, r: ByteRegex, pattern: str, with: []byte,
 	into: int, name: str, offset: int, limit: int,
 	at: lang.SourceLocation = here) -> int may fail
@@ -971,8 +972,8 @@ fn stop_into(pattern: str, into: int, name: str, at: lang.SourceLocation)
 }
 
 /// Write `with` at `offset` inside every place of `find` in `data`, left to
-/// right and without overlap, and give the number of places.
-/// `data.patch(find, with)` calls it.
+/// right and without overlap, and give the number of places. `data.patch(find,
+/// with)` calls it.
 ///
 /// It fails with `LengthMismatch` before it writes any byte when `with` at
 /// `offset` does not fit the length of `find`.
