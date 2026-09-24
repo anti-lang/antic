@@ -1100,6 +1100,11 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The platform layer of the C code is the files named platform: `src/rt/platform.h` with `src/rt/platform_posix.c` and `src/rt/platform_windows.c` for the runtime, and `src/antic/platform.c` and `src/anti/platform.c` for the two tools. A `#if` on the host system stands only there, as rule 22 of `docs/c-guidelines.md` says. The rule concerns the host: code that chooses by target through run-time values is not affected. Eddie decided it on 2026-09-23. Reason: a platform branch in one named place per part keeps the rest of the code the same on every host, and a list of files makes the rule checkable.
 - `repo_layout` reads the tree from the disk, without `build/`, when the root is no git work tree. Reason: step 2 of `./r` runs the suite in an export of the commit, which holds the tracked files and no `.git`.
 
+## Files of the checker
+
+- [provisional] The checker stands in six files along its parts. `sema.c` declares the items of a module and runs the passes of `sema_check`, and `sema_expr.c`, `sema_call.c`, `sema_const.c`, `sema_stmt.c` and `sema_export.c` hold expressions, calls and members, constants, statements and bodies, and the checks of what crosses to C with the doc warnings. Expressions and calls are two files, where the judgement of the audit named one part, because together they pass 3000 lines. `src/antic/sema_checker.h` holds `struct checker` and the functions the files share. Reason: rule 19 of `docs/c-guidelines.md`, and the parts the tool-pass report of the audit names.
+- [provisional] A function that the files of the checker share takes the prefix `sema_`, as `sema_check_expr` and `sema_error_at`, and one used in a single file stays `static` under its name. The structs and the macros of `sema_checker.h` keep their names. Reason: rule 25 names the exported symbols, and a type or a macro is none, as for the runtime headers.
+
 ## Open
 
 - Enums used as bit flags want a form of their own, to be designed later. A binding writes such a parameter with the integer type of C, and the caller converts each value with `as`.
