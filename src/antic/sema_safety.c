@@ -34,7 +34,7 @@ static bool in_lifecycle_of(const struct checker *c, const struct type *home)
     return is_lifecycle(fn) && t != NULL && sema_descends_from(t, home);
 }
 
-void sema_safety_declare(struct checker *c, struct item *it)
+void sema_safety_declare(struct item *it)
 {
     struct type *t = it->symbol->type;
     const struct item *outer;
@@ -54,10 +54,6 @@ void sema_safety_declare(struct checker *c, struct item *it)
             t->unchecked_fields = t->unchecked_fields ||
                                   outer->unchecked_fields;
         }
-    }
-    if (it->unchecked_fields && !it->concurrent) {
-        sema_error_at(c, it->name_pos, "`unchecked(unguarded-field)` in a "
-                      "class header belongs to a concurrent class");
     }
 }
 
@@ -401,8 +397,8 @@ void sema_note_field_write(struct checker *c, const struct expr *e)
 static bool written_elsewhere(const struct type *t,
                               const struct struct_field *f)
 {
-    return f->vis != VIS_PRIVATE && !is_free_field(f) &&
-           (f->unchecked || t->unchecked_fields);
+    return t->safety == SAFETY_CONCURRENT && f->vis != VIS_PRIVATE &&
+           !is_free_field(f) && (f->unchecked || t->unchecked_fields);
 }
 
 /* Report each field of the module that a write made none of the three,

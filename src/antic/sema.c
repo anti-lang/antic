@@ -1980,14 +1980,14 @@ static void declare_items(struct checker *c)
             it->symbol->type = types_struct(c->types, c->module_name, it->name);
             it->symbol->type->is_union = it->kind == ITEM_UNION;
             it->symbol->type->simd = it->simd;
-            sema_safety_declare(c, it);
+            sema_safety_declare(it);
         } else if (it->kind == ITEM_CLASS) {
             it->symbol->type = types_struct(c->types, c->module_name, it->name);
             it->symbol->type->kind = TYPE_CLASS;
             it->symbol->type->has_abstract = it->is_abstract;
             it->symbol->type->traced = it->trace;
             it->symbol->type->is_final = it->is_final;
-            sema_safety_declare(c, it);
+            sema_safety_declare(it);
             /* DESIGN: `compatible` names the floor of a plugin's
                version, which only an abstract class has a table for. */
             if (it->compatible.length > 0 && !it->is_abstract) {

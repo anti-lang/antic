@@ -287,7 +287,7 @@ void test_sync(void)
        received from until `recv` gives `none`, and deleted. A worker
        takes a channel and a mutex as it takes a value. */
     accepts("struct Point { x: int, y: int }\n"
-            "worker fn produce(chunk: []int, c: chan int, m: Mutex) -> int {\n"
+            "worker fn produce(chunk: []int, c: chan int, m: *Mutex) -> int {\n"
             "    for x in chunk { sync m { send(c, x); } }\n"
             "    return 0;\n"
             "}\n"
@@ -296,7 +296,7 @@ void test_sync(void)
             "    let m = Mutex.new();\n"
             "    let data = [1, 2, 3];\n"
             "    let all = data[0..3];\n"
-            "    let r = parallel all -> produce(c, m);\n"
+            "    let r = parallel all -> produce(c, &m);\n"
             "    free(r.ptr);\n"
             "    close(c);\n"
             "    let total = 0;\n"

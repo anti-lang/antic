@@ -296,7 +296,7 @@ bool sema_thread_safe_symbol(const struct symbol *sym);
 
 /* sema_safety.c */
 
-void sema_safety_declare(struct checker *c, struct item *it);
+void sema_safety_declare(struct item *it);
 void sema_safety_base(struct checker *c, const struct item *it,
                       const struct type *base);
 bool sema_needs_hidden_lock(const struct item *it);
