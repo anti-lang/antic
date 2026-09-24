@@ -62,26 +62,38 @@ if(NOT status EQUAL 0)
 endif()
 expect("${text}" "front end: 3 files, 6 targets, 0 warnings" "the six targets")
 
-# A project that warns and fails nothing. The warnings of the checker and
-# the doc warnings are counted apart, and the run ends with success.
+# A project whose checker warns. The check passes --warnings-as-errors, as a
+# release build refuses every warning, so the front end fails with each named
+# and no class below it runs.
 run(warnings "" status text)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "the warnings project failed with ${status}\n${text}")
+if(status EQUAL 0)
+    message(FATAL_ERROR "the warnings project passed\n${text}")
 endif()
-expect("${text}" "warning: `close_it` may fail and never does" "may fail")
-expect("${text}" "warning: `e` shadows a variable in scope" "the shadowing")
-expect("${text}" "warning: `nowhere` in the doc comment of `handler` resolves to nothing" "the name")
-expect("${text}" "holds a heading, which the doc markup has not" "the markup")
-expect("${text}" "front end: 1 file, 1 target, 2 warnings" "the two warnings")
+expect("${text}" "error: `close_it` may fail and never does [never-fails]" "may fail")
+expect("${text}" "error: `e` shadows the outer `e` [shadowed-catch]" "the shadowing")
+expect("${text}" "front end: 1 file, 1 target, 2 warnings, 1 failed" "the two warnings")
+refuse("${text}" "doc warnings:" "the class below")
+
+# The same project with both warnings allowed. The doc warnings are counted
+# apart and the run ends with success, since the doc class fails nothing.
+run(allowed "" status text)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "the allowed project failed with ${status}\n${text}")
+endif()
+refuse("${text}" "may fail and never does" "the allowed warning")
+refuse("${text}" "shadows the outer" "the allowed warning")
+expect("${text}" "warning: `nowhere` in the doc comment of `handler` resolves to nothing [doc-unresolved]" "the name")
+expect("${text}" "holds a heading, which the doc markup has not [doc-markup]" "the markup")
+expect("${text}" "front end: 1 file, 1 target, 0 warnings\n" "no warning")
 expect("${text}" "doc warnings: 2" "the two doc warnings")
 refuse("${text}" "has no `///` comment" "the undocumented item")
 
 # --warn-undocumented adds the `pub` item without a `///` comment.
-run(warnings "--warn-undocumented" status text)
+run(allowed "--warn-undocumented" status text)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "--warn-undocumented failed with ${status}\n${text}")
 endif()
-expect("${text}" "the pub item `undocumented` has no `///` comment" "the item")
+expect("${text}" "the pub item `undocumented` has no `///` comment [undocumented]" "the item")
 expect("${text}" "doc warnings: 3" "the three doc warnings")
 
 # The front end refuses one module, so no class below it runs.

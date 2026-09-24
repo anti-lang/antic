@@ -1,0 +1,18 @@
+//! Only a warning can be allowed, and only a safety check can be unchecked. An
+//! error has no name, so a clause that names one is refused. So is a name of
+//! the other kind, a name of nothing and an empty reason.
+
+import anti.lang;
+
+allow(type-mismatch, "an error is never silenced");
+allow(unguarded-field, "a safety check takes unchecked");
+unchecked(shadowed-catch, "a warning takes allow");
+allow(no-such-name, "no warning has this name");
+allow(never-fails, "");
+
+fn main() -> int
+	unchecked(never-fails, "a warning takes allow")
+{
+	allow(may-fail-unhandled, "an error is never silenced")
+	return 0;
+}

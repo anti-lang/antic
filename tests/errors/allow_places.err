@@ -1,0 +1,4 @@
+allow_places.anti:9:15: error: `allow` stands before a statement, last in a declaration's header or at the top of the file
+allow_places.anti:14:22: error: `allow` takes a name and a reason, `allow(name, "reason")`
+allow_places.anti:21:1: error: a clause of a statement stands before the statement
+allow_places.anti:23:1: error: a clause of the whole file stands at the top of the module, and one of a declaration last in its header

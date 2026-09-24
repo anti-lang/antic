@@ -1,0 +1,1 @@
+never_fails.anti:3:21: error: `close_it` may fail and never does [never-fails]

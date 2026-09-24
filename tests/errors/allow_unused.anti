@@ -1,0 +1,38 @@
+//! A clause that silences nothing is a warning, `unused-allow` for `allow` and
+//! `unused-unchecked` for `unchecked`, at every level. A clause of a check that
+//! this build does not run, such as a doc warning without `--doc-warnings`,
+//! waits for the build that runs it and says nothing.
+
+import anti.lang;
+
+allow(assert-call, "no assert calls a function");
+unchecked(exponential-pattern, "no pattern is here");
+allow(undocumented, "the doc warnings decide");
+
+class Node
+	allow(shadowed-catch, "no handler reuses a name")
+	unchecked(unguarded-field, "one thread owns a node")
+{
+	pub next: ?*Node unchecked(unguarded-field, "the list is built once"),
+}
+
+struct Pair
+	allow(above-vector-cap, "a pair is small")
+{
+	a: int,
+	b: int,
+}
+
+fn fails(n: int) may fail
+	allow(never-fails, "this one fails")
+{
+	if n < 0 { fail "negative"; }
+}
+
+fn main() -> int
+{
+	allow(shadowed-catch, "nothing is shadowed")
+	fails(1) catch fatal;
+	unchecked(exponential-pattern, "no pattern here either")
+	return 0;
+}

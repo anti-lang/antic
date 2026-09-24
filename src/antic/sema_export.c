@@ -347,12 +347,12 @@ static void doc_markup_warning(const struct doc_scope *s,
                                const struct name *owner, const char *what)
 {
     if (owner == NULL) {
-        diagnostics_doc(s->diags, doc->line, doc->column,
+        diagnostics_doc(s->diags, NAME_DOC_MARKUP, doc->line, doc->column,
                         "the doc comment of the module holds %s, which the "
                         "doc markup has not", what);
         return;
     }
-    diagnostics_doc(s->diags, doc->line, doc->column,
+    diagnostics_doc(s->diags, NAME_DOC_MARKUP, doc->line, doc->column,
                     "the doc comment of `%.*s` holds %s, which the doc "
                     "markup has not", (int)owner->length, owner->text, what);
 }
@@ -363,12 +363,12 @@ static void doc_name_warning(const struct doc_scope *s,
                              size_t length)
 {
     if (owner == NULL) {
-        diagnostics_doc(s->diags, doc->line, doc->column,
+        diagnostics_doc(s->diags, NAME_DOC_UNRESOLVED, doc->line, doc->column,
                         "`%.*s` in the doc comment of the module resolves to "
                         "nothing", (int)length, name);
         return;
     }
-    diagnostics_doc(s->diags, doc->line, doc->column,
+    diagnostics_doc(s->diags, NAME_DOC_UNRESOLVED, doc->line, doc->column,
                     "`%.*s` in the doc comment of `%.*s` resolves to nothing",
                     (int)length, name, (int)owner->length, owner->text);
 }
@@ -780,8 +780,8 @@ static void doc_check_undocumented(const struct doc_scope *s,
 
     if (it->pub && it->doc.length == 0 && !it->singleton_get &&
         it->block == BLOCK_NONE) {
-        diagnostics_doc(s->diags, it->name_pos.line, it->name_pos.column,
-                        "the pub item `%.*s` has no `///` comment",
+        diagnostics_doc(s->diags, NAME_UNDOCUMENTED, it->name_pos.line,
+                        it->name_pos.column, "the pub item `%.*s` has no `///` comment",
                         (int)it->name.length, it->name.text);
     }
     for (i = 0; i < it->member_count; i++) {
@@ -817,8 +817,8 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
     for (i = 0; i < module->item_count; i++) {
         const struct item *it = module->items[i];
         if (it->pub && it->note.length > 0 && it->doc.length == 0) {
-            diagnostics_doc(diags, it->name_pos.line, it->name_pos.column,
-                            "the pub item `%.*s` has a `//#` note and no "
+            diagnostics_doc(diags, NAME_DOC_NOTE_ONLY, it->name_pos.line,
+                            it->name_pos.column, "the pub item `%.*s` has a `//#` note and no "
                             "`///` comment", (int)it->name.length,
                             it->name.text);
         }
@@ -830,7 +830,7 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
     }
     for (i = 0; i < module->dropped_count; i++) {
         const struct dropped_doc *d = &module->dropped[i];
-        diagnostics_doc(diags, d->pos.line, d->pos.column,
+        diagnostics_doc(diags, NAME_DOC_DROPPED, d->pos.line, d->pos.column,
                         d->module_form
                             ? "the `%.*s` comment is dropped, because it "
                               "stands after the first import or item"

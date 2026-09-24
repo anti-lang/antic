@@ -1,0 +1,7 @@
+allow_names.anti:7:7: error: `type-mismatch` is no warning, and `allow` silences a warning alone
+allow_names.anti:8:7: error: `unguarded-field` is no warning, and `allow` silences a warning alone
+allow_names.anti:9:11: error: `shadowed-catch` is no safety check, and `unchecked` overrules a safety check alone
+allow_names.anti:10:7: error: `no-such-name` is no warning, and `allow` silences a warning alone
+allow_names.anti:11:1: error: the reason of `allow(never-fails)` is empty
+allow_names.anti:14:12: error: `never-fails` is no safety check, and `unchecked` overrules a safety check alone
+allow_names.anti:16:8: error: `may-fail-unhandled` is no warning, and `allow` silences a warning alone

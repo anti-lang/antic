@@ -1,0 +1,85 @@
+//! `catch none` counts a failure as `none`, where the result can be `none`. The
+//! error is deleted on the way out, as every handler deletes the error it
+//! holds, which `Counted` checks. A success gives its result unchanged. A call
+//! that gives `*T` counts as `none` where the `let` names `?*T`, and a call
+//! through a value of a failing function type takes the form as well.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted inherits lang.Error
+{
+	static atomic live: int = 0;
+
+	/// An error that counts itself alive until it is deleted.
+	pub fn make(code: int) -> *Counted
+	{
+		let e = alloc Counted { };
+		e.code = code;
+		e.message = "counted";
+		Counted.live.add(1);
+		return e;
+	}
+
+	concrete fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+class Box
+{
+	pub n: int,
+}
+
+/// A box of n, and a failure for a negative n.
+fn find(n: int) -> ?*Box may fail
+{
+	if n < 0 {
+		fail Counted.make(n);
+	}
+	return alloc Box { n: n };
+}
+
+/// A box of n that is never `none` when the call succeeds.
+fn make(n: int) -> *Box may fail
+{
+	if n < 0 {
+		fail Counted.make(n);
+	}
+	return alloc Box { n: n };
+}
+
+/// Print what the call gave and how many errors are alive.
+fn report(name: str, b: ?*Box)
+{
+	if b != none {
+		printf("%s box %d live %d\n".ptr, name.ptr, b.n as c_int,
+			Counted.live.load() as c_int);
+		delete(b);
+		return;
+	}
+	printf("%s none live %d\n".ptr, name.ptr, Counted.live.load() as c_int);
+}
+
+fn main() -> int
+{
+	let failed = find(-1) catch none;
+	report("failed", failed);
+	let found = find(3) catch none;
+	report("found", found);
+	let widened: ?*Box = make(-2) catch none;
+	report("widened", widened);
+	let made: ?*Box = make(4) catch none;
+	report("made", made);
+	let through: fn(int) -> ?*Box may fail = find;
+	let called = through(-5) catch none;
+	report("through", called);
+	let assigned: ?*Box = none;
+	assigned = find(-6) catch none;
+	report("assigned", assigned);
+	find(-7) catch none;
+	printf("dropped live %d\n".ptr, Counted.live.load() as c_int);
+	return 0;
+}

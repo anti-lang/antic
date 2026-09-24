@@ -50,6 +50,8 @@ static int usage(FILE *out)
           "                       and write nothing, for anti check\n"
           "  --warn-undocumented  with --doc-warnings: warn about every\n"
           "                       `pub` item without a `///` comment\n"
+          "  --warnings-as-errors refuse every warning, as a release build\n"
+          "                       does, for anti check\n"
           "  --package-name <p>   the package header of the library: name,\n"
           "  --package-version <v>  version,\n"
           "  --inject <I=P>       the provider P of the injectable "
@@ -295,6 +297,9 @@ static int run(int argc, char **argv, struct options *o)
             continue;
         } else if (strcmp(arg, "--front-end") == 0) {
             options.front_end = true;
+            continue;
+        } else if (strcmp(arg, "--warnings-as-errors") == 0) {
+            options.warnings_as_errors = true;
             continue;
         } else if (strcmp(arg, "--warn-undocumented") == 0) {
             options.warn_undocumented = true;

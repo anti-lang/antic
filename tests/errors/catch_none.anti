@@ -1,0 +1,39 @@
+//! `catch none` counts a failure as `none`, so it needs a result that can be
+//! `none`. A value, no result and a `try` block give none, and a call that
+//! cannot fail and a `catch` on a pointer have no failure to count.
+
+import anti.lang;
+
+fn count(n: int) -> int may fail
+{
+	if n < 0 { fail "negative"; }
+	return n;
+}
+
+fn touch(n: int) may fail
+{
+	if n < 0 { fail "negative"; }
+}
+
+fn plain(n: int) -> ?*int
+{
+	if n < 0 { return none; }
+	return none;
+}
+
+fn tried()
+{
+	try {
+		touch(3);
+	} catch none
+}
+
+fn main() -> int
+{
+	let n = count(1) catch none;
+	touch(2) catch none;
+	let q = plain(4) catch none;
+	let p: ?*int = none;
+	let held = p catch none;
+	return n;
+}

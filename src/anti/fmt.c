@@ -255,6 +255,13 @@ struct emitter {
     size_t frame_count;
     size_t frame_capacity;
     struct statement stmt;
+    const struct piece *stmt_start; /* the first piece of the statement */
+    /* The `(` of an `allow` or `unchecked` clause, as a count of open
+       brackets with it, and 0 outside one. The name before its comma is
+       written without spaces, `shadowed-catch`. */
+    size_t clause_depth;
+    bool clause_name;
+    bool clause_statement;      /* the clause opens its statement */
 };
 
 static void text_clear(struct text *t)
@@ -323,6 +330,21 @@ static bool contextual_word(const char *s, size_t n)
         }
     }
     return false;
+}
+
+/* Whether the piece is the word of an `allow` or `unchecked` clause,
+   which the `(` after it opens. */
+static bool clause_word(const struct emitter *e, const struct piece *p)
+{
+    const char *s;
+
+    if (p == NULL || p->kind != PIECE_TOKEN ||
+        p->token->kind != TOKEN_IDENT) {
+        return false;
+    }
+    s = e->src + p->offset;
+    return (p->length == 5 && memcmp(s, "allow", 5) == 0) ||
+           (p->length == 9 && memcmp(s, "unchecked", 9) == 0);
 }
 
 /* Whether the kind names a type, so that `[8]int` and `chan int(16)`
@@ -505,6 +527,11 @@ static bool space_before(const struct emitter *e, const struct piece *p)
         return true;
     }
     prev = e->prev->token->kind;
+    /* The name of a clause joins its words with `-`, as it is written. */
+    if (e->clause_name && (cur == TOKEN_MINUS || prev == TOKEN_MINUS) &&
+        e->prev->offset + e->prev->length == p->offset) {
+        return false;
+    }
     switch (prev) {
     case TOKEN_LPAREN:
     case TOKEN_LBRACKET:
@@ -1061,11 +1088,24 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     case TOKEN_RBRACE:
         emit_brace_close(e, p);
         return;
-    case TOKEN_LPAREN:
+    case TOKEN_LPAREN: {
+        /* `fn allow(...)` declares a function of that name, and
+           `x.allow(...)` calls one. */
+        bool clause = clause_word(e, e->prev) &&
+                      !(e->prev2 != NULL && e->prev2->kind == PIECE_TOKEN &&
+                        (e->prev2->token->kind == TOKEN_FN ||
+                         e->prev2->token->kind == TOKEN_DOT ||
+                         e->prev2->token->kind == TOKEN_QUESTION_DOT));
         note_token(e, kind);
         append_piece(e, p, space_before(e, p));
         push_bracket(e, false);
+        if (clause) {
+            e->clause_depth = e->brackets;
+            e->clause_name = true;
+            e->clause_statement = e->stmt_start == e->prev2;
+        }
         return;
+    }
     case TOKEN_LBRACKET: {
         /* `[8]int` and `[]byte` open a type, and `a[i]` an index. The
            second bracket of `[][]i32` opens one as well. */
@@ -1083,6 +1123,15 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
             e->brackets--;
             e->type_bracket = kind == TOKEN_RBRACKET &&
                               e->bracket_type[e->brackets];
+        }
+        /* A clause before a statement ends at its `)`, and the statement
+           it covers opens the next line, which continues nothing. */
+        if (e->clause_depth > 0 && e->brackets < e->clause_depth) {
+            e->clause_depth = 0;
+            e->clause_name = false;
+            if (e->clause_statement && e->brackets == 0) {
+                reset_statement(e);
+            }
         }
         return;
     case TOKEN_SEMICOLON:
@@ -1104,6 +1153,9 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
         return;
     case TOKEN_COMMA:
         append_piece(e, p, space_before(e, p));
+        if (e->clause_depth > 0 && e->brackets == e->clause_depth) {
+            e->clause_name = false;
+        }
         /* A comma at the level of a brace ends a field, an arm or a
            case wherever it stands. The colons of the next one then count
            from none. The word that governs the statement stands over the
@@ -1128,6 +1180,9 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     /* The space is read before the token joins the statement, because a
        colon reads the colons the statement holds already. */
     space = space_before(e, p);
+    if (!e->stmt.open) {
+        e->stmt_start = p;
+    }
     note_token(e, kind);
     append_piece(e, p, space);
 }

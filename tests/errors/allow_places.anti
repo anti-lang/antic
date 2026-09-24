@@ -1,0 +1,28 @@
+//! A clause stands before a statement, last in a declaration's header, at the
+//! top of the file or, for `unchecked`, after a field's type. A clause takes a
+//! name and a reason.
+
+import anti.lang;
+
+class Node
+{
+	next: ?*Node allow(unguarded-field, "a field takes unchecked"),
+}
+
+fn reasonless()
+{
+	allow(shadowed-catch)
+	return;
+}
+
+fn trailing()
+{
+	allow(shadowed-catch, "nothing follows")
+}
+
+allow(assert-call, "the top of the file is above the first item");
+
+fn main() -> int
+{
+	return 0;
+}

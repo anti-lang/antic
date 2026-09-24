@@ -34,6 +34,12 @@ struct options {
     /* --warn-undocumented, with --doc-warnings: every `pub` item without
        a `///` comment. `anti check` takes the same option. */
     bool warn_undocumented;
+    /* DESIGN: a release build accepts no warning, always. A dev build
+       prints a warning and carries on, and --warnings-as-errors gives it
+       the release behaviour, which `anti check` passes. A release build
+       is one that is neither --dev, -c nor --front-end. A doc warning
+       stays one, because the doc class of `anti check` fails nothing. */
+    bool warnings_as_errors;
     struct diagnostic_counts *counts;   /* NULL: count nothing. */
     /* DESIGN: --front-end stops after semantic analysis. No pass below the
        checker runs, so no assembly, no object and no executable is

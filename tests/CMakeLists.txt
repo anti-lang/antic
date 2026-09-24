@@ -306,7 +306,8 @@ foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
 endforeach()
 
 # A simd struct above the vector cap is an array and every operation on
-# it a loop, which a warning at the declaration says.
+# it a loop, which a warning at the declaration says. The program allows
+# it, because a release build accepts no warning.
 add_test(NAME program_simd_big
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
@@ -314,7 +315,6 @@ add_test(NAME program_simd_big
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs"
-        "-DWARNING=simd_big.anti:10:13: warning: `F64x64` is 512 bytes, above the vector cap of 256"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 
 # The native width of a simd operation: one instruction on the registers
@@ -673,8 +673,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
             "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64"
-            "-DWARNING=simd_big.anti:10:13: warning: `F64x64` is 512 bytes, above the vector cap of 256"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
     foreach(source IN LISTS program_sources)
         get_filename_component(name "${source}" NAME_WE)
         add_test(NAME program_${name}_macos-x86_64
@@ -1288,13 +1287,70 @@ add_test(NAME antl_internal
 
 # A `may fail` function without a `fail` and without a `try` is a warning,
 # not an error, because an interface function may fail in one
-# implementation and not in another.
+# implementation and not in another. A dev build prints it and carries on.
 add_test(NAME warning_never_fails
-    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
+    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" --dev -S
             -o "${CMAKE_CURRENT_BINARY_DIR}/never_fails.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.anti")
 set_tests_properties(warning_never_fails PROPERTIES
-    PASS_REGULAR_EXPRESSION "never_fails.anti:3:21: warning: `close_it` may fail and never does")
+    PASS_REGULAR_EXPRESSION "never_fails.anti:3:21: warning: `close_it` may fail and never does \\[never-fails\\]")
+
+# A release build accepts no warning, and --warnings-as-errors gives a dev
+# build the same behaviour. The warning is then an error with its name.
+foreach(mode "release|-S" "strict|--dev,--warnings-as-errors,-S")
+    string(REPLACE "|" ";" parts "${mode}")
+    list(GET parts 0 name)
+    list(GET parts 1 flags)
+    add_test(NAME error_never_fails_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+            "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},${flags},-o,${CMAKE_CURRENT_BINARY_DIR}/never_fails_${name}.s,never_fails.anti"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.err"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+endforeach()
+
+# `allow` at every level silences its warning, so a release build and a
+# build of the `tests` block both accept the program without a word.
+foreach(mode "release|-S" "tests|--tests,--dev,-S")
+    string(REPLACE "|" ";" parts "${mode}")
+    list(GET parts 0 name)
+    list(GET parts 1 flags)
+    string(REPLACE "," ";" flags "${flags}")
+    add_test(NAME silent_allow_levels_${name}
+        COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" ${flags}
+                -o "${CMAKE_CURRENT_BINARY_DIR}/allow_levels_${name}.s"
+                "${CMAKE_CURRENT_SOURCE_DIR}/errors/allow_levels.anti")
+    set_tests_properties(silent_allow_levels_${name} PROPERTIES
+        FAIL_REGULAR_EXPRESSION "warning|error")
+endforeach()
+
+# A clause that silences nothing is a warning, which a dev build prints and
+# carries on. The listing `allow_unused` holds the release build, which
+# refuses each. A clause of a doc warning waits for --doc-warnings.
+add_test(NAME warning_unused_clauses
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused.s,allow_unused.anti"
+        "-DNEEDLES=allow_unused.anti:8:1: warning: `allow(assert-call)` silences nothing [unused-allow];allow_unused.anti:16:19: warning: `unchecked(unguarded-field)` overrules nothing [unused-unchecked];allow_unused.anti:34:2: warning: `allow(shadowed-catch)` silences nothing [unused-allow]"
+        "-DABSENT=allow(undocumented)"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warnings.cmake")
+add_test(NAME warning_unused_doc_clause
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},--dev,--doc-warnings,--warn-undocumented,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_doc.s,allow_unused.anti"
+        "-DNEEDLES=allow_unused.anti:10:1: warning: `allow(undocumented)` silences nothing [unused-allow]"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warnings.cmake")
+
+# Every name of the compiler's table stands in docs/notes/warnings.md with
+# its meaning and its fix, and the note names nothing else.
+add_test(NAME warning_names
+    COMMAND "${CMAKE_COMMAND}"
+        "-DTABLE=${CMAKE_SOURCE_DIR}/src/antic/warnings.c"
+        "-DNOTE=${CMAKE_SOURCE_DIR}/docs/notes/warnings.md"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warning_names.cmake")
 
 # Doc warnings come only with --doc-warnings, which anti check passes.
 add_test(NAME warning_note
@@ -1324,8 +1380,8 @@ add_test(NAME warning_catch_shadow
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/catch_shadow.s,catch_shadow.anti"
-        "-DNEEDLES=catch_shadow.anti:22:25: warning: `e` shadows a variable in scope;catch_shadow.anti:26:21: warning: `e` shadows a variable in scope;catch_shadow.anti:31:10: warning: `e` shadows a variable in scope"
+        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/catch_shadow.s,catch_shadow.anti"
+        "-DNEEDLES=catch_shadow.anti:22:25: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:26:21: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:31:10: warning: `e` shadows the outer `e` [shadowed-catch]"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warnings.cmake")
 add_test(NAME silent_catch_no_shadow
     COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
@@ -1385,7 +1441,7 @@ add_test(NAME warning_one_segment
     COMMAND antic -c -o "${CMAKE_CURRENT_BINARY_DIR}/geometry.antl"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/geometry.anti")
 set_tests_properties(warning_one_segment PROPERTIES
-    PASS_REGULAR_EXPRESSION "geometry.anti: warning: the module path `geometry` has one segment, which is for a program's own files")
+    PASS_REGULAR_EXPRESSION "geometry.anti:1:1: warning: the module path `geometry` has one segment, which is for a program's own files \\[single-segment-path\\]")
 
 add_test(NAME error_no_main
     COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}"
@@ -2696,7 +2752,11 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "provides_lines|-S,-o,${LISTINGS}/provides_lines.s,provides_lines.anti"
         "plugin_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/plugin_calls.s,plugin_calls.anti"
         "compound_wrapping|-S,-o,${LISTINGS}/compound_wrapping.s,compound_wrapping.anti"
-        "long_float|-S,-o,${LISTINGS}/long_float.s,long_float.anti")
+        "long_float|-S,-o,${LISTINGS}/long_float.s,long_float.anti"
+        "allow_names|-S,-o,${LISTINGS}/allow_names.s,allow_names.anti"
+        "allow_places|-S,-o,${LISTINGS}/allow_places.s,allow_places.anti"
+        "allow_unused|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/allow_unused.s,allow_unused.anti"
+        "catch_none|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_none.s,catch_none.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

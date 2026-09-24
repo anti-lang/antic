@@ -1,13 +1,15 @@
 //! A simd struct above the vector cap of 256 bytes is an array, and every
-//! operation on it is a loop over its lanes. The compiler says so with a
-//! warning at the declaration. This program checks that the loops give what the
-//! instructions give below the cap.
+//! operation on it is a loop over its lanes. The compiler says so with the
+//! warning `above-vector-cap` at the declaration, which the header allows,
+//! since a release build accepts no warning. This program checks that the loops
+//! give what the instructions give below the cap.
 
 import anti.simd;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
 simd struct F64x64
+	allow(above-vector-cap, "the loops over the lanes are the subject")
 {
 	l0: float, l1: float, l2: float, l3: float, l4: float, l5: float, l6: float, l7: float,
 	l8: float, l9: float, l10: float, l11: float, l12: float, l13: float, l14: float, l15: float,

@@ -27,6 +27,7 @@
 #include "types.h"
 #include "process.h"
 #include "text.h"
+#include "warnings.h"
 
 #define ASSEMBLY_SUFFIX ".s"
 #define PACKAGE_SUFFIX ".package"
@@ -171,6 +172,7 @@ static void drop_test_blocks(struct module *tree, bool keep)
 {
     size_t kept = 0;
     size_t i;
+    size_t j;
 
     /* DESIGN: under `--tests` the two blocks stay and their functions are
        public, so the runner module that `anti test` writes calls them by
@@ -192,9 +194,18 @@ static void drop_test_blocks(struct module *tree, bool keep)
         }
     }
     tree->item_count = kept;
+    /* A clause of a dropped block goes with it, so it does not read as
+       one that silences nothing. */
+    for (i = j = 0; i < tree->clause_count; i++) {
+        if (tree->clauses[i].block == BLOCK_NONE) {
+            tree->clauses[j++] = tree->clauses[i];
+        }
+    }
+    tree->clause_count = j;
 }
 
-static bool module_name(const struct options *o, struct text *out)
+static bool module_name(const struct options *o, struct text *out,
+                        struct diagnostics *diags)
 {
     char error[200];
 
@@ -215,11 +226,13 @@ static bool module_name(const struct options *o, struct text *out)
                 o->input, text_cstr(out));
         return false;
     }
-    if (o->library && !o->front_end &&
+    /* The warning stands at the top of the file, where a clause of the
+       whole file covers it. */
+    if (o->library && !o->front_end && diags != NULL &&
         module_path_segments(text_cstr(out)) == 1) {
-        fprintf(stderr, "antic: %s: warning: the module path `%s` has one "
-                        "segment, which is for a program's own files\n",
-                o->input, text_cstr(out));
+        diagnostics_warn(diags, NAME_SINGLE_SEGMENT_PATH, 1, 1,
+                         "the module path `%s` has one segment, which is "
+                         "for a program's own files", text_cstr(out));
     }
     return true;
 }
@@ -691,10 +704,13 @@ static void print_diagnostics(const char *input,
     size_t i;
 
     for (i = 0; i < diags->count; i++) {
-        fprintf(stderr, "%s:%d:%d: %s: %s\n", input, diags->items[i].line,
-                diags->items[i].column,
-                diags->items[i].warning ? "warning" : "error",
-                diags->items[i].message);
+        const struct diagnostic *d = &diags->items[i];
+        fprintf(stderr, "%s:%d:%d: %s: %s", input, d->line, d->column,
+                d->warning ? "warning" : "error", d->message);
+        if (d->name != NAME_NONE) {
+            fprintf(stderr, " [%s]", warnings_name(d->name));
+        }
+        fputc('\n', stderr);
     }
 }
 
@@ -710,7 +726,9 @@ static void report_diagnostics(const struct options *o,
         return;
     }
     for (i = 0; i < diags->count; i++) {
-        if (!diags->items[i].warning) {
+        if (diags->items[i].promoted) {
+            o->counts->warnings++;
+        } else if (!diags->items[i].warning) {
             o->counts->errors++;
         } else if (diags->items[i].doc) {
             o->counts->doc_warnings++;
@@ -718,6 +736,67 @@ static void report_diagnostics(const struct options *o,
             o->counts->warnings++;
         }
     }
+}
+
+/* Whether the build writes a program in release mode. */
+static bool release_build(const struct options *o)
+{
+    return !o->dev && !o->library && !o->front_end;
+}
+
+/* Whether the checker sees the whole program, which it needs to find an
+   abstract class that no class fills. */
+static bool whole_program_check(const struct options *o)
+{
+    return release_build(o) && o->lib == LIB_NONE;
+}
+
+/* The checks that ran in this compilation. A check that belongs to
+   another build leaves its `allow` alone, since that build decides
+   whether the clause silences something. */
+static warnings_ran checks_ran(const struct options *o)
+{
+    warnings_ran ran = WARNINGS_ALL_RAN;
+
+    if (!o->doc_warnings) {
+        ran &= ~(WARNINGS_BIT(NAME_DOC_MARKUP) |
+                 WARNINGS_BIT(NAME_DOC_UNRESOLVED) |
+                 WARNINGS_BIT(NAME_DOC_NOTE_ONLY) |
+                 WARNINGS_BIT(NAME_DOC_DROPPED));
+    }
+    if (!o->doc_warnings || !o->warn_undocumented) {
+        ran &= ~WARNINGS_BIT(NAME_UNDOCUMENTED);
+    }
+    if (!whole_program_check(o)) {
+        ran &= ~WARNINGS_BIT(NAME_UNFILLED_ABSTRACT);
+    }
+    if (!o->library || o->front_end) {
+        ran &= ~WARNINGS_BIT(NAME_SINGLE_SEGMENT_PATH);
+    }
+    return ran;
+}
+
+/* Apply the clauses of the module, turn the warnings into errors where
+   the build accepts none, and report. complete says the checker ran to
+   its end, so a clause that silenced nothing is known. Returns false
+   when an error stands. */
+static bool settle_diagnostics(const struct options *o,
+                               const struct module *tree,
+                               struct diagnostics *diags, bool complete)
+{
+    size_t i;
+
+    warnings_apply(tree, diags, checks_ran(o), complete);
+    if (o->warnings_as_errors || release_build(o)) {
+        warnings_promote(diags);
+    }
+    report_diagnostics(o, diags);
+    for (i = 0; i < diags->count; i++) {
+        if (!diags->items[i].warning) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /* Print one token per line: its position, its group and its source text.
@@ -1717,7 +1796,7 @@ static int compile(const struct options *o, struct text *source,
         status = 2;
         goto done;
     }
-    if (!module_name(o, module)) {
+    if (!module_name(o, module, &diags)) {
         goto done;
     }
     types_init(&types, &arena);
@@ -1735,16 +1814,17 @@ static int compile(const struct options *o, struct text *source,
     }
     if (!sema_check(tree, text_cstr(module), o->package_name, libraries,
                     paths.count, &types, &arena, &diags,
-                    !o->dev && !o->library && !o->front_end &&
-                        o->lib == LIB_NONE)) {
-        report_diagnostics(o, &diags);
+                    whole_program_check(o))) {
+        settle_diagnostics(o, tree, &diags, false);
         goto done;
     }
     if (o->doc_warnings) {
         sema_doc_warnings(tree, text_cstr(module), libraries, paths.count,
                           &types, o->warn_undocumented, &diags);
     }
-    report_diagnostics(o, &diags);
+    if (!settle_diagnostics(o, tree, &diags, true)) {
+        goto done;
+    }
     diags.count = 0;
     if (o->dump_types) {
         struct text dump = {0};
@@ -1932,7 +2012,7 @@ const struct interface *driver_interface(const struct options *o,
         goto done;
     }
     drop_test_blocks(parsed, false);
-    if (!module_name(o, &module)) {
+    if (!module_name(o, &module, NULL)) {
         goto done;
     }
     if (!find_libraries(o, parsed, arena, &paths)) {
@@ -1949,9 +2029,11 @@ const struct interface *driver_interface(const struct options *o,
     }
     if (!sema_check(parsed, text_cstr(&module), o->package_name, libraries,
                     paths.count, types, arena, &diags, false)) {
+        warnings_apply(parsed, &diags, 0, false);
         report_diagnostics(o, &diags);
         goto done;
     }
+    warnings_apply(parsed, &diags, 0, false);
     report_diagnostics(o, &diags);
     iface = arena_alloc(arena, sizeof *iface);
     sema_interface(parsed, text_cstr(&module), arena, iface);

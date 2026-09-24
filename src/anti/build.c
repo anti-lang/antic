@@ -102,9 +102,11 @@ struct build {
 /* The cache key of one output: the digest of its input, the version of
    the compiler, the target and the processor level. The addendum names
    the first three. The level joins them because it decides the
-   instructions, and the debug flag because it decides the lines. */
+   instructions, and the debug flag because it decides the lines. The
+   strict flag is --warnings-as-errors, which decides whether a warning
+   stops the file. */
 static void cache_key(const char *input, enum target t, enum cpu_level cpu,
-                      bool debug, struct text *out)
+                      bool debug, bool strict, struct text *out)
 {
     struct anti_sha256 digest;
     struct text bytes = {0};
@@ -115,8 +117,9 @@ static void cache_key(const char *input, enum target t, enum cpu_level cpu,
         anti_rt_sha256_update(&digest, bytes.data, bytes.length);
     }
     anti_rt_sha256_hex(&digest, hex);
-    text_appendf(out, "%s %s %s %s %s\n", hex, ANTIC_VERSION, target_name(t),
-                 cpu_name(cpu), debug ? "g" : "no-g");
+    text_appendf(out, "%s %s %s %s %s%s\n", hex, ANTIC_VERSION,
+                 target_name(t), cpu_name(cpu), debug ? "g" : "no-g",
+                 strict ? " strict" : "");
     text_free(&bytes);
 }
 
@@ -235,7 +238,11 @@ static bool module_library(struct build *b, const struct unit *u,
                    output)) {
         goto done;
     }
-    cache_key(u->source, t, cpu, false, &key);
+    /* DESIGN: a release build accepts no warning, so it checks every
+       module of the project with --warnings-as-errors. A library file
+       that a dev build wrote was checked without it, and the key keeps
+       the two apart. */
+    cache_key(u->source, t, cpu, false, b->r->release, &key);
     if (cached(text_cstr(output), &key)) {
         ok = true;
         goto done;
@@ -245,6 +252,7 @@ static bool module_library(struct build *b, const struct unit *u,
     o.input = u->source;
     o.output = text_cstr(output);
     o.library = true;
+    o.warnings_as_errors = b->r->release;
     o.strip_docs = b->r->strip_docs;
     o.libraries = libraries->items;
     o.library_count = libraries->count;
@@ -275,7 +283,7 @@ static bool module_object(struct build *b, const char *library,
         goto done;
     }
     text_appendf(out, "%s%s", text_cstr(&base), target_info(t)->object_suffix);
-    cache_key(library, t, cpu, !b->r->release, &key);
+    cache_key(library, t, cpu, !b->r->release, false, &key);
     if (cached(text_cstr(out), &key)) {
         ok = true;
         goto done;

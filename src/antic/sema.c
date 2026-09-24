@@ -254,9 +254,9 @@ void sema_warn_catch_shadow(struct checker *c, const struct name *name,
         (outer->kind != SYMBOL_LOCAL && outer->kind != SYMBOL_PARAM)) {
         return;
     }
-    diagnostics_warn(c->diags, pos.line, pos.column,
-                     "`%.*s` shadows a variable in scope",
-                     (int)name->length, name->text);
+    diagnostics_warn(c->diags, NAME_SHADOWED_CATCH, pos.line, pos.column,
+                     "`%.*s` shadows the outer `%.*s`", (int)name->length,
+                     name->text, (int)name->length, name->text);
 }
 
 void sema_enter_scope(struct checker *c, struct scope *s)
@@ -525,7 +525,8 @@ static void check_simd_struct(struct checker *c, struct item *it)
         return;
     }
     if (bytes > CPU_VECTOR_BYTE_CAP) {
-        diagnostics_warn(c->diags, it->name_pos.line, it->name_pos.column,
+        diagnostics_warn(c->diags, NAME_ABOVE_VECTOR_CAP, it->name_pos.line,
+                         it->name_pos.column,
                          "`%.*s` is %llu bytes, above the vector cap of %d, "
                          "so it is an array and each operation on it a loop",
                          (int)it->name.length, it->name.text,
@@ -2820,7 +2821,8 @@ static void report_program(struct checker *c)
             continue;
         }
         if (!sema_filled_somewhere(c, t)) {
-            diagnostics_warn(c->diags, it->name_pos.line, it->name_pos.column,
+            diagnostics_warn(c->diags, NAME_UNFILLED_ABSTRACT,
+                             it->name_pos.line, it->name_pos.column,
                              "`%.*s` is abstract and no class fills it",
                              (int)it->name.length, it->name.text);
         }

@@ -4,8 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static void add(struct diagnostics *d, int line, int column, bool warning,
-                bool doc, const char *format, va_list args)
+static void add(struct diagnostics *d, enum diag_name name, int line,
+                int column, bool warning, bool doc, const char *format,
+                va_list args)
 {
     struct diagnostic *item;
 
@@ -25,6 +26,8 @@ static void add(struct diagnostics *d, int line, int column, bool warning,
     item->column = column;
     item->warning = warning;
     item->doc = doc;
+    item->promoted = false;
+    item->name = name;
     vsnprintf(item->message, sizeof item->message, format, args);
 }
 
@@ -34,27 +37,27 @@ void diagnostics_add(struct diagnostics *d, int line, int column,
     va_list args;
 
     va_start(args, format);
-    add(d, line, column, false, false, format, args);
+    add(d, NAME_NONE, line, column, false, false, format, args);
     va_end(args);
 }
 
-void diagnostics_warn(struct diagnostics *d, int line, int column,
-                      const char *format, ...)
+void diagnostics_warn(struct diagnostics *d, enum diag_name name, int line,
+                      int column, const char *format, ...)
 {
     va_list args;
 
     va_start(args, format);
-    add(d, line, column, true, false, format, args);
+    add(d, name, line, column, true, false, format, args);
     va_end(args);
 }
 
-void diagnostics_doc(struct diagnostics *d, int line, int column,
-                     const char *format, ...)
+void diagnostics_doc(struct diagnostics *d, enum diag_name name, int line,
+                     int column, const char *format, ...)
 {
     va_list args;
 
     va_start(args, format);
-    add(d, line, column, true, true, format, args);
+    add(d, name, line, column, true, true, format, args);
     va_end(args);
 }
 

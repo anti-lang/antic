@@ -1,0 +1,98 @@
+//! Every level of `allow` silences its warning in a release build, which
+//! accepts none: a statement, the header of a function, of a function of a
+//! class, of a class and of a struct, and the whole file. A clause in a `tests`
+//! block goes with the block, and a function may still be named `allow`.
+
+import anti.lang;
+import anti.simd;
+
+allow(assert-call, "the condition has no effect");
+
+/// The header covers the function and its doc comment.
+fn close_it(n: int) may fail
+	allow(never-fails, "an implementation of the contract may fail")
+{
+	if n < 0 { return; }
+}
+
+abstract class Shape
+	allow(unfilled-abstract, "a plugin fills it")
+{
+	abstract fn area(self) -> int;
+}
+
+class Holder
+	allow(shadowed-catch, "every handler of the class reuses e")
+{
+	pub n: int,
+
+	pub fn reuse(self) -> int
+	{
+		let e = self.n;
+		close_it(e) catch e {
+			return 0;
+		};
+		return e;
+	}
+
+	pub fn quiet(self) may fail
+		allow(never-fails, "an override may fail")
+	{
+		self.n = 1;
+	}
+}
+
+simd struct Wide
+	allow(above-vector-cap, "a loop over the lanes is enough")
+{
+	l0: f64, l1: f64, l2: f64, l3: f64, l4: f64, l5: f64, l6: f64, l7: f64,
+	l8: f64, l9: f64, l10: f64, l11: f64, l12: f64, l13: f64, l14: f64,
+	l15: f64, l16: f64, l17: f64, l18: f64, l19: f64, l20: f64, l21: f64,
+	l22: f64, l23: f64, l24: f64, l25: f64, l26: f64, l27: f64, l28: f64,
+	l29: f64, l30: f64, l31: f64, l32: f64, l33: f64, l34: f64, l35: f64,
+	l36: f64, l37: f64, l38: f64, l39: f64, l40: f64, l41: f64, l42: f64,
+	l43: f64, l44: f64, l45: f64, l46: f64, l47: f64, l48: f64, l49: f64,
+	l50: f64, l51: f64, l52: f64, l53: f64, l54: f64, l55: f64, l56: f64,
+	l57: f64, l58: f64, l59: f64, l60: f64, l61: f64, l62: f64, l63: f64,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn allow(n: int, why: str) -> int
+{
+	return n + why.len as int;
+}
+
+fn handled() -> int
+{
+	let e = 1;
+	allow(shadowed-catch, "the handler reads the error alone")
+	close_it(2) catch e {
+		return 1;
+	};
+	assert(twice(e) > 0);
+	allow(e, "a call");
+	return e;
+}
+
+tests
+{
+	fn shadowing()
+	{
+		let e = 2;
+		allow(shadowed-catch, "the test reuses e")
+		close_it(e) catch e {
+			return;
+		};
+	}
+}
+
+fn main() -> int
+{
+	let h = Holder { n: 3 };
+	h.quiet() catch fatal;
+	return handled() + h.reuse() - 4;
+}

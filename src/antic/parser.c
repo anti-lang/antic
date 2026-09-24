@@ -1,16 +1,21 @@
 #include "parser.h"
 
+#include <ctype.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "text.h"
+#include "warnings.h"
 
 /* DESIGN: recursive descent, one function per grammar rule of chapter 2,
    with precedence climbing for the binary operators. After an error the
    parser is in panic mode and reports nothing more. It skips to the start
    of a statement or an item, so one mistake produces one message. */
+
+struct list;
 
 struct parser {
     const char *source;
@@ -25,6 +30,8 @@ struct parser {
     bool ok;
     bool no_struct_literal;         /* inside a condition */
     int depth;                      /* levels entered by descend */
+    struct list *clauses;           /* every `allow` and `unchecked` */
+    enum fn_block block;            /* the test block being read */
 };
 
 /* A growable array of fixed-size elements, copied into the memory pool
@@ -1555,6 +1562,24 @@ static bool read_handler(struct parser *p, struct handler *out, bool required)
         out->kind = HANDLE_FATAL;
         return true;
     }
+    /* DESIGN: `catch none` counts a failure as `none`. It is the handler
+       `catch { yield none; }`, which deletes the error on its way out as
+       every handler does, so the parser writes that block and the
+       checker refuses it where the result cannot be `none`. */
+    if (check(p, TOKEN_NONE)) {
+        const struct token *t = next(p);
+        struct stmt *yield = new_stmt(p, STMT_YIELD, t);
+        yield->as.yielded = new_expr(p, EXPR_NONE, t);
+        out->kind = HANDLE_BLOCK;
+        out->none = true;
+        out->body = node(p, sizeof *out->body);
+        out->body->pos = pos_of(t);
+        out->body->end = pos_of(t);
+        out->body->stmts = node(p, sizeof *out->body->stmts);
+        out->body->stmts[0] = yield;
+        out->body->count = 1;
+        return true;
+    }
     out->kind = HANDLE_BLOCK;
     if (peek(p)->kind == TOKEN_IDENT) {
         out->pos = pos_of(peek(p));
@@ -1563,6 +1588,186 @@ static bool read_handler(struct parser *p, struct handler *out, bool required)
         }
     }
     return (out->body = block(p)) != NULL;
+}
+
+/* Clauses */
+
+/* Whether the token is a word of a name, letters, digits and `_` with a
+   letter first. A keyword is one as well, so `shadowed-catch` reads. */
+static bool name_word(const struct parser *p, const struct token *t)
+{
+    const char *s = p->source + t->offset;
+    size_t i;
+
+    if (t->length == 0 || !isalpha((unsigned char)s[0])) {
+        return false;
+    }
+    for (i = 1; i < t->length; i++) {
+        if (!isalnum((unsigned char)s[i]) && s[i] != '_') {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* Whether nothing stands between the two tokens. */
+static bool adjacent(const struct token *a, const struct token *b)
+{
+    return a->offset + a->length == b->offset;
+}
+
+/* Whether `allow` or `unchecked` and a `(` stand at the token ahead. */
+static bool clause_ahead(const struct parser *p, size_t ahead)
+{
+    const struct token *t = peek_at(p, ahead);
+
+    return (is_word(p, t, "allow") || is_word(p, t, "unchecked")) &&
+           peek_at(p, ahead + 1)->kind == TOKEN_LPAREN;
+}
+
+/* DESIGN: `allow` and `unchecked` are contextual words, so a function
+   may still carry either name. Before a statement the clause is the
+   word, its parentheses and a statement after them. A call of a
+   function of that name ends with `;` or goes on as an expression, and
+   the token after its `)` says which of the two stands. */
+static bool statement_clause(const struct parser *p)
+{
+    size_t i = p->pos + 1;
+    int depth = 0;
+    enum token_kind after;
+
+    if (!clause_ahead(p, 0)) {
+        return false;
+    }
+    for (; p->tokens[i].kind != TOKEN_EOF; i++) {
+        if (p->tokens[i].kind == TOKEN_LPAREN) {
+            depth++;
+        } else if (p->tokens[i].kind == TOKEN_RPAREN && --depth == 0) {
+            break;
+        }
+    }
+    if (p->tokens[i].kind == TOKEN_EOF) {
+        return false;
+    }
+    after = p->tokens[i + 1].kind;
+    return after != TOKEN_SEMICOLON && after != TOKEN_DOT &&
+           after != TOKEN_QUESTION_DOT && after != TOKEN_LBRACKET &&
+           after != TOKEN_LPAREN && after != TOKEN_CATCH &&
+           after != TOKEN_AS && after != TOKEN_IS && !is_assign_op(after) &&
+           precedence(after) == 0;
+}
+
+/* Read `allow(name, "reason")` or `unchecked(name, "reason")`. The
+   clause waits for the source it covers, which close_clauses gives it.
+   A name that is no warning of `allow`, or no safety check of
+   `unchecked`, is refused: an error is never silenced. */
+static bool read_clause(struct parser *p, enum clause_level level)
+{
+    const struct token *word = next(p);
+    const struct token *first;
+    const struct token *last;
+    struct clause c;
+    enum diag_name name;
+    char message[160];
+
+    memset(&c, 0, sizeof c);
+    c.unchecked = is_word(p, word, "unchecked");
+    c.level = level;
+    c.block = p->block;
+    c.pos = pos_of(word);
+    next(p);
+    first = last = peek(p);
+    if (name_word(p, first)) {
+        next(p);
+        while (check(p, TOKEN_MINUS) && adjacent(last, peek(p)) &&
+               adjacent(peek(p), peek_at(p, 1)) &&
+               name_word(p, peek_at(p, 1))) {
+            next(p);
+            last = next(p);
+        }
+        c.name.text = p->source + first->offset;
+        c.name.length = last->offset + last->length - first->offset;
+    }
+    if (c.name.length == 0 || !accept(p, TOKEN_COMMA) ||
+        !check(p, TOKEN_STRING)) {
+        snprintf(message, sizeof message,
+                 "`%s` takes a name and a reason, `%s(name, \"reason\")`",
+                 c.unchecked ? "unchecked" : "allow",
+                 c.unchecked ? "unchecked" : "allow");
+        error_here(p, message);
+        return false;
+    }
+    c.reason = next(p)->value.text;
+    if (!expect(p, TOKEN_RPAREN)) {
+        return false;
+    }
+    name = warnings_find(c.name.text, c.name.length);
+    if (!c.unchecked &&
+        (name == NAME_NONE || warnings_kind(name) != KIND_WARNING)) {
+        diagnostics_add(p->diags, first->line, first->column,
+                        "`%.*s` is no warning, and `allow` silences a "
+                        "warning alone", (int)c.name.length, c.name.text);
+        p->ok = false;
+    } else if (c.unchecked && (name == NAME_NONE ||
+                               warnings_kind(name) != KIND_SAFETY_CHECK)) {
+        diagnostics_add(p->diags, first->line, first->column,
+                        "`%.*s` is no safety check, and `unchecked` "
+                        "overrules a safety check alone",
+                        (int)c.name.length, c.name.text);
+        p->ok = false;
+    } else if (c.reason.length == 0) {
+        diagnostics_add(p->diags, c.pos.line, c.pos.column,
+                        "the reason of `%s(%.*s)` is empty",
+                        c.unchecked ? "unchecked" : "allow",
+                        (int)c.name.length, c.name.text);
+        p->ok = false;
+    }
+    list_push(p->clauses, &c);
+    return true;
+}
+
+/* Give the clauses read since mark that still wait the source from
+   `from` to the last token read. An inner statement closed its own
+   clauses first, so only the ones of this level wait. */
+static void close_clauses(struct parser *p, size_t mark, struct pos from)
+{
+    struct clause *all = p->clauses->data;
+    struct pos to = pos_of(&p->tokens[p->pos > 0 ? p->pos - 1 : 0]);
+    size_t i;
+
+    for (i = mark; i < p->clauses->count; i++) {
+        if (all[i].to.line == 0) {
+            all[i].from = from;
+            all[i].to = to;
+        }
+    }
+}
+
+/* The clauses last in a declaration's header, before its brace. */
+static bool header_clauses(struct parser *p)
+{
+    while (clause_ahead(p, 0)) {
+        if (!read_clause(p, CLAUSE_DECLARATION)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* Where the source a declaration's clause covers starts: its doc
+   comment, where a doc warning stands, or its first word. */
+static struct pos declaration_start(const struct item *it)
+{
+    struct pos at = it->pos;
+
+    if (it->doc.length > 0) {
+        at.line = it->doc.line;
+        at.column = it->doc.column;
+    } else if (it->note.length > 0) {
+        at.line = it->note.line;
+        at.column = it->note.column;
+    }
+    return at;
 }
 
 static struct stmt *statement(struct parser *p);
@@ -1949,13 +2154,27 @@ static struct stmt *statement_level(struct parser *p)
    statement is one level. */
 static struct stmt *statement(struct parser *p)
 {
-    struct stmt *s;
+    size_t mark = p->clauses->count;
+    struct pos from = pos_of(peek(p));
+    struct stmt *s = NULL;
 
     if (!descend(p)) {
         return NULL;
     }
-    s = statement_level(p);
+    while (statement_clause(p)) {
+        if (!read_clause(p, CLAUSE_STATEMENT)) {
+            ascend(p);
+            return NULL;
+        }
+    }
+    if (p->clauses->count > mark &&
+        (check(p, TOKEN_RBRACE) || check(p, TOKEN_EOF))) {
+        error_here(p, "a clause of a statement stands before the statement");
+    } else {
+        s = statement_level(p);
+    }
     ascend(p);
+    close_clauses(p, mark, from);
     return s;
 }
 
@@ -2101,7 +2320,7 @@ static bool starts_member(const struct parser *p)
 
 /* One function or constant declared between the braces of a struct, a
    union or an enum. An abstract function has no body and ends with `;`. */
-static struct item *member(struct parser *p, const struct item *owner)
+static struct item *member_level(struct parser *p, const struct item *owner)
 {
     struct item *m = node(p, sizeof *m);
 
@@ -2220,10 +2439,24 @@ static struct item *member(struct parser *p, const struct item *owner)
         return NULL;
     }
     may_fail_after(p, m);
+    if (!header_clauses(p)) {
+        return NULL;
+    }
     if (m->contract == FN_ABSTRACT) {
         return expect(p, TOKEN_SEMICOLON) ? m : NULL;
     }
     return (m->body = block(p)) == NULL ? NULL : m;
+}
+
+/* A member with the clauses of its header closed over it. */
+static struct item *member(struct parser *p, const struct item *owner)
+{
+    size_t mark = p->clauses->count;
+    struct pos from = pos_of(peek(p));
+    struct item *m = member_level(p, owner);
+
+    close_clauses(p, mark, m != NULL ? declaration_start(m) : from);
+    return m;
 }
 
 /* DESIGN: `compatible 1.1;` in the body of an abstract class names the
@@ -2357,6 +2590,24 @@ static bool struct_field_only(struct parser *p, const struct item *it)
     return false;
 }
 
+/* `unchecked(name, "reason")` after a field's type overrules a safety
+   check for that field alone. A warning of a field is one of its class,
+   so `allow` stands in the class header. */
+static bool field_clauses(struct parser *p)
+{
+    while (clause_ahead(p, 0)) {
+        if (is_word(p, peek(p), "allow")) {
+            error_here(p, "`allow` stands before a statement, last in a "
+                          "declaration's header or at the top of the file");
+            return false;
+        }
+        if (!read_clause(p, CLAUSE_FIELD)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* `class Circle inherits Shape { implements ser: Serializable, ... }`.
    DESIGN: the base is no member. It sits at offset 0, has no name of its
    own, is reached as `self.super`, and a class has at most one, so the
@@ -2366,6 +2617,7 @@ static bool struct_field_only(struct parser *p, const struct item *it)
 static struct item *class_item(struct parser *p, struct item *it)
 {
     struct list fields = {NULL, 0, 0, sizeof(struct param)};
+    size_t mark;
 
     next(p);
     it->kind = ITEM_CLASS;
@@ -2397,7 +2649,7 @@ static struct item *class_item(struct parser *p, struct item *it)
             return NULL;
         }
     }
-    if (!expect(p, TOKEN_LBRACE)) {
+    if (!header_clauses(p) || !expect(p, TOKEN_LBRACE)) {
         return NULL;
     }
     /* Fields first, comma separated, then the constants and functions,
@@ -2478,10 +2730,11 @@ static struct item *class_item(struct parser *p, struct item *it)
         /* An `inject` field may be called `alloc` or `free`, as the
            example of `docs/anti-syntax-overview.md` writes it. A name
            must stand after `inject`, so the position has one reading. */
+        mark = p->clauses->count;
         if (!(field.injected ? expect_member_name(p, &field.name)
                              : expect_name(p, &field.name)) ||
             !expect(p, TOKEN_COLON) ||
-            (field.type = type(p)) == NULL ||
+            (field.type = type(p)) == NULL || !field_clauses(p) ||
             (accept(p, TOKEN_COLON) &&
              (field.bits = expression(p)) == NULL) ||
             (accept(p, TOKEN_ASSIGN) &&
@@ -2489,6 +2742,7 @@ static struct item *class_item(struct parser *p, struct item *it)
             free(fields.data);
             return NULL;
         }
+        close_clauses(p, mark, field.pos);
         list_push(&fields, &field);
         if (!accept(p, TOKEN_COMMA)) {
             break;
@@ -2568,7 +2822,7 @@ static struct item *variant_item(struct parser *p, struct item *it)
     return expect(p, TOKEN_RBRACE) ? it : NULL;
 }
 
-static struct item *item(struct parser *p)
+static struct item *item_level(struct parser *p)
 {
     const struct token *start = peek(p);
     struct item *it = node(p, sizeof *it);
@@ -2673,7 +2927,8 @@ static struct item *item(struct parser *p)
             return NULL;
         }
         may_fail_after(p, it);
-        if (p->panic || (it->body = block(p)) == NULL) {
+        if (p->panic || !header_clauses(p) ||
+            (it->body = block(p)) == NULL) {
             return NULL;
         }
         return it;
@@ -2716,7 +2971,7 @@ static struct item *item(struct parser *p)
                 return NULL;
             }
         }
-        if (!expect(p, TOKEN_LBRACE)) {
+        if (!header_clauses(p) || !expect(p, TOKEN_LBRACE)) {
             return NULL;
         }
         /* DESIGN: a struct body holds fields and nothing else. It is
@@ -2809,6 +3064,35 @@ static struct item *item(struct parser *p)
     }
 }
 
+/* An item with the clauses of its header closed over it. */
+static struct item *item(struct parser *p)
+{
+    size_t mark = p->clauses->count;
+    struct pos from = pos_of(peek(p));
+    struct item *it = item_level(p);
+
+    close_clauses(p, mark, it != NULL ? declaration_start(it) : from);
+    return it;
+}
+
+/* DESIGN: a clause of the whole file stands at the top of the module,
+   among the imports and before the first item, and ends with `;`. It
+   covers every line of the file. */
+static bool file_clause(struct parser *p)
+{
+    struct clause *c;
+
+    if (!read_clause(p, CLAUSE_FILE)) {
+        return false;
+    }
+    c = (struct clause *)p->clauses->data + (p->clauses->count - 1);
+    c->from.line = 1;
+    c->from.column = 1;
+    c->to.line = INT_MAX;
+    c->to.column = INT_MAX;
+    return expect(p, TOKEN_SEMICOLON);
+}
+
 /* After an error in an import, skip the rest of its line up to and with
    its `;`. An import holds no braces, and a keyword in its path would
    stop sync_item inside it. */
@@ -2859,7 +3143,10 @@ static bool test_block(struct parser *p, struct list *items,
         return false;
     }
     while (!check(p, TOKEN_RBRACE) && !check(p, TOKEN_EOF)) {
-        struct item *it = item(p);
+        struct item *it;
+        p->block = which;
+        it = item(p);
+        p->block = BLOCK_NONE;
         if (it == NULL) {
             return false;
         }
@@ -2953,8 +3240,9 @@ bool parse(const char *source, const struct token_list *tokens,
            struct arena *arena, struct diagnostics *diags,
            struct module **out)
 {
+    struct list clauses = {NULL, 0, 0, sizeof(struct clause)};
     struct parser p = {source, NULL, tokens->items, NULL, NULL, 0, arena,
-                       diags, false, true, false, 0};
+                       diags, false, true, false, 0, &clauses, BLOCK_NONE};
     struct module *m = arena_alloc(arena, sizeof *m);
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
     struct list items = {NULL, 0, 0, sizeof(struct item *)};
@@ -2989,8 +3277,14 @@ bool parse(const char *source, const struct token_list *tokens,
     m->doc = doc_before(&p, TOKEN_MODULE_DOC);
     m->note = doc_before(&p, TOKEN_MODULE_NOTE);
 
-    while (check(&p, TOKEN_IMPORT)) {
+    while (check(&p, TOKEN_IMPORT) || clause_ahead(&p, 0)) {
         struct import imp;
+        if (clause_ahead(&p, 0)) {
+            if (!file_clause(&p)) {
+                sync_import(&p, peek(&p)->line);
+            }
+            continue;
+        }
         memset(&imp, 0, sizeof imp);
         imp.pos = pos_of(next(&p));
         imp.module_pos = pos_of(peek(&p));
@@ -3022,6 +3316,14 @@ bool parse(const char *source, const struct token_list *tokens,
                 }
                 sync_item(&p);
             }
+            continue;
+        }
+        if (clause_ahead(&p, 0)) {
+            error_here(&p, "a clause of the whole file stands at the top of "
+                           "the module, and one of a declaration last in "
+                           "its header");
+            next(&p);
+            sync_item(&p);
             continue;
         }
         if (check(&p, TOKEN_PROVIDES)) {
@@ -3083,6 +3385,7 @@ bool parse(const char *source, const struct token_list *tokens,
         list_push(&dropped, &d);
     }
     m->dropped = list_finish(&p, &dropped, &m->dropped_count);
+    m->clauses = list_finish(&p, &clauses, &m->clause_count);
     free(kept);
     free(origin);
     free(taken);

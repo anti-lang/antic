@@ -59,6 +59,9 @@ static void base_options(struct options *o, const char *runtime,
     o->root_count = root_count;
     o->runtime = runtime;
     o->front_end = true;
+    /* A warning fails the check, as it fails a release build. The doc
+       warnings stay a class that fails nothing. */
+    o->warnings_as_errors = true;
     if (!target_host(&o->target)) {
         fputs("anti: unknown host target\n", stderr);
         exit(2);

@@ -985,6 +985,11 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     if (sema_is_error(value)) {
         return value;
     }
+    if (h->none) {
+        sema_error_at(c, h->pos, "`catch none` counts a failure as `none`, "
+                      "and a `catch` on a pointer guards no failure");
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (!type_is_nullable(value)) {
         sema_error_at(c, h->pos, "`catch` here guards a `?*T`, found `%s`",
                       sema_tn(value));
@@ -1576,6 +1581,11 @@ static void check_stmt(struct checker *c, struct stmt *s)
         struct handler *h = &s->as.try_block.handler;
         struct block *outer_try = c->try_block;
         struct type *outer_error = c->error_type;
+        if (h->none) {
+            sema_error_at(c, h->pos, "`catch none` needs a result that can "
+                          "be `none`, and a `try` block gives none");
+            return;
+        }
         c->try_block = s->as.try_block.body;
         c->error_type = NULL;
         sema_check_block(c, s->as.try_block.body);
@@ -1811,7 +1821,8 @@ static void check_stmt(struct checker *c, struct stmt *s)
                                      sema_builtin(c, TYPE_BOOL)),
                      sema_builtin(c, TYPE_BOOL));
         if (expr_calls(s->as.assertion.cond)) {
-            diagnostics_warn(c->diags, s->as.assertion.cond->pos.line,
+            diagnostics_warn(c->diags, NAME_ASSERT_CALL,
+                             s->as.assertion.cond->pos.line,
                              s->as.assertion.cond->pos.column,
                              "this `assert` condition calls a function, "
                              "which a release build does not run");
@@ -2257,7 +2268,7 @@ void sema_check_function(struct checker *c, struct item *it)
        `try` is a warning and not an error. An interface function may
        fail in one implementation and not in another. */
     if (it->may_fail && !c->saw_fail && !sema_is_error(it->symbol->type)) {
-        diagnostics_warn(c->diags, it->may_fail_pos.line,
+        diagnostics_warn(c->diags, NAME_NEVER_FAILS, it->may_fail_pos.line,
                          it->may_fail_pos.column,
                          "`%.*s` may fail and never does",
                          (int)it->name.length, it->name.text);

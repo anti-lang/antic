@@ -1,0 +1,5 @@
+catch_none.anti:28:4: error: `catch none` needs a result that can be `none`, and a `try` block gives none
+catch_none.anti:33:19: error: `catch none` needs a result that can be `none`, and this call gives `int`
+catch_none.anti:34:11: error: `catch none` needs a result that can be `none`, and this call gives no result
+catch_none.anti:35:19: error: `catch none` counts a failure as `none`, and this call cannot fail
+catch_none.anti:37:15: error: `catch none` counts a failure as `none`, and a `catch` on a pointer guards no failure

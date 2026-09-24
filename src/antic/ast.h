@@ -190,6 +190,10 @@ struct handler {
     struct pos pos;
     struct block *body;             /* HANDLE_BLOCK */
     struct symbol *symbol;          /* the error the handler binds */
+    /* `catch none`: a HANDLE_BLOCK whose body the parser wrote as
+       `yield none;`. The checker refuses it where the result cannot be
+       `none`. */
+    bool none;
 };
 
 struct expr {
@@ -780,6 +784,35 @@ struct link_name {
     struct name name;               /* the decoded text of the literal */
 };
 
+/* DESIGN: `allow(name, "reason")` silences one warning and
+   `unchecked(name, "reason")` overrules one safety check. The parser
+   reads each where it applies and records the source it covers, both
+   ends included: the statement after it, the declaration whose header
+   holds it with its doc comment, the field whose type it follows, or the
+   whole file. A warning stands at a position, so covering is a compare
+   of positions, and no pass below the parser needs the clauses. Neither
+   is part of a signature, so the library file, the header and `anti doc`
+   leave them out. */
+enum clause_level {
+    CLAUSE_STATEMENT,
+    CLAUSE_DECLARATION,
+    CLAUSE_FIELD,
+    CLAUSE_FILE
+};
+
+struct clause {
+    bool unchecked;                 /* `unchecked` rather than `allow` */
+    enum clause_level level;
+    struct name name;               /* as written, `shadowed-catch` */
+    struct pos pos;                 /* of the word */
+    struct token_text reason;
+    struct pos from;
+    struct pos to;
+    /* The `tests` or `fixtures` block it stands in, which every build
+       but `anti test` drops with the clause. */
+    enum fn_block block;
+};
+
 struct module {
     const char *file;               /* the source path, for a message */
     struct doc_text doc;            /* the `//!` text */
@@ -796,6 +829,8 @@ struct module {
     size_t linux_library_count;
     struct dropped_doc *dropped;
     size_t dropped_count;
+    struct clause *clauses;         /* `allow` and `unchecked` */
+    size_t clause_count;
 };
 
 /* Append the tree of module to out, one node per line, indented by two

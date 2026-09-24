@@ -1136,6 +1136,19 @@ static struct type *check_handled(struct checker *c, struct expr *e,
     case HANDLE_FATAL:
         return result;
     case HANDLE_BLOCK:
+        /* `catch none` counts the failure as `none`, which the result
+           must be able to hold. */
+        if (h->none && result->kind == TYPE_VOID) {
+            sema_error_at(c, h->pos, "`catch none` needs a result that can "
+                          "be `none`, and this call gives no result");
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        if (h->none && !type_is_nullable(result) && !sema_is_error(result)) {
+            sema_error_at(c, h->pos, "`catch none` needs a result that can "
+                          "be `none`, and this call gives `%s`",
+                          sema_tn(result));
+            return sema_builtin(c, TYPE_ERROR);
+        }
         sema_enter_scope(c, &scope);
         /* DESIGN: a failing function returns `?*Error`, `none` on
            success. The handler runs on the failure alone, so the error it
@@ -2143,6 +2156,12 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
     /* A call that cannot fail may still give a `?*T`, and a `catch` on
        it guards the pointer rather than an error. The `let` that holds
        it takes the handler over, so the two forms read alike. */
+    if (e->as.call.handler.none) {
+        sema_error_at(c, e->as.call.handler.pos,
+                      "`catch none` counts a failure as `none`, and this "
+                      "call cannot fail");
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (e->as.call.handler.kind != HANDLE_NONE) {
         bool after_optional =
             e->as.call.optional &&

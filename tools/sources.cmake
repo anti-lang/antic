@@ -54,6 +54,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/target.c
     src/antic/text.c
     src/antic/types.c
+    src/antic/warnings.c
     src/antic/whole.c
     src/antic/x86_64.c
     src/rt/digest.c
