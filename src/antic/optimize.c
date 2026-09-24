@@ -729,27 +729,46 @@ static bool remove_unused_results(struct ir_function *f)
     return changed;
 }
 
-static void mark_reachable(const struct ir_function *f, uint32_t b,
-                           bool *reached)
+/* Mark every block that a path from the entry reaches. The search keeps
+   its own stack of blocks to visit, since a generated function may chain
+   more blocks than the call stack holds frames. A block goes on the stack
+   once, when it is first marked, so the stack never holds more than the
+   blocks of f. */
+static void mark_reachable(const struct ir_function *f, bool *reached)
 {
-    const struct ir_block *block;
-    const struct ir_inst *last;
+    uint32_t *pending = ir_alloc(f->block_count, sizeof *pending);
+    size_t count = 0;
 
-    if (reached[b]) {
+    if (f->block_count == 0) {
+        free(pending);
         return;
     }
-    reached[b] = true;
-    block = f->blocks[b];
-    if (block->count == 0) {
-        return;
+    reached[0] = true;
+    pending[count++] = 0;
+    while (count > 0) {
+        const struct ir_block *block = f->blocks[pending[--count]];
+        const struct ir_inst *last;
+        uint32_t next[2];
+        size_t n = 0;
+        size_t k;
+        if (block->count == 0) {
+            continue;
+        }
+        last = &block->insts[block->count - 1];
+        if (last->op == IR_JUMP) {
+            next[n++] = last->a.as.index;
+        } else if (last->op == IR_BRANCH || last->op == IR_BRANCH_OV) {
+            next[n++] = last->c.as.index;
+            next[n++] = last->b.as.index;
+        }
+        for (k = 0; k < n; k++) {
+            if (!reached[next[k]]) {
+                reached[next[k]] = true;
+                pending[count++] = next[k];
+            }
+        }
     }
-    last = &block->insts[block->count - 1];
-    if (last->op == IR_JUMP) {
-        mark_reachable(f, last->a.as.index, reached);
-    } else if (last->op == IR_BRANCH || last->op == IR_BRANCH_OV) {
-        mark_reachable(f, last->b.as.index, reached);
-        mark_reachable(f, last->c.as.index, reached);
-    }
+    free(pending);
 }
 
 /* Remove the blocks that no path from the entry reaches, and number the
@@ -763,7 +782,7 @@ static bool remove_unreachable_blocks(struct ir_function *f)
     size_t i;
     bool changed;
 
-    mark_reachable(f, 0, reached);
+    mark_reachable(f, reached);
     for (b = 0; b < f->block_count; b++) {
         if (reached[b]) {
             map[b] = (uint32_t)n;

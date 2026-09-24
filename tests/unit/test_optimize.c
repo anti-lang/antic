@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "arena.h"
@@ -132,6 +134,38 @@ static void jump_cycle(void)
     arena_free(&arena);
 }
 
+/* A chain of blocks, each of which branches to the next and to an exit
+   block. The search for the reachable blocks follows the chain to its
+   end. A recursion of one frame per block ran out of stack there. */
+static void deep_chain(void)
+{
+    enum { CHAIN = 200000 };
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block **blocks = ir_alloc(CHAIN + 1, sizeof *blocks);
+    struct ir_operand c;
+    size_t i;
+
+    ir_module_init(&m, &arena, "main");
+    f = ir_function_add(&m, "main", "chain", IR_VOID, IR_NO_AGG);
+    c = ir_temp_op(f, ir_param_add(f, IR_I8, IR_NO_AGG));
+    for (i = 0; i <= CHAIN; i++) {
+        blocks[i] = ir_block_add(f);
+    }
+    for (i = 0; i + 1 < CHAIN; i++) {
+        ir_branch(f, blocks[i], c, blocks[i + 1], blocks[CHAIN]);
+    }
+    ir_ret(f, blocks[CHAIN - 1], IR_VOID, ir_int_op(IR_I64, 0));
+    ir_ret(f, blocks[CHAIN], IR_VOID, ir_int_op(IR_I64, 0));
+    ir_optimize(&m, "main");
+    CHECK(m.function_count == 1);
+    CHECK(m.functions[0]->block_count == CHAIN + 1);
+    free(blocks);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* Store forwarding on IR that is not in SSA form. The function stores or
    loads through an address. It writes the held value, the base of the
    address or its offset again, then loads the address. Case 4 writes the
@@ -258,6 +292,7 @@ void test_optimize(void)
 
     one_module();
     jump_cycle();
+    deep_chain();
     for (which = 0; which < 5; which++) {
         forward_after_write(which);
     }
