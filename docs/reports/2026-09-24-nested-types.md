@@ -70,3 +70,20 @@ All under "Nested types" in `docs/decisions.md`:
 - The header wrote an export enum as a struct of its values, which no C
   compiler accepts. The fix came with the view of a nested enum. Is the form
   of the provisional entry the one wanted?
+
+## Proof of the push
+
+The push of `327e7e7`, before this section was added:
+
+```text
+$ git log --oneline -3
+327e7e7 Report nested types
+ad3a3d4 Record nested types in the documents
+2a88e61 Add nested_types to the emit manifest
+$ git status --short
+$ git rev-parse HEAD origin/main
+327e7e700ec0dbbd93c206393434a90f7a482c7d
+327e7e700ec0dbbd93c206393434a90f7a482c7d
+```
+
+Suites: host 864 passed of 864, ASan 863 of 863, UBSan 863 of 863.
