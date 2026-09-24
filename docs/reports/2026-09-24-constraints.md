@@ -60,7 +60,7 @@ reports nothing on the touched files.
 
 Taken after the push of the report.
 
-```
+```text
 $ git log --oneline -3
 c9b10e9 Report the constraints of generics
 ef2cfa4 Build the constraints of generics
