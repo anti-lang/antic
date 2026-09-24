@@ -234,7 +234,7 @@ Built: `fallthrough` and `switch` on `str`. Not built yet: `show`, `unreachable`
 
 ## Loops
 
-`while cond do { }` for zero or more, `do { } while cond` for at least one. `for` over ranges and slices with an optional binding and a constant step. Labels for `break` and `continue`. Everything else is a `while`.
+`while cond do { }` for zero or more, `do { } while cond` for at least one. `for` over ranges and slices with an optional binding and a constant step, and over collections and iterators. Labels for `break` and `continue`. Everything else is a `while`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -266,9 +266,27 @@ outer: for a in xs {
 
 `by` takes a constant expression. `by -k` visits the same values as `by k` in reverse order. `by 0` is a compile error, the Heederik guardrail.
 
-`for x in e` also walks a collection. The collection has `operator fn iter(self)`, which gives a new iterator on every call, and the iterator has `operator fn next(self) -> bool` and `operator fn value(self) -> T`. Nothing allocates, and nested loops each keep their own position. `while` calls the same hooks by name when the iterator is needed after the loop.
+`for x in e` also walks a collection. The collection has `operator fn iter(self)`, which gives a new iterator on every call, and the iterator has `operator fn next(self) -> bool` and `operator fn value(self) -> T`. Nothing allocates, and nested loops each keep their own position. `for x in it` walks an iterator in its place. `while` calls the same hooks by name when the iterator is needed after the loop. `.to_slice()` collects what an iterator gives into a new slice, freed with `free(s.ptr)`.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+class Person { pub age: int = 0, }
+class People
+{
+	pub all: [2]Person = [Person { }; 2],
+	operator fn iter(self) -> PeopleIter { return PeopleIter { list: self, at: -1 }; }
+}
+class PeopleIter
+{
+	pub list: *People,
+	pub at: int,
+	operator fn next(self) -> bool { self.at = self.at + 1; return self.at < 2; }
+	operator fn value(self) -> Person { return self.list.all[self.at]; }
+}
+let people = People { };
+```
+-->
+```anti
 for p in people { }
 
 let it = people.iter();
@@ -278,9 +296,12 @@ while it.next() do {
 		break;
 	}
 }
+
+let all = people.iter().to_slice();
+free(all.ptr);
 ```
 
-Not built yet: labels, and `for` over a collection through `iter`, `next` and `value`.
+Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice`. Not built yet: labels.
 
 ## Functions
 
@@ -737,7 +758,7 @@ The names: `add sub mul div rem neg eq lt and or xor shl shr not`. `!=`, `>`, `<
 
 The same table holds the language hooks: `iter`, `next` and `value` for `for x in e`, and `index` and `set_index` for `e[i]` and `e[i] = v`. A name outside the table is an error that lists the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is `a + b`. `f"..."` writes a class through `to_text`.
 
-Built: the operators. Not built yet: `iter`, `next`, `value`, `index` and `set_index`.
+Built: the operators and the hooks `iter`, `next`, `value`, `index` and `set_index`.
 
 ## Static fields and singletons
 
