@@ -546,6 +546,20 @@ add_test(NAME program_pattern_literals_dev
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_property(TEST program_pattern_literals_dev PROPERTY FIXTURES_REQUIRED
     lang_dev_object regex_dev_object)
+# The methods of `str` in dev mode, where the functions of anti.regex that
+# the checker calls in their place stand in the object of anti.regex.
+add_test(NAME program_pattern_replace_dev
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/pattern_replace.anti"
+        "-DOPTIONS=--dev"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev.o"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+set_property(TEST program_pattern_replace_dev PROPERTY FIXTURES_REQUIRED
+    lang_dev_object regex_dev_object)
 # The registry of the classes in dev mode, where the module that links
 # writes it. The program takes its allocator from anti.mem. A dev link
 # names the object of anti.mem on the command line.
@@ -712,7 +726,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     # on the host target alone. errors/pattern_level.anti holds the
     # refusal.
     set(rosetta_sources ${program_sources})
-    list(FILTER rosetta_sources EXCLUDE REGEX "/(pattern_literals|regex_compile)\\.anti$")
+    list(FILTER rosetta_sources EXCLUDE REGEX "/(pattern_[a-z]+|regex_compile)\\.anti$")
     foreach(source IN LISTS rosetta_sources)
         get_filename_component(name "${source}" NAME_WE)
         add_test(NAME program_${name}_macos-x86_64
@@ -2273,6 +2287,17 @@ add_test(NAME parallel_size
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_parallel_size.cmake")
 
+# A search with a pattern literal that reaches the match limit stops the
+# program with the pattern and the line.
+add_test(NAME pattern_limit
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/pattern_limit.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pattern_limit.cmake")
+
 # The size of a Mutex per target: four bytes on Linux and macOS, eight on
 # Windows.
 add_test(NAME mutex_size
@@ -2939,7 +2964,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "pattern_malformed|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_malformed.s,pattern_malformed.anti"
         "pattern_exponential|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_exponential.s,pattern_exponential.anti"
         "pattern_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_import.s,pattern_import.anti"
-        "pattern_level|--target,linux-x86_64,--cpu,v1,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_level,pattern_level.anti")
+        "pattern_level|--target,linux-x86_64,--cpu,v1,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_level,pattern_level.anti"
+        "pattern_methods|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_methods.s,pattern_methods.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

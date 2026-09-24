@@ -1,0 +1,31 @@
+exit 0
+walk 0: 1 22 333 4444 55555
+walk 2: 1 22
+walk -2: 4444 55555
+walk 9: 1 22 333 4444 55555
+walk -9: 1 22 333 4444 55555
+walk 0:
+walk -1:
+split 5: [1] [22] [333] [4444] [55555]
+split 2: [1] [22 333 4444 55555]
+split 2: [1 22 333 4444] [55555]
+split 4: [1 22] [333] [4444] [55555]
+split 1: [no space]
+split 1: []
+split 4: [a] [] [b] []
+cover 0: <x>(12) <y>(345) <z>
+cover -1: <x12y345z>(6) <>
+cover 0: <no digits>
+empty at 0
+empty at 1
+empty at 2
+empty at 3
+empty at 1
+empty matches 5
+empty split 5: [] [a] [ñ] [b] []
+slice k 1
+slice v 2
+compiled split -2 3: [a, b] [c ] [d]
+compiled pieces 3
+compiled walk 3
+the walk fails at the call: 1

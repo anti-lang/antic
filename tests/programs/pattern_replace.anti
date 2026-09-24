@@ -1,0 +1,129 @@
+//! `s.replace(r, with)` writes a new text with each match replaced. A template
+//! names groups with `$1` and `${name}`, `$` reads every digit after it, so
+//! `$10` is group 10 and `${1}0` is group 1 and a `0`, and `$$` writes one `$`.
+//! A function receives each match and returns its replacement: a named
+//! function, an anonymous one and a closure that changes a variable of its
+//! frame. `limit` takes matches from the start or from the end. Against a
+//! pattern compiled at run time a template that names a group the pattern lacks
+//! fails with `MissingGroup`.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, text: str)
+{
+	printf("%.*s [%.*s]\n".ptr, label.len as c_int, label.ptr,
+		text.len as c_int, text.ptr);
+	free(text.ptr);
+}
+
+fn bracket(m: Match) -> str
+{
+	if m.pre.len > 0 {
+		return "<>";
+	}
+	return "[]";
+}
+
+fn templates()
+{
+	let date = "2026-09-23";
+	show("swap", date.replace(re"(?<y>\d{4})-(?<m>\d\d)-(?<d>\d\d)",
+		"${d}/${m}/${y}"));
+	show("numbers", date.replace(re"(\d+)-(\d+)-(\d+)", "$3.$2.$1"));
+	let ten = "abcdefghij";
+	show("$10", ten.replace(re"(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)", "$10"));
+	show("${1}0", ten.replace(re"(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)", "${1}0"));
+	let held = re"(a)(b)";
+	let through = ten.replace(held, "$2$1") catch fatal;
+	show("a literal in a variable", through);
+	show("$$", "price 5".replace(re"(\d)", "$$$1"));
+	show("dollar alone", "a b".replace(re" ", " $ "));
+	show("whole", "one two".replace(re"\w+", "($0)"));
+	show("no match", "none".replace(re"\d", "#"));
+	show("empty", "".replace(re"x*", "-"));
+	show("unset group", "ab".replace(re"a(x)?b", "[$1]"));
+	let template = "<$1>";
+	show("template in a variable", "k=v".replace(re"(\w)=", template));
+}
+
+fn limits()
+{
+	let text = "a1b2c3d4";
+	show("0", text.replace(re"\d", "#", 0));
+	show("2", text.replace(re"\d", "#", 2));
+	show("-1", text.replace(re"\d", "#", -1));
+	show("-3", text.replace(re"\d", "#", -3));
+	show("-9", text.replace(re"\d", "#", -9));
+	show("fn -2", text.replace(re"\d", bracket, -2));
+}
+
+fn functions()
+{
+	show("named", "x1y22".replace(re"\d+", bracket));
+	show("anonymous", "a-b-c".replace(re"-", fn(m) {
+		if m.post.len > 1 {
+			return "+";
+		}
+		return "=";
+	}));
+	let seen = 0;
+	let widths = "aa bbb c".replace(re"\w+", fn(m) {
+		seen += 1;
+		if m.all.len > 2 {
+			return "long";
+		}
+		return m.all;
+	});
+	show("closure", widths);
+	printf("closure saw %d\n".ptr, seen as c_int);
+	let total = 0;
+	let kept = "1 2 3 4".replace(re"\d", fn(m) {
+		total += m.pre.len;
+		return m.all;
+	}, 2);
+	show("closure limit", kept);
+	printf("closure pre %d\n".ptr, total as c_int);
+}
+
+fn compiled() may fail
+{
+	let r = try Regex.compile(r"(\w+)@(\w+)");
+	show("compiled", try "me@home".replace(r, "$2 of $1"));
+	let calls = 0;
+	show("compiled fn", try "a@b c@d".replace(r, fn(m) {
+		calls += 1;
+		return m.group(2);
+	}, -1));
+	printf("compiled calls %d\n".ptr, calls as c_int);
+	let missing = "me@home".replace(r, "$3") catch e {
+		printf("missing group %d\n".ptr, (e is *regex.MissingGroup) as c_int);
+		yield "";
+	};
+	let named = "me@home".replace(r, "${who}") catch e {
+		printf("missing name %d\n".ptr, (e is *regex.MissingGroup) as c_int);
+		yield "";
+	};
+	let slow = try Regex.compile(r"(*LIMIT_MATCH=1000)(\w+\s?)*$");
+	let text = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!";
+	let asked = 0;
+	let replaced = text.replace(slow, fn(m) {
+		asked += 1;
+		return m.all;
+	}) catch e {
+		printf("expensive %d, asked %d\n".ptr,
+			(e is *regex.TooExpensive) as c_int, asked as c_int);
+		yield "";
+	};
+}
+
+fn main() -> int
+{
+	templates();
+	limits();
+	functions();
+	compiled() catch fatal;
+	return 0;
+}

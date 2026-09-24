@@ -1,7 +1,7 @@
 //! A failing call that is an argument of another failing call writes its result
-//! into a slot of its own, and the outer call writes the place its `let`
-//! names. The outer call passes that place, however many failing calls its
-//! arguments hold.
+//! into a slot of its own, and the outer call writes the place its `let` names.
+//! The outer call passes that place, however many failing calls its arguments
+//! hold.
 
 import anti.lang;
 

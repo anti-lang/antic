@@ -516,6 +516,22 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
     if (got == expected) {
         return true;
     }
+    /* A match of a literal is a plain match, and a match is a match that
+       may be `none`. The reverse needs a test. */
+    if (types_is_match(got) && types_is_match(expected)) {
+        struct type *widened =
+            expected->pattern == NULL ? types_match_plain(c->types, got) : got;
+        if (!got->nullable && expected->nullable) {
+            widened = types_with_none(c->types, widened);
+        }
+        if (widened == expected) {
+            return true;
+        }
+        if (got->nullable && !expected->nullable) {
+            error_may_be_none(c, e, got);
+            return false;
+        }
+    }
     /* The one implicit conversion of a pointer and the widening to
        `?*T` compose: a `*Circle` reaches a `?*Shape` parameter. */
     if (widens_to_nullable(got, expected)) {
@@ -2130,6 +2146,10 @@ static struct type *check_coalesce(struct checker *c, struct expr *e,
     if (sema_is_error(left)) {
         sema_check_expr(c, right, NULL);
         return left;
+    }
+    /* Two matches of two literals give a plain match. */
+    if (types_is_match(left)) {
+        left = types_match_plain(c->types, left);
     }
     got = sema_check_expr(c, right, left);
     if (!sema_require(c, right, got, left)) {

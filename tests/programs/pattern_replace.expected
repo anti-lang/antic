@@ -1,0 +1,31 @@
+exit 0
+swap [23/09/2026]
+numbers [23.09.2026]
+$10 [j]
+${1}0 [a0]
+a literal in a variable [bacdefghij]
+$$ [price $5]
+dollar alone [a $ b]
+whole [(one) (two)]
+no match [none]
+empty [-]
+unset group [[]]
+template in a variable [<k>v]
+0 [a#b#c#d#]
+2 [a#b#c3d4]
+-1 [a1b2c3d#]
+-3 [a1b#c#d#]
+-9 [a#b#c#d#]
+fn -2 [a1b2c<>d<>]
+named [x<>y<>]
+anonymous [a+b=c]
+closure [aa long c]
+closure saw 3
+closure limit [1 2 3 4]
+closure pre 1
+compiled [home of me]
+compiled fn [a@b d]
+compiled calls 1
+missing group 1
+missing name 1
+expensive 1, asked 0

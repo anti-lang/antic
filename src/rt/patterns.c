@@ -120,12 +120,6 @@ struct anti_matches {
     struct anti_cursor cursor;
 };
 
-/* The layout of a []str. */
-struct anti_texts {
-    struct anti_text *ptr;
-    int64_t len;
-};
-
 /* What a search gives, and what anti.regex reads from each function. */
 #define FOUND 1
 #define DONE 0
@@ -644,58 +638,6 @@ int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
     grow_append(&g, s + rest, length - rest);
     out->ptr = g.bytes;
     out->len = g.length;
-    return DONE;
-}
-
-/* DESIGN: `split` gives the pieces between the matches it takes, as slices
-   of the text. They stand in a slice of memory of the C library, which
-   the program frees with `free(parts.ptr)`. A text without a match is
-   one piece. */
-int64_t anti_rt_regex_split(const void *pattern, const unsigned char *s,
-                            int64_t length, int64_t limit,
-                            struct anti_texts *out)
-{
-    struct anti_matches it;
-    struct anti_text whole;
-    struct anti_text *pieces = NULL;
-    int64_t count = 0;
-    int64_t capacity = 0;
-    int64_t rest = 0;
-    int64_t status = walk_begin(&it, pattern, s, length, limit);
-
-    out->ptr = NULL;
-    out->len = 0;
-    if (status < 0) {
-        return status;
-    }
-    whole.ptr = s;
-    whole.len = length;
-    for (;;) {
-        int64_t start;
-        status = anti_rt_regex_next(&it.cursor, &it.current);
-        if (status < 0) {
-            free(pieces);
-            return status;
-        }
-        if (count == capacity) {
-            struct anti_text *grown;
-            capacity = capacity == 0 ? 8 : capacity * 2;
-            grown = realloc(pieces, (size_t)capacity * sizeof *pieces);
-            if (grown == NULL) {
-                out_of_memory();
-            }
-            pieces = grown;
-        }
-        if (status == DONE) {
-            pieces[count++] = slice(&whole, rest, length);
-            break;
-        }
-        start = it.current.all.ptr - s;
-        pieces[count++] = slice(&whole, rest, start);
-        rest = start + it.current.all.len;
-    }
-    out->ptr = pieces;
-    out->len = count;
     return DONE;
 }
 

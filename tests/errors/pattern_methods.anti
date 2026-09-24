@@ -1,0 +1,56 @@
+//! The methods of `str` with a pattern: a match read before a test, a group the
+//! literal lacks as a field, by `group` and by `took_part`, a compiled pattern
+//! without a handler, a group field of a pattern that is no literal, a template
+//! that names a group the literal lacks, a replacement of another type, the
+//! counts of arguments, a `catch` on a call that cannot fail, a `catch` on a
+//! match, `?` before another name and `none` in a `Match`.
+
+import anti.lang;
+import anti.regex;
+
+fn fields(r: Regex, line: str) -> int
+{
+	let m = line.matches(re"(?<year>\d{4})-(\d\d)");
+	let early = m.year;
+	if m == none {
+		return 0;
+	}
+	let a = m.day;
+	let b = m.3;
+	let c = m.group(5);
+	let d = m.took_part("day");
+	let e = line.matches(r);
+	let f = line.matches(r) catch none;
+	if f != none {
+		let g = f.year;
+	}
+	return m.count;
+}
+
+fn templates(line: str) -> str
+{
+	let a = line.replace(re"(\d)", "$2");
+	let b = line.replace(re"(?<x>\d)", "${y} $$ ${x}");
+	let c = line.replace(re"\d", 5);
+	let d = line.matches(re"a", 1);
+	let e = line.split();
+	let f = line.matches(re"a") catch fatal;
+	let g = line.matches(re"a");
+	let h = g catch fatal;
+	return a;
+}
+
+fn types() -> int
+{
+	let m: Match = none;
+	return 0;
+}
+
+fn optional(p: ?Regex)
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

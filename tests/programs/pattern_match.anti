@@ -1,0 +1,174 @@
+//! `s.matches(r)` gives the first match or `none`. The match compares with
+//! `none`, narrows after a test, stands alone as a condition in `if`, `while`,
+//! `&&`, `||` and `!`, and binds with `if let` and `let ... else`. Its fields
+//! are `all`, `pre`, `post` and `count`, `group` and `took_part` by number and
+//! by name, and for a pattern literal each group as a field. A pattern compiled
+//! at run time makes the call fail with `TooExpensive` at the match limit, and
+//! `catch none` counts that as no match.
+
+import anti.lang;
+import anti.io;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, text: str)
+{
+	printf("%.*s [%.*s]\n".ptr, label.len as c_int, label.ptr,
+		text.len as c_int, text.ptr);
+}
+
+fn flag(label: str, value: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, value as c_int);
+}
+
+/// The fields of a match of a literal, and the groups as fields.
+fn fields()
+{
+	let line = "due 2026-09-23, paid 2026-10-01";
+	let m = line.matches(re"(?<year>\d{4})-(?<month>\d\d)-(\d\d)(?<late> late)?");
+	if m == none {
+		return;
+	}
+	show("all", m.all);
+	show("pre", m.pre);
+	show("post", m.post);
+	printf("count %d\n".ptr, m.count as c_int);
+	show("m.year", m.year);
+	show("m.month", m.month);
+	show("m.3", m.3);
+	show("m.0", m.0);
+	show("group(1)", m.group(1));
+	show("group(\"month\")", m.group("month"));
+	show("m.late", m.late);
+	flag("took_part(\"late\")", m.took_part("late"));
+	flag("took_part(3)", m.took_part(3));
+	flag("took_part(0)", m.took_part(0));
+	io.println(f"{m.year} / {m.month}");
+}
+
+/// A group that matched nothing took part, and one that did not take part gives
+/// the empty text as well.
+fn empty_groups()
+{
+	let m = "ab".matches(re"a(x*)b(y)?") else {
+		return;
+	};
+	show("x*", m.1);
+	flag("x* took part", m.took_part(1));
+	show("y", m.2);
+	flag("y took part", m.took_part(2));
+}
+
+/// The forms of the test: a comparison, the value alone, `!`, `&&`, `||`,
+/// `while`, `if let` and `let ... else`.
+fn forms()
+{
+	let line = "key = value";
+	if line.matches(re"=") {
+		io.println("tested alone");
+	}
+	if !line.matches(re"#") {
+		io.println("no comment");
+	}
+	let m = line.matches(re"^(\w+)\s*=\s*(\w+)$");
+	if m && m.2.len == 0 {
+		io.println("empty value");
+	}
+	if !m || m.1.len == 0 {
+		io.println("no key");
+	} else {
+		show("key", m.1);
+	}
+	if m {
+		show("narrowed by the value alone", m.2);
+	}
+	if let pair = line.matches(re"(\w+) = (\w+)") {
+		show("if let", pair.2);
+	} else {
+		io.println("if let found none");
+	}
+	if let none_here = line.matches(re"\d") {
+		show("if let", none_here.all);
+	} else {
+		io.println("if let found none");
+	}
+	let rest = "a1b22c333";
+	let steps = 0;
+	while rest.matches(re"\d") do {
+		let digit = rest.matches(re"\d+") else {
+			break;
+		};
+		steps += 1;
+		rest = digit.post;
+	}
+	printf("steps %d\n".ptr, steps as c_int);
+	let digits = line.matches(re"\d+");
+	let either = digits ?? line.matches(re"\w+");
+	if either {
+		show("??", either.all);
+	}
+}
+
+/// A match passed on, as `Match` and as `?Match`.
+fn year_of(m: Match) -> str
+{
+	return m.group(1);
+}
+
+fn first_year(text: str) -> ?Match
+{
+	return text.matches(re"(\d{4})");
+}
+
+fn passing()
+{
+	let found = first_year("in 1969 and 1970");
+	if found != none {
+		show("passed", year_of(found));
+	}
+	let missing: ?Match = none;
+	flag("none holds none", missing == none);
+	missing = first_year("1971");
+	flag("assigned", missing != none);
+}
+
+/// A pattern compiled at run time: the call may fail, the groups are read by
+/// `group` alone, and `catch none` counts the failure as no match.
+fn compiled() may fail
+{
+	let r = try Regex.compile(r"(?<key>\w+):(\d+)");
+	let m = try "port:8080".matches(r);
+	if m != none {
+		show("compiled key", m.group("key"));
+		show("compiled 2", m.group(2));
+	}
+	let tested = try "none here".matches(r);
+	flag("compiled tested", tested != none);
+	if try "a:1".matches(r) {
+		io.println("compiled alone");
+	}
+	let slow = try Regex.compile(r"(*LIMIT_MATCH=1000)^(\w+\s?)*$");
+	let text = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!";
+	let counted = text.matches(slow) catch none;
+	flag("catch none", counted == none);
+	let caught = text.matches(slow) catch e {
+		if e is *regex.TooExpensive {
+			io.println("too expensive");
+		}
+		yield none;
+	};
+	flag("caught", caught == none);
+}
+
+fn main() -> int
+{
+	fields();
+	empty_groups();
+	forms();
+	passing();
+	compiled() catch fatal;
+	return 0;
+}

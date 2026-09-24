@@ -1,3 +1,4 @@
-pattern_import.anti:6:16: error: a pattern literal is compiled by `anti.regex`, so the module imports `anti.regex`
-pattern_import.anti:7:17: error: `Regex.compile` calls `anti.regex.compile`, so the module imports `anti.regex`
-pattern_import.anti:8:14: error: `Regex` has no function `parse`
+pattern_import.anti:7:16: error: a pattern literal is compiled by `anti.regex`, so the module imports `anti.regex`
+pattern_import.anti:8:17: error: `Regex.compile` calls `anti.regex.compile`, so the module imports `anti.regex`
+pattern_import.anti:9:14: error: `Regex` has no function `parse`
+pattern_import.anti:15:10: error: `s.matches` calls `anti.regex.matches`, so the module imports `anti.regex`

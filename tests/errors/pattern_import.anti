@@ -1,5 +1,6 @@
-//! A pattern literal and `Regex.compile` belong to `anti.regex`, which this
-//! module does not import, and `Regex` names one function.
+//! A pattern literal, `Regex.compile` and the methods of `str` with a pattern
+//! belong to `anti.regex`, which this module does not import, and `Regex` names
+//! one function.
 
 fn main() -> int
 {
@@ -7,4 +8,9 @@ fn main() -> int
 	let compiled = Regex.compile("a+") catch fatal;
 	let other = Regex.parse("a+");
 	return 0;
+}
+
+fn search(r: Regex, s: str)
+{
+	let m = s.matches(r) catch none;
 }

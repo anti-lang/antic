@@ -1,0 +1,111 @@
+//! `s.find_all(r)` walks every match from left to right, and `s.split(r)` walks
+//! the pieces between them, which `to_slice()` collects. A `limit` of 0 takes
+//! every match, a positive one that many from the start and a negative one that
+//! many from the end, and a limit beyond the count takes them all. The `pre` of
+//! each match the walk gives runs from the match before it, so the pieces and
+//! the matches cover the text. An empty match steps over a whole character, and
+//! a pattern compiled at run time walks as a literal does.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn walk(label: str, text: str, limit: int)
+{
+	printf("%.*s %d:".ptr, label.len as c_int, label.ptr, limit as c_int);
+	for m in text.find_all(re"\d+", limit) {
+		printf(" %.*s".ptr, m.all.len as c_int, m.all.ptr);
+	}
+	printf("\n".ptr);
+}
+
+fn pieces(label: str, parts: []str)
+{
+	printf("%.*s %d:".ptr, label.len as c_int, label.ptr, parts.len as c_int);
+	for p in parts {
+		printf(" [%.*s]".ptr, p.len as c_int, p.ptr);
+	}
+	printf("\n".ptr);
+	free(parts.ptr);
+}
+
+fn cover(text: str, limit: int)
+{
+	let rest = text;
+	printf("cover %d:".ptr, limit as c_int);
+	for m in text.find_all(re"[0-9]+", limit) {
+		printf(" <%.*s>(%.*s)".ptr, m.pre.len as c_int, m.pre.ptr,
+			m.all.len as c_int, m.all.ptr);
+		rest = m.post;
+	}
+	printf(" <%.*s>\n".ptr, rest.len as c_int, rest.ptr);
+}
+
+fn compiled() may fail
+{
+	let r = try Regex.compile(r",\s*");
+	let parts = try "a, b,c ,  d".split(r, -2);
+	pieces("compiled split -2", parts.to_slice());
+	let each = 0;
+	for p in try "x;y;z".split(try Regex.compile(r";")) {
+		each += p.len;
+	}
+	printf("compiled pieces %d\n".ptr, each as c_int);
+	let count = 0;
+	for m in try "x1y22z".find_all(try Regex.compile(r"\d")) {
+		count += m.all.len;
+	}
+	printf("compiled walk %d\n".ptr, count as c_int);
+	let slow = try Regex.compile(r"(*LIMIT_MATCH=1000)(\w+\s?)*$");
+	let text = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!";
+	let walked = 0;
+	let all = text.find_all(slow) catch e {
+		printf("the walk fails at the call: %d\n".ptr,
+			(e is *regex.TooExpensive) as c_int);
+		return;
+	};
+	for m in all {
+		walked += 1;
+	}
+	printf("walked %d\n".ptr, walked as c_int);
+}
+
+fn main() -> int
+{
+	let text = "1 22 333 4444 55555";
+	walk("walk", text, 0);
+	walk("walk", text, 2);
+	walk("walk", text, -2);
+	walk("walk", text, 9);
+	walk("walk", text, -9);
+	walk("walk", "none", 0);
+	walk("walk", "none", -1);
+	pieces("split", text.split(re" ").to_slice());
+	pieces("split", text.split(re" ", 1).to_slice());
+	pieces("split", text.split(re" ", -1).to_slice());
+	pieces("split", text.split(re" ", -3).to_slice());
+	pieces("split", "no space".split(re",").to_slice());
+	pieces("split", "".split(re",").to_slice());
+	pieces("split", "a,,b,".split(re",").to_slice());
+	cover("x12y345z", 0);
+	cover("x12y345z6", -1);
+	cover("no digits", 0);
+	let steps = 0;
+	for m in "añ€b".find_all(re"") {
+		printf("empty at %d\n".ptr, m.pre.len as c_int);
+		steps += 1;
+	}
+	printf("empty matches %d\n".ptr, steps as c_int);
+	pieces("empty split", "añb".split(re"x*").to_slice());
+	let found = "k=1;v=2".find_all(re"(\w)=(\d)").to_slice();
+	for m in found {
+		let key = m.group(1);
+		let value = m.group(2);
+		printf("slice %.*s %.*s\n".ptr, key.len as c_int, key.ptr,
+			value.len as c_int, value.ptr);
+	}
+	free(found.ptr);
+	compiled() catch fatal;
+	return 0;
+}

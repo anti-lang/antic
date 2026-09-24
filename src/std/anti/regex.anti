@@ -37,8 +37,6 @@ extern fn anti_rt_regex_template_fits(pattern: ?*byte, bytes: ?*byte,
 	length: int) -> int;
 extern fn anti_rt_regex_replace(pattern: ?*byte, s: ?*byte, length: int,
 	bytes: ?*byte, template_length: int, limit: int, out: ?*str) -> int;
-extern fn anti_rt_regex_split(pattern: ?*byte, s: ?*byte, length: int,
-	limit: int, out: ?*[]str) -> int;
 extern fn anti_rt_regex_append(g: ?*Growing, bytes: ?*byte, length: int);
 extern fn anti_rt_regex_take(g: ?*Growing) -> str;
 extern fn anti_rt_regex_stop_limit(file: ?*byte, length: int, line: int,
@@ -176,6 +174,52 @@ pub class Matches
 		return anti_rt_regex_begin(&self.cursor, self.cursor.pattern,
 			self.cursor.subject.ptr, self.cursor.subject.len, limit,
 			check as int);
+	}
+}
+
+/// The pieces of a text between the matches of a pattern, left to right, which
+/// `s.split(r)` gives to a `for` loop.
+///
+/// A text without a match is one piece, and a text of n matches n + 1 pieces.
+pub class Pieces
+{
+	/// The walk over the matches.
+	walk: Matches,
+	/// The piece the walk stands at.
+	piece: str,
+	/// The text after the last match the walk gave.
+	rest: str,
+	/// Whether the walk gave its last piece.
+	done: bool,
+
+	/// Move to the next piece, and say whether there is one. `for` calls it.
+	operator fn next(self) -> bool
+	{
+		if self.done {
+			return false;
+		}
+		if self.walk.next() {
+			let m = self.walk.value();
+			self.piece = m.pre;
+			self.rest = m.post;
+			return true;
+		}
+		self.piece = self.rest;
+		self.done = true;
+		return true;
+	}
+
+	/// The piece the walk stands at. `for` calls it after `next`.
+	operator fn value(self) -> str
+	{
+		return self.piece;
+	}
+
+	/// The pieces of `s` between the matches of the walk `it`, which began.
+	/// `split` makes its walk with it.
+	pub fn over(it: Matches, s: str) -> Pieces
+	{
+		return Pieces { walk: it, piece: "", rest: s, done: false };
 	}
 }
 
@@ -370,30 +414,33 @@ fn replaced(it: *Matches, s: str, with: fn(Match) -> str) -> str
 	return anti_rt_regex_take(&out);
 }
 
-/// The pieces of `s` between the matches of `r`. `s.split(r)` calls it.
+/// The pieces of `s` between the matches of `r`, left to right, for a `for`
+/// loop or `to_slice()`. `s.split(r)` calls it.
 ///
-/// A `limit` takes matches as `find_all` does. The pieces are slices of `s` in
-/// a slice of memory of the C library, which the program frees with
-/// `free(parts.ptr)`. It fails with `TooExpensive` at the match limit.
-pub fn split(s: str, r: Regex, limit: int = 0) -> []str may fail
+/// A `limit` takes matches as `find_all` does, and the text between two matches
+/// it passes over stays in one piece. Each piece is a slice of `s`. It searches
+/// the whole text once before the walk, so it fails with `TooExpensive` here
+/// and the walk never does.
+pub fn split(s: str, r: Regex, limit: int = 0,
+	at: lang.SourceLocation = here) -> Pieces may fail
 {
-	let parts = []str { ptr: none, len: 0 };
-	if anti_rt_regex_split(r.handle, s.ptr, s.len, limit, &parts) < 0 {
+	let it = Matches.walk(s, r, "", at);
+	if it.begin(limit, true) < 0 {
 		fail too_expensive();
 	}
-	return parts;
+	return Pieces.over(it, s);
 }
 
 /// The pieces of `s` between the matches of the pattern literal `r`, whose text
 /// is `pattern`. `s.split(re"...")` calls it.
 pub fn split_literal(s: str, r: Regex, pattern: str, limit: int = 0,
-	at: lang.SourceLocation = here) -> []str
+	at: lang.SourceLocation = here) -> Pieces
 {
-	let parts = []str { ptr: none, len: 0 };
-	if anti_rt_regex_split(r.handle, s.ptr, s.len, limit, &parts) < 0 {
+	let it = Matches.walk(s, r, pattern, at);
+	if it.begin(limit, false) < 0 {
 		stop_expensive(pattern, at);
 	}
-	return parts;
+	return Pieces.over(it, s);
 }
 
 /// Group `n` of the match `m`, 0 for the whole match. `m.group(n)` and `m.1`
