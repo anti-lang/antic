@@ -1,5 +1,10 @@
-/* Text conversions of the runtime entry. They use no platform functions,
-   so the unit tests check them on any host. */
+/* Text conversions of the runtime entry, and the UTF-8 encoder and
+   decoder of the runtime and antic.
+
+   DESIGN: one definition read from both sides. The lexer of antic encodes
+   an escape and checks a source with the functions below, and antic
+   compiles src/rt/utf.c for it. They use no platform functions, so the
+   unit tests check them on any host. */
 #ifndef ANTI_UTF_H
 #define ANTI_UTF_H
 

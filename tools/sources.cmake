@@ -47,7 +47,8 @@ set(ANTIC_CORE_SOURCES
     src/antic/types.c
     src/antic/whole.c
     src/antic/x86_64.c
-    src/rt/digest.c)
+    src/rt/digest.c
+    src/rt/utf.c)
 set(ANTIC_CORE_INCLUDE_DIRS src/antic)
 
 set(ANTIC_MAIN_SOURCES src/antic/main.c)

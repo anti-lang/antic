@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "json.h"
+#include "utf.h"
 
 void anti_rt_json_space(struct anti_json *s)
 {
@@ -113,22 +114,17 @@ bool anti_rt_json_string(struct anti_json *s, unsigned char *out,
             if (code >= 0xD800 && code <= 0xDFFF) {
                 return false;
             }
-            if (code < 0x80) {
-                c = (unsigned char)code;
-                break;
-            }
-            if (code < 0x800) {
-                if (!put_byte(out, room, length,
-                              (unsigned char)(0xC0 | (code >> 6)))) {
-                    return false;
+            {
+                unsigned char utf8[4];
+                size_t count = anti_rt_utf8_encode((uint32_t)code, utf8);
+                size_t i;
+                for (i = 0; i + 1 < count; i++) {
+                    if (!put_byte(out, room, length, utf8[i])) {
+                        return false;
+                    }
                 }
-            } else if (!put_byte(out, room, length,
-                                 (unsigned char)(0xE0 | (code >> 12))) ||
-                       !put_byte(out, room, length, (unsigned char)(
-                           0x80 | ((code >> 6) & 0x3F)))) {
-                return false;
+                c = utf8[count - 1];
             }
-            c = (unsigned char)(0x80 | (code & 0x3F));
             break;
         }
         default:

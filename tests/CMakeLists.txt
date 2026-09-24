@@ -70,8 +70,7 @@ add_executable(antic_unit_tests
     ../src/rt/json.c
     ../src/rt/symbols.c
     ../src/rt/text.c
-    ../src/rt/toml.c
-    ../src/rt/utf.c)
+    ../src/rt/toml.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core)
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
 # CRT of Windows hold it themselves.

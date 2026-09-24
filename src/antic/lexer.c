@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "text.h"
+#include "../rt/utf.h"
 
 /* The spelling of every keyword and symbol, indexed by kind. Keyword
    lookup, symbol matching and the names in messages all read this one
@@ -308,66 +309,14 @@ static void append_byte(struct text *t, unsigned char byte)
     text_append_bytes(t, &byte, 1);
 }
 
+/* Append the UTF-8 bytes of the scalar value cp. The encoder is the one
+   of the runtime, which antic compiles in. */
 static void append_utf8(struct text *t, uint32_t cp)
 {
-    if (cp < 0x80) {
-        append_byte(t, (unsigned char)cp);
-    } else if (cp < 0x800) {
-        append_byte(t, (unsigned char)(0xC0 | (cp >> 6)));
-        append_byte(t, (unsigned char)(0x80 | (cp & 0x3F)));
-    } else if (cp < 0x10000) {
-        append_byte(t, (unsigned char)(0xE0 | (cp >> 12)));
-        append_byte(t, (unsigned char)(0x80 | ((cp >> 6) & 0x3F)));
-        append_byte(t, (unsigned char)(0x80 | (cp & 0x3F)));
-    } else {
-        append_byte(t, (unsigned char)(0xF0 | (cp >> 18)));
-        append_byte(t, (unsigned char)(0x80 | ((cp >> 12) & 0x3F)));
-        append_byte(t, (unsigned char)(0x80 | ((cp >> 6) & 0x3F)));
-        append_byte(t, (unsigned char)(0x80 | (cp & 0x3F)));
-    }
-}
+    unsigned char bytes[4];
+    size_t count = anti_rt_utf8_encode(cp, bytes);
 
-/* Return the length of the valid UTF-8 sequence at s, or 0. RFC 3629
-   excludes overlong forms, the surrogates D800 to DFFF and values above
-   10FFFF. */
-static size_t utf8_length(const unsigned char *s, size_t available,
-                          uint32_t *cp)
-{
-    size_t n;
-    uint32_t min;
-    size_t i;
-
-    if (s[0] < 0x80) {
-        *cp = s[0];
-        return 1;
-    } else if ((s[0] & 0xE0) == 0xC0) {
-        n = 2;
-        min = 0x80;
-        *cp = s[0] & 0x1F;
-    } else if ((s[0] & 0xF0) == 0xE0) {
-        n = 3;
-        min = 0x800;
-        *cp = s[0] & 0x0F;
-    } else if ((s[0] & 0xF8) == 0xF0) {
-        n = 4;
-        min = 0x10000;
-        *cp = s[0] & 0x07;
-    } else {
-        return 0;
-    }
-    if (n > available) {
-        return 0;
-    }
-    for (i = 1; i < n; i++) {
-        if ((s[i] & 0xC0) != 0x80) {
-            return 0;
-        }
-        *cp = (*cp << 6) | (s[i] & 0x3F);
-    }
-    if (*cp < min || *cp > 0x10FFFF || (*cp >= 0xD800 && *cp <= 0xDFFF)) {
-        return 0;
-    }
-    return n;
+    text_append_bytes(t, bytes, count);
 }
 
 /* Check the whole file before lexing, so that every later step can rely
@@ -381,7 +330,8 @@ static bool validate(struct lexer *lx)
     uint32_t cp;
 
     while (i < lx->length) {
-        size_t n = utf8_length(s + i, lx->length - i, &cp);
+        size_t n;
+        cp = anti_rt_utf8_decode(s + i, lx->length - i, &n);
         if (n == 0) {
             error_at(lx, line, column, "invalid UTF-8");
             return false;
@@ -962,8 +912,9 @@ static void character(struct lexer *lx, size_t start, int line, int column)
     if (c == '\\') {
         valid = escape(lx, MODE_CHAR, &value, &raw_byte);
     } else {
-        size_t n = utf8_length((const unsigned char *)lx->src + lx->pos,
-                               lx->length - lx->pos, &value);
+        size_t n;
+        value = anti_rt_utf8_decode((const unsigned char *)lx->src + lx->pos,
+                                    lx->length - lx->pos, &n);
         while (n-- > 0) {
             advance(lx);
         }
@@ -1497,9 +1448,9 @@ static void lex_token(struct lexer *lx)
     } else if (c == '\'') {
         character(lx, start, line, column);
     } else if (!symbol(lx, start, line, column)) {
-        uint32_t cp;
-        size_t n = utf8_length((const unsigned char *)lx->src + lx->pos,
-                               lx->length - lx->pos, &cp);
+        size_t n;
+        anti_rt_utf8_decode((const unsigned char *)lx->src + lx->pos,
+                            lx->length - lx->pos, &n);
         if (c >= 0x80) {
             error_at(lx, line, column,
                      "unexpected character outside a literal");
