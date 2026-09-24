@@ -162,7 +162,7 @@ bool sema_refuses_half(struct checker *c, struct pos pos,
 struct type *sema_chan_element(struct checker *c, struct type_expr *t);
 struct type *sema_resolve_type(struct checker *c, struct type_expr *t);
 struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
-                             bool concurrent, struct pos pos);
+                             bool concurrent, bool owned, struct pos pos);
 struct symbol *sema_std_item(struct checker *c, const struct name *module,
                              const struct name *name, bool own);
 struct type *sema_error_class(struct checker *c, struct pos pos);

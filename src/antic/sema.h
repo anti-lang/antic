@@ -109,6 +109,9 @@ struct symbol {
     int caught_loops;
     const struct symbol *moved_into;
     bool deferred;
+    /* A `keep own` parameter that moved into an owner, and where. */
+    bool snapshot_moved;
+    struct pos snapshot_move;
     const struct name *params;      /* a function of an interface */
     /* DESIGN: the defaults of a function's parameters, one per parameter
        the program writes, `self` included, in the order of the type.

@@ -1,0 +1,84 @@
+//! The refusals of snapshots and owned function values. A snapshot is read-only
+//! and holds values that copy fully. A plain `keep` parameter, a plain field
+//! and a C function pointer refuse it, and an owned value is copied by `dup`
+//! alone.
+
+import anti.lang;
+
+extern fn callback(f: fn(int));
+
+class Holder
+{
+	pub plain: fn(int) = ignore,
+	pub own handler: fn(int) = ignore,
+}
+
+fn ignore(n: int)
+{
+}
+
+fn keep_it(keep f: fn(int))
+{
+}
+
+fn own_it(keep own f: fn(int))
+{
+}
+
+fn unkept(own f: fn(int))
+{
+}
+
+fn call(f: fn(int))
+{
+	f(1);
+}
+
+fn writes(items: []int)
+{
+	let n = 0;
+	call(snapshot fn(k) { n += k; });
+	let p = alloc Holder { };
+	own_it(snapshot fn(k) { p.plain(k); });
+	own_it(snapshot fn(k) { ignore(items[0]); });
+	delete(p);
+}
+
+fn copies(f: fn(int))
+{
+	own_it(snapshot fn(k) { f(k); });
+}
+
+fn plain_places(h: *Holder)
+{
+	let n = 1;
+	keep_it(snapshot fn(k) { ignore(n); });
+	h.plain = snapshot fn(k) { ignore(n); };
+	keep_it(fn(k) { ignore(n); });
+	callback(snapshot fn(k) { ignore(n); });
+}
+
+fn owned_values(h: *Holder, other: *Holder, f: fn(int))
+{
+	other.handler = h.handler;
+	keep_it(h.handler);
+	callback(h.handler);
+	own_it(f);
+	let n = 2;
+	own_it(fn(k) { ignore(n); });
+	let g = dup(h.handler);
+	h.handler = dup(f);
+}
+
+fn moved(h: *Holder, keep own f: fn(int))
+{
+	h.handler = f;
+	f(1);
+}
+
+fn moved_in_loop(h: *Holder, keep own f: fn(int))
+{
+	for i in 0..3 {
+		h.handler = f;
+	}
+}

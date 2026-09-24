@@ -1,0 +1,40 @@
+//! What the header of a library writes for an `own fn` field: a struct of the
+//! code and the snapshot, which C calls through and frees with the object.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_rt_snapshots_alive() -> i64;
+
+/// A button that owns what a click runs.
+export class Button
+{
+	/// What a click runs, with the snapshot it reads.
+	pub own handler: fn(c_int) = quiet,
+
+	/// Keep a handler that prints `base` plus what it is given.
+	export fn listen(self, base: c_int)
+	{
+		let text = "clicked";
+		self.handler = snapshot fn(n) {
+			printf("%.*s %d\n".ptr, text.len as c_int, text.ptr,
+				(base + n) as c_int);
+		};
+	}
+}
+
+fn quiet(n: c_int)
+{
+}
+
+/// A new button that runs nothing on a click.
+export fn make_button() -> *Button
+{
+	return alloc Button { };
+}
+
+/// The count of the snapshots alive.
+export fn snapshots() -> i64
+{
+	return anti_rt_snapshots_alive();
+}

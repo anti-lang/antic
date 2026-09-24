@@ -1,7 +1,7 @@
 //! A library whose functions take functions. The library file carries each
 //! parameter in its form: two words where the parameter does not keep its
-//! argument, `concurrent` where it may be called from more than one thread, and
-//! one C function pointer where it is `keep`.
+//! argument, `concurrent` where it may be called from more than one thread, one
+//! C function pointer where it is `keep`, and the owned form of `keep own`.
 
 /// Call f on every element of items.
 pub fn each(items: []int, f: fn(int))
@@ -49,6 +49,28 @@ pub class Button
 		for i in 0..n {
 			f(self.click(i));
 		}
+	}
+}
+
+/// A timer that owns the snapshot it runs.
+pub class Timer
+{
+	pub own tick: fn(int) -> int = same,
+
+	/// Keep and own f, which runs on every tick.
+	pub fn on_tick(self, keep own f: fn(int) -> int)
+	{
+		self.tick = f;
+	}
+
+	/// The sum of the ticks of the first n numbers.
+	pub fn run(self, n: int) -> int
+	{
+		let sum = 0;
+		for i in 0..n {
+			sum += self.tick(i);
+		}
+		return sum;
 	}
 }
 

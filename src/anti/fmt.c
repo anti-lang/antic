@@ -1026,13 +1026,23 @@ static bool joins_do(const struct emitter *e, size_t i)
 
 /* Whether the `fn` about to be written opens an anonymous function: one
    that stands where a value starts, inside a statement already open. A
-   `fn` after `:`, `->`, `as` or `?` writes a type. */
+   `fn` after `:`, `->`, `as` or `?` writes a type. A `fn` after the word
+   `snapshot` stands where the word stood. */
 static bool anonymous_fn(const struct emitter *e)
 {
-    if (!e->stmt.open || e->prev == NULL || e->prev->kind != PIECE_TOKEN) {
+    const struct piece *before = e->prev;
+
+    if (!e->stmt.open || before == NULL || before->kind != PIECE_TOKEN) {
         return false;
     }
-    switch (e->prev->token->kind) {
+    if (before->token->kind == TOKEN_IDENT && before->length == 8 &&
+        memcmp(e->src + before->offset, "snapshot", 8) == 0) {
+        before = e->prev2;
+        if (before == NULL || before->kind != PIECE_TOKEN) {
+            return false;
+        }
+    }
+    switch (before->token->kind) {
     case TOKEN_ASSIGN:
     case TOKEN_LPAREN:
     case TOKEN_LBRACKET:

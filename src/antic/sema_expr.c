@@ -308,16 +308,23 @@ static const struct capture *unsafe_capture(const struct item *it)
 }
 
 /* Refuse a function that is not kept where one is kept: a field, a
-   global, a result, a `keep` parameter or a parameter of an `extern fn`. */
+   global, a result, a `keep` parameter or a parameter of an `extern fn`.
+   A closure by reference is refused with `snapshot fn` as the fix, and a
+   snapshot with `keep own`. */
 static void refuse_kept(struct checker *c, const struct expr *e)
 {
     const struct symbol *sym = e->kind == EXPR_NAME ? e->symbol : NULL;
 
-    if (e->kind == EXPR_FN && e->as.fn->capture_count > 0) {
+    if (e->kind == EXPR_FN && e->as.fn->capture_count > 0 &&
+        e->as.fn->snapshot) {
+        sema_error_at(c, e->pos, "a `snapshot fn` is kept where it is owned, "
+                      "by a `keep own` parameter or an `own` field");
+    } else if (e->kind == EXPR_FN && e->as.fn->capture_count > 0) {
         const struct symbol *first = e->as.fn->captures[0].symbol;
         sema_error_at(c, e->pos, "a closure is never kept, and this one "
-                      "captures `%.*s`", (int)first->name.length,
-                      first->name.text);
+                      "captures `%.*s`, so a `snapshot fn` at a `keep own` "
+                      "parameter or an `own` field takes its value",
+                      (int)first->name.length, first->name.text);
     } else if (sym != NULL && sym->kind == SYMBOL_PARAM) {
         sema_error_at(c, e->pos, "`%.*s` is not marked `keep` and cannot be "
                       "stored", (int)sym->name.length, sym->name.text);
@@ -329,6 +336,74 @@ static void refuse_kept(struct checker *c, const struct expr *e)
         sema_error_at(c, e->pos,
                       "a function that is not kept cannot be stored");
     }
+}
+
+/* Whether e is `dup` of a function value, a copy that no one owns yet. */
+static bool is_fn_dup(const struct expr *e)
+{
+    return e->kind == EXPR_OBJECT && e->as.object.op == TOKEN_DUP &&
+           e->type != NULL && e->type->kind == TYPE_FN && e->type->owned;
+}
+
+/* DESIGN: an `own fn` place takes a fresh value: a snapshot, a function
+   that captures nothing, `dup` of an owned value, or a `keep own`
+   parameter of the function, which moves. `=` copies no owned value,
+   since two owners would free one snapshot twice. Returns whether the
+   value e of type got is taken. */
+static bool require_owned(struct checker *c, struct expr *e,
+                          struct type *got)
+{
+    struct symbol *sym = e->kind == EXPR_NAME ? e->symbol : NULL;
+
+    if (!got->context) {
+        e->to_context = true;
+        return true;
+    }
+    if (e->kind == EXPR_FN) {
+        if (!e->as.fn->snapshot) {
+            refuse_kept(c, e);
+            return false;
+        }
+        e->as.fn->snapshot_heap = true;
+        return true;
+    }
+    if (!got->owned) {
+        if (sym != NULL && sym->kind == SYMBOL_PARAM) {
+            sema_error_at(c, e->pos, "`%.*s` is not marked `keep own` and "
+                          "cannot be owned", (int)sym->name.length,
+                          sym->name.text);
+        } else {
+            refuse_kept(c, e);
+        }
+        return false;
+    }
+    if (is_fn_dup(e)) {
+        return true;
+    }
+    if (sym != NULL && sym->kind == SYMBOL_PARAM && sym->frame != c->function) {
+        sema_error_at(c, e->pos, "`%.*s` is captured, and a closure does not "
+                      "move what it captures", (int)sym->name.length,
+                      sym->name.text);
+        return false;
+    }
+    if (sym != NULL && sym->kind == SYMBOL_PARAM && c->quiet == 0) {
+        if (c->loop_depth > 0) {
+            sema_error_at(c, e->pos, "`%.*s` moves into an owner inside a "
+                          "loop, which would move it again",
+                          (int)sym->name.length, sym->name.text);
+            return false;
+        }
+        e->moves_snapshot = true;
+        sym->snapshot_moved = true;
+        sym->snapshot_move = e->pos;
+        return true;
+    }
+    if (sym != NULL && sym->kind == SYMBOL_PARAM) {
+        return true;
+    }
+    sema_error_at(c, e->pos, "an `own fn` value is not copied by `=`, use "
+                  "`dup`");
+    return false;
 }
 
 /* Refuse a function that is not `concurrent` at a `concurrent`
@@ -344,7 +419,8 @@ static void refuse_not_concurrent(struct checker *c, const struct expr *e)
     if (cap != NULL && cap->written &&
         !sema_thread_safe(cap->symbol->type)) {
         sema_error_at(c, cap->write, "`%.*s` is changed in a closure at a "
-                      "`concurrent` parameter, and `%s` is not thread-safe",
+                      "`concurrent` parameter, and `%s` is not thread-safe, "
+                      "so a `snapshot fn` reads a copy of it instead",
                       (int)cap->symbol->name.length, cap->symbol->name.text,
                       sema_tn(cap->symbol->type));
     } else if (cap != NULL) {
@@ -367,8 +443,10 @@ static void refuse_not_concurrent(struct checker *c, const struct expr *e)
    plain function takes the form of two words with the context `none`,
    and a `concurrent` one is taken where any is. Nothing converts to the
    plain form, so a function that is not kept never reaches a place that
-   keeps it. Returns -1 when got and expected are not forms of one type,
-   and else whether the conversion holds. */
+   keeps it. An `own fn` lends itself to a parameter of two words and is
+   taken where it is owned, which `require_owned` decides. Returns -1
+   when got and expected are not forms of one type, and else whether the
+   conversion holds. */
 static int require_fn_form(struct checker *c, struct expr *e,
                            struct type *got, struct type *expected)
 {
@@ -384,8 +462,22 @@ static int require_fn_form(struct checker *c, struct expr *e,
         error_may_be_none(c, e, got);
         return 0;
     }
+    if (expected->owned) {
+        return require_owned(c, e, got) ? 1 : 0;
+    }
+    if (!expected->context && got->owned) {
+        sema_error_at(c, e->pos, "an `own fn` value owns its snapshot and "
+                      "does not pass as one C function pointer");
+        return 0;
+    }
     if (!expected->context) {
         refuse_kept(c, e);
+        return 0;
+    }
+    if (is_fn_dup(e)) {
+        sema_error_at(c, e->pos, "the copy `dup` makes of a function has no "
+                      "owner here, and goes to an `own` field or a `keep own` "
+                      "parameter");
         return 0;
     }
     if (expected->concurrent && got->context && !got->concurrent) {
@@ -402,11 +494,14 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
     const struct struct_field *iface;
     int form;
 
-    if (sema_is_error(got) || sema_is_error(expected) || got == expected) {
+    if (sema_is_error(got) || sema_is_error(expected)) {
         return !sema_is_error(got);
     }
     if ((form = require_fn_form(c, e, got, expected)) >= 0) {
         return form == 1;
+    }
+    if (got == expected) {
+        return true;
     }
     /* The one implicit conversion of a pointer and the widening to
        `?*T` compose: a `*Circle` reaches a `?*Shape` parameter. */
@@ -2087,6 +2182,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         if (sym->caught && c->deferring > 0) {
             sym->deferred = true;
         }
+        if (sym->snapshot_moved) {
+            sema_error_at(c, e->pos, "`%.*s` has moved into an owner on line "
+                          "%u and is not named after it",
+                          (int)e->as.name.length, e->as.name.text,
+                          (unsigned)sym->snapshot_move.line);
+            return sema_builtin(c, TYPE_ERROR);
+        }
         /* A Flags value that is not the base of a field is read whole. */
         if (types_is_flags(sym->type) && c->field_base != e) {
             sym->flags_read = FLAGS_READ_ALL;
@@ -2465,6 +2567,18 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             e->as.sync_op.op = SYNC_CHAN_DELETE;
             e->as.sync_op.target = operand;
             return sema_builtin(c, TYPE_VOID);
+        }
+        /* DESIGN: `dup` of an `own fn` copies its snapshot, and the
+           copy goes to an owner, which the conversion checks. */
+        if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_FN && t->owned) {
+            return t;
+        }
+        if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_FN &&
+            !t->bound) {
+            sema_error_at(c, e->as.object.operand->pos,
+                          "`dup` copies an `own fn`, and this is `%s`",
+                          sema_tn(t));
+            return sema_builtin(c, TYPE_ERROR);
         }
         /* All three read the table of the object, so all three need a
            pointer the program has checked. `dup(p)` then gives the type

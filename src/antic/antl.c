@@ -369,7 +369,8 @@ static void put_type(struct writer *w, const struct type *t)
     /* DESIGN: a function type ends with a byte of its flags. Bit 0 is
        `?`, bit 1 bound, bit 2 `may fail` and bit 3 the out pointer of
        that form. Bit 4 is the form of two words of a parameter that does
-       not keep its argument, and bit 5 marks it `concurrent`. Each makes
+       not keep its argument, and bit 5 marks it `concurrent`. Bit 6 is
+       `own fn`, which stands with both. Each makes
        another type, and a module that imports this one reads the type
        the signature names. */
     case TYPE_FN:
@@ -382,7 +383,8 @@ static void put_type(struct writer *w, const struct type *t)
                             (unsigned)t->may_fail << 2 |
                             (unsigned)t->has_out << 3 |
                             (unsigned)t->context << 4 |
-                            (unsigned)t->concurrent << 5));
+                            (unsigned)t->concurrent << 5 |
+                            (unsigned)t->owned << 6));
         break;
     case TYPE_TUPLE:
         put_count(w, t->param_count);
@@ -1614,7 +1616,8 @@ static void read_types(struct reader *r)
             /* The out pointer belongs to the `may fail` form alone, and it
                is the last parameter. `concurrent` marks the form of two
                words alone, which a bound function never has. */
-            if (flags > 63 || ((flags & 32) != 0 && (flags & 16) == 0) ||
+            if (flags > 127 || ((flags & 32) != 0 && (flags & 16) == 0) ||
+                ((flags & 64) != 0 && (flags & 48) != 48) ||
                 ((flags & 16) != 0 && (flags & 2) != 0) ||
                 ((flags & 8) != 0 &&
                  ((flags & 4) == 0 || n == 0 ||
@@ -1626,7 +1629,9 @@ static void read_types(struct reader *r)
             }
             t = types_fn_flagged(r->types, params, n, t, (flags & 2) != 0,
                                  (flags & 4) != 0, (flags & 8) != 0);
-            if ((flags & 16) != 0) {
+            if ((flags & 64) != 0) {
+                t = types_fn_owned(r->types, t);
+            } else if ((flags & 16) != 0) {
                 t = types_fn_form(r->types, t, true, (flags & 32) != 0);
             }
             if ((flags & 1) != 0) {

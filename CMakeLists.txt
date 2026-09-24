@@ -197,8 +197,8 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # license_stub.c is not here, because it sits beside the library.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
     errno f16 fs hooks init io json license loaded mem object platform_posix
-    platform_windows plugin reflect registry signal start symbols sync text
-    threads toml trace utf)
+    platform_windows plugin reflect registry signal snapshot start symbols sync
+    text threads toml trace utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "src/rt/${source}.c")

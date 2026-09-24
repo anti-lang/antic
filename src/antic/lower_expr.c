@@ -14,6 +14,15 @@ void lower_store_value(struct lowerer *l, const struct type *t,
 {
     struct ir_operand v;
 
+    /* A named function as the default of an `own fn` field is checked
+       before the function has its type, so the checker marks no
+       conversion. The value is its code, with no snapshot. */
+    if (lower_is_context(t) && !e->to_context && !lower_is_context(e->type)) {
+        ir_store(l->f, l->b, IR_PTR, lower_expr(l, e), address);
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
+                 lower_context_word(l, t, address));
+        return;
+    }
     if (lower_is_aggregate(t)) {
         lower_build_into(l, e, address);
         return;
@@ -140,6 +149,15 @@ void lower_store_default(struct lowerer *l, const struct struct_field *field,
     }
     if (field->value != NULL) {
         lower_store_value(l, field->type, field->value, address);
+        return;
+    }
+    /* A named function as the default of an `own fn` field is its code
+       with no snapshot. */
+    if (field->type->kind == TYPE_FN && field->type->context) {
+        ir_store(l->f, l->b, IR_PTR,
+                 lower_constant(l, field->constant, IR_PTR), address);
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
+                 lower_context_word(l, field->type, address));
         return;
     }
     if (lower_is_aggregate(field->type)) {
@@ -315,6 +333,14 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
     struct ir_operand src;
     size_t i;
 
+    /* A plain function in the place of two words, or a `keep own`
+       parameter that moves, is a pair lower_expr builds. */
+    if (e->to_context || e->moves_snapshot) {
+        src = lower_expr(l, e);
+        ir_memcopy(l->f, l->b, dest, src,
+                   ir_aggregate(lower_agg_of(l, e->type)));
+        return;
+    }
     switch (e->kind) {
     /* `T(args)` and `alloc T(args)` build the object in place and run
        its `construct` with the arguments. */
@@ -707,6 +733,94 @@ static struct ir_operand lower_pair(struct lowerer *l, const struct type *t,
     return slot;
 }
 
+/* The copy of the captured value at src into the record at dst. */
+static void copy_captured(struct lowerer *l, const struct type *t,
+                          struct ir_operand src, struct ir_operand dst)
+{
+    if (lower_is_aggregate(t)) {
+        ir_memcopy(l->f, l->b, dst, src, lower_vtype_of(l, t));
+        return;
+    }
+    ir_store(l->f, l->b, lower_ir_type_of(t),
+             lower_temp(l, ir_load(l->f, l->b, lower_ir_type_of(t), src)),
+             dst);
+}
+
+/* DESIGN: a snapshot copies each captured value into its record when it
+   is made. At an `own` field or a `keep own` parameter the record goes
+   on the heap with the bytes of each `str` after it, and the runtime
+   counts it until it is freed. Anywhere else it sits in a slot of the
+   frame, and nothing is allocated. */
+static struct ir_operand lower_snapshot(struct lowerer *l,
+                                        const struct expr *e,
+                                        struct ir_operand code)
+{
+    static const enum ir_type one[] = {IR_I64};
+    static const enum ir_type four[] = {IR_PTR, IR_I64, IR_PTR, IR_I64};
+    const struct item *it = e->as.fn;
+    uint32_t agg = lower_snapshot_agg(l, it);
+    struct ir_operand fixed =
+        ir_sym_operand(l->m, ir_sym_size_of(l->m, ir_aggregate(agg)));
+    struct ir_operand size = fixed;
+    struct ir_operand block;
+    struct ir_operand cursor;
+    size_t i;
+
+    if (it->snapshot_heap) {
+        for (i = 0; i < it->capture_count; i++) {
+            const struct symbol *sym = it->captures[i].symbol;
+            struct ir_operand len;
+            if (sym->type->kind != TYPE_STR) {
+                continue;
+            }
+            len = lower_temp(
+                l, ir_load(l->f, l->b, IR_I64,
+                           lower_offset_address(
+                               l, lower_temp(l, sym->ir),
+                               lower_field_offset(l, sym->type,
+                                                  &lower_len_name))));
+            size = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64, size,
+                                           len));
+        }
+        block = lower_rt_call(l, "anti_rt_snapshot_new", IR_PTR, one, &size,
+                              1);
+    } else {
+        block = lower_temp(l, ir_entry_slot(l->f, ir_aggregate(agg)));
+        ir_store(l->f, l->b, IR_I64, fixed, block);
+    }
+    cursor = fixed;
+    for (i = 0; i < it->capture_count; i++) {
+        const struct symbol *sym = it->captures[i].symbol;
+        struct ir_operand src = lower_temp(l, sym->ir);
+        struct ir_operand dst = lower_offset_address(
+            l, block,
+            ir_sym_operand(l->m,
+                           ir_sym_offset_of(l->m, agg, (uint32_t)(i + 1))));
+        struct ir_operand len_offset;
+        struct ir_operand len;
+        struct ir_operand args[4];
+
+        if (!it->snapshot_heap || sym->type->kind != TYPE_STR) {
+            copy_captured(l, sym->type, src, dst);
+            continue;
+        }
+        len_offset = lower_field_offset(l, sym->type, &lower_len_name);
+        len = lower_temp(l, ir_load(l->f, l->b, IR_I64,
+                                    lower_offset_address(l, src, len_offset)));
+        args[0] = block;
+        args[1] = cursor;
+        args[2] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, src));
+        args[3] = len;
+        lower_rt_call(l, "anti_rt_snapshot_text", IR_VOID, four, args, 4);
+        ir_store(l->f, l->b, IR_I64, cursor, dst);
+        ir_store(l->f, l->b, IR_I64, len,
+                 lower_offset_address(l, dst, len_offset));
+        cursor = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64, cursor,
+                                         len));
+    }
+    return lower_pair(l, e->type, code, block);
+}
+
 /* DESIGN: an anonymous function that captures nothing is the address of
    its code, as a named function is. A closure is the code and a context
    in the frame that makes it: a record of the address of every variable
@@ -726,6 +840,9 @@ static struct ir_operand lower_closure(struct lowerer *l,
 
     if (it->capture_count == 0) {
         return code;
+    }
+    if (it->snapshot) {
+        return lower_snapshot(l, e, code);
     }
     agg = lower_captures_agg(l, it);
     record = lower_temp(l, ir_entry_slot(l->f, ir_aggregate(agg)));
@@ -808,6 +925,12 @@ struct ir_operand lower_address(struct lowerer *l,
         return lower_collect(l, e);
     case EXPR_FN:
         return lower_closure(l, e);
+    /* `dup` of an `own fn` copies the snapshot into a new pair. */
+    case EXPR_OBJECT:
+        slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
+        lower_dup_snapshot(l, e->type, lower_expr(l, e->as.object.operand),
+                           lower_temp(l, slot));
+        return lower_temp(l, slot);
     /* `none` in the form of two words has no code and no context. */
     case EXPR_NONE:
         if (lower_is_context(e->type)) {
@@ -2387,6 +2510,17 @@ struct ir_operand lower_expr(struct lowerer *l, const struct expr *e)
        the context `none`. */
     if (e->to_context) {
         return lower_pair(l, e->type, v, ir_int_op(IR_PTR, 0));
+    }
+    /* DESIGN: a `keep own` parameter that moves into an owner hands over
+       a copy of its two words and keeps `none` as its context, so the
+       free at the exits of the function passes over the snapshot. */
+    if (e->moves_snapshot) {
+        struct ir_operand copy = lower_temp(
+            l, ir_entry_slot(l->f, lower_vtype_of(l, e->type)));
+        ir_memcopy(l->f, l->b, copy, v, lower_vtype_of(l, e->type));
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
+                 lower_context_word(l, e->type, v));
+        return copy;
     }
     if (e->to_iface == NULL) {
         return v;

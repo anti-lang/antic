@@ -1,0 +1,242 @@
+//! Snapshots and owned function values. `snapshot fn` takes the values it uses
+//! when it is made. At a `keep own` parameter and in an `own` field it lives on
+//! the heap and is freed with its owner. At a `concurrent` parameter and at a
+//! parameter that does not keep its argument it stays in the caller's frame.
+//! `dup` copies an owned function value with its snapshot. Every step runs
+//! under a leak check, the count of the snapshots alive that the runtime keeps.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_rt_snapshots_alive() -> int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+enum Tone
+{
+	Low,
+	High,
+}
+
+class Button
+{
+	pub label: str = "",
+	pub own handler: fn(int) = ignore,
+
+	pub fn on_click(self, keep own f: fn(int))
+	{
+		self.handler = f;
+	}
+
+	pub fn click(self, n: int)
+	{
+		self.handler(n);
+	}
+
+	pub fn take(self, from: *Button)
+	{
+		self.handler = dup(from.handler);
+	}
+}
+
+class Panel
+{
+	pub name: str = "panel",
+	pub button: Button = Button { },
+}
+
+fn ignore(n: int)
+{
+}
+
+fn shout(n: int)
+{
+	printf("shout %d\n".ptr, n as c_int);
+}
+
+fn alive(step: str)
+{
+	printf("%.*s: %d alive\n".ptr, step.len as c_int, step.ptr,
+		anti_rt_snapshots_alive() as c_int);
+}
+
+fn call_twice(concurrent f: fn(int))
+{
+	f(1);
+	f(2);
+}
+
+fn call_once(f: fn(int))
+{
+	f(7);
+}
+
+fn drop_it(keep own f: fn(int))
+{
+	f(3);
+}
+
+fn pass_on(b: *Button, keep own f: fn(int))
+{
+	b.on_click(f);
+}
+
+fn kept_snapshot()
+{
+	let b = alloc Button { label: "save" };
+	let name = "report";
+	let p = Point { x: 3, y: 4 };
+	let c = 'z';
+	let on = true;
+	let scale = 2.5;
+	let tone = Tone.High;
+	b.on_click(snapshot fn(n) {
+		printf("%.*s %d %d %d %c %d %.1f %d\n".ptr, name.len as c_int,
+			name.ptr, n as c_int, p.x as c_int, p.y as c_int, c as u32 as c_int,
+			on as c_int, scale, tone as c_int);
+	});
+	name = "draft";
+	p.x = 30;
+	alive("kept");
+	b.click(1);
+	delete(b);
+	alive("deleted");
+}
+
+fn copied_snapshot()
+{
+	let b = alloc Button { };
+	let word = "copied bytes";
+	b.on_click(snapshot fn(n) {
+		printf("%.*s %d\n".ptr, word.len as c_int, word.ptr, n as c_int);
+	});
+	let c = dup(b);
+	alive("dup of the object");
+	delete(b);
+	c.click(2);
+	let d = alloc Button { };
+	d.take(c);
+	alive("dup of the value");
+	delete(c);
+	d.click(3);
+	delete(d);
+	alive("both deleted");
+}
+
+fn replaced_snapshot()
+{
+	let b = alloc Button { };
+	let first = 1;
+	let second = 2;
+	b.on_click(snapshot fn(n) {
+		printf("first %d\n".ptr, first as c_int);
+	});
+	b.on_click(snapshot fn(n) {
+		printf("second %d\n".ptr, second as c_int);
+	});
+	alive("replaced");
+	b.click(0);
+	b.on_click(shout);
+	alive("named");
+	b.click(5);
+	b.on_click(fn(n) {
+		printf("plain %d\n".ptr, n as c_int);
+	});
+	b.click(6);
+	delete(b);
+	alive("plain deleted");
+}
+
+fn unmoved_parameter()
+{
+	let k = 9;
+	drop_it(snapshot fn(n) {
+		printf("dropped %d %d\n".ptr, n as c_int, k as c_int);
+	});
+	alive("not moved");
+	let b = alloc Button { };
+	pass_on(b, snapshot fn(n) {
+		printf("passed on %d\n".ptr, k as c_int);
+	});
+	alive("passed on");
+	b.click(0);
+	delete(b);
+	alive("passed on deleted");
+}
+
+fn frame_snapshots()
+{
+	let total = 10;
+	let label = "frame";
+	call_twice(snapshot fn(n) {
+		printf("%.*s %d\n".ptr, label.len as c_int, label.ptr,
+			(total + n) as c_int);
+	});
+	call_once(snapshot fn(n) {
+		printf("once %d\n".ptr, (total + n) as c_int);
+	});
+	let f = snapshot fn(n: int) {
+		printf("local %d\n".ptr, (total * n) as c_int);
+	};
+	total = 0;
+	f(3);
+	alive("frame");
+}
+
+fn borrowed()
+{
+	let b = alloc Button { };
+	let base = 40;
+	b.on_click(snapshot fn(n) {
+		printf("borrowed %d\n".ptr, (base + n) as c_int);
+	});
+	call_once(b.handler);
+	call_twice(b.handler);
+	delete(b);
+	alive("borrowed");
+}
+
+fn inline_value()
+{
+	let tag = "inline";
+	{
+		let p = Panel { };
+		p.button.on_click(snapshot fn(n) {
+			printf("%.*s %d\n".ptr, tag.len as c_int, tag.ptr, n as c_int);
+		});
+		alive("inline");
+		p.button.click(4);
+	}
+	alive("block left");
+}
+
+fn nested()
+{
+	let outer = 5;
+	let b = alloc Button { };
+	b.on_click(snapshot fn(n) {
+		let inner = n + outer;
+		call_once(fn(m) {
+			printf("nested %d %d\n".ptr, inner as c_int, (outer + m) as c_int);
+		});
+	});
+	outer = 0;
+	b.click(1);
+	delete(b);
+	alive("nested");
+}
+
+fn main() -> int
+{
+	kept_snapshot();
+	copied_snapshot();
+	replaced_snapshot();
+	unmoved_parameter();
+	frame_snapshots();
+	borrowed();
+	inline_value();
+	nested();
+	return 0;
+}

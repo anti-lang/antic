@@ -337,7 +337,8 @@ static struct block *block(struct parser *p);
    parameter of function type, in a parameter list and in the list of a
    function type. A mark stands before a name followed by a colon, or
    before `fn` or `?fn`, so a parameter or a type may still carry either
-   name. */
+   name. `own` after `keep` makes `keep own`, a parameter that keeps and
+   owns what it is given. */
 static bool is_fn_mark(const struct parser *p, size_t at)
 {
     const struct token *t = peek_at(p, at);
@@ -351,12 +352,17 @@ static bool is_fn_mark(const struct parser *p, size_t at)
             peek_at(p, at + 2)->kind == TOKEN_FN) ||
            (after->kind == TOKEN_IDENT &&
             peek_at(p, at + 2)->kind == TOKEN_COLON) ||
-           is_word(p, after, "keep") || is_word(p, after, "concurrent");
+           is_word(p, after, "keep") || is_word(p, after, "concurrent") ||
+           (is_word(p, after, "own") &&
+            (peek_at(p, at + 2)->kind == TOKEN_IDENT ||
+             peek_at(p, at + 2)->kind == TOKEN_FN ||
+             peek_at(p, at + 2)->kind == TOKEN_QUESTION));
 }
 
 /* Read the marks before a parameter. Both may stand, and the checker
-   refuses the pair. */
-static void fn_param_marks(struct parser *p, bool *keep, bool *concurrent)
+   refuses the pair. `own` is read after a mark. */
+static void fn_param_marks(struct parser *p, bool *keep, bool *concurrent,
+                           bool *owned)
 {
     while (is_fn_mark(p, 0)) {
         if (is_word(p, peek(p), "keep")) {
@@ -365,6 +371,13 @@ static void fn_param_marks(struct parser *p, bool *keep, bool *concurrent)
             *concurrent = true;
         }
         next(p);
+        if (is_word(p, peek(p), "own") &&
+            (peek_at(p, 1)->kind == TOKEN_IDENT ||
+             peek_at(p, 1)->kind == TOKEN_FN ||
+             peek_at(p, 1)->kind == TOKEN_QUESTION)) {
+            next(p);
+            *owned = true;
+        }
     }
 }
 
@@ -463,8 +476,9 @@ static struct type_expr *type_level(struct parser *p)
         while (!check(p, TOKEN_RPAREN)) {
             bool keep = false;
             bool concurrent = false;
+            bool owned = false;
             struct type_expr *param;
-            fn_param_marks(p, &keep, &concurrent);
+            fn_param_marks(p, &keep, &concurrent, &owned);
             param = type(p);
             if (param == NULL) {
                 free(params.data);
@@ -472,6 +486,7 @@ static struct type_expr *type_level(struct parser *p)
             }
             param->keep = keep;
             param->concurrent = concurrent;
+            param->owned = owned;
             list_push(&params, &param);
             if (!accept(p, TOKEN_COMMA)) {
                 break;
@@ -724,7 +739,7 @@ static struct expr *anonymous_fn(struct parser *p, const struct token *at)
     while (!check(p, TOKEN_RPAREN)) {
         struct param param;
         memset(&param, 0, sizeof param);
-        fn_param_marks(p, &param.keep, &param.concurrent);
+        fn_param_marks(p, &param.keep, &param.concurrent, &param.owned);
         param.pos = pos_of(peek(p));
         if (!expect_name(p, &param.name) ||
             (accept(p, TOKEN_COLON) && (param.type = type(p)) == NULL)) {
@@ -802,16 +817,29 @@ static struct expr *primary(struct parser *p)
         e->as.name.length = t->length;
         return e;
     case TOKEN_IDENT: {
-        bool qualified = peek_at(p, 1)->kind == TOKEN_DOT &&
-                         peek_at(p, 2)->kind == TOKEN_IDENT &&
-                         peek_at(p, 3)->kind == TOKEN_LBRACE;
+        bool qualified;
+        bool member;
+        /* `snapshot fn(...) { }` is an anonymous function that copies
+           what it captures. `snapshot` is a contextual word. */
+        if (is_word(p, t, "snapshot") && peek_at(p, 1)->kind == TOKEN_FN) {
+            next(p);
+            e = anonymous_fn(p, peek(p));
+            if (e != NULL) {
+                e->pos = pos_of(t);
+                e->as.fn->snapshot = true;
+            }
+            return e;
+        }
+        qualified = peek_at(p, 1)->kind == TOKEN_DOT &&
+                    peek_at(p, 2)->kind == TOKEN_IDENT &&
+                    peek_at(p, 3)->kind == TOKEN_LBRACE;
         /* `geo.Shape.Circle { }` names the case of a variant of another
            module. */
-        bool member = peek_at(p, 1)->kind == TOKEN_DOT &&
-                      peek_at(p, 2)->kind == TOKEN_IDENT &&
-                      peek_at(p, 3)->kind == TOKEN_DOT &&
-                      peek_at(p, 4)->kind == TOKEN_IDENT &&
-                      peek_at(p, 5)->kind == TOKEN_LBRACE;
+        member = peek_at(p, 1)->kind == TOKEN_DOT &&
+                 peek_at(p, 2)->kind == TOKEN_IDENT &&
+                 peek_at(p, 3)->kind == TOKEN_DOT &&
+                 peek_at(p, 4)->kind == TOKEN_IDENT &&
+                 peek_at(p, 5)->kind == TOKEN_LBRACE;
         if (!p->no_struct_literal &&
             (qualified || member || peek_at(p, 1)->kind == TOKEN_LBRACE)) {
             e = new_expr(p, EXPR_STRUCT_LIT, t);
@@ -2337,7 +2365,7 @@ static struct param *params(struct parser *p, bool allow_variadic,
             next(p);
             param.owned = true;
         }
-        fn_param_marks(p, &param.keep, &param.concurrent);
+        fn_param_marks(p, &param.keep, &param.concurrent, &param.owned);
         param.pos = pos_of(peek(p));
         if (!expect_name(p, &param.name) || !expect(p, TOKEN_COLON) ||
             (param.type = type(p)) == NULL) {

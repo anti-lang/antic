@@ -47,7 +47,7 @@ static struct type *find_or_add_params(struct types *types,
             t->result != key->result || t->bound != key->bound ||
             t->nullable != key->nullable || t->may_fail != key->may_fail ||
             t->has_out != key->has_out || t->context != key->context ||
-            t->concurrent != key->concurrent ||
+            t->concurrent != key->concurrent || t->owned != key->owned ||
             t->param_count != key->param_count) {
             continue;
         }
@@ -298,6 +298,22 @@ struct type *types_fn_form(struct types *types, struct type *fn, bool context,
     key = *fn;
     key.context = context;
     key.concurrent = context && concurrent;
+    key.owned = false;
+    key.next = NULL;
+    return find_or_add(types, &key);
+}
+
+struct type *types_fn_owned(struct types *types, struct type *fn)
+{
+    struct type key;
+
+    if (fn == NULL || fn->kind != TYPE_FN || fn->bound) {
+        return fn;
+    }
+    key = *fn;
+    key.context = true;
+    key.concurrent = true;
+    key.owned = true;
     key.next = NULL;
     return find_or_add(types, &key);
 }
@@ -1128,15 +1144,16 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         }
         text_append(out, t->bound ? "bound fn(" : "fn(");
         /* A parameter of function type keeps its argument only when it
-           says so. A list therefore marks the plain form, and the
-           `concurrent` one as well. */
+           says so. A list therefore marks the plain form, the owned one
+           and the `concurrent` one. */
         for (i = 0; i < shown; i++) {
             const struct type *p = t->params[i];
             if (i > 0) {
                 text_append(out, ", ");
             }
             if (p->kind == TYPE_FN && !p->bound) {
-                text_append(out, !p->context    ? "keep "
+                text_append(out, p->owned        ? "keep own "
+                                 : !p->context   ? "keep "
                                  : p->concurrent ? "concurrent "
                                                  : "");
             }

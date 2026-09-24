@@ -28,5 +28,13 @@ fn main() -> int
 		clicks += v;
 	});
 	printf("clicks %d\n".ptr, clicks as c_int);
+	let t = alloc walk.Timer { tick: triple };
+	let step = 10;
+	t.on_tick(snapshot fn(n) { return n + step; });
+	step = 0;
+	let copy = dup(t);
+	delete(t);
+	printf("ticks %d\n".ptr, copy.run(3) as c_int);
+	delete(copy);
 	return 0;
 }

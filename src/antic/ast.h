@@ -62,6 +62,7 @@ struct type_expr {
        more than one thread at once. */
     bool keep;
     bool concurrent;
+    bool owned;                     /* `keep own fn(E)`: owns what it keeps */
     struct type *type;              /* set by semantic analysis */
 };
 
@@ -233,6 +234,9 @@ struct expr {
     /* A plain function where the form of two words is expected. Lowering
        pairs the code with the context `none`. Set by the checker. */
     bool to_context;
+    /* EXPR_NAME: a `keep own` parameter that moves into an owner, which
+       lowering then clears, so its exits free nothing. */
+    bool moves_snapshot;
     union {
         uint64_t integer;           /* EXPR_INT */
         uint32_t character;         /* EXPR_CHAR */
@@ -813,6 +817,11 @@ struct item {
     struct capture *captures;
     size_t capture_count;
     size_t capture_capacity;
+    /* `snapshot fn`: the captures are copies taken when it is made. The
+       checker sets heap where the snapshot outlives the frame, at an
+       `own` field or a `keep own` parameter. */
+    bool snapshot;
+    bool snapshot_heap;
 };
 
 struct import {

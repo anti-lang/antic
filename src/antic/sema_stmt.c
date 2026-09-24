@@ -637,7 +637,8 @@ static const struct symbol *held_deepest(const struct expr *e)
     if (e->kind == EXPR_NAME && e->symbol != NULL) {
         return e->symbol->holds;
     }
-    if (e->kind != EXPR_FN) {
+    /* A snapshot holds copies and depends on no variable. */
+    if (e->kind != EXPR_FN || e->as.fn->snapshot) {
         return NULL;
     }
     for (i = 0; i < e->as.fn->capture_count; i++) {
@@ -665,7 +666,8 @@ static void check_closure_lifetime(struct checker *c, const struct expr *target,
     }
     if (deepest->depth > sym->depth) {
         sema_error_at(c, value->pos, "`%.*s` outlives `%.*s`, which the "
-                      "closure captures", (int)sym->name.length,
+                      "closure captures, so a `snapshot fn` takes its value "
+                      "instead", (int)sym->name.length,
                       sym->name.text, (int)deepest->name.length,
                       deepest->name.text);
         return;
@@ -1552,6 +1554,12 @@ static void check_stmt(struct checker *c, struct stmt *s)
             types_fn_form(c->types, t, false, false) ==
                 types_fn_form(c->types, declared, false, false)) {
             declared = t;
+        }
+        /* A local never owns a function. It borrows an `own fn` in the
+           form of two words, and its owner frees the snapshot. */
+        if (!sema_is_error(t) && t->kind == TYPE_FN && t->owned &&
+            (declared == NULL || declared == t)) {
+            declared = types_fn_form(c->types, t, true, true);
         }
         if (declared != NULL) {
             if (sema_require(c, s->as.let.value, t, declared)) {
@@ -2648,8 +2656,11 @@ static struct type *anonymous_type(struct checker *c, struct item *it,
         struct param *p = &it->params[i];
         if (p->type != NULL) {
             params[i] = sema_param_form(c, sema_resolve_type(c, p->type),
-                                        p->keep, p->concurrent, p->pos);
-        } else if (target != NULL && !p->keep && !p->concurrent) {
+                                        p->keep, p->concurrent,
+                                        p->owned && p->type->kind == TYPEX_FN,
+                                        p->pos);
+        } else if (target != NULL && !p->keep && !p->concurrent &&
+                   !p->owned) {
             params[i] = target->params[i];
         } else {
             sema_error_at(c, p->pos, "`%.*s` needs a type, which an "
@@ -2688,6 +2699,61 @@ static struct type *anonymous_type(struct checker *c, struct item *it,
                                 types_pointer_nullable(c->types, error), out);
     }
     return types_fn(c->types, params, it->param_count, result);
+}
+
+/* Whether a value of t copies fully into a snapshot: a number, `bool`,
+   `char`, an enum, a struct of those, and a `str` at the top, whose
+   bytes the snapshot copies. */
+static bool snapshot_copies(const struct type *t, bool top)
+{
+    size_t i;
+
+    if (t->kind >= TYPE_BOOL && t->kind <= TYPE_F64) {
+        return true;
+    }
+    if (t->kind == TYPE_ENUM) {
+        return true;
+    }
+    if (t->kind == TYPE_STR) {
+        return top;
+    }
+    if (t->kind != TYPE_STRUCT) {
+        return false;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (!snapshot_copies(t->fields[i].type, false)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* DESIGN: a snapshot is read-only, so two threads that call it never
+   write it at once. It holds values that copy fully: an address would
+   copy the address and not what it points at. The first write of a
+   captured value and each capture of another type are refused. */
+static void check_snapshot(struct checker *c, const struct expr *e)
+{
+    const struct item *it = e->as.fn;
+    size_t i;
+
+    for (i = 0; i < it->capture_count; i++) {
+        const struct capture *cap = &it->captures[i];
+        const struct symbol *sym = cap->symbol;
+        if (sym->type == NULL || sema_is_error(sym->type)) {
+            continue;
+        }
+        if (!snapshot_copies(sym->type, true)) {
+            sema_error_at(c, e->pos, "a snapshot holds values that copy "
+                          "fully, and `%.*s` is `%s`",
+                          (int)sym->name.length, sym->name.text,
+                          sema_tn(sym->type));
+        } else if (cap->written) {
+            sema_error_at(c, cap->write, "`%.*s` is changed in a snapshot, "
+                          "which is read-only", (int)sym->name.length,
+                          sym->name.text);
+        }
+    }
 }
 
 /* DESIGN: an anonymous function is checked as a function of its own,
@@ -2759,8 +2825,15 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
                          "the anonymous function may fail and never does");
     }
     take_back(c, &state);
+    if (it->snapshot) {
+        check_snapshot(c, e);
+    }
     if (it->capture_count == 0) {
         return fn;
+    }
+    /* A snapshot writes nothing it holds, so every thread may call it. */
+    if (it->snapshot) {
+        return types_fn_form(c->types, fn, true, true);
     }
     for (i = 0; i < it->capture_count; i++) {
         const struct capture *cap = &it->captures[i];

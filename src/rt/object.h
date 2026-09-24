@@ -279,6 +279,24 @@ void anti_rt_copy_elements(void *from, void *into, int64_t count,
    none. The caller frees it with free. */
 void *anti_rt_copy_buffer(const void *from, int64_t bytes);
 
+/* A snapshot on the heap of size bytes, the size in its first eight.
+   It aborts when the memory is not there. */
+void *anti_rt_snapshot_new(int64_t size);
+
+/* Copy length bytes of a captured str into the snapshot at offset at. */
+void anti_rt_snapshot_text(void *snapshot, int64_t at,
+                           const unsigned char *bytes, int64_t length);
+
+/* Free a snapshot. NULL, the snapshot of a function that captures
+   nothing, frees nothing. */
+void anti_rt_snapshot_free(void *snapshot);
+
+/* A copy of a snapshot, byte for byte, or NULL for NULL. */
+void *anti_rt_snapshot_dup(const void *snapshot);
+
+/* The count of the snapshots on the heap that are not freed. */
+int64_t anti_rt_snapshots_alive(void);
+
 /* The descriptor of the root and its one ancestor, which every module
    of a program shares. */
 extern const struct anti_descriptor anti_lang_Object_descriptor;

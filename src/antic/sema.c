@@ -736,6 +736,7 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
             params[i] = sema_param_form(c, sema_resolve_type(c, t->params[i]),
                                         t->params[i]->keep,
                                         t->params[i]->concurrent,
+                                        t->params[i]->owned,
                                         t->params[i]->pos);
             if (sema_is_error(params[i])) {
                 return params[i];
@@ -797,9 +798,11 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
    pointer, as a field and a global do, and so does every parameter of an
    `extern fn`, since a closure cannot reach C. The two marks belong to a
    parameter of function type alone, and they do not stand together: a
-   kept function captures nothing, so it is safe on every thread. */
+   kept function captures nothing, so it is safe on every thread.
+   `keep own` keeps and owns an `own fn`, whose snapshot the function
+   frees unless it moves it on. */
 struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
-                             bool concurrent, struct pos pos)
+                             bool concurrent, bool owned, struct pos pos)
 {
     bool fn = t->kind == TYPE_FN && !t->bound;
 
@@ -824,6 +827,19 @@ struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
         sema_error_at(c, pos, "an `extern fn` takes plain C function "
                       "pointers, and `concurrent` marks a closure");
         return sema_builtin(c, TYPE_ERROR);
+    }
+    if (owned && c->plain_fns > 0) {
+        sema_error_at(c, pos, "an `extern fn` takes plain C function "
+                      "pointers, and `keep own` holds a snapshot");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (owned && !keep) {
+        sema_error_at(c, pos, "a parameter that owns a function keeps it, "
+                      "and is written `keep own`");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (owned) {
+        return types_fn_owned(c->types, t);
     }
     return types_fn_form(c->types, t, !keep && c->plain_fns == 0, concurrent);
 }
@@ -976,7 +992,9 @@ static struct type *function_type(struct checker *c, struct item *it)
         }
         params[i + extra] = sema_param_form(
             c, sema_resolve_type(c, it->params[i].type), it->params[i].keep,
-            it->params[i].concurrent, it->params[i].pos);
+            it->params[i].concurrent,
+            it->params[i].owned && it->params[i].type->kind == TYPEX_FN,
+            it->params[i].pos);
         if (it->kind == ITEM_EXTERN_FN) {
             c->plain_fns--;
         }
@@ -1397,7 +1415,11 @@ static void check_owned(struct checker *c, struct item *it)
         if (!p->owned) {
             continue;
         }
-        if (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE) {
+        if (sema_is_error(t)) {
+            continue;
+        }
+        if (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE &&
+            !(t->kind == TYPE_FN && t->owned)) {
             sema_error_at(c, p->pos,
                           "`own` needs a pointer or a slice, and `%.*s` "
                           "has type `%s`", (int)p->name.length, p->name.text,
@@ -2116,7 +2138,8 @@ static void declare_enums_and_variants(struct checker *c)
 /* DESIGN: `own` says the object frees the memory behind the field, so
    the field holds an address the object alone reaches. `str` is
    immutable and shared, and a class or struct field is inline and owned
-   by the object already. */
+   by the object already. A field of function type is `own fn`, the code
+   and a snapshot that the teardown of the class frees. */
 static void check_own_field(struct checker *c, const struct struct_field *f)
 {
     const struct type *ft = f->type;
@@ -2124,7 +2147,8 @@ static void check_own_field(struct checker *c, const struct struct_field *f)
     if (!f->owned || sema_is_error(ft)) {
         return;
     }
-    if (ft->kind != TYPE_POINTER && ft->kind != TYPE_SLICE) {
+    if (ft->kind != TYPE_POINTER && ft->kind != TYPE_SLICE &&
+        !(ft->kind == TYPE_FN && ft->owned)) {
         sema_error_at(c, f->pos, "`own` needs a pointer or a "
                       "slice, and `%.*s` has type `%s`",
                       (int)f->name.length, f->name.text, sema_tn(ft));
@@ -2212,6 +2236,12 @@ static void resolve_fields(struct checker *c, struct item *it,
         c->target_sized = true;
         fields[j].type = sema_resolve_type(c, it->params[j].type);
         c->target_sized = false;
+        /* An `own` field of function type holds `own fn`, which frees
+           its snapshot with the object. */
+        if (fields[j].owned && fields[j].type->kind == TYPE_FN &&
+            !fields[j].type->bound) {
+            fields[j].type = types_fn_owned(c->types, fields[j].type);
+        }
         if (it->params[j].bits != NULL ||
             type_field_is_unit_break(&fields[j])) {
             fields[j].bits = bitfield_width(c, &it->params[j],

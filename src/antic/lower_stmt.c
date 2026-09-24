@@ -50,6 +50,7 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->unlock = false;
     action->mutex = 0;
     action->leave = false;
+    action->snapshot = false;
 }
 
 /* Record the `leave` hook of the function around the scope. */
@@ -61,6 +62,18 @@ void lower_push_leave_action(struct lowerer *l)
     action = &l->defers->items[l->defers->count++];
     memset(action, 0, sizeof *action);
     action->leave = true;
+}
+
+/* Record the free of the snapshot of the `keep own` parameter param. */
+void lower_push_snapshot_action(struct lowerer *l, const struct symbol *param)
+{
+    struct exit_action *action;
+
+    l->defers->items = grow_defers(l->defers);
+    action = &l->defers->items[l->defers->count++];
+    memset(action, 0, sizeof *action);
+    action->local = param;
+    action->snapshot = true;
 }
 
 /* Record the delete of the error a handler binds, whose name is sym or
@@ -81,6 +94,7 @@ static void push_error_action(struct lowerer *l, const struct symbol *sym,
     action->unlock = false;
     action->mutex = 0;
     action->leave = false;
+    action->snapshot = false;
 }
 
 /* Record the unlock of the mutex whose handle is in mutex, which a `sync`
@@ -100,6 +114,7 @@ static void push_unlock_action(struct lowerer *l, uint32_t mutex)
     action->unlock = true;
     action->mutex = mutex;
     action->leave = false;
+    action->snapshot = false;
 }
 
 static void jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -712,7 +727,11 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
        holds no value, and nothing is destroyed. The zero-table trap is for
        use, not for assignment into. */
     if (lower_is_aggregate(target->type)) {
-        v = lower_address(l, value);
+        v = lower_expr(l, value);
+        /* An `own fn` place frees the snapshot it held. */
+        if (target->type->kind == TYPE_FN && target->type->owned) {
+            lower_free_snapshot(l, target->type, p.address);
+        }
         if (local_needs_teardown(target->type)) {
             if (target->type->kind == TYPE_ARRAY) {
                 destroy_array(l, p.address, target->type, true);
@@ -1895,7 +1914,10 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
         if (action->undo) {
             continue;
         }
-        if (action->leave) {
+        if (action->snapshot) {
+            lower_free_snapshot(l, action->local->type,
+                                lower_temp(l, action->local->ir));
+        } else if (action->leave) {
             if (failing) {
                 lower_hook_failed(l, l->failing_error);
             }

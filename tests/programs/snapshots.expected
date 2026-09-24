@@ -1,0 +1,34 @@
+exit 0
+kept: 1 alive
+report 1 3 4 z 1 2.5 1
+deleted: 0 alive
+dup of the object: 2 alive
+copied bytes 2
+dup of the value: 2 alive
+copied bytes 3
+both deleted: 0 alive
+replaced: 1 alive
+second 2
+named: 0 alive
+shout 5
+plain 6
+plain deleted: 0 alive
+dropped 3 9
+not moved: 0 alive
+passed on: 1 alive
+passed on 9
+passed on deleted: 0 alive
+frame 11
+frame 12
+once 17
+local 30
+frame: 0 alive
+borrowed 47
+borrowed 41
+borrowed 42
+borrowed: 0 alive
+inline: 1 alive
+inline 4
+block left: 0 alive
+nested 6 12
+nested: 0 alive

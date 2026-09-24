@@ -192,7 +192,8 @@ static void fn_signature(struct text *out, const char *lead,
         /* A parameter of function type carries its mark in its type. An
            `extern fn` takes C function pointers alone and writes none. */
         if (p->kind == TYPE_FN && !p->bound && !c_function(keyword)) {
-            text_append(out, !p->context    ? "keep "
+            text_append(out, p->owned        ? "keep own "
+                             : !p->context   ? "keep "
                              : p->concurrent ? "concurrent "
                                              : "");
         }
@@ -200,7 +201,7 @@ static void fn_signature(struct text *out, const char *lead,
             text_appendf(out, "%.*s: ", (int)params[i].length,
                          params[i].text);
         }
-        type_name(out, t->params[first + i]);
+        type_name(out, p);
     }
     if (variadic) {
         text_append(out, param_count > 0 || self ? ", ..." : "...");

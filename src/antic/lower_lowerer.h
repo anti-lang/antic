@@ -53,6 +53,9 @@ struct exit_action {
        after the locals of the body are gone. An exit that gives an error
        runs `failed` before it. */
     bool leave;
+    /* A `keep own` parameter in local frees its snapshot at every exit,
+       unless it moved and holds `none`. */
+    bool snapshot;
 };
 
 struct defers {
@@ -225,6 +228,13 @@ void lower_push_argument(struct lowerer *l, struct ir_operand *args,
 struct ir_function *lower_anonymous_function(struct lowerer *l,
                                              struct item *it);
 uint32_t lower_captures_agg(struct lowerer *l, const struct item *it);
+uint32_t lower_snapshot_agg(struct lowerer *l, const struct item *it);
+struct ir_operand lower_context_word(struct lowerer *l, const struct type *t,
+                                     struct ir_operand pair);
+void lower_free_snapshot(struct lowerer *l, const struct type *t,
+                         struct ir_operand pair);
+void lower_dup_snapshot(struct lowerer *l, const struct type *t,
+                        struct ir_operand from, struct ir_operand into);
 const struct ir_function *lower_bound_signature(struct lowerer *l,
                                                 const struct type *t);
 double lower_float_literal(const struct expr *literal, enum ir_type type);
@@ -418,6 +428,7 @@ struct ir_operand lower_simd(struct lowerer *l, const struct expr *e);
 /* lower_stmt.c */
 
 void lower_push_leave_action(struct lowerer *l);
+void lower_push_snapshot_action(struct lowerer *l, const struct symbol *param);
 bool lower_type_needs_destruct(const struct type *t);
 void lower_clear_tables(struct lowerer *l, struct ir_operand base,
                         const struct type *t);

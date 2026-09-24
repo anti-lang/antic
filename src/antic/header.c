@@ -216,6 +216,32 @@ static void c_type_name(struct text *out, const struct type *t)
     }
 }
 
+static void declaration(struct text *out, const struct type *t,
+                        const char *name, const struct type *owner);
+
+/* The C function pointer name of the function type t. The form of two
+   words takes its context last, as a `void *`. */
+static void callback(struct text *out, const struct type *t,
+                     const char *name, const struct type *owner)
+{
+    struct text inner = {0};
+    size_t i;
+
+    text_appendf(&inner, "(*%s)(", name);
+    for (i = 0; i < t->param_count; i++) {
+        struct text param = {0};
+        declaration(&param, t->params[i], "", owner);
+        text_appendf(&inner, "%s%s", i > 0 ? ", " : "", text_cstr(&param));
+        text_free(&param);
+    }
+    if (t->context) {
+        text_append(&inner, t->param_count > 0 ? ", void *" : "void *");
+    }
+    text_append(&inner, t->param_count == 0 && !t->context ? "void)" : ")");
+    declaration(out, t->result, text_cstr(&inner), owner);
+    text_free(&inner);
+}
+
 /* Append the C declaration of name with type t. owner is the aggregate
    whose definition holds the declaration, which names itself with its
    tag. */
@@ -223,7 +249,6 @@ static void declaration(struct text *out, const struct type *t,
                         const char *name, const struct type *owner)
 {
     struct text inner = {0};
-    size_t i;
 
     switch (t->kind) {
     /* DESIGN: C has one pointer type, so `*T` and `?*T` both cross as
@@ -248,18 +273,7 @@ static void declaration(struct text *out, const struct type *t,
        context after its own parameters, which is where antic passes it,
        and a named function passes NULL there. */
     case TYPE_FN:
-        text_appendf(&inner, "(*%s)(", name);
-        for (i = 0; i < t->param_count; i++) {
-            struct text param = {0};
-            declaration(&param, t->params[i], "", owner);
-            text_appendf(&inner, "%s%s", i > 0 ? ", " : "", text_cstr(&param));
-            text_free(&param);
-        }
-        if (t->context) {
-            text_append(&inner, t->param_count > 0 ? ", void *" : "void *");
-        }
-        text_append(&inner, t->param_count == 0 && !t->context ? "void)" : ")");
-        declaration(out, t->result, text_cstr(&inner), owner);
+        callback(out, t, name, owner);
         if (t->context) {
             text_appendf(out, ", void *%s%s", name, name[0] != '\0' ? "_context"
                                                                     : "");
@@ -688,7 +702,16 @@ static void class_fields(struct text *out, const struct type *t)
         c_name(&buffer, &f->name);
         doc_comment(out, &f->doc, "    ");
         text_append(out, "    ");
-        declaration(&field, f->type, text_cstr(&buffer), t);
+        /* DESIGN: an `own fn` field is two words, the code and the
+           snapshot, which anti_rt_snapshot_free gives back. */
+        if (f->type->kind == TYPE_FN && f->type->owned) {
+            text_append(&field, "struct {\n        ");
+            callback(&field, f->type, "code", t);
+            text_appendf(&field, ";\n        void *snapshot;\n    } %s",
+                         text_cstr(&buffer));
+        } else {
+            declaration(&field, f->type, text_cstr(&buffer), t);
+        }
         text_free(&buffer);
         text_append(out, text_cstr(&field));
         text_appendf(out, ";%s%s\n",
@@ -1243,6 +1266,33 @@ static void guard_name(struct text *out, const char *name)
     text_append(out, "_H");
 }
 
+/* Whether an exported class of the interfaces has an `own fn` field,
+   whose snapshot C frees with anti_rt_snapshot_free. */
+static bool owns_snapshots(const struct interface *const *ifaces,
+                           size_t count)
+{
+    size_t i;
+    size_t j;
+    size_t k;
+
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < ifaces[i]->item_count; j++) {
+            const struct symbol *sym = ifaces[i]->items[j];
+            if (!sym->exported || sym->kind != SYMBOL_STRUCT ||
+                sym->type->kind != TYPE_CLASS) {
+                continue;
+            }
+            for (k = 0; k < sym->type->field_count; k++) {
+                const struct type *f = sym->type->fields[k].type;
+                if (f != NULL && f->kind == TYPE_FN && f->owned) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void header_write(struct text *out, const char *name,
                   const struct interface *const *ifaces, size_t count,
                   bool bundled)
@@ -1333,6 +1383,13 @@ void header_write(struct text *out, const char *name,
                     "const anti_descriptor *type);\n"
                     "void *anti_rt_dup(void *object, "
                     "const anti_descriptor *type);\n\n");
+                if (owns_snapshots(ifaces, count)) {
+                    text_append(out,
+                        "/* Free the snapshot of an `own fn` field, which "
+                        "the object frees\n   with itself. NULL frees "
+                        "nothing. */\n"
+                        "void anti_rt_snapshot_free(void *snapshot);\n\n");
+                }
                 i = count;
                 break;
             }

@@ -1576,6 +1576,9 @@ static void take_trace_name(struct lowerer *l)
     text_free(&name);
 }
 
+static void snapshot_entry(struct lowerer *l, const struct item *it,
+                           struct ir_block *entry);
+
 static void lower_function(struct lowerer *l, const struct item *it)
 {
     struct defers around;
@@ -1656,7 +1659,9 @@ static void lower_function(struct lowerer *l, const struct item *it)
        the address of every variable the closure captures, in the order
        of the captures. Each name reaches its variable through the
        address loaded here. */
-    if (it->capture_count > 0) {
+    if (it->capture_count > 0 && it->snapshot) {
+        snapshot_entry(l, it, entry);
+    } else if (it->capture_count > 0) {
         struct ir_operand context =
             lower_temp(l, l->f->params[l->f->param_count - 1].temp);
         uint32_t agg = lower_captures_agg(l, it);
@@ -1678,6 +1683,12 @@ static void lower_function(struct lowerer *l, const struct item *it)
        it runs after the locals of the body are gone. */
     memset(&around, 0, sizeof around);
     l->defers = &around;
+    for (i = 0; i < it->param_count; i++) {
+        const struct symbol *sym = it->params[i].symbol;
+        if (sym->type->kind == TYPE_FN && sym->type->owned) {
+            lower_push_snapshot_action(l, sym);
+        }
+    }
     if (traced_function(l, it)) {
         take_trace_name(l);
         l->trace_self = lower_temp(l, l->f->params[0].temp);
@@ -1699,6 +1710,81 @@ static void lower_function(struct lowerer *l, const struct item *it)
         } else {
             ir_ret(l->f, l->b, IR_VOID, lower_none());
         }
+    }
+}
+
+/* DESIGN: a snapshot is one record: its size in bytes, then a copy of
+   each value it captures in the order of the captures. A snapshot on
+   the heap holds the bytes of each `str` after the record, and the `ptr`
+   of the `str` holds their offset from the start. It then moves and
+   copies as a block of bytes, so freeing it and `dup` need nothing of
+   the closure. A snapshot in the frame holds each `str` as it was, since
+   the caller waits and the bytes stay. */
+uint32_t lower_snapshot_agg(struct lowerer *l, const struct item *it)
+{
+    struct ir_field *fields = ir_alloc(it->capture_count + 1,
+                                       sizeof *fields);
+    struct text name = {0};
+    uint32_t agg;
+    size_t i;
+
+    fields[0].name = "size";
+    fields[0].type = ir_scalar(IR_I64);
+    for (i = 0; i < it->capture_count; i++) {
+        fields[i + 1].name = lower_cstr(&it->captures[i].symbol->name);
+        fields[i + 1].type = lower_vtype_of(l, it->captures[i].symbol->type);
+    }
+    text_appendf(&name, "%s.snapshot", l->m->functions[it->symbol->ir]->name);
+    agg = ir_struct_add(l->m, IR_AGG_STRUCT, text_cstr(&name), fields,
+                        it->capture_count + 1, false, 0);
+    text_free(&name);
+    for (i = 0; i < it->capture_count; i++) {
+        free((char *)fields[i + 1].name);
+    }
+    free(fields);
+    return agg;
+}
+
+/* The entry of a snapshot: each captured name reaches its copy in the
+   record that the context points at. A `str` of a snapshot on the heap
+   is rebuilt in a slot from its offset. */
+static void snapshot_entry(struct lowerer *l, const struct item *it,
+                           struct ir_block *entry)
+{
+    struct ir_operand base =
+        lower_temp(l, l->f->params[l->f->param_count - 1].temp);
+    uint32_t agg = lower_snapshot_agg(l, it);
+    size_t i;
+
+    for (i = 0; i < it->capture_count; i++) {
+        struct symbol *sym = it->captures[i].symbol;
+        uint32_t at = ir_ptradd(
+            l->f, entry, base,
+            ir_sym_operand(l->m,
+                           ir_sym_offset_of(l->m, agg, (uint32_t)(i + 1))));
+        struct ir_operand len_offset;
+        struct ir_operand offset;
+        uint32_t slot;
+        uint32_t ptr;
+
+        if (!it->snapshot_heap || sym->type->kind != TYPE_STR) {
+            sym->ir = at;
+            continue;
+        }
+        len_offset = lower_field_offset(l, sym->type, &lower_len_name);
+        slot = ir_slot(l->f, entry, lower_vtype_of(l, sym->type));
+        offset = lower_temp(l, ir_load(l->f, entry, IR_I64, lower_temp(l, at)));
+        ptr = ir_ptradd(l->f, entry, base, offset);
+        ir_store(l->f, entry, IR_PTR, lower_temp(l, ptr), lower_temp(l, slot));
+        ir_store(l->f, entry, IR_I64,
+                 lower_temp(l, ir_load(l->f, entry, IR_I64,
+                                       lower_temp(l, ir_ptradd(
+                                                         l->f, entry,
+                                                         lower_temp(l, at),
+                                                         len_offset)))),
+                 lower_temp(l, ir_ptradd(l->f, entry, lower_temp(l, slot),
+                                         len_offset)));
+        sym->ir = slot;
     }
 }
 
@@ -2022,6 +2108,49 @@ struct ir_operand lower_slice_length(struct lowerer *l, struct ir_operand p,
 
 }
 
+/* The address of the context word of the function value of type t at
+   pair. */
+struct ir_operand lower_context_word(struct lowerer *l, const struct type *t,
+                                     struct ir_operand pair)
+{
+    return lower_offset_address(
+        l, pair,
+        ir_sym_operand(l->m, ir_sym_offset_of(l->m, lower_agg_of(l, t), 1)));
+}
+
+/* DESIGN: an `own fn` frees its snapshot with its owner and leaves
+   `none` in the context word. A function that captures nothing holds
+   `none` there, and the runtime frees nothing for it. The snapshot is
+   memory of the C library whatever allocator the owner came from. */
+void lower_free_snapshot(struct lowerer *l, const struct type *t,
+                         struct ir_operand pair)
+{
+    static const enum ir_type one[] = {IR_PTR};
+    struct ir_operand word = lower_context_word(l, t, pair);
+    struct ir_operand snapshot =
+        lower_temp(l, ir_load(l->f, l->b, IR_PTR, word));
+
+    lower_rt_call(l, "anti_rt_snapshot_free", IR_VOID, one, &snapshot, 1);
+    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), word);
+}
+
+/* The copy of the `own fn` of type t at from into the pair at into: the
+   code, and a copy of the snapshot, byte for byte. */
+void lower_dup_snapshot(struct lowerer *l, const struct type *t,
+                        struct ir_operand from, struct ir_operand into)
+{
+    static const enum ir_type one[] = {IR_PTR};
+    struct ir_operand snapshot = lower_temp(
+        l, ir_load(l->f, l->b, IR_PTR, lower_context_word(l, t, from)));
+    struct ir_operand made;
+
+    ir_store(l->f, l->b, IR_PTR,
+             lower_temp(l, ir_load(l->f, l->b, IR_PTR, from)), into);
+    made = lower_rt_call(l, "anti_rt_snapshot_dup", IR_PTR, one, &snapshot,
+                         1);
+    ir_store(l->f, l->b, IR_PTR, made, lower_context_word(l, t, into));
+}
+
 /* The teardown of the field f of level up, in the object at self. Owned
    memory goes back to the allocator from. */
 static void teardown_field(struct lowerer *l, const struct type *up,
@@ -2043,6 +2172,10 @@ static void teardown_field(struct lowerer *l, const struct type *up,
         return;
     }
     at = lower_offset_address(l, self, lower_field_offset(l, up, &f->name));
+    if (f->type->kind == TYPE_FN) {
+        lower_free_snapshot(l, f->type, at);
+        return;
+    }
     if (!f->owned) {
         struct ir_operand args[2];
         args[0] = at;
@@ -2158,6 +2291,10 @@ static void copy_field(struct lowerer *l, const struct type *up,
     offset = lower_field_offset(l, up, &f->name);
     from = lower_offset_address(l, self, offset);
     into = lower_offset_address(l, to, offset);
+    if (f->type->kind == TYPE_FN) {
+        lower_dup_snapshot(l, f->type, from, into);
+        return;
+    }
     if (!f->owned) {
         lower_check_table(l, lower_temp(l, ir_load(l->f, l->b, IR_PTR, from)),
                           f->type);

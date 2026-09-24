@@ -140,6 +140,13 @@ struct type {
        thread-safe. */
     bool context;                   /* TYPE_FN: the code and a context */
     bool concurrent;                /* TYPE_FN, context: `concurrent` */
+    /* DESIGN: `own fn(...)` is the form of two words that owns its
+       context, the address of a snapshot on the heap, and frees it with
+       its owner. An `own` field and a `keep own` parameter hold it. It is
+       read-only, so it is `concurrent` as well, and it lends itself to a
+       parameter of the form of two words. Nothing else converts to it
+       but a snapshot, a function that captures nothing and `dup`. */
+    bool owned;                     /* TYPE_FN, context: `own fn` */
     /* DESIGN: `fn(A) -> R may fail` is a type of its own. It holds the
        ABI form that the checker gives a `may fail` function: `?*Error` as
        the result, and the out pointer last when the type names a result.
@@ -256,6 +263,9 @@ struct type *types_fn_flagged(struct types *types, struct type *const *params,
    stays. */
 struct type *types_fn_form(struct types *types, struct type *fn, bool context,
                            bool concurrent);
+/* The same function type as `own fn(...)`, the form of two words that
+   owns its snapshot. */
+struct type *types_fn_owned(struct types *types, struct type *fn);
 
 /* DESIGN: a bound function is a value of two words, the object and the
    entry of the table. Its type is the function type without `self`. It

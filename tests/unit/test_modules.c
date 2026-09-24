@@ -270,7 +270,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 55, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 56, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1346,9 +1346,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 56;
+    copy[4] = 57;
     refuses_file(copy, sizeof copy,
-                 "has format version 56, and antic reads version 55");
+                 "has format version 57, and antic reads version 56");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1371,7 +1371,13 @@ static void damaged_files(void)
     /* The flags of the function type: a bit that names nothing, and an
        out pointer without `may fail`. */
     memcpy(copy, scale_antl, sizeof copy);
+    copy[FN_FLAGS] = 128;
+    refuses_file(copy, sizeof copy, "is damaged at byte 86");
+    /* `own fn` without the form of two words and `concurrent`, which it
+       always stands with. */
     copy[FN_FLAGS] = 64;
+    refuses_file(copy, sizeof copy, "is damaged at byte 86");
+    copy[FN_FLAGS] = 64 | 16;
     refuses_file(copy, sizeof copy, "is damaged at byte 86");
     /* `concurrent` without the form of two words, and that form on a
        bound function. */

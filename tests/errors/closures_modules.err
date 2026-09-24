@@ -1,4 +1,4 @@
 closures_modules.anti:16:12: error: `f` is not marked `keep` and cannot be stored
-closures_modules.anti:17:13: error: a closure is never kept, and this one captures `count`
+closures_modules.anti:17:13: error: a closure is never kept, and this one captures `count`, so a `snapshot fn` at a `keep own` parameter or an `own` field takes its value
 closures_modules.anti:21:32: error: `f` is passed on to a `concurrent` parameter and is not marked `concurrent`
-closures_modules.anti:23:3: error: `count` is changed in a closure at a `concurrent` parameter, and `int` is not thread-safe
+closures_modules.anti:23:3: error: `count` is changed in a closure at a `concurrent` parameter, and `int` is not thread-safe, so a `snapshot fn` reads a copy of it instead

@@ -1,0 +1,18 @@
+snapshots.anti:28:15: error: a parameter that owns a function keeps it, and is written `keep own`
+snapshots.anti:40:24: error: `n` is changed in a snapshot, which is read-only
+snapshots.anti:42:9: error: a snapshot holds values that copy fully, and `p` is `*Holder`
+snapshots.anti:43:9: error: a snapshot holds values that copy fully, and `items` is `[]int`
+snapshots.anti:49:9: error: a snapshot holds values that copy fully, and `f` is `fn(int)`
+snapshots.anti:55:10: error: a `snapshot fn` is kept where it is owned, by a `keep own` parameter or an `own` field
+snapshots.anti:56:12: error: a `snapshot fn` is kept where it is owned, by a `keep own` parameter or an `own` field
+snapshots.anti:57:10: error: a closure is never kept, and this one captures `n`, so a `snapshot fn` at a `keep own` parameter or an `own` field takes its value
+snapshots.anti:58:11: error: a `snapshot fn` is kept where it is owned, by a `keep own` parameter or an `own` field
+snapshots.anti:63:18: error: an `own fn` value is not copied by `=`, use `dup`
+snapshots.anti:64:10: error: an `own fn` value owns its snapshot and does not pass as one C function pointer
+snapshots.anti:65:11: error: an `own fn` value owns its snapshot and does not pass as one C function pointer
+snapshots.anti:66:9: error: `f` is not marked `keep own` and cannot be owned
+snapshots.anti:68:9: error: a closure is never kept, and this one captures `n`, so a `snapshot fn` at a `keep own` parameter or an `own` field takes its value
+snapshots.anti:69:10: error: the copy `dup` makes of a function has no owner here, and goes to an `own` field or a `keep own` parameter
+snapshots.anti:70:18: error: `dup` copies an `own fn`, and this is `fn(int)`
+snapshots.anti:76:2: error: `f` has moved into an owner on line 75 and is not named after it
+snapshots.anti:82:15: error: `f` moves into an owner inside a loop, which would move it again
