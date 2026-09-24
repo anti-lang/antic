@@ -514,6 +514,7 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
     struct selector s;
     struct layouts layouts;
     struct expand_target natives;
+    bool ok = false;
     size_t i;
 
     memset(&s, 0, sizeof s);
@@ -526,8 +527,7 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
        have before. */
     if (!layouts_init(&layouts, t, m, error, error_size) ||
         !layout_data(&layouts, m)) {
-        layouts_free(&layouts);
-        return false;
+        goto done;
     }
     natives.flags_native = target_desc(t)->flags_native;
     natives.vector_native = target_desc(t)->vector_native;
@@ -537,8 +537,7 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
     for (i = 0; i < m->function_count; i++) {
         bool resolved = false;
         if (!layout_resolve(&layouts, m->functions[i], &resolved)) {
-            layouts_free(&layouts);
-            return false;
+            goto done;
         }
         if (!m->functions[i]->is_extern &&
             expand_function(m->functions[i], &natives)) {
@@ -557,7 +556,6 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
     s.error = error;
     s.error_size = error_size;
     for (i = 0; i < m->function_count && !s.failed; i++) {
-        out[i] = NULL;
         if (m->functions[i]->is_extern) {
             continue;
         }
@@ -566,6 +564,8 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
         s.out = out[i];
         select_function(&s);
     }
+    ok = !s.failed;
+done:
     layouts_free(&layouts);
-    return !s.failed;
+    return ok;
 }

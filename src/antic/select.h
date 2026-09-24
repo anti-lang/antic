@@ -183,7 +183,8 @@ const struct target_desc *target_desc(enum target t);
    values with constants. cpu is the level of the code, which picks an
    instruction or a call of the runtime where the levels differ. Returns
    false and writes a message to error for a layout error or an
-   instruction without a pattern. */
+   instruction without a pattern. Each function of out is the caller's,
+   who frees it with mach_function_free and then free. */
 bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
                    struct mach_function **out, char *error,
                    size_t error_size);

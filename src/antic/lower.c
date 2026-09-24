@@ -183,6 +183,10 @@ static bool is_aggregate(const struct type *t)
 
 static struct ir_vtype vtype_of(struct lowerer *l, const struct type *t);
 
+static char *copy_text(const struct text *t);
+
+/* The name of type t, qualified by its module when qualified is set. The
+   caller frees it with free. */
 static char *name_of_type(const struct type *t, bool qualified)
 {
     struct text name = {0};
@@ -193,8 +197,7 @@ static char *name_of_type(const struct type *t, bool qualified)
     } else {
         type_name(&name, t);
     }
-    copy = ir_alloc(name.length + 1, 1);
-    memcpy(copy, text_cstr(&name), name.length + 1);
+    copy = copy_text(&name);
     text_free(&name);
     return copy;
 }
@@ -349,6 +352,34 @@ static struct ir_function *find_function(const struct ir_module *m,
         }
     }
     return NULL;
+}
+
+/* A global of the IR module by its module and name, or NULL. A NULL
+   module names a global the runtime defines. */
+static struct ir_global *find_global(const struct ir_module *m,
+                                     const char *module, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        struct ir_global *g = m->globals[i];
+        if (strcmp(g->name, name) == 0 &&
+            (module == NULL ? g->module == NULL
+                            : g->module != NULL &&
+                                  strcmp(g->module, module) == 0)) {
+            return g;
+        }
+    }
+    return NULL;
+}
+
+/* A copy of the text of t, which the caller frees with free. */
+static char *copy_text(const struct text *t)
+{
+    char *copy = ir_alloc(t->length + 1, 1);
+
+    memcpy(copy, text_cstr(t), t->length + 1);
+    return copy;
 }
 
 static uint32_t result_agg(struct lowerer *l, const struct type *t)
@@ -1218,21 +1249,14 @@ static struct ir_global *static_global(struct lowerer *l,
     struct ir_module *m = l->m;
     struct ir_const *value;
     char *name = cstr(&sym->name);
-    struct ir_global *g = NULL;
-    size_t i;
+    struct ir_global *g = find_global(m, l->module_name, name);
 
-    for (i = 0; i < m->global_count; i++) {
-        if (m->globals[i]->module != NULL &&
-            strcmp(m->globals[i]->module, l->module_name) == 0 &&
-            strcmp(m->globals[i]->name, name) == 0) {
-            free(name);
-            return m->globals[i];
-        }
+    if (g == NULL) {
+        value = arena_alloc(m->arena, sizeof *value);
+        const_tree(l, sym->value, sym->type, value);
+        g = ir_global_add_value(m, l->module_name, name, value);
+        g->mutable = true;
     }
-    value = arena_alloc(m->arena, sizeof *value);
-    const_tree(l, sym->value, sym->type, value);
-    g = ir_global_add_value(m, l->module_name, name, value);
-    g->mutable = true;
     free(name);
     return g;
 }
@@ -1451,18 +1475,31 @@ static const struct const_value *location_value(struct lowerer *l,
     return v;
 }
 
-/* The aggregate of a table of n entries: an array of n pointers. Every
-   class of one length shares it, as any two equal array types do. */
+/* The aggregate of an array of n elements of type element, whose name is
+   element_name. Every use of one length shares it, as any two equal
+   array types do. The caller builds element first, since that may add an
+   aggregate and the length adds a symbol. */
+static uint32_t array_agg(struct lowerer *l, const char *element_name,
+                          struct ir_vtype element, size_t n)
+{
+    struct text name = {0};
+    uint32_t agg;
+    uint32_t length;
+
+    text_appendf(&name, "[%zu]%s", n, element_name);
+    agg = ir_agg_find(l->m, text_cstr(&name));
+    if (agg == IR_NO_AGG) {
+        length = ir_sym_int(l->m, IR_I64, (uint64_t)n);
+        agg = ir_array_add(l->m, text_cstr(&name), element, length, NULL);
+    }
+    text_free(&name);
+    return agg;
+}
+
+/* The aggregate of a table of n entries: an array of n pointers. */
 static uint32_t table_agg(struct lowerer *l, size_t n)
 {
-    char name[32];
-
-    snprintf(name, sizeof name, "[%zu]ptr", n);
-    if (ir_agg_find(l->m, name) != IR_NO_AGG) {
-        return ir_agg_find(l->m, name);
-    }
-    return ir_array_add(l->m, name, ir_scalar(IR_PTR),
-                        ir_sym_int(l->m, IR_I64, (uint64_t)n), NULL);
+    return array_agg(l, "ptr", ir_scalar(IR_PTR), n);
 }
 
 /* The class behind a value of type T or *T, or NULL. */
@@ -1644,7 +1681,6 @@ static struct ir_operand entry_offset(struct lowerer *l, int index)
                                  ir_sym_size_of(l->m, ir_scalar(IR_PTR)))));
 }
 
-/* The aggregate of one field record of a descriptor. */
 /* DESIGN: the function record of a descriptor names one public function
    of the class and where its entry sits. A program reads the list and
    calls through the table, so reflection needs no name of its own. */
@@ -1674,16 +1710,12 @@ static uint32_t function_agg(struct lowerer *l)
 /* The aggregate of a function list of n records. */
 static uint32_t functions_agg(struct lowerer *l, size_t n)
 {
-    char name[48];
+    uint32_t record = function_agg(l);
 
-    snprintf(name, sizeof name, "[%zu]anti.rt.Function", n);
-    if (ir_agg_find(l->m, name) != IR_NO_AGG) {
-        return ir_agg_find(l->m, name);
-    }
-    return ir_array_add(l->m, name, ir_aggregate(function_agg(l)),
-                        ir_sym_int(l->m, IR_I64, (uint64_t)n), NULL);
+    return array_agg(l, "anti.rt.Function", ir_aggregate(record), n);
 }
 
+/* The aggregate of one field record of a descriptor. */
 static uint32_t field_agg(struct lowerer *l)
 {
     static const char name[] = "anti.rt.Field";
@@ -1712,14 +1744,9 @@ static uint32_t field_agg(struct lowerer *l)
 /* The aggregate of an array of n field records. */
 static uint32_t fields_agg(struct lowerer *l, size_t n)
 {
-    char name[40];
+    uint32_t record = field_agg(l);
 
-    snprintf(name, sizeof name, "[%zu]anti.rt.Field", n);
-    if (ir_agg_find(l->m, name) != IR_NO_AGG) {
-        return ir_agg_find(l->m, name);
-    }
-    return ir_array_add(l->m, name, ir_aggregate(field_agg(l)),
-                        ir_sym_int(l->m, IR_I64, (uint64_t)n), NULL);
+    return array_agg(l, "anti.rt.Field", ir_aggregate(record), n);
 }
 
 /* The aggregate of a class descriptor. Every class shares it. */
@@ -1787,64 +1814,57 @@ static uint32_t class_depth(const struct type *t)
 }
 
 /* A global of the module named `<class>.<suffix>`, or NULL when the
-   module has none. Every class builds its data once. */
+   module has none. Every class builds its data once. On NULL,
+   *module_out and *name_out receive the module and the name to give the
+   global, and the caller frees both with free. */
 static struct ir_global *class_global(struct lowerer *l, const struct type *t,
                                       const char *suffix, char **module_out,
                                       char **name_out)
 {
     struct ir_module *m = l->m;
     char *module = cstr(&t->module);
-    char *name;
-    size_t size;
-    size_t i;
+    struct text name = {0};
+    struct ir_global *g;
 
     /* DESIGN: an export class gives its table and its descriptor the C
        names the generated header declares, so C code reads them. Every
        other class, and every struct, keeps the name `Type.part` of its
        module. */
-    size = t->name.length + strlen(suffix) + 8;
-    name = ir_alloc(size, 1);
     if (t->item_exported && t->kind == TYPE_CLASS &&
         (strcmp(suffix, "table") == 0 || strcmp(suffix, "descriptor") == 0)) {
-        snprintf(name, size, "anti_%.*s_%s", (int)t->name.length,
-                 t->name.text,
-                 strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
+        text_appendf(&name, "anti_%.*s_%s", (int)t->name.length,
+                     t->name.text,
+                     strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
     } else {
-        memcpy(name, t->name.text, t->name.length);
-        name[t->name.length] = '.';
-        memcpy(name + t->name.length + 1, suffix, strlen(suffix) + 1);
+        text_appendf(&name, "%.*s.%s", (int)t->name.length, t->name.text,
+                     suffix);
     }
-    for (i = 0; i < m->global_count; i++) {
-        if (m->globals[i]->module != NULL &&
-            strcmp(m->globals[i]->module, module) == 0 &&
-            strcmp(m->globals[i]->name, name) == 0) {
-            free(module);
-            free(name);
-            return m->globals[i];
-        }
-    }
+    g = find_global(m, module, text_cstr(&name));
     /* DESIGN: a class's table and descriptor belong to the module that
        declares it, which writes them whether it builds one or not. A
        module that names a class of another refers to them, so a program
        holds one descriptor per class and `is` compares one address. */
-    if (l->module_name != NULL && strcmp(module, l->module_name) != 0) {
-        struct ir_global *g = ir_global_add(m, module, name, NULL, 0, 1);
+    if (g == NULL && strcmp(module, l->module_name) != 0) {
+        g = ir_global_add(m, module, text_cstr(&name), NULL, 0, 1);
         g->is_extern = true;
         g->exported = t->item_exported;
-        free(module);
-        free(name);
-        return g;
     }
-    *module_out = module;
-    *name_out = name;
-    return NULL;
+    if (g == NULL) {
+        *module_out = module;
+        *name_out = copy_text(&name);
+    } else {
+        free(module);
+    }
+    text_free(&name);
+    return g;
 }
 
 static struct ir_global *class_descriptor(struct lowerer *l,
                                           const struct type *t);
 
 /* The global `<Struct>.<suffix>` of the module that declares the struct,
-   or NULL with the module and the name to give it. */
+   or NULL. On NULL, *module_out and *name_out receive the module and the
+   name to give the global, and the caller frees both with free. */
 static struct ir_global *struct_global(struct lowerer *l,
                                        const struct type *t,
                                        const char *suffix, char **module_out,
@@ -1853,34 +1873,26 @@ static struct ir_global *struct_global(struct lowerer *l,
     struct ir_module *m = l->m;
     char *module = cstr(&t->module);
     struct text name = {0};
-    size_t i;
+    struct ir_global *g;
 
     text_appendf(&name, "%.*s.%s", (int)t->name.length, t->name.text, suffix);
-    for (i = 0; i < m->global_count; i++) {
-        if (m->globals[i]->module != NULL &&
-            strcmp(m->globals[i]->module, module) == 0 &&
-            strcmp(m->globals[i]->name, text_cstr(&name)) == 0) {
-            free(module);
-            text_free(&name);
-            return m->globals[i];
-        }
-    }
-    *name_out = ir_alloc(name.length + 1, 1);
-    memcpy(*name_out, text_cstr(&name), name.length + 1);
-    text_free(&name);
+    g = find_global(m, module, text_cstr(&name));
     /* DESIGN: a struct's descriptor belongs to the module that declares
        it, as a class's does. A module that names the struct of another
        refers to it. A program then holds one descriptor per struct, and
        two field records of one struct hold one address. */
-    if (strcmp(module, l->module_name) != 0) {
-        struct ir_global *g = ir_global_add(m, module, *name_out, NULL, 0, 1);
+    if (g == NULL && strcmp(module, l->module_name) != 0) {
+        g = ir_global_add(m, module, text_cstr(&name), NULL, 0, 1);
         g->is_extern = true;
-        free(module);
-        free(*name_out);
-        return g;
     }
-    *module_out = module;
-    return NULL;
+    if (g == NULL) {
+        *module_out = module;
+        *name_out = copy_text(&name);
+    } else {
+        free(module);
+    }
+    text_free(&name);
+    return g;
 }
 
 /* The count of fields a descriptor lists: the class's own fields, with
@@ -2075,18 +2087,13 @@ static struct ir_global *class_fields(struct lowerer *l,
 static struct ir_global *runtime_global(struct lowerer *l, const char *name)
 {
     struct ir_module *m = l->m;
-    struct ir_global *g;
-    size_t i;
+    struct ir_global *g = find_global(m, NULL, name);
 
-    for (i = 0; i < m->global_count; i++) {
-        if (m->globals[i]->module == NULL &&
-            strcmp(m->globals[i]->name, name) == 0) {
-            return m->globals[i];
-        }
+    if (g == NULL) {
+        g = ir_global_add(m, NULL, name, NULL, 0, 1);
+        g->is_extern = true;
+        g->exported = true;
     }
-    g = ir_global_add(m, NULL, name, NULL, 0, 1);
-    g->is_extern = true;
-    g->exported = true;
     return g;
 }
 
@@ -2263,15 +2270,11 @@ static const struct ir_global *version_global(struct lowerer *l)
     static const char name[] = "package.version";
     struct ir_module *m = l->m;
     size_t length = strlen(l->version);
+    struct ir_global *g = find_global(m, l->module_name, name);
     uint8_t *bytes;
-    size_t i;
 
-    for (i = 0; i < m->global_count; i++) {
-        if (m->globals[i]->module != NULL && l->module_name != NULL &&
-            strcmp(m->globals[i]->module, l->module_name) == 0 &&
-            strcmp(m->globals[i]->name, name) == 0) {
-            return m->globals[i];
-        }
+    if (g != NULL) {
+        return g;
     }
     bytes = arena_alloc(m->arena, length + 1);
     memcpy(bytes, l->version, length + 1);
@@ -3087,22 +3090,16 @@ static struct ir_global *inject_slot(struct lowerer *l, const struct type *t)
     struct ir_module *m = l->m;
     struct text name = {0};
     struct ir_global *g;
-    size_t i;
 
     text_appendf(&name, INJECT_SLOT_PREFIX "%.*s.%.*s",
                  (int)t->module.length, t->module.text,
                  (int)t->name.length, t->name.text);
-    for (i = 0; i < m->global_count; i++) {
-        if (m->globals[i]->module != NULL &&
-            strcmp(m->globals[i]->module, RUNTIME_MODULE) == 0 &&
-            strcmp(m->globals[i]->name, text_cstr(&name)) == 0) {
-            text_free(&name);
-            return m->globals[i];
-        }
+    g = find_global(m, RUNTIME_MODULE, text_cstr(&name));
+    if (g == NULL) {
+        g = ir_global_add(m, RUNTIME_MODULE, text_cstr(&name), NULL, 0, 1);
+        g->is_extern = true;
+        g->mutable = true;
     }
-    g = ir_global_add(m, RUNTIME_MODULE, text_cstr(&name), NULL, 0, 1);
-    g->is_extern = true;
-    g->mutable = true;
     text_free(&name);
     return g;
 }

@@ -18,7 +18,8 @@
    whole program in dev mode as well as in release mode. */
 
 /* The classes of a program and the tables that each class pointer may
-   point at. */
+   point at. whole_build returns one that the caller frees with
+   whole_free. */
 struct whole;
 
 struct whole *whole_build(const struct ir_module *program);
