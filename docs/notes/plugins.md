@@ -50,13 +50,40 @@ that carry them.
 keeps the `[[library]]` entries of the other libraries of the directory
 and replaces the one of the library it wrote.
 
+The driver sets `plugin` of the IR module. On ELF and COFF
+`select_uses_got` then gives every function and every datum of another
+module the address in an entry: the GOT on ELF, and on COFF the
+`__imp_` pointer the import library of the host defines. ld.lld refuses
+a pc-relative reference to a name a shared object leaves undefined, and
+a COFF image has no GOT. Mach-O keeps the direct references that
+`-undefined dynamic_lookup` binds.
+
+The data of a COFF plugin cannot load an entry. An address of a name of
+the host in it holds the address of the `__imp_` entry instead, and
+`emit_imports` lists each such place in `anti_rt_imports`. The loader
+of `src/rt/platform_windows.c` replaces each with the address its entry
+holds before `plugin.c` reads the table. A state word keeps a second
+open of the same library from doing it twice. The `.def` file of a
+Windows plugin exports `anti_rt_provides` and `anti_rt_imports`, and the
+link takes `/NOENTRY`, the import library of the host, the vcruntime
+and the UCRT, whose heap the host shares.
+
 ## The host
 
 A program that injects an interface or calls `anti_rt_plugin_load` is a
 host. `whole_hosts_plugins` says so, and the driver reads it before the
 optimizer, for the same reason. The emitter then makes every function
-and every datum global and marks none hidden, and the link passes
-`-export_dynamic`. `--closed` turns both off.
+and every datum global and marks none hidden. The link passes
+`-export_dynamic` on macOS. On Linux it links in the glibc mode with
+`--export-dynamic`, since a static program of musl has no loader.
+`--closed` turns all of it off.
+
+A Windows host writes `<program>.def` and the link writes the import
+library `<program>.lib` beside it. `emit_names` lists the names of the
+object, a datum with `DATA`. `coff_archive_exports` of
+`src/antic/coff.c` adds the names of the runtime members the link takes.
+It reads the symbol index of the archive and follows the undefined names
+of the object and `main` through the members, as the linker does.
 
 The runtime is compiled without hidden visibility, so its symbols are
 there to resolve as well. A shared library for C keeps the surface that

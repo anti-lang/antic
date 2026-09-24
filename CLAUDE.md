@@ -227,10 +227,12 @@ directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
     `serialize`, `deserialize` and `reflect` handle it. It replaces the
     entry under "Sum types" in `docs/decisions.md` that gives a variant
     none.
-26. Plugins on Linux and Windows. On Linux a program that loads plugins
-    links in the dynamic glibc mode. On Windows the host links with an
-    import library its plugins resolve against. It extends the entry under
-    "Plugins" in `docs/decisions.md` that loads a library on macOS alone.
+26. Done. Plugins on Linux and Windows, and the Linux link mode against
+    glibc. A module names a library of the glibc sysroot with
+    `link linux "X11";`. A Linux program that reaches one, or that can
+    load a plugin, links dynamically against glibc 2.35. A Windows host
+    links with an import library its plugins resolve against.
+    `docs/reports/2026-09-24-glibc-and-plugins.md` reports it.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
@@ -364,9 +366,10 @@ reports what it finished.
   `anti-plugins.toml` beside a library, and `"plugin:path"` and `"discover"`
   of the manifest take a provider from one. `[injections]` and
   `--anti.inject` replace a provider at start, and `--closed` builds a
-  program a plugin cannot bind against. A program loads a library where it
-  is linked dynamically, which is macOS today. See "Plugins" in
-  `docs/decisions.md` and `docs/notes/plugins.md`.
+  program a plugin cannot bind against. A program loads a library on all
+  three systems. On Linux a host links against glibc, and a Windows
+  plugin links against the import library `<program>.lib` of its host.
+  See "Plugins" in `docs/decisions.md` and `docs/notes/plugins.md`.
 - Interface versioning is built. Every class descriptor carries the version
   of the package that declared the class, `--package-version` and `0.0.0`
   without one. An abstract class carries the chain of its structural hashes,
@@ -462,7 +465,10 @@ reports what it finished.
   `--probe`, the ABI probe in C and in Anti. `--clang` runs clang with
   `-Xclang -ast-dump=json` and reads the JSON with the scanner of
   `src/rt/json.c`. `anti bind --header <name>.antl` writes the header of `--lib`.
-  `link framework "Name";` is built, and `anti` passes the names to antic.
+  `link framework "Name";` and `link linux "Name";` are built, and `anti`
+  passes the names to antic. A Linux program that reaches a `link linux`
+  line links dynamically against the glibc 2.35 sysroot
+  `linux-<cpu>-glibc`, and every other one statically against musl.
   See "The bind command" in `docs/decisions.md` and `docs/notes/bind.md`.
   `anti fmt` writes the canonical form of the formatter rules, and `src/std/` and
   `tests/` stand in it.
@@ -495,7 +501,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 53. See "The doc
+  class body and the `worker` mark, and its format version is 54. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
