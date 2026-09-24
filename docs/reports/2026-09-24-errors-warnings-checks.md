@@ -106,7 +106,7 @@ All are under "Errors, warnings and checks" in `docs/decisions.md`:
 
 The push of `9fd32d8`, before this section was added:
 
-```
+```text
 $ git log --oneline -3
 9fd32d8 Report the warning names, allow, unchecked and catch none
 4a5509a Add catch_none to the emit manifest and widen the mask of the checks
