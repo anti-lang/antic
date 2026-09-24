@@ -1,0 +1,56 @@
+//! A failing call that is an argument of another failing call writes its result
+//! into a slot of its own, and the outer call writes the place its `let`
+//! names. The outer call passes that place, however many failing calls its
+//! arguments hold.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+fn make(k: int) -> int may fail
+{
+	if k < 0 {
+		fail "negative";
+	}
+	return k;
+}
+
+fn twice(k: int) -> int may fail
+{
+	if k < 0 {
+		fail "negative";
+	}
+	return 2 * k;
+}
+
+fn pair(a: int, b: int) -> Pair may fail
+{
+	if a < 0 {
+		fail "negative";
+	}
+	return Pair { a: a, b: b };
+}
+
+fn run() may fail
+{
+	let x = try twice(try make(7));
+	printf("int %d\n".ptr, x as c_int);
+	let p = try pair(try make(7), try twice(4));
+	printf("pair %d %d\n".ptr, p.a as c_int, p.b as c_int);
+	x = try twice(try twice(try make(3)));
+	printf("assigned %d\n".ptr, x as c_int);
+	let q = pair(try make(1), 2) catch fatal;
+	printf("caught %d %d\n".ptr, q.a as c_int, q.b as c_int);
+}
+
+fn main() -> int
+{
+	run() catch fatal;
+	return 0;
+}

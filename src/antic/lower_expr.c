@@ -1889,6 +1889,10 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
                                     callee->type->kind == TYPE_FN
                                 ? callee->type
                                 : NULL;
+    /* DESIGN: the place this call writes its result to is read before
+       the arguments are lowered. A failing call among them sets the out
+       address of its own slot, which is no place of this call. */
+    struct ir_operand out = l->out_address;
     struct ir_operand target = lower_none();
     struct ir_operand bound = lower_none();
     struct ir_operand context = lower_none();
@@ -1946,7 +1950,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         n++;
     }
     if (e->as.call.out != NULL) {
-        args[given++] = l->out_address;
+        args[given++] = out;
         n++;
     }
     if (context.kind != IR_NONE) {
