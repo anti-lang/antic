@@ -1,6 +1,5 @@
 #include "lower.h"
 
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -80,7 +79,6 @@ struct lowerer {
     struct ir_module *m;
     const char *file;           /* the source path, for an assertion */
     uint32_t file_index;        /* the same path in the module's table */
-    struct diagnostics *diags;
     const char *module_name;
     struct ir_function *f;
     struct ir_block *b;         /* NULL after a terminator */
@@ -111,7 +109,6 @@ struct lowerer {
     /* The error of the exit that runs the deferred statements, which the
        `failed` hook takes. */
     struct ir_operand failing_error;
-    bool failed;
 };
 
 static struct ir_operand none(void)
@@ -863,7 +860,7 @@ static void hook_object(struct lowerer *l, enum hook_kind hook,
     static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_operand args[2];
 
-    if (!l->hooks || l->failed || l->b == NULL || object.kind == IR_NONE) {
+    if (!l->hooks || l->b == NULL || object.kind == IR_NONE) {
         return;
     }
     args[0] = object;
@@ -920,7 +917,7 @@ static void hook_call(struct lowerer *l, enum hook_kind hook)
     static const enum ir_type params[] = {IR_PTR, IR_I64, IR_PTR, IR_I64};
     struct ir_operand args[4];
 
-    if (l->trace_name == NULL || l->failed || l->b == NULL) {
+    if (l->trace_name == NULL || l->b == NULL) {
         return;
     }
     args[0] = l->trace_self;
@@ -938,7 +935,7 @@ static void hook_failed(struct lowerer *l, struct ir_operand err)
     static const enum ir_type params[] = {IR_PTR, IR_PTR, IR_I64, IR_PTR};
     struct ir_operand args[4];
 
-    if (l->trace_name == NULL || l->failed || l->b == NULL ||
+    if (l->trace_name == NULL || l->b == NULL ||
         err.kind == IR_NONE) {
         return;
     }
@@ -959,7 +956,7 @@ static void hook_copied(struct lowerer *l, struct ir_operand made,
     static const enum ir_type params[] = {IR_PTR, IR_PTR};
     struct ir_operand args[2];
 
-    if (!l->hooks || l->failed || l->b == NULL || made.kind == IR_NONE) {
+    if (!l->hooks || l->b == NULL || made.kind == IR_NONE) {
         return;
     }
     args[0] = made;
@@ -1142,9 +1139,6 @@ static struct ir_operand field_address(struct lowerer *l,
     struct ir_operand address;
 
     address = pointer ? lower_expr(l, base) : lower_address(l, base);
-    if (l->failed) {
-        return none();
-    }
     return offset_address(l, address, field_offset(l, s, &e->as.field.name));
 }
 
@@ -1162,18 +1156,13 @@ static struct ir_operand first_element(struct lowerer *l, const struct expr *e,
     switch (e->type->kind) {
     case TYPE_ARRAY:
         address = lower_address(l, e);
-        if (!l->failed) {
-            *length = e->type->length_of != NULL
-                          ? ir_sym_operand(l->m, sym_of(l, e->type->length_of))
-                          : ir_int_op(IR_I64, e->type->length);
-        }
+        *length = e->type->length_of != NULL
+                      ? ir_sym_operand(l->m, sym_of(l, e->type->length_of))
+                      : ir_int_op(IR_I64, e->type->length);
         return address;
     case TYPE_STR:
     case TYPE_SLICE:
         address = lower_address(l, e);
-        if (l->failed) {
-            return none();
-        }
         *length = slice_length(l, address, e->type);
         return temp(l, ir_load(l->f, l->b, IR_PTR, address));
     default:
@@ -1204,9 +1193,6 @@ static struct ir_operand element_address(struct lowerer *l,
     struct ir_operand index = lower_expr(l, e->as.index.index);
     uint32_t offset;
 
-    if (l->failed) {
-        return none();
-    }
     if (length.kind != IR_NONE) {
         bounds_check(l, e, index, length);
     }
@@ -1281,16 +1267,16 @@ static bool lower_place(struct lowerer *l, const struct expr *e,
         return true;
     case EXPR_UNARY:
         p->address = lower_expr(l, e->as.unary.operand);
-        return !l->failed;
+        return true;
     case EXPR_INDEX:
         p->address = element_address(l, e);
-        return !l->failed;
+        return true;
     case EXPR_FIELD:
         /* A static field of a class is a global of the module. */
         if (sym != NULL && sym->kind == SYMBOL_GLOBAL) {
             p->address = temp(l, ir_addr(l->f, l->b,
                                          ir_global_op(static_global(l, sym))));
-            return !l->failed;
+            return true;
         }
         bits = bitfield_of(e, &owner);
         if (bits != NULL) {
@@ -1305,7 +1291,7 @@ static bool lower_place(struct lowerer *l, const struct expr *e,
                              : lower_address(l, base);
             p->object = p->address;
             p->owner = owner;
-            return !l->failed;
+            return true;
         }
         {
             const struct expr *base = e->as.field.base;
@@ -1313,21 +1299,18 @@ static bool lower_place(struct lowerer *l, const struct expr *e,
             const struct type *s = pointer ? base->type->element : base->type;
             struct ir_operand address =
                 pointer ? lower_expr(l, base) : lower_address(l, base);
-            if (l->failed) {
-                return false;
-            }
             p->object = address;
             p->owner = s;
             p->address = offset_address(l, address,
                                         field_offset(l, s, &e->as.field.name));
         }
-        return !l->failed;
+        return true;
     default:
         /* DESIGN: a value that is no place still has an address once it
            is written somewhere. A literal receiver of an operator is the
            case, and lower_address gives it a slot of its own. */
         p->address = lower_address(l, e);
-        return !l->failed;
+        return true;
     }
 }
 
@@ -2646,9 +2629,6 @@ static struct ir_global *interface_descriptor(struct lowerer *l,
     return g;
 }
 
-static struct ir_function *rt_function(struct lowerer *l, const char *name,
-                                       const enum ir_type *params,
-                                       size_t count);
 static struct ir_operand load_table(struct lowerer *l, struct ir_operand p,
                                     const struct type *t);
 
@@ -3002,7 +2982,7 @@ static void run_construct_bodies(struct lowerer *l, const struct type *t,
         return;
     }
     run_construct_bodies(l, t->base, dest);
-    for (i = 0; i < t->member_count && !l->failed; i++) {
+    for (i = 0; i < t->member_count; i++) {
         const struct item *m = t->members[i];
         if (m->kind != ITEM_FN || !same_name(&m->name, &construct_name) ||
             m->symbol == NULL || !has_body(m) ||
@@ -3073,9 +3053,7 @@ static void store_value(struct lowerer *l, const struct type *t,
         return;
     }
     v = lower_expr(l, e);
-    if (!l->failed) {
-        ir_store(l->f, l->b, ir_type_of(t), v, address);
-    }
+    ir_store(l->f, l->b, ir_type_of(t), v, address);
 }
 
 /* DESIGN: the slot of an injectable interface is one pointer per
@@ -3216,10 +3194,8 @@ static void store_field_default(struct lowerer *l, const struct type *owner,
 
     if (field->bits != 0) {
         struct ir_operand v = default_scalar(l, field);
-        if (!l->failed) {
-            ir_bitstore(l->f, l->b, ir_type_of(field->type), v, object,
-                        agg_of(l, owner), (uint32_t)i);
-        }
+        ir_bitstore(l->f, l->b, ir_type_of(field->type), v, object,
+                    agg_of(l, owner), (uint32_t)i);
         return;
     }
     store_default(l, field,
@@ -3250,9 +3226,6 @@ static void fill_array(struct lowerer *l, const struct expr *e,
         build_into(l, e->as.array_repeat.value, dest);
     } else {
         v = lower_expr(l, e->as.array_repeat.value);
-    }
-    if (l->failed) {
-        return;
     }
     index = ir_unary(l->f, l->b, IR_COPY, IR_I64,
                      ir_int_op(IR_I64, is_aggregate(element) ? 1 : 0));
@@ -3292,9 +3265,6 @@ static void build_slice(struct lowerer *l, const struct expr *e,
     struct ir_operand at;
     uint32_t offset;
 
-    if (l->failed) {
-        return;
-    }
     offset = ir_binary(l->f, l->b, IR_MUL, IR_I64, low,
                        size_operand(l, e->type->element));
     ir_store(l->f, l->b, IR_PTR,
@@ -3347,7 +3317,7 @@ static void build_variant(struct lowerer *l, const struct expr *e,
         return;
     }
     fields = case_address(l, v, dest);
-    for (i = 0; i < e->as.struct_lit.field_count && !l->failed; i++) {
+    for (i = 0; i < e->as.struct_lit.field_count; i++) {
         const struct field_init *init = &e->as.struct_lit.fields[i];
         const struct struct_field *field = field_of(payload, &init->name);
         store_value(l, field->type, init->value,
@@ -3370,7 +3340,7 @@ static void build_into(struct lowerer *l, const struct expr *e,
     case EXPR_CALL:
         if (e->as.call.builds != NULL) {
             struct ir_operand err = lower_construct(l, e, dest);
-            if (!l->failed && err.kind != IR_NONE) {
+            if (err.kind != IR_NONE) {
                 handle_error(l, e, err, dest, !e->as.call.on_heap,
                              e->as.call.on_heap ? dest : none());
             }
@@ -3378,9 +3348,7 @@ static void build_into(struct lowerer *l, const struct expr *e,
         }
         /* Any other call gives an aggregate, which is copied. */
         src = lower_address(l, e);
-        if (!l->failed) {
-            ir_memcopy(l->f, l->b, dest, src, vtype_of(l, t));
-        }
+        ir_memcopy(l->f, l->b, dest, src, vtype_of(l, t));
         break;
     case EXPR_STRUCT_LIT:
         if (t->kind == TYPE_VARIANT) {
@@ -3396,17 +3364,15 @@ static void build_into(struct lowerer *l, const struct expr *e,
                      dest);
             store_interface_tables(l, t, dest);
         }
-        for (i = 0; i < e->as.struct_lit.field_count && !l->failed; i++) {
+        for (i = 0; i < e->as.struct_lit.field_count; i++) {
             const struct field_init *init = &e->as.struct_lit.fields[i];
             const struct type *at = field_owner(t, &init->name);
             const struct struct_field *field = field_of(at, &init->name);
             if (field->bits != 0) {
                 struct ir_operand v = lower_expr(l, init->value);
-                if (!l->failed) {
-                    ir_bitstore(l->f, l->b, ir_type_of(field->type), v, dest,
-                                agg_of(l, at),
-                                (uint32_t)(field - at->fields));
-                }
+                ir_bitstore(l->f, l->b, ir_type_of(field->type), v, dest,
+                            agg_of(l, at),
+                            (uint32_t)(field - at->fields));
                 continue;
             }
             store_value(l, field->type, init->value,
@@ -3416,9 +3382,9 @@ static void build_into(struct lowerer *l, const struct expr *e,
         /* DESIGN: a field the literal leaves out has a default, which the
            checker required, and its expression is written here. The value
            is therefore complete however the literal was written. */
-        for (owner = t; owner != NULL && !l->failed;
+        for (owner = t; owner != NULL;
              owner = owner->kind == TYPE_CLASS ? owner->base : NULL) {
-        for (i = 0; i < owner->field_count && !l->failed; i++) {
+        for (i = 0; i < owner->field_count; i++) {
             const struct struct_field *field = &owner->fields[i];
             size_t k;
             bool given = false;
@@ -3441,7 +3407,7 @@ static void build_into(struct lowerer *l, const struct expr *e,
         run_construct(l, t, dest);
         break;
     case EXPR_ARRAY_LIT:
-        for (i = 0; i < e->as.array_lit.count && !l->failed; i++) {
+        for (i = 0; i < e->as.array_lit.count; i++) {
             store_value(l, t->element, e->as.array_lit.elements[i],
                         offset_address(l, dest,
                                        element_offset(l, t->element, i)));
@@ -3450,7 +3416,7 @@ static void build_into(struct lowerer *l, const struct expr *e,
     /* `(a, b)` writes one element per field, which is what a struct
        literal of the same types writes. */
     case EXPR_TUPLE:
-        for (i = 0; i < e->as.tuple.count && !l->failed; i++) {
+        for (i = 0; i < e->as.tuple.count; i++) {
             store_value(l, t->fields[i].type, e->as.tuple.elements[i],
                         offset_address(l, dest,
                                        field_offset(l, t, &t->fields[i].name)));
@@ -3466,15 +3432,13 @@ static void build_into(struct lowerer *l, const struct expr *e,
                  offset_address(l, dest, field_offset(l, t, &len_name)));
         break;
     case EXPR_SLICE_LIT:
-        for (i = 0; i < e->as.slice_lit.field_count && !l->failed; i++) {
+        for (i = 0; i < e->as.slice_lit.field_count; i++) {
             const struct field_init *init = &e->as.slice_lit.fields[i];
             bool len = name_is(&init->name, "len");
             struct ir_operand v = lower_expr(l, init->value);
-            if (!l->failed) {
-                ir_store(l->f, l->b, len ? IR_I64 : IR_PTR, v,
-                         offset_address(l, dest,
-                                        field_offset(l, t, &init->name)));
-            }
+            ir_store(l->f, l->b, len ? IR_I64 : IR_PTR, v,
+                     offset_address(l, dest,
+                                    field_offset(l, t, &init->name)));
         }
         break;
     case EXPR_SLICE:
@@ -3495,9 +3459,6 @@ static void build_into(struct lowerer *l, const struct expr *e,
                     ? lower_expr(l, e->as.field.base)
                     : lower_address(l, e->as.field.base);
             struct ir_operand entry;
-            if (l->failed) {
-                break;
-            }
             if (index > 0 && !bound_is_direct(e, s)) {
                 struct ir_operand table = load_table(l, object, s);
                 entry = temp(l, ir_load(l->f, l->b, IR_PTR,
@@ -3514,15 +3475,11 @@ static void build_into(struct lowerer *l, const struct expr *e,
             break;
         }
         src = lower_address(l, e);
-        if (!l->failed) {
-            ir_memcopy(l->f, l->b, dest, src, vtype_of(l, t));
-        }
+        ir_memcopy(l->f, l->b, dest, src, vtype_of(l, t));
         break;
     default:
         src = lower_address(l, e);
-        if (!l->failed) {
-            ir_memcopy(l->f, l->b, dest, src, vtype_of(l, t));
-        }
+        ir_memcopy(l->f, l->b, dest, src, vtype_of(l, t));
         break;
     }
 }
@@ -3556,9 +3513,6 @@ static struct ir_operand handled_operand(struct lowerer *l,
     }
     l->out_address = out;
     err = lower_call(l, e);
-    if (l->failed) {
-        return none();
-    }
     handle_error(l, e, err, out, has_out, none());
     if (!has_out || is_aggregate(e->type)) {
         return out;
@@ -3596,19 +3550,16 @@ static struct ir_operand lower_format(struct lowerer *l, const struct expr *e)
 
     builder->ir = ir_entry_slot(l->f, vtype_of(l, builder->type));
     build_into(l, e->as.format.start, temp(l, builder->ir));
-    for (i = 0; i < e->as.format.count && !l->failed; i++) {
+    for (i = 0; i < e->as.format.count; i++) {
         const struct format_part *part = &e->as.format.parts[i];
         struct ir_operand v;
         if (part->text_call != NULL) {
             lower_expr(l, part->text_call);
         }
-        if (part->value == NULL || l->failed) {
+        if (part->value == NULL) {
             continue;
         }
         v = lower_expr(l, part->value);
-        if (l->failed) {
-            break;
-        }
         part->bound->ir =
             ir_unary(l->f, l->b, IR_COPY,
                      is_aggregate(part->bound->type)
@@ -3617,7 +3568,7 @@ static struct ir_operand lower_format(struct lowerer *l, const struct expr *e)
                      v);
         lower_expr(l, part->value_call);
     }
-    return l->failed ? none() : lower_address(l, e->as.format.take);
+    return lower_address(l, e->as.format.take);
 }
 
 /* The address of the memory that holds the aggregate value of e. A
@@ -3639,9 +3590,6 @@ static struct ir_operand lower_address(struct lowerer *l,
     const struct symbol *sym = e->symbol;
     uint32_t slot;
 
-    if (l->failed) {
-        return none();
-    }
     if (sym != NULL && sym->kind == SYMBOL_CONST &&
         (e->kind == EXPR_NAME || e->kind == EXPR_FIELD)) {
         return const_address(l, sym->value, e->type);
@@ -3744,25 +3692,20 @@ static struct ir_operand lower_unary(struct lowerer *l, const struct expr *e)
             return ir_float_op(type, -float_literal(operand, type));
         }
         v = lower_expr(l, operand);
-        return l->failed ? none()
-                         : temp(l, ir_unary(l->f, l->b,
-                                            type == IR_F32 || type == IR_F64
-                                                ? IR_FNEG
-                                                : IR_NEG,
-                                            type, v));
+        return temp(l, ir_unary(l->f, l->b,
+                                type == IR_F32 || type == IR_F64 ? IR_FNEG
+                                                                 : IR_NEG,
+                                type, v));
     case TOKEN_BANG:
         v = lower_expr(l, operand);
-        return l->failed ? none()
-                         : temp(l, ir_binary(l->f, l->b, IR_XOR, IR_I8, v,
-                                             ir_int_op(IR_I8, 1)));
+        return temp(l, ir_binary(l->f, l->b, IR_XOR, IR_I8, v,
+                                 ir_int_op(IR_I8, 1)));
     case TOKEN_TILDE:
         v = lower_expr(l, operand);
-        return l->failed ? none()
-                         : temp(l, ir_unary(l->f, l->b, IR_NOT, type, v));
+        return temp(l, ir_unary(l->f, l->b, IR_NOT, type, v));
     case TOKEN_STAR:
         v = lower_expr(l, operand);
-        return l->failed ? none()
-                         : temp(l, ir_load(l->f, l->b, type, v));
+        return temp(l, ir_load(l->f, l->b, type, v));
     default: /* TOKEN_AMP: semantic analysis marked the operand */
         return lower_place(l, operand, &p) ? p.address : none();
     }
@@ -3816,18 +3759,12 @@ static struct ir_operand short_circuit(struct lowerer *l, const struct expr *e)
     struct ir_block *join;
     uint32_t result;
 
-    if (l->failed) {
-        return none();
-    }
     result = ir_unary(l->f, l->b, IR_COPY, IR_I8, left);
     rest = new_block(l);
     join = new_block(l);
     ir_branch(l->f, l->b, left, is_and ? rest : join, is_and ? join : rest);
     l->b = rest;
     right = lower_expr(l, e->as.binary.right);
-    if (l->failed) {
-        return none();
-    }
     ir_assign(l->f, l->b, result, right);
     ir_jump(l->f, l->b, join);
     l->b = join;
@@ -3846,9 +3783,6 @@ static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
     struct ir_block *join;
     uint32_t result;
 
-    if (l->failed) {
-        return none();
-    }
     result = ir_unary(l->f, l->b, IR_COPY, type, left);
     is_none = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, left,
                                 ir_int_op(type, 0)));
@@ -3857,9 +3791,6 @@ static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
     ir_branch(l->f, l->b, is_none, rest, join);
     l->b = rest;
     right = lower_expr(l, e->as.binary.right);
-    if (l->failed) {
-        return none();
-    }
     if (l->b != NULL) {
         ir_assign(l->f, l->b, result, right);
         ir_jump(l->f, l->b, join);
@@ -3882,9 +3813,6 @@ static struct ir_operand lower_optional(struct lowerer *l,
     struct ir_block *join;
     uint32_t result;
 
-    if (l->failed) {
-        return none();
-    }
     bind_value(l, e->as.optional.bound, p);
     result = ir_unary(l->f, l->b, IR_COPY, type, ir_int_op(type, 0));
     is_none = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, p,
@@ -3894,9 +3822,6 @@ static struct ir_operand lower_optional(struct lowerer *l,
     ir_branch(l->f, l->b, is_none, join, rest);
     l->b = rest;
     v = lower_expr(l, e->as.optional.access);
-    if (l->failed) {
-        return none();
-    }
     if (l->b != NULL) {
         ir_assign(l->f, l->b, result, v);
         ir_jump(l->f, l->b, join);
@@ -3905,9 +3830,6 @@ static struct ir_operand lower_optional(struct lowerer *l,
     return temp(l, result);
 }
 
-static struct ir_function *rt_function(struct lowerer *l, const char *name,
-                                       const enum ir_type *params,
-                                       size_t count);
 
 /* DESIGN: `==` on class pointers compares object identity. A pointer to
    an interface sub-object points into the middle of an object. Each
@@ -4020,9 +3942,6 @@ static struct ir_operand lower_flag_operation(struct lowerer *l,
         a = lower_expr(l, e->as.binary.left);
         b = lower_expr(l, e->as.binary.right);
     }
-    if (l->failed) {
-        return none();
-    }
     result = temp(l, ir_flag_op(l->f, l->b, op, type, a, b, c));
     for (k = 0; k < 4; k++) {
         if ((want >> k) & 1) {
@@ -4047,7 +3966,7 @@ static struct ir_operand lower_carry(struct lowerer *l, const struct expr *e)
 
     result = lower_flag_operation(
         l, e, type_is_signed(t) ? 1u << IR_FLAG_OVERFLOW : 0u, flags);
-    if (l->failed || !type_is_signed(t)) {
+    if (!type_is_signed(t)) {
         return result;
     }
     /* The operation stands before its one read. */
@@ -4229,9 +4148,6 @@ static struct ir_operand lower_simd_binary(struct lowerer *l,
     struct lanes c;
     size_t k;
 
-    if (l->failed) {
-        return none();
-    }
     dst = new_value(l, e->type);
     if (!simd_loops(t) && lane->kind != TYPE_F16 && !checked) {
         ir_vbinary(l->f, l->b, simd_lane_op(op, lane), ir_type_of(lane), dst,
@@ -4239,7 +4155,7 @@ static struct ir_operand lower_simd_binary(struct lowerer *l,
         return dst;
     }
     lanes_begin(l, &c, t->field_count, simd_loops(t));
-    for (k = 0; k < c.count && !l->failed; k++) {
+    for (k = 0; k < c.count; k++) {
         struct ir_operand a = read_lane(l, lane, lane_at(l, &c, t, x, k));
         struct ir_operand b = read_lane(l, lane, lane_at(l, &c, t, y, k));
         struct ir_operand r;
@@ -4274,16 +4190,13 @@ static struct ir_operand lower_simd_unary(struct lowerer *l,
     struct lanes c;
     size_t k;
 
-    if (l->failed) {
-        return none();
-    }
     dst = new_value(l, t);
     if (!simd_loops(t) && lane->kind != TYPE_F16) {
         ir_vunary(l->f, l->b, op, ir_type_of(lane), dst, x, agg_of(l, t));
         return dst;
     }
     lanes_begin(l, &c, t->field_count, simd_loops(t));
-    for (k = 0; k < c.count && !l->failed; k++) {
+    for (k = 0; k < c.count; k++) {
         struct ir_operand a = read_lane(l, lane, lane_at(l, &c, t, x, k));
         struct ir_operand r = temp(l, ir_unary(l->f, l->b, op, lane_math(lane),
                                                a));
@@ -4301,9 +4214,6 @@ static struct ir_operand lower_simd_cast(struct lowerer *l,
     struct ir_operand src = lower_address(l, e->as.cast.operand);
     struct ir_operand dst;
 
-    if (l->failed) {
-        return none();
-    }
     dst = new_value(l, e->type);
     ir_memcopy(l->f, l->b, dst, src, vtype_of(l, e->type));
     return dst;
@@ -4474,9 +4384,6 @@ static struct ir_operand lower_simd(struct lowerer *l, const struct expr *e)
     switch (e->as.simd.op) {
     case SIMD_OP_SPLAT:
         x = lower_expr(l, args[0]);
-        if (l->failed) {
-            return none();
-        }
         dst = new_value(l, t);
         if (!loops) {
             ir_vsplat(l->f, l->b, bits, dst, x, agg_of(l, t));
@@ -4489,9 +4396,6 @@ static struct ir_operand lower_simd(struct lowerer *l, const struct expr *e)
     case SIMD_OP_LOAD:
         x = lower_address(l, args[0]);
         y = lower_expr(l, args[1]);
-        if (l->failed) {
-            return none();
-        }
         z = simd_elements(l, e, args[0], x, y, t->field_count);
         dst = new_value(l, t);
         ir_memcopy(l->f, l->b, dst, z, vtype_of(l, t));
@@ -4500,17 +4404,11 @@ static struct ir_operand lower_simd(struct lowerer *l, const struct expr *e)
         dst = simd_value(l, args[0]);
         x = lower_address(l, args[1]);
         y = lower_expr(l, args[2]);
-        if (l->failed) {
-            return none();
-        }
         z = simd_elements(l, e, args[1], x, y, t->field_count);
         ir_memcopy(l->f, l->b, z, dst, vtype_of(l, t));
         return none();
     case SIMD_OP_SHUFFLE:
         x = simd_value(l, args[0]);
-        if (l->failed) {
-            return none();
-        }
         dst = new_value(l, t);
         if (!loops) {
             ir_vshuffle(l->f, l->b, bits, dst, x, e->as.simd.lanes,
@@ -4530,9 +4428,6 @@ static struct ir_operand lower_simd(struct lowerer *l, const struct expr *e)
     case SIMD_OP_MIN:
     case SIMD_OP_MAX:
         x = simd_value(l, args[0]);
-        if (l->failed) {
-            return none();
-        }
         if (loops || lane->kind == TYPE_F16) {
             return fold_lanes(l, e->as.simd.op, t, x, none());
         }
@@ -4541,9 +4436,6 @@ static struct ir_operand lower_simd(struct lowerer *l, const struct expr *e)
     case SIMD_OP_DOT:
         x = simd_value(l, args[0]);
         y = lower_address(l, args[1]);
-        if (l->failed) {
-            return none();
-        }
         if (loops || lane->kind == TYPE_F16) {
             return fold_lanes(l, SIMD_OP_DOT, t, x, y);
         }
@@ -4560,9 +4452,6 @@ static struct ir_operand lower_simd(struct lowerer *l, const struct expr *e)
         z = lower_address(l, args[0]);
         x = lower_address(l, args[1]);
         y = lower_address(l, args[2]);
-        if (l->failed) {
-            return none();
-        }
         dst = new_value(l, t);
         if (!loops) {
             ir_vselect(l->f, l->b, bits, dst, z, x, y, agg_of(l, t));
@@ -4601,9 +4490,6 @@ static struct ir_operand lower_simd(struct lowerer *l, const struct expr *e)
         enum ir_op fold = e->as.simd.op == SIMD_OP_ANY ? IR_OR : IR_AND;
         uint32_t acc;
         x = lower_address(l, args[0]);
-        if (l->failed) {
-            return none();
-        }
         if (!loops) {
             return temp(l, ir_vreduce(l->f, l->b, fold, IR_I8, x,
                                       agg_of(l, t)));
@@ -4643,9 +4529,6 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     }
     left = lower_expr(l, e->as.binary.left);
     right = lower_expr(l, e->as.binary.right);
-    if (l->failed) {
-        return none();
-    }
     if (identity) {
         left = object_of(l, left);
         right = object_of(l, right);
@@ -4839,7 +4722,7 @@ static struct ir_operand widen_to_i64(struct lowerer *l, const struct expr *e)
     struct ir_operand v = lower_expr(l, e);
     enum ir_type from = ir_type_of(e->type);
 
-    if (l->failed || from == IR_I64 || from == IR_PTR) {
+    if (from == IR_I64 || from == IR_PTR) {
         return v;
     }
     return temp(l, ir_unary(l->f, l->b,
@@ -4983,9 +4866,7 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
              text_cstr(&name));
     text_free(&name);
     if (to->kind == TYPE_CHAR || to->kind == TYPE_ENUM) {
-        struct ir_block *here = l->b;
         struct ir_operand wide = widen_operand(l, v, source_form);
-        l->b = here;
         if (to->kind == TYPE_CHAR) {
             scalar_check(l, e, from, wide, operation, kind, v);
         } else if (to->field_count > 0) {
@@ -5023,9 +4904,6 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
     struct ir_operand v = lower_expr(l, e->as.cast.operand);
     enum ir_op op;
 
-    if (l->failed) {
-        return none();
-    }
     /* An f16 converts to and from an f32 alone, and to itself. */
     if (from->kind == TYPE_F16 || to->kind == TYPE_F16) {
         if (from->kind == to->kind) {
@@ -5157,7 +5035,7 @@ static struct ir_operand lower_argument(struct lowerer *l,
 {
     struct ir_operand value = lower_expr(l, arg);
 
-    if (!arg->moves || l->failed || l->b == NULL) {
+    if (!arg->moves || l->b == NULL) {
         return value;
     }
     value = temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, value));
@@ -5199,9 +5077,6 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     if (callee->type != NULL && callee->type->kind == TYPE_FN &&
         callee->type->bound) {
         struct ir_operand value = lower_address(l, callee);
-        if (l->failed) {
-            return none();
-        }
         bound = temp(l, ir_load(l->f, l->b, IR_PTR, value));
         target = temp(l, ir_load(l->f, l->b, IR_PTR,
                                  offset_address(l, value,
@@ -5221,10 +5096,6 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     }
     if (bound.kind != IR_NONE) {
         n++;
-    }
-    if (l->failed) {
-        free(args);
-        return none();
     }
     if (e->as.call.out != NULL) {
         args[n++] = l->out_address;
@@ -5547,9 +5418,6 @@ static struct ir_operand lower_dispatch(struct lowerer *l,
 
     snprintf(name, sizeof name, "dispatch.%u", next_thunk(l, "dispatch."));
     args[0] = lower_expr(l, e->as.dispatch.object);
-    if (l->failed) {
-        return none();
-    }
     if (extra > 0) {
         char context_name[32];
         uint32_t slot;
@@ -5572,9 +5440,6 @@ static struct ir_operand lower_dispatch(struct lowerer *l,
     f = dispatch_thunk(l, e, name, agg);
     args[2] = temp(l, ir_addr(l->f, l->b, ir_func_op(f)));
     args[3] = context;
-    if (l->failed) {
-        return none();
-    }
     handle = ir_call(l->f, l->b, IR_PTR,
                      ir_func_op(rt_function(l, "anti_rt_dispatch", signature,
                                             4)),
@@ -5596,9 +5461,6 @@ static struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
     struct ir_operand args[3];
     uint32_t out;
 
-    if (l->failed) {
-        return none();
-    }
     if (e->as.join.all) {
         args[0] = temp(l, ir_load(l->f, l->b, IR_PTR, value));
         args[1] = temp(l, ir_load(l->f, l->b, IR_I64,
@@ -5660,9 +5522,6 @@ static struct ir_operand lower_parallel(struct lowerer *l,
 
     snprintf(name, sizeof name, "parallel.%u", next_thunk(l, "parallel."));
     array = lower_address(l, e->as.parallel.array);
-    if (l->failed) {
-        return none();
-    }
     if (extra > 0) {
         char context_name[32];
         uint32_t slot;
@@ -5698,9 +5557,6 @@ static struct ir_operand lower_parallel(struct lowerer *l,
     args[6] = context;
     args[7] = temp(l, results);
     args[8] = temp(l, count);
-    if (l->failed) {
-        return none();
-    }
     ir_call(l->f, l->b, IR_VOID,
             ir_func_op(rt_function(l, "anti_rt_parallel", signature, 9)),
             args, 9);
@@ -5731,9 +5587,6 @@ static struct ir_operand load_handle(struct lowerer *l, const struct expr *e)
     struct ir_operand at = e->type->kind == TYPE_POINTER ? lower_expr(l, e)
                                                           : lower_address(l, e);
 
-    if (l->failed) {
-        return none();
-    }
     return temp(l, ir_load(l->f, l->b, IR_PTR, at));
 }
 
@@ -5769,9 +5622,6 @@ static struct ir_operand lower_sync_op(struct lowerer *l,
     case SYNC_CHAN_NEW:
         args[0] = size_operand(l, e->type->element);
         args[1] = lower_expr(l, e->as.sync_op.value);
-        if (l->failed) {
-            return none();
-        }
         handle = sync_call(l, "anti_rt_chan_new", IR_PTR, sizes, args, 2);
         break;
     /* The runtime clears the handle it frees, so a second `destroy`
@@ -5780,46 +5630,31 @@ static struct ir_operand lower_sync_op(struct lowerer *l,
         args[0] = target->type->kind == TYPE_POINTER
                       ? lower_expr(l, target)
                       : lower_address(l, target);
-        if (!l->failed) {
-            sync_call(l, "anti_rt_mutex_destroy", IR_VOID, one, args, 1);
-        }
+        sync_call(l, "anti_rt_mutex_destroy", IR_VOID, one, args, 1);
         return none();
     case SYNC_SEND:
         element = target->type->element;
         args[0] = load_handle(l, target);
-        if (l->failed) {
-            return none();
-        }
         slot = ir_entry_slot(l->f, vtype_of(l, element));
         store_value(l, element, e->as.sync_op.value, temp(l, slot));
         args[1] = temp(l, slot);
-        if (!l->failed) {
-            sync_call(l, "anti_rt_chan_send", IR_VOID, two, args, 2);
-        }
+        sync_call(l, "anti_rt_chan_send", IR_VOID, two, args, 2);
         return none();
     /* `recv` gives the address of the slot it filled, or `none` when
        the channel is closed and empty. */
     case SYNC_RECV:
         element = target->type->element;
         args[0] = load_handle(l, target);
-        if (l->failed) {
-            return none();
-        }
         slot = ir_entry_slot(l->f, vtype_of(l, element));
         args[1] = temp(l, slot);
         return sync_call(l, "anti_rt_chan_recv", IR_PTR, two, args, 2);
     case SYNC_CLOSE:
     case SYNC_CHAN_DELETE:
         args[0] = load_handle(l, target);
-        if (!l->failed) {
-            sync_call(l,
-                      e->as.sync_op.op == SYNC_CLOSE ? "anti_rt_chan_close"
-                                                     : "anti_rt_chan_delete",
-                      IR_VOID, one, args, 1);
-        }
-        return none();
-    }
-    if (l->failed) {
+        sync_call(l,
+                  e->as.sync_op.op == SYNC_CLOSE ? "anti_rt_chan_close"
+                                                 : "anti_rt_chan_delete",
+                  IR_VOID, one, args, 1);
         return none();
     }
     /* A new Mutex or channel is a slot that holds the handle. */
@@ -5839,7 +5674,7 @@ static struct ir_operand lower_expr(struct lowerer *l, const struct expr *e)
 {
     struct ir_operand v = lower_expr_value(l, e);
 
-    if (e->to_iface == NULL || l->failed) {
+    if (e->to_iface == NULL) {
         return v;
     }
     return temp(l, ir_ptradd(l->f, l->b, v,
@@ -5855,9 +5690,6 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
     struct place p;
     uint32_t size;
 
-    if (l->failed) {
-        return none();
-    }
     if (is_aggregate(e->type)) {
         return lower_address(l, e);
     }
@@ -5947,15 +5779,10 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                                 ir_func_op(c_function(l, "malloc", IR_PTR,
                                                       IR_I64)),
                                 &v, 1));
-            if (!l->failed) {
-                build_into(l, e->as.alloc.value, v);
-            }
+            build_into(l, e->as.alloc.value, v);
             return v;
         }
         v = lower_expr(l, e->as.alloc.count);
-        if (l->failed) {
-            return none();
-        }
         /* DESIGN: the elements of a class come zeroed, so one the
            program has not filled has a zero table, which the zero-table
            check reports. Other elements are C's and keep malloc. */
@@ -5975,10 +5802,8 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                                &v, 1));
     case EXPR_FREE:
         v = lower_expr(l, e->as.free_pointer);
-        if (!l->failed) {
-            ir_call(l->f, l->b, IR_VOID,
-                    ir_func_op(c_function(l, "free", IR_VOID, IR_PTR)), &v, 1);
-        }
+        ir_call(l->f, l->b, IR_VOID,
+                ir_func_op(c_function(l, "free", IR_VOID, IR_PTR)), &v, 1);
         return none();
     /* DESIGN: an atomic operation is a call of the runtime, which holds
        one body per operation and switches on the width. The runtime is
@@ -6014,9 +5839,6 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         if (e->as.atomic.b != NULL) {
             args[n++] = widen_to_i64(l, e->as.atomic.b);
         }
-        if (l->failed) {
-            return none();
-        }
         f = rt_function(l, names[e->as.atomic.op], four, n);
         f->result = result;
         call = ir_call(l->f, l->b, result, ir_func_op(f), args, n);
@@ -6036,18 +5858,12 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                                ? "anti_rt_delete"
                                : "anti_rt_destroy";
         v = lower_expr(l, e->as.object.operand);
-        if (l->failed) {
-            return none();
-        }
         if (e->as.object.from != NULL) {
             static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
             struct ir_operand args[3];
             args[0] = v;
             args[1] = static_descriptor(l, e->as.object.operand->type);
             args[2] = lower_expr(l, e->as.object.from);
-            if (l->failed) {
-                return none();
-            }
             return rt_call(l,
                            e->as.object.op == TOKEN_DELETE
                                ? "anti_rt_delete_from"
@@ -6069,9 +5885,6 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
     /* The value once, then the test the checker wrote over it. */
     case EXPR_IN:
         v = lower_expr(l, e->as.in.value);
-        if (l->failed) {
-            return none();
-        }
         bind_value(l, e->as.in.bound, v);
         return lower_expr(l, e->as.in.test);
     default:
@@ -6109,9 +5922,7 @@ static void lower_branch(struct lowerer *l, const struct expr *e,
         return;
     }
     v = lower_expr(l, e);
-    if (!l->failed) {
-        ir_branch(l->f, l->b, v, then_block, else_block);
-    }
+    ir_branch(l->f, l->b, v, then_block, else_block);
 }
 
 /* Statements */
@@ -6239,9 +6050,6 @@ static void lower_sync(struct lowerer *l, const struct stmt *s)
     struct defers scope;
     uint32_t mutex;
 
-    if (l->failed) {
-        return;
-    }
     mutex = ir_unary(l->f, l->b, IR_COPY, IR_PTR, handle);
     sync_call(l, "anti_rt_mutex_lock", IR_VOID, one, &handle, 1);
     memset(&scope, 0, sizeof scope);
@@ -6293,14 +6101,11 @@ static void lower_select(struct lowerer *l, const struct stmt *s)
     struct ir_operand index;
     size_t i;
 
-    for (i = 0; i < count && !l->failed; i++) {
+    for (i = 0; i < count; i++) {
         const struct switch_arm *arm = &s->as.select.arms[i];
         struct ir_operand handle = load_handle(l, arm->value);
         struct ir_operand offset;
         uint32_t slot;
-        if (l->failed) {
-            return;
-        }
         offset = temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
                                    ir_int_op(IR_I64, i), pointer_size));
         ir_store(l->f, l->b, IR_PTR, handle,
@@ -6309,15 +6114,12 @@ static void lower_select(struct lowerer *l, const struct stmt *s)
         ir_store(l->f, l->b, IR_PTR, temp(l, slot),
                  offset_address(l, temp(l, slots), offset));
     }
-    if (l->failed) {
-        return;
-    }
     args[0] = temp(l, chans);
     args[1] = temp(l, slots);
     args[2] = ir_int_op(IR_I64, count);
     args[3] = temp(l, got);
     index = sync_call(l, "anti_rt_select", IR_I64, params, args, 4);
-    for (i = 0; i < count && l->b != NULL && !l->failed; i++) {
+    for (i = 0; i < count && l->b != NULL; i++) {
         const struct switch_arm *arm = &s->as.select.arms[i];
         struct ir_block *body = new_block(l);
         struct ir_block *next = i + 1 < count ? new_block(l) : NULL;
@@ -6350,7 +6152,7 @@ static void lower_if(struct lowerer *l, const struct stmt *s)
     struct ir_block *join = NULL;
     size_t i;
 
-    for (i = 0; i < count && !l->failed; i++) {
+    for (i = 0; i < count; i++) {
         const struct if_branch *branch = &s->as.if_chain.branches[i];
         struct ir_block *then_block = new_block(l);
         struct ir_block *next;
@@ -6369,7 +6171,7 @@ static void lower_if(struct lowerer *l, const struct stmt *s)
         jump_to_join(l, &join);
         l->b = next;
     }
-    if (s->as.if_chain.else_body != NULL && !l->failed) {
+    if (s->as.if_chain.else_body != NULL) {
         lower_block(l, s->as.if_chain.else_body);
         jump_to_join(l, &join);
     }
@@ -6450,9 +6252,6 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
     if (over != NULL) {
         seq = over->type;
         base = lower_address(l, over);
-        if (l->failed) {
-            return;
-        }
         if (seq->kind == TYPE_SLICE) {
             limit = temp(l, ir_load(l->f, l->b, IR_I64,
                                     offset_address(l, base,
@@ -6470,9 +6269,6 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
         struct ir_operand high;
         counter_type = ir_type_of(s->as.for_loop.low->type);
         high = lower_expr(l, s->as.for_loop.high);
-        if (l->failed) {
-            return;
-        }
         /* DESIGN: `by -k` walks the values of `by k` in reverse, so it
            starts at the largest of them and not at the high bound. That
            value is `low + ((high - low - 1) / k) * k`, and the division
@@ -6645,9 +6441,6 @@ static struct ir_operand call_into_slot(struct lowerer *l,
 
     l->out_address = out;
     err = lower_call(l, call);
-    if (l->failed) {
-        return none();
-    }
     handle_error(l, call, err, out, true, none());
     return temp(l, ir_load(l->f, l->b, p->type, out));
 }
@@ -6696,7 +6489,7 @@ static void hook_changed(struct lowerer *l, const struct place *p,
     const struct type *up;
     size_t index = 0;
 
-    if (!l->trace_writes || l->failed || l->b == NULL ||
+    if (!l->trace_writes || l->b == NULL ||
         target->kind != EXPR_FIELD || p->object.kind == IR_NONE ||
         !traced_class(l, p->owner)) {
         return;
@@ -6739,9 +6532,6 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         struct ir_operand err;
         l->out_address = p.address;
         err = lower_call(l, value);
-        if (l->failed) {
-            return;
-        }
         handle_error(l, value, err, p.address, true, none());
         hook_changed(l, &p, target);
         return;
@@ -6754,9 +6544,6 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
        use, not for assignment into. */
     if (is_aggregate(target->type)) {
         v = lower_address(l, value);
-        if (l->failed) {
-            return;
-        }
         if (local_needs_teardown(target->type)) {
             if (target->type->kind == TYPE_ARRAY) {
                 destroy_array(l, p.address, target->type, true);
@@ -6772,9 +6559,6 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         old = read_place(l, &p);
     }
     v = handled ? call_into_slot(l, value, &p) : lower_expr(l, value);
-    if (l->failed) {
-        return;
-    }
     if (s->as.assign.op != TOKEN_ASSIGN) {
         enum token_kind op = compound_op(s->as.assign.op);
         struct ir_operand checked =
@@ -7112,7 +6896,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
              dest);
     store_interface_tables(l, t, dest);
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
-        for (i = 0; i < up->field_count && !l->failed; i++) {
+        for (i = 0; i < up->field_count; i++) {
             const struct struct_field *field = &up->fields[i];
             if (!has_default(field)) {
                 continue;
@@ -7129,7 +6913,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
             m = t->members[i];
         }
     }
-    if (m == NULL || m->symbol == NULL || l->failed) {
+    if (m == NULL || m->symbol == NULL) {
         hook_object(l, HOOK_CREATED, dest);
         return none();
     }
@@ -7137,10 +6921,6 @@ static struct ir_operand lower_construct(struct lowerer *l,
     args[0] = dest;
     for (i = 0; i < e->as.call.arg_count; i++) {
         args[i + 1] = lower_argument(l, e->as.call.args[i]);
-    }
-    if (l->failed) {
-        free(args);
-        return none();
     }
     /* A `construct` that may fail returns `?*Error`, which the checker
        gave its type. One that cannot fail returns nothing. */
@@ -7155,7 +6935,7 @@ static struct ir_operand lower_construct(struct lowerer *l,
     }
     /* A `construct` that failed leaves no object, and its memory goes
        back before the handler runs, so the hook is the success path's. */
-    if (l->hooks && !l->failed && l->b != NULL) {
+    if (l->hooks && l->b != NULL) {
         struct ir_block *made = new_block(l);
         struct ir_block *after = new_block(l);
         ir_branch(l->f, l->b,
@@ -7244,7 +7024,7 @@ static void destructure(struct lowerer *l, const struct stmt *s)
     const struct type *t = value->type;
     size_t i;
 
-    for (i = 0; i < s->as.let.name_count && !l->failed; i++) {
+    for (i = 0; i < s->as.let.name_count; i++) {
         const struct symbol *bound = s->as.let.names[i].symbol;
         struct ir_operand at =
             offset_address(l, temp(l, value->ir),
@@ -7290,14 +7070,8 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
                                                   IR_I64)),
                             &size, 1));
         struct ir_operand err;
-        if (l->failed) {
-            return;
-        }
         ir_store(l->f, l->b, IR_PTR, object, place);
         err = lower_construct(l, call, object);
-        if (l->failed) {
-            return;
-        }
         if (err.kind != IR_NONE) {
             handle_error(l, call, err, place, true, object);
         }
@@ -7315,9 +7089,6 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         }
         l->out_address = out;
         err = lower_call(l, s->as.let.value);
-        if (l->failed) {
-            return;
-        }
         handle_error(l, s->as.let.value, err, out, has_out, none());
         /* DESIGN: the binding is a local of its type and is torn down at
            the end of its block like any other. It is registered after the
@@ -7339,9 +7110,6 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         return;
     }
     v = lower_expr(l, s->as.let.value);
-    if (l->failed) {
-        return;
-    }
     if (sym->address_taken) {
         ir_store(l->f, l->b, ir_type_of(sym->type), v, temp(l, sym->ir));
     } else {
@@ -7416,9 +7184,6 @@ static void lower_flags_let(struct lowerer *l, const struct stmt *s)
     struct ir_operand v =
         lower_flag_operation(l, s->as.let.value, flags->flags_read, values);
 
-    if (l->failed) {
-        return;
-    }
     if (result->address_taken) {
         ir_store(l->f, l->b, ir_type_of(result->type), v, temp(l, result->ir));
     } else {
@@ -7439,7 +7204,7 @@ static void lower_flags_assign(struct lowerer *l, const struct stmt *s)
     struct ir_operand v = lower_flag_operation(
         l, s->as.assign.value, flags->symbol->flags_read, values);
 
-    if (l->failed || !lower_place(l, target->as.tuple.elements[0], &result) ||
+    if (!lower_place(l, target->as.tuple.elements[0], &result) ||
         !lower_place(l, flags, &into)) {
         return;
     }
@@ -7459,7 +7224,7 @@ static void lower_let(struct lowerer *l, const struct stmt *s)
         return;
     }
     lower_let_value(l, s);
-    if (s->as.let.name_count > 0 && !l->failed && l->b != NULL) {
+    if (s->as.let.name_count > 0 && l->b != NULL) {
         destructure(l, s);
     }
 }
@@ -7554,15 +7319,9 @@ static void lower_fail(struct lowerer *l, const struct stmt *s)
         struct ir_function *maker = callee_function(l, s->as.fail.make);
         args[0] = ir_int_op(IR_I64, 0);
         args[1] = lower_expr(l, s->as.fail.value);
-        if (l->failed) {
-            return;
-        }
         err = temp(l, ir_call(l->f, l->b, IR_PTR, ir_func_op(maker), args, 2));
     } else {
         err = lower_expr(l, s->as.fail.value);
-    }
-    if (l->failed) {
-        return;
     }
     if (s->as.fail.error != NULL && s->as.fail.capture != NULL) {
         err = temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, err));
@@ -7661,9 +7420,7 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
     case STMT_EXPR:
         if (is_handled_call(s->as.expr)) {
             struct ir_operand err = lower_call(l, s->as.expr);
-            if (!l->failed) {
-                handle_error(l, s->as.expr, err, none(), false, none());
-            }
+            handle_error(l, s->as.expr, err, none(), false, none());
             return;
         }
         lower_expr(l, s->as.expr);
@@ -7706,9 +7463,6 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         const struct type *variant = s->as.switch_stmt.value->type;
         struct ir_operand address = none();
         over = lower_expr(l, s->as.switch_stmt.value);
-        if (l->failed) {
-            return;
-        }
         /* DESIGN: a switch on a variant reads the tag once and compares it
            with the number of each arm's case. The value stays where it
            is. An arm that binds the fields copies them before its body
@@ -7740,14 +7494,8 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
                                                    number->number)));
             } else {
                 struct ir_operand value = lower_expr(l, at->value);
-                if (l->failed) {
-                    return;
-                }
                 test = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over,
                                          value));
-            }
-            if (l->failed) {
-                return;
             }
             k = otherwise != NULL && i >= s->as.switch_stmt.otherwise_at
                     ? i + 1
@@ -7799,9 +7547,6 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         struct token_text text;
         struct text message = {0};
         struct ir_operand cond = lower_expr(l, s->as.assertion.cond);
-        if (l->failed) {
-            return;
-        }
         if (s->as.assertion.message.length > 0) {
             text_appendf(&message, "%s:%d: assertion failed: %.*s", l->file,
                          s->as.assertion.cond->pos.line,
@@ -7849,9 +7594,6 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         if (l->result_out.kind != IR_NONE && s->as.return_value != NULL) {
             store_value(l, s->as.return_value->type, s->as.return_value,
                         l->result_out);
-            if (l->failed) {
-                return;
-            }
             if (s->as.return_value->kind == EXPR_NAME) {
                 l->moved = s->as.return_value->symbol;
             }
@@ -7877,9 +7619,6 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
             }
         } else {
             v = lower_expr(l, s->as.return_value);
-            if (l->failed) {
-                return;
-            }
             /* The value is computed before the deferred statements run,
                so a `defer` cannot change what the function returns. A
                function without one keeps the value where it is. */
@@ -7916,12 +7655,8 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
     }
 }
 
-/* Anti has no labels, so a statement after return, break or continue is
-   unreachable. Lowering skips it. */
-/* Run the statements of one block scope, last declared first. */
-static void destroy_local(struct lowerer *l, const struct symbol *sym);
-
-/* DESIGN: the statements of `undo` run before the `defer` statements of
+/* Run the statements of one block scope, last declared first.
+   DESIGN: the statements of `undo` run before the `defer` statements of
    the same block, so the block undoes what it did while its locals are
    still there. One reverse pass takes the `undo` actions and a second
    takes the rest, which is the order the specification gives. */
@@ -7931,14 +7666,14 @@ static void run_defers(struct lowerer *l, const struct defers *scope,
     size_t i;
 
     if (failing) {
-        for (i = scope->count; i > 0 && l->b != NULL && !l->failed; i--) {
+        for (i = scope->count; i > 0 && l->b != NULL; i--) {
             const struct exit_action *action = &scope->items[i - 1];
             if (action->undo) {
                 lower_stmt(l, action->stmt);
             }
         }
     }
-    for (i = scope->count; i > 0 && l->b != NULL && !l->failed; i--) {
+    for (i = scope->count; i > 0 && l->b != NULL; i--) {
         const struct exit_action *action = &scope->items[i - 1];
         if (action->undo) {
             continue;
@@ -7979,6 +7714,8 @@ static void run_defers_to(struct lowerer *l, const struct defers *stop,
     }
 }
 
+/* Anti has no labels, so a statement after return, break or continue is
+   unreachable. Lowering skips it. */
 static void lower_block(struct lowerer *l, const struct block *b)
 {
     struct defers scope;
@@ -7987,7 +7724,7 @@ static void lower_block(struct lowerer *l, const struct block *b)
     memset(&scope, 0, sizeof scope);
     scope.outer = l->defers;
     l->defers = &scope;
-    for (i = 0; i < b->count && l->b != NULL && !l->failed; i++) {
+    for (i = 0; i < b->count && l->b != NULL; i++) {
         lower_stmt(l, b->stmts[i]);
     }
     /* The closing brace is an exit of the block, and never an error. */
@@ -8284,7 +8021,7 @@ static void lower_function(struct lowerer *l, struct item *it)
         push_leave_action(l);
     }
     lower_block(l, it->body);
-    if (l->b != NULL && !l->failed) {
+    if (l->b != NULL) {
         run_defers(l, &around, false);
     }
     l->defers = NULL;
@@ -8292,7 +8029,7 @@ static void lower_function(struct lowerer *l, struct item *it)
     /* Semantic analysis rejects a function with a result that can reach
        its end, so only a function without one gets here. A `may fail`
        function reports success there. */
-    if (l->b != NULL && !l->failed) {
+    if (l->b != NULL) {
         if (it->may_fail) {
             ir_ret(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0));
         } else {
@@ -8318,7 +8055,6 @@ static struct ir_global *singleton_instance(struct lowerer *l,
         return g;
     }
     value = arena_alloc(l->m->arena, sizeof *value);
-    memset(value, 0, sizeof *value);
     value->kind = IR_CONST_INT;
     value->scalar = IR_PTR;
     value->integer = 0;
@@ -8866,12 +8602,13 @@ bool lower_module(struct module *module, const char *module_name,
     /* Every function of the module sits past the ones the library files
        brought, so one pass at the end gives them their source. */
     size_t first = out->function_count;
-    bool ok = true;
     size_t i;
 
+    /* Semantic analysis rejects every module that lowering cannot
+       translate, so no construct reports an error here. */
+    (void)diags;
     memset(&l, 0, sizeof l);
     l.m = out;
-    l.diags = diags;
     l.module_name = module_name;
     l.file = module->file != NULL ? module->file : module_name;
     l.file_index = ir_file_add(out, l.file);
@@ -8946,7 +8683,6 @@ bool lower_module(struct module *module, const char *module_name,
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         size_t j;
-        l.failed = false;
         if (it->kind == ITEM_FN) {
             lower_function(&l, it);
         }
@@ -8958,7 +8694,6 @@ bool lower_module(struct module *module, const char *module_name,
                 lower_function(&l, it->members[j]);
             }
         }
-        ok = ok && !l.failed;
     }
     for (i = first; i < out->function_count; i++) {
         struct ir_function *f = out->functions[i];
@@ -8967,5 +8702,5 @@ bool lower_module(struct module *module, const char *module_name,
             f->file = l.file_index;
         }
     }
-    return ok;
+    return true;
 }

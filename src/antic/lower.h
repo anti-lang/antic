@@ -8,12 +8,6 @@
 #include "diagnostic.h"
 #include "ir.h"
 
-/* Translate a module that passed semantic analysis into IR. The ir field
-   of a local or parameter symbol names the temporary of its value, or of
-   its slot address when the address is taken. For a function it holds the
-   IR function index. Returns false after an error in diags. Semantic
-   analysis rejects every module that lowering cannot translate, so no
-   construct of the language reports one. */
 enum lower_option {
     LOWER_NO_REFLECT = 1u << 0,     /* --no-reflect: no field list */
     LOWER_DEV = 1u << 1,            /* --dev: every dispatch checks its table */
@@ -27,7 +21,12 @@ enum lower_option {
     LOWER_TRACE_WRITES = 1u << 4    /* --trace writes: the changed hook */
 };
 
-/* patterns holds the `--trace <pattern>` arguments, which instrument a
+/* Translate a module that passed semantic analysis into IR. The ir field
+   of a local or parameter symbol names the temporary of its value, or of
+   its slot address when the address is taken. For a function it holds the
+   IR function index. Semantic analysis rejects every module that lowering
+   cannot translate, so lowering writes nothing to diags and returns true.
+   patterns holds the `--trace <pattern>` arguments, which instrument a
    package or a class by name whether it asked or not. version is the
    version of the package being built, `--package-version`, which the
    descriptor of every class the module declares carries. */
