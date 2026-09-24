@@ -6,7 +6,8 @@
 # which the CMake build had added, and did not link. One list leaves
 # nothing to fall out of step.
 
-# The compiler, which the unit tests, antic and anti link.
+# The compiler, which the unit tests, antic and anti link. The files of
+# src/rt/ in it are the code that the runtime and the host share.
 set(ANTIC_CORE_SOURCES
     src/antic/antl.c
     src/antic/applesdk.c
@@ -45,7 +46,8 @@ set(ANTIC_CORE_SOURCES
     src/antic/text.c
     src/antic/types.c
     src/antic/whole.c
-    src/antic/x86_64.c)
+    src/antic/x86_64.c
+    src/rt/digest.c)
 set(ANTIC_CORE_INCLUDE_DIRS src/antic)
 
 set(ANTIC_MAIN_SOURCES src/antic/main.c)

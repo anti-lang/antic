@@ -689,6 +689,22 @@ static int joined(char *out, size_t size, const char *dir, size_t dir_length,
     return written > 0 && (size_t)written < size;
 }
 
+/* Write the digest of the file at path into hex. Gives 0 when the file
+   cannot be read. */
+static int digest_file(const char *path, char hex[65])
+{
+    FILE *f = anti_rt_fs_open((const unsigned char *)path,
+                              (int64_t)strlen(path), 0);
+    int ok;
+
+    if (f == NULL) {
+        return 0;
+    }
+    ok = anti_rt_sha256_stream(f, hex);
+    fclose(f);
+    return ok;
+}
+
 static unsigned char *index_bytes(const char *path, int64_t *length)
 {
     FILE *f = anti_rt_fs_open((const unsigned char *)path,
@@ -819,7 +835,7 @@ static int discover_in(const char *dir, size_t dir_length,
             !joined(library, sizeof library, dir, dir_length, file)) {
             continue;
         }
-        if (!anti_rt_sha256_file(library, hex) ||
+        if (!digest_file(library, hex) ||
             !same_bytes((const unsigned char *)hex, 64, digest.ptr,
                         digest.len)) {
             fail("%s does not match the digest of %s", library, index);

@@ -103,15 +103,15 @@ struct build {
 static void cache_key(const char *input, enum target t, enum cpu_level cpu,
                       bool debug, struct text *out)
 {
-    struct sha256 digest;
+    struct anti_sha256 digest;
     struct text bytes = {0};
     char hex[65];
 
-    sha256_init(&digest);
+    anti_rt_sha256_init(&digest);
     if (files_read(input, &bytes)) {
-        sha256_update(&digest, bytes.data, bytes.length);
+        anti_rt_sha256_update(&digest, bytes.data, bytes.length);
     }
-    sha256_hex(&digest, hex);
+    anti_rt_sha256_hex(&digest, hex);
     text_appendf(out, "%s %s %s %s %s\n", hex, ANTIC_VERSION, target_name(t),
                  cpu_name(cpu), debug ? "g" : "no-g");
     text_free(&bytes);

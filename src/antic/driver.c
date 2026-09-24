@@ -803,7 +803,7 @@ static bool has_main(const struct ir_module *program, const char *module)
    be opened adds nothing, and the link that needs it reports it. A file
    that opens and then fails to read returns false, since a digest of part
    of it would name other code. */
-static bool digest_file(struct sha256 *s, const char *path)
+static bool digest_file(struct anti_sha256 *s, const char *path)
 {
     FILE *f = fopen(path, "rb");
     unsigned char bytes[4096];
@@ -814,7 +814,7 @@ static bool digest_file(struct sha256 *s, const char *path)
         return true;
     }
     while ((n = fread(bytes, 1, sizeof bytes, f)) > 0) {
-        sha256_update(s, bytes, n);
+        anti_rt_sha256_update(s, bytes, n);
     }
     ok = !ferror(f);
     fclose(f);
@@ -834,20 +834,21 @@ static bool build_id(const struct options *o, const struct text *assembly,
                      char *error, size_t size)
 {
     struct text library = {0};
-    struct sha256 s;
+    struct anti_sha256 s;
     size_t at = 0;
     size_t i;
     bool ok = true;
 
-    sha256_init(&s);
+    anti_rt_sha256_init(&s);
     for (i = 0; spans != NULL && i < spans->count; i++) {
         if (spans->items[i].start > at) {
-            sha256_update(&s, assembly->data + at, spans->items[i].start - at);
+            anti_rt_sha256_update(&s, assembly->data + at,
+                                  spans->items[i].start - at);
         }
         at = spans->items[i].end > at ? spans->items[i].end : at;
     }
     if (at < assembly->length) {
-        sha256_update(&s, assembly->data + at, assembly->length - at);
+        anti_rt_sha256_update(&s, assembly->data + at, assembly->length - at);
     }
     for (i = 0; ok && i < o->object_count; i++) {
         if (!digest_file(&s, o->objects[i])) {
@@ -862,7 +863,7 @@ static bool build_id(const struct options *o, const struct text *assembly,
             ok = false;
         }
     }
-    sha256_hex(&s, hex);
+    anti_rt_sha256_hex(&s, hex);
     text_free(&library);
     return ok;
 }

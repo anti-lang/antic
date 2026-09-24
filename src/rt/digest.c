@@ -1,22 +1,7 @@
-/* The SHA-256 of FIPS 180-4. Discovery digests a library before it
-   opens one, against the digest that the index of its directory
-   records. */
+/* The SHA-256 of FIPS 180-4, for the runtime, antic and anti. */
 #include "digest.h"
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <string.h>
-
-#include "std.h"
-
-/* The state of a digest fed in pieces. */
-struct sha256 {
-    uint32_t hash[8];
-    unsigned char block[64];
-    size_t used;                    /* the bytes of block that are filled */
-    uint64_t length;                /* the bytes fed so far */
-};
 
 /* The round constants and the initial hash of FIPS 180-4, section 4.2.2
    and 5.3.3. */
@@ -85,15 +70,15 @@ static void compress(uint32_t hash[8], const unsigned char block[64])
     }
 }
 
-static void sha256_init(struct sha256 *s)
+void anti_rt_sha256_init(struct anti_sha256 *s)
 {
     memcpy(s->hash, initial, sizeof s->hash);
     s->used = 0;
     s->length = 0;
 }
 
-static void sha256_update(struct sha256 *s, const void *bytes,
-                          size_t count)
+void anti_rt_sha256_update(struct anti_sha256 *s, const void *bytes,
+                           size_t count)
 {
     const unsigned char *from = bytes;
 
@@ -114,9 +99,7 @@ static void sha256_update(struct sha256 *s, const void *bytes,
     }
 }
 
-/* Write the digest as 64 lowercase hexadecimal digits and a NUL. The
-   state is spent afterwards. */
-static void sha256_hex(struct sha256 *s, char hex[65])
+void anti_rt_sha256_hex(struct anti_sha256 *s, char hex[65])
 {
     uint64_t bits = s->length * 8;
     int i;
@@ -141,26 +124,19 @@ static void sha256_hex(struct sha256 *s, char hex[65])
     hex[64] = '\0';
 }
 
-int anti_rt_sha256_file(const char *path, char hex[65])
+bool anti_rt_sha256_stream(FILE *f, char hex[65])
 {
-    FILE *f = anti_rt_fs_open((const unsigned char *)path,
-                              (int64_t)strlen(path), 0);
-    struct sha256 s;
+    struct anti_sha256 s;
     unsigned char bytes[4096];
     size_t n;
 
-    if (f == NULL) {
-        return 0;
-    }
-    sha256_init(&s);
+    anti_rt_sha256_init(&s);
     while ((n = fread(bytes, 1, sizeof bytes, f)) > 0) {
-        sha256_update(&s, bytes, n);
+        anti_rt_sha256_update(&s, bytes, n);
     }
     if (ferror(f)) {
-        fclose(f);
-        return 0;
+        return false;
     }
-    fclose(f);
-    sha256_hex(&s, hex);
-    return 1;
+    anti_rt_sha256_hex(&s, hex);
+    return true;
 }

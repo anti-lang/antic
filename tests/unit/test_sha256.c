@@ -8,15 +8,15 @@
 static void digest_of(const char *bytes, size_t length, size_t step,
                       char hex[65])
 {
-    struct sha256 s;
+    struct anti_sha256 s;
     size_t at;
 
-    sha256_init(&s);
+    anti_rt_sha256_init(&s);
     for (at = 0; at < length; at += step) {
         size_t n = length - at < step ? length - at : step;
-        sha256_update(&s, bytes + at, n);
+        anti_rt_sha256_update(&s, bytes + at, n);
     }
-    sha256_hex(&s, hex);
+    anti_rt_sha256_hex(&s, hex);
 }
 
 /* The vectors of FIPS 180-4 and its examples, whole and in pieces that
@@ -27,7 +27,7 @@ void test_sha256(void)
         "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
     char hex[65];
     char million[1000];
-    struct sha256 s;
+    struct anti_sha256 s;
     int i;
 
     digest_of("", 0, 1, hex);
@@ -43,11 +43,11 @@ void test_sha256(void)
     CHECK_STR(hex, "248d6a61d20638b8e5c026930c3e6039"
                    "a33ce45964ff2167f6ecedd419db06c1");
     memset(million, 'a', sizeof million);
-    sha256_init(&s);
+    anti_rt_sha256_init(&s);
     for (i = 0; i < 1000; i++) {
-        sha256_update(&s, million, sizeof million);
+        anti_rt_sha256_update(&s, million, sizeof million);
     }
-    sha256_hex(&s, hex);
+    anti_rt_sha256_hex(&s, hex);
     CHECK_STR(hex, "cdc76e5c9914fb9281a1c7e284d73e67"
                    "f1809a48a497200e046d39ccc7112cd0");
 }

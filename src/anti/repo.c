@@ -265,7 +265,7 @@ static void write_stamp(const char *stamp)
    apart. */
 static bool index_dir(const char *prefix, const char *name, struct text *out)
 {
-    struct sha256 digest;
+    struct anti_sha256 digest;
     char hex[65];
 
     if (!repo_name_valid(name)) {
@@ -276,9 +276,9 @@ static bool index_dir(const char *prefix, const char *name, struct text *out)
     if (!repo_cache_dir(out)) {
         return false;
     }
-    sha256_init(&digest);
-    sha256_update(&digest, prefix, strlen(prefix));
-    sha256_hex(&digest, hex);
+    anti_rt_sha256_init(&digest);
+    anti_rt_sha256_update(&digest, prefix, strlen(prefix));
+    anti_rt_sha256_hex(&digest, hex);
     text_appendf(out, "/index/%s/%s", hex, name);
     return files_make_dirs(text_cstr(out));
 }
