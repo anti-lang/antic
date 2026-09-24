@@ -1,0 +1,117 @@
+// The refusals of the checker for generics, each with its message.
+
+struct Circle
+{
+	r: f32,
+}
+
+abstract class Shape
+{
+	pub abstract fn area(self) -> f32;
+}
+
+class Square inherits Shape
+{
+	side: f32,
+
+	concrete fn area(self) -> f32
+	{
+		return self.side * self.side;
+	}
+}
+
+class Plain
+{
+	size: int,
+}
+
+fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+// The body uses `+`, and the constraints give `lt` alone.
+fn sum<T: lt>(a: T, b: T) -> T
+{
+	return a + b;
+}
+
+// No interface of the constraints declares `perimeter`.
+fn total<T: Shape>(items: []*T) -> f32
+{
+	return items[0].area() + items[0].perimeter();
+}
+
+fn g(a: int) -> int
+{
+	return a;
+}
+
+fn pick(value: int) -> int
+{
+	return value;
+}
+
+fn make<T>() -> int
+{
+	return 0;
+}
+
+struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+struct Ring<T, N: int>
+{
+	items: [N]T,
+}
+
+class List<T>
+{
+	pub abstract fn map<U>(self) -> int;
+}
+
+export fn exported<T>(a: T) -> T
+{
+	return a;
+}
+
+export type Exported = Circle;
+
+constraint Loop = Again;
+constraint Again = Loop;
+
+fn loose<T: nothing>(a: T) -> T
+{
+	return a;
+}
+
+fn classy<T: Plain>(a: T) -> T
+{
+	return a;
+}
+
+type Itself = Itself;
+
+fn uses(a: int, b: int, c: int, size: int, circles: []*Circle)
+{
+	let bigger = max(Circle { r: 1.0 }, Circle { r: 2.0 });
+	let read = pick(g<a, b>(c));
+	let made = make();
+	let sized: Ring<int, size> = none;
+	let short: Ring<int> = none;
+	let bare: Pair = none;
+	let plain: Circle<int> = Circle { r: 1.0 };
+	let named = max;
+	let area = total(circles);
+	let many = max<int, int>(1, 2);
+	let pair = Pair { first: 1, second: 2 };
+	let typed: Ring<3, 4> = none;
+	let counted: Ring<int, int> = none;
+	let constraint_value = Loop;
+}

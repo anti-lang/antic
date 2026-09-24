@@ -1757,6 +1757,16 @@ add_test(NAME dump_ast_switch_fallthrough
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.ast"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 
+# Type parameters and type arguments in the tree: `>>` closes two lists,
+# and `<` in an expression opens a list by the rule of C#.
+add_test(NAME dump_ast_generics_syntax
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DOPTION=--dump-ast"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.ast"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+
 # An `f"..."` is one node, with the value of each `{expr}` below it.
 add_test(NAME dump_ast_format
     COMMAND "${CMAKE_COMMAND}"
@@ -2989,7 +2999,10 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "pattern_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_import.s,pattern_import.anti"
         "pattern_level|--target,linux-x86_64,--cpu,v1,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_level,pattern_level.anti"
         "pattern_methods|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_methods.s,pattern_methods.anti"
-        "pattern_bytes|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_bytes.s,pattern_bytes.anti")
+        "pattern_bytes|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_bytes.s,pattern_bytes.anti"
+        "generics|--front-end,generics.anti"
+        "generic_syntax|--front-end,generic_syntax.anti"
+        "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)
@@ -3003,6 +3016,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
 endforeach()
 set(DUMP "${CMAKE_CURRENT_SOURCE_DIR}/dump")
 foreach(case "symbolic.types|--dump-types,${DUMP}/symbolic.anti"
+        "generics.types|--dump-types,${DUMP}/generics.anti"
         "header/main.ir|--dump-ir,${DUMP}/header/main.anti"
         "size_of/main.ir|--dump-ir,${DUMP}/size_of/main.anti"
         "size_of/main.linux-arm64.sel|--dump-select,--target,linux-arm64,${DUMP}/size_of/main.anti"

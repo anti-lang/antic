@@ -1,0 +1,1 @@
+generic_copies.anti:19:9: error: `max` needs a compiled copy here, and antic compiles no copy of a generic yet

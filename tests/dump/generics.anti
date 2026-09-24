@@ -1,0 +1,136 @@
+// Generics through the checker: type parameters on a function, a struct,
+// a class, a variant and an interface, copies named with their type
+// arguments, the arguments a call infers, a `constraint` and a `type`.
+
+constraint Ordered = eq + lt;
+
+abstract class Shape
+{
+	pub abstract fn area(self) -> f32;
+}
+
+class Square inherits Shape
+{
+	side: f32,
+
+	concrete fn area(self) -> f32
+	{
+		return self.side * self.side;
+	}
+}
+
+abstract class Source<T>
+{
+	pub abstract fn next(self) -> T;
+}
+
+class Counter inherits Source<int>
+{
+	pub count: int,
+
+	concrete fn next(self) -> int
+	{
+		self.count = self.count + 1;
+		return self.count;
+	}
+}
+
+fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn smallest<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b && a != b {
+		return a;
+	}
+	return max(a, b);
+}
+
+fn first<T>(items: []T) -> T
+{
+	return items[0];
+}
+
+fn area_of<T: Shape>(items: []*T) -> f32
+{
+	return items[0].area();
+}
+
+fn width<T>() -> int
+{
+	return size_of(T) as int;
+}
+
+struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+struct Ring<T, N: int>
+{
+	items: [N]T,
+	head: int,
+}
+
+fn ring_length<T, N: int>(r: *Ring<T, N>) -> int
+{
+	return N;
+}
+
+variant Result<T, E>
+{
+	Ok { value: T },
+	Err { error: E },
+}
+
+class Box<T>
+{
+	value: T,
+
+	pub fn get(self) -> T
+	{
+		return self.value;
+	}
+
+	pub fn make(v: T) -> Box<T>
+	{
+		return Box<T> { value: v };
+	}
+
+	pub fn pair<U>(self, other: U) -> Pair<T, U>
+	{
+		return Pair<T, U> { first: self.value, second: other };
+	}
+}
+
+type Named = Pair<int, str>;
+type Count = int;
+
+fn uses(squares: []*Square, bytes: []u8)
+{
+	let p: Pair<int, str> = Pair { first: 1, second: "one" };
+	let q: Named = Pair<int, str> { first: 2, second: "two" };
+	let m = max(3, 7);
+	let f = max<float>(1.5, 2.5);
+	let s = smallest(1, 2);
+	let b = first(bytes);
+	let r: Ring<u8, 4> = Ring<u8, 4> { items: [1, 2, 3, 4], head: 0 };
+	let length = ring_length(&r);
+	let boxed = Box<int>.make(5);
+	let inferred = Box.make(2.5);
+	let nested: Box<Box<int>> = Box<Box<int>>.make(boxed);
+	let got = boxed.get();
+	let paired = boxed.pair("five");
+	let ok: Result<int, str> = Result.Ok { value: 3 };
+	let failed = Result<int, str>.Err { error: "no" };
+	let area = area_of(squares);
+	let n: Count = width<Pair<int, u8>>();
+	let counter = Counter { count: 0 };
+	let next = counter.next();
+}

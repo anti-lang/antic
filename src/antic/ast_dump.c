@@ -101,6 +101,24 @@ static void dump_params(struct dumper *d, int depth, const char *label,
                         const struct param *params, size_t count,
                         const struct type *owner);
 
+static void dump_type(struct dumper *d, int depth, const struct type_expr *t);
+
+/* The type arguments of a name, one line that opens them and one node
+   per argument below it. */
+static void dump_type_args(struct dumper *d, int depth,
+                           struct type_expr *const *args, size_t count)
+{
+    size_t i;
+
+    if (count == 0) {
+        return;
+    }
+    simple(d, depth, "type_args", NULL);
+    for (i = 0; i < count; i++) {
+        dump_type(d, depth + 1, args[i]);
+    }
+}
+
 static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
 {
     size_t start = begin(d, depth);
@@ -115,6 +133,12 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
     case TYPEX_NAMED:
         label_name(d, t->nullable ? "type ?" : "type", &t->module, &t->name);
         end(d, start, NULL);
+        dump_type_args(d, depth + 1, t->args, t->arg_count);
+        break;
+    case TYPEX_CONST:
+        text_append(d->out, "type const");
+        end(d, start, NULL);
+        dump_expr(d, depth + 1, t->length);
         break;
     case TYPEX_POINTER:
         text_append(d->out, t->nullable ? "type ?*" : "type *");
@@ -287,6 +311,7 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
     case EXPR_NAME:
         label_name(d, "ident", NULL, &e->as.name);
         end(d, start, type);
+        dump_type_args(d, depth + 1, e->type_args, e->type_arg_count);
         break;
     case EXPR_UNARY:
         text_append(d->out, "unary ");
@@ -340,6 +365,7 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         label_name(d, e->as.field.optional ? "optional_field" : "field", NULL,
                    &e->as.field.name);
         end(d, start, type);
+        dump_type_args(d, depth + 1, e->type_args, e->type_arg_count);
         dump_expr(d, depth + 1, e->as.field.base);
         break;
     /* The checked form of `?.`: the value, then the field or the call
@@ -354,6 +380,7 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         label_name(d, "struct_lit", &e->as.struct_lit.module,
                    &e->as.struct_lit.name);
         end(d, start, type);
+        dump_type_args(d, depth + 1, e->type_args, e->type_arg_count);
         dump_fields(d, depth + 1, e->as.struct_lit.fields,
                     e->as.struct_lit.field_count);
         break;
@@ -788,6 +815,28 @@ static void dump_params(struct dumper *d, int depth, const char *label,
 }
 
 /* The functions and constants declared in the body of a struct or enum. */
+/* The type parameters of a generic, each with its constraints. */
+static void dump_type_params(struct dumper *d, int depth,
+                             const struct item *it)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < it->type_param_count; i++) {
+        const struct type_param *tp = &it->type_params[i];
+        size_t start = begin(d, depth);
+        label_name(d, tp->constant ? "type_param const" : "type_param", NULL,
+                   &tp->name);
+        end(d, start, NULL);
+        for (j = 0; j < tp->constraint_count; j++) {
+            size_t at = begin(d, depth + 1);
+            label_name(d, "constraint", &tp->constraints[j].module,
+                       &tp->constraints[j].name);
+            end(d, at, NULL);
+        }
+    }
+}
+
 static void dump_members(struct dumper *d, const struct item *it)
 {
     size_t i;
@@ -825,6 +874,7 @@ static void dump_members(struct dumper *d, const struct item *it)
         if (m->has_self) {
             simple(d, 2, "self", NULL);
         }
+        dump_type_params(d, 2, m);
         dump_params(d, 2, "param", m->params, m->param_count, NULL);
         if (m->result != NULL) {
             simple(d, 2, "result", NULL);
@@ -877,6 +927,8 @@ static void dump_module(struct dumper *d, const struct module *module)
                             : it->kind == ITEM_ENUM      ? "enum_decl"
                             : it->kind == ITEM_CLASS     ? "class_decl"
                             : it->kind == ITEM_VARIANT   ? "variant_decl"
+                            : it->kind == ITEM_CONSTRAINT ? "constraint_decl"
+                            : it->kind == ITEM_TYPE      ? "type_decl"
                                                          : "const_decl";
         size_t start = begin(d, 0);
 
@@ -903,6 +955,7 @@ static void dump_module(struct dumper *d, const struct module *module)
             simple(d, 1, "align", NULL);
             dump_expr(d, 2, it->align);
         }
+        dump_type_params(d, 1, it);
         switch (it->kind) {
         case ITEM_FN:
         case ITEM_EXTERN_FN:
@@ -947,6 +1000,7 @@ static void dump_module(struct dumper *d, const struct module *module)
                 size_t at = begin(d, 1);
                 label_name(d, "inherits", &it->base_module, &it->base_name);
                 end(d, at, NULL);
+                dump_type_args(d, 2, it->base_args, it->base_arg_count);
             }
             dump_params(d, 1, "field", it->params, it->param_count, type);
             dump_members(d, it);
@@ -976,6 +1030,17 @@ static void dump_module(struct dumper *d, const struct module *module)
         case ITEM_CONST:
             dump_type(d, 1, it->type);
             dump_expr(d, 1, it->value);
+            break;
+        case ITEM_CONSTRAINT:
+            for (j = 0; j < it->constraint_count; j++) {
+                size_t at = begin(d, 1);
+                label_name(d, "constraint", &it->constraints[j].module,
+                           &it->constraints[j].name);
+                end(d, at, NULL);
+            }
+            break;
+        case ITEM_TYPE:
+            dump_type(d, 1, it->type);
             break;
         }
     }

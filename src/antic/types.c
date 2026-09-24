@@ -253,6 +253,9 @@ void symbolic_print(struct text *out, const struct symbolic *s,
         text_append(out, " as ");
         print_type(out, s->type, qualified);
         break;
+    case SYMBOLIC_PARAM:
+        print_type(out, s->of, false);
+        break;
     }
 }
 
@@ -1019,6 +1022,15 @@ struct type *types_tuple(struct types *types, struct type *const *elements,
     return t;
 }
 
+struct type *types_param(struct types *types, struct name name)
+{
+    struct type *t = arena_alloc(types->arena, sizeof *t);
+
+    t->kind = TYPE_PARAM;
+    t->name = name;
+    return t;
+}
+
 struct type *types_struct(struct types *types, struct name module,
                           struct name name)
 {
@@ -1434,6 +1446,9 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         if (qualified) {
             text_appendf(out, "%.*s.", (int)t->module.length, t->module.text);
         }
+        text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
+        return;
+    case TYPE_PARAM:
         text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
         return;
     default:

@@ -1,0 +1,20 @@
+// A build past the front end refuses the first use that needs a compiled
+// copy of a generic, and compiles a generic that nothing uses.
+
+fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn unused<T>(a: T) -> T
+{
+	return a;
+}
+
+fn main() -> int
+{
+	return max(3, 7) - 7;
+}

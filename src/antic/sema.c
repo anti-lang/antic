@@ -164,7 +164,12 @@ static struct symbol *nested_find(const struct checker *c,
 struct symbol *sema_module_find(const struct checker *c,
                                 const struct name *name)
 {
-    struct symbol *found = nested_find(c, name);
+    struct symbol *found = sema_type_param_find(c, name);
+
+    if (found != NULL) {
+        return found;
+    }
+    found = nested_find(c, name);
 
     return found != NULL ? found
                          : sema_scope_find_local(&c->module_scope, name);
@@ -720,7 +725,15 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
             return sema_builtin(c, TYPE_ERROR);
         }
         if (t->module.length > 0) {
-            return sema_imported_struct(c, &t->module, &t->name, t->pos);
+            struct type *imported =
+                sema_imported_struct(c, &t->module, &t->name, t->pos);
+            if (t->arg_count > 0 && !sema_is_error(imported)) {
+                sema_error_at(c, t->pos, "`%.*s.%.*s` is not generic",
+                              (int)t->module.length, t->module.text,
+                              (int)t->name.length, t->name.text);
+                return sema_builtin(c, TYPE_ERROR);
+            }
+            return imported;
         }
         sym = sema_module_find(c, &t->name);
         /* DESIGN: `Object` is the root of every class chain, which the
@@ -754,6 +767,33 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
             sema_error_at(c, t->pos, "unknown type `%.*s`", (int)t->name.length,
                           t->name.text);
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        if (sym->item != NULL && sym->item->kind == ITEM_TYPE) {
+            struct type *aliased = sema_alias_type(c, sym);
+            if (t->arg_count > 0 && !sema_is_error(aliased)) {
+                sema_error_at(c, t->pos, "`%.*s` is not generic",
+                              (int)t->name.length, t->name.text);
+                return sema_builtin(c, TYPE_ERROR);
+            }
+            return aliased;
+        }
+        /* A generic is named with its type arguments, and the name of
+           anything else takes none. */
+        if (sym->type != NULL && sym->type->type_param_count > 0) {
+            if (t->arg_count == 0) {
+                sema_error_at(c, t->pos, "`%s` takes %zu type argument%s",
+                              sema_tn(sym->type),
+                              sym->type->type_param_count,
+                              sym->type->type_param_count == 1 ? "" : "s");
+                return sema_builtin(c, TYPE_ERROR);
+            }
+            return sema_copy_of(c, sym->type, t->args, t->arg_count, t->pos);
+        }
+        if (t->arg_count > 0 && sym->type != NULL &&
+            !sema_is_error(sym->type)) {
+            sema_error_at(c, t->pos, "`%.*s` is not generic",
+                          (int)t->name.length, t->name.text);
             return sema_builtin(c, TYPE_ERROR);
         }
         return sym->type;
@@ -828,6 +868,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
     case TYPEX_CHAN:
         element = sema_chan_element(c, t->element);
         return sema_is_error(element) ? element : types_chan(c->types, element);
+    case TYPEX_CONST:
+        sema_error_at(c, t->pos, "expected a type, found a constant");
+        return sema_builtin(c, TYPE_ERROR);
     }
     return sema_builtin(c, TYPE_ERROR);
 }
@@ -1010,7 +1053,23 @@ bool sema_check_object_from(struct checker *c, struct expr *e,
 
 /* The type of a function item, fn(params) -> result. A function of a
    struct body that takes self has a first parameter of type *T. */
+static struct type *function_type_of(struct checker *c, struct item *it);
+
+/* DESIGN: the types of a signature name the type parameters of the
+   function, so the function is the signature being resolved while its
+   types are. */
 static struct type *function_type(struct checker *c, struct item *it)
+{
+    const struct item *saved = c->signature;
+    struct type *t;
+
+    c->signature = it;
+    t = function_type_of(c, it);
+    c->signature = saved;
+    return t;
+}
+
+static struct type *function_type_of(struct checker *c, struct item *it)
 {
     size_t extra = it->has_self ? 1 : 0;
     size_t out = it->may_fail && it->result != NULL ? 1 : 0;
@@ -1374,6 +1433,7 @@ static void declare_cases(struct checker *c, struct item *it)
         types_set_fields(c->types, payloads[i], fields, one->field_count);
     }
     types_set_cases(c->types, v, tag, payloads, count);
+    sema_generic_ready(c, v);
 }
 
 /* DESIGN: the default of a parameter is a constant expression, which the
@@ -1485,7 +1545,9 @@ static enum symbol_kind item_symbol_kind(enum item_kind kind)
     case ITEM_UNION:
     case ITEM_ENUM:
     case ITEM_CLASS:
-    case ITEM_VARIANT: return SYMBOL_STRUCT;
+    case ITEM_VARIANT:
+    case ITEM_TYPE: return SYMBOL_STRUCT;
+    case ITEM_CONSTRAINT: return SYMBOL_CONSTRAINT;
     default: return SYMBOL_CONST;
     }
 }
@@ -1687,6 +1749,9 @@ static bool same_signature(struct checker *c, const struct item *m,
         theirs->kind != TYPE_FN) {
         return true;
     }
+    /* A function of a copy of a generic takes the arguments of the copy
+       in place of the parameters. */
+    theirs = sema_member_type(c, (struct type *)theirs, owner, m->name_pos);
     sema_format_to(fn, sizeof fn, "concrete fn %.*s%s%.*s",
                    (int)m->qualifier.length, m->qualifier.text,
                    m->qualifier.length > 0 ? "::" : "", (int)m->name.length,
@@ -2067,6 +2132,20 @@ static void resolve_base(struct checker *c, struct item *it)
         base_type = base != NULL && base->kind == SYMBOL_STRUCT
                         ? base->type
                         : NULL;
+        if (base != NULL && base->item != NULL &&
+            base->item->kind == ITEM_TYPE) {
+            base_type = sema_alias_type(c, base);
+        }
+    }
+    /* A generic base is named with its arguments,
+       `inherits Iterable<T>`. */
+    if (base_type != NULL && !sema_is_error(base_type) &&
+        (base_type->type_param_count > 0 || it->base_arg_count > 0)) {
+        base_type = sema_copy_of(c, base_type, it->base_args,
+                                 it->base_arg_count, it->base_pos);
+        if (sema_is_error(base_type)) {
+            return;
+        }
     }
     if (base_type == NULL || base_type->kind != TYPE_CLASS) {
         if (it->base_module.length > 0) {
@@ -2174,7 +2253,9 @@ static void declare_enums_and_variants(struct checker *c)
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_VARIANT) {
+            c->within = it;
             declare_cases(c, it);
+            c->within = NULL;
         }
     }
 }
@@ -2378,6 +2459,7 @@ static void declare_fields(struct checker *c, struct item *it)
     if (it->simd) {
         check_simd_struct(c, it);
     }
+    sema_generic_ready(c, it->symbol->type);
 }
 
 /* The fields of every struct, union and class, then the refusal of a
@@ -3137,14 +3219,18 @@ static void check_types(struct checker *c)
 
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
+        struct type *t = it->symbol != NULL && it->kind != ITEM_TYPE
+                             ? it->symbol->type
+                             : NULL;
         if (type_has_fields(t)) {
             check_implements(c, it, t);
         }
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
+        struct type *t = it->symbol != NULL && it->kind != ITEM_TYPE
+                             ? it->symbol->type
+                             : NULL;
         if (type_has_fields(t)) {
             refuse_abstract_fields(c, t);
         }
@@ -3152,7 +3238,9 @@ static void check_types(struct checker *c)
     check_free_operators(c);
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
+        struct type *t = it->symbol != NULL && it->kind != ITEM_TYPE
+                             ? it->symbol->type
+                             : NULL;
         if (!type_has_fields(t)) {
             continue;
         }
@@ -3191,6 +3279,23 @@ static void check_member_functions(struct checker *c)
     }
 }
 
+/* Whether a class of the program fills t, or a copy of t when t is
+   generic. */
+static bool filled_or_copied(const struct checker *c, const struct type *t)
+{
+    const struct type *copy;
+
+    if (sema_filled_somewhere(c, t)) {
+        return true;
+    }
+    for (copy = t->copies; copy != NULL; copy = copy->next_copy) {
+        if (sema_filled_somewhere(c, copy)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* DESIGN: the pass that only reports runs last, over every function a
    worker can reach and over the abstract classes of the program. It
    changes nothing, so a build that skips it still compiles the same
@@ -3216,11 +3321,13 @@ static void report_program(struct checker *c)
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
+        struct type *t = it->symbol != NULL && it->kind != ITEM_TYPE
+                             ? it->symbol->type
+                             : NULL;
         if (it->kind != ITEM_CLASS || !it->is_abstract || t == NULL) {
             continue;
         }
-        if (!sema_filled_somewhere(c, t)) {
+        if (!filled_or_copied(c, t)) {
             diagnostics_warn(c->diags, NAME_UNFILLED_ABSTRACT,
                              it->name_pos.line, it->name_pos.column,
                              "`%.*s` is abstract and no class fills it",
@@ -3238,6 +3345,11 @@ static void check_boundary(struct checker *c)
 
     for (i = 0; i < module->item_count; i++) {
         if (module->items[i]->symbol == NULL) {
+            continue;
+        }
+        sema_check_generic_item(c, module->items[i]);
+        if (module->items[i]->kind == ITEM_TYPE ||
+            module->items[i]->type_param_count > 0) {
             continue;
         }
         if (module->items[i]->exported) {
@@ -3282,6 +3394,8 @@ bool sema_check(struct module *module, const char *module_name,
         declare_import(&c, &module->imports[i]);
     }
     declare_items(&c);
+    sema_declare_generics(&c);
+    sema_resolve_generics(&c);
     resolve_bases(&c);
     declare_enums_and_variants(&c);
     declare_all_fields(&c);
@@ -3289,6 +3403,7 @@ bool sema_check(struct module *module, const char *module_name,
     declare_function_types(&c);
     declare_all_members(&c);
     check_signatures(&c);
+    sema_run_pending(&c);
     check_free_functions(&c);
     check_types(&c);
     check_member_functions(&c);

@@ -86,6 +86,10 @@ enum token_kind {
     /* `re"..."`, a pattern literal, raw, its bytes in value.text. It
        stands after every earlier kind, so no stored value moves. */
     TOKEN_PATTERN,
+    /* The keywords of generics, `constraint` and `type`. They stand after
+       every earlier kind for the same reason. */
+    TOKEN_CONSTRAINT,
+    TOKEN_TYPE,
 
     TOKEN_KIND_COUNT
 };

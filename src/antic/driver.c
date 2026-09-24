@@ -838,6 +838,27 @@ static warnings_ran checks_ran(const struct options *o)
    the build accepts none, and report. complete says the checker ran to
    its end, so a clause that silenced nothing is known. Returns false
    when an error stands. */
+/* DESIGN: the checker reads generics and their uses, and compiling a copy
+   of a generic is a later step. A build past the front end that needs a
+   copy stops at the first use, before any pass that writes code. A
+   generic that nothing uses compiles to nothing, so the passes after the
+   checker see the module without its generics, its `type` names and its
+   constraints. */
+static bool compiles_generics(struct module *tree, struct diagnostics *diags)
+{
+    if (tree->generic_use.line > 0) {
+        diagnostics_add(diags, tree->generic_use.line,
+                        tree->generic_use.column,
+                        "`%.*s` needs a compiled copy here, and antic "
+                        "compiles no copy of a generic yet",
+                        (int)tree->generic_name.length,
+                        tree->generic_name.text);
+        return false;
+    }
+    sema_strip_generics(tree);
+    return true;
+}
+
 static bool settle_diagnostics(const struct options *o,
                                const struct module *tree,
                                struct diagnostics *diags, bool complete)
@@ -1907,14 +1928,18 @@ static int compile(const struct options *o, struct text *source,
         status = 2;
         goto done;
     }
-    if (o->library) {
-        status = write_library(o, tree, text_cstr(module), &arena, &diags);
-        goto done;
-    }
     /* The front end ends here, before the first pass that writes a file of
        the program. Status 2 is the status of a command a dump finished. */
     if (o->front_end) {
         status = 2;
+        goto done;
+    }
+    if (!compiles_generics(tree, &diags)) {
+        report_diagnostics(o, &diags);
+        goto done;
+    }
+    if (o->library) {
+        status = write_library(o, tree, text_cstr(module), &arena, &diags);
         goto done;
     }
     if (o->dump_ir || o->dump_opt) {
@@ -2106,6 +2131,7 @@ const struct interface *driver_interface(const struct options *o,
         report_diagnostics(o, &diags);
         goto done;
     }
+    sema_strip_generics(parsed);
     warnings_apply(parsed, &diags, 0, false);
     report_diagnostics(o, &diags);
     iface = arena_alloc(arena, sizeof *iface);

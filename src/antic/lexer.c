@@ -188,6 +188,8 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_MINUS_SAT_ASSIGN] = {"-|=", CAT_SYMBOL},
     [TOKEN_STAR_SAT_ASSIGN] = {"*|=", CAT_SYMBOL},
     [TOKEN_MUL_HIGH] = {MUL_HIGH, CAT_OTHER},
+    [TOKEN_CONSTRAINT] = {"constraint", CAT_KEYWORD},
+    [TOKEN_TYPE] = {"type", CAT_KEYWORD},
 };
 
 /* The words chapter 2 reserves for threads and does not use yet. They lex

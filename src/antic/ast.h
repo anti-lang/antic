@@ -37,7 +37,10 @@ enum type_expr_kind {
     TYPEX_SLICE,    /* []T */
     TYPEX_FN,       /* fn(T, U) -> R */
     TYPEX_TUPLE,    /* (int, str) */
-    TYPEX_CHAN      /* chan T */
+    TYPEX_CHAN,     /* chan T */
+    /* An integer literal among type arguments, `1024` of
+       `Ring<Sample, 1024>`, held in length. */
+    TYPEX_CONST
 };
 
 struct type_expr {
@@ -53,9 +56,13 @@ struct type_expr {
                                        TYPEX_CHAN */
     /* TYPEX_POINTER: `?*T`, and TYPEX_NAMED: `?Match` */
     bool nullable;
-    struct expr *length;            /* TYPEX_ARRAY */
+    struct expr *length;            /* TYPEX_ARRAY, TYPEX_CONST */
     struct type_expr **params;      /* TYPEX_FN, TYPEX_TUPLE */
     size_t param_count;
+    /* TYPEX_NAMED: the type arguments of `Pair<int, str>`, none for a
+       name without `<`. */
+    struct type_expr **args;
+    size_t arg_count;
     struct type_expr *result;       /* TYPEX_FN, NULL without a result */
     bool may_fail;                  /* TYPEX_FN: `fn(T) -> R may fail` */
     /* The marks of a parameter of a function type. `keep fn(E)` holds
@@ -222,6 +229,13 @@ struct iteration {
 struct expr {
     enum expr_kind kind;
     struct pos pos;
+    /* DESIGN: the type arguments written after a name in an expression,
+       `max<int>` and `List<Person>` of `List<Person>.new()`. EXPR_NAME,
+       EXPR_FIELD and EXPR_STRUCT_LIT carry them. The parser reads them by
+       the rule of C#, and none are written when the count is 0. */
+    struct type_expr **type_args;
+    size_t type_arg_count;
+    struct pos type_args_pos;       /* the `<` */
     struct token_text spelling;     /* source text of a literal */
     struct type *type;              /* set by semantic analysis */
     struct symbol *symbol;          /* EXPR_NAME, set by semantic analysis. */
@@ -687,6 +701,26 @@ enum field_form { FIELD_PLAIN, FIELD_USE, FIELD_BASE, FIELD_TABLE,
    differs, so one enumeration serves both. */
 enum visibility { VIS_PRIVATE, VIS_PROTECTED, VIS_INTERNAL, VIS_PUB };
 
+/* One constraint of a type parameter as written after its `:`: a hook
+   of the operator table, an interface, or a set that `constraint` names.
+   module is empty when the name is not qualified. */
+struct constraint_ref {
+    struct name module;
+    struct name name;
+    struct pos pos;
+};
+
+/* A type parameter of a generic, `T: lt + eq` or `N: int`. */
+struct type_param {
+    struct name name;
+    struct pos pos;
+    bool constant;                  /* `N: int`, an integer constant */
+    struct constraint_ref *constraints;
+    size_t constraint_count;
+    struct type *type;              /* set by semantic analysis */
+    struct symbol *symbol;          /* set by semantic analysis */
+};
+
 /* A parameter, or a field of a struct declaration. */
 struct param {
     struct name name;
@@ -753,7 +787,9 @@ enum item_kind {
     ITEM_CONST,
     ITEM_ENUM,
     ITEM_CLASS,
-    ITEM_VARIANT
+    ITEM_VARIANT,
+    ITEM_CONSTRAINT,                /* `constraint Ordered = eq + lt;` */
+    ITEM_TYPE                       /* `type People = List<Person>;` */
 };
 
 /* A function of a struct body against the contracts of its chain. */
@@ -780,7 +816,15 @@ struct item {
     bool may_fail;
     struct pos may_fail_pos;
     struct block *body;             /* ITEM_FN */
-    struct type_expr *type;         /* ITEM_CONST */
+    struct type_expr *type;         /* ITEM_CONST, ITEM_TYPE */
+    /* The type parameters between `<` and `>` after the name of a
+       function, a struct, a class or a variant. None for an item that is
+       not generic. */
+    struct type_param *type_params;
+    size_t type_param_count;
+    /* ITEM_CONSTRAINT: the set it names. */
+    struct constraint_ref *constraints;
+    size_t constraint_count;
     struct expr *value;             /* ITEM_CONST */
     bool packed;                    /* ITEM_STRUCT, ITEM_UNION, ITEM_VARIANT */
     bool simd;                      /* ITEM_STRUCT: a `simd struct` */
@@ -803,6 +847,10 @@ struct item {
     struct name base_module;        /* ITEM_CLASS: the module of the base,
                                        empty when unqualified. */
     struct pos base_pos;
+    /* ITEM_CLASS: the type arguments of a generic base,
+       `inherits Iterable<T>`. */
+    struct type_expr **base_args;
+    size_t base_arg_count;
     /* `compatible <version>;` in the body of an abstract class: the
        lowest version a plugin may have been built for. Empty where the
        body has no such line. */
@@ -944,6 +992,10 @@ struct module {
     size_t dropped_count;
     struct clause *clauses;         /* `allow` and `unchecked` */
     size_t clause_count;
+    /* Set by the checker: the first place that needs a compiled copy of
+       a generic, and the name of that generic. Line 0 where none does. */
+    struct pos generic_use;
+    struct name generic_name;
 };
 
 /* Append the tree of module to out, one node per line, indented by two

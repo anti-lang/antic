@@ -1,0 +1,55 @@
+//! A generic that nothing uses compiles to nothing, and a `type` names the type
+//! it stands for. The program runs without a copy.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+class Box<T>
+{
+	value: T,
+
+	pub fn get(self) -> T
+	{
+		return self.value;
+	}
+}
+
+class Counter
+{
+	pub count: int,
+
+	pub fn bump(self) -> int
+	{
+		self.count = self.count + 1;
+		return self.count;
+	}
+
+	pub fn keep<T>(self, value: T) -> T
+	{
+		return value;
+	}
+}
+
+constraint Ordered = eq + lt;
+type Count = int;
+
+fn main() -> int
+{
+	let counter = Counter { count: 1 };
+	let n: Count = counter.bump();
+	printf("count %d\n".ptr, n as c_int);
+	return 0;
+}

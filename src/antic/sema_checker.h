@@ -95,12 +95,47 @@ struct checker {
        place, a parameter of it included. The signature of an `extern fn`
        is checked so. */
     int plain_fns;
+    /* The function whose signature is resolved now, whose type
+       parameters its types name. NULL outside a signature. */
+    const struct item *signature;
+    /* The callee of the call checked now, which may name a generic
+       function without its arguments. */
+    const struct expr *callee;
+    /* The copies named before the functions had their types, whose
+       constraints are checked once they do. */
+    struct pending_check *pending;
+    size_t pending_count;
+    size_t pending_capacity;
+    bool pending_done;
     /* The fields of concurrent classes that the module writes after
        `construct`, reported at their declarations at the end. */
     struct written_field *written;
     size_t written_count;
     size_t written_capacity;
     bool ok;
+};
+
+/* A copy of a generic whose arguments are checked against the
+   constraints of type parameter param once every function has its type. */
+struct pending_check {
+    struct type *type;
+    const struct type *param;
+    struct name generic;
+    struct pos pos;
+};
+
+/* What a call gives the inference of a generic: the type arguments
+   written after the callee's name, the expression that wrote them and the
+   name as written, the type before the `.` of `List<int>.new()` or the
+   type of the receiver, and one slot per argument for the type of each
+   argument checked while inferring. */
+struct generic_call {
+    struct type_expr *const *written;
+    size_t count;
+    const struct expr *written_at;
+    const struct name *name;
+    struct type *owner;
+    struct type **prechecked;
 };
 
 /* The most names one condition proves. */
@@ -201,6 +236,8 @@ bool sema_simd_numeric(const struct type *lane);
 const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT]);
 bool sema_operator_named(const struct name *name);
 struct symbol *sema_hook(struct checker *c, struct type *t, const char *text);
+struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
+                                    const char *text);
 bool sema_is_iterator(struct checker *c, struct type *t);
 struct expr *sema_hook_call(struct checker *c, struct expr *base,
                             const char *name, struct expr **args,
@@ -323,6 +360,38 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
 void sema_check_function(struct checker *c, struct item *it);
 void sema_check_main(struct checker *c, struct item *it);
 void sema_check_test_block(struct checker *c, struct item *it);
+
+/* sema_generic.c */
+
+struct symbol *sema_type_param_find(const struct checker *c,
+                                    const struct name *name);
+void sema_declare_generics(struct checker *c);
+void sema_resolve_generics(struct checker *c);
+struct type *sema_alias_type(struct checker *c, struct symbol *sym);
+void sema_run_pending(struct checker *c);
+void sema_note_generic_use(struct checker *c, struct pos pos,
+                           const struct name *generic);
+bool sema_has_params(const struct type *t);
+void sema_generic_ready(struct checker *c, struct type *generic);
+struct type *sema_copy_of(struct checker *c, struct type *generic,
+                          struct type_expr *const *written, size_t count,
+                          struct pos pos);
+struct type *sema_member_type(struct checker *c, struct type *fn,
+                              const struct type *copy, struct pos pos);
+void sema_refuse_type_args(struct checker *c, const struct expr *e,
+                           const struct name *name);
+struct type *sema_generic_named(struct checker *c, struct expr *e,
+                                struct type *t, const struct name *name,
+                                struct type *expected);
+struct type *sema_generic_call(struct checker *c, struct expr *e,
+                               struct type *fn, const struct symbol *sym,
+                               size_t fixed, const struct generic_call *g);
+bool sema_param_operator(struct checker *c, struct expr *e,
+                         enum token_kind op, const char *hook,
+                         struct type *operand);
+const struct type *sema_param_iface(const struct type *p,
+                                    const struct name *name);
+void sema_check_generic_item(struct checker *c, const struct item *it);
 
 /* sema_pattern.c */
 

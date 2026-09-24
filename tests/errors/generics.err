@@ -1,0 +1,23 @@
+generics.anti:86:12: error: constraint `Loop` names itself
+generics.anti:89:13: error: `nothing` is no hook of the operator table, no interface and no constraint
+generics.anti:94:14: error: `Plain` is no hook of the operator table, no interface and no constraint
+generics.anti:99:6: error: type `Itself` names itself
+generics.anti:39:9: error: `sum` uses `+` on `T`, which its constraints do not give. Add `add` to them
+generics.anti:45:27: error: `T` has no function `perimeter`, since no interface of its constraints declares one
+generics.anti:103:15: error: `Circle` has no `lt`, which `max` needs for `T`
+generics.anti:104:19: error: `g` is not generic. Put the comparison in parentheses
+generics.anti:105:13: error: nothing in the arguments gives `T` of `make`, so the call writes it out after the name
+generics.anti:106:23: error: `size` must be a constant for `N`
+generics.anti:107:13: error: `Ring` takes 2 type arguments, found 1
+generics.anti:108:12: error: `Pair` takes 2 type arguments
+generics.anti:109:13: error: `Circle` is not generic
+generics.anti:110:14: error: `max` is generic, and names a function where it is called
+generics.anti:111:13: error: `Circle` has no `Shape`, which `total` needs for `T`
+generics.anti:112:16: error: `max` takes 1 type argument, found 2
+generics.anti:113:13: error: `Pair` is generic, and nothing gives its type arguments here. Write them out after its name
+generics.anti:114:18: error: `Ring` takes a type for `T`, found a constant
+generics.anti:115:25: error: `Ring` takes a constant for `N`, found a type
+generics.anti:116:25: error: `Loop` is a constraint, not a value
+generics.anti:76:18: error: `map` takes type parameters, so it cannot be `abstract` or replaced
+generics.anti:79:11: error: an `export fn` cannot be generic. Export a named copy with `export type`
+generics.anti:84:24: error: `export type` names a copy of a generic struct or class, and `Circle` is none

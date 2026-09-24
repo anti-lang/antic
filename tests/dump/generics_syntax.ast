@@ -1,0 +1,136 @@
+function read
+  type_param K
+    constraint eq
+    constraint hash
+  type_param V
+  param m
+    type Map
+      type_args
+        type K
+        type List
+          type_args
+            type V
+  param k
+    type K
+  result
+    type ?*
+      type List
+        type_args
+          type V
+  block
+    let_stmt nested
+      type List
+        type_args
+          type List
+            type_args
+              type int
+      call
+        field new
+          ident List
+            type_args
+              type List
+                type_args
+                  type int
+    let_stmt generic
+      call
+        ident max
+          type_args
+            type int
+        ident a
+        ident b
+    let_stmt literal
+      struct_lit Pair
+        type_args
+          type int
+          type str
+        field_init first
+          int_lit 1
+        field_init second
+          string_lit "one"
+    let_stmt qualified
+      struct_lit geo.Pair
+        type_args
+          type int
+          type str
+        field_init first
+          int_lit 1
+        field_init second
+          string_lit "one"
+    let_stmt case_of
+      struct_lit Result.Ok
+        type_args
+          type int
+          type str
+        field_init value
+          int_lit 1
+    let_stmt compared
+      relation >
+        relation <
+          ident a
+          ident b
+        ident c
+    let_stmt called
+      call
+        ident f
+        call
+          ident g
+            type_args
+              type a
+              type b
+          ident c
+    let_stmt less
+      relation <
+        ident x
+        ident y
+    let_stmt shifted
+      shift >>
+        ident x
+        int_lit 2
+    let_stmt ring
+      call
+        field new
+          ident Ring
+            type_args
+              type Sample
+              type const
+                int_lit 1024
+    return_stmt
+      none
+class_decl List
+  type_param T
+  inherits Iterable
+    type_args
+      type T
+  pub function map
+    self
+    type_param U
+    param f
+      type fn
+        type T
+        result
+          type U
+    result
+      type List
+        type_args
+          type U
+    block
+      return_stmt
+        call
+          field new
+            ident List
+              type_args
+                type U
+type_decl People
+  type List
+    type_args
+      type Person
+export type_decl PersonList
+  type List
+    type_args
+      type Person
+constraint_decl Key
+  constraint eq
+  constraint hash
+constraint_decl Sortable
+  constraint Ordered
+  constraint geo.Shape

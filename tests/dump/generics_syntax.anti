@@ -1,0 +1,33 @@
+// How the parser reads `<` and `>`. In a type, `<` after a name opens
+// type arguments, and `>>` closes two lists. In an expression, `<` after
+// a name opens them when a list of types closed by `>` follows and a
+// `(`, `.` or `{` comes after it, the rule of C#. Anything else is a
+// comparison.
+
+fn read<K: eq + hash, V>(m: Map<K, List<V>>, k: K) -> ?*List<V>
+{
+	let nested: List<List<int>> = List<List<int>>.new();
+	let generic = max<int>(a, b);
+	let literal = Pair<int, str> { first: 1, second: "one" };
+	let qualified = geo.Pair<int, str> { first: 1, second: "one" };
+	let case_of = Result<int, str>.Ok { value: 1 };
+	let compared = a < b > c;
+	let called = f(g<a, b>(c));
+	let less = x < y;
+	let shifted = x >> 2;
+	let ring = Ring<Sample, 1024>.new();
+	return none;
+}
+
+class List<T> inherits Iterable<T>
+{
+	pub fn map<U>(self, f: fn(T) -> U) -> List<U>
+	{
+		return List<U>.new();
+	}
+}
+
+type People = List<Person>;
+export type PersonList = List<Person>;
+constraint Key = eq + hash;
+constraint Sortable = Ordered + geo.Shape;

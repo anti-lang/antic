@@ -32,6 +32,11 @@ struct parser {
     int depth;                      /* levels entered by descend */
     struct list *clauses;           /* every `allow` and `unchecked` */
     enum fn_block block;            /* the test block being read */
+    /* DESIGN: `>>` closes two lists of type arguments. The inner list
+       takes the first `>` and sets half, and the outer list takes the
+       second and moves past the token. angles counts the lists open. */
+    bool half;
+    int angles;
 };
 
 /* A growable array of fixed-size elements, copied into the memory pool
@@ -263,6 +268,8 @@ static struct doc_text doc_before(struct parser *p, enum token_kind kind)
    up to a closing brace or a keyword that starts a statement. */
 static void sync_statement(struct parser *p)
 {
+    p->half = false;
+    p->angles = 0;
     for (;;) {
         switch (peek(p)->kind) {
         case TOKEN_SEMICOLON:
@@ -292,6 +299,8 @@ static void sync_item(struct parser *p)
 {
     int depth = 0;
 
+    p->half = false;
+    p->angles = 0;
     for (;;) {
         switch (peek(p)->kind) {
         case TOKEN_EOF:
@@ -311,6 +320,8 @@ static void sync_item(struct parser *p)
         case TOKEN_VARIANT:
         case TOKEN_EXTERN:
         case TOKEN_CONST:
+        case TOKEN_CONSTRAINT:
+        case TOKEN_TYPE:
         case TOKEN_PUB:
         case TOKEN_EXPORT:
         case TOKEN_IMPORT:
@@ -332,6 +343,8 @@ static bool is_word(const struct parser *p, const struct token *t,
                     const char *word);
 static struct type_expr *type(struct parser *p);
 static struct block *block(struct parser *p);
+static struct expr *new_expr(struct parser *p, enum expr_kind kind,
+                             const struct token *at);
 
 /* DESIGN: `keep` and `concurrent` are contextual words before a
    parameter of function type, in a parameter list and in the list of a
@@ -388,6 +401,213 @@ static bool is_builtin_type(enum token_kind kind)
     return kind >= TOKEN_BOOL_TYPE && kind <= TOKEN_C_WCHAR;
 }
 
+/* DESIGN: the rule of C# for `<` in an expression. The tokens from the
+   `<` are read as a list of types without building anything. A scan
+   holds the token it stands at, as a count ahead of the parser, and
+   whether the first `>` of a `>>` there is taken. */
+struct angle_scan {
+    size_t at;
+    bool half;
+};
+
+static bool scan_type(const struct parser *p, struct angle_scan *s);
+
+/* Close one list at the scan: a `>`, the first `>` of a `>>`, or the
+   second one that a list inside took the first of. */
+static bool scan_close(const struct parser *p, struct angle_scan *s)
+{
+    enum token_kind k = peek_at(p, s->at)->kind;
+
+    if (s->half) {
+        s->half = false;
+        s->at++;
+        return true;
+    }
+    if (k == TOKEN_GT) {
+        s->at++;
+        return true;
+    }
+    if (k == TOKEN_SHR) {
+        s->half = true;
+        return true;
+    }
+    return false;
+}
+
+/* A list of type arguments from the `<` at the scan. An argument is a
+   type or an integer literal. */
+static bool scan_list(const struct parser *p, struct angle_scan *s)
+{
+    s->at++;
+    for (;;) {
+        if (s->half) {
+            return false;
+        }
+        if (peek_at(p, s->at)->kind == TOKEN_INT) {
+            s->at++;
+        } else if (!scan_type(p, s)) {
+            return false;
+        }
+        if (!s->half && peek_at(p, s->at)->kind == TOKEN_COMMA) {
+            s->at++;
+            continue;
+        }
+        return scan_close(p, s);
+    }
+}
+
+/* The types of a list that `(` opened at the scan, up to its `)`. */
+static bool scan_types(const struct parser *p, struct angle_scan *s)
+{
+    s->at++;
+    while (peek_at(p, s->at)->kind != TOKEN_RPAREN) {
+        while (is_fn_mark(p, s->at) || is_word(p, peek_at(p, s->at), "own")) {
+            s->at++;
+        }
+        if (s->half || !scan_type(p, s) || s->half) {
+            return false;
+        }
+        if (peek_at(p, s->at)->kind != TOKEN_COMMA) {
+            break;
+        }
+        s->at++;
+    }
+    if (peek_at(p, s->at)->kind != TOKEN_RPAREN) {
+        return false;
+    }
+    s->at++;
+    return true;
+}
+
+static bool scan_type(const struct parser *p, struct angle_scan *s)
+{
+    enum token_kind k = peek_at(p, s->at)->kind;
+
+    if (is_builtin_type(k)) {
+        s->at++;
+        return true;
+    }
+    switch (k) {
+    case TOKEN_QUESTION:
+    case TOKEN_STAR:
+    case TOKEN_QUESTION_STAR:
+    case TOKEN_CHAN:
+        s->at++;
+        return scan_type(p, s);
+    case TOKEN_IDENT:
+        s->at++;
+        if (peek_at(p, s->at)->kind == TOKEN_DOT &&
+            peek_at(p, s->at + 1)->kind == TOKEN_IDENT) {
+            s->at += 2;
+        }
+        return peek_at(p, s->at)->kind != TOKEN_LT || scan_list(p, s);
+    case TOKEN_LBRACKET:
+        s->at++;
+        k = peek_at(p, s->at)->kind;
+        if (k == TOKEN_INT || k == TOKEN_IDENT) {
+            s->at++;
+        }
+        if (peek_at(p, s->at)->kind != TOKEN_RBRACKET) {
+            return false;
+        }
+        s->at++;
+        return scan_type(p, s);
+    case TOKEN_LPAREN:
+        return scan_types(p, s);
+    case TOKEN_FN:
+        s->at++;
+        if (peek_at(p, s->at)->kind != TOKEN_LPAREN || !scan_types(p, s)) {
+            return false;
+        }
+        if (peek_at(p, s->at)->kind == TOKEN_ARROW) {
+            s->at++;
+            return scan_type(p, s);
+        }
+        return true;
+    default:
+        return false;
+    }
+}
+
+/* Where the list of type arguments whose `<` stands at ahead ends, as a
+   count ahead of the parser, or 0. It is a list when its tokens read as
+   types closed by `>` and the token after it is `(`, `.` or `{`. */
+static size_t generic_end(const struct parser *p, size_t ahead)
+{
+    struct angle_scan s;
+    enum token_kind after;
+
+    if (peek_at(p, ahead)->kind != TOKEN_LT) {
+        return 0;
+    }
+    s.at = ahead;
+    s.half = false;
+    if (!scan_list(p, &s) || s.half) {
+        return 0;
+    }
+    after = peek_at(p, s.at)->kind;
+    return after == TOKEN_LPAREN || after == TOKEN_DOT || after == TOKEN_LBRACE
+               ? s.at
+               : 0;
+}
+
+/* Close one list of type arguments, the `>` or one half of a `>>`. */
+static bool close_angle(struct parser *p)
+{
+    if (p->half) {
+        p->half = false;
+        next(p);
+        return true;
+    }
+    if (check(p, TOKEN_SHR)) {
+        if (p->angles < 2) {
+            error_here(p, "expected `>`");
+            return false;
+        }
+        p->half = true;
+        return true;
+    }
+    return expect(p, TOKEN_GT);
+}
+
+/* `<int, str>`: the type arguments after a name. An argument is a type,
+   or an integer literal for a constant parameter. */
+static struct type_expr **type_args(struct parser *p, size_t *count)
+{
+    struct list args = {NULL, 0, 0, sizeof(struct type_expr *)};
+    bool ok = true;
+
+    next(p);
+    p->angles++;
+    for (;;) {
+        struct type_expr *arg;
+        if (check(p, TOKEN_INT)) {
+            const struct token *t = next(p);
+            arg = node(p, sizeof *arg);
+            arg->kind = TYPEX_CONST;
+            arg->pos = pos_of(t);
+            arg->length = new_expr(p, EXPR_INT, t);
+            arg->length->as.integer = t->value.integer;
+        } else if ((arg = type(p)) == NULL) {
+            ok = false;
+            break;
+        }
+        list_push(&args, &arg);
+        if (!p->half && accept(p, TOKEN_COMMA)) {
+            continue;
+        }
+        ok = close_angle(p);
+        break;
+    }
+    p->angles--;
+    if (!ok) {
+        free(args.data);
+        *count = 0;
+        return NULL;
+    }
+    return list_finish(p, &args, count);
+}
+
 static struct type_expr *type_level(struct parser *p)
 {
     const struct token *t = peek(p);
@@ -411,6 +631,11 @@ static struct type_expr *type_level(struct parser *p)
             if (!expect_name(p, &ty->name)) {
                 return NULL;
             }
+        }
+        /* In a type, `<` after a name always opens type arguments. */
+        if (check(p, TOKEN_LT) &&
+            (ty->args = type_args(p, &ty->arg_count)) == NULL) {
+            return NULL;
         }
     } else if (accept(p, TOKEN_CHAN)) {
         /* `chan T`, the channel of values of T. */
@@ -829,6 +1054,7 @@ static struct expr *primary(struct parser *p)
     case TOKEN_IDENT: {
         bool qualified;
         bool member;
+        size_t end;
         /* `snapshot fn(...) { }` is an anonymous function that copies
            what it captures. `snapshot` is a contextual word. */
         if (is_word(p, t, "snapshot") && peek_at(p, 1)->kind == TOKEN_FN) {
@@ -839,6 +1065,60 @@ static struct expr *primary(struct parser *p)
                 e->as.fn->snapshot = true;
             }
             return e;
+        }
+        /* `Pair<int, str> { }`, `max<int>(a, b)` and `List<int>.new()`
+           name a generic with its type arguments, by the rule of C#. A
+           variant's case follows its arguments,
+           `Result<int, str>.Ok { }`. */
+        end = generic_end(p, 1);
+        if (end > 0) {
+            if (!p->no_struct_literal &&
+                (peek_at(p, end)->kind == TOKEN_LBRACE ||
+                 (peek_at(p, end)->kind == TOKEN_DOT &&
+                  peek_at(p, end + 1)->kind == TOKEN_IDENT &&
+                  peek_at(p, end + 2)->kind == TOKEN_LBRACE))) {
+                bool case_of = peek_at(p, end)->kind == TOKEN_DOT;
+                e = new_expr(p, EXPR_STRUCT_LIT, t);
+                expect_name(p, &e->as.struct_lit.name);
+                e->type_args_pos = pos_of(peek(p));
+                e->type_args = type_args(p, &e->type_arg_count);
+                if (e->type_args == NULL) {
+                    return NULL;
+                }
+                if (case_of) {
+                    e->as.struct_lit.module = e->as.struct_lit.name;
+                    next(p);
+                    expect_name(p, &e->as.struct_lit.name);
+                }
+                next(p);
+                e->as.struct_lit.fields =
+                    field_inits(p, &e->as.struct_lit.field_count);
+                return p->panic ? NULL : e;
+            }
+            e = new_expr(p, EXPR_NAME, t);
+            expect_name(p, &e->as.name);
+            e->type_args_pos = pos_of(peek(p));
+            e->type_args = type_args(p, &e->type_arg_count);
+            return e->type_args == NULL ? NULL : e;
+        }
+        /* `geo.Pair<int, str> { }` names a generic of another module. */
+        if (!p->no_struct_literal && peek_at(p, 1)->kind == TOKEN_DOT &&
+            peek_at(p, 2)->kind == TOKEN_IDENT &&
+            (end = generic_end(p, 3)) > 0 &&
+            peek_at(p, end)->kind == TOKEN_LBRACE) {
+            e = new_expr(p, EXPR_STRUCT_LIT, t);
+            expect_name(p, &e->as.struct_lit.module);
+            next(p);
+            expect_name(p, &e->as.struct_lit.name);
+            e->type_args_pos = pos_of(peek(p));
+            e->type_args = type_args(p, &e->type_arg_count);
+            if (e->type_args == NULL) {
+                return NULL;
+            }
+            next(p);
+            e->as.struct_lit.fields =
+                field_inits(p, &e->as.struct_lit.field_count);
+            return p->panic ? NULL : e;
         }
         qualified = peek_at(p, 1)->kind == TOKEN_DOT &&
                     peek_at(p, 2)->kind == TOKEN_IDENT &&
@@ -1172,6 +1452,14 @@ static struct expr *postfix(struct parser *p)
                 next(p);
             } else if (!expect_member_name(p, &outer->as.field.name)) {
                 return NULL;
+            }
+            /* `geo.max<int>(a, b)` and `geo.List<int>.new()`. */
+            if (!outer->as.field.element && generic_end(p, 0) > 0) {
+                outer->type_args_pos = pos_of(peek(p));
+                outer->type_args = type_args(p, &outer->type_arg_count);
+                if (outer->type_args == NULL) {
+                    return NULL;
+                }
             }
         } else {
             return e;
@@ -2466,6 +2754,67 @@ static bool starts_member(const struct parser *p)
 
 /* One function or constant declared between the braces of a struct, a
    union or an enum. An abstract function has no body and ends with `;`. */
+/* The constraints after the `:` of a type parameter or the `=` of a
+   `constraint`, joined by `+`. Each is a name, qualified by a module or
+   not. */
+static struct constraint_ref *constraint_list(struct parser *p,
+                                              size_t *count)
+{
+    struct list refs = {NULL, 0, 0, sizeof(struct constraint_ref)};
+
+    do {
+        struct constraint_ref r;
+        memset(&r, 0, sizeof r);
+        r.pos = pos_of(peek(p));
+        if (!expect_name(p, &r.name) ||
+            (accept(p, TOKEN_DOT) &&
+             (r.module = r.name, !expect_name(p, &r.name)))) {
+            free(refs.data);
+            *count = 0;
+            return NULL;
+        }
+        list_push(&refs, &r);
+    } while (accept(p, TOKEN_PLUS));
+    return list_finish(p, &refs, count);
+}
+
+/* `<T: lt + eq, U, N: int>` after the name of a generic. A parameter
+   without `:` is unconstrained, and `N: int` takes an integer constant. */
+static bool type_params(struct parser *p, struct item *it)
+{
+    struct list list = {NULL, 0, 0, sizeof(struct type_param)};
+
+    if (!check(p, TOKEN_LT)) {
+        return true;
+    }
+    next(p);
+    do {
+        struct type_param tp;
+        memset(&tp, 0, sizeof tp);
+        tp.pos = pos_of(peek(p));
+        if (!expect_name(p, &tp.name)) {
+            free(list.data);
+            return false;
+        }
+        if (accept(p, TOKEN_COLON)) {
+            if (accept(p, TOKEN_INT_TYPE)) {
+                tp.constant = true;
+            } else if (is_builtin_type(peek(p)->kind)) {
+                error_here(p, "a constant parameter is written `N: int`");
+                free(list.data);
+                return false;
+            } else if ((tp.constraints = constraint_list(
+                            p, &tp.constraint_count)) == NULL) {
+                free(list.data);
+                return false;
+            }
+        }
+        list_push(&list, &tp);
+    } while (accept(p, TOKEN_COMMA));
+    it->type_params = list_finish(p, &list, &it->type_param_count);
+    return expect(p, TOKEN_GT);
+}
+
 static struct item *member_level(struct parser *p, const struct item *owner)
 {
     struct item *m = node(p, sizeof *m);
@@ -2577,6 +2926,9 @@ static struct item *member_level(struct parser *p, const struct item *owner)
         if (!expect_member_name(p, &m->name)) {
             return NULL;
         }
+    }
+    if (!type_params(p, m)) {
+        return NULL;
     }
     m->params = params(p, false, &m->variadic, &m->has_self,
                        &m->param_count);
@@ -2897,7 +3249,7 @@ static struct item *class_item(struct parser *p, struct item *it)
 
     next(p);
     it->kind = ITEM_CLASS;
-    if (!expect_name(p, &it->name)) {
+    if (!expect_name(p, &it->name) || !type_params(p, it)) {
         return NULL;
     }
     /* DESIGN: `align(N)` stays directly after the name, as on a struct,
@@ -2918,6 +3270,10 @@ static struct item *class_item(struct parser *p, struct item *it)
             (accept(p, TOKEN_DOT) &&
              (it->base_module = it->base_name,
               !expect_name(p, &it->base_name)))) {
+            return NULL;
+        }
+        if (check(p, TOKEN_LT) &&
+            (it->base_args = type_args(p, &it->base_arg_count)) == NULL) {
             return NULL;
         }
         if (check(p, TOKEN_COMMA) || check(p, TOKEN_INHERITS)) {
@@ -3057,7 +3413,7 @@ static struct item *variant_item(struct parser *p, struct item *it)
 
     next(p);
     it->kind = ITEM_VARIANT;
-    if (!expect_name(p, &it->name)) {
+    if (!expect_name(p, &it->name) || !type_params(p, it)) {
         return NULL;
     }
     if (is_word(p, peek(p), "align")) {
@@ -3229,7 +3585,7 @@ static struct item *item_level(struct parser *p)
     case TOKEN_FN:
         next(p);
         it->kind = ITEM_FN;
-        if (!expect_name(p, &it->name)) {
+        if (!expect_name(p, &it->name) || !type_params(p, it)) {
             return NULL;
         }
         it->params = params(p, false, &it->variadic, NULL,
@@ -3272,7 +3628,8 @@ static struct item *item_level(struct parser *p)
     case TOKEN_UNION: {
         struct list fields = {NULL, 0, 0, sizeof(struct param)};
         it->kind = next(p)->kind == TOKEN_UNION ? ITEM_UNION : ITEM_STRUCT;
-        if (!expect_name(p, &it->name)) {
+        if (!expect_name(p, &it->name) ||
+            (it->kind == ITEM_STRUCT && !type_params(p, it))) {
             return NULL;
         }
         if (is_word(p, peek(p), "align")) {
@@ -3365,6 +3722,33 @@ static struct item *item_level(struct parser *p)
         }
         return expect(p, TOKEN_RBRACE) ? it : NULL;
     }
+    case TOKEN_CONSTRAINT:
+        /* `constraint Ordered = eq + lt;` names a set of constraints. C
+           has none, so a constraint is never exported. */
+        if (it->exported) {
+            error_here(p, "a `constraint` is not exported, since C has no "
+                          "generics");
+            return NULL;
+        }
+        next(p);
+        it->kind = ITEM_CONSTRAINT;
+        if (!expect_name(p, &it->name) || !expect(p, TOKEN_ASSIGN) ||
+            (it->constraints = constraint_list(
+                 p, &it->constraint_count)) == NULL ||
+            !expect(p, TOKEN_SEMICOLON)) {
+            return NULL;
+        }
+        return it;
+    case TOKEN_TYPE:
+        /* `type People = List<Person>;` names a type, and
+           `export type PersonList = List<Person>;` offers it to C. */
+        next(p);
+        it->kind = ITEM_TYPE;
+        if (!expect_name(p, &it->name) || !expect(p, TOKEN_ASSIGN) ||
+            (it->type = type(p)) == NULL || !expect(p, TOKEN_SEMICOLON)) {
+            return NULL;
+        }
+        return it;
     case TOKEN_CONST:
         next(p);
         it->kind = ITEM_CONST;
@@ -3588,7 +3972,8 @@ bool parse(const char *source, const struct token_list *tokens,
 {
     struct list clauses = {NULL, 0, 0, sizeof(struct clause)};
     struct parser p = {source, NULL, tokens->items, NULL, NULL, 0, arena,
-                       diags, false, true, false, 0, &clauses, BLOCK_NONE};
+                       diags, false, true, false, 0, &clauses, BLOCK_NONE,
+                       false, 0};
     struct module *m = arena_alloc(arena, sizeof *m);
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
     struct list items = {NULL, 0, 0, sizeof(struct item *)};

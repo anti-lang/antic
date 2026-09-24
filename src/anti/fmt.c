@@ -46,6 +46,10 @@ struct piece {
     bool blank_before;          /* an empty line stands before it. */
     bool dropped;               /* a parenthesis of a condition. */
     size_t match;               /* of a `{`, the index of its `}`. */
+    /* A `<` that opens a list of type parameters or type arguments, and
+       the `>` or `>>` that closes one or two. */
+    bool angle_open;
+    int angle_close;
 };
 
 struct piece_list {
@@ -212,6 +216,259 @@ static void pair_braces(struct piece_list *l)
         l->items[j - 1].dropped = true;
     }
     free(open);
+}
+
+/* DESIGN: `<` and `>` around type parameters and type arguments stand
+   without spaces, `List<int>`, and a comparison keeps its spaces. The
+   formatter tells them apart by the rules of the parser: a list after
+   the name of a declaration, a list in a type, and in an expression a
+   list of types whose `>` a `(`, `.` or `{` follows, the rule of C#. */
+struct angles {
+    struct piece_list *l;
+    size_t *tokens;             /* the index of each token piece */
+    size_t count;
+    bool half;                  /* the first `>` of a `>>` is taken */
+    /* The pieces a scan would mark, the `<` with 0 and a `>` or `>>`
+       with the lists it closes, kept until the scan succeeds. */
+    size_t *marks;
+    int *closes;
+    size_t mark_count;
+};
+
+static void angle_mark(struct angles *a, size_t at, int closes)
+{
+    a->marks[a->mark_count] = a->tokens[at];
+    a->closes[a->mark_count] = closes;
+    a->mark_count++;
+}
+
+static enum token_kind angle_kind(const struct angles *a, size_t at)
+{
+    return at < a->count ? a->l->items[a->tokens[at]].token->kind
+                         : TOKEN_EOF;
+}
+
+static bool angle_type(struct angles *a, size_t *at);
+
+static bool angle_close(struct angles *a, size_t *at)
+{
+    if (a->half) {
+        a->half = false;
+        angle_mark(a, *at, 1);
+        (*at)++;
+        return true;
+    }
+    if (angle_kind(a, *at) == TOKEN_GT) {
+        angle_mark(a, *at, 1);
+        (*at)++;
+        return true;
+    }
+    if (angle_kind(a, *at) == TOKEN_SHR) {
+        angle_mark(a, *at, 1);
+        a->half = true;
+        return true;
+    }
+    return false;
+}
+
+/* A list from the `<` at *at: types and integer literals, or in a
+   declaration names with their constraints. */
+static bool angle_list(struct angles *a, size_t *at, bool declaration)
+{
+    angle_mark(a, *at, 0);
+    (*at)++;
+    for (;;) {
+        enum token_kind k = angle_kind(a, *at);
+        if (a->half) {
+            return false;
+        }
+        if (declaration) {
+            if (k != TOKEN_IDENT) {
+                return false;
+            }
+            (*at)++;
+            if (angle_kind(a, *at) == TOKEN_COLON) {
+                do {
+                    (*at)++;
+                    k = angle_kind(a, *at);
+                    if (k != TOKEN_IDENT && k != TOKEN_INT_TYPE) {
+                        return false;
+                    }
+                    (*at)++;
+                    if (angle_kind(a, *at) == TOKEN_DOT) {
+                        *at += 2;
+                    }
+                } while (angle_kind(a, *at) == TOKEN_PLUS);
+            }
+        } else if (k == TOKEN_INT) {
+            (*at)++;
+        } else if (!angle_type(a, at)) {
+            return false;
+        }
+        if (!a->half && angle_kind(a, *at) == TOKEN_COMMA) {
+            (*at)++;
+            continue;
+        }
+        return angle_close(a, at);
+    }
+}
+
+static bool angle_types(struct angles *a, size_t *at)
+{
+    (*at)++;
+    while (angle_kind(a, *at) != TOKEN_RPAREN) {
+        if (!angle_type(a, at) || a->half) {
+            return false;
+        }
+        if (angle_kind(a, *at) != TOKEN_COMMA) {
+            break;
+        }
+        (*at)++;
+    }
+    if (angle_kind(a, *at) != TOKEN_RPAREN) {
+        return false;
+    }
+    (*at)++;
+    return true;
+}
+
+static bool angle_type(struct angles *a, size_t *at)
+{
+    enum token_kind k = angle_kind(a, *at);
+
+    if (k >= TOKEN_BOOL_TYPE && k <= TOKEN_C_WCHAR) {
+        (*at)++;
+        return true;
+    }
+    switch (k) {
+    case TOKEN_QUESTION:
+    case TOKEN_STAR:
+    case TOKEN_QUESTION_STAR:
+    case TOKEN_CHAN:
+        (*at)++;
+        return angle_type(a, at);
+    case TOKEN_IDENT:
+        (*at)++;
+        if (angle_kind(a, *at) == TOKEN_DOT &&
+            angle_kind(a, *at + 1) == TOKEN_IDENT) {
+            *at += 2;
+        }
+        return angle_kind(a, *at) != TOKEN_LT || angle_list(a, at, false);
+    case TOKEN_LBRACKET:
+        (*at)++;
+        if (angle_kind(a, *at) == TOKEN_INT ||
+            angle_kind(a, *at) == TOKEN_IDENT) {
+            (*at)++;
+        }
+        if (angle_kind(a, *at) != TOKEN_RBRACKET) {
+            return false;
+        }
+        (*at)++;
+        return angle_type(a, at);
+    case TOKEN_LPAREN:
+        return angle_types(a, at);
+    case TOKEN_FN:
+        (*at)++;
+        if (angle_kind(a, *at) != TOKEN_LPAREN || !angle_types(a, at)) {
+            return false;
+        }
+        if (angle_kind(a, *at) == TOKEN_ARROW) {
+            (*at)++;
+            return angle_type(a, at);
+        }
+        return true;
+    default:
+        return false;
+    }
+}
+
+/* Whether the name at the token index at stands where a type does:
+   after `:`, `->`, a pointer, a bracket, `alloc`, `as`, `is`, `chan`,
+   `inherits` or the `=` of a `type` item. */
+static bool type_position(const struct angles *a, size_t at)
+{
+    enum token_kind before;
+
+    if (at >= 2 && angle_kind(a, at - 1) == TOKEN_DOT &&
+        angle_kind(a, at - 2) == TOKEN_IDENT) {
+        at -= 2;
+    }
+    if (at == 0) {
+        return false;
+    }
+    before = angle_kind(a, at - 1);
+    switch (before) {
+    case TOKEN_COLON:
+    case TOKEN_ARROW:
+    case TOKEN_STAR:
+    case TOKEN_QUESTION_STAR:
+    case TOKEN_QUESTION:
+    case TOKEN_RBRACKET:
+    case TOKEN_ALLOC:
+    case TOKEN_AS:
+    case TOKEN_IS:
+    case TOKEN_CHAN:
+    case TOKEN_INHERITS:
+        return true;
+    case TOKEN_ASSIGN:
+        return at >= 3 && angle_kind(a, at - 3) == TOKEN_TYPE;
+    default:
+        return false;
+    }
+}
+
+static void mark_angles(struct piece_list *l)
+{
+    struct angles a;
+    size_t i;
+
+    a.l = l;
+    a.tokens = files_array(l->count + 1, sizeof *a.tokens);
+    a.marks = files_array(2 * l->count + 2, sizeof *a.marks);
+    a.closes = files_array(2 * l->count + 2, sizeof *a.closes);
+    a.count = 0;
+    a.half = false;
+    for (i = 0; i < l->count; i++) {
+        if (l->items[i].kind == PIECE_TOKEN) {
+            a.tokens[a.count++] = i;
+        }
+    }
+    for (i = 1; i < a.count; i++) {
+        size_t end = i;
+        enum token_kind before;
+        enum token_kind after;
+        bool declaration;
+        if (angle_kind(&a, i) != TOKEN_LT ||
+            angle_kind(&a, i - 1) != TOKEN_IDENT ||
+            l->items[a.tokens[i]].angle_open) {
+            continue;
+        }
+        before = i >= 2 ? angle_kind(&a, i - 2) : TOKEN_EOF;
+        declaration = before == TOKEN_FN || before == TOKEN_STRUCT ||
+                      before == TOKEN_CLASS || before == TOKEN_VARIANT;
+        a.half = false;
+        a.mark_count = 0;
+        if (!angle_list(&a, &end, declaration) || a.half) {
+            continue;
+        }
+        after = angle_kind(&a, end);
+        if (declaration || type_position(&a, i - 1) ||
+            after == TOKEN_LPAREN || after == TOKEN_DOT ||
+            after == TOKEN_LBRACE) {
+            size_t k;
+            for (k = 0; k < a.mark_count; k++) {
+                struct piece *p = &l->items[a.marks[k]];
+                if (a.closes[k] == 0) {
+                    p->angle_open = true;
+                } else {
+                    p->angle_close += a.closes[k];
+                }
+            }
+        }
+    }
+    free(a.tokens);
+    free(a.marks);
+    free(a.closes);
 }
 
 /* What a brace belongs to, which decides where it opens. */
@@ -408,6 +665,9 @@ static bool ends_value(const struct piece *p)
     if (p == NULL || p->kind != PIECE_TOKEN) {
         return false;
     }
+    if (p->angle_close > 0) {
+        return true;
+    }
     switch (p->token->kind) {
     case TOKEN_IDENT:
     case TOKEN_INT:
@@ -539,6 +799,11 @@ static bool space_before(const struct emitter *e, const struct piece *p)
         return true;
     }
     prev = e->prev->token->kind;
+    /* A list of type arguments stands without spaces inside its angle
+       brackets and against the name before it. */
+    if (p->angle_open || p->angle_close > 0 || e->prev->angle_open) {
+        return false;
+    }
     /* The name of a clause joins its words with `-`, as it is written. */
     if (e->clause_name && (cur == TOKEN_MINUS || prev == TOKEN_MINUS) &&
         e->prev->offset + e->prev->length == p->offset) {
@@ -1287,6 +1552,22 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     default:
         break;
     }
+    /* The angle brackets of type arguments open and close a list as
+       brackets do, so a `:` or a `,` inside one ends nothing. */
+    if (p->angle_open) {
+        note_token(e, kind);
+        append_piece(e, p, space_before(e, p));
+        push_bracket(e, true);
+        return;
+    }
+    if (p->angle_close > 0) {
+        note_token(e, kind);
+        append_piece(e, p, space_before(e, p));
+        e->brackets -= (size_t)p->angle_close <= e->brackets
+                           ? (size_t)p->angle_close
+                           : e->brackets;
+        return;
+    }
     if (kind == TOKEN_WHILE && joins_do(e, index)) {
         e->do_tail = true;
     }
@@ -1364,6 +1645,7 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     }
     collect(source, length, &tokens, &pieces);
     pair_braces(&pieces);
+    mark_angles(&pieces);
     memset(&e, 0, sizeof e);
     e.src = source;
     e.out = out;

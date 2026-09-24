@@ -1,0 +1,383 @@
+constraint_decl Ordered    Ordered
+  constraint eq
+  constraint lt
+class_decl Shape           Shape
+  abstract
+  pub function area        fn(*Shape) -> f32
+    abstract
+    self
+    result
+      type f32
+class_decl Square          Square
+  inherits Shape
+  field side
+    type f32
+  pub function area        fn(*Square) -> f32
+    concrete
+    self
+    result
+      type f32
+    block
+      return_stmt
+        multiplicative *   f32
+          field side       f32
+            ident self     *Square
+          field side       f32
+            ident self     *Square
+class_decl Source          Source
+  type_param T
+  abstract
+  pub function next        fn(*Source) -> T
+    abstract
+    self
+    result
+      type T
+class_decl Counter         Counter
+  inherits Source
+    type_args
+      type int
+  field count
+    type int
+    pub
+  pub function next        fn(*Counter) -> int
+    concrete
+    self
+    result
+      type int
+    block
+      simple_stmt =
+        field count        int
+          ident self       *Counter
+        additive +         int
+          field count      int
+            ident self     *Counter
+          int_lit 1        int
+      return_stmt
+        field count        int
+          ident self       *Counter
+function max               fn(T, T) -> T
+  type_param T
+    constraint lt
+  param a                  T
+    type T
+  param b                  T
+    type T
+  result
+    type T
+  block
+    if_stmt
+      branch
+        relation <         bool
+          ident a          T
+          ident b          T
+        block
+          return_stmt
+            ident b        T
+    return_stmt
+      ident a              T
+function smallest          fn(T, T) -> T
+  type_param T
+    constraint Ordered
+  param a                  T
+    type T
+  param b                  T
+    type T
+  result
+    type T
+  block
+    if_stmt
+      branch
+        and_expr &&        bool
+          relation <       bool
+            ident a        T
+            ident b        T
+          equality !=      bool
+            ident a        T
+            ident b        T
+        block
+          return_stmt
+            ident a        T
+    return_stmt
+      call                 T
+        ident max          fn(T, T) -> T
+        ident a            T
+        ident b            T
+function first             fn([]T) -> T
+  type_param T
+  param items              []T
+    type []
+      type T
+  result
+    type T
+  block
+    return_stmt
+      index                T
+        ident items        []T
+        int_lit 0          int
+function area_of           fn([]*T) -> f32
+  type_param T
+    constraint Shape
+  param items              []*T
+    type []
+      type *
+        type T
+  result
+    type f32
+  block
+    return_stmt
+      call                 f32
+        ident Shape.area   fn(*Shape) -> f32
+        index              *Shape
+          ident items      []*T
+          int_lit 0        int
+function width             fn() -> int
+  type_param T
+  result
+    type int
+  block
+    return_stmt
+      cast                 int
+        size_of            int
+          type T
+        type int
+struct_decl Pair
+  type_param A
+  type_param B
+  field first              A
+    type A
+  field second             B
+    type B
+struct_decl Ring
+  type_param T
+  type_param const N
+  field items              [N]T
+    type [N]
+      ident N              int
+      type T
+  field head               int
+    type int
+function ring_length       fn(*Ring<T, N>) -> int
+  type_param T
+  type_param const N
+  param r                  *Ring<T, N>
+    type *
+      type Ring
+        type_args
+          type T
+          type N
+  result
+    type int
+  block
+    return_stmt
+      ident N              int
+variant_decl Result        Result
+  type_param T
+  type_param E
+  case Ok
+    field value            T
+      type T
+  case Err
+    field error            E
+      type E
+class_decl Box             Box
+  type_param T
+  field value
+    type T
+  pub function get         fn(*Box) -> T
+    self
+    result
+      type T
+    block
+      return_stmt
+        field value        T
+          ident self       *Box
+  pub function make        fn(T) -> Box
+    param v                T
+      type T
+    result
+      type Box
+        type_args
+          type T
+    block
+      return_stmt
+        struct_lit Box     Box
+          type_args
+            type T
+          field_init value
+            ident v        T
+  pub function pair        fn(*Box, U) -> Pair<T, U>
+    self
+    type_param U
+    param other            U
+      type U
+    result
+      type Pair
+        type_args
+          type T
+          type U
+    block
+      return_stmt
+        struct_lit Pair    Pair<T, U>
+          type_args
+            type T
+            type U
+          field_init first
+            field value    T
+              ident self   *Box
+          field_init second
+            ident other    U
+type_decl Named            Pair<int, str>
+  type Pair
+    type_args
+      type int
+      type str
+type_decl Count            int
+  type int
+function uses              fn([]*Square, []byte)
+  param squares            []*Square
+    type []
+      type *
+        type Square
+  param bytes              []byte
+    type []
+      type u8
+  block
+    let_stmt p             Pair<int, str>
+      type Pair
+        type_args
+          type int
+          type str
+      struct_lit Pair      Pair<int, str>
+        field_init first
+          int_lit 1        int
+        field_init second
+          string_lit "one" str
+    let_stmt q             Pair<int, str>
+      type Named
+      struct_lit Pair      Pair<int, str>
+        type_args
+          type int
+          type str
+        field_init first
+          int_lit 2        int
+        field_init second
+          string_lit "two" str
+    let_stmt m             int
+      call                 int
+        ident max          fn(int, int) -> int
+        int_lit 3          int
+        int_lit 7          int
+    let_stmt f             float
+      call                 float
+        ident max          fn(float, float) -> float
+          type_args
+            type float
+        float_lit 1.5      float
+        float_lit 2.5      float
+    let_stmt s             int
+      call                 int
+        ident smallest     fn(int, int) -> int
+        int_lit 1          int
+        int_lit 2          int
+    let_stmt b             byte
+      call                 byte
+        ident first        fn([]byte) -> byte
+        ident bytes        []byte
+    let_stmt r             Ring<byte, 4>
+      type Ring
+        type_args
+          type u8
+          type const
+            int_lit 4      int
+      struct_lit Ring      Ring<byte, 4>
+        type_args
+          type u8
+          type const
+            int_lit 4      int
+        field_init items
+          array_lit        [4]byte
+            int_lit 1      byte
+            int_lit 2      byte
+            int_lit 3      byte
+            int_lit 4      byte
+        field_init head
+          int_lit 0        int
+    let_stmt length        int
+      call                 int
+        ident ring_length  fn(*Ring<byte, 4>) -> int
+        unary &            *Ring<byte, 4>
+          ident r          Ring<byte, 4>
+    let_stmt boxed         Box<int>
+      call                 Box<int>
+        field make         fn(int) -> Box<int>
+          ident Box
+            type_args
+              type int
+        int_lit 5          int
+    let_stmt inferred      Box<float>
+      call                 Box<float>
+        field make         fn(float) -> Box<float>
+          ident Box
+        float_lit 2.5      float
+    let_stmt nested        Box<Box<int>>
+      type Box
+        type_args
+          type Box
+            type_args
+              type int
+      call                 Box<Box<int>>
+        field make         fn(Box<int>) -> Box<Box<int>>
+          ident Box
+            type_args
+              type Box
+                type_args
+                  type int
+        ident boxed        Box<int>
+    let_stmt got           int
+      call                 int
+        ident Box.get      fn(*Box<int>) -> int
+        unary &            *Box<int>
+          ident boxed      Box<int>
+    let_stmt paired        Pair<int, str>
+      call                 Pair<int, str>
+        ident Box.pair     fn(*Box<int>, str) -> Pair<int, str>
+        unary &            *Box<int>
+          ident boxed      Box<int>
+        string_lit "five"  str
+    let_stmt ok            Result<int, str>
+      type Result
+        type_args
+          type int
+          type str
+      struct_lit Result.Ok Result<int, str>
+        field_init value
+          int_lit 3        int
+    let_stmt failed        Result<int, str>
+      struct_lit Result.Err Result<int, str>
+        type_args
+          type int
+          type str
+        field_init error
+          string_lit "no"  str
+    let_stmt area          f32
+      call                 f32
+        ident area_of      fn([]*Square) -> f32
+        ident squares      []*Square
+    let_stmt n             int
+      type Count
+      call                 int
+        ident width        fn() -> int
+          type_args
+            type Pair
+              type_args
+                type int
+                type u8
+    let_stmt counter       Counter
+      struct_lit Counter   Counter
+        field_init count
+          int_lit 0        int
+    let_stmt next          int
+      call                 int
+        ident Counter.next fn(*Counter) -> int
+        unary &            *Counter
+          ident counter    Counter

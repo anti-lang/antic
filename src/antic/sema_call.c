@@ -808,6 +808,18 @@ static bool names_sub_object(const struct expr *e)
 /* Rewrite v.f(args) into f(receiver, args). The struct T of v has no
    field f, and the module declares a function f whose first parameter is
    T or *T. Returns false after reporting an error. */
+/* Whether a is b, a class below b, or a copy of the generic b or of a
+   class below it, so a function of b takes a as `self`. */
+static bool descends_or_copies(const struct type *a, const struct type *b)
+{
+    for (; a != NULL; a = a->kind == TYPE_CLASS ? a->base : NULL) {
+        if (a == b || (a->generic != NULL && a->generic == b)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool method_call(struct checker *c, struct expr *call)
 {
     struct expr *field = call->as.call.callee;
@@ -829,7 +841,7 @@ static bool method_call(struct checker *c, struct expr *call)
     f = sema_method_symbol(c, s, &field->as.field.name);
     if (f == NULL || (f->kind != SYMBOL_FN && f->kind != SYMBOL_EXTERN_FN) ||
         sema_is_error(f->type) || f->type->param_count == 0 ||
-        !sema_descends_from(s, sema_struct_of(f->type->params[0]))) {
+        !descends_or_copies(s, sema_struct_of(f->type->params[0]))) {
         const struct item *hidden = reached_member(s, &field->as.field.name);
         bool ambiguous = false;
         const struct struct_field *through =
@@ -858,7 +870,7 @@ static bool method_call(struct checker *c, struct expr *call)
                       field->as.field.name.text);
         return false;
     }
-    first = f->type->params[0];
+    first = sema_member_type(c, f->type->params[0], s, receiver->pos);
     if (first->kind == TYPE_POINTER && type_has_fields(t)) {
         struct expr *address = sema_new_node(c, EXPR_UNARY, receiver->pos);
         if (!sema_is_place(receiver)) {
@@ -1390,6 +1402,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
     if (fn == NULL || fn->kind != TYPE_FN) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    fn = sema_member_type(c, fn, t, e->pos);
     e->as.call.builds = t;
     e->as.call.callee->symbol = m->symbol;
     e->as.call.callee->type = fn;
@@ -2069,8 +2082,38 @@ static const struct type *plugin_call(struct checker *c, struct expr *e,
     return instance ? iface : NULL;
 }
 
+static struct type *check_call(struct checker *c, struct expr *e,
+                              struct type *expected, struct generic_call *g);
+
+/* DESIGN: a call carries what a generic needs from it past the rewrites
+   of the checker: the type arguments written after the callee's name,
+   and the class or the receiver the callee is reached through. The
+   callee is the name checked now, so a generic function named there is
+   a call and not a value. */
 struct type *sema_check_call(struct checker *c, struct expr *e,
                              struct type *expected)
+{
+    struct expr *callee = e->as.call.callee;
+    const struct expr *saved = c->callee;
+    struct generic_call g;
+    struct type *t;
+
+    memset(&g, 0, sizeof g);
+    g.written = callee->type_args;
+    g.count = callee->type_arg_count;
+    g.written_at = callee;
+    g.name = callee->kind == EXPR_FIELD ? &callee->as.field.name
+                                        : &callee->as.name;
+    g.prechecked = types_alloc_array(c->arena, e->as.call.arg_count + 2,
+                                     sizeof *g.prechecked);
+    c->callee = callee;
+    t = check_call(c, e, expected, &g);
+    c->callee = saved;
+    return t;
+}
+
+static struct type *check_call(struct checker *c, struct expr *e,
+                              struct type *expected, struct generic_call *g)
 {
     struct expr *callee = e->as.call.callee;
     struct type *fn;
@@ -2128,13 +2171,30 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
                (sym = (struct symbol *)sema_lookup(c,
                         &callee->as.field.base->as.name)) != NULL &&
                sym->kind == SYMBOL_STRUCT) {
-        if (type_is_simd(sym->type) &&
-            simd_static_name(&callee->as.field.name)) {
-            return check_simd_static(c, e, sym->type);
+        struct type *owner = sym->item != NULL && sym->item->kind == ITEM_TYPE
+                                 ? sema_alias_type(c, sym)
+                                 : sym->type;
+        if (sema_is_error(owner)) {
+            return owner;
         }
+        if (type_is_simd(owner) &&
+            simd_static_name(&callee->as.field.name)) {
+            return check_simd_static(c, e, owner);
+        }
+        /* `List<int>.new()` names a copy, and `List.new()` leaves the
+           arguments of the class to the call. */
+        if (callee->as.field.base->type_arg_count > 0) {
+            owner = sema_copy_of(c, owner, callee->as.field.base->type_args,
+                                 callee->as.field.base->type_arg_count,
+                                 callee->as.field.base->type_args_pos);
+            if (sema_is_error(owner)) {
+                return owner;
+            }
+        }
+        g->owner = owner;
         /* T.f(args) calls a function of the body of T, which takes no
            self. An enum value is not callable. */
-        fn = check_type_member(c, callee, sym->type);
+        fn = check_type_member(c, callee, owner);
         callee->type = fn;
         if (sema_is_error(fn)) {
             return fn;
@@ -2194,6 +2254,29 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
         if (sema_is_error(base)) {
             return base;
         }
+        /* A value of a type parameter reaches the functions of the
+           interfaces its constraints name, as a pointer to the one that
+           declares the function. */
+        if (base->kind == TYPE_PARAM ||
+            (base->kind == TYPE_POINTER &&
+             base->element->kind == TYPE_PARAM)) {
+            const struct type *p =
+                base->kind == TYPE_PARAM ? base : base->element;
+            const struct type *iface =
+                sema_param_iface(p, &callee->as.field.name);
+            if (iface == NULL) {
+                sema_error_at(c, callee->pos, "`%s` has no function `%.*s`, "
+                              "since no interface of its constraints "
+                              "declares one", sema_tn(p),
+                              (int)callee->as.field.name.length,
+                              callee->as.field.name.text);
+                return sema_builtin(c, TYPE_ERROR);
+            }
+            base = types_pointer(c->types, (struct type *)iface);
+            callee->as.field.base->type = base;
+            callee->as.field.checked = true;
+        }
+        g->owner = base;
         s = sema_struct_of(base);
         if (types_is_mutex(s) &&
             sema_name_is(&callee->as.field.name, MUTEX_DESTROY)) {
@@ -2234,7 +2317,13 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
         /* A class name in the place of a function builds a value. */
         if (sym != NULL && sym->kind == SYMBOL_STRUCT &&
             sym->type != NULL && sym->type->kind == TYPE_CLASS) {
-            return check_construct(c, e, sym->type, expected);
+            struct type *built = sema_generic_named(c, callee, sym->type,
+                                                    &callee->as.name,
+                                                    expected);
+            if (sema_is_error(built)) {
+                return built;
+            }
+            return check_construct(c, e, built, expected);
         }
         if (sym != NULL && sym->kind == SYMBOL_EXTERN_FN) {
             fn = sym->type;
@@ -2296,11 +2385,20 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
         }
         return sema_builtin(c, TYPE_ERROR);
     }
+    /* A generic function, or a function of a generic class, takes the
+       arguments of its copy here, written or inferred. */
+    fn = sema_generic_call(c, e, fn, sym, fixed, g);
+    if (sema_is_error(fn)) {
+        return fn;
+    }
+    callee->type = fn;
     for (i = fixed; i < given; i++) {
         struct expr *arg = e->as.call.args[i];
         if (i < fn->param_count) {
-            ok = sema_require(c, arg, sema_check_expr(c, arg, fn->params[i]),
-                              fn->params[i]) && ok;
+            struct type *t = g->prechecked[i] != NULL
+                                 ? g->prechecked[i]
+                                 : sema_check_expr(c, arg, fn->params[i]);
+            ok = sema_require(c, arg, t, fn->params[i]) && ok;
             sema_refuse_lock_copy(c, arg, fn->params[i]);
             sema_check_leak_arg(c, e->as.call.callee, arg, fn->params[i]);
             if (sym != NULL && sym->worker) {

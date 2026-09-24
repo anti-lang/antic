@@ -1,0 +1,20 @@
+// The refusals of the parser for generics.
+
+// A constant parameter takes an `int`.
+struct Ring < T, N: u8 >
+{
+	items: [N]T,
+}
+
+// `>>` closes two lists, and one is open.
+fn one(items: List < int >>)
+{
+}
+
+// C has no generics, so a constraint is never exported.
+export constraint Visible = eq;
+
+// A list of type parameters holds names.
+fn two < int > (a: int)
+{
+}

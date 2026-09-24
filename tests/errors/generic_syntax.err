@@ -1,0 +1,4 @@
+generic_syntax.anti:4:21: error: a constant parameter is written `N: int`
+generic_syntax.anti:10:26: error: expected `>`
+generic_syntax.anti:15:8: error: a `constraint` is not exported, since C has no generics
+generic_syntax.anti:18:10: error: expected identifier

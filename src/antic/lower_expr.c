@@ -1846,6 +1846,11 @@ uint32_t lower_sym_of(struct lowerer *l, const struct symbolic *s)
                          : type_is_signed(s->a->type) ? IR_SEXT
                                                       : IR_ZEXT,
                          type, a, IR_NO_AGG);
+    case SYMBOLIC_PARAM:
+        /* A copy of a generic replaces every parameter before lowering,
+           and the driver refuses a program that needs one, so no
+           parameter reaches this switch. */
+        break;
     }
     return a;
 }

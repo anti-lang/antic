@@ -61,7 +61,13 @@ enum type_kind {
        and param_count is the number of cases. Every rule of layout,
        passing and returning is the struct's, so the passes after the
        checker see a struct. */
-    TYPE_VARIANT
+    TYPE_VARIANT,
+    /* DESIGN: a type parameter, `T` inside the generic that declares it.
+       Each parameter is a type of its own, so two parameters are never
+       the same type. It meets the hooks and the interfaces of its
+       constraints and nothing else. The passes after the checker never
+       see one, since a copy of the generic replaces every parameter. */
+    TYPE_PARAM
 };
 
 struct struct_field {
@@ -111,7 +117,10 @@ enum symbolic_kind {
     SYMBOLIC_SIZE_OF,
     SYMBOLIC_UNARY,
     SYMBOLIC_BINARY,
-    SYMBOLIC_CAST
+    SYMBOLIC_CAST,
+    /* A constant parameter of a generic, `N` of `Ring<T, N: int>`, whose
+       type stands in of. */
+    SYMBOLIC_PARAM
 };
 
 /* A constant integer or bool whose value depends on the target, because
@@ -231,6 +240,31 @@ struct type {
        of its form, since all of them have one layout. */
     const struct expr *pattern;     /* Match: the literal, or NULL */
     struct type *twin;              /* Match: the other form of it */
+
+    /* DESIGN: generics. A generic struct, class or variant holds its
+       type parameters, and a copy of it names the generic and holds the
+       arguments, a type per parameter, or a constant in values for an
+       `N: int`. Two copies with the same arguments are one type, so the
+       copies of a generic form a list on it that the checker searches. A
+       copy has the members of its generic, whose signatures name the
+       parameters, and the checker puts the arguments in at each use. */
+    struct type **type_params;      /* a generic: its TYPE_PARAMs */
+    size_t type_param_count;
+    struct type *generic;           /* a copy: the generic it copies */
+    struct type **args;             /* a copy: NULL for a constant */
+    const struct symbolic **values; /* a copy: the constants, or NULL */
+    struct type *copies;            /* a generic: its copies */
+    struct type *next_copy;
+    bool generic_ready;             /* a generic: its fields are known */
+    /* TYPE_PARAM: the declaration, the hooks its constraints give, one
+       bit per entry of the hook table, and the interfaces they name. The
+       item is the generic that declares it. A `constraint` holds its set
+       in a TYPE_PARAM as well. */
+    const struct type_param *param;
+    const struct item *declared_by;
+    uint32_t hooks;
+    const struct type **ifaces;
+    size_t iface_count;
 
     enum layout_state layout;       /* TYPE_STRUCT, for the cycle check */
     struct type *next;              /* the list of derived types */
@@ -615,6 +649,9 @@ struct type *type_simd_lane(const struct type *t);
 uint64_t type_lane_bytes(const struct type *t);
 /* The bytes of the simd struct t, its lanes without padding. */
 uint64_t type_simd_bytes(const struct type *t);
+
+/* A new type parameter named name. Each call returns a distinct type. */
+struct type *types_param(struct types *types, struct name name);
 
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */

@@ -19,7 +19,8 @@ enum symbol_kind {
     SYMBOL_EXTERN_FN,
     SYMBOL_STRUCT,
     SYMBOL_MODULE,  /* the name an import declares */
-    SYMBOL_GLOBAL   /* a static atomic field of a class */
+    SYMBOL_GLOBAL,  /* a static atomic field of a class */
+    SYMBOL_CONSTRAINT   /* `constraint Ordered = eq + lt;` */
 };
 
 enum const_kind {
@@ -187,6 +188,12 @@ bool sema_check(struct module *module, const char *module_name,
                 size_t library_count, struct types *types,
                 struct arena *arena, struct diagnostics *diags,
                 bool program);
+
+/* Take the generics out of a checked module: every generic item, every
+   function of a class body with type parameters of its own, every `type`
+   and every `constraint`. The passes after the checker compile what
+   remains. */
+void sema_strip_generics(struct module *module);
 
 /* The `fallthrough;` that ends the body of a switch arm, the last
    statement of its block, or NULL when the arm ends otherwise. */

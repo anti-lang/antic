@@ -630,6 +630,12 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             if (!sema_is_error(t) && type_is_simd(t)) {
                 return check_simd_unary(c, e, t);
             }
+            /* A parameter has the operator its constraints give. */
+            if (!sema_is_error(t) && t->kind == TYPE_PARAM) {
+                return sema_param_operator(c, e, e->as.unary.op, called, t)
+                           ? t
+                           : sema_builtin(c, TYPE_ERROR);
+            }
             if (!sema_is_error(t) &&
                 (fn = operator_symbol(c, t, called)) != NULL) {
                 struct expr *call = sema_new_node(c, EXPR_CALL, e->pos);
@@ -826,6 +832,15 @@ bool sema_operator_named(const struct name *name)
 
 /* The operator function `name` that the type t declares, or that the
    module of t declares for a struct. */
+static struct symbol *operator_symbol(struct checker *c, struct type *t,
+                                      const char *text);
+
+struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
+                                    const char *text)
+{
+    return operator_symbol(c, t, text);
+}
+
 static struct symbol *operator_symbol(struct checker *c, struct type *t,
                                       const char *text)
 {
@@ -1181,6 +1196,45 @@ static struct type *check_simd_binary(struct checker *c, struct expr *e,
     }
 }
 
+/* DESIGN: an operator on a type parameter calls the hook of the
+   operator table, which its constraints must give. Both operands are the
+   same parameter, as for any operator, and the result is the parameter,
+   or bool for a comparison. */
+static struct type *param_binary(struct checker *c, struct expr *e,
+                                 const char *called, struct type *left,
+                                 struct type *right)
+{
+    enum token_kind op = e->as.binary.op;
+    struct type *param = left->kind == TYPE_PARAM ? left : right;
+    char spelling[OP_TEXT];
+
+    if (called == NULL) {
+        sema_error_at(c, e->pos, "`%s` is not defined on `%s`",
+                      sema_op_text(op, spelling), sema_tn(param));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (!sema_param_operator(c, e, op, called, param)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (left != right) {
+        sema_error_at(c, e->pos, "the operands of `%s` have the types `%s` and "
+                      "`%s`", sema_op_text(op, spelling), sema_tn(left),
+                      sema_tn(right));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    switch (op) {
+    case TOKEN_EQ:
+    case TOKEN_NE:
+    case TOKEN_LT:
+    case TOKEN_LE:
+    case TOKEN_GT:
+    case TOKEN_GE:
+        return sema_builtin(c, TYPE_BOOL);
+    default:
+        return left;
+    }
+}
+
 struct type *sema_check_binary(struct checker *c, struct expr *e,
                                struct type *expected)
 {
@@ -1241,6 +1295,9 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
             (types_is_match(left) || types_is_match(right))) {
             return sema_builtin(c, TYPE_BOOL);
         }
+        if (left->kind == TYPE_PARAM || right->kind == TYPE_PARAM) {
+            return param_binary(c, e, called, left, right);
+        }
         if (type_is_simd(left) || type_is_simd(right)) {
             return check_simd_binary(c, e, left, right);
         }
@@ -1275,6 +1332,9 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
     default:
         if (!binary_operands(c, e, expected, &left, &right)) {
             return sema_builtin(c, TYPE_ERROR);
+        }
+        if (left->kind == TYPE_PARAM || right->kind == TYPE_PARAM) {
+            return param_binary(c, e, called, left, right);
         }
         if (type_is_simd(left) || type_is_simd(right)) {
             return check_simd_binary(c, e, left, right);
@@ -2306,6 +2366,25 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                           (int)e->as.name.length, e->as.name.text);
             return sema_builtin(c, TYPE_ERROR);
         }
+        if (sym->kind == SYMBOL_CONSTRAINT) {
+            sema_error_at(c, e->pos, "`%.*s` is a constraint, not a value",
+                          (int)e->as.name.length, e->as.name.text);
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        /* DESIGN: a generic function names a copy where it is called,
+           since the arguments of the call give its type arguments. A
+           name of one anywhere else names no function. */
+        if (sym->kind == SYMBOL_FN && sym->item != NULL &&
+            sym->item->type_param_count > 0 && c->callee != e) {
+            sema_error_at(c, e->pos, "`%.*s` is generic, and names a function "
+                          "where it is called", (int)e->as.name.length,
+                          e->as.name.text);
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        if (e->type_arg_count > 0 && c->callee != e) {
+            sema_refuse_type_args(c, e, &e->as.name);
+            return sema_builtin(c, TYPE_ERROR);
+        }
         /* A local of another frame is a variable an anonymous function
            captures. */
         if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
@@ -2486,7 +2565,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             (named = sema_lookup(c, &e->as.struct_lit.module)) != NULL &&
             named->kind == SYMBOL_STRUCT && named->type != NULL &&
             named->type->kind == TYPE_VARIANT) {
-            return sema_variant_literal(c, e, named->type, name);
+            t = sema_generic_named(c, e, named->type,
+                                   &e->as.struct_lit.module, expected);
+            if (sema_is_error(t)) {
+                return t;
+            }
+            return sema_variant_literal(c, e, t, name);
         }
         if (e->as.struct_lit.module.length > 0) {
             t = sema_imported_struct(c, &e->as.struct_lit.module, name, e->pos);
@@ -2509,8 +2593,14 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                               (int)name->length, name->text);
                 return sema_builtin(c, TYPE_ERROR);
             } else {
-                t = sym->type;
+                t = sym->item != NULL && sym->item->kind == ITEM_TYPE
+                        ? sema_alias_type(c, sym)
+                        : sym->type;
             }
+        }
+        t = sema_generic_named(c, e, t, name, expected);
+        if (sema_is_error(t)) {
+            return t;
         }
         if (t->kind == TYPE_VARIANT) {
             sema_error_at(c, e->pos,

@@ -15,7 +15,7 @@ _Static_assert(TYPE_VARIANT == 28, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
-_Static_assert(TOKEN_KIND_COUNT == 178, "raise ANTL_VERSION, then update this");
+_Static_assert(TOKEN_KIND_COUNT == 180, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_LOCK == 11, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_RET == 85, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
@@ -339,6 +339,10 @@ static void put_symbolic(struct writer *w, const struct symbolic *s)
         put_u8(w, (uint8_t)s->op);
         put_symbolic(w, s->a);
         put_symbolic(w, s->b);
+        break;    case SYMBOLIC_PARAM:
+        /* A library file carries no generic yet, so nothing it writes
+           names a parameter. */
+        w->failed = true;
         break;
     }
 }
@@ -1320,6 +1324,7 @@ static const struct symbolic *read_symbolic(struct reader *r, uint32_t limit,
         if (key.kind == SYMBOLIC_BINARY && !r->failed) {
             key.b = read_symbolic(r, limit, depth + 1);
         }
+        break;    case SYMBOLIC_PARAM:
         break;
     }
     if (r->failed || !(type_is_integer(key.type) || key.type->kind == TYPE_BOOL)) {
