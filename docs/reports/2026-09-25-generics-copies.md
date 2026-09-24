@@ -77,3 +77,20 @@ passes 993 of 993, ASan 992 of 992 and UBSan 992 of 992, without
 and `build/logs/ubsan-test.log`. The docs-style checker reports nothing on
 every file touched, apart from `tests/CMakeLists.txt`, which it reads as
 prose and has always failed on.
+
+## Proof of the push
+
+Taken after the push of the code and the report.
+
+```text
+$ git log --oneline -3
+2357a26 Report the compilation of generics
+b340f60 Compile the copies of generics
+5bc0acb Store a generic in a library file as its checked tree
+$ git status --short
+$ git rev-parse HEAD origin/main
+2357a26f35f5e83354700ad7dfd964bef7edc1f9
+2357a26f35f5e83354700ad7dfd964bef7edc1f9
+```
+
+Suites: host 993 of 993, ASan 992 of 992, UBSan 992 of 992.
