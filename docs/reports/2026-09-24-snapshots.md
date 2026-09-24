@@ -75,3 +75,16 @@ The suites on `a8e2661`: the host 882 of 882, ASan 881 of 881, UBSan 881 of
 881. The sanitizer builds leave out `no_paths` as before. Logs: `build/drive/logs/snap-final-host.log`,
 `build/drive/logs/snap-final-asan.log` and
 `build/drive/logs/snap-final-ubsan.log`.
+
+After the push of the report:
+
+```text
+$ git log --oneline -3
+fd80c8f Report snapshots and owned function values
+a8e2661 Pass over an own fn field in reflection and serialize
+2fc08ac Record snapshots and owned function values in the documents
+$ git status --short
+$ git rev-parse HEAD origin/main
+fd80c8f1e974e26a38b8fb141818371d315dd0d0
+fd80c8f1e974e26a38b8fb141818371d315dd0d0
+```
