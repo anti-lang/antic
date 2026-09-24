@@ -21,7 +21,7 @@ set(ANTIC_RAYLIB_SOURCES rcore rshapes rtextures rtext rmodels raudio rglfw)
 
 # DESIGN: the desktop back end over GLFW with OpenGL 3.3, the default of
 # raylib's own Makefile, with its flags. On Linux GLFW takes X11 alone and
-# Wayland stays out, as docs/decisions-native.md records. The
+# Wayland stays out, as docs/decisions.md records. The
 # configuration is raylib's config.h, unchanged.
 set(ANTIC_RAYLIB_DEFINES -DPLATFORM_DESKTOP_GLFW -DGRAPHICS_API_OPENGL_33)
 

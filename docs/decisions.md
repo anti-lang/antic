@@ -286,7 +286,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - The back end folds a symbolic value with wrapping at the width of its type. A division by zero is an error that names the target. Reason: the fold agrees with the same arithmetic at run time.
 - After folding, the back end runs the optimizer passes again on each function that held a symbolic value. Reason: a folded size reaches the simplifications a number reaches, and the machine code stays the same as with sizes in the IR.
 - A value computed from `size_of` converts only to an integer type in a constant expression. Reason: the back end folds symbolic values as integers.
-- Runtime archive: prebuilt static libraries per target under `lib/<os>-<cpu>/` plus the target-independent `.antl` files. Static linking throughout. `src/native/` holds the CMake build, run per target in CI. Contents: `anti_rt`, as `libanti_rt.a` and `anti_rt.lib`, with the startup file `src/rt/start.c` and the thread-pool runtime, raylib (zlib), miniaudio (MIT-0), Mbed TLS (Apache 2.0) and PCRE2 (BSD). Mbed TLS 4.x splits crypto into TF-PSA-Crypto, so that is two libraries, or use the 3.6 LTS line. PCRE2 is the 8-bit build with UTF support and JIT off.
+- Runtime archive: prebuilt static libraries per target under `lib/<os>-<cpu>/` plus the target-independent `.antl` files. Static linking throughout. `src/native/` holds the CMake build, run per target in CI. Contents: `anti_rt`, as `libanti_rt.a` and `anti_rt.lib`, with the startup file `src/rt/start.c` and the thread-pool runtime, raylib (zlib), miniaudio (MIT-0), Mbed TLS (Apache 2.0), PCRE2 (BSD) and SQLite (public domain). Mbed TLS 4.x splits crypto into TF-PSA-Crypto, so that is two libraries, or use the 3.6 LTS line. The build follows the 3.6 LTS line, as "SQLite and Mbed TLS" below records. PCRE2 is the 8-bit build with UTF support and JIT off.
 - antic and the runtime archive are published per target, as `anti-<version>-<target>.tar.xz` among the assets of the GitHub release of the tag `v<version>`. A target is published only after the test suite has run on that target, in a VM or on a runner. Reason: a binary that nobody executed is not a release.
 - CMake is pinned at the version of `tools/cmake-version`, which builds the published binaries of antic. `tools/cmake-pin` names the release archive of each host with its digest, as Kitware publishes them. Reason: the version that produced a binary is the version we tested with.
 - An install of Anti is local to the user and follows the conventions of the platform. It is never one directory named `~/.anti`. On Linux and macOS the executables `anti` and `antic` go in `~/.local/bin`, the toolchain and the runtime archive in `~/.local/share/anti`, the configuration in `~/.config/anti` and the script-mode cache and the downloads in `~/.cache/anti`. `XDG_BIN_HOME`, `XDG_DATA_HOME`, `XDG_CONFIG_HOME` and `XDG_CACHE_HOME` replace the four roots when they are set. On Windows the executables go in `%LOCALAPPDATA%\Programs\anti\bin`, the toolchain and the runtime archive in `%LOCALAPPDATA%\anti`, and the configuration and the cache in `config\` and `cache\` of that directory. Nothing under `/` or `C:\` outside the user's profile is ever written. Reason: a reset of a user is then four directories and never the machine, and a tool that follows the platform's conventions needs no explaining. The four roots are also what a backup, a sync tool and an administrator already know.
@@ -311,7 +311,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - [provisional] The glibc mode has a sysroot and a runtime of its own per processor, `sysroot/linux-<cpu>-glibc` and `lib/linux-<cpu>-glibc/<level>/` of the runtime archive. The runtime is built against the headers of the sysroot on every host, the Linux one as well. Every program of the mode links libm. Reason: a runtime built against the glibc of the machine names symbol versions above 2.35. musl carries libm inside libc.a, so a program of the static mode reaches it without a line.
 - [provisional] The glibc sysroot holds libX11 and libGL of jammy, `libx11-6`, `libx11-dev`, `libgl1` and `libgl-dev`, and the installer writes every symbolic link of the packages as a copy of the file it reaches. A link that reaches no file goes. Reason: the -dev packages carry the names `libX11.so` and `libGL.so` that `-l` finds. libc6-dev links `libm.so` to an absolute path of the machine it installs on, and lld on the Windows VM reads no link the installer writes.
 - [provisional] The published package still holds the two musl sysroots and no glibc sysroot and no glibc runtime. Reason: what a package holds is Eddie's decision, and the entry on the published package names the two Linux sysroots alone.
-- The native libraries are built in the order PCRE2, Mbed TLS, miniaudio, raylib. Reason: the awkward one comes last, and the first three unblock `anti.regex` and `anti.net` early.
+- The native libraries are built in the order PCRE2, SQLite, Mbed TLS, miniaudio, raylib. SQLite stands after PCRE2, where "Standard interfaces" in `docs/anti-language-additions.md` places it. Reason: the awkward one comes last, and the first three unblock `anti.regex` and `anti.net` early.
 - Bindings: `anti bind --clang raylib.h` writes `anti.raylib`, and `anti bind --clang miniaudio.h` writes `anti.miniaudio`. Nothing in a binding is hand-written. `static inline` C functions get exported wrappers in a generated shim. An ABI probe compares sizes, alignments, offsets and bitfield bytes between C and Anti on every target. Struct-by-value calls into raylib double as the ABI test suite.
 - The runtime archive also holds `llvm-ar` of the pinned release of `anti-lang/llvm-tools`, Mozilla's CA bundle as `lib/cacert.pem` and a `licenses/` directory with one file per component.
 - [provisional] A member of a class body read from a library file takes `self` when the first parameter of its function type is `*C`, where `C` is the class. The file does not record the mark. The reader refuses a member whose type is not a function, a bound function type, and one whose parameter count differs from the names the declaration wrote plus `self` plus the out pointer of `may fail`. Reason: the reader used to set `self` on every member, and the `get` of a singleton takes none, so the mark has to come from somewhere. The type is the one source that needs no change of the format. A function of a class body that takes no `self` and whose first parameter is `*C` reads as one that takes `self`. A flag in the marks byte of the member removes that case, with a new format version.
@@ -329,6 +329,306 @@ about structs, enums, classes, interfaces and errors lives there, and
 - [provisional] `antl_write` and `antl_write_header` return false when a count or an index of the library file does not fit in its 32 bits. antic then reports `antic: <source> is too large for a library file` and writes no file. Reason: rule 17 wants a refusal rather than a damaged file, and the format keeps its fixed width.
 - [provisional] The reader uses some strings of a library file as C strings, such as a module path or a package name. Such a string with a NUL inside makes the file damaged. Reason: `strcmp` would compare the text before the NUL, so `foo\0x` would match `foo`.
 - [provisional] The start flag of `init.c` is atomic, since a static library for C sets it on first use from any thread of the host. Reason: rule 23.
+
+### PCRE2
+
+- PCRE2 10.48 is pinned in `tools/pcre2-pin` by version and by the SHA-256 of
+  `pcre2-10.48.tar.gz`, the digest that the release page of `PCRE2Project/pcre2`
+  publishes. `src/native/get-pcre2.cmake` downloads the archive over HTTPS into
+  `build/deps/pcre2/`, checks the digest and unpacks it there. An archive already on
+  disk with the pinned digest is not downloaded again, so a configure without a network
+  works once the source is there. The test `pcre2_pin` checks the pin and refuses a copy
+  of the version or the digest in the script or the recipe.
+- The library is the 8-bit build with UTF support and JIT off, as "Runtime archive" in
+  `docs/decisions.md` settles. `src/native/pcre2.cmake` compiles the 31 sources of the
+  list in `NON-AUTOTOOLS-BUILD` of the release with the pinned clang, and llvm-ar writes
+  `lib/<target>/libpcre2-8.a`, or `lib/<target>/pcre2-8.lib` on Windows, in the runtime
+  tree. Every target with a sysroot is built, at the default level of the target.
+- [provisional] `src/native/` is a subdirectory of the build of antic, which the
+  top-level `CMakeLists.txt` adds after `tests/`, and no project of its own run once per
+  target. Reason: one configure then builds all six targets with the sysroots and the
+  flags that the cross builds of anti_rt use, and the tests link through the antic of
+  the same tree. The CMake block quoted under "Libraries of later chapters" in
+  `docs/site/runtime-archive/index.md` shows the former form and changes when this entry
+  is folded.
+- [provisional] The triple and the flags of each target stand in `antic_native_target`
+  of `src/native/CMakeLists.txt`, a second copy of the arguments that the top-level file
+  passes to `anti_cross_runtime`. Reason: the step could change no other line of the
+  top-level file. The fold makes both builds read one function.
+- [provisional] The download script is `src/native/get-pcre2.cmake`, beside its recipe,
+  and not in `tools/` beside `tools/get-raylib.cmake`. Reason: `tools/` holds the pin,
+  and the script belongs to the one recipe that runs it.
+- [provisional] The library keeps the name PCRE2 gives its 8-bit library, `pcre2-8`, as
+  `libpcre2-8.a` and `pcre2-8.lib`, the forms of `libanti_rt.a` and `anti_rt.lib`.
+  Reason: a C project that links the published file finds it under its usual name.
+- [provisional] The configuration is `config.h.generic` of the release with four
+  definitions: `HAVE_CONFIG_H`, `PCRE2_CODE_UNIT_WIDTH=8`, `SUPPORT_UNICODE` and
+  `PCRE2_STATIC`. `SUPPORT_JIT` is never defined. The limits of matching, nesting and
+  names stay the defaults of the release. Reason: the smallest configuration that gives
+  the decided build.
+- [provisional] PCRE2 compiles with the warnings of anti_rt, `-Wall -Wextra -Wpedantic
+  -Werror`, and `-Wno-overlength-strings`. Reason: the table of messages in
+  `pcre2_error.c` is one literal of 5,686 bytes, above the 4,095 that C11 guarantees, and
+  clang, which compiles every target, takes it. No other warning is raised on any of the
+  six targets.
+- [provisional] `pcre2.h` stays in `build/<preset>/native/pcre2/include/` and is not yet
+  part of the runtime archive. Reason: nothing in the archive reads it before
+  `anti.regex` binds it, and the directory of headers in the archive is not decided.
+- [provisional] The build copies `LICENCE.md` of the release to `licenses/pcre2.txt` of
+  the runtime tree, the directory of one licence file per component that "Licences that
+  travel" describes.
+- PCRE2's licence text must be added to `LICENSES/` of the repository, which the fence of
+  this step did not include. The text is `LICENCE.md` of the pinned release, whose SPDX
+  identifier is `BSD-3-Clause WITH PCRE2-exception`.
+- [provisional] The tests of the native libraries are registered in
+  `src/native/CMakeLists.txt` through `src/native/pcre2.cmake`, and their scripts and
+  sources lie in `tests/`: `tests/run_native_link.cmake`, `tests/run_pcre2_pin.cmake`
+  and `tests/abi/pcre2_probe.c` with `tests/abi/pcre2_match.anti`. Reason: the tests
+  exist only where the libraries are built, and `tests/CMakeLists.txt` stayed outside
+  the fence.
+- `pcre2_link_<target>` links `pcre2_match.anti` with the C probe and the library for
+  each of the six targets through antic and lld, as a program of that target links. A
+  missing symbol fails the link. `pcre2_match` runs the program of the host. It checks
+  that the library reports UTF support and no JIT, that a group starts and ends at the
+  offsets PCRE2 names, that `.` takes the two bytes of `ß` as one character, that a
+  caseless `ö` matches `Ö`, and that `a(b` fails to compile at offset 3.
+
+### raylib and miniaudio
+
+- raylib is the release that `tools/raylib-pin` names, 6.0, the pin of the bindings.
+  `ANTIC_RAYLIB_DIR` names the extracted release, and `src/native/raylib.cmake` builds it.
+- [provisional] miniaudio 0.11.24 is pinned in `tools/miniaudio-pin` by version and by
+  the SHA-256 of the source archive of the tag. GitHub publishes no digest for a source
+  archive, so the digest is the one of the archive at its first download, as for raylib.
+  `src/native/get-miniaudio.cmake` downloads it into `build/deps/miniaudio/` and checks
+  the digest. Reason: 0.11.24 is the version raylib 6.0 bundles in
+  `src/external/miniaudio.h`, so a program carries one version of miniaudio. The test
+  `miniaudio_pin` checks the pin, refuses a copy of it in the script or the recipe, and
+  compares the version with the one raylib bundles.
+- The glibc 2.35 sysroot is extended with the X11 and OpenGL development packages of the
+  original jammy release, for amd64 and arm64. They are pinned by digest in
+  `tools/sysroot-pins` as libc6-dev is. Eddie decided this. The packages are those of
+  X11, Xrandr, Xinerama, Xcursor, Xi, Xext, Xrender, Xfixes, xorgproto and the GL headers
+  and libraries. Each development package comes with its library, 22 packages per
+  processor. Each digest is the
+  SHA-256 that the Packages index of the jammy release pocket lists. The keys start with
+  `MEDIA_`, and `MEDIA_PACKAGES` lists them.
+- [provisional] The GL packages are libgl-dev, libgl1, libglx-dev, libglx0 and libglvnd0.
+  Reason: the smallest set that holds `GL/gl.h`, `GL/glext.h`, `KHR/khrplatform.h`,
+  `GL/glx.h` and `libGL.so` with every library that `libGL.so.1` names.
+- [provisional] `src/native/get-media-sysroot.cmake` unpacks the packages over
+  `sysroot/linux-<cpu>-glibc`, and `tools/get-sysroot.cmake` stays as it was. It
+  installs the glibc sysroot first when the tree holds none. A stamp in the tree names
+  the digests it was unpacked from. Reason: the script belongs to the recipes that read
+  the packages, and `tools/get-sysroot.cmake` and its test `glibc_sysroot` lay outside
+  the fence. The fold may move the packages into `glibc_sysroot` of that script.
+- [provisional] Every absolute symbolic link of the extended sysroot becomes the relative
+  link to the same file inside the tree. Reason: libc6 names the loader
+  `/lib64/ld-linux-x86-64.so.2` by an absolute link, which lies outside the sysroot on
+  the host, and lld then refuses the `libc.so` script that names it. The same fix
+  belongs in `glibc_sysroot` of `tools/get-sysroot.cmake` at the fold.
+- [provisional] `ANTIC_GLIBC_SYSROOT_DIR` names the directory of the glibc sysroots, by
+  default `build/deps/sysroot` of the checkout. Reason: `ANTIC_SYSROOT_DIR` of a
+  worktree is the one of the main checkout, which this lane does not write.
+- raylib builds its desktop back end over GLFW, with X11 on Linux and no Wayland. Eddie
+  decided this. The configuration is `-DPLATFORM_DESKTOP_GLFW
+  -DGRAPHICS_API_OPENGL_33`, the default of raylib's own Makefile, with raylib's
+  `config.h` unchanged, `-D_GLFW_X11` on Linux, `-DGL_SILENCE_DEPRECATION` on macOS and
+  `-D_CRT_SECURE_NO_WARNINGS -DUNICODE` on Windows, all with `-std=c99 -O2` at the default
+  level of the target.
+- miniaudio compiles against the C library alone. Eddie decided this. It is
+  `miniaudio.c` of the release with no definition of ours: every back end stays in, and
+  miniaudio loads the one it uses at run time.
+- [provisional] Both Linux libraries compile for `x86_64-linux-gnu` and
+  `aarch64-linux-gnu` against the glibc sysroot, and they lie in `lib/linux-<cpu>/`
+  beside the level directories of the musl anti_rt, as the other libraries of that
+  target. Reason: "Runtime archive" in `docs/decisions.md` links a program that imports
+  either of them against glibc.
+- [provisional] Both macOS libraries compile against the Apple SDK that
+  `tools/macos-sdk-pin` names, through `tools/macos-sdk.cmake`. A host without that SDK
+  builds neither for macOS and says so at configure. Reason: the zig stubs of the macOS
+  sysroot carry no framework headers, and raylib's Cocoa back end and miniaudio's Core
+  Audio back end include them.
+- [provisional] The Windows flags of every native library put clang's own headers first.
+  The headers of the MSVC CRT follow, the order clang-cl searches. Reason: the CRT holds its own
+  `immintrin.h`, whose `__m256i` is the union of MSVC. The AVX2 constants of
+  `stb_image_resize2.h` in raylib were then initialised byte by byte from 64-bit values,
+  which clang truncated. PCRE2 builds and passes its tests under the new order.
+- [provisional] raylib compiles with `-Wall -Werror`, `-Wno-missing-braces` and
+  `-Wno-unused-function`. Reason: raylib's Makefile turns off the first, and `rtextures.c`
+  and `rtext.c` silence the second with a pragma for `__GNUC__`, which clang for MSVC does
+  not define. `-Wextra` and `-Wpedantic` raise hundreds of findings in the bundled stb
+  and GLFW sources. miniaudio takes the warnings of anti_rt, `-Wall -Wextra -Wpedantic
+  -Werror`, which raise nothing on any target.
+- [provisional] raylib compiles with `-fno-strict-aliasing`, as its Makefile does, and
+  `-fwrapv-pointer`. Reason: `stb_vorbis.c` checks a bound by comparing a pointer after
+  an addition that may overflow, and clang folds that comparison to false without it.
+- [provisional] `rglfw.c` compiles for macOS as Objective-C with
+  `-fno-objc-msgsend-class-selector-stubs`. Reason: the pinned clang calls a class
+  method through a stub `objc_msgSendClass$<selector>$<class>` that the linker writes,
+  and ld64.lld 23.1.1 writes none, so the link fails. The calls then go through
+  `objc_msgSend`.
+- [provisional] raylib keeps the copy of miniaudio that `raudio.c` compiles. Reason: the
+  smallest option, raylib as released. A program that calls raylib's audio and
+  `anti.miniaudio` at once pulls both objects and defines the `ma_` functions twice.
+  The report asks how to settle it.
+- The names are `libraylib.a` and `libminiaudio.a`, or `raylib.lib` and `miniaudio.lib`
+  on Windows, in `lib/<target>/`. The headers stay in the source trees and are not yet
+  part of the runtime archive, as for PCRE2. The build copies the licence of each to
+  `licenses/raylib.txt` and `licenses/miniaudio.txt` of the runtime tree.
+- The licence texts of raylib (zlib) and miniaudio (MIT-0, or public domain) must be
+  added to `LICENSES/` of the repository. The fence of this step did not include it.
+  So must the copyright files of the 22 X11 and GL packages if the glibc sysroot ever
+  ships in the runtime archive. The script copies them to `licenses/` of the sysroot.
+
+### The system libraries of raylib and miniaudio
+
+A program links these beyond the C library, which antic links for every program. The
+libraries named "at run time" are loaded by the library itself and need no link.
+
+| Library | Linux, glibc | macOS | Windows |
+|---|---|---|---|
+| raylib | `X11`, `m`, `pthread`, `dl` | the frameworks `Cocoa` and `IOKit` | `gdi32`, `user32`, `shell32`, `winmm` |
+| raylib, at run time | libGL, libGLX and the X11 extensions, through GLFW | `OpenGL`, through GLFW | `opengl32.dll`, through GLFW |
+| miniaudio | `m`, `pthread`, `dl` | none | none |
+| miniaudio, at run time | ALSA, PulseAudio or JACK | `CoreAudio`, `AudioToolbox` | WASAPI, DirectSound or WinMM |
+
+- `libX11` is linked, since `rcore.c` calls it for the clipboard. GLFW loads the rest of
+  X11. Since glibc 2.34 `pthread` and `dl` lie in `libc.so.6`, and the two names stay on
+  the link line as raylib's Makefile gives them, for an older loader.
+- On macOS `Cocoa` and `IOKit` resolve every symbol. The table of `src/anti/bindtype.c`
+  names `Cocoa`, `CoreVideo`, `IOKit` and `OpenGL` for raylib, and the test links all
+  four. It names `AudioToolbox`, `CoreAudio` and `CoreFoundation` for miniaudio, which
+  links without them.
+- On Windows the probe names the four libraries with `#pragma comment(lib, ...)`, which
+  reaches lld-link as a `/DEFAULTLIB` directive. `kernel32.lib` comes with the C runtime.
+
+### The tests of raylib and miniaudio
+
+- [provisional] The tests are registered in `src/native/raylib.cmake`,
+  `src/native/miniaudio.cmake` and `src/native/media.cmake`, as for PCRE2. The probes are
+  `tests/abi/raylib_probe.c` and `tests/abi/miniaudio_probe.c`, and the Anti halves
+  `tests/abi/raylib_link.anti` and `tests/abi/miniaudio_link.anti`.
+- On Linux, `raylib_link_<target>` and `miniaudio_link_<target>` link the probe with its
+  own `main`, compiled against the extended sysroot, with the pinned clang and lld
+  against glibc. Eddie decided this: linking an Anti program against glibc is not this
+  step's work. `tests/run_glibc_link.cmake` names every start file and library, checks
+  that the program names the loader of glibc and `libc.so.6`, and on a host of that
+  target runs it.
+- On macOS and Windows the same tests link the Anti half with the probe and the library
+  through antic and lld, as `pcre2_link_<target>` does. `tests/run_native_link.cmake`
+  takes the options of antic, so the macOS link passes `--framework` for raylib.
+  `raylib_run` and `miniaudio_run` run the program of the host.
+- The raylib probe resizes a solid red image through the SIMD path of
+  `stb_image_resize2.h`, formats and reads a text, packs a colour, and takes the address
+  of `InitWindow`, `InitAudioDevice`, `DrawText` and `LoadModel`, so GLFW, rlgl and
+  raylib's miniaudio must link. The miniaudio probe compares the version with the
+  header, reads a square wave, counts the playback devices of the null back end, and
+  takes the address of `ma_device_init` and `ma_decoder_init_file`.
+- `media_sysroot` checks that every package the step names is pinned for both
+  processors with a digest. It then runs a copy of `get-media-sysroot.cmake` on stand-in
+  packages. The files land, an absolute link becomes relative and the licences are
+  copied. A second run changes nothing, and a package of another digest is refused.
+
+### SQLite and Mbed TLS
+
+- SQLite is built between PCRE2 and Mbed TLS, the order of "Standard interfaces" in
+  `docs/anti-language-additions.md`. `src/native/CMakeLists.txt` includes the recipes in
+  that order.
+- [provisional] Mbed TLS follows the LTS line of version 3.6, and the pin names its newest
+  release. Reason: "Runtime archive" in `docs/decisions.md` names two options. The 4.x
+  line keeps its crypto in the second library TF-PSA-Crypto. The 3.6 LTS line is one
+  source tree and one project, the smaller of the two. The release notes of 3.6.7 support the line
+  until at least March 2027. The choice needs a review before then. `net_sockets.c`, which
+  `anti.net` wraps, exists in both lines.
+- Mbed TLS is pinned in `tools/mbedtls-pin` by version and by the SHA-256 of
+  `mbedtls-<version>.tar.bz2` that the release publishes in
+  `mbedtls-<version>-sha256sum.txt`. `src/native/get-mbedtls.cmake` downloads it over
+  HTTPS into `build/deps/mbedtls/`, checks the digest and unpacks it, as for PCRE2.
+- SQLite is pinned in `tools/sqlite-pin` by version, by the year of the directory of
+  sqlite.org that holds the release and by the digest of the amalgamation.
+  `src/native/get-sqlite.cmake` downloads `sqlite-amalgamation-<number>.zip` over HTTPS
+  into `build/deps/sqlite/`, where `<number>` is the version in the form 3XXYYZZ.
+- [provisional] The digest of SQLite is the SHA3-256 that `sqlite.org/download.html`
+  publishes, and not a SHA-256. The script checks it with `EXPECTED_HASH SHA3_256`.
+  Reason: the publisher gives no other digest. The other pins take the publisher's digest
+  where one exists.
+- The tests `mbedtls_pin` and `sqlite_pin` check each pin and refuse a copy of its
+  version or digest in the script or the recipe. They check that the script downloads
+  over HTTPS against the pinned digest.
+- [provisional] The three libraries of the Mbed TLS release, mbedcrypto, mbedx509 and
+  mbedtls, go into one archive, `libmbedtls.a`, or `mbedtls.lib` on Windows. The sources
+  are the lists `src_crypto`, `src_x509` and `src_tls` of `library/CMakeLists.txt` in the
+  release, 107 files. Reason: `docs/distribution.md` lists one static library per target
+  for `mbedtls`, and one archive keeps the link line of a program at one name.
+- [provisional] Mbed TLS compiles with `include/mbedtls/mbedtls_config.h` of the release
+  unchanged and no definition of ours. That configuration holds TLS 1.2 and 1.3, the PSA
+  crypto API, `net_sockets.c`, the timing module, file access and the entropy of the
+  operating system, with no threading. Reason: the smallest option, the library as
+  released. `anti.net` may need `MBEDTLS_THREADING_C` when it is built, since a context
+  shared between workers needs a lock.
+- [provisional] SQLite is `sqlite3.c` of the amalgamation with no compile-time option of
+  ours: serialized threading and extensions loaded at run time, as released. The name is
+  `libsqlite3.a`, or `sqlite3.lib` on Windows, the name of SQLite's own builds. Reason:
+  the smallest option, and a C project that links the published file finds it under its
+  usual name.
+- [provisional] Both compile as C99 with the warnings of anti_rt, `-Wall -Wextra
+  -Wpedantic -Werror`, which raise nothing for Mbed TLS on any target and nothing for
+  SQLite on Linux and macOS. On Windows SQLite turns four off:
+  `-Wlanguage-extension-token`, which `__int64` in `sqlite3.h` and the `__try` blocks of
+  `SQLITE_USE_SEH` raise, and `-Wsign-compare`, `-Wunused-variable` and
+  `-Wunused-function`, which the exception filter and the lock check of those blocks
+  raise. Reason: SQLite writes that code for `_MSC_VER`, which clang for MSVC defines.
+  The probe keeps the first off too, since it includes `sqlite3.h`.
+- [provisional] Both Linux libraries compile against musl, as PCRE2 does, and a program
+  links them in the default static mode. Reason: neither loads a library of the system
+  at run time, so the glibc mode of "Runtime archive" does not apply to them.
+- The build copies `LICENSE` of Mbed TLS to `licenses/mbedtls.txt` of the runtime tree.
+- [provisional] SQLite ships no licence file. The build writes `licenses/sqlite.txt`
+  from the dedication to the public domain at the top of `sqlite3.h`, and fails when the
+  header holds none. Reason: the directory holds one file per component.
+- The licence text of Mbed TLS (Apache 2.0) must be added to `LICENSES/` of the
+  repository, as those of PCRE2, raylib and miniaudio. The fence of this step did not
+  include it. SQLite, in the public domain, needs no text there.
+- The headers stay in the source trees and are not yet part of the runtime archive, as
+  for PCRE2.
+- `lib/cacert.pem`, Mozilla's CA bundle that "Runtime archive" places beside Mbed TLS, is
+  not part of this step.
+
+### The system libraries of SQLite and Mbed TLS
+
+A program links these beyond the C library, which antic links for every program.
+
+| Library | Linux, musl | macOS | Windows |
+|---|---|---|---|
+| SQLite | none | none | none |
+| Mbed TLS | none | none | `bcrypt`, `ws2_32` |
+
+- On Windows `entropy_poll.c` calls `BCryptGenRandom` and does not name its library. The
+  probe names `bcrypt.lib` with `#pragma comment(lib, ...)`, which `anti.net` must do as
+  well. `net_sockets.c` and `x509_crt.c` name `ws2_32.lib` themselves.
+
+### The tests of SQLite and Mbed TLS
+
+- [provisional] The tests are registered in `src/native/sqlite.cmake` and
+  `src/native/mbedtls.cmake`, as for PCRE2. The probes are `tests/abi/sqlite_probe.c` and
+  `tests/abi/mbedtls_probe.c`, and the Anti halves `tests/abi/sqlite_link.anti` and
+  `tests/abi/mbedtls_link.anti`.
+- `sqlite_link_<target>` and `mbedtls_link_<target>` link the Anti half with the probe
+  and the library for each of the six targets through antic and lld, as a program of
+  that target links. A missing symbol fails the link. `sqlite_run` and `mbedtls_run` run
+  the program of the host.
+- The SQLite probe compares the version with the header and reads the serialized
+  threading mode. It opens an in-memory database and inserts three rows through a
+  prepared statement with bound values. The queries give a sum, a count with a condition,
+  a row by its text and `length('ß')` as one character. A query without a row gives
+  none, and a query on a missing table fails with `SQLITE_ERROR`.
+- The Mbed TLS probe compares the version with the header and hashes `abc` through PSA
+  against the SHA-256 digest of FIPS 180-2. It then sets up a TLS client context: a
+  CTR-DRBG seeded from the entropy of the system, the default configuration of a client
+  over a stream with verification required, `mbedtls_ssl_setup` and the name of the
+  server. It takes the address of `mbedtls_net_connect`, `mbedtls_ssl_handshake` and
+  `mbedtls_x509_crt_parse_file`, so the sockets and the reading of a CA bundle must link.
 
 ## Threading
 
@@ -679,7 +979,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The refusal exits with 70, the status the runtime already uses when it cannot start. Reason: the section gives the message and not the status, and a second status for a second start-up failure would say nothing more.
 - The simulation of a lower machine is compiled under `ANTI_DEV_CPU`, which reads the level from the environment variable `ANTI_CPU_LEVEL`. The unit tests are the only build that defines it, and the runtime of the archive is compiled without it. Reason: a shipped program reads no variable of its own, so the one-environment-variable rule holds. `docs/notes/hosts-and-harness.md` records it as a test hook.
 - The runtime archive holds one `anti_rt` per target and level, in `lib/<target>/<level>/`, with the licence stub of a bundled archive beside it. antic links the one that `--cpu` names. `--cpu v1` therefore gives a program that runs on hardware without AVX2. Reason: the runtime is small and it is what every program links. A level that reached the program's own code and not its runtime would keep none of the section's promise.
-- The native libraries stay at the default level, in `lib/<target>/`. A program below the default that imports a bundled library is refused at link, with `anti.raylib is built for x86-64-v3, this program targets v1`. Reason: a native library is large and is built once. The refusal states the limit rather than linking instructions the machine cannot run. Nothing in `src/native/` builds yet, so the refusal has no site until the first library arrives. The message above is the one it writes.
+- The native libraries stay at the default level, in `lib/<target>/`. A program below the default that imports a bundled library is refused at link, with `anti.raylib is built for x86-64-v3, this program targets v1`. Reason: a native library is large and is built once. The refusal states the limit rather than linking instructions the machine cannot run. `src/native/` builds PCRE2, SQLite, Mbed TLS, miniaudio and raylib, and no module imports one yet, so the refusal has no site until the first module arrives. The message above is the one it writes.
 - The processor check reads the level of the runtime that was linked. The build compiles `src/rt/cpu.c` once per level, with `ANTI_CPU_LEVEL_ID` set to that level's id. `src/rt/cpu.c` refuses to compile without it. antic writes no level into the program. Reason: the runtime carries the level's instructions on every path. The check and the code it guards therefore come from one build. A level that antic wrote and a runtime that disagreed would check the wrong thing.
 - `driver_run` refuses a level of the other architecture. Reason: the zero value of `enum cpu_level` is v1. A caller that builds its own options and forgets the level then asks for a directory that does not exist. `anti test` was that caller, and the guard turns a link error into a message.
 - The suite's macos-x86_64 programs, which a macos-arm64 host runs under Rosetta, compile with `--cpu v1` and link the archive's v1 runtime. Reason: Rosetta has no AVX2 and runs no program of the default level. With a runtime per level those 85 programs need nothing of their own.
@@ -1197,7 +1497,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - `#pragma pack(1)` and `__attribute__((packed))` give `packed`. A pack above one byte is refused. `aligned(N)` on a record gives `align(N)`, and on the first field it raises the record's alignment. On another field it is refused. Reason: the addendum refuses every layout directive other than the two it names, and an aligned first field lays out as an aligned record.
 - The shim renames a `static` function with a macro around the include and wraps it under its name. A C99 `inline` definition gets `extern __typeof__(f) f;`, which makes the header's definition the symbol. A variadic inline function is left out. Reason: the addendum asks for a wrapper of the same name, and neither form copies a body.
 - The macros are the object-like `#define` lines of the header in the output of `clang -E -dD`, evaluated as `docs/notes/bind.md` describes. A define of rlparser of the kind `FLOAT` is a `c_float`, and `COLOR` is a struct literal. Reason: the AST holds no macro, and raylib writes its floats with the suffix f.
-- The frameworks of a binding come from a table in `src/anti/bindtype.c`: raylib takes Cocoa, CoreVideo, IOKit and OpenGL, and miniaudio takes AudioToolbox, CoreAudio and CoreFoundation. Reason: those are the frameworks raylib's GLFW back end and miniaudio's Core Audio back end link on macOS.
+- The frameworks of a binding come from a table in `src/anti/bindtype.c`: raylib takes Cocoa, CoreVideo, IOKit and OpenGL, and miniaudio takes AudioToolbox, CoreAudio and CoreFoundation. Reason: those are the frameworks raylib's GLFW back end and miniaudio's Core Audio back end link on macOS. The build of the libraries shows that raylib links with `Cocoa` and `IOKit` alone and miniaudio with none, as "raylib and miniaudio" under "Libraries and runtime" records.
 - `volatile` leaves a `// volatile in C` line before its field, and a line before a function whose parameter is volatile. Reason: the entry under "Core language" asks for a comment in the binding.
 - A binding and a probe in Anti pass through the formatter of `anti fmt` before they are written. Reason: a binding committed into `src/std/` stands in the canonical form that `fmt_canonical` checks.
 - [provisional] An API description that names one struct twice is refused as a whole, with a message naming the struct.
@@ -1246,4 +1546,4 @@ What antic does that the design above leaves open, as far as a user of the langu
 ## Open
 
 - Enums used as bit flags want a form of their own, to be designed later. A binding writes such a parameter with the integer type of C, and the caller converts each value with `as`.
-- The native libraries of `src/native/`, which nothing builds yet, are published "under `downloads/resources/<library>/<version>/`" by the entry above them. The site serves text alone since 2026-09-20, so that path no longer exists. They follow the packages onto a GitHub release when step 16 builds them. The entry stays as Eddie wrote it until he says which release holds them. The same question stands for the mirror of the LLVM tools that the site serves today under `downloads/resources/llvm/`.
+- The native libraries of `src/native/` are published "under `downloads/resources/<library>/<version>/`" by the entry above them. The site serves text alone since 2026-09-20, so that path no longer exists. Step 16 builds them now, and they follow the packages onto a GitHub release. The entry stays as Eddie wrote it until he says which release holds them. The same question stands for the mirror of the LLVM tools that the site serves today under `downloads/resources/llvm/`.

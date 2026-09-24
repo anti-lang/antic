@@ -194,7 +194,10 @@ directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
 15. Done. `f"..."` and `rf"..."` with their format specifications, as
     calls of `anti.text.Builder`. `docs/reports/2026-09-21-interpolation.md`
     reports it, and `docs/notes/interpolation.md` holds its choices.
-16. The native libraries in `src/native/`, which nothing builds yet.
+16. The native libraries in `src/native/`. PCRE2, SQLite, Mbed TLS, miniaudio
+    and raylib build for all six targets, as "Libraries and runtime" in
+    `docs/decisions.md` records. Their headers and `lib/cacert.pem` are not yet
+    part of the runtime archive, and no module of the standard library binds them.
 17. Inline atomic instruction sequences, which are runtime calls today.
 18. Done. The one manifest of a release, and the installers that read its
     signature. `docs/reports/2026-09-20-one-manifest.md` reports both.

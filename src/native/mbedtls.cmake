@@ -11,7 +11,7 @@
 # second library TF-PSA-Crypto. The three libraries of the release,
 # mbedcrypto, mbedx509 and mbedtls, go into one archive, the one static
 # library per target that docs/distribution.md lists for mbedtls. See
-# docs/decisions-native.md.
+# docs/decisions.md.
 
 antic_shared_path(ANTIC_MBEDTLS_DIR "${ANTIC_DEPS_DIR}/mbedtls"
     "the Mbed TLS source from src/native/get-mbedtls.cmake")

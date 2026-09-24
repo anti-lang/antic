@@ -10,7 +10,7 @@
 #
 # DESIGN: this is a subdirectory of the build of antic and no project of
 # its own, so one configure builds every target that has a sysroot, as the
-# cross builds of anti_rt do. See docs/decisions-native.md.
+# cross builds of anti_rt do. See "Libraries and runtime" in docs/decisions.md.
 
 # DESIGN: every native library of the runtime archive is built for the
 # default level of its target, as docs/anti-language-additions.md settles

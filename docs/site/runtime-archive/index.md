@@ -201,33 +201,27 @@ That choice is what lets a program built with Anti carry a notice about musl alo
 
 ## Libraries of later chapters
 
-A second CMake build stands in `src/native/`, for the third-party libraries that the archive
-will bundle. It builds one target at a time, named as the directory under `lib/`.
+`src/native/` builds the third-party libraries of the archive. It is a subdirectory of
+the build of antic and no project of its own. One configure builds every target that has
+a sysroot, as the cross builds of anti_rt do. Each library lies in `lib/<target>/`
+beside the level directories of anti_rt, built at the default level of the target.
 
 ```cmake
 # Builds the third-party libraries of the runtime archive as static
-# libraries for one target triple. Run once per target, from CI or by hand.
-# Libraries are added in the chapters that need them: the thread pool
-# runtime, raylib, miniaudio, Mbed TLS, PCRE2.
+# libraries, one per target, from the pinned sources with the pinned clang.
+# CMakeLists.txt at the top adds this directory after the cross builds of
+# anti_rt and the tests.
 
-cmake_minimum_required(VERSION 3.20)
-
-project(antic-runtime LANGUAGES C)
-
-set(ANTIC_RUNTIME_TARGET "" CACHE STRING
-    "Target directory name, for example macos-arm64 or windows-x86_64")
-
-if(ANTIC_RUNTIME_TARGET STREQUAL "")
-    message(FATAL_ERROR "Set ANTIC_RUNTIME_TARGET, for example -DANTIC_RUNTIME_TARGET=macos-arm64")
-endif()
-
-set(ANTIC_RUNTIME_OUTPUT
-    "${CMAKE_BINARY_DIR}/runtime/lib/${ANTIC_RUNTIME_TARGET}")
-file(MAKE_DIRECTORY "${ANTIC_RUNTIME_OUTPUT}")
+include(pcre2.cmake)
+include(sqlite.cmake)
+include(mbedtls.cmake)
+include(media.cmake)
+include(miniaudio.cmake)
+include(raylib.cmake)
 ```
 
-Each library arrives with the chapter that needs it. raylib, miniaudio, Mbed TLS and
-PCRE2 arrive with the standard library. That chapter also adds `lib/cacert.pem` for
+PCRE2, SQLite, Mbed TLS, miniaudio and raylib build today. Their modules of the
+standard library come later. That step also adds `lib/cacert.pem` for
 the networking module. It adds the generated shims that `anti bind` writes for the
 `static inline` functions of a C header. The driver then puts the system libraries of
 an imported module on the link line. OpenGL, the Cocoa frameworks and `winmm` belong
