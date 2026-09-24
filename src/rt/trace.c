@@ -123,41 +123,15 @@ static const struct loaded *load(const char *path, bool object)
     }
     if (file_count < LOADED_MAX) {
         struct loaded *l = &files[file_count];
-        FILE *f = fopen(path, "rb");
-        size_t room = 0;
+        int64_t size = 0;
         l->path = malloc(strlen(path) + 1);
         if (l->path != NULL) {
             memcpy(l->path, path, strlen(path) + 1);
             file_count++;
-        }
-        while (f != NULL && l->path != NULL) {
-            size_t n;
-            if (l->size == room) {
-                uint8_t *more = realloc(l->bytes, room == 0 ? 65536 : 2 * room);
-                if (more == NULL) {
-                    free(l->bytes);
-                    l->bytes = NULL;
-                    break;
-                }
-                l->bytes = more;
-                room = room == 0 ? 65536 : 2 * room;
-            }
-            n = fread(l->bytes + l->size, 1, room - l->size, f);
-            if (n == 0) {
-                break;
-            }
-            l->size += n;
-        }
-        /* A read error leaves a short image, which the readers would take
-           for the whole file. The entry then holds no bytes, as for a
-           file that does not open. */
-        if (f != NULL && ferror(f) != 0) {
-            free(l->bytes);
-            l->bytes = NULL;
-            l->size = 0;
-        }
-        if (f != NULL) {
-            fclose(f);
+            /* A file that cannot be read whole leaves the entry without
+               bytes, so it is not tried again. */
+            l->bytes = anti_rt_fs_read(path, &size);
+            l->size = l->bytes != NULL ? (size_t)size : 0;
         }
         if (l->bytes != NULL && object) {
             anti_rt_macho_relocate(l->bytes, l->size);

@@ -70,6 +70,10 @@ void anti_rt_table_unset(const unsigned char *name, int64_t length);
 struct anti_text anti_rt_text_from_c(const unsigned char *bytes);
 struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len);
 
+/* 1 when the a_length bytes at a are the b_length bytes at b, else 0. */
+int anti_rt_same_bytes(const unsigned char *a, int64_t a_length,
+                       const unsigned char *b, int64_t b_length);
+
 /* The fields of `anti.text.Builder`, which the class declares in this
    order after the table pointer that every object begins with. The
    runtime appends to one when it serializes an object. */
@@ -155,6 +159,11 @@ void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing);
 
 /* The size in bytes of the file of the stream, or -1. */
 int64_t anti_rt_fs_size(void *file);
+
+/* The bytes of the file at path, a NUL path, with a NUL after them and
+   their count in length, or NULL. errno is ENOMEM when the memory ran
+   out. The caller frees the bytes with free. */
+unsigned char *anti_rt_fs_read(const char *path, int64_t *length);
 
 /* The names of the directory, without `.` and `..`, in one block that the
    caller frees, with their number in count, or NULL. */

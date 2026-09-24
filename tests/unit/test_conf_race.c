@@ -3,7 +3,7 @@
    sets `threads` again. A thread reads the key and its bytes the whole
    time. The sanitizer builds report a value freed under that reader. The
    runtime of an Anti program carries no sanitizer, so the check stands
-   here, with the loader and the files of anti.fs replaced by stand-ins. */
+   here, with the loader replaced by stand-ins. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)
@@ -39,30 +39,6 @@ struct anti_text anti_rt_runtime_version(void)
     struct anti_text text = {(const unsigned char *)"0.0.0", 5};
 
     return text;
-}
-
-void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing)
-{
-    char name[1024];
-
-    (void)writing;
-    if (len < 0 || (size_t)len >= sizeof name) {
-        return NULL;
-    }
-    memcpy(name, path, (size_t)len);
-    name[len] = '\0';
-    return fopen(name, "rb");
-}
-
-int64_t anti_rt_fs_size(void *file)
-{
-    long size;
-
-    if (fseek(file, 0, SEEK_END) != 0) {
-        return -1;
-    }
-    size = ftell(file);
-    return fseek(file, 0, SEEK_SET) == 0 ? (int64_t)size : -1;
 }
 
 void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,

@@ -24,6 +24,13 @@ struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len)
     return text;
 }
 
+int anti_rt_same_bytes(const unsigned char *a, int64_t a_length,
+                       const unsigned char *b, int64_t b_length)
+{
+    return a_length == b_length &&
+           (a_length == 0 || memcmp(a, b, (size_t)a_length) == 0);
+}
+
 /* Make room for count more bytes and the NUL after them. Returns false
    when the memory runs out or no size holds them, and the builder keeps
    what it holds. */

@@ -47,6 +47,7 @@ add_executable(antic_unit_tests
     unit/test_coff.c
     unit/test_toml.c
     unit/test_rt_bounds.c
+    unit/test_fs.c
     unit/test_json.c
     unit/test_bind.c
     unit/test_deps.c
@@ -67,6 +68,7 @@ add_executable(antic_unit_tests
     ../src/rt/atomic.c
     ../src/rt/cpu.c
     ../src/rt/f16.c
+    ../src/rt/fs.c
     ../src/rt/json.c
     ../src/rt/symbols.c
     ../src/rt/text.c
@@ -99,12 +101,11 @@ target_link_libraries(rt_signal_tests PRIVATE Threads::Threads)
 add_test(NAME rt_signal COMMAND rt_signal_tests)
 
 # rt.configure while another thread reads the keys, in a program of its own
-# with stand-ins for the loader and for anti.fs. The runtime of an Anti
-# program carries no sanitizer, and this program does in the sanitizer
-# builds.
+# with stand-ins for the loader. The runtime of an Anti program carries no
+# sanitizer, and this program does in the sanitizer builds.
 add_executable(rt_conf_tests unit/test_conf_race.c ../src/rt/conf.c
-    ../src/rt/assert.c ../src/rt/toml.c ../src/rt/atomic.c
-    ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
+    ../src/rt/assert.c ../src/rt/toml.c ../src/rt/atomic.c ../src/rt/fs.c
+    ../src/rt/utf.c ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_conf_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_conf_tests PRIVATE
@@ -119,8 +120,8 @@ foreach(which one two)
 endforeach()
 add_executable(rt_plugin_tests unit/test_plugin_race.c ../src/rt/plugin.c
     ../src/rt/assert.c ../src/rt/loaded.c ../src/rt/atomic.c
-    ../src/rt/digest.c ../src/rt/toml.c ../src/rt/platform_posix.c
-    ../src/rt/platform_windows.c)
+    ../src/rt/digest.c ../src/rt/text.c ../src/rt/toml.c
+    ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_plugin_tests PRIVATE
@@ -152,7 +153,7 @@ add_test(NAME rt_platform COMMAND rt_platform_tests)
 add_library(plugin_bad SHARED unit/plugin_bad.c)
 add_executable(rt_plugin_table_tests unit/test_plugin_table.c
     ../src/rt/plugin.c ../src/rt/assert.c ../src/rt/loaded.c
-    ../src/rt/atomic.c ../src/rt/digest.c ../src/rt/toml.c
+    ../src/rt/atomic.c ../src/rt/digest.c ../src/rt/text.c ../src/rt/toml.c
     ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_plugin_table_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})

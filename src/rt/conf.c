@@ -6,6 +6,7 @@
    built. The layers are the command line, then the file with its
    includes, then the build. A key takes the value of the highest layer
    that named it. */
+#include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -410,40 +411,6 @@ void anti_rt_conf_option(const char *name, int64_t length, const char *value)
     free(where);
 }
 
-/* The bytes of the file, NUL after them, or NULL when it cannot be
-   read. It opens the file through anti.fs, which takes the path of
-   Windows as UTF-16 and every other as its bytes. */
-static unsigned char *file_bytes(const char *path, int64_t *length)
-{
-    FILE *f = anti_rt_fs_open((const unsigned char *)path,
-                              (int64_t)strlen(path), 0);
-    unsigned char *bytes;
-    int64_t size;
-
-    if (f == NULL) {
-        return NULL;
-    }
-    size = anti_rt_fs_size(f);
-    if (size < 0) {
-        fclose(f);
-        return NULL;
-    }
-    bytes = malloc((size_t)size + 1);
-    if (bytes == NULL) {
-        fclose(f);
-        startup_error("out of memory at program start");
-    }
-    if (size > 0 && fread(bytes, 1, (size_t)size, f) != (size_t)size) {
-        fclose(f);
-        free(bytes);
-        return NULL;
-    }
-    fclose(f);
-    bytes[size] = '\0';
-    *length = size;
-    return bytes;
-}
-
 /* The path of an include, which is relative to the file that names
    it. */
 static char *resolve(const char *base, const char *path)
@@ -702,7 +669,11 @@ static void read_file(const char *path, const struct including *from)
         startup_error("the configuration files include one another at %s",
                       path);
     }
-    bytes = file_bytes(path, &length);
+    errno = 0;
+    bytes = anti_rt_fs_read(path, &length);
+    if (bytes == NULL && errno == ENOMEM) {
+        startup_error("out of memory at program start");
+    }
     if (bytes == NULL) {
         startup_error("cannot read the configuration file %s", path);
     }

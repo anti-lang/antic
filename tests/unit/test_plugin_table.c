@@ -52,6 +52,13 @@ int64_t anti_rt_fs_size(void *file)
     return -1;
 }
 
+unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
+{
+    (void)path;
+    (void)length;
+    return NULL;
+}
+
 const void *anti_rt_body_entry(anti_rt_body body)
 {
     union {

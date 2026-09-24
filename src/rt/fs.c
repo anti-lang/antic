@@ -157,6 +157,42 @@ int64_t anti_rt_fs_size(void *file)
     return end;
 }
 
+unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
+{
+    FILE *f = anti_rt_fs_open((const unsigned char *)path,
+                              (int64_t)strlen(path), 0);
+    unsigned char *bytes = NULL;
+    int64_t size;
+
+    if (f == NULL) {
+        return NULL;
+    }
+    size = anti_rt_fs_size(f);
+    if (size >= 0 && (uint64_t)size >= SIZE_MAX) {
+        errno = ENOMEM;
+    } else if (size >= 0) {
+        bytes = malloc((size_t)size + 1);
+        if (bytes == NULL) {
+            errno = ENOMEM;
+        }
+    }
+    if (bytes != NULL && size > 0 &&
+        fread(bytes, 1, (size_t)size, f) != (size_t)size) {
+        /* A short read is no lack of memory, whatever errno held. */
+        if (errno == 0 || errno == ENOMEM) {
+            errno = EIO;
+        }
+        free(bytes);
+        bytes = NULL;
+    }
+    fclose(f);
+    if (bytes != NULL) {
+        bytes[size] = '\0';
+        *length = size;
+    }
+    return bytes;
+}
+
 /* The names of a listing, each ended by a NUL, one after another. */
 struct names {
     unsigned char *bytes;

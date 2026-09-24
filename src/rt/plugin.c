@@ -68,13 +68,6 @@ struct anti_text anti_rt_plugin_message(void)
     return text;
 }
 
-static int same_bytes(const unsigned char *a, int64_t a_length,
-                      const unsigned char *b, int64_t b_length)
-{
-    return a_length == b_length &&
-           (a_length == 0 || memcmp(a, b, (size_t)a_length) == 0);
-}
-
 /* Copy a str into a NUL-terminated path, or give 0 for one too long. */
 static int path_of(char *out, size_t size, const unsigned char *path,
                    int64_t length)
@@ -115,7 +108,7 @@ static const struct anti_provides *entry_of(const struct anti_plugin *p,
     for (i = 0; i < p->table->count; i++) {
         const struct anti_provides *e = &p->table->entries[i];
         if (d != NULL ? e->descriptor == d
-                      : same_bytes(e->path, e->path_length, path,
+                      : anti_rt_same_bytes(e->path, e->path_length, path,
                                    length)) {
             return e;
         }
@@ -561,7 +554,7 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
              damage);
         goto close;
     }
-    if (!same_bytes(table->version, table->version_length, version.ptr,
+    if (!anti_rt_same_bytes(table->version, table->version_length, version.ptr,
                     version.len)) {
         fail("%s was built for runtime %.*s, and this program carries %.*s",
              name, (int)table->version_length, table->version,
@@ -622,7 +615,7 @@ int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
     }
     for (i = 0; i < e->class_of->function_count; i++) {
         const struct anti_function *f = &e->class_of->functions[i];
-        if (same_bytes(f->name, f->name_length, name, length)) {
+        if (anti_rt_same_bytes(f->name, f->name_length, name, length)) {
             return 1;
         }
     }
@@ -705,37 +698,6 @@ static int digest_file(const char *path, char hex[65])
     return ok;
 }
 
-static unsigned char *index_bytes(const char *path, int64_t *length)
-{
-    FILE *f = anti_rt_fs_open((const unsigned char *)path,
-                              (int64_t)strlen(path), 0);
-    unsigned char *bytes;
-    int64_t size;
-
-    if (f == NULL) {
-        return NULL;
-    }
-    size = anti_rt_fs_size(f);
-    if (size < 0) {
-        fclose(f);
-        return NULL;
-    }
-    bytes = malloc((size_t)size + 1);
-    if (bytes == NULL) {
-        fclose(f);
-        return NULL;
-    }
-    if (size > 0 && fread(bytes, 1, (size_t)size, f) != (size_t)size) {
-        fclose(f);
-        free(bytes);
-        return NULL;
-    }
-    fclose(f);
-    bytes[size] = '\0';
-    *length = size;
-    return bytes;
-}
-
 /* The value of `library.<n>.<field>` of the index, or an empty text. */
 static struct anti_text index_field(const struct anti_toml *doc, int64_t n,
                                     const char *field)
@@ -775,7 +737,7 @@ static int index_lists(const struct anti_toml *doc, int64_t n,
         if (value.len == 0) {
             return 0;
         }
-        if (same_bytes(value.ptr, value.len, path, length)) {
+        if (anti_rt_same_bytes(value.ptr, value.len, path, length)) {
             return 1;
         }
     }
@@ -801,7 +763,7 @@ static int discover_in(const char *dir, size_t dir_length,
     if (!joined(index, sizeof index, dir, dir_length, "anti-plugins.toml")) {
         return 0;
     }
-    bytes = index_bytes(index, &bytes_length);
+    bytes = anti_rt_fs_read(index, &bytes_length);
     if (bytes == NULL) {
         return 0;
     }
@@ -824,7 +786,7 @@ static int discover_in(const char *dir, size_t dir_length,
         }
         /* A library built for another runtime is logged and passed
            over, as the specification asks. */
-        if (!same_bytes(built.ptr, built.len, version.ptr, version.len)) {
+        if (!anti_rt_same_bytes(built.ptr, built.len, version.ptr, version.len)) {
             anti_rt_note("anti: %.*s was built for runtime %.*s, and this "
                          "program carries %.*s", (int)name.len, name.ptr,
                          (int)built.len, built.ptr, (int)version.len,
@@ -836,7 +798,7 @@ static int discover_in(const char *dir, size_t dir_length,
             continue;
         }
         if (!digest_file(library, hex) ||
-            !same_bytes((const unsigned char *)hex, 64, digest.ptr,
+            !anti_rt_same_bytes((const unsigned char *)hex, 64, digest.ptr,
                         digest.len)) {
             fail("%s does not match the digest of %s", library, index);
             anti_rt_toml_free(doc);

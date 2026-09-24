@@ -9,14 +9,8 @@
 #include "json.h"
 #include "plugin.h"
 #include "registry.h"
+#include "std.h"
 #include "utf.h"
-
-static bool same_bytes(const unsigned char *a, int64_t a_length,
-                       const unsigned char *b, int64_t b_length)
-{
-    return a_length == b_length &&
-           (a_length == 0 || memcmp(a, b, (size_t)a_length) == 0);
-}
 
 /* The class of one table whose name matches, or NULL. A bare name that
    two classes of the table carry sets two. */
@@ -30,12 +24,12 @@ static const struct anti_class *find_in(const struct anti_registry *r,
 
     for (i = 0; i < r->count; i++) {
         const struct anti_class *c = &r->classes[i];
-        if (!same_bytes(c->descriptor->name, c->descriptor->name_length,
+        if (!anti_rt_same_bytes(c->descriptor->name, c->descriptor->name_length,
                         name + dot, length - dot)) {
             continue;
         }
         if (dot > 0) {
-            if (same_bytes(c->module, c->module_length, name, dot - 1)) {
+            if (anti_rt_same_bytes(c->module, c->module_length, name, dot - 1)) {
                 return c;
             }
             continue;
@@ -336,7 +330,7 @@ static const struct anti_field *field_named(const struct anti_descriptor *d,
     *index = 0;
     for (; d != NULL; d = d->parent) {
         for (i = 0; i < d->field_count; i++) {
-            if (same_bytes(d->fields[i].name, d->fields[i].name_length, name,
+            if (anti_rt_same_bytes(d->fields[i].name, d->fields[i].name_length, name,
                            (int64_t)length)) {
                 *index += i;
                 return &d->fields[i];
