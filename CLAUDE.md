@@ -287,8 +287,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 855 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 854 each, without the `no_paths` test, which needs a
+- 864 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 863 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -414,6 +414,11 @@ reports what it finished.
   A `construct` that can fail is written
   `may fail`, a derived one calls `self.super.construct(args)` as its
   first statement, and C makes an object with `anti_<Class>_construct`.
+- Nested types are built. A class body declares a `struct`, an `enum` or a
+  `class`, named as written in the class and as `PeopleList.Node` in the
+  symbols, and `PeopleList_Node` in the C header. A public signature of the
+  class that names one is refused. See "Nested types" in `docs/decisions.md`
+  and `docs/notes/nested-types.md`.
 - Tuples are built. `(int, str)` is an anonymous struct with C layout, `(a, b)`
   builds one, `t.0` reads an element, and `let (a, b) = e;` and
   `for i, x in items` are the two forms that take one apart. The header writes

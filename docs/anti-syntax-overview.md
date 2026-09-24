@@ -552,7 +552,12 @@ c.move(1.0, 1.0);
 
 A class may declare a `struct`, `enum` or `class` inside its body. The nested type is private: only the enclosing class names it, and a public signature that names it is a compile error. Its full name is `PeopleList.Node` in the symbols and the header. A type that users work with directly stays at module level.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+struct Person { age: int }
+```
+-->
+```anti
 class PeopleList
 {
 	struct Node
@@ -565,7 +570,7 @@ class PeopleList
 }
 ```
 
-Built: everything above but nested types. Not built yet: nested types.
+Built: everything above, nested types included. The C header writes a nested type as `PeopleList_Node`, and one that the layout of an `export class` reaches stands before the class with its layout alone.
 
 ## Interfaces
 
