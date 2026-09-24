@@ -67,7 +67,10 @@ static const struct option options[] = {
 #define OPTION_COUNT (sizeof options / sizeof options[0])
 
 /* The file --anti.conf named, and the two options that end the program
-   once the pass over the arguments is done. */
+   once the pass over the arguments is done. DESIGN: the pass over the
+   arguments writes the three before main, on the one thread there is,
+   and anti_rt_conf_start reads them before main as well. Nothing touches
+   them once threads run, so they need no lock. */
 static const char *conf_path;
 static int inspect_asked;
 static int help_asked;
@@ -296,6 +299,10 @@ struct injection {
     char *where;
 };
 
+/* DESIGN: the lines of the command line and of the file layer, which the
+   start reads before main. rt.configure may add to them later from one
+   thread alone, since file_read lets one call read a file. No reader
+   looks at them after the start, so they need no lock. */
 static struct injection injections[INJECTION_MAX];
 static size_t injection_count;
 
