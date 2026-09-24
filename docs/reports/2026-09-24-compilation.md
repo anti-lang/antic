@@ -70,3 +70,19 @@ None.
 
 Nothing was built, so the suites did not run. The docs-style checker
 reports nothing on this report.
+
+## Proof of the push
+
+Taken after the push of the report. No suite ran, so there are no pass
+counts.
+
+```text
+$ git log --oneline -3
+f0ac75c Report the compilation of generics as blocked
+5bf28ae Tag the fence of the proof in the report of the constraints
+f48fa27 Add the proof of the push to the report of the constraints
+$ git status --short
+$ git rev-parse HEAD origin/main
+f0ac75c0491cfdca418a602feaa64af6e391eb36
+f0ac75c0491cfdca418a602feaa64af6e391eb36
+```
