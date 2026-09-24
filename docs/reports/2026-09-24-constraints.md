@@ -55,3 +55,19 @@ reports nothing on the touched files.
 - host: 100% tests passed out of 982
 - asan: 100% tests passed out of 981
 - ubsan: 100% tests passed out of 981
+
+## Proof of the push
+
+Taken after the push of the report.
+
+```
+$ git log --oneline -3
+c9b10e9 Report the constraints of generics
+ef2cfa4 Build the constraints of generics
+bd1833d Add the proof of the push to the report of the syntax of generics
+$ git status --short
+ M docs/reports/2026-09-24-constraints.md
+$ git rev-parse HEAD origin/main
+c9b10e9c3a567a76a436249de91281c73850e140
+c9b10e9c3a567a76a436249de91281c73850e140
+```
