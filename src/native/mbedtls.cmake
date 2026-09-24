@@ -29,8 +29,7 @@ string(REGEX REPLACE "^MBEDTLS_VERSION=" "" antic_mbedtls_version
 set(ANTIC_MBEDTLS_SOURCE "${ANTIC_MBEDTLS_DIR}/mbedtls-${antic_mbedtls_version}")
 set(ANTIC_MBEDTLS_INCLUDE "${ANTIC_MBEDTLS_SOURCE}/include")
 set(ANTIC_MBEDTLS_WORK "${CMAKE_BINARY_DIR}/native/mbedtls")
-configure_file("${ANTIC_MBEDTLS_SOURCE}/LICENSE"
-    "${ANTIC_RUNTIME_DIR}/licenses/mbedtls.txt" COPYONLY)
+antic_native_license(mbedtls "${ANTIC_MBEDTLS_SOURCE}/LICENSE")
 
 # The sources of the three libraries, src_crypto, src_x509 and src_tls of
 # library/CMakeLists.txt in the release. The files of 3rdparty/ build only

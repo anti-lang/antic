@@ -3,7 +3,8 @@
 # The installer holds the key that checks the LLVM tools, and the package
 # holds the pin that names them. Both macOS sysroots of Zig's stubs go in,
 # and the stubs of Apple's SDK in sdk/ stay out. A package of a build with
-# the compiler of the machine is refused.
+# the compiler of the machine is refused. Every licence of the runtime tree
+# goes in.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DHOST=<host>
 #         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
@@ -93,6 +94,15 @@ foreach(entry anti/tools/llvm-pin anti/tools/llvm-version
               anti/licenses/zig.txt anti/licenses/apsl.txt)
     if(NOT entries MATCHES "(^|\n)${entry}\n")
         message(FATAL_ERROR "${archive} lacks ${entry}")
+    endif()
+endforeach()
+# Every licence of the runtime tree goes in, those of the native libraries
+# among them.
+file(GLOB licences RELATIVE "${RUNTIME}/licenses" "${RUNTIME}/licenses/*.txt")
+foreach(licence IN LISTS licences)
+    string(REPLACE "." "\\." pattern "${licence}")
+    if(NOT entries MATCHES "(^|\n)anti/licenses/${pattern}\n")
+        message(FATAL_ERROR "${archive} lacks anti/licenses/${licence}")
     endif()
 endforeach()
 if(entries MATCHES "(^|\n)anti/sysroot/macos-[^/\n]+/sdk/")

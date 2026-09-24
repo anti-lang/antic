@@ -12,8 +12,7 @@ if(NOT EXISTS "${ANTIC_RAYLIB_DIR}/src/rcore.c")
 endif()
 set(ANTIC_RAYLIB_SOURCE "${ANTIC_RAYLIB_DIR}/src")
 set(ANTIC_RAYLIB_WORK "${CMAKE_BINARY_DIR}/native/raylib")
-configure_file("${ANTIC_RAYLIB_DIR}/LICENSE"
-    "${ANTIC_RUNTIME_DIR}/licenses/raylib.txt" COPYONLY)
+antic_native_license(raylib "${ANTIC_RAYLIB_DIR}/LICENSE")
 
 # The seven modules of the library. rglfw.c holds GLFW, and raudio.c the
 # copy of miniaudio that raylib bundles.

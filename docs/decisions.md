@@ -377,9 +377,9 @@ about structs, enums, classes, interfaces and errors lives there, and
 - [provisional] The build copies `LICENCE.md` of the release to `licenses/pcre2.txt` of
   the runtime tree, the directory of one licence file per component that "Licences that
   travel" describes.
-- PCRE2's licence text must be added to `LICENSES/` of the repository, which the fence of
-  this step did not include. The text is `LICENCE.md` of the pinned release, whose SPDX
-  identifier is `BSD-3-Clause WITH PCRE2-exception`.
+- PCRE2's licence text is `LICENSES/pcre2.txt` of the repository. The text is
+  `LICENCE.md` of the pinned release, whose SPDX identifier is `BSD-3-Clause WITH
+  PCRE2-exception`.
 - [provisional] The tests of the native libraries are registered in
   `src/native/CMakeLists.txt` through `src/native/pcre2.cmake`, and their scripts and
   sources lie in `tests/`: `tests/run_native_link.cmake`, `tests/run_pcre2_pin.cmake`
@@ -476,9 +476,9 @@ about structs, enums, classes, interfaces and errors lives there, and
   on Windows, in `lib/<target>/`. The headers stay in the source trees and are not yet
   part of the runtime archive, as for PCRE2. The build copies the licence of each to
   `licenses/raylib.txt` and `licenses/miniaudio.txt` of the runtime tree.
-- The licence texts of raylib (zlib) and miniaudio (MIT-0, or public domain) must be
-  added to `LICENSES/` of the repository. The fence of this step did not include it.
-  So must the copyright files of the 22 X11 and GL packages if the glibc sysroot ever
+- The licence texts of raylib (zlib) and miniaudio (MIT-0, or public domain) are
+  `LICENSES/raylib.txt` and `LICENSES/miniaudio.txt` of the repository. The copyright
+  files of the 22 X11 and GL packages must be added there if the glibc sysroot ever
   ships in the runtime archive. The script copies them to `licenses/` of the sysroot.
 
 ### The system libraries of raylib and miniaudio
@@ -587,9 +587,22 @@ libraries named "at run time" are loaded by the library itself and need no link.
 - [provisional] SQLite ships no licence file. The build writes `licenses/sqlite.txt`
   from the dedication to the public domain at the top of `sqlite3.h`, and fails when the
   header holds none. Reason: the directory holds one file per component.
-- The licence text of Mbed TLS (Apache 2.0) must be added to `LICENSES/` of the
-  repository, as those of PCRE2, raylib and miniaudio. The fence of this step did not
-  include it. SQLite, in the public domain, needs no text there.
+- The licence text of Mbed TLS (Apache 2.0) is `LICENSES/mbedtls.txt` of the
+  repository, as those of PCRE2, raylib and miniaudio. SQLite's dedication to the public
+  domain is `LICENSES/sqlite.txt`, since Eddie asked for its text there as well.
+
+### The licence texts of the native libraries
+
+- [provisional] `LICENSES/` holds one file per native library, `<name>.txt`, the name and
+  the bytes of the file that the build writes to `licenses/` of the runtime tree. Reason:
+  the directory held no text before, and the form of `licenses/` is the one form of a
+  licence file the repository had. `antic_native_license` of `src/native/CMakeLists.txt`
+  copies each text of a pinned release and notes its name.
+- The test `native_licenses` compares every noted file of the runtime tree with its copy
+  in `LICENSES/`, byte for byte. A pin whose release changes a text fails it until
+  `LICENSES/` follows. The test `package_keys` checks that the package of the host holds
+  every file of `licenses/` of the runtime tree. `anti license` is not built. It reads
+  `licenses/` of the runtime archive, which holds the five texts.
 - The headers stay in the source trees and are not yet part of the runtime archive, as
   for PCRE2.
 - `lib/cacert.pem`, Mozilla's CA bundle that "Runtime archive" places beside Mbed TLS, is

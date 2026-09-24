@@ -73,6 +73,15 @@ function(antic_native_library out target name)
     endif()
 endfunction()
 
+# Copy the licence text <source> of the native library <name> to
+# licenses/<name>.txt of the runtime tree, which the packer and anti
+# license read, and note the name for the test native_licenses.
+function(antic_native_license name source)
+    configure_file("${source}" "${ANTIC_RUNTIME_DIR}/licenses/${name}.txt"
+        COPYONLY)
+    set_property(GLOBAL APPEND PROPERTY ANTIC_NATIVE_LICENSES "${name}")
+endfunction()
+
 set(ANTIC_NATIVE_TARGETS "")
 foreach(target IN LISTS ANTIC_TARGETS)
     if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
@@ -86,3 +95,13 @@ include(mbedtls.cmake)
 include(media.cmake)
 include(miniaudio.cmake)
 include(raylib.cmake)
+
+# LICENSES/ of the repository holds the licence text of every library
+# above, the same bytes the build copies from its pinned release.
+get_property(antic_native_licenses GLOBAL PROPERTY ANTIC_NATIVE_LICENSES)
+list(JOIN antic_native_licenses "," antic_native_licenses)
+add_test(NAME native_licenses
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DNAMES=${antic_native_licenses}"
+            -P "${PROJECT_SOURCE_DIR}/tests/run_native_licenses.cmake")

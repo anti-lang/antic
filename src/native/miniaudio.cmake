@@ -22,8 +22,7 @@ string(REGEX REPLACE "^MINIAUDIO_VERSION=" "" antic_miniaudio_version
 set(ANTIC_MINIAUDIO_SOURCE
     "${ANTIC_MINIAUDIO_DIR}/miniaudio-${antic_miniaudio_version}")
 set(ANTIC_MINIAUDIO_WORK "${CMAKE_BINARY_DIR}/native/miniaudio")
-configure_file("${ANTIC_MINIAUDIO_SOURCE}/LICENSE"
-    "${ANTIC_RUNTIME_DIR}/licenses/miniaudio.txt" COPYONLY)
+antic_native_license(miniaudio "${ANTIC_MINIAUDIO_SOURCE}/LICENSE")
 
 # DESIGN: miniaudio.c of the release, with no definition of our own. Every
 # back end stays in, and miniaudio loads the one it uses at run time: ALSA,

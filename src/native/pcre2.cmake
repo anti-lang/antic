@@ -33,8 +33,7 @@ configure_file("${ANTIC_PCRE2_SOURCE}/src/pcre2.h.generic"
     "${ANTIC_PCRE2_INCLUDE}/pcre2.h" COPYONLY)
 configure_file("${ANTIC_PCRE2_SOURCE}/src/pcre2_chartables.c.dist"
     "${ANTIC_PCRE2_WORK}/pcre2_chartables.c" COPYONLY)
-configure_file("${ANTIC_PCRE2_SOURCE}/LICENCE.md"
-    "${ANTIC_RUNTIME_DIR}/licenses/pcre2.txt" COPYONLY)
+antic_native_license(pcre2 "${ANTIC_PCRE2_SOURCE}/LICENCE.md")
 
 # The sources of the 8-bit library, the list of NON-AUTOTOOLS-BUILD.
 # pcre2_jit_compile.c is one of them with JIT off, when it holds the stubs
