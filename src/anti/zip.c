@@ -67,14 +67,24 @@ static unsigned long crc32_of(const char *bytes, size_t length)
     return crc ^ 0xffffffffUL;
 }
 
+/* The largest count and the largest size the 16-bit and the 32-bit
+   fields of the format hold. The writer refuses a value past them, since
+   the field would hold it cut and the archive would be broken. */
+#define ZIP_MAX16 0xffffu
+#define ZIP_MAX32 0xffffffffu
+
 bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
 {
     struct text out = {0};
     struct text directory = {0};
     unsigned long *offsets = files_array(count + 1, sizeof *offsets);
     size_t i;
-    bool ok = true;
+    bool ok = count <= ZIP_MAX16;
 
+    if (!ok) {
+        fprintf(stderr, "anti: %s: %zu entries are more than a zip archive "
+                        "holds\n", path, count);
+    }
     for (i = 0; ok && i < count; i++) {
         struct text bytes = {0};
         unsigned long crc;
@@ -83,6 +93,12 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
             ok = files_read_reported(entries[i].file, &bytes);
         } else {
             text_append_bytes(&bytes, entries[i].bytes, entries[i].size);
+        }
+        if (ok && (name_length > ZIP_MAX16 || bytes.length > ZIP_MAX32 ||
+                   out.length > ZIP_MAX32)) {
+            fprintf(stderr, "anti: %s: entry %zu is too large for a zip "
+                            "archive\n", path, i);
+            ok = false;
         }
         if (!ok) {
             text_free(&bytes);
@@ -125,6 +141,11 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         put32(&directory, offsets[i]);
         text_append_bytes(&directory, entries[i].name, name_length);
         text_free(&bytes);
+    }
+    if (ok && (out.length > ZIP_MAX32 || directory.length > ZIP_MAX32)) {
+        fprintf(stderr, "anti: %s: the entries are too large for a zip "
+                        "archive\n", path);
+        ok = false;
     }
     if (ok) {
         unsigned long start = (unsigned long)out.length;

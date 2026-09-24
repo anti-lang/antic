@@ -23,7 +23,8 @@ struct zip_entry {
 
 /* Write the archive at path with these entries, in order. Returns false
    and writes a message when a file cannot be read or the archive cannot
-   be written. */
+   be written. It does so too when a name, a size, an offset or the count
+   is past what the fields of the format hold, and writes no file. */
 bool zip_write(const char *path, const struct zip_entry *entries,
                size_t count);
 

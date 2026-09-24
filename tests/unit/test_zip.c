@@ -506,6 +506,49 @@ static void broken_archives(void)
     remove(ARCHIVE);
 }
 
+/* A name longer than 65535 bytes and more than 65535 entries have no
+   field of the format that holds them, so the writer refuses both
+   rather than cut them. */
+static void write_limits(void)
+{
+    struct zip_entry *many = calloc(65536, sizeof *many);
+    char *name = malloc(70000 + 1);
+    struct zip_entry one;
+    FILE *f;
+    size_t i;
+
+    CHECK(many != NULL && name != NULL);
+    if (many == NULL || name == NULL) {
+        free(many);
+        free(name);
+        return;
+    }
+    remove(ARCHIVE);
+    memset(name, 'n', 70000);
+    name[70000] = '\0';
+    memset(&one, 0, sizeof one);
+    one.name = name;
+    one.bytes = "x";
+    one.size = 1;
+    CHECK(!zip_write(ARCHIVE, &one, 1));
+    f = fopen(ARCHIVE, "rb");
+    CHECK(f == NULL);
+    if (f != NULL) {
+        fclose(f);
+    }
+    name[8] = '\0';
+    for (i = 0; i < 65536; i++) {
+        many[i].name = name;
+        many[i].bytes = "x";
+        many[i].size = 1;
+    }
+    CHECK(!zip_write(ARCHIVE, many, 65536));
+    CHECK(zip_write(ARCHIVE, many, 65535));
+    remove(ARCHIVE);
+    free(many);
+    free(name);
+}
+
 void test_zip(void)
 {
     fputs("anti test: the messages below are expected\n", stderr);
@@ -513,4 +556,5 @@ void test_zip(void)
     deflate_bound();
     broken_deflate();
     broken_archives();
+    write_limits();
 }
