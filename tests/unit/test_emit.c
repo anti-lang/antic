@@ -291,7 +291,7 @@ static void data_relocation_overlap(void)
 }
 
 static const char fnptr[] = "extern fn abs(x: i32) -> i32;\n"
-                            "fn apply(f: fn(i32) -> i32, x: i32) -> i32 {\n"
+                            "fn apply(keep f: fn(i32) -> i32, x: i32) -> i32 {\n"
                             "    return f(x);\n"
                             "}\n"
                             "fn pick() -> fn(i32) -> i32 {\n"

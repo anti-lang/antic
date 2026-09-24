@@ -96,6 +96,12 @@ struct anti_Error *failing_step(Counter * /* non-null */ c, int32_t limit);
 /** f of n, or the error f gives. C passes a function of the ABI form. */
 /* May fail: NULL on success, an error otherwise. */
 struct anti_Error *failing_apply(struct anti_Error *(*f)(int32_t, int32_t * /* non-null */), int32_t n, int32_t * /* non-null */ out);
+/**
+ * f of n, or the error f gives. C passes a callback of the ABI form and its
+ * context.
+ */
+/* May fail: NULL on success, an error otherwise. */
+struct anti_Error *failing_apply_in(struct anti_Error *(*f)(int32_t, int32_t * /* non-null */, void *), void *f_context, int32_t n, int32_t * /* non-null */ out);
 /** Twice n, which never fails. */
 int32_t failing_twice(int32_t n);
 

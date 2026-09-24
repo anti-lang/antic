@@ -627,6 +627,57 @@ static bool check_set_index(struct checker *c, struct stmt *s)
     return true;
 }
 
+/* The captured variable declared deepest of the closure that the value e
+   gives, or NULL when e gives none or one that captures nothing. */
+static const struct symbol *held_deepest(const struct expr *e)
+{
+    const struct symbol *deepest = NULL;
+    size_t i;
+
+    if (e->kind == EXPR_NAME && e->symbol != NULL) {
+        return e->symbol->holds;
+    }
+    if (e->kind != EXPR_FN) {
+        return NULL;
+    }
+    for (i = 0; i < e->as.fn->capture_count; i++) {
+        const struct symbol *sym = e->as.fn->captures[i].symbol;
+        if (deepest == NULL || sym->depth > deepest->depth) {
+            deepest = sym;
+        }
+    }
+    return deepest;
+}
+
+/* DESIGN: a closure never outlives the variables it captures. A local of
+   its frame may hold one. A local declared in a block outside that of a
+   captured variable would hold it after the variable is gone. The
+   assignment is refused with the name of the variable. */
+static void check_closure_lifetime(struct checker *c, const struct expr *target,
+                                   const struct expr *value)
+{
+    const struct symbol *deepest = held_deepest(value);
+    struct symbol *sym = target->kind == EXPR_NAME ? target->symbol : NULL;
+
+    if (sym == NULL || deepest == NULL || sym->type == NULL ||
+        sym->type->kind != TYPE_FN || !sym->type->context) {
+        return;
+    }
+    if (deepest->depth > sym->depth) {
+        sema_error_at(c, value->pos, "`%.*s` outlives `%.*s`, which the "
+                      "closure captures", (int)sym->name.length,
+                      sym->name.text, (int)deepest->name.length,
+                      deepest->name.text);
+        return;
+    }
+    if (sym->holds == NULL || deepest->depth > sym->holds->depth) {
+        sym->holds = deepest;
+    }
+    if (value->kind == EXPR_FN) {
+        sym->closure = value->as.fn;
+    }
+}
+
 static void check_assign(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
@@ -700,6 +751,7 @@ static void check_assign(struct checker *c, struct stmt *s)
         sema_check_expr(c, s->as.assign.value, NULL);
         return;
     }
+    sema_note_write(c, target);
     v = sema_check_expr(c, s->as.assign.value, t);
     /* The value is checked first, so that `p = p.next` still reads the
        `p` the check proved. Then the narrowing ends: what it proved is
@@ -712,6 +764,7 @@ static void check_assign(struct checker *c, struct stmt *s)
     }
     if (op == TOKEN_ASSIGN) {
         sema_refuse_owned_copy(c, s->as.assign.value, t);
+        check_closure_lifetime(c, target, s->as.assign.value);
         return;
     }
     if ((op == TOKEN_PLUS_ASSIGN || op == TOKEN_MINUS_ASSIGN ||
@@ -1072,13 +1125,15 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
 static struct type *declared_result(struct checker *c)
 {
     const struct item *it = c->function;
+    const struct type *t = it->symbol->type;
 
     if (!it->may_fail) {
-        return it->symbol->type->result;
+        return t->result;
     }
-    return it->result != NULL && it->result->type != NULL
-               ? it->result->type
-               : sema_builtin(c, TYPE_VOID);
+    /* An anonymous function may take its result from the target, so the
+       result is read from the out pointer of its type. */
+    return t->has_out ? t->params[t->param_count - 1]->element
+                      : sema_builtin(c, TYPE_VOID);
 }
 
 /* DESIGN: `let (a, b) = e;` and `for i, x in items` are one rule. The
@@ -1490,6 +1545,14 @@ static void check_stmt(struct checker *c, struct stmt *s)
             }
             declared = NULL;
         }
+        /* A local of function type holds a closure in the form of two
+           words, as a parameter that does not keep its argument does. */
+        if (declared != NULL && !sema_is_error(t) && t->kind == TYPE_FN &&
+            t->context && declared->kind == TYPE_FN && !declared->context &&
+            types_fn_form(c->types, t, false, false) ==
+                types_fn_form(c->types, declared, false, false)) {
+            declared = t;
+        }
         if (declared != NULL) {
             if (sema_require(c, s->as.let.value, t, declared)) {
                 sema_refuse_owned_copy(c, s->as.let.value, declared);
@@ -1511,6 +1574,10 @@ static void check_stmt(struct checker *c, struct stmt *s)
         if (sym != NULL) {
             sym->type = t;
             s->as.let.symbol = sym;
+            sym->holds = held_deepest(s->as.let.value);
+            if (s->as.let.value->kind == EXPR_FN) {
+                sym->closure = s->as.let.value->as.fn;
+            }
             /* A failing call writes its result through a pointer, so
                the local it writes to needs a place of its own. So does
                the pointer of `alloc T(args)`, which a handler may
@@ -2327,14 +2394,22 @@ void sema_check_function(struct checker *c, struct item *it)
     check_construct_sets(c, it);
     sema_leave_scope(c, &params);
     if (declared_result(c)->kind != TYPE_VOID && !block_returns(it->body)) {
-        sema_error_at(c, it->name_pos,
-                      "`%.*s` can reach its end without `return`",
-                      (int)it->name.length, it->name.text);
+        if (it->enclosing != NULL) {
+            sema_error_at(c, it->name_pos, "the anonymous function can reach "
+                          "its end without `return`");
+        } else {
+            sema_error_at(c, it->name_pos,
+                          "`%.*s` can reach its end without `return`",
+                          (int)it->name.length, it->name.text);
+        }
     }
     /* DESIGN: a `may fail` function without a `fail` and without a
        `try` is a warning and not an error. An interface function may
-       fail in one implementation and not in another. */
-    if (it->may_fail && !c->saw_fail && !sema_is_error(it->symbol->type)) {
+       fail in one implementation and not in another. An anonymous
+       function that takes `may fail` from its target wrote no position,
+       and no warning names it. */
+    if (it->may_fail && !c->saw_fail && !sema_is_error(it->symbol->type) &&
+        it->may_fail_pos.line != 0) {
         diagnostics_warn(c->diags, NAME_NEVER_FAILS, it->may_fail_pos.line,
                          it->may_fail_pos.column,
                          "`%.*s` may fail and never does",
@@ -2343,6 +2418,358 @@ void sema_check_function(struct checker *c, struct item *it)
     c->saw_fail = false;
     c->function = NULL;
     c->within = within;
+}
+
+/* Anonymous functions and closures */
+
+/* The named function whose body is checked, around every anonymous
+   function that stands in it. NULL outside a function. */
+const struct item *sema_named_function(const struct checker *c)
+{
+    const struct item *it = c->function;
+
+    while (it != NULL && it->enclosing != NULL) {
+        it = it->enclosing;
+    }
+    return it;
+}
+
+/* DESIGN: a type is thread-safe when it is built to be changed from more
+   than one thread at once. Of the types that are built, a `Mutex` and a
+   channel are. The atomics are fields and not the type of a variable,
+   and concurrent classes are not built yet. */
+bool sema_thread_safe(const struct type *t)
+{
+    return t != NULL && (types_is_mutex(t) || types_is_chan(t));
+}
+
+/* The capture of sym in the anonymous function it, added when it is not
+   there yet. */
+static struct capture *capture_in(struct item *it, struct symbol *sym)
+{
+    size_t i;
+
+    for (i = 0; i < it->capture_count; i++) {
+        if (it->captures[i].symbol == sym) {
+            return &it->captures[i];
+        }
+    }
+    if (it->capture_count == it->capture_capacity) {
+        size_t capacity = it->capture_capacity == 0 ? 4
+                                                    : it->capture_capacity * 2;
+        struct capture *grown =
+            capacity <= SIZE_MAX / sizeof *grown
+                ? realloc(it->captures, capacity * sizeof *grown)
+                : NULL;
+        if (grown == NULL) {
+            fputs("antic: out of memory\n", stderr);
+            exit(70);
+        }
+        it->captures = grown;
+        it->capture_capacity = capacity;
+    }
+    memset(&it->captures[it->capture_count], 0, sizeof *it->captures);
+    it->captures[it->capture_count].symbol = sym;
+    return &it->captures[it->capture_count++];
+}
+
+/* DESIGN: a variable an anonymous function names from another frame is
+   captured by reference. The variable then lives in memory. Every
+   anonymous function between the one that names it and its frame
+   captures it as well. A closure made inside a closure then finds the
+   address in the context of the one around it. */
+void sema_capture(struct checker *c, struct symbol *sym)
+{
+    struct item *it;
+
+    sym->address_taken = true;
+    for (it = c->function; it != NULL && it != sym->frame;
+         it = it->enclosing) {
+        capture_in(it, sym);
+    }
+}
+
+/* The variable at the root of the place e, when a closure captures it,
+   else NULL. A place through a pointer or a slice changes what they
+   point to and not the variable. */
+static struct symbol *captured_root(const struct checker *c,
+                                    const struct expr *e)
+{
+    while (e->kind == EXPR_INDEX || e->kind == EXPR_FIELD) {
+        const struct expr *base = e->kind == EXPR_INDEX ? e->as.index.base
+                                                        : e->as.field.base;
+        if (base->type == NULL || base->type->kind == TYPE_POINTER ||
+            base->type->kind == TYPE_SLICE) {
+            return NULL;
+        }
+        e = base;
+    }
+    if (e->kind != EXPR_NAME || e->symbol == NULL ||
+        (e->symbol->kind != SYMBOL_LOCAL &&
+         e->symbol->kind != SYMBOL_PARAM) ||
+        e->symbol->frame == NULL || e->symbol->frame == c->function) {
+        return NULL;
+    }
+    return e->symbol;
+}
+
+/* Record that the closures around the place e change the variable at its
+   root, with the position of the first change. */
+void sema_note_write(struct checker *c, const struct expr *e)
+{
+    struct symbol *sym = captured_root(c, e);
+    struct item *it;
+
+    for (it = c->function; sym != NULL && it != NULL && it != sym->frame;
+         it = it->enclosing) {
+        struct capture *cap = capture_in(it, sym);
+        if (!cap->written) {
+            cap->written = true;
+            cap->write = e->pos;
+        }
+    }
+}
+
+/* Record a call through a captured function of the form that is not
+   `concurrent`, which a closure at a `concurrent` parameter may not
+   make. */
+void sema_note_call(struct checker *c, const struct expr *callee)
+{
+    struct symbol *sym = captured_root(c, callee);
+    struct item *it;
+
+    if (sym == NULL || callee->kind != EXPR_NAME || sym->type == NULL ||
+        sym->type->kind != TYPE_FN || !sym->type->context ||
+        sym->type->concurrent) {
+        return;
+    }
+    for (it = c->function; it != NULL && it != sym->frame;
+         it = it->enclosing) {
+        struct capture *cap = capture_in(it, sym);
+        if (!cap->called) {
+            cap->called = true;
+            cap->call = callee->pos;
+        }
+    }
+}
+
+/* DESIGN: a worker may take a function value as a parameter, and a
+   closure only through a `concurrent` one. A parameter without the mark
+   therefore takes a function that captures nothing. */
+void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
+                                const struct type *param)
+{
+    if (param->kind == TYPE_FN && param->context && !param->concurrent &&
+        arg->type != NULL && arg->type->kind == TYPE_FN &&
+        arg->type->context) {
+        sema_error_at(c, arg->pos, "a worker takes a closure through a "
+                      "`concurrent` parameter alone");
+    }
+}
+
+/* The checker's state of one function body, which an anonymous function
+   sets aside while its own body is checked. */
+struct body_state {
+    struct item *function;
+    int loop_depth;
+    struct stmt *fallthrough;
+    struct type *yields;
+    int handler_depth;
+    struct block *try_block;
+    struct type *error_type;
+    bool saw_fail;
+    const struct expr *top_call;
+    int deferring;
+    const struct expr *field_base;
+    const struct held_mutex *held;
+};
+
+static void set_aside(struct checker *c, struct body_state *s)
+{
+    s->function = c->function;
+    s->loop_depth = c->loop_depth;
+    s->fallthrough = c->fallthrough;
+    s->yields = c->yields;
+    s->handler_depth = c->handler_depth;
+    s->try_block = c->try_block;
+    s->error_type = c->error_type;
+    s->saw_fail = c->saw_fail;
+    s->top_call = c->top_call;
+    s->deferring = c->deferring;
+    s->field_base = c->field_base;
+    s->held = c->held;
+    c->loop_depth = 0;
+    c->fallthrough = NULL;
+    c->yields = NULL;
+    c->handler_depth = 0;
+    c->try_block = NULL;
+    c->error_type = NULL;
+    c->deferring = 0;
+    c->field_base = NULL;
+    c->held = NULL;
+}
+
+static void take_back(struct checker *c, const struct body_state *s)
+{
+    c->function = s->function;
+    c->loop_depth = s->loop_depth;
+    c->fallthrough = s->fallthrough;
+    c->yields = s->yields;
+    c->handler_depth = s->handler_depth;
+    c->try_block = s->try_block;
+    c->error_type = s->error_type;
+    c->saw_fail = s->saw_fail;
+    c->top_call = s->top_call;
+    c->deferring = s->deferring;
+    c->field_base = s->field_base;
+    c->held = s->held;
+}
+
+/* The type of the anonymous function it, from the types it writes and
+   the target where it leaves one out. NULL after an error. */
+static struct type *anonymous_type(struct checker *c, struct item *it,
+                                   const struct type *target)
+{
+    size_t shown = target != NULL
+                       ? target->param_count - (target->has_out ? 1 : 0)
+                       : 0;
+    struct type **params = arena_alloc(
+        c->arena, (it->param_count + 2) * sizeof *params);
+    struct type *result = sema_builtin(c, TYPE_VOID);
+    size_t i;
+
+    if (target != NULL && shown != it->param_count) {
+        sema_error_at(c, it->pos, "the anonymous function takes %zu "
+                      "parameter%s, and `%s` gives %zu", it->param_count,
+                      it->param_count == 1 ? "" : "s", sema_tn(target), shown);
+        return NULL;
+    }
+    for (i = 0; i < it->param_count; i++) {
+        struct param *p = &it->params[i];
+        if (p->type != NULL) {
+            params[i] = sema_param_form(c, sema_resolve_type(c, p->type),
+                                        p->keep, p->concurrent, p->pos);
+        } else if (target != NULL && !p->keep && !p->concurrent) {
+            params[i] = target->params[i];
+        } else {
+            sema_error_at(c, p->pos, "`%.*s` needs a type, which an "
+                          "anonymous function takes from a parameter of "
+                          "function type", (int)p->name.length, p->name.text);
+            return NULL;
+        }
+        if (sema_is_error(params[i])) {
+            return NULL;
+        }
+    }
+    if (it->result != NULL) {
+        result = sema_resolve_type(c, it->result);
+    } else if (target != NULL) {
+        result = target->has_out ? target->params[shown]->element
+                 : target->may_fail ? sema_builtin(c, TYPE_VOID)
+                                    : target->result;
+    }
+    if (sema_is_error(result)) {
+        return NULL;
+    }
+    if (target != NULL && target->may_fail && !it->may_fail) {
+        it->may_fail = true;
+    }
+    if (it->may_fail) {
+        struct type *error = sema_error_class(c, it->pos);
+        bool out = result->kind != TYPE_VOID;
+        if (error == NULL) {
+            return NULL;
+        }
+        if (out) {
+            params[it->param_count] = types_pointer(c->types, result);
+        }
+        return types_fn_failing(c->types, params,
+                                it->param_count + (out ? 1 : 0),
+                                types_pointer_nullable(c->types, error), out);
+    }
+    return types_fn(c->types, params, it->param_count, result);
+}
+
+/* DESIGN: an anonymous function is checked as a function of its own,
+   whose scope sits inside the scope where it stands. A name of the
+   function around it is then found. Naming a local or a parameter of
+   another frame captures it. The types come from the target, a parameter
+   of function type, and never from the body. The value is an ordinary
+   function when nothing is captured. A closure takes the form of two
+   words. It is `concurrent` when it changes no captured variable whose
+   type is not thread-safe and calls no captured function that is not. */
+struct type *sema_check_anonymous(struct checker *c, struct expr *e,
+                                  struct type *expected)
+{
+    struct item *it = e->as.fn;
+    const struct type *target = NULL;
+    struct body_state state;
+    struct scope params;
+    struct symbol *sym;
+    struct type *fn;
+    size_t i;
+    bool safe = true;
+
+    if (c->function == NULL) {
+        sema_error_at(c, e->pos, "an anonymous function stands in the body "
+                      "of a function");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (expected != NULL && expected->kind == TYPE_FN && !expected->bound) {
+        target = expected;
+    }
+    it->enclosing = c->function;
+    it->capture_count = 0;
+    fn = anonymous_type(c, it, target);
+    if (fn == NULL) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    sym = arena_alloc(c->arena, sizeof *sym);
+    sym->kind = SYMBOL_FN;
+    sym->name = it->name;
+    sym->pos = it->pos;
+    sym->type = fn;
+    sym->item = it;
+    sym->may_fail = it->may_fail;
+    it->symbol = sym;
+    set_aside(c, &state);
+    c->function = it;
+    c->saw_fail = false;
+    c->top_call = NULL;
+    sema_enter_scope(c, &params);
+    for (i = 0; i < it->param_count; i++) {
+        struct symbol *p =
+            sema_declare(c, SYMBOL_PARAM, &it->params[i].name,
+                         it->params[i].pos,
+                         "`%.*s` is already declared in this block");
+        if (p != NULL) {
+            p->type = fn->params[i];
+            it->params[i].symbol = p;
+        }
+    }
+    sema_check_block(c, it->body);
+    sema_leave_scope(c, &params);
+    if (declared_result(c)->kind != TYPE_VOID && !block_returns(it->body)) {
+        sema_error_at(c, it->pos, "the anonymous function can reach its end "
+                      "without `return`");
+    }
+    if (it->may_fail && !c->saw_fail && it->may_fail_pos.line != 0) {
+        diagnostics_warn(c->diags, NAME_NEVER_FAILS, it->may_fail_pos.line,
+                         it->may_fail_pos.column,
+                         "the anonymous function may fail and never does");
+    }
+    take_back(c, &state);
+    if (it->capture_count == 0) {
+        return fn;
+    }
+    for (i = 0; i < it->capture_count; i++) {
+        const struct capture *cap = &it->captures[i];
+        if ((cap->written && !sema_thread_safe(cap->symbol->type)) ||
+            cap->called) {
+            safe = false;
+        }
+    }
+    return types_fn_form(c->types, fn, true, safe);
 }
 
 /* main takes one of the three forms of chapter 2. */

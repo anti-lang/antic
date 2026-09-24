@@ -311,7 +311,8 @@ const struct type *sema_declaring_class(const struct item *m)
 /* The class whose function is being checked, or NULL outside one. */
 const struct type *sema_checking_class(const struct checker *c)
 {
-    const struct item *owner = c->function != NULL ? c->function->owner : NULL;
+    const struct item *named = sema_named_function(c);
+    const struct item *owner = named != NULL ? named->owner : NULL;
     return owner != NULL && owner->symbol != NULL ? owner->symbol->type : NULL;
 }
 
@@ -323,8 +324,10 @@ const struct type *sema_checking_class(const struct checker *c)
    and no block reaches into a library. */
 static bool from_test_block(const struct checker *c, const struct type *t)
 {
-    return c->function != NULL && c->function->block != BLOCK_NONE &&
-           t != NULL && sema_same_name(&t->module, &c->module_name);
+    const struct item *named = sema_named_function(c);
+
+    return named != NULL && named->block != BLOCK_NONE && t != NULL &&
+           sema_same_name(&t->module, &c->module_name);
 }
 
 /* DESIGN: the four levels of the object model document. A public member
@@ -762,7 +765,7 @@ static bool method_call(struct checker *c, struct expr *call)
                           (int)f->name.length, f->name.text);
             return false;
         }
-        sema_mark_address_taken(receiver);
+        sema_mark_address_taken(c, receiver);
         address->as.unary.op = TOKEN_AMP;
         address->as.unary.operand = receiver;
         address->type = first;
@@ -1441,7 +1444,7 @@ static struct type *check_mutex_destroy(struct checker *c, struct expr *e,
         sema_error_at(c, m->pos, "calling `" MUTEX_DESTROY "` needs a place");
         return sema_builtin(c, TYPE_ERROR);
     } else {
-        sema_mark_address_taken(m);
+        sema_mark_address_taken(c, m);
     }
     if (!sync_call(c, e, SYNC_MUTEX_DESTROY, m)) {
         return sema_builtin(c, TYPE_ERROR);
@@ -2089,6 +2092,7 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
     }
     /* A `?fn(...)` holds no function until the program has checked it. */
     fn = sema_usable_pointer(c, callee, fn);
+    sema_note_call(c, callee);
     sym = function_symbol(callee);
     /* The parameters at the end that the call leaves out take their
        defaults, which are appended once the given ones are checked. */
@@ -2132,6 +2136,9 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
         if (i < fn->param_count) {
             ok = sema_require(c, arg, sema_check_expr(c, arg, fn->params[i]),
                               fn->params[i]) && ok;
+            if (sym != NULL && sym->worker) {
+                sema_refuse_worker_closure(c, arg, fn->params[i]);
+            }
             note_move(c, sym, i, arg);
         } else {
             struct type *t = sema_check_expr(c, arg, NULL);
@@ -2706,12 +2713,20 @@ static bool worker_args(struct checker *c, struct expr *call,
                           fn->result);
     size_t i;
 
+    /* DESIGN: a worker may take a function value as a parameter. Every
+       thread shares the code of a function. A closure reaches a worker
+       only through a `concurrent` parameter. The checker has proved such
+       a closure safe to call from more than one thread at once. */
     for (i = 0; i < arg_count; i++) {
+        const struct type *param = fn->params[i + 1];
         ok = sema_require(c, args[i],
                           sema_check_expr(c, args[i], fn->params[i + 1]),
                           fn->params[i + 1]) && ok;
-        ok = worker_type(c, args[i]->pos, "an argument of a worker",
-                         fn->params[i + 1]) && ok;
+        sema_refuse_worker_closure(c, args[i], param);
+        if (param->kind != TYPE_FN || param->bound) {
+            ok = worker_type(c, args[i]->pos, "an argument of a worker",
+                             fn->params[i + 1]) && ok;
+        }
     }
     if (call->kind == EXPR_CALL) {
         call->type = fn->result;

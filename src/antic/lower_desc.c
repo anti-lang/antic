@@ -587,7 +587,10 @@ static const char *value_type_name(const struct type *t)
         [TYPE_F64] = "f64",   [TYPE_STR] = "str",
     };
 
-    if (t->kind == TYPE_POINTER || (t->kind == TYPE_FN && !t->bound)) {
+    /* A function with its context is two words, which no Value
+       carries, so reflect.call refuses a function that takes one. */
+    if (t->kind == TYPE_POINTER ||
+        (t->kind == TYPE_FN && !t->bound && !t->context)) {
         return "ptr";
     }
     /* An enum is signed under the ABI of Windows, so the index converts
@@ -1281,7 +1284,9 @@ static struct ir_function *interface_thunk(struct lowerer *l,
     entry = ir_block_add(f);
     l->f = f;
     l->b = entry;
-    args = ir_alloc(sig->param_count + 1, sizeof *args);
+    /* The thunk passes on each IR parameter as it came, so a parameter
+       of two words passes as two. */
+    args = ir_alloc(f->param_count + 1, sizeof *args);
     back = lower_temp(l, ir_binary(f, entry, IR_SUB, IR_I64,
                                    ir_int_op(IR_I64, 0),
                                    lower_field_offset(l, sub->home,
@@ -1289,11 +1294,11 @@ static struct ir_function *interface_thunk(struct lowerer *l,
     args[0] = lower_temp(l,
                          ir_ptradd(f, entry, lower_temp(l, f->params[0].temp),
                                    back));
-    for (i = 1; i < sig->param_count; i++) {
+    for (i = 1; i < f->param_count; i++) {
         args[i] = lower_temp(l, f->params[i].temp);
     }
     value = ir_call(f, entry, lower_ir_type_of(sig->result),
-                    ir_func_op(target), args, sig->param_count);
+                    ir_func_op(target), args, f->param_count);
     free(args);
     if (sig->result->kind == TYPE_VOID) {
         ir_ret(f, entry, IR_VOID, lower_none());
@@ -1408,11 +1413,11 @@ struct ir_function *lower_reach_thunk(struct lowerer *l,
     }
     l->f = f;
     l->b = ir_block_add(f);
-    args = ir_alloc(sig->param_count + 1, sizeof *args);
+    args = ir_alloc(f->param_count + 1, sizeof *args);
     args[0] = lower_offset_address(l, lower_temp(l, f->params[0].temp),
                                    lower_field_offset(l, sub->home,
                                                       &sub->name));
-    for (i = 1; i < sig->param_count; i++) {
+    for (i = 1; i < f->param_count; i++) {
         args[i] = lower_temp(l, f->params[i].temp);
     }
     table = lower_load_table(l, args[0], sub->type);
@@ -1421,7 +1426,7 @@ struct ir_function *lower_reach_thunk(struct lowerer *l,
                    lower_offset_address(l, table,
                                         lower_entry_offset(l, index))));
     value = ir_call_indirect(l->f, l->b, lower_ir_type_of(sig->result), target,
-                             lower_signature(l, sig), args, sig->param_count);
+                             lower_signature(l, sig), args, f->param_count);
     call = &l->b->insts[l->b->count - 1];
     call->c = ir_global_op(lower_class_descriptor(l, sub->type));
     call->field = (uint32_t)index;

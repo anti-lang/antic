@@ -215,7 +215,7 @@ static void pair_braces(struct piece_list *l)
 }
 
 /* What a brace belongs to, which decides where it opens. */
-enum brace_kind { BRACE_ITEM, BRACE_BLOCK, BRACE_LITERAL };
+enum brace_kind { BRACE_ITEM, BRACE_BLOCK, BRACE_LITERAL, BRACE_ANONYMOUS };
 
 /* The statement a brace interrupts, kept so that the one after it reads
    the same as the one before. */
@@ -232,6 +232,13 @@ struct frame {
     bool inlined;               /* the `}` stands on the line of the `{` */
     bool from_do;               /* `do {`, so `} while` joins */
     struct statement saved;
+    /* The body of an anonymous function interrupts an expression. The
+       indent, the continuation and the open brackets of the line it
+       stands in come back at its `}`. */
+    size_t depth;
+    bool cont;
+    size_t brackets;
+    bool *bracket_type;
 };
 
 struct emitter {
@@ -262,6 +269,10 @@ struct emitter {
     size_t clause_depth;
     bool clause_name;
     bool clause_statement;      /* the clause opens its statement */
+    /* An anonymous function whose body has not opened yet, and the open
+       brackets its `fn` stood in. */
+    bool anonymous;
+    size_t anonymous_brackets;
 };
 
 static void text_clear(struct text *t)
@@ -1013,6 +1024,86 @@ static bool joins_do(const struct emitter *e, size_t i)
            e->prev->token->kind == TOKEN_RBRACE && i > 0;
 }
 
+/* Whether the `fn` about to be written opens an anonymous function: one
+   that stands where a value starts, inside a statement already open. A
+   `fn` after `:`, `->`, `as` or `?` writes a type. */
+static bool anonymous_fn(const struct emitter *e)
+{
+    if (!e->stmt.open || e->prev == NULL || e->prev->kind != PIECE_TOKEN) {
+        return false;
+    }
+    switch (e->prev->token->kind) {
+    case TOKEN_ASSIGN:
+    case TOKEN_LPAREN:
+    case TOKEN_LBRACKET:
+    case TOKEN_COMMA:
+    case TOKEN_RETURN:
+    case TOKEN_YIELD:
+    case TOKEN_FAT_ARROW:
+    case TOKEN_QUESTION_QUESTION:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/* DESIGN: the body of an anonymous function opens on the line of its
+   signature. It indents one tab past that line, as a statement block
+   does. Its `}` opens the line that goes on with the expression around
+   it, at the indent of that line. A body written on one line stays. */
+static void emit_anonymous_open(struct emitter *e, const struct piece_list *l,
+                                const struct piece *p)
+{
+    bool inlined = e->inlined > 0 ||
+                   (p->match > 0 && l->items[p->match].end_line == p->line);
+    struct frame f;
+
+    memset(&f, 0, sizeof f);
+    e->anonymous = false;
+    f.kind = BRACE_ANONYMOUS;
+    f.inlined = inlined;
+    f.saved = e->stmt;
+    f.depth = e->depth;
+    f.cont = e->cont;
+    f.brackets = e->brackets;
+    if (e->brackets > 0) {
+        f.bracket_type = files_array(e->brackets, sizeof *f.bracket_type);
+        memcpy(f.bracket_type, e->bracket_type,
+               e->brackets * sizeof *f.bracket_type);
+    }
+    append_piece(e, p, space_before(e, p));
+    push_frame(e, f);
+    e->brackets = 0;
+    reset_statement(e);
+    if (inlined) {
+        e->inlined++;
+        return;
+    }
+    flush(e);
+    e->depth = f.depth + (f.cont ? 1 : 0) + 1;
+    e->cont = false;
+}
+
+static void emit_anonymous_close(struct emitter *e, const struct piece *p,
+                                 struct frame *f)
+{
+    if (f->inlined) {
+        e->inlined--;
+        append_piece(e, p, true);
+    } else {
+        flush(e);
+        e->depth = f->depth;
+        e->cont = f->cont;
+        append_piece(e, p, false);
+    }
+    e->stmt = f->saved;
+    e->brackets = 0;
+    while (e->brackets < f->brackets) {
+        push_bracket(e, f->bracket_type[e->brackets]);
+    }
+    free(f->bracket_type);
+}
+
 static void emit_brace_open(struct emitter *e, const struct piece_list *l,
                             const struct piece *p)
 {
@@ -1021,6 +1112,11 @@ static void emit_brace_open(struct emitter *e, const struct piece_list *l,
                    (p->match > 0 && l->items[p->match].end_line == p->line);
     struct frame f;
 
+    if (e->anonymous && e->brackets == e->anonymous_brackets) {
+        emit_anonymous_open(e, l, p);
+        return;
+    }
+    memset(&f, 0, sizeof f);
     if (!inlined && (kind == BRACE_ITEM || !e->stmt.open)) {
         flush(e);
         e->cont = false;
@@ -1051,6 +1147,10 @@ static void emit_brace_close(struct emitter *e, const struct piece *p)
         return;
     }
     f = e->frames[--e->frame_count];
+    if (f.kind == BRACE_ANONYMOUS) {
+        emit_anonymous_close(e, p, &f);
+        return;
+    }
     if (f.inlined) {
         e->inlined--;
         append_piece(e, p, true);
@@ -1183,6 +1283,14 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     if (!e->stmt.open) {
         e->stmt_start = p;
     }
+    /* An anonymous function declares no item, so its `fn` leaves the
+       statement as it is. */
+    if (kind == TOKEN_FN && anonymous_fn(e)) {
+        e->anonymous = true;
+        e->anonymous_brackets = e->brackets;
+        append_piece(e, p, space);
+        return;
+    }
     note_token(e, kind);
     append_piece(e, p, space);
 }
@@ -1215,6 +1323,9 @@ static bool breaks_line(struct emitter *e, const struct piece_list *l,
     }
     if (kind == TOKEN_LBRACE) {
         bool inlined = p->match > 0 && l->items[p->match].end_line == p->line;
+        if (e->anonymous && e->brackets == e->anonymous_brackets) {
+            return false;
+        }
         /* An item body and a block that stands on its own open a line,
            and every other brace joins the statement before it. */
         return !inlined && (classify(e) == BRACE_ITEM || !e->stmt.open);

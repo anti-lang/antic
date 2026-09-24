@@ -34,7 +34,7 @@ pub const TERMINATE: int = 15;
 /// One function per signal, and a later call replaces the one before it. The
 /// function runs on a thread of the runtime, not inside the handler, so it may
 /// do anything an ordinary function does.
-pub fn on_signal(sig: int, f: fn(int))
+pub fn on_signal(sig: int, keep f: fn(int))
 {
 	anti_rt_on_signal(sig, f);
 }

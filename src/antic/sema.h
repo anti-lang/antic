@@ -130,6 +130,17 @@ struct symbol {
        these alone, so a field that nothing reads costs nothing. */
     uint8_t flags_read;
 
+    /* DESIGN: a local or a parameter belongs to the frame of one
+       function. An anonymous function that names one of another frame
+       captures it. depth counts the blocks around its declaration. A
+       closure assigned to another local of the frame is checked against
+       it. A local that holds a closure names the anonymous function for
+       the messages. It names the captured variable declared deepest as
+       well, since the closure is held in no block outside that one. */
+    const struct item *frame;
+    int depth;
+    const struct item *closure;
+    const struct symbol *holds;
     /* An export item, whose function has the C symbol of its name. */
     bool exported;
     struct doc_text doc;            /* the /// text of a pub item */

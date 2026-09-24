@@ -278,7 +278,7 @@ elseif(CASE STREQUAL "exports")
     endforeach()
     list(SORT names)
     set(wanted anti_licenses geo_apply geo_dot geo_half geo_layer geo_ready
-        geo_scale)
+        geo_scale geo_sum_by)
     if(NOT names STREQUAL wanted)
         message(FATAL_ERROR "exports: ${names}\nexpected: ${wanted}")
     endif()

@@ -47,6 +47,8 @@ Num geo_half(Num n);
 uint32_t geo_layer(Flags * /* non-null */ f);
 /** The squared length of v, through a function pointer. */
 int32_t geo_apply(int32_t (*f)(int32_t), Vec2 v);
+/** f of each coordinate of v, summed. C passes a callback and its context. */
+int32_t geo_sum_by(int32_t (*f)(int32_t, void *), void *f_context, Vec2 v);
 /** 1 once the runtime is initialised. */
 int32_t geo_ready(void);
 

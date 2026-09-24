@@ -813,6 +813,8 @@ bool sema_eval_const(struct checker *c, struct expr *e,
     /* The slice is collected at run time, into memory of its own. */
     case EXPR_COLLECT:
         return fail_const(c, e, "`to_slice`");
+    case EXPR_FN:
+        return fail_const(c, e, "an anonymous function");
     /* The two comparisons of numbers fold, with the value in both. An
        `lt` operator is a call and never a constant. */
     case EXPR_IN: {

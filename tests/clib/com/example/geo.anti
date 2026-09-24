@@ -57,9 +57,15 @@ export fn geo_layer(f: *Flags) -> u32
 }
 
 /// The squared length of v, through a function pointer.
-export fn geo_apply(f: fn(c_int) -> c_int, v: Vec2) -> c_int
+export fn geo_apply(keep f: fn(c_int) -> c_int, v: Vec2) -> c_int
 {
 	return f(v.x) + f(v.y) + square(0);
+}
+
+/// f of each coordinate of v, summed. C passes a callback and its context.
+export fn geo_sum_by(f: fn(c_int) -> c_int, v: Vec2) -> c_int
+{
+	return f(v.x) + f(v.y);
 }
 
 /// 1 once the runtime is initialised.

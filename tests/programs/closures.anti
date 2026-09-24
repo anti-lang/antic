@@ -1,0 +1,193 @@
+//! Anonymous functions and closures. An anonymous function takes its types from
+//! the parameter it is passed to, one that captures nothing is an ordinary
+//! function value, a closure reads and changes the variables of its frame by
+//! reference, a `keep` parameter stores a named function, and a `concurrent`
+//! parameter passes a closure on to the workers of `parallel`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Counter
+{
+	pub total: int = 0,
+
+	pub fn add_each(self, items: []int)
+	{
+		each(items, fn(n) {
+			self.total += n;
+		});
+	}
+}
+
+class Button
+{
+	pub click: fn(int) -> int = twice,
+
+	pub fn on_click(self, keep f: fn(int) -> int)
+	{
+		self.click = f;
+	}
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn each(items: []int, f: fn(int))
+{
+	for x in items {
+		f(x);
+	}
+}
+
+fn apply(f: fn(int) -> int, n: int) -> int
+{
+	return f(n);
+}
+
+fn apply_or(f: ?fn(int) -> int, n: int) -> int
+{
+	if f != none {
+		return f(n);
+	}
+	return n;
+}
+
+fn pick(first: bool) -> fn(int) -> int
+{
+	if first {
+		return twice;
+	}
+	return fn(n: int) -> int {
+		return n + 100;
+	};
+}
+
+fn halve(f: fn(int) -> int may fail, n: int) -> int may fail
+{
+	return try f(n);
+}
+
+fn nested(n: int) -> int
+{
+	let sum = 0;
+	let outer = [1, 2, 3];
+	let inner = [10, 20];
+	each(outer[0..3], fn(a) {
+		each(inner[0..2], fn(b) {
+			sum += a * b + n;
+		});
+	});
+	return sum;
+}
+
+fn with_point(p: Point, f: fn(Point) -> int) -> int
+{
+	return f(p);
+}
+
+worker fn scaled(chunk: []int, concurrent f: fn(int) -> int) -> int
+{
+	let sum = 0;
+	for x in chunk {
+		sum += f(x);
+	}
+	return sum;
+}
+
+fn map_sum(items: []int, concurrent f: fn(int) -> int) -> int
+{
+	let parts = parallel items by 2 -> scaled(f);
+	let sum = 0;
+	for p in parts {
+		sum += p;
+	}
+	free(parts.ptr);
+	return sum;
+}
+
+fn main() -> int
+{
+	let items = [1, 2, 3, 4];
+	let all = items[0..4];
+
+	// An anonymous function that captures nothing.
+	printf("%lld\n".ptr, apply(fn(n) { return n * 3; }, 5));
+	let square = fn(n: int) -> int { return n * n; };
+	printf("%lld\n".ptr, apply(square, 7));
+	printf("%lld %lld\n".ptr, pick(true)(4), pick(false)(4));
+
+	// A closure reads and changes what it captures.
+	let hits = 0;
+	let total = 0;
+	each(all, fn(n) {
+		hits += 1;
+		total += n;
+	});
+	printf("%lld %lld\n".ptr, hits, total);
+
+	// A closure held in a local, called twice.
+	let step = 10;
+	let bump = fn(n: int) -> int {
+		step += 1;
+		return n + step;
+	};
+	printf("%lld %lld %lld\n".ptr, apply(bump, 1), apply(bump, 1), step);
+
+	// A named function at a parameter that does not keep it.
+	printf("%lld\n".ptr, apply(twice, 21));
+	printf("%lld %lld\n".ptr, apply_or(none, 5), apply_or(fn(n) { return n + hits; }, 5));
+
+	// A `keep` parameter stores a named or a non-capturing function.
+	let b = Button { };
+	printf("%lld\n".ptr, b.click(3));
+	b.on_click(fn(n: int) -> int { return n - 1; });
+	printf("%lld\n".ptr, b.click(3));
+
+	// A closure made inside a closure.
+	printf("%lld\n".ptr, nested(1));
+
+	// `self` and a struct captured by reference.
+	let c = Counter { };
+	c.add_each(all);
+	printf("%lld\n".ptr, c.total);
+	let origin = Point { x: 3, y: 4 };
+	printf("%lld\n".ptr, with_point(Point { x: 1, y: 2 }, fn(p) {
+		return p.x * origin.x + p.y * origin.y;
+	}));
+
+	// A closure that takes `may fail` from its target.
+	let failed = false;
+	let half = halve(fn(n) {
+		if n % 2 != 0 {
+			fail "odd";
+		}
+		return n / 2;
+	}, 10) catch e {
+		failed = true;
+		yield 0;
+	};
+	let none_left = halve(fn(n) {
+		if n % 2 != 0 {
+			fail "odd";
+		}
+		return n / 2;
+	}, 7) catch e {
+		failed = true;
+		yield -1;
+	};
+	printf("%lld %lld %d\n".ptr, half, none_left, failed as c_int);
+
+	// A closure at a `concurrent` parameter reads what it captures.
+	let factor = 3;
+	printf("%lld\n".ptr, map_sum(all, fn(n) { return n * factor; }));
+	return 0;
+}

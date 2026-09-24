@@ -129,6 +129,17 @@ struct type {
     const struct symbolic *length_of; /* TYPE_ARRAY, a symbolic length */
     struct type **params;           /* TYPE_FN */
     bool bound;                     /* TYPE_FN: an object and an entry */
+    /* DESIGN: a parameter of function type that does not keep its
+       argument holds two words, the code and a context pointer. Its
+       type is the function type with context set, so a value of it
+       converts to nothing that keeps it: a field, a global, a result
+       and a `keep` parameter hold the one C function pointer. A named
+       function converts to it with the context `none`. concurrent marks
+       the form of a `concurrent` parameter, which a closure reaches only
+       when it writes no captured variable of a type that is not
+       thread-safe. */
+    bool context;                   /* TYPE_FN: the code and a context */
+    bool concurrent;                /* TYPE_FN, context: `concurrent` */
     /* DESIGN: `fn(A) -> R may fail` is a type of its own. It holds the
        ABI form that the checker gives a `may fail` function: `?*Error` as
        the result, and the out pointer last when the type names a result.
@@ -196,9 +207,9 @@ struct types {
 };
 
 void types_init(struct types *types, struct arena *arena);
-/* Memory for count items of size bytes each, zeroed, in the pool arena,
-   which frees it. antic stops when the product does not fit in a size_t,
-   as on any failed allocation. */
+/* Memory for count items of size bytes each, zeroed, in the pool, which
+   frees it. antic stops when the product does not fit in a size_t, as on
+   any failed allocation. */
 void *types_alloc_array(struct arena *arena, size_t count, size_t size);
 struct type *types_builtin(struct types *types, enum type_kind kind);
 /* `*T`, the pointer that never holds `none`. */
@@ -239,6 +250,12 @@ struct type *types_fn_failing(struct types *types, struct type *const *params,
 struct type *types_fn_flagged(struct types *types, struct type *const *params,
                               size_t param_count, struct type *result,
                               bool bound, bool may_fail, bool has_out);
+/* The same function type in another form. With context set it is the
+   form of a parameter that does not keep its argument, `concurrent` or
+   not. Without, it is the plain form of one C function pointer. The `?`
+   stays. */
+struct type *types_fn_form(struct types *types, struct type *fn, bool context,
+                           bool concurrent);
 
 /* DESIGN: a bound function is a value of two words, the object and the
    entry of the table. Its type is the function type without `self`. It
@@ -408,8 +425,8 @@ const struct item *types_interface_member(const struct type *t,
                                           const struct name *name);
 /* The symbol name of the member m of the class named owner. It is `T.f`,
    and `T.Q.f` for a body qualified by another class, so that two bodies
-   of one name have two symbols. The text lies in the memory pool arena
-   and ends in a NUL, and the pool frees it. */
+   of one name have two symbols. The text lies in the memory pool and ends
+   in a NUL, and the pool frees it. */
 struct name types_member_symbol(struct arena *arena, const struct name *owner,
                                 const struct item *m);
 

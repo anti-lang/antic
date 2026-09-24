@@ -44,6 +44,7 @@ struct scope {
     struct narrowing *narrowed;
     size_t narrowed_count;
     size_t narrowed_capacity;
+    int depth;                  /* the blocks around it, 0 for a module */
 };
 
 /* One `sync` that the statement being checked stands in, innermost
@@ -84,6 +85,10 @@ struct checker {
     const struct expr *field_base; /* the base of the field checked now */
     const struct held_mutex *held; /* the `sync` blocks around it */
     int const_depth;            /* constants evaluated inside each other */
+    /* Above 0, a function type holds one C function pointer in every
+       place, a parameter of it included. The signature of an `extern fn`
+       is checked so. */
+    int plain_fns;
     bool ok;
 };
 
@@ -156,6 +161,8 @@ bool sema_refuses_half(struct checker *c, struct pos pos,
                        const struct type *t);
 struct type *sema_chan_element(struct checker *c, struct type_expr *t);
 struct type *sema_resolve_type(struct checker *c, struct type_expr *t);
+struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
+                             bool concurrent, struct pos pos);
 struct symbol *sema_std_item(struct checker *c, const struct name *module,
                              const struct name *name, bool own);
 struct type *sema_error_class(struct checker *c, struct pos pos);
@@ -168,7 +175,7 @@ bool sema_check_object_from(struct checker *c, struct expr *e,
 /* sema_expr.c */
 
 bool sema_is_place(const struct expr *e);
-void sema_mark_address_taken(struct expr *e);
+void sema_mark_address_taken(struct checker *c, struct expr *e);
 bool sema_spell(struct text *out, const struct expr *e);
 struct type *sema_usable_pointer(struct checker *c, const struct expr *e,
                                  struct type *t);
@@ -264,6 +271,15 @@ bool sema_type_owns(const struct type *t);
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             struct type *t);
 void sema_check_block(struct checker *c, struct block *b);
+const struct item *sema_named_function(const struct checker *c);
+bool sema_thread_safe(const struct type *t);
+void sema_capture(struct checker *c, struct symbol *sym);
+void sema_note_write(struct checker *c, const struct expr *e);
+void sema_note_call(struct checker *c, const struct expr *callee);
+void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
+                                const struct type *param);
+struct type *sema_check_anonymous(struct checker *c, struct expr *e,
+                                  struct type *expected);
 void sema_check_function(struct checker *c, struct item *it);
 void sema_check_main(struct checker *c, struct item *it);
 void sema_check_test_block(struct checker *c, struct item *it);

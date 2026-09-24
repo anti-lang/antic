@@ -686,6 +686,62 @@ static struct ir_operand lower_sync_op(struct lowerer *l,
 
 /* The address of the memory that holds the aggregate value of e. A
    literal gets a slot of its own, and a constant is read-only data. */
+static struct ir_operand coalesce(struct lowerer *l, const struct expr *e);
+
+/* A function with its context in a slot of the frame: code and then
+   context, in the aggregate of the form t. */
+static struct ir_operand lower_pair(struct lowerer *l, const struct type *t,
+                                    struct ir_operand code,
+                                    struct ir_operand context)
+{
+    uint32_t agg = lower_agg_of(l, t);
+    struct ir_operand slot =
+        lower_temp(l, ir_entry_slot(l->f, ir_aggregate(agg)));
+
+    ir_store(l->f, l->b, IR_PTR, code, slot);
+    ir_store(l->f, l->b, IR_PTR, context,
+             lower_offset_address(l, slot,
+                                  ir_sym_operand(l->m,
+                                                 ir_sym_offset_of(l->m, agg,
+                                                                  1))));
+    return slot;
+}
+
+/* DESIGN: an anonymous function that captures nothing is the address of
+   its code, as a named function is. A closure is the code and a context
+   in the frame that makes it: a record of the address of every variable
+   it captures. Creating one allocates nothing. The record and the pair
+   sit in slots of the frame, which outlive every local the closure may
+   be held in. */
+static struct ir_operand lower_closure(struct lowerer *l,
+                                       const struct expr *e)
+{
+    struct item *it = e->as.fn;
+    struct ir_function *f = lower_anonymous_function(l, it);
+    struct ir_operand code = lower_temp(l, ir_addr(l->f, l->b,
+                                                   ir_func_op(f)));
+    uint32_t agg;
+    struct ir_operand record;
+    size_t i;
+
+    if (it->capture_count == 0) {
+        return code;
+    }
+    agg = lower_captures_agg(l, it);
+    record = lower_temp(l, ir_entry_slot(l->f, ir_aggregate(agg)));
+    for (i = 0; i < it->capture_count; i++) {
+        ir_store(l->f, l->b, IR_PTR,
+                 lower_temp(l, it->captures[i].symbol->ir),
+                 lower_offset_address(
+                     l, record,
+                     i == 0 ? lower_zero()
+                            : ir_sym_operand(l->m,
+                                             ir_sym_offset_of(l->m, agg,
+                                                              (uint32_t)i))));
+    }
+    return lower_pair(l, e->type, code, record);
+}
+
 struct ir_operand lower_address(struct lowerer *l,
                                 const struct expr *e)
 {
@@ -714,6 +770,10 @@ struct ir_operand lower_address(struct lowerer *l,
     if (e->kind == EXPR_CAST && (type_is_simd(e->type) ||
                                  type_is_simd(e->as.cast.operand->type))) {
         return lower_simd_cast(l, e);
+    }
+    if (e->kind == EXPR_BINARY && e->as.binary.op == TOKEN_QUESTION_QUESTION &&
+        lower_is_context(e->type)) {
+        return coalesce(l, e);
     }
     switch (e->kind) {
     case EXPR_SIMD:
@@ -746,6 +806,17 @@ struct ir_operand lower_address(struct lowerer *l,
         return lower_format(l, e);
     case EXPR_COLLECT:
         return lower_collect(l, e);
+    case EXPR_FN:
+        return lower_closure(l, e);
+    /* `none` in the form of two words has no code and no context. */
+    case EXPR_NONE:
+        if (lower_is_context(e->type)) {
+            return lower_pair(l, e->type, ir_int_op(IR_PTR, 0),
+                              ir_int_op(IR_PTR, 0));
+        }
+        slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
+        lower_build_into(l, e, lower_temp(l, slot));
+        return lower_temp(l, slot);
     default:
         slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
         lower_build_into(l, e, lower_temp(l, slot));
@@ -882,7 +953,10 @@ static struct ir_operand short_circuit(struct lowerer *l, const struct expr *e)
    otherwise, which runs only then. */
 static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
 {
-    enum ir_type type = lower_ir_type_of(e->type);
+    /* Of two functions with their context, the result is the address of
+       the pair it takes, and the test reads the code. */
+    bool pair = lower_is_context(e->type);
+    enum ir_type type = pair ? IR_PTR : lower_ir_type_of(e->type);
     struct ir_operand left = lower_expr(l, e->as.binary.left);
     struct ir_operand right;
     struct ir_operand is_none;
@@ -891,8 +965,11 @@ static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
     uint32_t result;
 
     result = ir_unary(l->f, l->b, IR_COPY, type, left);
-    is_none = lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, left,
-                                      ir_int_op(type, 0)));
+    is_none = lower_temp(
+        l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
+                     pair ? lower_temp(l, ir_load(l->f, l->b, IR_PTR, left))
+                          : left,
+                     ir_int_op(type, 0)));
     rest = lower_new_block(l);
     join = lower_new_block(l);
     ir_branch(l->f, l->b, is_none, rest, join);
@@ -1116,6 +1193,14 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     }
     left = lower_expr(l, e->as.binary.left);
     right = lower_expr(l, e->as.binary.right);
+    /* A function with its context compares by its code, which is zero
+       for `none`. */
+    if (lower_is_context(e->as.binary.left->type)) {
+        left = lower_temp(l, ir_load(l->f, l->b, IR_PTR, left));
+    }
+    if (lower_is_context(e->as.binary.right->type)) {
+        right = lower_temp(l, ir_load(l->f, l->b, IR_PTR, right));
+    }
     if (identity) {
         left = object_of(l, left);
         right = object_of(l, right);
@@ -1653,18 +1738,37 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     bool direct = sym != NULL && (sym->kind == SYMBOL_FN ||
                                   sym->kind == SYMBOL_EXTERN_FN);
     size_t n = e->as.call.arg_count;
+    const struct type *fn = callee->type != NULL &&
+                                    callee->type->kind == TYPE_FN
+                                ? callee->type
+                                : NULL;
     struct ir_operand target = lower_none();
     struct ir_operand bound = lower_none();
+    struct ir_operand context = lower_none();
     struct ir_operand *args;
     uint32_t result;
     uint32_t slot;
     enum ir_type declared;
+    size_t given;
     size_t i;
 
     /* The callee comes before the arguments, from left to right. A
        bound function gives its object as the first argument and its
-       entry as the target. */
-    if (callee->type != NULL && callee->type->kind == TYPE_FN &&
+       entry as the target. A function with its context gives its code
+       as the target and its context as the last argument. */
+    if (lower_is_context(fn)) {
+        struct ir_operand value = lower_address(l, callee);
+        target = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
+        context = lower_temp(
+            l, ir_load(l->f, l->b, IR_PTR,
+                       lower_offset_address(
+                           l, value,
+                           ir_sym_operand(l->m,
+                                          ir_sym_offset_of(
+                                              l->m, lower_agg_of(l, fn),
+                                              1)))));
+        direct = false;
+    } else if (callee->type != NULL && callee->type->kind == TYPE_FN &&
         callee->type->bound) {
         struct ir_operand value = lower_address(l, callee);
         bound = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
@@ -1678,19 +1782,28 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     } else if (!direct) {
         target = lower_expr(l, callee);
     }
-    args = ir_alloc(n + 2, sizeof *args);
+    args = ir_alloc(2 * n + 3, sizeof *args);
+    given = 0;
     if (bound.kind != IR_NONE) {
-        args[0] = bound;
+        args[given++] = bound;
     }
+    /* An argument at a parameter that does not keep it passes as two
+       words. */
     for (i = 0; i < n; i++) {
-        args[i + (bound.kind != IR_NONE ? 1 : 0)] =
-            lower_argument(l, e->as.call.args[i]);
+        struct ir_operand value = lower_argument(l, e->as.call.args[i]);
+        lower_push_argument(l, args, &given, value,
+                            fn != NULL && i < fn->param_count ? fn->params[i]
+                                                              : NULL);
     }
     if (bound.kind != IR_NONE) {
         n++;
     }
     if (e->as.call.out != NULL) {
-        args[n++] = l->out_address;
+        args[given++] = l->out_address;
+        n++;
+    }
+    if (context.kind != IR_NONE) {
+        args[given++] = context;
     }
     /* DESIGN: a call through the table loads the table pointer from the
        object, which is its first word, then the entry of the function.
@@ -1724,13 +1837,17 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     }
     if (direct) {
         result = ir_call(l->f, l->b, declared,
-                         ir_func_op(lower_callee_function(l, sym)), args, n);
+                         ir_func_op(lower_callee_function(l, sym)), args,
+                         given);
     } else {
         result = ir_call_indirect(l->f, l->b, declared, target,
                                   bound.kind != IR_NONE
                                       ? lower_bound_signature(l, callee->type)
+                                  : context.kind != IR_NONE
+                                      ? lower_context_signature(l,
+                                                                callee->type)
                                       : lower_signature(l, callee->type),
-                                  args, n);
+                                  args, given);
         if (slot > 0) {
             struct ir_inst *call = &l->b->insts[l->b->count - 1];
             call->c = ir_global_op(lower_class_descriptor(l,
@@ -1828,6 +1945,13 @@ struct ir_operand lower_object_call(struct lowerer *l, const char *name,
 
 /* The aggregate that carries the arguments every chunk receives, or
    IR_NO_AGG when the worker takes the chunk alone. */
+/* The type of parameter i + 1 of the worker that call names, which holds
+   argument i of the call. */
+static const struct type *worker_param(const struct expr *call, size_t i)
+{
+    return call->as.call.callee->symbol->type->params[i + 1];
+}
+
 static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
                                   const char *name)
 {
@@ -1841,7 +1965,7 @@ static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
         char *field = ir_alloc(24, 1);
         snprintf(field, 24, "a%zu", i);
         fields[i].name = field;
-        fields[i].type = lower_vtype_of(l, call->as.call.args[i]->type);
+        fields[i].type = lower_vtype_of(l, worker_param(call, i));
         fields[i].bits = 0;
         fields[i].ext = IR_EXT_NONE;
     }
@@ -1880,7 +2004,7 @@ static struct ir_operand pack_context(struct lowerer *l,
                                  ir_sym_operand(l->m,
                                                 ir_sym_offset_of(l->m, *agg,
                                                                  (uint32_t)i)));
-        lower_store_value(l, arg->type, arg, at);
+        lower_store_value(l, worker_param(call, i), arg, at);
     }
     return lower_temp(l, slot);
 }
@@ -1899,28 +2023,30 @@ static void call_worker(struct lowerer *l, const struct expr *call,
     size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct ir_function *f = l->f;
     struct ir_block *entry = l->b;
-    struct ir_operand *args = ir_alloc(extra + 1, sizeof *args);
+    struct ir_operand *args = ir_alloc(2 * extra + 1, sizeof *args);
     struct ir_operand at_out;
     uint32_t value;
+    size_t count = 1;
     size_t i;
 
     args[0] = first;
     for (i = 0; i < extra; i++) {
-        const struct type *t = call->as.call.args[i]->type;
+        const struct type *t = worker_param(call, i);
         struct ir_operand at =
             lower_offset_address(l, lower_temp(l, f->params[0].temp),
                                  ir_sym_operand(l->m,
                                                 ir_sym_offset_of(l->m, context,
                                                                  (uint32_t)i)));
-        args[i + 1] = lower_is_aggregate(t)
-                          ? at
-                          : lower_temp(l,
-                                       ir_load(f, entry, lower_ir_type_of(t),
-                                               at));
+        lower_push_argument(
+            l, args, &count,
+            lower_is_aggregate(t)
+                ? at
+                : lower_temp(l, ir_load(f, entry, lower_ir_type_of(t), at)),
+            t);
     }
     value = ir_call(f, entry, lower_ir_type_of(result),
                     ir_func_op(lower_callee_function(l, callee->symbol)), args,
-                    extra + 1);
+                    count);
     free(args);
     at_out = lower_temp(l, f->params[out].temp);
     if (result->kind == TYPE_VOID) {
@@ -2257,6 +2383,11 @@ struct ir_operand lower_expr(struct lowerer *l, const struct expr *e)
 {
     struct ir_operand v = lower_expr_value(l, e);
 
+    /* A plain function where the form of two words is expected takes
+       the context `none`. */
+    if (e->to_context) {
+        return lower_pair(l, e->type, v, ir_int_op(IR_PTR, 0));
+    }
     if (e->to_iface == NULL) {
         return v;
     }
@@ -2288,6 +2419,8 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         return ir_int_op(type, e->as.boolean);
     case EXPR_NONE:
         return ir_int_op(type, 0);
+    case EXPR_FN:
+        return lower_closure(l, e);
     case EXPR_NAME:
         return lower_name(l, e);
     case EXPR_UNARY:

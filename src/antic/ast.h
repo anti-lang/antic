@@ -27,6 +27,7 @@ struct type;    /* a checked type, filled in by semantic analysis */
 struct symbol;  /* what a name refers to, filled in by semantic analysis */
 struct struct_field;    /* a field of a checked type */
 struct expr;
+struct item;
 
 enum type_expr_kind {
     TYPEX_BUILTIN,  /* int, f32, str and the other type keywords */
@@ -56,6 +57,11 @@ struct type_expr {
     size_t param_count;
     struct type_expr *result;       /* TYPEX_FN, NULL without a result */
     bool may_fail;                  /* TYPEX_FN: `fn(T) -> R may fail` */
+    /* The marks of a parameter of a function type. `keep fn(E)` holds
+       the one C function pointer. `concurrent fn(E)` may be called from
+       more than one thread at once. */
+    bool keep;
+    bool concurrent;
     struct type *type;              /* set by semantic analysis */
 };
 
@@ -138,7 +144,8 @@ enum expr_kind {
     EXPR_SYNC_OP,                   /* an operation of a mutex or a channel */
     EXPR_SIMD,                      /* a built-in of a simd struct */
     EXPR_DESCRIPTOR,                /* the descriptor of a class, as `*byte` */
-    EXPR_COLLECT                    /* `it.to_slice()` of an iterator */
+    EXPR_COLLECT,                   /* `it.to_slice()` of an iterator */
+    EXPR_FN                         /* `fn(params) { body }`, anonymous */
 };
 
 /* The format specification after the colon of an `{expr}`, as the
@@ -223,6 +230,9 @@ struct expr {
        records the field here and lowering adds the offset, so every
        place a value flows into an interface slot is covered once. */
     const struct struct_field *to_iface;
+    /* A plain function where the form of two words is expected. Lowering
+       pairs the code with the context `none`. Set by the checker. */
+    bool to_context;
     union {
         uint64_t integer;           /* EXPR_INT */
         uint32_t character;         /* EXPR_CHAR */
@@ -416,6 +426,9 @@ struct expr {
            gives. `lib.instance(I)` and `lib.supports(I, n)` write one,
            and no source text does. */
         const struct type *descriptor_of;
+        /* EXPR_FN: the anonymous function, an ITEM_FN whose enclosing
+           names the function it is written in. */
+        struct item *fn;
     } as;
 };
 
@@ -672,6 +685,25 @@ struct param {
     bool writable;                  /* `mutable`: a singleton field to write */
     bool injected;                  /* `inject`: a provider fills the field */
     bool inject_final;              /* `inject final`: no replacement */
+    /* A parameter of function type: `keep` stores its argument, and
+       `concurrent` may call it from more than one thread at once. */
+    bool keep;
+    bool concurrent;
+};
+
+/* DESIGN: a variable of an enclosing function that an anonymous function
+   uses. The closure reaches it by reference through its context, which
+   holds one address per capture in this order. A write assigns the
+   variable or a part of it, or takes its address. The first write is
+   kept for the message of a `concurrent` parameter. */
+struct capture {
+    struct symbol *symbol;
+    bool written;
+    struct pos write;
+    /* A call through a captured function that is not `concurrent`, which
+       a `concurrent` parameter refuses as it refuses a write. */
+    bool called;
+    struct pos call;
 };
 
 /* One case of a variant: its name and its fields, none for a case such
@@ -773,6 +805,14 @@ struct item {
     size_t nested_count;
     const struct item *outer;       /* the class whose body declares it */
     struct name local_name;         /* the name as written, `Node` */
+    /* Of an anonymous function, the function whose body holds it. The
+       captures are the variables of the functions around it that it
+       uses. A parameter written without a type takes it from the
+       target. */
+    struct item *enclosing;
+    struct capture *captures;
+    size_t capture_count;
+    size_t capture_capacity;
 };
 
 struct import {

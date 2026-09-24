@@ -54,8 +54,10 @@ static bool is_bitfield(const struct expr *e)
     return f != NULL && f->bits != 0;
 }
 
-void sema_mark_address_taken(struct expr *e)
+void sema_mark_address_taken(struct checker *c, struct expr *e)
 {
+    const struct expr *place = e;
+
     while (e->kind == EXPR_INDEX || e->kind == EXPR_FIELD) {
         struct expr *base = e->kind == EXPR_INDEX ? e->as.index.base
                                                   : e->as.field.base;
@@ -68,6 +70,8 @@ void sema_mark_address_taken(struct expr *e)
     if (e->kind == EXPR_NAME && e->symbol != NULL) {
         e->symbol->address_taken = true;
     }
+    /* An address taken of a captured variable may change it. */
+    sema_note_write(c, place);
 }
 
 /* A literal whose type comes from its context: an integer or float
@@ -285,13 +289,124 @@ static bool widens_to_nullable(const struct type *got,
            got->kind == expected->kind;
 }
 
+/* The first variable of the anonymous function it that a `concurrent`
+   parameter refuses, or NULL. Refused are a variable it changes whose
+   type is not thread-safe and a function it calls that is not
+   `concurrent`. */
+static const struct capture *unsafe_capture(const struct item *it)
+{
+    size_t i;
+
+    for (i = 0; it != NULL && i < it->capture_count; i++) {
+        const struct capture *cap = &it->captures[i];
+        if ((cap->written && !sema_thread_safe(cap->symbol->type)) ||
+            cap->called) {
+            return cap;
+        }
+    }
+    return NULL;
+}
+
+/* Refuse a function that is not kept where one is kept: a field, a
+   global, a result, a `keep` parameter or a parameter of an `extern fn`. */
+static void refuse_kept(struct checker *c, const struct expr *e)
+{
+    const struct symbol *sym = e->kind == EXPR_NAME ? e->symbol : NULL;
+
+    if (e->kind == EXPR_FN && e->as.fn->capture_count > 0) {
+        const struct symbol *first = e->as.fn->captures[0].symbol;
+        sema_error_at(c, e->pos, "a closure is never kept, and this one "
+                      "captures `%.*s`", (int)first->name.length,
+                      first->name.text);
+    } else if (sym != NULL && sym->kind == SYMBOL_PARAM) {
+        sema_error_at(c, e->pos, "`%.*s` is not marked `keep` and cannot be "
+                      "stored", (int)sym->name.length, sym->name.text);
+    } else if (sym != NULL) {
+        sema_error_at(c, e->pos, "`%.*s` holds a function that is not kept "
+                      "and cannot be stored", (int)sym->name.length,
+                      sym->name.text);
+    } else {
+        sema_error_at(c, e->pos,
+                      "a function that is not kept cannot be stored");
+    }
+}
+
+/* Refuse a function that is not `concurrent` at a `concurrent`
+   parameter. The message names the variable a closure changes. */
+static void refuse_not_concurrent(struct checker *c, const struct expr *e)
+{
+    const struct symbol *sym = e->kind == EXPR_NAME ? e->symbol : NULL;
+    const struct item *closure = e->kind == EXPR_FN ? e->as.fn
+                                 : sym != NULL      ? sym->closure
+                                                    : NULL;
+    const struct capture *cap = unsafe_capture(closure);
+
+    if (cap != NULL && cap->written &&
+        !sema_thread_safe(cap->symbol->type)) {
+        sema_error_at(c, cap->write, "`%.*s` is changed in a closure at a "
+                      "`concurrent` parameter, and `%s` is not thread-safe",
+                      (int)cap->symbol->name.length, cap->symbol->name.text,
+                      sema_tn(cap->symbol->type));
+    } else if (cap != NULL) {
+        sema_error_at(c, cap->call, "`%.*s` is called in a closure at a "
+                      "`concurrent` parameter and is not marked `concurrent`",
+                      (int)cap->symbol->name.length, cap->symbol->name.text);
+    } else if (sym != NULL && sym->kind == SYMBOL_PARAM) {
+        sema_error_at(c, e->pos, "`%.*s` is passed on to a `concurrent` "
+                      "parameter and is not marked `concurrent`",
+                      (int)sym->name.length, sym->name.text);
+    } else if (sym != NULL) {
+        sema_error_at(c, e->pos, "`%.*s` holds a function that is not marked "
+                      "`concurrent`", (int)sym->name.length, sym->name.text);
+    } else {
+        sema_error_at(c, e->pos, "the function is not marked `concurrent`");
+    }
+}
+
+/* DESIGN: the forms of one function type convert in one direction. A
+   plain function takes the form of two words with the context `none`,
+   and a `concurrent` one is taken where any is. Nothing converts to the
+   plain form, so a function that is not kept never reaches a place that
+   keeps it. Returns -1 when got and expected are not forms of one type,
+   and else whether the conversion holds. */
+static int require_fn_form(struct checker *c, struct expr *e,
+                           struct type *got, struct type *expected)
+{
+    if (got->kind != TYPE_FN || expected->kind != TYPE_FN || got->bound ||
+        expected->bound || (!got->context && !expected->context) ||
+        types_fn_form(c->types, types_without_none(c->types, got), false,
+                      false) !=
+            types_fn_form(c->types, types_without_none(c->types, expected),
+                          false, false)) {
+        return -1;
+    }
+    if (got->nullable && !expected->nullable) {
+        error_may_be_none(c, e, got);
+        return 0;
+    }
+    if (!expected->context) {
+        refuse_kept(c, e);
+        return 0;
+    }
+    if (expected->concurrent && got->context && !got->concurrent) {
+        refuse_not_concurrent(c, e);
+        return 0;
+    }
+    e->to_context = !got->context;
+    return 1;
+}
+
 bool sema_require(struct checker *c, struct expr *e, struct type *got,
                   struct type *expected)
 {
     const struct struct_field *iface;
+    int form;
 
     if (sema_is_error(got) || sema_is_error(expected) || got == expected) {
         return !sema_is_error(got);
+    }
+    if ((form = require_fn_form(c, e, got, expected)) >= 0) {
+        return form == 1;
     }
     /* The one implicit conversion of a pointer and the widening to
        `?*T` compose: a `*Circle` reaches a `?*Shape` parameter. */
@@ -470,7 +585,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             sema_error_at(c, operand->pos, "a bitfield has no address");
             return sema_builtin(c, TYPE_ERROR);
         }
-        sema_mark_address_taken(operand);
+        sema_mark_address_taken(c, operand);
         return types_pointer(c->types, t);
     default:
         return sema_builtin(c, TYPE_ERROR);
@@ -724,7 +839,7 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
         start->as.unary.operand = e;
         t = types_pointer(c->types, t);
         start->type = t;
-        sema_mark_address_taken(e);
+        sema_mark_address_taken(c, e);
     }
     it->start = start;
     it->cursor = sema_declare(c, SYMBOL_LOCAL, &hidden_iterator, e->pos,
@@ -799,7 +914,7 @@ static struct expr *operator_receiver(struct checker *c, struct expr *a,
         slot->type = first;
         return slot;
     }
-    sema_mark_address_taken(a);
+    sema_mark_address_taken(c, a);
     address = sema_new_node(c, EXPR_UNARY, a->pos);
     address->as.unary.op = TOKEN_AMP;
     address->as.unary.operand = a;
@@ -1252,7 +1367,7 @@ static bool fixed_layout(const struct type *t, uint64_t *size,
     case TYPE_FN:
     case TYPE_STR:
     case TYPE_SLICE:
-        *size = t->kind == TYPE_FN && !t->bound ? 8 : 16;
+        *size = t->kind == TYPE_FN && !t->bound && !t->context ? 8 : 16;
         *align = 8;
         return true;
     case TYPE_ENUM:
@@ -1950,6 +2065,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                           (int)e->as.name.length, e->as.name.text);
             return sema_builtin(c, TYPE_ERROR);
         }
+        /* A local of another frame is a variable an anonymous function
+           captures. */
+        if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
+            sym->frame != NULL && sym->frame != c->function) {
+            sema_capture(c, sym);
+        }
         if (sym->kind == SYMBOL_EXTERN_FN && sym->variadic) {
             sema_error_at(c, e->pos,
                           "a variadic function has no function pointer "
@@ -1976,7 +2097,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                 return sema_builtin(c, TYPE_ERROR);
             }
         }
-        if (sym->type != NULL && type_is_nullable(sym->type)) {
+        /* A closure may run after the variable has changed, so a
+           captured variable keeps its declared type. */
+        if (sym->type != NULL && type_is_nullable(sym->type) &&
+            sym->frame == c->function) {
             struct type *proved = sema_narrowed_type(c, sym);
             if (proved != NULL) {
                 return proved;
@@ -1985,6 +2109,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return sym->type != NULL ? sym->type : sema_builtin(c, TYPE_ERROR);
     case EXPR_UNARY:
         return check_unary(c, e, expected);
+    case EXPR_FN:
+        return sema_check_anonymous(c, e, expected);
     case EXPR_BINARY:
         return sema_check_binary(c, e, expected);
     case EXPR_CAST:
@@ -2060,7 +2186,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                 sema_error_at(c, e->pos, "slicing an array needs a place");
                 return sema_builtin(c, TYPE_ERROR);
             }
-            sema_mark_address_taken(e->as.slice.base);
+            sema_mark_address_taken(c, e->as.slice.base);
             return types_slice(c->types, t->element);
         }
         if (t->kind == TYPE_SLICE) {

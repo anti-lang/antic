@@ -242,8 +242,12 @@ static void declaration(struct text *out, const struct type *t,
         text_appendf(&inner, "%s[%" PRIu64 "]", name, t->length);
         declaration(out, t->element, text_cstr(&inner), owner);
         break;
+    /* DESIGN: an Anti function type is a function pointer in C. A
+       parameter that does not keep its argument is written the C way, as
+       a callback and a `void *` context after it. The callback takes the
+       context after its own parameters, which is where antic passes it,
+       and a named function passes NULL there. */
     case TYPE_FN:
-        /* An Anti function type is a function pointer in C. */
         text_appendf(&inner, "(*%s)(", name);
         for (i = 0; i < t->param_count; i++) {
             struct text param = {0};
@@ -251,8 +255,15 @@ static void declaration(struct text *out, const struct type *t,
             text_appendf(&inner, "%s%s", i > 0 ? ", " : "", text_cstr(&param));
             text_free(&param);
         }
-        text_append(&inner, t->param_count == 0 ? "void)" : ")");
+        if (t->context) {
+            text_append(&inner, t->param_count > 0 ? ", void *" : "void *");
+        }
+        text_append(&inner, t->param_count == 0 && !t->context ? "void)" : ")");
         declaration(out, t->result, text_cstr(&inner), owner);
+        if (t->context) {
+            text_appendf(out, ", void *%s%s", name, name[0] != '\0' ? "_context"
+                                                                    : "");
+        }
         break;
     case TYPE_STRUCT:
     case TYPE_CLASS:

@@ -10,6 +10,13 @@ static int32_t square(int32_t v)
     return v * v;
 }
 
+/* A callback of a parameter that does not keep its argument. antic
+   passes the context after the parameters. */
+static int32_t times(int32_t v, void *context)
+{
+    return v * *(int32_t *)context;
+}
+
 int main(void)
 {
     Vec2 a = {3, 4};
@@ -19,6 +26,7 @@ int main(void)
     Num half;
     Flags flags = {0, 9};
     uint32_t layer;
+    int32_t factor = 10;
 
     n.d = 7.0;
     half = geo_half(n);
@@ -30,6 +38,7 @@ int main(void)
     layer = geo_layer(&flags);
     printf("%u %u\n", layer, flags.visible);
     printf("%d\n", geo_apply(square, a));
+    printf("%d\n", geo_sum_by(times, &factor, a));
     printf("%d\n", (int)LAYERS);
     return 0;
 }

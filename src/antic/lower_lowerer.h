@@ -116,6 +116,14 @@ struct lowerer {
     /* The error of the exit that runs the deferred statements, which the
        `failed` hook takes. */
     struct ir_operand failing_error;
+    /* DESIGN: an anonymous function is lowered after the function it
+       stands in, as a function of the module of its own. The list holds
+       the ones met and not lowered yet, and count numbers each, which
+       names it `<enclosing>.<count>`. */
+    struct item **anonymous;
+    size_t anonymous_count;
+    size_t anonymous_capacity;
+    size_t anonymous_named;
 };
 
 /* A place is where an assignment writes: a variable that lives in a
@@ -208,6 +216,15 @@ const struct ir_function *lower_signature(struct lowerer *l,
                                           const struct type *t);
 const struct ir_function *lower_fatal_signature(struct lowerer *l);
 const struct ir_function *lower_provider_signature(struct lowerer *l);
+bool lower_is_context(const struct type *t);
+const struct ir_function *lower_context_signature(struct lowerer *l,
+                                                  const struct type *t);
+void lower_push_argument(struct lowerer *l, struct ir_operand *args,
+                         size_t *count, struct ir_operand value,
+                         const struct type *param);
+struct ir_function *lower_anonymous_function(struct lowerer *l,
+                                             struct item *it);
+uint32_t lower_captures_agg(struct lowerer *l, const struct item *it);
 const struct ir_function *lower_bound_signature(struct lowerer *l,
                                                 const struct type *t);
 double lower_float_literal(const struct expr *literal, enum ir_type type);

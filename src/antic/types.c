@@ -46,7 +46,8 @@ static struct type *find_or_add_params(struct types *types,
             t->length != key->length || t->length_of != key->length_of ||
             t->result != key->result || t->bound != key->bound ||
             t->nullable != key->nullable || t->may_fail != key->may_fail ||
-            t->has_out != key->has_out ||
+            t->has_out != key->has_out || t->context != key->context ||
+            t->concurrent != key->concurrent ||
             t->param_count != key->param_count) {
             continue;
         }
@@ -284,6 +285,21 @@ struct type *types_fn_flagged(struct types *types, struct type *const *params,
     key.may_fail = may_fail;
     key.has_out = has_out;
     return find_or_add_params(types, &key, params);
+}
+
+struct type *types_fn_form(struct types *types, struct type *fn, bool context,
+                           bool concurrent)
+{
+    struct type key;
+
+    if (fn == NULL || fn->kind != TYPE_FN || fn->bound) {
+        return fn;
+    }
+    key = *fn;
+    key.context = context;
+    key.concurrent = context && concurrent;
+    key.next = NULL;
+    return find_or_add(types, &key);
 }
 
 struct type *types_bound_of(struct types *types, const struct type *fn)
@@ -1107,15 +1123,24 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         size_t shown = t->param_count - (t->has_out ? 1 : 0);
         const struct type *result =
             t->has_out ? t->params[shown]->element : t->result;
+        if (t->concurrent) {
+            text_append(out, "concurrent ");
+        }
         if (t->nullable) {
             text_append(out, "?");
         }
         text_append(out, t->bound ? "bound fn(" : "fn(");
+        /* A parameter of function type keeps its argument only when it
+           says so, so the plain form is the one a list marks. */
         for (i = 0; i < shown; i++) {
+            const struct type *p = t->params[i];
             if (i > 0) {
                 text_append(out, ", ");
             }
-            print_type(out, t->params[i], qualified);
+            if (p->kind == TYPE_FN && !p->bound && !p->context) {
+                text_append(out, "keep ");
+            }
+            print_type(out, p, qualified);
         }
         text_append(out, ")");
         if (t->has_out || (!t->may_fail && result->kind != TYPE_VOID)) {

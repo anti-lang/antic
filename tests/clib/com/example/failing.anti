@@ -23,7 +23,14 @@ export fn failing_step(c: *Counter, limit: c_int) may fail
 }
 
 /// f of n, or the error f gives. C passes a function of the ABI form.
-export fn failing_apply(f: fn(c_int) -> c_int may fail, n: c_int) -> c_int may fail
+export fn failing_apply(keep f: fn(c_int) -> c_int may fail, n: c_int) -> c_int may fail
+{
+	return try f(n);
+}
+
+/// f of n, or the error f gives. C passes a callback of the ABI form and its
+/// context.
+export fn failing_apply_in(f: fn(c_int) -> c_int may fail, n: c_int) -> c_int may fail
 {
 	return try f(n);
 }

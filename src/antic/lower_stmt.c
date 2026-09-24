@@ -1274,21 +1274,28 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         }
         return;
     }
+    /* A function with its context is an aggregate that may be `none`, so
+       the guard and the `else` below read it as well. */
     if (lower_is_aggregate(sym->type)) {
         lower_build_into(l, s->as.let.value, lower_temp(l, sym->ir));
         if (local_needs_teardown(sym->type)) {
             push_exit_action(l, NULL, sym, false);
         }
-        return;
-    }
-    v = lower_expr(l, s->as.let.value);
-    /* A local that is not address-taken gets a temporary of its own. An
-       assignment to the variable it was copied from leaves it unchanged. */
-    if (sym->address_taken) {
-        ir_store(l->f, l->b, lower_ir_type_of(sym->type), v,
-                 lower_temp(l, sym->ir));
+        if (!lower_is_context(sym->type)) {
+            return;
+        }
     } else {
-        sym->ir = ir_unary(l->f, l->b, IR_COPY, lower_ir_type_of(sym->type), v);
+        v = lower_expr(l, s->as.let.value);
+        /* A local that is not address-taken gets a temporary of its own.
+           An assignment to the variable it was copied from leaves it
+           unchanged. */
+        if (sym->address_taken) {
+            ir_store(l->f, l->b, lower_ir_type_of(sym->type), v,
+                     lower_temp(l, sym->ir));
+        } else {
+            sym->ir = ir_unary(l->f, l->b, IR_COPY,
+                               lower_ir_type_of(sym->type), v);
+        }
     }
     /* `let m = p catch fatal` and `let m = p catch e { }` guard the
        pointer with the error forms. The error is built on the `none`
@@ -1304,7 +1311,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         struct ir_block *otherwise = lower_new_block(l);
         struct ir_block *rest = lower_new_block(l);
         struct ir_operand held =
-            sym->address_taken
+            sym->address_taken || lower_is_context(sym->type)
                 ? lower_temp(l,
                              ir_load(l->f, l->b, IR_PTR,
                                      lower_temp(l, sym->ir)))

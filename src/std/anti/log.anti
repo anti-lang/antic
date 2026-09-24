@@ -108,7 +108,7 @@ pub class CallbackSink inherits Sink
 	to: fn(str),
 
 	/// A sink that calls `to` with every line.
-	pub fn new(to: fn(str)) -> *CallbackSink
+	pub fn new(keep to: fn(str)) -> *CallbackSink
 	{
 		return alloc CallbackSink { to: to };
 	}
@@ -374,7 +374,7 @@ class Kind
 /// `make` takes the `path` of the entry and gives the sink. A file that names a
 /// kind nothing registered writes one line to standard error and the entry is
 /// left out. The kinds `stderr` and `file` are always there.
-pub fn register(name: str, make: fn(str) -> *Sink)
+pub fn register(name: str, keep make: fn(str) -> *Sink)
 {
 	let one = alloc Kind { name: name, make: make, next: none };
 	while true do {

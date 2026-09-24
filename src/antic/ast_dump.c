@@ -96,6 +96,10 @@ static void op_name(struct dumper *d, enum token_kind op)
 }
 
 static void dump_expr(struct dumper *d, int depth, const struct expr *e);
+static void dump_block(struct dumper *d, int depth, const struct block *b);
+static void dump_params(struct dumper *d, int depth, const char *label,
+                        const struct param *params, size_t count,
+                        const struct type *owner);
 
 static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
 {
@@ -129,7 +133,9 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
         dump_type(d, depth + 1, t->element);
         break;
     case TYPEX_FN:
-        text_append(d->out, "type fn");
+        text_append(d->out, t->keep ? "type keep fn"
+                            : t->concurrent ? "type concurrent fn"
+                                            : "type fn");
         end(d, start, NULL);
         for (i = 0; i < t->param_count; i++) {
             dump_type(d, depth + 1, t->params[i]);
@@ -223,6 +229,19 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
                      (int)e->as.descriptor_of->name.length,
                      e->as.descriptor_of->name.text);
         end(d, start, type);
+        break;
+    /* An anonymous function shows its parameters, its result and its
+       body, as a function item does. */
+    case EXPR_FN:
+        text_append(d->out, "fn_expr");
+        end(d, start, type);
+        dump_params(d, depth + 1, "param", e->as.fn->params,
+                    e->as.fn->param_count, NULL);
+        if (e->as.fn->result != NULL) {
+            simple(d, depth + 1, "result", NULL);
+            dump_type(d, depth + 2, e->as.fn->result);
+        }
+        dump_block(d, depth + 1, e->as.fn->body);
         break;
     /* The iterator that `to_slice` walks follows as a child. */
     case EXPR_COLLECT:
@@ -466,8 +485,6 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
     }
     }
 }
-
-static void dump_block(struct dumper *d, int depth, const struct block *b);
 
 /* `catch e { }`, `catch fatal` or the `try` form. */
 static void dump_handler(struct dumper *d, int depth,
@@ -751,6 +768,12 @@ static void dump_params(struct dumper *d, int depth, const char *label,
         }
         if (params[i].writable) {
             simple(d, depth + 1, "mutable", NULL);
+        }
+        if (params[i].keep) {
+            simple(d, depth + 1, "keep", NULL);
+        }
+        if (params[i].concurrent) {
+            simple(d, depth + 1, "concurrent", NULL);
         }
         if (params[i].value != NULL) {
             simple(d, depth + 1, "default", NULL);

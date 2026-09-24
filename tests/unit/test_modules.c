@@ -270,7 +270,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 54, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 55, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1113,6 +1113,60 @@ static void keeps_extern_aggregates(void)
     close_session(&a);
 }
 
+/* A parameter that does not keep its argument crosses the library file
+   in its form of two words, `concurrent` included. The module that loads
+   it passes the code and the context. */
+static void keeps_context_signatures(void)
+{
+    struct session a;
+    struct session b;
+    struct text bytes = {0};
+    struct text ir = {0};
+    struct ir_module program;
+    char error[160] = "";
+    const struct interface *lib;
+    const struct type *f = NULL;
+
+    open_session(&a);
+    build_library(&a, "calls",
+                  "pub fn run(concurrent f: fn(i16) -> int) -> int {\n"
+                  "    return f(1);\n"
+                  "}\n",
+                  &bytes);
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "calls");
+    lib = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
+                    &b.types, &b.arena, &program, error, sizeof error);
+    CHECK(lib != NULL);
+    CHECK_STR(error, "");
+    if (lib != NULL && lib->item_count == 1 &&
+        lib->items[0]->type->param_count == 1) {
+        f = lib->items[0]->type->params[0];
+    }
+    CHECK(f != NULL && f->context && f->concurrent);
+    ir_print(&ir, &program);
+    CHECK_STR(text_cstr(&ir),
+              "type fn(...) = struct { code: ptr, context: ptr }\n"
+              "extern fn calls.fn.0(i16 signext, ptr) -> i64\n"
+              "fn calls.run(%0: ptr, %1: ptr) -> i64 {\n"
+              "b0:\n"
+              "    %2 = slot fn(...)\n"
+              "    store ptr %0, %2\n"
+              "    %3 = ptradd %2, offset_of fn(...).context\n"
+              "    store ptr %1, %3\n"
+              "    %4 = load ptr %2\n"
+              "    %5 = ptradd %2, offset_of fn(...).context\n"
+              "    %6 = load ptr %5\n"
+              "    %7 = call i64 %4 via @calls.fn.0(1, %6)\n"
+              "    ret i64 %7\n"
+              "}\n");
+    text_free(&bytes);
+    text_free(&ir);
+    ir_module_free(&program);
+    close_session(&b);
+    close_session(&a);
+}
+
 static void keeps_signatures(void)
 {
     struct session a;
@@ -1124,7 +1178,7 @@ static void keeps_signatures(void)
 
     open_session(&a);
     build_library(&a, "calls",
-                  "pub fn run(f: fn(i16) -> int) -> int {\n"
+                  "pub fn run(keep f: fn(i16) -> int) -> int {\n"
                   "    return f(1);\n"
                   "}\n",
                   &bytes);
@@ -1292,9 +1346,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 55;
+    copy[4] = 56;
     refuses_file(copy, sizeof copy,
-                 "has format version 55, and antic reads version 54");
+                 "has format version 56, and antic reads version 55");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1317,7 +1371,13 @@ static void damaged_files(void)
     /* The flags of the function type: a bit that names nothing, and an
        out pointer without `may fail`. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[FN_FLAGS] = 16;
+    copy[FN_FLAGS] = 64;
+    refuses_file(copy, sizeof copy, "is damaged at byte 86");
+    /* `concurrent` without the form of two words, and that form on a
+       bound function. */
+    copy[FN_FLAGS] = 32;
+    refuses_file(copy, sizeof copy, "is damaged at byte 86");
+    copy[FN_FLAGS] = 18;
     refuses_file(copy, sizeof copy, "is damaged at byte 86");
     copy[FN_FLAGS] = 8;
     refuses_file(copy, sizeof copy, "is damaged at byte 86");
@@ -1899,6 +1959,7 @@ void test_modules(void)
     keeps_constants();
     keeps_halves();
     keeps_signatures();
+    keeps_context_signatures();
     keeps_extern_aggregates();
     keeps_classes();
     one_struct_descriptor();

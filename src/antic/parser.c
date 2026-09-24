@@ -333,6 +333,41 @@ static bool is_word(const struct parser *p, const struct token *t,
 static struct type_expr *type(struct parser *p);
 static struct block *block(struct parser *p);
 
+/* DESIGN: `keep` and `concurrent` are contextual words before a
+   parameter of function type, in a parameter list and in the list of a
+   function type. A mark stands before a name followed by a colon, or
+   before `fn` or `?fn`, so a parameter or a type may still carry either
+   name. */
+static bool is_fn_mark(const struct parser *p, size_t at)
+{
+    const struct token *t = peek_at(p, at);
+    const struct token *after = peek_at(p, at + 1);
+
+    if (!is_word(p, t, "keep") && !is_word(p, t, "concurrent")) {
+        return false;
+    }
+    return after->kind == TOKEN_FN ||
+           (after->kind == TOKEN_QUESTION &&
+            peek_at(p, at + 2)->kind == TOKEN_FN) ||
+           (after->kind == TOKEN_IDENT &&
+            peek_at(p, at + 2)->kind == TOKEN_COLON) ||
+           is_word(p, after, "keep") || is_word(p, after, "concurrent");
+}
+
+/* Read the marks before a parameter. Both may stand, and the checker
+   refuses the pair. */
+static void fn_param_marks(struct parser *p, bool *keep, bool *concurrent)
+{
+    while (is_fn_mark(p, 0)) {
+        if (is_word(p, peek(p), "keep")) {
+            *keep = true;
+        } else {
+            *concurrent = true;
+        }
+        next(p);
+    }
+}
+
 /* Types */
 
 static bool is_builtin_type(enum token_kind kind)
@@ -426,11 +461,17 @@ static struct type_expr *type_level(struct parser *p)
             return NULL;
         }
         while (!check(p, TOKEN_RPAREN)) {
-            struct type_expr *param = type(p);
+            bool keep = false;
+            bool concurrent = false;
+            struct type_expr *param;
+            fn_param_marks(p, &keep, &concurrent);
+            param = type(p);
             if (param == NULL) {
                 free(params.data);
                 return NULL;
             }
+            param->keep = keep;
+            param->concurrent = concurrent;
             list_push(&params, &param);
             if (!accept(p, TOKEN_COMMA)) {
                 break;
@@ -654,6 +695,62 @@ static struct expr *format_literal(struct parser *p, const struct token *t)
     return e;
 }
 
+static void may_fail_after(struct parser *p, struct item *it);
+
+/* DESIGN: `fn(params) -> R { body }` in the place of an expression is an
+   anonymous function. The parser writes it as an ITEM_FN of its own, so
+   the checker and lowering treat its body as they treat any function's.
+   A parameter may leave out its type, and a missing result or `may
+   fail` may come from the target as well, which the checker decides.
+   The body is a block of its own, so a struct literal is allowed in it
+   inside a condition too. */
+static struct expr *anonymous_fn(struct parser *p, const struct token *at)
+{
+    struct list list = {NULL, 0, 0, sizeof(struct param)};
+    struct expr *e = new_expr(p, EXPR_FN, at);
+    struct item *it = node(p, sizeof *it);
+    bool saved = p->no_struct_literal;
+
+    next(p);
+    it->kind = ITEM_FN;
+    it->pos = pos_of(at);
+    it->name_pos = it->pos;
+    it->name.text = p->source + at->offset;
+    it->name.length = at->length;
+    e->as.fn = it;
+    if (!expect(p, TOKEN_LPAREN)) {
+        return NULL;
+    }
+    while (!check(p, TOKEN_RPAREN)) {
+        struct param param;
+        memset(&param, 0, sizeof param);
+        fn_param_marks(p, &param.keep, &param.concurrent);
+        param.pos = pos_of(peek(p));
+        if (!expect_name(p, &param.name) ||
+            (accept(p, TOKEN_COLON) && (param.type = type(p)) == NULL)) {
+            free(list.data);
+            return NULL;
+        }
+        list_push(&list, &param);
+        if (!accept(p, TOKEN_COMMA)) {
+            break;
+        }
+    }
+    if (!expect(p, TOKEN_RPAREN)) {
+        free(list.data);
+        return NULL;
+    }
+    it->params = list_finish(p, &list, &it->param_count);
+    if (accept(p, TOKEN_ARROW) && (it->result = type(p)) == NULL) {
+        return NULL;
+    }
+    may_fail_after(p, it);
+    p->no_struct_literal = false;
+    it->body = block(p);
+    p->no_struct_literal = saved;
+    return it->body != NULL ? e : NULL;
+}
+
 static struct expr *primary(struct parser *p)
 {
     const struct token *t = peek(p);
@@ -694,6 +791,8 @@ static struct expr *primary(struct parser *p)
     case TOKEN_HERE:
         next(p);
         return new_expr(p, EXPR_HERE, t);
+    case TOKEN_FN:
+        return anonymous_fn(p, t);
     /* `self` is the receiver of a function of a struct body. It reads as
        a name, and the checker gives it the type *T. */
     case TOKEN_SELF:
@@ -2238,6 +2337,7 @@ static struct param *params(struct parser *p, bool allow_variadic,
             next(p);
             param.owned = true;
         }
+        fn_param_marks(p, &param.keep, &param.concurrent);
         param.pos = pos_of(peek(p));
         if (!expect_name(p, &param.name) || !expect(p, TOKEN_COLON) ||
             (param.type = type(p)) == NULL) {

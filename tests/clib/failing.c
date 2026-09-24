@@ -14,11 +14,21 @@ static struct anti_Error *halve(int32_t n, int32_t *out)
     return failing_half(n, out);
 }
 
+/* The same with the context of a parameter that does not keep its
+   argument, which antic passes after the out pointer. It adds the number
+   the context points at before it halves. */
+static struct anti_Error *halve_in(int32_t n, int32_t *out, void *context)
+{
+    return failing_half(n + *(int32_t *)context, out);
+}
+
 int main(void)
 {
     Counter c = {1};
     Gauge g;
     int32_t half = 0;
+    int32_t two = 2;
+    int32_t one = 1;
     struct anti_Error *e;
 
     e = failing_half(8, &half);
@@ -32,6 +42,10 @@ int main(void)
     e = failing_apply(halve, 12, &half);
     printf("%d %d\n", e == NULL, half);
     e = failing_apply(halve, 5, &half);
+    printf("%d\n", e == NULL);
+    e = failing_apply_in(halve_in, &two, 12, &half);
+    printf("%d %d\n", e == NULL, half);
+    e = failing_apply_in(halve_in, &one, 12, &half);
     printf("%d\n", e == NULL);
     printf("%d\n", failing_twice(21));
     /* The helper writes the tables and the defaults, then runs

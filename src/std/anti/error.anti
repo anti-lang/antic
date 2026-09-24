@@ -49,7 +49,7 @@ pub class SystemError inherits lang.Error
 ///
 /// One function is registered at a time, and a later call replaces the one
 /// before it.
-pub fn on_fatal(f: fn())
+pub fn on_fatal(keep f: fn())
 {
 	/* The singleton is bound to a local first. The checker refuses the
 	   chained `lang.Fatal.get().hook.store(f)` across modules, a defect

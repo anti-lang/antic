@@ -53,3 +53,18 @@ pub fn count(n: int) -> int
 	}
 	return seen + p.x as int;
 }
+
+/// Anonymous functions, whose bodies open on the line of the signature.
+fn closures(items: []int) -> int
+{
+	let total = 0;
+	each(items, fn(n) {
+		total = total + n;
+		let twice = fn(m: int) -> int { return m * 2; };
+		total = total + twice(n);
+	});
+	let pick = fn(n: int) -> int {
+		return n;
+	};
+	return total + pick(1);
+}

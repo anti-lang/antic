@@ -271,6 +271,8 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
     sym->kind = kind;
     sym->name = *name;
     sym->pos = pos;
+    sym->frame = c->function;
+    sym->depth = s->depth;
     s->entries[s->count].name = *name;
     s->entries[s->count].symbol = sym;
     s->count++;
@@ -305,6 +307,7 @@ void sema_enter_scope(struct checker *c, struct scope *s)
 {
     memset(s, 0, sizeof *s);
     s->parent = c->scope;
+    s->depth = c->scope != NULL ? c->scope->depth + 1 : 0;
     c->scope = s;
 }
 
@@ -730,7 +733,10 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         struct type *result = sema_builtin(c, TYPE_VOID);
         struct type *fn;
         for (i = 0; i < t->param_count; i++) {
-            params[i] = sema_resolve_type(c, t->params[i]);
+            params[i] = sema_param_form(c, sema_resolve_type(c, t->params[i]),
+                                        t->params[i]->keep,
+                                        t->params[i]->concurrent,
+                                        t->params[i]->pos);
             if (sema_is_error(params[i])) {
                 return params[i];
             }
@@ -782,6 +788,44 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         return sema_is_error(element) ? element : types_chan(c->types, element);
     }
     return sema_builtin(c, TYPE_ERROR);
+}
+
+/* DESIGN: a parameter of function type does not keep its argument unless
+   it is marked `keep`. It then takes the form of two words, the code and
+   a context, and `concurrent` marks the form that may be called from more
+   than one thread at once. A `keep` parameter holds the one C function
+   pointer, as a field and a global do, and so does every parameter of an
+   `extern fn`, since a closure cannot reach C. The two marks belong to a
+   parameter of function type alone, and they do not stand together: a
+   kept function captures nothing, so it is safe on every thread. */
+struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
+                             bool concurrent, struct pos pos)
+{
+    bool fn = t->kind == TYPE_FN && !t->bound;
+
+    if (sema_is_error(t)) {
+        return t;
+    }
+    if ((keep || concurrent) && !fn) {
+        sema_error_at(c, pos, "`%s` marks a parameter of function type, and "
+                      "this one is `%s`", keep ? "keep" : "concurrent",
+                      sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (keep && concurrent) {
+        sema_error_at(c, pos, "`keep` and `concurrent` do not stand together, "
+                      "since a kept function captures nothing");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (!fn) {
+        return t;
+    }
+    if (c->plain_fns > 0 && concurrent) {
+        sema_error_at(c, pos, "an `extern fn` takes plain C function "
+                      "pointers, and `concurrent` marks a closure");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return types_fn_form(c->types, t, !keep && c->plain_fns == 0, concurrent);
 }
 
 /* Resolve t and record the result in the node for later stages. */
@@ -927,7 +971,15 @@ static struct type *function_type(struct checker *c, struct item *it)
         params[0] = types_pointer(c->types, owner->symbol->type);
     }
     for (i = 0; i < it->param_count; i++) {
-        params[i + extra] = sema_resolve_type(c, it->params[i].type);
+        if (it->kind == ITEM_EXTERN_FN) {
+            c->plain_fns++;
+        }
+        params[i + extra] = sema_param_form(
+            c, sema_resolve_type(c, it->params[i].type), it->params[i].keep,
+            it->params[i].concurrent, it->params[i].pos);
+        if (it->kind == ITEM_EXTERN_FN) {
+            c->plain_fns--;
+        }
         if (sema_is_error(params[i + extra])) {
             return params[i + extra];
         }

@@ -71,12 +71,20 @@ enum ir_type lower_ir_type_of(const struct type *t)
     }
 }
 
-/* A str, a slice and a bound function are aggregates of two words. */
+/* Whether t is a function type in the form of two words, the code and a
+   context. A parameter that does not keep its argument takes it. */
+bool lower_is_context(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_FN && t->context;
+}
+
+/* A str, a slice, a bound function and a function with its context are
+   aggregates of two words. */
 bool lower_is_aggregate(const struct type *t)
 {
     return type_has_fields(t) || t->kind == TYPE_ARRAY ||
            t->kind == TYPE_STR || t->kind == TYPE_SLICE ||
-           (t->kind == TYPE_FN && t->bound);
+           (t->kind == TYPE_FN && (t->bound || t->context));
 }
 
 /* The name of type t, qualified by its module when qualified is set. The
@@ -96,12 +104,27 @@ static char *name_of_type(const struct type *t, bool qualified)
     return copy;
 }
 
+/* The name of the aggregate of every function with its context, which no
+   type of a program spells. The caller frees it with free. */
+static char *pair_name(void)
+{
+    static const char name[] = "fn(...)";
+    char *copy = ir_alloc(sizeof name, 1);
+
+    memcpy(copy, name, sizeof name);
+    return copy;
+}
+
 /* The aggregate of t in the type table of the module. A struct lists its
    fields, a str or slice a pointer and a length, and an array its element
    and its length. */
 uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
 {
-    char *name = name_of_type(t, true);
+    /* DESIGN: every function with its context is one aggregate of two
+       pointers, whatever its signature and its marks. A value made in one
+       form and read in another then names the same fields. */
+    char *name = t->kind == TYPE_FN && !t->bound ? pair_name()
+                                                 : name_of_type(t, true);
     uint32_t agg = ir_agg_find(l->m, name);
     struct ir_field *fields;
     size_t count = type_has_fields(t) ? t->field_count : 2;
@@ -147,10 +170,12 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
             free((char *)fields[i].name);
         }
     } else if (t->kind == TYPE_FN) {
-        /* A bound function is the object and the entry of its table. */
-        fields[0].name = "object";
+        /* A bound function is the object and the entry of its table, and
+           a function with its context the code and the context. The plain
+           form names the same pair where a conversion builds it. */
+        fields[0].name = t->bound ? "object" : "code";
         fields[0].type = ir_scalar(IR_PTR);
-        fields[1].name = "entry";
+        fields[1].name = t->bound ? "entry" : "context";
         fields[1].type = ir_scalar(IR_PTR);
         agg = ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 2, false, 0);
     } else {
@@ -290,14 +315,44 @@ static enum ir_ext param_ext(const struct type *t)
 }
 
 /* A parameter of 8 or 16 bits records whether it is signed, and an
-   aggregate its layout. */
+   aggregate its layout.
+   DESIGN: a parameter that does not keep its argument is two parameters
+   of the IR, the code and then the context. C passes a callback and its
+   `void *` so. Every convention then passes two pointers, where a struct
+   of two words would go by reference on Windows. */
 void lower_add_param(struct lowerer *l, struct ir_function *f,
                      const struct type *t)
 {
     enum ir_type type = lower_ir_type_of(t);
 
+    if (lower_is_context(t)) {
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+        return;
+    }
     ir_param_add(f, type, lower_result_agg(l, t));
     f->params[f->param_count - 1].ext = param_ext(t);
+}
+
+/* Append to args the operands that pass value to a parameter of type
+   param. A function with its context passes the two words its aggregate
+   at value holds, and every other value passes as it is. */
+void lower_push_argument(struct lowerer *l, struct ir_operand *args,
+                         size_t *count, struct ir_operand value,
+                         const struct type *param)
+{
+    if (!lower_is_context(param)) {
+        args[(*count)++] = value;
+        return;
+    }
+    args[(*count)++] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
+    args[(*count)++] = lower_temp(
+        l, ir_load(l->f, l->b, IR_PTR,
+                   lower_offset_address(
+                       l, value,
+                       ir_sym_operand(l->m,
+                                      ir_sym_offset_of(
+                                          l->m, lower_agg_of(l, param), 1)))));
 }
 
 /* The C library functions behind alloc and free. A module that declares
@@ -379,25 +434,57 @@ struct ir_function *lower_callee_function(struct lowerer *l,
     return f;
 }
 
+/* Whether the IR parameters of g from *at on are those of the parameters
+   of t, and move *at past them. A parameter with its context is two. */
+static bool has_params(struct lowerer *l, const struct ir_function *g,
+                       const struct type *t, size_t *at)
+{
+    size_t i;
+
+    for (i = 0; i < t->param_count; i++) {
+        if (lower_is_context(t->params[i])) {
+            if (*at + 2 > g->param_count ||
+                g->params[*at].type != IR_PTR ||
+                g->params[*at + 1].type != IR_PTR) {
+                return false;
+            }
+            *at += 2;
+            continue;
+        }
+        if (*at >= g->param_count ||
+            g->params[*at].type != lower_ir_type_of(t->params[i]) ||
+            g->params[*at].ext != param_ext(t->params[i]) ||
+            g->params[*at].agg != lower_result_agg(l, t->params[i])) {
+            return false;
+        }
+        (*at)++;
+    }
+    return true;
+}
+
 /* Whether declared function g has the parameters and result of t. */
 static bool has_signature(struct lowerer *l, const struct ir_function *g,
                           const struct type *t)
 {
-    size_t i;
+    size_t at = 0;
 
-    if (g->result != lower_ir_type_of(t->result) ||
-        g->result_agg != lower_result_agg(l, t->result) ||
-        g->param_count != t->param_count) {
-        return false;
-    }
-    for (i = 0; i < t->param_count; i++) {
-        if (g->params[i].type != lower_ir_type_of(t->params[i]) ||
-            g->params[i].ext != param_ext(t->params[i]) ||
-            g->params[i].agg != lower_result_agg(l, t->params[i])) {
-            return false;
-        }
-    }
-    return true;
+    return g->result == lower_ir_type_of(t->result) &&
+           g->result_agg == lower_result_agg(l, t->result) &&
+           has_params(l, g, t, &at) && at == g->param_count;
+}
+
+/* The same with the context pointer after the parameters, which a call
+   through a function with its context passes last. */
+static bool has_context_signature(struct lowerer *l,
+                                  const struct ir_function *g,
+                                  const struct type *t)
+{
+    size_t at = 0;
+
+    return g->result == lower_ir_type_of(t->result) &&
+           g->result_agg == lower_result_agg(l, t->result) &&
+           has_params(l, g, t, &at) && at + 1 == g->param_count &&
+           g->params[at].type == IR_PTR && g->params[at].agg == IR_NO_AGG;
 }
 
 /* DESIGN: a call through a function pointer takes its parameters and
@@ -463,6 +550,32 @@ const struct ir_function *lower_signature(struct lowerer *l,
     return f;
 }
 
+/* DESIGN: a call through a function with its context passes the context
+   after every other argument, the out pointer of `may fail` included. A
+   closure takes it there. A named function, whose context is `none`, has
+   no parameter there and never reads it. On each of the six conventions
+   the caller removes what it pushed. The extra word is then harmless,
+   and no call tests the context. */
+const struct ir_function *lower_context_signature(struct lowerer *l,
+                                                  const struct type *t)
+{
+    size_t count;
+    struct ir_function *f =
+        find_signature(l, has_context_signature, t, &count);
+    size_t i;
+
+    if (f != NULL) {
+        return f;
+    }
+    f = declare_signature(l, count, lower_ir_type_of(t->result),
+                          lower_result_agg(l, t->result));
+    for (i = 0; i < t->param_count; i++) {
+        lower_add_param(l, f, t->params[i]);
+    }
+    ir_param_add(f, IR_PTR, IR_NO_AGG);
+    return f;
+}
+
 static bool fits_fatal(struct lowerer *l, const struct ir_function *g,
                        const struct type *t)
 {
@@ -508,20 +621,24 @@ const struct ir_function *lower_provider_signature(struct lowerer *l)
 static bool fits_bound(struct lowerer *l, const struct ir_function *g,
                        const struct type *t)
 {
+    size_t at = 1;
     size_t k;
 
     (void)l;
-    if (g->param_count != t->param_count + 1 ||
-        g->params[0].type != IR_PTR ||
+    if (g->param_count == 0 || g->params[0].type != IR_PTR ||
         g->result != lower_ir_type_of(t->result)) {
         return false;
     }
     for (k = 0; k < t->param_count; k++) {
-        if (g->params[k + 1].type != lower_ir_type_of(t->params[k])) {
+        size_t words = lower_is_context(t->params[k]) ? 2 : 1;
+        if (at + words > g->param_count ||
+            (words == 1 &&
+             g->params[at].type != lower_ir_type_of(t->params[k]))) {
             return false;
         }
+        at += words;
     }
-    return true;
+    return at == g->param_count;
 }
 
 /* The signature of a call through a bound function, which takes the
@@ -1464,6 +1581,7 @@ static void lower_function(struct lowerer *l, const struct item *it)
     struct defers around;
     struct ir_block *entry;
     size_t first;
+    size_t at;
     size_t i;
 
     l->f = l->m->functions[it->symbol->ir];
@@ -1475,35 +1593,83 @@ static void lower_function(struct lowerer *l, const struct item *it)
     l->may_fail = it->may_fail;
     l->result_out = lower_none();
     entry = lower_new_block(l);
+    l->b = entry;
     /* DESIGN: `self` is the first IR parameter of a member function
        and has no entry in the declared list. Every declared parameter
-       therefore sits one place further along. */
+       therefore sits one place further along. One that does not keep its
+       argument takes two places, which a slot joins into its pair. */
     first = it->has_self ? 1 : 0;
     if (it->self != NULL) {
         it->self->ir = l->f->params[0].temp;
+        /* A closure captures `self` by its address. */
+        if (it->self->address_taken) {
+            it->self->ir = ir_slot(l->f, entry, ir_scalar(IR_PTR));
+        }
     }
+    at = first;
     for (i = 0; i < it->param_count; i++) {
         struct symbol *sym = it->params[i].symbol;
-        sym->ir = l->f->params[i + first].temp;
-        if (sym->address_taken && !lower_is_aggregate(sym->type)) {
+        sym->ir = l->f->params[at].temp;
+        if (lower_is_context(sym->type) ||
+            (sym->address_taken && !lower_is_aggregate(sym->type))) {
             sym->ir = ir_slot(l->f, entry, lower_vtype_of(l, sym->type));
         }
+        at += lower_is_context(sym->type) ? 2 : 1;
     }
     lower_reserve_slots(l, entry, it->body);
+    if (it->self != NULL && it->self->address_taken) {
+        ir_store(l->f, entry, IR_PTR, lower_temp(l, l->f->params[0].temp),
+                 lower_temp(l, it->self->ir));
+    }
+    at = first;
     for (i = 0; i < it->param_count; i++) {
         const struct symbol *sym = it->params[i].symbol;
+        if (lower_is_context(sym->type)) {
+            ir_store(l->f, entry, IR_PTR, lower_temp(l, l->f->params[at].temp),
+                     lower_temp(l, sym->ir));
+            ir_store(l->f, entry, IR_PTR,
+                     lower_temp(l, l->f->params[at + 1].temp),
+                     lower_offset_address(
+                         l, lower_temp(l, sym->ir),
+                         ir_sym_operand(l->m,
+                                        ir_sym_offset_of(
+                                            l->m, lower_agg_of(l, sym->type),
+                                            1))));
+            at += 2;
+            continue;
+        }
         if (sym->address_taken && !lower_is_aggregate(sym->type)) {
-            ir_store(l->f, entry, l->f->params[i + first].type,
-                     lower_temp(l, l->f->params[i + first].temp),
+            ir_store(l->f, entry, l->f->params[at].type,
+                     lower_temp(l, l->f->params[at].temp),
                      lower_temp(l, sym->ir));
         }
+        at++;
     }
     /* The out pointer of a `may fail` function with a result follows the
        parameters the declaration wrote, which is the ABI its callers
        already pass. */
-    if (it->may_fail && it->param_count + first < l->f->param_count) {
-        l->result_out = lower_temp(l,
-                                   l->f->params[it->param_count + first].temp);
+    if (it->may_fail && at < l->f->param_count &&
+        it->symbol->type->has_out) {
+        l->result_out = lower_temp(l, l->f->params[at].temp);
+    }
+    /* DESIGN: the context of a closure is its last parameter. It holds
+       the address of every variable the closure captures, in the order
+       of the captures. Each name reaches its variable through the
+       address loaded here. */
+    if (it->capture_count > 0) {
+        struct ir_operand context =
+            lower_temp(l, l->f->params[l->f->param_count - 1].temp);
+        uint32_t agg = lower_captures_agg(l, it);
+        for (i = 0; i < it->capture_count; i++) {
+            it->captures[i].symbol->ir = ir_load(
+                l->f, entry, IR_PTR,
+                lower_offset_address(
+                    l, context,
+                    i == 0 ? lower_zero()
+                           : ir_sym_operand(l->m,
+                                            ir_sym_offset_of(l->m, agg,
+                                                             (uint32_t)i))));
+        }
     }
     l->b = entry;
     /* DESIGN: the `enter` hook stands before the first statement and the
@@ -1534,6 +1700,66 @@ static void lower_function(struct lowerer *l, const struct item *it)
             ir_ret(l->f, l->b, IR_VOID, lower_none());
         }
     }
+}
+
+/* The aggregate of the context of the closure it: one pointer per
+   variable it captures, in the order of the captures. */
+uint32_t lower_captures_agg(struct lowerer *l, const struct item *it)
+{
+    struct ir_field *fields = ir_alloc(it->capture_count, sizeof *fields);
+    struct text name = {0};
+    uint32_t agg;
+    size_t i;
+
+    for (i = 0; i < it->capture_count; i++) {
+        fields[i].name = lower_cstr(&it->captures[i].symbol->name);
+        fields[i].type = ir_scalar(IR_PTR);
+    }
+    text_appendf(&name, "%s.context", l->m->functions[it->symbol->ir]->name);
+    agg = ir_struct_add(l->m, IR_AGG_STRUCT, text_cstr(&name), fields,
+                        it->capture_count, false, 0);
+    text_free(&name);
+    for (i = 0; i < it->capture_count; i++) {
+        free((char *)fields[i].name);
+    }
+    free(fields);
+    return agg;
+}
+
+/* The IR function of the anonymous function it. The first expression
+   that names it declares it and queues it, and it is lowered after the
+   function being lowered now. A `defer` lowers its statement at every
+   exit, so one expression may be met more than once. A closure takes its
+   context after every other parameter. */
+struct ir_function *lower_anonymous_function(struct lowerer *l,
+                                             struct item *it)
+{
+    const struct type *t = it->symbol->type;
+    struct text name = {0};
+    struct ir_function *f;
+    size_t i;
+
+    for (i = 0; i < l->anonymous_count; i++) {
+        if (l->anonymous[i] == it) {
+            return l->m->functions[it->symbol->ir];
+        }
+    }
+    text_appendf(&name, "%s.%zu", l->f->name, l->anonymous_named++);
+    f = ir_function_add(l->m, l->module_name, text_cstr(&name),
+                        lower_ir_type_of(t->result),
+                        lower_result_agg(l, t->result));
+    text_free(&name);
+    for (i = 0; i < t->param_count; i++) {
+        lower_add_param(l, f, t->params[i]);
+    }
+    if (it->capture_count > 0) {
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+    }
+    it->symbol->ir = f->index;
+    l->anonymous = ir_grow(l->anonymous, &l->anonymous_capacity,
+                           l->anonymous_count, sizeof *l->anonymous);
+    l->anonymous[l->anonymous_count++] = it;
+    return f;
 }
 
 /* DESIGN: a singleton keeps its one instance in an atomic global of its
@@ -1738,13 +1964,13 @@ static void class_construct(struct lowerer *l, const struct item *it)
     self = lower_temp(l, f->params[0].temp);
     ir_call(l->f, l->b, IR_VOID, ir_func_op(lower_init_function(l, t)), &self,
             1);
-    args = ir_alloc(sig->param_count, sizeof *args);
-    for (i = 0; i < sig->param_count; i++) {
+    args = ir_alloc(f->param_count, sizeof *args);
+    for (i = 0; i < f->param_count; i++) {
         args[i] = lower_temp(l, f->params[i].temp);
     }
     value = ir_call(l->f, l->b, lower_ir_type_of(sig->result),
                     ir_func_op(target),
-                    args, sig->param_count);
+                    args, f->param_count);
     free(args);
     if (sig->result->kind == TYPE_VOID) {
         ir_ret(l->f, l->b, IR_VOID, lower_none());
@@ -2116,6 +2342,7 @@ bool lower_module(struct module *module, const char *module_name,
     /* Every function of the module sits past the ones the library files
        brought, so one pass at the end gives them their source. */
     size_t first = out->function_count;
+    size_t done = 0;
     size_t i;
 
     /* Semantic analysis rejects every module that lowering cannot
@@ -2208,7 +2435,13 @@ bool lower_module(struct module *module, const char *module_name,
                 lower_function(&l, it->members[j]);
             }
         }
+        /* The anonymous functions each body met, and the ones those
+           met in turn. */
+        while (done < l.anonymous_count) {
+            lower_function(&l, l.anonymous[done++]);
+        }
     }
+    free(l.anonymous);
     for (i = first; i < out->function_count; i++) {
         struct ir_function *f = out->functions[i];
         if (!f->is_extern && f->module != NULL &&
