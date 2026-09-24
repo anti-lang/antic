@@ -125,19 +125,31 @@ function(glibc_sysroot target arch triple)
     endforeach()
     file(REMOVE_RECURSE "${work}/deb")
     # DESIGN: a package links a development name such as libm.so to the
-    # absolute path of the library on the machine it installs on. lld
-    # follows a link as the file system gives it, so each absolute link
-    # becomes one relative to the sysroot, and -lm finds the libm of the
-    # sysroot rather than none.
+    # library, and libc6-dev links it to the absolute path of the machine
+    # it installs on. Every link becomes a copy of the file it reaches in
+    # the sysroot. lld then reads libm.so as the libm of the sysroot, and
+    # a Windows host, where lld reads no link the script can write, holds
+    # the same tree. A link that reaches no file goes, as the changelog of
+    # a -dev package does, which names the one of a package not installed.
+    # A library link among them would fail the link that names it.
     file(GLOB_RECURSE links LIST_DIRECTORIES false "${root}/*")
     foreach(link IN LISTS links)
-        if(IS_SYMLINK "${link}")
-            file(READ_SYMLINK "${link}" points)
+        set(at "${link}")
+        set(steps 0)
+        while(IS_SYMLINK "${at}" AND steps LESS 8)
+            file(READ_SYMLINK "${at}" points)
             if(IS_ABSOLUTE "${points}")
-                get_filename_component(dir "${link}" DIRECTORY)
-                file(RELATIVE_PATH relative "${dir}" "${root}${points}")
-                file(REMOVE "${link}")
-                file(CREATE_LINK "${relative}" "${link}" SYMBOLIC)
+                set(at "${root}${points}")
+            else()
+                get_filename_component(dir "${at}" DIRECTORY)
+                set(at "${dir}/${points}")
+            endif()
+            math(EXPR steps "${steps} + 1")
+        endwhile()
+        if(NOT at STREQUAL link)
+            file(REMOVE "${link}")
+            if(EXISTS "${at}" AND NOT IS_SYMLINK "${at}")
+                file(COPY_FILE "${at}" "${link}")
             endif()
         endif()
     endforeach()

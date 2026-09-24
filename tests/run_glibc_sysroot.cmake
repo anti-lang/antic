@@ -1,8 +1,9 @@
 # tools/sysroot-pins names glibc 2.35, the kernel headers and the X11 and
 # GL libraries of Ubuntu 22.04, seven packages of the jammy release pocket
 # per processor. tools/get-sysroot.cmake unpacks them into
-# sysroot/linux-<cpu>-glibc for the Linux link mode against glibc, makes
-# every absolute link relative and adds the builtins of the pinned clang.
+# sysroot/linux-<cpu>-glibc for the Linux link mode against glibc, turns
+# every link into a copy of its file and adds the builtins of the pinned
+# clang.
 # Stand-in packages served from file:// URLs and a stand-in clang take the
 # place of the real ones in a copy of the script.
 #
@@ -79,14 +80,20 @@ stand_in(gl.deb usr/lib/x86_64-linux-gnu/libGL.so.1
          usr/share/doc/libgl1/copyright)
 stand_in(gl-dev.deb usr/include/GL/gl.h)
 # A development link that names the absolute path of its library, as
-# libm.so of libc6-dev does.
+# libm.so of libc6-dev does, and one that names the library of another
+# package through a relative path, as libGL.so of libgl-dev does.
 set(stage "${WORK}/stage-links")
-file(MAKE_DIRECTORY "${stage}/data/usr/lib/x86_64-linux-gnu")
+file(MAKE_DIRECTORY "${stage}/data/usr/lib/x86_64-linux-gnu"
+     "${stage}/data/lib/x86_64-linux-gnu")
+file(WRITE "${stage}/data/lib/x86_64-linux-gnu/libm.so.6"
+     "lib/x86_64-linux-gnu/libm.so.6\n")
 file(CREATE_LINK /lib/x86_64-linux-gnu/libm.so.6
      "${stage}/data/usr/lib/x86_64-linux-gnu/libm.so" SYMBOLIC)
+file(CREATE_LINK libGL.so.1
+     "${stage}/data/usr/lib/x86_64-linux-gnu/libGL.so" SYMBOLIC)
 file(WRITE "${stage}/debian-binary" "2.0\n")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf ../data.tar.zst --zstd
-                        -- usr
+                        -- lib usr
                 WORKING_DIRECTORY "${stage}/data" COMMAND_ERROR_IS_FATAL ANY)
 file(COPY_FILE "${stage}/data.tar.zst" "${stage}/control.tar.zst")
 execute_process(COMMAND "${LLVM_AR}" rc --format=gnu
@@ -146,10 +153,20 @@ foreach(path usr/include/features.h usr/lib/x86_64-linux-gnu/libc.so
         message(FATAL_ERROR "${tree}/${path} holds '${text}'")
     endif()
 endforeach()
-file(READ_SYMLINK "${tree}/usr/lib/x86_64-linux-gnu/libm.so" points)
-if(NOT points STREQUAL "../../../lib/x86_64-linux-gnu/libm.so.6")
-    message(FATAL_ERROR "libm.so of ${tree} points to '${points}'")
-endif()
+foreach(pair libm.so=lib/x86_64-linux-gnu/libm.so.6
+             libGL.so=usr/lib/x86_64-linux-gnu/libGL.so.1)
+    string(REPLACE "=" ";" pair "${pair}")
+    list(GET pair 0 name)
+    list(GET pair 1 file)
+    set(path "${tree}/usr/lib/x86_64-linux-gnu/${name}")
+    if(IS_SYMLINK "${path}")
+        message(FATAL_ERROR "${path} is still a link")
+    endif()
+    file(READ "${path}" text)
+    if(NOT text STREQUAL "${file}\n")
+        message(FATAL_ERROR "${path} is no copy of ${file}: '${text}'")
+    endif()
+endforeach()
 file(READ "${tree}/usr/lib/libclang_rt.builtins.a" text)
 if(NOT text STREQUAL "builtins\n")
     message(FATAL_ERROR "${tree} holds no builtins of the pinned clang")
