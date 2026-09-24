@@ -101,3 +101,20 @@ All are under "Errors, warnings and checks" in `docs/decisions.md`:
   so every `unchecked` is `unused-unchecked` today. Is that the wanted
   interim, or should an `unchecked` of a check that is not built stay
   silent?
+
+## Proof of the push
+
+The push of `9fd32d8`, before this section was added:
+
+```
+$ git log --oneline -3
+9fd32d8 Report the warning names, allow, unchecked and catch none
+4a5509a Add catch_none to the emit manifest and widen the mask of the checks
+b64b99d Record the warning names, allow, unchecked and catch none in the documents
+$ git status --short
+$ git rev-parse HEAD origin/main
+9fd32d814e6f8cfe590a0c1c37c5e6135868a5de
+9fd32d814e6f8cfe590a0c1c37c5e6135868a5de
+```
+
+Suites: host 855 passed of 855, ASan 854 of 854, UBSan 854 of 854.
