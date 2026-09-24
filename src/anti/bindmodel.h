@@ -147,10 +147,6 @@ void bind_warn(struct bind_module *b, const char *format, ...)
 /* A type in the memory pool of b. */
 struct bind_type *bind_type_new(struct bind_module *b, enum bind_kind kind);
 
-/* The scalar Anti type of a C type name, `unsigned int` or `uint8_t`, or
-   NULL when the name is none of the fixed mappings. */
-const struct bind_type *bind_known_name(struct bind_module *b, const char *name);
-
 /* The names a C type spelling refers to, which a reader resolves. */
 struct bind_names {
     /* The type a typedef name stands for, or NULL. */

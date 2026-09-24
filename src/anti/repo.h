@@ -2,7 +2,6 @@
 #define ANTI_REPO_H
 
 #include <stdbool.h>
-#include <stddef.h>
 
 #include "text.h"
 
@@ -22,11 +21,6 @@ bool repo_name_valid(const char *name);
 
 /* Whether digest is a SHA-256 digest in 64 lowercase hex digits. */
 bool repo_digest_valid(const char *digest);
-
-/* The cache of a user, which is per user and not per project. It holds
-   the index files under index/<digest of the prefix>/<name>/ and the
-   library files under pkg/<name>/<version>/. */
-bool repo_cache_dir(struct text *out);
 
 /* Whether url is a repository URL that the rules allow. Writes a message
    naming the URL and the rule otherwise. */

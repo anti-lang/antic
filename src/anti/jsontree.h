@@ -54,9 +54,6 @@ void json_free(struct json_tree *tree);
 const struct json_value *json_get(const struct json_value *value,
                                   const char *key);
 
-/* The text of a string, or NULL when value is not a string. */
-const char *json_string(const struct json_value *value);
-
 /* The string of the member key, or NULL. */
 const char *json_member_string(const struct json_value *value,
                                const char *key);

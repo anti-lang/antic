@@ -87,7 +87,10 @@ static const struct {
     {"char16_t", "u16"},      {"char32_t", "u32"},
 };
 
-const struct bind_type *bind_known_name(struct bind_module *b, const char *name)
+/* The scalar Anti type of a C type name, `unsigned int` or `uint8_t`, or
+   NULL when the name is none of the fixed mappings. */
+static const struct bind_type *bind_known_name(struct bind_module *b,
+                                               const char *name)
 {
     size_t i;
 

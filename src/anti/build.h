@@ -2,7 +2,6 @@
 #define ANTI_BUILD_H
 
 #include <stdbool.h>
-#include <stddef.h>
 
 /* What `anti build` and `anti run` were asked for. A field that names
    nothing is NULL, and the manifest or the host decides in its place. */

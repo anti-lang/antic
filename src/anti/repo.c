@@ -66,7 +66,10 @@ bool repo_digest_valid(const char *digest)
     return digest[64] == '\0';
 }
 
-bool repo_cache_dir(struct text *out)
+/* The cache of a user, which is per user and not per project. It holds
+   the index files under index/<digest of the prefix>/<name>/ and the
+   library files under pkg/<name>/<version>/. */
+static bool repo_cache_dir(struct text *out)
 {
     if (!user_dir(out, USER_DIR_CACHE, USER_DIR_APP)) {
         fputs("anti: the environment does not say where the cache of the user "

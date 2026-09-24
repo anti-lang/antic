@@ -283,7 +283,8 @@ const struct json_value *json_get(const struct json_value *value,
     return NULL;
 }
 
-const char *json_string(const struct json_value *value)
+/* The text of a string, or NULL when value is not a string. */
+static const char *json_string(const struct json_value *value)
 {
     return value != NULL && value->kind == JSON_STRING ? value->text : NULL;
 }
