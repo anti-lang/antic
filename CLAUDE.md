@@ -312,9 +312,21 @@ reports what it finished.
   nested `sync` on the same place in one function is refused. `chan int(16)`
   makes a channel, `send` and `recv` block, `recv` gives `?*T` or `none`
   once the channel is closed and empty, and `select` takes from whichever
-  channel is ready. `src/rt/sync.c` holds both. The warning on a field written
-  inside `sync` and read outside it is not built. See "Locking and channels"
-  in `docs/decisions.md` and `docs/notes/locking.md`.
+  channel is ready. `src/rt/sync.c` holds the channels and `src/rt/lock.c`
+  the Mutex. The warning on a field written inside `sync` and read outside it
+  is not built. See "Locking and channels" in `docs/decisions.md` and
+  `docs/notes/locking.md`.
+- Concurrent classes are built. A Mutex is one word of the program's memory,
+  a futex word, an `os_unfair_lock` or an `SRWLOCK`, and cannot be copied or
+  assigned. `synchronized class` runs every function with `self` that is not
+  private under a hidden lock that its thread takes again without waiting,
+  and `sync obj { }` holds it. `concurrent class` has every field guarded by
+  a Mutex, atomic or fixed, and the safety check `unguarded-field` refuses the
+  rest unless `unchecked` covers it. A public function of either gives out no
+  pointer into the fields, `let n: atomic int = 0;` is an atomic local, and a
+  worker takes a pointer to a thread-safe object. A dev build reports two
+  locks taken in opposite orders. See "Concurrent classes" in
+  `docs/decisions.md` and `docs/notes/concurrent-classes.md`.
 - `anti.mem.Allocator` is built, with `alloc(size, align)` and `free(p)`, the
   default `LibcAllocator` over `src/rt/mem.c` and `ArenaAllocator` over blocks of
   another allocator. `alloc` and `free` name a function of a class and follow

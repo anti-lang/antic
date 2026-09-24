@@ -879,7 +879,7 @@ select {
 delete(c);
 ```
 
-A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. A worker takes a `Mutex` and a `chan T` beside its values.
+A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. A worker takes a `chan T` beside its values, and a pointer to a `Mutex`, which cannot be copied.
 
 Built: `parallel`, `dispatch`, `join`, `join_all`, `Mutex`, `sync`, `chan T` with `send`, `recv` and `close`, and `select`. `--anti.threads` and the `threads` key of the configuration file set the pool size, and `ANTI_THREADS` is gone. Not built yet: the warning on a field written inside `sync` and read outside it.
 
@@ -887,7 +887,12 @@ Built: `parallel`, `dispatch`, `join`, `join_all`, `Mutex`, `sync`, `chan T` wit
 
 Any value may be read from more than one thread at once. Changing one from more than one thread needs a thread-safe type: `Mutex`, `chan T`, the atomics, or a class declared thread-safe, which the compiler checks.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+struct Person { age: int, }
+```
+-->
+```anti
 pub synchronized class Counter
 {
 	count: int = 0,
@@ -907,14 +912,16 @@ pub concurrent class PeopleList
 	lock: Mutex,
 	head: ?*Node = none guarded by lock,
 	tail: ?*Node unchecked(unguarded-field, "swapped with compare_swap"),
+
+	pub fn reset(self) { self.tail = none; }
 }
 
 let hits: atomic int = 0;
 ```
 
-A `synchronized class` gives each object a hidden lock that every public function runs under, released on every exit, and `sync obj { }` holds it for a block. A `concurrent class` leaves the locking to the programmer, and every field is guarded by a `Mutex`, atomic, or fixed after `construct`. `unchecked(unguarded-field, "reason")` after a field's type or in the class header overrules the check. A public function of either never gives out a pointer or a slice into the object's fields. A worker may take a pointer to a thread-safe object, and `atomic` marks a local as well. A `Mutex` is one word of the program's memory and cannot be copied. A dev build records the order in which each thread takes locks and reports two orders that conflict.
+A `synchronized class` gives each object a hidden lock that every public function runs under, released on every exit, and `sync obj { }` holds it for a block. A `concurrent class` leaves the locking to the programmer, and every field is guarded by a `Mutex`, atomic, or fixed after `construct`. `unchecked(unguarded-field, "reason")` after a field's type or in the class header overrules the check. A public function of either never gives out a pointer or a slice into the object's fields. A worker may take a pointer to a thread-safe object, and `atomic` marks a local as well. A `Mutex` is one word of the program's memory and cannot be copied. A dev build records the order in which each thread takes locks and reports two orders that conflict. `size_of(Mutex)` is 4 on Linux and macOS and 8 on Windows.
 
-Not built yet: `synchronized class`, `concurrent class`, `guarded by`, `unchecked`, atomic locals, the pointer to a thread-safe object in a worker, the one-word `Mutex` and the report of lock orders.
+Built: everything above. That covers `synchronized class` with its hidden lock, `sync obj { }`, `concurrent class` with `guarded by`, atomic and fixed fields and the safety check `unguarded-field`, `unchecked` after a field's type and in the class header, the rule on pointers into the fields, atomic locals, the pointer to a thread-safe object in a worker, the one-word `Mutex` and the report of lock orders in a dev build. Not built yet: `compare_swap` on a field that `unchecked` marks, which the atomic operations of a field do not reach.
 
 ## Hooks and tracing
 
@@ -1151,7 +1158,7 @@ fn sum_all(lines: []str) -> int may fail
 
 Every warning and every safety check has a stable name at the end of its message, as in `` `e` shadows the outer `e` [shadowed-catch] ``. `allow` and `unchecked` stand before a statement, last in a declaration's header, or at the top of the file ending with `;`, and `unchecked` also after a field's type. Each takes one name and a required reason, and is not part of a signature. One that silences nothing is the warning `unused-allow` or `unused-unchecked`. `antic --warnings-as-errors` gives the release behaviour in a dev build, and `anti check` uses it. The first safety checks are `unguarded-field` and `exponential-pattern`.
 
-Built: the name of every warning, `allow` and `unchecked` at every level, `unused-allow` and `unused-unchecked`, the refusal of a clause that names an error, `--warnings-as-errors`, `anti check` with it, and a release build that refuses a warning. `docs/notes/warnings.md` lists the names with their meaning and their fix. Not built yet: the two safety checks, which wait for concurrent classes and regular expressions, so an `unchecked` of either overrules nothing today.
+Built: the name of every warning, `allow` and `unchecked` at every level, `unused-allow` and `unused-unchecked`, the refusal of a clause that names an error, `--warnings-as-errors`, `anti check` with it, and a release build that refuses a warning. `docs/notes/warnings.md` lists the names with their meaning and their fix. The safety check `unguarded-field` is built with concurrent classes. Not built yet: `exponential-pattern`, which waits for regular expressions, so an `unchecked` of it overrules nothing today.
 
 ## Wire formats
 
@@ -1268,4 +1275,4 @@ String prefixes: `r b br f rf x re`.
 
 Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
 
-Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today, the prefix `re`, and `synchronized` and `guarded by` of round four.
+Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. `synchronized` and `guarded by` are built as well. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today, and the prefix `re`.
