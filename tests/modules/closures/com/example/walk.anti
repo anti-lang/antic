@@ -1,0 +1,58 @@
+//! A library whose functions take functions. The library file carries each
+//! parameter in its form: two words where the parameter does not keep its
+//! argument, `concurrent` where it may be called from more than one thread, and
+//! one C function pointer where it is `keep`.
+
+/// Call f on every element of items.
+pub fn each(items: []int, f: fn(int))
+{
+	for x in items {
+		f(x);
+	}
+}
+
+/// The sum of f over the chunks of items, which the workers compute.
+pub fn map_sum(items: []int, concurrent f: fn(int) -> int) -> int
+{
+	let parts = parallel items by 2 -> sum_of(f);
+	let sum = 0;
+	for p in parts {
+		sum += p;
+	}
+	free(parts.ptr);
+	return sum;
+}
+
+worker fn sum_of(chunk: []int, concurrent f: fn(int) -> int) -> int
+{
+	let sum = 0;
+	for x in chunk {
+		sum += f(x);
+	}
+	return sum;
+}
+
+/// A button that keeps the function it is given.
+pub class Button
+{
+	pub click: fn(int) -> int = same,
+
+	/// Keep f, which runs on every click.
+	pub fn on_click(self, keep f: fn(int) -> int)
+	{
+		self.click = f;
+	}
+
+	/// Call f with each of the first n numbers.
+	pub fn repeat(self, n: int, f: fn(int))
+	{
+		for i in 0..n {
+			f(self.click(i));
+		}
+	}
+}
+
+fn same(n: int) -> int
+{
+	return n;
+}

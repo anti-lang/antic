@@ -1,0 +1,32 @@
+//! A program that passes closures and functions to the parameters of another
+//! module, each in the form the library file records.
+
+import com.example.walk;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn triple(n: int) -> int
+{
+	return n * 3;
+}
+
+fn main() -> int
+{
+	let items = [1, 2, 3, 4];
+	let all = items[0..4];
+	let total = 0;
+	walk.each(all, fn(n) {
+		total += n;
+	});
+	printf("total %d\n".ptr, total as c_int);
+	let factor = 5;
+	printf("mapped %d\n".ptr, walk.map_sum(all, fn(n) { return n * factor; }) as c_int);
+	let b = walk.Button { click: triple };
+	b.on_click(fn(n) { return n * 4; });
+	let clicks = 0;
+	b.repeat(3, fn(v) {
+		clicks += v;
+	});
+	printf("clicks %d\n".ptr, clicks as c_int);
+	return 0;
+}

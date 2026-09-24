@@ -89,6 +89,44 @@ fn nested(n: int) -> int
 	return sum;
 }
 
+fn or_twice(f: ?fn(int) -> int, n: int) -> int
+{
+	let g = f ?? twice;
+	return g(n);
+}
+
+fn loops(items: []int) -> int
+{
+	let sum = 0;
+	for i in 0..3 {
+		each(items, fn(n) {
+			sum += n * i;
+		});
+	}
+	for x in items {
+		let add = fn() {
+			sum += x;
+		};
+		call(add);
+	}
+	return sum;
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn deferred() -> int
+{
+	let log = 0;
+	{
+		defer call(fn() { log += 100; });
+		log += 1;
+	}
+	return log;
+}
+
 fn with_point(p: Point, f: fn(Point) -> int) -> int
 {
 	return f(p);
@@ -189,5 +227,25 @@ fn main() -> int
 	// A closure at a `concurrent` parameter reads what it captures.
 	let factor = 3;
 	printf("%lld\n".ptr, map_sum(all, fn(n) { return n * factor; }));
+	let scale = fn(n: int) -> int { return n * factor + 1; };
+	printf("%lld\n".ptr, map_sum(all, scale));
+
+	// A captured Mutex is thread-safe, so a `concurrent` closure holds it.
+	let m = Mutex.new();
+	printf("%lld\n".ptr, map_sum(all, fn(n) {
+		sync m {
+		}
+		return n;
+	}));
+	m.destroy();
+
+	// Loop variables, a `defer`, a text and `??` on a function.
+	printf("%lld\n".ptr, loops(all));
+	printf("%lld\n".ptr, deferred());
+	let name = "closure";
+	let length = 0;
+	call(fn() { length = name.len; });
+	printf("%lld\n".ptr, length);
+	printf("%lld %lld\n".ptr, or_twice(none, 5), or_twice(fn(n) { return n + factor; }, 5));
 	return 0;
 }

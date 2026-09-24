@@ -1,0 +1,164 @@
+//! The refusals of anonymous functions and closures. A closure never reaches a
+//! place that keeps a function, a parameter not marked `keep` is never stored,
+//! `concurrent` is required where a function goes on to a worker, a closure at
+//! a `concurrent` parameter changes no captured variable whose type is not
+//! thread-safe, and the types of an anonymous function come from its target.
+
+import anti.lang;
+
+extern fn qsort_like(f: fn(int) -> int);
+extern fn marked(concurrent f: fn(int));
+
+class Holder
+{
+	pub f: fn() = nothing,
+	pub made: fn() = fn() { },
+}
+
+struct Pair
+{
+	f: fn(),
+}
+
+fn nothing()
+{
+}
+
+fn each(items: []int, f: fn(int))
+{
+	for x in items {
+		f(x);
+	}
+}
+
+fn keep_it(keep f: fn(int))
+{
+}
+
+fn run(concurrent f: fn(int))
+{
+	f(1);
+}
+
+fn twice(f: fn(int) -> int, n: int) -> int
+{
+	return f(f(n));
+}
+
+fn marks(keep x: int)
+{
+}
+
+fn both(keep concurrent f: fn())
+{
+}
+
+fn stores(h: *Holder, f: fn())
+{
+	h.f = f;
+	let p = Pair { f: f };
+	let g = f;
+	h.f = g;
+}
+
+fn returns(f: fn()) -> fn()
+{
+	return f;
+}
+
+fn passes(f: fn(int))
+{
+	let base = 2;
+	keep_it(f);
+	qsort_like(fn(n) { return n; });
+	qsort_like(fn(n) { return n + base; });
+	run(f);
+}
+
+fn closures(h: *Holder, items: []int) -> fn()
+{
+	let count = 0;
+	h.f = fn() { count += 1; };
+	keep_it(fn(n) { count += n; });
+	let lost = fn() {
+		count += 1;
+	};
+	each(items, fn(n) { count += n; });
+	return fn() { count += 2; };
+}
+
+fn concurrent_writes(items: []int, f: fn(int))
+{
+	let hits = 0;
+	run(fn(n) { hits += n; });
+	let bump = fn(n: int) { hits += n; };
+	run(bump);
+	run(fn(n) { f(n); });
+	let m = Mutex.new();
+	run(fn(n) {
+		sync m {
+		}
+	});
+	m.destroy();
+}
+
+worker fn apply(chunk: []int, f: fn(int) -> int) -> int
+{
+	return f(chunk.len);
+}
+
+worker fn apply_all(chunk: []int, concurrent f: fn(int) -> int) -> int
+{
+	return f(chunk.len);
+}
+
+fn workers(items: []int, f: fn(int) -> int)
+{
+	let base = 3;
+	let a = parallel items -> apply(fn(n) { return n + base; });
+	let b = parallel items -> apply_all(f);
+	let c = parallel items -> apply(fn(n) { return n; });
+	free(a.ptr);
+	free(b.ptr);
+	free(c.ptr);
+}
+
+fn outlives()
+{
+	let n = 0;
+	let g = fn() { n += 1; };
+	{
+		let inner = 1;
+		g = fn() { n += inner; };
+	}
+	g();
+}
+
+fn inference(items: []int)
+{
+	let f = fn(x) { };
+	each(items, fn(a, b) { });
+	let n = twice(fn(m) {
+		if m > 0 {
+			return m;
+		}
+	}, 3);
+	let k = twice(fn(m) -> int may fail {
+		if m < 0 {
+			fail "negative";
+		}
+		return m;
+	}, 3);
+	while n > 0 do {
+		each(items, fn(x) {
+			break;
+		});
+	}
+}
+
+fn narrowing(p: ?*Holder, items: []int)
+{
+	if p != none {
+		each(items, fn(x) { p.f(); });
+	}
+}

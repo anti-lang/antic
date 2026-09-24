@@ -1,0 +1,26 @@
+closures.anti:15:19: error: an anonymous function stands in the body of a function
+closures.anti:10:29: error: an `extern fn` takes plain C function pointers, and `concurrent` marks a closure
+closures.anti:48:15: error: `keep` marks a parameter of function type, and this one is `int`
+closures.anti:52:25: error: `keep` and `concurrent` do not stand together, since a kept function captures nothing
+closures.anti:58:8: error: `f` is not marked `keep` and cannot be stored
+closures.anti:59:20: error: `f` is not marked `keep` and cannot be stored
+closures.anti:61:8: error: `g` holds a function that is not kept and cannot be stored
+closures.anti:66:9: error: `f` is not marked `keep` and cannot be stored
+closures.anti:72:10: error: `f` is not marked `keep` and cannot be stored
+closures.anti:74:13: error: a closure is never kept, and this one captures `base`
+closures.anti:75:6: error: `f` is passed on to a `concurrent` parameter and is not marked `concurrent`
+closures.anti:81:8: error: a closure is never kept, and this one captures `count`
+closures.anti:82:10: error: a closure is never kept, and this one captures `count`
+closures.anti:87:9: error: a closure is never kept, and this one captures `count`
+closures.anti:93:14: error: `hits` is changed in a closure at a `concurrent` parameter, and `int` is not thread-safe
+closures.anti:94:26: error: `hits` is changed in a closure at a `concurrent` parameter, and `int` is not thread-safe
+closures.anti:96:14: error: `f` is called in a closure at a `concurrent` parameter and is not marked `concurrent`
+closures.anti:118:34: error: a worker takes a closure through a `concurrent` parameter alone
+closures.anti:119:38: error: `f` is passed on to a `concurrent` parameter and is not marked `concurrent`
+closures.anti:132:7: error: `g` outlives `inner`, which the closure captures
+closures.anti:139:13: error: `x` needs a type, which an anonymous function takes from a parameter of function type
+closures.anti:140:14: error: the anonymous function takes 2 parameters, and `fn(int)` gives 1
+closures.anti:141:16: error: the anonymous function can reach its end without `return`
+closures.anti:146:16: error: expected `fn(int) -> int`, found `fn(int) -> int may fail`
+closures.anti:154:4: error: `break` outside a loop
+closures.anti:162:23: error: `p` may be `none`, check it or use `?*T`

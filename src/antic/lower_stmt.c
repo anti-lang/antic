@@ -364,6 +364,19 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     free(around.items);
 }
 
+/* Give the variable of a `for` the value of this pass. A closure that
+   captures the variable reads it from the place of its own, which the
+   slots of the frame hold, and every other variable is a temporary. */
+static void bind_loop_name(struct lowerer *l, struct symbol *sym,
+                           enum ir_type type, struct ir_operand value)
+{
+    if (sym->address_taken) {
+        ir_store(l->f, l->b, type, value, lower_temp(l, sym->ir));
+    } else {
+        sym->ir = ir_unary(l->f, l->b, IR_COPY, type, value);
+    }
+}
+
 /* DESIGN: `for` is a loop of its own rather than a rewrite into `while`,
    because the step is the target of `continue`. A textual rewrite would
    put the step after the body, where `continue` jumps over it and the
@@ -490,8 +503,7 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
                                               ir_int_op(counter_type, k))));
         }
         if (sym != NULL) {
-            sym->ir = ir_unary(l->f, l->b, IR_COPY, counter_type,
-                               lower_temp(l, counter));
+            bind_loop_name(l, sym, counter_type, lower_temp(l, counter));
         }
     } else {
         struct ir_operand at =
@@ -507,14 +519,18 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
            and the element is the value at it. The two names take their
            values from where they stand, and no pair is built. */
         if (index != NULL) {
-            index->ir = ir_unary(l->f, l->b, IR_COPY, IR_I64,
-                                 lower_temp(l, counter));
+            bind_loop_name(l, index, IR_I64, lower_temp(l, counter));
         }
         if (s->as.for_loop.by_pointer) {
-            sym->ir = ir_unary(l->f, l->b, IR_COPY, IR_PTR, at);
+            bind_loop_name(l, sym, IR_PTR, at);
         } else if (lower_is_aggregate(sym->type)) {
             ir_memcopy(l->f, l->b, lower_temp(l, sym->ir), at,
                        lower_vtype_of(l, sym->type));
+        } else if (sym->address_taken) {
+            bind_loop_name(l, sym, lower_ir_type_of(sym->type),
+                           lower_temp(l, ir_load(l->f, l->b,
+                                                 lower_ir_type_of(sym->type),
+                                                 at)));
         } else {
             sym->ir = ir_load(l->f, l->b, lower_ir_type_of(sym->type), at);
         }
@@ -2022,6 +2038,15 @@ static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
         if (sym != NULL &&
             (sym->address_taken || lower_is_aggregate(sym->type))) {
             sym->ir = ir_slot(l->f, entry, lower_vtype_of(l, sym->type));
+        }
+        /* The index of `for i, x in items` has a place of its own when a
+           closure captures it. */
+        for (j = 0; j + 1 < s->as.for_loop.name_count; j++) {
+            struct symbol *name = s->as.for_loop.names[j].symbol;
+            if (name != NULL && name->address_taken) {
+                name->ir = ir_slot(l->f, entry,
+                                   lower_vtype_of(l, name->type));
+            }
         }
         lower_reserve_slots(l, entry, s->as.for_loop.body);
         break;

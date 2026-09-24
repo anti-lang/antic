@@ -1,0 +1,26 @@
+//! The forms of the parameters of another module, read from its library file. A
+//! closure never reaches its `keep` parameter, and a function that is not
+//! `concurrent` never reaches its `concurrent` one.
+
+import com.example.walk;
+
+fn same(n: int) -> int
+{
+	return n;
+}
+
+fn pass(items: []int, f: fn(int) -> int)
+{
+	let count = 0;
+	let b = walk.Button { click: same };
+	b.click = f;
+	b.on_click(fn(n) {
+		count += n;
+		return n;
+	});
+	let sum = walk.map_sum(items, f);
+	let more = walk.map_sum(items, fn(n) {
+		count += 1;
+		return n;
+	});
+}

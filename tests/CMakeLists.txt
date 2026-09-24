@@ -1961,6 +1961,27 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# Closures and functions passed to the parameters of a library.
+# The library file carries each parameter in its form. A `concurrent` one
+# reaches the workers of `parallel`, and a `keep` one stores a C function
+# pointer.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME closures_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/closures"
+            "-DLIBRARIES=walk"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/closures-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.
 foreach(mode release dev)
@@ -2046,6 +2067,25 @@ foreach(mode release dev)
     set_tests_properties(error_worker_reach_${mode} PROPERTIES
         FIXTURES_REQUIRED board_antl)
 endforeach()
+
+# The forms of the parameters of a library reach its importer.
+# A closure never reaches a `keep` parameter of the library. A function
+# that is not `concurrent` never reaches a `concurrent` one.
+file(MAKE_DIRECTORY "${LIBS}/closures/com/example")
+add_test(NAME antl_walk
+    COMMAND antic -c -I "${MODULES}/closures"
+            -o "${LIBS}/closures/com/example/walk.antl"
+            "${MODULES}/closures/com/example/walk.anti")
+set_tests_properties(antl_walk PROPERTIES FIXTURES_SETUP walk_antl)
+add_test(NAME error_closures_modules
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=-S,-I,${LIBS}/closures,-o,${CMAKE_CURRENT_BINARY_DIR}/closures_modules.s,closures_modules.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/closures_modules.err"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+set_tests_properties(error_closures_modules PROPERTIES
+    FIXTURES_REQUIRED walk_antl)
 
 # A qualified base that the module does not declare as a public class
 add_test(NAME error_inherits_module
@@ -2799,7 +2839,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "nested_outside|-S,-o,${LISTINGS}/nested_outside.s,nested_outside.anti"
         "nested_forms|-S,-o,${LISTINGS}/nested_forms.s,nested_forms.anti"
         "nested_export|-S,-o,${LISTINGS}/nested_export.s,nested_export.anti"
-        "hooks|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/hooks.s,hooks.anti")
+        "hooks|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/hooks.s,hooks.anti"
+        "closures|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/closures.s,closures.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)
