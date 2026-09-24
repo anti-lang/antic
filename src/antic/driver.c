@@ -1928,18 +1928,21 @@ static int compile(const struct options *o, struct text *source,
         status = 2;
         goto done;
     }
-    /* The front end ends here, before the first pass that writes a file of
-       the program. Status 2 is the status of a command a dump finished. */
-    if (o->front_end) {
-        status = 2;
-        goto done;
-    }
-    if (!compiles_generics(tree, &diags)) {
+    /* A library file holds the IR of the module, so it is written after
+       the checker as a program is, and `anti check` has one written for
+       each module another imports. */
+    if ((o->library || !o->front_end) && !compiles_generics(tree, &diags)) {
         report_diagnostics(o, &diags);
         goto done;
     }
     if (o->library) {
         status = write_library(o, tree, text_cstr(module), &arena, &diags);
+        goto done;
+    }
+    /* The front end ends here, before the first pass that writes a file of
+       the program. Status 2 is the status of a command a dump finished. */
+    if (o->front_end) {
+        status = 2;
         goto done;
     }
     if (o->dump_ir || o->dump_opt) {
