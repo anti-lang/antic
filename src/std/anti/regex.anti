@@ -17,6 +17,12 @@
 //! ends in `_literal`, which cannot fail and stops the program at the match
 //! limit, with the pattern and the line. `Match` is declared by the compiler in
 //! `anti.lang`, and its groups are read by `group` and `took_part`.
+//!
+//! The same methods of `[]byte` take a `ByteRegex` and call the functions whose
+//! names start with `bytes_`. Their match is a `ByteMatch`, whose texts are
+//! slices of the searched bytes. `ByteRegex.compile(text)` calls
+//! `compile_bytes`. `patch` writes bytes over part of what it finds, in place,
+//! and fails with `LengthMismatch` when what it writes does not fit.
 
 import anti.lang;
 
@@ -45,6 +51,25 @@ extern fn anti_rt_regex_stop_group(file: ?*byte, length: int, line: int,
 	count: int, n: int, what: ?*byte, what_length: int);
 extern fn anti_rt_regex_stop_name(file: ?*byte, length: int, line: int,
 	name: ?*byte, name_length: int);
+extern fn anti_rt_regex_compile_bytes(bytes: ?*byte, length: int,
+	code: ?*i32, offset: ?*int) -> ?*byte;
+extern fn anti_rt_regex_first_bytes(pattern: ?*byte, s: ?*byte, length: int,
+	out: ?*?ByteMatch) -> int;
+extern fn anti_rt_regex_next_bytes(c: ?*Cursor, current: ?*?ByteMatch) -> int;
+extern fn anti_rt_regex_current_bytes(current: ?*?ByteMatch) -> ?*ByteMatch;
+extern fn anti_rt_regex_group_bytes(m: ?*ByteMatch, n: int,
+	out: ?*[]byte) -> int;
+extern fn anti_rt_regex_group_named_bytes(m: ?*ByteMatch, name: ?*byte,
+	length: int, out: ?*[]byte) -> int;
+extern fn anti_rt_regex_replace_bytes(pattern: ?*byte, s: ?*byte, length: int,
+	bytes: ?*byte, template_length: int, limit: int, out: ?*[]byte) -> int;
+extern fn anti_rt_regex_take_bytes(g: ?*Growing) -> []byte;
+extern fn anti_rt_regex_patch(pattern: ?*byte, data: ?*byte, length: int,
+	with: ?*byte, with_length: int, into: int, name: ?*byte, name_length: int,
+	offset: int, limit: int) -> int;
+extern fn anti_rt_bytes_patch(data: ?*byte, length: int, find: ?*byte,
+	find_length: int, with: ?*byte, with_length: int, offset: int,
+	limit: int) -> int;
 extern fn anti_rt_regex_stop_template(file: ?*byte, length: int, line: int,
 	bytes: ?*byte, template_length: int, pattern: ?*byte,
 	pattern_length: int);
@@ -68,8 +93,14 @@ pub class TooExpensive inherits Error
 {
 }
 
-/// A replacement template that names a group the pattern lacks.
+/// A replacement template that names a group the pattern lacks, or a `patch`
+/// whose `into` names none.
 pub class MissingGroup inherits Error
+{
+}
+
+/// A `patch` whose bytes do not fit the span they are written into.
+pub class LengthMismatch inherits Error
 {
 }
 
@@ -90,6 +121,25 @@ pub fn compile(text: str) -> Regex may fail
 		fail e;
 	};
 	return Regex { handle: handle };
+}
+
+/// Compile the byte pattern `text`. `ByteRegex.compile(text)` calls it.
+///
+/// `.` matches any byte, and a character outside ASCII stands for its UTF-8
+/// bytes. It fails with `BadPattern` when the pattern does not compile, and
+/// for a negated class or a range that holds a character outside ASCII.
+pub fn compile_bytes(text: str) -> ByteRegex may fail
+{
+	let code: i32 = 0;
+	let offset = 0;
+	let made = anti_rt_regex_compile_bytes(text.ptr, text.len, &code, &offset);
+	let handle = made else {
+		let e = alloc BadPattern { position: offset };
+		e.code = code as int;
+		e.message = anti_rt_regex_message(code);
+		fail e;
+	};
+	return ByteRegex { handle: handle };
 }
 
 /// Where a walk over the matches of a pattern stands, which the runtime reads
@@ -498,4 +548,450 @@ pub fn took_part_named(m: Match, name: str,
 			name.len);
 	}
 	return status > 0;
+}
+
+/// The matches of a byte pattern in bytes, left to right, which
+/// `data.find_all(r)` gives to a `for` loop.
+pub class ByteMatches
+{
+	/// The match the walk stands at.
+	current: ?ByteMatch,
+	/// Where the walk stands.
+	cursor: Cursor,
+	/// The text of a pattern literal, for the stop at the match limit.
+	pattern: str,
+	/// The call that began the walk.
+	at: lang.SourceLocation,
+
+	/// Move to the next match, and say whether there is one. `for` calls it.
+	operator fn next(self) -> bool
+	{
+		let status = anti_rt_regex_next_bytes(&self.cursor, &self.current);
+		if status < 0 {
+			stop_expensive(self.pattern, self.at);
+		}
+		return status > 0;
+	}
+
+	/// The match the walk stands at. `for` calls it after `next`.
+	operator fn value(self) -> ByteMatch
+	{
+		let m = anti_rt_regex_current_bytes(&self.current) catch fatal;
+		return *m;
+	}
+
+	/// A walk over `data` with `r`, begun with a `limit`, and whether a search
+	/// reached the match limit when `check` searched the whole data first.
+	pub fn walk(data: []byte, r: ByteRegex, pattern: str,
+		at: lang.SourceLocation, limit: int, check: bool) -> (ByteMatches, bool)
+	{
+		let it = ByteMatches {
+			current: none,
+			cursor: Cursor {
+				pattern: r.handle,
+				subject: "",
+				at: 0,
+				options: 0,
+				last: 0,
+				skip: 0,
+				left: 0,
+			},
+			pattern: pattern,
+			at: at,
+		};
+		let status = anti_rt_regex_begin(&it.cursor, r.handle, data.ptr,
+			data.len, limit, check as int);
+		return (it, status < 0);
+	}
+}
+
+/// The pieces of bytes between the matches of a byte pattern, left to right,
+/// which `data.split(r)` gives to a `for` loop.
+pub class BytePieces
+{
+	/// The walk over the matches.
+	walk: ByteMatches,
+	/// The piece the walk stands at.
+	piece: []byte,
+	/// The bytes after the last match the walk gave.
+	rest: []byte,
+	/// Whether the walk gave its last piece.
+	done: bool,
+
+	/// Move to the next piece, and say whether there is one. `for` calls it.
+	operator fn next(self) -> bool
+	{
+		if self.done {
+			return false;
+		}
+		if self.walk.next() {
+			let m = self.walk.value();
+			self.piece = m.pre;
+			self.rest = m.post;
+			return true;
+		}
+		self.piece = self.rest;
+		self.done = true;
+		return true;
+	}
+
+	/// The piece the walk stands at. `for` calls it after `next`.
+	operator fn value(self) -> []byte
+	{
+		return self.piece;
+	}
+
+	/// The pieces of `data` between the matches of the walk `it`.
+	pub fn over(it: ByteMatches, data: []byte) -> BytePieces
+	{
+		return BytePieces { walk: it, piece: data[0..0], rest: data, done: false };
+	}
+}
+
+/// The first match of `r` in `data`, or `none`. `data.matches(r)` calls it.
+pub fn bytes_matches(data: []byte, r: ByteRegex) -> ?ByteMatch may fail
+{
+	let found: ?ByteMatch = none;
+	if anti_rt_regex_first_bytes(r.handle, data.ptr, data.len, &found) < 0 {
+		fail too_expensive();
+	}
+	return found;
+}
+
+/// The first match of the byte pattern literal `r`, whose text is `pattern`, in
+/// `data`, or `none`. `data.matches(re"...")` calls it.
+pub fn bytes_matches_literal(data: []byte, r: ByteRegex, pattern: str,
+	at: lang.SourceLocation = here) -> ?ByteMatch
+{
+	let found: ?ByteMatch = none;
+	if anti_rt_regex_first_bytes(r.handle, data.ptr, data.len, &found) < 0 {
+		stop_expensive(pattern, at);
+	}
+	return found;
+}
+
+/// Whether `r` matches in `data`. `if data.matches(r) { }` calls it.
+pub fn bytes_matched(data: []byte, r: ByteRegex) -> bool may fail
+{
+	let status = anti_rt_regex_test(r.handle, data.ptr, data.len);
+	if status < 0 {
+		fail too_expensive();
+	}
+	return status > 0;
+}
+
+/// Whether the byte pattern literal `r`, whose text is `pattern`, matches in
+/// `data`. `if data.matches(re"...") { }` calls it.
+pub fn bytes_matched_literal(data: []byte, r: ByteRegex, pattern: str,
+	at: lang.SourceLocation = here) -> bool
+{
+	let status = anti_rt_regex_test(r.handle, data.ptr, data.len);
+	if status < 0 {
+		stop_expensive(pattern, at);
+	}
+	return status > 0;
+}
+
+/// The matches of `r` in `data`, left to right, for a `for` loop.
+/// `data.find_all(r)` calls it, and a `limit` takes matches as `find_all` of
+/// `str` does.
+pub fn bytes_find_all(data: []byte, r: ByteRegex, limit: int = 0,
+	at: lang.SourceLocation = here) -> ByteMatches may fail
+{
+	let (it, expensive) = ByteMatches.walk(data, r, "", at, limit, true);
+	if expensive {
+		fail too_expensive();
+	}
+	return it;
+}
+
+/// The matches of the byte pattern literal `r`, whose text is `pattern`, in
+/// `data`. `data.find_all(re"...")` calls it.
+pub fn bytes_find_all_literal(data: []byte, r: ByteRegex, pattern: str,
+	limit: int = 0, at: lang.SourceLocation = here) -> ByteMatches
+{
+	let (it, expensive) = ByteMatches.walk(data, r, pattern, at, limit, false);
+	if expensive {
+		stop_expensive(pattern, at);
+	}
+	return it;
+}
+
+/// `data` with the matches of `r` replaced by the template `with`, in new bytes
+/// of the C library, which the program frees with `free(result.ptr)`.
+///
+/// It fails with `MissingGroup` when the template names a group the pattern
+/// lacks, and with `TooExpensive` at the match limit.
+pub fn bytes_replace(data: []byte, r: ByteRegex, with: []byte,
+	limit: int = 0) -> []byte may fail
+{
+	if anti_rt_regex_template_fits(r.handle, with.ptr, with.len) == 0 {
+		let e = alloc MissingGroup { };
+		e.message = "the template names a group the pattern lacks";
+		fail e;
+	}
+	let out = data[0..0];
+	if anti_rt_regex_replace_bytes(r.handle, data.ptr, data.len, with.ptr,
+		with.len, limit, &out) < 0 {
+		fail too_expensive();
+	}
+	return out;
+}
+
+/// `data` with the matches of the byte pattern literal `r`, whose text is
+/// `pattern`, replaced by the template `with`. `data.replace(re"...", with)`
+/// calls it.
+pub fn bytes_replace_literal(data: []byte, r: ByteRegex, pattern: str,
+	with: []byte, limit: int = 0, at: lang.SourceLocation = here) -> []byte
+{
+	if anti_rt_regex_template_fits(r.handle, with.ptr, with.len) == 0 {
+		anti_rt_regex_stop_template(at.file.ptr, at.file.len, at.line, with.ptr,
+			with.len, pattern.ptr, pattern.len);
+	}
+	let out = data[0..0];
+	if anti_rt_regex_replace_bytes(r.handle, data.ptr, data.len, with.ptr,
+		with.len, limit, &out) < 0 {
+		stop_expensive(pattern, at);
+	}
+	return out;
+}
+
+/// `data` with each match of `r` replaced by what `with` returns for it.
+/// `data.replace(r, fn(m) { })` calls it.
+pub fn bytes_replace_fn(data: []byte, r: ByteRegex,
+	with: fn(ByteMatch) -> []byte, limit: int = 0,
+	at: lang.SourceLocation = here) -> []byte may fail
+{
+	let (it, expensive) = ByteMatches.walk(data, r, "", at, limit, true);
+	if expensive {
+		fail too_expensive();
+	}
+	return bytes_replaced(&it, data, with);
+}
+
+/// `data` with each match of the byte pattern literal `r`, whose text is
+/// `pattern`, replaced by what `with` returns for it.
+pub fn bytes_replace_fn_literal(data: []byte, r: ByteRegex, pattern: str,
+	with: fn(ByteMatch) -> []byte, limit: int = 0,
+	at: lang.SourceLocation = here) -> []byte
+{
+	let (it, expensive) = ByteMatches.walk(data, r, pattern, at, limit, false);
+	if expensive {
+		stop_expensive(pattern, at);
+	}
+	return bytes_replaced(&it, data, with);
+}
+
+/// The bytes `data` with each match of the walk `it` replaced by what `with`
+/// returns for it, in new memory of the C library.
+fn bytes_replaced(it: *ByteMatches, data: []byte,
+	with: fn(ByteMatch) -> []byte) -> []byte
+{
+	let out = Growing { bytes: none, length: 0, capacity: 0 };
+	let rest = data;
+	for m in *it {
+		anti_rt_regex_append(&out, m.pre.ptr, m.pre.len);
+		let piece = with(m);
+		anti_rt_regex_append(&out, piece.ptr, piece.len);
+		rest = m.post;
+	}
+	anti_rt_regex_append(&out, rest.ptr, rest.len);
+	return anti_rt_regex_take_bytes(&out);
+}
+
+/// The pieces of `data` between the matches of `r`, left to right, for a `for`
+/// loop or `to_slice()`. `data.split(r)` calls it.
+pub fn bytes_split(data: []byte, r: ByteRegex, limit: int = 0,
+	at: lang.SourceLocation = here) -> BytePieces may fail
+{
+	let (it, expensive) = ByteMatches.walk(data, r, "", at, limit, true);
+	if expensive {
+		fail too_expensive();
+	}
+	return BytePieces.over(it, data);
+}
+
+/// The pieces of `data` between the matches of the byte pattern literal `r`,
+/// whose text is `pattern`. `data.split(re"...")` calls it.
+pub fn bytes_split_literal(data: []byte, r: ByteRegex, pattern: str,
+	limit: int = 0, at: lang.SourceLocation = here) -> BytePieces
+{
+	let (it, expensive) = ByteMatches.walk(data, r, pattern, at, limit, false);
+	if expensive {
+		stop_expensive(pattern, at);
+	}
+	return BytePieces.over(it, data);
+}
+
+/// Group `n` of the byte match `m`, 0 for the whole match. `m.group(n)` and
+/// `m.1` call it.
+pub fn bytes_group(m: ByteMatch, n: int, at: lang.SourceLocation = here) -> []byte
+{
+	let out = m.all[0..0];
+	if anti_rt_regex_group_bytes(&m, n, &out) < 0 {
+		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, m.count, n,
+			"group".ptr, 5);
+	}
+	return out;
+}
+
+/// The group of the byte match `m` named `name`. `m.group("name")` and `m.name`
+/// call it.
+pub fn bytes_group_named(m: ByteMatch, name: str,
+	at: lang.SourceLocation = here) -> []byte
+{
+	let out = m.all[0..0];
+	if anti_rt_regex_group_named_bytes(&m, name.ptr, name.len, &out) < 0 {
+		anti_rt_regex_stop_name(at.file.ptr, at.file.len, at.line, name.ptr,
+			name.len);
+	}
+	return out;
+}
+
+/// Whether group `n` of the byte match `m` took part in it. `m.took_part(n)`
+/// calls it.
+pub fn bytes_took_part(m: ByteMatch, n: int,
+	at: lang.SourceLocation = here) -> bool
+{
+	let out = m.all[0..0];
+	let status = anti_rt_regex_group_bytes(&m, n, &out);
+	if status < 0 {
+		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, m.count, n,
+			"took_part".ptr, 9);
+	}
+	return status > 0;
+}
+
+/// Whether the group of the byte match `m` named `name` took part in it.
+/// `m.took_part("name")` calls it.
+pub fn bytes_took_part_named(m: ByteMatch, name: str,
+	at: lang.SourceLocation = here) -> bool
+{
+	let out = m.all[0..0];
+	let status = anti_rt_regex_group_named_bytes(&m, name.ptr, name.len, &out);
+	if status < 0 {
+		anti_rt_regex_stop_name(at.file.ptr, at.file.len, at.line, name.ptr,
+			name.len);
+	}
+	return status > 0;
+}
+
+/// The failure of a `patch` whose bytes do not fit.
+fn length_mismatch() -> *LengthMismatch
+{
+	let e = alloc LengthMismatch { };
+	e.message = "the bytes to patch in do not fit the span they are written into";
+	return e;
+}
+
+/// The failure of a `patch` whose `into` names no group of the pattern.
+fn missing_into() -> *MissingGroup
+{
+	let e = alloc MissingGroup { };
+	e.message = "`into` names no group of the pattern";
+	return e;
+}
+
+/// Write `with` at `offset` inside the group `into`, or the group named
+/// `name`, of every match of `r` in `data`, and give the number of places.
+/// `data.patch(r, with)` calls it.
+///
+/// `into` 0 takes the one group of a pattern with one and the whole match of a
+/// pattern without. A `limit` takes matches as `replace` does. It fails with
+/// `LengthMismatch` when `with` does not fit a span, with `MissingGroup` when
+/// `into` names no group, and with `TooExpensive` at the match limit, each
+/// before it writes any byte.
+pub fn patch(data: []byte, r: ByteRegex, with: []byte, into: int, name: str,
+	offset: int, limit: int) -> int may fail
+{
+	let n = anti_rt_regex_patch(r.handle, data.ptr, data.len, with.ptr, with.len,
+		into, name.ptr, name.len, offset, limit);
+	if n == -1 {
+		fail too_expensive();
+	}
+	if n == -2 {
+		fail length_mismatch();
+	}
+	if n == -3 {
+		fail missing_into();
+	}
+	return n;
+}
+
+/// `patch` with the byte pattern literal `r`, whose text is `pattern`, where
+/// `with`, `offset` or `into` is computed. `data.patch(re"...", with)` calls it.
+///
+/// It fails with `LengthMismatch` alone. The program stops at `at` at the
+/// match limit, or when a computed `into` names no group of the literal.
+pub fn patch_literal(data: []byte, r: ByteRegex, pattern: str, with: []byte,
+	into: int, name: str, offset: int, limit: int,
+	at: lang.SourceLocation = here) -> int may fail
+{
+	let n = anti_rt_regex_patch(r.handle, data.ptr, data.len, with.ptr, with.len,
+		into, name.ptr, name.len, offset, limit);
+	if n == -1 {
+		stop_expensive(pattern, at);
+	}
+	if n == -2 {
+		fail length_mismatch();
+	}
+	if n == -3 {
+		stop_into(pattern, into, name, at);
+	}
+	return n;
+}
+
+/// `patch` with the byte pattern literal `r`, whose text is `pattern`, where
+/// `with`, `offset` and `into` are literals the compiler found to fit.
+pub fn patch_fixed(data: []byte, r: ByteRegex, pattern: str, with: []byte,
+	into: int, name: str, offset: int, limit: int,
+	at: lang.SourceLocation = here) -> int
+{
+	let n = anti_rt_regex_patch(r.handle, data.ptr, data.len, with.ptr, with.len,
+		into, name.ptr, name.len, offset, limit);
+	if n == -1 {
+		stop_expensive(pattern, at);
+	}
+	if n < 0 {
+		stop_into(pattern, into, name, at);
+	}
+	return n;
+}
+
+/// Stop the program where a `patch` with the pattern literal `pattern` names no
+/// group of it.
+fn stop_into(pattern: str, into: int, name: str, at: lang.SourceLocation)
+{
+	if name.len > 0 {
+		anti_rt_regex_stop_name(at.file.ptr, at.file.len, at.line, name.ptr,
+			name.len);
+	}
+	anti_rt_regex_stop_template(at.file.ptr, at.file.len, at.line, "into".ptr,
+		4, pattern.ptr, pattern.len);
+}
+
+/// Write `with` at `offset` inside every place of `find` in `data`, left to
+/// right and without overlap, and give the number of places.
+/// `data.patch(find, with)` calls it.
+///
+/// It fails with `LengthMismatch` before it writes any byte when `with` at
+/// `offset` does not fit the length of `find`.
+pub fn patch_bytes(data: []byte, find: []byte, with: []byte, offset: int,
+	limit: int) -> int may fail
+{
+	let n = anti_rt_bytes_patch(data.ptr, data.len, find.ptr, find.len, with.ptr,
+		with.len, offset, limit);
+	if n < 0 {
+		fail length_mismatch();
+	}
+	return n;
+}
+
+/// `patch_bytes` where `find`, `with` and `offset` are literals the compiler
+/// found to fit, so it cannot fail.
+pub fn patch_bytes_fixed(data: []byte, find: []byte, with: []byte, offset: int,
+	limit: int) -> int
+{
+	return anti_rt_bytes_patch(data.ptr, data.len, find.ptr, find.len, with.ptr,
+		with.len, offset, limit);
 }

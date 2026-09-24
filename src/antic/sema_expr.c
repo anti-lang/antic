@@ -2001,11 +2001,15 @@ static void pattern_piece(char *out, size_t size, const struct expr *e,
    The safety check `exponential-pattern` then reads its repeats. The
    module imports `anti.regex`, whose classes are the failures of a
    pattern and which names what the program links, as an `f"..."` asks
-   for `anti.text`. */
-static struct type *check_pattern(struct checker *c, struct expr *e)
+   for `anti.text`. A literal takes its mode from where it stands, as an
+   anonymous function takes its types: where a `ByteRegex` is expected it
+   is a byte pattern, and everywhere else a pattern of text. */
+static struct type *check_pattern(struct checker *c, struct expr *e,
+                                  struct type *expected)
 {
     static const struct name module = {REGEX_MODULE,
                                        sizeof REGEX_MODULE - 1};
+    bool bytes = expected != NULL && types_is_byte_regex(expected);
     struct pattern_span inner;
     struct pattern_span outer;
     char message[ANTI_PATTERN_MESSAGE];
@@ -2017,8 +2021,8 @@ static struct type *check_pattern(struct checker *c, struct expr *e)
                       "`");
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (!pattern_compiles(e->as.text.bytes, e->as.text.length, &offset,
-                          message, sizeof message)) {
+    if (!pattern_compiles(e->as.text.bytes, e->as.text.length, bytes,
+                          &offset, message, sizeof message)) {
         sema_error_at(c, pattern_position(e, offset), "malformed pattern: %s",
                       message);
         return sema_builtin(c, TYPE_ERROR);
@@ -2035,7 +2039,7 @@ static struct type *check_pattern(struct checker *c, struct expr *e)
                       "write a possessive quantifier, `a++`, or an atomic "
                       "group, `(?>...)`", in, around);
     }
-    return types_regex(c->types);
+    return bytes ? types_byte_regex(c->types) : types_regex(c->types);
 }
 
 /* DESIGN: `x in lo..hi` is `x >= lo && x < hi`. The checker binds x to
@@ -2393,7 +2397,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_FORMAT:
         return check_format(c, e);
     case EXPR_PATTERN:
-        return check_pattern(c, e);
+        return check_pattern(c, e, expected);
     case EXPR_IN:
         return check_in(c, e);
     case EXPR_INDEX:
@@ -2498,6 +2502,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                 t = types_field_descriptor(c->types);
             } else if (sym == NULL && sema_name_is(name, LANG_REGEX)) {
                 t = types_regex(c->types);
+            } else if (sym == NULL && sema_name_is(name, LANG_BYTE_REGEX)) {
+                t = types_byte_regex(c->types);
             } else if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
                 sema_error_at(c, e->pos, "unknown struct `%.*s`",
                               (int)name->length, name->text);

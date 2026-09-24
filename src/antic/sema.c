@@ -715,8 +715,8 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
             if (sema_is_error(named) || types_is_match(named)) {
                 return types_with_none(c->types, named);
             }
-            sema_error_at(c, t->pos, "`?` stands before `*T`, `fn(...)` or "
-                          "`Match`, found `%s`", sema_tn(named));
+            sema_error_at(c, t->pos, "`?` stands before `*T`, `fn(...)`, "
+                          "`Match` or `ByteMatch`, found `%s`", sema_tn(named));
             return sema_builtin(c, TYPE_ERROR);
         }
         if (t->module.length > 0) {
@@ -739,8 +739,14 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         if (sym == NULL && sema_name_is(&t->name, LANG_REGEX)) {
             return types_regex(c->types);
         }
+        if (sym == NULL && sema_name_is(&t->name, LANG_BYTE_REGEX)) {
+            return types_byte_regex(c->types);
+        }
         if (sym == NULL && sema_name_is(&t->name, LANG_MATCH)) {
-            return types_match(c->types, NULL);
+            return types_match_of(c->types, false);
+        }
+        if (sym == NULL && sema_name_is(&t->name, LANG_BYTE_MATCH)) {
+            return types_match_of(c->types, true);
         }
         if (sym == NULL && sema_name_is(&t->name, LANG_FIELD_DESCRIPTOR)) {
             return types_field_descriptor(c->types);

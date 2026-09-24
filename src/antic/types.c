@@ -749,24 +749,21 @@ struct type *types_chan(struct types *types, struct type *element)
 }
 
 /* DESIGN: the handle of a Regex is `*u8` to the checker, the address of
-   the pattern the runtime compiled, as the handle of a channel is. */
-struct type *types_regex(struct types *types)
+   the pattern the runtime compiled, as the handle of a channel is. A
+   ByteRegex has the same one field. */
+static struct type *pattern_struct(struct types *types, const char *name)
 {
     static const char module_text[] = LANG_MODULE;
-    static const char name_text[] = LANG_REGEX;
     static const char field_text[] = REGEX_HANDLE;
     struct struct_field field;
     struct type *t;
 
-    if (types->regex != NULL) {
-        return types->regex;
-    }
     t = arena_alloc(types->arena, sizeof *t);
     t->kind = TYPE_STRUCT;
     t->module.text = module_text;
     t->module.length = sizeof module_text - 1;
-    t->name.text = name_text;
-    t->name.length = sizeof name_text - 1;
+    t->name.text = name;
+    t->name.length = strlen(name);
     t->next = types->derived;
     types->derived = t;
     memset(&field, 0, sizeof field);
@@ -776,13 +773,34 @@ struct type *types_regex(struct types *types)
     field.vis = VIS_PUB;
     types_set_fields(types, t, &field, 1);
     t->layout = LAYOUT_DONE;
-    types->regex = t;
     return t;
+}
+
+struct type *types_regex(struct types *types)
+{
+    if (types->regex == NULL) {
+        types->regex = pattern_struct(types, LANG_REGEX);
+    }
+    return types->regex;
+}
+
+struct type *types_byte_regex(struct types *types)
+{
+    if (types->byte_regex == NULL) {
+        types->byte_regex = pattern_struct(types, LANG_BYTE_REGEX);
+    }
+    return types->byte_regex;
 }
 
 bool types_is_regex(const struct type *t)
 {
-    return lang_item(t, TYPE_STRUCT, LANG_REGEX);
+    return lang_item(t, TYPE_STRUCT, LANG_REGEX) ||
+           lang_item(t, TYPE_STRUCT, LANG_BYTE_REGEX);
+}
+
+bool types_is_byte_regex(const struct type *t)
+{
+    return lang_item(t, TYPE_STRUCT, LANG_BYTE_REGEX);
 }
 
 /* A struct of `anti.lang` in the form of a match, with its fields. */
@@ -815,17 +833,27 @@ static bool same_literal(const struct expr *a, const struct expr *b)
            memcmp(a->as.text.bytes, b->as.text.bytes, a->as.text.length) == 0;
 }
 
+/* Whether the literal pattern is a byte pattern. */
+static bool literal_bytes(const struct expr *pattern)
+{
+    return pattern != NULL && types_is_byte_regex(pattern->type);
+}
+
 /* DESIGN: the fields of a match, in the order `struct anti_match` of
    src/rt/regex.h holds them. The hidden ones carry names no program can
-   write, so a program reads `all`, `pre`, `post` and `count` alone. */
-struct type *types_match(struct types *types, const struct expr *pattern)
+   write, so a program reads `all`, `pre`, `post` and `count` alone. A
+   `ByteMatch` has the same fields with `[]byte` for `str`. */
+static struct type *match_form(struct types *types,
+                               const struct expr *pattern, bool bytes)
 {
     static const char *const names[] = {
         MATCH_PATTERN, MATCH_ALL, MATCH_PRE, MATCH_POST, MATCH_COUNT,
         MATCH_SUBJECT, MATCH_FROM, MATCH_OPTIONS
     };
     struct struct_field fields[sizeof names / sizeof names[0]];
-    struct type *str = types_builtin(types, TYPE_STR);
+    struct type *text =
+        bytes ? types_slice(types, types_builtin(types, TYPE_U8))
+              : types_builtin(types, TYPE_STR);
     struct type *word = types_builtin(types, TYPE_I64);
     struct type *plain;
     struct type *maybe;
@@ -834,6 +862,7 @@ struct type *types_match(struct types *types, const struct expr *pattern)
 
     for (t = types->derived; t != NULL; t = t->next) {
         if (types_is_match(t) && !t->nullable &&
+            types_is_byte_match(t) == bytes &&
             same_literal(t->pattern, pattern)) {
             return t;
         }
@@ -844,30 +873,55 @@ struct type *types_match(struct types *types, const struct expr *pattern)
         fields[i].name.length = strlen(names[i]);
         fields[i].vis = VIS_PUB;
         fields[i].hidden = names[i][0] == '(';
-        fields[i].type = str;
+        fields[i].type = text;
     }
     fields[0].type =
         types_pointer_nullable(types, types_builtin(types, TYPE_U8));
     fields[4].type = word;
     fields[6].type = word;
     fields[7].type = word;
-    plain = match_struct(types, LANG_MATCH, fields, i);
-    maybe = match_struct(types, LANG_MATCH_NONE, fields, i);
+    plain = match_struct(types, bytes ? LANG_BYTE_MATCH : LANG_MATCH, fields,
+                         i);
+    maybe = match_struct(types, bytes ? LANG_BYTE_MATCH_NONE : LANG_MATCH_NONE,
+                         fields, i);
     plain->pattern = pattern;
     maybe->pattern = pattern;
     maybe->nullable = true;
     plain->twin = maybe;
     maybe->twin = plain;
     if (pattern == NULL) {
-        types->match = plain;
+        if (bytes) {
+            types->byte_match = plain;
+        } else {
+            types->match = plain;
+        }
     }
     return plain;
+}
+
+struct type *types_match(struct types *types, const struct expr *pattern)
+{
+    return match_form(types, pattern, literal_bytes(pattern));
+}
+
+struct type *types_match_of(struct types *types, bool bytes)
+{
+    struct type *have = bytes ? types->byte_match : types->match;
+
+    return have != NULL ? have : match_form(types, NULL, bytes);
 }
 
 bool types_is_match(const struct type *t)
 {
     return lang_item(t, TYPE_STRUCT, LANG_MATCH) ||
-           lang_item(t, TYPE_STRUCT, LANG_MATCH_NONE);
+           lang_item(t, TYPE_STRUCT, LANG_MATCH_NONE) ||
+           types_is_byte_match(t);
+}
+
+bool types_is_byte_match(const struct type *t)
+{
+    return lang_item(t, TYPE_STRUCT, LANG_BYTE_MATCH) ||
+           lang_item(t, TYPE_STRUCT, LANG_BYTE_MATCH_NONE);
 }
 
 struct type *types_match_plain(struct types *types, struct type *t)
@@ -877,7 +931,7 @@ struct type *types_match_plain(struct types *types, struct type *t)
     if (t->pattern == NULL) {
         return t;
     }
-    plain = types->match != NULL ? types->match : types_match(types, NULL);
+    plain = types_match_of(types, types_is_byte_match(t));
     return t->nullable ? plain->twin : plain;
 }
 

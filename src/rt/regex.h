@@ -16,6 +16,24 @@
 void *anti_rt_regex_compile(const unsigned char *bytes, int64_t length,
                             int32_t *code, int64_t *offset);
 
+/* The compiled form of the byte pattern of length bytes at bytes, or NULL
+   when it does not compile. *code and *offset then hold what
+   anti_rt_regex_compile writes. A character outside ASCII stands for its UTF-8
+   bytes, and a class that holds one becomes a choice of byte sequences.
+   A negated class that holds one is refused with
+   ANTI_RT_REGEX_WIDE_NEGATED, and a range that reaches one with
+   ANTI_RT_REGEX_WIDE_RANGE, at the character. */
+void *anti_rt_regex_compile_bytes(const unsigned char *bytes, int64_t length,
+                                  int32_t *code, int64_t *offset);
+
+/* The numbers of the two refusals of a byte pattern. PCRE2 numbers its
+   own errors of a compile from 101 to below 300, so these meet none. */
+#define ANTI_RT_REGEX_WIDE_NEGATED 400
+#define ANTI_RT_REGEX_WIDE_RANGE 401
+
+/* Whether the compiled pattern searches bytes. */
+int anti_rt_regex_is_bytes(const void *compiled);
+
 /* Give back what anti_rt_regex_compile made. */
 void anti_rt_regex_free(void *compiled);
 

@@ -1,0 +1,138 @@
+//! `data.patch(find, with, into, at, limit)` writes `with` over part of what it
+//! finds, in place, and gives the number of places. A byte sequence patches the
+//! whole place and a pattern its one group, the group `into` names or the whole
+//! match. `with` goes at offset `at` inside the span, and the rest of the span
+//! keeps its bytes, so a longer span keeps its tail. `limit` takes places from
+//! the start or from the end. A `with` computed at run time that does not fit
+//! fails with `LengthMismatch` before any byte changes, and a compiled pattern
+//! of several groups without `into` fails with `MissingGroup`.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, n: int, data: []byte)
+{
+	printf("%.*s %lld [".ptr, label.len as c_int, label.ptr, n);
+	for i in 0..data.len {
+		let b = data[i];
+		if b >= 0x20 && b < 0x7F {
+			printf("%c".ptr, b as c_int);
+		} else {
+			printf("\\x%02X".ptr, b as c_int);
+		}
+	}
+	printf("]\n".ptr);
+}
+
+fn fail_name(e: *lang.Error) -> str
+{
+	if e is *regex.LengthMismatch {
+		return "LengthMismatch";
+	}
+	if e is *regex.MissingGroup {
+		return "MissingGroup";
+	}
+	if e is *regex.TooExpensive {
+		return "TooExpensive";
+	}
+	return "other";
+}
+
+fn failed(label: str, e: *lang.Error)
+{
+	let name = fail_name(e);
+	printf("%.*s %.*s\n".ptr, label.len as c_int, label.ptr, name.len as c_int,
+		name.ptr);
+}
+
+fn sequences()
+{
+	let room: [9]byte = [0x80, 0x10, 0x20, 0x30, 0x00, 0x80, 0x10, 0x20, 0x30];
+	let bytes = room[0..9];
+	let n = bytes.patch(x"80 10 20 30", x"81");
+	show("whole", n, bytes);
+	n = bytes.patch(x"81 10 20 30", x"FF", 0, 2);
+	show("at 2", n, bytes);
+	n = bytes.patch(x"81 10 FF 30", x"77 66", 0, 2, -1);
+	show("last", n, bytes);
+	n = bytes.patch(x"55", x"55");
+	show("nowhere", n, bytes);
+	let long = x"01 02 03";
+	let at = 2;
+	n = bytes.patch(x"81 10", long) catch e {
+		failed("too long", e);
+		yield -1;
+	};
+	n = bytes.patch(x"81 10 77 66", x"01", 0, at + 2) catch e {
+		failed("past the end", e);
+		yield -1;
+	};
+	show("unchanged", n, bytes);
+}
+
+fn patterns()
+{
+	let v = "version: 1.10.1".to_bytes();
+	let n = v.patch(re"version: \d+\.\d+\.(\d+)", b"2");
+	show("version", n, v);
+	free(v.ptr);
+	let w = "version: 1.10.10".to_bytes();
+	n = w.patch(re"version: \d+\.\d+\.(\d+)", b"2");
+	show("longer span", n, w);
+	free(w.ptr);
+	let rows = "a=11 b=22 c=33 d=44".to_bytes();
+	n = rows.patch(re"\w=\d\d", b"#", 0, 1, 2);
+	show("first two", n, rows);
+	n = rows.patch(re"(?<k>\w)=(?<v>\d\d)", b"V", "k");
+	show("by name", n, rows);
+	n = rows.patch(re"(\w)=(\d)(\d)", b"9", 3, 0, -1);
+	show("by number", n, rows);
+	n = rows.patch(re"(x)?=", b"!");
+	show("no part", n, rows);
+	let one = b"*";
+	n = rows.patch(re"(\d)", one) catch fatal;
+	show("computed", n, rows);
+	let wide = b"**";
+	n = rows.patch(re"V=(.)", wide) catch e {
+		failed("computed too long", e);
+		yield -1;
+	};
+	show("unchanged", n, rows);
+	free(rows.ptr);
+}
+
+fn compiled()
+{
+	let data = "k=1;k=2;k=3".to_bytes();
+	let r = ByteRegex.compile("k=(\\d)") catch fatal;
+	let n = data.patch(r, b"0", 0, 0, -2) catch fatal;
+	show("compiled", n, data);
+	let two = ByteRegex.compile("(\\w)=(\\d)") catch fatal;
+	n = data.patch(two, b"x") catch e {
+		failed("several groups", e);
+		yield -1;
+	};
+	n = data.patch(two, b"K", 1) catch fatal;
+	show("into 1", n, data);
+	n = data.patch(two, b"77", 2) catch e {
+		failed("does not fit", e);
+		yield -1;
+	};
+	n = data.patch(two, b"x", 3) catch e {
+		failed("no group 3", e);
+		yield -1;
+	};
+	show("unchanged", n, data);
+	free(data.ptr);
+}
+
+fn main() -> int
+{
+	sequences();
+	patterns();
+	compiled();
+	return 0;
+}

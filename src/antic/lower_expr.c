@@ -348,14 +348,15 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
     }
     switch (e->kind) {
     /* `none` of a match writes zero into every field, its pattern
-       first. */
+       first. A text of a `ByteMatch` is a `[]byte`, two words as a `str`
+       is. */
     case EXPR_NONE:
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
             struct ir_operand at = lower_offset_address(
                 l, dest, lower_field_offset(l, t, &f->name));
             enum ir_type word = lower_ir_type_of(f->type);
-            if (f->type->kind == TYPE_STR) {
+            if (f->type->kind == TYPE_STR || f->type->kind == TYPE_SLICE) {
                 ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
                 at = lower_offset_address(
                     l, at, lower_field_offset(l, f->type, &lower_len_name));

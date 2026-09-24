@@ -1695,6 +1695,21 @@ static void read_types(struct reader *r)
                 t = types_regex(r->types);
                 break;
             }
+            if (kind == TYPE_STRUCT &&
+                names_lang(&module, &name, LANG_BYTE_REGEX)) {
+                t = types_byte_regex(r->types);
+                break;
+            }
+            if (kind == TYPE_STRUCT &&
+                names_lang(&module, &name, LANG_BYTE_MATCH)) {
+                t = types_match_of(r->types, true);
+                break;
+            }
+            if (kind == TYPE_STRUCT &&
+                names_lang(&module, &name, LANG_BYTE_MATCH_NONE)) {
+                t = types_with_none(r->types, types_match_of(r->types, true));
+                break;
+            }
             /* A match of a literal is written as the plain match of its
                form, since the literal stays in the module that wrote
                it. */

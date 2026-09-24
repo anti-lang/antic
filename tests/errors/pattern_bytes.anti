@@ -1,0 +1,52 @@
+//! Byte patterns and `patch`: a negated class and a range that hold a character
+//! outside ASCII, `(*UCP)` in a byte pattern, a `Regex` passed to a method of
+//! `[]byte` and a `ByteRegex` to a method of `str`, a `with` that does not fit a
+//! byte sequence, a group of a literal or the offset `at`, a pattern of several
+//! groups without `into`, a group the pattern lacks, `into` beside a byte
+//! sequence, `patch` of a `str`, `to_text` of a `str` and a `Match` read as a
+//! `ByteMatch`.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+fn classes(data: []byte)
+{
+	let a = data.matches(re"x[^ó]");
+	let b = data.matches(re"[a-é]");
+	let c = data.matches(re"(*UCP)\d");
+	let d = data.matches(re"[^\x80]");
+}
+
+fn modes(data: []byte, s: str)
+{
+	let r = re"a";
+	let a = data.matches(r);
+	let b: ByteRegex = re"b";
+	let c = s.matches(b);
+}
+
+fn fits(data: []byte)
+{
+	let a = data.patch(x"80 10", x"01 02 03");
+	let b = data.patch(re"v(\d)", b"22");
+	let c = data.patch(x"80 10 20", x"FF", 0, 3);
+	let d = data.patch(re"(a)(b)", b"x");
+	let e = data.patch(re"(a)", b"x", 2);
+	let f = data.patch(re"(a)", b"x", "b");
+	let g = data.patch(x"80", x"01", 1);
+	let h = data.patch(re"v(\d+)", b"2", 0, 1);
+	let i = data.patch(re"v\d", b"222");
+}
+
+fn methods(s: str, data: []byte, m: Match)
+{
+	let a = s.patch(x"80", x"81");
+	let b = s.to_text();
+	let c: ByteMatch = m;
+}
+
+fn main() -> int
+{
+	return 0;
+}

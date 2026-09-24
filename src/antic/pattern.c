@@ -6,14 +6,23 @@
 #include "../rt/regex.h"
 #include "arena.h"
 
-bool pattern_compiles(const char *bytes, size_t length, size_t *offset,
-                      char *message, size_t room)
+static void *compile(const char *bytes, size_t length, bool bytes_mode,
+                     int32_t *code, int64_t *at)
+{
+    return bytes_mode
+               ? anti_rt_regex_compile_bytes((const unsigned char *)bytes,
+                                             (int64_t)length, code, at)
+               : anti_rt_regex_compile((const unsigned char *)bytes,
+                                       (int64_t)length, code, at);
+}
+
+bool pattern_compiles(const char *bytes, size_t length, bool bytes_mode,
+                      size_t *offset, char *message, size_t room)
 {
     unsigned char text[ANTI_RT_REGEX_MESSAGE_ROOM];
     int32_t code = 0;
     int64_t at = 0;
-    void *compiled = anti_rt_regex_compile((const unsigned char *)bytes,
-                                           (int64_t)length, &code, &at);
+    void *compiled = compile(bytes, length, bytes_mode, &code, &at);
     size_t n;
 
     if (compiled != NULL) {
@@ -31,12 +40,11 @@ bool pattern_compiles(const char *bytes, size_t length, size_t *offset,
     return false;
 }
 
-long pattern_group_count(const char *bytes, size_t length)
+long pattern_group_count(const char *bytes, size_t length, bool bytes_mode)
 {
     int32_t code = 0;
     int64_t at = 0;
-    void *compiled = anti_rt_regex_compile((const unsigned char *)bytes,
-                                           (int64_t)length, &code, &at);
+    void *compiled = compile(bytes, length, bytes_mode, &code, &at);
     long count;
 
     if (compiled == NULL) {
@@ -47,13 +55,12 @@ long pattern_group_count(const char *bytes, size_t length)
     return count;
 }
 
-long pattern_group_number(const char *bytes, size_t length, const char *name,
-                          size_t name_length)
+long pattern_group_number(const char *bytes, size_t length, bool bytes_mode,
+                          const char *name, size_t name_length)
 {
     int32_t code = 0;
     int64_t at = 0;
-    void *compiled = anti_rt_regex_compile((const unsigned char *)bytes,
-                                           (int64_t)length, &code, &at);
+    void *compiled = compile(bytes, length, bytes_mode, &code, &at);
     long number;
 
     if (compiled == NULL) {
@@ -96,6 +103,11 @@ struct node {
     struct set set;             /* NODE_SET */
     bool atomic;                /* an atomic group, a possessive repeat */
     bool zero_width;            /* a lookaround, which consumes no text */
+    /* A backreference or a call, which may be empty. A condition,
+       `(?(...)yes|no)`. The number of a capturing group, or 0. */
+    bool unknown;
+    bool conditional;
+    long capture;
     long min;                   /* NODE_REPEAT, and max -1 for no bound */
     long max;
     struct pattern_span span;
@@ -108,6 +120,8 @@ struct reader {
     struct arena *arena;
     bool caseless;              /* `(?i)` */
     bool extended;              /* `(?x)` */
+    long groups;                /* the capturing groups opened so far */
+    bool unsure;                /* `(?|`, `(?n)` or `\K`: no least length */
 };
 
 static void set_add(struct set *s, unsigned c)
@@ -545,6 +559,7 @@ static struct node *parse_escape(struct reader *r, size_t start)
     e = r->s[r->pos];
     switch (e) {
     case 'b': case 'B': case 'A': case 'Z': case 'z': case 'G': case 'K':
+        r->unsure = r->unsure || e == 'K';
         r->pos++;
         n = new_node(r, NODE_EMPTY, start);
         n->span.end = r->pos;
@@ -579,13 +594,17 @@ static struct node *parse_escape(struct reader *r, size_t start)
             }
             (void)read_number(r);
         }
-        return opaque(r, start);
+        n = opaque(r, start);
+        n->unknown = true;
+        return n;
     default:
         break;
     }
     if (e >= '1' && e <= '9') {
         (void)read_number(r);
-        return opaque(r, start);
+        n = opaque(r, start);
+        n->unknown = true;
+        return n;
     }
     /* The escape of one character reads as it does in a class. */
     r->pos = start;
@@ -650,6 +669,8 @@ static int read_flags(struct reader *r)
             r->caseless = on;
         } else if (c == 'x') {
             r->extended = on;
+        } else if (c == 'n') {
+            r->unsure = true;
         }
         r->pos++;
     }
@@ -683,6 +704,7 @@ static struct node *parse_group(struct reader *r, size_t start)
         return group;
     }
     if (c != '?') {
+        group->capture = ++r->groups;
         return group_body(r, group);
     }
     r->pos++;
@@ -690,6 +712,7 @@ static struct node *parse_group(struct reader *r, size_t start)
     switch (c) {
     case ':':
     case '|':
+        r->unsure = r->unsure || c == '|';
         r->pos++;
         return group_body(r, group);
     case '>':
@@ -707,19 +730,24 @@ static struct node *parse_group(struct reader *r, size_t start)
             group->zero_width = true;
             return group_body(r, group);
         }
+        group->capture = ++r->groups;
         skip_past(r, '>');
         return group_body(r, group);
     case '\'':
+        group->capture = ++r->groups;
         r->pos++;
         skip_past(r, '\'');
         return group_body(r, group);
     case 'P':
         if (peek(r, 1) == '<') {
+            group->capture = ++r->groups;
             skip_past(r, '>');
             return group_body(r, group);
         }
         skip_past(r, ')');
-        return opaque(r, start);
+        group = opaque(r, start);
+        group->unknown = true;
+        return group;
     case '#':
         skip_past(r, ')');
         return NULL;
@@ -743,6 +771,7 @@ static struct node *parse_group(struct reader *r, size_t start)
                 break;
             }
         }
+        group->conditional = true;
         return group_body(r, group);
     }
     case '[':
@@ -760,7 +789,9 @@ static struct node *parse_group(struct reader *r, size_t start)
         ((c == '+' || c == '-') && peek(r, 1) >= 0 &&
          is_digit((unsigned)peek(r, 1)))) {
         skip_past(r, ')');
-        return opaque(r, start);
+        group = opaque(r, start);
+        group->unknown = true;
+        return group;
     }
     {
         bool caseless = r->caseless;
@@ -1061,4 +1092,100 @@ bool pattern_exponential(const char *bytes, size_t length,
     found = find_nested(root, inner, outer);
     arena_free(&arena);
     return found;
+}
+
+/* The value of n times each, capped far below the range of a long. */
+static long times(long n, long each)
+{
+    const long cap = 1L << 30;
+
+    if (n == 0 || each == 0) {
+        return 0;
+    }
+    return n > cap / each ? cap : n * each;
+}
+
+/* The fewest characters n can match. A character is one byte at least,
+   so the count is a least count of bytes as well. */
+static long least(const struct node *n)
+{
+    long total;
+    long one;
+    size_t i;
+
+    switch (n->kind) {
+    case NODE_SET:
+        return n->unknown ? 0 : 1;
+    case NODE_EMPTY:
+        return 0;
+    case NODE_CAT:
+        total = 0;
+        for (i = 0; i < n->count; i++) {
+            total += least(n->children[i]);
+            total = total > 1L << 30 ? 1L << 30 : total;
+        }
+        return total;
+    case NODE_ALT:
+        total = -1;
+        for (i = 0; i < n->count; i++) {
+            one = least(n->children[i]);
+            total = total < 0 || one < total ? one : total;
+        }
+        return total < 0 ? 0 : total;
+    case NODE_GROUP:
+        if (n->zero_width || n->count == 0) {
+            return 0;
+        }
+        /* A condition with one branch may match nothing. */
+        if (n->conditional && n->children[0]->kind != NODE_ALT) {
+            return 0;
+        }
+        return least(n->children[0]);
+    case NODE_REPEAT:
+        return times(n->min, least(n->children[0]));
+    }
+    return 0;
+}
+
+static const struct node *find_group(const struct node *n, long group)
+{
+    const struct node *found;
+    size_t i;
+
+    if (n->kind == NODE_GROUP && n->capture == group) {
+        return n;
+    }
+    for (i = 0; i < n->count; i++) {
+        if ((found = find_group(n->children[i], group)) != NULL) {
+            return found;
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: the fit rule of `patch` asks, for a pattern literal, whether
+   `with` fits every span a match can give. The reader answers with the
+   fewest bytes the group can match. A backreference or a call counts as
+   empty, and a branch reset, `(?n)` and `\K` give no answer at all, so
+   the count is 0 and only an empty `with` fits. Counting too few can
+   refuse a call that would have fit, and never passes one that cannot. */
+long pattern_least_bytes(const char *bytes, size_t length, long group)
+{
+    struct arena arena = {0};
+    struct reader r;
+    const struct node *root;
+    const struct node *n;
+    long count = 0;
+
+    memset(&r, 0, sizeof r);
+    r.s = (const unsigned char *)bytes;
+    r.n = length;
+    r.arena = &arena;
+    root = parse_alt(&r);
+    n = group == 0 ? root : find_group(root, group);
+    if (n != NULL && !r.unsure) {
+        count = least(n);
+    }
+    arena_free(&arena);
+    return count;
 }

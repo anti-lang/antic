@@ -4,8 +4,10 @@
 //! string, and `equal` compares two by their bytes. `Builder` collects bytes
 //! and gives the `str` of what it collected. It writes numbers, truth values,
 //! characters and texts into fields of a width, which is what an `f"..."`
-//! calls. `parse_int` reads the integer a text spells and may fail, and every
-//! other function of the module cannot.
+//! calls. `parse_int` reads the integer a text spells and may fail.
+//! `to_bytes` copies a text into new bytes, and `to_text` copies bytes into a
+//! new text and fails when they are no valid UTF-8. `s.to_bytes()` and
+//! `data.to_text()` call them. Every other function of the module cannot fail.
 
 import anti.lang;
 import anti.mem;
@@ -14,6 +16,9 @@ extern fn memcmp(a: ?*byte, b: ?*byte, count: c_size_t) -> c_int;
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
 extern fn anti_rt_text_slice(bytes: ?*byte, len: int) -> str;
+extern fn anti_rt_text_copy(bytes: ?*byte, len: int) -> str;
+extern fn anti_rt_bytes_copy(bytes: ?*byte, len: int) -> []byte;
+extern fn anti_rt_text_invalid(bytes: ?*byte, len: int) -> int;
 extern fn anti_rt_builder_append(b: ?*Builder, bytes: ?*byte, len: int);
 extern fn anti_rt_builder_text(b: ?*Builder) -> str;
 extern fn anti_rt_builder_clear(b: ?*Builder);
@@ -45,6 +50,27 @@ pub fn from_c(bytes: ?*byte) -> str
 pub fn from_bytes(bytes: []byte) -> str
 {
 	return anti_rt_text_slice(bytes.ptr, bytes.len);
+}
+
+/// A copy of the bytes of `s`, in new memory of the C library that the program
+/// frees with `free(result.ptr)`. `s.to_bytes()` calls it.
+///
+/// It copies, since the bytes can be written and a `str` never changes.
+pub fn to_bytes(s: str) -> []byte
+{
+	return anti_rt_bytes_copy(s.ptr, s.len);
+}
+
+/// A text of a copy of `data`, in new memory of the C library that the program
+/// frees with `free(result.ptr)`. `data.to_text()` calls it.
+///
+/// It fails when the bytes are no valid UTF-8.
+pub fn to_text(data: []byte) -> str may fail
+{
+	if anti_rt_text_invalid(data.ptr, data.len) >= 0 {
+		fail "the bytes are no valid UTF-8";
+	}
+	return anti_rt_text_copy(data.ptr, data.len);
 }
 
 /// The number of bytes of `s`.

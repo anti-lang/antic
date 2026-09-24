@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "std.h"
+#include "utf.h"
 
 struct anti_text anti_rt_text_from_c(const unsigned char *bytes)
 {
@@ -22,6 +23,51 @@ struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len)
     text.ptr = bytes;
     text.len = len;
     return text;
+}
+
+/* DESIGN: `s.to_bytes()` and `data.to_text()` copy, since a `[]byte` can
+   be written and a `str` never changes. The copy is memory of the C
+   library, which the program frees with `free(result.ptr)`, as it frees
+   the text of an `f"..."`. An empty copy still holds one byte, so its
+   pointer is never null. */
+struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
+{
+    struct anti_text text;
+    unsigned char *copy = malloc(len > 0 ? (size_t)len : 1);
+
+    if (copy == NULL) {
+        anti_rt_fail_abort("anti: out of memory in a copy of %lld bytes",
+                           (long long)len);
+    }
+    if (len > 0) {
+        memcpy(copy, bytes, (size_t)len);
+    }
+    text.ptr = copy;
+    text.len = len;
+    return text;
+}
+
+/* The copy of anti_rt_text_copy, which anti.text declares as `[]byte`. */
+struct anti_text anti_rt_bytes_copy(const unsigned char *bytes, int64_t len)
+{
+    return anti_rt_text_copy(bytes, len);
+}
+
+/* The offset of the first byte of the len bytes at bytes that starts no
+   well-formed UTF-8 sequence, or -1 when they are valid UTF-8. */
+int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len)
+{
+    int64_t i = 0;
+
+    while (i < len) {
+        size_t length = 0;
+        (void)anti_rt_utf8_decode(bytes + i, (size_t)(len - i), &length);
+        if (length == 0) {
+            return i;
+        }
+        i += (int64_t)length;
+    }
+    return -1;
 }
 
 int anti_rt_same_bytes(const unsigned char *a, int64_t a_length,

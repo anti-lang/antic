@@ -1,0 +1,17 @@
+pattern_bytes.anti:15:29: error: malformed pattern: a byte pattern cannot negate a class that holds a character outside ASCII, which text mode can
+pattern_bytes.anti:16:29: error: malformed pattern: a range of a byte pattern cannot reach beyond ASCII, which text mode can
+pattern_bytes.anti:17:32: error: malformed pattern: using UCP is disabled by the application
+pattern_bytes.anti:24:23: error: expected `ByteRegex`, found `Regex`
+pattern_bytes.anti:26:20: error: expected `Regex`, found `ByteRegex`
+pattern_bytes.anti:31:31: error: `with` of 3 bytes at offset 0 does not fit the 2 bytes of `find`
+pattern_bytes.anti:32:32: error: `with` of 2 bytes at offset 0 does not fit group 1 of the pattern, which can be 1 byte long
+pattern_bytes.anti:33:34: error: `with` of 1 byte at offset 3 does not fit the 3 bytes of `find`
+pattern_bytes.anti:34:10: error: the pattern has 2 groups, so `patch` names the one it writes into with `into`
+pattern_bytes.anti:35:36: error: the pattern has 1 group, and 2 is none of them
+pattern_bytes.anti:36:36: error: the pattern has no group `b`
+pattern_bytes.anti:37:35: error: `into` names a group of a pattern, and a byte sequence has none, so it is 0
+pattern_bytes.anti:38:33: error: `with` of 1 byte at offset 1 does not fit group 1 of the pattern, which can be 1 byte long
+pattern_bytes.anti:39:30: error: `with` of 3 bytes at offset 0 does not fit the match, which can be 2 bytes long
+pattern_bytes.anti:44:10: error: `str` has no field `patch`
+pattern_bytes.anti:45:10: error: `str` has no field `to_text`
+pattern_bytes.anti:46:21: error: expected `ByteMatch`, found `Match`

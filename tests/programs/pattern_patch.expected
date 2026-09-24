@@ -1,0 +1,23 @@
+exit 0
+whole 2 [\x81\x10 0\x00\x81\x10 0]
+at 2 2 [\x81\x10\xFF0\x00\x81\x10\xFF0]
+last 1 [\x81\x10\xFF0\x00\x81\x10wf]
+nowhere 0 [\x81\x10\xFF0\x00\x81\x10wf]
+too long LengthMismatch
+past the end LengthMismatch
+unchanged -1 [\x81\x10\xFF0\x00\x81\x10wf]
+version 1 [version: 1.10.2]
+longer span 1 [version: 1.10.20]
+first two 2 [a#11 b#22 c=33 d=44]
+by name 2 [a#11 b#22 V=33 V=44]
+by number 1 [a#11 b#22 V=33 V=49]
+no part 0 [a#11 b#22 V=33 V=49]
+computed 8 [a#** b#** V=** V=**]
+computed too long LengthMismatch
+unchanged -1 [a#** b#** V=** V=**]
+compiled 2 [k=1;k=0;k=0]
+several groups MissingGroup
+into 1 3 [K=1;K=0;K=0]
+does not fit LengthMismatch
+no group 3 MissingGroup
+unchanged -1 [K=1;K=0;K=0]

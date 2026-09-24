@@ -1,4 +1,4 @@
-pattern_methods.anti:49:16: error: `?` stands before `*T`, `fn(...)` or `Match`, found `Regex`
+pattern_methods.anti:49:16: error: `?` stands before `*T`, `fn(...)`, `Match` or `ByteMatch`, found `Regex`
 pattern_methods.anti:14:14: error: `m` may be `none`, test it before reading it
 pattern_methods.anti:18:10: error: the pattern has no group `day`
 pattern_methods.anti:19:10: error: the pattern has 2 groups, and 3 is none of them

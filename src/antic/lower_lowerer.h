@@ -86,12 +86,14 @@ struct try_scope {
     struct try_scope *outer;
 };
 
-/* One pattern literal of the module: the global of its bytes, their
-   count and the global that holds its compiled Regex. */
+/* One pattern literal of the module. It holds the global of its bytes,
+   their count and the global of its compiled Regex or ByteRegex. bytes
+   marks a byte pattern. */
 struct lower_pattern {
     uint32_t text;
     int64_t length;
     uint32_t slot;
+    bool bytes;
 };
 
 struct lowerer {

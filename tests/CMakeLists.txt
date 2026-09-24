@@ -120,7 +120,7 @@ foreach(which one two)
 endforeach()
 add_executable(rt_plugin_tests unit/test_plugin_race.c ../src/rt/plugin.c
     ../src/rt/assert.c ../src/rt/loaded.c ../src/rt/atomic.c
-    ../src/rt/digest.c ../src/rt/text.c ../src/rt/toml.c
+    ../src/rt/digest.c ../src/rt/text.c ../src/rt/toml.c ../src/rt/utf.c
     ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
@@ -154,7 +154,7 @@ add_library(plugin_bad SHARED unit/plugin_bad.c)
 add_executable(rt_plugin_table_tests unit/test_plugin_table.c
     ../src/rt/plugin.c ../src/rt/assert.c ../src/rt/loaded.c
     ../src/rt/atomic.c ../src/rt/digest.c ../src/rt/text.c ../src/rt/toml.c
-    ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
+    ../src/rt/utf.c ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_plugin_table_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_plugin_table_tests PRIVATE
@@ -581,6 +581,29 @@ add_test(NAME program_deserialize_dev
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_tests_properties(program_deserialize_dev PROPERTIES
     FIXTURES_REQUIRED mem_dev_object)
+# The methods of `[]byte` and `patch` in dev mode, where the byte
+# literals compile in the constructor of the program's module. The
+# conversions call anti.text, whose object imports anti.mem.
+add_test(NAME dev_object_text
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/text.antl")
+set_tests_properties(dev_object_text PROPERTIES FIXTURES_SETUP text_dev_object)
+foreach(name IN ITEMS pattern_bytes pattern_patch)
+    add_test(NAME program_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev.o"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_property(TEST program_${name}_dev PROPERTY FIXTURES_REQUIRED
+        lang_dev_object regex_dev_object text_dev_object mem_dev_object)
+endforeach()
 # The hooks under the options that decide them. hooks.anti,
 # hook_trace.anti and trace_handlers.anti run above without options,
 # which is release mode. The five always-on hooks fire there and the call
@@ -2965,7 +2988,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "pattern_exponential|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_exponential.s,pattern_exponential.anti"
         "pattern_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_import.s,pattern_import.anti"
         "pattern_level|--target,linux-x86_64,--cpu,v1,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_level,pattern_level.anti"
-        "pattern_methods|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_methods.s,pattern_methods.anti")
+        "pattern_methods|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_methods.s,pattern_methods.anti"
+        "pattern_bytes|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_bytes.s,pattern_bytes.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

@@ -1,0 +1,38 @@
+exit 0
+all [\x89PNG\x0D\x0A\x1A\x0A\xFF]
+group 1 [\x0D\x0A\x1A\x0A]
+group 2 [\xFF]
+post [\x00]
+any byte [\x00]
+tested
+no digit
+literal [versi\xC3\xB3n]
+repeat [\xC3\xB3\xC3\xB3\xC3\xB3]
+class [\xC3\xB3]
+class [a]
+word [a1]
+word [_]
+word [b]
+key [k2]
+value [v2]
+key [k3]
+value [v3]
+piece [k1=v1]
+piece [k2=v2]
+piece []
+piece [k3=v3]
+parts 2
+first [k1=v1]
+rest [k2=v2;;k3=v3]
+template [v1:k1;v2:k2;;v3:k3]
+function [k<one>=v<one>;k2=v2;;k3=v3]
+zeros 3
+compiled class [\xC3\xB3]
+negated at 3
+range at 3
+byte range [\x80\xFF]
+(*UCP) refused
+bytes 6
+héllo Héllo
+the bytes are no valid UTF-8
+left 0

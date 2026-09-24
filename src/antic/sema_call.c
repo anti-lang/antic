@@ -1544,21 +1544,25 @@ static struct type *check_regex_compile(struct checker *c, struct expr *e,
                                        sizeof REGEX_MODULE - 1};
     struct expr *callee = e->as.call.callee;
     const struct name *name = &callee->as.field.name;
+    bool bytes = sema_name_is(&callee->as.field.base->as.name,
+                              LANG_BYTE_REGEX);
+    const char *type = bytes ? LANG_BYTE_REGEX : LANG_REGEX;
+    const char *function = bytes ? REGEX_COMPILE_BYTES : REGEX_COMPILE;
     const struct interface *lib;
     struct symbol *home;
     struct scope scope;
     struct type *t;
 
     if (!sema_name_is(name, REGEX_COMPILE)) {
-        sema_error_at(c, callee->pos, "`" LANG_REGEX "` has no function "
-                      "`%.*s`", (int)name->length, name->text);
+        sema_error_at(c, callee->pos, "`%s` has no function `%.*s`", type,
+                      (int)name->length, name->text);
         return sema_builtin(c, TYPE_ERROR);
     }
     lib = sema_find_library(c, &module);
     if (lib == NULL) {
-        sema_error_at(c, e->pos, "`" LANG_REGEX "." REGEX_COMPILE "` calls `"
-                      REGEX_MODULE "." REGEX_COMPILE "`, so the module "
-                      "imports `" REGEX_MODULE "`");
+        sema_error_at(c, e->pos, "`%s." REGEX_COMPILE "` calls `"
+                      REGEX_MODULE ".%s`, so the module imports `"
+                      REGEX_MODULE "`", type, function);
         return sema_builtin(c, TYPE_ERROR);
     }
     sema_enter_scope(c, &scope);
@@ -1566,6 +1570,8 @@ static struct type *check_regex_compile(struct checker *c, struct expr *e,
                         "`%.*s` is already declared");
     home->home = lib;
     callee->as.field.base->as.name = hidden_regex;
+    callee->as.field.name.text = function;
+    callee->as.field.name.length = strlen(function);
     t = sema_check_call(c, e, expected);
     sema_leave_scope(c, &scope);
     return t;
@@ -2101,7 +2107,8 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
     }
     if (callee->kind == EXPR_FIELD &&
         callee->as.field.base->kind == EXPR_NAME &&
-        sema_name_is(&callee->as.field.base->as.name, LANG_REGEX) &&
+        (sema_name_is(&callee->as.field.base->as.name, LANG_REGEX) ||
+         sema_name_is(&callee->as.field.base->as.name, LANG_BYTE_REGEX)) &&
         sema_lookup(c, &callee->as.field.base->as.name) == NULL) {
         return check_regex_compile(c, e, expected);
     }

@@ -1,0 +1,186 @@
+//! The methods of `[]byte` with a byte pattern. A pattern literal takes its
+//! mode from where it stands, so a literal at a method of `[]byte` or in a
+//! `ByteRegex` variable is a byte pattern, where `.` matches any byte and
+//! `\x89` is the byte 0x89. A character outside ASCII stands for its UTF-8
+//! bytes, and a class that lists one becomes a choice of byte sequences. A match
+//! gives `[]byte` slices of the searched data. `ByteRegex.compile` refuses a
+//! negated class and a range that hold a character outside ASCII. `to_bytes`
+//! and `to_text` copy, and `to_text` fails on bytes that are no valid UTF-8.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, data: []byte)
+{
+	printf("%.*s [".ptr, label.len as c_int, label.ptr);
+	for i in 0..data.len {
+		let b = data[i];
+		if b >= 0x20 && b < 0x7F {
+			printf("%c".ptr, b as c_int);
+		} else {
+			printf("\\x%02X".ptr, b as c_int);
+		}
+	}
+	printf("]\n".ptr);
+}
+
+fn count(label: str, n: int)
+{
+	printf("%.*s %lld\n".ptr, label.len as c_int, label.ptr, n);
+}
+
+fn mode()
+{
+	let data = x"89 50 4E 47 0D 0A 1A 0A FF 00";
+	let m = data.matches(re"\x89PNG(....)(.)") else {
+		printf("no header\n".ptr);
+		return;
+	};
+	show("all", m.all);
+	show("group 1", m.1);
+	show("group 2", m.group(2));
+	show("post", m.post);
+	let held: ByteRegex = re"\xFF(.)";
+	let tail = data.matches(held) catch fatal;
+	if tail {
+		show("any byte", tail.group(1));
+	}
+	if data.matches(re"PNG") {
+		printf("tested\n".ptr);
+	}
+	if !data.matches(re"\d") {
+		printf("no digit\n".ptr);
+	}
+}
+
+fn characters()
+{
+	let word = "versión 2".to_bytes();
+	if let m = word.matches(re"versión") {
+		show("literal", m.all);
+	} else {
+		printf("versión missed\n".ptr);
+	}
+	let repeated = "óóóa".to_bytes();
+	let r = repeated.matches(re"ó+") else {
+		return;
+	};
+	show("repeat", r.all);
+	let mixed = "cóa-b".to_bytes();
+	for m in mixed.find_all(re"[óa]") {
+		show("class", m.all);
+	}
+	let ascii = "a1ٳ_ b".to_bytes();
+	for m in ascii.find_all(re"\w+") {
+		show("word", m.all);
+	}
+	free(word.ptr);
+	free(repeated.ptr);
+	free(mixed.ptr);
+	free(ascii.ptr);
+}
+
+fn doubled(m: ByteMatch) -> []byte
+{
+	if m.all.len > 1 {
+		return b"<long>";
+	}
+	return b"<one>";
+}
+
+fn walks()
+{
+	let data = b"k1=v1;k2=v2;;k3=v3";
+	for m in data.find_all(re"(?<key>\w+)=(\w+)", -2) {
+		show("key", m.key);
+		show("value", m.2);
+	}
+	for piece in data.split(re";") {
+		show("piece", piece);
+	}
+	let parts = data.split(re";+", 1).to_slice();
+	count("parts", parts.len);
+	show("first", parts[0]);
+	show("rest", parts[1]);
+	free(parts.ptr);
+	let swapped = data.replace(re"(\w+)=(\w+)", b"$2:$1");
+	show("template", swapped);
+	free(swapped.ptr);
+	let marked = data.replace(re"\d+", doubled, 2);
+	show("function", marked);
+	free(marked.ptr);
+}
+
+fn compiled()
+{
+	let r = ByteRegex.compile("\\x00+") catch fatal;
+	let data = x"01 00 00 02 00";
+	let n = 0;
+	let found = data.find_all(r) catch fatal;
+	for m in found {
+		n += m.all.len;
+	}
+	count("zeros", n);
+	let wide = ByteRegex.compile("[óa]") catch fatal;
+	let m = "xó".to_bytes().matches(wide) catch fatal;
+	if m {
+		show("compiled class", m.all);
+	}
+	let fallback = ByteRegex.compile("x") catch fatal;
+	let negated = ByteRegex.compile("x[^ó]") catch e {
+		if e is *regex.BadPattern {
+			let bad = e as *regex.BadPattern;
+			count("negated at", bad.position);
+		}
+		yield fallback;
+	};
+	let range = ByteRegex.compile("[a-é]") catch e {
+		if e is *regex.BadPattern {
+			let bad = e as *regex.BadPattern;
+			count("range at", bad.position);
+		}
+		yield negated;
+	};
+	let bytes = ByteRegex.compile("[\\x80-\\xFF]+") catch fatal;
+	let high = x"41 80 FF 42".matches(bytes) catch fatal;
+	if high {
+		show("byte range", high.all);
+	}
+	let ucp = ByteRegex.compile("(*UCP)\\d") catch e {
+		printf("(*UCP) refused\n".ptr);
+		yield range;
+	};
+	let unused = ucp;
+}
+
+fn conversions()
+{
+	let text = "héllo";
+	let bytes = text.to_bytes();
+	count("bytes", bytes.len);
+	bytes[0] = 0x48;
+	let back = bytes.to_text() catch fatal;
+	printf("%.*s %.*s\n".ptr, text.len as c_int, text.ptr, back.len as c_int,
+		back.ptr);
+	free(back.ptr);
+	free(bytes.ptr);
+	let bad = x"61 C3";
+	let t = bad.to_text() catch e {
+		printf("%.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield "";
+	};
+	count("left", t.len);
+}
+
+fn main() -> int
+{
+	mode();
+	characters();
+	walks();
+	compiled();
+	conversions();
+	return 0;
+}

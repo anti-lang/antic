@@ -246,6 +246,8 @@ struct types {
     struct type *mutex;             /* anti.lang.Mutex */
     struct type *regex;             /* anti.lang.Regex */
     struct type *match;             /* anti.lang.Match without a literal */
+    struct type *byte_regex;        /* anti.lang.ByteRegex */
+    struct type *byte_match;        /* anti.lang.ByteMatch without one */
     struct type *object_lock;       /* the hidden lock of a class */
     struct type *field_record;      /* anti.lang.FieldDescriptor */
 };
@@ -378,6 +380,14 @@ struct type *types_object(struct types *types);
    call of `compile` of `anti.regex`, which the module then imports, and
    so is a pattern literal, whose errors are classes of that module. */
 #define LANG_REGEX "Regex"
+/* DESIGN: `ByteRegex` is the built-in struct of a pattern of bytes, in
+   the form of `Regex`, which searches a `[]byte`. A pattern literal takes
+   its mode from where it stands, so it is a `ByteRegex` where one is
+   expected and a `Regex` everywhere else. `ByteRegex.compile(text)` is a
+   call of `compile_bytes` of `anti.regex`. */
+#define LANG_BYTE_REGEX "ByteRegex"
+#define REGEX_COMPILE_BYTES "compile_bytes"
+#define REGEX_LITERAL_BYTES "anti_rt_regex_literal_bytes"
 #define REGEX_HANDLE "handle"
 #define REGEX_COMPILE "compile"
 #define REGEX_MODULE "anti.regex"
@@ -394,6 +404,11 @@ struct type *types_object(struct types *types);
    of `anti.regex`, which the checker calls in their place. */
 #define LANG_MATCH "Match"
 #define LANG_MATCH_NONE "?Match"
+/* DESIGN: `ByteMatch` is the match of a byte pattern. It has the fields of
+   a `Match` in the same order, and `all`, `pre`, `post` and its groups are
+   `[]byte` slices of the searched data. */
+#define LANG_BYTE_MATCH "ByteMatch"
+#define LANG_BYTE_MATCH_NONE "?ByteMatch"
 #define MATCH_PATTERN "(pattern)"
 #define MATCH_ALL "all"
 #define MATCH_PRE "pre"
@@ -543,13 +558,23 @@ bool types_is_object_lock(const struct type *t);
 bool types_is_mutex(const struct type *t);
 /* The struct `anti.lang.Regex`, one for the compilation. */
 struct type *types_regex(struct types *types);
-/* Whether t is the struct that types_regex made. */
+/* The struct `anti.lang.ByteRegex`, one for the compilation. */
+struct type *types_byte_regex(struct types *types);
+/* Whether t is the struct that types_regex or types_byte_regex made. */
 bool types_is_regex(const struct type *t);
-/* The `Match` of the pattern literal pattern, or the plain one for NULL.
+/* Whether t is the struct that types_byte_regex made. */
+bool types_is_byte_regex(const struct type *t);
+/* The `Match` of the pattern literal pattern, or the plain one for NULL,
+   and a `ByteMatch` for a literal that is a `ByteRegex`.
    types_with_none gives its `?Match`. */
 struct type *types_match(struct types *types, const struct expr *pattern);
-/* Whether t is a `Match` or a `?Match` of any literal. */
+/* The plain `Match`, or the plain `ByteMatch` when bytes holds. */
+struct type *types_match_of(struct types *types, bool bytes);
+/* Whether t is a `Match`, a `ByteMatch` or either with `?`, of any
+   literal. */
 bool types_is_match(const struct type *t);
+/* Whether t is a `ByteMatch` or a `?ByteMatch`. */
+bool types_is_byte_match(const struct type *t);
 /* The match t without its literal, in the same form. */
 struct type *types_match_plain(struct types *types, struct type *t);
 /* `chan T`, one per element type. */

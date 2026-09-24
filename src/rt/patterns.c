@@ -33,6 +33,26 @@ void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
     return compiled;
 }
 
+/* The byte pattern literal of length bytes at bytes, compiled before main
+   as anti_rt_regex_literal compiles a pattern of text. */
+void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
+{
+    unsigned char message[ANTI_RT_REGEX_MESSAGE_ROOM];
+    int32_t code = 0;
+    int64_t offset = 0;
+    void *compiled;
+
+    anti_rt_cpu_check();
+    compiled = anti_rt_regex_compile_bytes(bytes, length, &code, &offset);
+    if (compiled == NULL) {
+        anti_rt_regex_message_into(code, message, sizeof message);
+        anti_rt_fail_exit(70, "anti: the byte pattern `%.*s` does not "
+                          "compile at start: %s", (int)length,
+                          (const char *)bytes, (const char *)message);
+    }
+    return compiled;
+}
+
 /* The error numbers of PCRE2 lie between -256 and 511: the failures of a
    match below zero and those of a compile from 100 up. */
 #define MESSAGE_LOW (-256)
@@ -190,7 +210,8 @@ static int crlf_newline(const void *pattern)
            newline == PCRE2_NEWLINE_ANYCRLF;
 }
 
-/* The offset of the character after the one at at. */
+/* The offset of the character after the one at at. A byte pattern
+   steps one byte, since its text holds no characters. */
 static int64_t next_character(const struct anti_cursor *c, int64_t at)
 {
     const unsigned char *s = c->subject.ptr;
@@ -201,6 +222,9 @@ static int64_t next_character(const struct anti_cursor *c, int64_t at)
         return at + 2;
     }
     at++;
+    if (anti_rt_regex_is_bytes(c->pattern)) {
+        return at;
+    }
     while (at < length && (s[at] & 0xC0) == 0x80) {
         at++;
     }
@@ -641,6 +665,136 @@ int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
     return DONE;
 }
 
+/* What `patch` gives beside the count of the places it patched. */
+#define MISFIT (-2)
+#define MISSING (-3)
+
+/* DESIGN: `patch` with a pattern writes with at offset at inside the
+   group into of every match the limit takes. The data never changes
+   length. into 0 takes the one group of a pattern with one, or the whole
+   match of a pattern without groups. A pattern with more needs into, by
+   number or by the name of name_length bytes. The walk runs twice over
+   the same matches: once to count and to find that every span takes
+   with, once to write. The limit of a search, a missing group and a with
+   that does not fit are so found before any byte changes. A match whose group did not take part is
+   passed over and not counted. */
+int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
+                            int64_t length, const unsigned char *with,
+                            int64_t with_length, int64_t into,
+                            const unsigned char *name, int64_t name_length,
+                            int64_t at, int64_t limit)
+{
+    int64_t count = anti_rt_regex_group_count(pattern);
+    int64_t group = into;
+    int64_t places = 0;
+    int pass;
+
+    if (name_length > 0) {
+        group = anti_rt_regex_group_number(pattern, name, name_length);
+        if (group < 0) {
+            return MISSING;
+        }
+    } else if (into == 0) {
+        if (count > 1) {
+            return MISSING;
+        }
+        group = count;
+    } else if (into < 0 || into > count) {
+        return MISSING;
+    }
+    if (at < 0) {
+        return MISFIT;
+    }
+    for (pass = 0; pass < 2; pass++) {
+        struct anti_matches it;
+        pcre2_match_data *md = match_data(pattern, 1);
+        int64_t status = walk_begin(&it, pattern, data, length, limit);
+        places = 0;
+        while (status >= 0 &&
+               (status = advance(&it.cursor, &it.current, md)) == FOUND) {
+            const PCRE2_SIZE *ov = pcre2_get_ovector_pointer(md);
+            int64_t start = (int64_t)ov[2 * group];
+            int64_t end = (int64_t)ov[2 * group + 1];
+            if (ov[2 * group] == PCRE2_UNSET) {
+                continue;
+            }
+            if (at + with_length > end - start) {
+                status = MISFIT;
+                break;
+            }
+            if (pass == 1 && with_length > 0) {
+                memcpy(data + start + at, with, (size_t)with_length);
+            }
+            places++;
+        }
+        pcre2_match_data_free(md);
+        if (status < 0) {
+            return status;
+        }
+    }
+    return places;
+}
+
+/* The first place from from on where the find_length bytes at find stand
+   in the length bytes at data, or -1. */
+static int64_t find_bytes(const unsigned char *data, int64_t length,
+                          const unsigned char *find, int64_t find_length,
+                          int64_t from)
+{
+    int64_t i;
+
+    for (i = from; i + find_length <= length; i++) {
+        if (data[i] == find[0] &&
+            memcmp(data + i, find, (size_t)find_length) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* DESIGN: `patch` with a byte sequence writes with at offset at inside
+   every place the sequence stands, left to right and without overlap. A
+   limit takes places as it takes matches. The span is the whole
+   place, so a with that does not fit is found before any byte changes.
+   An empty sequence stands nowhere, so it patches nothing. */
+int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
+                            const unsigned char *find, int64_t find_length,
+                            const unsigned char *with, int64_t with_length,
+                            int64_t at, int64_t limit)
+{
+    int64_t total = 0;
+    int64_t skip = 0;
+    int64_t places = 0;
+    int64_t i;
+
+    if (at < 0 || at + with_length > find_length) {
+        return MISFIT;
+    }
+    if (find_length == 0) {
+        return 0;
+    }
+    if (limit < 0) {
+        for (i = find_bytes(data, length, find, find_length, 0); i >= 0;
+             i = find_bytes(data, length, find, find_length, i + find_length)) {
+            total++;
+        }
+        skip = total + limit > 0 ? total + limit : 0;
+    }
+    for (i = find_bytes(data, length, find, find_length, 0);
+         i >= 0 && (limit <= 0 || places < limit);
+         i = find_bytes(data, length, find, find_length, i + find_length)) {
+        if (skip > 0) {
+            skip--;
+            continue;
+        }
+        if (with_length > 0) {
+            memcpy(data + i + at, with, (size_t)with_length);
+        }
+        places++;
+    }
+    return places;
+}
+
 /* DESIGN: a text that grows, as anti.regex.Growing holds it. `replace`
    with a function writes its result into one without anti.text, so a
    program of patterns links nothing it does not name. */
@@ -717,4 +871,53 @@ _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
                        (const char *)file, (long long)line,
                        (int)template_length, (const char *)bytes,
                        (int)pattern_length, (const char *)pattern);
+}
+
+/* DESIGN: a `ByteMatch` has the layout of a `Match`, and a `[]byte` the
+   layout of a `str`. The searches of a `[]byte` are therefore the same
+   functions, under names of their own, since anti.regex declares each
+   external function with one signature. */
+int64_t anti_rt_regex_first_bytes(const void *pattern, const unsigned char *s,
+                                  int64_t length, struct anti_match *out)
+{
+    return anti_rt_regex_first(pattern, s, length, out);
+}
+
+int64_t anti_rt_regex_next_bytes(struct anti_cursor *c,
+                                 struct anti_match *current)
+{
+    return anti_rt_regex_next(c, current);
+}
+
+struct anti_match *anti_rt_regex_current_bytes(struct anti_match *current)
+{
+    return current;
+}
+
+int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,
+                                  struct anti_text *out)
+{
+    return anti_rt_regex_group(m, n, out);
+}
+
+int64_t anti_rt_regex_group_named_bytes(const struct anti_match *m,
+                                        const unsigned char *name,
+                                        int64_t length, struct anti_text *out)
+{
+    return anti_rt_regex_group_named(m, name, length, out);
+}
+
+int64_t anti_rt_regex_replace_bytes(const void *pattern,
+                                    const unsigned char *s, int64_t length,
+                                    const unsigned char *bytes,
+                                    int64_t template_length, int64_t limit,
+                                    struct anti_text *out)
+{
+    return anti_rt_regex_replace(pattern, s, length, bytes, template_length,
+                                 limit, out);
+}
+
+struct anti_text anti_rt_regex_take_bytes(struct growing *g)
+{
+    return anti_rt_regex_take(g);
 }
