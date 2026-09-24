@@ -10,7 +10,8 @@
 #   SYSROOT   the glibc sysroot of the target
 #   LIBDIR    the directory of its C library, under the multiarch name
 #   OBJECT    the object of the probe, which holds main
-#   LIBRARY   the static library of the runtime tree
+#   LIBRARY   the static libraries of the runtime tree, separated by
+#             commas
 #   LIBS      the system libraries, separated by commas, without -l
 #   EXPECTED  the expected file: "exit N" and then the standard output
 #   HOST      the target of this host
@@ -19,6 +20,7 @@
 
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/probe-${TARGET}")
+string(REPLACE "," ";" libraries "${LIBRARY}")
 string(REPLACE "," ";" libs "${LIBS}")
 set(flags "")
 foreach(lib IN LISTS libs)
@@ -32,7 +34,7 @@ file(REMOVE "${exe}")
 execute_process(
     COMMAND "${CLANG}" "--target=${TRIPLE}" "--sysroot=${SYSROOT}"
             -fuse-ld=lld "--ld-path=${LLD}" -nostdlib -pie
-            "${LIBDIR}/Scrt1.o" "${LIBDIR}/crti.o" "${OBJECT}" "${LIBRARY}"
+            "${LIBDIR}/Scrt1.o" "${LIBDIR}/crti.o" "${OBJECT}" ${libraries}
             ${flags} -lc "${LIBDIR}/crtn.o" -o "${exe}"
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
     ENCODING NONE)

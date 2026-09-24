@@ -403,8 +403,10 @@ about structs, enums, classes, interfaces and errors lives there, and
   `src/native/get-miniaudio.cmake` downloads it into `build/deps/miniaudio/` and checks
   the digest. Reason: 0.11.24 is the version raylib 6.0 bundles in
   `src/external/miniaudio.h`, so a program carries one version of miniaudio. The test
-  `miniaudio_pin` checks the pin, refuses a copy of it in the script or the recipe, and
-  compares the version with the one raylib bundles.
+  `miniaudio_pin` checks the pin and refuses a copy of it in the script or the recipe.
+  The test `raylib_miniaudio_pin` compares it with `RAYLIB_MINIAUDIO_VERSION` of
+  `tools/raylib-pin`, the version the raylib release bundles, and compares raylib's
+  copy of `miniaudio.h` with the header of the pinned release, byte for byte.
 - The glibc 2.35 sysroot is extended with the X11 and OpenGL development packages of the
   original jammy release, for amd64 and arm64. They are pinned by digest in
   `tools/sysroot-pins` as libc6-dev is. Eddie decided this. The packages are those of
@@ -468,10 +470,21 @@ about structs, enums, classes, interfaces and errors lives there, and
   method through a stub `objc_msgSendClass$<selector>$<class>` that the linker writes,
   and ld64.lld 23.1.1 writes none, so the link fails. The calls then go through
   `objc_msgSend`.
-- [provisional] raylib keeps the copy of miniaudio that `raudio.c` compiles. Reason: the
-  smallest option, raylib as released. A program that calls raylib's audio and
-  `anti.miniaudio` at once pulls both objects and defines the `ma_` functions twice.
-  The report asks how to settle it.
+- raylib is built against the miniaudio library of the runtime tree and not the copy in
+  its `raudio.c`, so a program has one set of `ma_` functions. Eddie decided this.
+  `libraylib.a` defines no `ma_` function, and a program of raylib links `libminiaudio.a`
+  after it. A program that calls raylib's audio and miniaudio at once links both.
+- [provisional] `raudio.c` compiles with `-Dminiaudio_c`, the guard with which
+  `miniaudio.h` marks its implementation as included. The `MINIAUDIO_IMPLEMENTATION` of
+  `raudio.c` then brings the declarations alone. The header it reads stays raylib's copy
+  in `src/external/`, which `raylib_miniaudio_pin` holds equal to the header of the pinned
+  release. Reason: the smallest option that changes no source of raylib. The defines of
+  `raudio.c` that shape miniaudio's implementation, `MA_NO_JACK`, `MA_NO_GENERATION` and
+  the others, change no type of the header.
+- [provisional] The `MA_COINIT_VALUE` of 2 that `raudio.c` defines no longer reaches the
+  code that initialises COM on Windows. miniaudio's own default, a multithreaded
+  apartment, applies to raylib's audio as well. Reason: the library is `miniaudio.c` of
+  the release with no definition of ours, which Eddie decided.
 - The names are `libraylib.a` and `libminiaudio.a`, or `raylib.lib` and `miniaudio.lib`
   on Windows, in `lib/<target>/`. The headers stay in the source trees and are not yet
   part of the runtime archive, as for PCRE2. The build copies the licence of each to
@@ -490,6 +503,7 @@ libraries named "at run time" are loaded by the library itself and need no link.
 |---|---|---|---|
 | raylib | `X11`, `m`, `pthread`, `dl` | the frameworks `Cocoa` and `IOKit` | `gdi32`, `user32`, `shell32`, `winmm` |
 | raylib, at run time | libGL, libGLX and the X11 extensions, through GLFW | `OpenGL`, through GLFW | `opengl32.dll`, through GLFW |
+| raylib's audio | `libminiaudio.a` of the runtime tree and its libraries below | the same | the same |
 | miniaudio | `m`, `pthread`, `dl` | none | none |
 | miniaudio, at run time | ALSA, PulseAudio or JACK | `CoreAudio`, `AudioToolbox` | WASAPI, DirectSound or WinMM |
 
@@ -522,9 +536,18 @@ libraries named "at run time" are loaded by the library itself and need no link.
 - The raylib probe resizes a solid red image through the SIMD path of
   `stb_image_resize2.h`, formats and reads a text, packs a colour, and takes the address
   of `InitWindow`, `InitAudioDevice`, `DrawText` and `LoadModel`, so GLFW, rlgl and
-  raylib's miniaudio must link. The miniaudio probe compares the version with the
+  the miniaudio library must link. Every test of raylib links `libminiaudio.a` after
+  `libraylib.a`. The miniaudio probe compares the version with the
   header, reads a square wave, counts the playback devices of the null back end, and
   takes the address of `ma_device_init` and `ma_decoder_init_file`.
+- [provisional] `media_audio_link_<target>` links one program with both libraries for
+  each of the six targets, as the tests of each library link, and `media_audio_run` runs
+  the program of the host. The probe is `tests/abi/media_audio_probe.c`, and the Anti
+  half `tests/abi/media_audio_link.anti`. raylib's `WaveFormat` resamples eight frames at
+  8000 Hz to sixteen at 16000 Hz through `ma_convert_frames`, and the probe reads a square
+  wave through `ma_waveform`, which raylib's build of miniaudio leaves out. With the copy
+  in `raudio.c` the link defined every `ma_` function twice. Reason: `anti.miniaudio` is
+  not built, so the probe calls miniaudio as the module will.
 - `media_sysroot` checks that every package the step names is pinned for both
   processors with a digest. It then runs a copy of `get-media-sysroot.cmake` on stand-in
   packages. The files land, an absolute link becomes relative and the licences are

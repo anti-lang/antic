@@ -15,8 +15,23 @@ set(ANTIC_RAYLIB_WORK "${CMAKE_BINARY_DIR}/native/raylib")
 antic_native_license(raylib "${ANTIC_RAYLIB_DIR}/LICENSE")
 
 # The seven modules of the library. rglfw.c holds GLFW, and raudio.c the
-# copy of miniaudio that raylib bundles.
+# audio module over miniaudio.
 set(ANTIC_RAYLIB_SOURCES rcore rshapes rtextures rtext rmodels raudio rglfw)
+
+# DESIGN: raylib takes the ma_ functions from libminiaudio of the runtime
+# tree, so a program that calls raylib's audio and miniaudio of its own
+# holds one copy of each. raudio.c defines MINIAUDIO_IMPLEMENTATION before
+# it includes miniaudio.h, and -Dminiaudio_c is the guard with which that
+# header marks its implementation as included already, so raudio.c reads
+# the declarations alone. The header it reads is raylib's copy in
+# src/external/, which the test raylib_miniaudio_pin holds byte for byte
+# equal to the header of the pinned miniaudio. The defines of raudio.c
+# that shape the implementation, MA_NO_JACK, MA_NO_GENERATION and the
+# others, and MA_COINIT_VALUE of 2, then shape nothing: the library is
+# miniaudio.c as released, with every back end and COM initialised as a
+# multithreaded apartment on Windows. A program of raylib links
+# libminiaudio after libraylib.
+set(ANTIC_RAYLIB_AUDIO -Dminiaudio_c)
 
 # DESIGN: the desktop back end over GLFW with OpenGL 3.3, the default of
 # raylib's own Makefile, with its flags. On Linux GLFW takes X11 alone and
@@ -68,15 +83,19 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     foreach(source IN LISTS ANTIC_RAYLIB_SOURCES)
         set(input "${ANTIC_RAYLIB_SOURCE}/${source}.c")
         set(object "${work}/${source}.o")
+        # raudio.c reads the declarations of miniaudio alone.
+        set(module "")
+        if(source STREQUAL "raudio")
+            set(module ${ANTIC_RAYLIB_AUDIO})
+        endif()
         # GLFW's Cocoa back end is Objective-C, which rglfw.c includes.
         # DESIGN: the pinned clang calls a class method through a stub
         # objc_msgSendClass$<selector>$<class> that the linker writes.
         # ld64.lld 23.1.1 writes the stubs of objc_msgSend$ and not these,
         # so the calls go through objc_msgSend as Apple's clang compiles
         # them for macOS 11.
-        set(language "")
         if(source STREQUAL "rglfw" AND target MATCHES "^macos-")
-            set(language -x objective-c
+            set(module -x objective-c
                 -fno-objc-msgsend-class-selector-stubs)
         endif()
         add_custom_command(OUTPUT "${object}"
@@ -85,7 +104,7 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
                 ${ANTIC_RAYLIB_DEFINES} ${platform}
                 -I "${ANTIC_RAYLIB_SOURCE}"
                 -I "${ANTIC_RAYLIB_SOURCE}/external/glfw/include"
-                ${language} -c "${input}" -o "${object}"
+                ${module} -c "${input}" -o "${object}"
             DEPENDS "${input}"
             VERBATIM)
         list(APPEND objects "${object}")
@@ -114,11 +133,13 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         DEPENDS "${antic_raylib_probe}" "${ANTIC_RAYLIB_SOURCE}/raylib.h"
         VERBATIM)
     add_custom_target(raylib_${target} ALL DEPENDS "${library}" "${probe}")
+    antic_native_library(miniaudio_name "${target}" miniaudio)
+    set(miniaudio "${ANTIC_RUNTIME_DIR}/lib/${target}/${miniaudio_name}")
 
     set(expected "${PROJECT_SOURCE_DIR}/tests/abi/raylib_link.expected")
     if(target MATCHES "^linux-")
         antic_media_glibc_test(raylib_link_${target} "${target}"
-            "${probe}" "${library}" "${ANTIC_RAYLIB_LIBS_linux}"
+            "${probe}" "${library},${miniaudio}" "${ANTIC_RAYLIB_LIBS_linux}"
             "${expected}")
         continue()
     endif()
@@ -139,7 +160,7 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${source}"
-                "-DOBJECTS=${probe},${library}"
+                "-DOBJECTS=${probe},${library},${miniaudio}"
                 "-DWORK=${ANTIC_RAYLIB_WORK}/run"
                 "-DOPTIONS=${options}"
                 -P "${PROJECT_SOURCE_DIR}/tests/run_program.cmake")
@@ -150,9 +171,87 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${source}"
-            "-DOBJECTS=${probe},${library}"
+            "-DOBJECTS=${probe},${library},${miniaudio}"
             "-DWORK=${ANTIC_RAYLIB_WORK}/link"
             "-DTARGET=${target}"
             "-DOPTIONS=${options}"
             -P "${PROJECT_SOURCE_DIR}/tests/run_native_link.cmake")
 endforeach()
+
+# A program that calls raylib's audio and miniaudio of its own links both
+# libraries. The test media_audio_link_<target> links such a program for
+# every target, and media_audio_run runs the one of the host.
+set(antic_media_audio_probe "${PROJECT_SOURCE_DIR}/tests/abi/media_audio_probe.c")
+foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
+    antic_media_target(triple flags "${target}")
+    antic_native_library(raylib_name "${target}" raylib)
+    antic_native_library(miniaudio_name "${target}" miniaudio)
+    set(work "${ANTIC_RAYLIB_WORK}/${target}")
+    set(libraries "${ANTIC_RUNTIME_DIR}/lib/${target}/${raylib_name}"
+        "${ANTIC_RUNTIME_DIR}/lib/${target}/${miniaudio_name}")
+    set(probe "${work}/media_audio_probe.o")
+    set(probe_main "")
+    if(target MATCHES "^linux-")
+        set(probe_main -DMEDIA_AUDIO_PROBE_MAIN)
+    endif()
+    add_custom_command(OUTPUT "${probe}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
+        COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2 ${flags}
+            "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
+            "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
+            -Wall -Wextra -Wpedantic -Werror -Wshadow -Wconversion
+            -Wstrict-prototypes ${probe_main}
+            -I "${ANTIC_RAYLIB_SOURCE}" -I "${ANTIC_MINIAUDIO_SOURCE}"
+            -c "${antic_media_audio_probe}" -o "${probe}"
+        DEPENDS "${antic_media_audio_probe}" "${ANTIC_RAYLIB_SOURCE}/raylib.h"
+            "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.h"
+        VERBATIM)
+    add_custom_target(media_audio_${target} ALL DEPENDS "${probe}")
+
+    set(expected "${PROJECT_SOURCE_DIR}/tests/abi/media_audio_link.expected")
+    if(target MATCHES "^linux-")
+        list(JOIN libraries "," libraries)
+        antic_media_glibc_test(media_audio_link_${target} "${target}"
+            "${probe}" "${libraries}" "${ANTIC_RAYLIB_LIBS_linux}"
+            "${expected}")
+        continue()
+    endif()
+    set(source "${PROJECT_SOURCE_DIR}/tests/abi/media_audio_link.anti")
+    set(options "")
+    if(target MATCHES "^macos-")
+        foreach(framework IN LISTS ANTIC_RAYLIB_FRAMEWORKS)
+            string(APPEND options ",--framework,${framework}")
+        endforeach()
+        string(SUBSTRING "${options}" 1 -1 options)
+    endif()
+    list(JOIN libraries "," libraries)
+    if(target STREQUAL ANTIC_HOST_TARGET)
+        add_test(NAME media_audio_run
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${source}"
+                "-DOBJECTS=${probe},${libraries}"
+                "-DWORK=${ANTIC_RAYLIB_WORK}/media_audio_run"
+                "-DOPTIONS=${options}"
+                -P "${PROJECT_SOURCE_DIR}/tests/run_program.cmake")
+    endif()
+    add_test(NAME media_audio_link_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${source}"
+            "-DOBJECTS=${probe},${libraries}"
+            "-DWORK=${ANTIC_RAYLIB_WORK}/media_audio_link"
+            "-DTARGET=${target}"
+            "-DOPTIONS=${options}"
+            -P "${PROJECT_SOURCE_DIR}/tests/run_native_link.cmake")
+endforeach()
+
+add_test(NAME raylib_miniaudio_pin
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+            "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
+            "-DMINIAUDIO=${ANTIC_MINIAUDIO_SOURCE}"
+            -P "${PROJECT_SOURCE_DIR}/tests/run_raylib_miniaudio_pin.cmake")

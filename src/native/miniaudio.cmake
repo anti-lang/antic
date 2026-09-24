@@ -116,5 +116,4 @@ endforeach()
 
 add_test(NAME miniaudio_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-            "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
             -P "${PROJECT_SOURCE_DIR}/tests/run_miniaudio_pin.cmake")

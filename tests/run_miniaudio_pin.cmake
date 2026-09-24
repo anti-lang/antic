@@ -1,8 +1,10 @@
 # The miniaudio version and digest live in tools/miniaudio-pin alone. The download
 # script reads them from there, so no second copy can drift.
 #
-#   cmake -DROOT=<repository> -DRAYLIB=<raylib release>
-#         -P tests/run_miniaudio_pin.cmake
+#   cmake -DROOT=<repository> -P tests/run_miniaudio_pin.cmake
+#
+# The test raylib_miniaudio_pin compares the version with the one raylib
+# bundles.
 
 set(pin "${ROOT}/tools/miniaudio-pin")
 set(script "${ROOT}/src/native/get-miniaudio.cmake")
@@ -48,18 +50,3 @@ foreach(file "${script}" "${recipe}")
         endif()
     endforeach()
 endforeach()
-
-# The pin is the version that raylib's pinned release bundles, so a
-# program that links both carries one version of miniaudio.
-file(STRINGS "${RAYLIB}/src/external/miniaudio.h" parts
-     REGEX "^#define MA_VERSION_(MAJOR|MINOR|REVISION) +[0-9]+$")
-set(bundled "")
-foreach(part IN LISTS parts)
-    string(REGEX REPLACE "^.* ([0-9]+)$" "\\1" number "${part}")
-    list(APPEND bundled "${number}")
-endforeach()
-list(JOIN bundled "." bundled)
-if(NOT bundled STREQUAL version)
-    message(FATAL_ERROR "tools/miniaudio-pin names ${version}, and raylib "
-                        "bundles miniaudio ${bundled}")
-endif()
