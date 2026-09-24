@@ -3150,7 +3150,7 @@ static struct ir_operand default_scalar(struct lowerer *l,
                                         const struct struct_field *field)
 {
     if (field->value != NULL) {
-        return lower_expr(l, (struct expr *)field->value);
+        return lower_expr(l, field->value);
     }
     return constant(l, field->constant, ir_type_of(field->type));
 }
@@ -3185,7 +3185,7 @@ static void store_default(struct lowerer *l, const struct struct_field *field,
         return;
     }
     if (field->value != NULL) {
-        store_value(l, field->type, (struct expr *)field->value, address);
+        store_value(l, field->type, field->value, address);
         return;
     }
     if (is_aggregate(field->type)) {
@@ -6872,7 +6872,7 @@ static void handle_error(struct lowerer *l, const struct expr *call,
     case HANDLE_BLOCK:
         error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
         if (h->symbol != NULL) {
-            ((struct symbol *)h->symbol)->ir = error;
+            h->symbol->ir = error;
         }
         scope.join = join;
         scope.out = out;
@@ -7016,7 +7016,7 @@ static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
     }
     error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
     if (h->symbol != NULL) {
-        ((struct symbol *)h->symbol)->ir = error;
+        h->symbol->ir = error;
     }
     scope.join = join;
     scope.out = place;
@@ -7039,7 +7039,7 @@ static void destructure(struct lowerer *l, const struct stmt *s)
     size_t i;
 
     for (i = 0; i < s->as.let.name_count; i++) {
-        const struct symbol *bound = s->as.let.names[i].symbol;
+        struct symbol *bound = s->as.let.names[i].symbol;
         struct ir_operand at =
             offset_address(l, temp(l, value->ir),
                            field_offset(l, t, &t->fields[i].name));
@@ -7054,8 +7054,7 @@ static void destructure(struct lowerer *l, const struct stmt *s)
                      temp(l, ir_load(l->f, l->b, ir_type_of(bound->type), at)),
                      temp(l, bound->ir));
         } else {
-            ((struct symbol *)bound)->ir =
-                ir_load(l->f, l->b, ir_type_of(bound->type), at);
+            bound->ir = ir_load(l->f, l->b, ir_type_of(bound->type), at);
         }
         if (local_needs_teardown(bound->type)) {
             push_exit_action(l, NULL, bound, false);
@@ -7417,7 +7416,7 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
         }
         l->b = handler;
         if (h->symbol != NULL) {
-            ((struct symbol *)h->symbol)->ir = scope.error;
+            h->symbol->ir = scope.error;
         }
         lower_handler(l, h, scope.error,
                       h->symbol != NULL ? h->symbol->type : NULL, NULL);
@@ -7895,7 +7894,7 @@ static void reserve_slots(struct lowerer *l, struct ir_block *entry,
     }
 }
 
-static void declare_function(struct lowerer *l, struct item *it)
+static void declare_function(struct lowerer *l, const struct item *it)
 {
     const struct type *t = it->symbol->type;
     /* A function of a struct body carries the name `T.f`, which its
@@ -7977,7 +7976,7 @@ static void take_trace_name(struct lowerer *l)
     text_free(&name);
 }
 
-static void lower_function(struct lowerer *l, struct item *it)
+static void lower_function(struct lowerer *l, const struct item *it)
 {
     struct defers around;
     struct ir_block *entry;

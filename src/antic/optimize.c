@@ -101,6 +101,18 @@ static struct ir_operand *operand(struct ir_inst *inst, size_t i)
     }
 }
 
+/* The operand i of inst for a reader: a, b, c, then the arguments. */
+static const struct ir_operand *operand_at(const struct ir_inst *inst,
+                                           size_t i)
+{
+    switch (i) {
+    case 0: return &inst->a;
+    case 1: return &inst->b;
+    case 2: return &inst->c;
+    default: return &inst->args[i - 3];
+    }
+}
+
 static size_t operand_count(const struct ir_inst *inst)
 {
     return 3 + inst->arg_count;
@@ -1157,7 +1169,7 @@ static bool escapes_in(const struct ir_inst *inst, uint32_t temp)
         return is_temp(&inst->b, temp);
     }
     for (i = 0; i < operand_count(inst); i++) {
-        if (is_temp(operand((struct ir_inst *)inst, i), temp)) {
+        if (is_temp(operand_at(inst, i), temp)) {
             return true;
         }
     }
@@ -1348,8 +1360,8 @@ void ir_optimize_function(struct ir_function *f)
 
 /* The whole program */
 
-static void mark_function(struct ir_module *m, uint32_t index, bool *live,
-                          bool *live_globals)
+static void mark_function(const struct ir_module *m, uint32_t index,
+                          bool *live, bool *live_globals)
 {
     struct ir_function *f = m->functions[index];
     size_t b;
@@ -1378,7 +1390,7 @@ static void mark_function(struct ir_module *m, uint32_t index, bool *live,
 /* Mark what the addresses inside a constant reach, and set grew when one
    of them was not marked before. A table entry names a function, so a
    constant keeps a function alive as well as a global. */
-static void mark_const(struct ir_module *m, const struct ir_const *c,
+static void mark_const(const struct ir_module *m, const struct ir_const *c,
                        bool *live, bool *live_globals, bool *grew)
 {
     size_t i;

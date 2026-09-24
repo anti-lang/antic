@@ -1441,7 +1441,7 @@ static uint32_t class_of_function(const struct ir_module *m,
    offset of its field. */
 #define INJECT_AT_ZERO (IR_NO_INDEX - 1)
 
-static uint32_t interface_offset(struct whole *w, struct ir_module *m,
+static uint32_t interface_offset(const struct whole *w, struct ir_module *m,
                                  uint32_t record, uint32_t descriptor)
 {
     const struct ir_class *c = m->classes[record];
