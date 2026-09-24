@@ -15,7 +15,7 @@ You do not stop to ask. A gap goes through the gap procedure. Search the specifi
 - Add the loop rules to `docs/decisions.md` under "Core language". They are not object model:
   - `for i in lo..hi { }`, `for x in slice { }`, `for x in &slice { }`, and `for lo..hi { }` with no binding. The binding is optional in the range forms and required in the slice forms.
   - `by k` after a range takes a constant expression. A `let` variable is refused. `by k` with `k > 0` walks the set ascending. `by -k` walks the same values in reverse order. The procedure for chapter 2: a positive step uses `i` and then increments it. A negative step starts from `hi`, decrements `i` and then uses it. Both stop when the value leaves the range.
-  - `by 0` is a compile error, `` `by 0` never advances ``. The check is `heederik_guardrail` in `sema.c`. Its comment links to the chapter 2 footnote by its label, `#fn:heederik`.
+  - `by 0` is a compile error, `` `by 0` never advances ``. The check is `heederik_guardrail` in `sema_stmt.c`. Its comment links to the chapter 2 footnote by its label, `#fn:heederik`.
   - Every other loop is a `while`.
 - Commit.
 

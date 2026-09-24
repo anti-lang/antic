@@ -10,8 +10,8 @@ A later step folds these into `docs/decisions.md`.
   boundary moves them.
 - [provisional] `src/antic/attributes.h` is the file of antic that holds a
   compiler extension, the format attribute, as `ATTRIBUTE_PRINTF`. It is a
-  header alone, so the source list does not change. `diagnostic.h`,
-  `sema.c` and `antl.c` still write the attribute out.
+  header alone, so the source list does not change. `diagnostic.h` and
+  `antl.c` still write the attribute out.
 - [provisional] A message that a fixed buffer cuts ends in three dots,
   which `ir_vformat` writes.
 - [provisional] The verifier refuses a call that passes an aggregate among

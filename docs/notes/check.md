@@ -73,7 +73,7 @@ of the doc comment it came from. A reader then finds both ends.
 
 ## The doc warnings
 
-`sema_doc_warnings` of `src/antic/sema.c` holds them, and `diagnostics_doc`
+`sema_doc_warnings` of `src/antic/sema_export.c` holds them, and `diagnostics_doc`
 marks each one, so the check tells them from the warnings of the checker.
 
 A backtick name is one identifier or a path of identifiers, with an

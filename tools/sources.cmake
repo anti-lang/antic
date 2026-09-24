@@ -42,6 +42,11 @@ set(ANTIC_CORE_SOURCES
     src/antic/sha256.c
     src/antic/userdirs.c
     src/antic/sema.c
+    src/antic/sema_call.c
+    src/antic/sema_const.c
+    src/antic/sema_export.c
+    src/antic/sema_expr.c
+    src/antic/sema_stmt.c
     src/antic/target.c
     src/antic/text.c
     src/antic/types.c

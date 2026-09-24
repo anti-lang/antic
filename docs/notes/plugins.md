@@ -11,9 +11,9 @@ settled points are in `docs/decisions.md` under the same name.
 reads `provides` as a keyword and the interface as one dotted path. The
 last name is the class and the names before it are its module, written
 as the alias an `import` declared or as the whole module path.
-`interface_named` of `src/antic/sema.c` resolves both spellings, and
-`lib.instance(I)` and `lib.supports(I, "f")` read the same form through
-`name_path`.
+`sema_interface_named` of `src/antic/sema_call.c` resolves both
+spellings, and `lib.instance(I)` and `lib.supports(I, "f")` read the
+same form through `name_path`.
 
 The checker refuses an interface that is not abstract and a class the
 module does not declare. Refused as well are an abstract class, a
@@ -65,12 +65,13 @@ there to resolve as well. A shared library for C keeps the surface that
 ## The two calls
 
 `lib.instance(I)` and `lib.supports(I, "f")` name an interface where a
-value stands. `check_call` of `src/antic/sema.c` sees a receiver of type
-`*anti.plugin.Library`. It resolves the path of the first argument to an
-abstract class and replaces that argument with an `EXPR_DESCRIPTOR`
-node. It renames the call to `instance_at` or `supports_at`, which are
-ordinary functions of the class. The method call carries it from
-there. `instance` has the type `?*I`, which `catch fatal` narrows.
+value stands. `sema_check_call` of `src/antic/sema_call.c` sees a
+receiver of type `*anti.plugin.Library`. It resolves the path of the
+first argument to an abstract class and replaces that argument with an
+`EXPR_DESCRIPTOR` node. It renames the call to `instance_at` or
+`supports_at`, which are ordinary functions of the class. The method
+call carries it from there. `instance` has the type `?*I`, which
+`catch fatal` narrows.
 
 `EXPR_DESCRIPTOR` lowers to the address of the class descriptor, and no
 source text writes one.
