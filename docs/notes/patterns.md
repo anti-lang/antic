@@ -63,8 +63,37 @@ user of the tools can observe, under "Regular expressions".
 - `src/rt/patterns.c` holds the walk of every method, the groups found again, the
   templates and the stops. `anti_rt_regex_piece` of `src/rt/regex.c` reads a template for
   the runtime and for the checker alike.
+- `check_pattern` of `src/antic/sema_expr.c` takes the expected type. A literal checked
+  against a `ByteRegex` compiles in byte mode and has that type, and every other one is
+  a `Regex`. The type of the checked literal carries the mode from then on.
+  `types_match` gives a `ByteMatch` for a literal whose type is a `ByteRegex`.
+  `lower_pattern` keys its globals by the text and the mode, and calls
+  `anti_rt_regex_literal_bytes` for a byte literal.
+- `anti_rt_regex_compile_bytes` of `src/rt/regex.c` writes the pattern PCRE2 compiles.
+  A map gives for each byte it writes the byte of the written pattern. An error of
+  PCRE2 goes back through the map, so its position is that of the source. A class is
+  walked three times. The first finds its end, its wide characters and a refusal, the
+  second writes its ASCII members and the third the wide ones. A class without its `]` goes to PCRE2 as it
+  stands.
+- `types_is_regex` holds for both pattern types and `types_is_match` for all four forms
+  of a match, so the descriptor, the header, the worker and the narrowing treat them
+  alike. `types_is_byte_regex` and `types_is_byte_match` tell the byte forms apart, and
+  `sema_require` keeps a `Match` and a `ByteMatch` apart.
+- `method_call` of `src/antic/sema_pattern.c` serves `str` and `[]byte`, and puts
+  `bytes_` before the name of the function for bytes. `patch_call` writes every argument
+  that `patch` leaves out as a literal 0, resolves a literal `into` to a group number and
+  measures the fit with `pattern_least_bytes`, which counts on the tree of
+  `pattern_exponential` with the number of each capturing group. `convert_call` writes
+  `to_bytes` and `to_text` as calls of `anti.text`.
+- The runtime searches bytes with the functions of text. The functions whose names end
+  in `_bytes` stand under names of their own because `anti.regex` declares each external
+  function with one signature. `anti_rt_regex_patch` and `anti_rt_bytes_patch` of
+  `src/rt/patterns.c` give the count of places, or -1, -2 and -3 for the match limit, a
+  span that does not fit and a missing group.
 - The tests are `programs/regex_compile.anti`, `programs/pattern_literals.anti` in both
   modes, `programs/pattern_match.anti`, `programs/pattern_walk.anti`,
   `programs/pattern_replace.anti` in both modes, `programs/failing_nested.anti`,
-  `traps/pattern_limit.anti`, and the listings `pattern_malformed`, `pattern_exponential`,
-  `pattern_import`, `pattern_level` and `pattern_methods` of `tests/errors/`.
+  `traps/pattern_limit.anti`, `programs/pattern_bytes.anti` and
+  `programs/pattern_patch.anti` in both modes, and the listings `pattern_malformed`,
+  `pattern_exponential`, `pattern_import`, `pattern_level`, `pattern_methods` and
+  `pattern_bytes` of `tests/errors/`.

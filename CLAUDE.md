@@ -473,6 +473,10 @@ reports what it finished.
   `s.matches(r)`, `s.find_all(r)`, `s.replace(r, with)` and `s.split(r)` are
   calls of `anti.regex` with `limit` in both directions. A literal at the call
   cannot fail and stops at the match limit, and any other pattern may fail.
+  `ByteRegex` and the same methods of `[]byte` are built, a literal takes its
+  mode from where it stands, and a match of bytes is a `ByteMatch`. `patch`
+  takes `into`, `at` and `limit` by position until named arguments are built,
+  and `to_bytes` and `to_text` are calls of `anti.text`.
   `Match` and `?Match` are structs of `anti.lang`, a match stands as a
   condition, `if let` binds one, and the groups of a literal are fields. See
   "Regular expressions" in `docs/decisions.md` and `docs/notes/patterns.md`.

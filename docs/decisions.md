@@ -1740,7 +1740,91 @@ What antic does that the design above leaves open, as far as a user of the langu
   writes through a buffer of the runtime, so a program of patterns links no `anti.text`.
 - The library format is version 59, since the reader takes `Match` and `?Match` of
   `anti.lang` as the structs the compiler declares, which a file of 58 cannot name.
-- Not built yet: `ByteRegex` and the methods of `[]byte`. The link line that
+- "Bytes" in `docs/anti-language-additions.md` is built: `ByteRegex` and
+  `ByteRegex.compile`, the mode of a literal taken from where it stands, the methods of
+  `[]byte`, the class rules of byte patterns, `to_bytes`, `to_text` and `patch` with the
+  fit rule. A literal is a byte pattern where a `ByteRegex` is expected: at a method of
+  `[]byte`, as the `find` of `patch`, and in a variable, a parameter or a field of that
+  type.
+- The library format is version 60, since the reader takes `ByteRegex`, `ByteMatch`
+  and `?ByteMatch` of `anti.lang` as the structs the compiler declares.
+- [provisional] `ByteRegex` is a struct of `anti.lang` that the compiler declares, as it
+  does `Regex`, with the one field `handle`. The match of a byte pattern is `ByteMatch`,
+  and `?ByteMatch` may be `none`. It has the fields of `Match` in the same order, with
+  `[]byte` in the place of `str`, and its groups are `[]byte`. A function given to
+  `replace` of `[]byte` is a `fn(ByteMatch) -> []byte`. Reason: the specification names
+  `ByteRegex` beside `Regex` and gives a match of bytes `[]byte` slices, and names no
+  type for that match. One layout lets the runtime search both with the same code.
+- [provisional] A byte pattern compiles without UTF mode, with `PCRE2_NEVER_UTF`,
+  `PCRE2_NEVER_UCP` and `PCRE2_DOTALL`. `(*UTF)` and `(*UCP)` are refused as malformed,
+  so `\d`, `\w` and `\s` stay their ASCII sets. `.` matches every byte, the newline
+  included, and `(?-s)` turns that off. Reason: the specification says that `.` matches
+  any byte and that the three escapes are the ASCII sets in a byte pattern.
+- [provisional] A character outside ASCII outside a class, in `\Q...\E` as well, is
+  compiled as an atom of its bytes, `(?:\xC3\xB3)`, so `re"ó+"` repeats the whole
+  character. A class that lists one becomes `(?:[a]|\xC3\xB3)`, its ASCII members first.
+  Reason: the specification writes the character as its UTF-8 bytes, and a quantifier
+  after a character repeats the character in text mode.
+- [provisional] A byte escape is a byte and no character, so `[^\x00]` and `[\x80-\xFF]`
+  stand. The refusals name a character outside ASCII that the pattern writes as itself:
+  `` a byte pattern cannot negate a class that holds a character outside ASCII, which
+  text mode can `` and `` a range of a byte pattern cannot reach beyond ASCII, which text
+  mode can ``, at the character. A literal reports them as `malformed pattern`, and
+  `ByteRegex.compile` as a `BadPattern` with the codes 400 and 401. Reason: the reason
+  the specification gives is that byte mode cannot know where a character starts, and a
+  byte escape names one byte.
+- [provisional] A walk over bytes steps one byte past an empty match, where a walk over
+  text steps a character. It steps two over CR LF under a newline of CR LF. Reason:
+  bytes hold no characters.
+- [provisional] The methods of `[]byte` call the functions of `anti.regex` whose names
+  start with `bytes_`, `bytes_matches_literal` and the rest. `find_all` and `split` give
+  the classes `regex.ByteMatches` and `regex.BytePieces`, and `to_slice()` gives a
+  `[]ByteMatch` or a `[][]byte`. Reason: one name per signature in the module, as the
+  methods of `str` have.
+- [provisional] Named arguments are not built, so `patch` takes its arguments by
+  position, `data.patch(find, with, into, at, limit)`. `into` 0 is the default: the one
+  group of a pattern with one, the whole match of a pattern without. Any other number or
+  a `str` names a group. A byte sequence takes `into` as the literal 0 alone. Reason: the
+  specification writes `into = 0` as the default and `at: 2` by name, and the smallest
+  form that reaches `at` is its position.
+- [provisional] The fit rule of a pattern literal measures `at` plus the length of `with`
+  against the fewest bytes the group can match, which the reader of the checker counts.
+  A backreference and a call count as empty, and a branch reset, `(?n)` and `\K` give 0.
+  The message is `` `with` of 2 bytes at offset 0 does not fit group 1 of the pattern,
+  which can be 1 byte long ``. Reason: a call with a literal cannot fail, so `with` must
+  fit every span a match can give. A count below the true least refuses a call that would
+  fit, and never passes one that cannot.
+- [provisional] A computed `into` counts as a computed operand, so the call may fail
+  with `LengthMismatch`. `patch` calls `patch` of `anti.regex` for a compiled pattern,
+  `patch_literal` for a literal with a computed operand and `patch_fixed` when every
+  operand is a literal. A byte sequence calls `patch_bytes` or `patch_bytes_fixed`.
+  Reason: the rule of origin names `find`, `with` and `at`, and `into` decides the span
+  as `find` does.
+- [provisional] `patch` finds every place before it writes a byte. With a pattern it
+  runs the walk twice. The match limit, a missing group and a `with` that does not fit
+  so fail before any byte changes. A match whose group did not take part is neither
+  patched nor counted. A negative `at` does not fit. Reason: a failure halfway would
+  leave data patched in part, and the specification gives no rule for a group that did
+  not take part.
+- [provisional] With a compiled pattern, `into` 0 on a pattern of more than one group and an
+  `into` that names no group fail with `MissingGroup`. With a literal and a computed
+  `into`, a missing group stops the program, as a template does. Reason: the
+  specification makes leaving out `into` a compile error for a literal alone, and
+  `MissingGroup` is the failure of a group a pattern lacks.
+- [provisional] The places of a byte sequence do not overlap, and an empty sequence
+  stands nowhere, so it patches nothing and gives 0. Reason: `replace` walks matches
+  without overlap, and every offset of an empty sequence would patch nothing anyway.
+- [provisional] `LengthMismatch` is a class of `anti.regex` that inherits `regex.Error`,
+  and `patch` of a byte sequence is a function of `anti.regex` as well, so a module that
+  calls `patch` imports it. Reason: the failures of the pattern methods are classes of
+  `anti.regex`, as the entry of 2026-09-23 says, and one import serves both forms.
+- [provisional] `s.to_bytes()` and `data.to_text()` are the calls `to_bytes(s)` and
+  `to_text(data)` of `anti.text`, so a module that writes one imports `anti.text`, as an
+  `f"..."` does. Both copy into memory of the C library, which the program frees with
+  `free(result.ptr)`. `to_text` fails with an `Error` whose message is `the bytes are no
+  valid UTF-8`. Reason: the specification says both make a new value and names no class
+  for the failure.
+- Not built yet: `at:` and the other named arguments of `patch`. The link line that
   `antic --lib static` prints names no PCRE2, and a plugin that holds a pattern literal
   calls the glue of its host, which holds it only when the host holds `anti.regex`.
   `anti_licenses` of a program that links PCRE2 names no PCRE2 yet, as it names no musl.

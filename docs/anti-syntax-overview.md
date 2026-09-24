@@ -1235,24 +1235,34 @@ let n = line.matches(r) catch none;
 
 `matches`, `find_all`, `replace` and `split` are methods of `str`. `find_all` and `split` are iterators, and `to_slice()` collects either. `limit` takes that many matches from the start, or from the end when negative. A match behaves as a `?*T` does and stands alone as a condition. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, and a function may give each replacement. A call with a pattern literal never fails. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
 
-Built: `catch none`, as a form of every failing call, the pattern literal `re"..."` with its check at compile time and the safety check `exponential-pattern`, the literals compiled once before `main`, `Regex.compile`, the inline flags, the ASCII meaning of `\d`, `\w` and `\s` with `(*UCP)` for the Unicode one, and the classes `Error`, `BadPattern`, `TooExpensive` and `MissingGroup` of `anti.regex`. A module that writes a pattern imports `anti.regex`. The methods `matches`, `find_all`, `replace` and `split` with `limit` in both directions, the match with its fields, `?Match`, the test of a match in `if`, `while`, `&&`, `||` and `!`, `if let` and `let ... else` on one, the groups of a literal as fields, templates checked at compile time, a function as the replacement, and the match limit with the failure by the origin of the pattern are built. Not built yet: `ByteRegex`.
+Built: `catch none`, as a form of every failing call, the pattern literal `re"..."` with its check at compile time and the safety check `exponential-pattern`, the literals compiled once before `main`, `Regex.compile`, the inline flags, the ASCII meaning of `\d`, `\w` and `\s` with `(*UCP)` for the Unicode one, and the classes `Error`, `BadPattern`, `TooExpensive` and `MissingGroup` of `anti.regex`. A module that writes a pattern imports `anti.regex`. The methods `matches`, `find_all`, `replace` and `split` with `limit` in both directions, the match with its fields, `?Match`, the test of a match in `if`, `while`, `&&`, `||` and `!`, `if let` and `let ... else` on one, the groups of a literal as fields, templates checked at compile time, a function as the replacement, and the match limit with the failure by the origin of the pattern are built. `ByteRegex` and the byte forms of the methods are built, see [Bytes](#bytes).
 
 ## Bytes
 
 The same methods work on `[]byte` with a `ByteRegex`, where `.` matches any byte and nothing needs to be valid UTF-8. A pattern literal takes its mode from where it is used. `patch` writes bytes over part of what it finds, in place, and allocates nothing.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.regex;
+import anti.text;
+let data = "0123".to_bytes();
+```
+-->
+```anti
 data.patch(x"80 10 20 30", x"81");
-data.patch(x"80 10 20 30", x"FF", at: 2);
 
 let v = "version: 1.10.1".to_bytes();
 v.patch(re"version: \d+\.\d+\.(\d+)", b"2");
 let s = v.to_text() catch fatal;
 ```
 
+```anti not-built
+data.patch(x"80 10 20 30", x"FF", at: 2);
+```
+
 `s.to_bytes()` copies a `str` into new bytes, and `data.to_text()` checks for valid UTF-8 and may fail. A match's fields are slices of the searched bytes. `replace` returns new bytes, and `patch` never changes the length, so a `with` that does not fit its span is a compile error or a `LengthMismatch` failure by the origin of its operands. `str` has no `patch`.
 
-Not built yet: `ByteRegex`, the methods of `[]byte`, `patch`, `to_bytes` and `to_text`.
+Built: `ByteRegex` and `ByteRegex.compile`, the mode of a pattern literal taken from where it is used, the methods `matches`, `find_all`, `replace` and `split` of `[]byte` with the match `ByteMatch`, the class rules of byte patterns, `to_bytes` and `to_text`, and `patch` with a byte sequence or a pattern, `into`, `at`, `limit` and the fit rule. Until named arguments are built, `into`, `at` and `limit` come by position, `data.patch(x"80 10 20 30", x"FF", 0, 2)`. Not built yet: `at: 2` and the other named arguments of `patch`.
 
 ## Standard library
 
