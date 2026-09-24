@@ -22,7 +22,7 @@ struct bind_request {
     const char *target;         /* NULL: the host */
     const char **includes;
     size_t include_count;
-    const char **defines;
+    const char *const *defines;
     size_t define_count;
     bool probe;                 /* write probe_<library>.c and .anti too */
 };

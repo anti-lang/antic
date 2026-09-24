@@ -1392,7 +1392,9 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
         !run(&ast, &json, "read the header as C")) {
         goto done;
     }
-    read_preprocessed(&r, text.data != NULL ? text.data : (char *)"");
+    if (text.data != NULL) {
+        read_preprocessed(&r, text.data);
+    }
     if (!json_read((const unsigned char *)json.data, json.length, &tree, error,
                    sizeof error)) {
         fprintf(stderr, "anti: the AST of clang is not JSON: %s\n", error);

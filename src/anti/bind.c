@@ -126,9 +126,8 @@ int bind_run(const struct bind_request *q)
     b.module = text_cstr(&module);
     b.library = module_path_last(b.module);
     b.source = files_base_name(q->input);
-    for (i = 0; i < q->define_count; i++) {
-        bind_list_add(&b.defines, (void *)q->defines[i]);
-    }
+    b.defines = q->defines;
+    b.define_count = q->define_count;
     if (q->clang) {
         struct bind_clang_request c;
         b.header = b.source;
@@ -202,7 +201,6 @@ done:
     free(b.enums.items);
     free(b.functions.items);
     free(b.consts.items);
-    free(b.defines.items);
     arena_free(&b.arena);
     text_free(&module);
     text_free(&bytes);

@@ -127,7 +127,8 @@ struct bind_module {
     struct bind_list enums;
     struct bind_list functions;
     struct bind_list consts;
-    struct bind_list defines;   /* NAME or NAME=VALUE, which the shim repeats */
+    const char *const *defines; /* NAME or NAME=VALUE, which the shim repeats */
+    size_t define_count;
     size_t warnings;
 };
 

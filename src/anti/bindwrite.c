@@ -434,8 +434,8 @@ static void write_defines(const struct bind_module *b, struct text *out)
 {
     size_t i;
 
-    for (i = 0; i < b->defines.count; i++) {
-        const char *d = b->defines.items[i];
+    for (i = 0; i < b->define_count; i++) {
+        const char *d = b->defines[i];
         const char *eq = strchr(d, '=');
         if (eq != NULL) {
             text_appendf(out, "#define %.*s %s\n", (int)(eq - d), d, eq + 1);

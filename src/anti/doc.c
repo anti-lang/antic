@@ -1091,7 +1091,7 @@ static bool is_library(const char *path)
    imports ask for. A search root of its own reads them back. `anti
    check` writes the same files for the same reason, and they are the
    only thing the run writes beside the pages. */
-static bool write_interfaces(const char **sources, size_t count,
+static bool write_interfaces(const char *const *sources, size_t count,
                              const char **roots, size_t root_count,
                              const char *work, const char *runtime,
                              struct unit *units, size_t *order)
@@ -1105,7 +1105,7 @@ static bool write_interfaces(const char **sources, size_t count,
         if (is_library(sources[i])) {
             continue;
         }
-        if (!unit_read(sources[i], (const char *const *)roots, root_count,
+        if (!unit_read(sources[i], roots, root_count,
                        work, &units[i])) {
             return false;
         }
@@ -1139,10 +1139,10 @@ static bool write_interfaces(const char **sources, size_t count,
     return ok;
 }
 
-int doc_run(const char **sources, size_t count, const char **roots,
-            size_t root_count, const char *out, const char *work,
-            const char *runtime, enum doc_form form, bool dev,
-            bool private_items)
+int doc_run(const char *const *sources, size_t count,
+            const char *const *roots, size_t root_count, const char *out,
+            const char *work, const char *runtime, enum doc_form form,
+            bool dev, bool private_items)
 {
     struct arena *arenas = NULL;
     struct types *tables = NULL;
