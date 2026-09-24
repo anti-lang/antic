@@ -5269,6 +5269,84 @@ static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
     return agg;
 }
 
+/* Pack the arguments of call into a context in a slot of the frame,
+   named `<name>.context`. Returns the address of the slot, or a null
+   pointer for a call without arguments, and *agg receives the aggregate
+   of the context or IR_NO_AGG. */
+static struct ir_operand pack_context(struct lowerer *l,
+                                      const struct expr *call, size_t extra,
+                                      const char *name, uint32_t *agg)
+{
+    struct text context_name = {0};
+    uint32_t slot;
+    size_t i;
+
+    *agg = IR_NO_AGG;
+    if (extra == 0) {
+        return ir_int_op(IR_PTR, 0);
+    }
+    text_appendf(&context_name, "%s.context", name);
+    *agg = context_aggregate(l, call, text_cstr(&context_name));
+    text_free(&context_name);
+    slot = ir_slot(l->f, l->b, ir_aggregate(*agg));
+    for (i = 0; i < extra; i++) {
+        const struct expr *arg = call->as.call.args[i];
+        struct ir_operand at =
+            offset_address(l, temp(l, slot),
+                           ir_sym_operand(l->m,
+                                          ir_sym_offset_of(l->m, *agg,
+                                                           (uint32_t)i)));
+        store_value(l, arg->type, arg, at);
+    }
+    return temp(l, slot);
+}
+
+/* The body the two thunks share, written into the entry block of the
+   thunk the lowerer is in. It calls the worker of call with first and
+   the arguments the context of parameter 0 holds. What the worker gives
+   goes to the address in parameter out. */
+static void call_worker(struct lowerer *l, const struct expr *call,
+                        uint32_t context, struct ir_operand first,
+                        size_t out)
+{
+    const struct expr *callee = call->kind == EXPR_CALL
+                                    ? call->as.call.callee : call;
+    const struct type *result = callee->symbol->type->result;
+    size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
+    struct ir_function *f = l->f;
+    struct ir_block *entry = l->b;
+    struct ir_operand *args = ir_alloc(extra + 1, sizeof *args);
+    struct ir_operand at_out;
+    uint32_t value;
+    size_t i;
+
+    args[0] = first;
+    for (i = 0; i < extra; i++) {
+        const struct type *t = call->as.call.args[i]->type;
+        struct ir_operand at =
+            offset_address(l, temp(l, f->params[0].temp),
+                           ir_sym_operand(l->m,
+                                          ir_sym_offset_of(l->m, context,
+                                                           (uint32_t)i)));
+        args[i + 1] = is_aggregate(t)
+                          ? at
+                          : temp(l, ir_load(f, entry, ir_type_of(t), at));
+    }
+    value = ir_call(f, entry, ir_type_of(result),
+                    ir_func_op(callee_function(l, callee->symbol)), args,
+                    extra + 1);
+    free(args);
+    at_out = temp(l, f->params[out].temp);
+    if (result->kind == TYPE_VOID) {
+        /* A worker without a result writes nothing. */
+    } else if (is_aggregate(result)) {
+        ir_memcopy(f, entry, at_out, temp(l, value), vtype_of(l, result));
+    } else {
+        ir_store(f, entry, ir_type_of(result), temp(l, value), at_out);
+    }
+    ir_ret(f, entry, IR_VOID, none());
+}
+
 /* DESIGN: the worker pool calls one C signature, and a worker has the
    signature its own declaration gives. antic writes a thunk for each
    `parallel` that joins the two. The thunk rebuilds the chunk from the
@@ -5278,21 +5356,12 @@ static struct ir_function *parallel_thunk(struct lowerer *l,
                                           const struct expr *e,
                                           const char *name, uint32_t context)
 {
-    const struct expr *call = e->as.parallel.call;
-    const struct expr *callee = call->kind == EXPR_CALL
-                                    ? call->as.call.callee : call;
     const struct type *slice = e->as.parallel.array->type;
-    const struct type *result = callee->symbol->type->result;
-    size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct ir_function *outer_f = l->f;
     struct ir_block *outer_b = l->b;
     struct ir_function *f;
-    struct ir_operand *args;
     struct ir_block *entry;
-    struct ir_operand chunk;
     uint32_t slot;
-    uint32_t value;
-    size_t i;
 
     f = ir_function_add(l->m, l->module_name, name, IR_VOID, IR_NO_AGG);
     ir_param_add(f, IR_PTR, IR_NO_AGG);     /* the context */
@@ -5308,31 +5377,7 @@ static struct ir_function *parallel_thunk(struct lowerer *l,
     ir_store(f, entry, IR_I64, temp(l, f->params[2].temp),
              offset_address(l, temp(l, slot),
                             field_offset(l, slice, &len_name)));
-
-    args = ir_alloc(extra + 1, sizeof *args);
-    args[0] = temp(l, slot);
-    for (i = 0; i < extra; i++) {
-        const struct type *t = call->as.call.args[i]->type;
-        struct ir_operand at =
-            offset_address(l, temp(l, f->params[0].temp),
-                           ir_sym_operand(l->m,
-                                          ir_sym_offset_of(l->m, context,
-                                                           (uint32_t)i)));
-        args[i + 1] = is_aggregate(t)
-                          ? at
-                          : temp(l, ir_load(f, entry, ir_type_of(t), at));
-    }
-    value = ir_call(f, entry, ir_type_of(result),
-                    ir_func_op(callee_function(l, callee->symbol)), args,
-                    extra + 1);
-    free(args);
-    chunk = temp(l, f->params[3].temp);
-    if (is_aggregate(result)) {
-        ir_memcopy(f, entry, chunk, temp(l, value), vtype_of(l, result));
-    } else {
-        ir_store(f, entry, ir_type_of(result), temp(l, value), chunk);
-    }
-    ir_ret(f, entry, IR_VOID, none());
+    call_worker(l, e->as.parallel.call, context, temp(l, slot), 3);
     l->f = outer_f;
     l->b = outer_b;
     return f;
@@ -5345,54 +5390,18 @@ static struct ir_function *dispatch_thunk(struct lowerer *l,
                                           const struct expr *e,
                                           const char *name, uint32_t context)
 {
-    const struct expr *call = e->as.dispatch.call;
-    const struct expr *callee = call->kind == EXPR_CALL
-                                    ? call->as.call.callee : call;
-    const struct type *result = callee->symbol->type->result;
-    size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct ir_function *outer_f = l->f;
     struct ir_block *outer_b = l->b;
     struct ir_function *f;
-    struct ir_operand *args;
-    struct ir_block *entry;
-    struct ir_operand out;
-    uint32_t value;
-    size_t i;
 
     f = ir_function_add(l->m, l->module_name, name, IR_VOID, IR_NO_AGG);
     ir_param_add(f, IR_PTR, IR_NO_AGG);     /* the context */
     ir_param_add(f, IR_PTR, IR_NO_AGG);     /* the object */
     ir_param_add(f, IR_PTR, IR_NO_AGG);     /* where the result goes */
-    entry = ir_block_add(f);
     l->f = f;
-    l->b = entry;
-
-    args = ir_alloc(extra + 1, sizeof *args);
-    args[0] = temp(l, f->params[1].temp);
-    for (i = 0; i < extra; i++) {
-        const struct type *t = call->as.call.args[i]->type;
-        struct ir_operand at =
-            offset_address(l, temp(l, f->params[0].temp),
-                           ir_sym_operand(l->m,
-                                          ir_sym_offset_of(l->m, context,
-                                                           (uint32_t)i)));
-        args[i + 1] = is_aggregate(t)
-                          ? at
-                          : temp(l, ir_load(f, entry, ir_type_of(t), at));
-    }
-    value = ir_call(f, entry, ir_type_of(result),
-                    ir_func_op(callee_function(l, callee->symbol)), args,
-                    extra + 1);
-    free(args);
-    out = temp(l, f->params[2].temp);
-    if (result->kind == TYPE_VOID) {
-        /* A worker without a result writes nothing. */
-    } else if (is_aggregate(result)) {
-        ir_memcopy(f, entry, out, temp(l, value), vtype_of(l, result));
-    } else {
-        ir_store(f, entry, ir_type_of(result), temp(l, value), out);
-    }
-    ir_ret(f, entry, IR_VOID, none());
+    l->b = ir_block_add(f);
+    call_worker(l, e->as.dispatch.call, context, temp(l, f->params[1].temp),
+                2);
     l->f = outer_f;
     l->b = outer_b;
     return f;
@@ -5410,34 +5419,17 @@ static struct ir_operand lower_dispatch(struct lowerer *l,
                                     ? call->as.call.callee : call;
     const struct type *result = callee->symbol->type->result;
     size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
-    struct ir_operand context = ir_int_op(IR_PTR, 0);
+    struct ir_operand context;
     struct ir_operand args[4];
     struct ir_function *f;
-    uint32_t agg = IR_NO_AGG;
+    uint32_t agg;
     uint32_t handle;
     uint32_t out;
     char name[32];
-    size_t i;
 
     snprintf(name, sizeof name, "dispatch.%zu", next_thunk(l, "dispatch."));
     args[0] = lower_expr(l, e->as.dispatch.object);
-    if (extra > 0) {
-        char context_name[40];
-        uint32_t slot;
-        snprintf(context_name, sizeof context_name, "%s.context", name);
-        agg = context_aggregate(l, call, context_name);
-        slot = ir_slot(l->f, l->b, ir_aggregate(agg));
-        for (i = 0; i < extra; i++) {
-            const struct expr *arg = call->as.call.args[i];
-            struct ir_operand at =
-                offset_address(l, temp(l, slot),
-                               ir_sym_operand(l->m,
-                                              ir_sym_offset_of(l->m, agg,
-                                                               (uint32_t)i)));
-            store_value(l, arg->type, arg, at);
-        }
-        context = temp(l, slot);
-    }
+    context = pack_context(l, call, extra, name, &agg);
     args[1] = result->kind == TYPE_VOID ? ir_int_op(IR_I64, 0)
                                         : size_operand(l, result);
     f = dispatch_thunk(l, e, name, agg);
@@ -5515,37 +5507,20 @@ static struct ir_operand lower_parallel(struct lowerer *l,
     const struct type *slice = e->as.parallel.array->type;
     const struct type *result = callee->symbol->type->result;
     size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
-    struct ir_operand context = ir_int_op(IR_PTR, 0);
+    struct ir_operand context;
     struct ir_operand args[9];
     struct ir_operand array;
     struct ir_operand length;
     struct ir_operand length_at;
-    uint32_t agg = IR_NO_AGG;
+    uint32_t agg;
     uint32_t results;
     uint32_t count;
     uint32_t out;
     char name[32];
-    size_t i;
 
     snprintf(name, sizeof name, "parallel.%zu", next_thunk(l, "parallel."));
     array = lower_address(l, e->as.parallel.array);
-    if (extra > 0) {
-        char context_name[40];
-        uint32_t slot;
-        snprintf(context_name, sizeof context_name, "%s.context", name);
-        agg = context_aggregate(l, call, context_name);
-        slot = ir_slot(l->f, l->b, ir_aggregate(agg));
-        for (i = 0; i < extra; i++) {
-            const struct expr *arg = call->as.call.args[i];
-            struct ir_operand at =
-                offset_address(l, temp(l, slot),
-                               ir_sym_operand(l->m,
-                                              ir_sym_offset_of(l->m, agg,
-                                                               (uint32_t)i)));
-            store_value(l, arg->type, arg, at);
-        }
-        context = temp(l, slot);
-    }
+    context = pack_context(l, call, extra, name, &agg);
     results = ir_slot(l->f, l->b, ir_scalar(IR_PTR));
     count = ir_slot(l->f, l->b, ir_scalar(IR_I64));
     args[0] = temp(l, ir_load(l->f, l->b, IR_PTR, array));
@@ -6796,6 +6771,24 @@ static void lower_handler(struct lowerer *l, const struct handler *h,
     free(scope.items);
 }
 
+/* `catch fatal`: call `fatal` of the class of the error err through its
+   table, which the class of type error_type holds, then go on at join. */
+static void call_fatal(struct lowerer *l, struct ir_operand err,
+                       const struct type *error_type, struct ir_block *join)
+{
+    static const struct name fatal_name = {"fatal", 5};
+    size_t index = table_index(error_type->element, &fatal_name, 1);
+    struct ir_operand table = load_table(l, err, error_type);
+    struct ir_operand entry =
+        temp(l, ir_load(l->f, l->b, IR_PTR,
+                        offset_address(l, table, entry_offset(l, index))));
+    struct ir_operand self = err;
+
+    ir_call_indirect(l->f, l->b, IR_VOID, entry, fatal_signature(l), &self,
+                     1);
+    ir_jump(l->f, l->b, join);
+}
+
 /* DESIGN: a call that can fail gives a pointer. A pointer of `none` is
    success, so the branch after the call is the whole of the error
    machinery. It is one compare and one branch, and nothing unwinds. */
@@ -6845,21 +6838,9 @@ static void handle_error(struct lowerer *l, const struct expr *call,
             ir_ret(l->f, l->b, IR_PTR, err);
         }
         break;
-    case HANDLE_FATAL: {
-        static const struct name fatal_name = {"fatal", 5};
-        const struct type *error_type = call->as.call.callee->type->result;
-        size_t index = table_index(error_type->element, &fatal_name, 1);
-        struct ir_operand table = load_table(l, err, error_type);
-        struct ir_operand entry =
-            temp(l, ir_load(l->f, l->b, IR_PTR,
-                            offset_address(l, table,
-                                           entry_offset(l, index))));
-        struct ir_operand self = err;
-        ir_call_indirect(l->f, l->b, IR_VOID, entry,
-                         fatal_signature(l), &self, 1);
-        ir_jump(l->f, l->b, join);
+    case HANDLE_FATAL:
+        call_fatal(l, err, call->as.call.callee->type->result, join);
         break;
-    }
     case HANDLE_BLOCK:
         error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
         if (h->symbol != NULL) {
@@ -6991,17 +6972,7 @@ static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
                           ir_func_op(callee_function(l, s->as.let.guard_make)),
                           NULL, 0));
     if (h->kind == HANDLE_FATAL) {
-        static const struct name fatal_name = {"fatal", 5};
-        size_t index = table_index(error_type->element, &fatal_name, 1);
-        struct ir_operand table = load_table(l, err, error_type);
-        struct ir_operand entry =
-            temp(l, ir_load(l->f, l->b, IR_PTR,
-                            offset_address(l, table,
-                                           entry_offset(l, index))));
-        struct ir_operand self = err;
-        ir_call_indirect(l->f, l->b, IR_VOID, entry, fatal_signature(l),
-                         &self, 1);
-        ir_jump(l->f, l->b, join);
+        call_fatal(l, err, error_type, join);
         l->b = join;
         return;
     }
