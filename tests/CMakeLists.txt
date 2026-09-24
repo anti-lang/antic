@@ -544,8 +544,8 @@ add_test(NAME program_pattern_literals_dev
         "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev.o"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-set_tests_properties(program_pattern_literals_dev PROPERTIES
-    FIXTURES_REQUIRED "lang_dev_object;regex_dev_object")
+set_property(TEST program_pattern_literals_dev PROPERTY FIXTURES_REQUIRED
+    lang_dev_object regex_dev_object)
 # The registry of the classes in dev mode, where the module that links
 # writes it. The program takes its allocator from anti.mem. A dev link
 # names the object of anti.mem on the command line.
@@ -1104,8 +1104,8 @@ add_test(NAME fmt_canonical
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_fmt_canonical.cmake")
 
 # Every class of `anti check`: the front end on every source of a project,
-# the `anti` blocks of the doc comments, the doc warnings, the formatting
-# rules and the line that says the pattern check waits for PCRE2.
+# the `anti` blocks of the doc comments, the doc warnings and the formatting
+# rules.
 add_test(NAME anti_check
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"

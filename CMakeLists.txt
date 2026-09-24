@@ -110,9 +110,9 @@ endif()
 set(ANTIC_HOST_TARGET "${ANTIC_HOST_OS}-${ANTIC_HOST_CPU}")
 
 # The compiler's code is a library so that the unit tests link the same
-# objects as the antic executable.
+# objects as the antic executable. It links PCRE2 to check every pattern
+# literal.
 include(tools/sources.cmake)
-# PCRE2, which antic links to check every pattern literal.
 include(src/native/pcre2-source.cmake)
 add_library(antic_core STATIC ${ANTIC_CORE_SOURCES})
 target_include_directories(antic_core PUBLIC ${ANTIC_CORE_INCLUDE_DIRS})

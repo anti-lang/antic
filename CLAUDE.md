@@ -197,7 +197,8 @@ directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
 16. The native libraries in `src/native/`. PCRE2, SQLite, Mbed TLS, miniaudio
     and raylib build for all six targets, as "Libraries and runtime" in
     `docs/decisions.md` records. Their headers and `lib/cacert.pem` are not yet
-    part of the runtime archive, and no module of the standard library binds them.
+    part of the runtime archive. `anti.regex` binds PCRE2, and no module binds
+    the other four.
 17. Inline atomic instruction sequences, which are runtime calls today.
 18. Done. The one manifest of a release, and the installers that read its
     signature. `docs/reports/2026-09-20-one-manifest.md` reports both.
@@ -269,7 +270,7 @@ reports what it finished.
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`,
   `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`,
-  `anti.simd`, `anti.trace` and `anti.plugin`.
+  `anti.simd`, `anti.trace`, `anti.plugin` and `anti.regex`.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
@@ -291,8 +292,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 951 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 950 each, without the `no_paths` test, which needs a
+- 959 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 958 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -461,6 +462,16 @@ reports what it finished.
   warning, `--warnings-as-errors` gives a dev build the same, and `anti check`
   passes it. `catch none` counts a failure as `none`. See "Errors, warnings
   and checks" in `docs/decisions.md` and `docs/notes/warnings.md`.
+- Pattern literals are built. `re"..."` is raw and has type `Regex`, a
+  struct of `anti.lang` that the compiler declares. antic links PCRE2 and
+  checks every literal: a malformed one is an error at the byte PCRE2
+  names, and nested repeats over text that overlaps fail the safety check
+  `exponential-pattern`. Each module compiles its literals once before
+  `main`, in a constructor. `Regex.compile(text)` calls `compile` of
+  `anti.regex`, which fails with `BadPattern`. A program that holds
+  `anti.regex` links `anti_rt_regex` and `libpcre2-8.a` of `lib/<target>/`.
+  The methods of `str` are not built. See "Regular expressions" in
+  `docs/decisions.md` and `docs/notes/patterns.md`.
 - `f"..."` and `rf"..."` are built. Each text and each `{expr}` is a call
   on an `anti.text.Builder`, the format specification after a colon gives
   the arguments of the call, and the text is memory of its own that the
@@ -534,9 +545,9 @@ reports what it finished.
   `--targets all` once per target, the `anti` blocks of the doc comments in
   their two contexts, the doc warnings and the formatting, which compares
   each file with what `anti fmt` writes. The first
-  failing class ends the run, the doc-warning class reports and fails
-  nothing, and the last status line says the pattern check of
-  `regex.compile` waits for PCRE2. `antic --front-end` runs the front end
+  failing class ends the run, and the doc-warning class reports and fails
+  nothing. No class checks patterns, since the front end checks every
+  pattern literal. `antic --front-end` runs the front end
   alone, `--warn-undocumented` reports a `pub` item without a `///`
   comment, and the checker warns where the name a `catch` binds shadows a
   variable. See "The check command" in `docs/decisions.md` and
@@ -548,7 +559,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 56. See "The doc
+  class body and the `worker` mark, and its format version is 58. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
