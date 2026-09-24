@@ -74,8 +74,22 @@ no freeing of a `Regex`, and the programs of patterns off Rosetta.
 
 The three suites at `c208bc7`, the last commit that changed code:
 
-```
+```text
 host:  100% tests passed out of 959
 asan:  100% tests passed out of 958
 ubsan: 100% tests passed out of 958
+```
+
+The state after the push of the report, before this proof was added:
+
+```text
+$ git log --oneline -3
+8cfabc1 Report the pattern literals, Regex and anti.regex
+c208bc7 Fold the PCRE2 comment of the build and record the state of patterns
+16da9c2 Pin the assembly of the pattern programs and format their tests
+$ git status --short
+(no output)
+$ git rev-parse HEAD origin/main
+8cfabc14ed4764119114d5cb278b7a97a07f8d06
+8cfabc14ed4764119114d5cb278b7a97a07f8d06
 ```
