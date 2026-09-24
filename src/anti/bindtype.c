@@ -8,6 +8,7 @@
 
 #include "bindmodel.h"
 #include "diagnostic.h"
+#include "files.h"
 #include "lexer.h"
 
 void bind_list_add(struct bind_list *list, void *item)

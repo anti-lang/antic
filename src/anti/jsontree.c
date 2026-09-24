@@ -1,4 +1,5 @@
 /* A tree of a JSON document over the scanner of src/rt/json.c. */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

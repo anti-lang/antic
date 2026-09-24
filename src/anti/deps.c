@@ -31,12 +31,6 @@
    other. */
 enum { DEPS_ROUNDS = 64 };
 
-static void die_out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 /* The largest part of a version, the one of DEPS_VERSION_DIGITS nines. */
 #define DEPS_VERSION_PART_MAX INT64_C(999999999)
 
@@ -223,10 +217,8 @@ static struct dep_package *graph_add(struct dep_graph *g, const char *name)
     if (p != NULL) {
         return p;
     }
-    g->packages = realloc(g->packages, (g->count + 1) * sizeof *g->packages);
-    if (g->packages == NULL) {
-        die_out_of_memory();
-    }
+    g->packages = files_resize(g->packages, g->count + 1,
+                               sizeof *g->packages);
     p = &g->packages[g->count++];
     memset(p, 0, sizeof *p);
     text_append(&p->name, name);
@@ -243,10 +235,8 @@ static struct dep_module *package_module(struct dep_package *p,
             return &p->modules[i];
         }
     }
-    p->modules = realloc(p->modules, (p->module_count + 1) * sizeof *p->modules);
-    if (p->modules == NULL) {
-        die_out_of_memory();
-    }
+    p->modules = files_resize(p->modules, p->module_count + 1,
+                              sizeof *p->modules);
     memset(&p->modules[p->module_count], 0, sizeof *p->modules);
     text_append(&p->modules[p->module_count].path, module);
     return &p->modules[p->module_count++];
@@ -266,12 +256,8 @@ static void require(struct resolver *r, const char *name,
             return;
         }
     }
-    r->requirements = realloc(r->requirements,
-                              (r->requirement_count + 1) *
-                                  sizeof *r->requirements);
-    if (r->requirements == NULL) {
-        die_out_of_memory();
-    }
+    r->requirements = files_resize(r->requirements, r->requirement_count + 1,
+                                   sizeof *r->requirements);
     item = &r->requirements[r->requirement_count++];
     memset(item, 0, sizeof *item);
     text_append(&item->name, name);

@@ -15,12 +15,6 @@
 #include "text.h"
 #include "toml.h"
 
-static void die_out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 /* The interface of a key under `inject.`, or NULL when the key belongs
    to another table. `inject.test.` names the test table. */
 static const char *interface_of(const char *key, size_t length, bool tests)
@@ -83,10 +77,7 @@ bool manifest_inject_read(const char *path, bool tests,
         return false;
     }
     count = anti_rt_toml_count(doc);
-    out->entries = malloc(((size_t)count + 1) * sizeof *out->entries);
-    if (out->entries == NULL) {
-        die_out_of_memory();
-    }
+    out->entries = files_array((size_t)count + 1, sizeof *out->entries);
     /* The plain table first, so an entry of `[inject.test]` replaces the
        one `[inject]` holds for that interface. */
     for (i = 0; i < count; i++) {
@@ -202,11 +193,7 @@ static void array_of_key(const struct anti_toml *doc, const char *key,
             return;
         }
         if (*count == capacity) {
-            capacity = capacity == 0 ? 4 : capacity * 2;
-            *items = realloc(*items, capacity * sizeof **items);
-            if (*items == NULL) {
-                die_out_of_memory();
-            }
+            *items = files_grow(*items, &capacity, sizeof **items);
         }
         memset(&(*items)[*count], 0, sizeof **items);
         text_append(&(*items)[*count], value);
@@ -246,12 +233,8 @@ static struct manifest_dependency *dependency_of(struct manifest *m,
             return &m->dependencies[i];
         }
     }
-    m->dependencies = realloc(m->dependencies,
-                              (m->dependency_count + 1) *
-                                  sizeof *m->dependencies);
-    if (m->dependencies == NULL) {
-        die_out_of_memory();
-    }
+    m->dependencies = files_resize(m->dependencies, m->dependency_count + 1,
+                                   sizeof *m->dependencies);
     memset(&m->dependencies[m->dependency_count], 0, sizeof *m->dependencies);
     text_append_bytes(&m->dependencies[m->dependency_count].name, name,
                       name_length);
@@ -273,12 +256,9 @@ static bool read_tables(const char *path, const struct anti_toml *doc,
         struct anti_text value = anti_rt_toml_value(doc, i);
         if (strncmp(key, repositories, sizeof repositories - 1) == 0) {
             const char *alias = key + sizeof repositories - 1;
-            m->repositories = realloc(m->repositories,
-                                      (m->repository_count + 1) *
-                                          sizeof *m->repositories);
-            if (m->repositories == NULL) {
-                die_out_of_memory();
-            }
+            m->repositories = files_resize(m->repositories,
+                                           m->repository_count + 1,
+                                           sizeof *m->repositories);
             memset(&m->repositories[m->repository_count], 0,
                    sizeof *m->repositories);
             text_append(&m->repositories[m->repository_count].alias, alias);

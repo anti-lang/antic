@@ -18,12 +18,6 @@
 #include "parser.h"
 #include "text.h"
 
-static void out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 bool unit_file(const char *dir, const char *module,
                         const char *suffix, struct text *out)
 {
@@ -93,10 +87,7 @@ bool unit_read(const char *source, const char *const *roots,
             out->has_main = true;
         }
     }
-    out->imports = calloc(tree->import_count + 1, sizeof *out->imports);
-    if (out->imports == NULL) {
-        out_of_memory();
-    }
+    out->imports = files_array(tree->import_count + 1, sizeof *out->imports);
     for (i = 0; i < tree->import_count; i++) {
         text_append_bytes(&out->imports[i], tree->imports[i].module.text,
                           tree->imports[i].module.length);
@@ -124,16 +115,13 @@ void unit_free(struct unit *u)
 
 void unit_order(const struct unit *units, size_t count, size_t *order)
 {
-    bool *done = calloc(count + 1, sizeof *done);
+    bool *done = files_array(count + 1, sizeof *done);
     size_t placed = 0;
     size_t i;
     size_t j;
     size_t k;
     bool grew = true;
 
-    if (done == NULL) {
-        out_of_memory();
-    }
     while (grew && placed < count) {
         grew = false;
         for (i = 0; i < count; i++) {

@@ -42,12 +42,6 @@ enum { BUILD_DEPTH = 8 };
 
 static int build_project(const struct build_request *r, int depth);
 
-static void die_out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 /* A growing list of strings that the option lists point into. */
 struct strings {
     const char **items;
@@ -58,12 +52,8 @@ struct strings {
 static void strings_add(struct strings *list, const char *item)
 {
     if (list->count == list->capacity) {
-        list->capacity = list->capacity == 0 ? 8 : list->capacity * 2;
-        list->items = realloc(list->items,
-                              list->capacity * sizeof *list->items);
-        if (list->items == NULL) {
-            die_out_of_memory();
-        }
+        list->items = files_grow(list->items, &list->capacity,
+                                 sizeof *list->items);
     }
     list->items[list->count++] = item;
 }
@@ -418,10 +408,7 @@ static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
     if (!driver_libraries(&search, &arena, &closure, &count)) {
         goto done;
     }
-    paths = calloc(count + 1, sizeof *paths);
-    if (paths == NULL) {
-        die_out_of_memory();
-    }
+    paths = files_array(count + 1, sizeof *paths);
     for (i = 0; i < count; i++) {
         struct text module = {0};
         bool written;
@@ -690,10 +677,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
         goto done;
     }
     graph_libraries(b, &shared);
-    files = calloc(b->unit_count + 1, sizeof *files);
-    if (files == NULL) {
-        die_out_of_memory();
-    }
+    files = files_array(b->unit_count + 1, sizeof *files);
     /* Every library file first, in the order of the imports, so a module
        that imports another of the project finds it. */
     for (i = 0; i < b->unit_count; i++) {
@@ -905,11 +889,8 @@ static bool read_units(struct build *b)
                         "module\n", text_cstr(&b->src), SOURCE_SUFFIX);
         return false;
     }
-    b->units = calloc(b->sources.count, sizeof *b->units);
-    b->order = calloc(b->sources.count, sizeof *b->order);
-    if (b->units == NULL || b->order == NULL) {
-        die_out_of_memory();
-    }
+    b->units = files_array(b->sources.count, sizeof *b->units);
+    b->order = files_array(b->sources.count, sizeof *b->order);
     b->unit_count = b->sources.count;
     for (i = 0; i < b->sources.count; i++) {
         if (!unit_read(text_cstr(&b->sources.items[i]), b->roots, 1, NULL,
@@ -993,10 +974,7 @@ static int build_project(const struct build_request *r, int depth)
                       &b.graph)) {
         goto done;
     }
-    b.specs = calloc(b.graph.count + 1, sizeof *b.specs);
-    if (b.specs == NULL) {
-        die_out_of_memory();
-    }
+    b.specs = files_array(b.graph.count + 1, sizeof *b.specs);
     for (i = 0; i < b.graph.count; i++) {
         const struct dep_package *p = &b.graph.packages[i];
         text_appendf(&b.specs[i], "%s,%s,%s", text_cstr(&p->name),

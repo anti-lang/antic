@@ -71,14 +71,10 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
 {
     struct text out = {0};
     struct text directory = {0};
-    unsigned long *offsets = calloc(count + 1, sizeof *offsets);
+    unsigned long *offsets = files_array(count + 1, sizeof *offsets);
     size_t i;
     bool ok = true;
 
-    if (offsets == NULL) {
-        fputs("anti: out of memory\n", stderr);
-        exit(70);
-    }
     for (i = 0; ok && i < count; i++) {
         struct text bytes = {0};
         unsigned long crc;
@@ -196,11 +192,7 @@ static bool read_directory(const char *path, struct zip_archive *out)
     }
     count = get16(p + end + 10);
     at = get32(p + end + 16);
-    out->items = calloc(count + 1, sizeof *out->items);
-    if (out->items == NULL) {
-        fputs("anti: out of memory\n", stderr);
-        exit(70);
-    }
+    out->items = files_array(count + 1, sizeof *out->items);
     for (i = 0; i < count; i++) {
         struct zip_item *item = &out->items[i];
         size_t name_length;

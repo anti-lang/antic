@@ -143,7 +143,7 @@ static int usage(FILE *out)
 /* `anti symbols` and its three commands. */
 static int symbols_command(int argc, char **argv)
 {
-    const char **symbols = calloc((size_t)argc, sizeof *symbols);
+    const char **symbols = files_array((size_t)argc, sizeof *symbols);
     const char *conf = NULL;
     const char *from = NULL;
     const char *out = "symbols.zip";
@@ -152,10 +152,6 @@ static int symbols_command(int argc, char **argv)
     int status;
     int i;
 
-    if (symbols == NULL) {
-        fputs("anti: out of memory\n", stderr);
-        return 70;
-    }
     for (i = 3; i < argc; i++) {
         if (strcmp(argv[i], "--conf") == 0 && i + 1 < argc) {
             conf = argv[++i];
@@ -213,15 +209,13 @@ static bool default_runtime(struct text *out)
 }
 
 /* The paths of every file in found, as sources of a command. The array
-   points into found, which outlives it. */
+   points into found, which outlives it, and the caller frees the array
+   with free. */
 static const char **sources_of(const struct files_list *found)
 {
-    const char **sources = malloc((found->count + 1) * sizeof *sources);
+    const char **sources = files_array(found->count + 1, sizeof *sources);
     size_t i;
 
-    if (sources == NULL) {
-        return NULL;
-    }
     for (i = 0; i < found->count; i++) {
         sources[i] = text_cstr(&found->items[i]);
     }
@@ -284,8 +278,8 @@ static int build_command(int argc, char **argv)
 /* `anti check`. */
 static int check_command(int argc, char **argv)
 {
-    const char **sources = malloc((size_t)argc * sizeof *sources);
-    const char **roots = malloc((size_t)argc * sizeof *roots);
+    const char **sources = files_array((size_t)argc, sizeof *sources);
+    const char **roots = files_array((size_t)argc, sizeof *roots);
     const char *work = "build/check";
     const char *runtime = NULL;
     struct text home = {0};
@@ -296,11 +290,6 @@ static int check_command(int argc, char **argv)
     int status;
     int i;
 
-    if (sources == NULL || roots == NULL) {
-        fputs("anti: out of memory\n", stderr);
-        status = 70;
-        goto done;
-    }
     for (i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--warn-undocumented") == 0) {
             undocumented = true;
@@ -337,8 +326,8 @@ done:
 /* `anti doc`. */
 static int doc_command(int argc, char **argv)
 {
-    const char **sources = malloc((size_t)argc * sizeof *sources);
-    const char **roots = malloc((size_t)argc * sizeof *roots);
+    const char **sources = files_array((size_t)argc, sizeof *sources);
+    const char **roots = files_array((size_t)argc, sizeof *roots);
     const char **listed = NULL;
     struct files_list found = {0};
     struct text src = {0};
@@ -356,11 +345,6 @@ static int doc_command(int argc, char **argv)
     int status;
     int i;
 
-    if (sources == NULL || roots == NULL) {
-        fputs("anti: out of memory\n", stderr);
-        status = 70;
-        goto done;
-    }
     for (i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--dev") == 0) {
             dev = true;
@@ -397,11 +381,6 @@ static int doc_command(int argc, char **argv)
             goto done;
         }
         listed = sources_of(&found);
-        if (listed == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            status = 70;
-            goto done;
-        }
         count = found.count;
         if (root_count == 0) {
             roots[root_count++] = text_cstr(&src);
@@ -426,7 +405,7 @@ done:
 /* `anti fmt`. */
 static int fmt_command(int argc, char **argv)
 {
-    const char **sources = malloc((size_t)argc * sizeof *sources);
+    const char **sources = files_array((size_t)argc, sizeof *sources);
     const char **listed = NULL;
     struct files_list found = {0};
     struct text src = {0};
@@ -437,11 +416,6 @@ static int fmt_command(int argc, char **argv)
     int status;
     int i;
 
-    if (sources == NULL) {
-        fputs("anti: out of memory\n", stderr);
-        status = 70;
-        goto done;
-    }
     for (i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--check") == 0) {
             check = true;
@@ -463,11 +437,6 @@ static int fmt_command(int argc, char **argv)
             goto done;
         }
         listed = sources_of(&found);
-        if (listed == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            status = 70;
-            goto done;
-        }
         count = found.count;
     }
     status = fmt_run(listed != NULL ? listed : sources, count, check);
@@ -485,8 +454,8 @@ done:
 /* `anti test`. */
 static int test_command(int argc, char **argv)
 {
-    const char **sources = malloc((size_t)argc * sizeof *sources);
-    const char **roots = malloc((size_t)argc * sizeof *roots);
+    const char **sources = files_array((size_t)argc, sizeof *sources);
+    const char **roots = files_array((size_t)argc, sizeof *roots);
     const char *work = "build/tests";
     const char *runtime = NULL;
     const char *llvm_mc = NULL;
@@ -498,11 +467,6 @@ static int test_command(int argc, char **argv)
     int status;
     int i;
 
-    if (sources == NULL || roots == NULL) {
-        fputs("anti: out of memory\n", stderr);
-        status = 70;
-        goto done;
-    }
     for (i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--release") == 0) {
             release = true;
@@ -547,8 +511,8 @@ done:
    the header of a library file with --header. */
 static int bind_command(int argc, char **argv)
 {
-    const char **roots = malloc((size_t)argc * sizeof *roots);
-    const char **defines = malloc((size_t)argc * sizeof *defines);
+    const char **roots = files_array((size_t)argc, sizeof *roots);
+    const char **defines = files_array((size_t)argc, sizeof *defines);
     const char *header = NULL;
     struct bind_request request;
     struct text home = {0};
@@ -557,11 +521,6 @@ static int bind_command(int argc, char **argv)
     int i;
 
     memset(&request, 0, sizeof request);
-    if (roots == NULL || defines == NULL) {
-        fputs("anti: out of memory\n", stderr);
-        status = 70;
-        goto done;
-    }
     request.out_dir = ".";
     request.includes = roots;
     request.defines = defines;

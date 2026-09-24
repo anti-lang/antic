@@ -73,25 +73,13 @@ struct page {
     size_t item_capacity;
 };
 
-static void out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 static struct entry *entry_add(struct entry **list, size_t *count,
                                size_t *capacity)
 {
     struct entry *one;
 
     if (*count == *capacity) {
-        size_t grown = *capacity == 0 ? 8 : *capacity * 2;
-        struct entry *items = realloc(*list, grown * sizeof *items);
-        if (items == NULL) {
-            out_of_memory();
-        }
-        *list = items;
-        *capacity = grown;
+        *list = files_grow(*list, capacity, sizeof **list);
     }
     one = &(*list)[(*count)++];
     memset(one, 0, sizeof *one);
@@ -431,10 +419,7 @@ static void body_entries(struct entry *item, const struct type *t, bool all)
            on the item, and the two lists carry the same names. */
         names = NULL;
         if (params > 0) {
-            names = malloc(params * sizeof *names);
-            if (names == NULL) {
-                out_of_memory();
-            }
+            names = files_array(params, sizeof *names);
             for (j = 0; j < params; j++) {
                 names[j] = m->symbol->params != NULL ? m->symbol->params[j]
                                                      : m->params[j].name;
@@ -510,10 +495,7 @@ static void tree_item(struct page *p, const struct item *it, bool notes)
     case ITEM_EXTERN_FN: {
         struct name *names = NULL;
         if (it->param_count > 0) {
-            names = malloc(it->param_count * sizeof *names);
-            if (names == NULL) {
-                out_of_memory();
-            }
+            names = files_array(it->param_count, sizeof *names);
             for (i = 0; i < it->param_count; i++) {
                 names[i] = it->params[i].name;
             }
@@ -1186,17 +1168,13 @@ int doc_run(const char **sources, size_t count, const char **roots,
         fputs("anti: doc takes a source or a library file\n", stderr);
         return 2;
     }
-    arenas = calloc(count, sizeof *arenas);
-    tables = calloc(count, sizeof *tables);
-    programs = calloc(count, sizeof *programs);
-    pages = calloc(count, sizeof *pages);
-    units = calloc(count, sizeof *units);
-    order = calloc(count, sizeof *order);
-    search = calloc(root_count + 2, sizeof *search);
-    if (arenas == NULL || tables == NULL || programs == NULL ||
-        pages == NULL || units == NULL || order == NULL || search == NULL) {
-        out_of_memory();
-    }
+    arenas = files_array(count, sizeof *arenas);
+    tables = files_array(count, sizeof *tables);
+    programs = files_array(count, sizeof *programs);
+    pages = files_array(count, sizeof *pages);
+    units = files_array(count, sizeof *units);
+    order = files_array(count, sizeof *order);
+    search = files_array(root_count + 2, sizeof *search);
     for (i = 0; i < root_count; i++) {
         search[search_count++] = roots[i];
     }

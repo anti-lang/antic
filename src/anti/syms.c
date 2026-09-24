@@ -38,12 +38,6 @@ enum { INCLUDE_DEPTH = 32 };
 static const char notice_begin[] = "ANTI_LICENSES_BEGIN\nbuild ";
 enum { ID_LENGTH = 64 };
 
-static void die_out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 static bool ends_with(const char *s, const char *suffix)
 {
     size_t a = strlen(s);
@@ -65,12 +59,8 @@ static struct text *texts_add(struct texts *list, const void *bytes,
     struct text *t;
 
     if (list->count == list->capacity) {
-        list->capacity = list->capacity == 0 ? 8 : list->capacity * 2;
-        list->items = realloc(list->items,
-                              list->capacity * sizeof *list->items);
-        if (list->items == NULL) {
-            die_out_of_memory();
-        }
+        list->items = files_grow(list->items, &list->capacity,
+                                 sizeof *list->items);
     }
     t = &list->items[list->count++];
     memset(t, 0, sizeof *t);
@@ -274,12 +264,8 @@ static void add_binary(struct binaries *list, const char *path)
         return;
     }
     if (list->count == list->capacity) {
-        list->capacity = list->capacity == 0 ? 8 : list->capacity * 2;
-        list->items = realloc(list->items,
-                              list->capacity * sizeof *list->items);
-        if (list->items == NULL) {
-            die_out_of_memory();
-        }
+        list->items = files_grow(list->items, &list->capacity,
+                                 sizeof *list->items);
     }
     b = &list->items[list->count];
     memset(b, 0, sizeof *b);
@@ -518,12 +504,8 @@ static struct unit *units_add(struct units *list)
     struct unit *u;
 
     if (list->count == list->capacity) {
-        list->capacity = list->capacity == 0 ? 8 : list->capacity * 2;
-        list->items = realloc(list->items,
-                              list->capacity * sizeof *list->items);
-        if (list->items == NULL) {
-            die_out_of_memory();
-        }
+        list->items = files_grow(list->items, &list->capacity,
+                                 sizeof *list->items);
     }
     u = &list->items[list->count++];
     memset(u, 0, sizeof *u);
@@ -841,10 +823,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
         units_free(&units);
         text_free(&archive);
     }
-    entries = calloc(total, sizeof *entries);
-    if (entries == NULL) {
-        die_out_of_memory();
-    }
+    entries = files_array(total, sizeof *entries);
     entries[entry_count].name = INDEX_NAME;
     entries[entry_count].bytes = index.data;
     entries[entry_count].size = index.length;

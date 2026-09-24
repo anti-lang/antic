@@ -6,6 +6,26 @@
 
 #include "text.h"
 
+/* Print that anti ran out of memory and exit with status 70. Every
+   allocation of the tool that fails ends here. */
+void files_out_of_memory(void);
+
+/* An array of count elements of size bytes each, zeroed. A product that
+   overflows a size_t or a failed calloc exits through
+   files_out_of_memory. The caller frees the array with free. */
+void *files_array(size_t count, size_t size);
+
+/* items resized to count elements of size bytes each, as realloc does.
+   The checks and the exit are those of files_array. The caller frees
+   the array with free. */
+void *files_resize(void *items, size_t count, size_t size);
+
+/* items, an array of *room elements of size bytes each, grown to twice
+   its room, or to 16 elements from none. The new elements are zeroed and
+   *room holds the new room. The checks and the exit are those of
+   files_array. The caller frees the array with free. */
+void *files_grow(void *items, size_t *room, size_t size);
+
 /* Make the directory path and every missing directory above it. */
 bool files_make_dirs(const char *path);
 

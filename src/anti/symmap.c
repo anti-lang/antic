@@ -30,12 +30,6 @@ struct map {
     size_t capacity;
 };
 
-static void die_out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 static bool add_function(void *context, const char *name, uint64_t vaddr,
                          uint64_t size)
 {
@@ -43,11 +37,7 @@ static bool add_function(void *context, const char *name, uint64_t vaddr,
     struct entry *e;
 
     if (m->count == m->capacity) {
-        m->capacity = m->capacity == 0 ? 64 : m->capacity * 2;
-        m->items = realloc(m->items, m->capacity * sizeof *m->items);
-        if (m->items == NULL) {
-            die_out_of_memory();
-        }
+        m->items = files_grow(m->items, &m->capacity, sizeof *m->items);
     }
     e = &m->items[m->count++];
     memset(e, 0, sizeof *e);

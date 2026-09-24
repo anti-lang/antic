@@ -50,12 +50,6 @@ struct doc_blocks {
     size_t capacity;
 };
 
-static void out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 /* The module path with `_` for every dot, which names a file of the work
    directory. */
 static void flat_path(const char *module, struct text *out)
@@ -142,13 +136,8 @@ static size_t front_end_class(const struct unit *units, size_t count,
 static void blocks_add(struct doc_blocks *list, struct doc_block *one)
 {
     if (list->count == list->capacity) {
-        size_t capacity = list->capacity == 0 ? 8 : list->capacity * 2;
-        struct doc_block *items = realloc(list->items, capacity * sizeof *items);
-        if (items == NULL) {
-            out_of_memory();
-        }
-        list->items = items;
-        list->capacity = capacity;
+        list->items = files_grow(list->items,
+                                 &list->capacity, sizeof *list->items);
     }
     list->items[list->count++] = *one;
 }
@@ -511,15 +500,11 @@ int check_run(const char *const *sources, size_t source_count,
         text_free(&package);
         return 1;
     }
-    units = calloc(count + 1, sizeof *units);
-    order = calloc(count + 1, sizeof *order);
-    path_roots = malloc((root_count + 2) * sizeof *path_roots);
-    search = malloc((root_count + 3) * sizeof *search);
-    block_search = malloc((root_count + 4) * sizeof *block_search);
-    if (units == NULL || order == NULL || path_roots == NULL ||
-        search == NULL || block_search == NULL) {
-        out_of_memory();
-    }
+    units = files_array(count + 1, sizeof *units);
+    order = files_array(count + 1, sizeof *order);
+    path_roots = files_array(root_count + 2, sizeof *path_roots);
+    search = files_array(root_count + 3, sizeof *search);
+    block_search = files_array(root_count + 4, sizeof *block_search);
     path_root_count = 0;
     for (i = 0; i < root_count; i++) {
         path_roots[path_root_count++] = roots[i];

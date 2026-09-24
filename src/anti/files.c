@@ -4,6 +4,7 @@
 #include "files.h"
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,52 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
+
+void files_out_of_memory(void)
+{
+    fputs("anti: out of memory\n", stderr);
+    exit(70);
+}
+
+void *files_array(size_t count, size_t size)
+{
+    void *items;
+
+    if (size != 0 && count > SIZE_MAX / size) {
+        files_out_of_memory();
+    }
+    /* calloc may answer NULL for no bytes, which is no failure. */
+    items = calloc(count == 0 ? 1 : count, size == 0 ? 1 : size);
+    return items;
+}
+
+void *files_resize(void *items, size_t count, size_t size)
+{
+    void *grown;
+
+    if (size != 0 && count > SIZE_MAX / size) {
+        files_out_of_memory();
+    }
+    grown = realloc(items, count * size == 0 ? 1 : count * size);
+    return grown;
+}
+
+void *files_grow(void *items, size_t *room, size_t size)
+{
+    size_t grown = *room == 0 ? 16 : *room;
+    unsigned char *bytes;
+
+    if (*room != 0) {
+        if (grown > SIZE_MAX / 2) {
+            files_out_of_memory();
+        }
+        grown *= 2;
+    }
+    bytes = files_resize(items, grown, size);
+    memset(bytes + *room * size, 0, (grown - *room) * size);
+    *room = grown;
+    return bytes;
+}
 
 static bool make_one(const char *path)
 {
@@ -222,15 +269,7 @@ bool files_copy_program(const char *from, const char *to)
 static void list_add(struct files_list *out, const char *path)
 {
     if (out->count == out->capacity) {
-        size_t capacity = out->capacity == 0 ? 32 : out->capacity * 2;
-        struct text *items = realloc(out->items, capacity * sizeof *items);
-        if (items == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            exit(70);
-        }
-        memset(items + out->count, 0, (capacity - out->count) * sizeof *items);
-        out->items = items;
-        out->capacity = capacity;
+        out->items = files_grow(out->items, &out->capacity, sizeof *out->items);
     }
     text_append(&out->items[out->count++], path);
 }

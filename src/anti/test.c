@@ -47,12 +47,6 @@ static bool named(const struct name *a, const char *text)
     return a->length == n && memcmp(a->text, text, n) == 0;
 }
 
-static void die_out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 /* The directory of the library file of a module path: work/a/b for
    a.b.c, which is where find_libraries of the compiler looks. */
 static bool library_path(const char *work, const char *module,
@@ -119,10 +113,7 @@ static bool read_unit(const char *source, const char *const *roots,
         }
         goto done;
     }
-    out->tests = malloc(tree->item_count * sizeof *out->tests + 1);
-    if (out->tests == NULL) {
-        die_out_of_memory();
-    }
+    out->tests = files_array(tree->item_count + 1, sizeof *out->tests);
     for (i = 0; i < tree->item_count; i++) {
         const struct item *it = tree->items[i];
         char *name;
@@ -134,10 +125,7 @@ static bool read_unit(const char *source, const char *const *roots,
             out->teardown = out->teardown || named(&it->name, "teardown");
             continue;
         }
-        name = malloc(it->name.length + 1);
-        if (name == NULL) {
-            die_out_of_memory();
-        }
+        name = files_array(it->name.length + 1, 1);
         memcpy(name, it->name.text, it->name.length);
         name[it->name.length] = '\0';
         out->tests[out->test_count++] = name;
@@ -261,10 +249,7 @@ static bool compile_imports(const struct unit *u, const struct options *base,
         arena_free(&arena);
         return false;
     }
-    out->items = calloc(count + 1, sizeof *out->items);
-    if (out->items == NULL) {
-        die_out_of_memory();
-    }
+    out->items = files_array(count + 1, sizeof *out->items);
     for (i = 0; ok && i < count; i++) {
         struct options one = *base;
         struct text base_path = {0};
@@ -403,10 +388,7 @@ static bool run_unit(const struct unit *u, const struct options *base,
         if (!compile_imports(u, base, work, text_cstr(&flat), &imports)) {
             goto done;
         }
-        objects = malloc((imports.count + 1) * sizeof *objects);
-        if (objects == NULL) {
-            die_out_of_memory();
-        }
+        objects = files_array(imports.count + 1, sizeof *objects);
         objects[0] = text_cstr(&u->object);
         for (i = 0; i < imports.count; i++) {
             objects[i + 1] = text_cstr(&imports.items[i]);
@@ -453,11 +435,8 @@ int test_run(const char *const *sources, size_t source_count,
     if (!files_make_dirs(work)) {
         return 1;
     }
-    units = calloc(source_count, sizeof *units);
-    search = malloc((root_count + 1) * sizeof *search);
-    if (units == NULL || search == NULL) {
-        die_out_of_memory();
-    }
+    units = files_array(source_count, sizeof *units);
+    search = files_array(root_count + 1, sizeof *search);
     /* The work directory holds the library files this run wrote, and the
        user's roots hold the sources. Both are search roots of every call,
        the work directory first, so a module of the run wins. */

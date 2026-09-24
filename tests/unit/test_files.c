@@ -139,8 +139,39 @@ static void walk_links(void)
 }
 #endif
 
+/* files_grow keeps the elements, zeroes the new room and doubles it. */
+static void grow_array(void)
+{
+    size_t room = 0;
+    size_t *items = NULL;
+    size_t *zeroed = files_array(3, sizeof *zeroed);
+    size_t i;
+    bool kept = true;
+    bool clear = true;
+
+    CHECK(zeroed[0] == 0 && zeroed[2] == 0);
+    free(zeroed);
+    for (i = 0; i < 40; i++) {
+        if (i == room) {
+            items = files_grow(items, &room, sizeof *items);
+        }
+        items[i] = i + 1;
+    }
+    CHECK(room == 64);
+    for (i = 0; i < 40; i++) {
+        kept = kept && items[i] == i + 1;
+    }
+    for (i = 40; i < room; i++) {
+        clear = clear && items[i] == 0;
+    }
+    CHECK(kept);
+    CHECK(clear);
+    free(items);
+}
+
 void test_files(void)
 {
+    grow_array();
     read_whole();
     read_error();
     write_errors();

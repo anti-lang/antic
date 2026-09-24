@@ -31,12 +31,6 @@
 #define WRAP_COLUMNS 80
 #define TAB_COLUMNS 4
 
-static void out_of_memory(void)
-{
-    fputs("anti: out of memory\n", stderr);
-    exit(70);
-}
-
 /* One token or one ordinary comment of the source, in the order the
    bytes stand. */
 enum piece_kind { PIECE_TOKEN, PIECE_COMMENT };
@@ -63,13 +57,7 @@ struct piece_list {
 static struct piece *add_piece(struct piece_list *l)
 {
     if (l->count == l->capacity) {
-        size_t capacity = l->capacity == 0 ? 256 : l->capacity * 2;
-        struct piece *items = realloc(l->items, capacity * sizeof *items);
-        if (items == NULL) {
-            out_of_memory();
-        }
-        l->items = items;
-        l->capacity = capacity;
+        l->items = files_grow(l->items, &l->capacity, sizeof *l->items);
     }
     memset(&l->items[l->count], 0, sizeof l->items[0]);
     return &l->items[l->count++];
@@ -191,13 +179,10 @@ static enum token_kind kind_at(const struct piece_list *l, size_t i)
    condition, which the canonical form drops. */
 static void pair_braces(struct piece_list *l)
 {
-    size_t *open = calloc(l->count + 1, sizeof *open);
+    size_t *open = files_array(l->count + 1, sizeof *open);
     size_t depth = 0;
     size_t i;
 
-    if (open == NULL) {
-        out_of_memory();
-    }
     for (i = 0; i < l->count; i++) {
         enum token_kind kind = kind_at(l, i);
         if (kind == TOKEN_LBRACE) {
@@ -283,13 +268,8 @@ static void text_clear(struct text *t)
 static void push_frame(struct emitter *e, struct frame f)
 {
     if (e->frame_count == e->frame_capacity) {
-        size_t capacity = e->frame_capacity == 0 ? 32 : e->frame_capacity * 2;
-        struct frame *frames = realloc(e->frames, capacity * sizeof *frames);
-        if (frames == NULL) {
-            out_of_memory();
-        }
-        e->frames = frames;
-        e->frame_capacity = capacity;
+        e->frames = files_grow(e->frames,
+                               &e->frame_capacity, sizeof *e->frames);
     }
     e->frames[e->frame_count++] = f;
 }
@@ -297,14 +277,9 @@ static void push_frame(struct emitter *e, struct frame f)
 static void push_bracket(struct emitter *e, bool type)
 {
     if (e->brackets == e->bracket_capacity) {
-        size_t capacity = e->bracket_capacity == 0 ? 32 :
-                          e->bracket_capacity * 2;
-        bool *kinds = realloc(e->bracket_type, capacity * sizeof *kinds);
-        if (kinds == NULL) {
-            out_of_memory();
-        }
-        e->bracket_type = kinds;
-        e->bracket_capacity = capacity;
+        e->bracket_type = files_grow(e->bracket_type,
+                                     &e->bracket_capacity,
+                                     sizeof *e->bracket_type);
     }
     e->bracket_type[e->brackets++] = type;
 }
