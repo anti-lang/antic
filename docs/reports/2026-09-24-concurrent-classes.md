@@ -86,6 +86,16 @@ of the checker": `sema_safety.c`.
   on `drive-additions-5.sh`.
 - The docs-style checker reports nothing on every file this step touched.
 
+## Completion
+
+Commit `6db8ed8` stops tracking `drive-additions-5.sh`, and the file stays in
+the root, excluded by `.git/info/exclude`. The gates then ran again at
+`6db8ed8`, with zero warnings in all three builds:
+
+- host: 898 of 898 passed, `build/drive/logs/fin-ctest-host.log`.
+- ASan: 897 of 897 passed, `build/drive/logs/fin-ctest-asan.log`.
+- UBSan: 897 of 897 passed, `build/drive/logs/fin-ctest-ubsan.log`.
+
 ## State
 
 `git log --oneline -3` before this report:
