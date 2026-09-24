@@ -40,9 +40,12 @@ static void set_add(struct set *s, uint32_t v)
 
 /* Liveness */
 
+/* DESIGN: a position is 2k for the reads of instruction k and 2k + 1 for
+   its writes. Positions and slots are int64_t, so a function of any
+   instruction count numbers them without overflow. */
 struct range {
-    int from;
-    int to;
+    int64_t from;
+    int64_t to;
 };
 
 struct fixed {
@@ -53,12 +56,12 @@ struct fixed {
 
 struct interval {
     uint32_t vreg;
-    int start;
-    int end;
+    int64_t start;
+    int64_t end;
     int hint_preg;
     int hint_vreg;
     int preg;               /* NONE when spilled */
-    int slot;               /* the spill slot, NONE when in a register */
+    int64_t slot;           /* the spill slot, NONE when in a register */
     bool fp;                /* in the float register class */
     /* DESIGN: the cost of spilling. Every use and definition counts one,
        multiplied by ten for each loop its block sits inside. The lowest
@@ -79,7 +82,7 @@ struct alloc {
     struct fixed fixed[PREG_LIMIT];
     /* The slot that saves each borrowed register, per class: integer,
        float. NONE until an instruction needs it. */
-    int borrow_slot[2][BORROW_LIMIT];
+    int64_t borrow_slot[2][BORROW_LIMIT];
     bool refused;           /* an instruction found no register to borrow */
 };
 
@@ -241,7 +244,7 @@ static void compute_liveness(struct alloc *a)
 
 /* Intervals and fixed ranges */
 
-static void extend(struct interval *iv, int position)
+static void extend(struct interval *iv, int64_t position)
 {
     if (position < iv->start) {
         iv->start = position;
@@ -253,13 +256,13 @@ static void extend(struct interval *iv, int position)
 
 struct scan_ctx {
     struct alloc *a;
-    int position;           /* 2k for instruction k */
-    int block_start;
+    int64_t position;       /* 2k for instruction k */
+    int64_t block_start;
     uint64_t weight;        /* what one use in this block costs */
-    int current[PREG_LIMIT];/* the open fixed range of each register */
+    int64_t current[PREG_LIMIT];    /* the open fixed range of each one */
 };
 
-static void add_range(struct fixed *fx, int from, int to)
+static void add_range(struct fixed *fx, int64_t from, int64_t to)
 {
     fx->ranges = ir_grow(fx->ranges, &fx->capacity, fx->count,
                          sizeof *fx->ranges);
@@ -272,7 +275,7 @@ static void scan_register(void *ctx, const struct mach_operand *o, bool write)
 {
     struct scan_ctx *c = ctx;
     struct alloc *a = c->a;
-    int position = c->position + (write ? 1 : 0);
+    int64_t position = c->position + (write ? 1 : 0);
 
     if (o->kind == MACH_VREG) {
         extend(&a->intervals[o->reg], position);
@@ -284,10 +287,10 @@ static void scan_register(void *ctx, const struct mach_operand *o, bool write)
     }
     if (write) {
         add_range(&a->fixed[o->reg], position, position);
-        c->current[o->reg] = (int)a->fixed[o->reg].count - 1;
+        c->current[o->reg] = (int64_t)a->fixed[o->reg].count - 1;
     } else if (c->current[o->reg] == NONE) {
         add_range(&a->fixed[o->reg], c->block_start, position);
-        c->current[o->reg] = (int)a->fixed[o->reg].count - 1;
+        c->current[o->reg] = (int64_t)a->fixed[o->reg].count - 1;
     } else {
         a->fixed[o->reg].ranges[c->current[o->reg]].to = position;
     }
@@ -435,12 +438,12 @@ static void build_intervals(struct alloc *a)
     size_t b;
     size_t i;
     uint32_t v;
-    int k = 0;
+    int64_t k = 0;
 
     a->intervals = ir_alloc(f->vreg_count, sizeof *a->intervals);
     for (v = 0; v < f->vreg_count; v++) {
         a->intervals[v].vreg = v;
-        a->intervals[v].start = INT_MAX;
+        a->intervals[v].start = INT64_MAX;
         a->intervals[v].end = NONE;
         a->intervals[v].hint_preg = NONE;
         a->intervals[v].hint_vreg = NONE;
@@ -452,8 +455,8 @@ static void build_intervals(struct alloc *a)
     ctx.a = a;
     for (b = 0; b < f->block_count; b++) {
         const struct mach_block *block = &f->blocks[b];
-        int start = 2 * k;
-        int end = 2 * (k + (int)block->count) - 1;
+        int64_t start = 2 * k;
+        int64_t end = 2 * (k + (int64_t)block->count) - 1;
         if (block->count == 0) {
             end = start;
         }
@@ -622,12 +625,12 @@ static void linear_scan(struct alloc *a)
                 victim = NULL;
             }
             if (victim == NULL) {
-                cur->slot = (int)mach_slot_add(f, 8, 8);
+                cur->slot = mach_slot_add(f, 8, 8);
                 continue;
             }
             preg = victim->preg;
             victim->preg = NONE;
-            victim->slot = (int)mach_slot_add(f, 8, 8);
+            victim->slot = mach_slot_add(f, 8, 8);
             for (j = 0; j < active_count; j++) {
                 if (active[j] == victim) {
                     active[j] = active[--active_count];
@@ -788,10 +791,10 @@ static void reserve_borrow_slots(struct alloc *a)
             struct needs n = needs_of(a, &f->blocks[b].insts[i]);
             for (c = 0; c < 2; c++) {
                 for (k = sizeof a->abi->scratch; k < n.count[c]; k++) {
-                    int *slot =
+                    int64_t *slot =
                         &a->borrow_slot[c][k - sizeof a->abi->scratch];
                     if (*slot == NONE) {
-                        *slot = (int)mach_slot_add(f, 8, 8);
+                        *slot = mach_slot_add(f, 8, 8);
                     }
                 }
             }
@@ -824,7 +827,7 @@ static void borrow(struct rewrite *rw, const struct mach_inst *inst,
             c ? a->abi->fp_allocatable_count : a->abi->allocatable_count;
         size_t r = 0;
         for (k = sizeof a->abi->scratch; k < n.count[c]; k++) {
-            int slot = a->borrow_slot[c][k - sizeof a->abi->scratch];
+            int64_t slot = a->borrow_slot[c][k - sizeof a->abi->scratch];
             while (r < regs_count && ((taken >> regs[r]) & 1) != 0) {
                 r++;
             }

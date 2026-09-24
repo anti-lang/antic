@@ -508,62 +508,95 @@ static bool has_signature(struct lowerer *l, const struct ir_function *g,
 /* DESIGN: a call through a function pointer takes its parameters and
    result from a signature: a function fn.N that the module declares and
    never defines. No identifier contains a dot, so no Anti function has
-   that name. Equal signatures share one declaration. */
-static const struct ir_function *signature(struct lowerer *l,
-                                           const struct type *t)
+   that name. Equal signatures share one declaration. find_signature
+   returns the declaration for which fits holds, which may read t, or
+   NULL with the count of the module's signatures in *count. */
+static struct ir_function *find_signature(
+    struct lowerer *l,
+    bool (*fits)(struct lowerer *l, const struct ir_function *g,
+                 const struct type *t),
+    const struct type *t, size_t *count)
 {
-    struct ir_function *f;
-    uint32_t count = 0;
-    char name[24];
     size_t i;
 
+    *count = 0;
     for (i = 0; i < l->m->function_count; i++) {
-        const struct ir_function *g = l->m->functions[i];
+        struct ir_function *g = l->m->functions[i];
         if (!g->is_extern || g->module == NULL ||
             strcmp(g->module, l->module_name) != 0 ||
             strncmp(g->name, "fn.", 3) != 0) {
             continue;
         }
-        if (has_signature(l, g, t)) {
+        if (fits(l, g, t)) {
             return g;
         }
-        count++;
+        (*count)++;
     }
-    snprintf(name, sizeof name, "fn.%u", count);
-    f = ir_declare_add(l->m, l->module_name, name, ir_type_of(t->result),
-                       result_agg(l, t->result));
+    return NULL;
+}
+
+/* Declare the signature fn.<count> with no parameters, which the caller
+   adds. */
+static struct ir_function *declare_signature(struct lowerer *l, size_t count,
+                                             enum ir_type result,
+                                             uint32_t agg)
+{
+    struct text name = {0};
+    struct ir_function *f;
+
+    text_appendf(&name, "fn.%zu", count);
+    f = ir_declare_add(l->m, l->module_name, text_cstr(&name), result, agg);
+    text_free(&name);
+    return f;
+}
+
+static const struct ir_function *signature(struct lowerer *l,
+                                           const struct type *t)
+{
+    size_t count;
+    struct ir_function *f = find_signature(l, has_signature, t, &count);
+    size_t i;
+
+    if (f != NULL) {
+        return f;
+    }
+    f = declare_signature(l, count, ir_type_of(t->result),
+                          result_agg(l, t->result));
     for (i = 0; i < t->param_count; i++) {
         add_param(l, f, t->params[i]);
     }
     return f;
 }
 
+static bool fits_fatal(struct lowerer *l, const struct ir_function *g,
+                       const struct type *t)
+{
+    (void)l;
+    (void)t;
+    return g->param_count == 1 && g->params[0].type == IR_PTR &&
+           g->result == IR_VOID;
+}
+
 /* The signature of `fatal`, which takes the error and returns nothing.
    `catch fatal` calls it through the table of the error's class. */
 static const struct ir_function *fatal_signature(struct lowerer *l)
 {
-    struct ir_function *f;
-    uint32_t count = 0;
-    char name[24];
-    size_t i;
+    size_t count;
+    struct ir_function *f = find_signature(l, fits_fatal, NULL, &count);
 
-    for (i = 0; i < l->m->function_count; i++) {
-        const struct ir_function *g = l->m->functions[i];
-        if (!g->is_extern || g->module == NULL ||
-            strcmp(g->module, l->module_name) != 0 ||
-            strncmp(g->name, "fn.", 3) != 0) {
-            continue;
-        }
-        if (g->param_count == 1 && g->params[0].type == IR_PTR &&
-            g->result == IR_VOID) {
-            return g;
-        }
-        count++;
+    if (f == NULL) {
+        f = declare_signature(l, count, IR_VOID, IR_NO_AGG);
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
     }
-    snprintf(name, sizeof name, "fn.%u", count);
-    f = ir_declare_add(l->m, l->module_name, name, IR_VOID, IR_NO_AGG);
-    ir_param_add(f, IR_PTR, IR_NO_AGG);
     return f;
+}
+
+static bool fits_provider(struct lowerer *l, const struct ir_function *g,
+                          const struct type *t)
+{
+    (void)l;
+    (void)t;
+    return g->param_count == 0 && g->result == IR_PTR;
 }
 
 /* DESIGN: a provider takes no arguments and gives a pointer of its
@@ -571,26 +604,28 @@ static const struct ir_function *fatal_signature(struct lowerer *l)
    slot needs that signature. */
 static const struct ir_function *provider_signature(struct lowerer *l)
 {
-    struct ir_function *f;
-    uint32_t count = 0;
-    char name[24];
-    size_t i;
+    size_t count;
+    struct ir_function *f = find_signature(l, fits_provider, NULL, &count);
 
-    for (i = 0; i < l->m->function_count; i++) {
-        const struct ir_function *g = l->m->functions[i];
-        if (!g->is_extern || g->module == NULL ||
-            strcmp(g->module, l->module_name) != 0 ||
-            strncmp(g->name, "fn.", 3) != 0) {
-            continue;
-        }
-        if (g->param_count == 0 && g->result == IR_PTR) {
-            return g;
-        }
-        count++;
+    return f != NULL ? f : declare_signature(l, count, IR_PTR, IR_NO_AGG);
+}
+
+static bool fits_bound(struct lowerer *l, const struct ir_function *g,
+                       const struct type *t)
+{
+    size_t k;
+
+    (void)l;
+    if (g->param_count != t->param_count + 1 ||
+        g->params[0].type != IR_PTR || g->result != ir_type_of(t->result)) {
+        return false;
     }
-    snprintf(name, sizeof name, "fn.%u", count);
-    f = ir_declare_add(l->m, l->module_name, name, IR_PTR, IR_NO_AGG);
-    return f;
+    for (k = 0; k < t->param_count; k++) {
+        if (g->params[k + 1].type != ir_type_of(t->params[k])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /* The signature of a call through a bound function, which takes the
@@ -598,36 +633,15 @@ static const struct ir_function *provider_signature(struct lowerer *l)
 static const struct ir_function *bound_signature(struct lowerer *l,
                                                  const struct type *t)
 {
-    struct ir_function *f;
-    uint32_t count = 0;
-    char name[24];
+    size_t count;
+    struct ir_function *f = find_signature(l, fits_bound, t, &count);
     size_t i;
 
-    for (i = 0; i < l->m->function_count; i++) {
-        const struct ir_function *g = l->m->functions[i];
-        if (!g->is_extern || g->module == NULL ||
-            strcmp(g->module, l->module_name) != 0 ||
-            strncmp(g->name, "fn.", 3) != 0) {
-            continue;
-        }
-        if (g->param_count == t->param_count + 1 &&
-            g->params[0].type == IR_PTR &&
-            g->result == ir_type_of(t->result)) {
-            size_t k;
-            for (k = 0; k < t->param_count; k++) {
-                if (g->params[k + 1].type != ir_type_of(t->params[k])) {
-                    break;
-                }
-            }
-            if (k == t->param_count) {
-                return g;
-            }
-        }
-        count++;
+    if (f != NULL) {
+        return f;
     }
-    snprintf(name, sizeof name, "fn.%u", count);
-    f = ir_declare_add(l->m, l->module_name, name, ir_type_of(t->result),
-                       result_agg(l, t->result));
+    f = declare_signature(l, count, ir_type_of(t->result),
+                          result_agg(l, t->result));
     ir_param_add(f, IR_PTR, IR_NO_AGG);
     for (i = 0; i < t->param_count; i++) {
         add_param(l, f, t->params[i]);
@@ -779,9 +793,9 @@ static struct ir_operand element_offset(struct lowerer *l,
 }
 
 /* The number that names the next global of the module. */
-static uint32_t globals_of_module(struct lowerer *l)
+static size_t globals_of_module(struct lowerer *l)
 {
-    uint32_t count = 0;
+    size_t count = 0;
     size_t i;
 
     for (i = 0; i < l->m->global_count; i++) {
@@ -801,7 +815,7 @@ static const struct ir_global *literal_global(struct lowerer *l,
 {
     struct ir_module *m = l->m;
     uint8_t *bytes;
-    char name[16];
+    char name[24];
     size_t i;
 
     for (i = 0; i < m->global_count; i++) {
@@ -818,7 +832,7 @@ static const struct ir_global *literal_global(struct lowerer *l,
     bytes = arena_alloc(m->arena, text->length + 1);
     memcpy(bytes, text->bytes, text->length);
     bytes[text->length] = 0;
-    snprintf(name, sizeof name, "%u", globals_of_module(l));
+    snprintf(name, sizeof name, "%zu", globals_of_module(l));
     return ir_global_add(m, l->module_name, name, bytes, text->length + 1, 1);
 }
 
@@ -1383,7 +1397,7 @@ static struct ir_operand const_address(struct lowerer *l,
 {
     struct ir_module *m = l->m;
     struct ir_const *value = arena_alloc(m->arena, sizeof *value);
-    char name[16];
+    char name[24];
     size_t i;
 
     const_tree(l, v, t, value);
@@ -1394,7 +1408,7 @@ static struct ir_operand const_address(struct lowerer *l,
             return temp(l, ir_addr(l->f, l->b, ir_global_op(g)));
         }
     }
-    snprintf(name, sizeof name, "%u", globals_of_module(l));
+    snprintf(name, sizeof name, "%zu", globals_of_module(l));
     return temp(l, ir_addr(l->f, l->b, ir_global_op(
                     ir_global_add_value(m, l->module_name, name, value))));
 }
@@ -1635,18 +1649,18 @@ static void table_of(const struct type *t, struct table *out)
 /* The index of the entry that holds the function `name`, or 0 when the
    class has no such entry. Entry 0 is the descriptor, so a real entry is
    never 0. */
-static int table_index(const struct type *t, const struct name *name,
-                       size_t params)
+static size_t table_index(const struct type *t, const struct name *name,
+                          size_t params)
 {
     struct table table = {0};
     size_t i;
-    int found = 0;
+    size_t found = 0;
 
     table_of(t, &table);
     for (i = 0; i < table.count; i++) {
         if (same_name(&table.entries[i].name, name) &&
             table.entries[i].params == params) {
-            found = (int)i + 1;
+            found = i + 1;
             break;
         }
     }
@@ -1656,7 +1670,7 @@ static int table_index(const struct type *t, const struct name *name,
 
 /* The offset of table entry index. The IR holds no sizes, so the width
    of a pointer stays symbolic. */
-static struct ir_operand entry_offset(struct lowerer *l, int index)
+static struct ir_operand entry_offset(struct lowerer *l, size_t index)
 {
     return temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
                              ir_int_op(IR_I64, (uint64_t)index),
@@ -2912,8 +2926,8 @@ static struct ir_function *reach_thunk(struct lowerer *l,
     const struct type *sig = sym->type;
     struct ir_function *outer_f = l->f;
     struct ir_block *outer_b = l->b;
-    int index = table_index(sub->type, &sym->item->name,
-                            sig->param_count);
+    size_t index = table_index(sub->type, &sym->item->name,
+                               sig->param_count);
     struct ir_function *f;
     struct ir_operand *args;
     struct ir_operand table;
@@ -3451,9 +3465,9 @@ static void build_into(struct lowerer *l, const struct expr *e,
            body, because no class below replaces it. */
         if (t->kind == TYPE_FN && t->bound) {
             const struct type *s = struct_of_expr(e->as.field.base);
-            int index = s != NULL ? table_index(s, &e->as.field.name,
-                                               t->param_count + 1)
-                                  : 0;
+            size_t index = s != NULL ? table_index(s, &e->as.field.name,
+                                                  t->param_count + 1)
+                                     : 0;
             struct ir_operand object =
                 e->as.field.base->type->kind == TYPE_POINTER
                     ? lower_expr(l, e->as.field.base)
@@ -4656,7 +4670,7 @@ static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
     ancestors = descriptor_field(l, descriptor, 5, IR_PTR);
     at = temp(l, ir_load(l->f, l->b, IR_PTR,
                          offset_address(l, ancestors,
-                                        entry_offset(l, (int)depth))));
+                                        entry_offset(l, depth))));
     found = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, at,
                               temp(l, ir_addr(l->f, l->b,
                                   ir_global_op(class_descriptor(l, to))))));
@@ -5108,8 +5122,8 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
        which entries it may reach. */
     slot = 0;
     if (e->as.call.dispatch != NULL && n > 0) {
-        int index = table_index(e->as.call.dispatch, &e->as.call.entry,
-                                dispatched_params(e, sym, n));
+        size_t index = table_index(e->as.call.dispatch, &e->as.call.entry,
+                                   dispatched_params(e, sym, n));
         if (index > 0) {
             slot = (uint32_t)index;
             struct ir_operand table =
@@ -5152,10 +5166,10 @@ static struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
 
 /* The count of `parallel` thunks already written here, which names the
    next one. */
-static uint32_t next_thunk(const struct lowerer *l, const char *prefix)
+static size_t next_thunk(const struct lowerer *l, const char *prefix)
 {
     size_t length = strlen(prefix);
-    uint32_t count = 0;
+    size_t count = 0;
     size_t i;
 
     for (i = 0; i < l->m->function_count; i++) {
@@ -5413,13 +5427,13 @@ static struct ir_operand lower_dispatch(struct lowerer *l,
     uint32_t agg = IR_NO_AGG;
     uint32_t handle;
     uint32_t out;
-    char name[24];
+    char name[32];
     size_t i;
 
-    snprintf(name, sizeof name, "dispatch.%u", next_thunk(l, "dispatch."));
+    snprintf(name, sizeof name, "dispatch.%zu", next_thunk(l, "dispatch."));
     args[0] = lower_expr(l, e->as.dispatch.object);
     if (extra > 0) {
-        char context_name[32];
+        char context_name[40];
         uint32_t slot;
         snprintf(context_name, sizeof context_name, "%s.context", name);
         agg = context_aggregate(l, call, context_name);
@@ -5517,13 +5531,13 @@ static struct ir_operand lower_parallel(struct lowerer *l,
     uint32_t results;
     uint32_t count;
     uint32_t out;
-    char name[24];
+    char name[32];
     size_t i;
 
-    snprintf(name, sizeof name, "parallel.%u", next_thunk(l, "parallel."));
+    snprintf(name, sizeof name, "parallel.%zu", next_thunk(l, "parallel."));
     array = lower_address(l, e->as.parallel.array);
     if (extra > 0) {
-        char context_name[32];
+        char context_name[40];
         uint32_t slot;
         snprintf(context_name, sizeof context_name, "%s.context", name);
         agg = context_aggregate(l, call, context_name);
@@ -6843,7 +6857,7 @@ static void handle_error(struct lowerer *l, const struct expr *call,
     case HANDLE_FATAL: {
         static const struct name fatal_name = {"fatal", 5};
         const struct type *error_type = call->as.call.callee->type->result;
-        int index = table_index(error_type->element, &fatal_name, 1);
+        size_t index = table_index(error_type->element, &fatal_name, 1);
         struct ir_operand table = load_table(l, err, error_type);
         struct ir_operand entry =
             temp(l, ir_load(l->f, l->b, IR_PTR,
@@ -6987,7 +7001,7 @@ static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
                           NULL, 0));
     if (h->kind == HANDLE_FATAL) {
         static const struct name fatal_name = {"fatal", 5};
-        int index = table_index(error_type->element, &fatal_name, 1);
+        size_t index = table_index(error_type->element, &fatal_name, 1);
         struct ir_operand table = load_table(l, err, error_type);
         struct ir_operand entry =
             temp(l, ir_load(l->f, l->b, IR_PTR,

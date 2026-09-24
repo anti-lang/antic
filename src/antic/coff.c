@@ -675,6 +675,19 @@ static uint32_t number_symbols(struct join *j, uint32_t *features_index,
     return count;
 }
 
+/* Write value into the 4 bytes of an offset or a length of the joined
+   object. A value past 4 GiB does not fit, and the join refuses it. */
+static bool put_size(struct join *j, unsigned char *field, size_t value)
+{
+    if (value > UINT32_MAX) {
+        text_append(j->error, "the joined object passes 4 GiB, which a "
+                              "COFF offset cannot reach");
+        return false;
+    }
+    put(field, (uint32_t)value, 4);
+    return true;
+}
+
 /* The 8 bytes of a name field: the name itself, or its offset in the
    string table of the joined object, as `/offset` for a section. */
 static bool name_field(struct join *j, unsigned char *field, const char *name,
@@ -698,8 +711,8 @@ static bool name_field(struct join *j, unsigned char *field, const char *name,
             return false;
         }
         memcpy(field, digits, (size_t)n);
-    } else {
-        put(field + 4, (uint32_t)offset, 4);
+    } else if (!put_size(j, field + 4, offset)) {
+        return false;
     }
     text_append_bytes(&j->strings, name, length);
     text_append_bytes(&j->strings, "", 1);
@@ -743,7 +756,9 @@ static bool write_sections(struct join *j, struct text *out,
             put(h + 28, 0, 4);
             if (!(s->flags & SCN_UNINITIALIZED) && raw > 0) {
                 pad(out);
-                put(h + 20, (uint32_t)out->length, 4);
+                if (!put_size(j, h + 20, out->length)) {
+                    return false;
+                }
                 text_append_bytes(out, o->in->data + get(s->header + 20, 4), raw);
             }
             if (s->flags & SCN_LNK_NRELOC_OVFL && relocs == 0xFFFF) {
@@ -752,7 +767,9 @@ static bool write_sections(struct join *j, struct text *out,
             put(h + 24, 0, 4);
             if (relocs > 0) {
                 pad(out);
-                put(h + 24, (uint32_t)out->length, 4);
+                if (!put_size(j, h + 24, out->length)) {
+                    return false;
+                }
             }
             for (n = 0; n < relocs; n++) {
                 unsigned char record[RELOC_SIZE];
@@ -779,8 +796,10 @@ static bool write_sections(struct join *j, struct text *out,
         memset(h, 0, SECTION_SIZE);
         memcpy(h, ".drectve", 8);
         pad(out);
-        put(h + 16, (uint32_t)j->directives.length, 4);
-        put(h + 20, (uint32_t)out->length, 4);
+        if (!put_size(j, h + 16, j->directives.length) ||
+            !put_size(j, h + 20, out->length)) {
+            return false;
+        }
         put(h + 36, j->directive_flags, 4);
         text_append_bytes(out, j->directives.data, j->directives.length);
     }
@@ -929,15 +948,15 @@ bool coff_join(const struct coff_input *inputs, size_t count,
         memset(header, 0, sizeof header);
         put(header, machine, 2);
         put(header + 2, sections, 2);
-        put(header + 8, (uint32_t)symbols_at, 4);
+        ok = ok && put_size(&j, header + 8, symbols_at);
         put(header + 12, symbols, 4);
         put(header + 18, get(inputs[0].data + 18, 2), 2);
         memcpy(body.data, header, HEADER_SIZE);
         memcpy(body.data + HEADER_SIZE, headers, (size_t)SECTION_SIZE * sections);
         text_append_bytes(&body, table.data, table.length);
         {
-            unsigned char size[4];
-            put(size, (uint32_t)(4 + j.strings.length), 4);
+            unsigned char size[4] = {0};
+            ok = ok && put_size(&j, size, 4 + j.strings.length);
             text_append_bytes(&body, size, 4);
             text_append_bytes(&body, j.strings.data, j.strings.length);
         }
