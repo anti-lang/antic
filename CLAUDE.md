@@ -240,8 +240,8 @@ and the CPU levels are built. The variables of `-g` come before the first public
 release. After it, the wrapping and saturating operators with `Flags`, then
 sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
-four are built. Then generics and closures. Closures are built, apart from
-`snapshot fn`.
+four are built. Then generics and closures. Closures are built, `snapshot fn`
+included.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -415,16 +415,19 @@ reports what it finished.
   A `construct` that can fail is written
   `may fail`, a derived one calls `self.super.construct(args)` as its
   first statement, and C makes an object with `anti_<Class>_construct`.
-- Anonymous functions and closures are built, apart from `snapshot fn`.
+- Anonymous functions, closures and `snapshot fn` are built.
   `fn(m) { }` takes its types from the parameter it is passed to, and a
   closure captures the locals it names by reference through a context in the
   frame. A parameter of function type is two words, the code and a context,
-  unless it is `keep`, and a field, a global, a result and a `keep` parameter
-  hold one C function pointer, so a closure never reaches them. `concurrent`
+  unless it is `keep`, and a plain field, a global, a result and a plain
+  `keep` parameter hold one C function pointer, so a closure never reaches
+  them. `concurrent`
   marks a parameter that goes on to `parallel` or `dispatch`, and a closure
   there changes no captured variable whose type is not thread-safe. See
   "Anonymous functions and closures" in `docs/decisions.md` and
-  `docs/notes/closures.md`.
+  `docs/notes/closures.md`. `snapshot fn` copies what it captures.
+  At an `own` field or a `keep own` parameter its snapshot lives on the
+  heap as `own fn`, two words that the owner frees and `dup` copies.
 - Nested types are built. A class body declares a `struct`, an `enum` or a
   `class`, named as written in the class and as `PeopleList.Node` in the
   symbols, and `PeopleList_Node` in the C header. A public signature of the
@@ -530,7 +533,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 55. See "The doc
+  class body and the `worker` mark, and its format version is 56. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops

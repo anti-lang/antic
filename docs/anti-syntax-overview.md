@@ -365,14 +365,31 @@ fn on_click(keep f: fn(int)) { }
 fn map_sum(items: []int, concurrent f: fn(int) -> int) -> int { return 0; }
 ```
 
-```anti not-built
-let name = "report";
-on_click(b, snapshot fn(e) { save(name); });
+```anti
+class Panel
+{
+	own handler: fn(int) = ignore,
+
+	pub fn on_click(self, keep own f: fn(int))
+	{
+		self.handler = f;
+	}
+}
+
+fn ignore(n: int) { }
+fn save(name: str, n: int) { }
+
+fn wire(p: *Panel)
+{
+	let name = "report";
+	p.on_click(snapshot fn(n) { save(name, n); });
+	name = "draft";
+}
 ```
 
-A closure never outlives what it captures. It is passed to a parameter that does not keep it, or held in a local used the same way, and never stored in a field, a return value, a global or a `keep` parameter. Creating one allocates nothing. A parameter that passes its function on to `parallel` or `dispatch` is marked `concurrent`, and a closure there may change a captured variable only when its type is thread-safe. A worker takes a closure through a `concurrent` parameter alone. `snapshot fn` copies what it uses when it is made, is read-only, holds numbers, `bool`, `char`, structs of those and `str`, and is accepted at a `keep` or a `concurrent` parameter. A parameter that does not keep its argument is two words, the code and a context pointer, and a kept function value stays one C function pointer. The header writes the two words as a callback and a `void *` context, and an `extern fn` takes C function pointers alone.
+A closure never outlives what it captures. It is passed to a parameter that does not keep it, or held in a local used the same way, and never stored in a field, a return value, a global or a `keep` parameter. Creating one allocates nothing. A parameter that passes its function on to `parallel` or `dispatch` is marked `concurrent`, and a closure there may change a captured variable only when its type is thread-safe. A worker takes a closure through a `concurrent` parameter alone. `snapshot fn` copies what it uses when it is made, is read-only, and holds numbers, `bool`, `char`, structs of those and `str`. It is accepted at an `own` field, a `keep own` parameter and a `concurrent` parameter, and a plain `keep` parameter refuses it. A parameter that does not keep its argument is two words, the code and a context pointer, and a plain kept function value stays one C function pointer. `own fn` is two words as well, the code and a snapshot on the heap that its owner frees. `=` does not copy it, and `dup` copies it with its snapshot. The header writes the two words of a parameter as a callback and a `void *` context, and an `own fn` field as a struct of the code and the snapshot. An `extern fn` takes C function pointers alone.
 
-Built: anonymous functions with their types from the target, closures that capture by reference, `keep` and `concurrent` with the checks on both sides, the two words of a parameter that does not keep its argument, and the rule of the worker. `programs/closures.anti` runs them, and `errors/closures.anti` holds the refusals. Not built yet: `snapshot fn`.
+Built: everything above. That covers anonymous functions with their types from the target, closures that capture by reference, `keep` and `concurrent` with the checks on both sides, the two words of a parameter that does not keep its argument and the rule of the worker. `snapshot fn` is built as well, with `own` fields and `keep own` parameters. `programs/closures.anti` and `programs/snapshots.anti` run them, and `errors/closures.anti` and `errors/snapshots.anti` hold the refusals.
 
 ## Tuples
 
@@ -1251,4 +1268,4 @@ String prefixes: `r b br f rf x re`.
 
 Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
 
-Built of round four: `keep`, `concurrent`, `unchecked` and `allow`. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today, the prefix `re`, and `snapshot`, `synchronized` and `guarded by` of round four.
+Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today, the prefix `re`, and `synchronized` and `guarded by` of round four.

@@ -667,7 +667,7 @@ fn censor(text: str, words: Regex) -> (str, int)
 
 - A closure never outlives the variables it captures. It may only be passed as an argument to a parameter that does not keep it. It may also be held in a local of the same function that is used the same way. It is refused in a field, a return value, a global, and any parameter marked `keep`.
 - The captured variables stay in the enclosing function's frame, and the closure reaches them through a context pointer. Creating a closure allocates nothing.
-- A parameter of function type does not keep its argument unless it is marked `keep`: `fn on_click(keep f: fn(Event))`. A `keep` parameter, a field and a global of function type accept named functions and non-capturing anonymous ones alone.
+- A parameter of function type does not keep its argument unless it is marked `keep`: `fn on_click(keep f: fn(Event))`. A `keep` parameter, a field and a global of function type accept named functions and non-capturing anonymous ones alone. An `own` field and a `keep own` parameter accept a snapshot as well, as [Snapshots](#snapshots) says.
 - The checker enforces `keep`. A function that stores a parameter not marked `keep` is a compile error.
 - A closure may change what it captures only when it is called from one thread at a time. Each thread that runs a function makes its own closures over its own frame. Closures made on different threads share nothing.
 - A parameter of function type that a function passes on to `parallel` or `dispatch` may be called from more than one thread at once. It is marked `concurrent`, and the checker requires the mark. A closure passed to a `concurrent` parameter may read what it captures. It may change a captured variable only when that variable's type is concurrent, as [Concurrent classes](#concurrent-classes) defines. Otherwise the write is refused with the variable's name. The creating thread waits in `parallel` until every worker finishes, so the reads cannot race a write.
@@ -687,13 +687,33 @@ name = "draft";                      // the closure still saves "report"
 
 - The snapshot is read-only. A snapshot closure that writes a captured value is refused. If it could write, two threads calling the same closure would write the same snapshot at once.
 - A snapshot may hold only values that copy fully. Those are numbers, `bool`, `char`, structs of those, and `str`, whose bytes are copied into it. Capturing a pointer or a slice is refused. The copy would hold an address, not what it points at.
-- A snapshot closure is accepted at a `keep` parameter and at a `concurrent` parameter, where a closure by reference is refused. Each refusal of a closure by reference names `snapshot fn` as the fix.
-- Where the snapshot lives follows from where the closure goes, not from the word. At a `concurrent` parameter it sits in the caller's frame, since the caller waits. Nothing is allocated. At a `keep` parameter it must outlive the frame, so it goes on the heap. Whoever keeps the closure owns it and frees it.
+- A snapshot closure is accepted at an `own` field, at a `keep own` parameter and at a `concurrent` parameter, where a closure by reference is refused. At a plain `keep` parameter it is refused, and the message names `keep own` as the fix. Each refusal of a closure by reference names `snapshot fn` as the fix.
+- Where the snapshot lives follows from where the closure goes, not from the word. At a `concurrent` parameter it sits in the caller's frame, since the caller waits. Nothing is allocated. At an `own` field or a `keep own` parameter it must outlive the frame, so it goes on the heap. Its owner frees it, as [Calling convention](#calling-convention) says.
+
+```anti
+class Button
+{
+	own handler: fn(Event) = ignore,
+
+	pub fn on_click(self, keep own f: fn(Event))
+	{
+		self.handler = f;
+	}
+}
+```
 - The word is `snapshot` and not `copy`. The values are taken at that moment and stay as they were. A copy suggests something its holder may change.
 
 ### Calling convention
 
-A value of function type held in a field, a global or a `keep` parameter stays one pointer, the C function pointer it is today, so C callbacks such as raylib's are unchanged. A parameter that does not keep its argument is passed as two words, the code and a context pointer, and the context is `none` for a function that captures nothing. The header writes such a parameter the C way, as a callback and a `void *` context. An `extern fn` takes plain C function pointers only, so a closure cannot reach C.
+`own` chooses the representation of a function value that is kept.
+
+- A plain function value, `fn(...)`, stays one C function pointer. It holds a named function or an anonymous one that captures nothing. A field, a global and a `keep` parameter hold it. So do the parameters of an `extern fn`, bindings and C callbacks such as raylib's, which are unchanged.
+- An owned function value, `own fn(...)`, is two words, the code and the address of a snapshot, and frees the snapshot with its owner. It is written where the value is kept: `own handler: fn(Event)` for a field, and `keep own f: fn(Event)` for a parameter that keeps and owns what it is given. A named function or a non-capturing one fits there too, with no snapshot, and holds `none` in the second word.
+- An owned function value is freed with its owner, is not copied by `=`, and is copied by `dup`, which copies its snapshot.
+- A snapshot is one block that starts with its size in bytes and holds the captured values and the bytes of any captured `str`. Freeing and copying it need nothing specific to the closure. `anti_rt_snapshot_free` gives the block back, and one runtime function copies it for `dup` by that size. Freeing `none` does nothing.
+- A parameter that does not keep its argument is passed as two words, the code and a context pointer. The context is `none` for a function that captures nothing. An owned value passes there too, and lends its snapshot for the call.
+- The header writes a parameter of two words the C way, as a callback and a `void *` context. It writes an `own fn` field as a struct of the code pointer and the snapshot pointer, and declares `anti_rt_snapshot_free`.
+- An `extern fn` takes plain C function pointers only, so a closure cannot reach C. Passing an `own fn` where a plain C function pointer is expected is refused.
 
 ## Concurrent classes
 
@@ -910,7 +930,7 @@ fn parse_all(lines: []str) may fail
 ## Keywords
 
 - Keywords added: `variant`, `tests`, `fixtures`, `provides`, `undo`, `unreachable`, `undefined`, `show`, `embed`, `fail`, `here`, `fallthrough`. `sync`, `chan`, `send`, `recv`, `select` were reserved.
-- Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range, `may fail` after a signature, `simd` before `struct`. Round four adds `snapshot` before an anonymous `fn`, `keep` and `concurrent` before a parameter of function type, `synchronized` and `concurrent` before `class`, `guarded by` and `unchecked` after a field's type, `unchecked` in a class header, `allow` for silencing a warning, and `none` after `catch`.
+- Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range, `may fail` after a signature, `simd` before `struct`. Round four adds `snapshot` before an anonymous `fn`, `keep`, `keep own` and `concurrent` before a parameter of function type, `synchronized` and `concurrent` before `class`, `guarded by` and `unchecked` after a field's type, `unchecked` in a class header, `allow` for silencing a warning, and `none` after `catch`.
 - String prefixes added: `rf`, `x` and `re`.
 - Labels added: an identifier and `:` before `for`, `while` or a block.
 - Tokens added: `?*`, `+% -% *% <<%`, `+| -| *|`, `+%= -%= *%= <<%=`, `+|= -|= *|=`, the two-name `let` form `let (a, b) =`.
