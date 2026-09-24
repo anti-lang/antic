@@ -567,7 +567,6 @@ bool ir_const_equal(const struct ir_const *a, const struct ir_const *b);
 struct ir_operand ir_temp_op(const struct ir_function *f, uint32_t temp);
 struct ir_operand ir_int_op(enum ir_type type, uint64_t value);
 struct ir_operand ir_float_op(enum ir_type type, double value);
-struct ir_operand ir_block_op(const struct ir_block *b);
 struct ir_operand ir_func_op(const struct ir_function *f);
 struct ir_operand ir_global_op(const struct ir_global *g);
 
@@ -659,10 +658,6 @@ void ir_ret(struct ir_function *f, struct ir_block *b, enum ir_type type,
 /* The names of types and operations in the text form. */
 const char *ir_type_name(enum ir_type type);
 const char *ir_op_name(enum ir_op op);
-/* Append the text form of a type in memory, or of a symbolic value. */
-void ir_vtype_print(struct text *out, const struct ir_module *m,
-                    struct ir_vtype v);
-void ir_sym_print(struct text *out, const struct ir_module *m, uint32_t sym);
 
 /* Append the text form of m to out. */
 void ir_print(struct text *out, const struct ir_module *m);

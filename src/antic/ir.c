@@ -680,7 +680,7 @@ struct ir_operand ir_float_op(enum ir_type type, double value)
     return o;
 }
 
-struct ir_operand ir_block_op(const struct ir_block *b)
+static struct ir_operand ir_block_op(const struct ir_block *b)
 {
     struct ir_operand o = {IR_BLOCK, IR_VOID, {0}};
     o.as.index = b->index;

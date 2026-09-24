@@ -3,6 +3,8 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include "arith.h"
+
 const char *ir_type_name(enum ir_type type)
 {
     static const char *const names[] = {
@@ -64,8 +66,9 @@ static void symbol(struct text *out, const char *module, const char *name)
     }
 }
 
-void ir_vtype_print(struct text *out, const struct ir_module *m,
-                    struct ir_vtype v)
+/* Append the text form of a type in memory. */
+static void ir_vtype_print(struct text *out, const struct ir_module *m,
+                           struct ir_vtype v)
 {
     if (v.type == IR_AGG) {
         text_append(out, m->aggs[v.agg]->name);
@@ -78,17 +81,18 @@ static void integer(struct text *out, enum ir_type type, uint64_t value)
 {
     if (type == IR_I64 || type == IR_PTR || type == IR_CLONG ||
         type == IR_CWCHAR) {
-        text_appendf(out, "%" PRId64, (int64_t)value);
-    } else if (type == IR_I32) {
-        text_appendf(out, "%" PRId32, (int32_t)value);
-    } else if (type == IR_I16) {
-        text_appendf(out, "%d", (int16_t)value);
+        text_appendf(out, "%" PRId64, arith_signed(value, 64));
     } else {
-        text_appendf(out, "%d", (int8_t)value);
+        text_appendf(out, "%" PRId64,
+                     arith_signed(value, type == IR_I32   ? 32
+                                         : type == IR_I16 ? 16
+                                                          : 8));
     }
 }
 
-void ir_sym_print(struct text *out, const struct ir_module *m, uint32_t sym)
+/* Append the text form of a symbolic value. */
+static void ir_sym_print(struct text *out, const struct ir_module *m,
+                         uint32_t sym)
 {
     const struct ir_sym *s = &m->syms[sym];
 
