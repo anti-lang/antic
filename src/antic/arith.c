@@ -2,6 +2,8 @@
 
 #include "text.h"
 
+#include <float.h>
+#include <math.h>
 #include <stdlib.h>
 
 /* The value of the low n bits of v, extended by is_signed. */
@@ -17,6 +19,40 @@ static uint64_t extend(uint64_t v, int n, bool is_signed)
     sign = (uint64_t)1 << (n - 1);
     v &= mask;
     return is_signed ? (v ^ sign) - sign : v;
+}
+
+int64_t arith_signed(uint64_t v, int n)
+{
+    uint64_t x = extend(v, n, true);
+
+    return x <= (uint64_t)INT64_MAX ? (int64_t)x : -(int64_t)~x - 1;
+}
+
+int64_t arith_shift_right(int64_t a, unsigned k)
+{
+    return a < 0 ? -(int64_t)(~(uint64_t)a >> k) - 1
+                 : (int64_t)((uint64_t)a >> k);
+}
+
+float arith_to_f32(double d)
+{
+    /* Halfway between FLT_MAX and 2^128. From there on the nearest float
+       is infinity, and a tie goes there too, since FLT_MAX is odd. */
+    const double edge = 0x1.ffffffp+127;
+
+    if (d >= edge) {
+        return HUGE_VALF;
+    }
+    if (d <= -edge) {
+        return -HUGE_VALF;
+    }
+    if (d > FLT_MAX) {
+        return FLT_MAX;
+    }
+    if (d < -FLT_MAX) {
+        return -FLT_MAX;
+    }
+    return (float)d;
 }
 
 /* The 128-bit product of a and b as hi and lo, unsigned. C has no wider
@@ -93,8 +129,8 @@ static int direction(char op, uint64_t a, uint64_t b, int n, bool is_signed)
         return (op == '+' ? a + b : a * b) > largest(n, false) ? 1 : 0;
     }
     if (n < 64) {
-        int64_t x = (int64_t)extend(a, n, true);
-        int64_t y = (int64_t)extend(b, n, true);
+        int64_t x = arith_signed(a, n);
+        int64_t y = arith_signed(b, n);
         int64_t r = op == '+' ? x + y : op == '-' ? x - y : x * y;
         int64_t top = (int64_t)largest(n, true);
         return r > top ? 1 : r < -top - 1 ? -1 : 0;

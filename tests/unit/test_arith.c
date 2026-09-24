@@ -1,3 +1,5 @@
+#include <float.h>
+#include <math.h>
 #include <stdint.h>
 
 #include "../binary_stdio.h"
@@ -53,4 +55,29 @@ void test_arith(void)
                          64, true) == (uint64_t)INT64_MIN);
     CHECK(arith_saturate('*', (uint64_t)-1, (uint64_t)-1, 64, true) == 1);
     CHECK(arith_saturate('+', 20, 30, 32, false) == 50);
+
+    /* Signed values of each width, computed without a cast that C leaves
+       to the implementation. */
+    CHECK(arith_signed(0x80, 8) == -128);
+    CHECK(arith_signed(0x17f, 8) == 127);
+    CHECK(arith_signed(0xffff, 16) == -1);
+    CHECK(arith_signed(0x80000000, 32) == INT32_MIN);
+    CHECK(arith_signed((uint64_t)1 << 63, 64) == INT64_MIN);
+    CHECK(arith_signed(UINT64_MAX, 64) == -1);
+    CHECK(arith_signed(5, 64) == 5);
+
+    /* An arithmetic shift rounds toward minus infinity. */
+    CHECK(arith_shift_right(-7, 1) == -4);
+    CHECK(arith_shift_right(INT64_MIN, 63) == -1);
+    CHECK(arith_shift_right(-1, 40) == -1);
+    CHECK(arith_shift_right(7, 1) == 3);
+    CHECK(arith_shift_right(INT64_MAX, 62) == 1);
+
+    /* A double past the largest float rounds as IEEE 754 does. */
+    CHECK(arith_to_f32(1.5) == 1.5f);
+    CHECK(arith_to_f32(1e300) == HUGE_VALF);
+    CHECK(arith_to_f32(-1e300) == -HUGE_VALF);
+    CHECK(arith_to_f32(0x1.fffffe8p+127) == FLT_MAX);
+    CHECK(arith_to_f32(0x1.ffffffp+127) == HUGE_VALF);
+    CHECK(arith_to_f32(-0x1.fffffe8p+127) == -FLT_MAX);
 }

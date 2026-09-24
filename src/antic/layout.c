@@ -241,10 +241,10 @@ static void compute(struct layouts *l, uint32_t agg)
         struct ir_vtype element = t->fields[0].type;
         if (!layout_fold(l, t->length, &length)) {
             length = 1;
-        } else if (length == 0 || length > INT64_MAX) {
+        } else if (arith_signed(length, 64) < 1) {
             fail(l, "the array length `%s` is %" PRId64 " on %s, and an "
                     "array length is at least 1",
-                 t->length_text, signed_value(IR_I64, length),
+                 t->length_text, arith_signed(length, 64),
                  target_name(l->target));
             length = 1;
         }
@@ -373,17 +373,7 @@ static uint64_t trim(enum ir_type type, uint64_t v)
 
 static int64_t signed_value(enum ir_type type, uint64_t v)
 {
-    int n = bits(type);
-    uint64_t sign = (uint64_t)1 << (n - 1);
-
-    /* A negative value is computed from its complement, since C leaves
-       the conversion of a uint64_t above INT64_MAX to the
-       implementation. */
-    v = trim(type, v);
-    if ((v & sign) == 0) {
-        return (int64_t)v;
-    }
-    return -(int64_t)(~v & (sign | (sign - 1))) - 1;
+    return arith_signed(v, bits(type));
 }
 
 /* Apply op to the folded operands a and b of type type. The result has
@@ -426,7 +416,8 @@ static bool fold_op(struct layouts *l, const struct ir_sym *s,
     case IR_XOR: *out = a ^ b; break;
     case IR_SHL: *out = a << (b % 64); break;
     case IR_SHR_S:
-        *out = (uint64_t)(signed_value(type, a) >> (b % 64));
+        *out = (uint64_t)arith_shift_right(signed_value(type, a),
+                                           (unsigned)(b % 64));
         break;
     case IR_SHR_U: *out = trim(type, a) >> (b % 64); break;
     case IR_NEG: *out = 0 - a; break;
@@ -888,7 +879,7 @@ static void write_const(struct layouts *l, struct ir_module *m,
         break;
     case IR_CONST_FLOAT:
         if (size == 4) {
-            single = (float)c->floating;
+            single = arith_to_f32(c->floating);
             memcpy(&bits, &single, sizeof single);
         } else {
             memcpy(&bits, &c->floating, sizeof c->floating);

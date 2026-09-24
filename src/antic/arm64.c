@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arith.h"
 #include "regalloc.h"
 
 /* The ARM64 back end: registers, opcodes and the pattern table of
@@ -228,14 +229,6 @@ static uint8_t bits(enum ir_type type)
     }
 }
 
-static int64_t signed_value(uint64_t v, uint8_t w)
-{
-    return w == 8    ? (int8_t)(uint8_t)v
-           : w == 16 ? (int16_t)(uint16_t)v
-           : w == 32 ? (int32_t)(uint32_t)v
-                     : (int64_t)v;
-}
-
 /* The instruction that extends an 8-bit or 16-bit value to 32 bits. */
 static enum a64_op extension(uint8_t n, bool is_signed)
 {
@@ -291,7 +284,7 @@ static void load_into(struct mach_block *b, struct mach_operand dst,
 {
     uint64_t mask = dst.width == 64 ? UINT64_MAX : UINT32_MAX;
     uint64_t v = value & mask;
-    int64_t signed_v = dst.width == 64 ? (int64_t)v : (int32_t)(uint32_t)v;
+    int64_t signed_v = select_signed(v, dst.width == 64 ? 64 : 32);
     struct mach_operand ops[3];
     bool first = true;
     int shift;
@@ -454,7 +447,7 @@ static void emit_add_sub(struct selector *s, const struct ir_inst *inst)
     enum a64_op op = inst->op == IR_SUB ? A64_SUB : A64_ADD;
     enum a64_op other = inst->op == IR_SUB ? A64_ADD : A64_SUB;
     int64_t v = inst->b.kind == IR_INT
-                    ? signed_value(inst->b.as.integer, bits(inst->b.type))
+                    ? select_signed(inst->b.as.integer, bits(inst->b.type))
                     : 0;
 
     ops[0] = select_result(s, inst);
@@ -481,7 +474,7 @@ static void emit_binary(struct selector *s, const struct ir_inst *inst)
     if (op != A64_MUL && inst->b.kind == IR_INT &&
         is_logical_imm(inst->b.as.integer, r.width)) {
         emit3(s, op, r, a,
-              mach_imm(signed_value(inst->b.as.integer, r.width)));
+              mach_imm(select_signed(inst->b.as.integer, r.width)));
         return;
     }
     emit3(s, op, r, a, select_reg(s, &inst->b));
@@ -508,7 +501,7 @@ static struct mach_operand extended(struct selector *s,
     }
     r = select_new_vreg(s, 32);
     if (o->kind == IR_INT) {
-        load(s, r, is_signed ? (uint64_t)signed_value(o->as.integer, n)
+        load(s, r, is_signed ? (uint64_t)select_signed(o->as.integer, n)
                              : o->as.integer);
     } else {
         emit2(s, extension(n, is_signed), r, select_reg(s, o));
@@ -1177,7 +1170,7 @@ static void load_float(struct selector *s, struct mach_operand dst,
     uint64_t pattern;
 
     if (type == IR_F32) {
-        float narrow = (float)value;
+        float narrow = arith_to_f32(value);
         uint32_t word;
         memcpy(&word, &narrow, sizeof word);
         pattern = word;
@@ -1303,7 +1296,7 @@ static void emit_convert(struct selector *s, const struct ir_inst *inst)
 
     if (inst->a.kind == IR_INT) {
         load(s, r, inst->op == IR_SEXT
-                       ? (uint64_t)signed_value(inst->a.as.integer, from)
+                       ? (uint64_t)select_signed(inst->a.as.integer, from)
                        : inst->a.as.integer);
     } else if (inst->op == IR_TRUNC) {
         move(s, widened(r, 32), widened(select_reg(s, &inst->a), 32));
@@ -1358,7 +1351,7 @@ static void compare(struct selector *s, const struct ir_inst *inst)
     }
     if (inst->b.kind == IR_INT) {
         v = n < 32 && !is_signed ? (int64_t)inst->b.as.integer
-                                 : signed_value(inst->b.as.integer, n);
+                                 : select_signed(inst->b.as.integer, n);
         ops[0] = a;
         if (fits_imm12(v)) {
             emit_imm12(s, A64_CMP, 1, ops, v);
@@ -1526,7 +1519,7 @@ static void emit_flag_op(struct selector *s, const struct ir_inst *inst)
     if (inst->c.kind == IR_NONE) {
         ops[1] = select_reg(s, &inst->a);
         v = inst->b.kind == IR_INT
-                ? signed_value(inst->b.as.integer, bits(inst->b.type))
+                ? select_signed(inst->b.as.integer, bits(inst->b.type))
                 : -1;
         if (inst->b.kind == IR_INT && fits_imm12(v)) {
             emit_imm12(s, add ? A64_ADDS : A64_SUBS, 2, ops, v);
@@ -1810,7 +1803,7 @@ static void load_value(struct selector *s, struct mach_operand reg,
     if (value->kind == IR_INT) {
         load(s, reg,
              ext == IR_EXT_SIGN
-                 ? (uint64_t)signed_value(value->as.integer, bits(value->type))
+                 ? (uint64_t)select_signed(value->as.integer, bits(value->type))
                  : value->as.integer);
     } else if (select_is_float(value->type)) {
         struct mach_operand v = select_reg(s, value);

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arith.h"
 #include "attributes.h"
 #include "expand.h"
 #include "optimize.h"
@@ -67,6 +68,11 @@ struct mach_operand select_new_vreg(struct selector *s, uint8_t width)
 struct mach_operand select_new_fp_vreg(struct selector *s, uint8_t width)
 {
     return mach_vreg(mach_vreg_add(s->out, true), width);
+}
+
+int64_t select_signed(uint64_t v, uint8_t w)
+{
+    return arith_signed(v, w == 8 || w == 16 || w == 32 ? w : 64);
 }
 
 bool select_is_float(enum ir_type type)
@@ -363,7 +369,7 @@ static size_t fold_address(struct selector *s, const struct ir_block *b,
     } else if (add->b.kind == IR_TEMP) {
         a.index = &add->b;
     } else {
-        a.offset = (int64_t)add->b.as.integer;
+        a.offset = arith_signed(add->b.as.integer, 64);
     }
     if (!s->target->fits_address(s, &a, &b->insts[i + n])) {
         return 0;

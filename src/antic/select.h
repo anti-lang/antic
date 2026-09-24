@@ -199,6 +199,9 @@ struct mach_operand mach_imm(int64_t value);
 struct mach_operand select_result(struct selector *s, const struct ir_inst *inst);
 struct mach_operand select_new_vreg(struct selector *s, uint8_t width);
 struct mach_operand select_new_fp_vreg(struct selector *s, uint8_t width);
+/* The immediate v of width w in bits as a signed value. A width other
+   than 8, 16 or 32 reads all 64 bits. */
+int64_t select_signed(uint64_t v, uint8_t w);
 bool select_is_float(enum ir_type type);
 /* Store the register parts of an aggregate into the memory at address. */
 void select_store_parts(struct selector *s, const struct arg_location *loc,

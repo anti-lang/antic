@@ -37,11 +37,7 @@ static uint64_t trim(enum ir_type type, uint64_t v)
 
 static int64_t signed_value(enum ir_type type, uint64_t v)
 {
-    int n = bits(type);
-    uint64_t sign = (uint64_t)1 << (n - 1);
-
-    v = trim(type, v);
-    return (int64_t)((v ^ sign) - sign);
+    return arith_signed(v, bits(type));
 }
 
 static struct ir_operand none(void)
@@ -241,8 +237,8 @@ static bool fold_float(enum ir_op op, enum ir_type t, double a, double b,
                        struct ir_operand *out)
 {
     double r;
-    float fa = (float)a;
-    float fb = (float)b;
+    float fa = arith_to_f32(a);
+    float fb = arith_to_f32(b);
     bool single = t == IR_F32;
 
     switch (op) {
@@ -315,12 +311,12 @@ static bool fold_conversion(const struct ir_inst *inst, struct ir_operand *out)
         *out = ir_float_op(to, anti_f16_widen((uint16_t)v));
         return true;
     case IR_HTRUNC:
-        *out = ir_int_op(to, anti_f16_narrow((float)d));
+        *out = ir_int_op(to, anti_f16_narrow(arith_to_f32(d)));
         return true;
     default:
         return false;
     }
-    *out = ir_float_op(to, to == IR_F32 ? (double)(float)d : d);
+    *out = ir_float_op(to, to == IR_F32 ? (double)arith_to_f32(d) : d);
     return true;
 }
 

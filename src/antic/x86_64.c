@@ -361,27 +361,17 @@ static void move_float(struct selector *s, struct mach_operand dst,
     emit2(s, X64_MOVS, dst, src);
 }
 
-static int64_t signed_value(uint64_t v, uint8_t w)
-{
-    switch (w) {
-    case 8: return (int8_t)(uint8_t)v;
-    case 16: return (int16_t)(uint16_t)v;
-    case 32: return (int32_t)(uint32_t)v;
-    default: return (int64_t)v;
-    }
-}
-
 /* An immediate of a 64-bit instruction is 32 bits, sign-extended. Smaller
    instructions take an immediate of their own width. */
 static bool fits_imm(const struct ir_operand *o, uint8_t w)
 {
-    int64_t v = signed_value(o->as.integer, w);
+    int64_t v = select_signed(o->as.integer, w);
     return o->kind == IR_INT && (w < 64 || (v >= INT32_MIN && v <= INT32_MAX));
 }
 
 static void load(struct selector *s, struct mach_operand dst, uint64_t value)
 {
-    int64_t v = signed_value(value, dst.width);
+    int64_t v = select_signed(value, dst.width);
 
     if (dst.width == 64 && (v < INT32_MIN || v > INT32_MAX)) {
         emit2(s, X64_MOVABS, dst, mach_imm(v));
@@ -466,13 +456,13 @@ static void two_operand(struct selector *s, const struct ir_inst *inst,
 
     if (fits_imm(&inst->b, r.width)) {
         load_into(s, r, &inst->a);
-        emit2(s, op, r, mach_imm(signed_value(inst->b.as.integer, r.width)));
+        emit2(s, op, r, mach_imm(select_signed(inst->b.as.integer, r.width)));
         return;
     }
     if (inst->b.kind == IR_TEMP && inst->b.as.temp == inst->result) {
         if (commutative) {
             b = fits_imm(&inst->a, r.width)
-                    ? mach_imm(signed_value(inst->a.as.integer, r.width))
+                    ? mach_imm(select_signed(inst->a.as.integer, r.width))
                     : select_reg(s, &inst->a);
             emit2(s, op, r, b);
             return;
@@ -531,7 +521,7 @@ static void emit_mul(struct selector *s, const struct ir_inst *inst)
     }
     ops[0] = widened(r, w);
     ops[1] = widened(select_reg(s, &inst->a), w);
-    ops[2] = mach_imm(signed_value(inst->b.as.integer, r.width));
+    ops[2] = mach_imm(select_signed(inst->b.as.integer, r.width));
     select_emit(s, X64_IMUL3, 3, ops);
 }
 
@@ -544,7 +534,7 @@ static void extend_into(struct selector *s, struct mach_operand dst,
 
     if (value->kind == IR_INT) {
         uint64_t v = value->as.integer;
-        load(s, dst, is_signed ? (uint64_t)signed_value(v, w) : v);
+        load(s, dst, is_signed ? (uint64_t)select_signed(v, w) : v);
     } else if (w < 32) {
         emit2(s, is_signed ? X64_MOVSX : X64_MOVZX, dst, select_reg(s, value));
     } else {
@@ -591,7 +581,7 @@ static void widen_32(struct selector *s, struct mach_operand dst,
                      const struct ir_operand *value, bool is_signed)
 {
     if (value->kind == IR_INT) {
-        load(s, dst, is_signed ? (uint64_t)signed_value(value->as.integer, 32)
+        load(s, dst, is_signed ? (uint64_t)select_signed(value->as.integer, 32)
                                : value->as.integer & 0xffffffff);
     } else if (is_signed) {
         emit2(s, X64_MOVSX, dst, select_reg(s, value));
@@ -663,7 +653,7 @@ static void emit_convert(struct selector *s, const struct ir_inst *inst)
 
     if (inst->a.kind == IR_INT) {
         load(s, r, inst->op == IR_SEXT
-                       ? (uint64_t)signed_value(inst->a.as.integer, from)
+                       ? (uint64_t)select_signed(inst->a.as.integer, from)
                        : inst->a.as.integer);
     } else if (inst->op == IR_TRUNC) {
         move(s, r, widened(select_reg(s, &inst->a), r.width));
@@ -925,7 +915,7 @@ static void compare(struct selector *s, const struct ir_inst *inst)
     struct mach_operand a = select_reg(s, &inst->a);
 
     if (fits_imm(&inst->b, a.width)) {
-        emit2(s, X64_CMP, a, mach_imm(signed_value(inst->b.as.integer,
+        emit2(s, X64_CMP, a, mach_imm(select_signed(inst->b.as.integer,
                                                    a.width)));
     } else {
         emit2(s, X64_CMP, a, select_reg(s, &inst->b));
@@ -1386,7 +1376,7 @@ static void emit_call(struct selector *s, const struct ir_inst *inst)
             move_float(s, slot, select_reg(s, arg));
         } else {
             emit2(s, X64_MOV, slot,
-                  fits_imm(arg, w) ? mach_imm(signed_value(arg->as.integer, w))
+                  fits_imm(arg, w) ? mach_imm(select_signed(arg->as.integer, w))
                                    : select_reg(s, arg));
         }
         if ((uint64_t)locations[i].offset + 8 > outgoing) {
@@ -1566,7 +1556,7 @@ static void emit_store(struct selector *s, const struct ir_inst *inst)
     uint8_t w = width(inst->a.type);
     bool fp = select_is_float(inst->a.type);
     struct mach_operand value =
-        fits_imm(&inst->a, w) ? mach_imm(signed_value(inst->a.as.integer, w))
+        fits_imm(&inst->a, w) ? mach_imm(select_signed(inst->a.as.integer, w))
                               : select_reg(s, &inst->a);
 
     emit2(s, fp ? X64_MOVS : X64_MOV, address_of(s, &inst->b, inst->a.type),
@@ -1796,12 +1786,12 @@ static void emit_ptradd(struct selector *s, const struct ir_inst *inst)
 /* DESIGN: a simd operation works on its values in memory, one register
    at a time. A register holds 16 bytes, 32 at x86-64-v3, whose AVX2
    gives the wide forms, and 8 for a simd struct of 8 bytes. A wide value
-   spans more than one register. Each one takes the instruction of the operation,
-   so an f32x8 is one vaddps at v3 and two addps below it. The registers
-   are the two the spills use and the four below them, which the
-   instructions name. No value of the allocator lives in them across the
-   operation. A comparison narrows its lanes of all ones to one byte of 0
-   or 1 per lane of the mask, and a choice widens the mask back. */
+   spans more than one register. Each one takes the instruction of the
+   operation, so an f32x8 is one vaddps at v3 and two addps below it. The
+   registers are the two the spills use and the four below them, which
+   the instructions name. No value of the allocator lives in them across
+   the operation. A comparison narrows its lanes of all ones to one byte
+   of 0 or 1 per lane of the mask, and a choice widens the mask back. */
 
 /* A vector register operand, with the 256-bit form in its value. */
 static struct mach_operand vector_of(uint8_t reg, bool wide)

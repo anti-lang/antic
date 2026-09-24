@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arith.h"
 #include "ir.h"
 
 /* DESIGN: lld-link and link.exe write no relocatable object, and the
@@ -398,7 +399,7 @@ static bool read_comdats(struct join *j, struct object *o)
 
     for (i = 0; i < o->symbol_count; i++) {
         const unsigned char *s = symbol_at(o, i);
-        int16_t number = (int16_t)get(s + 12, 2);
+        int16_t number = (int16_t)arith_signed(get(s + 12, 2), 16);
         uint8_t storage = s[16];
         uint8_t aux = s[17];
         const char *name;
@@ -564,7 +565,7 @@ static bool enter_definitions(struct join *j)
         uint32_t i;
         for (i = 0; i < o->symbol_count; i += 1 + symbol_at(o, i)[17]) {
             const unsigned char *s = symbol_at(o, i);
-            int16_t number = (int16_t)get(s + 12, 2);
+            int16_t number = (int16_t)arith_signed(get(s + 12, 2), 16);
             const char *name;
             size_t length;
             struct entry *e;
@@ -606,7 +607,7 @@ static uint32_t number_symbols(struct join *j, uint32_t *features_index,
         uint32_t i;
         for (i = 0; i < o->symbol_count; i++) {
             const unsigned char *s = symbol_at(o, i);
-            int16_t number = (int16_t)get(s + 12, 2);
+            int16_t number = (int16_t)arith_signed(get(s + 12, 2), 16);
             uint8_t aux = s[17];
             const char *name;
             size_t length;
@@ -798,7 +799,7 @@ static bool write_symbols(struct join *j, struct text *out,
         uint32_t i;
         for (i = 0; i < o->symbol_count; i += 1 + symbol_at(o, i)[17]) {
             const unsigned char *s = symbol_at(o, i);
-            int16_t number = (int16_t)get(s + 12, 2);
+            int16_t number = (int16_t)arith_signed(get(s + 12, 2), 16);
             uint8_t aux = s[17];
             unsigned char record[SYMBOL_SIZE];
             const char *name;
