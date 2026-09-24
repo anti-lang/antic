@@ -287,8 +287,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 864 ctest tests pass on the development Mac and none is skipped. The ASan and
-  the UBSan builds run 863 each, without the `no_paths` test, which needs a
+- 869 ctest tests pass on the development Mac and none is skipped. The ASan and
+  the UBSan builds run 868 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -445,6 +445,11 @@ reports what it finished.
   rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer
   of an `extern fn` is `?*T`. A failing function returns `?*Error`.
+- The language hooks are built. `operator fn` takes `iter`, `next`, `value`,
+  `index` and `set_index` beside the operators, `for x in e` walks a
+  collection and an iterator, `e[i]` and `e[i] = v` call `index` and
+  `set_index`, and every iterator has `to_slice`. See "Language hooks and
+  iteration" in `docs/decisions.md` and `docs/notes/iteration.md`.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
   See "Small things" in `docs/decisions.md`.
