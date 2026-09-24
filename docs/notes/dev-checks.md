@@ -32,7 +32,7 @@ The text of a check takes a number before it is removed.
 `anti_rt_check_failed(text, length, kind, a, b)` in `src/rt/check.c`. The compiler
 builds the text, which names the file, the line and the operation. The kind
 names the labels of the two values, and `src/rt/std.h` holds it as `enum
-anti_check`. `src/antic/lower.c` mirrors it as `enum check_kind`, and the unit test
+anti_check`. `src/antic/lower_lowerer.h` mirrors it as `enum check_kind`, and the unit test
 `records_check_kinds` pins the numbers of the two together by reading the call
 that lowering writes.
 
@@ -67,7 +67,7 @@ Dropping the checks turns every overflow operation back into its plain
 arithmetic, so a build without them emits what it emitted before the checks
 existed.
 
-Narrowing. `narrow_check` in `src/antic/lower.c`. The value goes to the target type
+Narrowing. `narrow_check` in `src/antic/lower_expr.c`. The value goes to the target type
 and back to the source with the target's signedness. A value the target cannot
 hold comes back changed. The round trip is blind to a change of sign alone,
 because a target of the same width keeps every bit. That case is a signed

@@ -30,6 +30,10 @@ set(ANTIC_CORE_SOURCES
     src/antic/lexer.c
     src/antic/linker.c
     src/antic/lower.c
+    src/antic/lower_desc.c
+    src/antic/lower_expr.c
+    src/antic/lower_simd.c
+    src/antic/lower_stmt.c
     src/antic/mach.c
     src/antic/modpath.c
     src/antic/notice.c

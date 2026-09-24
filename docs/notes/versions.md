@@ -8,7 +8,7 @@ the rest of the loader.
 
 ## What a descriptor carries
 
-`descriptor_agg` of `src/antic/lower.c` gives every class descriptor three
+`lower_descriptor_agg` of `src/antic/lower_desc.c` gives every class descriptor three
 fields after the function list. They are the bytes of the version of the
 package that declared the class, its length, and a record. The record
 belongs to an abstract class and is NULL for every other. The record is `anti.rt.Versions`, with the

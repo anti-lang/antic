@@ -7,7 +7,7 @@ and tracing" of `docs/decisions.md`.
 
 ## The entries
 
-`root_names` in `src/antic/lower.c` names the seven functions of the root and
+`root_names` in `src/antic/lower_desc.c` names the seven functions of the root and
 then the nine hooks, in the order `created destroyed copied dispatched
 joined enter leave failed changed`. `enum anti_hook` in `src/rt/object.h`
 repeats that order and `ANTI_ENTRY_OF_HOOK` gives the entry of one,
@@ -22,15 +22,17 @@ object after `self`. Those nine take the entries after the root's
 sixteen, so every handler shares one place per hook.
 
 A table entry is keyed by its name and its parameter count. `table_add`
-and `table_index` of `src/antic/lower.c` compare both, so the handler's
+and `lower_table_index` of `src/antic/lower_desc.c` compare both, so the
+handler's
 `created(self, o)` takes an entry of its own beside the root's
 `created(self)`. Anti has no overloading, so the count changes nothing
 for any other name of a chain.
 
 ## The sites
 
-`hook_object`, `hook_copied`, `hook_call`, `hook_failed` and
-`hook_changed` of `src/antic/lower.c` each write one call of the runtime.
+`lower_hook_object`, `lower_hook_copied`, `lower_hook_call` and
+`lower_hook_failed` of `src/antic/lower.c` and `hook_changed` of
+`src/antic/lower_stmt.c` each write one call of the runtime.
 `src/rt/hooks.c` holds what a site does: it loads the handler from one atomic
 word, calls the handler's function when there is one, and dispatches the
 object's own hook unless that entry still holds the root's empty body.

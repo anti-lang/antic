@@ -14,8 +14,8 @@
    knows the size of each type on the host it runs on. The low byte names
    the type. A pointer, a slice, an array and an enum hold the id of the
    type they are built on in the byte above. The id of `[]i32` is
-   ANTI_TYPE_SLICE | ANTI_TYPE_I32 << 8. src/antic/lower.c writes these numbers,
-   and the unit test records_type_ids pins the two together. */
+   ANTI_TYPE_SLICE | ANTI_TYPE_I32 << 8. src/antic/lower_desc.c writes these
+   numbers, and the unit test records_type_ids pins the two together. */
 enum anti_type {
     ANTI_TYPE_NONE,     /* a bitfield, which no walk reads */
     ANTI_TYPE_BOOL,
@@ -151,10 +151,10 @@ struct anti_descriptor {
 
 /* DESIGN: the seven functions of the root take the entries after the
    descriptor, in this order, in the table of every class. The nine hooks
-   take the entries after them. The order is root_names in src/antic/lower.c,
-   and a unit test pins the two together. The destruct entry of a class
-   holds the teardown the compiler writes for it. The copy entry holds
-   its copy unless the chain declares one. */
+   take the entries after them. The order is root_names in
+   src/antic/lower_desc.c, and a unit test pins the two together. The
+   destruct entry of a class holds the teardown the compiler writes for
+   it. The copy entry holds its copy unless the chain declares one. */
 enum anti_entry {
     ANTI_ENTRY_DESCRIPTOR,
     ANTI_ENTRY_TYPE_NAME,
