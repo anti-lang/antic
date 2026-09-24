@@ -8,6 +8,7 @@ Contents:
 
 - [Program structure](#program-structure)
 - [Modules](#modules)
+- [Direct imports](#direct-imports)
 - [Types](#types)
 - [Literals](#literals)
 - [Variables and constants](#variables-and-constants)
@@ -24,8 +25,10 @@ Contents:
 - [Variants](#variants)
 - [Classes](#classes)
 - [Interfaces](#interfaces)
+- [Generics](#generics)
 - [Ownership](#ownership)
 - [Pointers](#pointers)
+- [Optional values](#optional-values)
 - [Reflection](#reflection)
 - [Operators on classes](#operators-on-classes)
 - [Static fields and singletons](#static-fields-and-singletons)
@@ -44,6 +47,7 @@ Contents:
 - [Script mode](#script-mode)
 - [Regular expressions](#regular-expressions)
 - [Bytes](#bytes)
+- [Collections](#collections)
 - [Standard library](#standard-library)
 - [Later](#later)
 - [Reserved words](#reserved-words)
@@ -88,9 +92,24 @@ out.println("renamed");
 
 `pub` exports to every module, `internal` to modules under the same package root, none to the file. `import x as y` renames the local name. Paths under `anti.` are the language's. Third parties use a root they own.
 
+## Direct imports
+
+`import anti.collection.map.{Map, HashMap};` makes the listed names of a module visible in the file without the module's name, so code writes `Map<str, int>` rather than `map.Map<str, int>`. Each listed name is a public item of that module, and one that clashes with a name already visible in the file is refused, naming both. The module stays reachable by its name, as with a plain `import`. `anti fmt` keeps the list sorted.
+
+```anti not-built
+import anti.collection.map.{HashMap, Map};
+import anti.mem.{ArenaAllocator, Shared};
+import anti.regex.{Regex};
+
+let ages = Map<str, int>.new();
+let seen = map.HashMap<str, bool>.new();
+```
+
+Not built yet: direct imports.
+
 ## Types
 
-Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Function pointers `fn(i32) -> i32` and nullable ones `?fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. The built-in types `Flags`, `Mutex` and `chan T`. The C types `c_int`, `c_long`, `c_wchar` and the rest for bindings. No implicit conversions between numbers.
+Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Optional values `?T` of any type. Function pointers `fn(i32) -> i32` and nullable ones `?fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. The built-in types `Flags`, `Mutex` and `chan T`. The C types `c_int`, `c_long`, `c_wchar` and the rest for bindings. No implicit conversions between numbers.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -109,7 +128,7 @@ let t: (int, str) = (1, "one");
 let h: f16 = 1.5 as f16;
 ```
 
-Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of the runtime at `v1` and `v2`.
+Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of the runtime at `v1` and `v2`. Not built yet: `?T` beyond `?*T`, `?fn(...)` and `?Match`, see [Optional values](#optional-values).
 
 ## Literals
 
@@ -301,7 +320,16 @@ let all = people.iter().to_slice();
 free(all.ptr);
 ```
 
-Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice`. Not built yet: labels.
+`for x in c` gives a copy of each element, and the loop variable is read-only, so a change that would reach the copy alone is refused. `for x in &c` gives each element as a `lent` pointer for one turn of the loop, and a change through it reaches the element. Both forms hold for slices and for the collections of [Collections](#collections). A collection must not change its size while a loop walks it. A dev build traps when it does, naming the collection and both places, and `remove_all(test)` removes while it walks.
+
+```anti not-built
+for p in people { }       // p is a copy of each Person, read-only
+for p in &people {
+	p.age += 1;           // p is a lent *Person
+}
+```
+
+Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice`. Not built yet: labels, `for x in &c` over a collection, the read-only loop variable of the copy form, and the trap on a collection that changes its size while a loop walks it.
 
 ## Functions
 
@@ -664,6 +692,36 @@ s.serialize(&b);
 
 Built.
 
+## Generics
+
+Functions, structs, classes, variants and interfaces take type parameters between `<` and `>`. A constraint after `:` states what the generic needs from a type: a hook of the operator table such as `lt`, `add`, `iter` or `hash`, an interface, or a set named with `constraint`, combined with `+`. The compiler checks the body against the constraints where the generic is written and every use where it is used, so an error lands in the code that made it. A parameter without constraints can be stored, copied, moved, passed on and measured with `size_of`, which is what a container needs. `N: int` takes an integer constant instead of a type, such as the length of a fixed array. `anti.lang` ships `constraint Number = add + sub + mul + div + neg + lt;` and `constraint Ordered = eq + lt;`.
+
+```anti not-built
+fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+struct Pair<A, B> { first: A, second: B, }
+struct Ring<T, N: int> { items: [N]T, head: int, }
+variant Result<T, E> { Ok { value: T }, Err { error: E }, }
+constraint Key = eq + hash;
+
+let p: Pair<int, str> = Pair { first: 1, second: "one" };
+let m = max(3, 7);                     // max<int>
+let people = List<Person>.new();
+
+type People = List<Person>;
+export type PersonList = List<Person>;
+```
+
+Type arguments are inferred from the arguments of a call and written out where nothing gives them. In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows and the token after it is `(`, `.` or `{`, so `a < b > c` stays two comparisons. `>>` closes two lists. Every use with concrete arguments gets its own compiled copy, with no boxing, and two uses with the same arguments are one type in every module. The whole-program pass merges copies whose code is identical. A method with type parameters of its own is called directly and never stands in the table, so it cannot be `abstract` or replaced. A library file stores a generic as IR with its parameters open. C sees no open generic: `export type PersonList = List<Person>;` writes a copy into the header as an exported class, and a generic `export fn` is refused.
+
+Not built yet: generics, with constraints, `constraint`, `N: int`, `type` and `export type`, and `Number` and `Ordered` of `anti.lang`.
+
 ## Ownership
 
 `own` on a pointer or slice field says the object owns the memory. `destruct`, `dup`, `equals` and `serialize` follow it. Inline class and struct fields are owned by definition. The compiler writes a teardown and a copy for every class, which `delete`, `destroy` and `dup` call, so `--no-reflect` loses nothing about ownership. An `own` slice of class values destroys its elements last to first, as a local array does. `alloc(T, n)` of a class gives zeroed memory, so an element not filled yet has a zero table. So does the storage the compiler supplies for the out pointer of a `catch` binding. `delete`, `destroy` and `dup` trap on a zero table with the class name in every mode, and `is`, `as` and a dispatch do in dev mode. `=` into such an element destroys nothing.
@@ -686,6 +744,18 @@ class Buffer
 	shared: *Texture,
 }
 ```
+
+`own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
+
+```anti not-built
+fn grow(lent p: *Person) { p.age += 1; }
+
+let c = Shared<Circle>.new(Circle { r: 2.0 });
+let shapes = List<Shared<Circle>>.new();
+shapes.push(c.share());
+```
+
+Built: `own` and `transient` fields, and the `own` parameter that takes an error. Not built yet: the `own` parameter of any other type, `lent` and `Shared<T>`.
 
 ## Pointers
 
@@ -712,6 +782,20 @@ let k = n ?? &default_node;
 `alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing. A function value follows the same rule: `fn(...)` never holds `none` and `?fn(...)` may.
 
 Built.
+
+## Optional values
+
+`?T` is a `T` or `none`, for a value of any type, and follows every rule of `?*T`. It compares with `none`, narrows after a test, and works with `if let`, `let ... else` and `??`, and it is used as a `T` only after a test proves it holds one. `none` means that nothing is there, which is normal, and a failure is `may fail`: `map.get(key)` gives `?V`, and `text.parse_int(s)` stays `may fail`. A `?T` of a value type is the value and one flag byte, padded to the type's alignment, and `?*T` stays one pointer. The C header writes `?T` as a struct of the value and a `bool`.
+
+```anti not-built
+fn find_user(id: int) -> ?User { return none; }
+
+let age = ages.get("Ann") ?? 0;
+if let a = ages.get("Ann") { }
+let first = queue.first() else { return 1; };
+```
+
+Built: `?*T`, `?fn(...)` and `?Match`, a struct of `anti.lang`. Not built yet: `?T` of any other type.
 
 ## Reflection
 
@@ -783,9 +867,9 @@ if a == b { }
 
 The names: `add sub mul div rem neg eq lt and or xor shl shr not`. `!=`, `>`, `<=`, `>=` and compound assignments derive. For a struct the operator is a free function in the declaring module.
 
-The same table holds the language hooks: `iter`, `next` and `value` for `for x in e`, and `index` and `set_index` for `e[i]` and `e[i] = v`. A name outside the table is an error that lists the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is `a + b`. `f"..."` writes a class through `to_text`.
+The same table holds the language hooks: `iter`, `next` and `value` for `for x in e`, and `index` and `set_index` for `e[i]` and `e[i] = v`. A name outside the table is an error that lists the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is `a + b`. `f"..."` writes a class through `to_text`. `operator fn hash(self) -> u64` is the hook of a key of a hashing collection. A struct or class gets a default that hashes its fields in order, and two values equal by `eq` have the same `hash`.
 
-Built: the operators and the hooks `iter`, `next`, `value`, `index` and `set_index`.
+Built: the operators and the hooks `iter`, `next`, `value`, `index` and `set_index`. Not built yet: the hook `hash`.
 
 ## Static fields and singletons
 
@@ -1133,7 +1217,9 @@ A release binary carries no symbol data. `anti build --release` writes a symbols
 
 The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `armv8.5` on macOS, `armv8.2` on Windows and `armv8.0` on Linux. `--cpu` overrides on every target, and a program refuses to start on a processor below its level. A level is a code-generation setting, not a target. The runtime archive holds one runtime per target and level, so a program below the default links a runtime of its own level. The native libraries are built for the default level alone, and a program below it that imports one is refused at link.
 
-Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, the build id in `anti_licenses` of every executable and shared library, the backtraces, with `StackTrace`, `anti.debug.backtrace` and `--anti.backtrace`, and the CPU levels, with `--cpu`, the start-up check and the runtime archive with one runtime per target and level. `symbolize` names the function of a frame in every build and its file and line in a `-g` build. `trace` and the options that decide it are built, and "Hooks and tracing" above names them. The symbols archive of `anti build --release` is built: `<program>-symbols.zip` beside the program, with the same link with its debug sections kept, the map of the program's functions and, on Windows, the PDB. `anti symbols inventory`, `check` and `resolve` are built. They read the runtime configuration and the build id of every binary it reaches, and `resolve` names a frame from the debug link and fills what it lacks from the map. Not built yet: the variables of `-g`, the symbols archive of a shared library and of a plugin, which `anti build` does not write, and the names of a Windows frame in `resolve`, which reads no PDB and leaves the frame raw. Windows has not run a trace.
+`--memory-checks`, for `antic`, `anti build`, `anti test` and `anti run`, makes a build find a use after free, a double free and a read or write outside a heap block while the program runs, and report the leaks at exit with where each block was allocated. The back end emits the checks of AddressSanitizer around every load and store, and the build links its runtime from the pinned clang. The option is off by default, since the program runs two to three times slower, and is refused on windows-arm64, which has no such runtime.
+
+Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, the build id in `anti_licenses` of every executable and shared library, the backtraces, with `StackTrace`, `anti.debug.backtrace` and `--anti.backtrace`, and the CPU levels, with `--cpu`, the start-up check and the runtime archive with one runtime per target and level. `symbolize` names the function of a frame in every build and its file and line in a `-g` build. `trace` and the options that decide it are built, and "Hooks and tracing" above names them. The symbols archive of `anti build --release` is built: `<program>-symbols.zip` beside the program, with the same link with its debug sections kept, the map of the program's functions and, on Windows, the PDB. `anti symbols inventory`, `check` and `resolve` are built. They read the runtime configuration and the build id of every binary it reaches, and `resolve` names a frame from the debug link and fills what it lacks from the map. Not built yet: the variables of `-g`, the symbols archive of a shared library and of a plugin, which `anti build` does not write, and the names of a Windows frame in `resolve`, which reads no PDB and leaves the frame raw. Windows has not run a trace. Not built yet: `--memory-checks`.
 
 ## Warnings and safety checks
 
@@ -1264,6 +1350,34 @@ data.patch(x"80 10 20 30", x"FF", at: 2);
 
 Built: `ByteRegex` and `ByteRegex.compile`, the mode of a pattern literal taken from where it is used, the methods `matches`, `find_all`, `replace` and `split` of `[]byte` with the match `ByteMatch`, the class rules of byte patterns, `to_bytes` and `to_text`, and `patch` with a byte sequence or a pattern, `into`, `at`, `limit` and the fit rule. Until named arguments are built, `into`, `at` and `limit` come by position, `data.patch(x"80 10 20 30", x"FF", 0, 2)`. Not built yet: `at: 2` and the other named arguments of `patch`.
 
+## Collections
+
+The collections of `anti.collection` are generic classes used as values, one module per family: `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>`, `Map<K, V>` and `HashMap<K, V>`, `Set<T>`, `HashSet<T>` and `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`, `Tree<T>` and `PriorityQueue<T>`. `anti.collection` itself holds `Iterable<T>` and `Iterator<T>`. A collection owns its storage and stores its elements by value. It is freed at the end of its block, moves on return, is refused by `=` and is copied by `dup`. No pointer to an element leaves it except through a `lent` parameter: reading gives a copy, as a `?T` where nothing may be there, and `read` and `modify` lend an element to a function.
+
+```anti not-built
+import anti.collection.list.{List};
+import anti.collection.map.{Map};
+import anti.text;
+
+let people = List<Person>.new(capacity: 1000);
+people.push(Person { name: "Ann", age: 41 });
+let first = people.get(0) ?? Person { };
+people.modify(0, fn(p) { p.age += 1; });
+let n = people.update_all(fn(p) { return p.age >= 65; }, fn(p) { p.retired = true; });
+let ann = people.find_one(fn(p) { return text.equal(p.name, "Ann"); }) catch fatal;
+
+let ages = Map<str, int>.new(from: &arena);
+ages.set("Ann", 41);
+let age = ages.get("Ann") ?? 0;
+for (k, v) in ages { }
+```
+
+Criteria come in three forms: `_all` acts on every match and gives the count, `_first` on the first match in the collection's order, and `_one` on the one match, failing when none or more than one matches. Every collection takes an optional allocator, `from: &arena`, and one that grows takes an initial `capacity`, with `reserve(n)` and `shrink()`. `Map` walks in insertion order, the same on every run. `SortedMap` is a B-tree and walks in key order. `HashMap` walks in an order that differs on every walk, so no program depends on it. A hashing collection mixes its hashes with a seed chosen at start. `Ring<T, N>` allocates nothing after it is made, for real-time code. A `Pool` keeps its elements at fixed addresses and gives handles of a slot and a generation, so a stale handle finds nothing, and a `Tree` holds a hierarchy on the same handles.
+
+The thread-safe collections of `anti.collection.sync` and `anti.collection.concurrent` follow [Concurrent classes](#concurrent-classes). `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` are `synchronized`. `ConcurrentMap<K, V>` is `concurrent`, split into parts locked apart. `SpscRing<T, N>` passes values from one thread to one other with two atomic counters and no lock. They have no operation by position and no `lend_slice`, and every one has versioned `set`. A queue between threads is `chan T`.
+
+Built: `List`, `Map` and `IntMap` of `anti.collection`, which hold `*Object` values under no key, a `str` key and an `int` key. Not built yet: every collection of this section, its thread-safe versions and the modules under `anti.collection`.
+
 ## Standard library
 
 The modules under `anti.` ship with the compiler, and a program imports them without `-I`. `anti.lang` is the root and imports nothing. It holds `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `Trace` and `TraceHandler`, and the compiler declares `Object`, `Job`, `Flags`, `Mutex` and `FieldDescriptor` there.
@@ -1278,20 +1392,20 @@ io.println(s);
 free(s.ptr);
 ```
 
-Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`, `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`, `anti.simd`, `anti.trace`, `anti.plugin` and `anti.regex` over PCRE2. Not built yet: the other modules over the native libraries of the runtime archive, `anti.net`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`, `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`, `anti.simd`, `anti.trace`, `anti.plugin` and `anti.regex` over PCRE2. Not built yet: the other modules over the native libraries of the runtime archive, `anti.net`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses, the modules of [Collections](#collections) under `anti.collection`, `Shared<T>` of `anti.mem`, and `Number` and `Ordered` of `anti.lang`.
 
 ## Later
 
-Generics come after the features above, as "Timing" in `docs/anti-language-additions.md` orders them. They have no syntax yet, so no example stands here. With them come `anti.collection.Iterable[T]` and `Iterator[T]`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
+Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it, and none of it is built. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
 
 ## Reserved words
 
-Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for break continue return defer undo try catch yield fail assert show unreachable undefined embed here fallthrough as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join join_all sync chan send recv select atomic true false none tests fixtures provides`.
+Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for break continue return defer undo try catch yield fail assert show unreachable undefined embed here fallthrough as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join join_all sync chan send recv select atomic true false none tests fixtures provides constraint type`.
 
-Contextual words: `packed align by in final own transient operator mutable trace inject compatible simd`, `fatal` and `none` after `catch`, and `may fail` after a signature. Round four adds `snapshot keep concurrent synchronized unchecked allow` and `guarded by`. `alloc` and `free` name a function of a class after `fn` and a member after `.`.
+Contextual words: `packed align by in final own transient operator mutable trace inject compatible simd`, `fatal` and `none` after `catch`, and `may fail` after a signature. Round four adds `snapshot keep concurrent synchronized unchecked allow` and `guarded by`, and round five adds `lent`. `alloc` and `free` name a function of a class after `fn` and a member after `.`.
 
 String prefixes: `r b br f rf x re`.
 
 Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
 
-Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. `synchronized` and `guarded by` are built as well. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today, and the prefix `re`.
+Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. `synchronized` and `guarded by` are built as well. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today. Not built of round five: `constraint`, `type` and `lent`, which the lexer reads as names today.

@@ -270,7 +270,7 @@ Four levels, and each applies where it makes sense:
 | `~a` | `not` | unary |
 
 - `a op b` rewrites to `a.f(b)` when the left operand's type declares `operator fn f`. Only the left operand's type is looked up. Compound assignments derive from the binary form.
-- The language hooks extend the table beyond the operators: `iter` on a collection and `next` and `value` on its iterator for `for x in e`, and `index` and `set_index` for `e[i]` and `e[i] = v`. "Language hooks" and "Iteration" in `docs/anti-language-additions.md` give them. `operator fn` with a name outside the table is an error listing the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is the same call as `a + b`.
+- The language hooks extend the table beyond the operators: `iter` on a collection and `next` and `value` on its iterator for `for x in e`, `index` and `set_index` for `e[i]` and `e[i] = v`, and `hash` for a key of a hashing collection. "Language hooks", "Iteration" and "Hashing and order" in `docs/anti-language-additions.md` give them. `operator fn` with a name outside the table is an error listing the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is the same call as `a + b`.
 - For a struct the operator is a free function in the module that declares the type: `operator fn add(a: Vector2, b: Vector2) -> Vector2`.
 - Not overloadable: `=`, `&&`, `||`, `.`, `()`, `as`.
 - Without an `operator fn eq`, `==` on a class value or a struct value is undefined, as before. `==` on class pointers is identity, see [Pointers and conversions](#pointers-and-conversions).
@@ -351,12 +351,12 @@ Four levels, and each applies where it makes sense:
 ## Keywords
 
 - Keywords: `class`, `self`, `super`, `abstract`, `concrete`, `enum`, `use`, `inherits`, `implements`, `is`, `dup`, `delete`, `destroy`, `static`, `singleton`, `internal`, `protected`, `catch`, `try`, `yield`. `atomic`, `dispatch`, `join` and `yield` were reserved already.
-- Contextual words: `final`, `own`, `transient`, `operator`, `mutable`. They join `packed`, `align`, `by`, `in` after a `for` binding and `fatal` and `none` after `catch`. The contextual words of round four are listed under "Keywords" in `docs/anti-language-additions.md`.
+- Contextual words: `final`, `own`, `transient`, `operator`, `mutable`. They join `packed`, `align`, `by`, `in` after a `for` binding and `fatal` and `none` after `catch`. The keywords and contextual words of rounds four and five are listed under "Keywords" in `docs/anti-language-additions.md`.
 - Tokens: `::` in a `concrete fn` qualifier, `as?`, `=>` in `switch`.
 
 ## Not in the language
 
-Multiple concrete bases and virtual bases. An `interface` keyword. `virtual` and `override`. Overloading by signature. Generics, which are on the roadmap after the book as a compile-time feature. Closures are specified under "Anonymous functions and closures" in `docs/anti-language-additions.md`. Retroactive conformance, a type gaining an interface from outside its declaration. Value polymorphism. Exceptions. Properties and annotations. Anonymous classes. Covariant return types beyond `dup`.
+Multiple concrete bases and virtual bases. An `interface` keyword. `virtual` and `override`. Overloading by signature. Generics are specified under "Generics" in `docs/anti-language-additions.md`, compiled as one copy per use. Closures are specified under "Anonymous functions and closures" in `docs/anti-language-additions.md`. Retroactive conformance, a type gaining an interface from outside its declaration. Value polymorphism. Exceptions. Properties and annotations. Anonymous classes. Covariant return types beyond `dup`.
 
 ## Example
 

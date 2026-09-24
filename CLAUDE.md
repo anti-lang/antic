@@ -245,7 +245,8 @@ release. After it, the wrapping and saturating operators with `Flags`, then
 sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
 four are built. Then generics and closures. Closures are built, `snapshot fn`
-included.
+included. Round five, generics and collections, stands in the same document,
+and none of it is built.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`

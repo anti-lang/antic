@@ -53,6 +53,10 @@ compiler change is one flag. `antic` already takes N inputs and emits one file.
 `anti test` runs the suite in both modes when `--all-modes` is given. Bugs that hide in
 inlining show up as a difference between the two.
 
+`--memory-checks` on `anti build`, `anti run` and `anti test` passes the option of the
+same name to `antic`, in either mode. It is off by default. "Memory checks" in
+`docs/anti-language-additions.md` gives what it finds.
+
 ## Check command
 
 `anti check` runs everything that writes no artifact. It exits non-zero on the first
@@ -151,6 +155,8 @@ Other rules:
 - Doc comments are re-wrapped at 80 columns. The line or block form the author chose is
   kept. A ` * ` gutter inside a block comment is removed.
 - Ordinary `//` comments keep their position.
+- The names of a direct import, `import anti.collection.map.{HashMap, Map};`, stand
+  sorted. "Direct imports" in `docs/anti-language-additions.md` gives the form.
 
 The rules move the line breaks they name and leave the others where the author wrote
 them, so no expression is re-flowed. A body whose closing brace stands on the line of
