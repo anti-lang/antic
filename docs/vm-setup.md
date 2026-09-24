@@ -24,7 +24,7 @@ cmake -DDEST=$HOME/.local/share/anti-vm/clang -P /tmp/antic/tools/get-clang.cmak
 cmake -DDEST=$HOME/.local/share/anti-vm/toolchain -P /tmp/antic/tools/get-llvm.cmake
 cmake -DDEST=$HOME/.local/share/anti-vm/sysroot -DLLVM_BIN=$HOME/.local/share/anti-vm/toolchain/bin \
   -DCLANG_DIR=$HOME/.local/share/anti-vm/clang -DACCEPT_LICENSE=yes \
-  -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
+  -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
   -P /tmp/antic/tools/get-sysroot.cmake
 cmake -DDEST=$HOME/.local/share/anti-vm/raylib -P /tmp/antic/tools/get-raylib.cmake
 ```
@@ -79,11 +79,15 @@ stubs, and `link_identity_macos-arm64` finds the bytes that the Mac links. At `6
 2026-09-22 it passes 536 of 536 with three skipped, and ASan and UBSan 535 of 535 each.
 At `b44e7dc` it passes 539 of 539, and ASan and UBSan 538 of 538 each.
 At `b0a8071` it passes 541 of 541 with three skipped. Its sanitizer suites did not run.
+At `45d8fcb` on 2026-09-24 it passes 710 of 724 with three skipped. The 14 that fail
+fail the same way at `db447ea`, before the glibc mode: the outline atomics of the host
+runtime, `deps_dir`, `anti_build`, five `anti_bind_*` and three `clib_*`.
 
 | Untested item | Tests that run it |
 |---|---|
 | linux-arm64 programs, which the Mac only links | `program_*`, `std_*`, `dev_modules` |
 | Static PIE programs against musl | `program_*`, linked with ld.lld against `~/.local/share/anti-vm/sysroot/linux-arm64` |
+| Dynamic PIE programs against glibc 2.35, with libX11 and libGL | `linux_modes`, `plugin_host`, `plugin_versions` |
 | C objects built against glibc in a musl program | `program_abi_structs`, `program_abi_raymath`, `program_abi_wchar`, whose C files gcc compiles |
 | The 16-aligned register rule of AAPCS64 outside Apple | `program_abi_structs` |
 | `.init_array` constructors of a shared library | `clib_shared`, `clib_loader`, `clib_two` |
@@ -126,7 +130,7 @@ cmake -DDEST=$env:LOCALAPPDATA\anti-vm\toolchain -P $env:USERPROFILE\antic-check
 One command installs the sysroots of all six targets. The Windows ones come from the Build Tools of the VM, and the macOS ones from Zig. A program that names a framework takes Apple's SDK as on the Linux VM.
 
 ```powershell
-cmake -DDEST=$env:LOCALAPPDATA\anti-vm\sysroot -DLLVM_BIN=$env:LOCALAPPDATA\anti-vm\toolchain\bin -DCLANG_DIR=$env:LOCALAPPDATA\anti-vm\clang -DTARGETS="linux-x86_64;linux-arm64;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" -P $env:USERPROFILE\antic-check\tools\get-sysroot.cmake
+cmake -DDEST=$env:LOCALAPPDATA\anti-vm\sysroot -DLLVM_BIN=$env:LOCALAPPDATA\anti-vm\toolchain\bin -DCLANG_DIR=$env:LOCALAPPDATA\anti-vm\clang -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" -P $env:USERPROFILE\antic-check\tools\get-sysroot.cmake
 ```
 
 Create `%USERPROFILE%\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment, including the variable `LIB` that lld-link reads, and puts the Ninja of Visual Studio on the path. The pinned clang needs Ninja, because the Visual Studio generator takes the compiler of its own toolset.
@@ -144,6 +148,11 @@ six targets. It passes 351 of 351, among them every cross link and `link_identit
 At `b44e7dc` on 2026-09-22 it passes 523 of 523 with eight skipped, the ten `clib_*`
 tests among them. At `b0a8071` it passes 524 of 524 with eight skipped, `clib_bundle`
 with the runtime joined into the library object among them.
+At `45d8fcb` on 2026-09-24 `test_toml.c` and `test_zip.c` do not compile, so `unit` does
+not run. Of the other 700 tests 689 pass, `plugin_host`, `plugin_versions` and
+`linux_modes` among them. The 11 that fail are `program_sync_exits_dev`,
+`program_deserialize_dev`, `deps_dir`, `anti_build`, `anti_build_deps`,
+`anti_build_inputs`, four `anti_bind_*` and `clib_simd`.
 Extract a tree from the Mac with `tar -xmf`. Ninja otherwise keeps objects that are newer
 than the files the tar restores.
 
@@ -178,6 +187,7 @@ ssh anti-windows %USERPROFILE%\test.cmd
 | `tools/install.ps1` | The installer has never run. The VM is the first machine that can parse it. |
 | The published package of this host | `anti-<version>-windows-<cpu>.tar.xz`, once the suite passes here. |
 | Pointer equality of DLL functions | Waits for the DLL-based libraries of chapter 23. |
+| A plugin bound through the import library of its host | `plugin_host`, `plugin_versions` |
 
 ## Installing a package on a VM
 
