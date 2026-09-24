@@ -1,5 +1,6 @@
 /* The reader of an API description in the format of raylib's rlparser,
    raylib_api.json. */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -404,8 +405,9 @@ static bool color(struct api *a, const char *name, const char *value,
         if (*p == '}') {
             break;
         }
+        errno = 0;
         n = strtoll(p, &end, 10);
-        if (end == p || field >= r->field_count) {
+        if (end == p || errno == ERANGE || field >= r->field_count) {
             text_free(&literal);
             return false;
         }

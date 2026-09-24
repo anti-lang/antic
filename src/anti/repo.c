@@ -9,6 +9,7 @@
    user's profile is written. */
 #include "repo.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -238,9 +239,13 @@ static bool checked_recently(const char *stamp)
     bool fresh = false;
 
     if (files_read(stamp, &bytes) && bytes.length > 0) {
-        long long then = strtoll(text_cstr(&bytes), NULL, 10);
+        long long then;
         long long now = (long long)time(NULL);
-        fresh = now >= then && now - then < REPO_INDEX_SECONDS;
+        errno = 0;
+        then = strtoll(text_cstr(&bytes), NULL, 10);
+        /* A stamp out of range is no stamp, and the index is checked. */
+        fresh = errno != ERANGE && now >= then &&
+                now - then < REPO_INDEX_SECONDS;
     }
     text_free(&bytes);
     return fresh;

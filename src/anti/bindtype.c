@@ -1,6 +1,7 @@
 /* The pieces of anti bind that both readers share. They are the lists and
    texts of a binding, the fixed mappings of the C types and the parser of
    a C type spelling. */
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -525,7 +526,12 @@ static const struct bind_type *suffixes(struct parser *p,
             }
             memcpy(digits, p->word, p->word_length);
             digits[p->word_length] = '\0';
+            errno = 0;
             t->length = strtoll(digits, NULL, 0);
+            /* A length past INT64_MAX is refused, not saturated. */
+            if (errno == ERANGE) {
+                return NULL;
+            }
             next(p);
         }
         if (p->kind != T_RBRACKET) {

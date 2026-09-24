@@ -512,13 +512,23 @@ static bool find_constant(const struct json_value *node, int64_t *out)
 
     if (kind != NULL && strcmp(kind, "ConstantExpr") == 0 && value != NULL) {
         char *end;
+        errno = 0;
         *out = strtoll(value, &end, 10);
-        if (*end != '\0') {
+        if (*end != '\0' || end == value) {
             return false;
         }
-        /* A value above INT64_MAX is an unsigned 64-bit one. */
-        if (value[0] != '-' && *out == INT64_MAX) {
-            *out = (int64_t)strtoull(value, NULL, 10);
+        /* A value above INT64_MAX is an unsigned 64-bit one, whose bits
+           stand in the int64_t. */
+        if (errno == ERANGE && value[0] != '-') {
+            unsigned long long u;
+            errno = 0;
+            u = strtoull(value, NULL, 10);
+            if (errno == ERANGE) {
+                return false;
+            }
+            *out = bind_signed(u);
+        } else if (errno == ERANGE) {
+            return false;
         }
         return true;
     }

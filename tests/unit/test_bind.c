@@ -1,5 +1,6 @@
 /* The parser of C type spellings and the evaluator of constant
    expressions of anti bind. */
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -143,6 +144,21 @@ static void expressions(void)
     CHECK(!value_of(&b, "(1 + 2", &v));
     CHECK(!value_of(&b, "", &v));
     CHECK(!value_of(&b, "\"open", &v));
+    /* A literal that no 64-bit integer or double holds is refused, not
+       taken at the saturated value. */
+    CHECK(!value_of(&b, "18446744073709551616", &v));
+    CHECK(!value_of(&b, "0x10000000000000000", &v));
+    CHECK(!value_of(&b, "1e999", &v));
+    CHECK(value_of(&b, "18446744073709551615u", &v) && v.i == -1 &&
+          strcmp(v.type, "c_ulonglong") == 0);
+    CHECK(value_of(&b, "1e-999", &v) && v.f == 0.0);
+    /* A negative value shifts right as C's arithmetic shift does. */
+    CHECK(value_of(&b, "-8 >> 1", &v) && v.i == -4);
+    CHECK(value_of(&b, "-1 >> 63", &v) && v.i == -1);
+    CHECK(value_of(&b, "(-9223372036854775807ll - 1) >> 62", &v) &&
+          v.i == -2);
+    CHECK(value_of(&b, "(int)0x80000000u", &v) && v.i == INT32_MIN);
+    CHECK(value_of(&b, "(char)200", &v) && v.i == -56);
     arena_free(&b.arena);
 }
 
@@ -218,6 +234,9 @@ static void deep_input(void)
         free(deep);
         free(shallow);
     }
+    /* An array length past what an int64_t holds is refused. */
+    CHECK(parse(&b, "int[99999999999999999999]") == NULL);
+    CHECK(parse(&b, "int[16]") != NULL);
     free(b.records.items);
     arena_free(&b.arena);
 }

@@ -21,6 +21,11 @@ struct bind_eval {
     const char *enum_value;
 };
 
+/* The two's complement value of the 64 bits of x. C11 leaves the
+   conversion of an unsigned value above INT64_MAX to the implementation,
+   so the value is computed rather than converted. */
+int64_t bind_signed(uint64_t x);
+
 /* The value of a name inside an expression, a macro or an enumerator
    evaluated before. Returns false for a name it does not know. */
 typedef bool (*bind_lookup)(void *context, const char *name,

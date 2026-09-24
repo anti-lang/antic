@@ -223,22 +223,34 @@ elseif(CASE STREQUAL "api_malformed")
         {\"name\": \"Self\", \"fields\": [
             {\"name\": \"s\", \"type\": \"Self\"}]},
         {\"name\": \"Deep\", \"fields\": [
-            {\"name\": \"d\", \"type\": \"int ${stars}\"}]}],
+            {\"name\": \"d\", \"type\": \"int ${stars}\"}]},
+        {\"name\": \"Pair\", \"fields\": [
+            {\"name\": \"a\", \"type\": \"int\"},
+            {\"name\": \"b\", \"type\": \"int\"}]}],
         \"aliases\": [{\"name\": \"Loop\", \"type\": \"Loop\"}],
         \"defines\": [
             {\"name\": \"MINUS\", \"type\": \"INT\", \"value\": \"${minus}1\"},
             {\"name\": \"OPEN\", \"type\": \"INT\", \"value\": \"${open}1\"},
-            {\"name\": \"NEG\", \"type\": \"UNKNOWN\", \"value\": \"-NOTHING\"}],
+            {\"name\": \"NEG\", \"type\": \"UNKNOWN\", \"value\": \"-NOTHING\"},
+            {\"name\": \"HUGE\", \"type\": \"COLOR\",
+             \"value\": \"CLITERAL(Pair){ 99999999999999999999, 1 }\"},
+            {\"name\": \"SMALL\", \"type\": \"COLOR\",
+             \"value\": \"CLITERAL(Pair){ 2, 1 }\"}],
         \"enums\": 5, \"callbacks\": {\"x\": 1}}")
     run("${ANTI}" bind "${api}" --probe -o "${WORK}/out")
     string(REGEX REPLACE "[ \n]+" " " said "${run_err}")
     foreach(warning "the define `MINUS` is skipped" "the define `OPEN` is skipped"
-            "the define `NEG` is skipped" "`g` is left out")
+            "the define `NEG` is skipped" "the define `HUGE` is skipped"
+            "`g` is left out")
         string(FIND "${said}" "${warning}" at)
         if(at EQUAL -1)
             message(FATAL_ERROR "no warning `${warning}`:\n${run_err}")
         endif()
     endforeach()
+    string(FIND "${said}" "the define `SMALL` is skipped" at)
+    if(NOT at EQUAL -1)
+        message(FATAL_ERROR "the define `SMALL` was skipped:\n${run_err}")
+    endif()
 elseif(CASE STREQUAL "clang_malformed")
     # Valid C that a reader of the AST mishandled, and macros nested deep
     # or chained long. Each binds with warnings.

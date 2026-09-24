@@ -1,6 +1,8 @@
 /* The evaluator of the constant expressions of a binding. It gives the
    value of an object-like macro of a header and of a define of
    raylib_api.json. */
+#include <errno.h>
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,6 +90,23 @@ static void leave(void)
     nesting--;
 }
 
+int64_t bind_signed(uint64_t x)
+{
+    if (x <= (uint64_t)INT64_MAX) {
+        return (int64_t)x;
+    }
+    return -(int64_t)(UINT64_MAX - x) - 1;
+}
+
+/* The low bits of x as a signed number of that width. */
+static int64_t sign_extended(uint64_t x, unsigned bits)
+{
+    uint64_t sign = UINT64_C(1) << (bits - 1);
+    uint64_t low = x & ((sign << 1) - 1);
+
+    return bind_signed((low ^ sign) - sign);
+}
+
 /* An integer wraps at the width of its type, as C computes it. c_long
    and the wider types keep 64 bits. */
 static void narrow(struct bind_eval *v)
@@ -98,15 +117,15 @@ static void narrow(struct bind_eval *v)
         return;
     }
     if (strcmp(v->type, "c_int") == 0) {
-        v->i = (int64_t)(int32_t)(uint32_t)x;
+        v->i = sign_extended(x, 32);
     } else if (strcmp(v->type, "c_uint") == 0) {
         v->i = (int64_t)(uint32_t)x;
     } else if (strcmp(v->type, "c_short") == 0) {
-        v->i = (int64_t)(int16_t)(uint16_t)x;
+        v->i = sign_extended(x, 16);
     } else if (strcmp(v->type, "c_ushort") == 0) {
         v->i = (int64_t)(uint16_t)x;
     } else if (strcmp(v->type, "c_char") == 0) {
-        v->i = (int64_t)(int8_t)(uint8_t)x;
+        v->i = sign_extended(x, 8);
     } else if (strcmp(v->type, "c_uchar") == 0) {
         v->i = (int64_t)(uint8_t)x;
     }
@@ -129,10 +148,22 @@ static struct bind_eval number(struct eval *e)
     if (!hex && (start[n] == '.' || start[n] == 'e' || start[n] == 'E')) {
         v.kind = BIND_EVAL_FLOAT;
         v.type = "c_double";
+        errno = 0;
         v.f = strtod(start, &end);
         e->pos += (size_t)(end - start);
+        /* A literal past the largest double is refused. One below the
+           smallest reads as zero, or nearly so, as C reads it. */
+        if (errno == ERANGE && v.f > DBL_MAX) {
+            fail(e);
+            v.f = 0.0;
+        }
         if (e->s[e->pos] == 'f' || e->s[e->pos] == 'F') {
             v.type = "c_float";
+            /* A double past the largest float has no float value in C. */
+            if (v.f > FLT_MAX) {
+                fail(e);
+                v.f = 0.0;
+            }
             v.f = (double)(float)v.f;
             e->pos++;
         } else if (e->s[e->pos] == 'l' || e->s[e->pos] == 'L') {
@@ -142,10 +173,18 @@ static struct bind_eval number(struct eval *e)
         return v;
     }
     {
-        unsigned long long u = strtoull(start, &end, 0);
+        unsigned long long u;
         int longs = 0;
         bool is_unsigned = false;
+        errno = 0;
+        u = strtoull(start, &end, 0);
         e->pos += (size_t)(end - start);
+        /* A literal past 2^64 - 1 is refused, not taken as the largest
+           value strtoull saturates to. */
+        if (errno == ERANGE) {
+            fail(e);
+            u = 0;
+        }
         for (;;) {
             char c = e->s[e->pos];
             if (c == 'u' || c == 'U') {
@@ -158,7 +197,7 @@ static struct bind_eval number(struct eval *e)
             e->pos++;
         }
         v.kind = BIND_EVAL_INT;
-        v.i = (int64_t)u;
+        v.i = bind_signed(u);
         if (u > (unsigned long long)INT64_MAX) {
             is_unsigned = true;
         }
@@ -377,7 +416,7 @@ static struct bind_eval unary(struct eval *e)
         if (v.kind == BIND_EVAL_FLOAT) {
             v.f = -v.f;
         } else if (v.kind == BIND_EVAL_INT) {
-            v.i = (int64_t)(0 - (uint64_t)v.i);
+            v.i = bind_signed(0 - (uint64_t)v.i);
             narrow(&v);
         } else {
             fail(e);
@@ -492,14 +531,17 @@ static struct bind_eval apply(struct eval *e, struct bind_eval a,
                 fail(e);
                 return a;
             }
-            x = is_unsigned ? x >> y : (uint64_t)(a.i >> y);
+            /* A negative value shifts as the complement of the
+               complement, which C11 defines, where >> of a negative
+               int64_t is the implementation's. */
+            x = is_unsigned || a.i >= 0 ? x >> y : ~(~x >> y);
             break;
         case '&': x &= y; break;
         case '|': x |= y; break;
         case '^': x ^= y; break;
         default: fail(e); break;
         }
-        a.i = (int64_t)x;
+        a.i = bind_signed(x);
         narrow(&a);
         return a;
     }
