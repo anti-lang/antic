@@ -82,7 +82,7 @@ static bool c_representable(const struct type *t, bool field,
             nested_in(t, cls)) {
             return true;
         }
-        if (types_is_mutex(t) || types_is_chan(t)) {
+        if (types_is_mutex(t) || types_is_chan(t) || types_is_regex(t)) {
             return false;
         }
         /* The hidden lock of a synchronized class, which the header
@@ -524,7 +524,8 @@ static bool doc_name_known(const struct doc_scope *s, const char *name,
        functions of the object model and the entry function of a program
        follow them. A doc comment names each as a language word. */
     static const char *const declared[] = {
-        LANG_OBJECT, LANG_JOB, LANG_FLAGS, LANG_MUTEX, LANG_FIELD_DESCRIPTOR,
+        LANG_OBJECT, LANG_JOB, LANG_FLAGS, LANG_MUTEX, LANG_REGEX,
+        LANG_FIELD_DESCRIPTOR,
         "construct", "deserialize", "main"
     };
     const struct type *object;

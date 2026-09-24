@@ -112,8 +112,12 @@ set(ANTIC_HOST_TARGET "${ANTIC_HOST_OS}-${ANTIC_HOST_CPU}")
 # The compiler's code is a library so that the unit tests link the same
 # objects as the antic executable.
 include(tools/sources.cmake)
+# PCRE2, which antic links to check every pattern literal.
+include(src/native/pcre2-source.cmake)
 add_library(antic_core STATIC ${ANTIC_CORE_SOURCES})
 target_include_directories(antic_core PUBLIC ${ANTIC_CORE_INCLUDE_DIRS})
+target_include_directories(antic_core PRIVATE "${ANTIC_PCRE2_INCLUDE}")
+target_link_libraries(antic_core PUBLIC antic_pcre2)
 
 add_executable(antic ${ANTIC_MAIN_SOURCES})
 target_link_libraries(antic PRIVATE antic_core)
@@ -196,9 +200,9 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
-    errno f16 fs hooks init io json license loaded lock mem object platform_posix
-    platform_windows plugin reflect registry signal snapshot start symbols sync
-    text threads toml trace utf)
+    errno f16 fs hooks init io json license loaded lock mem object patterns
+    platform_posix platform_windows plugin reflect regex registry signal snapshot start
+    symbols sync text threads toml trace utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "src/rt/${source}.c")
@@ -220,6 +224,8 @@ if(NOT ANTIC_HOST_OS STREQUAL "macos")
             ARCHIVE_OUTPUT_DIRECTORY "${out}")
         target_compile_definitions(anti_rt_${level} PRIVATE
             ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}})
+        target_include_directories(anti_rt_${level} PRIVATE
+            "${ANTIC_PCRE2_INCLUDE}")
         # DESIGN: sanitizers check antic. Anti programs link the runtime without a
         # sanitizer runtime, so the runtime carries no sanitizer instrumentation,
         # whatever CMAKE_C_FLAGS holds in a sanitizer configuration.
@@ -320,8 +326,10 @@ function(anti_cross_runtime_at target triple level root)
                 -Wall -Wextra -Wpedantic -Werror
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+                -I "${ANTIC_PCRE2_INCLUDE}"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
+                "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/rt.h" "${PROJECT_SOURCE_DIR}/src/rt/std.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/object.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/atomic.h"
@@ -331,6 +339,7 @@ function(anti_cross_runtime_at target triple level root)
                 "${PROJECT_SOURCE_DIR}/src/rt/platform.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/plugin.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/reflect.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/regex.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/registry.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/digest.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/signal.h"
@@ -425,7 +434,7 @@ endif()
 
 # The standard library in src/std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
-set(ANTIC_STD_MODULES lang runtime mem debug io text license error time os fs reflect random collection toml config args json log simd trace plugin)
+set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection toml config args json log simd trace plugin)
 set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/std/anti")
 set(std_files "")
 foreach(module IN LISTS ANTIC_STD_MODULES)

@@ -255,6 +255,11 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
                      e->spelling.bytes);
         end(d, start, type);
         break;
+    case EXPR_PATTERN:
+        text_appendf(d->out, "pattern_lit %.*s", (int)e->spelling.length,
+                     e->spelling.bytes);
+        end(d, start, type);
+        break;
     case EXPR_BOOL:
         text_append(d->out, e->as.boolean ? "true" : "false");
         end(d, start, type);

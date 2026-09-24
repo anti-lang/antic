@@ -1455,8 +1455,9 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
         if (!f->is_extern &&
-            (f->exported || (strcmp(f->module, entry) == 0 &&
-                             (!has_main || strcmp(f->name, "main") == 0)))) {
+            (f->exported || ir_is_patterns_start(f) ||
+             (strcmp(f->module, entry) == 0 &&
+              (!has_main || strcmp(f->name, "main") == 0)))) {
             mark_function(m, (uint32_t)i, live, live_globals);
         }
     }

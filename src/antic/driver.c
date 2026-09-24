@@ -60,6 +60,8 @@ struct extras {
     /* The names a Windows program that can host a plugin defines, as
        emit_names writes them, which its .def file exports. */
     struct text host_names;
+    /* The program holds `anti.regex`, so the link adds PCRE2. */
+    bool regex;
 };
 
 static void extras_free(struct extras *e)
@@ -648,9 +650,52 @@ static bool host_exports(const struct options *o, const char *object,
     return ok;
 }
 
+/* DESIGN: a program that holds `anti.regex` links PCRE2 from lib/<target>/
+   of the runtime archive after its own objects. The library is built for
+   the default level of the target alone. A program below that level is
+   refused with the level of each, in the words of "CPU levels" in
+   docs/anti-language-additions.md. out holds the objects of the command
+   line and the library. */
+static bool native_inputs(const struct options *o, const struct extras *extras,
+                          struct text *pcre2, const char ***out,
+                          size_t *count)
+{
+    enum cpu_level level = cpu_default(o->target);
+    const char **list;
+
+    *out = o->objects;
+    *count = o->object_count;
+    if (!extras->regex) {
+        return true;
+    }
+    if (cpu_arch(o->cpu) == cpu_arch(level) && o->cpu < level) {
+        fprintf(stderr, "antic: " REGEX_MODULE " is built for %s%s, this "
+                "program targets %s\n",
+                target_info(o->target)->arch == ARCH_X86_64 ? "x86-64-" : "",
+                cpu_name(level), cpu_name(o->cpu));
+        return false;
+    }
+    link_native_library(pcre2, o->runtime, o->target, NATIVE_PCRE2);
+    list = malloc((o->object_count + 1) * sizeof *list);
+    if (list == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        return false;
+    }
+    if (o->object_count > 0) {
+        memcpy(list, o->objects, o->object_count * sizeof *list);
+    }
+    list[o->object_count] = text_cstr(pcre2);
+    *out = list;
+    *count = o->object_count + 1;
+    return true;
+}
+
 static bool link_program(const struct options *o, const char *object,
                          const char *executable, const struct extras *extras)
 {
+    struct text pcre2 = {0};
+    const char **extra;
+    size_t extra_count;
     struct link_inputs in;
     struct link_command command;
     struct link_facts facts;
@@ -660,12 +705,15 @@ static bool link_program(const struct options *o, const char *object,
     enum target_os os = target_info(o->target)->os;
     bool ok = true;
 
+    if (!native_inputs(o, extras, &pcre2, &extra, &extra_count)) {
+        return false;
+    }
     memset(&in, 0, sizeof in);
     in.object = object;
     in.executable = executable;
     in.runtime = o->runtime;
-    in.extra = o->objects;
-    in.extra_count = o->object_count;
+    in.extra = extra;
+    in.extra_count = extra_count;
     in.frameworks = o->frameworks;
     in.framework_count = o->framework_count;
     in.linux_libraries = o->linux_libraries;
@@ -695,6 +743,10 @@ static bool link_program(const struct options *o, const char *object,
     link_facts_free(&facts);
     text_free(&def);
     text_free(&implib);
+    if (extra != o->objects) {
+        free((void *)extra);
+    }
+    text_free(&pcre2);
     return ok;
 }
 
@@ -943,6 +995,20 @@ static int dump_ir(const char *input, const char *file, struct module *tree,
     return 2;
 }
 
+/* Whether a function of module name stands in the program. */
+static bool holds_module(const struct ir_module *program, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < program->function_count; i++) {
+        const char *module = program->functions[i]->module;
+        if (module != NULL && strcmp(module, name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* Whether the program has a function main in the main module. */
 static bool has_main(const struct ir_module *program, const char *module)
 {
@@ -1085,6 +1151,7 @@ static int back_end(const struct options *o, struct module *tree,
        carry them. */
     extras->hosts_plugins = !o->closed && o->lib == LIB_NONE && !o->library &&
                             whole_hosts_plugins(program);
+    extras->regex = holds_module(program, REGEX_MODULE);
     for (i = 0; is_plugin(o) && i < program->class_count; i++) {
         const struct ir_class *c = program->classes[i];
         size_t j;

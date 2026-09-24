@@ -341,7 +341,7 @@ static void reach_program(struct reach *r, const struct ir_module *m,
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
         if (!f->is_extern &&
-            (entry == NULL || f->exported ||
+            (entry == NULL || f->exported || ir_is_patterns_start(f) ||
              (f->module != NULL && strcmp(f->module, entry) == 0 &&
               (!has_main || strcmp(f->name, "main") == 0)))) {
             reach_function(r, (uint32_t)i);

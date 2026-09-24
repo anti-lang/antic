@@ -1,0 +1,60 @@
+//! The failures of a pattern, and the compile of a pattern at run time.
+//!
+//! A pattern literal, `re"..."`, is checked by the compiler and compiled
+//! before `main`, and a module that writes one imports this module.
+//! `Regex.compile(text)` compiles a pattern at run time through `compile`.
+//! `Regex` is declared by the compiler in `anti.lang`. The engine is PCRE2.
+//!
+//! Every error of a pattern is an `Error` of this module: `BadPattern` for a
+//! pattern that does not compile, `TooExpensive` for a match that reaches the
+//! match limit and `MissingGroup` for a template that names a group the
+//! pattern lacks.
+
+import anti.lang;
+
+extern fn anti_rt_regex_compile(bytes: ?*byte, length: int, code: ?*i32,
+	offset: ?*int) -> ?*byte;
+extern fn anti_rt_regex_message(code: i32) -> str;
+
+/// The failure of a pattern, the base of every error of this module.
+pub class Error inherits lang.Error
+{
+}
+
+/// A pattern that does not compile.
+///
+/// The message is PCRE2's, and the code is PCRE2's number of the error.
+pub class BadPattern inherits Error
+{
+	/// The byte of the pattern where PCRE2 stopped.
+	pub position: int = 0,
+}
+
+/// A match that reached the match limit of its pattern.
+pub class TooExpensive inherits Error
+{
+}
+
+/// A replacement template that names a group the pattern lacks.
+pub class MissingGroup inherits Error
+{
+}
+
+/// Compile the pattern `text`. `Regex.compile(text)` calls it.
+///
+/// The pattern is text, so `\d`, `\w` and `\s` mean their ASCII sets unless it
+/// starts with `(*UCP)`. It fails with `BadPattern` when the pattern does not
+/// compile.
+pub fn compile(text: str) -> Regex may fail
+{
+	let code: i32 = 0;
+	let offset = 0;
+	let made = anti_rt_regex_compile(text.ptr, text.len, &code, &offset);
+	let handle = made else {
+		let e = alloc BadPattern { position: offset };
+		e.code = code as int;
+		e.message = anti_rt_regex_message(code);
+		fail e;
+	};
+	return Regex { handle: handle };
+}

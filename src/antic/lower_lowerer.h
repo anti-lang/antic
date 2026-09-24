@@ -86,6 +86,14 @@ struct try_scope {
     struct try_scope *outer;
 };
 
+/* One pattern literal of the module: the global of its bytes, their
+   count and the global that holds its compiled Regex. */
+struct lower_pattern {
+    uint32_t text;
+    int64_t length;
+    uint32_t slot;
+};
+
 struct lowerer {
     struct ir_module *m;
     const char *file;           /* the source path, for an assertion */
@@ -125,6 +133,11 @@ struct lowerer {
        the ones met and not lowered yet, and count numbers each, which
        names it `<enclosing>.<count>`. */
     struct item **anonymous;
+    /* The pattern literals of the module, which the function
+       IR_PATTERNS_START compiles before main. */
+    struct lower_pattern *regex_literals;
+    size_t regex_count;
+    size_t regex_capacity;
     size_t anonymous_count;
     size_t anonymous_capacity;
     size_t anonymous_named;
@@ -399,6 +412,7 @@ uint32_t lower_sym_of(struct lowerer *l, const struct symbolic *s);
 struct ir_operand lower_argument(struct lowerer *l,
                                  const struct expr *arg);
 struct ir_operand lower_call(struct lowerer *l, const struct expr *e);
+struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e);
 struct ir_function *lower_rt_function_giving(struct lowerer *l,
                                              const char *name,
                                              enum ir_type result,

@@ -416,6 +416,7 @@ static bool ends_value(const struct piece *p)
     case TOKEN_STRING:
     case TOKEN_BYTES:
     case TOKEN_FORMAT:
+    case TOKEN_PATTERN:
     case TOKEN_RPAREN:
     case TOKEN_RBRACKET:
     case TOKEN_RBRACE:

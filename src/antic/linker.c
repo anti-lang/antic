@@ -52,6 +52,16 @@ void link_target_dir(struct text *out, enum target t, bool glibc)
     text_appendf(out, "%s%s", target_name(t), glibc ? LINUX_GLIBC_SUFFIX : "");
 }
 
+void link_native_library(struct text *out, const char *runtime, enum target t,
+                         const char *name)
+{
+    text_appendf(out, "%s/%s/", runtime, RUNTIME_LIB_DIR);
+    link_target_dir(out, t, false);
+    text_appendf(out, target_info(t)->format == FORMAT_COFF ? "/%s.lib"
+                                                            : "/lib%s.a",
+                 name);
+}
+
 /* The runtime library of t at level cpu, of the glibc mode with glibc. */
 static void runtime_library(struct text *out, const char *runtime,
                             enum target t, enum cpu_level cpu, bool glibc)

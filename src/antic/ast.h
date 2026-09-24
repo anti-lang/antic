@@ -146,7 +146,8 @@ enum expr_kind {
     EXPR_SIMD,                      /* a built-in of a simd struct */
     EXPR_DESCRIPTOR,                /* the descriptor of a class, as `*byte` */
     EXPR_COLLECT,                   /* `it.to_slice()` of an iterator */
-    EXPR_FN                         /* `fn(params) { body }`, anonymous */
+    EXPR_FN,                        /* `fn(params) { body }`, anonymous */
+    EXPR_PATTERN                    /* `re"..."`, its bytes in text */
 };
 
 /* The format specification after the colon of an `{expr}`, as the

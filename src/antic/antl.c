@@ -15,7 +15,7 @@ _Static_assert(TYPE_VARIANT == 28, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
-_Static_assert(TOKEN_KIND_COUNT == 177, "raise ANTL_VERSION, then update this");
+_Static_assert(TOKEN_KIND_COUNT == 178, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_LOCK == 11, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_RET == 85, "raise ANTL_VERSION, then update this");
 _Static_assert(IR_FAIL_CHECK == 2, "raise ANTL_VERSION, then update this");
@@ -114,7 +114,8 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
 
     if ((t->kind == TYPE_CLASS && t->base == NULL) || types_is_job(t) ||
         types_is_flags(t) || types_is_mutex(t) || types_is_chan(t) ||
-        types_is_object_lock(t) || types_is_field_descriptor(t)) {
+        types_is_regex(t) || types_is_object_lock(t) ||
+        types_is_field_descriptor(t)) {
         return false;
     }
     return type_has_fields(t) && t->module.length == strlen(module) &&
@@ -1688,6 +1689,10 @@ static void read_types(struct reader *r)
             }
             if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_MUTEX)) {
                 t = types_mutex(r->types);
+                break;
+            }
+            if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_REGEX)) {
+                t = types_regex(r->types);
                 break;
             }
             if (kind == TYPE_STRUCT &&

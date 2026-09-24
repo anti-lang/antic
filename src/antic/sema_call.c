@@ -1529,6 +1529,48 @@ static struct type *check_mutex_new(struct checker *c, struct expr *e)
     return types_mutex(c->types);
 }
 
+/* DESIGN: `Regex.compile(text)` is the call `compile(text)` of
+   `anti.regex`, which the checker writes over the callee and checks as
+   any call, so the argument, the failure and its handler follow the rules
+   of a program's own call. The module it names cannot be written in a
+   program. It stands in a scope of its own, as the one of an `f"..."`
+   does. */
+static const struct name hidden_regex = {"<regex>", 7};
+
+static struct type *check_regex_compile(struct checker *c, struct expr *e,
+                                        struct type *expected)
+{
+    static const struct name module = {REGEX_MODULE,
+                                       sizeof REGEX_MODULE - 1};
+    struct expr *callee = e->as.call.callee;
+    const struct name *name = &callee->as.field.name;
+    const struct interface *lib;
+    struct symbol *home;
+    struct scope scope;
+    struct type *t;
+
+    if (!sema_name_is(name, REGEX_COMPILE)) {
+        sema_error_at(c, callee->pos, "`" LANG_REGEX "` has no function "
+                      "`%.*s`", (int)name->length, name->text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    lib = sema_find_library(c, &module);
+    if (lib == NULL) {
+        sema_error_at(c, e->pos, "`" LANG_REGEX "." REGEX_COMPILE "` calls `"
+                      REGEX_MODULE "." REGEX_COMPILE "`, so the module "
+                      "imports `" REGEX_MODULE "`");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    sema_enter_scope(c, &scope);
+    home = sema_declare(c, SYMBOL_MODULE, &hidden_regex, e->pos,
+                        "`%.*s` is already declared");
+    home->home = lib;
+    callee->as.field.base->as.name = hidden_regex;
+    t = sema_check_call(c, e, expected);
+    sema_leave_scope(c, &scope);
+    return t;
+}
+
 /* `m.destroy()` releases the mutex that m names, a Mutex in a place or
    a pointer to one. */
 static struct type *check_mutex_destroy(struct checker *c, struct expr *e,
@@ -2056,6 +2098,12 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
         sema_name_is(&callee->as.field.base->as.name, LANG_MUTEX) &&
         sema_lookup(c, &callee->as.field.base->as.name) == NULL) {
         return check_mutex_new(c, e);
+    }
+    if (callee->kind == EXPR_FIELD &&
+        callee->as.field.base->kind == EXPR_NAME &&
+        sema_name_is(&callee->as.field.base->as.name, LANG_REGEX) &&
+        sema_lookup(c, &callee->as.field.base->as.name) == NULL) {
+        return check_regex_compile(c, e, expected);
     }
     if (simd_module_call(c, e)) {
         return check_simd_module(c, e);

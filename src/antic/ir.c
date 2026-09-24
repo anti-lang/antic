@@ -405,6 +405,12 @@ static struct ir_function *new_function(struct ir_module *m,
     return f;
 }
 
+bool ir_is_patterns_start(const struct ir_function *f)
+{
+    return !f->is_extern && f->module != NULL &&
+           strcmp(f->name, IR_PATTERNS_START) == 0;
+}
+
 struct ir_function *ir_function_add(struct ir_module *m, const char *module,
                                     const char *name, enum ir_type result,
                                     uint32_t result_agg)

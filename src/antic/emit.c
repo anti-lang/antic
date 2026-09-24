@@ -359,6 +359,27 @@ static bool relocations_fit(const struct ir_global *g, char *error,
     return true;
 }
 
+/* The sections of the functions that run before main, one entry of an
+   address each. */
+static const char *const constructor_sections[] = {
+    [FORMAT_ELF] = ".init_array,\"aw\"",
+    [FORMAT_MACHO] = "__DATA,__mod_init_func,mod_init_funcs",
+    [FORMAT_COFF] = ".CRT$XCU,\"dr\"",
+};
+
+/* An entry that runs f before main, or when the library loads. */
+static void emit_start(struct text *out, enum target t,
+                       const struct ir_function *f)
+{
+    struct text symbol = {0};
+
+    mach_function_symbol(&symbol, t, f);
+    text_appendf(out, "    .section %s\n    .p2align 3\n    .quad %s\n",
+                 constructor_sections[target_info(t)->format],
+                 text_cstr(&symbol));
+    text_free(&symbol);
+}
+
 static bool emit(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
                  const char *module, bool one_module, bool exports,
@@ -394,6 +415,11 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
     debug_sections(&debug, out, functions);
     if (m->global_count > 0) {
         emit_data(out, t, m, one_module, exports);
+    }
+    for (i = 0; i < m->function_count; i++) {
+        if (functions[i] != NULL && ir_is_patterns_start(m->functions[i])) {
+            emit_start(out, t, m->functions[i]);
+        }
     }
     if (m->plugin && info->format == FORMAT_COFF) {
         emit_imports(out, t, m);
@@ -458,16 +484,12 @@ void emit_names(struct text *out, enum target t, const struct ir_module *m,
    __mod_init_func on Mach-O and .CRT$XCU on COFF. */
 void emit_constructor(struct text *out, enum target t, const char *function)
 {
-    static const char *const sections[] = {
-        [FORMAT_ELF] = ".init_array,\"aw\"",
-        [FORMAT_MACHO] = "__DATA,__mod_init_func,mod_init_funcs",
-        [FORMAT_COFF] = ".CRT$XCU,\"dr\"",
-    };
     struct text symbol = {0};
 
     c_symbol(&symbol, t, function);
     text_appendf(out, "    .section %s\n    .p2align 3\n    .quad %s\n",
-                 sections[target_info(t)->format], text_cstr(&symbol));
+                 constructor_sections[target_info(t)->format],
+                 text_cstr(&symbol));
     text_free(&symbol);
 }
 

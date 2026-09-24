@@ -234,6 +234,7 @@ struct types {
     struct type *object;            /* anti.lang.Object, the class root */
     struct type *flags;             /* anti.lang.Flags */
     struct type *mutex;             /* anti.lang.Mutex */
+    struct type *regex;             /* anti.lang.Regex */
     struct type *object_lock;       /* the hidden lock of a class */
     struct type *field_record;      /* anti.lang.FieldDescriptor */
 };
@@ -356,6 +357,22 @@ struct type *types_object(struct types *types);
    them. */
 #define LANG_OBJECT_LOCK "Object lock"
 #define HIDDEN_LOCK "(lock)"
+/* DESIGN: `Regex` is the built-in struct of a pattern of text, which the
+   compiler declares in `anti.lang` as it does `Mutex`. It holds one field,
+   the handle of the pattern that the runtime compiled, so a copy names the
+   same pattern, as a copy of a channel names the same channel. A compiled
+   pattern never changes, so any number of threads read one at once. A
+   type named `Regex` in the module wins over the built-in one. It carries
+   no descriptor, since no module declares it. `Regex.compile(text)` is a
+   call of `compile` of `anti.regex`, which the module then imports, and
+   so is a pattern literal, whose errors are classes of that module. */
+#define LANG_REGEX "Regex"
+#define REGEX_HANDLE "handle"
+#define REGEX_COMPILE "compile"
+#define REGEX_MODULE "anti.regex"
+/* The runtime function that compiles one pattern literal before main,
+   which IR_PATTERNS_START of each module calls. */
+#define REGEX_LITERAL "anti_rt_regex_literal"
 #define MUTEX_NEW "new"
 #define MUTEX_DESTROY "destroy"
 #define CHAN_CLOSE "close"
@@ -493,6 +510,10 @@ struct type *types_object_lock(struct types *types);
 bool types_is_object_lock(const struct type *t);
 /* Whether t is the struct that types_mutex made. */
 bool types_is_mutex(const struct type *t);
+/* The struct `anti.lang.Regex`, one for the compilation. */
+struct type *types_regex(struct types *types);
+/* Whether t is the struct that types_regex made. */
+bool types_is_regex(const struct type *t);
 /* `chan T`, one per element type. */
 struct type *types_chan(struct types *types, struct type *element);
 /* Whether t is a channel that types_chan made. */

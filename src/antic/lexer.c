@@ -950,7 +950,8 @@ enum string_form {
     FORM_RAW,
     FORM_INTERPOLATED,
     FORM_RAW_INTERPOLATED,
-    FORM_HEX
+    FORM_HEX,
+    FORM_PATTERN
 };
 
 /* The string prefixes, one meaning each, in the one table that
@@ -974,6 +975,7 @@ static const struct string_prefix {
     {"fr", FORM_RAW_INTERPOLATED, false,
      "`fr\"` is not a prefix, write `rf\"`"},
     {"x", FORM_HEX, true, NULL},
+    {"re", FORM_PATTERN, false, NULL},
 };
 
 /* The entry whose letters stand at the current position with any '#'
@@ -1088,7 +1090,8 @@ static void string(struct lexer *lx, const struct string_prefix *prefix,
         } else if (prefix->form == FORM_HEX) {
             hex_character(lx, &pending, &pending_line, &pending_column,
                           &bytes, &valid);
-        } else if (c == '\\' && prefix->form != FORM_RAW) {
+        } else if (c == '\\' && prefix->form != FORM_RAW &&
+                   prefix->form != FORM_PATTERN) {
             uint32_t value;
             bool raw_byte;
             if (escape(lx, mode, &value, &raw_byte)) {
@@ -1123,8 +1126,11 @@ static void string(struct lexer *lx, const struct string_prefix *prefix,
         valid = false;
     }
     if (valid) {
-        push(lx, prefix->bytes ? TOKEN_BYTES : TOKEN_STRING, start, line,
-             column)->value.text = keep(lx, &bytes);
+        push(lx,
+             prefix->form == FORM_PATTERN ? TOKEN_PATTERN
+             : prefix->bytes              ? TOKEN_BYTES
+                                          : TOKEN_STRING,
+             start, line, column)->value.text = keep(lx, &bytes);
     } else {
         push(lx, TOKEN_ERROR, start, line, column);
     }
@@ -1523,6 +1529,7 @@ const char *token_kind_name(enum token_kind kind)
     case TOKEN_STRING: return "string literal";
     case TOKEN_BYTES: return "byte string literal";
     case TOKEN_FORMAT: return "interpolated string literal";
+    case TOKEN_PATTERN: return "pattern literal";
     case TOKEN_RESERVED: return "reserved word";
     case TOKEN_DOC:
     case TOKEN_MODULE_DOC: return "doc comment";

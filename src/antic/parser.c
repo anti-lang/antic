@@ -789,6 +789,11 @@ static struct expr *primary(struct parser *p)
         return e;
     case TOKEN_FORMAT:
         return format_literal(p, t);
+    case TOKEN_PATTERN:
+        next(p);
+        e = new_expr(p, EXPR_PATTERN, t);
+        e->as.text = t->value.text;
+        return e;
     case TOKEN_CHAR:
         next(p);
         e = new_expr(p, EXPR_CHAR, t);

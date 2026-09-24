@@ -722,6 +722,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         if (sym == NULL && sema_name_is(&t->name, LANG_MUTEX)) {
             return types_mutex(c->types);
         }
+        if (sym == NULL && sema_name_is(&t->name, LANG_REGEX)) {
+            return types_regex(c->types);
+        }
         if (sym == NULL && sema_name_is(&t->name, LANG_FIELD_DESCRIPTOR)) {
             return types_field_descriptor(c->types);
         }

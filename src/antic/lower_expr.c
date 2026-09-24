@@ -926,6 +926,8 @@ struct ir_operand lower_address(struct lowerer *l,
                                    e->type);
     case EXPR_FORMAT:
         return lower_format(l, e);
+    case EXPR_PATTERN:
+        return lower_pattern(l, e);
     case EXPR_COLLECT:
         return lower_collect(l, e);
     case EXPR_FN:

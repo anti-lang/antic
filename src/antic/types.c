@@ -740,6 +740,43 @@ struct type *types_chan(struct types *types, struct type *element)
     return handle_struct(types, name_text, element);
 }
 
+/* DESIGN: the handle of a Regex is `*u8` to the checker, the address of
+   the pattern the runtime compiled, as the handle of a channel is. */
+struct type *types_regex(struct types *types)
+{
+    static const char module_text[] = LANG_MODULE;
+    static const char name_text[] = LANG_REGEX;
+    static const char field_text[] = REGEX_HANDLE;
+    struct struct_field field;
+    struct type *t;
+
+    if (types->regex != NULL) {
+        return types->regex;
+    }
+    t = arena_alloc(types->arena, sizeof *t);
+    t->kind = TYPE_STRUCT;
+    t->module.text = module_text;
+    t->module.length = sizeof module_text - 1;
+    t->name.text = name_text;
+    t->name.length = sizeof name_text - 1;
+    t->next = types->derived;
+    types->derived = t;
+    memset(&field, 0, sizeof field);
+    field.name.text = field_text;
+    field.name.length = sizeof field_text - 1;
+    field.type = types_pointer(types, types_builtin(types, TYPE_U8));
+    field.vis = VIS_PUB;
+    types_set_fields(types, t, &field, 1);
+    t->layout = LAYOUT_DONE;
+    types->regex = t;
+    return t;
+}
+
+bool types_is_regex(const struct type *t)
+{
+    return lang_item(t, TYPE_STRUCT, LANG_REGEX);
+}
+
 bool types_is_mutex(const struct type *t)
 {
     return lang_item(t, TYPE_STRUCT, LANG_MUTEX);
@@ -1323,8 +1360,9 @@ bool type_pointer_free(const struct type *t)
            threads. A worker takes a channel beside its values, and a
            copy names the same one. A Mutex cannot be copied, so a worker
            takes a pointer to one, and a class that holds one stays
-           pointer-free. */
-        if (types_is_mutex(t) || types_is_chan(t)) {
+           pointer-free. A Regex never changes after it is compiled, so a
+           worker takes one as it takes a `str`. */
+        if (types_is_mutex(t) || types_is_chan(t) || types_is_regex(t)) {
             return true;
         }
         /* DESIGN: the pointer-free test of `parallel` exempts the table

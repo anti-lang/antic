@@ -810,6 +810,9 @@ bool sema_eval_const(struct checker *c, struct expr *e,
     /* The text is built at run time, into memory of its own. */
     case EXPR_FORMAT:
         return fail_const(c, e, sema_format_name(e));
+    /* The pattern is compiled at start, into memory of the runtime. */
+    case EXPR_PATTERN:
+        return fail_const(c, e, "a pattern literal");
     /* The slice is collected at run time, into memory of its own. */
     case EXPR_COLLECT:
         return fail_const(c, e, "`to_slice`");

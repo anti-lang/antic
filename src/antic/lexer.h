@@ -83,6 +83,9 @@ enum token_kind {
        operator, so the checker makes a binary expression of the call with
        this kind. No source text lexes as it. */
     TOKEN_MUL_HIGH,
+    /* `re"..."`, a pattern literal, raw, its bytes in value.text. It
+       stands after every earlier kind, so no stored value moves. */
+    TOKEN_PATTERN,
 
     TOKEN_KIND_COUNT
 };

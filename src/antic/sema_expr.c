@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "arith.h"
+#include "pattern.h"
 #include "sema_checker.h"
 
 /* Places and literals */
@@ -1909,6 +1910,98 @@ static struct type *check_format(struct checker *c, struct expr *e)
     return ok ? sema_builtin(c, TYPE_STR) : sema_builtin(c, TYPE_ERROR);
 }
 
+/* Patterns */
+
+/* The position in the file of byte offset of the pattern of the literal
+   e. The pattern holds the bytes between the quotes, with a CR LF read
+   as one LF, and the column counts bytes, as the lexer does. */
+static struct pos pattern_position(const struct expr *e, size_t offset)
+{
+    const char *s = e->spelling.bytes;
+    size_t n = e->spelling.length;
+    struct pos p = e->pos;
+    size_t i = 2;
+    size_t k;
+
+    p.column += 2;
+    while (i < n && s[i] == '#') {
+        i++;
+        p.column++;
+    }
+    i++;
+    p.column++;
+    for (k = 0; k < offset && i < n; k++, i++) {
+        if (s[i] == '\r' && i + 1 < n && s[i + 1] == '\n') {
+            i++;
+        }
+        if (s[i] == '\n') {
+            p.line++;
+            p.column = 1;
+        } else {
+            p.column++;
+        }
+    }
+    return p;
+}
+
+/* The bytes of span of the pattern, cut to fit a message. */
+static void pattern_piece(char *out, size_t size, const struct expr *e,
+                          struct pattern_span span)
+{
+    size_t length = span.end - span.start;
+
+    if (length > 24) {
+        sema_format_to(out, size, "%.*s...", 21,
+                       e->as.text.bytes + span.start);
+    } else {
+        sema_format_to(out, size, "%.*s", (int)length,
+                       e->as.text.bytes + span.start);
+    }
+}
+
+/* DESIGN: a pattern literal is checked where it stands. PCRE2, linked
+   into antic, compiles it with the options the program compiles it with
+   at start, so a malformed pattern is an error at the byte PCRE2 names.
+   The safety check `exponential-pattern` then reads its repeats. The
+   module imports `anti.regex`, whose classes are the failures of a
+   pattern and which names what the program links, as an `f"..."` asks
+   for `anti.text`. */
+static struct type *check_pattern(struct checker *c, struct expr *e)
+{
+    static const struct name module = {REGEX_MODULE,
+                                       sizeof REGEX_MODULE - 1};
+    struct pattern_span inner;
+    struct pattern_span outer;
+    char message[ANTI_PATTERN_MESSAGE];
+    size_t offset = 0;
+
+    if (sema_find_library(c, &module) == NULL) {
+        sema_error_at(c, e->pos, "a pattern literal is compiled by `"
+                      REGEX_MODULE "`, so the module imports `" REGEX_MODULE
+                      "`");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (!pattern_compiles(e->as.text.bytes, e->as.text.length, &offset,
+                          message, sizeof message)) {
+        sema_error_at(c, pattern_position(e, offset), "malformed pattern: %s",
+                      message);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (pattern_exponential(e->as.text.bytes, e->as.text.length, &inner,
+                            &outer)) {
+        char in[32];
+        char around[32];
+        pattern_piece(in, sizeof in, e, inner);
+        pattern_piece(around, sizeof around, e, outer);
+        sema_check_at(c, NAME_EXPONENTIAL_PATTERN,
+                      pattern_position(e, inner.start),
+                      "the repeat `%s` inside `%s` can take exponential time, "
+                      "write a possessive quantifier, `a++`, or an atomic "
+                      "group, `(?>...)`", in, around);
+    }
+    return types_regex(c->types);
+}
+
 /* DESIGN: `x in lo..hi` is `x >= lo && x < hi`. The checker binds x to
    a local that no scope holds and writes the two comparisons over it.
    The value is then computed once, and the high bound only when the
@@ -2250,6 +2343,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return types_pointer(c->types, sema_builtin(c, TYPE_U8));
     case EXPR_FORMAT:
         return check_format(c, e);
+    case EXPR_PATTERN:
+        return check_pattern(c, e);
     case EXPR_IN:
         return check_in(c, e);
     case EXPR_INDEX:
@@ -2352,6 +2447,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             } else if (sym == NULL &&
                        sema_name_is(name, LANG_FIELD_DESCRIPTOR)) {
                 t = types_field_descriptor(c->types);
+            } else if (sym == NULL && sema_name_is(name, LANG_REGEX)) {
+                t = types_regex(c->types);
             } else if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
                 sema_error_at(c, e->pos, "unknown struct `%.*s`",
                               (int)name->length, name->text);

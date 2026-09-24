@@ -394,10 +394,11 @@ static uint64_t type_id_of(const struct type *t)
     };
 
     /* DESIGN: a Mutex and a channel are handles of objects that threads
-       share. A walk has nothing to write or copy there, so their type id
-       is none, as a variant's is, and `serialize` and `reflect.get`
-       pass over them. */
-    if (types_is_mutex(t) || types_is_chan(t) || types_is_object_lock(t)) {
+       share, and a Regex the handle of a compiled pattern. A walk has
+       nothing to write or copy there, so their type id is none, as a
+       variant's is, and `serialize` and `reflect.get` pass over them. */
+    if (types_is_mutex(t) || types_is_chan(t) || types_is_regex(t) ||
+        types_is_object_lock(t)) {
         return TYPE_ID_NONE;
     }
     /* An `own fn` field is two words and owns its snapshot. No Value
@@ -1028,7 +1029,8 @@ struct ir_global *lower_struct_descriptor(struct lowerer *l,
     size_t k;
 
     if (t->is_union || types_is_job(t) || types_is_flags(t) ||
-        types_is_mutex(t) || types_is_chan(t) || types_is_object_lock(t)) {
+        types_is_mutex(t) || types_is_chan(t) || types_is_regex(t) ||
+        types_is_object_lock(t)) {
         return NULL;
     }
     g = struct_global(l, t, "descriptor", &module, &name);

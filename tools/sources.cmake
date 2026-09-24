@@ -39,6 +39,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/notice.c
     src/antic/optimize.c
     src/antic/parser.c
+    src/antic/pattern.c
     src/antic/process.c
     src/antic/regalloc.c
     src/antic/select.c
@@ -59,6 +60,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/whole.c
     src/antic/x86_64.c
     src/rt/digest.c
+    src/rt/regex.c
     src/rt/utf.c)
 set(ANTIC_CORE_INCLUDE_DIRS src/antic)
 

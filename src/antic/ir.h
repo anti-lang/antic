@@ -526,6 +526,15 @@ uint32_t ir_sym_op(struct ir_module *m, enum ir_op op, enum ir_type type,
    else a symbolic operand. */
 struct ir_operand ir_sym_operand(const struct ir_module *m, uint32_t sym);
 
+/* DESIGN: the function of a module that compiles its pattern literals
+   before main. The back end writes it as a constructor of the object, and
+   the removal of unused code keeps it, since nothing calls it. The name
+   holds a dot, so no function of a program has it. */
+#define IR_PATTERNS_START "patterns.start"
+
+/* Whether f is the IR_PATTERNS_START of its module, defined here. */
+bool ir_is_patterns_start(const struct ir_function *f);
+
 struct ir_function *ir_function_add(struct ir_module *m, const char *module,
                                     const char *name, enum ir_type result,
                                     uint32_t result_agg);

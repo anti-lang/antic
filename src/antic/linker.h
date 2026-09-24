@@ -145,6 +145,14 @@ bool link_is_input(const char *path);
 void link_runtime_library(struct text *out, const char *runtime, enum target t,
                           enum cpu_level cpu);
 
+/* The native library of `anti.regex`, PCRE2 as src/native/ names it. */
+#define NATIVE_PCRE2 "pcre2-8"
+
+/* Append the path of the native library name of target t below runtime,
+   which stays at the default level of the target. */
+void link_native_library(struct text *out, const char *runtime, enum target t,
+                         const char *name);
+
 /* Append the directory name of target t below the runtime's lib/ and
    sysroot/, with LINUX_GLIBC_SUFFIX in the glibc mode. */
 void link_target_dir(struct text *out, enum target t, bool glibc);
