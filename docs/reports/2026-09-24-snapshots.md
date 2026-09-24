@@ -1,54 +1,77 @@
-# Snapshots: blocked
+# Snapshots
 
-The step was "Snapshots" of `docs/anti-language-additions.md`: `snapshot fn`,
-the read-only snapshot, captures that copy fully, acceptance at `keep` and
-`concurrent` parameters, the frame and the heap as the two places a snapshot
-lives, and the refusals that name `snapshot fn`. No code changed. The session
-stopped before the first edit, because the part at a `keep` parameter needs a
-decision that the documents do not contain.
+The step was "Snapshots" of `docs/anti-language-additions.md`. It had blocked
+on the question of how a kept snapshot fits a kept function value of one C
+function pointer. Eddie decided that `own` chooses the representation, and
+then that an owned function value is two words. The step is built on that
+decision, which `docs/decisions.md` holds under "Anonymous functions and
+closures" and the additions document under "Snapshots" and "Calling
+convention".
 
-## The question
+## Done
 
-Two rules of the same section of the specification meet at a `keep` parameter.
+- `snapshot fn` copies each value it captures when it is made. It is
+  read-only and holds numbers, `bool`, `char`, enums, structs of those and
+  `str`. A write and every other type are refused.
+- `own fn` is the form of two words that owns its snapshot. An `own` field
+  of function type and a `keep own` parameter hold it. There the snapshot
+  goes on the heap as one block that starts with its size, and the bytes of
+  each `str` follow the record. Anywhere else it sits in the caller's frame.
+- The teardown of a class frees the snapshot of each `own fn` field, the
+  copy of `dup` copies it, and `=` into the field frees the old one. `=`
+  never copies an existing owned value, and `dup(f)` does. A `keep own`
+  parameter frees its snapshot at every exit unless it moved into an owner.
+- A plain `keep` parameter, a plain field and a C function pointer refuse a
+  snapshot and an `own fn`. Each refusal of a closure by reference names
+  `snapshot fn`, and the one at a plain `keep` names `keep own`.
+- The C header writes an `own fn` field as a struct of the code and the
+  snapshot and declares `anti_rt_snapshot_free`. The library format is 56.
+- `src/rt/snapshot.c` holds the runtime side and a count of the snapshots
+  alive, which the tests read as their leak check.
+- An `own fn` field has the type id none in its field record, so the
+  default `serialize` and reflection pass over it.
 
-- "Snapshots" says a snapshot at a `keep` parameter "goes on the heap. Whoever
-  keeps the closure owns it and frees it."
-- "Calling convention" names a value of function type held in a field, a
-  global or a `keep` parameter. It "stays one pointer, the C function pointer
-  it is today". C callbacks such as raylib's then stay unchanged. The syntax overview
-  says the same, and the entry under "Anonymous functions and closures" in
-  `docs/decisions.md` builds it: nothing converts to the plain form.
+Tests: `programs/snapshots.anti` in release and dev mode runs every rule
+under the leak check: a kept snapshot freed with its owner, `dup` of the
+object and of the value, replacement, a `keep own` parameter that moves and
+one that does not, frames, borrowing, an inline class value and a nested
+closure. `errors/snapshots.anti` holds the 18 refusals, the one at a plain
+`keep` parameter included. `clib_handlers` calls through the header's struct
+from C. `closures_modules` takes `keep own` and an `own` field through a
+library file. `std/serialize_snapshot.anti` checks the field record.
 
-A C function pointer has no room for the address of the heap snapshot. The
-code of the snapshot cannot find its values. The keeper cannot tell a snapshot
-it must free from a named function it must not free. Every way through
-changes the representation of a kept function value, which the gap procedure
-does not cover:
+## Failures and fixes
 
-1. A kept function value becomes two words, the code and a context, in a
-   field, a global, a result and a `keep` parameter. The plain C pointer stays
-   for `extern fn` alone. This breaks "stays one pointer" and changes
-   the header of every exported signature that keeps a function.
-2. The runtime makes an executable stub per kept snapshot on the heap, as
-   libffi closures do, so the kept value stays one C pointer. This needs
-   writable and executable memory on every target: `MAP_JIT` and
-   `pthread_jit_write_protect_np` on macOS ARM64, `VirtualAlloc` on Windows.
-   It also needs a registry in the runtime that tells a stub from a named
-   function when the keeper frees it.
-3. Another representation Eddie names.
+- A named function as the default of an `own fn` field declared before the
+  function has no type when the fields are checked. The checker marks no
+  conversion, and the first build copied a function address as a pair. The
+  lowering of a default now pairs such a value with `none`. The same gap
+  keeps a default like that out of the library file, before this change as
+  well. `closures_modules` names the function in the literal, as it did
+  already for `Button`.
+- `anti fmt` moved the brace of `let f = snapshot fn(...) {` to its own
+  line. `anonymous_fn` in `src/anti/fmt.c` now looks past the word.
+- Adding a member to the runtime archive changes the linked bytes of
+  `return42` on macos-arm64, although no snapshot code links into it. With
+  the member left out the old digest came back. The pin was written from
+  this Mac, as its message asks, and the emit manifest took the six
+  `snapshots` listings.
+- The first reflection record gave an `own fn` field the id of a function
+  pointer of one word. A deserialized object then held code 0 there.
 
-A second question follows from the first: who the keeper is. The test the
-step asks for frees "a kept snapshot with its owner". That reads as the object
-whose field holds the value, freed by its `destruct` chain. The documents do
-not say what frees a snapshot held in a global, or in a local of the function
-that took the `keep` parameter.
+## Provisional entries added
 
-The parts at a `concurrent` parameter and at a parameter that does not keep
-its argument need neither decision. They were not built on their own, because
-the step is one feature and a part of it would ship `snapshot fn` with its
-main use refused.
+Under "Anonymous functions and closures" in `docs/decisions.md`: the refusals
+that name `snapshot fn`, a snapshot in the frame at a parameter that does
+not keep and in a local, the types a snapshot holds, the offsets of its
+`str` bytes, the moves of a `keep own` parameter, the free on `=` into an
+`own fn` field, `dup` of a function value, `keep own` in lists and in the
+library file, the count of the snapshots alive, the field record, and the
+header declaration.
 
-## State
+## Proof
 
-Nothing was committed apart from this report. No `[provisional]` entry was
-added. The suites did not run, since no code changed.
+The suites on `a8e2661`: the host 882 of 882, ASan 881 of 881, UBSan 881 of
+881. The sanitizer builds leave out `no_paths` as before. Logs: `build/drive/logs/snap-final-host.log`,
+`build/drive/logs/snap-final-asan.log` and
+`build/drive/logs/snap-final-ubsan.log`.
