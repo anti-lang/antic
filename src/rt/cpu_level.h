@@ -49,10 +49,6 @@ int32_t anti_cpu_level(void);
    level it is missing, for anti_cpu_level_message. */
 int32_t anti_cpu_missing(int32_t needed);
 
-/* The level this runtime was compiled for, which is the level of the
-   program that linked it. */
-int32_t anti_cpu_built(void);
-
 /* Exit with the message of the section when this machine is below the
    level of the runtime, and return otherwise. src/rt/start.c calls it before
    main. */

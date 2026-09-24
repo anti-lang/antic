@@ -305,11 +305,6 @@ int32_t anti_cpu_missing(int32_t needed)
     return have < needed ? needed : 0;
 }
 
-int32_t anti_cpu_built(void)
-{
-    return ANTI_CPU_LEVEL_ID;
-}
-
 void anti_cpu_check(void)
 {
     int32_t missing = anti_cpu_missing(ANTI_CPU_LEVEL_ID);

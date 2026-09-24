@@ -156,7 +156,7 @@ static struct anti_slice arguments(void)
 static struct anti_slice environment(void)
 {
     wchar_t *block = GetEnvironmentStringsW();
-    const wchar_t *p = block;
+    const wchar_t *p;
     struct anti_slice env;
     size_t count = 0;
     size_t i;
