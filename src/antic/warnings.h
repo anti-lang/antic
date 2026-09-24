@@ -21,10 +21,12 @@ enum diag_name warnings_find(const char *text, size_t length);
 /* The checks that ran in one compilation, one bit per name. An `allow`
    of a warning whose check did not run silences nothing and says
    nothing, because the build that runs the check decides. */
-typedef unsigned long warnings_ran;
+typedef unsigned long long warnings_ran;
 
-#define WARNINGS_ALL_RAN (~0UL)
-#define WARNINGS_BIT(name) (1UL << (unsigned)(name))
+#define WARNINGS_ALL_RAN (~0ULL)
+#define WARNINGS_BIT(name) (1ULL << (unsigned)(name))
+
+_Static_assert(NAME_COUNT <= 64, "a name needs a bit of warnings_ran");
 
 /* Apply the `allow` and `unchecked` clauses of the module. A warning or
    a safety check that one of them covers is dropped. With complete set,
