@@ -265,8 +265,8 @@ struct anti_text *anti_rt_fs_list(const unsigned char *path, int64_t len,
         return NULL;
     }
     do {
-        size_t written = anti_utf16_to_utf8((const uint16_t *)data.name,
-                                            wcslen(data.name), name);
+        size_t written = anti_rt_utf16_to_utf8((const uint16_t *)data.name,
+                                               wcslen(data.name), name);
         if (!is_dot_entry(name, written) &&
             add_name(&n, name, written) != 0) {
             failed = 1;

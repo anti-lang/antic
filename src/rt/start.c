@@ -114,7 +114,7 @@ static struct anti_str from_utf16(const uint16_t *s)
         n++;
     }
     unsigned char *bytes = allocate(3 * n + 1);
-    return make_str(bytes, anti_utf16_to_utf8(s, n, bytes));
+    return make_str(bytes, anti_rt_utf16_to_utf8(s, n, bytes));
 }
 
 static uint16_t *copy_units(const wchar_t *s, size_t n)
@@ -135,7 +135,7 @@ static struct anti_slice arguments(void)
     uint16_t *units = copy_units(line, n);
     uint16_t *split = allocate((2 * n + 2) * sizeof *split);
     struct anti_slice args;
-    size_t count = anti_split_command_line(units, split);
+    size_t count = anti_rt_split_command_line(units, split);
     const uint16_t *p = split;
     size_t i;
 
@@ -188,7 +188,7 @@ int main(void)
        Windows start in text mode, which writes CRLF for each LF. */
     _setmode(_fileno(stdout), _O_BINARY);
     _setmode(_fileno(stderr), _O_BINARY);
-    anti_cpu_check();
+    anti_rt_cpu_check();
     anti_rt_init();
     args = arguments();
     runtime_options(&args);
@@ -209,8 +209,9 @@ static struct anti_slice strings(char **list, size_t count)
     for (i = 0; i < count; i++) {
         size_t n = strlen(list[i]);
         unsigned char *bytes = allocate(3 * n + 1);
-        slice.ptr[i] = make_str(
-            bytes, anti_utf8_repair((const unsigned char *)list[i], n, bytes));
+        size_t written =
+            anti_rt_utf8_repair((const unsigned char *)list[i], n, bytes);
+        slice.ptr[i] = make_str(bytes, written);
     }
     return slice;
 }
@@ -220,7 +221,7 @@ int main(int argc, char **argv)
     struct anti_slice args;
     size_t count = 0;
 
-    anti_cpu_check();
+    anti_rt_cpu_check();
     anti_rt_init();
     args = strings(argv, (size_t)argc);
     runtime_options(&args);

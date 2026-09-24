@@ -5,8 +5,8 @@
 
 /* The two signals a console sends, under the numbers C gives them. A
    Windows program has no others of this kind. */
-#define SIGINT_SIGNAL 2
-#define SIGBREAK_SIGNAL 21
+#define ANTI_SIGINT 2
+#define ANTI_SIGBREAK 21
 
 /* Register the function that runs when the program receives sig. One
    function per signal, and a later call replaces the one before it. */

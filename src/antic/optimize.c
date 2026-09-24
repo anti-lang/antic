@@ -320,10 +320,10 @@ static bool fold_conversion(const struct ir_inst *inst, struct ir_operand *out)
     /* The runtime's own routines, so a folded conversion rounds as the
        one a program makes. */
     case IR_HEXT:
-        *out = ir_float_op(to, anti_f16_widen((uint16_t)v));
+        *out = ir_float_op(to, anti_rt_f16_widen((uint16_t)v));
         return true;
     case IR_HTRUNC:
-        *out = ir_int_op(to, anti_f16_narrow(arith_to_f32(d)));
+        *out = ir_int_op(to, anti_rt_f16_narrow(arith_to_f32(d)));
         return true;
     default:
         return false;

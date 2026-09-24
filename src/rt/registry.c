@@ -441,7 +441,7 @@ static bool read_char(struct reader *r, void *bytes)
     if (!read_string(r, text, sizeof text, &length)) {
         return false;
     }
-    c = anti_utf8_decode(text, length, &used);
+    c = anti_rt_utf8_decode(text, length, &used);
     if (used == 0 || used != length) {
         return false;
     }

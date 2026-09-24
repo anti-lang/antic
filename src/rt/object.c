@@ -388,7 +388,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
         uint32_t c;
         unsigned char utf8[4];
         memcpy(&c, bytes, sizeof c);
-        put_text(b, utf8, (int64_t)anti_utf8_encode(c, utf8));
+        put_text(b, utf8, (int64_t)anti_rt_utf8_encode(c, utf8));
         return;
     }
     /* An f16 is written as the f32 a read gives, which reads back to
@@ -396,7 +396,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
     case ANTI_TYPE_F16: {
         uint16_t h;
         memcpy(&h, bytes, sizeof h);
-        anti_rt_builder_float(b, (double)anti_f16_widen(h), -1, 0, 1);
+        anti_rt_builder_float(b, (double)anti_rt_f16_widen(h), -1, 0, 1);
         return;
     }
     case ANTI_TYPE_F32: {

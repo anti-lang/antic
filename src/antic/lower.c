@@ -670,7 +670,7 @@ static struct ir_operand constant(struct lowerer *l,
        rounding changes nothing. */
     case CONST_FLOAT:
         if (v->type->kind == TYPE_F16) {
-            return ir_int_op(type, anti_f16_narrow((float)v->as.floating));
+            return ir_int_op(type, anti_rt_f16_narrow((float)v->as.floating));
         }
         return ir_float_op(type, v->as.floating);
     case CONST_BOOL:

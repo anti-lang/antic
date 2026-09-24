@@ -132,7 +132,7 @@ failed:
    calls the function the program registered without a pipe. */
 static BOOL WINAPI on_console(DWORD event)
 {
-    int64_t sig = event == CTRL_BREAK_EVENT ? SIGBREAK_SIGNAL : SIGINT_SIGNAL;
+    int64_t sig = event == CTRL_BREAK_EVENT ? ANTI_SIGBREAK : ANTI_SIGINT;
     void (*f)(int64_t) = handler_of(sig);
 
     anti_rt_atomic_store(&pending, (int64_t)sizeof pending, sig);

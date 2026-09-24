@@ -89,7 +89,7 @@ when started by hand.
 ## Test hooks
 
 - `ANTI_DEV_CPU` compiles the processor simulation into `src/rt/cpu.c`. With it,
-  `anti_cpu_level` reads the level from the environment variable `ANTI_CPU_LEVEL`
+  `anti_rt_cpu_level` reads the level from the environment variable `ANTI_CPU_LEVEL`
   instead of the processor, so a test on this machine sees the refusal a lower machine
   gets. The unit tests are the only build that defines it. The runtime of the archive
   is compiled without it, so a shipped program reads no variable of its own and the

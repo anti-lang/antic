@@ -56,7 +56,7 @@
    here. A build that leaves it out would ship a runtime that checks the
    wrong processor, so it stops instead. */
 #ifndef ANTI_CPU_LEVEL_ID
-#error "define ANTI_CPU_LEVEL_ID, the anti_cpu_level of this runtime"
+#error "define ANTI_CPU_LEVEL_ID, the anti_rt_cpu_level of this runtime"
 #endif
 
 /* One row per level. message is the start-up message of a machine that
@@ -101,14 +101,14 @@ static const struct row *row_of(int32_t level)
     return NULL;
 }
 
-const char *anti_cpu_level_name(int32_t level)
+const char *anti_rt_cpu_level_name(int32_t level)
 {
     const struct row *r = row_of(level);
 
     return r == NULL ? "" : r->name;
 }
 
-const char *anti_cpu_level_message(int32_t level)
+const char *anti_rt_cpu_level_message(int32_t level)
 {
     const struct row *r = row_of(level);
 
@@ -277,7 +277,7 @@ static int32_t machine_level(void)
 
 #endif
 
-int32_t anti_cpu_level(void)
+int32_t anti_rt_cpu_level(void)
 {
 #if defined(ANTI_DEV_CPU)
     /* A test on this machine sees the refusal of a lower one. */
@@ -295,9 +295,9 @@ int32_t anti_cpu_level(void)
     return machine_level();
 }
 
-int32_t anti_cpu_missing(int32_t needed)
+int32_t anti_rt_cpu_missing(int32_t needed)
 {
-    int32_t have = anti_cpu_level();
+    int32_t have = anti_rt_cpu_level();
 
     if (have == ANTI_CPU_NONE || row_of(needed) == NULL) {
         return 0;
@@ -305,12 +305,12 @@ int32_t anti_cpu_missing(int32_t needed)
     return have < needed ? needed : 0;
 }
 
-void anti_cpu_check(void)
+void anti_rt_cpu_check(void)
 {
-    int32_t missing = anti_cpu_missing(ANTI_CPU_LEVEL_ID);
+    int32_t missing = anti_rt_cpu_missing(ANTI_CPU_LEVEL_ID);
 
     if (missing == 0) {
         return;
     }
-    anti_rt_fail_exit(70, "anti: %s", anti_cpu_level_message(missing));
+    anti_rt_fail_exit(70, "anti: %s", anti_rt_cpu_level_message(missing));
 }

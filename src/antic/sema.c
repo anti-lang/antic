@@ -98,7 +98,7 @@ static void error_at(struct checker *c, struct pos pos, const char *format,
     ;
 
 /* Format into out, which holds size bytes, size being 4 or more. A text
-   too long for out ends in "..." where it was cut, so that a message
+   too long for out ends in three periods where it was cut, so that a message
    never loses its end unmarked. */
 static void vformat_to(char *out, size_t size, const char *format,
                        va_list args)
@@ -3717,7 +3717,7 @@ static struct type *caught_error(struct checker *c, struct type *result)
                : result;
 }
 
-/* Declare the name the handler h binds, in the scope just entered, as a
+/* Declare the name the handler h binds, in the scope entered last, as a
    read-only local of type t that holds the caught error. A handler
    without a name declares nothing. */
 static void declare_caught(struct checker *c, struct handler *h,
@@ -5424,8 +5424,8 @@ static bool worker_type(struct checker *c, struct pos pos, const char *what,
 }
 
 /* The function type of the worker that call of `parallel` or `dispatch`
-   names, with one parameter before the arguments of the call, the chunk
-   or the object that first names. NULL after an error. */
+   names. It has one parameter before the arguments of the call, for the
+   chunk or the object that first names. NULL after an error. */
 static struct type *worker_callee(struct checker *c, struct expr *call,
                                   const char *form, const char *first)
 {
@@ -6946,7 +6946,7 @@ static bool eval_const(struct checker *c, struct expr *e,
                value of one f32 are the same sixteen bits. */
             out->kind = CONST_FLOAT;
             out->as.floating =
-                anti_f16_widen(anti_f16_narrow((float)a.as.floating));
+                anti_rt_f16_widen(anti_rt_f16_narrow((float)a.as.floating));
         } else if (type_is_float(e->type)) {
             out->kind = CONST_FLOAT;
             out->as.floating = a.kind == CONST_FLOAT ? a.as.floating
@@ -11029,7 +11029,7 @@ bool sema_check(struct module *module, const char *module_name,
 }
 
 /* A copy of the length bytes at text with a NUL after them, in the
-   memory pool arena, which frees it. */
+   memory pool of the first parameter, which frees it. */
 static const char *keep_name(struct arena *arena, const char *text,
                              size_t length)
 {

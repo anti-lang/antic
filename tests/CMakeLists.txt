@@ -368,6 +368,15 @@ add_test(NAME workflows_dispatch_only
         "-DWORKFLOWS=${PROJECT_SOURCE_DIR}/.github/workflows"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_workflows.cmake")
 
+# Rule 25: every symbol a runtime library of the archive defines starts
+# with anti_rt_, on every target and level.
+add_test(NAME rt_names
+    COMMAND "${CMAKE_COMMAND}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_rt_names.cmake")
+set_tests_properties(rt_names PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # The layout rule of "Repository layout" in CLAUDE.md, over git ls-files.
 add_test(NAME repo_layout
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"

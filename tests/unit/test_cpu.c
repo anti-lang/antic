@@ -98,10 +98,10 @@ static void ids(void)
     CHECK(cpu_id(CPU_ARMV8_2) < cpu_id(CPU_ARMV8_5));
     CHECK(cpu_id(CPU_V3) == ANTI_CPU_X86_64_V3);
     CHECK(cpu_id(CPU_ARMV8_5) == ANTI_CPU_ARMV8_5);
-    CHECK_STR(anti_cpu_level_name(cpu_id(CPU_V3)), cpu_name(CPU_V3));
-    CHECK_STR(anti_cpu_level_name(cpu_id(CPU_ARMV8_2)),
+    CHECK_STR(anti_rt_cpu_level_name(cpu_id(CPU_V3)), cpu_name(CPU_V3));
+    CHECK_STR(anti_rt_cpu_level_name(cpu_id(CPU_ARMV8_2)),
               cpu_name(CPU_ARMV8_2));
-    CHECK_STR(anti_cpu_level_name(0), "");
+    CHECK_STR(anti_rt_cpu_level_name(0), "");
 }
 
 /* The start-up check refuses a machine below the level of the program and
@@ -110,36 +110,36 @@ static void ids(void)
 static void refusal(void)
 {
     set_level("v1");
-    CHECK(anti_cpu_level() == ANTI_CPU_X86_64_V1);
-    CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V3) == ANTI_CPU_X86_64_V3);
-    CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V2) == ANTI_CPU_X86_64_V2);
-    CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V1) == 0);
-    CHECK_STR(anti_cpu_level_message(ANTI_CPU_X86_64_V3),
+    CHECK(anti_rt_cpu_level() == ANTI_CPU_X86_64_V1);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_X86_64_V3) == ANTI_CPU_X86_64_V3);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_X86_64_V2) == ANTI_CPU_X86_64_V2);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_X86_64_V1) == 0);
+    CHECK_STR(anti_rt_cpu_level_message(ANTI_CPU_X86_64_V3),
               "this program needs a processor with AVX2 "
               "(x86-64-v3, 2013 or later)");
-    CHECK_STR(anti_cpu_level_message(ANTI_CPU_ARMV8_5),
+    CHECK_STR(anti_rt_cpu_level_message(ANTI_CPU_ARMV8_5),
               "this program needs an Apple Silicon Mac");
-    CHECK_STR(anti_cpu_level_message(ANTI_CPU_ARMV8_2),
+    CHECK_STR(anti_rt_cpu_level_message(ANTI_CPU_ARMV8_2),
               "this program needs an ARMv8.2 processor "
               "(Raspberry Pi 5, Apple Silicon, or later)");
 
     set_level("v3");
-    CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V3) == 0);
-    CHECK(anti_cpu_missing(ANTI_CPU_X86_64_V1) == 0);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_X86_64_V3) == 0);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_X86_64_V1) == 0);
 
     /* The lowest level of an architecture never refuses: every machine of
        it is at least that. */
     set_level("armv8.0");
-    CHECK(anti_cpu_missing(ANTI_CPU_ARMV8_2) == ANTI_CPU_ARMV8_2);
-    CHECK(anti_cpu_missing(ANTI_CPU_ARMV8_5) == ANTI_CPU_ARMV8_5);
-    CHECK(anti_cpu_missing(ANTI_CPU_ARMV8_0) == 0);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_ARMV8_2) == ANTI_CPU_ARMV8_2);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_ARMV8_5) == ANTI_CPU_ARMV8_5);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_ARMV8_0) == 0);
 
     set_level("armv8.5");
-    CHECK(anti_cpu_missing(ANTI_CPU_ARMV8_5) == 0);
-    CHECK(anti_cpu_missing(ANTI_CPU_ARMV8_2) == 0);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_ARMV8_5) == 0);
+    CHECK(anti_rt_cpu_missing(ANTI_CPU_ARMV8_2) == 0);
 
     /* A value that names no level asks for nothing. */
-    CHECK(anti_cpu_missing(0) == 0);
+    CHECK(anti_rt_cpu_missing(0) == 0);
     clear_level();
 }
 

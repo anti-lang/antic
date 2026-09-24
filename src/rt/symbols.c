@@ -4,8 +4,8 @@
 
 /* The form is `_A`, each segment of the module path as its length in
    decimal and its bytes, then `_` and the name of the function. */
-size_t anti_coff_demangle(const char *name, size_t length, char *out,
-                          size_t room)
+size_t anti_rt_coff_demangle(const char *name, size_t length, char *out,
+                             size_t room)
 {
     size_t at = 2;
     size_t n = 0;
@@ -664,7 +664,7 @@ static bool elf_nearest(void *context, const char *name, uint64_t value,
     return false;
 }
 
-/* The walk of anti_elf_functions, with the caller's function inside. */
+/* The walk of anti_rt_elf_functions, with the caller's function inside. */
 struct functions {
     anti_function_fn fn;
     void *context;
@@ -682,8 +682,8 @@ static bool elf_each_function(void *context, const char *name, uint64_t value,
     return f->fn(f->context, name, value, size);
 }
 
-bool anti_elf_functions(const uint8_t *file, size_t size, anti_function_fn fn,
-                        void *context)
+bool anti_rt_elf_functions(const uint8_t *file, size_t size,
+                           anti_function_fn fn, void *context)
 {
     struct bytes b = {file, size};
     struct functions f;
@@ -693,8 +693,8 @@ bool anti_elf_functions(const uint8_t *file, size_t size, anti_function_fn fn,
     return elf_symbols(&b, elf_each_function, &f);
 }
 
-bool anti_elf_function(const uint8_t *file, size_t size, uint64_t vaddr,
-                       struct anti_found *out)
+bool anti_rt_elf_function(const uint8_t *file, size_t size, uint64_t vaddr,
+                          struct anti_found *out)
 {
     struct bytes b = {file, size};
     struct nearest n = {vaddr, NULL, 0};
@@ -729,8 +729,8 @@ static bool elf_named(void *context, const char *name, uint64_t value,
     return true;
 }
 
-bool anti_elf_symbol(const uint8_t *file, size_t size, const char *name,
-                     uint64_t *vaddr)
+bool anti_rt_elf_symbol(const uint8_t *file, size_t size, const char *name,
+                        uint64_t *vaddr)
 {
     struct bytes b = {file, size};
     struct named n = {name, 0};
@@ -742,8 +742,8 @@ bool anti_elf_symbol(const uint8_t *file, size_t size, const char *name,
     return true;
 }
 
-bool anti_elf_line(const uint8_t *file, size_t size, uint64_t vaddr,
-                   struct anti_found *out)
+bool anti_rt_elf_line(const uint8_t *file, size_t size, uint64_t vaddr,
+                      struct anti_found *out)
 {
     struct bytes b = {file, size};
     struct elf_section section;
@@ -766,8 +766,8 @@ bool anti_elf_line(const uint8_t *file, size_t size, uint64_t vaddr,
     return dwarf_line(&s, vaddr, out);
 }
 
-uint64_t anti_elf_loaded_room(const uint8_t *headers, size_t count,
-                              uint64_t vaddr)
+uint64_t anti_rt_elf_loaded_room(const uint8_t *headers, size_t count,
+                                 uint64_t vaddr)
 {
     size_t i;
 
@@ -868,8 +868,8 @@ static bool macho_layout_visit(void *context, uint32_t kind,
     return false;
 }
 
-bool anti_macho_table(const uint8_t *header, size_t size, bool mapped,
-                      intptr_t slide, struct anti_macho_table *out)
+bool anti_rt_macho_table(const uint8_t *header, size_t size, bool mapped,
+                         intptr_t slide, struct anti_macho_table *out)
 {
     struct bytes b = {header, size};
     struct macho_layout l;
@@ -915,8 +915,8 @@ static const char *unprefixed(const char *name)
     return name[0] == '_' ? name + 1 : name;
 }
 
-bool anti_macho_functions(const struct anti_macho_table *t,
-                          anti_function_fn fn, void *context)
+bool anti_rt_macho_functions(const struct anti_macho_table *t,
+                             anti_function_fn fn, void *context)
 {
     uint32_t i;
 
@@ -938,8 +938,8 @@ bool anti_macho_functions(const struct anti_macho_table *t,
     return false;
 }
 
-bool anti_macho_function(const struct anti_macho_table *t, uint64_t vaddr,
-                         struct anti_found *out)
+bool anti_rt_macho_function(const struct anti_macho_table *t, uint64_t vaddr,
+                            struct anti_found *out)
 {
     struct nearest n = {vaddr, NULL, 0};
     uint32_t i;
@@ -967,8 +967,8 @@ bool anti_macho_function(const struct anti_macho_table *t, uint64_t vaddr,
     return true;
 }
 
-bool anti_macho_symbol(const struct anti_macho_table *t, const char *name,
-                       uint64_t *vaddr)
+bool anti_rt_macho_symbol(const struct anti_macho_table *t, const char *name,
+                          uint64_t *vaddr)
 {
     uint32_t i;
 
@@ -992,9 +992,9 @@ bool anti_macho_symbol(const struct anti_macho_table *t, const char *name,
    before the functions it holds, and each function has two entries, its
    start and its size. A link can give two names to one function and the
    size to one of them, so an entry of size 0 matches no address. */
-bool anti_macho_debug_map(const struct anti_macho_table *t, uint64_t vaddr,
-                          const char **object, const char **symbol,
-                          uint64_t *start)
+bool anti_rt_macho_debug_map(const struct anti_macho_table *t, uint64_t vaddr,
+                             const char **object, const char **symbol,
+                             uint64_t *start)
 {
     const char *current = NULL;
     const char *name = NULL;
@@ -1093,14 +1093,14 @@ static bool macho_object_sections(const uint8_t *file, size_t size,
    against a symbol holds the addend, which the address of the symbol
    completes. Only the plain unsigned kind, 0 on both architectures, is
    resolved, since a line table writes no other. */
-void anti_macho_relocate(uint8_t *file, size_t size)
+void anti_rt_macho_relocate(uint8_t *file, size_t size)
 {
     struct macho_sections m;
     struct anti_macho_table t;
     uint32_t i;
 
     if (!macho_object_sections(file, size, &m) ||
-        !anti_macho_table(file, size, false, 0, &t) ||
+        !anti_rt_macho_table(file, size, false, 0, &t) ||
         !inside(&m.file, m.line_reloff, (uint64_t)m.line_nreloc * 8)) {
         return;
     }
@@ -1132,9 +1132,9 @@ void anti_macho_relocate(uint8_t *file, size_t size)
     }
 }
 
-bool anti_macho_object_line(const uint8_t *file, size_t size,
-                            const char *symbol, uint64_t offset,
-                            struct anti_found *out)
+bool anti_rt_macho_object_line(const uint8_t *file, size_t size,
+                               const char *symbol, uint64_t offset,
+                               struct anti_found *out)
 {
     struct macho_sections m;
     struct anti_macho_table t;
@@ -1142,7 +1142,7 @@ bool anti_macho_object_line(const uint8_t *file, size_t size,
     uint32_t i;
 
     if (!macho_object_sections(file, size, &m) ||
-        !anti_macho_table(file, size, false, 0, &t)) {
+        !anti_rt_macho_table(file, size, false, 0, &t)) {
         return false;
     }
     for (i = 0; i < t.count; i++) {

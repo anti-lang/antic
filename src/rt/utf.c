@@ -53,7 +53,8 @@ static size_t sequence_length(unsigned char b, unsigned char *low,
 /* DESIGN: each maximal subpart of an ill-formed sequence becomes one
    U+FFFD, the practice of section 3.9.6 of the Unicode Standard. out holds
    3 * n bytes. */
-size_t anti_utf8_repair(const unsigned char *in, size_t n, unsigned char *out)
+size_t anti_rt_utf8_repair(const unsigned char *in, size_t n,
+                           unsigned char *out)
 {
     size_t written = 0;
     size_t i = 0;
@@ -81,12 +82,12 @@ size_t anti_utf8_repair(const unsigned char *in, size_t n, unsigned char *out)
     return written;
 }
 
-size_t anti_utf8_encode(uint32_t c, unsigned char *out)
+size_t anti_rt_utf8_encode(uint32_t c, unsigned char *out)
 {
     return put_scalar(c, out);
 }
 
-uint32_t anti_utf8_decode(const unsigned char *in, size_t n, size_t *length)
+uint32_t anti_rt_utf8_decode(const unsigned char *in, size_t n, size_t *length)
 {
     unsigned char low;
     unsigned char high;
@@ -111,7 +112,7 @@ uint32_t anti_utf8_decode(const unsigned char *in, size_t n, size_t *length)
 
 /* A surrogate pair gives one scalar value, and any other surrogate
    U+FFFD. out holds 3 * n bytes. */
-size_t anti_utf16_to_utf8(const uint16_t *in, size_t n, unsigned char *out)
+size_t anti_rt_utf16_to_utf8(const uint16_t *in, size_t n, unsigned char *out)
 {
     size_t written = 0;
     size_t i;
@@ -139,7 +140,7 @@ static int is_blank(uint16_t c)
    arguments. The program name ends at a blank outside quotes and keeps its
    backslashes. out receives each argument followed by a 0 unit and holds
    2 * n + 2 units for a line of n units. Returns the number of arguments. */
-size_t anti_split_command_line(const uint16_t *line, uint16_t *out)
+size_t anti_rt_split_command_line(const uint16_t *line, uint16_t *out)
 {
     const uint16_t *p = line;
     size_t count = 0;

@@ -29,12 +29,12 @@ enum anti_cpu_level {
 
 /* The name of a level, "v3" or "armv8.2", and "" for a value that names
    none. */
-const char *anti_cpu_level_name(int32_t level);
+const char *anti_rt_cpu_level_name(int32_t level);
 
 /* The start-up message of a machine that cannot run a program of this
    level, without the "anti: " that the runtime writes in front. Returns ""
    for a value that names no level. */
-const char *anti_cpu_level_message(int32_t level);
+const char *anti_rt_cpu_level_message(int32_t level);
 
 /* The highest level this machine runs, for the architecture the runtime
    was compiled for. ANTI_CPU_NONE on an architecture with no level table.
@@ -43,15 +43,15 @@ const char *anti_cpu_level_message(int32_t level);
    answer. A test then sees the refusal of a lower machine on the machine
    it runs on. A released runtime is compiled without it and reads the
    processor alone. */
-int32_t anti_cpu_level(void);
+int32_t anti_rt_cpu_level(void);
 
 /* Zero when this machine runs a program built for needed. Otherwise the
-   level it is missing, for anti_cpu_level_message. */
-int32_t anti_cpu_missing(int32_t needed);
+   level it is missing, for anti_rt_cpu_level_message. */
+int32_t anti_rt_cpu_missing(int32_t needed);
 
 /* Exit with the message of the section when this machine is below the
    level of the runtime, and return otherwise. src/rt/start.c calls it before
    main. */
-void anti_cpu_check(void);
+void anti_rt_cpu_check(void);
 
 #endif

@@ -160,7 +160,7 @@ static const struct loaded *load(const char *path, bool object)
             fclose(f);
         }
         if (l->bytes != NULL && object) {
-            anti_macho_relocate(l->bytes, l->size);
+            anti_rt_macho_relocate(l->bytes, l->size);
         }
         found = l->path != NULL && l->bytes != NULL ? l : NULL;
     }
@@ -304,8 +304,8 @@ static struct anti_text image_id(const uint8_t *header)
     memcpy(&flags, header + 24, 4);
     slide = image_slide(header);
     if ((flags & 0x80000000u) == 0 &&
-        anti_macho_table(header, SIZE_MAX, true, slide, &t) &&
-        anti_macho_symbol(&t, "anti_licenses", &vaddr)) {
+        anti_rt_macho_table(header, SIZE_MAX, true, slide, &t) &&
+        anti_rt_macho_symbol(&t, "anti_licenses", &vaddr)) {
         id = notice_id((const char *)(uintptr_t)(vaddr + (uint64_t)slide),
                        SIZE_MAX);
     }
@@ -356,19 +356,19 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
         return;
     }
     slide = image_slide(header);
-    if (!anti_macho_table(header, SIZE_MAX, true, slide, &t)) {
+    if (!anti_rt_macho_table(header, SIZE_MAX, true, slide, &t)) {
         return;
     }
     /* A return address follows the call, so the lookup takes the byte
        before it, which is the call and names its line. */
     vaddr = frame->address - 1 - (uint64_t)slide;
-    if (anti_macho_function(&t, vaddr, &found)) {
+    if (anti_rt_macho_function(&t, vaddr, &found)) {
         out->function = text_part(found.function, found.function_length);
     }
-    if (anti_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
+    if (anti_rt_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
         const struct loaded *l = load(object, true);
-        if (l != NULL && anti_macho_object_line(l->bytes, l->size, symbol,
-                                                vaddr - start, &found) &&
+        if (l != NULL && anti_rt_macho_object_line(l->bytes, l->size, symbol,
+                                                   vaddr - start, &found) &&
             found.file != NULL) {
             out->file = text_part(found.file, found.file_length);
             out->line = found.line;
@@ -388,7 +388,7 @@ static void read_program_path(void)
     program_path[n > 0 ? n : 0] = 0;
 }
 
-/* anti_elf_loaded_room reads the program headers as the 56 bytes of
+/* anti_rt_elf_loaded_room reads the program headers as the 56 bytes of
    the 64-bit form, which every Linux target has. */
 _Static_assert(sizeof(ElfW(Phdr)) == 56, "a program header is 56 bytes");
 
@@ -397,7 +397,7 @@ struct module_of {
     uintptr_t address;
     const char *name;
     uintptr_t bias;
-    const ElfW(Phdr) *headers;      /* read by anti_elf_loaded_room */
+    const ElfW(Phdr) *headers;      /* read by anti_rt_elf_loaded_room */
     size_t header_count;
     size_t visited;
     bool found;
@@ -461,12 +461,12 @@ static struct anti_text module_id(const struct module_of *m)
         return notice_id(anti_licenses, SIZE_MAX);
     }
     l = load(m->name, false);
-    if (l == NULL || !anti_elf_symbol(l->bytes, l->size, "anti_licenses",
-                                      &vaddr)) {
+    if (l == NULL || !anti_rt_elf_symbol(l->bytes, l->size, "anti_licenses",
+                                         &vaddr)) {
         return text_of(NULL);
     }
-    room = anti_elf_loaded_room((const uint8_t *)m->headers,
-                                m->header_count, vaddr);
+    room = anti_rt_elf_loaded_room((const uint8_t *)m->headers,
+                                   m->header_count, vaddr);
     if (room == 0) {
         return text_of(NULL);
     }
@@ -516,10 +516,10 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
     /* A return address follows the call, so the lookup takes the byte
        before it, which is the call and names its line. */
     vaddr = frame->address - 1 - frame->base;
-    if (anti_elf_function(l->bytes, l->size, vaddr, &found)) {
+    if (anti_rt_elf_function(l->bytes, l->size, vaddr, &found)) {
         out->function = text_part(found.function, found.function_length);
     }
-    if (anti_elf_line(l->bytes, l->size, vaddr, &found) &&
+    if (anti_rt_elf_line(l->bytes, l->size, vaddr, &found) &&
         found.file != NULL) {
         out->file = text_part(found.file, found.file_length);
         out->line = found.line;
@@ -653,7 +653,7 @@ void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
             units[i] = (uint16_t)name[i];
         }
         out->module = keep((const char *)bytes,
-                           anti_utf16_to_utf8(units, n, bytes));
+                           anti_rt_utf16_to_utf8(units, n, bytes));
     }
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
                            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -808,8 +808,8 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
         help_from_addr(GetCurrentProcess(), pc, &displacement, &symbol.info)) {
         size_t n = strnlen(symbol.info.Name, symbol.info.NameLen);
         char name[512];
-        size_t named = anti_coff_demangle(symbol.info.Name, n, name,
-                                          sizeof name);
+        size_t named = anti_rt_coff_demangle(symbol.info.Name, n, name,
+                                             sizeof name);
         out->function = named > 0 ? keep(name, named)
                                   : keep(symbol.info.Name, n);
     }

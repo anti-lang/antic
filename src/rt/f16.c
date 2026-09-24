@@ -5,10 +5,10 @@
    instruction. They are the functions antic folds constants with. */
 float anti_rt_f16_to_f32(uint32_t h)
 {
-    return anti_f16_widen((uint16_t)h);
+    return anti_rt_f16_widen((uint16_t)h);
 }
 
 uint32_t anti_rt_f32_to_f16(float f)
 {
-    return anti_f16_narrow(f);
+    return anti_rt_f16_narrow(f);
 }

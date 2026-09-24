@@ -176,7 +176,7 @@ void anti_rt_reflect_get(void *object, const struct anti_descriptor *d,
         if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F16) {
             uint16_t half;
             memcpy(&half, at, sizeof half);
-            out->data.f = anti_f16_widen(half);
+            out->data.f = anti_rt_f16_widen(half);
         } else if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F32) {
             float narrow;
             memcpy(&narrow, at, sizeof narrow);
@@ -225,7 +225,7 @@ int64_t anti_rt_reflect_set(void *object, const struct anti_descriptor *d,
     case ANTI_VALUE_FLOAT:
         /* An f16 takes the float through f32, as `as f16` takes one. */
         if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F16) {
-            uint16_t half = anti_f16_narrow((float)value->data.f);
+            uint16_t half = anti_rt_f16_narrow((float)value->data.f);
             memcpy(at, &half, sizeof half);
         } else if (anti_rt_type_scalar(f->type) == ANTI_TYPE_F32) {
             float narrow = (float)value->data.f;

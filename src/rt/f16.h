@@ -14,7 +14,7 @@
 #include <string.h>
 
 /* The f32 of the half h. Every half has one exactly. */
-static inline float anti_f16_widen(uint16_t h)
+static inline float anti_rt_f16_widen(uint16_t h)
 {
     uint32_t sign = (uint32_t)(h & 0x8000) << 16;
     uint32_t exponent = (h >> 10) & 0x1F;
@@ -39,7 +39,7 @@ static inline float anti_f16_widen(uint16_t h)
 }
 
 /* The half nearest to f, ties to even. */
-static inline uint16_t anti_f16_narrow(float f)
+static inline uint16_t anti_rt_f16_narrow(float f)
 {
     uint32_t bits;
     uint32_t sign;

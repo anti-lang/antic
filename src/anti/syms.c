@@ -1093,11 +1093,11 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
     vaddr = base + offset - 1;
     if (elf) {
         const uint8_t *bytes = (const uint8_t *)twin->data;
-        if (anti_elf_function(bytes, twin->length, vaddr, &found)) {
+        if (anti_rt_elf_function(bytes, twin->length, vaddr, &found)) {
             text_append_bytes(&out->function, found.function,
                               found.function_length);
         }
-        if (anti_elf_line(bytes, twin->length, vaddr, &found) &&
+        if (anti_rt_elf_line(bytes, twin->length, vaddr, &found) &&
             found.file != NULL) {
             text_append_bytes(&out->where, found.file, found.file_length);
             text_appendf(&out->where, ":%lld", (long long)found.line);
@@ -1107,22 +1107,22 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
         const char *object;
         const char *symbol;
         uint64_t start;
-        if (anti_macho_table((const uint8_t *)twin->data, twin->length, false,
-                             0, &t)) {
-            if (anti_macho_function(&t, vaddr, &found)) {
+        if (anti_rt_macho_table((const uint8_t *)twin->data, twin->length,
+                                false, 0, &t)) {
+            if (anti_rt_macho_function(&t, vaddr, &found)) {
                 text_append_bytes(&out->function, found.function,
                                   found.function_length);
             }
             /* The link of Mach-O leaves the line table in the objects
                that its debug map names, which stand where it was
                built. */
-            if (anti_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
+            if (anti_rt_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
                 struct text bytes = {0};
                 if (files_read(object, &bytes)) {
-                    anti_macho_relocate((uint8_t *)bytes.data, bytes.length);
-                    if (anti_macho_object_line((const uint8_t *)bytes.data,
-                                               bytes.length, symbol,
-                                               vaddr - start, &found) &&
+                    anti_rt_macho_relocate((uint8_t *)bytes.data, bytes.length);
+                    if (anti_rt_macho_object_line((const uint8_t *)bytes.data,
+                                                  bytes.length, symbol,
+                                                  vaddr - start, &found) &&
                         found.file != NULL) {
                         text_append_bytes(&out->where, found.file,
                                           found.file_length);

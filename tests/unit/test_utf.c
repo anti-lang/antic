@@ -5,7 +5,7 @@
 #include "text.h"
 #include "utf.h"
 
-/* The output of anti_utf8_repair as hex bytes separated by spaces. */
+/* The output of anti_rt_utf8_repair as hex bytes separated by spaces. */
 static void repairs(const unsigned char *in, size_t n, const char *expected)
 {
     unsigned char *out = malloc(3 * n + 1);
@@ -13,7 +13,7 @@ static void repairs(const unsigned char *in, size_t n, const char *expected)
     size_t count;
     size_t i;
 
-    count = anti_utf8_repair(in, n, out);
+    count = anti_rt_utf8_repair(in, n, out);
     for (i = 0; i < count; i++) {
         text_appendf(&hex, "%s%02X", i == 0 ? "" : " ", out[i]);
     }
@@ -29,7 +29,7 @@ static void converts(const uint16_t *in, size_t n, const char *expected)
     size_t count;
     size_t i;
 
-    count = anti_utf16_to_utf8(in, n, out);
+    count = anti_rt_utf16_to_utf8(in, n, out);
     for (i = 0; i < count; i++) {
         text_appendf(&hex, "%s%02X", i == 0 ? "" : " ", out[i]);
     }
@@ -52,7 +52,7 @@ static void splits(const char *line, const char *expected)
     for (i = 0; i <= n; i++) {
         units[i] = (uint16_t)(unsigned char)line[i];
     }
-    count = anti_split_command_line(units, out);
+    count = anti_rt_split_command_line(units, out);
     for (arg = 0, i = 0; arg < count; arg++, i++) {
         if (arg > 0) {
             text_append(&joined, "|");
@@ -72,11 +72,11 @@ static void splits(const char *line, const char *expected)
 static void round_trips(uint32_t c, size_t length)
 {
     unsigned char bytes[4];
-    size_t n = anti_utf8_encode(c, bytes);
+    size_t n = anti_rt_utf8_encode(c, bytes);
     size_t read = 9;
 
     CHECK(n == length);
-    CHECK(anti_utf8_decode(bytes, n, &read) == c);
+    CHECK(anti_rt_utf8_decode(bytes, n, &read) == c);
     CHECK(read == n);
 }
 
@@ -85,7 +85,7 @@ static void refuses(const unsigned char *in, size_t n)
 {
     size_t read = 9;
 
-    anti_utf8_decode(in, n, &read);
+    anti_rt_utf8_decode(in, n, &read);
     CHECK(read == 0);
 }
 

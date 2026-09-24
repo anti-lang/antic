@@ -93,7 +93,7 @@ its addresses, its name and, where the debug information gives them, its file
 and line. It reads the program with the readers of `src/rt/symbols.c`, the ones
 `anti.lang.StackTrace.symbolize` reads a running program with. The map is
 therefore what a trace of that program would name. Those readers looked up one
-address at a time, and `anti_elf_functions` and `anti_macho_functions` walk a
+address at a time, and `anti_rt_elf_functions` and `anti_rt_macho_functions` walk a
 whole symbol table for this.
 
 The binary, the debug link and the map all carry one build id, which is what

@@ -6,7 +6,7 @@
 #include <string.h>
 #include "symbols.h"
 
-/* The name that anti_coff_demangle gives for symbol, or "" when it gives
+/* The name that anti_rt_coff_demangle gives for symbol, or "" when it gives
    none. */
 static void demangles(const char *symbol, size_t room, const char *expected)
 {
@@ -14,7 +14,7 @@ static void demangles(const char *symbol, size_t room, const char *expected)
     size_t length;
 
     memset(out, 'x', sizeof out);
-    length = anti_coff_demangle(symbol, strlen(symbol), out, room);
+    length = anti_rt_coff_demangle(symbol, strlen(symbol), out, room);
     CHECK(length < sizeof out);
     out[length < sizeof out ? length : 0] = 0;
     CHECK_STR(out, expected);
@@ -267,7 +267,7 @@ static bool line_of(const struct blob *line, uint64_t vaddr,
     size_t size = elf_image(image, sizeof image, ELF_NULL, line);
 
     memset(found, 0, sizeof *found);
-    return anti_elf_line(image, size, vaddr, found);
+    return anti_rt_elf_line(image, size, vaddr, found);
 }
 
 /* S28: a section of type NOBITS holds no bytes of the file. A reader of
@@ -282,21 +282,21 @@ static void nobits_sections(void)
 
     simple_lines(&line, 6);
     size = elf_image(image, sizeof image, ELF_NULL, &line);
-    CHECK(anti_elf_symbol(image, size, "anti_licenses", &vaddr));
+    CHECK(anti_rt_elf_symbol(image, size, "anti_licenses", &vaddr));
     CHECK(vaddr == 0x1000);
     memset(&found, 0, sizeof found);
-    CHECK(anti_elf_line(image, size, 0x1004, &found));
+    CHECK(anti_rt_elf_line(image, size, 0x1004, &found));
     CHECK(found.line == 7);
     CHECK(found.file != NULL && strcmp(found.file, "a.anti") == 0);
 
     size = elf_image(image, sizeof image, ELF_SHSTRTAB, &line);
-    CHECK(!anti_elf_symbol(image, size, "anti_licenses", &vaddr));
-    CHECK(!anti_elf_line(image, size, 0x1004, &found));
+    CHECK(!anti_rt_elf_symbol(image, size, "anti_licenses", &vaddr));
+    CHECK(!anti_rt_elf_line(image, size, 0x1004, &found));
     size = elf_image(image, sizeof image, ELF_STRTAB, &line);
-    CHECK(!anti_elf_symbol(image, size, "anti_licenses", &vaddr));
+    CHECK(!anti_rt_elf_symbol(image, size, "anti_licenses", &vaddr));
     size = elf_image(image, sizeof image, ELF_DEBUG_LINE, &line);
-    CHECK(anti_elf_symbol(image, size, "anti_licenses", &vaddr));
-    CHECK(!anti_elf_line(image, size, 0x1004, &found));
+    CHECK(anti_rt_elf_symbol(image, size, "anti_licenses", &vaddr));
+    CHECK(!anti_rt_elf_line(image, size, 0x1004, &found));
 }
 
 /* S29: the line register refuses a step that leaves int64_t, from
@@ -417,9 +417,9 @@ static void long_leb(void)
     op[1 + CONTINUED] = 0;
     op[0] = 0;
     memset(&found, 0, sizeof found);
-    CHECK(!anti_elf_line(file, start + length, 0x1000, &found));
+    CHECK(!anti_rt_elf_line(file, start + length, 0x1000, &found));
     op[0] = 3;
-    CHECK(!anti_elf_line(file, start + length, 0x1000, &found));
+    CHECK(!anti_rt_elf_line(file, start + length, 0x1000, &found));
     free(file);
 }
 
@@ -444,18 +444,18 @@ static void loaded_room(void)
     put(headers + 112 + 4, 4, 4);
     put(headers + 112 + 16, 0x30000, 8);
     put(headers + 112 + 40, 0x1000, 8);
-    CHECK(anti_elf_loaded_room(headers, 3, 0x10000) == 0x1000);
-    CHECK(anti_elf_loaded_room(headers, 3, 0x10ff0) == 0x10);
-    CHECK(anti_elf_loaded_room(headers, 3, 0x11000) == 0);
-    CHECK(anti_elf_loaded_room(headers, 3, 0xffff) == 0);
-    CHECK(anti_elf_loaded_room(headers, 3, 0x20010) == 0);
-    CHECK(anti_elf_loaded_room(headers, 3, 0x30010) == 0);
-    CHECK(anti_elf_loaded_room(headers, 1, 0x10000) == 0x1000);
-    CHECK(anti_elf_loaded_room(headers, 0, 0x10000) == 0);
+    CHECK(anti_rt_elf_loaded_room(headers, 3, 0x10000) == 0x1000);
+    CHECK(anti_rt_elf_loaded_room(headers, 3, 0x10ff0) == 0x10);
+    CHECK(anti_rt_elf_loaded_room(headers, 3, 0x11000) == 0);
+    CHECK(anti_rt_elf_loaded_room(headers, 3, 0xffff) == 0);
+    CHECK(anti_rt_elf_loaded_room(headers, 3, 0x20010) == 0);
+    CHECK(anti_rt_elf_loaded_room(headers, 3, 0x30010) == 0);
+    CHECK(anti_rt_elf_loaded_room(headers, 1, 0x10000) == 0x1000);
+    CHECK(anti_rt_elf_loaded_room(headers, 0, 0x10000) == 0);
     put(headers + 112, 1, 4);
     put(headers + 112 + 16, UINT64_MAX - 0xf, 8);
-    CHECK(anti_elf_loaded_room(headers, 3, UINT64_MAX) == 0);
-    CHECK(anti_elf_loaded_room(headers, 3, 0x5) == 0);
+    CHECK(anti_rt_elf_loaded_room(headers, 3, UINT64_MAX) == 0);
+    CHECK(anti_rt_elf_loaded_room(headers, 3, 0x5) == 0);
 }
 
 void test_symbols(void)

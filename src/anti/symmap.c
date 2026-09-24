@@ -67,8 +67,8 @@ static void elf_lines(struct map *m, const struct text *bytes)
     for (i = 0; i < m->count; i++) {
         struct anti_found found;
         memset(&found, 0, sizeof found);
-        if (anti_elf_line((const uint8_t *)bytes->data, bytes->length,
-                          m->items[i].vaddr, &found) &&
+        if (anti_rt_elf_line((const uint8_t *)bytes->data, bytes->length,
+                             m->items[i].vaddr, &found) &&
             found.file != NULL) {
             text_append_bytes(&m->items[i].file, found.file,
                               found.file_length);
@@ -92,8 +92,8 @@ static void macho_lines(struct map *m, const struct anti_macho_table *t)
         const char *symbol;
         uint64_t start;
         memset(&found, 0, sizeof found);
-        if (!anti_macho_debug_map(t, m->items[i].vaddr, &path, &symbol,
-                                  &start)) {
+        if (!anti_rt_macho_debug_map(t, m->items[i].vaddr, &path, &symbol,
+                                     &start)) {
             continue;
         }
         if (strcmp(text_cstr(&object_path), path) != 0) {
@@ -104,11 +104,12 @@ static void macho_lines(struct map *m, const struct anti_macho_table *t)
                 object.length = 0;
                 continue;
             }
-            anti_macho_relocate((uint8_t *)object.data, object.length);
+            anti_rt_macho_relocate((uint8_t *)object.data, object.length);
         }
         if (object.length > 0 &&
-            anti_macho_object_line((const uint8_t *)object.data, object.length,
-                                   symbol, m->items[i].vaddr - start, &found) &&
+            anti_rt_macho_object_line((const uint8_t *)object.data,
+                                      object.length, symbol,
+                                      m->items[i].vaddr - start, &found) &&
             found.file != NULL) {
             text_append_bytes(&m->items[i].file, found.file,
                               found.file_length);
@@ -179,14 +180,14 @@ bool symmap_write(const char *program, enum target t, const char *id,
         return false;
     }
     if (info->format == FORMAT_ELF) {
-        anti_elf_functions((const uint8_t *)bytes.data, bytes.length,
-                           add_function, &m);
+        anti_rt_elf_functions((const uint8_t *)bytes.data, bytes.length,
+                              add_function, &m);
         sort_map(&m);
         elf_lines(&m, &bytes);
     } else if (info->format == FORMAT_MACHO &&
-               anti_macho_table((const uint8_t *)bytes.data, bytes.length,
-                                false, 0, &table)) {
-        anti_macho_functions(&table, add_function, &m);
+               anti_rt_macho_table((const uint8_t *)bytes.data, bytes.length,
+                                   false, 0, &table)) {
+        anti_rt_macho_functions(&table, add_function, &m);
         sort_map(&m);
         macho_lines(&m, &table);
     }
