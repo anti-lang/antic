@@ -83,3 +83,20 @@ interfaces, the depth limit of nested copies, and `>>` with one list open.
   therefore fails `anti check` until copies compile.
 - `type Name = T;` takes any type. The specification shows it naming a copy
   alone.
+
+## Proof of the push
+
+The push of the step's last code commit, as `git` printed it:
+
+```text
+$ git log --oneline -3
+4016098 Report the syntax of generics
+7d419bb Split a long sentence of the comment on deep copies
+ea85db8 Check the forms of generics a field and a bound function reach
+$ git status --short
+$ git rev-parse HEAD origin/main
+4016098ea54a303dfe3ebfb905a0aa8482dad340
+4016098ea54a303dfe3ebfb905a0aa8482dad340
+```
+
+Suites: host 980 of 980, ASan 979 of 979, UBSan 979 of 979.
