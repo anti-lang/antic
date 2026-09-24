@@ -44,7 +44,9 @@ extern const struct anti_registry anti_rt_registry;
 const struct anti_class *anti_rt_registry_find(const unsigned char *name,
                                                int64_t length);
 
-/* A new object of the class named, on the heap, or NULL. */
+/* A new object of the class named, on the heap of the C library, or
+   NULL. The caller frees it with anti_rt_delete, which `delete`
+   calls. */
 void *anti_rt_reflect_new(const unsigned char *name, int64_t length);
 
 /* A new object from the JSON that the default serialize writes. The

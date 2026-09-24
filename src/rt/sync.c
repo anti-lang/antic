@@ -83,6 +83,8 @@ static _Noreturn void fatal(const char *message)
 
 /* Mutex */
 
+/* The lock of a new Mutex, on the heap. anti_rt_mutex_destroy frees it,
+   which `m.destroy()` calls. */
 void *anti_rt_mutex_new(void)
 {
     lock_t *m = malloc(sizeof *m);
@@ -169,6 +171,8 @@ static struct channel *channel_of(void *handle, const char *what)
     return handle;
 }
 
+/* A new channel of capacity values of size bytes each, on the heap.
+   anti_rt_chan_delete frees it, which `delete(c)` calls. */
 void *anti_rt_chan_new(int64_t size, int64_t capacity)
 {
     struct channel *ch = NULL;

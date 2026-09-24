@@ -149,7 +149,8 @@ void anti_rt_mem_free(void *p);
    their count. Every function reports a failure through errno. */
 
 /* The C stream of the file, opened for reading, or for writing when
-   writing is not 0, or NULL. */
+   writing is not 0, or NULL. The caller closes it with fclose, which
+   `close` of anti.fs calls. */
 void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing);
 
 /* The size in bytes of the file of the stream, or -1. */

@@ -132,7 +132,9 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length);
 struct anti_text anti_rt_plugin_message(void);
 
 /* An object of the class the library provides for the interface, as a
-   pointer to its interface sub-object, or NULL. */
+   pointer to its interface sub-object, or NULL. The object is on the
+   heap of the C library, and the caller frees it with anti_rt_delete,
+   which `delete` calls, before the library unloads. */
 void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d);
 
 /* Whether the class the library provides for the interface carries a

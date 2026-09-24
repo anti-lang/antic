@@ -231,8 +231,9 @@ const void *anti_rt_body_entry(anti_rt_body body);
    the object as. It names that class when the table of the object is
    zero. A null object is left alone. */
 
-/* A copy of the object on the heap, of its concrete size, made by the
-   copy entry of its table. */
+/* A copy of the object on the heap of the C library, of its concrete
+   size, or NULL. The copy entry of its table makes it. The caller frees
+   it with anti_rt_delete, which `delete` calls. */
 void *anti_rt_dup(void *object, const struct anti_descriptor *type);
 
 /* DESIGN: memory goes back to the allocator it came from. The teardown
@@ -275,7 +276,7 @@ void anti_rt_copy_elements(void *from, void *into, int64_t count,
                            const struct anti_descriptor *type);
 
 /* A new buffer on the heap with the bytes at from, or NULL when there are
-   none. */
+   none. The caller frees it with free. */
 void *anti_rt_copy_buffer(const void *from, int64_t bytes);
 
 /* The descriptor of the root and its one ancestor, which every module

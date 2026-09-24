@@ -19,7 +19,8 @@
    holds `a.0.b`. */
 struct anti_toml;
 
-/* Read the document. Returns NULL when the text is not the subset. */
+/* Read the document. Returns NULL when the text is not the subset. The
+   caller frees the document with anti_rt_toml_free. */
 struct anti_toml *anti_rt_toml_read(const unsigned char *bytes, int64_t len);
 
 /* The number of keys the document holds. */

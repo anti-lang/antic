@@ -362,7 +362,8 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
 /* DESIGN: `dispatch` gives one object to the pool and gives a job back.
    The object is in flight from here until the worker returns. A second
    dispatch of the same object gives no job, so two workers never hold
-   one object. The result waits in the job until `join` takes it. */
+   one object. The result waits in the job until `join` takes it. The
+   job is on the heap, and anti_rt_join frees it, which `join` calls. */
 void *anti_rt_dispatch(void *object, int64_t result_size,
                        void (*run)(void *context, void *object, void *out),
                        void *context)
