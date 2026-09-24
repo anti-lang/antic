@@ -978,7 +978,7 @@ abstract class Iterable<T> { ... }
 
 ### Libraries and C
 
-- A library file stores a generic as IR with its parameters open, together with its constraints in the public interface. The program that uses it fills in the arguments and compiles the copy. A library ships generics like any other code, with no source and no templates in headers.
+- A library file stores each generic body as its checked syntax tree. Its names are resolved, its types are checked against its constraints, and its type parameters stay open. Its constraints stand in the public interface. A use with concrete arguments lowers that tree with those arguments into ordinary IR. A copy from the program's own source is made the same way. Code that is not generic stays IR. The IR gives every value a concrete type. An operation on `T` lowers to different instructions per type, so no single IR stands for an open body. The tree has a section of its own in the library file, written byte for byte the same on every host. A library ships generics like any other code, with no source and no templates in headers.
 - The C header cannot show an open generic, since C has none. A library offers a copy to C by naming it: `export type PersonList = List<Person>;`. The header then writes it as any exported class, `struct anti_PersonList` with its functions.
 - `type Name = Generic<Args>;` without `export` names a copy for use in Anti alone.
 - An `export fn` has concrete types throughout. A generic `export fn` is refused, and the message suggests a named copy.
