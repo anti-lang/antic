@@ -97,6 +97,36 @@ static void error_at(struct checker *c, struct pos pos, const char *format,
 #endif
     ;
 
+/* Format into out, which holds size bytes, size being 4 or more. A text
+   too long for out ends in "..." where it was cut, so that a message
+   never loses its end unmarked. */
+static void vformat_to(char *out, size_t size, const char *format,
+                       va_list args)
+{
+    int n = vsnprintf(out, size, format, args);
+
+    if (n < 0) {
+        out[0] = '\0';
+    } else if ((size_t)n >= size) {
+        memcpy(out + size - 4, "...", 4);
+    }
+}
+
+static void format_to(char *out, size_t size, const char *format, ...)
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((format(printf, 3, 4)))
+#endif
+    ;
+
+static void format_to(char *out, size_t size, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vformat_to(out, size, format, args);
+    va_end(args);
+}
+
 static void error_at(struct checker *c, struct pos pos, const char *format,
                      ...)
 {
@@ -107,7 +137,7 @@ static void error_at(struct checker *c, struct pos pos, const char *format,
         return;
     }
     va_start(args, format);
-    vsnprintf(message, sizeof message, format, args);
+    vformat_to(message, sizeof message, format, args);
     va_end(args);
     diagnostics_add(c->diags, pos.line, pos.column, "%s", message);
     c->ok = false;
@@ -123,7 +153,7 @@ static const char *tn(const struct type *t)
     char *buffer = buffers[next++ % 4];
 
     type_name(&text, t);
-    snprintf(buffer, sizeof buffers[0], "%s", text_cstr(&text));
+    format_to(buffer, sizeof buffers[0], "%s", text_cstr(&text));
     text_free(&text);
     return buffer;
 }
@@ -820,6 +850,24 @@ static struct type *resolve_type(struct checker *c, struct type_expr *t)
     return t->type;
 }
 
+/* The struct or class name of the standard module module, from its
+   library file. With own set, the module being checked may be that
+   module and declare name itself, as `anti.lang` declares its error
+   class. NULL when neither declares a struct or class of that name. */
+static struct symbol *std_item(struct checker *c, const struct name *module,
+                               const struct name *name, bool own)
+{
+    const struct interface *lib = find_library(c, module);
+    struct symbol *sym = lib != NULL ? library_item(c, lib, name) : NULL;
+
+    if (sym == NULL && own && same_name(&c->module_name, module)) {
+        sym = lookup(c, name);
+    }
+    return sym != NULL && sym->kind == SYMBOL_STRUCT && sym->type != NULL
+               ? sym
+               : NULL;
+}
+
 /* DESIGN: `may fail` gives a function the convention a program used to
    write by hand: `?*lang.Error` as the result and an out pointer for
    what it computes. The class is an ordinary imported one, so a module
@@ -829,15 +877,9 @@ static struct type *error_class(struct checker *c, struct pos pos)
 {
     static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
     static const struct name class_name = {LANG_ERROR, sizeof LANG_ERROR - 1};
-    const struct interface *lib = find_library(c, &module);
-    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+    struct symbol *sym = std_item(c, &module, &class_name, true);
 
-    /* `anti.lang` declares the class itself rather than importing it. */
-    if (sym == NULL && name_is(&c->module_name, LANG_MODULE)) {
-        sym = lookup(c, &class_name);
-    }
-    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
-        sym->type->kind != TYPE_CLASS) {
+    if (sym == NULL || sym->type->kind != TYPE_CLASS) {
         error_at(c, pos, "`may fail` gives `?*" LANG_MODULE "." LANG_ERROR
                  "`, so the module imports `" LANG_MODULE "`");
         return NULL;
@@ -852,14 +894,9 @@ static struct type *location_type(struct checker *c, struct pos pos)
     static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
     static const struct name type_name = {
         LANG_SOURCE_LOCATION, sizeof LANG_SOURCE_LOCATION - 1};
-    const struct interface *lib = find_library(c, &module);
-    struct symbol *sym = lib != NULL ? library_item(c, lib, &type_name) : NULL;
+    struct symbol *sym = std_item(c, &module, &type_name, true);
 
-    if (sym == NULL && name_is(&c->module_name, LANG_MODULE)) {
-        sym = lookup(c, &type_name);
-    }
-    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
-        sym->type->kind != TYPE_STRUCT) {
+    if (sym == NULL || sym->type->kind != TYPE_STRUCT) {
         error_at(c, pos, "`here` gives an `" LANG_MODULE "."
                  LANG_SOURCE_LOCATION "`, so the module imports `"
                  LANG_MODULE "`");
@@ -875,14 +912,9 @@ static struct type *allocator_pointer(struct checker *c)
     static const struct name module = {MEM_MODULE, sizeof MEM_MODULE - 1};
     static const struct name class_name = {MEM_ALLOCATOR,
                                            sizeof MEM_ALLOCATOR - 1};
-    const struct interface *lib = find_library(c, &module);
-    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+    struct symbol *sym = std_item(c, &module, &class_name, true);
 
-    if (sym == NULL && name_is(&c->module_name, MEM_MODULE)) {
-        sym = lookup(c, &class_name);
-    }
-    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
-        sym->type->kind != TYPE_CLASS) {
+    if (sym == NULL || sym->type->kind != TYPE_CLASS) {
         return NULL;
     }
     return types_pointer(c->types, sym->type);
@@ -1923,6 +1955,7 @@ static void declare_get(struct checker *c, struct item *it)
        module defines `module.T.get` and another module calls that. */
     text_appendf(&qualified, "%.*s.%s", (int)it->name.length, it->name.text,
                  get_text);
+    sym->name.length = qualified.length;
     text = arena_alloc(c->arena, qualified.length + 1);
     memcpy(text, qualified.data, qualified.length + 1);
     text_free(&qualified);
@@ -1936,7 +1969,6 @@ static void declare_get(struct checker *c, struct item *it)
     m->singleton_get = true;
     sym->kind = SYMBOL_FN;
     sym->name.text = text;
-    sym->name.length = strlen(text);
     sym->item = m;
     sym->type = types_fn(c->types, NULL, 0, types_pointer(c->types, t));
     members =
@@ -2403,7 +2435,7 @@ static struct type *check_variant_test(struct checker *c, struct expr *e,
     if (target->member.length > 0) {
         named = imported_struct(c, &target->module, &target->name,
                                 target->pos);
-        if (is_error((struct type *)named)) {
+        if (is_error(named)) {
             return builtin(c, TYPE_ERROR);
         }
         which = &target->member;
@@ -2786,7 +2818,7 @@ static bool refuse_abstract_value(struct checker *c, struct pos pos,
         return false;
     }
     error_at(c, pos, "`%s` is abstract and has no complete value, and %s "
-             "needs one", tn((struct type *)t), what);
+             "needs one", tn(t), what);
     return true;
 }
 
@@ -2834,11 +2866,9 @@ static struct type *lang_error_or_null(struct checker *c)
 {
     static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
     static const struct name class_name = {LANG_ERROR, sizeof LANG_ERROR - 1};
-    const struct interface *lib = find_library(c, &module);
-    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
+    struct symbol *sym = std_item(c, &module, &class_name, false);
 
-    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->type == NULL ||
-        sym->type->kind != TYPE_CLASS) {
+    if (sym == NULL || sym->type->kind != TYPE_CLASS) {
         return NULL;
     }
     return sym->type;
@@ -2945,7 +2975,7 @@ static const struct type *inherited(const struct type *t)
    and `v.f(args)` into `T.f(&v.name, args)`, so nothing below the checker
    knows about promotion. The containing struct's own names win, and a
    name that two fields both provide is an error at the use. */
-static const struct struct_field *promoting_field(const struct checker *c,
+static const struct struct_field *promoting_field(struct checker *c,
                                                   const struct type *s,
                                                   const struct name *name,
                                                   bool *ambiguous);
@@ -2955,7 +2985,7 @@ static const struct struct_field *promoting_field(const struct checker *c,
 /* DESIGN: a `use` field and an interface sub-object promote the public
    members of their type and nothing else. A base promotes what the class
    itself may see, because the chain is one namespace. */
-static bool provides(const struct checker *c, const struct type *t,
+static bool provides(struct checker *c, const struct type *t,
                      const struct name *name, bool pub_only)
 {
     const struct struct_field *f;
@@ -2977,7 +3007,7 @@ static bool provides(const struct checker *c, const struct type *t,
     return promoting_field(c, t, name, &ambiguous) != NULL;
 }
 
-static const struct struct_field *promoting_field(const struct checker *c,
+static const struct struct_field *promoting_field(struct checker *c,
                                                   const struct type *s,
                                                   const struct name *name,
                                                   bool *ambiguous)
@@ -2993,7 +3023,7 @@ static const struct struct_field *promoting_field(const struct checker *c,
         }
         if (found != NULL) {
             *ambiguous = true;
-            error_at((struct checker *)c, f->pos,
+            error_at(c, f->pos,
                      "`%.*s` is provided by both `%.*s` and `%.*s`",
                      (int)name->length, name->text,
                      (int)found->name.length, found->name.text,
@@ -3598,12 +3628,8 @@ static struct symbol *null_pointer_maker(struct checker *c, struct pos pos)
     static const struct name class_name = {
         LANG_NONE_DEREFERENCE, sizeof LANG_NONE_DEREFERENCE - 1};
     static const struct name maker = {"new", 3};
-    const struct interface *lib = find_library(c, &module);
-    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
-    const struct item *m =
-        sym != NULL && sym->kind == SYMBOL_STRUCT && sym->type != NULL
-            ? find_member(sym->type, &maker)
-            : NULL;
+    struct symbol *sym = std_item(c, &module, &class_name, false);
+    const struct item *m = sym != NULL ? find_member(sym->type, &maker) : NULL;
 
     if (m == NULL || m->symbol == NULL || m->symbol->type == NULL) {
         error_at(c, pos, "`catch` on a `?*T` gives an `" LANG_MODULE "."
@@ -3642,16 +3668,10 @@ static struct symbol *trace_capture(struct checker *c, struct pos pos)
                                            sizeof LANG_STACK_TRACE - 1};
     static const struct name capture = {LANG_TRACE_CAPTURE,
                                         sizeof LANG_TRACE_CAPTURE - 1};
-    const struct interface *lib = find_library(c, &module);
-    struct symbol *sym = lib != NULL ? library_item(c, lib, &class_name) : NULL;
-    const struct item *m;
+    struct symbol *sym = std_item(c, &module, &class_name, true);
+    const struct item *m =
+        sym != NULL ? find_member(sym->type, &capture) : NULL;
 
-    if (sym == NULL && name_is(&c->module_name, LANG_MODULE)) {
-        sym = lookup(c, &class_name);
-    }
-    m = sym != NULL && sym->kind == SYMBOL_STRUCT && sym->type != NULL
-            ? find_member(sym->type, &capture)
-            : NULL;
     if (m == NULL || m->symbol == NULL || m->symbol->type == NULL ||
         m->symbol->type->kind != TYPE_FN ||
         m->symbol->type->param_count != 1) {
@@ -3695,6 +3715,26 @@ static struct type *caught_error(struct checker *c, struct type *result)
     return result != NULL && type_is_nullable(result)
                ? types_pointer(c->types, result->element)
                : result;
+}
+
+/* Declare the name the handler h binds, in the scope just entered, as a
+   read-only local of type t that holds the caught error. A handler
+   without a name declares nothing. */
+static void declare_caught(struct checker *c, struct handler *h,
+                           struct type *t)
+{
+    if (h->name.length == 0) {
+        return;
+    }
+    warn_catch_shadow(c, &h->name, h->pos);
+    h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
+                        "`%.*s` is already declared in this block");
+    if (h->symbol != NULL) {
+        h->symbol->type = t;
+        h->symbol->read_only = true;
+        h->symbol->caught = true;
+        h->symbol->caught_loops = c->loop_depth;
+    }
 }
 
 /* DESIGN: a function fails when it is written `may fail`, and never
@@ -3834,23 +3874,11 @@ static struct type *check_handled(struct checker *c, struct expr *e,
         return result;
     case HANDLE_BLOCK:
         enter_scope(c, &scope);
-        if (h->name.length > 0) {
-            warn_catch_shadow(c, &h->name, h->pos);
-            h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
-                                "`%.*s` is already declared in this block");
-            if (h->symbol != NULL) {
-                /* DESIGN: a failing function returns `?*Error`, `none`
-                   on success. The handler runs on the failure alone, so
-                   the error it binds is the `*Error` of that result and
-                   needs no check of its own. */
-                h->symbol->type = caught_error(c, fn->result);
-                h->symbol->read_only = true;
-            }
-        }
-        if (h->symbol != NULL) {
-            h->symbol->caught = true;
-            h->symbol->caught_loops = c->loop_depth;
-        }
+        /* DESIGN: a failing function returns `?*Error`, `none` on
+           success. The handler runs on the failure alone, so the error it
+           binds is the `*Error` of that result and needs no check of its
+           own. */
+        declare_caught(c, h, caught_error(c, fn->result));
         c->yields = result;
         c->handler_depth++;
         check_block(c, h->body);
@@ -4507,7 +4535,8 @@ static bool name_path(struct checker *c, const struct expr *e,
     const struct name *parts[PATH_PARTS];
     struct text path = {0};
     size_t count = 0;
-    const char *dot;
+    size_t length;
+    size_t dot;
     char *copy;
     size_t i;
 
@@ -4526,14 +4555,18 @@ static bool name_path(struct checker *c, const struct expr *e,
         text_appendf(&path, ".%.*s", (int)parts[i - 1]->length,
                      parts[i - 1]->text);
     }
-    copy = arena_alloc(c->arena, path.length + 1);
-    memcpy(copy, text_cstr(&path), path.length + 1);
+    length = path.length;
+    copy = arena_alloc(c->arena, length + 1);
+    memcpy(copy, text_cstr(&path), length + 1);
     text_free(&path);
-    dot = strrchr(copy, '.');
+    dot = length;
+    while (dot > 0 && copy[dot - 1] != '.') {
+        dot--;
+    }
     qualifier->text = copy;
-    qualifier->length = dot != NULL ? (size_t)(dot - copy) : 0;
-    last->text = dot != NULL ? dot + 1 : copy;
-    last->length = strlen(last->text);
+    qualifier->length = dot > 0 ? dot - 1 : 0;
+    last->text = copy + dot;
+    last->length = length - dot;
     return true;
 }
 
@@ -4572,7 +4605,7 @@ static const struct type *plugin_call(struct checker *c, struct expr *e,
     }
     if (iface->kind != TYPE_CLASS || !iface->has_abstract) {
         error_at(c, given->pos, "`%s` is not abstract, and a library "
-                 "provides an interface", tn((struct type *)iface));
+                 "provides an interface", tn(iface));
         return NULL;
     }
     argument = new_node(c, EXPR_DESCRIPTOR, given->pos);
@@ -5014,8 +5047,8 @@ static struct type *variant_literal(struct checker *c, struct expr *e,
     }
     payload = v->params[index];
     e->as.struct_lit.variant_case = (uint32_t)(index + 1);
-    snprintf(written, sizeof written, "%s.%.*s", tn(v), (int)name->length,
-             name->text);
+    format_to(written, sizeof written, "%s.%.*s", tn(v), (int)name->length,
+              name->text);
     return check_field_inits(c, e, e->as.struct_lit.fields,
                              e->as.struct_lit.field_count,
                              payload != NULL ? payload->fields : NULL,
@@ -5390,6 +5423,66 @@ static bool worker_type(struct checker *c, struct pos pos, const char *what,
     return true;
 }
 
+/* The function type of the worker that call of `parallel` or `dispatch`
+   names, with one parameter before the arguments of the call, the chunk
+   or the object that first names. NULL after an error. */
+static struct type *worker_callee(struct checker *c, struct expr *call,
+                                  const char *form, const char *first)
+{
+    struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
+    size_t arg_count = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
+    struct symbol *sym;
+    struct type *fn;
+
+    if (callee->kind != EXPR_NAME) {
+        error_at(c, callee->pos, "`%s` runs a worker named here", form);
+        return NULL;
+    }
+    sym = lookup(c, &callee->as.name);
+    callee->symbol = sym;
+    fn = check_expr(c, callee, NULL);
+    if (is_error(fn)) {
+        return NULL;
+    }
+    if (fn->kind != TYPE_FN || sym == NULL || !sym->worker) {
+        error_at(c, callee->pos, "`%.*s` is not a `worker fn`",
+                 (int)callee->as.name.length, callee->as.name.text);
+        return NULL;
+    }
+    if (fn->param_count != arg_count + 1) {
+        error_at(c, call->pos, "`%.*s` takes %zu argument%s beside the %s, "
+                 "found %zu", (int)callee->as.name.length,
+                 callee->as.name.text, fn->param_count - 1,
+                 fn->param_count == 2 ? "" : "s", first, arg_count);
+        return NULL;
+    }
+    return fn;
+}
+
+/* Check the result and the arguments of the call of the worker fn, each
+   a value without a pointer, and give the call its type. */
+static bool worker_args(struct checker *c, struct expr *call,
+                        const struct type *fn)
+{
+    struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
+    struct expr **args = call->kind == EXPR_CALL ? call->as.call.args : NULL;
+    size_t arg_count = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
+    bool ok = worker_type(c, callee->pos, "the result of a worker",
+                          fn->result);
+    size_t i;
+
+    for (i = 0; i < arg_count; i++) {
+        ok = require(c, args[i], check_expr(c, args[i], fn->params[i + 1]),
+                     fn->params[i + 1]) && ok;
+        ok = worker_type(c, args[i]->pos, "an argument of a worker",
+                         fn->params[i + 1]) && ok;
+    }
+    if (call->kind == EXPR_CALL) {
+        call->type = fn->result;
+    }
+    return ok;
+}
+
 /* Check `parallel a by n -> f(x)`. It splits a into n chunks and runs f
    on each through the worker pool. The results come back in chunk
    order. */
@@ -5397,12 +5490,8 @@ static struct type *check_parallel(struct checker *c, struct expr *e)
 {
     struct expr *call = e->as.parallel.call;
     struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
-    struct expr **args = call->kind == EXPR_CALL ? call->as.call.args : NULL;
-    size_t arg_count = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct type *array = check_expr(c, e->as.parallel.array, NULL);
-    struct symbol *sym;
     struct type *fn;
-    size_t i;
     bool ok = true;
 
     if (e->as.parallel.chunks != NULL) {
@@ -5418,26 +5507,8 @@ static struct type *check_parallel(struct checker *c, struct expr *e)
                  "`parallel` splits a slice, and this is `%s`", tn(array));
         return builtin(c, TYPE_ERROR);
     }
-    if (callee->kind != EXPR_NAME) {
-        error_at(c, callee->pos, "`parallel` runs a worker named here");
-        return builtin(c, TYPE_ERROR);
-    }
-    sym = lookup(c, &callee->as.name);
-    callee->symbol = sym;
-    fn = check_expr(c, callee, NULL);
-    if (is_error(fn)) {
-        return builtin(c, TYPE_ERROR);
-    }
-    if (fn->kind != TYPE_FN || sym == NULL || !sym->worker) {
-        error_at(c, callee->pos, "`%.*s` is not a `worker fn`",
-                 (int)callee->as.name.length, callee->as.name.text);
-        return builtin(c, TYPE_ERROR);
-    }
-    if (fn->param_count != arg_count + 1) {
-        error_at(c, call->pos, "`%.*s` takes %zu argument%s beside the chunk, "
-                 "found %zu", (int)callee->as.name.length,
-                 callee->as.name.text, fn->param_count - 1,
-                 fn->param_count == 2 ? "" : "s", arg_count);
+    fn = worker_callee(c, call, "parallel", "chunk");
+    if (fn == NULL) {
         return builtin(c, TYPE_ERROR);
     }
     if (fn->params[0]->kind != TYPE_SLICE ||
@@ -5448,17 +5519,7 @@ static struct type *check_parallel(struct checker *c, struct expr *e)
         return builtin(c, TYPE_ERROR);
     }
     ok = worker_type(c, callee->pos, "the chunk", array->element) && ok;
-    ok = worker_type(c, callee->pos, "the result of a worker", fn->result) &&
-         ok;
-    for (i = 0; i < arg_count; i++) {
-        ok = require(c, args[i], check_expr(c, args[i], fn->params[i + 1]),
-                     fn->params[i + 1]) && ok;
-        ok = worker_type(c, args[i]->pos, "an argument of a worker",
-                         fn->params[i + 1]) && ok;
-    }
-    if (call->kind == EXPR_CALL) {
-        call->type = fn->result;
-    }
+    ok = worker_args(c, call, fn) && ok;
     return ok ? types_slice(c->types, fn->result) : builtin(c, TYPE_ERROR);
 }
 
@@ -5470,13 +5531,8 @@ static struct type *check_dispatch(struct checker *c, struct expr *e)
 {
     struct expr *call = e->as.dispatch.call;
     struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
-    struct expr **args = call->kind == EXPR_CALL ? call->as.call.args : NULL;
-    size_t arg_count = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct type *object = check_expr(c, e->as.dispatch.object, NULL);
-    struct symbol *sym;
     struct type *fn;
-    size_t i;
-    bool ok = true;
 
     if (is_error(object)) {
         return builtin(c, TYPE_ERROR);
@@ -5487,26 +5543,8 @@ static struct type *check_dispatch(struct checker *c, struct expr *e)
                  tn(object));
         return builtin(c, TYPE_ERROR);
     }
-    if (callee->kind != EXPR_NAME) {
-        error_at(c, callee->pos, "`dispatch` runs a worker named here");
-        return builtin(c, TYPE_ERROR);
-    }
-    sym = lookup(c, &callee->as.name);
-    callee->symbol = sym;
-    fn = check_expr(c, callee, NULL);
-    if (is_error(fn)) {
-        return builtin(c, TYPE_ERROR);
-    }
-    if (fn->kind != TYPE_FN || sym == NULL || !sym->worker) {
-        error_at(c, callee->pos, "`%.*s` is not a `worker fn`",
-                 (int)callee->as.name.length, callee->as.name.text);
-        return builtin(c, TYPE_ERROR);
-    }
-    if (fn->param_count != arg_count + 1) {
-        error_at(c, call->pos, "`%.*s` takes %zu argument%s beside the object, "
-                 "found %zu", (int)callee->as.name.length,
-                 callee->as.name.text, fn->param_count - 1,
-                 fn->param_count == 2 ? "" : "s", arg_count);
+    fn = worker_callee(c, call, "dispatch", "object");
+    if (fn == NULL) {
         return builtin(c, TYPE_ERROR);
     }
     if (fn->params[0] != object) {
@@ -5515,18 +5553,8 @@ static struct type *check_dispatch(struct checker *c, struct expr *e)
                  tn(fn->params[0]), tn(object));
         return builtin(c, TYPE_ERROR);
     }
-    ok = worker_type(c, callee->pos, "the result of a worker", fn->result) &&
-         ok;
-    for (i = 0; i < arg_count; i++) {
-        ok = require(c, args[i], check_expr(c, args[i], fn->params[i + 1]),
-                     fn->params[i + 1]) && ok;
-        ok = worker_type(c, args[i]->pos, "an argument of a worker",
-                         fn->params[i + 1]) && ok;
-    }
-    if (call->kind == EXPR_CALL) {
-        call->type = fn->result;
-    }
-    return ok ? types_job(c->types, fn->result) : builtin(c, TYPE_ERROR);
+    return worker_args(c, call, fn) ? types_job(c->types, fn->result)
+                                    : builtin(c, TYPE_ERROR);
 }
 
 /* `join(job)` waits for one job and gives its result. `join_all(jobs)`
@@ -7994,7 +8022,7 @@ static void check_switch_covers(struct checker *c, const struct stmt *s,
     }
     if (found > 0) {
         error_at(c, s->pos, "this `switch` on `%s` has no arm for %s",
-                 tn((struct type *)over), text_cstr(&missing));
+                 tn(over), text_cstr(&missing));
     }
     text_free(&missing);
 }
@@ -8092,7 +8120,7 @@ static void check_cases_covered(struct checker *c, const struct stmt *s,
     }
     if (found > 0) {
         error_at(c, s->pos, "this `switch` on `%s` has no arm for %s",
-                 tn((struct type *)over), text_cstr(&missing));
+                 tn(over), text_cstr(&missing));
     }
     text_free(&missing);
 }
@@ -8289,17 +8317,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
         return types_without_none(c->types, value);
     }
     enter_scope(c, &scope);
-    if (h->name.length > 0) {
-        warn_catch_shadow(c, &h->name, h->pos);
-        h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
-                            "`%.*s` is already declared in this block");
-        if (h->symbol != NULL) {
-            h->symbol->type = error;
-            h->symbol->read_only = true;
-            h->symbol->caught = true;
-            h->symbol->caught_loops = c->loop_depth;
-        }
-    }
+    declare_caught(c, h, error);
     c->yields = types_without_none(c->types, value);
     c->handler_depth++;
     check_block(c, h->body);
@@ -8875,20 +8893,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
             return;
         }
         enter_scope(c, &try_scope);
-        if (h->name.length > 0) {
-            warn_catch_shadow(c, &h->name, h->pos);
-            h->symbol = declare(c, SYMBOL_LOCAL, &h->name, h->pos,
-                                "`%.*s` is already declared in this block");
-            if (h->symbol != NULL) {
-                h->symbol->type =
-                    c->error_type != NULL
-                        ? caught_error(c, c->error_type)
-                        : builtin(c, TYPE_ERROR);
-                h->symbol->read_only = true;
-                h->symbol->caught = true;
-                h->symbol->caught_loops = c->loop_depth;
-            }
-        }
+        declare_caught(c, h,
+                       c->error_type != NULL ? caught_error(c, c->error_type)
+                                             : builtin(c, TYPE_ERROR));
         check_block(c, h->body);
         leave_scope(c, &try_scope);
         c->error_type = outer_error;
@@ -9231,7 +9238,7 @@ static void require_set(struct checker *c, const struct required *r,
     }
     if (i < r->count) {
         error_at(c, pos, "`construct` of `%s` returns `none` before it sets "
-                 "`%.*s`", tn((struct type *)r->owner),
+                 "`%.*s`", tn(r->owner),
                  (int)r->fields[i]->name.length, r->fields[i]->name.text);
     }
 }
@@ -9844,9 +9851,9 @@ static const struct type *written_result(const struct type *fn)
 static void returned_text(char *out, size_t size, const struct type *t)
 {
     if (t == NULL) {
-        snprintf(out, size, "nothing");
+        format_to(out, size, "nothing");
     } else {
-        snprintf(out, size, "`%s`", tn(t));
+        format_to(out, size, "`%s`", tn(t));
     }
 }
 
@@ -9898,12 +9905,12 @@ static bool same_signature(struct checker *c, const struct item *m,
         theirs->kind != TYPE_FN) {
         return true;
     }
-    snprintf(fn, sizeof fn, "concrete fn %.*s%s%.*s",
-             (int)m->qualifier.length, m->qualifier.text,
-             m->qualifier.length > 0 ? "::" : "", (int)m->name.length,
-             m->name.text);
-    snprintf(at, sizeof at, "%s.%.*s", tn(owner), (int)entry->name.length,
-             entry->name.text);
+    format_to(fn, sizeof fn, "concrete fn %.*s%s%.*s",
+              (int)m->qualifier.length, m->qualifier.text,
+              m->qualifier.length > 0 ? "::" : "", (int)m->name.length,
+              m->name.text);
+    format_to(at, sizeof at, "%s.%.*s", tn(owner), (int)entry->name.length,
+              entry->name.text);
     if (m->has_self != entry->has_self) {
         error_at(c, m->name_pos, "`%s` %s `self`, and `%s` %s", fn,
                  m->has_self ? "takes" : "does not take", at,
@@ -9936,10 +9943,10 @@ static bool same_signature(struct checker *c, const struct item *m,
     if (count != their_count) {
         char takes[48];
         if (count == 0) {
-            snprintf(takes, sizeof takes, "no parameter");
+            format_to(takes, sizeof takes, "no parameter");
         } else {
-            snprintf(takes, sizeof takes, "%zu parameter%s", count,
-                     count == 1 ? "" : "s");
+            format_to(takes, sizeof takes, "%zu parameter%s", count,
+                      count == 1 ? "" : "s");
         }
         error_at(c, m->name_pos, "`%s` takes %s%s, and `%s` takes %zu", fn,
                  takes, m->has_self ? " besides `self`" : "", at,
@@ -10138,7 +10145,7 @@ static void check_provides(struct checker *c, struct module *module)
                 module->provides[j].type == iface) {
                 error_at(c, pr->interface_pos,
                          "`%s` is provided twice",
-                         tn((struct type *)iface));
+                         tn(iface));
             }
         }
         if (iface == NULL) {
@@ -10147,7 +10154,7 @@ static void check_provides(struct checker *c, struct module *module)
         if (iface->kind != TYPE_CLASS || !iface->has_abstract) {
             error_at(c, pr->interface_pos, "`%s` is not abstract, and a "
                      "`provides` line names an interface",
-                     tn((struct type *)iface));
+                     tn(iface));
             continue;
         }
         if (it == NULL || it->kind != ITEM_CLASS || sym->type == NULL) {
@@ -10172,7 +10179,7 @@ static void check_provides(struct checker *c, struct module *module)
         if (!fills(sym->type, iface)) {
             error_at(c, pr->class_pos, "`%.*s` neither inherits `%s` nor "
                      "implements it", (int)pr->class_name.length,
-                     pr->class_name.text, tn((struct type *)iface));
+                     pr->class_name.text, tn(iface));
             continue;
         }
         pr->type = iface;
@@ -10728,8 +10735,8 @@ bool sema_check(struct module *module, const char *module_name,
                 t->fields[j].form == FIELD_IMPL) {
                 continue;
             }
-            snprintf(what, sizeof what, "the field `%.*s`",
-                     (int)t->fields[j].name.length, t->fields[j].name.text);
+            format_to(what, sizeof what, "the field `%.*s`",
+                      (int)t->fields[j].name.length, t->fields[j].name.text);
             refuse_abstract_value(&c, t->fields[j].pos, what,
                                   t->fields[j].type);
         }
@@ -10997,12 +11004,10 @@ bool sema_check(struct module *module, const char *module_name,
                 continue;
             }
             if (!filled_somewhere(&c, t)) {
-                char message[96];
-                snprintf(message, sizeof message,
-                         "`%.*s` is abstract and no class fills it",
-                         (int)it->name.length, it->name.text);
                 diagnostics_warn(c.diags, it->name_pos.line,
-                                 it->name_pos.column, "%s", message);
+                                 it->name_pos.column,
+                                 "`%.*s` is abstract and no class fills it",
+                                 (int)it->name.length, it->name.text);
             }
         }
     }
@@ -11023,6 +11028,8 @@ bool sema_check(struct module *module, const char *module_name,
     return c.ok;
 }
 
+/* A copy of the length bytes at text with a NUL after them, in the
+   memory pool arena, which frees it. */
 static const char *keep_name(struct arena *arena, const char *text,
                              size_t length)
 {
@@ -11111,15 +11118,15 @@ static void check_c_type(struct checker *c, struct pos pos, const char *what,
 {
     const struct type *hidden = NULL;
 
-    if (is_error((struct type *)t) || c_representable(t, field, &hidden)) {
+    if (is_error(t) || c_representable(t, field, &hidden)) {
         return;
     }
     if (hidden != NULL) {
         error_at(c, pos, "%s has type `%s`, and `%s` is not exported", what,
-                 tn((struct type *)t), tn((struct type *)hidden));
+                 tn(t), tn(hidden));
     } else {
         error_at(c, pos, "%s has type `%s`, which C cannot represent", what,
-                 tn((struct type *)t));
+                 tn(t));
     }
 }
 
@@ -11159,7 +11166,7 @@ static bool has_plain_pointer(const struct type *t)
 static void check_c_nullable(struct checker *c, struct pos pos,
                              const char *what, const struct type *t)
 {
-    if (!is_error((struct type *)t) && has_plain_pointer(t)) {
+    if (!is_error(t) && has_plain_pointer(t)) {
         error_at(c, pos, "every pointer %s is `?*T`", what);
     }
 }
@@ -11176,14 +11183,14 @@ static void check_extern_fn(struct checker *c, struct item *it)
         return;
     }
     for (i = 0; i < it->param_count && i < t->param_count; i++) {
-        snprintf(what, sizeof what, "of the parameter `%.*s` of `extern fn "
-                 "%.*s`", (int)it->params[i].name.length,
-                 it->params[i].name.text, (int)it->name.length, it->name.text);
+        format_to(what, sizeof what, "of the parameter `%.*s` of `extern fn "
+                  "%.*s`", (int)it->params[i].name.length,
+                  it->params[i].name.text, (int)it->name.length, it->name.text);
         check_c_nullable(c, it->params[i].pos, what, t->params[i]);
     }
     if (it->result != NULL && t->result->kind != TYPE_VOID) {
-        snprintf(what, sizeof what, "of the result of `extern fn %.*s`",
-                 (int)it->name.length, it->name.text);
+        format_to(what, sizeof what, "of the result of `extern fn %.*s`",
+                  (int)it->name.length, it->name.text);
         check_c_nullable(c, it->result->pos, what, t->result);
     }
 }
@@ -11206,16 +11213,16 @@ static void check_export(struct checker *c, struct item *it)
             return;
         }
         for (i = 0; i < it->param_count && t->kind == TYPE_FN; i++) {
-            snprintf(what, sizeof what, "the parameter `%.*s` of export fn "
-                     "`%.*s`", (int)it->params[i].name.length,
-                     it->params[i].name.text, (int)it->name.length,
-                     it->name.text);
+            format_to(what, sizeof what, "the parameter `%.*s` of export fn "
+                      "`%.*s`", (int)it->params[i].name.length,
+                      it->params[i].name.text, (int)it->name.length,
+                      it->name.text);
             check_c_type(c, it->params[i].pos, what, t->params[i], false);
         }
         if (it->result != NULL && t->kind == TYPE_FN &&
             t->result->kind != TYPE_VOID) {
-            snprintf(what, sizeof what, "the result of export fn `%.*s`",
-                     (int)it->name.length, it->name.text);
+            format_to(what, sizeof what, "the result of export fn `%.*s`",
+                      (int)it->name.length, it->name.text);
             check_c_type(c, it->result->pos, what, t->result, false);
         }
         for (i = 0; i < c->library_count; i++) {
@@ -11245,10 +11252,10 @@ static void check_export(struct checker *c, struct item *it)
                 t->fields[i].form == FIELD_TABLE) {
                 continue;
             }
-            snprintf(what, sizeof what,
-                     "the field `%.*s` of export class `%.*s`",
-                     (int)t->fields[i].name.length, t->fields[i].name.text,
-                     (int)it->name.length, it->name.text);
+            format_to(what, sizeof what,
+                      "the field `%.*s` of export class `%.*s`",
+                      (int)t->fields[i].name.length, t->fields[i].name.text,
+                      (int)it->name.length, it->name.text);
             check_c_type(c, t->fields[i].pos, what, t->fields[i].type, true);
         }
         for (i = 0; i < it->member_count; i++) {
@@ -11261,15 +11268,15 @@ static void check_export(struct checker *c, struct item *it)
                 continue;
             }
             for (j = m->has_self ? 1 : 0; j < ft->param_count; j++) {
-                snprintf(what, sizeof what, "the parameter %zu of `%.*s.%.*s`",
-                         j, (int)it->name.length, it->name.text,
-                         (int)m->name.length, m->name.text);
+                format_to(what, sizeof what, "the parameter %zu of `%.*s.%.*s`",
+                          j, (int)it->name.length, it->name.text,
+                          (int)m->name.length, m->name.text);
                 check_c_type(c, m->name_pos, what, ft->params[j], false);
             }
             if (ft->result->kind != TYPE_VOID) {
-                snprintf(what, sizeof what, "the result of `%.*s.%.*s`",
-                         (int)it->name.length, it->name.text,
-                         (int)m->name.length, m->name.text);
+                format_to(what, sizeof what, "the result of `%.*s.%.*s`",
+                          (int)it->name.length, it->name.text,
+                          (int)m->name.length, m->name.text);
                 check_c_type(c, m->name_pos, what, ft->result, false);
             }
         }
@@ -11277,10 +11284,10 @@ static void check_export(struct checker *c, struct item *it)
     case ITEM_STRUCT:
     case ITEM_UNION:
         for (i = 0; i < t->field_count; i++) {
-            snprintf(what, sizeof what, "the field `%.*s` of export %s `%.*s`",
-                     (int)t->fields[i].name.length, t->fields[i].name.text,
-                     it->kind == ITEM_UNION ? "union" : "struct",
-                     (int)it->name.length, it->name.text);
+            format_to(what, sizeof what, "the field `%.*s` of export %s `%.*s`",
+                      (int)t->fields[i].name.length, t->fields[i].name.text,
+                      it->kind == ITEM_UNION ? "union" : "struct",
+                      (int)it->name.length, it->name.text);
             check_c_type(c, t->fields[i].pos, what, t->fields[i].type, true);
         }
         /* DESIGN: the header writes align(N) as _Alignas on the first
@@ -11302,24 +11309,24 @@ static void check_export(struct checker *c, struct item *it)
         for (i = 0; i < t->param_count; i++) {
             const struct type *payload = t->params[i];
             for (j = 0; payload != NULL && j < payload->field_count; j++) {
-                snprintf(what, sizeof what, "the field `%.*s` of case `%.*s` "
-                         "of export variant `%.*s`",
-                         (int)payload->fields[j].name.length,
-                         payload->fields[j].name.text,
-                         (int)t->base->fields[i].name.length,
-                         t->base->fields[i].name.text,
-                         (int)it->name.length, it->name.text);
+                format_to(what, sizeof what, "the field `%.*s` of case `%.*s` "
+                          "of export variant `%.*s`",
+                          (int)payload->fields[j].name.length,
+                          payload->fields[j].name.text,
+                          (int)t->base->fields[i].name.length,
+                          t->base->fields[i].name.text,
+                          (int)it->name.length, it->name.text);
                 check_c_type(c, payload->fields[j].pos, what,
                              payload->fields[j].type, true);
             }
         }
         return;
     case ITEM_CONST:
-        if (!is_error((struct type *)t) && !type_is_numeric(t) &&
+        if (!is_error(t) && !type_is_numeric(t) &&
             t->kind != TYPE_BOOL && t->kind != TYPE_STR) {
             error_at(c, it->type->pos, "export const `%.*s` has type `%s`, and "
                      "an export const is a number, a bool or a str",
-                     (int)it->name.length, it->name.text, tn((struct type *)t));
+                     (int)it->name.length, it->name.text, tn(t));
         }
         return;
     default:
@@ -11335,7 +11342,7 @@ static void check_export(struct checker *c, struct item *it)
    where a reader looks for its text. */
 struct doc_scope {
     const struct module *module;
-    const char *module_name;
+    struct name module_name;    /* empty when the module has no name */
     const struct interface *const *libraries;
     size_t library_count;
     struct types *types;
@@ -11381,12 +11388,16 @@ static bool doc_same(const struct name *a, const char *text, size_t length)
 
 /* The last segment of a module path, which is the name an import
    declares. */
-static const char *doc_last_segment(const char *path, size_t *length)
+static struct name doc_last_segment(struct name path)
 {
-    const char *dot = strrchr(path, '.');
+    size_t start = path.length;
 
-    *length = strlen(dot == NULL ? path : dot + 1);
-    return dot == NULL ? path : dot + 1;
+    while (start > 0 && path.text[start - 1] != '.') {
+        start--;
+    }
+    path.text += start;
+    path.length -= start;
+    return path;
 }
 
 /* Whether one name of the item, its own or one it declares, is the n
@@ -11460,18 +11471,17 @@ static bool doc_name_known(const struct doc_scope *s, const char *name,
             return true;
         }
     }
-    if (s->module_name != NULL) {
-        size_t last;
-        const char *segment = doc_last_segment(s->module_name, &last);
-        if (last == head && memcmp(segment, name, head) == 0) {
+    if (s->module_name.length > 0) {
+        struct name last = doc_last_segment(s->module_name);
+        size_t first = 0;
+        if (doc_same(&last, name, head)) {
             return true;
         }
-    }
-    if (s->module_name != NULL) {
-        const char *dot_first = strchr(s->module_name, '.');
-        size_t first = dot_first == NULL ? strlen(s->module_name)
-                                         : (size_t)(dot_first - s->module_name);
-        if (first == head && memcmp(s->module_name, name, head) == 0) {
+        while (first < s->module_name.length &&
+               s->module_name.text[first] != '.') {
+            first++;
+        }
+        if (first == head && memcmp(s->module_name.text, name, head) == 0) {
             return true;
         }
     }
@@ -11797,7 +11807,10 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
 
     memset(&scope, 0, sizeof scope);
     scope.module = module;
-    scope.module_name = module_name;
+    if (module_name != NULL) {
+        scope.module_name.text = module_name;
+        scope.module_name.length = strlen(module_name);
+    }
     scope.libraries = libraries;
     scope.library_count = library_count;
     scope.types = types;
