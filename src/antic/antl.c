@@ -36,6 +36,7 @@ struct writer {
     const struct type **types;      /* the type table in index order */
     size_t type_count;
     size_t type_capacity;
+    bool failed;    /* a count or an index did not fit in 32 bits */
 };
 
 static void put_u8(struct writer *w, uint8_t v)
@@ -54,6 +55,17 @@ static void put_u32(struct writer *w, uint32_t v)
     text_append_bytes(w->out, b, sizeof b);
 }
 
+/* A count or an index, which the file holds in 32 bits. A larger one
+   marks the writer failed, and the file is refused. */
+static void put_count(struct writer *w, size_t n)
+{
+    if (n > UINT32_MAX) {
+        w->failed = true;
+        n = 0;
+    }
+    put_u32(w, (uint32_t)n);
+}
+
 static void put_u64(struct writer *w, uint64_t v)
 {
     uint8_t b[8];
@@ -67,7 +79,7 @@ static void put_u64(struct writer *w, uint64_t v)
 
 static void put_bytes(struct writer *w, const char *s, size_t length)
 {
-    put_u32(w, (uint32_t)length);
+    put_count(w, length);
     text_append_bytes(w->out, s, length);
 }
 
@@ -152,16 +164,19 @@ static bool is_public_struct(const struct writer *w, const struct type *t)
     return false;
 }
 
-static long find_type(const struct writer *w, const struct type *t)
+/* Whether t is in the type table of w. If so, index receives its index. */
+static bool find_type(const struct writer *w, const struct type *t,
+                      size_t *index)
 {
     size_t i;
 
     for (i = 0; i < w->type_count; i++) {
         if (w->types[i] == t) {
-            return (long)i;
+            *index = i;
+            return true;
         }
     }
-    return -1;
+    return false;
 }
 
 static void add_type(struct writer *w, const struct type *t)
@@ -227,8 +242,9 @@ static void visit_defaults(struct writer *w, const struct symbol *sym)
 static void visit_type(struct writer *w, const struct type *t)
 {
     size_t i;
+    size_t index;
 
-    if (find_type(w, t) >= 0) {
+    if (find_type(w, t, &index)) {
         return;
     }
     switch (t->kind) {
@@ -291,7 +307,14 @@ static void visit_type(struct writer *w, const struct type *t)
 
 static void put_type_ref(struct writer *w, const struct type *t)
 {
-    put_u32(w, (uint32_t)find_type(w, t));
+    size_t index;
+
+    /* visit_type puts every type the file names in the table first. */
+    if (!find_type(w, t, &index)) {
+        w->failed = true;
+        index = 0;
+    }
+    put_count(w, index);
 }
 
 static void put_symbolic(struct writer *w, const struct symbolic *s)
@@ -348,7 +371,7 @@ static void put_type(struct writer *w, const struct type *t)
        that form. Each makes another type, and a module that imports this
        one reads the type the signature names. */
     case TYPE_FN:
-        put_u32(w, (uint32_t)t->param_count);
+        put_count(w, t->param_count);
         for (i = 0; i < t->param_count; i++) {
             put_type_ref(w, t->params[i]);
         }
@@ -358,7 +381,7 @@ static void put_type(struct writer *w, const struct type *t)
                             (unsigned)t->has_out << 3));
         break;
     case TYPE_TUPLE:
-        put_u32(w, (uint32_t)t->param_count);
+        put_count(w, t->param_count);
         for (i = 0; i < t->param_count; i++) {
             put_type_ref(w, t->params[i]);
         }
@@ -392,7 +415,7 @@ static void put_type(struct writer *w, const struct type *t)
                it. */
             put_bytes(w, t->compatible.text, t->compatible.length);
             put_u64(w, t->align);
-            put_u32(w, (uint32_t)t->field_count);
+            put_count(w, t->field_count);
             for (i = 0; i < t->field_count; i++) {
                 put_bytes(w, t->fields[i].name.text, t->fields[i].name.length);
                 put_type_ref(w, t->fields[i].type);
@@ -417,7 +440,7 @@ static void put_type(struct writer *w, const struct type *t)
             }
             /* The public functions of the body, so a call on a value of
                another module resolves and reaches the right symbol. */
-            put_u32(w, (uint32_t)public_members(t));
+            put_count(w, public_members(t));
             for (i = 0; i < t->member_count; i++) {
                 const struct item *m = t->members[i];
                 if (!carried_member(m)) {
@@ -442,7 +465,7 @@ static void put_type(struct writer *w, const struct type *t)
                    Neither `self` nor the out pointer of `may fail`
                    stands among them, so the reader needs no type to take
                    them. */
-                put_u32(w, (uint32_t)m->param_count);
+                put_count(w, m->param_count);
                 for (j = 0; j < m->param_count; j++) {
                     const struct name *n = m->symbol->params != NULL
                                                ? &m->symbol->params[j]
@@ -458,7 +481,7 @@ static void put_type(struct writer *w, const struct type *t)
         put_bytes(w, t->module.text, t->module.length);
         put_bytes(w, t->name.text, t->name.length);
         put_type_ref(w, t->base);
-        put_u32(w, (uint32_t)t->field_count);
+        put_count(w, t->field_count);
         for (i = 0; i < t->field_count; i++) {
             put_bytes(w, t->fields[i].name.text, t->fields[i].name.length);
             put_u64(w, t->fields[i].number);
@@ -495,7 +518,7 @@ static void put_value(struct writer *w, const struct const_value *v)
         break;
     case CONST_ARRAY:
     case CONST_STRUCT:
-        put_u32(w, (uint32_t)v->as.aggregate.count);
+        put_count(w, v->as.aggregate.count);
         for (i = 0; i < v->as.aggregate.count; i++) {
             put_value(w, &v->as.aggregate.items[i]);
         }
@@ -514,7 +537,7 @@ static void put_param_defaults(struct writer *w, const struct symbol *sym)
 {
     size_t i;
 
-    put_u32(w, (uint32_t)(sym->defaults != NULL ? sym->default_count : 0));
+    put_count(w, sym->defaults != NULL ? sym->default_count : 0);
     for (i = 0; sym->defaults != NULL && i < sym->default_count; i++) {
         const struct param_default *d = &sym->defaults[i];
         put_u8(w, d->here ? 2 : d->value != NULL ? 1 : 0);
@@ -530,7 +553,7 @@ static void put_param_owned(struct writer *w, const struct symbol *sym)
 {
     size_t i;
 
-    put_u32(w, (uint32_t)(sym->owned != NULL ? sym->owned_count : 0));
+    put_count(w, sym->owned != NULL ? sym->owned_count : 0);
     for (i = 0; sym->owned != NULL && i < sym->owned_count; i++) {
         put_u8(w, sym->owned[i] ? 1 : 0);
     }
@@ -643,7 +666,7 @@ static void put_inst(struct writer *w, const struct ir_inst *inst)
     put_operand(w, &inst->c);
     put_vtype(w, inst->of);
     put_u32(w, inst->field);
-    put_u32(w, (uint32_t)inst->arg_count);
+    put_count(w, inst->arg_count);
     for (i = 0; i < inst->arg_count; i++) {
         put_operand(w, &inst->args[i]);
     }
@@ -658,11 +681,11 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
     /* The source files of the module, which its functions name by index.
        A path comes from the search root, so the bytes are the same on
        every host. */
-    put_u32(w, (uint32_t)ir->file_count);
+    put_count(w, ir->file_count);
     for (i = 0; i < ir->file_count; i++) {
         put_str(w, ir->files[i]);
     }
-    put_u32(w, (uint32_t)ir->sym_count);
+    put_count(w, ir->sym_count);
     for (i = 0; i < ir->sym_count; i++) {
         const struct ir_sym *sym = &ir->syms[i];
         put_u8(w, (uint8_t)sym->kind);
@@ -674,7 +697,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         put_u32(w, sym->a);
         put_u32(w, sym->b);
     }
-    put_u32(w, (uint32_t)ir->agg_count);
+    put_count(w, ir->agg_count);
     for (i = 0; i < ir->agg_count; i++) {
         const struct ir_aggtype *t = ir->aggs[i];
         put_u8(w, (uint8_t)t->kind);
@@ -683,7 +706,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         put_u64(w, t->align);
         put_u32(w, t->length);
         put_str(w, t->length_text);
-        put_u32(w, (uint32_t)t->field_count);
+        put_count(w, t->field_count);
         for (j = 0; j < t->field_count; j++) {
             put_str(w, t->fields[j].name);
             put_vtype(w, t->fields[j].type);
@@ -691,7 +714,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
             put_u8(w, (uint8_t)t->fields[j].ext);
         }
     }
-    put_u32(w, (uint32_t)ir->global_count);
+    put_count(w, ir->global_count);
     for (i = 0; i < ir->global_count; i++) {
         const struct ir_global *g = ir->globals[i];
         put_str(w, g->module);
@@ -701,7 +724,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         if (g->size > 0) {
             text_append_bytes(w->out, g->bytes, g->size);
         }
-        put_u32(w, (uint32_t)g->reloc_count);
+        put_count(w, g->reloc_count);
         for (j = 0; j < g->reloc_count; j++) {
             put_u64(w, g->relocs[j].offset);
             put_u32(w, g->relocs[j].global);
@@ -717,7 +740,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
     }
     /* All signatures come before the first body, so a body can call a
        function that the file lists later. */
-    put_u32(w, (uint32_t)ir->function_count);
+    put_count(w, ir->function_count);
     for (i = 0; i < ir->function_count; i++) {
         const struct ir_function *f = ir->functions[i];
         put_u8(w, (uint8_t)((f->is_extern ? 1 : 0) | (f->variadic ? 2 : 0) |
@@ -728,7 +751,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         put_u32(w, f->result_agg);
         put_u32(w, f->file);
         put_u32(w, f->decl_line);
-        put_u32(w, (uint32_t)f->param_count);
+        put_count(w, f->param_count);
         for (j = 0; j < f->param_count; j++) {
             put_u8(w, (uint8_t)f->params[j].type);
             put_u8(w, (uint8_t)f->params[j].ext);
@@ -744,18 +767,18 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         for (j = 0; j < f->temp_count; j++) {
             put_u8(w, (uint8_t)f->temps[j]);
         }
-        put_u32(w, (uint32_t)f->block_count);
+        put_count(w, f->block_count);
         for (j = 0; j < f->block_count; j++) {
             /* The failure block of an assertion carries its flag, so the
                build that compiles the program can still drop it. */
             put_u8(w, (uint8_t)f->blocks[j]->fail);
-            put_u32(w, (uint32_t)f->blocks[j]->count);
+            put_count(w, f->blocks[j]->count);
             for (k = 0; k < f->blocks[j]->count; k++) {
                 put_inst(w, &f->blocks[j]->insts[k]);
             }
         }
     }
-    put_u32(w, (uint32_t)ir->class_count);
+    put_count(w, ir->class_count);
     for (i = 0; i < ir->class_count; i++) {
         const struct ir_class *c = ir->classes[i];
         put_str(w, c->module);
@@ -766,21 +789,21 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         put_u32(w, c->table);
         put_u32(w, c->init);
         put_u32(w, c->agg);
-        put_u32(w, (uint32_t)c->subtable_count);
+        put_count(w, c->subtable_count);
         for (j = 0; j < c->subtable_count; j++) {
             put_u32(w, c->subtables[j].interface);
             put_u32(w, c->subtables[j].table);
             put_u32(w, c->subtables[j].agg);
             put_u32(w, c->subtables[j].field);
         }
-        put_u32(w, (uint32_t)c->mutable_count);
+        put_count(w, c->mutable_count);
         for (j = 0; j < c->mutable_count; j++) {
             put_u32(w, c->mutable_fields[j]);
         }
         /* The `inject` fields, so the pass over the whole program finds
            every interface of the program and the class that needs a
            provider for it. */
-        put_u32(w, (uint32_t)c->inject_count);
+        put_count(w, c->inject_count);
         for (j = 0; j < c->inject_count; j++) {
             put_str(w, c->injects[j].interface);
             put_str(w, c->injects[j].field);
@@ -789,7 +812,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         }
         /* The `provides` lines, so a library file carries what its
            module offers to a host that loads it. */
-        put_u32(w, (uint32_t)c->provides_count);
+        put_count(w, c->provides_count);
         for (j = 0; j < c->provides_count; j++) {
             put_str(w, c->provides[j].interface);
             put_u32(w, c->provides[j].descriptor);
@@ -809,7 +832,7 @@ static void put_header(struct writer *w, const struct interface *iface)
     put_u32(w, ANTL_VERSION);
     put_str(w, p->name != NULL ? p->name : iface->module);
     put_str(w, p->version != NULL ? p->version : PACKAGE_VERSION_DEFAULT);
-    put_u32(w, (uint32_t)p->dependency_count);
+    put_count(w, p->dependency_count);
     for (i = 0; i < p->dependency_count; i++) {
         put_str(w, p->dependencies[i].name);
         put_str(w, p->dependencies[i].constraint);
@@ -817,23 +840,23 @@ static void put_header(struct writer *w, const struct interface *iface)
     }
     put_str(w, p->license);
     put_str(w, p->license_text);
-    put_u32(w, (uint32_t)p->attribution_count);
+    put_count(w, p->attribution_count);
     for (i = 0; i < p->attribution_count; i++) {
         put_str(w, p->attribution[i]);
     }
     put_str(w, iface->module);
-    put_u32(w, (uint32_t)iface->import_count);
+    put_count(w, iface->import_count);
     for (i = 0; i < iface->import_count; i++) {
         put_str(w, iface->imports[i]);
     }
-    put_u32(w, (uint32_t)iface->framework_count);
+    put_count(w, iface->framework_count);
     for (i = 0; i < iface->framework_count; i++) {
         put_str(w, iface->frameworks[i]);
     }
     put_doc(w, iface->doc, iface->doc != NULL ? strlen(iface->doc) : 0);
 }
 
-void antl_write_header(struct text *out, const struct interface *iface)
+bool antl_write_header(struct text *out, const struct interface *iface)
 {
     struct writer w;
 
@@ -841,9 +864,10 @@ void antl_write_header(struct text *out, const struct interface *iface)
     w.out = out;
     w.iface = iface;
     put_header(&w, iface);
+    return !w.failed;
 }
 
-void antl_write(struct text *out, const struct interface *iface,
+bool antl_write(struct text *out, const struct interface *iface,
                 const struct ir_module *ir, bool strip_docs)
 {
     struct writer w;
@@ -861,14 +885,14 @@ void antl_write(struct text *out, const struct interface *iface,
         visit_defaults(&w, iface->items[i]);
     }
     put_header(&w, iface);
-    put_u32(&w, (uint32_t)w.type_count);
+    put_count(&w, w.type_count);
     for (i = 0; i < w.type_count; i++) {
         put_type(&w, w.types[i]);
     }
     for (i = 0; i < w.type_count; i++) {
         put_defaults(&w, w.types[i]);
     }
-    put_u32(&w, (uint32_t)iface->item_count);
+    put_count(&w, iface->item_count);
     for (i = 0; i < iface->item_count; i++) {
         const struct symbol *sym = iface->items[i];
         put_u8(&w, (uint8_t)sym->kind);
@@ -899,6 +923,7 @@ void antl_write(struct text *out, const struct interface *iface,
     }
     put_ir(&w, ir);
     free((void *)w.types);
+    return !w.failed;
 }
 
 /* Reading */
@@ -928,13 +953,18 @@ static void fail(struct reader *r, const char *format, ...)
 static void fail(struct reader *r, const char *format, ...)
 {
     va_list args;
+    int n;
 
     if (r->failed) {
         return;
     }
     va_start(args, format);
-    vsnprintf(r->error, r->error_size, format, args);
+    n = vsnprintf(r->error, r->error_size, format, args);
     va_end(args);
+    /* A message cut to fit ends in "...". */
+    if (n >= 0 && (size_t)n >= r->error_size && r->error_size >= 4) {
+        memcpy(r->error + r->error_size - 4, "...", 4);
+    }
     r->failed = true;
 }
 
@@ -1001,7 +1031,7 @@ static uint32_t get_count(struct reader *r, size_t min)
 
 static void *allocate(struct reader *r, size_t count, size_t size)
 {
-    return arena_alloc(r->arena, (count + 1) * size);
+    return types_alloc_array(r->arena, count + 1, size);
 }
 
 /* A string as a name that points into the memory pool. */
@@ -1022,9 +1052,16 @@ static struct name get_name(struct reader *r)
     return n;
 }
 
+/* A string that the reader uses as a C string, such as a module path. A
+   NUL inside it would cut it short, so the file is damaged then. */
 static const char *get_cstr(struct reader *r)
 {
-    return get_name(r).text;
+    struct name n = get_name(r);
+
+    if (n.length > 0 && memchr(n.text, '\0', n.length) != NULL) {
+        damaged(r);
+    }
+    return n.text;
 }
 
 static bool name_equals(const struct name *n, const char *s)
@@ -1157,37 +1194,7 @@ static bool name_equals_name(const struct name *a, const struct name *b)
            memcmp(a->text, b->text, a->length) == 0;
 }
 
-/* Whether module and name spell the root of every class chain. */
-static bool names_root(const struct name *module, const struct name *name)
-{
-    static const struct name root_module = {LANG_MODULE,
-                                            sizeof LANG_MODULE - 1};
-    static const struct name root_name = {LANG_OBJECT,
-                                          sizeof LANG_OBJECT - 1};
-
-    return name_equals_name(module, &root_module) &&
-           name_equals_name(name, &root_name);
-}
-
-static bool names_flags(const struct name *module, const struct name *name)
-{
-    static const struct name lang = {LANG_MODULE, sizeof LANG_MODULE - 1};
-    static const struct name flags = {LANG_FLAGS, sizeof LANG_FLAGS - 1};
-
-    return name_equals_name(module, &lang) && name_equals_name(name, &flags);
-}
-
-static bool names_field_descriptor(const struct name *module,
-                                   const struct name *name)
-{
-    static const struct name lang = {LANG_MODULE, sizeof LANG_MODULE - 1};
-    static const struct name record = {LANG_FIELD_DESCRIPTOR,
-                                       sizeof LANG_FIELD_DESCRIPTOR - 1};
-
-    return name_equals_name(module, &lang) && name_equals_name(name, &record);
-}
-
-/* Whether module and name are those of `anti.lang` and the struct text,
+/* Whether module and name are those of `anti.lang` and the item text,
    which the compiler declares. */
 static bool names_lang(const struct name *module, const struct name *name,
                        const char *text)
@@ -1210,13 +1217,13 @@ static struct type *foreign_struct(struct reader *r, const struct name *module,
 
     /* The root of every class chain is the compiler's own, not a module
        any library file declares. */
-    if (names_root(module, name)) {
+    if (names_lang(module, name, LANG_OBJECT)) {
         return types_object(r->types);
     }
-    if (names_flags(module, name)) {
+    if (names_lang(module, name, LANG_FLAGS)) {
         return types_flags(r->types);
     }
-    if (names_field_descriptor(module, name)) {
+    if (names_lang(module, name, LANG_FIELD_DESCRIPTOR)) {
         return types_field_descriptor(r->types);
     }
     lib = library(r, module);
@@ -1648,8 +1655,9 @@ static void read_types(struct reader *r)
             /* The root carries the path of `anti.lang` and is still
                no struct of its library file. */
             if (!name_equals(&module, r->iface->module) ||
-                names_root(&module, &name) || names_flags(&module, &name) ||
-                names_field_descriptor(&module, &name)) {
+                names_lang(&module, &name, LANG_OBJECT) ||
+                names_lang(&module, &name, LANG_FLAGS) ||
+                names_lang(&module, &name, LANG_FIELD_DESCRIPTOR)) {
                 t = foreign_struct(r, &module, &name);
                 break;
             }
@@ -1732,7 +1740,7 @@ static void read_types(struct reader *r)
                 /* The parameter names the declaration wrote, which
                    `anti doc` and the generated header print. */
                 {
-                    uint32_t total = get_count(r, 8);
+                    uint32_t total = get_count(r, 4);
                     struct name *names = allocate(r, total, sizeof *names);
                     struct param *list = allocate(r, total, sizeof *list);
                     uint32_t k;
@@ -2622,7 +2630,12 @@ static void read_body(struct reader *r, struct ir_module *program,
     }
     for (i = 0; i < blocks && !r->failed; i++) {
         uint32_t count;
-        f->blocks[i]->fail = (enum ir_fail)get_u8(r);
+        uint8_t fail_kind;
+        fail_kind = get_u8(r);
+        if (fail_kind > IR_FAIL_CHECK) {
+            damaged(r);
+        }
+        f->blocks[i]->fail = (enum ir_fail)fail_kind;
         count = get_count(r, 50);
         for (j = 0; j < count && !r->failed; j++) {
             struct ir_inst inst;
@@ -2823,12 +2836,17 @@ static void read_classes(struct reader *r, struct ir_module *program,
             uint32_t sub_agg = get_u32(r);
             uint32_t sub_field = get_u32(r);
             uint32_t mapped = map_agg(r, program, maps, sub_agg);
+            uint32_t mapped_interface;
+            uint32_t mapped_at;
             if (r->failed || sub_field >= program->aggs[mapped]->field_count) {
                 damaged(r);
                 return;
             }
-            ir_class_subtable(c, map_global(r, maps, interface, false),
-                              map_global(r, maps, at, false), mapped,
+            /* Each call may mark the file damaged, so each has a line
+               of its own. */
+            mapped_interface = map_global(r, maps, interface, false);
+            mapped_at = map_global(r, maps, at, false);
+            ir_class_subtable(c, mapped_interface, mapped_at, mapped,
                               sub_field);
         }
         mutables = get_count(r, 4);

@@ -1327,6 +1327,16 @@ static void damaged_files(void)
     memset(copy + n, 0, 4);
     memcpy(copy + n + 4, scale_antl + sizeof scale_antl - 4, 4);
     refuses_file(copy, n + 8, NULL);
+    /* A block whose failure kind names nothing. The kind opens the block,
+       after the temporaries and the count of blocks. */
+    memcpy(copy, scale_antl, sizeof copy);
+    copy[sizeof copy - TAIL + 10] = IR_FAIL_CHECK + 1;
+    refuses_file(copy, sizeof copy, NULL);
+    /* A module path with a NUL inside, which a C string would cut to
+       `sc`. The path starts at byte 46. */
+    memcpy(copy, scale_antl, sizeof copy);
+    copy[48] = '\0';
+    refuses_file(copy, sizeof copy, NULL);
 }
 
 /* A file writes a name as a 32-bit length and the bytes. This is the

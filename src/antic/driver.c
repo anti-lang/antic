@@ -1102,7 +1102,11 @@ static int write_library(const struct options *o, struct module *tree,
                       lower_options(o), o->trace_patterns,
                       o->trace_pattern_count, o->package_version) &&
         own_interface(o, tree, module, arena, &iface)) {
-        antl_write(&bytes, &iface, &ir, o->strip_docs);
+        if (!antl_write(&bytes, &iface, &ir, o->strip_docs)) {
+            fprintf(stderr, "antic: %s is too large for a library file\n",
+                    o->input);
+            goto done;
+        }
         if (o->output != NULL) {
             text_append(&path, o->output);
         } else {
@@ -1112,6 +1116,7 @@ static int write_library(const struct options *o, struct module *tree,
         }
         status = write_file(text_cstr(&path), &bytes) ? 2 : 1;
     }
+done:
     text_free(&bytes);
     text_free(&path);
     ir_module_free(&ir);
@@ -1686,7 +1691,12 @@ static int compile(const struct options *o, struct text *source,
             library_name(o, text_cstr(module), &extras->name);
             header_write(&extras->header, text_cstr(&extras->name), all,
                          paths.count + 1, o->bundle_runtime);
-            antl_write_header(&extras->package, &own);
+            if (!antl_write_header(&extras->package, &own)) {
+                fprintf(stderr, "antic: %s is too large for a library file\n",
+                        o->input);
+                free((void *)all);
+                goto done;
+            }
         }
         free((void *)all);
     }

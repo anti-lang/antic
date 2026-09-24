@@ -19,14 +19,16 @@
 #define ANTL_VERSION 53
 
 /* Append the library file of a checked and lowered module to out, with
-   the package header of iface. strip_docs leaves the doc text out. */
-void antl_write(struct text *out, const struct interface *iface,
+   the package header of iface. strip_docs leaves the doc text out.
+   Returns false when a count or an index does not fit in the 32 bits the
+   file gives it, and out then holds no usable file. */
+bool antl_write(struct text *out, const struct interface *iface,
                 const struct ir_module *ir, bool strip_docs);
 
 /* Append the start of the library file of iface up to its imports and doc
    text, which antl_header reads. A static library for C holds it as the
-   copy of its package header. */
-void antl_write_header(struct text *out, const struct interface *iface);
+   copy of its package header. Returns false as antl_write does. */
+bool antl_write_header(struct text *out, const struct interface *iface);
 
 /* Read the package header, the module name, the imports and the module's
    doc text of a library file into out, with no items. Returns false and writes a message to error when the file is
@@ -36,8 +38,11 @@ bool antl_header(const uint8_t *data, size_t size, struct arena *arena,
 
 /* Read a library file. Its types go into types, and its functions and
    globals are appended to program. libraries holds the interfaces read
-   before, which include every import of the file. Returns NULL and writes
-   a message to error when the file cannot be used. */
+   before, which include every import of the file. The interface, its
+   types and its names lie in the memory pool arena, which frees them.
+   Returns NULL and writes a message to error when the file cannot be
+   used. program may then hold records of the file read before the
+   failure, and the caller stops using it. */
 struct interface *antl_read(const uint8_t *data, size_t size,
                             const struct interface *const *libraries,
                             size_t library_count, struct types *types,
