@@ -1,0 +1,77 @@
+//! A public class whose layout holds types nested in it: a node it links by
+//! pointer, an enum and a class it holds by value, and a class nested in that
+//! one. Another module builds the class, lays it out and calls it, and never
+//! names a nested type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+pub class PeopleList
+{
+	struct Node
+	{
+		age: int,
+		next: ?*Node,
+	}
+
+	enum State
+	{
+		Empty,
+		Filled,
+	}
+
+	class Counter
+	{
+		class Step
+		{
+			pub by: int = 1,
+
+			pub fn twice(self) -> int
+			{
+				return 2 * self.by;
+			}
+		}
+
+		pub total: int = 0,
+		step: Step,
+
+		pub fn bump(self)
+		{
+			self.total = self.total + self.step.twice();
+		}
+	}
+
+	head: ?*Node = none,
+	state: State = State.Empty,
+	count: Counter,
+	pub name: str = "people",
+
+	pub fn add(self, age: int)
+	{
+		self.head = alloc Node { age: age, next: self.head };
+		self.state = State.Filled;
+		self.count.bump();
+	}
+
+	pub fn report(self)
+	{
+		let sum = 0;
+		let p = self.head;
+		while p != none do {
+			sum = sum + p.age;
+			p = p.next;
+		}
+		printf("%s %d %d %d\n".ptr, self.name.ptr,
+			(self.state == State.Filled) as c_int, sum as c_int,
+			self.count.total as c_int);
+	}
+
+	pub fn clear(self)
+	{
+		while true do {
+			let q = self.head else { break; };
+			self.head = q.next;
+			free(q);
+		}
+		self.state = State.Empty;
+	}
+}

@@ -1,0 +1,1 @@
+nested_export.anti:9:3: error: the field `title` of `Catalog.Entry`, which export class `Catalog` holds, has type `str`, which C cannot represent

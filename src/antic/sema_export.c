@@ -1,6 +1,7 @@
 /* The checks of what crosses to C, the doc warnings of `anti check` and
    the interface of a checked module. */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "sema_checker.h"
@@ -26,12 +27,28 @@ static bool is_error_class(const struct type *t)
     return types_is_lang_error(t);
 }
 
+/* Whether t is a type declared in the body of cls, at any depth. */
+static bool nested_in(const struct type *t, const struct item *cls)
+{
+    size_t i;
+
+    for (i = 0; cls != NULL && i < cls->nested_count; i++) {
+        const struct item *inner = cls->nested[i];
+        if ((inner->symbol != NULL && inner->symbol->type == t) ||
+            nested_in(t, inner)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* Whether a value of type t has a C representation. That is a scalar
    other than char, a pointer to such a type, an exported struct or union,
    or a function pointer of such types. A struct field may also be a
-   fixed-size array of such a type. Sets *hidden to a struct that is not
-   exported. */
+   fixed-size array of such a type. A type nested in the export class cls
+   crosses with it. Sets *hidden to a struct that is not exported. */
 static bool c_representable(const struct type *t, bool field,
+                            const struct item *cls,
                             const struct type **hidden)
 {
     size_t i;
@@ -44,24 +61,25 @@ static bool c_representable(const struct type *t, bool field,
         return false;
     case TYPE_ARRAY:
         return field && t->length_of == NULL &&
-               c_representable(t->element, true, hidden);
+               c_representable(t->element, true, cls, hidden);
     case TYPE_POINTER:
-        return c_representable(t->element, false, hidden);
+        return c_representable(t->element, false, cls, hidden);
     case TYPE_FN:
         for (i = 0; i < t->param_count; i++) {
-            if (!c_representable(t->params[i], false, hidden)) {
+            if (!c_representable(t->params[i], false, cls, hidden)) {
                 return false;
             }
         }
         return t->result->kind == TYPE_VOID ||
-               c_representable(t->result, false, hidden);
+               c_representable(t->result, false, cls, hidden);
     /* Flags crosses as the struct of four bools that the header writes
        for it. A Mutex and a channel hold a handle of the runtime, which
        C has no declaration of. */
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
-        if (t->item_exported || is_error_class(t) || types_is_flags(t)) {
+        if (t->item_exported || is_error_class(t) || types_is_flags(t) ||
+            nested_in(t, cls)) {
             return true;
         }
         if (types_is_mutex(t) || types_is_chan(t)) {
@@ -74,7 +92,7 @@ static bool c_representable(const struct type *t, bool field,
        that struct, which is why an array among them is allowed. */
     case TYPE_TUPLE:
         for (i = 0; i < t->param_count; i++) {
-            if (!c_representable(t->params[i], true, hidden)) {
+            if (!c_representable(t->params[i], true, cls, hidden)) {
                 return false;
             }
         }
@@ -91,11 +109,12 @@ static bool c_representable(const struct type *t, bool field,
 /* Report a type in an export signature or struct that C cannot represent.
    what names the place, as `the parameter `s` of export fn `f``. */
 static void check_c_type(struct checker *c, struct pos pos, const char *what,
-                         const struct type *t, bool field)
+                         const struct type *t, bool field,
+                         const struct item *cls)
 {
     const struct type *hidden = NULL;
 
-    if (sema_is_error(t) || c_representable(t, field, &hidden)) {
+    if (sema_is_error(t) || c_representable(t, field, cls, &hidden)) {
         return;
     }
     if (hidden != NULL) {
@@ -176,6 +195,54 @@ void sema_check_extern_fn(struct checker *c, struct item *it)
     }
 }
 
+/* The type nested in cls that a field of type t holds by value or
+   points to, through arrays and pointers, or NULL. */
+static const struct type *held_nested(const struct type *t,
+                                      const struct item *cls)
+{
+    while (t != NULL && (t->kind == TYPE_POINTER || t->kind == TYPE_ARRAY)) {
+        t = t->element;
+    }
+    return t != NULL && nested_in(t, cls) ? t : NULL;
+}
+
+/* DESIGN: a type nested in an export class crosses to C with the class
+   when the layout reaches it. A field of the class reaches it, or a field
+   of another nested type the layout reaches. The header writes the layout of each one, so
+   its fields follow the export rule. A nested type the layout does not
+   reach stays out of C, as a library file carries it only when a field
+   reaches it. */
+static void check_nested_fields(struct checker *c, const struct item *cls,
+                                const struct type *t, struct ptr_set *seen)
+{
+    char what[160];
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        const struct struct_field *f = &t->fields[i];
+        const struct type *inner = held_nested(f->type, cls);
+        size_t j;
+        if (inner == NULL || !sema_ptr_set_add(seen, inner) ||
+            inner->kind == TYPE_ENUM) {
+            continue;
+        }
+        for (j = 0; j < inner->field_count; j++) {
+            const struct struct_field *g = &inner->fields[j];
+            if (g->form == FIELD_BASE || g->form == FIELD_TABLE) {
+                continue;
+            }
+            sema_format_to(what, sizeof what,
+                           "the field `%.*s` of `%.*s`, which export class "
+                           "`%.*s` holds,",
+                           (int)g->name.length, g->name.text,
+                           (int)inner->name.length, inner->name.text,
+                           (int)cls->name.length, cls->name.text);
+            check_c_type(c, g->pos, what, g->type, true, cls);
+        }
+        check_nested_fields(c, cls, inner, seen);
+    }
+}
+
 /* DESIGN: an export item has a C symbol and appears in a C header. Its
    types have a C representation, its name is not main, and no other module
    exports the same name. */
@@ -200,13 +267,14 @@ void sema_check_export(struct checker *c, struct item *it)
                            "`%.*s`", (int)it->params[i].name.length,
                            it->params[i].name.text, (int)it->name.length,
                            it->name.text);
-            check_c_type(c, it->params[i].pos, what, t->params[i], false);
+            check_c_type(c, it->params[i].pos, what, t->params[i], false,
+                         NULL);
         }
         if (it->result != NULL && t->kind == TYPE_FN &&
             t->result->kind != TYPE_VOID) {
             sema_format_to(what, sizeof what, "the result of export fn `%.*s`",
                            (int)it->name.length, it->name.text);
-            check_c_type(c, it->result->pos, what, t->result, false);
+            check_c_type(c, it->result->pos, what, t->result, false, NULL);
         }
         for (i = 0; i < c->library_count; i++) {
             const struct interface *lib = c->libraries[i];
@@ -241,7 +309,13 @@ void sema_check_export(struct checker *c, struct item *it)
                            (int)t->fields[i].name.length,
                            t->fields[i].name.text,
                            (int)it->name.length, it->name.text);
-            check_c_type(c, t->fields[i].pos, what, t->fields[i].type, true);
+            check_c_type(c, t->fields[i].pos, what, t->fields[i].type, true,
+                         it);
+        }
+        if (it->nested_count > 0) {
+            struct ptr_set seen = {0};
+            check_nested_fields(c, it, t, &seen);
+            free((void *)seen.slots);
         }
         for (i = 0; i < it->member_count; i++) {
             const struct item *m = it->members[i];
@@ -257,13 +331,14 @@ void sema_check_export(struct checker *c, struct item *it)
                                "the parameter %zu of `%.*s.%.*s`",
                                j, (int)it->name.length, it->name.text,
                                (int)m->name.length, m->name.text);
-                check_c_type(c, m->name_pos, what, ft->params[j], false);
+                check_c_type(c, m->name_pos, what, ft->params[j], false,
+                             NULL);
             }
             if (ft->result->kind != TYPE_VOID) {
                 sema_format_to(what, sizeof what, "the result of `%.*s.%.*s`",
                                (int)it->name.length, it->name.text,
                                (int)m->name.length, m->name.text);
-                check_c_type(c, m->name_pos, what, ft->result, false);
+                check_c_type(c, m->name_pos, what, ft->result, false, NULL);
             }
         }
         return;
@@ -276,7 +351,8 @@ void sema_check_export(struct checker *c, struct item *it)
                            t->fields[i].name.text,
                            it->kind == ITEM_UNION ? "union" : "struct",
                            (int)it->name.length, it->name.text);
-            check_c_type(c, t->fields[i].pos, what, t->fields[i].type, true);
+            check_c_type(c, t->fields[i].pos, what, t->fields[i].type, true,
+                         NULL);
         }
         /* DESIGN: the header writes align(N) as _Alignas on the first
            field, which keeps offset 0 on every target. C refuses
@@ -308,7 +384,7 @@ void sema_check_export(struct checker *c, struct item *it)
                                t->base->fields[i].name.text,
                                (int)it->name.length, it->name.text);
                 check_c_type(c, payload->fields[j].pos, what,
-                             payload->fields[j].type, true);
+                             payload->fields[j].type, true, NULL);
             }
         }
         return;

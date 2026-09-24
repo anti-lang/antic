@@ -1,0 +1,124 @@
+//! Types declared in a class body: a struct, an enum and a class, each private
+//! to the class and named as written inside it. The body of a nested class
+//! declares a type of its own, a nested class inherits another, and a
+//! module-level type of the same name stays apart from the nested one.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The body of PeopleList names its own `Node`, and this one outside it.
+struct Node
+{
+	id: int,
+	label: int,
+}
+
+class PeopleList
+{
+	/// One person of the list.
+	struct Node
+	{
+		age: int,
+		next: ?*Node,
+	}
+
+	enum State
+	{
+		Empty,
+		Filled,
+		Full,
+	}
+
+	class Counter
+	{
+		struct Step
+		{
+			by: int,
+		}
+
+		pub total: int = 0,
+		step: Step = Step { by: 1 },
+
+		pub fn bump(self)
+		{
+			self.total = self.total + self.step.by;
+		}
+	}
+
+	class Doubler inherits Counter
+	{
+		pub fn twice(self)
+		{
+			self.bump();
+			self.bump();
+		}
+	}
+
+	head: ?*Node = none,
+	state: State = State.Empty,
+	count: Counter = Counter { },
+	extra: Doubler = Doubler { },
+
+	const LIMIT: int = 3;
+
+	pub fn add(self, age: int)
+	{
+		let n = alloc Node { age: age, next: self.head };
+		self.head = n;
+		self.count.bump();
+		self.extra.twice();
+		self.state = State.Filled;
+		if self.count.total >= PeopleList.LIMIT {
+			self.state = State.Full;
+		}
+	}
+
+	fn sum(self) -> int
+	{
+		let total = 0;
+		let p = self.head;
+		while p != none do {
+			total = total + p.age;
+			p = p.next;
+		}
+		return total;
+	}
+
+	pub fn report(self)
+	{
+		let text = "empty";
+		switch self.state {
+			State.Empty => text = "empty",
+			State.Filled => text = "filled",
+			State.Full => text = "full",
+		}
+		printf("%s %d %d %d\n".ptr, text.ptr, self.sum() as c_int,
+			self.count.total as c_int, self.extra.total as c_int);
+	}
+
+	pub fn clear(self)
+	{
+		while self.head != none do {
+			let q = self.head else { break; };
+			self.head = q.next;
+			free(q);
+		}
+		self.state = State.Empty;
+	}
+}
+
+fn main() -> int
+{
+	let outside = Node { id: 7, label: 9 };
+	let list = alloc PeopleList { };
+	list.report();
+	list.add(30);
+	list.report();
+	list.add(40);
+	list.add(50);
+	list.report();
+	list.clear();
+	list.report();
+	printf("%d %d\n".ptr, outside.id as c_int, outside.label as c_int);
+	delete(list);
+	return 0;
+}

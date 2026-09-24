@@ -944,14 +944,17 @@ static void const_deps_of(struct const_deps *d, const struct expr *e)
 static void const_deps_of_symbol(struct const_deps *d, struct symbol *sym)
 {
     struct scope *saved = d->c->scope;
+    const struct item *within = d->c->within;
 
     if (sym->item != NULL) {
         d->c->scope = &d->c->module_scope;
+        d->c->within = sema_within(sym->item);
         const_deps_of(d, sym->item->value);
     } else {
         const_deps_of(d, sym->stmt->as.let.value);
     }
     d->c->scope = saved;
+    d->c->within = within;
 }
 
 /* Whether a value of type t holds a class, itself or in a field or an
@@ -1083,6 +1086,7 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
     struct type_expr *type_expr;
     struct expr *value;
     struct scope *saved = c->scope;
+    const struct item *within = c->within;
     struct type *t;
     bool ok;
 
@@ -1115,6 +1119,7 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
         type_expr = sym->item->type;
         value = sym->item->value;
         c->scope = &c->module_scope;
+        c->within = sema_within(sym->item);
     } else {
         type_expr = sym->stmt->as.let.type;
         value = sym->stmt->as.let.value;
@@ -1142,5 +1147,6 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
     sym->state = EVAL_DONE;
     c->const_depth--;
     c->scope = saved;
+    c->within = within;
     return ok;
 }

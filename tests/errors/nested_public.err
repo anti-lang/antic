@@ -1,0 +1,8 @@
+nested_public.anti:30:2: error: the public field `first` of `PeopleList` names `PeopleList.Node`, which is private to `PeopleList`
+nested_public.anti:31:2: error: the protected field `state` of `PeopleList` names `PeopleList.State`, which is private to `PeopleList`
+nested_public.anti:34:12: error: the public constant `START` of `PeopleList` names `PeopleList.State`, which is private to `PeopleList`
+nested_public.anti:37:5: error: the public function `construct` of `PeopleList` names `PeopleList.Node`, which is private to `PeopleList`
+nested_public.anti:42:9: error: the public function `top` of `PeopleList` names `PeopleList.Node`, which is private to `PeopleList`
+nested_public.anti:47:9: error: the public function `push` of `PeopleList` names `PeopleList.Node`, which is private to `PeopleList`
+nested_public.anti:52:15: error: the protected function `walk` of `PeopleList` names `PeopleList.Node`, which is private to `PeopleList`
+nested_public.anti:54:9: error: the public function `states` of `PeopleList` names `PeopleList.State`, which is private to `PeopleList`

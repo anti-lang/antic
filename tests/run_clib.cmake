@@ -9,7 +9,7 @@
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, simd,
-#             classes, failing, tuples, flags, variants or names
+#             classes, failing, tuples, flags, variants, nested or names
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
@@ -236,6 +236,21 @@ elseif(CASE STREQUAL "variants")
     expect_output("${dir}/variants${EXE}" "${SOURCES}/variants.expected")
     run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
         "${SOURCES}/variants.cpp")
+elseif(CASE STREQUAL "nested")
+    # An export class whose layout holds types nested in it. The header
+    # writes each one the layout reaches before the class, under the name
+    # `PeopleList_Node`, and C reads the fields of each. The header
+    # compiles as C++17 as well.
+    library(nested static "${dir}")
+    expect_header("${dir}/nested.h" nested.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/nested.c"
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/nested${EXE}")
+    expect_output("${dir}/nested${EXE}" "${SOURCES}/nested.expected")
+    run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
+        "${SOURCES}/nested.cpp")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
     run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" "${library_link}" ${LINK}

@@ -2224,10 +2224,13 @@ void sema_check_function(struct checker *c, struct item *it)
     struct scope params;
     size_t i;
 
+    const struct item *within = c->within;
+
     if (sema_is_error(it->symbol->type)) {
         return;
     }
     c->function = it;
+    c->within = sema_within(it);
     sema_enter_scope(c, &params);
     if (it->has_self) {
         static const struct name self_name = {"self", 4};
@@ -2275,6 +2278,7 @@ void sema_check_function(struct checker *c, struct item *it)
     }
     c->saw_fail = false;
     c->function = NULL;
+    c->within = within;
 }
 
 /* main takes one of the three forms of chapter 2. */

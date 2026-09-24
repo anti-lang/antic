@@ -742,6 +742,17 @@ struct item {
     enum visibility vis;
     struct name qualifier;          /* `concrete fn X::f`, the X */
     struct pos qualifier_pos;
+    /* DESIGN: a struct, enum or class declared in a class body is a
+       nested type. The parser adds it to the items of the module before
+       the class that declares it. It gives it the full name
+       `PeopleList.Node`, which the symbols and the header use. No name
+       the lexer reads holds a dot, so no code outside the class names
+       it. The checker resolves the name as written, `Node`, in the body
+       of the class and of every type nested in it. */
+    struct item **nested;           /* ITEM_CLASS: the types of its body */
+    size_t nested_count;
+    const struct item *outer;       /* the class whose body declares it */
+    struct name local_name;         /* the name as written, `Node` */
 };
 
 struct import {

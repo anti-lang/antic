@@ -1,0 +1,67 @@
+//! An export class whose layout holds types nested in it. The header writes
+//! each one the layout reaches before the class, as `PeopleList_Node`, with its
+//! layout alone, and C reads the fields.
+
+export class PeopleList
+{
+	/// One person of the list.
+	struct Node
+	{
+		age: i32,
+		next: ?*Node,
+	}
+
+	enum State: u8
+	{
+		Empty,
+		Filled,
+	}
+
+	class Counter
+	{
+		struct Step
+		{
+			by: i32,
+		}
+
+		pub total: i32 = 0,
+		step: Step = Step { by: 2 },
+
+		pub fn bump(self)
+		{
+			self.total = self.total + self.step.by;
+		}
+	}
+
+	/// No field reaches this type, so it stays out of C.
+	struct Unused
+	{
+		text: str,
+	}
+
+	head: ?*Node = none,
+	state: State = State.Empty,
+	count: Counter,
+	pub size: i32 = 0,
+
+	/// Put a person of the given age in front.
+	pub fn add(self, age: i32)
+	{
+		self.head = alloc Node { age: age, next: self.head };
+		self.state = State.Filled;
+		self.count.bump();
+		self.size = self.size + 1;
+	}
+
+	/// Free every node.
+	pub fn clear(self)
+	{
+		while true do {
+			let q = self.head else { break; };
+			self.head = q.next;
+			free(q);
+		}
+		self.state = State.Empty;
+		self.size = 0;
+	}
+}

@@ -1,0 +1,68 @@
+//! A type nested in a class is private to it. A signature that code outside the
+//! class reaches names none of them, and a private one may.
+
+class PeopleList
+{
+	struct Node
+	{
+		age: int,
+		next: ?*Node,
+	}
+
+	enum State
+	{
+		Empty,
+		Filled,
+	}
+
+	class Walker
+	{
+		at: ?*Node = none,
+
+		/// A nested class names a type of the class around it.
+		pub fn node(self) -> ?*Node
+		{
+			return self.at;
+		}
+	}
+
+	head: ?*Node = none,
+	pub first: ?*Node = none,
+	protected state: State = State.Empty,
+	walker: Walker = Walker { },
+
+	pub const START: State = State.Empty;
+	const PRIVATE_START: State = State.Filled;
+
+	fn construct(self, from: *Node)
+	{
+		self.head = from;
+	}
+
+	pub fn top(self) -> ?*Node
+	{
+		return self.head;
+	}
+
+	pub fn push(self, n: *Node)
+	{
+		self.head = n;
+	}
+
+	protected fn walk(self, visit: fn(*Node)) { }
+
+	pub fn states(self, into: []State) -> int
+	{
+		return into.len;
+	}
+
+	fn inner(self, n: ?*Node) -> ?*Node
+	{
+		return n;
+	}
+
+	pub fn size(self) -> int
+	{
+		return 0;
+	}
+}

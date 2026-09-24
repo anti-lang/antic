@@ -65,6 +65,9 @@ struct checker {
     struct scope module_scope;
     struct scope *scope;
     struct item *function;      /* the function whose body is checked */
+    /* The item whose nested types, and those of the classes around it,
+       are named as written. NULL at module level. */
+    const struct item *within;
     int loop_depth;
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
     bool target_sized;          /* a symbolic array length is allowed */
@@ -115,6 +118,9 @@ bool sema_name_is(const struct name *a, const char *text);
 struct symbol *sema_scope_find_local(const struct scope *s,
                                      const struct name *name);
 struct symbol *sema_lookup(const struct checker *c, const struct name *name);
+const struct item *sema_within(const struct item *it);
+struct symbol *sema_module_find(const struct checker *c,
+                                const struct name *name);
 const struct interface *sema_find_library(const struct checker *c,
                                           const struct name *module);
 struct symbol *sema_library_item(const struct checker *c,

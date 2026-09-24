@@ -1,0 +1,21 @@
+//! A program that builds a class of another module whose layout holds types
+//! nested in it, by value on the stack and on the heap, and calls it.
+
+import com.example.people;
+
+fn main() -> int
+{
+	let local = people.PeopleList { name: "local" };
+	local.report();
+	local.add(20);
+	local.add(22);
+	local.report();
+	local.clear();
+	let list = alloc people.PeopleList { };
+	list.add(7);
+	list.report();
+	list.clear();
+	list.report();
+	delete(list);
+	return 0;
+}

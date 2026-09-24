@@ -104,7 +104,8 @@ endif()
 if(CASE STREQUAL "header")
     # The header of each library file equals the header that antic --lib
     # writes for the same module, which tests/dump holds.
-    foreach(name geo shapes canvas failing tuples flags variants simdlib)
+    foreach(name geo shapes canvas failing tuples flags variants simdlib
+            nested)
         run("${ANTIC}" -c --runtime "${RUNTIME}" -I "${SOURCES}"
             -o "${WORK}/${name}.antl" "${SOURCES}/com/example/${name}.anti")
         run("${ANTI}" bind --header "${WORK}/${name}.antl" -o "${WORK}/out"

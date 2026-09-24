@@ -1,0 +1,19 @@
+//! A type nested in an export class crosses to C with it when the layout
+//! reaches it, so its fields follow the export rule. One the layout does not
+//! reach stays out of C.
+
+export class Catalog
+{
+	struct Entry
+	{
+		title: str,
+		next: ?*Entry,
+	}
+
+	struct Draft
+	{
+		title: str,
+	}
+
+	first: ?*Entry = none,
+}

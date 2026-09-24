@@ -1779,7 +1779,7 @@ const struct type *sema_interface_named(struct checker *c,
     struct symbol *sym;
 
     if (qualifier->length == 0) {
-        sym = sema_scope_find_local(&c->module_scope, name);
+        sym = sema_module_find(c, name);
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
             sema_error_at(c, pos, "cannot find class `%.*s`", (int)name->length,
                           name->text);

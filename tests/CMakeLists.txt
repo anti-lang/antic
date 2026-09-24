@@ -1923,6 +1923,25 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# A public class of a library whose layout holds types nested in it,
+# which another module lays out, builds and calls.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME nested_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/nested"
+            "-DLIBRARIES=people"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/nested-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.
 foreach(mode release dev)
@@ -2493,7 +2512,7 @@ if(ANTIC_LLVM_AR)
 endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
-            failing tuples flags variants simd names)
+            failing tuples flags variants nested simd names)
         add_test(NAME clib_${case}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
@@ -2756,7 +2775,11 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "allow_names|-S,-o,${LISTINGS}/allow_names.s,allow_names.anti"
         "allow_places|-S,-o,${LISTINGS}/allow_places.s,allow_places.anti"
         "allow_unused|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/allow_unused.s,allow_unused.anti"
-        "catch_none|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_none.s,catch_none.anti")
+        "catch_none|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_none.s,catch_none.anti"
+        "nested_public|-S,-o,${LISTINGS}/nested_public.s,nested_public.anti"
+        "nested_outside|-S,-o,${LISTINGS}/nested_outside.s,nested_outside.anti"
+        "nested_forms|-S,-o,${LISTINGS}/nested_forms.s,nested_forms.anti"
+        "nested_export|-S,-o,${LISTINGS}/nested_export.s,nested_export.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

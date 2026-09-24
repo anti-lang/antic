@@ -1,0 +1,43 @@
+//! Only the enclosing class names a type nested in it. A module function, a
+//! class that inherits the enclosing one and a class beside it name none, by
+//! the name as written or by the full name.
+
+class PeopleList
+{
+	struct Node
+	{
+		age: int,
+	}
+
+	head: ?*Node = none,
+}
+
+fn count(n: *Node) -> int
+{
+	return n.age;
+}
+
+fn make() -> int
+{
+	let n = PeopleList.Node { age: 3 };
+	return n.age;
+}
+
+class Family inherits PeopleList
+{
+	last: ?*Node = none,
+}
+
+class Other
+{
+	struct Leaf
+	{
+		size: int,
+	}
+
+	fn grow(self) -> int
+	{
+		let l = Node { age: 1 };
+		return l.age;
+	}
+}

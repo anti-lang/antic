@@ -203,6 +203,19 @@ static const char *owned_note(const struct symbol *sym, size_t i)
                : "";
 }
 
+/* DESIGN: the C name of a type is its name. A type nested in a class
+   has the full name `PeopleList.Node`, and a dot is no C identifier. The
+   header therefore writes `PeopleList_Node`, as c_symbol writes the
+   symbol of a function of a class. */
+static void c_type_name(struct text *out, const struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < t->name.length; i++) {
+        text_appendf(out, "%c", t->name.text[i] == '.' ? '_' : t->name.text[i]);
+    }
+}
+
 /* Append the C declaration of name with type t. owner is the aggregate
    whose definition holds the declaration, which names itself with its
    tag. */
@@ -249,10 +262,10 @@ static void declaration(struct text *out, const struct type *t,
         } else if (types_is_flags(t)) {
             text_append(out, "struct anti_" LANG_FLAGS);
         } else if (t == owner) {
-            text_appendf(out, "%s %.*s", t->is_union ? "union" : "struct",
-                         (int)t->name.length, t->name.text);
+            text_appendf(out, "%s ", t->is_union ? "union" : "struct");
+            c_type_name(out, t);
         } else {
-            text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
+            c_type_name(out, t);
         }
         text_appendf(out, "%s%s", name[0] != '\0' ? " " : "", name);
         break;
@@ -261,8 +274,10 @@ static void declaration(struct text *out, const struct type *t,
         tuple_c_name(out, t);
         text_appendf(out, "%s%s", name[0] != '\0' ? " " : "", name);
         break;
+    /* An enum of C has the width of an int, so a value crosses as the
+       underlying integer, and enum_view names the values. */
     case TYPE_ENUM:
-        text_appendf(out, "%.*s%s%s", (int)t->name.length, t->name.text,
+        text_appendf(out, "%s%s%s", scalar_name(t->base),
                      name[0] != '\0' ? " " : "", name);
         break;
     default:
@@ -568,40 +583,47 @@ static void vector_typedef(struct text *out, const struct type *t)
                  (int)t->name.length, t->name.text);
 }
 
-/* DESIGN: an export struct or union becomes a typedef of the same name.
-   packed becomes #pragma pack and align(N) an _Alignas on the first
-   field, which C++ spells alignas. A simd struct of 16 bytes is the
-   vector type of C. One of another size is the struct of its lanes,
-   aligned to its size or to sixteen, whichever is less. */
-static void aggregate(struct text *out, const struct symbol *sym,
-                      const struct interface *const *ifaces, size_t count,
-                      struct emitted *done)
+/* DESIGN: an enum becomes the C enum of its values, named as the type,
+   and each value `T_Value`, as the tags of a variant are named. A field
+   or a parameter of the type is its underlying integer, which
+   declaration writes, because a C enum has the width of an int. */
+static void enum_view(struct text *out, const struct type *t,
+                      const struct doc_text *doc)
 {
-    const struct type *t = sym->type;
-    const char *kind = t->is_union ? "union" : "struct";
+    struct text name = {0};
+    bool is_signed = type_is_signed(t->base);
     size_t i;
 
-    if (was_emitted(done, t)) {
+    if (t->field_count == 0) {
         return;
     }
-    mark_emitted(done, t);
-    if (t->kind == TYPE_VARIANT) {
-        variant_view(out, sym, ifaces, count, done);
-        return;
-    }
+    c_type_name(&name, t);
+    doc_comment(out, doc, "");
+    text_appendf(out, "enum %s {\n", text_cstr(&name));
     for (i = 0; i < t->field_count; i++) {
-        emit_uses(out, t->fields[i].type, ifaces, count, done);
+        struct text buffer = {0};
+        c_name(&buffer, &t->fields[i].name);
+        doc_comment(out, &t->fields[i].doc, "    ");
+        if (is_signed) {
+            text_appendf(out, "    %s_%s = %" PRId64 "%s\n", text_cstr(&name),
+                         text_cstr(&buffer), (int64_t)t->fields[i].number,
+                         i + 1 < t->field_count ? "," : "");
+        } else {
+            text_appendf(out, "    %s_%s = %" PRIu64 "%s\n", text_cstr(&name),
+                         text_cstr(&buffer), t->fields[i].number,
+                         i + 1 < t->field_count ? "," : "");
+        }
+        text_free(&buffer);
     }
-    doc_comment(out, &sym->doc, "");
-    if (t->simd && type_simd_bytes(t) == 16) {
-        vector_typedef(out, t);
-        return;
-    }
-    if (t->packed) {
-        text_append(out, "#pragma pack(push, 1)\n");
-    }
-    text_appendf(out, "typedef %s %.*s {\n", kind, (int)t->name.length,
-                 t->name.text);
+    text_append(out, "};\n\n");
+    text_free(&name);
+}
+
+/* The fields of a struct or union t between its braces. */
+static void struct_fields(struct text *out, const struct type *t)
+{
+    size_t i;
+
     for (i = 0; i < t->field_count; i++) {
         struct text field = {0};
         struct text buffer = {0};
@@ -628,6 +650,180 @@ static void aggregate(struct text *out, const struct symbol *sym,
         text_free(&field);
         text_free(&buffer);
     }
+}
+
+/* The fields of a class t between its braces: the table pointer of the
+   root, the base, then its own fields with their level. */
+static void class_fields(struct text *out, const struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        struct text field = {0};
+        struct text buffer = {0};
+        const struct struct_field *f = &t->fields[i];
+        if (f->form == FIELD_TABLE) {
+            text_append(out, "    const ");
+            c_type_name(out, t);
+            text_append(out, "_vtable *vtable;\n");
+            continue;
+        }
+        if (f->form == FIELD_BASE) {
+            text_appendf(out, "    %s", f->type->base == NULL ? "anti_" : "");
+            c_type_name(out, f->type);
+            text_append(out, " base;\n");
+            continue;
+        }
+        c_name(&buffer, &f->name);
+        doc_comment(out, &f->doc, "    ");
+        text_append(out, "    ");
+        declaration(&field, f->type, text_cstr(&buffer), t);
+        text_free(&buffer);
+        text_append(out, text_cstr(&field));
+        text_appendf(out, ";%s%s\n",
+                     f->owned ? "   /* own */" : "",
+                     f->vis == VIS_PUB ? ""
+                     : f->vis == VIS_PROTECTED ? "   /* protected */"
+                                               : "   /* private */");
+        text_free(&field);
+    }
+}
+
+/* Whether t is a type nested in the class outer, at any depth. Such a
+   type is of the module of outer, and its full name starts with the name
+   of outer and a dot. */
+static bool nested_in(const struct type *t, const struct type *outer)
+{
+    return (t->kind == TYPE_STRUCT || t->kind == TYPE_CLASS ||
+            t->kind == TYPE_ENUM) &&
+           t->module.length == outer->module.length &&
+           memcmp(t->module.text, outer->module.text, t->module.length) == 0 &&
+           t->name.length > outer->name.length &&
+           t->name.text[outer->name.length] == '.' &&
+           memcmp(t->name.text, outer->name.text, outer->name.length) == 0;
+}
+
+/* The types nested in outer that the fields of t reach, directly or
+   through a pointer or an array. Each goes into order after the ones
+   its own fields reach, so what it holds by value stands before it. */
+static void collect_nested(const struct type *t, const struct type *outer,
+                           struct emitted *seen, struct emitted *order)
+{
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        const struct type *f = t->fields[i].type;
+        while (f != NULL &&
+               (f->kind == TYPE_POINTER || f->kind == TYPE_ARRAY)) {
+            f = f->element;
+        }
+        if (f == NULL || !nested_in(f, outer) || was_emitted(seen, f)) {
+            continue;
+        }
+        mark_emitted(seen, f);
+        collect_nested(f, outer, seen, order);
+        mark_emitted(order, f);
+    }
+}
+
+/* DESIGN: a type nested in an export class is private to it. C sees its
+   layout alone, because the layout of the class holds it. The header
+   writes each one the fields of the class reach before the class. It
+   writes no table, no prototype and no helper of one. A typedef of every
+   struct and class comes first, so a pointer to one that stands later is
+   declared.
+   A library file carries the types the fields reach, so the header
+   written from one equals the header of --lib. */
+static void nested_views(struct text *out, const struct type *t)
+{
+    struct emitted seen = {0};
+    struct emitted order = {0};
+    size_t i;
+
+    collect_nested(t, t, &seen, &order);
+    for (i = 0; i < order.count; i++) {
+        const struct type *n = order.items[i];
+        struct text name = {0};
+        if (n->kind == TYPE_ENUM) {
+            continue;
+        }
+        c_type_name(&name, n);
+        text_appendf(out, "typedef %s %s %s;\n",
+                     n->is_union ? "union" : "struct", text_cstr(&name),
+                     text_cstr(&name));
+        text_free(&name);
+    }
+    text_append(out, order.count > 0 ? "\n" : "");
+    for (i = 0; i < order.count; i++) {
+        const struct type *n = order.items[i];
+        struct text name = {0};
+        if (n->kind == TYPE_ENUM) {
+            enum_view(out, n, &(struct doc_text){NULL, 0, 0, 0});
+            continue;
+        }
+        c_type_name(&name, n);
+        text_appendf(out, "/* %.*s, private to %.*s. */\n",
+                     (int)n->name.length, n->name.text, (int)t->name.length,
+                     t->name.text);
+        if (n->packed) {
+            text_append(out, "#pragma pack(push, 1)\n");
+        }
+        text_appendf(out, "struct %s {\n", text_cstr(&name));
+        if (n->kind == TYPE_CLASS) {
+            class_fields(out, n);
+        } else {
+            struct_fields(out, n);
+        }
+        text_append(out, "};\n");
+        if (n->packed) {
+            text_append(out, "#pragma pack(pop)\n");
+        }
+        text_append(out, "\n");
+        text_free(&name);
+    }
+    free((void *)seen.items);
+    free((void *)order.items);
+}
+
+/* DESIGN: an export struct or union becomes a typedef of the same name.
+   packed becomes #pragma pack and align(N) an _Alignas on the first
+   field, which C++ spells alignas. A simd struct of 16 bytes is the
+   vector type of C. One of another size is the struct of its lanes,
+   aligned to its size or to sixteen, whichever is less. */
+static void aggregate(struct text *out, const struct symbol *sym,
+                      const struct interface *const *ifaces, size_t count,
+                      struct emitted *done)
+{
+    const struct type *t = sym->type;
+    const char *kind = t->is_union ? "union" : "struct";
+    size_t i;
+
+    if (was_emitted(done, t)) {
+        return;
+    }
+    mark_emitted(done, t);
+    if (t->kind == TYPE_VARIANT) {
+        variant_view(out, sym, ifaces, count, done);
+        return;
+    }
+    if (t->kind == TYPE_ENUM) {
+        enum_view(out, t, &sym->doc);
+        return;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        emit_uses(out, t->fields[i].type, ifaces, count, done);
+    }
+    doc_comment(out, &sym->doc, "");
+    if (t->simd && type_simd_bytes(t) == 16) {
+        vector_typedef(out, t);
+        return;
+    }
+    if (t->packed) {
+        text_append(out, "#pragma pack(push, 1)\n");
+    }
+    text_appendf(out, "typedef %s %.*s {\n", kind, (int)t->name.length,
+                 t->name.text);
+    struct_fields(out, t);
     text_appendf(out, "} %.*s;\n", (int)t->name.length, t->name.text);
     if (t->packed) {
         text_append(out, "#pragma pack(pop)\n");
@@ -797,6 +993,7 @@ static void class_view(struct text *out, const struct symbol *sym)
 
     text_appendf(out, "typedef struct %.*s %.*s;\n", name_length, name_text,
                  name_length, name_text);
+    nested_views(out, t);
     text_appendf(out, "typedef struct %.*s_vtable {\n"
                       "    const void *descriptor;\n"
                       "    /* The seven functions of anti.lang.Object. They "
@@ -817,34 +1014,7 @@ static void class_view(struct text *out, const struct symbol *sym)
 
     doc_comment(out, &sym->doc, "");
     text_appendf(out, "struct %.*s {\n", name_length, name_text);
-    for (i = 0; i < t->field_count; i++) {
-        struct text field = {0};
-        struct text buffer = {0};
-        const struct struct_field *f = &t->fields[i];
-        if (f->form == FIELD_TABLE) {
-            text_appendf(out, "    const %.*s_vtable *vtable;\n", name_length,
-                         name_text);
-            continue;
-        }
-        if (f->form == FIELD_BASE) {
-            bool root = f->type->base == NULL;
-            text_appendf(out, "    %s%.*s base;\n", root ? "anti_" : "",
-                         (int)f->type->name.length, f->type->name.text);
-            continue;
-        }
-        c_name(&buffer, &f->name);
-        doc_comment(out, &f->doc, "    ");
-        text_append(out, "    ");
-        declaration(&field, f->type, text_cstr(&buffer), t);
-        text_free(&buffer);
-        text_append(out, text_cstr(&field));
-        text_appendf(out, ";%s%s\n",
-                     f->owned ? "   /* own */" : "",
-                     f->vis == VIS_PUB ? ""
-                     : f->vis == VIS_PROTECTED ? "   /* protected */"
-                                               : "   /* private */");
-        text_free(&field);
-    }
+    class_fields(out, t);
     text_appendf(out, "};\n\n");
 
     text_appendf(out, "extern const anti_descriptor anti_%.*s_descriptor;\n",

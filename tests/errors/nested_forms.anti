@@ -1,0 +1,25 @@
+//! A type nested in a class is private to it, so no visibility word stands
+//! before it. A struct, an enum or a class nests, and a union or a variant
+//! stays at module level.
+
+class Open
+{
+	pub struct Node
+	{
+		age: int,
+	}
+}
+
+class Cell
+{
+	union Bits
+	{
+		word: u32,
+		bytes: [4]u8,
+	}
+}
+
+class Holder
+{
+	variant Slot { Full { n: int }, Empty }
+}

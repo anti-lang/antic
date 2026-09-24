@@ -1,0 +1,4 @@
+nested_outside.anti:28:10: error: unknown type `Node`
+nested_outside.anti:15:14: error: unknown type `Node`
+nested_outside.anti:22:10: error: cannot find module `PeopleList`
+nested_outside.anti:40:11: error: unknown struct `Node`

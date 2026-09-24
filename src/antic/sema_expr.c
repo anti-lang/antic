@@ -1927,7 +1927,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                 return t;
             }
         } else {
-            sym = sema_scope_find_local(&c->module_scope, name);
+            sym = sema_module_find(c, name);
             if (sym == NULL && sema_name_is(name, LANG_FLAGS)) {
                 t = types_flags(c->types);
             } else if (sym == NULL &&

@@ -115,12 +115,54 @@ struct symbol *sema_scope_find_local(const struct scope *s,
     return NULL;
 }
 
+/* The class whose nested types the body of it names: the class that
+   declares a member, and the item itself otherwise. */
+const struct item *sema_within(const struct item *it)
+{
+    return it != NULL && it->owner != NULL ? it->owner : it;
+}
+
+/* DESIGN: a type nested in a class is named as written in the body of
+   that class. It is named so in the body of every type nested in it as
+   well, and nowhere else. The innermost class wins, then the classes around it, then the
+   module. The full name `PeopleList.Node` holds a dot, which no name of
+   the source holds, so the module scope never gives it to a name. */
+static struct symbol *nested_find(const struct checker *c,
+                                  const struct name *name)
+{
+    const struct item *it;
+    size_t i;
+
+    for (it = c->within; it != NULL; it = it->outer) {
+        for (i = 0; i < it->nested_count; i++) {
+            const struct item *inner = it->nested[i];
+            if (inner->symbol != NULL &&
+                sema_same_name(&inner->local_name, name)) {
+                return inner->symbol;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* An item of the module by name, the nested types of c->within first. */
+struct symbol *sema_module_find(const struct checker *c,
+                                const struct name *name)
+{
+    struct symbol *found = nested_find(c, name);
+
+    return found != NULL ? found
+                         : sema_scope_find_local(&c->module_scope, name);
+}
+
 struct symbol *sema_lookup(const struct checker *c, const struct name *name)
 {
     const struct scope *s;
 
     for (s = c->scope; s != NULL; s = s->parent) {
-        struct symbol *found = sema_scope_find_local(s, name);
+        struct symbol *found = s == &c->module_scope
+                                   ? sema_module_find(c, name)
+                                   : sema_scope_find_local(s, name);
         if (found != NULL) {
             return found;
         }
@@ -648,7 +690,7 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         if (t->module.length > 0) {
             return sema_imported_struct(c, &t->module, &t->name, t->pos);
         }
-        sym = sema_scope_find_local(&c->module_scope, &t->name);
+        sym = sema_module_find(c, &t->name);
         /* DESIGN: `Object` is the root of every class chain, which the
            compiler declares. A program writes the name where the object
            model uses it, as in `equals(self, other: *Object)`, and a
@@ -1904,7 +1946,7 @@ static void resolve_base(struct checker *c, struct item *it)
             return;
         }
     } else {
-        base = sema_scope_find_local(&c->module_scope, &it->base_name);
+        base = sema_module_find(c, &it->base_name);
         base_type = base != NULL && base->kind == SYMBOL_STRUCT
                         ? base->type
                         : NULL;
@@ -1948,7 +1990,9 @@ static void resolve_bases(struct checker *c)
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->kind == ITEM_CLASS && it->symbol != NULL) {
+            c->within = it;
             resolve_base(c, it);
+            c->within = NULL;
         }
     }
 }
@@ -2004,7 +2048,9 @@ static void declare_enums_and_variants(struct checker *c)
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_ENUM) {
+            c->within = it;
             declare_enum_values(c, it);
+            c->within = NULL;
         }
     }
     for (i = 0; i < module->item_count; i++) {
@@ -2212,7 +2258,9 @@ static void declare_all_fields(struct checker *c)
         if (it->symbol != NULL &&
             (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
              it->kind == ITEM_CLASS)) {
+            c->within = it;
             declare_fields(c, it);
+            c->within = NULL;
         }
     }
     for (i = 0; i < module->item_count; i++) {
@@ -2315,7 +2363,9 @@ static void declare_all_members(struct checker *c)
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->symbol->type != NULL) {
+            c->within = it;
             declare_members(c, it);
+            c->within = NULL;
         }
     }
     for (i = 0; i < module->item_count; i++) {
@@ -2349,12 +2399,14 @@ static void check_signatures(struct checker *c)
             check_defaults(c, it);
             check_owned(c, it);
         }
+        c->within = it;
         for (j = 0; it->symbol != NULL && j < it->member_count; j++) {
             if (it->members[j]->kind == ITEM_FN) {
                 check_defaults(c, it->members[j]);
                 check_owned(c, it->members[j]);
             }
         }
+        c->within = NULL;
     }
     /* DESIGN: a singleton has one instance, which `Config.get()` makes
        on the first call. The program never allocates one, so the checker
@@ -2734,6 +2786,107 @@ static void require_filled_interfaces(struct checker *c,
     }
 }
 
+/* The type nested directly in cls that t names, or NULL. t may reach
+   it through a pointer, an array, a slice, a channel, a Job, a tuple or
+   a function type. A type nested deeper has no name in the body of
+   cls. */
+static const struct type *names_nested(const struct type *t,
+                                       const struct item *cls)
+{
+    const struct type *found;
+    size_t i;
+
+    if (t == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < cls->nested_count; i++) {
+        if (cls->nested[i]->symbol != NULL &&
+            cls->nested[i]->symbol->type == t) {
+            return t;
+        }
+    }
+    switch (t->kind) {
+    case TYPE_POINTER:
+    case TYPE_ARRAY:
+    case TYPE_SLICE:
+        return names_nested(t->element, cls);
+    case TYPE_FN:
+    case TYPE_TUPLE:
+        for (i = 0; i < t->param_count; i++) {
+            if ((found = names_nested(t->params[i], cls)) != NULL) {
+                return found;
+            }
+        }
+        return names_nested(t->result, cls);
+    case TYPE_STRUCT:
+        /* A channel keeps its element and a Job its result. */
+        if ((found = names_nested(t->element, cls)) != NULL) {
+            return found;
+        }
+        return names_nested(t->result, cls);
+    default:
+        return NULL;
+    }
+}
+
+static const char *level_word(enum visibility vis)
+{
+    return vis == VIS_PROTECTED ? "protected" : "public";
+}
+
+/* DESIGN: a type nested in a class is private to it, so code outside
+   can neither create one nor receive one. A signature that code outside
+   the class reaches therefore names none of them: a `pub` or `protected`
+   function or field, a `pub` constant, and a `construct` that takes
+   arguments, which `T(args)` calls from outside and which C reaches as
+   `anti_<Class>_construct`. */
+static void refuse_nested_in_signatures(struct checker *c,
+                                        const struct item *it,
+                                        const struct type *t)
+{
+    const struct type *found;
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        const struct struct_field *f = &t->fields[i];
+        if (f->form != FIELD_PLAIN || f->vis == VIS_PRIVATE ||
+            (found = names_nested(f->type, it)) == NULL) {
+            continue;
+        }
+        sema_error_at(c, f->pos, "the %s field `%.*s` of `%.*s` names "
+                      "`%s`, which is private to `%.*s`",
+                      level_word(f->vis), (int)f->name.length, f->name.text,
+                      (int)it->name.length, it->name.text, sema_tn(found),
+                      (int)it->name.length, it->name.text);
+    }
+    for (i = 0; i < it->member_count; i++) {
+        const struct item *m = it->members[i];
+        const struct type *mt = NULL;
+        bool made = m->kind == ITEM_FN && m->has_self &&
+                    m->param_count > 0 && sema_name_is(&m->name, "construct");
+        if (m->symbol == NULL || (m->vis == VIS_PRIVATE && !made)) {
+            continue;
+        }
+        if (m->kind == ITEM_FN) {
+            mt = m->symbol->type;
+        } else if (m->type != NULL) {
+            c->quiet++;
+            mt = sema_resolve_type(c, m->type);
+            c->quiet--;
+        }
+        if ((found = names_nested(mt, it)) == NULL) {
+            continue;
+        }
+        sema_error_at(c, m->name_pos, "the %s %s `%.*s` of `%.*s` names "
+                      "`%s`, which is private to `%.*s`",
+                      made ? "public" : level_word(m->vis),
+                      m->kind == ITEM_FN ? "function" : "constant",
+                      (int)m->name.length, m->name.text,
+                      (int)it->name.length, it->name.text, sema_tn(found),
+                      (int)it->name.length, it->name.text);
+    }
+}
+
 /* The checks of every type with fields: its interfaces, its abstract
    fields, then its contracts and the functions of its body. */
 static void check_types(struct checker *c)
@@ -2768,6 +2921,11 @@ static void check_types(struct checker *c)
         check_one_construct(c, it);
         check_qualifiers(c, it, t);
         require_filled_interfaces(c, it, t);
+        if (it->kind == ITEM_CLASS && it->nested_count > 0) {
+            c->within = it;
+            refuse_nested_in_signatures(c, it, t);
+            c->within = NULL;
+        }
     }
 }
 

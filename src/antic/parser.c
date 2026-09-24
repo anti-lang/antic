@@ -2525,8 +2525,89 @@ static bool inherits_in_body(struct parser *p, const struct item *it)
     return accept(p, TOKEN_COMMA);
 }
 
-/* Read the functions and constants of a body into it->members. */
-static bool members_of(struct parser *p, struct item *it)
+static struct item *item(struct parser *p);
+
+/* Whether the next tokens declare a type in a class body: the words that
+   may stand before a type, then the word of its kind. */
+static bool starts_nested(const struct parser *p)
+{
+    size_t i;
+
+    for (i = 0; i < 4; i++) {
+        const struct token *t = peek_at(p, i);
+        switch (t->kind) {
+        case TOKEN_STRUCT:
+        case TOKEN_UNION:
+        case TOKEN_ENUM:
+        case TOKEN_CLASS:
+        case TOKEN_VARIANT:
+            return true;
+        case TOKEN_PUB:
+        case TOKEN_EXPORT:
+        case TOKEN_INTERNAL:
+        case TOKEN_PROTECTED:
+        case TOKEN_ABSTRACT:
+        case TOKEN_SINGLETON:
+            continue;
+        default:
+            if (!is_word(p, t, "packed") && !is_word(p, t, "simd") &&
+                !is_word(p, t, "final") && !is_word(p, t, "trace")) {
+                return false;
+            }
+        }
+    }
+    return false;
+}
+
+/* DESIGN: a class body may declare a struct, an enum or a class, as
+   "Nested types" in docs/anti-language-additions.md gives. The type is
+   private to the class, so no visibility word stands before it. The
+   union and the variant stay at module level, since the additions name
+   the three kinds alone. */
+static bool nested_type(struct parser *p, struct list *nested)
+{
+    const struct token *word = peek(p);
+    struct item *inner;
+
+    /* Both refusals leave the declaration whole, so the rest of the
+       body parses and reports its own errors. */
+    switch (word->kind) {
+    case TOKEN_PUB:
+    case TOKEN_EXPORT:
+    case TOKEN_INTERNAL:
+    case TOKEN_PROTECTED:
+        diagnostics_add(p->diags, word->line, word->column,
+                        "a type declared in a class is private to the "
+                        "class, and takes no `pub`, `export`, `internal` "
+                        "or `protected`");
+        p->ok = false;
+        next(p);
+        break;
+    default:
+        break;
+    }
+    inner = item(p);
+    if (inner == NULL) {
+        return false;
+    }
+    if (inner->kind != ITEM_STRUCT && inner->kind != ITEM_ENUM &&
+        inner->kind != ITEM_CLASS) {
+        diagnostics_add(p->diags, inner->name_pos.line,
+                        inner->name_pos.column,
+                        "a class body declares a struct, an enum or a "
+                        "class, and a %s stands at module level",
+                        inner->kind == ITEM_UNION ? "union" : "variant");
+        p->ok = false;
+        return true;
+    }
+    list_push(nested, &inner);
+    return true;
+}
+
+/* Read the functions and constants of a body into it->members, and the
+   types of a class body into nested, which is NULL for an enum. */
+static bool members_of(struct parser *p, struct item *it,
+                       struct list *nested)
 {
     struct list list = {NULL, 0, 0, sizeof(struct item *)};
 
@@ -2534,6 +2615,13 @@ static bool members_of(struct parser *p, struct item *it)
         struct item *m;
         if (it->kind == ITEM_CLASS && check(p, TOKEN_INHERITS)) {
             inherits_in_body(p, it);
+            continue;
+        }
+        if (nested != NULL && starts_nested(p)) {
+            if (!nested_type(p, nested)) {
+                free(list.data);
+                return false;
+            }
             continue;
         }
         m = member(p, it);
@@ -2617,6 +2705,7 @@ static bool field_clauses(struct parser *p)
 static struct item *class_item(struct parser *p, struct item *it)
 {
     struct list fields = {NULL, 0, 0, sizeof(struct param)};
+    struct list nested = {NULL, 0, 0, sizeof(struct item *)};
     size_t mark;
 
     next(p);
@@ -2655,8 +2744,16 @@ static struct item *class_item(struct parser *p, struct item *it)
     /* Fields first, comma separated, then the constants and functions,
        each ended by its own `;` or block. */
     while (!check(p, TOKEN_RBRACE) && !check(p, TOKEN_EOF) &&
-           !starts_member(p)) {
+           (!starts_member(p) || starts_nested(p))) {
         struct param field;
+        if (starts_nested(p)) {
+            if (!nested_type(p, &nested)) {
+                free(fields.data);
+                free(nested.data);
+                return NULL;
+            }
+            continue;
+        }
         memset(&field, 0, sizeof field);
         field.doc = doc_before(p, TOKEN_DOC);
         field.note = doc_before(p, TOKEN_NOTE);
@@ -2740,6 +2837,7 @@ static struct item *class_item(struct parser *p, struct item *it)
             (accept(p, TOKEN_ASSIGN) &&
              (field.value = expression(p)) == NULL)) {
             free(fields.data);
+            free(nested.data);
             return NULL;
         }
         close_clauses(p, mark, field.pos);
@@ -2749,9 +2847,11 @@ static struct item *class_item(struct parser *p, struct item *it)
         }
     }
     it->params = list_finish(p, &fields, &it->param_count);
-    if (!members_of(p, it)) {
+    if (!members_of(p, it, &nested)) {
+        free(nested.data);
         return NULL;
     }
+    it->nested = list_finish(p, &nested, &it->nested_count);
     return expect(p, TOKEN_RBRACE) ? it : NULL;
 }
 
@@ -3043,7 +3143,7 @@ static struct item *item_level(struct parser *p)
             }
         }
         it->params = list_finish(p, &values, &it->param_count);
-        if (!members_of(p, it)) {
+        if (!members_of(p, it, NULL)) {
             return NULL;
         }
         return expect(p, TOKEN_RBRACE) ? it : NULL;
@@ -3128,6 +3228,35 @@ static bool module_path(struct parser *p, struct name *out)
     out->length = path.length;
     text_free(&path);
     return true;
+}
+
+/* An item of the module, after every type nested in it. A nested type
+   takes its full name, the name of the class, a dot and the name as
+   written. The name
+   of the class is complete before the types inside it take theirs, so a
+   type nested two deep is `A.B.C`. The nested types come first, so the
+   checker has declared their fields when a default of the class names
+   one. */
+static void push_item(struct parser *p, struct list *items, struct item *it)
+{
+    size_t i;
+
+    for (i = 0; i < it->nested_count; i++) {
+        struct item *inner = it->nested[i];
+        size_t length = it->name.length + 1 + inner->name.length;
+        char *full = node(p, length + 1);
+        memcpy(full, it->name.text, it->name.length);
+        full[it->name.length] = '.';
+        memcpy(full + it->name.length + 1, inner->name.text,
+               inner->name.length);
+        full[length] = '\0';
+        inner->local_name = inner->name;
+        inner->name.text = full;
+        inner->name.length = length;
+        inner->outer = it;
+        push_item(p, items, inner);
+    }
+    list_push(items, &it);
 }
 
 /* DESIGN: `tests { }` and `fixtures { }` hold functions and nothing else.
@@ -3357,7 +3486,7 @@ bool parse(const char *source, const struct token_list *tokens,
         }
         it = item(&p);
         if (it != NULL) {
-            list_push(&items, &it);
+            push_item(&p, &items, it);
         } else {
             if (p.pos == before) {
                 next(&p);
