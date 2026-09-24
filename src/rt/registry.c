@@ -49,12 +49,15 @@ static const struct anti_class *find_in(const struct anti_registry *r,
     return found;
 }
 
-/* DESIGN: a name without a dot is the name the descriptor holds, which
+/* The class named `Class` or `module.Class`, or NULL when the registry
+   holds none or holds two of the bare name.
+
+   DESIGN: a name without a dot is the name the descriptor holds, which
    two modules may both declare. It finds a class when one class alone
    has it. `module.Class` names the class of one module and is never in
    doubt. */
-const struct anti_class *anti_rt_registry_find(const unsigned char *name,
-                                               int64_t length)
+static const struct anti_class *registry_find(const unsigned char *name,
+                                             int64_t length)
 {
     const struct anti_class *found;
     bool two = false;
@@ -113,7 +116,7 @@ static void *build(const struct anti_class *c)
 
 void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
 {
-    const struct anti_class *c = anti_rt_registry_find(name, length);
+    const struct anti_class *c = registry_find(name, length);
 
     /* A construct with arguments has none to take here, and a required
        class field has no value. */
@@ -723,7 +726,7 @@ static void *read_object(struct reader *r,
     if (!type_of(*r, name, &length)) {
         return NULL;
     }
-    c = anti_rt_registry_find(name, (int64_t)length);
+    c = registry_find(name, (int64_t)length);
     if (c == NULL || !descends(c->descriptor, expected) ||
         (c->flags & ANTI_CLASS_REQUIRED) != 0) {
         return NULL;

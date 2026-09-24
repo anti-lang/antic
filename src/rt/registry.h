@@ -39,11 +39,6 @@ struct anti_registry {
 
 extern const struct anti_registry anti_rt_registry;
 
-/* The class named `Class` or `module.Class`, or NULL when the registry
-   holds none or holds two of the bare name. */
-const struct anti_class *anti_rt_registry_find(const unsigned char *name,
-                                               int64_t length);
-
 /* A new object of the class named, on the heap of the C library, or
    NULL. The caller frees it with anti_rt_delete, which `delete`
    calls. */
