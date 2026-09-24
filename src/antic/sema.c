@@ -10187,6 +10187,1027 @@ static void check_provides(struct checker *c, struct module *module)
     }
 }
 
+/* The passes of sema_check, in the order it runs them. Each walks
+   `module->items` once, and a later pass reads what an earlier one
+   declared. */
+
+/* Declare every item first, so each can be used before its
+   declaration. */
+static void declare_items(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        it->symbol = declare(c, item_symbol_kind(it->kind), &it->name,
+                             it->name_pos, "`%.*s` is already declared");
+        if (it->symbol == NULL) {
+            continue;
+        }
+        it->symbol->item = it;
+        it->symbol->variadic = it->variadic;
+        it->symbol->worker = it->worker;
+        it->symbol->may_fail = it->may_fail;
+        it->symbol->exported = it->exported;
+        it->symbol->doc = it->doc;
+        if (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION) {
+            it->symbol->type = types_struct(c->types, c->module_name, it->name);
+            it->symbol->type->is_union = it->kind == ITEM_UNION;
+            it->symbol->type->simd = it->simd;
+        } else if (it->kind == ITEM_CLASS) {
+            it->symbol->type = types_struct(c->types, c->module_name, it->name);
+            it->symbol->type->kind = TYPE_CLASS;
+            it->symbol->type->has_abstract = it->is_abstract;
+            it->symbol->type->traced = it->trace;
+            it->symbol->type->is_final = it->is_final;
+            /* DESIGN: `compatible` names the floor of a plugin's
+               version, which only an abstract class has a table for. */
+            if (it->compatible.length > 0 && !it->is_abstract) {
+                error_at(c, it->compatible_pos,
+                         "`compatible` names the versions a plugin may carry, "
+                         "and belongs to an abstract class");
+            }
+            it->symbol->type->compatible = it->compatible;
+        } else if (it->kind == ITEM_VARIANT) {
+            it->symbol->type = types_struct(c->types, c->module_name, it->name);
+            it->symbol->type->kind = TYPE_VARIANT;
+        } else if (it->kind == ITEM_ENUM) {
+            /* DESIGN: the underlying type of an enum is c_int unless the
+               declaration names one, as an unfixed C enum is an int. */
+            struct type *base = it->base != NULL
+                                    ? resolve_type(c, it->base)
+                                    : types_builtin(c->types, TYPE_I32);
+            it->symbol->type =
+                types_enum(c->types, c->module_name, it->name, base);
+        }
+        if (it->symbol->type != NULL) {
+            it->symbol->type->members = it->members;
+            it->symbol->type->member_count = it->member_count;
+        }
+    }
+}
+
+/* DESIGN: a class names its base in its header. The base is nested
+   whole at offset 0, so the checker resolves it before the fields,
+   which put the base at index 0. A base that is not a class, or that
+   is `final`, is refused. A class without `inherits` takes the root
+   `anti.lang.Object`, which the compiler declares. */
+static void resolve_base(struct checker *c, struct item *it)
+{
+    struct symbol *base;
+    struct type *base_type;
+
+    if (it->base_name.length == 0) {
+        it->symbol->type->base = types_object(c->types);
+        return;
+    }
+    /* A qualified base is a public class of an imported module. */
+    if (it->base_module.length > 0) {
+        base_type = imported_struct(c, &it->base_module, &it->base_name,
+                                    it->base_pos);
+        if (is_error(base_type)) {
+            return;
+        }
+    } else {
+        base = scope_find_local(&c->module_scope, &it->base_name);
+        base_type = base != NULL && base->kind == SYMBOL_STRUCT
+                        ? base->type
+                        : NULL;
+    }
+    if (base_type == NULL || base_type->kind != TYPE_CLASS) {
+        if (it->base_module.length > 0) {
+            error_at(c, it->base_pos, "`%.*s.%.*s` is not a class",
+                     (int)it->base_module.length, it->base_module.text,
+                     (int)it->base_name.length, it->base_name.text);
+        } else {
+            error_at(c, it->base_pos, "`%.*s` is not a class",
+                     (int)it->base_name.length, it->base_name.text);
+        }
+        return;
+    }
+    if (base_type->is_final) {
+        error_at(c, it->base_pos,
+                 "`%.*s` cannot inherit `final` class `%.*s`",
+                 (int)it->name.length, it->name.text,
+                 (int)it->base_name.length, it->base_name.text);
+        return;
+    }
+    /* The bases of the module are set in the order of the items.
+       A chain therefore ends at a base not yet set. A cycle is found
+       at the class that would close it, which keeps the root, so
+       every walk up a chain ends. */
+    if (descends_from(base_type, it->symbol->type)) {
+        error_at(c, it->base_pos, "class `%.*s` inherits itself",
+                 (int)it->name.length, it->name.text);
+        it->symbol->type->base = types_object(c->types);
+        return;
+    }
+    it->symbol->type->base = base_type;
+}
+
+static void resolve_bases(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->kind == ITEM_CLASS && it->symbol != NULL) {
+            resolve_base(c, it);
+        }
+    }
+}
+
+/* DESIGN: the values of an enum live in its fields, each with the
+   enum as its type. A value without `=` follows the one before it,
+   starting at 0, as C numbers an enumerator. */
+static void declare_enum_values(struct checker *c, struct item *it)
+{
+    struct struct_field *values;
+    size_t j;
+
+    values = types_alloc_array(c->arena, it->param_count + 1, sizeof *values);
+    for (j = 0; j < it->param_count; j++) {
+        size_t k;
+        memset(&values[j], 0, sizeof values[j]);
+        values[j].name = it->params[j].name;
+        values[j].pos = it->params[j].pos;
+        values[j].doc = it->params[j].doc;
+        values[j].type = it->symbol->type;
+        values[j].value = it->params[j].value;
+        /* DESIGN: a value without `=` follows the one before it and
+           the first is 0, as C numbers an enumerator. */
+        values[j].number = j == 0 ? 0 : values[j - 1].number + 1;
+        if (it->params[j].value != NULL) {
+            struct const_value v;
+            struct type *base = it->symbol->type->base;
+            if (require(c, it->params[j].value,
+                        check_expr(c, it->params[j].value, base), base) &&
+                eval_const(c, it->params[j].value, &v) &&
+                v.kind == CONST_INT) {
+                values[j].number = v.as.integer;
+            }
+        }
+        for (k = 0; k < j; k++) {
+            if (same_name(&values[k].name, &values[j].name)) {
+                error_at(c, values[j].pos, "enum `%.*s` has two values "
+                         "named `%.*s`", (int)it->name.length,
+                         it->name.text, (int)values[j].name.length,
+                         values[j].name.text);
+            }
+        }
+    }
+    types_set_fields(c->types, it->symbol->type, values, it->param_count);
+}
+
+static void declare_enums_and_variants(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL && it->kind == ITEM_ENUM) {
+            declare_enum_values(c, it);
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL && it->kind == ITEM_VARIANT) {
+            declare_cases(c, it);
+        }
+    }
+}
+
+/* DESIGN: `own` says the object frees the memory behind the field, so
+   the field holds an address the object alone reaches. `str` is
+   immutable and shared, and a class or struct field is inline and owned
+   by the object already. */
+static void check_own_field(struct checker *c, const struct struct_field *f)
+{
+    const struct type *ft = f->type;
+
+    if (!f->owned || is_error(ft)) {
+        return;
+    }
+    if (ft->kind != TYPE_POINTER && ft->kind != TYPE_SLICE) {
+        error_at(c, f->pos, "`own` needs a pointer or a "
+                 "slice, and `%.*s` has type `%s`",
+                 (int)f->name.length, f->name.text, tn(ft));
+    }
+}
+
+/* DESIGN: a `transient` field holds derived state, such as a cache. The
+   copy of the object writes `none` into it, and the field list leaves it
+   out, so the default `equals`, `hash` and `serialize` pass over it.
+   `none` is the value the copy writes, so the field is a `?*T` or a
+   `?fn(...)`. The class frees what it holds in its own `destruct`, and
+   `own` would free it a second time. */
+static void check_transient_field(struct checker *c,
+                                  const struct struct_field *f)
+{
+    const struct type *ft = f->type;
+
+    if (!f->transient || is_error(ft)) {
+        return;
+    }
+    if ((ft->kind != TYPE_POINTER && ft->kind != TYPE_FN) ||
+        !type_is_nullable(ft) || ft->bound) {
+        error_at(c, f->pos, "`transient` needs a `?*T` or a "
+                 "`?fn(...)`, and `%.*s` has type `%s`",
+                 (int)f->name.length, f->name.text, tn(ft));
+    } else if (f->owned) {
+        error_at(c, f->pos, "`%.*s` is `transient`, so its "
+                 "class frees it in `destruct` and it is not `own`",
+                 (int)f->name.length, f->name.text);
+    }
+}
+
+/* DESIGN: `inject` names a field the provider of its interface fills
+   before `construct` runs. The type is therefore a pointer to an
+   abstract class, which is what an interface is, and never `?*T`,
+   because a provider never gives `none`. No default stands beside it,
+   since the provider writes the field whatever a literal holds, and
+   `own` does not, since the provider owns what it gives. */
+static void check_inject_field(struct checker *c, const struct struct_field *f,
+                               const struct param *p)
+{
+    const struct type *ft = f->type;
+
+    if (!f->injected || is_error(ft)) {
+        return;
+    }
+    if (ft->kind != TYPE_POINTER || ft->nullable ||
+        ft->element->kind != TYPE_CLASS || !ft->element->has_abstract) {
+        error_at(c, f->pos, "`inject` needs a pointer to an "
+                 "abstract class, and `%.*s` has type `%s`",
+                 (int)f->name.length, f->name.text, tn(ft));
+    } else if (p->value != NULL) {
+        error_at(c, f->pos, "`%.*s` is `inject`, so its "
+                 "provider fills it and it has no default",
+                 (int)f->name.length, f->name.text);
+    } else if (f->owned) {
+        error_at(c, f->pos, "`%.*s` is `inject`, so its "
+                 "provider owns what it gives and it is not `own`",
+                 (int)f->name.length, f->name.text);
+    }
+}
+
+/* The declared fields of it, each with its type and bitfield width,
+   refusing a name used twice. */
+static void resolve_fields(struct checker *c, struct item *it,
+                           struct struct_field *fields)
+{
+    size_t j;
+
+    for (j = 0; j < it->param_count; j++) {
+        size_t k;
+        fields[j].name = it->params[j].name;
+        fields[j].pos = it->params[j].pos;
+        fields[j].doc = it->params[j].doc;
+        fields[j].form = it->params[j].form;
+        fields[j].vis = it->params[j].vis;
+        fields[j].owned = it->params[j].owned;
+        fields[j].transient = it->params[j].transient;
+        fields[j].atomic = it->params[j].atomic;
+        fields[j].writable = it->params[j].writable;
+        fields[j].injected = it->params[j].injected;
+        fields[j].inject_final = it->params[j].inject_final;
+
+        fields[j].value = it->params[j].value;
+        c->target_sized = true;
+        fields[j].type = resolve_type(c, it->params[j].type);
+        c->target_sized = false;
+        if (it->params[j].bits != NULL ||
+            type_field_is_unit_break(&fields[j])) {
+            fields[j].bits = bitfield_width(c, &it->params[j],
+                                            fields[j].type);
+        }
+        if (it->kind == ITEM_UNION && type_field_is_unit_break(&fields[j])) {
+            error_at(c, fields[j].pos, "a union holds no zero-width "
+                     "bitfield");
+        }
+        for (k = 0; k < j && !type_field_is_unit_break(&fields[j]); k++) {
+            if (same_name(&fields[k].name, &fields[j].name)) {
+                error_at(c, fields[j].pos, "%s `%.*s` has two fields "
+                         "named `%.*s`",
+                         it->kind == ITEM_UNION ? "union" : "struct",
+                         (int)it->name.length, it->name.text,
+                         (int)fields[j].name.length, fields[j].name.text);
+            }
+        }
+    }
+}
+
+/* The fields of a struct, union or class, with their checks, their
+   defaults and the layout attributes of the item. */
+static void declare_fields(struct checker *c, struct item *it)
+{
+    struct struct_field *fields;
+    size_t base_fields;
+    size_t j;
+
+    /* DESIGN: a class carries its base as field 0, named `super`.
+       The name is a keyword, so no declared field collides with it,
+       and `self.super` is then ordinary field access. The base is
+       nested whole, so the C rules of chapter 18 place it at offset
+       0 and the class's own fields after it. */
+    base_fields = it->kind == ITEM_CLASS ? 1 : 0;
+    fields = types_alloc_array(c->arena, it->param_count + base_fields,
+                               sizeof *fields);
+    if (base_fields != 0) {
+        static const char super_text[] = "super";
+        memset(&fields[0], 0, sizeof fields[0]);
+        fields[0].name.text = super_text;
+        fields[0].name.length = sizeof super_text - 1;
+        fields[0].pos = it->name_pos;
+        fields[0].form = FIELD_BASE;
+        fields[0].type = it->symbol->type->base;
+    }
+    fields += base_fields;
+    resolve_fields(c, it, fields);
+    for (j = 0; j < it->param_count; j++) {
+        check_own_field(c, &fields[j]);
+    }
+    for (j = 0; j < it->param_count; j++) {
+        check_transient_field(c, &fields[j]);
+    }
+    for (j = 0; j < it->param_count; j++) {
+        check_inject_field(c, &fields[j], &it->params[j]);
+    }
+    /* A default is checked against the type of its field, so the
+       value that lowering writes is complete and typed. It is a
+       constant expression, and its value is kept for the library
+       file. */
+    for (j = 0; j < it->param_count; j++) {
+        struct const_value *v;
+        if (it->params[j].value == NULL ||
+            !require(c, it->params[j].value,
+                     check_expr(c, it->params[j].value, fields[j].type),
+                     fields[j].type)) {
+            continue;
+        }
+        v = arena_alloc(c->arena, sizeof *v);
+        if (eval_const(c, it->params[j].value, v)) {
+            fields[j].constant = v;
+        }
+    }
+    types_set_fields(c->types, it->symbol->type, fields - base_fields,
+                     it->param_count + base_fields);
+    it->symbol->type->packed = it->packed;
+    if (it->align != NULL) {
+        it->symbol->type->align = alignment(c, it->align);
+    }
+    if (it->simd) {
+        check_simd_struct(c, it);
+    }
+}
+
+/* The fields of every struct, union and class, then the refusal of a
+   type that contains itself. */
+static void declare_all_fields(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL &&
+            (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
+             it->kind == ITEM_CLASS)) {
+            declare_fields(c, it);
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        const char *kind = it->kind == ITEM_STRUCT    ? "struct"
+                           : it->kind == ITEM_UNION   ? "union"
+                           : it->kind == ITEM_CLASS   ? "class"
+                           : it->kind == ITEM_VARIANT ? "variant"
+                                                      : NULL;
+        if (it->symbol != NULL && kind != NULL &&
+            types_find_cycle(it->symbol->type) != NULL) {
+            error_at(c, it->name_pos, "%s `%.*s` contains itself", kind,
+                     (int)it->name.length, it->name.text);
+            types_break_cycles(it->symbol->type, builtin(c, TYPE_ERROR));
+        }
+    }
+}
+
+static void declare_function_types(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL &&
+            (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN)) {
+            it->symbol->type = function_type(c, it);
+        }
+        /* The operators of a simd struct are built in, and an `operator
+           fn` beside them would never be called. */
+        if (it->symbol != NULL && it->kind == ITEM_FN && it->is_operator &&
+            it->symbol->type->kind == TYPE_FN &&
+            it->symbol->type->param_count > 0 &&
+            type_is_simd(struct_of(it->symbol->type->params[0]))) {
+            error_at(c, it->name_pos, "`%s` is a `simd struct`, whose "
+                     "operators are built in",
+                     tn(struct_of(it->symbol->type->params[0])));
+        }
+    }
+}
+
+/* DESIGN: a function of a struct body carries the name `T.f`, so its
+   symbol is `module.T.f`, one segment more than a free function. It
+   is not declared in the module scope, because it is reached through
+   its type. */
+static void declare_members(struct checker *c, struct item *it)
+{
+    size_t j;
+
+    for (j = 0; j < it->member_count; j++) {
+        struct item *m = it->members[j];
+        struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
+        struct name text;
+        size_t k;
+        for (k = 0; k < j; k++) {
+            if (same_name(&it->members[k]->name, &m->name) &&
+                same_qualifier(it, it->members[k], m)) {
+                error_at(c, m->name_pos, "`%.*s` declares `%.*s` twice",
+                         (int)it->name.length, it->name.text,
+                         (int)m->name.length, m->name.text);
+            }
+        }
+        text = types_member_symbol(c->arena, &it->name, m);
+        if (m->contract == FN_ABSTRACT) {
+            it->symbol->type->has_abstract = true;
+        }
+        /* A static field is a global, which lowering writes, and a
+           constant of a body is folded where it is named. */
+        /* DESIGN: every public function of an export class has the
+           C symbol `Class_fn`, because the generated header declares
+           a prototype for each one. */
+        if (it->exported && m->kind == ITEM_FN && m->pub) {
+            m->exported = true;
+        }
+        sym->kind = m->kind != ITEM_CONST  ? SYMBOL_FN
+                    : m->is_static         ? SYMBOL_GLOBAL
+                                           : SYMBOL_CONST;
+        sym->name = text;
+        sym->pos = m->name_pos;
+        sym->item = m;
+        sym->exported = m->exported;
+        sym->may_fail = m->may_fail;
+        sym->doc = m->doc;
+
+        m->symbol = sym;
+        if (m->kind == ITEM_FN) {
+            sym->type = function_type(c, m);
+        }
+    }
+}
+
+/* The members of every body, the export mark of every type and the
+   constants of the module. */
+static void declare_all_members(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL && it->symbol->type != NULL) {
+            declare_members(c, it);
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL &&
+            (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
+             it->kind == ITEM_CLASS || it->kind == ITEM_ENUM ||
+             it->kind == ITEM_VARIANT)) {
+            it->symbol->type->item_exported = it->exported;
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL && it->kind == ITEM_CONST) {
+            const_symbol(c, it->symbol, it->name_pos);
+        }
+    }
+}
+
+/* Every body calls with the defaults and the `own` parameters, so they
+   are known before the first body is checked. */
+static void check_signatures(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {
+            check_defaults(c, it);
+            check_owned(c, it);
+        }
+        for (j = 0; it->symbol != NULL && j < it->member_count; j++) {
+            if (it->members[j]->kind == ITEM_FN) {
+                check_defaults(c, it->members[j]);
+                check_owned(c, it->members[j]);
+            }
+        }
+    }
+    /* DESIGN: a singleton has one instance, which `Config.get()` makes
+       on the first call. The program never allocates one, so the checker
+       declares `get` itself, before any body names it. */
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->kind == ITEM_CLASS && it->is_singleton &&
+            it->symbol != NULL && it->symbol->type != NULL) {
+            declare_get(c, it);
+        }
+    }
+}
+
+static void check_free_functions(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol == NULL || it->kind != ITEM_FN) {
+            continue;
+        }
+        check_function(c, it);
+        if (name_is(&it->name, "main") && !is_error(it->symbol->type)) {
+            check_main(c, it);
+        }
+        if (it->block != BLOCK_NONE && !is_error(it->symbol->type)) {
+            check_test_block(c, it);
+        }
+    }
+}
+
+/* DESIGN: `implements name: I` places a sub-object of the abstract
+   class I inside the class. Only an abstract class may be implemented,
+   and one class implements an interface once, so that every name it
+   provides has one path. */
+static void check_implements(struct checker *c, const struct item *it,
+                             const struct type *t)
+{
+    size_t j;
+
+    for (j = 0; j < t->field_count; j++) {
+        const struct type *iface = t->fields[j].type;
+        const struct type *chain;
+        size_t k;
+        if (t->fields[j].form != FIELD_IMPL) {
+            continue;
+        }
+        if (iface == NULL || iface->kind != TYPE_CLASS ||
+            !iface->has_abstract) {
+            error_at(c, t->fields[j].pos, "`%s` is not abstract and "
+                     "cannot be implemented", tn(iface));
+            continue;
+        }
+        for (k = 0; k < j; k++) {
+            if (t->fields[k].form == FIELD_IMPL &&
+                t->fields[k].type == iface) {
+                error_at(c, t->fields[j].pos,
+                         "`%.*s` implements `%s` twice",
+                         (int)it->name.length, it->name.text, tn(iface));
+            }
+        }
+        for (chain = inherited(t); chain != NULL; chain = inherited(chain)) {
+            for (k = 0; k < chain->field_count; k++) {
+                if (chain->fields[k].form == FIELD_IMPL &&
+                    chain->fields[k].type == iface) {
+                    error_at(c, t->fields[j].pos, "`%.*s` implements "
+                             "`%s`, which `%.*s` implements already",
+                             (int)it->name.length, it->name.text,
+                             tn(iface), (int)chain->name.length,
+                             chain->name.text);
+                }
+            }
+        }
+    }
+}
+
+/* A plain or `use` field of an abstract class is refused here, after
+   every class knows whether a contract reaches it. The base and an
+   interface sub-object are the two places an abstract class is a
+   value, so they are skipped. */
+static void refuse_abstract_fields(struct checker *c, const struct type *t)
+{
+    size_t j;
+
+    for (j = 0; j < t->field_count; j++) {
+        char what[96];
+        if (t->fields[j].form == FIELD_BASE ||
+            t->fields[j].form == FIELD_TABLE ||
+            t->fields[j].form == FIELD_IMPL) {
+            continue;
+        }
+        format_to(what, sizeof what, "the field `%.*s`",
+                  (int)t->fields[j].name.length, t->fields[j].name.text);
+        refuse_abstract_value(c, t->fields[j].pos, what, t->fields[j].type);
+    }
+}
+
+/* The function of the chain or of an implemented interface that the
+   member m of t matches by name, or NULL. */
+static const struct item *matched_above(const struct type *t,
+                                        const struct item *m)
+{
+    const struct item *above = NULL;
+    const struct type *base;
+
+    if (inherited(t) != NULL) {
+        above = types_primary_member(inherited(t), &m->name);
+    }
+    /* An interface declares functions the class fills, so a
+       `concrete fn` matches there as well as in the base chain. An
+       interface a base implements counts, because a body below replaces
+       the one of the base in its table. */
+    for (base = t; above == NULL && base != NULL; base = inherited(base)) {
+        size_t k;
+        for (k = 0; above == NULL && k < base->field_count; k++) {
+            const struct type *iface;
+            if (base->fields[k].form != FIELD_IMPL) {
+                continue;
+            }
+            for (iface = base->fields[k].type;
+                 iface != NULL && above == NULL; iface = inherited(iface)) {
+                const struct item *found = find_member(iface, &m->name);
+                if (found != NULL && found->kind == ITEM_FN) {
+                    above = found;
+                }
+            }
+        }
+    }
+    return above;
+}
+
+/* DESIGN: a contract is declared with `abstract fn` and filled with
+   `concrete fn` of the same signature. The checker walks the chain of
+   `inherits` fields of every struct and refuses one that leaves a
+   contract unfilled, and `check_replacement` compares each `concrete
+   fn` with the entries it fills. */
+static void check_contracts(struct checker *c, const struct item *it,
+                            const struct type *t)
+{
+    size_t j;
+
+    for (j = 0; j < it->member_count; j++) {
+        struct item *m = it->members[j];
+        const struct item *above;
+        if (m->kind != ITEM_FN) {
+            continue;
+        }
+        above = matched_above(t, m);
+        if (m->contract == FN_ABSTRACT) {
+            continue;
+        }
+        if (m->contract == FN_CONCRETE && above == NULL) {
+            error_at(c, m->name_pos, "`concrete fn %.*s` of `%.*s` fills "
+                     "no abstract function", (int)m->name.length,
+                     m->name.text, (int)it->name.length, it->name.text);
+        } else if (m->contract == FN_CONCRETE) {
+            check_replacement(c, it, t, m);
+        } else if (m->contract == FN_PLAIN && above != NULL &&
+                   above->contract != FN_PLAIN) {
+            error_at(c, m->name_pos, "`%.*s` of `%.*s` matches an "
+                     "abstract function and needs `concrete`",
+                     (int)m->name.length, m->name.text,
+                     (int)it->name.length, it->name.text);
+        }
+    }
+}
+
+/* DESIGN: a struct may not redeclare a name that its chain already
+   has. A `concrete fn` is the exception, because it fills the abstract
+   function of that name. */
+static void refuse_redeclared(struct checker *c, const struct item *it,
+                              const struct type *t)
+{
+    const struct type *base;
+    size_t j;
+
+    for (base = inherited(t); base != NULL; base = inherited(base)) {
+        for (j = 0; j < t->field_count; j++) {
+            if (t->fields[j].form == FIELD_BASE ||
+                t->fields[j].form == FIELD_TABLE) {
+                continue;
+            }
+            if (find_field(base, &t->fields[j].name) != NULL ||
+                find_member(base, &t->fields[j].name) != NULL) {
+                error_at(c, t->fields[j].pos, "`%.*s` already has `%.*s`",
+                         (int)base->name.length, base->name.text,
+                         (int)t->fields[j].name.length,
+                         t->fields[j].name.text);
+            }
+        }
+        for (j = 0; j < it->member_count; j++) {
+            const struct item *m = it->members[j];
+            const struct item *shadowed;
+            /* `construct` and `destruct` repeat down a chain by design,
+               because the compiler runs one body per level. A `concrete
+               fn` replaces an entry, and an `abstract fn` re-opens one,
+               which an interface does when it names a function of the
+               root. */
+            if (m->contract != FN_PLAIN || name_is(&m->name, "construct") ||
+                name_is(&m->name, "destruct")) {
+                continue;
+            }
+            /* DESIGN: a static function is namespaced by its class and
+               reached as `Class.f`, never through a value and never
+               through a table. Two statics of one name in a chain name
+               two functions and no call is ambiguous, so the rule leaves
+               them. A function that takes `self` is another matter, and
+               so is a field. */
+            shadowed = find_member(base, &m->name);
+            if (!m->has_self && find_field(base, &m->name) == NULL &&
+                shadowed != NULL && shadowed->kind == ITEM_FN &&
+                !shadowed->has_self) {
+                continue;
+            }
+            if (find_field(base, &m->name) != NULL || shadowed != NULL) {
+                error_at(c, m->name_pos, "`%.*s` already has `%.*s`",
+                         (int)base->name.length, base->name.text,
+                         (int)m->name.length, m->name.text);
+            }
+        }
+    }
+}
+
+/* DESIGN: every abstract function of the chain needs a concrete one at
+   or below the class that declares it. An abstract class may leave one
+   open. It is never a complete value, and every class below it is
+   checked here. */
+static void require_filled_chain(struct checker *c, const struct item *it,
+                                 const struct type *t)
+{
+    const struct type *base;
+    size_t j;
+
+    for (base = inherited(t); base != NULL && !it->is_abstract;
+         base = inherited(base)) {
+        for (j = 0; j < base->member_count; j++) {
+            const struct item *a = base->members[j];
+            const struct item *filled;
+            if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT) {
+                continue;
+            }
+            filled = types_primary_member(t, &a->name);
+            if (filled == NULL || filled->contract != FN_CONCRETE) {
+                error_at(c, it->name_pos, "`%.*s` lacks `concrete fn "
+                         "%.*s`", (int)it->name.length, it->name.text,
+                         (int)a->name.length, a->name.text);
+            }
+        }
+    }
+}
+
+/* An `operator fn` carries one of the fourteen names the table holds,
+   and nothing else. */
+static void check_operator_names(struct checker *c, const struct item *it)
+{
+    size_t j;
+
+    for (j = 0; j < it->member_count; j++) {
+        const struct item *m = it->members[j];
+        if (m->kind == ITEM_FN && m->is_operator &&
+            !operator_named(&m->name)) {
+            error_at(c, m->name_pos, "`operator fn` takes one of `add`, "
+                     "`sub`, `mul`, `div`, `rem`, `neg`, `eq`, `lt`, "
+                     "`and`, `or`, `xor`, `shl`, `shr` and `not`");
+        }
+    }
+}
+
+/* DESIGN: one `construct` per class, and every alternative is a static
+   function with a name of its own. A `construct` without arguments
+   cannot fail and returns nothing. */
+static void check_one_construct(struct checker *c, const struct item *it)
+{
+    const struct item *first = NULL;
+    size_t j;
+
+    for (j = 0; j < it->member_count; j++) {
+        struct item *m = it->members[j];
+        if (m->kind != ITEM_FN || !name_is(&m->name, "construct")) {
+            continue;
+        }
+        if (first != NULL) {
+            error_at(c, m->name_pos, "`%.*s` has one `construct`, "
+                     "and every other maker is a static function",
+                     (int)it->name.length, it->name.text);
+        }
+        first = m;
+        if (!m->has_self) {
+            error_at(c, m->name_pos,
+                     "`construct` takes `self` as its first parameter");
+        } else if (m->param_count == 0 && m->result != NULL) {
+            error_at(c, m->name_pos, "a `construct` without "
+                     "arguments cannot fail and returns nothing");
+        }
+    }
+}
+
+/* DESIGN: the qualifier of a `concrete fn` names the table it fills:
+   the class itself, a class of its chain, or an interface it
+   implements. Any other name reaches no table. Two qualifiers that
+   reach one table fill it twice, which is refused as a name declared
+   twice. */
+static void check_qualifiers(struct checker *c, const struct item *it,
+                             const struct type *t)
+{
+    size_t j;
+
+    for (j = 0; j < it->member_count; j++) {
+        const struct item *m = it->members[j];
+        size_t k;
+        if (m->kind != ITEM_FN || m->qualifier.length == 0) {
+            continue;
+        }
+        if (qualified_table(t, &m->qualifier) == NULL) {
+            error_at(c, m->qualifier_pos, "`%.*s` is no base and no "
+                     "interface of `%.*s`", (int)m->qualifier.length,
+                     m->qualifier.text, (int)it->name.length,
+                     it->name.text);
+            continue;
+        }
+        for (k = 0; k < j; k++) {
+            const struct item *other = it->members[k];
+            if (other->kind == ITEM_FN &&
+                same_name(&other->name, &m->name) &&
+                other->qualifier.length > 0 &&
+                !same_name(&other->qualifier, &m->qualifier) &&
+                one_table(t, other, m)) {
+                error_at(c, m->name_pos, "`%.*s` declares `%.*s` twice",
+                         (int)it->name.length, it->name.text,
+                         (int)m->name.length, m->name.text);
+            }
+        }
+    }
+}
+
+/* An interface leaves its functions open, and the class that
+   implements it fills them. The chain of the interface counts, because
+   an interface may inherit another abstract class. */
+static void require_filled_interfaces(struct checker *c,
+                                      const struct item *it,
+                                      const struct type *t)
+{
+    size_t j;
+
+    for (j = 0; j < t->field_count && !it->is_abstract; j++) {
+        const struct type *iface;
+        if (t->fields[j].form != FIELD_IMPL) {
+            continue;
+        }
+        for (iface = t->fields[j].type; iface != NULL;
+             iface = inherited(iface)) {
+            size_t k;
+            for (k = 0; k < iface->member_count; k++) {
+                const struct item *a = iface->members[k];
+                const struct item *filled;
+                if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT) {
+                    continue;
+                }
+                filled = types_interface_member(t, t->fields[j].type,
+                                                &a->name);
+                if (filled == NULL || filled->contract != FN_CONCRETE) {
+                    error_at(c, it->name_pos, "`%.*s` lacks `concrete "
+                             "fn %.*s` of `%s`", (int)it->name.length,
+                             it->name.text, (int)a->name.length,
+                             a->name.text, tn(iface));
+                }
+            }
+        }
+    }
+}
+
+/* The checks of every type with fields: its interfaces, its abstract
+   fields, then its contracts and the functions of its body. */
+static void check_types(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
+        if (type_has_fields(t)) {
+            check_implements(c, it, t);
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
+        if (type_has_fields(t)) {
+            refuse_abstract_fields(c, t);
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
+        if (!type_has_fields(t)) {
+            continue;
+        }
+        check_contracts(c, it, t);
+        refuse_redeclared(c, it, t);
+        require_filled_chain(c, it, t);
+        check_operator_names(c, it);
+        check_one_construct(c, it);
+        check_qualifiers(c, it, t);
+        require_filled_interfaces(c, it, t);
+    }
+}
+
+/* A function of a body is checked like a free function, with `self`
+   declared as a parameter of type *T. */
+static void check_member_functions(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        for (j = 0; j < it->member_count; j++) {
+            struct item *m = it->members[j];
+            if (m->symbol == NULL || m->kind != ITEM_FN || m->body == NULL) {
+                continue;
+            }
+            check_function(c, m);
+        }
+    }
+}
+
+/* DESIGN: the pass that only reports runs last, over every function a
+   worker can reach and over the abstract classes of the program. It
+   changes nothing, so a build that skips it still compiles the same
+   program. */
+static void report_program(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->kind != ITEM_FN || !it->worker || it->body == NULL) {
+            continue;
+        }
+        walk_worker(c, it);
+    }
+    /* An abstract class that no class of the program fills has no value
+       and no use. A build that writes a program sees every class, so it
+       can say so. A library build sees no program: `anti.lang` writes
+       `TraceHandler` for the program that installs a handler. */
+    if (!c->program) {
+        return;
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
+        if (it->kind != ITEM_CLASS || !it->is_abstract || t == NULL) {
+            continue;
+        }
+        if (!filled_somewhere(c, t)) {
+            diagnostics_warn(c->diags, it->name_pos.line, it->name_pos.column,
+                             "`%.*s` is abstract and no class fills it",
+                             (int)it->name.length, it->name.text);
+        }
+    }
+}
+
+/* The checks of what crosses to C: every exported item, every
+   `extern fn`, `provides` and `link framework`. */
+static void check_boundary(struct checker *c)
+{
+    struct module *module = c->module;
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        if (module->items[i]->symbol == NULL) {
+            continue;
+        }
+        if (module->items[i]->exported) {
+            check_export(c, module->items[i]);
+        }
+        if (module->items[i]->kind == ITEM_EXTERN_FN) {
+            check_extern_fn(c, module->items[i]);
+        }
+    }
+    check_provides(c, module);
+    check_frameworks(c, module);
+}
+
 bool sema_check(struct module *module, const char *module_name,
                 const char *package,
                 const struct interface *const *libraries,
@@ -10196,7 +11217,6 @@ bool sema_check(struct module *module, const char *module_name,
 {
     struct checker c;
     size_t i;
-    size_t j;
 
     memset(&c, 0, sizeof c);
     c.types = types;
@@ -10212,818 +11232,21 @@ bool sema_check(struct module *module, const char *module_name,
     c.ok = true;
     c.program = program;
     declare_root(&c);
-
     for (i = 0; i < module->import_count; i++) {
         declare_import(&c, &module->imports[i]);
     }
-
-    /* Declare every item first, so each can be used before its
-       declaration. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        it->symbol = declare(&c, item_symbol_kind(it->kind), &it->name,
-                             it->name_pos, "`%.*s` is already declared");
-        if (it->symbol == NULL) {
-            continue;
-        }
-        it->symbol->item = it;
-        it->symbol->variadic = it->variadic;
-        it->symbol->worker = it->worker;
-        it->symbol->may_fail = it->may_fail;
-        it->symbol->exported = it->exported;
-        it->symbol->doc = it->doc;
-        if (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION) {
-            it->symbol->type = types_struct(types, c.module_name, it->name);
-            it->symbol->type->is_union = it->kind == ITEM_UNION;
-            it->symbol->type->simd = it->simd;
-        } else if (it->kind == ITEM_CLASS) {
-            it->symbol->type = types_struct(types, c.module_name, it->name);
-            it->symbol->type->kind = TYPE_CLASS;
-            it->symbol->type->has_abstract = it->is_abstract;
-            it->symbol->type->traced = it->trace;
-            it->symbol->type->is_final = it->is_final;
-            /* DESIGN: `compatible` names the floor of a plugin's
-               version, which only an abstract class has a table for. */
-            if (it->compatible.length > 0 && !it->is_abstract) {
-                error_at(&c, it->compatible_pos,
-                         "`compatible` names the versions a plugin may carry, "
-                         "and belongs to an abstract class");
-            }
-            it->symbol->type->compatible = it->compatible;
-        } else if (it->kind == ITEM_VARIANT) {
-            it->symbol->type = types_struct(types, c.module_name, it->name);
-            it->symbol->type->kind = TYPE_VARIANT;
-        } else if (it->kind == ITEM_ENUM) {
-            /* DESIGN: the underlying type of an enum is c_int unless the
-               declaration names one, as an unfixed C enum is an int. */
-            struct type *base = it->base != NULL
-                                    ? resolve_type(&c, it->base)
-                                    : types_builtin(types, TYPE_I32);
-            it->symbol->type =
-                types_enum(types, c.module_name, it->name, base);
-        }
-        if (it->symbol->type != NULL) {
-            it->symbol->type->members = it->members;
-            it->symbol->type->member_count = it->member_count;
-        }
-    }
-
-    /* DESIGN: a class names its base in its header. The base is nested
-       whole at offset 0, so the checker resolves it before the fields,
-       which put the base at index 0. A base that is not a class, or that
-       is `final`, is refused. A class without `inherits` takes the root
-       `anti.lang.Object`, which the compiler declares. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        struct symbol *base;
-        struct type *base_type;
-        if (it->kind != ITEM_CLASS || it->symbol == NULL) {
-            continue;
-        }
-        if (it->base_name.length == 0) {
-            it->symbol->type->base = types_object(types);
-            continue;
-        }
-        /* A qualified base is a public class of an imported module. */
-        if (it->base_module.length > 0) {
-            base_type = imported_struct(&c, &it->base_module, &it->base_name,
-                                        it->base_pos);
-            if (is_error(base_type)) {
-                continue;
-            }
-        } else {
-            base = scope_find_local(&c.module_scope, &it->base_name);
-            base_type = base != NULL && base->kind == SYMBOL_STRUCT
-                            ? base->type
-                            : NULL;
-        }
-        if (base_type == NULL || base_type->kind != TYPE_CLASS) {
-            if (it->base_module.length > 0) {
-                error_at(&c, it->base_pos, "`%.*s.%.*s` is not a class",
-                         (int)it->base_module.length, it->base_module.text,
-                         (int)it->base_name.length, it->base_name.text);
-            } else {
-                error_at(&c, it->base_pos, "`%.*s` is not a class",
-                         (int)it->base_name.length, it->base_name.text);
-            }
-            continue;
-        }
-        if (base_type->is_final) {
-            error_at(&c, it->base_pos,
-                     "`%.*s` cannot inherit `final` class `%.*s`",
-                     (int)it->name.length, it->name.text,
-                     (int)it->base_name.length, it->base_name.text);
-            continue;
-        }
-        /* The bases of the module are set in the order of the items.
-           A chain therefore ends at a base not yet set. A cycle is found
-           at the class that would close it, which keeps the root, so
-           every walk up a chain ends. */
-        if (descends_from(base_type, it->symbol->type)) {
-            error_at(&c, it->base_pos, "class `%.*s` inherits itself",
-                     (int)it->name.length, it->name.text);
-            it->symbol->type->base = types_object(types);
-            continue;
-        }
-        it->symbol->type->base = base_type;
-    }
-
-    /* DESIGN: the values of an enum live in its fields, each with the
-       enum as its type. A value without `=` follows the one before it,
-       starting at 0, as C numbers an enumerator. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        struct struct_field *values;
-        if (it->symbol == NULL || it->kind != ITEM_ENUM) {
-            continue;
-        }
-        values =
-            types_alloc_array(arena, it->param_count + 1, sizeof *values);
-        for (j = 0; j < it->param_count; j++) {
-            size_t k;
-            memset(&values[j], 0, sizeof values[j]);
-            values[j].name = it->params[j].name;
-            values[j].pos = it->params[j].pos;
-            values[j].doc = it->params[j].doc;
-            values[j].type = it->symbol->type;
-            values[j].value = it->params[j].value;
-            /* DESIGN: a value without `=` follows the one before it and
-               the first is 0, as C numbers an enumerator. */
-            values[j].number = j == 0 ? 0 : values[j - 1].number + 1;
-            if (it->params[j].value != NULL) {
-                struct const_value v;
-                struct type *base = it->symbol->type->base;
-                if (require(&c, it->params[j].value,
-                            check_expr(&c, it->params[j].value, base), base) &&
-                    eval_const(&c, it->params[j].value, &v) &&
-                    v.kind == CONST_INT) {
-                    values[j].number = v.as.integer;
-                }
-            }
-            for (k = 0; k < j; k++) {
-                if (same_name(&values[k].name, &values[j].name)) {
-                    error_at(&c, values[j].pos, "enum `%.*s` has two values "
-                             "named `%.*s`", (int)it->name.length,
-                             it->name.text, (int)values[j].name.length,
-                             values[j].name.text);
-                }
-            }
-        }
-        types_set_fields(types, it->symbol->type, values, it->param_count);
-    }
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->symbol != NULL && it->kind == ITEM_VARIANT) {
-            declare_cases(&c, it);
-        }
-    }
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        struct struct_field *fields;
-        size_t base_fields;
-        if (it->symbol == NULL ||
-            (it->kind != ITEM_STRUCT && it->kind != ITEM_UNION &&
-             it->kind != ITEM_CLASS)) {
-            continue;
-        }
-        /* DESIGN: a class carries its base as field 0, named `super`.
-           The name is a keyword, so no declared field collides with it,
-           and `self.super` is then ordinary field access. The base is
-           nested whole, so the C rules of chapter 18 place it at offset
-           0 and the class's own fields after it. */
-        base_fields = it->kind == ITEM_CLASS ? 1 : 0;
-        fields = types_alloc_array(arena, it->param_count + base_fields,
-                                   sizeof *fields);
-        if (base_fields != 0) {
-            static const char super_text[] = "super";
-            memset(&fields[0], 0, sizeof fields[0]);
-            fields[0].name.text = super_text;
-            fields[0].name.length = sizeof super_text - 1;
-            fields[0].pos = it->name_pos;
-            fields[0].form = FIELD_BASE;
-            fields[0].type = it->symbol->type->base;
-        }
-        fields += base_fields;
-        for (j = 0; j < it->param_count; j++) {
-            size_t k;
-            fields[j].name = it->params[j].name;
-            fields[j].pos = it->params[j].pos;
-            fields[j].doc = it->params[j].doc;
-            fields[j].form = it->params[j].form;
-            fields[j].vis = it->params[j].vis;
-            fields[j].owned = it->params[j].owned;
-            fields[j].transient = it->params[j].transient;
-            fields[j].atomic = it->params[j].atomic;
-            fields[j].writable = it->params[j].writable;
-            fields[j].injected = it->params[j].injected;
-            fields[j].inject_final = it->params[j].inject_final;
-
-            fields[j].value = it->params[j].value;
-            c.target_sized = true;
-            fields[j].type = resolve_type(&c, it->params[j].type);
-            c.target_sized = false;
-            if (it->params[j].bits != NULL ||
-                type_field_is_unit_break(&fields[j])) {
-                fields[j].bits = bitfield_width(&c, &it->params[j],
-                                                fields[j].type);
-            }
-            if (it->kind == ITEM_UNION && type_field_is_unit_break(&fields[j])) {
-                error_at(&c, fields[j].pos, "a union holds no zero-width "
-                         "bitfield");
-            }
-            for (k = 0; k < j && !type_field_is_unit_break(&fields[j]); k++) {
-                if (same_name(&fields[k].name, &fields[j].name)) {
-                    error_at(&c, fields[j].pos, "%s `%.*s` has two fields "
-                             "named `%.*s`",
-                             it->kind == ITEM_UNION ? "union" : "struct",
-                             (int)it->name.length, it->name.text,
-                             (int)fields[j].name.length, fields[j].name.text);
-                }
-            }
-        }
-        /* DESIGN: `own` says the object frees the memory behind the
-           field, so the field holds an address the object alone reaches.
-           `str` is immutable and shared, and a class or struct field is
-           inline and owned by the object already. */
-        for (j = 0; j < it->param_count; j++) {
-            const struct type *ft = fields[j].type;
-            if (!fields[j].owned || is_error(ft)) {
-                continue;
-            }
-            if (ft->kind != TYPE_POINTER && ft->kind != TYPE_SLICE) {
-                error_at(&c, fields[j].pos, "`own` needs a pointer or a "
-                         "slice, and `%.*s` has type `%s`",
-                         (int)fields[j].name.length, fields[j].name.text,
-                         tn(ft));
-            }
-        }
-        /* DESIGN: a `transient` field holds derived state, such as a
-           cache. The copy of the object writes `none` into it, and the
-           field list leaves it out, so the default `equals`, `hash` and
-           `serialize` pass over it. `none` is the value the copy writes,
-           so the field is a `?*T` or a `?fn(...)`. The class frees what
-           it holds in its own `destruct`, and `own` would free it a
-           second time. */
-        for (j = 0; j < it->param_count; j++) {
-            const struct type *ft = fields[j].type;
-            if (!fields[j].transient || is_error(ft)) {
-                continue;
-            }
-            if ((ft->kind != TYPE_POINTER && ft->kind != TYPE_FN) ||
-                !type_is_nullable(ft) || ft->bound) {
-                error_at(&c, fields[j].pos, "`transient` needs a `?*T` or a "
-                         "`?fn(...)`, and `%.*s` has type `%s`",
-                         (int)fields[j].name.length, fields[j].name.text,
-                         tn(ft));
-            } else if (fields[j].owned) {
-                error_at(&c, fields[j].pos, "`%.*s` is `transient`, so its "
-                         "class frees it in `destruct` and it is not `own`",
-                         (int)fields[j].name.length, fields[j].name.text);
-            }
-        }
-        /* DESIGN: `inject` names a field the provider of its interface
-           fills before `construct` runs. The type is therefore a
-           pointer to an abstract class, which is what an interface is,
-           and never `?*T`, because a provider never gives `none`. No
-           default stands beside it, since the provider writes the field
-           whatever a literal holds, and `own` does not, since the
-           provider owns what it gives. */
-        for (j = 0; j < it->param_count; j++) {
-            const struct type *ft = fields[j].type;
-            if (!fields[j].injected || is_error(ft)) {
-                continue;
-            }
-            if (ft->kind != TYPE_POINTER || ft->nullable ||
-                ft->element->kind != TYPE_CLASS ||
-                !ft->element->has_abstract) {
-                error_at(&c, fields[j].pos, "`inject` needs a pointer to an "
-                         "abstract class, and `%.*s` has type `%s`",
-                         (int)fields[j].name.length, fields[j].name.text,
-                         tn(ft));
-            } else if (it->params[j].value != NULL) {
-                error_at(&c, fields[j].pos, "`%.*s` is `inject`, so its "
-                         "provider fills it and it has no default",
-                         (int)fields[j].name.length, fields[j].name.text);
-            } else if (fields[j].owned) {
-                error_at(&c, fields[j].pos, "`%.*s` is `inject`, so its "
-                         "provider owns what it gives and it is not `own`",
-                         (int)fields[j].name.length, fields[j].name.text);
-            }
-        }
-        /* A default is checked against the type of its field, so the
-           value that lowering writes is complete and typed. It is a
-           constant expression, and its value is kept for the library
-           file. */
-        for (j = 0; j < it->param_count; j++) {
-            struct const_value *v;
-            if (it->params[j].value == NULL ||
-                !require(&c, it->params[j].value,
-                         check_expr(&c, it->params[j].value, fields[j].type),
-                         fields[j].type)) {
-                continue;
-            }
-            v = arena_alloc(arena, sizeof *v);
-            if (eval_const(&c, it->params[j].value, v)) {
-                fields[j].constant = v;
-            }
-        }
-        types_set_fields(types, it->symbol->type, fields - base_fields,
-                         it->param_count + base_fields);
-        it->symbol->type->packed = it->packed;
-        if (it->align != NULL) {
-            it->symbol->type->align = alignment(&c, it->align);
-        }
-        if (it->simd) {
-            check_simd_struct(&c, it);
-        }
-    }
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        const char *kind = it->kind == ITEM_STRUCT    ? "struct"
-                           : it->kind == ITEM_UNION   ? "union"
-                           : it->kind == ITEM_CLASS   ? "class"
-                           : it->kind == ITEM_VARIANT ? "variant"
-                                                      : NULL;
-        if (it->symbol != NULL && kind != NULL &&
-            types_find_cycle(it->symbol->type) != NULL) {
-            error_at(&c, it->name_pos, "%s `%.*s` contains itself", kind,
-                     (int)it->name.length, it->name.text);
-            types_break_cycles(it->symbol->type, builtin(&c, TYPE_ERROR));
-        }
-    }
-
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->symbol != NULL &&
-            (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN)) {
-            it->symbol->type = function_type(&c, it);
-        }
-        /* The operators of a simd struct are built in, and an `operator
-           fn` beside them would never be called. */
-        if (it->symbol != NULL && it->kind == ITEM_FN && it->is_operator &&
-            it->symbol->type->kind == TYPE_FN &&
-            it->symbol->type->param_count > 0 &&
-            type_is_simd(struct_of(it->symbol->type->params[0]))) {
-            error_at(&c, it->name_pos, "`%s` is a `simd struct`, whose "
-                     "operators are built in",
-                     tn(struct_of(it->symbol->type->params[0])));
-        }
-    }
-    /* DESIGN: a function of a struct body carries the name `T.f`, so its
-       symbol is `module.T.f`, one segment more than a free function. It
-       is not declared in the module scope, because it is reached through
-       its type. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->symbol == NULL || it->symbol->type == NULL) {
-            continue;
-        }
-        for (j = 0; j < it->member_count; j++) {
-            struct item *m = it->members[j];
-            struct symbol *sym = arena_alloc(arena, sizeof *sym);
-            struct name text;
-            size_t k;
-            for (k = 0; k < j; k++) {
-                if (same_name(&it->members[k]->name, &m->name) &&
-                    same_qualifier(it, it->members[k], m)) {
-                    error_at(&c, m->name_pos, "`%.*s` declares `%.*s` twice",
-                             (int)it->name.length, it->name.text,
-                             (int)m->name.length, m->name.text);
-                }
-            }
-            text = types_member_symbol(arena, &it->name, m);
-            if (m->contract == FN_ABSTRACT) {
-                it->symbol->type->has_abstract = true;
-            }
-            /* A static field is a global, which lowering writes, and a
-               constant of a body is folded where it is named. */
-            /* DESIGN: every public function of an export class has the
-               C symbol `Class_fn`, because the generated header declares
-               a prototype for each one. */
-            if (it->exported && m->kind == ITEM_FN && m->pub) {
-                m->exported = true;
-            }
-            sym->kind = m->kind != ITEM_CONST  ? SYMBOL_FN
-                        : m->is_static         ? SYMBOL_GLOBAL
-                                               : SYMBOL_CONST;
-            sym->name = text;
-            sym->pos = m->name_pos;
-            sym->item = m;
-            sym->exported = m->exported;
-            sym->may_fail = m->may_fail;
-            sym->doc = m->doc;
-
-            m->symbol = sym;
-            if (m->kind == ITEM_FN) {
-                sym->type = function_type(&c, m);
-            }
-        }
-    }
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->symbol != NULL &&
-            (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
-             it->kind == ITEM_CLASS || it->kind == ITEM_ENUM ||
-             it->kind == ITEM_VARIANT)) {
-            it->symbol->type->item_exported = it->exported;
-        }
-    }
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->symbol != NULL && it->kind == ITEM_CONST) {
-            const_symbol(&c, it->symbol, it->name_pos);
-        }
-    }
-    /* Every body calls with the defaults and the `own` parameters, so
-       they are known before the first body is checked. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {
-            check_defaults(&c, it);
-            check_owned(&c, it);
-        }
-        for (j = 0; it->symbol != NULL && j < it->member_count; j++) {
-            if (it->members[j]->kind == ITEM_FN) {
-                check_defaults(&c, it->members[j]);
-                check_owned(&c, it->members[j]);
-            }
-        }
-    }
-    /* DESIGN: a singleton has one instance, which `Config.get()` makes
-       on the first call. The program never allocates one, so the checker
-       declares `get` itself, before any body names it. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->kind == ITEM_CLASS && it->is_singleton &&
-            it->symbol != NULL && it->symbol->type != NULL) {
-            declare_get(&c, it);
-        }
-    }
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->symbol == NULL || it->kind != ITEM_FN) {
-            continue;
-        }
-        check_function(&c, it);
-        if (name_is(&it->name, "main") && !is_error(it->symbol->type)) {
-            check_main(&c, it);
-        }
-        if (it->block != BLOCK_NONE && !is_error(it->symbol->type)) {
-            check_test_block(&c, it);
-        }
-    }
-    /* DESIGN: `implements name: I` places a sub-object of the abstract
-       class I inside the class. Only an abstract class may be
-       implemented, and one class implements an interface once, so that
-       every name it provides has one path. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
-        if (!type_has_fields(t)) {
-            continue;
-        }
-        for (j = 0; j < t->field_count; j++) {
-            const struct type *iface = t->fields[j].type;
-            const struct type *chain;
-            size_t k;
-            if (t->fields[j].form != FIELD_IMPL) {
-                continue;
-            }
-            if (iface == NULL || iface->kind != TYPE_CLASS ||
-                !iface->has_abstract) {
-                error_at(&c, t->fields[j].pos, "`%s` is not abstract and "
-                         "cannot be implemented", tn(iface));
-                continue;
-            }
-            for (k = 0; k < j; k++) {
-                if (t->fields[k].form == FIELD_IMPL &&
-                    t->fields[k].type == iface) {
-                    error_at(&c, t->fields[j].pos,
-                             "`%.*s` implements `%s` twice",
-                             (int)it->name.length, it->name.text, tn(iface));
-                }
-            }
-            for (chain = inherited(t); chain != NULL;
-                 chain = inherited(chain)) {
-                for (k = 0; k < chain->field_count; k++) {
-                    if (chain->fields[k].form == FIELD_IMPL &&
-                        chain->fields[k].type == iface) {
-                        error_at(&c, t->fields[j].pos, "`%.*s` implements "
-                                 "`%s`, which `%.*s` implements already",
-                                 (int)it->name.length, it->name.text,
-                                 tn(iface), (int)chain->name.length,
-                                 chain->name.text);
-                    }
-                }
-            }
-        }
-    }
-    /* A plain or `use` field of an abstract class is refused here,
-       after every class knows whether a contract reaches it. The base
-       and an interface sub-object are the two places an abstract class
-       is a value, so they are skipped. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
-        if (!type_has_fields(t)) {
-            continue;
-        }
-        for (j = 0; j < t->field_count; j++) {
-            char what[96];
-            if (t->fields[j].form == FIELD_BASE ||
-                t->fields[j].form == FIELD_TABLE ||
-                t->fields[j].form == FIELD_IMPL) {
-                continue;
-            }
-            format_to(what, sizeof what, "the field `%.*s`",
-                      (int)t->fields[j].name.length, t->fields[j].name.text);
-            refuse_abstract_value(&c, t->fields[j].pos, what,
-                                  t->fields[j].type);
-        }
-    }
-    /* DESIGN: a contract is declared with `abstract fn` and filled with
-       `concrete fn` of the same signature. The checker walks the chain of
-       `inherits` fields of every struct and refuses one that leaves a
-       contract unfilled, and `check_replacement` compares each
-       `concrete fn` with the entries it fills. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
-        const struct type *base;
-        if (!type_has_fields(t)) {
-            continue;
-        }
-        for (j = 0; j < it->member_count; j++) {
-            struct item *m = it->members[j];
-            const struct item *above = NULL;
-            size_t k;
-            if (m->kind != ITEM_FN) {
-                continue;
-            }
-            if (inherited(t) != NULL) {
-                above = types_primary_member(inherited(t), &m->name);
-            }
-            /* An interface declares functions the class fills, so a
-               `concrete fn` matches there as well as in the base
-               chain. An interface a base implements counts, because a
-               body below replaces the one of the base in its table. */
-            for (base = t; above == NULL && base != NULL;
-                 base = inherited(base)) {
-                for (k = 0; above == NULL && k < base->field_count; k++) {
-                    const struct type *iface;
-                    if (base->fields[k].form != FIELD_IMPL) {
-                        continue;
-                    }
-                    for (iface = base->fields[k].type;
-                         iface != NULL && above == NULL;
-                         iface = inherited(iface)) {
-                        const struct item *found =
-                            find_member(iface, &m->name);
-                        if (found != NULL && found->kind == ITEM_FN) {
-                            above = found;
-                        }
-                    }
-                }
-            }
-            if (m->contract == FN_ABSTRACT) {
-                continue;
-            }
-            if (m->contract == FN_CONCRETE && above == NULL) {
-                error_at(&c, m->name_pos, "`concrete fn %.*s` of `%.*s` fills "
-                         "no abstract function", (int)m->name.length,
-                         m->name.text, (int)it->name.length, it->name.text);
-            } else if (m->contract == FN_CONCRETE) {
-                check_replacement(&c, it, t, m);
-            } else if (m->contract == FN_PLAIN && above != NULL &&
-                       above->contract != FN_PLAIN) {
-                error_at(&c, m->name_pos, "`%.*s` of `%.*s` matches an "
-                         "abstract function and needs `concrete`",
-                         (int)m->name.length, m->name.text,
-                         (int)it->name.length, it->name.text);
-            }
-        }
-        /* DESIGN: a struct may not redeclare a name that its chain
-           already has. A `concrete fn` is the exception, because it
-           fills the abstract function of that name. */
-        for (base = inherited(t); base != NULL; base = inherited(base)) {
-            for (j = 0; j < t->field_count; j++) {
-                if (t->fields[j].form == FIELD_BASE ||
-                    t->fields[j].form == FIELD_TABLE) {
-                    continue;
-                }
-                if (find_field(base, &t->fields[j].name) != NULL ||
-                    find_member(base, &t->fields[j].name) != NULL) {
-                    error_at(&c, t->fields[j].pos, "`%.*s` already has `%.*s`",
-                             (int)base->name.length, base->name.text,
-                             (int)t->fields[j].name.length,
-                             t->fields[j].name.text);
-                }
-            }
-            for (j = 0; j < it->member_count; j++) {
-                const struct item *m = it->members[j];
-                const struct item *shadowed;
-                /* `construct` and `destruct` repeat down a chain by
-                   design, because the compiler runs one body per level.
-                   A `concrete fn` replaces an entry, and an `abstract
-                   fn` re-opens one, which an interface does when it
-                   names a function of the root. */
-                if (m->contract != FN_PLAIN ||
-                    name_is(&m->name, "construct") ||
-                    name_is(&m->name, "destruct")) {
-                    continue;
-                }
-                /* DESIGN: a static function is namespaced by its class
-                   and reached as `Class.f`, never through a value and
-                   never through a table. Two statics of one name in a
-                   chain name two functions and no call is ambiguous, so
-                   the rule leaves them. A function that takes `self` is
-                   another matter, and so is a field. */
-                shadowed = find_member(base, &m->name);
-                if (!m->has_self && find_field(base, &m->name) == NULL &&
-                    shadowed != NULL && shadowed->kind == ITEM_FN &&
-                    !shadowed->has_self) {
-                    continue;
-                }
-                if (find_field(base, &m->name) != NULL || shadowed != NULL) {
-                    error_at(&c, m->name_pos, "`%.*s` already has `%.*s`",
-                             (int)base->name.length, base->name.text,
-                             (int)m->name.length, m->name.text);
-                }
-            }
-        }
-        /* DESIGN: every abstract function of the chain needs a concrete
-           one at or below the class that declares it. An abstract class
-           may leave one open. It is never a complete value, and every
-           class below it is checked here. */
-        for (base = inherited(t); base != NULL && !it->is_abstract;
-             base = inherited(base)) {
-            for (j = 0; j < base->member_count; j++) {
-                const struct item *a = base->members[j];
-                const struct item *filled;
-                if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT) {
-                    continue;
-                }
-                filled = types_primary_member(t, &a->name);
-                if (filled == NULL || filled->contract != FN_CONCRETE) {
-                    error_at(&c, it->name_pos, "`%.*s` lacks `concrete fn "
-                             "%.*s`", (int)it->name.length, it->name.text,
-                             (int)a->name.length, a->name.text);
-                }
-            }
-        }
-        /* An `operator fn` carries one of the fourteen names the table
-           holds, and nothing else. */
-        for (j = 0; j < it->member_count; j++) {
-            const struct item *m = it->members[j];
-            if (m->kind == ITEM_FN && m->is_operator &&
-                !operator_named(&m->name)) {
-                error_at(&c, m->name_pos, "`operator fn` takes one of `add`, "
-                         "`sub`, `mul`, `div`, `rem`, `neg`, `eq`, `lt`, "
-                         "`and`, `or`, `xor`, `shl`, `shr` and `not`");
-            }
-        }
-        /* DESIGN: one `construct` per class, and every alternative is a
-           static function with a name of its own. A `construct` without
-           arguments cannot fail and returns nothing. */
-        {
-            const struct item *first = NULL;
-            for (j = 0; j < it->member_count; j++) {
-                struct item *m = it->members[j];
-                if (m->kind != ITEM_FN || !name_is(&m->name, "construct")) {
-                    continue;
-                }
-                if (first != NULL) {
-                    error_at(&c, m->name_pos, "`%.*s` has one `construct`, "
-                             "and every other maker is a static function",
-                             (int)it->name.length, it->name.text);
-                }
-                first = m;
-                if (!m->has_self) {
-                    error_at(&c, m->name_pos,
-                             "`construct` takes `self` as its first "
-                             "parameter");
-                } else if (m->param_count == 0 && m->result != NULL) {
-                    error_at(&c, m->name_pos, "a `construct` without "
-                             "arguments cannot fail and returns nothing");
-                }
-            }
-        }
-        /* DESIGN: the qualifier of a `concrete fn` names the table it
-           fills: the class itself, a class of its chain, or an interface
-           it implements. Any other name reaches no table. Two qualifiers
-           that reach one table fill it twice, which is refused as a name
-           declared twice. */
-        for (j = 0; j < it->member_count; j++) {
-            const struct item *m = it->members[j];
-            size_t k;
-            if (m->kind != ITEM_FN || m->qualifier.length == 0) {
-                continue;
-            }
-            if (qualified_table(t, &m->qualifier) == NULL) {
-                error_at(&c, m->qualifier_pos, "`%.*s` is no base and no "
-                         "interface of `%.*s`", (int)m->qualifier.length,
-                         m->qualifier.text, (int)it->name.length,
-                         it->name.text);
-                continue;
-            }
-            for (k = 0; k < j; k++) {
-                const struct item *other = it->members[k];
-                if (other->kind == ITEM_FN &&
-                    same_name(&other->name, &m->name) &&
-                    other->qualifier.length > 0 &&
-                    !same_name(&other->qualifier, &m->qualifier) &&
-                    one_table(t, other, m)) {
-                    error_at(&c, m->name_pos, "`%.*s` declares `%.*s` twice",
-                             (int)it->name.length, it->name.text,
-                             (int)m->name.length, m->name.text);
-                }
-            }
-        }
-        /* An interface leaves its functions open, and the class that
-           implements it fills them. The chain of the interface counts,
-           because an interface may inherit another abstract class. */
-        for (j = 0; j < t->field_count && !it->is_abstract; j++) {
-            const struct type *iface;
-            if (t->fields[j].form != FIELD_IMPL) {
-                continue;
-            }
-            for (iface = t->fields[j].type; iface != NULL;
-                 iface = inherited(iface)) {
-                size_t k;
-                for (k = 0; k < iface->member_count; k++) {
-                    const struct item *a = iface->members[k];
-                    const struct item *filled;
-                    if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT) {
-                        continue;
-                    }
-                    filled = types_interface_member(t, t->fields[j].type,
-                                                    &a->name);
-                    if (filled == NULL || filled->contract != FN_CONCRETE) {
-                        error_at(&c, it->name_pos, "`%.*s` lacks `concrete "
-                                 "fn %.*s` of `%s`", (int)it->name.length,
-                                 it->name.text, (int)a->name.length,
-                                 a->name.text, tn(iface));
-                    }
-                }
-            }
-        }
-    }
-    /* A function of a body is checked like a free function, with `self`
-       declared as a parameter of type *T. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        for (j = 0; j < it->member_count; j++) {
-            struct item *m = it->members[j];
-            if (m->symbol == NULL || m->kind != ITEM_FN ||
-                m->body == NULL) {
-                continue;
-            }
-            check_function(&c, m);
-        }
-    }
-    /* DESIGN: the pass that only reports runs last, over every function
-       a worker can reach and over the abstract classes of the program.
-       It changes nothing, so a build that skips it still compiles the
-       same program. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->kind != ITEM_FN || !it->worker || it->body == NULL) {
-            continue;
-        }
-        walk_worker(&c, it);
-    }
-    /* An abstract class that no class of the program fills has no value
-       and no use. A build that writes a program sees every class, so it
-       can say so. A library build sees no program: `anti.lang` writes
-       `TraceHandler` for the program that installs a handler. */
-    if (c.program) {
-        for (i = 0; i < module->item_count; i++) {
-            struct item *it = module->items[i];
-            struct type *t = it->symbol != NULL ? it->symbol->type : NULL;
-            if (it->kind != ITEM_CLASS || !it->is_abstract || t == NULL) {
-                continue;
-            }
-            if (!filled_somewhere(&c, t)) {
-                diagnostics_warn(c.diags, it->name_pos.line,
-                                 it->name_pos.column,
-                                 "`%.*s` is abstract and no class fills it",
-                                 (int)it->name.length, it->name.text);
-            }
-        }
-    }
-    for (i = 0; i < module->item_count; i++) {
-        if (module->items[i]->symbol == NULL) {
-            continue;
-        }
-        if (module->items[i]->exported) {
-            check_export(&c, module->items[i]);
-        }
-        if (module->items[i]->kind == ITEM_EXTERN_FN) {
-            check_extern_fn(&c, module->items[i]);
-        }
-    }
-    check_provides(&c, module);
-    check_frameworks(&c, module);
+    declare_items(&c);
+    resolve_bases(&c);
+    declare_enums_and_variants(&c);
+    declare_all_fields(&c);
+    declare_function_types(&c);
+    declare_all_members(&c);
+    check_signatures(&c);
+    check_free_functions(&c);
+    check_types(&c);
+    check_member_functions(&c);
+    report_program(&c);
+    check_boundary(&c);
     free(c.module_scope.entries);
     return c.ok;
 }
