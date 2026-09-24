@@ -47,7 +47,8 @@ typedef bool (*dep_path_fn)(void *context, const char *directory,
    is the directory of the manifest, which a relative path of a
    dependency starts at. Returns false and writes a message on a
    constraint that no version satisfies, a digest that differs, or a file
-   that cannot be had. */
+   that cannot be had. out then holds no allocation. The caller frees a
+   graph resolved with deps_free. */
 bool deps_resolve(const struct manifest *m, const char *root, bool offline,
                   dep_path_fn path_of, void *context, struct dep_graph *out);
 

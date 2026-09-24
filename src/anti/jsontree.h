@@ -42,8 +42,9 @@ struct json_tree {
 /* Read one JSON value that fills the bytes, up to white space. Every
    string is decoded, with a NUL after it, and every number is checked
    against the grammar. Returns false with a message in error that names
-   the line and the column. A string that holds a NUL byte is refused, since a
-   name of C holds none. */
+   the line and the column, and out then holds no allocation. A string
+   that holds a NUL byte is refused, since a name of C holds none. The
+   caller frees a tree read with json_free. */
 bool json_read(const unsigned char *bytes, size_t length,
                struct json_tree *out, char *error, size_t error_size);
 

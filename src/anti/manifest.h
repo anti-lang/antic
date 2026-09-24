@@ -82,7 +82,8 @@ struct manifest {
 /* Read the whole manifest at path. Returns false when the file is
    missing, is no TOML the reader takes, or holds an entry that no rule of
    docs/tooling.md allows. The message names the file and the entry. On
-   failure out holds no allocation, so the caller frees nothing. */
+   failure out holds no allocation, so the caller frees nothing. The
+   caller frees a manifest read with manifest_free. */
 bool manifest_read(const char *path, bool tests, struct manifest *out);
 
 void manifest_free(struct manifest *m);

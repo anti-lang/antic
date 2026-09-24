@@ -30,14 +30,15 @@ bool repo_url_allowed(const char *url);
    the cache. The check of a cached index runs at most once an hour.
    offline contacts no repository and fails when the file is not cached.
    Returns false when the file cannot be had, and out holds its path
-   otherwise. */
+   otherwise. out may hold text after a failure too, and the caller frees
+   it with text_free either way. */
 bool repo_index(const char *prefix, const char *name, bool offline,
                 struct text *out);
 
 /* The library file of one module of one version, fetched into the cache
    when it is not there and verified against digest either way. Returns
    false when the file cannot be had or its digest differs, and out holds
-   its path otherwise. */
+   its path otherwise. The caller frees out with text_free. */
 bool repo_module(const char *prefix, const char *name, const char *version,
                  const char *module, const char *digest, bool offline,
                  struct text *out);
