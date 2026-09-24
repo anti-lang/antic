@@ -75,3 +75,20 @@ All under "Language hooks and iteration" in `docs/decisions.md`:
   has no `libLTO.dylib`. It is no compiler warning and predates this step.
 - The style checker reads every `#` comment of `tests/CMakeLists.txt` as a
   heading, 232 findings before this step. The new comment adds one more.
+
+## Proof of the push
+
+The push of `cbb8d5f`, before this section was added:
+
+```text
+$ git log --oneline -3
+cbb8d5f Report the language hooks
+51513b2 Record the language hooks in the documents
+094d8b9 Put the iteration tests in the canonical form
+$ git status --short
+$ git rev-parse HEAD origin/main
+cbb8d5fc40636525d104ffda601bea89cec8781e
+cbb8d5fc40636525d104ffda601bea89cec8781e
+```
+
+Suites: host 869 passed of 869, ASan 868 of 868, UBSan 868 of 868.
