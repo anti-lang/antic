@@ -15,7 +15,7 @@
    machine code names, or that a call overwrites, form fixed ranges that
    an interval must not overlap. */
 
-enum { NONE = -1, PREG_LIMIT = 64 };
+enum { NONE = -1, PREG_LIMIT = REGALLOC_REGISTERS };
 
 /* The registers one instruction may read: each operand, and the base and
    the index of a memory operand. */

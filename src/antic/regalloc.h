@@ -8,12 +8,17 @@
 #include "mach.h"
 #include "target.h"
 
+/* The physical registers of a target, one bit each of a 64-bit set. A
+   frame has room to save all of them. The loop over the set then bounds
+   the count. */
+enum { REGALLOC_REGISTERS = 64 };
+
 /* The stack frame of a function after register allocation. */
 struct frame {
     bool needed;            /* the function calls or uses the stack */
     uint64_t size;          /* bytes below the frame record, a multiple of 16 */
-    uint8_t saved[32];      /* the callee-saved registers the function uses */
-    int64_t saved_offset[32];   /* offsets from sp */
+    uint8_t saved[REGALLOC_REGISTERS];  /* the callee-saved ones in use */
+    int64_t saved_offset[REGALLOC_REGISTERS];   /* offsets from sp */
     size_t saved_count;
     bool probe;             /* the prologue probes the pages of the frame */
     bool unwind;            /* the prologue and epilogues carry .seh_ lines */

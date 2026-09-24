@@ -222,7 +222,8 @@ static uint32_t add_agg(struct ir_module *m, const struct ir_aggtype *key,
     *t = *key;
     t->name = keep(m->arena, key->name);
     t->length_text = keep(m->arena, key->length_text);
-    t->fields = arena_alloc(m->arena, (count + 1) * sizeof *t->fields);
+    t->fields = arena_alloc(m->arena,
+                            ir_product(count + 1, sizeof *t->fields));
     for (i = 0; i < count; i++) {
         t->fields[i] = fields[i];
         t->fields[i].name = keep(m->arena, fields[i].name);

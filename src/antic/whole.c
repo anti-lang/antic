@@ -419,15 +419,17 @@ static uint32_t struct_agg(struct ir_module *m, const char *name,
                            const char *const *names,
                            const enum ir_type *types, size_t count)
 {
-    struct ir_field fields[16];
+    struct ir_field *fields = ir_alloc(count, sizeof *fields);
+    uint32_t agg;
     size_t i;
 
-    memset(fields, 0, sizeof fields);
     for (i = 0; i < count; i++) {
         fields[i].name = names[i];
         fields[i].type = ir_scalar(types[i]);
     }
-    return ir_struct_add(m, IR_AGG_STRUCT, name, fields, count, false, 0);
+    agg = ir_struct_add(m, IR_AGG_STRUCT, name, fields, count, false, 0);
+    free(fields);
+    return agg;
 }
 
 static void const_int(struct ir_const *c, enum ir_type type, uint64_t value)

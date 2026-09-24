@@ -10,6 +10,9 @@
 #include "expand.h"
 #include "optimize.h"
 
+static void fail(struct selector *s, const char *format, ...)
+    ATTRIBUTE_PRINTF(2, 3);
+
 /* DESIGN: an IR temporary %n becomes the virtual register tn, so the
    machine code keeps the numbers of the IR. Registers that selection adds,
    such as one for a constant, take the numbers after the temporaries. */
@@ -49,6 +52,13 @@ struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,
 {
     struct mach_inst *inst = mach_append(s->b);
 
+    /* A pattern that passes more operands is a defect of antic, which the
+       selection reports instead of writing past the array. */
+    if (count > MACH_MAX_OPERANDS) {
+        fail(s, "an instruction takes %zu operands, and at most %d fit",
+             count, (int)MACH_MAX_OPERANDS);
+        count = 0;
+    }
     inst->line = s->line;
     inst->op = op;
     inst->count = (uint8_t)count;
@@ -223,9 +233,6 @@ bool select_is_next(const struct selector *s, const struct ir_operand *block)
 {
     return block->as.index == s->block + 1;
 }
-
-static void fail(struct selector *s, const char *format, ...)
-    ATTRIBUTE_PRINTF(2, 3);
 
 static void fail(struct selector *s, const char *format, ...)
 {

@@ -1711,6 +1711,8 @@ static void locate(const struct selector *s, const struct ir_function *callee,
         int64_t size = s->abi == &apple && !variadic ? bits(types[i]) / 8 : 8;
         memset(&out[i], 0, sizeof out[i]);
         out[i].copy = -1;
+        /* The verifier refuses an aggregate among the variadic
+           arguments, so an aggregate here has its parameter record. */
         if (types[i] == IR_AGG) {
             const struct layout *agg = select_layout(s, callee->params[i].agg);
             size_t hfa = hfa_members(agg);

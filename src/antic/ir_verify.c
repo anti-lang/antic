@@ -385,10 +385,20 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
         }
         if (named->kind == IR_FUNC && operand_ok(v, inst, named)) {
             const struct ir_function *callee = v->m->functions[named->as.index];
+            size_t k;
             if (callee->variadic ? inst->arg_count < callee->param_count
                                  : inst->arg_count != callee->param_count) {
                 fail(v, "call passes %zu arguments to %s, which takes %zu",
                      inst->arg_count, callee->name, callee->param_count);
+            }
+            /* The checker passes a scalar alone past the parameters, and
+               the back ends read no parameter record there. */
+            for (k = callee->param_count; k < inst->arg_count; k++) {
+                if (inst->args[k].type == IR_AGG) {
+                    fail(v, "call passes an aggregate as variadic argument "
+                            "%zu of %s", k, callee->name);
+                    break;
+                }
             }
         }
         /* A call through a table names the descriptor of its class and

@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "arena.h"
@@ -320,6 +322,43 @@ static void indirect_arguments(void)
     arena_free(&arena);
 }
 
+/* A variadic argument is a scalar, as the checker requires. The back
+   ends read the parameter record of an aggregate argument, which a
+   variadic argument does not have. */
+static void variadic_aggregate(void)
+{
+    static const char *const names[] = {"x"};
+    struct ir_field fields[1];
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *print;
+    struct ir_function *f;
+    struct ir_block *b0;
+    struct ir_operand args[2];
+    uint32_t agg;
+    uint32_t value;
+
+    ir_module_init(&m, &arena, "main");
+    memset(fields, 0, sizeof fields);
+    fields[0].name = names[0];
+    fields[0].type = ir_scalar(IR_I64);
+    agg = ir_struct_add(&m, IR_AGG_STRUCT, "main.Pair", fields, 1, false, 0);
+    print = ir_extern_add(&m, "printf", IR_I32, true);
+    ir_param_add(print, IR_PTR, IR_NO_AGG);
+    f = ir_function_add(&m, "main", "f", IR_VOID, IR_NO_AGG);
+    value = ir_param_add(f, IR_AGG, agg);
+    b0 = ir_block_add(f);
+    args[0] = ir_int_op(IR_PTR, 0);
+    args[1] = ir_temp_op(f, value);
+    args[1].type = IR_AGG;
+    ir_call(f, b0, IR_I32, ir_func_op(print), args, 2);
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+    verified(&m, "main.f b0: call passes an aggregate as variadic argument 1 "
+                 "of printf\n");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* An integer constant keeps only the bits of its type. */
 static void constants(void)
 {
@@ -427,6 +466,7 @@ void test_ir(void)
     constants();
     out_of_range();
     indirect_arguments();
+    variadic_aggregate();
     unassigned();
     scale();
     loop();
