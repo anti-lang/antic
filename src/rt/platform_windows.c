@@ -2,6 +2,7 @@
 #if defined(_WIN32)
 
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -121,6 +122,59 @@ const char *anti_rt_path_last_separator(const char *path)
     return back != NULL && (slash == NULL || back > slash) ? back : slash;
 }
 
+/* The table anti_rt_imports of a plugin, which antic writes. */
+struct imports {
+    int64_t count;
+    volatile LONG64 state;      /* IMPORTS_NONE until the places are done */
+    void **places[];
+};
+
+enum { IMPORTS_NONE, IMPORTS_BUSY, IMPORTS_DONE };
+
+/* DESIGN: a plugin reaches a name of its host through the __imp_ entry of
+   the import library, which Windows fills when it loads the library. An
+   address in the data of the plugin cannot be such a load. Each one holds
+   the address of its __imp_ entry instead, and the loader replaces it
+   with the address the entry holds. The first open of a library does it. A
+   second open of the same library returns the same image, and the state
+   word keeps it from replacing an address twice. A place whose page
+   cannot be written fails the open, which then closes the library. */
+static bool fill_imports(HMODULE handle)
+{
+    union {
+        FARPROC from;
+        struct imports *to;
+    } cast;
+    struct imports *t;
+    bool ok = true;
+    int64_t i;
+
+    cast.from = GetProcAddress(handle, "anti_rt_imports");
+    t = cast.to;
+    if (t == NULL) {
+        return true;
+    }
+    if (InterlockedCompareExchange64(&t->state, IMPORTS_BUSY, IMPORTS_NONE) !=
+        IMPORTS_NONE) {
+        while (InterlockedCompareExchange64(&t->state, IMPORTS_DONE,
+                                            IMPORTS_DONE) != IMPORTS_DONE) {
+            SwitchToThread();
+        }
+        return true;
+    }
+    for (i = 0; ok && i < t->count; i++) {
+        void **place = t->places[i];
+        DWORD was;
+        ok = VirtualProtect(place, sizeof *place, PAGE_READWRITE, &was) != 0;
+        if (ok) {
+            *place = *(void **)*place;
+            ok = VirtualProtect(place, sizeof *place, was, &was) != 0;
+        }
+    }
+    InterlockedExchange64(&t->state, IMPORTS_DONE);
+    return ok;
+}
+
 void *anti_rt_library_open(const char *path)
 {
     wchar_t *wide = wide_of(path);
@@ -132,6 +186,12 @@ void *anti_rt_library_open(const char *path)
     }
     handle = LoadLibraryW(wide);
     free(wide);
+    if (handle != NULL && !fill_imports(handle)) {
+        DWORD error = GetLastError();
+        FreeLibrary(handle);
+        SetLastError(error);
+        return NULL;
+    }
     return handle;
 }
 

@@ -1,0 +1,14 @@
+//! A `link linux` line names one library of the glibc sysroot, once. A path,
+//! an empty text and a name twice are refused. `linux` stays a name
+//! elsewhere.
+
+link linux "X11";
+link linux "X11";
+link linux "";
+link linux "/usr/lib/libGL.so";
+
+fn main() -> int
+{
+	let linux = 2;
+	return linux;
+}

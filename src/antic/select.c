@@ -157,6 +157,12 @@ const struct ir_function *select_callee(const struct selector *s,
 
 bool select_uses_got(const struct selector *s, const struct ir_operand *o)
 {
+    if (s->imports && o->kind == IR_FUNC) {
+        return s->m->functions[o->as.index]->is_extern;
+    }
+    if (s->imports && o->kind == IR_GLOBAL) {
+        return s->m->globals[o->as.index]->is_extern;
+    }
     return o->kind == IR_FUNC && s->m->functions[o->as.index]->module == NULL &&
            s->convention != CONVENTION_WINDOWS_X64 &&
            s->convention != CONVENTION_WINDOWS_ARM64;
@@ -558,6 +564,7 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
     s.abi = s.target->abi(target_info(t)->convention);
     s.convention = target_info(t)->convention;
     s.cpu = cpu;
+    s.imports = m->plugin && target_info(t)->format != FORMAT_MACHO;
     s.m = m;
     s.layouts = &layouts;
     s.error = error;

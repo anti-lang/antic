@@ -853,6 +853,10 @@ static void put_header(struct writer *w, const struct interface *iface)
     for (i = 0; i < iface->framework_count; i++) {
         put_str(w, iface->frameworks[i]);
     }
+    put_count(w, iface->linux_library_count);
+    for (i = 0; i < iface->linux_library_count; i++) {
+        put_str(w, iface->linux_libraries[i]);
+    }
     put_doc(w, iface->doc, iface->doc != NULL ? strlen(iface->doc) : 0);
 }
 
@@ -961,7 +965,7 @@ static void fail(struct reader *r, const char *format, ...)
     va_start(args, format);
     n = vsnprintf(r->error, r->error_size, format, args);
     va_end(args);
-    /* A message cut to fit ends in "...". */
+    /* A message cut to fit ends in three dots. */
     if (n >= 0 && (size_t)n >= r->error_size && r->error_size >= 4) {
         memcpy(r->error + r->error_size - 4, "...", 4);
     }
@@ -1139,6 +1143,12 @@ static void read_header(struct reader *r, struct interface *out)
                                sizeof *out->frameworks);
     for (i = 0; i < out->framework_count && !r->failed; i++) {
         out->frameworks[i] = get_cstr(r);
+    }
+    out->linux_library_count = get_count(r, 4);
+    out->linux_libraries = allocate(r, out->linux_library_count,
+                                    sizeof *out->linux_libraries);
+    for (i = 0; i < out->linux_library_count && !r->failed; i++) {
+        out->linux_libraries[i] = get_cstr(r);
     }
     out->doc = get_cstr(r);
 }

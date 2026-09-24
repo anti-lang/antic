@@ -9,9 +9,10 @@
 #   tools/sysroot-pins, checked against its digest, and the compiler-rt
 #   builtins of the pinned clang in CLANG_DIR, which defaults to
 #   build/deps/clang of the repository.
-# linux-x86_64-glibc, linux-arm64-glibc: glibc 2.35 and the kernel headers
-#   of Ubuntu 22.04 from the packages of tools/sysroot-pins, for the Linux
-#   link mode against glibc.
+# linux-x86_64-glibc, linux-arm64-glibc: glibc 2.35, the kernel headers and
+#   the X11 and GL libraries of Ubuntu 22.04 from the packages of
+#   tools/sysroot-pins, and the compiler-rt builtins of the pinned clang,
+#   for the Linux link mode against glibc.
 # macos-arm64, macos-x86_64: the stubs of libSystem that Zig generates and
 #   the headers of the macOS C library, from the release of Zig that
 #   tools/zig-stubs-pin names, on every host. They link every program that
@@ -100,15 +101,15 @@ function(tree_digest dir out)
     set("${out}" "${digest}" PARENT_SCOPE)
 endfunction()
 
-# Unpack the three glibc packages of <arch> into <target>. A package is an
-# ar archive whose data.tar.zst holds the files. The copyright files of
-# glibc and of the kernel headers go to licenses/.
-function(glibc_sysroot target arch)
+# Unpack the glibc packages of <arch> into <target>. A package is an ar
+# archive whose data.tar.zst holds the files. The copyright files of
+# glibc, of the kernel headers, of libX11 and of libglvnd go to licenses/.
+function(glibc_sysroot target arch triple)
     set(root "${DEST}/${target}")
     set(work "${DEST}/.download/${target}")
     file(REMOVE_RECURSE "${root}")
     file(MAKE_DIRECTORY "${work}" "${root}")
-    foreach(package LIBC_DEV LIBC HEADERS)
+    foreach(package LIBC_DEV LIBC HEADERS X11 X11_DEV GL GL_DEV)
         set(name "${GLIBC_${arch}_${package}}")
         get_filename_component(asset "${name}" NAME)
         fetch("${GLIBC_${arch}_URL}/${name}" "${work}/${asset}"
@@ -123,10 +124,39 @@ function(glibc_sysroot target arch)
         file(ARCHIVE_EXTRACT INPUT "${data}" DESTINATION "${root}")
     endforeach()
     file(REMOVE_RECURSE "${work}/deb")
+    # DESIGN: a package links a development name such as libm.so to the
+    # absolute path of the library on the machine it installs on. lld
+    # follows a link as the file system gives it, so each absolute link
+    # becomes one relative to the sysroot, and -lm finds the libm of the
+    # sysroot rather than none.
+    file(GLOB_RECURSE links LIST_DIRECTORIES false "${root}/*")
+    foreach(link IN LISTS links)
+        if(IS_SYMLINK "${link}")
+            file(READ_SYMLINK "${link}" points)
+            if(IS_ABSOLUTE "${points}")
+                get_filename_component(dir "${link}" DIRECTORY)
+                file(RELATIVE_PATH relative "${dir}" "${root}${points}")
+                file(REMOVE "${link}")
+                file(CREATE_LINK "${relative}" "${link}" SYMBOLIC)
+            endif()
+        endif()
+    endforeach()
+    file(GLOB builtins "${CLANG_DIR}/lib/clang/*/lib/${triple}-unknown-linux-musl/libclang_rt.builtins.a")
+    if(NOT builtins)
+        message(FATAL_ERROR "${CLANG_DIR} holds no builtins of ${triple}. "
+                            "Run tools/get-clang.cmake first.")
+    endif()
+    file(COPY_FILE "${builtins}" "${root}/usr/lib/libclang_rt.builtins.a")
     file(COPY_FILE "${root}/usr/share/doc/libc6/copyright"
          "${DEST}/licenses/glibc.txt")
     file(COPY_FILE "${root}/usr/share/doc/linux-libc-dev/copyright"
          "${DEST}/licenses/linux-headers.txt")
+    file(COPY_FILE "${root}/usr/share/doc/libx11-6/copyright"
+         "${DEST}/licenses/libx11.txt")
+    file(COPY_FILE "${root}/usr/share/doc/libgl1/copyright"
+         "${DEST}/licenses/libglvnd.txt")
+    file(COPY_FILE "${CLANG_DIR}/licenses/llvm.txt"
+         "${DEST}/licenses/compiler-rt.txt")
 endfunction()
 
 function(linux_sysroot target arch musl_digest)
@@ -467,9 +497,9 @@ foreach(target IN LISTS TARGETS)
     elseif(target STREQUAL "linux-arm64")
         linux_sysroot("${target}" aarch64 "${MUSL_DEV_AARCH64}")
     elseif(target STREQUAL "linux-x86_64-glibc")
-        glibc_sysroot("${target}" X86_64)
+        glibc_sysroot("${target}" X86_64 x86_64)
     elseif(target STREQUAL "linux-arm64-glibc")
-        glibc_sysroot("${target}" AARCH64)
+        glibc_sysroot("${target}" AARCH64 aarch64)
     elseif(target STREQUAL "macos-arm64")
         macos_sysroot("${target}" arm64)
     elseif(target STREQUAL "macos-x86_64")

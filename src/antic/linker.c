@@ -47,16 +47,29 @@ static struct text *next(struct link_command *c)
     return &c->strings[c->string_count++];
 }
 
-void link_runtime_library(struct text *out, const char *runtime, enum target t,
-                          enum cpu_level cpu)
+void link_target_dir(struct text *out, enum target t, bool glibc)
+{
+    text_appendf(out, "%s%s", target_name(t), glibc ? LINUX_GLIBC_SUFFIX : "");
+}
+
+/* The runtime library of t at level cpu, of the glibc mode with glibc. */
+static void runtime_library(struct text *out, const char *runtime,
+                            enum target t, enum cpu_level cpu, bool glibc)
 {
     /* DESIGN: MSVC names a static library name.lib, and the other
        toolchains libname.a. The level names the directory, because the
        archive holds one runtime per level of the target. */
-    text_appendf(out, "%s/%s/%s/%s/%s", runtime, RUNTIME_LIB_DIR,
-                 target_name(t), cpu_name(cpu),
+    text_appendf(out, "%s/%s/", runtime, RUNTIME_LIB_DIR);
+    link_target_dir(out, t, glibc);
+    text_appendf(out, "/%s/%s", cpu_name(cpu),
                  target_info(t)->format == FORMAT_COFF ? "anti_rt.lib"
                                                        : "libanti_rt.a");
+}
+
+void link_runtime_library(struct text *out, const char *runtime, enum target t,
+                          enum cpu_level cpu)
+{
+    runtime_library(out, runtime, t, cpu, false);
 }
 
 const char *const *link_crt_dirs(enum target t)
@@ -148,6 +161,84 @@ static void macos(struct link_command *c, enum target t,
     add(c, text_cstr(library));
     add(c, "-lSystem");
     macos_frameworks(c, in);
+}
+
+/* The dynamic linker of a Linux program linked against glibc. */
+static const char *glibc_interpreter(enum target t)
+{
+    return target_info(t)->arch == ARCH_ARM64 ? "/lib/ld-linux-aarch64.so.1"
+                                              : "/lib64/ld-linux-x86-64.so.2";
+}
+
+/* The -l arguments of the `link linux` libraries. */
+static void linux_libraries(struct link_command *c,
+                            const struct link_inputs *in)
+{
+    size_t i;
+
+    for (i = 0; i < in->linux_library_count; i++) {
+        add(c, "-l");
+        add(c, in->linux_libraries[i]);
+    }
+}
+
+/* DESIGN: the glibc mode links a position-independent executable against
+   glibc 2.35 of the sysroot, with its dynamic linker. --sysroot makes
+   the absolute paths of the linker script libc.so name files of the
+   sysroot. The libraries of `link linux` come before libm and libc. Every
+   program of the mode takes libm, because musl carries it in libc.a and
+   a program of the static mode reaches it there. A program that can host
+   a plugin exports its names with --export-dynamic. */
+static void linux_glibc(struct link_command *c, enum target t,
+                        const struct link_inputs *in)
+{
+    static const char *const before[] = {"Scrt1.o", "crti.o"};
+    const char *triple = target_info(t)->arch == ARCH_ARM64
+                             ? "aarch64-linux-gnu"
+                             : "x86_64-linux-gnu";
+    const char *linker = program(c, in, "ld.lld", "ld");
+    struct text *library = next(c);
+    struct text *sysroot = next(c);
+    struct text *interpreter = next(c);
+    struct text *search = next(c);
+    struct text *shared = next(c);
+    struct text *builtins = next(c);
+    struct text *crtn = next(c);
+    size_t i;
+
+    runtime_library(library, in->runtime, t, in->cpu, true);
+    text_appendf(sysroot, "--sysroot=%s", in->sysroot);
+    text_appendf(interpreter, "--dynamic-linker=%s", glibc_interpreter(t));
+    text_appendf(search, "-L%s/usr/lib/%s", in->sysroot, triple);
+    text_appendf(shared, "-L%s/lib/%s", in->sysroot, triple);
+    text_appendf(builtins, "%s/usr/lib/libclang_rt.builtins.a", in->sysroot);
+    text_appendf(crtn, "%s/usr/lib/%s/crtn.o", in->sysroot, triple);
+    add(c, linker);
+    add(c, text_cstr(sysroot));
+    add(c, "-pie");
+    add(c, text_cstr(interpreter));
+    if (in->exports) {
+        add(c, "--export-dynamic");
+    }
+    if (!in->debug) {
+        add(c, "--strip-debug");
+    }
+    add(c, "-o");
+    add(c, in->executable);
+    for (i = 0; i < 2; i++) {
+        struct text *file = next(c);
+        text_appendf(file, "%s/usr/lib/%s/%s", in->sysroot, triple, before[i]);
+        add(c, text_cstr(file));
+    }
+    add_inputs(c, in);
+    add(c, text_cstr(library));
+    add(c, text_cstr(search));
+    add(c, text_cstr(shared));
+    linux_libraries(c, in);
+    add(c, "-lm");
+    add(c, "-lc");
+    add(c, text_cstr(builtins));
+    add(c, text_cstr(crtn));
 }
 
 /* DESIGN: ld.lld links a Linux program statically against the musl of
@@ -272,10 +363,7 @@ static void linux_ld(struct link_command *c, enum target t,
     struct text *search = next(c);
     struct text *crtn = next(c);
 
-    text_appendf(interpreter, "--dynamic-linker=%s",
-                 target_info(t)->arch == ARCH_ARM64
-                     ? "/lib/ld-linux-aarch64.so.1"
-                     : "/lib64/ld-linux-x86-64.so.2");
+    text_appendf(interpreter, "--dynamic-linker=%s", glibc_interpreter(t));
     text_appendf(start, "%s/Scrt1.o", in->crt_dir);
     text_appendf(crti, "%s/crti.o", in->crt_dir);
     link_runtime_library(library, in->runtime, t, in->cpu);
@@ -297,6 +385,7 @@ static void linux_ld(struct link_command *c, enum target t,
     add_inputs(c, in);
     add(c, text_cstr(library));
     add(c, text_cstr(search));
+    linux_libraries(c, in);
     add(c, "-lc");
     add(c, text_cstr(crtn));
 }
@@ -321,6 +410,18 @@ static void windows(struct link_command *c, enum target t,
     add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                               : "/MACHINE:X64");
     windows_output(c, in);
+    /* DESIGN: a program that can host a plugin exports the names of the
+       .def file. The link writes the import library its plugins link
+       against. A plugin then imports the runtime, the descriptors and
+       the functions from the executable by name. */
+    if (in->exports && in->def_file != NULL) {
+        struct text *def = next(c);
+        struct text *implib = next(c);
+        text_appendf(def, "/DEF:%s", in->def_file);
+        text_appendf(implib, "/IMPLIB:%s", in->import_library);
+        add(c, text_cstr(def));
+        add(c, text_cstr(implib));
+    }
     windows_libpaths(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
@@ -351,7 +452,9 @@ void link_command(struct link_command *c, enum target t,
     switch (target_info(t)->os) {
     case OS_MACOS: macos(c, t, in); break;
     case OS_LINUX:
-        if (in->linker == LINKER_LLD) {
+        if (in->linker == LINKER_LLD && in->glibc) {
+            linux_glibc(c, t, in);
+        } else if (in->linker == LINKER_LLD) {
             linux_lld(c, t, in);
         } else {
             linux_ld(c, t, in);
@@ -470,14 +573,24 @@ void link_shared_command(struct link_command *c, enum target t,
         add(c, "/NOLOGO");
         windows_debug(c, in);
         add(c, "/DLL");
+        /* DESIGN: a plugin links no C runtime startup, so it has no entry
+           point. The host's runtime has started before the load, and
+           the loader registers what the plugin carries. */
+        if (s->plugin) {
+            add(c, "/NOENTRY");
+        }
         add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                                   : "/MACHINE:X64");
         windows_output(c, in);
         add(c, text_cstr(def));
         windows_libpaths(c, t, in);
+        /* The inputs of a plugin hold the import library of its host,
+           which names every symbol of the runtime and the program. */
         add_inputs(c, in);
-        add(c, text_cstr(library));
-        add(c, "msvcrt.lib");
+        if (!s->plugin) {
+            add(c, text_cstr(library));
+            add(c, "msvcrt.lib");
+        }
         add(c, "libvcruntime.lib");
         add(c, "ucrt.lib");
         add(c, "legacy_stdio_definitions.lib");

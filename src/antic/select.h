@@ -171,6 +171,9 @@ struct selector {
     char *error;
     size_t error_size;
     bool failed;
+    /* The module is a plugin on ELF or COFF, whose externs lie in the
+       host. */
+    bool imports;
 };
 
 const struct target_desc *target_desc_x86_64(void);

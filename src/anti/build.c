@@ -89,11 +89,14 @@ struct build {
     struct text lib_dir;
     struct text obj_dir;
     struct text name;
-    /* The frameworks of the `link framework` lines of every library file
-       the program reaches, which the link passes as --framework. */
+    /* The frameworks of the `link framework` lines and the libraries of
+       the `link linux` lines of every library file the program reaches.
+       The link passes them as --framework and --linux-lib. */
     struct arena framework_arena;
     const char **frameworks;
     size_t framework_count;
+    const char **linux_libraries;
+    size_t linux_library_count;
 };
 
 /* The cache key of one output: the digest of its input, the version of
@@ -181,6 +184,8 @@ static void base_options(struct build *b, struct options *o,
     o->debug = !b->r->release;
     o->frameworks = b->frameworks;
     o->framework_count = b->framework_count;
+    o->linux_libraries = b->linux_libraries;
+    o->linux_library_count = b->linux_library_count;
 }
 
 /* The package header that every library file of this project carries. */
@@ -613,9 +618,10 @@ static bool build_c_library(struct build *b, enum target t, enum cpu_level cpu,
 }
 
 /* DESIGN: a binding names the frameworks of Apple's SDK it needs with
-   `link framework`, and its library file records them. The build reads
-   them from every library file the program reaches. It passes them to
-   antic as --framework, so a program never names a framework itself. */
+   `link framework`, and the libraries of the glibc sysroot with `link
+   linux`. Its library file records both. The build reads them from every
+   library file the program reaches. It passes them to antic as
+   --framework and --linux-lib, so a program never names one itself. */
 static bool link_frameworks(struct build *b, enum target t,
                             enum cpu_level cpu, const struct text *files,
                             const struct strings *shared)
@@ -635,12 +641,17 @@ static bool link_frameworks(struct build *b, enum target t,
     }
     b->frameworks = NULL;
     b->framework_count = 0;
+    b->linux_libraries = NULL;
+    b->linux_library_count = 0;
     base_options(b, &search, t, cpu);
     search.libraries = seed.items;
     search.library_count = seed.count;
     ok = driver_libraries(&search, &b->framework_arena, &closure, &count) &&
          driver_frameworks(closure, count, &b->framework_arena,
-                           &b->frameworks, &b->framework_count);
+                           &b->frameworks, &b->framework_count) &&
+         driver_linux_libraries(closure, count, &b->framework_arena,
+                                &b->linux_libraries,
+                                &b->linux_library_count);
     strings_free(&seed);
     return ok;
 }

@@ -139,6 +139,29 @@ static const char *const miniaudio_frameworks[] = {
     "AudioToolbox", "CoreAudio", "CoreFoundation"
 };
 
+/* DESIGN: the libraries of the glibc sysroot that each bundled library
+   needs on Linux, which the binding names with `link linux`. They are
+   the link lines that the two projects give for Linux. A program that
+   reaches one links dynamically against glibc. */
+static const char *const raylib_linux[] = {
+    "GL", "m", "pthread", "dl", "rt", "X11"
+};
+static const char *const miniaudio_linux[] = {"dl", "pthread", "m"};
+
+size_t bind_linux_libraries(const char *library, const char *const **names)
+{
+    if (strcmp(library, "raylib") == 0) {
+        *names = raylib_linux;
+        return sizeof raylib_linux / sizeof raylib_linux[0];
+    }
+    if (strcmp(library, "miniaudio") == 0) {
+        *names = miniaudio_linux;
+        return sizeof miniaudio_linux / sizeof miniaudio_linux[0];
+    }
+    *names = NULL;
+    return 0;
+}
+
 size_t bind_frameworks(const char *library, const char *const **names)
 {
     if (strcmp(library, "raylib") == 0) {

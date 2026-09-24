@@ -179,9 +179,9 @@ endfunction()
 # DESIGN: the runtime is what every program links, so the archive holds one
 # of it per level the target's architecture has. A program built with --cpu
 # below the target's default then links a runtime of its own level. The
-# levels of a target are those of its architecture, which its name ends in.
+# levels of a target are those of its architecture, which its name holds.
 function(antic_cpu_levels out target)
-    if(target MATCHES "arm64$")
+    if(target MATCHES "arm64")
         set(${out} "${ANTIC_CPU_LEVELS_arm64}" PARENT_SCOPE)
     else()
         set(${out} "${ANTIC_CPU_LEVELS_x86_64}" PARENT_SCOPE)
@@ -267,7 +267,11 @@ find_program(ANTIC_LLVM_AR NAMES llvm-ar
     DOC "llvm-ar from LLVM 23.1.1")
 set(ANTIC_TARGETS linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
     windows-x86_64 windows-arm64)
-foreach(target IN LISTS ANTIC_TARGETS)
+# DESIGN: the Linux link mode against glibc takes a sysroot and a runtime
+# of its own, named after the target with -glibc, the suffix
+# LINUX_GLIBC_SUFFIX of src/antic/linker.h.
+set(ANTIC_GLIBC_TARGETS linux-x86_64-glibc linux-arm64-glibc)
+foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
     if(EXISTS "${ANTIC_SYSROOT_DIR}/${target}")
         file(COPY "${ANTIC_SYSROOT_DIR}/${target}"
             DESTINATION "${ANTIC_RUNTIME_DIR}/sysroot")
@@ -372,7 +376,7 @@ endfunction()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
     execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
         OUTPUT_VARIABLE clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
-    foreach(target IN LISTS ANTIC_TARGETS)
+    foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
         set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
         if(NOT EXISTS "${sysroot}" OR
            (target STREQUAL ANTIC_HOST_TARGET AND NOT target MATCHES "^macos-"))
@@ -382,6 +386,16 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
             string(REPLACE "linux-arm64" "aarch64" arch "${target}")
             string(REPLACE "linux-x86_64" "x86_64" arch "${arch}")
             anti_cross_runtime(${target} ${arch}-linux-musl -fPIC -nostdinc
+                -isystem "${sysroot}/usr/include"
+                -isystem "${clang_resource}/include")
+        elseif(target MATCHES "^linux-(x86_64|arm64)-glibc$")
+            # DESIGN: the runtime of the glibc mode compiles against the
+            # headers of glibc 2.35 on every host, the Linux one as well,
+            # so it names no symbol version above the sysroot's.
+            string(REPLACE "linux-arm64-glibc" "aarch64" arch "${target}")
+            string(REPLACE "linux-x86_64-glibc" "x86_64" arch "${arch}")
+            anti_cross_runtime(${target} ${arch}-linux-gnu -fPIC -nostdinc
+                -isystem "${sysroot}/usr/include/${arch}-linux-gnu"
                 -isystem "${sysroot}/usr/include"
                 -isystem "${clang_resource}/include")
         elseif(target STREQUAL "macos-x86_64")

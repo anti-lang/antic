@@ -5,6 +5,12 @@ link framework "Cocoa";
 link framework "CoreVideo";
 link framework "IOKit";
 link framework "OpenGL";
+link linux "GL";
+link linux "m";
+link linux "pthread";
+link linux "dl";
+link linux "rt";
+link linux "X11";
 
 pub const RAYLIB_VERSION_MAJOR: c_int = 6;
 

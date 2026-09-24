@@ -39,6 +39,8 @@ static int usage(FILE *out)
           "                       default, or with the platform linker\n"
           "  --framework <name>   link a macOS program against a framework\n"
           "                       of Apple's SDK\n"
+          "  --linux-lib <name>   link a Linux program against a library\n"
+          "                       of the glibc sysroot, dynamically\n"
           "  -I <dir>             a search root: module a.b is a/b.anti\n"
           "                       or a/b.antl under it\n"
           "  --anti-internal      allow -c for a module under anti.\n"
@@ -304,6 +306,13 @@ static int run(int argc, char **argv, struct options *o)
             }
             options.frameworks[options.framework_count++] = value;
             continue;
+        } else if (strcmp(arg, "--linux-lib") == 0) {
+            const char *value = value_of(argc, argv, &i);
+            if (value == NULL) {
+                return 2;
+            }
+            options.linux_libraries[options.linux_library_count++] = value;
+            continue;
         } else if (strcmp(arg, "--inject") == 0) {
             const char *value = value_of(argc, argv, &i);
             if (value == NULL) {
@@ -429,13 +438,15 @@ int main(int argc, char **argv)
     options.dependencies = malloc((size_t)argc * sizeof *options.dependencies);
     options.attribution = malloc((size_t)argc * sizeof *options.attribution);
     options.frameworks = malloc((size_t)argc * sizeof *options.frameworks);
+    options.linux_libraries =
+        malloc((size_t)argc * sizeof *options.linux_libraries);
     options.trace_patterns =
         malloc((size_t)argc * sizeof *options.trace_patterns);
     options.inject = malloc((size_t)argc * sizeof *options.inject);
     if (options.libraries == NULL || options.objects == NULL ||
         options.roots == NULL || options.dependencies == NULL ||
         options.attribution == NULL || options.frameworks == NULL ||
-        options.trace_patterns == NULL || options.inject == NULL) {
+        options.linux_libraries == NULL || options.trace_patterns == NULL || options.inject == NULL) {
         fputs("antic: out of memory\n", stderr);
         goto done;
     }
@@ -447,6 +458,7 @@ done:
     free((void *)options.dependencies);
     free((void *)options.attribution);
     free((void *)options.frameworks);
+    free((void *)options.linux_libraries);
     free((void *)options.trace_patterns);
     free((void *)options.inject);
     return status;

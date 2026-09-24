@@ -173,6 +173,9 @@ bool bind_is_keyword(const char *name);
 /* The frameworks of Apple's SDK that a library links against on macOS,
    from the table of anti bind. Returns the number of names. */
 size_t bind_frameworks(const char *library, const char *const **names);
+/* The libraries of the glibc sysroot that library needs on Linux, as
+   bind_frameworks gives the frameworks. */
+size_t bind_linux_libraries(const char *library, const char *const **names);
 
 /* Decide what the module can hold. A record is bound when the type of
    every field has an Anti spelling. A function or a constant is bound

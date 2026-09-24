@@ -1718,29 +1718,34 @@ static bool same_qualifier(const struct item *it, const struct item *a,
 }
 
 /* A framework is named once, and its name is one name of Apple's SDK:
-   no path and no empty text, since it becomes -framework <name>. */
-static void check_frameworks(struct checker *c, const struct module *module)
+   no path and no empty text, since it becomes -framework <name>. A
+   library of `link linux` follows the same rules, since it becomes
+   -l<name>. */
+static void check_link_names(struct checker *c, const struct link_name *names,
+                             size_t count, const char *kind, const char *what)
 {
     size_t i;
     size_t j;
 
-    for (i = 0; i < module->framework_count; i++) {
-        const struct framework_line *f = &module->frameworks[i];
+    for (i = 0; i < count; i++) {
+        const struct link_name *f = &names[i];
         if (f->name.length == 0) {
-            sema_error_at(c, f->pos, "`link framework` names no framework");
+            sema_error_at(c, f->pos, "`link %s` names no %s", kind, what);
         } else if (memchr(f->name.text, '/', f->name.length) ||
             memchr(f->name.text, '\\', f->name.length) ||
             memchr(f->name.text, ' ', f->name.length)) {
-            sema_error_at(c, f->pos, "`link framework` names a framework of "
-                          "Apple's SDK, and `%.*s` is none",
+            sema_error_at(c, f->pos, "`link %s` names a %s of %s, and `%.*s` "
+                          "is none", kind, what,
+                          strcmp(kind, "linux") == 0 ? "the glibc sysroot"
+                                                     : "Apple's SDK",
                           (int)f->name.length, f->name.text);
         }
         for (j = 0; j < i; j++) {
-            if (module->frameworks[j].name.length == f->name.length &&
-                memcmp(module->frameworks[j].name.text, f->name.text,
+            if (names[j].name.length == f->name.length &&
+                memcmp(names[j].name.text, f->name.text,
                        f->name.length) == 0) {
-                sema_error_at(c, f->pos, "the framework `%.*s` is linked twice",
-                              (int)f->name.length, f->name.text);
+                sema_error_at(c, f->pos, "the %s `%.*s` is linked twice",
+                              what, (int)f->name.length, f->name.text);
             }
         }
     }
@@ -2823,7 +2828,7 @@ static void report_program(struct checker *c)
 }
 
 /* The checks of what crosses to C: every exported item, every
-   `extern fn`, `provides` and `link framework`. */
+   `extern fn`, `provides`, `link framework` and `link linux`. */
 static void check_boundary(struct checker *c)
 {
     struct module *module = c->module;
@@ -2841,7 +2846,10 @@ static void check_boundary(struct checker *c)
         }
     }
     check_provides(c, module);
-    check_frameworks(c, module);
+    check_link_names(c, module->frameworks, module->framework_count,
+                     "framework", "framework");
+    check_link_names(c, module->linux_libraries, module->linux_library_count,
+                     "linux", "library");
 }
 
 bool sema_check(struct module *module, const char *module_name,

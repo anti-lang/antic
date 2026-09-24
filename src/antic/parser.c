@@ -211,8 +211,8 @@ static bool is_doc(enum token_kind kind)
 }
 
 /* The length of the doc marker that opens the token text s of length
-   bytes, 4 for the two developer markers of the module and 3 for the six
-   others. Every marker has at least 3 bytes. */
+   bytes. It is 4 for the two developer markers of the module and 3 for
+   the six others. Every marker has at least 3 bytes. */
 static size_t marker_length(const char *s, size_t length)
 {
     return length >= 4 && s[2] == '#' && s[3] == '!' ? 4 : 3;
@@ -2916,13 +2916,14 @@ static bool provides_line(struct parser *p, struct list *out)
 }
 
 /* DESIGN: `link framework "Name";` names a framework of Apple's SDK at
-   module level. `link` and `framework` are contextual words there alone,
-   so both stay names everywhere else. A binding carries the line and
-   the library file records it, and `anti` passes the names to antic as
-   --framework. */
-static bool link_line(struct parser *p, struct list *out)
+   module level, and `link linux "Name";` a library of the glibc sysroot.
+   `link`, `framework` and `linux` are contextual words there alone, so
+   each stays a name everywhere else. A binding carries the line and the
+   library file records it, and `anti` passes the names to antic as
+   --framework and --linux-lib. */
+static bool link_line(struct parser *p, struct list *out, const char *kind)
 {
-    struct framework_line line;
+    struct link_name line;
     const struct token *t;
 
     memset(&line, 0, sizeof line);
@@ -2931,8 +2932,11 @@ static bool link_line(struct parser *p, struct list *out)
     next(p);
     t = peek(p);
     if (t->kind != TOKEN_STRING) {
-        error_here(p, "`link framework` takes the name of a framework as a "
-                      "string");
+        error_here(p, strcmp(kind, "linux") == 0
+                          ? "`link linux` takes the name of a library as a "
+                            "string"
+                          : "`link framework` takes the name of a framework "
+                            "as a string");
         return false;
     }
     next(p);
@@ -2955,7 +2959,8 @@ bool parse(const char *source, const struct token_list *tokens,
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
     struct list items = {NULL, 0, 0, sizeof(struct item *)};
     struct list provides = {NULL, 0, 0, sizeof(struct provides)};
-    struct list frameworks = {NULL, 0, 0, sizeof(struct framework_line)};
+    struct list frameworks = {NULL, 0, 0, sizeof(struct link_name)};
+    struct list linux_libraries = {NULL, 0, 0, sizeof(struct link_name)};
     struct list dropped = {NULL, 0, 0, sizeof(struct dropped_doc)};
     struct token *kept = malloc(tokens->count * sizeof *kept);
     size_t *origin = malloc(tokens->count * sizeof *origin);
@@ -3030,7 +3035,17 @@ bool parse(const char *source, const struct token_list *tokens,
         }
         if (is_word(&p, peek(&p), "link") &&
             is_word(&p, peek_at(&p, 1), "framework")) {
-            if (!link_line(&p, &frameworks)) {
+            if (!link_line(&p, &frameworks, "framework")) {
+                if (p.pos == before) {
+                    next(&p);
+                }
+                sync_item(&p);
+            }
+            continue;
+        }
+        if (is_word(&p, peek(&p), "link") &&
+            is_word(&p, peek_at(&p, 1), "linux")) {
+            if (!link_line(&p, &linux_libraries, "linux")) {
                 if (p.pos == before) {
                     next(&p);
                 }
@@ -3052,6 +3067,8 @@ bool parse(const char *source, const struct token_list *tokens,
     m->items = list_finish(&p, &items, &m->item_count);
     m->provides = list_finish(&p, &provides, &m->provides_count);
     m->frameworks = list_finish(&p, &frameworks, &m->framework_count);
+    m->linux_libraries = list_finish(&p, &linux_libraries,
+                                     &m->linux_library_count);
     for (i = 0; i < tokens->count; i++) {
         const struct token *t = &tokens->items[i];
         struct dropped_doc d;

@@ -56,6 +56,9 @@ struct extras {
     /* The `provides` lines of a plugin, one per line as
        `<interface>\t<class>`, which the index file carries. */
     struct text provides;
+    /* The names a Windows program that can host a plugin defines, as
+       emit_names writes them, which its .def file exports. */
+    struct text host_names;
 };
 
 static void extras_free(struct extras *e)
@@ -66,6 +69,7 @@ static void extras_free(struct extras *e)
     text_free(&e->notice);
     text_free(&e->exports);
     text_free(&e->provides);
+    text_free(&e->host_names);
 }
 
 
@@ -417,10 +421,13 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     in->lld_dir = file_exists(text_cstr(&marker)) ? text_cstr(&f->lld_dir)
                                                   : NULL;
     text_free(&marker);
-    text_appendf(&f->sysroot, "%s/%s/%s", o->runtime, RUNTIME_SYSROOT_DIR,
-                 target_name(t));
+    text_appendf(&f->sysroot, "%s/%s/", o->runtime, RUNTIME_SYSROOT_DIR);
+    link_target_dir(&f->sysroot, t, in->glibc);
+    /* The builtins are the last file tools/get-sysroot.cmake writes into
+       a glibc sysroot. */
     text_appendf(&marker, "%s/%s", text_cstr(&f->sysroot),
-                 os == OS_LINUX   ? "usr/lib/libc.a"
+                 os == OS_LINUX && in->glibc ? "usr/lib/libclang_rt.builtins.a"
+                 : os == OS_LINUX            ? "usr/lib/libc.a"
                  : os == OS_MACOS ? SYSROOT_SDK_VERSION
                  : target_info(t)->arch == ARCH_ARM64
                      ? "crt/lib/aarch64/msvcrt.lib"
@@ -573,14 +580,72 @@ static bool run_link(const struct windows_link *w, const struct link_command *c)
     return true;
 }
 
+/* DESIGN: a Windows program that can host a plugin exports the names of
+   its own object and of the runtime it links. A .def file beside it
+   lists them. The link writes the import library <program>.lib, which
+   its plugins link against. A plugin then names the executable in its
+   imports, and Windows binds it to the program that loads it. */
+static bool host_exports(const struct options *o, const char *object,
+                         const char *executable, const struct text *names,
+                         struct text *def, struct text *implib)
+{
+    const char *suffix = target_info(o->target)->executable_suffix;
+    const char *slash = strrchr(executable, '/');
+    const char *file = slash != NULL ? slash + 1 : executable;
+    size_t n = strlen(executable);
+    struct text library = {0};
+    struct text bytes = {0};
+    struct text program = {0};
+    struct text all = {0};
+    struct text content = {0};
+    const char *p;
+    bool ok;
+
+    if (n >= strlen(suffix) && strcmp(executable + n - strlen(suffix),
+                                      suffix) == 0) {
+        n -= strlen(suffix);
+    }
+    text_appendf(def, "%.*s%s", (int)n, executable, DEF_SUFFIX);
+    text_appendf(implib, "%.*s%s", (int)n, executable,
+                 LINK_COFF_ARCHIVE_SUFFIX);
+    link_runtime_library(&library, o->runtime, o->target, o->cpu);
+    text_append(&all, text_cstr(names));
+    ok = read_bytes(text_cstr(&library), &bytes) &&
+         read_bytes(object, &program);
+    if (ok && !coff_archive_exports((const unsigned char *)bytes.data,
+                                    bytes.length,
+                                    (const unsigned char *)program.data,
+                                    program.length, &all)) {
+        fprintf(stderr, "antic: cannot read the symbols of %s and %s\n",
+                text_cstr(&library), object);
+        ok = false;
+    }
+    text_appendf(&content, "NAME %s\nEXPORTS\n", file);
+    for (p = text_cstr(&all); ok && *p != '\0';) {
+        size_t line = strcspn(p, "\n");
+        text_appendf(&content, "    %.*s\n", (int)line, p);
+        p += line + (p[line] == '\n');
+    }
+    ok = ok && write_file(text_cstr(def), &content);
+    text_free(&library);
+    text_free(&bytes);
+    text_free(&program);
+    text_free(&all);
+    text_free(&content);
+    return ok;
+}
+
 static bool link_program(const struct options *o, const char *object,
-                         const char *executable, bool exports)
+                         const char *executable, const struct extras *extras)
 {
     struct link_inputs in;
     struct link_command command;
     struct link_facts facts;
     struct windows_link w;
-    bool ok;
+    struct text def = {0};
+    struct text implib = {0};
+    enum target_os os = target_info(o->target)->os;
+    bool ok = true;
 
     memset(&in, 0, sizeof in);
     in.object = object;
@@ -590,11 +655,24 @@ static bool link_program(const struct options *o, const char *object,
     in.extra_count = o->object_count;
     in.frameworks = o->frameworks;
     in.framework_count = o->framework_count;
-    in.exports = exports;
+    in.linux_libraries = o->linux_libraries;
+    in.linux_library_count = o->linux_library_count;
+    in.exports = extras->hosts_plugins;
+    in.glibc = os == OS_LINUX &&
+               (o->linux_library_count > 0 || extras->hosts_plugins);
     memset(&w, 0, sizeof w);
-    ok = link_facts(o, &in, &facts) &&
-         (target_info(o->target)->os != OS_WINDOWS ||
-          windows_link_paths(&w, &in, NULL));
+    memset(&facts, 0, sizeof facts);
+    if (in.exports && os == OS_WINDOWS) {
+        ok = host_exports(o, object, executable, &extras->host_names, &def,
+                          &implib);
+        in.def_file = text_cstr(&def);
+        in.import_library = text_cstr(&implib);
+    }
+    ok = ok && link_facts(o, &in, &facts) &&
+         (os != OS_WINDOWS || windows_link_paths(&w, &in, &in.def_file));
+    if (ok && in.import_library != NULL) {
+        in.import_library = windows_path(&w, in.import_library, true);
+    }
     if (ok) {
         link_command(&command, o->target, &in);
         ok = run_link(&w, &command);
@@ -602,6 +680,8 @@ static bool link_program(const struct options *o, const char *object,
     }
     windows_link_free(&w);
     link_facts_free(&facts);
+    text_free(&def);
+    text_free(&implib);
     return ok;
 }
 
@@ -957,6 +1037,7 @@ static int back_end(const struct options *o, struct module *tree,
                 o->input);
         return 1;
     }
+    program->plugin = is_plugin(o);
     functions = calloc(program->function_count + 1, sizeof *functions);
     if (functions == NULL) {
         fputs("antic: out of memory\n", stderr);
@@ -1008,6 +1089,10 @@ static int back_end(const struct options *o, struct module *tree,
                               notice.length);
                 text_free(&notice);
             }
+        }
+        if (ok && extras->hosts_plugins &&
+            target_info(o->target)->format == FORMAT_COFF) {
+            emit_names(&extras->host_names, o->target, program, functions);
         }
         for (i = 0; ok && i < program->function_count; i++) {
             const struct ir_function *f = program->functions[i];
@@ -1277,9 +1362,11 @@ bool driver_libraries(const struct options *options, struct arena *arena,
     return true;
 }
 
-bool driver_frameworks(const char *const *paths, size_t count,
+/* The names of the `link framework` lines, or with linux of the `link
+   linux` lines, of the library files, each once. */
+static bool link_names(const char *const *paths, size_t count,
                        struct arena *arena, const char ***names,
-                       size_t *name_count)
+                       size_t *name_count, bool linux)
 {
     const char **list = NULL;
     size_t n = 0;
@@ -1303,9 +1390,13 @@ bool driver_frameworks(const char *const *paths, size_t count,
             return false;
         }
         text_free(&bytes);
-        for (j = 0; j < header.framework_count; j++) {
+        for (j = 0; j < (linux ? header.linux_library_count
+                               : header.framework_count);
+             j++) {
+            const char *name = linux ? header.linux_libraries[j]
+                                     : header.frameworks[j];
             for (k = 0; k < n; k++) {
-                if (strcmp(list[k], header.frameworks[j]) == 0) {
+                if (strcmp(list[k], name) == 0) {
                     break;
                 }
             }
@@ -1322,7 +1413,7 @@ bool driver_frameworks(const char *const *paths, size_t count,
                 }
                 list = grown;
             }
-            list[n++] = header.frameworks[j];
+            list[n++] = name;
         }
     }
     *names = arena_alloc(arena, (n + 1) * sizeof **names);
@@ -1332,6 +1423,20 @@ bool driver_frameworks(const char *const *paths, size_t count,
     *name_count = n;
     free((void *)list);
     return true;
+}
+
+bool driver_frameworks(const char *const *paths, size_t count,
+                       struct arena *arena, const char ***names,
+                       size_t *name_count)
+{
+    return link_names(paths, count, arena, names, name_count, false);
+}
+
+bool driver_linux_libraries(const char *const *paths, size_t count,
+                            struct arena *arena, const char ***names,
+                            size_t *name_count)
+{
+    return link_names(paths, count, arena, names, name_count, true);
 }
 
 /* Read the library files and load each after the libraries it imports,
@@ -2466,6 +2571,18 @@ static bool build_c_library(const struct options *o, const char *object,
             s.exported_file = text_cstr(&exported);
             text_free(&content);
         }
+        /* DESIGN: a Windows plugin exports its table and the list of the
+           places the loader fills with the addresses of the host. */
+        if (ok && info->os == OS_WINDOWS && s.plugin) {
+            struct text content = {0};
+            text_appendf(&def, "%s%s%s", text_cstr(&dir), name, DEF_SUFFIX);
+            text_appendf(&content, "LIBRARY %s\nEXPORTS\n"
+                         "    anti_rt_provides DATA\n"
+                         "    anti_rt_imports DATA\n", name);
+            ok = write_file(text_cstr(&def), &content);
+            s.def_file = text_cstr(&def);
+            text_free(&content);
+        }
         if (ok && info->os == OS_WINDOWS && !s.plugin) {
             struct text content = {0};
             const char *p = text_cstr(&extras->exports);
@@ -2626,8 +2743,7 @@ int driver_run(const struct options *o)
     if (o->output == NULL) {
         text_append(&base, target_info(o->target)->executable_suffix);
     }
-    if (link_program(o, text_cstr(&obj_path), text_cstr(&base),
-                     extras.hosts_plugins)) {
+    if (link_program(o, text_cstr(&obj_path), text_cstr(&base), &extras)) {
         status = 0;
     }
 

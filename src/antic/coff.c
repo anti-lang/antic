@@ -1,5 +1,6 @@
 #include "coff.h"
 
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -973,5 +974,219 @@ bool coff_join(const struct coff_input *inputs, size_t count,
     free(headers);
     text_free(&body);
     release(&j);
+    return ok;
+}
+
+/* Whether the lines of out hold the name of n bytes at name. */
+static bool listed(const struct text *out, const char *name, size_t n)
+{
+    const char *line = text_cstr(out);
+
+    while (*line != '\0') {
+        const char *eol = strchr(line, '\n');
+        if ((size_t)(eol - line) == n && memcmp(line, name, n) == 0) {
+            return true;
+        }
+        line = eol + 1;
+    }
+    return false;
+}
+
+/* The symbol index of an archive: its names and the offset of the member
+   that defines each. */
+struct archive_index {
+    const unsigned char *data;
+    size_t size;
+    uint32_t count;
+    const unsigned char *offsets;
+    const char **names;
+    size_t *lengths;
+};
+
+static uint32_t big_endian(const unsigned char *p)
+{
+    return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 |
+           (uint32_t)p[2] << 8 | p[3];
+}
+
+/* The bytes and the size of the member whose header stands at offset,
+   from the size field of its header. */
+static bool member_at(const unsigned char *data, size_t size, size_t offset,
+                      const unsigned char **bytes, size_t *length)
+{
+    char field[11];
+
+    if (offset > size || size - offset < 60) {
+        return false;
+    }
+    memcpy(field, data + offset + 48, 10);
+    field[10] = '\0';
+    *length = (size_t)strtoul(field, NULL, 10);
+    if (*length > size - offset - 60) {
+        return false;
+    }
+    *bytes = data + offset + 60;
+    return true;
+}
+
+/* DESIGN: the first member of an archive of the GNU and COFF formats is
+   the symbol index, named "/". It holds the count of the symbols and
+   their member offsets as big-endian words of 32 bits, then the names,
+   each ended by a NUL. */
+static bool read_index(const unsigned char *data, size_t size,
+                       struct archive_index *index)
+{
+    const unsigned char *member;
+    const char *names;
+    const char *end;
+    size_t length;
+    uint32_t i;
+
+    memset(index, 0, sizeof *index);
+    if (size < 8 || memcmp(data, "!<arch>\n", 8) != 0 ||
+        !member_at(data, size, 8, &member, &length) ||
+        memcmp(data + 8, "/ ", 2) != 0 || length < 4) {
+        return false;
+    }
+    index->data = data;
+    index->size = size;
+    index->count = big_endian(member);
+    if (index->count > (length - 4) / 4) {
+        return false;
+    }
+    index->offsets = member + 4;
+    index->names = calloc((size_t)index->count + 1, sizeof *index->names);
+    index->lengths = calloc((size_t)index->count + 1, sizeof *index->lengths);
+    if (index->names == NULL || index->lengths == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    names = (const char *)member + 4 + 4 * (size_t)index->count;
+    end = (const char *)member + length;
+    for (i = 0; i < index->count; i++) {
+        const char *nul = memchr(names, '\0', (size_t)(end - names));
+        if (nul == NULL) {
+            return false;
+        }
+        index->names[i] = names;
+        index->lengths[i] = (size_t)(nul - names);
+        names = nul + 1;
+    }
+    return true;
+}
+
+static void free_index(struct archive_index *index)
+{
+    free((void *)index->names);
+    free(index->lengths);
+}
+
+/* Append to out each external symbol of the COFF object data, one per
+   line and each name once. defined takes the defined ones, and false
+   the undefined ones. */
+static bool object_symbols(const unsigned char *data, size_t size,
+                           bool defined, struct text *out)
+{
+    size_t symbols_at;
+    uint32_t count;
+    const char *strings;
+    size_t strings_size;
+    uint32_t i;
+
+    if (size < HEADER_SIZE) {
+        return false;
+    }
+    symbols_at = get(data + 8, 4);
+    count = get(data + 12, 4);
+    if (symbols_at > size || (size - symbols_at) / SYMBOL_SIZE < count) {
+        return false;
+    }
+    strings = (const char *)data + symbols_at + (size_t)SYMBOL_SIZE * count;
+    strings_size = size - symbols_at - (size_t)SYMBOL_SIZE * count;
+    for (i = 0; i < count; i++) {
+        const unsigned char *sym = data + symbols_at + (size_t)SYMBOL_SIZE * i;
+        uint32_t section = get(sym + 12, 2);
+        const char *name = (const char *)sym;
+        size_t length = 0;
+        if (sym[16] == CLASS_EXTERNAL &&
+            (defined ? section > 0 && section <= SECTION_MAX
+                     : section == 0 && get(sym + 8, 4) == 0)) {
+            if (get(sym, 4) == 0) {
+                uint32_t offset = get(sym + 4, 4);
+                const char *nul;
+                if (offset < 4 || offset >= strings_size) {
+                    return false;
+                }
+                name = strings + offset;
+                nul = memchr(name, '\0', strings_size - offset);
+                if (nul == NULL) {
+                    return false;
+                }
+                length = (size_t)(nul - name);
+            } else {
+                while (length < 8 && name[length] != '\0') {
+                    length++;
+                }
+            }
+            if (!listed(out, name, length)) {
+                text_appendf(out, "%.*s\n", (int)length, name);
+            }
+        }
+        i += sym[17];
+    }
+    return true;
+}
+
+/* DESIGN: a Windows program that can host a plugin exports the names of
+   the runtime it links, and no more. An export pulls the member that
+   defines it, and a member of the runtime may need a table only some
+   programs write. The closure starts at the symbols the object leaves
+   undefined and at `main`, which the C runtime calls. It takes each
+   member of the archive that defines a name it needs, as the linker
+   does. The names those members define are the exports, as on Linux
+   --export-dynamic exports what the program links. */
+bool coff_archive_exports(const unsigned char *archive, size_t archive_size,
+                          const unsigned char *object, size_t object_size,
+                          struct text *out)
+{
+    struct archive_index index;
+    struct text needed = {0};
+    struct text taken = {0};
+    const char *next;
+    bool ok;
+
+    ok = read_index(archive, archive_size, &index) &&
+         object_symbols(object, object_size, false, &needed);
+    text_append(&needed, "main\n");
+    next = text_cstr(&needed);
+    while (ok && *next != '\0') {
+        size_t at = (size_t)(next - text_cstr(&needed));
+        size_t n = strcspn(next, "\n");
+        uint32_t i;
+        for (i = 0; i < index.count; i++) {
+            char offset[16];
+            const unsigned char *bytes;
+            size_t length;
+            if (index.lengths[i] != n || memcmp(index.names[i], next, n) != 0) {
+                continue;
+            }
+            snprintf(offset, sizeof offset, "%" PRIu32 "\n",
+                     big_endian(index.offsets + 4 * (size_t)i));
+            if (listed(&taken, offset, strlen(offset) - 1)) {
+                break;
+            }
+            text_append(&taken, offset);
+            ok = member_at(archive, archive_size,
+                           big_endian(index.offsets + 4 * (size_t)i), &bytes,
+                           &length) &&
+                 object_symbols(bytes, length, true, out) &&
+                 object_symbols(bytes, length, false, &needed);
+            break;
+        }
+        next = text_cstr(&needed) + at + n + 1;
+    }
+    free_index(&index);
+    text_free(&needed);
+    text_free(&taken);
     return ok;
 }

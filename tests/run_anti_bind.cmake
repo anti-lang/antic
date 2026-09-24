@@ -147,12 +147,13 @@ elseif(CASE STREQUAL "raymath")
                  "${WORK}/raymath_calls.expected")
 elseif(CASE STREQUAL "raylib")
     # anti.raylib comes from raylib.h of the pinned raylib, the header that
-    # raylib compiles. It compiles, names its frameworks, turns the colour
-    # macros into constants of Color, and its two probes agree.
+    # raylib compiles. It compiles, names its frameworks and its Linux
+    # libraries, turns the colour macros into constants of Color, and its
+    # two probes agree.
     run("${ANTI}" bind --clang "${RAYLIB}/src/raylib.h" --probe
         -o "${WORK}/out" --runtime "${RUNTIME}")
     file(READ "${WORK}/out/raylib.anti" module)
-    foreach(line "link framework \"Cocoa\";"
+    foreach(line "link framework \"Cocoa\";" "link linux \"X11\";"
             "pub const RAYWHITE: Color = Color { r: 245, g: 245, b: 245, a: 255 };"
             "pub extern fn SetConfigFlags(flags: c_uint);")
         string(FIND "${module}" "${line}" at)

@@ -25,6 +25,11 @@
 /* The object beside the runtime library that a bundled archive carries
    instead of the licence text of src/rt/license.c. */
 #define RUNTIME_LICENSE_STUB "anti_rt_license_stub"
+/* DESIGN: the Linux link mode against glibc takes the sysroot and the
+   runtime of the target name with this suffix, linux-arm64-glibc beside
+   linux-arm64. tools/get-sysroot.cmake and CMakeLists.txt spell the same
+   names. */
+#define LINUX_GLIBC_SUFFIX "-glibc"
 #define SYSROOT_SDK_VERSION "sdk-version"
 #define SYSROOT_APPLE_SDK_DIR "sdk"
 
@@ -56,6 +61,17 @@ struct link_inputs {
     /* DESIGN: a program that can host a plugin exports the names in its
        symbol table, so the loader binds the plugin against them. */
     bool exports;
+    const char *const *linux_libraries; /* Linux: -l of the glibc mode */
+    size_t linux_library_count;
+    /* DESIGN: a Linux program links dynamically against glibc when a
+       module it imports names a library with `link linux` or when it can
+       host a plugin. Every other Linux program links statically against
+       musl. */
+    bool glibc;
+    /* Windows: the .def file of the names a program that hosts a plugin
+       exports, and the import library the link writes beside it. */
+    const char *def_file;
+    const char *import_library;
 };
 
 /* The suffixes of the object files and archives that antic passes to the
@@ -128,6 +144,10 @@ bool link_is_input(const char *path);
    runtime. */
 void link_runtime_library(struct text *out, const char *runtime, enum target t,
                           enum cpu_level cpu);
+
+/* Append the directory name of target t below the runtime's lib/ and
+   sysroot/, with LINUX_GLIBC_SUFFIX in the glibc mode. */
+void link_target_dir(struct text *out, enum target t, bool glibc);
 
 /* Append the path of path relative to the directory directory. Both are
    absolute and separate their parts with '/', and neither holds `.` or

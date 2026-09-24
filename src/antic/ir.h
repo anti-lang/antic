@@ -440,6 +440,11 @@ struct ir_module {
     struct ir_class **classes;
     size_t class_count;
     size_t class_capacity;
+    /* DESIGN: the object of a plugin, whose functions and data of other
+       modules the host defines. On ELF the code reaches each of them
+       through the GOT, and on COFF through the __imp_ entry the import
+       library of the host gives. */
+    bool plugin;
 };
 
 /* Checked heap memory for the back end. The compiler cannot continue

@@ -867,6 +867,14 @@ void sema_interface(const struct module *module, const char *module_name,
                                        module->frameworks[i].name.length);
     }
     out->framework_count = module->framework_count;
+    out->linux_libraries = types_alloc_array(
+        arena, module->linux_library_count + 1, sizeof *out->linux_libraries);
+    for (i = 0; i < module->linux_library_count; i++) {
+        out->linux_libraries[i] =
+            keep_name(arena, module->linux_libraries[i].name.text,
+                      module->linux_libraries[i].name.length);
+    }
+    out->linux_library_count = module->linux_library_count;
     out->items = types_alloc_array(arena, module->item_count + 1,
                                    sizeof *out->items);
     for (i = 0; i < module->item_count; i++) {

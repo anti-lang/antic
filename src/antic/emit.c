@@ -155,6 +155,18 @@ static const char *const mutable_sections[] = {
     [FORMAT_COFF] = ".data",
 };
 
+/* Whether the address of relocation r names a function or a datum the
+   host of a COFF plugin defines. */
+static bool imported(enum target t, const struct ir_module *m,
+                     const struct ir_reloc *r)
+{
+    if (!m->plugin || target_info(t)->format != FORMAT_COFF) {
+        return false;
+    }
+    return r->fn ? m->functions[r->global]->is_extern
+                 : m->globals[r->global]->is_extern;
+}
+
 /* The symbol an address at offset names, written into out. It is a
    global, or the function of a table entry, which may be an extern of
    the runtime and then carries no module. Returns false when no
@@ -168,6 +180,12 @@ static bool reloc_at(struct text *out, enum target t,
     for (i = 0; i < g->reloc_count; i++) {
         if (g->relocs[i].offset != offset) {
             continue;
+        }
+        /* DESIGN: a COFF plugin holds the address of the __imp_ entry of
+           a name of its host. The loader replaces it with the address
+           that entry holds. anti_rt_imports lists each such place. */
+        if (imported(t, m, &g->relocs[i])) {
+            text_append(out, "__imp_");
         }
         if (g->relocs[i].fn) {
             mach_function_symbol(out, t, m->functions[g->relocs[i].global]);
@@ -267,6 +285,49 @@ static void emit_data(struct text *out, enum target t,
     }
 }
 
+/* DESIGN: the table anti_rt_imports of a COFF plugin holds three parts.
+   The first is the count of the places that hold the address of an
+   __imp_ entry. The second is a word the loader marks once it has
+   replaced them, and the third the address of each place. It stands in .data, because the loader writes
+   the mark. */
+static void emit_imports(struct text *out, enum target t,
+                         const struct ir_module *m)
+{
+    struct text symbol = {0};
+    struct text places = {0};
+    size_t count = 0;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < m->global_count; i++) {
+        const struct ir_global *g = m->globals[i];
+        struct text name = {0};
+        if (g->is_extern) {
+            continue;
+        }
+        if (g->exported) {
+            c_symbol(&name, t, g->name);
+        } else {
+            mangle(&name, t, g->module, g->name);
+        }
+        for (j = 0; j < g->reloc_count; j++) {
+            if (imported(t, m, &g->relocs[j])) {
+                text_appendf(&places, "    .quad %s+%" PRIu64 "\n",
+                             text_cstr(&name), g->relocs[j].offset);
+                count++;
+            }
+        }
+        text_free(&name);
+    }
+    c_symbol(&symbol, t, "anti_rt_imports");
+    text_appendf(out, "    .section %s\n    .p2align 3\n    .globl %s\n%s:\n"
+                 "    .quad %zu\n    .quad 0\n%s",
+                 mutable_sections[target_info(t)->format], text_cstr(&symbol),
+                 text_cstr(&symbol), count, text_cstr(&places));
+    text_free(&symbol);
+    text_free(&places);
+}
+
 /* Whether every address of g lies inside its bytes and apart from the
    others. The pairs cost no more than the writing of g, which looks each
    offset up among the addresses. */
@@ -334,6 +395,9 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
     if (m->global_count > 0) {
         emit_data(out, t, m, one_module, exports);
     }
+    if (m->plugin && info->format == FORMAT_COFF) {
+        emit_imports(out, t, m);
+    }
     /* Without this note GNU ld may mark the stack executable. */
     if (info->format == FORMAT_ELF) {
         text_append(out, "    .section .note.GNU-stack,\"\",@progbits\n");
@@ -357,6 +421,36 @@ bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
 {
     return emit(out, t, cpu, m, functions, module, true, exports, debug_info,
                 spans, error, error_size);
+}
+
+void emit_names(struct text *out, enum target t, const struct ir_module *m,
+                struct mach_function **functions)
+{
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        struct text symbol = {0};
+        if (functions[i] == NULL) {
+            continue;
+        }
+        mach_function_symbol(&symbol, t, m->functions[i]);
+        text_appendf(out, "%s\n", text_cstr(&symbol));
+        text_free(&symbol);
+    }
+    for (i = 0; i < m->global_count; i++) {
+        const struct ir_global *g = m->globals[i];
+        struct text name = {0};
+        if (g->is_extern) {
+            continue;
+        }
+        if (g->exported) {
+            c_symbol(&name, t, g->name);
+        } else {
+            mangle(&name, t, g->module, g->name);
+        }
+        text_appendf(out, "%s DATA\n", text_cstr(&name));
+        text_free(&name);
+    }
 }
 
 /* DESIGN: a shared library initialises the runtime in a constructor. The

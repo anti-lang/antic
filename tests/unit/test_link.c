@@ -13,34 +13,40 @@ static const char *const extra_windows[] = {"shapes.obj"};
 
 static const struct link_inputs unix_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/x86_64-linux-gnu",
-    NULL, 0, LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false
+    NULL, 0, LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
+    NULL, 0, false, NULL, NULL
 };
 
 static const struct link_inputs windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, NULL, 0,
-    LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false
+    LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
+    NULL, 0, false, NULL, NULL
 };
 
 static const struct link_inputs extra_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/aarch64-linux-gnu",
     extra_unix, 2, LINKER_PLATFORM, CPU_ARMV8_5, NULL, NULL, NULL, 0, false,
-    false
+    false,
+    NULL, 0, false, NULL, NULL
 };
 
 static const struct link_inputs extra_windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, extra_windows, 1,
-    LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false
+    LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
+    NULL, 0, false, NULL, NULL
 };
 
 /* lld of the runtime archive with the sysroot of the target. */
 static const struct link_inputs lld_inputs = {
     "prog.o", "prog", "/rt", NULL, "26.5", NULL, extra_unix, 1, LINKER_LLD,
-    CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false
+    CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false,
+    NULL, 0, false, NULL, NULL
 };
 
 static const struct link_inputs lld_windows_inputs = {
     "prog.obj", "prog.exe", "/rt", NULL, NULL, NULL, NULL, 0, LINKER_LLD,
-    CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false
+    CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false,
+    NULL, 0, false, NULL, NULL
 };
 
 /* Build the command line of target t and compare it, joined by spaces.

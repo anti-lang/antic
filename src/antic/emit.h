@@ -33,6 +33,12 @@ bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
                  const char *module, bool exports, bool debug_info,
                  struct debug_spans *spans, char *error, size_t error_size);
 
+/* Append the names the program defines to out, one per line. The name
+   of a datum is followed by ` DATA`, as the EXPORTS of a .def file take
+   them. functions is the array emit_program read. */
+void emit_names(struct text *out, enum target t, const struct ir_module *m,
+                struct mach_function **functions);
+
 /* Append a constructor that calls C function function when the library
    loads. */
 void emit_constructor(struct text *out, enum target t, const char *function);

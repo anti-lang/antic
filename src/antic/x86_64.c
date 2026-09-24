@@ -2507,10 +2507,21 @@ static void print_operand(struct text *out, const struct ir_module *m,
         mach_symbol(out, m, names, o);
         break;
     case MACH_FUNC:
+    case MACH_GLOBAL:
+        /* An entry of the GOT holds the address of a symbol a plugin
+           takes from its host. On COFF the __imp_ pointer of the import
+           library holds it. */
+        if (o->got && names != NULL &&
+            target_info(names->target)->format == FORMAT_COFF) {
+            text_append(out, "__imp_");
+            mach_symbol(out, m, names, o);
+            text_append(out, "(%rip)");
+            break;
+        }
         mach_symbol(out, m, names, o);
-        text_append(out, o->got           ? "@GOTPCREL(%rip)"
-                         : o->pc_relative ? "(%rip)"
-                                          : "");
+        text_append(out, o->got                                 ? "@GOTPCREL(%rip)"
+                         : o->pc_relative || o->kind == MACH_GLOBAL ? "(%rip)"
+                                                                : "");
         break;
     case MACH_SLOT:
         text_appendf(out, "slot%" PRId64, o->value);
@@ -2527,10 +2538,6 @@ static void print_operand(struct text *out, const struct ir_module *m,
             text_appendf(out, ",%u", o->scale);
         }
         text_append(out, ")");
-        break;
-    case MACH_GLOBAL:
-        mach_symbol(out, m, names, o);
-        text_append(out, "(%rip)");
         break;
     default:
         break;

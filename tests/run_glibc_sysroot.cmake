@@ -1,8 +1,10 @@
-# tools/sysroot-pins names glibc 2.35 and the kernel headers of Ubuntu
-# 22.04, three packages of the jammy release pocket per processor.
-# tools/get-sysroot.cmake unpacks them into sysroot/linux-<cpu>-glibc for
-# the Linux link mode against glibc. Stand-in packages served from file://
-# URLs take the place of the real ones in a copy of the script.
+# tools/sysroot-pins names glibc 2.35, the kernel headers and the X11 and
+# GL libraries of Ubuntu 22.04, seven packages of the jammy release pocket
+# per processor. tools/get-sysroot.cmake unpacks them into
+# sysroot/linux-<cpu>-glibc for the Linux link mode against glibc, makes
+# every absolute link relative and adds the builtins of the pinned clang.
+# Stand-in packages served from file:// URLs and a stand-in clang take the
+# place of the real ones in a copy of the script.
 #
 #   cmake -DROOT=<repository> -DWORK=<dir> -DLLVM_AR=<llvm-ar>
 #         -P tests/run_glibc_sysroot.cmake
@@ -25,10 +27,10 @@ foreach(arch X86_64 AARCH64)
     if(arch STREQUAL "AARCH64")
         set(deb arm64)
     endif()
-    foreach(package LIBC_DEV LIBC HEADERS)
+    foreach(package LIBC_DEV LIBC HEADERS X11 X11_DEV GL GL_DEV)
         set(name "${GLIBC_${arch}_${package}}")
         set(digest "${GLIBC_${arch}_${package}_DIGEST}")
-        if(NOT name MATCHES "^(g/glibc/libc6(-dev)?_2\\.35-0ubuntu3|l/linux/linux-libc-dev_5\\.15\\.0-25\\.25)_${deb}\\.deb$")
+        if(NOT name MATCHES "^(g/glibc/libc6(-dev)?_2\\.35-0ubuntu3|l/linux/linux-libc-dev_5\\.15\\.0-25\\.25|libx/libx11/libx11-(6|dev)_1\\.7\\.5-1|libg/libglvnd/libgl(1|-dev)_1\\.4\\.0-1)_${deb}\\.deb$")
             message(FATAL_ERROR "GLIBC_${arch}_${package} is '${name}', not a "
                                 "package of the jammy release for ${deb}")
         endif()
@@ -70,6 +72,32 @@ stand_in(libc-dev.deb usr/include/features.h usr/lib/x86_64-linux-gnu/libc.so
 stand_in(libc.deb lib/x86_64-linux-gnu/libc.so.6 usr/share/doc/libc6/copyright)
 stand_in(headers.deb usr/include/linux/futex.h
          usr/share/doc/linux-libc-dev/copyright)
+stand_in(x11.deb usr/lib/x86_64-linux-gnu/libX11.so.6
+         usr/share/doc/libx11-6/copyright)
+stand_in(x11-dev.deb usr/include/X11/Xlib.h)
+stand_in(gl.deb usr/lib/x86_64-linux-gnu/libGL.so.1
+         usr/share/doc/libgl1/copyright)
+stand_in(gl-dev.deb usr/include/GL/gl.h)
+# A development link that names the absolute path of its library, as
+# libm.so of libc6-dev does.
+set(stage "${WORK}/stage-links")
+file(MAKE_DIRECTORY "${stage}/data/usr/lib/x86_64-linux-gnu")
+file(CREATE_LINK /lib/x86_64-linux-gnu/libm.so.6
+     "${stage}/data/usr/lib/x86_64-linux-gnu/libm.so" SYMBOLIC)
+file(WRITE "${stage}/debian-binary" "2.0\n")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf ../data.tar.zst --zstd
+                        -- usr
+                WORKING_DIRECTORY "${stage}/data" COMMAND_ERROR_IS_FATAL ANY)
+file(COPY_FILE "${stage}/data.tar.zst" "${stage}/control.tar.zst")
+execute_process(COMMAND "${LLVM_AR}" rc --format=gnu
+                        "${WORK}/packages/links.deb" debian-binary
+                        control.tar.zst data.tar.zst
+                WORKING_DIRECTORY "${stage}" COMMAND_ERROR_IS_FATAL ANY)
+# The builtins and the licence of a stand-in clang.
+set(clang "${WORK}/clang")
+file(WRITE "${clang}/lib/clang/23/lib/x86_64-unknown-linux-musl/libclang_rt.builtins.a"
+     "builtins\n")
+file(WRITE "${clang}/licenses/llvm.txt" "llvm\n")
 
 # A copy of the script beside pins that name the stand-ins.
 file(MAKE_DIRECTORY "${WORK}/tools")
@@ -79,7 +107,8 @@ file(COPY_FILE "${ROOT}/tools/zig-stubs-pin" "${WORK}/tools/zig-stubs-pin")
 file(STRINGS "${ROOT}/tools/sysroot-pins" kept REGEX "^[^G]|^G[^L]")
 list(JOIN kept "\n" text)
 string(APPEND text "\nGLIBC_X86_64_URL=file://${WORK}/packages\n")
-foreach(pair LIBC_DEV=libc-dev.deb LIBC=libc.deb HEADERS=headers.deb)
+foreach(pair LIBC_DEV=libc-dev.deb LIBC=libc.deb HEADERS=headers.deb
+             X11=x11.deb X11_DEV=links.deb GL=gl.deb GL_DEV=gl-dev.deb)
     string(REPLACE "=" ";" pair "${pair}")
     list(GET pair 0 package)
     list(GET pair 1 name)
@@ -92,6 +121,7 @@ file(WRITE "${WORK}/tools/sysroot-pins" "${text}")
 function(get_sysroot result)
     execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/sysroot"
                             -DLLVM_BIN=bin -DTARGETS=linux-x86_64-glibc
+                            "-DCLANG_DIR=${clang}"
                             -P "${WORK}/tools/get-sysroot.cmake"
                     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
                     ENCODING NONE)
@@ -105,7 +135,9 @@ if(NOT status EQUAL 0)
 endif()
 set(tree "${WORK}/sysroot/linux-x86_64-glibc")
 foreach(path usr/include/features.h usr/lib/x86_64-linux-gnu/libc.so
-             lib/x86_64-linux-gnu/libc.so.6 usr/include/linux/futex.h)
+             lib/x86_64-linux-gnu/libc.so.6 usr/include/linux/futex.h
+             usr/lib/x86_64-linux-gnu/libX11.so.6
+             usr/lib/x86_64-linux-gnu/libGL.so.1 usr/include/GL/gl.h)
     if(NOT EXISTS "${tree}/${path}")
         message(FATAL_ERROR "${tree} lacks ${path}")
     endif()
@@ -114,11 +146,21 @@ foreach(path usr/include/features.h usr/lib/x86_64-linux-gnu/libc.so
         message(FATAL_ERROR "${tree}/${path} holds '${text}'")
     endif()
 endforeach()
+file(READ_SYMLINK "${tree}/usr/lib/x86_64-linux-gnu/libm.so" points)
+if(NOT points STREQUAL "../../../lib/x86_64-linux-gnu/libm.so.6")
+    message(FATAL_ERROR "libm.so of ${tree} points to '${points}'")
+endif()
+file(READ "${tree}/usr/lib/libclang_rt.builtins.a" text)
+if(NOT text STREQUAL "builtins\n")
+    message(FATAL_ERROR "${tree} holds no builtins of the pinned clang")
+endif()
 if(EXISTS "${tree}/debian-binary")
     message(FATAL_ERROR "the wrapper of a package landed in ${tree}")
 endif()
 foreach(pair glibc.txt=usr/share/doc/libc6/copyright
-             linux-headers.txt=usr/share/doc/linux-libc-dev/copyright)
+             linux-headers.txt=usr/share/doc/linux-libc-dev/copyright
+             libx11.txt=usr/share/doc/libx11-6/copyright
+             libglvnd.txt=usr/share/doc/libgl1/copyright)
     string(REPLACE "=" ";" pair "${pair}")
     list(GET pair 0 licence)
     list(GET pair 1 source)

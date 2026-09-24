@@ -771,9 +771,11 @@ struct dropped_doc {
     bool module_form;               /* `//!` or `//#!`, which a module takes */
 };
 
-/* `link framework "CoreAudio";` at module level: a framework of Apple's
-   SDK that a program linking the module needs on macOS. */
-struct framework_line {
+/* `link framework "CoreAudio";` at module level names a framework of
+   Apple's SDK that a program linking the module needs on macOS.
+   `link linux "X11";` names a library of the glibc sysroot that it needs
+   on Linux. */
+struct link_name {
     struct pos pos;
     struct name name;               /* the decoded text of the literal */
 };
@@ -788,8 +790,10 @@ struct module {
     size_t item_count;
     struct provides *provides;
     size_t provides_count;
-    struct framework_line *frameworks;
+    struct link_name *frameworks;
     size_t framework_count;
+    struct link_name *linux_libraries;
+    size_t linux_library_count;
     struct dropped_doc *dropped;
     size_t dropped_count;
 };

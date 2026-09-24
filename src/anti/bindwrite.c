@@ -347,16 +347,21 @@ static void write_function(const struct bind_function *f, struct text *out)
 void bind_write_module(const struct bind_module *b, struct text *out)
 {
     const char *const *frameworks;
+    const char *const *libraries;
     size_t count = bind_frameworks(b->library, &frameworks);
+    size_t linux_count = bind_linux_libraries(b->library, &libraries);
     size_t i;
 
     text_appendf(out, "//! The binding of %s, which `anti bind` wrote from "
                  "`%s`.\n//! Nothing in it is written by hand. Run `anti "
                  "bind` again to change it.\n", b->library, b->source);
-    if (count > 0) {
+    if (count + linux_count > 0) {
         text_append(out, "\n");
         for (i = 0; i < count; i++) {
             text_appendf(out, "link framework \"%s\";\n", frameworks[i]);
+        }
+        for (i = 0; i < linux_count; i++) {
+            text_appendf(out, "link linux \"%s\";\n", libraries[i]);
         }
     }
     for (i = 0; i < b->consts.count; i++) {

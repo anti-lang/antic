@@ -220,8 +220,9 @@ static void write_runner(const struct test_unit *u, struct text *out)
     text_append(out, "\treturn 0;\n}\n");
 }
 
-/* The frameworks that the library files below the module name, which
-   the link of the runner passes as --framework, as `anti build` does. */
+/* The frameworks and the Linux libraries that the library files below
+   the module name. The link of the runner passes them as --framework
+   and --linux-lib, as `anti build` does. */
 static bool runner_frameworks(const struct test_unit *u,
                               const struct options *base,
                               struct arena *arena, struct options *o)
@@ -237,7 +238,9 @@ static bool runner_frameworks(const struct test_unit *u,
     search.input = NULL;
     return driver_libraries(&search, arena, &paths, &count) &&
            driver_frameworks(paths, count, arena, &o->frameworks,
-                             &o->framework_count);
+                             &o->framework_count) &&
+           driver_linux_libraries(paths, count, arena, &o->linux_libraries,
+                                  &o->linux_library_count);
 }
 
 /* Build the runner of one module and run it. */

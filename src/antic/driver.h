@@ -98,6 +98,9 @@ struct options {
     const char **frameworks;    /* --framework, macOS frameworks of Apple's
                                    SDK. */
     size_t framework_count;
+    const char **linux_libraries; /* --linux-lib, libraries of the glibc
+                                     sysroot. */
+    size_t linux_library_count;
     enum linker linker;         /* --linker lld|platform, lld by default. */
     const char *package_name;   /* --package-name, of the header. */
     const char *package_version;
@@ -143,6 +146,13 @@ bool driver_libraries(const struct options *options, struct arena *arena,
 bool driver_frameworks(const char *const *paths, size_t count,
                        struct arena *arena, const char ***names,
                        size_t *name_count);
+
+/* The libraries that the `link linux` lines of the library files name,
+   as driver_frameworks gives the frameworks. `anti` passes them to antic
+   as --linux-lib. */
+bool driver_linux_libraries(const char *const *paths, size_t count,
+                            struct arena *arena, const char ***names,
+                            size_t *name_count);
 
 struct interface;
 struct ir_module;

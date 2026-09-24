@@ -2198,6 +2198,8 @@ static void print(struct text *out, enum cpu_level cpu,
 {
     bool macho = names != NULL &&
                  target_info(names->target)->format == FORMAT_MACHO;
+    bool coff = names != NULL &&
+                target_info(names->target)->format == FORMAT_COFF;
     size_t i;
 
     /* No instruction of the ARM64 back end changes with the level yet.
@@ -2242,15 +2244,19 @@ static void print(struct text *out, enum cpu_level cpu,
             print_operand(out, m, names, o);
             text_append(out, macho ? "@PAGEOFF" : "");
         } else if (inst->op == A64_LDRGOT && i == 1) {
-            /* ldr x0, [x0, :got_lo12:sym] or [x0, sym@GOTPAGEOFF]. */
+            /* ldr x0, [x0, :got_lo12:sym] or [x0, sym@GOTPAGEOFF]. On
+               COFF the entry is the __imp_ pointer of the import
+               library, ldr x0, [x0, :lo12:__imp_sym]. */
             text_append(out, "[");
             print_operand(out, m, names, o);
-            text_append(out, macho ? ", " : ", :got_lo12:");
+            text_append(out, macho  ? ", "
+                             : coff ? ", :lo12:__imp_"
+                                    : ", :got_lo12:");
             print_operand(out, m, names, &inst->operands[2]);
             text_append(out, macho ? "@GOTPAGEOFF]" : "]");
             break;
         } else if (inst->op == A64_ADRP && i == 1 && o->got) {
-            text_append(out, macho ? "" : ":got:");
+            text_append(out, macho ? "" : coff ? "__imp_" : ":got:");
             print_operand(out, m, names, o);
             text_append(out, macho ? "@GOTPAGE" : "");
         } else if (inst->op == A64_ADRP && i == 1) {

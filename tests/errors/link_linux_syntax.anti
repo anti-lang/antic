@@ -1,0 +1,8 @@
+//! `link linux` takes the name of the library as a string.
+
+link linux X11;
+
+fn main() -> int
+{
+	return 0;
+}
