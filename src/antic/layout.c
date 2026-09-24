@@ -30,13 +30,18 @@ static void fail(struct layouts *l, const char *format, ...)
 static void fail(struct layouts *l, const char *format, ...)
 {
     va_list args;
+    int n;
 
     if (l->failed) {
         return;
     }
     va_start(args, format);
-    vsnprintf(l->error, l->error_size, format, args);
+    n = vsnprintf(l->error, l->error_size, format, args);
     va_end(args);
+    /* A message cut to fit ends in "...". */
+    if (n >= 0 && (size_t)n >= l->error_size && l->error_size >= 4) {
+        memcpy(l->error + l->error_size - 4, "...", 4);
+    }
     l->failed = true;
 }
 
@@ -179,7 +184,7 @@ static void flatten(struct layouts *l, struct ir_vtype v, uint64_t offset,
    integer that holds the field's bits. It starts at the byte of the first
    bit, or earlier when it would end past the aggregate. */
 static bool bit_unit(struct layouts *l, const struct ir_aggtype *t,
-                     const struct layout *out, size_t i)
+                     struct layout *out, size_t i)
 {
     struct layout_bits *b = &out->bits[i];
     uint64_t width = t->fields[i].bits;
@@ -211,6 +216,8 @@ static bool bit_unit(struct layouts *l, const struct ir_aggtype *t,
     b->shift = (uint8_t)(b->pos - b->unit_offset * 8);
     return true;
 }
+
+static int64_t signed_value(enum ir_type type, uint64_t v);
 
 /* The C rules of chapter 18. A struct places each field at the next
    multiple of its alignment, and a union places every field at 0. packed
@@ -251,10 +258,11 @@ static void compute(struct layouts *l, uint32_t agg)
         struct ir_vtype element = t->fields[0].type;
         if (!layout_fold(l, t->length, &length)) {
             length = 1;
-        } else if ((int64_t)length < 1) {
+        } else if (length == 0 || length > INT64_MAX) {
             fail(l, "the array length `%s` is %" PRId64 " on %s, and an "
                     "array length is at least 1",
-                 t->length_text, (int64_t)length, target_name(l->target));
+                 t->length_text, signed_value(IR_I64, length),
+                 target_name(l->target));
             length = 1;
         }
         bit = mul_size(mul_size(length, layout_size(l, element), &overflow),
@@ -385,8 +393,14 @@ static int64_t signed_value(enum ir_type type, uint64_t v)
     int n = bits(type);
     uint64_t sign = (uint64_t)1 << (n - 1);
 
+    /* A negative value is computed from its complement, since C leaves
+       the conversion of a uint64_t above INT64_MAX to the
+       implementation. */
     v = trim(type, v);
-    return (int64_t)((v ^ sign) - sign);
+    if ((v & sign) == 0) {
+        return (int64_t)v;
+    }
+    return -(int64_t)(~v & (sign | (sign - 1))) - 1;
 }
 
 /* Apply op to the folded operands a and b of type type. The result has
