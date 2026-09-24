@@ -4757,13 +4757,6 @@ static struct ir_operand narrow_from_i64(struct lowerer *l,
     return temp(l, ir_unary(l->f, l->b, IR_TRUNC, to, v));
 }
 
-/* DESIGN: a narrowing `as` is checked by the round trip. The value goes
-   to the target type and back to the source with the target's
-   signedness. A value the target cannot hold comes back changed.
-   The round trip is blind to a change of sign alone, because a target of
-   the same width keeps every bit. That case is a comparison against
-   zero. A target-sized type leaves both to the back end, because a
-   conversion that is a copy on one target passes the round trip. */
 /* The integer type that t converts as. An enum converts as its base
    type, and char as the unsigned 32-bit value it already is. */
 static const struct type *integer_form(const struct type *t)
@@ -4865,34 +4858,31 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
         type_is_signed(source_form) ? CHECK_VALUE : CHECK_VALUE_U;
     bool sign_changes =
         type_is_signed(source_form) != type_is_signed(integer_form(to));
-    struct text name = {0};
-    char operation[80];
+    struct text operation = {0};
     struct ir_operand ok;
     struct ir_operand round;
 
     if (from == to) {
         return;
     }
-    type_name(&name, to);
-    snprintf(operation, sizeof operation,
-             to->kind == TYPE_ENUM ? "value not declared by %s"
-                                   : "value out of range for %s",
-             text_cstr(&name));
-    text_free(&name);
+    text_append(&operation, to->kind == TYPE_ENUM ? "value not declared by "
+                                                  : "value out of range for ");
+    type_name(&operation, to);
     if (to->kind == TYPE_CHAR || to->kind == TYPE_ENUM) {
         struct ir_operand wide = widen_operand(l, v, source_form);
         if (to->kind == TYPE_CHAR) {
-            scalar_check(l, e, from, wide, operation, kind, v);
+            scalar_check(l, e, from, wide, text_cstr(&operation), kind, v);
         } else if (to->field_count > 0) {
-            enum_check(l, e, from, to, wide, operation, kind, v);
+            enum_check(l, e, from, to, wide, text_cstr(&operation), kind, v);
         }
-        return;
+        goto done;
     }
     if (sign_changes &&
         (type_is_signed(source_form) || narrows(source, target))) {
         ok = temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, v,
                                ir_int_op(source, 0)));
-        check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind,
+        check_branch(l, ok, false,
+                     check_text(l, e->pos.line, text_cstr(&operation)), kind,
                      v, none(), from);
     }
     if (source != target && narrows(source, target)) {
@@ -4902,9 +4892,12 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
                                                                   : IR_ZEXT,
                                  source, round));
         ok = temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, round, v));
-        check_branch(l, ok, false, check_text(l, e->pos.line, operation), kind,
+        check_branch(l, ok, false,
+                     check_text(l, e->pos.line, text_cstr(&operation)), kind,
                      v, none(), from);
     }
+done:
+    text_free(&operation);
 }
 
 /* The conversions of chapter 2. Two types with one IR type, such as u32
