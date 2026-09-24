@@ -827,9 +827,9 @@ static void fill_copy(struct checker *c, struct type *copy)
 }
 
 /* DESIGN: filling a copy may name another copy, which is filled in
-   turn. A generic whose fields name a copy of itself with other
-   arguments, `W<T>` holding a `W<Box<T>>`, names new copies without end,
-   so a chain of copies past COPY_DEPTH_MAX is refused once. The message
+   turn. A generic may name a copy of itself with other arguments, as
+   `W<T>` holding a `W<Box<T>>` does. It names new copies without end, so
+   a chain of copies past COPY_DEPTH_MAX is refused once. The message
    stands at the first type parameter of the generic the chain began
    with. */
 #define COPY_DEPTH_MAX 64
