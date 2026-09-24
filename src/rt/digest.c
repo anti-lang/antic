@@ -123,8 +123,9 @@ void anti_rt_sha256_hex(struct anti_sha256 *s, char hex[65])
         s->block[56 + i] = (unsigned char)(bits >> (56 - 8 * i));
     }
     compress(s->hash, s->block);
-    for (i = 0; i < 8; i++) {
-        snprintf(hex + 8 * i, 9, "%08x", (unsigned)s->hash[i]);
+    for (i = 0; i < 64; i++) {
+        hex[i] = "0123456789abcdef"[(s->hash[i / 8] >> (28 - 4 * (i % 8))) &
+                                    0xf];
     }
     hex[64] = '\0';
 }

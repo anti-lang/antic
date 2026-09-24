@@ -29,14 +29,34 @@ enum { ANTI_PLUGIN_PATH = 4096 };
    any thread may load, and each reads the reason of its own call. */
 static _Thread_local char message[512];
 
+/* The text snprintf wrote into out, of size bytes, when it gave
+   written. A text cut short ends in `...`, and a failure leaves one that
+   says so. */
+static const char *fitted(char *out, size_t size, int written)
+{
+    static const char failed[] = "a message that cannot be written";
+    size_t kept = sizeof failed - 1;
+
+    if (written < 0 && size > 0) {
+        kept = kept < size - 1 ? kept : size - 1;
+        memcpy(out, failed, kept);
+        out[kept] = '\0';
+    } else if (written >= 0 && (size_t)written >= size && size > 3) {
+        memcpy(out + size - 4, "...", 4);
+    }
+    return out;
+}
+
 /* Keep the reason the last call gave, which a caller may print. */
 static void fail(const char *format, ...)
 {
     va_list args;
+    int written;
 
     va_start(args, format);
-    vsnprintf(message, sizeof message, format, args);
+    written = vsnprintf(message, sizeof message, format, args);
     va_end(args);
+    fitted(message, sizeof message, written);
 }
 
 struct anti_text anti_rt_plugin_message(void)
@@ -185,13 +205,14 @@ static const char *function_at(const struct anti_descriptor *d, int64_t slot,
 
     for (i = 0; i < d->function_count; i++) {
         if (d->functions[i].slot == slot) {
-            snprintf(out, size, "%.*s", (int)d->functions[i].name_length,
-                     d->functions[i].name);
-            return out;
+            return fitted(out, size,
+                          snprintf(out, size, "%.*s",
+                                   (int)d->functions[i].name_length,
+                                   d->functions[i].name));
         }
     }
-    snprintf(out, size, "slot %lld", (long long)slot);
-    return out;
+    return fitted(out, size,
+                  snprintf(out, size, "slot %lld", (long long)slot));
 }
 
 /* DESIGN: the three checks of one provided interface. The plugin's hash
@@ -703,11 +724,13 @@ static struct anti_text index_field(const struct anti_toml *doc, int64_t n,
                                     const char *field)
 {
     char key[64];
-    int64_t at;
+    int written = snprintf(key, sizeof key, "library.%lld.%s", (long long)n,
+                           field);
+    int64_t at = -1;
 
-    snprintf(key, sizeof key, "library.%lld.%s", (long long)n, field);
-    at = anti_rt_toml_find(doc, (const unsigned char *)key,
-                           (int64_t)strlen(key));
+    if (written > 0 && (size_t)written < sizeof key) {
+        at = anti_rt_toml_find(doc, (const unsigned char *)key, written);
+    }
     if (at < 0) {
         struct anti_text empty;
         empty.ptr = (const unsigned char *)"";
@@ -726,7 +749,11 @@ static int index_lists(const struct anti_toml *doc, int64_t n,
     for (k = 0; k < 64; k++) {
         char field[32];
         struct anti_text value;
-        snprintf(field, sizeof field, "interfaces.%lld", (long long)k);
+        int written = snprintf(field, sizeof field, "interfaces.%lld",
+                               (long long)k);
+        if (written <= 0 || (size_t)written >= sizeof field) {
+            return 0;
+        }
         value = index_field(doc, n, field);
         if (value.len == 0) {
             return 0;

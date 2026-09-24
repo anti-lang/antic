@@ -822,6 +822,9 @@ struct growing {
     size_t room;
 };
 
+/* The room of one formatted line of the text of a trace. */
+enum { LINE_ROOM = 128 };
+
 static void add(struct growing *g, const void *bytes, size_t n)
 {
     if (g->bytes == NULL) {
@@ -841,6 +844,19 @@ static void add(struct growing *g, const void *bytes, size_t n)
     memcpy(g->bytes + g->used, bytes, n);
     g->used += n;
     g->bytes[g->used] = 0;
+}
+
+/* Add the line snprintf wrote when it gave n, or give the bytes back
+   and 0 when it failed or cut the line short. */
+static int add_line(struct growing *g, const char *line, int n)
+{
+    if (n < 0 || (size_t)n >= LINE_ROOM) {
+        free(g->bytes);
+        g->bytes = NULL;
+        return 0;
+    }
+    add(g, line, (size_t)n);
+    return 1;
 }
 
 /* The number of the module of frame i: the count of distinct modules
@@ -880,7 +896,7 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
                                   int64_t count)
 {
     struct growing g;
-    char line[128];
+    char line[LINE_ROOM];
     int64_t modules = 0;
     int64_t i;
     int n;
@@ -899,14 +915,18 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
         }
         n = snprintf(line, sizeof line, "%smodule %" PRId64 " ",
                      g.used > 0 ? "\n" : "", modules++);
-        add(&g, line, (size_t)n);
+        if (!add_line(&g, line, n)) {
+            return NULL;
+        }
         if (f->build_id.len > 0) {
             add(&g, f->build_id.ptr, (size_t)f->build_id.len);
         } else {
             add(&g, "-", 1);
         }
         n = snprintf(line, sizeof line, " 0x%016" PRIx64 " ", f->base);
-        add(&g, line, (size_t)n);
+        if (!add_line(&g, line, n)) {
+            return NULL;
+        }
         add(&g, f->module.ptr, (size_t)f->module.len);
     }
     for (i = 0; i < count; i++) {
@@ -921,7 +941,9 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
                          g.used > 0 ? "\n" : "", f->address, number,
                          f->address - f->base);
         }
-        add(&g, line, (size_t)n);
+        if (!add_line(&g, line, n)) {
+            return NULL;
+        }
     }
     return g.bytes;
 }

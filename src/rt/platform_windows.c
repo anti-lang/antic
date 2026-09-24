@@ -153,7 +153,14 @@ void *anti_rt_library_symbol(void *handle, const char *name)
 
 const char *anti_rt_library_error(char *text, size_t size)
 {
-    snprintf(text, size, "error %lu", (unsigned long)GetLastError());
+    int written =
+        snprintf(text, size, "error %lu", (unsigned long)GetLastError());
+
+    /* A text cut short still names the error, and a failure leaves an
+       empty one. */
+    if (written < 0 && size > 0) {
+        text[0] = '\0';
+    }
     return text;
 }
 

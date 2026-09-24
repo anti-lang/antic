@@ -154,6 +154,7 @@ static void read_header(struct reader *r, struct anti_toml *doc)
     int64_t start;
     int64_t length;
     int64_t next;
+    int written;
 
     r->pos++;
     if (peek(r) == '[') {
@@ -190,9 +191,15 @@ static void read_header(struct reader *r, struct anti_toml *doc)
             r->failed = 1;
             return;
         }
-        r->table_length += (size_t)snprintf(
-            r->table + r->table_length, sizeof r->table - r->table_length,
-            ".%lld", (long long)next);
+        written = snprintf(r->table + r->table_length,
+                           sizeof r->table - r->table_length, ".%lld",
+                           (long long)next);
+        if (written <= 0 ||
+            (size_t)written >= sizeof r->table - r->table_length) {
+            r->failed = 1;
+            return;
+        }
+        r->table_length += (size_t)written;
     }
 }
 
