@@ -470,8 +470,12 @@ reports what it finished.
   `main`, in a constructor. `Regex.compile(text)` calls `compile` of
   `anti.regex`, which fails with `BadPattern`. A program that holds
   `anti.regex` links `anti_rt_regex` and `libpcre2-8.a` of `lib/<target>/`.
-  The methods of `str` are not built. See "Regular expressions" in
-  `docs/decisions.md` and `docs/notes/patterns.md`.
+  `s.matches(r)`, `s.find_all(r)`, `s.replace(r, with)` and `s.split(r)` are
+  calls of `anti.regex` with `limit` in both directions. A literal at the call
+  cannot fail and stops at the match limit, and any other pattern may fail.
+  `Match` and `?Match` are structs of `anti.lang`, a match stands as a
+  condition, `if let` binds one, and the groups of a literal are fields. See
+  "Regular expressions" in `docs/decisions.md` and `docs/notes/patterns.md`.
 - `f"..."` and `rf"..."` are built. Each text and each `{expr}` is a call
   on an `anti.text.Builder`, the format specification after a colon gives
   the arguments of the call, and the text is memory of its own that the
@@ -559,7 +563,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 58. See "The doc
+  class body and the `worker` mark, and its format version is 59. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops

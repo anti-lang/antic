@@ -1209,7 +1209,16 @@ Not built yet.
 
 A pattern literal `re"..."` is raw and has type `Regex`. The compiler checks it, knows its groups and compiles it once before `main`. `Regex.compile(text)` compiles one at run time and may fail. The engine is PCRE2, linked only when a program uses a pattern.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.io;
+import anti.regex;
+import anti.text;
+let line = "on 2026-09-23, 7, 8";
+let input = r"\d+";
+```
+-->
+```anti
 let m = line.matches(re"(?<year>\d{4})-(?<month>\d\d)");
 if m == none {
 	fail "no date";
@@ -1224,9 +1233,9 @@ let r = Regex.compile(input) catch fatal;
 let n = line.matches(r) catch none;
 ```
 
-`matches`, `find_all`, `replace` and `split` are methods of `str`, and `limit` takes that many matches from the start, or from the end when negative. A match behaves as a `?*T` does and stands alone as a condition. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, and a function may give each replacement. A call with a pattern literal never fails. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
+`matches`, `find_all`, `replace` and `split` are methods of `str`. `find_all` and `split` are iterators, and `to_slice()` collects either. `limit` takes that many matches from the start, or from the end when negative. A match behaves as a `?*T` does and stands alone as a condition. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, and a function may give each replacement. A call with a pattern literal never fails. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
 
-Built: `catch none`, as a form of every failing call, the pattern literal `re"..."` with its check at compile time and the safety check `exponential-pattern`, the literals compiled once before `main`, `Regex.compile`, the inline flags, the ASCII meaning of `\d`, `\w` and `\s` with `(*UCP)` for the Unicode one, and the classes `Error`, `BadPattern`, `TooExpensive` and `MissingGroup` of `anti.regex`. A module that writes a pattern imports `anti.regex`. Not built yet: the methods of `str`, the match, templates, the match limit and `ByteRegex`.
+Built: `catch none`, as a form of every failing call, the pattern literal `re"..."` with its check at compile time and the safety check `exponential-pattern`, the literals compiled once before `main`, `Regex.compile`, the inline flags, the ASCII meaning of `\d`, `\w` and `\s` with `(*UCP)` for the Unicode one, and the classes `Error`, `BadPattern`, `TooExpensive` and `MissingGroup` of `anti.regex`. A module that writes a pattern imports `anti.regex`. The methods `matches`, `find_all`, `replace` and `split` with `limit` in both directions, the match with its fields, `?Match`, the test of a match in `if`, `while`, `&&`, `||` and `!`, `if let` and `let ... else` on one, the groups of a literal as fields, templates checked at compile time, a function as the replacement, and the match limit with the failure by the origin of the pattern are built. Not built yet: `ByteRegex`.
 
 ## Bytes
 
@@ -1259,7 +1268,7 @@ io.println(s);
 free(s.ptr);
 ```
 
-Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`, `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`, `anti.simd`, `anti.trace` and `anti.plugin`. Not built yet: the modules over the native libraries of the runtime archive, `anti.net`, `anti.regex`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`, `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`, `anti.simd`, `anti.trace`, `anti.plugin` and `anti.regex` over PCRE2. Not built yet: the other modules over the native libraries of the runtime archive, `anti.net`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
 
 ## Later
 

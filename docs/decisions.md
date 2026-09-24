@@ -278,7 +278,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - antic takes the package header from `--package-name`, `--package-version`, `--dependency <name>,<constraint>,<url>`, `--license`, `--license-text <file>` and `--attribution`. Without them it writes the module path, version `0.0.0` and empty licence fields. Reason: `anti` passes what `anti.toml` holds, and antic keeps working without a manifest.
 - The public interface of a library file also holds the `//!` text of the module, and `--strip-docs` removes it with the rest. Reason: user docs are built from a `.antl` alone.
 - Doc warnings belong to `anti check`. It passes `--doc-warnings` to antic, which then warns about a `//#` note on a `pub` item without a `///` comment, and about a doc comment that documents nothing. Without the option antic is silent about documentation.
-- The library format has a version, `ANTL_VERSION` in `src/antic/antl.h`, which is 58 today. Every change of the format raises it, and antic refuses a file with another number.
+- The library format has a version, `ANTL_VERSION` in `src/antic/antl.h`, which is 59 today. Every change of the format raises it, and antic refuses a file with another number.
 - Libraries are distributed as serialised IR. Object files would need six variants. Source alone would force a full front-end run on every import. `antic -c geometry.anti` writes `geometry.antl`, one library file per module. The file holds a format version, a package header, the public interface with the text of each `///` comment, and the unoptimised IR of all function bodies. The package header holds the package name, version, dependencies with repository URLs, `license`, the full licence text and `attribution`. antic refuses mismatched versions. `antic main.anti geometry.antl` type-checks against the interface and loads the IR. It then optimises the whole program, emits one assembly file, assembles and links.
 - The IR is target-independent. It records types, never sizes, offsets or register classes. `size_of`, field offsets and array strides are symbolic values that the optimizer never folds. The back end computes layout and ABI per target and replaces them with immediates. Library files are byte-identical whichever host produced them. The test suite checks that.
 - The IR writes an array stride as `size_of` of the element type. Reason: C's stride is the element size, and one form serves arrays, slices and pointers.
@@ -856,7 +856,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - On Linux and macOS the runtime reads `argv` and the POSIX variable `environ`. `src/rt/utf.c` replaces each maximal subpart of an ill-formed UTF-8 sequence with U+FFFD, the practice of section 3.9.6 of the Unicode Standard.
 - On Windows the runtime splits `GetCommandLineW` by the rules of Microsoft's page "Parsing C command-line arguments", reads `GetEnvironmentStringsW` and converts UTF-16 to UTF-8 with U+FFFD for an unpaired surrogate. The conversions have unit tests on the development Mac. The Windows branch of `src/rt/start.c` is only syntax-checked with clang against a stub `windows.h`.
 - Decided and not implemented: selection computes the address of a stack slot at each use. Lowering computes all of them in the entry block today. The addresses of a function with many address-taken locals then stay alive across its calls and spill. A function with 520 such locals on linux-arm64 saves ten callee-saved registers and spills the rest.
-- Decided and not implemented: the `anti` tool, with `anti syntax`, `anti license`, the resolver, the cache, publishing and the two GitHub templates, and the standard library modules `anti.net`, `anti.raylib` and `anti.miniaudio`, which wait for the native libraries of the runtime archive. `anti.regex` holds the failures of a pattern and `compile`, and the methods of `str` wait. The tests of `docs/tooling.md` that need those parts wait for them: header consistency with `anti.toml`, highlighter coverage, the resolver and the offline build. `anti fmt`, `anti check`, `anti test` and `anti doc` are built. The format stability of the table is the test `anti_fmt` and the doc equivalence is the test `anti_doc`.
+- Decided and not implemented: the `anti` tool, with `anti syntax`, `anti license`, the resolver, the cache, publishing and the two GitHub templates, and the standard library modules `anti.net`, `anti.raylib` and `anti.miniaudio`, which wait for the native libraries of the runtime archive. `anti.regex` holds the failures of a pattern, `compile` and the functions behind the methods of `str`. The tests of `docs/tooling.md` that need those parts wait for them: header consistency with `anti.toml`, highlighter coverage, the resolver and the offline build. `anti fmt`, `anti check`, `anti test` and `anti doc` are built. The format stability of the table is the test `anti_fmt` and the doc equivalence is the test `anti_doc`.
 - Untested off the development Mac: the MSVC bitfield rule and `c_long` and `c_wchar` at 32 and 16 bits run only as layout unit tests checked against clang's sizes. Shared libraries, `.def` files and `.CRT$XCU` constructors on Windows, `.init_array` and `--soname` on Linux, and the 16-aligned register rule of AAPCS64 outside Apple are assembled with llvm-mc and pinned by unit tests, not linked or run.
 - The platform command lines come from the GNU ld manual, the glibc sources and Microsoft's linker and CRT pages. The lld command lines come from the ld.lld manual and the musl and xwin sources. Unit tests pin both. Whether `link.exe` needs `kernel32.lib` or other libraries beside the CRT ones is unknown, because lld-link is what runs. The runtime objects are compiled for the dynamic Universal CRT, `/MD` in the terms of MSVC, which matches the `msvcrt.lib` and `ucrt.lib` of the link line. The executables that lld writes for Linux and Windows now run on the two virtual machines, and all 22 program tests pass on Windows ARM64.
 - macos-x86_64 programs link on the development Mac with lld against the runtime library that clang builds for macos-x86_64, which the test `cross_link_macos-x86_64` checks by format. The next item covers running them.
@@ -1562,9 +1562,9 @@ What antic does that the design above leaves open, as far as a user of the langu
 ## Regular expressions
 
 - The pattern literal `re"..."` is built. It is raw, it takes hash delimiters, and its type
-  is `Regex`. "Patterns", "Failures, by where a pattern comes from" and "Thread safety" of
-  "Regular expressions" in `docs/anti-language-additions.md` are built as far as they
-  reach without the methods of `str`.
+  is `Regex`. "Regular expressions" in `docs/anti-language-additions.md` is built: the
+  patterns, the failures by where a pattern comes from, thread safety, the methods of
+  `str`, the match and replacement.
 - antic links PCRE2 and compiles every pattern literal with the options the program uses
   at start. A pattern that does not compile is the error `` malformed pattern: missing
   closing parenthesis ``, PCRE2's message, at the byte PCRE2 names. The column counts
@@ -1601,9 +1601,9 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] A `BadPattern` carries PCRE2's message as its `message`, PCRE2's number of
   the error as its `code` and the byte where PCRE2 stopped as `position`. The text of each
   number is made once and kept for the life of the program. `TooExpensive` and
-  `MissingGroup` carry nothing beyond `Error`. Reason: the specification names the
-  message and the position, a `str` owns no memory, and nothing raises the other two
-  before the methods of `str` exist.
+  `MissingGroup` carry nothing beyond `Error`, and a message that names neither the
+  pattern nor the group. Reason: the specification names the message and the position,
+  and a `str` owns no memory, so a message made from the pattern would leak.
 - [provisional] The check `exponential-pattern` fires on a repeat whose count varies, `+`,
   `*`, `?` or `{n,m}` with m above n, that stands inside an unbounded repeat, `*`, `+` or
   `{n,}`, with no atomic group, lookaround or possessive repeat between them. It fires when
@@ -1643,15 +1643,106 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] A program of patterns runs on the host target alone in the suite, and not
   under Rosetta as `macos-x86_64 --cpu v1`, where the link refuses it. Reason: PCRE2 stands
   at x86-64-v3, which Rosetta does not run.
-- The library format is version 58, since the token of a pattern literal raises the count
-  of token kinds. It stands after every earlier kind, so no stored value moves.
-- Not built yet: the methods `matches`, `find_all`, `replace` and `split`, the match and its
-  fields, the groups of a literal as fields, templates, the match limit and the failures
-  `TooExpensive` and `MissingGroup` raise, `ByteRegex` and the byte methods. The link line
-  that `antic --lib static` prints names no PCRE2, and a plugin that holds a pattern
-  literal calls the glue of its host, which holds it only when the host holds
-  `anti.regex`. `anti_licenses` of a program that links PCRE2 names no PCRE2 yet, as it
-  names no musl.
+- The library format rose to version 58, since the token of a pattern literal raises the
+  count of token kinds. It stands after every earlier kind, so no stored value moves.
+- The methods of `str` are calls of `anti.regex`, which the checker writes in their place
+  with the text first. A pattern literal written at the call calls the function that ends
+  in `_literal`, which cannot fail. Any other pattern calls the function of the method's
+  name, which may fail with `TooExpensive`, and `replace` with a template with
+  `MissingGroup` as well. `replace` calls `replace_fn` for a function.
+- [provisional] A pattern comes from a literal only where the literal stands in the call.
+  `let r = re"a"; s.matches(r)` passes a `Regex` in a variable and needs a handler, as a
+  pattern from `Regex.compile` does. Reason: the checker follows no value through a
+  variable, and a `let` may be assigned a compiled pattern later, in a loop as well.
+- [provisional] `Match` is a struct of `anti.lang` that the compiler declares, as it does
+  `Regex`, and `?Match` is a second struct of the same fields that may be `none`. Its
+  first field is the pattern that found it, zero for `none`, and then `all`, `pre`,
+  `post` and `count`, and the text searched with the place and the options of the search
+  that found it. The hidden fields have names no program can write. `?` stands before
+  `Match` and no other name, and a `Match` cannot hold `none`. It has no descriptor.
+  Reason: the specification gives the match the rules of `?*T` and writes `?Match`, and
+  a first word of zero gives the test the one comparison of a pointer.
+- [provisional] A match holds no positions of its groups. `group` and `took_part` run the
+  search that found the match again. It starts at the same place with the same options,
+  and they read the group from it. A match is so a value of twelve words that owns no
+  memory. Reason: the specification puts the positions in the caller's frame or in the
+  returned match. A match of fixed size cannot hold every group of every pattern.
+- [provisional] The match of a pattern literal carries the literal in its type, so `m.1`,
+  `m.year`, `m.group(2)` with a number and `m.took_part("day")` with a name are checked at
+  compile time. `m.0` is the whole match. A match of any other pattern, a `Match`
+  parameter and an element of `to_slice()` read groups by `group` alone, and a group they
+  lack stops the program at the call, as an index out of bounds does. A field of the
+  match wins over a group of its name. A function given to `replace` takes a plain
+  `Match`. Reason: the specification checks the groups of a literal at compile time and
+  gives a compiled pattern `group` and `took_part` alone, and names no failure of
+  either.
+- [provisional] Of two groups of one name, which `(?J)` allows, `group("name")` gives
+  the first that took part, or the first when none did. Reason: PCRE2's
+  `pcre2_substring_get_byname` reads them so.
+- [provisional] A match stands as a condition in `if`, `while`, `&&`, `||` and `!`, and the
+  checker writes it as the comparison with `none`, so `if m { }` narrows `m`. A
+  `matches` that is only tested there calls `matched`, which gives a `bool` and asks
+  PCRE2 for the whole match alone. `if let m = e { } else { }` binds a match in the first
+  block and runs the `else` when it is `none`. A `catch` on a call that gives a match and
+  cannot fail is refused, since a match is tested with `if` or `let ... else`. Reason:
+  the specification names the forms, and `if let` on a match takes the form `if let` has
+  on a variant, without the case.
+- [provisional] `find_all` takes `limit` as `replace` and `split` do, and `split` gives the
+  pieces between the matches as an iterator, `regex.Pieces`, which `to_slice()` collects
+  into a `[]str` that the program frees with `free(parts.ptr)`. A text with n matches
+  gives n + 1 pieces, and a text without one gives itself. Reason: the list of the
+  methods wrote `split -> []str`, while the example of the overview calls `to_slice()`
+  on it and the step asked for `find_all` and `split` as iterators with a limit in both
+  directions. An iterator walks the pieces without memory, and `to_slice()` gives the
+  slice.
+- [provisional] The `pre` of a match that `find_all` gives runs from the end of the match
+  it gave before, or from the start of the text, and its `post` runs to the end of the
+  text. The `pre` of every match, the matches and the `post` of the last so cover the
+  whole text, and the pieces of `split` are those `pre` and that last `post`. A match of
+  `matches` has the text before it as `pre`. Reason: the specification says that `pre`,
+  the matches and `post` cover the text, and a `pre` that repeated the matches before it
+  would cover it twice. Its sentence on a text without matches describes the pieces,
+  since a match that is `none` has no fields.
+- [provisional] A negative limit counts the matches first and passes over all but the last
+  of them. With a pattern compiled at run time, `find_all`, `split` and `replace` with a
+  function search the whole text once before they give anything, so they fail at the call
+  and never in the walk, and a function of `replace` is not called before a failure.
+  Reason: the specification runs the search from the start whatever the direction, and a
+  `for` has no handler for a failure of `next`.
+- [provisional] The match limit is PCRE2's own, ten million, with its limits of depth and
+  of the heap. A pattern may lower them with `(*LIMIT_MATCH=n)`, which is fixed when it is
+  compiled. Reaching any of the three is `TooExpensive`, or the stop of a literal. The
+  stop writes the file and the line, then `the pattern`, the pattern and `reached the
+  match limit`, and aborts. Reason: the specification fixes the limit at the compile and
+  names no number.
+- [provisional] PCRE2 checks a text as UTF-8 once, and a walk skips the check after its
+  first search. A text that is no valid UTF-8 stops the program
+  with PCRE2's message, since a `str` never holds one. After an empty match the next
+  search asks for a match at the same place that is not empty. Without one it steps a
+  whole character on, and two bytes for CR LF under a newline of CR LF.
+- [provisional] In a template `${name}` takes a name of `[A-Za-z_][A-Za-z0-9_]*`, `${10}`
+  and `$10` name group 10, and group 0 is the whole match. A `$` that starts none of the
+  forms is written as it stands. A template written as a literal beside a pattern literal
+  is checked at compile time. Any other template beside a pattern literal is checked when
+  the call runs, and one that names a group the pattern lacks stops the program. Reason:
+  the smallest reading of `$` that refuses nothing the specification writes, and a
+  literal call cannot fail.
+- [provisional] `replace` gives a new text in memory of the C library, also when nothing
+  matched, which the program frees with `free(result.ptr)` as it frees an `f"..."`. The
+  pieces of `split` and the texts of a match are slices of the text searched. Reason: the
+  specification says so of the bytes form, and one rule for both keeps every result of
+  `replace` freed the same way.
+- [provisional] `regex.Matches` and `regex.Pieces` are classes, since a struct takes its
+  iterator hooks from the functions of its own module alone. `Matches.walk`,
+  `Matches.begin` and `Pieces.over` are public, as `find_all` and `split` build their
+  walks with them. `anti.regex` imports `anti.lang` alone, and `replace` with a function
+  writes through a buffer of the runtime, so a program of patterns links no `anti.text`.
+- The library format is version 59, since the reader takes `Match` and `?Match` of
+  `anti.lang` as the structs the compiler declares, which a file of 58 cannot name.
+- Not built yet: `ByteRegex` and the methods of `[]byte`. The link line that
+  `antic --lib static` prints names no PCRE2, and a plugin that holds a pattern literal
+  calls the glue of its host, which holds it only when the host holds `anti.regex`.
+  `anti_licenses` of a program that links PCRE2 names no PCRE2 yet, as it names no musl.
 
 ## Names and shared code of the runtime
 

@@ -499,9 +499,9 @@ Nothing a match reads or writes is global.
 ### Methods of `str`
 
 - `s.matches(r) -> ?Match` gives the first match, or `none`.
-- `s.find_all(r)` gives every match, left to right, for a `for` loop: `for m in s.find_all(r) { }`.
+- `s.find_all(r, limit: int = 0)` gives every match, left to right, for a `for` loop: `for m in s.find_all(r) { }`.
 - `s.replace(r, with, limit: int = 0) -> str` replaces matches. `with` is a template or a function, as described below.
-- `s.split(r, limit: int = 0) -> []str` splits at each match.
+- `s.split(r, limit: int = 0)` gives the pieces between the matches, left to right, for a `for` loop, and `to_slice()` collects them into a `[]str`.
 
 `limit` of 0 means every match. A positive `limit` takes that many matches from the start, and a negative one that many from the end. The search itself always runs from the start. A negative limit picks the last of the matches found that way, so the result never depends on direction. Text is stored in logical order, the order it is read. So "from the start" is the reading direction of every script, right-to-left ones included. No locale or text direction is consulted, since either would be a global setting.
 
