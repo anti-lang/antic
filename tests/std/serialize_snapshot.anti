@@ -1,0 +1,52 @@
+//! An `own fn` field is two words and owns its snapshot, so the default
+//! `serialize` writes it as `null`, as it writes a `Mutex`, and
+//! `Object.deserialize` leaves it at its default. The snapshot stays with the
+//! object that made it, and its delete frees it.
+import anti.io;
+import anti.mem;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+extern fn anti_rt_snapshots_alive() -> i64;
+
+class Button
+{
+	pub label: str = "go",
+	pub own handler: fn(int) = quiet,
+
+	pub fn on_click(self, keep own f: fn(int))
+	{
+		self.handler = f;
+	}
+}
+
+fn quiet(n: int)
+{
+	printf("quiet %d\n".ptr, n as c_int);
+}
+
+fn main() -> int
+{
+	let b = alloc Button { label: "save" };
+	let base = 40;
+	b.on_click(snapshot fn(n) {
+		printf("snapshot %d\n".ptr, (base + n) as c_int);
+	});
+	let t = text.Builder.new();
+	b.serialize(&t);
+	io.println(t.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(t.text(), &arena);
+	if back == none || !(back is *Button) {
+		return 2;
+	}
+	let copy = back as *Button;
+	io.println(copy.label);
+	copy.handler(1);
+	b.handler(2);
+	printf("%d alive\n".ptr, anti_rt_snapshots_alive() as c_int);
+	arena.free_all();
+	delete(b);
+	printf("%d alive\n".ptr, anti_rt_snapshots_alive() as c_int);
+	return 0;
+}

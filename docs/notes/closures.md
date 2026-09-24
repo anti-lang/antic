@@ -110,6 +110,8 @@ choices of `snapshot fn` and `own fn`.
 - A named function as the default of an `own fn` field has no type when
   the fields are checked, if it is declared later. `lower_store_value`
   pairs it with `none` there.
+- `type_id_of` in `lower_desc.c` gives an `own fn` field the type id
+  none, so reflection and the default `serialize` pass over it.
 - The header writes an `own fn` field as `struct { code; snapshot; }` and
   declares `anti_rt_snapshot_free` when an exported class has one.
 - `src/rt/snapshot.c` holds the five functions of the runtime and the count

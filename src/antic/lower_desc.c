@@ -400,6 +400,12 @@ static uint64_t type_id_of(const struct type *t)
     if (types_is_mutex(t) || types_is_chan(t)) {
         return TYPE_ID_NONE;
     }
+    /* An `own fn` field is two words and owns its snapshot. No Value
+       carries two words, and a copy would give the snapshot two owners,
+       so its type id is none as well. */
+    if (t->kind == TYPE_FN && t->context) {
+        return TYPE_ID_NONE;
+    }
     switch (t->kind) {
     case TYPE_POINTER: return TYPE_ID_PTR;
     case TYPE_FN: return TYPE_ID_FN;

@@ -1,0 +1,7 @@
+exit 0
+{"type":"Button","label":"save","handler":null}
+save
+quiet 1
+snapshot 42
+1 alive
+0 alive
