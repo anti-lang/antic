@@ -10,6 +10,7 @@
 #include "files.h"
 #include "fmt.h"
 #include "header.h"
+#include "modpath.h"
 #include "text.h"
 
 /* DESIGN: the header comes from the same driver call that `antic --lib`
@@ -56,25 +57,13 @@ done:
     return status;
 }
 
-static const char *base_name(const char *path)
-{
-    const char *slash = strrchr(path, '/');
-#ifdef _WIN32
-    const char *back = strrchr(path, '\\');
-    if (back != NULL && (slash == NULL || back > slash)) {
-        slash = back;
-    }
-#endif
-    return slash != NULL ? slash + 1 : path;
-}
-
 /* DESIGN: the module of a binding is anti.<name>, where the name is the
    file name without its extension, and without `_api` for a description
    of rlparser. raylib_api.json gives anti.raylib and miniaudio.h gives
    anti.miniaudio, the two modules docs/tooling-addendum.md names. */
 static void default_module(const char *input, struct text *out)
 {
-    const char *base = base_name(input);
+    const char *base = files_base_name(input);
     const char *dot = strrchr(base, '.');
     size_t n = dot != NULL ? (size_t)(dot - base) : strlen(base);
 
@@ -135,8 +124,8 @@ int bind_run(const struct bind_request *q)
         default_module(q->input, &module);
     }
     b.module = text_cstr(&module);
-    b.library = bind_last_segment(b.module);
-    b.source = base_name(q->input);
+    b.library = module_path_last(b.module);
+    b.source = files_base_name(q->input);
     for (i = 0; i < q->define_count; i++) {
         bind_list_add(&b.defines, (void *)q->defines[i]);
     }

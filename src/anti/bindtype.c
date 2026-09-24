@@ -124,13 +124,6 @@ bool bind_is_keyword(const char *name)
     return !word;
 }
 
-const char *bind_last_segment(const char *module)
-{
-    const char *dot = strrchr(module, '.');
-
-    return dot != NULL ? dot + 1 : module;
-}
-
 /* DESIGN: the frameworks of Apple's SDK that each bundled library needs
    on macOS, which the binding names with `link framework`. raylib opens
    its window through GLFW over Cocoa and draws with OpenGL. miniaudio

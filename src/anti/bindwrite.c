@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "bindmodel.h"
+#include "modpath.h"
 
 /* Where a type stands, which decides how an array and `void` read. */
 enum place { AS_FIELD, AS_PARAM, AS_RESULT };
@@ -642,7 +643,7 @@ static bool settable(const struct bind_module *b, const struct bind_type *t,
         for (i = 0; e != NULL && i < e->value_count; i++) {
             if (e->values[i].value != 0) {
                 text_append(&s->c_value, e->values[i].name);
-                text_appendf(&s->anti_value, "%s.%s.", bind_last_segment(b->module),
+                text_appendf(&s->anti_value, "%s.%s.", module_path_last(b->module),
                              e->name);
                 text_append(&s->anti_value, e->values[i].name);
                 return true;
@@ -724,7 +725,7 @@ void bind_write_probe_c(const struct bind_module *b, struct text *out)
 
 void bind_write_probe_anti(const struct bind_module *b, struct text *out)
 {
-    const char *m = bind_last_segment(b->module);
+    const char *m = module_path_last(b->module);
     size_t i;
     size_t j;
 

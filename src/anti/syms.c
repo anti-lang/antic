@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "files.h"
+#include "selfpath.h"
 #include "symbols.h"
 #include "text.h"
 #include "toml.h"
@@ -79,22 +80,10 @@ static void texts_free(struct texts *list)
     memset(list, 0, sizeof *list);
 }
 
-/* The last part of a path, after either separator. */
-static const char *base_name(const char *path)
-{
-    const char *slash = strrchr(path, '/');
-    const char *back = strrchr(path, '\\');
-
-    if (back != NULL && (slash == NULL || back > slash)) {
-        slash = back;
-    }
-    return slash != NULL ? slash + 1 : path;
-}
-
 /* The directory of a path, or `.` for a bare name. */
 static void directory_of(const char *path, struct text *out)
 {
-    const char *name = base_name(path);
+    const char *name = files_base_name(path);
 
     if (name == path) {
         text_append(out, ".");
@@ -106,16 +95,10 @@ static void directory_of(const char *path, struct text *out)
     }
 }
 
-static bool is_absolute(const char *path)
-{
-    return path[0] == '/' || path[0] == '\\' ||
-           (path[0] != '\0' && path[1] == ':');
-}
-
 /* path, resolved against the directory dir unless it is absolute. */
 static void resolved(const char *dir, const char *path, struct text *out)
 {
-    if (is_absolute(path)) {
+    if (path_is_absolute(path)) {
         text_append(out, path);
     } else {
         text_appendf(out, "%s/%s", dir, path);
@@ -130,7 +113,7 @@ static void stem_of(const char *name, struct text *out)
     static const char *const suffixes[] = {".exe", ".dylib", ".so", ".dll"};
     size_t i;
 
-    text_append(out, base_name(name));
+    text_append(out, files_base_name(name));
     for (i = 0; i < sizeof suffixes / sizeof suffixes[0]; i++) {
         size_t length = strlen(suffixes[i]);
         if (ends_with(text_cstr(out), suffixes[i]) && out->length > length) {
@@ -418,7 +401,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct text id = {0};
         struct text version = {0};
         const char *path = text_cstr(&files.items[i]);
-        if (files_read(path, &bytes) && is_program(base_name(path), &bytes) &&
+        if (files_read(path, &bytes) && is_program(files_base_name(path), &bytes) &&
             notice_of(&bytes, &id, &version)) {
             add_binary(out, path);
         }
@@ -672,7 +655,7 @@ static bool load_archive(const char *path, struct units *out)
     }
     /* The module is the name of the archive without its suffix, which
        is the stem of the binary it belongs to. */
-    text_append(&u->module, base_name(path));
+    text_append(&u->module, files_base_name(path));
     if (ends_with(text_cstr(&u->module), ARCHIVE_SUFFIX)) {
         u->module.length -= sizeof ARCHIVE_SUFFIX - 1;
         u->module.data[u->module.length] = '\0';
@@ -801,7 +784,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
                text_cstr(&b->id));
         if (s == PRESENT && unit_of(&folded, text_cstr(&b->id)) == NULL) {
             struct unit *u = units_add(&folded);
-            text_append(&u->module, base_name(text_cstr(&b->path)));
+            text_append(&u->module, files_base_name(text_cstr(&b->path)));
             text_append(&u->id, text_cstr(&b->id));
             text_append(&u->version, text_cstr(&b->version));
             text_append(&u->source, text_cstr(&archive));

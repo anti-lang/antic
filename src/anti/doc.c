@@ -24,6 +24,7 @@
 #include "driver.h"
 #include "files.h"
 #include "ir.h"
+#include "modpath.h"
 #include "repo.h"
 #include "sema.h"
 #include "target.h"
@@ -582,13 +583,6 @@ static bool same(const char *s, size_t n, const char *other)
 
 /* The last segment of a module path, which an import declares as its
    name where the import writes no alias. */
-static const char *last_segment(const char *path)
-{
-    const char *dot = strrchr(path, '.');
-
-    return dot != NULL ? dot + 1 : path;
-}
-
 /* The last `.` of the bytes, or NULL where they hold none. */
 static const char *last_dot(const char *s, size_t n)
 {
@@ -664,7 +658,7 @@ static bool resolve_name(const struct interface *iface, const char *s,
     }
     for (i = 0; i < iface->import_count; i++) {
         if (same(s, head, iface->imports[i]) ||
-            same(s, head, last_segment(iface->imports[i]))) {
+            same(s, head, module_path_last(iface->imports[i]))) {
             text_appendf(href, "%s%s#%.*s", iface->imports[i],
                          DOC_HTML_SUFFIX, (int)(n - head - 1), dot + 1);
             return true;

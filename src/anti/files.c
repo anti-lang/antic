@@ -437,6 +437,17 @@ void files_list_free(struct files_list *list)
     list->capacity = 0;
 }
 
+const char *files_base_name(const char *path)
+{
+    const char *slash = strrchr(path, '/');
+    const char *back = strrchr(path, '\\');
+
+    if (back != NULL && (slash == NULL || back > slash)) {
+        slash = back;
+    }
+    return slash != NULL ? slash + 1 : path;
+}
+
 bool files_exists(const char *path)
 {
 #if defined(_WIN32)

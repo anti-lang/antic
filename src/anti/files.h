@@ -56,6 +56,11 @@ bool files_read_reported(const char *path, struct text *out);
    where a full disk reports the bytes of the last buffer. */
 bool files_write(const char *path, const struct text *bytes);
 
+/* The last part of path, after the last `/` or `\\`. Both separators
+   count on every host, so a path written on Windows splits the same way
+   on the machine that reads it. The result points into path. */
+const char *files_base_name(const char *path);
+
 /* Whether path names a file or directory that exists. */
 bool files_exists(const char *path);
 

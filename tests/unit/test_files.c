@@ -169,9 +169,20 @@ static void grow_array(void)
     free(items);
 }
 
+/* Both separators end a directory on every host. */
+static void base_names(void)
+{
+    CHECK_STR(files_base_name("a/b/c.anti"), "c.anti");
+    CHECK_STR(files_base_name("a\\b\\c.anti"), "c.anti");
+    CHECK_STR(files_base_name("a\\b/c.anti"), "c.anti");
+    CHECK_STR(files_base_name("c.anti"), "c.anti");
+    CHECK_STR(files_base_name("a/"), "");
+}
+
 void test_files(void)
 {
     grow_array();
+    base_names();
     read_whole();
     read_error();
     write_errors();

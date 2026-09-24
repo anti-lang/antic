@@ -173,9 +173,6 @@ const struct bind_type *bind_parse_type(struct bind_module *b, const char *c,
 /* Whether name is a word the lexer of Anti reserves. */
 bool bind_is_keyword(const char *name);
 
-/* The last segment of a module path. */
-const char *bind_last_segment(const char *module);
-
 /* The frameworks of Apple's SDK that a library links against on macOS,
    from the table of anti bind. Returns the number of names. */
 size_t bind_frameworks(const char *library, const char *const **names);
