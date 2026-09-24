@@ -28,8 +28,26 @@ enum anti_cpu_level {
 };
 
 /* The name of a level, "v3" or "armv8.2", and "" for a value that names
-   none. */
-const char *anti_rt_cpu_level_name(int32_t level);
+   none. --cpu of antic takes these names, and the runtime writes them. */
+static inline const char *anti_rt_cpu_level_name(int32_t level)
+{
+    switch (level) {
+    case ANTI_CPU_X86_64_V1:
+        return "v1";
+    case ANTI_CPU_X86_64_V2:
+        return "v2";
+    case ANTI_CPU_X86_64_V3:
+        return "v3";
+    case ANTI_CPU_ARMV8_0:
+        return "armv8.0";
+    case ANTI_CPU_ARMV8_2:
+        return "armv8.2";
+    case ANTI_CPU_ARMV8_5:
+        return "armv8.5";
+    default:
+        return "";
+    }
+}
 
 /* The start-up message of a machine that cannot run a program of this
    level, without the "anti: " that the runtime writes in front. Returns ""

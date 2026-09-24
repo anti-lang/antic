@@ -63,7 +63,6 @@
    cannot run a program of the level. */
 struct row {
     int32_t level;
-    const char *name;
     const char *message;
 };
 
@@ -77,16 +76,16 @@ struct row {
    armv8.0. Those two messages are unreachable and are written for the
    table's shape. */
 static const struct row rows[] = {
-    {ANTI_CPU_X86_64_V1, "v1", "this program needs an x86-64 processor"},
-    {ANTI_CPU_X86_64_V2, "v2",
+    {ANTI_CPU_X86_64_V1, "this program needs an x86-64 processor"},
+    {ANTI_CPU_X86_64_V2,
      "this program needs a processor with SSE4.2 (x86-64-v2, 2009 or later)"},
-    {ANTI_CPU_X86_64_V3, "v3",
+    {ANTI_CPU_X86_64_V3,
      "this program needs a processor with AVX2 (x86-64-v3, 2013 or later)"},
-    {ANTI_CPU_ARMV8_0, "armv8.0", "this program needs an ARMv8-A processor"},
-    {ANTI_CPU_ARMV8_2, "armv8.2",
+    {ANTI_CPU_ARMV8_0, "this program needs an ARMv8-A processor"},
+    {ANTI_CPU_ARMV8_2,
      "this program needs an ARMv8.2 processor (Raspberry Pi 5, Apple "
      "Silicon, or later)"},
-    {ANTI_CPU_ARMV8_5, "armv8.5", "this program needs an Apple Silicon Mac"},
+    {ANTI_CPU_ARMV8_5, "this program needs an Apple Silicon Mac"},
 };
 
 static const struct row *row_of(int32_t level)
@@ -99,13 +98,6 @@ static const struct row *row_of(int32_t level)
         }
     }
     return NULL;
-}
-
-const char *anti_rt_cpu_level_name(int32_t level)
-{
-    const struct row *r = row_of(level);
-
-    return r == NULL ? "" : r->name;
 }
 
 const char *anti_rt_cpu_level_message(int32_t level)
@@ -286,7 +278,8 @@ int32_t anti_rt_cpu_level(void)
 
     if (simulated != NULL) {
         for (i = 0; i < sizeof rows / sizeof rows[0]; i++) {
-            if (strcmp(simulated, rows[i].name) == 0) {
+            const char *name = anti_rt_cpu_level_name(rows[i].level);
+            if (strcmp(simulated, name) == 0) {
                 return rows[i].level;
             }
         }

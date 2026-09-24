@@ -89,19 +89,25 @@ static void features(void)
 }
 
 /* The ids the runtime reads, which rise with the level inside one
-   architecture. */
+   architecture. Both sides name each level with the function of
+   src/rt/cpu_level.h. */
 static void ids(void)
 {
+    int i;
+
     CHECK(cpu_id(CPU_V1) < cpu_id(CPU_V2));
     CHECK(cpu_id(CPU_V2) < cpu_id(CPU_V3));
     CHECK(cpu_id(CPU_ARMV8_0) < cpu_id(CPU_ARMV8_2));
     CHECK(cpu_id(CPU_ARMV8_2) < cpu_id(CPU_ARMV8_5));
     CHECK(cpu_id(CPU_V3) == ANTI_CPU_X86_64_V3);
     CHECK(cpu_id(CPU_ARMV8_5) == ANTI_CPU_ARMV8_5);
-    CHECK_STR(anti_rt_cpu_level_name(cpu_id(CPU_V3)), cpu_name(CPU_V3));
-    CHECK_STR(anti_rt_cpu_level_name(cpu_id(CPU_ARMV8_2)),
-              cpu_name(CPU_ARMV8_2));
+    for (i = 0; i < CPU_LEVEL_COUNT; i++) {
+        CHECK_STR(anti_rt_cpu_level_name(cpu_id((enum cpu_level)i)),
+                  cpu_name((enum cpu_level)i));
+        CHECK(cpu_name((enum cpu_level)i)[0] != '\0');
+    }
     CHECK_STR(anti_rt_cpu_level_name(0), "");
+    CHECK_STR(anti_rt_cpu_level_name(ANTI_CPU_ARMV8_5 + 1), "");
 }
 
 /* The start-up check refuses a machine below the level of the program and
