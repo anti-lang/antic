@@ -189,10 +189,10 @@ bool sema_check(struct module *module, const char *module_name,
                 struct arena *arena, struct diagnostics *diags,
                 bool program);
 
-/* Take the generics out of a checked module: every generic item, every
-   function of a class body with type parameters of its own, every `type`
-   and every `constraint`. The passes after the checker compile what
-   remains. */
+/* Take the generics out of a checked module. That is every generic item,
+   every `type` and every `constraint`, and every function of a class body
+   with type parameters of its own. The passes after the checker compile
+   what remains. */
 void sema_strip_generics(struct module *module);
 
 /* The `fallthrough;` that ends the body of a switch arm, the last

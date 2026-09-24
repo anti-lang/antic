@@ -245,8 +245,8 @@ release. After it, the wrapping and saturating operators with `Flags`, then
 sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
 four are built. Then generics and closures. Closures are built, `snapshot fn`
-included. Round five, generics and collections, stands in the same document,
-and none of it is built.
+included. Round five, generics and collections, stands in the same document.
+Its first part, the syntax of generics, is built, and none of the rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -499,6 +499,15 @@ reports what it finished.
   collection and an iterator, `e[i]` and `e[i] = v` call `index` and
   `set_index`, and every iterator has `to_slice`. See "Language hooks and
   iteration" in `docs/decisions.md` and `docs/notes/iteration.md`.
+- The syntax of generics is built. Type parameters in `<>` on functions,
+  structs, classes, variants, interfaces and the functions of a class
+  body, `N: int`, type arguments in every type, the rule of C# in an
+  expression and `>>` closing two lists. `constraint` and `type` are
+  items. The checker checks a body against its constraints and each use
+  where it stands, and infers the type arguments of a call. A build past
+  the front end refuses a use that needs a compiled copy, and leaves out a
+  generic that nothing uses. See "Generics and collections" in
+  `docs/decisions.md` and `docs/notes/generics.md`.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
   See "Small things" in `docs/decisions.md`.
@@ -568,7 +577,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 59. See "The doc
+  class body and the `worker` mark, and its format version is 61. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops

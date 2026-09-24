@@ -38,9 +38,7 @@ enum type_expr_kind {
     TYPEX_FN,       /* fn(T, U) -> R */
     TYPEX_TUPLE,    /* (int, str) */
     TYPEX_CHAN,     /* chan T */
-    /* An integer literal among type arguments, `1024` of
-       `Ring<Sample, 1024>`, held in length. */
-    TYPEX_CONST
+    TYPEX_CONST     /* 1024 */
 };
 
 struct type_expr {

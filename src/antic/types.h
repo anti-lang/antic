@@ -242,8 +242,8 @@ struct type {
     struct type *twin;              /* Match: the other form of it */
 
     /* DESIGN: generics. A generic struct, class or variant holds its
-       type parameters, and a copy of it names the generic and holds the
-       arguments, a type per parameter, or a constant in values for an
+       type parameters. A copy of it names the generic and holds the
+       arguments, a type per parameter or a constant in values for an
        `N: int`. Two copies with the same arguments are one type, so the
        copies of a generic form a list on it that the checker searches. A
        copy has the members of its generic, whose signatures name the
@@ -256,9 +256,9 @@ struct type {
     struct type *copies;            /* a generic: its copies */
     struct type *next_copy;
     bool generic_ready;             /* a generic: its fields are known */
-    /* TYPE_PARAM: the declaration, the hooks its constraints give, one
-       bit per entry of the hook table, and the interfaces they name. The
-       item is the generic that declares it. A `constraint` holds its set
+    /* TYPE_PARAM: the declaration, the hooks its constraints give and
+       the interfaces they name. The hooks hold one bit per entry of the
+       hook table. The item is the generic that declares it. A `constraint` holds its set
        in a TYPE_PARAM as well. */
     const struct type_param *param;
     const struct item *declared_by;

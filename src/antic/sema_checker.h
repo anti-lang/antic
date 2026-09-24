@@ -107,6 +107,11 @@ struct checker {
     size_t pending_count;
     size_t pending_capacity;
     bool pending_done;
+    /* The copies being filled, one inside another, and whether a chain
+       too deep was refused. */
+    int copy_depth;
+    bool copy_refused;
+    const struct type *copy_root;   /* the generic the chain began with */
     /* The fields of concurrent classes that the module writes after
        `construct`, reported at their declarations at the end. */
     struct written_field *written;
@@ -124,11 +129,11 @@ struct pending_check {
     struct pos pos;
 };
 
-/* What a call gives the inference of a generic: the type arguments
-   written after the callee's name, the expression that wrote them and the
-   name as written, the type before the `.` of `List<int>.new()` or the
-   type of the receiver, and one slot per argument for the type of each
-   argument checked while inferring. */
+/* What a call gives the inference of a generic. It holds the type
+   arguments written after the callee's name, the expression that wrote
+   them and the name as written. It holds the type before the `.` of
+   `List<int>.new()` or the type of the receiver. It has one slot per
+   argument for the type of each argument checked while inferring. */
 struct generic_call {
     struct type_expr *const *written;
     size_t count;
@@ -377,7 +382,7 @@ struct type *sema_copy_of(struct checker *c, struct type *generic,
                           struct type_expr *const *written, size_t count,
                           struct pos pos);
 struct type *sema_member_type(struct checker *c, struct type *fn,
-                              const struct type *copy, struct pos pos);
+                              const struct type *copy);
 void sema_refuse_type_args(struct checker *c, const struct expr *e,
                            const struct name *name);
 struct type *sema_generic_named(struct checker *c, struct expr *e,

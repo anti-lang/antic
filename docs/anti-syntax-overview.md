@@ -696,7 +696,25 @@ Built.
 
 Functions, structs, classes, variants and interfaces take type parameters between `<` and `>`. A constraint after `:` states what the generic needs from a type: a hook of the operator table such as `lt`, `add`, `iter` or `hash`, an interface, or a set named with `constraint`, combined with `+`. The compiler checks the body against the constraints where the generic is written and every use where it is used, so an error lands in the code that made it. A parameter without constraints can be stored, copied, moved, passed on and measured with `size_of`, which is what a container needs. `N: int` takes an integer constant instead of a type, such as the length of a fixed array. `anti.lang` ships `constraint Number = add + sub + mul + div + neg + lt;` and `constraint Ordered = eq + lt;`.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+class Person
+{
+	pub name: str,
+}
+
+class List<T>
+{
+	count: int,
+
+	pub fn new() -> List<T>
+	{
+		return List<T> { count: 0 };
+	}
+}
+```
+-->
+```anti
 fn max<T: lt>(a: T, b: T) -> T
 {
 	if a < b {
@@ -720,7 +738,7 @@ export type PersonList = List<Person>;
 
 Type arguments are inferred from the arguments of a call and written out where nothing gives them. In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows and the token after it is `(`, `.` or `{`, so `a < b > c` stays two comparisons. `>>` closes two lists. Every use with concrete arguments gets its own compiled copy, with no boxing, and two uses with the same arguments are one type in every module. The whole-program pass merges copies whose code is identical. A method with type parameters of its own is called directly and never stands in the table, so it cannot be `abstract` or replaced. A library file stores a generic as IR with its parameters open. C sees no open generic: `export type PersonList = List<Person>;` writes a copy into the header as an exported class, and a generic `export fn` is refused.
 
-Not built yet: generics, with constraints, `constraint`, `N: int`, `type` and `export type`, and `Number` and `Ordered` of `anti.lang`.
+Built: the syntax of generics and its checks. Type parameters in `<>` on functions, structs, classes, variants, interfaces and the functions of a class body, `N: int`, type arguments in every type, the rule of C# in an expression with the refusal of a name that is not generic, and `>>` closing two lists. `constraint` and `type` are built, and `export type` is checked. The checker checks a body against its constraints and each use where it stands, and infers the type arguments of a call from its arguments. A generic that nothing uses compiles to nothing. `tests/dump/generics.anti` and `tests/errors/generics.anti` hold the forms and the refusals. Not built yet: the compiled copies, so a build past the front end refuses a use that needs one, the whole-program merge of identical copies, the descriptor of a copy, a generic, a `type` and a `constraint` in a library file, the header of `export type`, and `Number` and `Ordered` of `anti.lang`.
 
 ## Ownership
 
@@ -1396,7 +1414,7 @@ Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.
 
 ## Later
 
-Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it, and none of it is built. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
+Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it. The syntax of generics is built, and none of the rest. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
 
 ## Reserved words
 
@@ -1408,4 +1426,4 @@ String prefixes: `r b br f rf x re`.
 
 Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
 
-Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. `synchronized` and `guarded by` are built as well. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today. Not built of round five: `constraint`, `type` and `lent`, which the lexer reads as names today.
+Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. `synchronized` and `guarded by` are built as well. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today. Built of round five: `constraint` and `type`. Not built yet: `lent`, which the lexer reads as a name today.

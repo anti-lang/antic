@@ -1929,8 +1929,8 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     /* A library file holds the IR of the module, so it is written after
-       the checker as a program is, and `anti check` has one written for
-       each module another imports. */
+       the checker as a program is. `anti check` has one written for each
+       module another imports. */
     if ((o->library || !o->front_end) && !compiles_generics(tree, &diags)) {
         report_diagnostics(o, &diags);
         goto done;

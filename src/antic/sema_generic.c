@@ -13,9 +13,9 @@
    or a variant is a type the checker builds by putting the arguments in
    place of the parameters. A call of a generic function puts them into
    its signature, from the written arguments or from the types of the
-   values it is given. Compiling the copies is a later pass, so the
-   checker records the first use that needs one, and the driver refuses
-   a build past the front end that has one. */
+   values it is given. Compiling the copies is a later pass. The checker
+   records the first use that needs one, and the driver refuses a build
+   past the front end that has one. */
 
 /* The hook table, in the order of the bits of a TYPE_PARAM. The first
    fourteen are the operators, then the five language hooks and `hash`. */
@@ -51,8 +51,8 @@ static int hook_of(const char *text)
 /* Declarations */
 
 /* The type parameter or the constant parameter named name among the
-   generics around the code being checked: the function, the functions
-   around an anonymous one, and the classes around a nested type. */
+   generics around the code being checked. Those are the function, the
+   functions around an anonymous one and the classes around a type. */
 struct symbol *sema_type_param_find(const struct checker *c,
                                     const struct name *name)
 {
@@ -452,10 +452,10 @@ static void check_meets(struct checker *c, struct type *t,
     }
 }
 
-/* DESIGN: a copy named before the functions of the module have their
-   types, in a field or a signature, is checked against its constraints
-   once they do, since an `operator fn` gives a hook. Every check after
-   that runs where the use stands. */
+/* DESIGN: a copy may be named in a field or a signature before the
+   functions of the module have their types. It is checked against its
+   constraints once they do, since an `operator fn` gives a hook. Every
+   check after that runs where the use stands. */
 static void meets(struct checker *c, struct type *t, const struct type *p,
                   const struct name *generic, struct pos pos)
 {
@@ -522,7 +522,6 @@ struct generic_map {
     struct type **args;
     const struct symbolic **values;
     size_t count;
-    struct pos pos;
 };
 
 bool sema_has_params(const struct type *t)
@@ -610,8 +609,7 @@ static const struct symbolic *subst_symbolic(struct checker *c,
 
 static struct type *copy_named(struct checker *c, struct type *generic,
                                struct type **args,
-                               const struct symbolic **values,
-                               struct pos pos);
+                               const struct symbolic **values);
 
 static struct type *subst(struct checker *c, struct type *t,
                           const struct generic_map *map)
@@ -707,8 +705,7 @@ static struct type *subst(struct checker *c, struct type *t,
             changed = changed || params[i] != t->args[i] ||
                       values[i] != t->values[i];
         }
-        return changed ? copy_named(c, t->generic, params, values, map->pos)
-                       : t;
+        return changed ? copy_named(c, t->generic, params, values) : t;
     default:
         return t;
     }
@@ -829,6 +826,33 @@ static void fill_copy(struct checker *c, struct type *copy)
     types_set_fields(c->types, copy, fields, g->field_count);
 }
 
+/* DESIGN: filling a copy may name another copy, which is filled in
+   turn. A generic whose fields name a copy of itself with other
+   arguments, `W<T>` holding a `W<Box<T>>`, names new copies without end,
+   so a chain of copies past COPY_DEPTH_MAX is refused once. The message
+   stands at the first type parameter of the generic the chain began
+   with. */
+#define COPY_DEPTH_MAX 64
+
+static void fill_one(struct checker *c, struct type *copy)
+{
+    if (c->copy_depth >= COPY_DEPTH_MAX) {
+        if (!c->copy_refused) {
+            c->copy_refused = true;
+            sema_error_at(c, c->copy_root->type_params[0]->param->pos,
+                          "the copies of `%s` name ever deeper copies of it",
+                          sema_tn(c->copy_root));
+        }
+        return;
+    }
+    if (c->copy_depth == 0) {
+        c->copy_root = copy->generic;
+    }
+    c->copy_depth++;
+    fill_copy(c, copy);
+    c->copy_depth--;
+}
+
 void sema_generic_ready(struct checker *c, struct type *generic)
 {
     struct type *copy;
@@ -838,7 +862,7 @@ void sema_generic_ready(struct checker *c, struct type *generic)
     }
     generic->generic_ready = true;
     for (copy = generic->copies; copy != NULL; copy = copy->next_copy) {
-        fill_copy(c, copy);
+        fill_one(c, copy);
     }
 }
 
@@ -848,8 +872,7 @@ void sema_generic_ready(struct checker *c, struct type *generic)
    `List`. */
 static struct type *copy_named(struct checker *c, struct type *generic,
                                struct type **args,
-                               const struct symbolic **values,
-                               struct pos pos)
+                               const struct symbolic **values)
 {
     struct type *copy;
     size_t count = generic->type_param_count;
@@ -888,9 +911,8 @@ static struct type *copy_named(struct checker *c, struct type *generic,
     copy->next_copy = generic->copies;
     generic->copies = copy;
     if (generic->generic_ready) {
-        fill_copy(c, copy);
+        fill_one(c, copy);
     }
-    (void)pos;
     return copy;
 }
 
@@ -919,7 +941,7 @@ static struct type *make_copy(struct checker *c, struct type *generic,
             concrete = concrete && values[i]->kind != SYMBOLIC_PARAM;
         }
     }
-    copy = copy_named(c, generic, args, values, pos);
+    copy = copy_named(c, generic, args, values);
     if (concrete && copy != generic) {
         sema_note_generic_use(c, pos, generic_name(generic));
     }
@@ -927,7 +949,7 @@ static struct type *make_copy(struct checker *c, struct type *generic,
 }
 
 /* The argument of the parameter p of the generic named name, as written
-   at a: a type for a type parameter, and for a constant one an integer
+   at a. A type parameter takes a type. A constant one takes an integer
    literal or the name of a constant. */
 static bool resolve_arg(struct checker *c, const struct name *name,
                         const struct type *p, struct type_expr *a,
@@ -1017,7 +1039,7 @@ struct type *sema_copy_of(struct checker *c, struct type *generic,
 /* The type a member of the copy has there: the type fn of the member of
    its generic with the arguments in place. */
 struct type *sema_member_type(struct checker *c, struct type *fn,
-                              const struct type *copy, struct pos pos)
+                              const struct type *copy)
 {
     struct generic_map map;
 
@@ -1025,7 +1047,6 @@ struct type *sema_member_type(struct checker *c, struct type *fn,
         return fn;
     }
     map = copy_map(copy);
-    map.pos = pos;
     return subst(c, fn, &map);
 }
 
@@ -1212,7 +1233,6 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
     map.args = types_alloc_array(c->arena, map.count + 1, sizeof *map.args);
     map.values = types_alloc_array(c->arena, map.count + 1,
                                    sizeof *map.values);
-    map.pos = e->pos;
     for (i = 0; i < outer_count; i++) {
         params[i] = outer->type_params[i];
     }

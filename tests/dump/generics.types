@@ -179,6 +179,7 @@ variant_decl Result        Result
   case Err
     field error            E
       type E
+  case Missing
 class_decl Box             Box
   type_param T
   field value
@@ -359,6 +360,11 @@ function uses              fn([]*Square, []byte)
           type str
         field_init error
           string_lit "no"  str
+    let_stmt missing       Result<int, str>
+      struct_lit Result<int, str>.Missing Result<int, str>
+    let_stmt getter        bound fn() -> int
+      field get            bound fn() -> int
+        ident boxed        Box<int>
     let_stmt area          f32
       call                 f32
         ident area_of      fn([]*Square) -> f32

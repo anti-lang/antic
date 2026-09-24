@@ -87,6 +87,7 @@ variant Result<T, E>
 {
 	Ok { value: T },
 	Err { error: E },
+	Missing,
 }
 
 class Box<T>
@@ -129,6 +130,8 @@ fn uses(squares: []*Square, bytes: []u8)
 	let paired = boxed.pair("five");
 	let ok: Result<int, str> = Result.Ok { value: 3 };
 	let failed = Result<int, str>.Err { error: "no" };
+	let missing = Result<int, str>.Missing;
+	let getter = boxed.get;
 	let area = area_of(squares);
 	let n: Count = width<Pair<int, u8>>();
 	let counter = Counter { count: 0 };

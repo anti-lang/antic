@@ -1751,7 +1751,7 @@ static bool same_signature(struct checker *c, const struct item *m,
     }
     /* A function of a copy of a generic takes the arguments of the copy
        in place of the parameters. */
-    theirs = sema_member_type(c, (struct type *)theirs, owner, m->name_pos);
+    theirs = sema_member_type(c, (struct type *)theirs, owner);
     sema_format_to(fn, sizeof fn, "concrete fn %.*s%s%.*s",
                    (int)m->qualifier.length, m->qualifier.text,
                    m->qualifier.length > 0 ? "::" : "", (int)m->name.length,

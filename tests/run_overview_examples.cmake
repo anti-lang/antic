@@ -43,7 +43,7 @@ string(REPLACE "[" "${open_bracket}" content "${content}")
 string(REPLACE "]" "${close_bracket}" content "${content}")
 string(REPLACE "\n" ";" lines "${content}")
 
-set(item_start "^(import|pub|internal|fn|extern|export|struct|packed|union|enum|variant|class|abstract|final|singleton|simd|trace|worker|provides|link|tests|fixtures)( |$)")
+set(item_start "^(import|pub|internal|fn|extern|export|struct|packed|union|enum|variant|class|abstract|final|singleton|simd|trace|worker|provides|link|tests|fixtures|constraint|type)( |$)")
 set(checked 0)
 set(skipped 0)
 set(failures "")

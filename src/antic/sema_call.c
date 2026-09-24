@@ -809,7 +809,7 @@ static bool names_sub_object(const struct expr *e)
    field f, and the module declares a function f whose first parameter is
    T or *T. Returns false after reporting an error. */
 /* Whether a is b, a class below b, or a copy of the generic b or of a
-   class below it, so a function of b takes a as `self`. */
+   class below it. A function of b then takes a as `self`. */
 static bool descends_or_copies(const struct type *a, const struct type *b)
 {
     for (; a != NULL; a = a->kind == TYPE_CLASS ? a->base : NULL) {
@@ -870,7 +870,7 @@ static bool method_call(struct checker *c, struct expr *call)
                       field->as.field.name.text);
         return false;
     }
-    first = sema_member_type(c, f->type->params[0], s, receiver->pos);
+    first = sema_member_type(c, f->type->params[0], s);
     if (first->kind == TYPE_POINTER && type_has_fields(t)) {
         struct expr *address = sema_new_node(c, EXPR_UNARY, receiver->pos);
         if (!sema_is_place(receiver)) {
@@ -1402,7 +1402,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
     if (fn == NULL || fn->kind != TYPE_FN) {
         return sema_builtin(c, TYPE_ERROR);
     }
-    fn = sema_member_type(c, fn, t, e->pos);
+    fn = sema_member_type(c, fn, t);
     e->as.call.builds = t;
     e->as.call.callee->symbol = m->symbol;
     e->as.call.callee->type = fn;
@@ -2086,8 +2086,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
                               struct type *expected, struct generic_call *g);
 
 /* DESIGN: a call carries what a generic needs from it past the rewrites
-   of the checker: the type arguments written after the callee's name,
-   and the class or the receiver the callee is reached through. The
+   of the checker. That is the type arguments written after the callee's
+   name, and the class or the receiver the callee is reached through. The
    callee is the name checked now, so a generic function named there is
    a call and not a value. */
 struct type *sema_check_call(struct checker *c, struct expr *e,
@@ -2635,9 +2635,18 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
         return check_qualified(c, e, module, false);
     }
     if (e->as.field.base->kind == EXPR_NAME) {
-        const struct symbol *sym = sema_lookup(c, &e->as.field.base->as.name);
+        struct symbol *sym = sema_lookup(c, &e->as.field.base->as.name);
         if (sym != NULL && sym->kind == SYMBOL_STRUCT) {
-            return check_type_member(c, e, sym->type);
+            /* `Result<int, str>.Missing` names a case of a copy. */
+            struct type *t = sym->item != NULL && sym->item->kind == ITEM_TYPE
+                                 ? sema_alias_type(c, sym)
+                                 : sym->type;
+            t = sema_generic_named(c, e->as.field.base, t,
+                                   &e->as.field.base->as.name, NULL);
+            if (sema_is_error(t)) {
+                return t;
+            }
+            return check_type_member(c, e, t);
         }
         /* The root reaches its namespace by its name as it does as a
            type, for `Object.deserialize`. */
@@ -2734,7 +2743,9 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                 m->symbol->type->kind == TYPE_FN &&
                 m->symbol->type->param_count > 0) {
                 e->symbol = m->symbol;
-                return types_bound_of(c->types, m->symbol->type);
+                return types_bound_of(
+                    c->types,
+                    sema_member_type(c, m->symbol->type, s));
             }
             /* DESIGN: a constant of a body is reached as `T.N`, never
                through a value, so a constant is never mistaken for a

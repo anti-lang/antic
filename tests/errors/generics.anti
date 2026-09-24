@@ -98,6 +98,17 @@ fn classy<T: Plain>(a: T) -> T
 
 type Itself = Itself;
 
+// Each copy names a deeper one.
+struct Grow<T>
+{
+	inner: ?*Grow<Pair<T, T>>,
+}
+
+fn grows(g: Grow<int>) -> int
+{
+	return 0;
+}
+
 fn uses(a: int, b: int, c: int, size: int, circles: []*Circle)
 {
 	let bigger = max(Circle { r: 1.0 }, Circle { r: 2.0 });

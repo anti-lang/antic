@@ -154,7 +154,7 @@ struct token_list {
    diags and keep going, so that one run reports all of them. Returns true
    when no error occurred. The array of out is allocated with realloc,
    and token_list_free releases it. The texts of the tokens lie in the
-   memory pool arena, which frees them. */
+   memory pool the call names, which frees them. */
 bool lex(const char *source, size_t length, struct arena *arena,
          struct diagnostics *diags, struct token_list *out);
 
