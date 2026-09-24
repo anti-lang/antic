@@ -18,13 +18,53 @@
    exports. A program that hosts a plugin leaves the hidden mark off. The
    loader then resolves the plugin against it, and the descriptors it
    holds are the ones the plugin reaches. */
+/* DESIGN: a copy of a generic is made in every module that uses it, and
+   its name carries the generic and its arguments, `List<int>.push`. In a
+   build of one object per module each object then defines it. The copy
+   is therefore link-once. It is a weak definition on ELF and Mach-O, and
+   a COMDAT section that keeps any one on COFF. The link keeps one copy of
+   each. A release build writes one object, where each copy stands
+   once. */
+static bool link_once(const char *name, bool module)
+{
+    return module && strchr(name, '<') != NULL;
+}
+
+/* On COFF, move to the COMDAT section of symbol, a section like section
+   that the link keeps once. */
+static void comdat_open(struct text *out, enum target t, const char *section,
+                        const char *symbol)
+{
+    if (target_info(t)->format == FORMAT_COFF) {
+        /* A COMDAT section names its flags, which .data leaves to its
+           name elsewhere. */
+        text_appendf(out, "    .section %s%s,discard,%s\n", section,
+                     strcmp(section, ".data") == 0 ? ",\"dw\"" : "", symbol);
+    }
+}
+
+/* Back to section after a COMDAT section on COFF. */
+static void comdat_close(struct text *out, enum target t, const char *section)
+{
+    if (target_info(t)->format == FORMAT_COFF) {
+        text_appendf(out, "    .section %s\n", section);
+    }
+}
+
 static void visibility(struct text *out, enum target t, const char *symbol,
-                       bool exported, bool module, bool exports)
+                       bool exported, bool module, bool exports, bool once)
 {
     if (!exported && !module && !exports) {
         return;
     }
-    text_appendf(out, "    .globl %s\n", symbol);
+    if (once && target_info(t)->format == FORMAT_ELF) {
+        text_appendf(out, "    .weak %s\n", symbol);
+    } else {
+        text_appendf(out, "    .globl %s\n", symbol);
+    }
+    if (once && target_info(t)->format == FORMAT_MACHO) {
+        text_appendf(out, "    .weak_definition %s\n", symbol);
+    }
     if (module && !exports && !exported &&
         target_info(t)->format != FORMAT_COFF) {
         text_appendf(out, "    %s %s\n",
@@ -72,11 +112,16 @@ static void emit_function(struct text *out, enum target t, enum cpu_level cpu,
     size_t b;
     size_t i;
 
+    bool once = link_once(f->ir->name, module);
+
     mach_function_symbol(&symbol, t, f->ir);
     names.target = t;
     names.function = text_cstr(&symbol);
+    if (once) {
+        comdat_open(out, t, ".text,\"xr\"", text_cstr(&symbol));
+    }
     visibility(out, t, text_cstr(&symbol), f->ir->exported, module,
-               exports);
+               exports, once);
     /* An ARM64 instruction is 4 bytes, and a function starts on one. */
     if (target_info(t)->arch == ARCH_ARM64) {
         text_append(out, "    .p2align 2\n");
@@ -101,6 +146,9 @@ static void emit_function(struct text *out, enum target t, enum cpu_level cpu,
     debug_close(debug, out);
     if (f->unwind) {
         text_append(out, "    .seh_endproc\n");
+    }
+    if (once) {
+        comdat_close(out, t, ".text");
     }
     text_free(&symbol);
 }
@@ -204,26 +252,30 @@ static bool reloc_at(struct text *out, enum target t,
    names, so that the linker fills in the eight bytes. */
 static void emit_global(struct text *out, enum target t,
                         const struct ir_module *m, const struct ir_global *g,
-                        bool module, bool exports)
+                        const char *section, bool module, bool exports)
 {
     struct text name = {0};
     uint64_t align;
     uint64_t k;
     int log2;
     uint64_t from = 0;
+    bool once = link_once(g->name, module);
 
+    if (g->exported) {
+        c_symbol(&name, t, g->name);
+    } else {
+        mangle(&name, t, g->module, g->name);
+    }
+    if (once) {
+        comdat_open(out, t, section, text_cstr(&name));
+    }
     for (log2 = 0, align = g->align; align > 1; align /= 2) {
         log2++;
     }
     if (log2 > 0) {
         text_appendf(out, "    .p2align %d\n", log2);
     }
-    if (g->exported) {
-        c_symbol(&name, t, g->name);
-    } else {
-        mangle(&name, t, g->module, g->name);
-    }
-    visibility(out, t, text_cstr(&name), g->exported, module, exports);
+    visibility(out, t, text_cstr(&name), g->exported, module, exports, once);
     text_appendf(out, "%s:\n", text_cstr(&name));
     text_free(&name);
     for (k = 0; k < g->size; k++) {
@@ -237,6 +289,9 @@ static void emit_global(struct text *out, enum target t,
         text_free(&symbol);
     }
     byte_rows(out, g->bytes, from, g->size);
+    if (once) {
+        comdat_close(out, t, section);
+    }
 }
 
 /* DESIGN: a global that holds an address goes to the section for data the
@@ -263,13 +318,15 @@ static void emit_data(struct text *out, enum target t,
             relocated = true;
             continue;
         }
-        emit_global(out, t, m, m->globals[i], module, exports);
+        emit_global(out, t, m, m->globals[i], data_sections[format], module,
+                    exports);
     }
     if (written) {
         text_appendf(out, "    .section %s\n", mutable_sections[format]);
         for (i = 0; i < m->global_count; i++) {
             if (m->globals[i]->mutable && !m->globals[i]->is_extern) {
-                emit_global(out, t, m, m->globals[i], module, exports);
+                emit_global(out, t, m, m->globals[i], mutable_sections[format],
+                            module, exports);
             }
         }
     }
@@ -280,7 +337,8 @@ static void emit_data(struct text *out, enum target t,
     for (i = 0; i < m->global_count; i++) {
         if (!m->globals[i]->mutable && m->globals[i]->reloc_count > 0 &&
             !m->globals[i]->is_extern) {
-            emit_global(out, t, m, m->globals[i], module, exports);
+            emit_global(out, t, m, m->globals[i], reloc_sections[format],
+                        module, exports);
         }
     }
 }

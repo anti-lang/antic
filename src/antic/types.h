@@ -709,8 +709,16 @@ void types_break_cycles(struct type *s, struct type *error);
 /* The name of t as a program writes it, with int, float and byte for the
    aliased types. */
 void type_name(struct text *out, const struct type *t);
-/* The name of t with the module of every struct in it, as main.Vec2. */
+/* The name of t with the module of every struct in it, as main.Vec2. A
+   copy of a generic qualifies its arguments as well. */
 void type_name_qualified(struct text *out, const struct type *t);
+/* DESIGN: the name of a struct, a class or a variant in a symbol of its
+   module. It is the name of t, and for a copy of a generic the name of
+   the generic with the arguments qualified by their modules,
+   `List<geo.Point>`. Two copies whose arguments share a name in two
+   modules then never share a symbol, while `type_name` still gives
+   `List<Point>` as the program writes it. */
+void type_symbol_name(struct text *out, const struct type *t);
 
 bool type_is_integer(const struct type *t);
 /* Whether f is a zero-width bitfield, written `_: T : 0`, which breaks the

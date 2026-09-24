@@ -512,29 +512,7 @@ void sema_run_pending(struct checker *c)
     c->pending_capacity = 0;
 }
 
-void sema_note_generic_use(struct checker *c, struct pos pos,
-                           const struct name *generic)
-{
-    if (in_generic(c) || c->module->generic_use.line > 0) {
-        return;
-    }
-    c->module->generic_use = pos;
-    c->module->generic_name = *generic;
-}
-
 /* Substitution */
-
-/* The parameters of a generic and what stands in their place, a type or
-   a constant, and the generic type whose copy it is. */
-struct generic_map {
-    struct types *types;
-    const struct type *from;
-    struct type *to;
-    struct type *const *params;
-    struct type **args;
-    const struct symbolic **values;
-    size_t count;
-};
 
 bool sema_has_params(const struct type *t)
 {
@@ -584,6 +562,12 @@ bool sema_has_params(const struct type *t)
 static struct type *subst(struct checker *c, struct type *t,
                           const struct generic_map *map);
 
+struct type *sema_subst(struct checker *c, struct type *t,
+                        const struct generic_map *map)
+{
+    return subst(c, t, map);
+}
+
 static const struct symbolic *subst_symbolic(struct checker *c,
                                              const struct symbolic *s,
                                              const struct generic_map *map)
@@ -622,6 +606,13 @@ static const struct symbolic *subst_symbolic(struct checker *c,
 static struct type *copy_named(struct checker *c, struct type *generic,
                                struct type **args,
                                const struct symbolic **values);
+
+const struct symbolic *sema_subst_symbolic(struct checker *c,
+                                           const struct symbolic *s,
+                                           const struct generic_map *map)
+{
+    return subst_symbolic(c, s, map);
+}
 
 static struct type *subst(struct checker *c, struct type *t,
                           const struct generic_map *map)
@@ -753,7 +744,7 @@ static struct name copy_name(struct checker *c, const struct type *generic,
     return name;
 }
 
-static struct generic_map copy_map(const struct type *copy)
+struct generic_map sema_copy_map(const struct type *copy)
 {
     struct generic_map map;
 
@@ -808,7 +799,7 @@ static struct type *copy_payload(struct checker *c, struct type *payload,
 static void fill_copy(struct checker *c, struct type *copy)
 {
     const struct type *g = copy->generic;
-    struct generic_map map = copy_map(copy);
+    struct generic_map map = sema_copy_map(copy);
     struct struct_field *fields;
     size_t i;
 
@@ -928,6 +919,13 @@ static struct type *copy_named(struct checker *c, struct type *generic,
     return copy;
 }
 
+struct type *sema_copy_named(struct checker *c, struct type *generic,
+                             struct type **args,
+                             const struct symbolic **values)
+{
+    return copy_named(c, generic, args, values);
+}
+
 /* The name of the item that declares the generic g, for a message. */
 static const struct name *generic_name(const struct type *g)
 {
@@ -940,24 +938,15 @@ static struct type *make_copy(struct checker *c, struct type *generic,
                               struct type **args,
                               const struct symbolic **values, struct pos pos)
 {
-    struct type *copy;
-    bool concrete = true;
     size_t i;
 
     for (i = 0; i < generic->type_param_count; i++) {
         if (args[i] != NULL) {
             meets(c, args[i], generic->type_params[i], generic_name(generic),
                   pos);
-            concrete = concrete && !sema_has_params(args[i]);
-        } else {
-            concrete = concrete && values[i]->kind != SYMBOLIC_PARAM;
         }
     }
-    copy = copy_named(c, generic, args, values);
-    if (concrete && copy != generic) {
-        sema_note_generic_use(c, pos, generic_name(generic));
-    }
-    return copy;
+    return copy_named(c, generic, args, values);
 }
 
 /* The argument of the parameter p of the generic named name, as written
@@ -1058,7 +1047,7 @@ struct type *sema_member_type(struct checker *c, struct type *fn,
     if (copy == NULL || copy->generic == NULL) {
         return fn;
     }
-    map = copy_map(copy);
+    map = sema_copy_map(copy);
     return subst(c, fn, &map);
 }
 
@@ -1219,7 +1208,6 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
     struct generic_map map;
     const struct name *name;
     size_t i;
-    bool concrete = true;
 
     if (own == 0 && g->count > 0) {
         sema_refuse_type_args(c, g->written_at, g->name);
@@ -1327,9 +1315,6 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
         if (map.args[i] != NULL) {
             check_meets(c, map.args[i], params[i],
                         i < outer_count ? &outer->name : name, e->pos);
-            concrete = concrete && !sema_has_params(map.args[i]);
-        } else if (map.values[i] != NULL) {
-            concrete = concrete && map.values[i]->kind != SYMBOLIC_PARAM;
         }
     }
     /* A copy of the class that inference completed replaces the class in
@@ -1346,9 +1331,11 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
         map.from = outer;
         map.to = make_copy(c, outer, args, values, e->pos);
     }
-    if (concrete) {
-        sema_note_generic_use(c, e->pos, own > 0 ? name : &outer->name);
-    }
+    /* The call keeps the arguments of the copy it calls, which the copy
+       of the function that holds it puts its own arguments into. */
+    e->as.call.copy_args = map.args;
+    e->as.call.copy_values = map.values;
+    e->as.call.copy_count = map.count;
     return subst(c, fn, &map);
 }
 

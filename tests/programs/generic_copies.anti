@@ -1,0 +1,294 @@
+//! Every use of a generic with concrete arguments gets a compiled copy. The
+//! program takes copies of a function, a struct, a class and a variant, and a
+//! copy that calls another. It reads `size_of(T)` per copy and the descriptor
+//! of each copy of a class, and has a class inherit a copy. An operator of a
+//! struct runs its `operator fn`, a walk and `e[i]` run the hooks, and a call
+//! reaches an interface of the constraints. The dev build of the same program
+//! prints the same.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+struct Money
+{
+	cents: int,
+}
+
+operator fn lt(a: Money, b: Money) -> bool
+{
+	return a.cents < b.cents;
+}
+
+class Person
+{
+	pub age: int,
+}
+
+class Order
+{
+	pub total: int,
+}
+
+class List<T>
+{
+	pub own items: []T,
+	pub count: int = 0,
+
+	pub fn push(self, value: T)
+	{
+		if self.count == self.items.len {
+			let grown = alloc(T, self.items.len * 2 + 4) else {
+				return;
+			};
+			for i in 0..self.count {
+				grown[i] = self.items[i];
+			}
+			free(self.items.ptr);
+			self.items = []T { ptr: grown, len: self.items.len * 2 + 4 };
+		}
+		self.items[self.count] = value;
+		self.count = self.count + 1;
+	}
+
+	pub fn get(self, i: int) -> T
+	{
+		return self.items[i];
+	}
+
+	pub fn size(self) -> int
+	{
+		return size_of(T) as int;
+	}
+}
+
+fn sum<T: add>(items: *List<T>, zero: T) -> T
+{
+	let total = zero;
+	for i in 0..items.count {
+		total = total + items.get(i);
+	}
+	return total;
+}
+
+struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+fn make<A, B>(a: A, b: B) -> Pair<A, B>
+{
+	return Pair<A, B> { first: a, second: b };
+}
+
+variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+fn wrap<T>(v: T) -> Maybe<T>
+{
+	return Maybe<T>.Some { value: v };
+}
+
+fn apply<T>(v: T, f: fn(T) -> T) -> T
+{
+	let twice = fn(x: T) -> T { return f(f(x)); };
+	return twice(v);
+}
+
+abstract class Source<T>
+{
+	pub abstract fn next(self) -> T;
+}
+
+class Counter<T: add> inherits Source<T>
+{
+	pub step: T,
+	pub at: T,
+
+	fn construct(self, start: T, step: T)
+	{
+		self.at = start;
+		self.step = step;
+	}
+
+	concrete fn next(self) -> T
+	{
+		self.at = self.at + self.step;
+		return self.at;
+	}
+
+	concrete fn destruct(self)
+	{
+		printf("destruct %.*s\n".ptr, self.type_name().len as c_int,
+			self.type_name().ptr);
+	}
+}
+
+fn pull<T>(s: *Source<T>) -> T
+{
+	return s.next();
+}
+
+class Box<T>
+{
+	pub value: T,
+
+	pub fn get(self) -> T
+	{
+		return self.value;
+	}
+}
+
+class IntBox inherits Box<int>
+{
+	pub fn doubled(self) -> int
+	{
+		return self.get() * 2;
+	}
+}
+
+abstract class Measured
+{
+	pub abstract fn area(self) -> int;
+}
+
+class Square inherits Measured
+{
+	pub side: int,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn larger<T: Measured>(a: *T, b: *T) -> int
+{
+	return max(a.area(), b.area());
+}
+
+class Numbers
+{
+	pub values: [4]int,
+
+	operator fn index(self, i: int) -> int
+	{
+		return self.values[i];
+	}
+
+	operator fn set_index(self, i: int, v: int)
+	{
+		self.values[i] = v;
+	}
+
+	operator fn iter(self) -> NumbersIter
+	{
+		return NumbersIter { list: self, at: -1 };
+	}
+}
+
+class NumbersIter
+{
+	pub list: *Numbers,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < 4;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.list.values[self.at];
+	}
+}
+
+fn swap<C: index + set_index>(c: C)
+{
+	let first = c[0];
+	c[0] = c[1];
+	c[1] = first;
+}
+
+fn count<C: iter>(c: C) -> int
+{
+	let n = 0;
+	for x in c {
+		let kept = x;
+		n = n + 1;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d\n".ptr, max(3, 7) as c_int, (max(2.5, 1.5) * 2.0) as c_int,
+		max(Money { cents: 5 }, Money { cents: 9 }).cents as c_int);
+
+	let numbers = List<int> { items: []int { ptr: alloc(int, 2), len: 2 } };
+	numbers.push(3);
+	numbers.push(4);
+	numbers.push(5);
+	printf("%d %d %d\n".ptr, numbers.count as c_int, sum(&numbers, 0) as c_int,
+		numbers.size() as c_int);
+	let bytes = List<u8> { items: []u8 { ptr: alloc(u8, 1), len: 1 } };
+	bytes.push(7);
+	printf("%d %d\n".ptr, bytes.get(0) as c_int, bytes.size() as c_int);
+	let people = List<*Person> {
+		items: []*Person {
+			ptr: alloc(*Person, 1),
+			len: 1
+		}
+	};
+	people.push(alloc Person { age: 30 });
+	let orders = List<*Order> {
+		items: []*Order {
+			ptr: alloc(*Order, 1),
+			len: 1
+		}
+	};
+	orders.push(alloc Order { total: 12 });
+	printf("%d %d\n".ptr, people.get(0).age as c_int,
+		orders.get(0).total as c_int);
+	printf("%.*s %.*s\n".ptr, numbers.type_name().len as c_int,
+		numbers.type_name().ptr, people.type_name().len as c_int,
+		people.type_name().ptr);
+
+	let p = make(3, 2.5);
+	printf("%d %d\n".ptr, p.first as c_int, p.second as c_int);
+	switch wrap(9) {
+		Some s => printf("some %d\n".ptr, s.value as c_int),
+		Nothing => printf("nothing\n".ptr),
+	}
+	printf("%d\n".ptr, apply(5, fn(x: int) -> int { return x * 2; }) as c_int);
+
+	{
+		let c = Counter<int>(10, 5);
+		printf("%d %d\n".ptr, pull<int>(&c) as c_int, c.next() as c_int);
+		let f = alloc Counter<float>(0.5, 0.25);
+		printf("%d\n".ptr, (pull<float>(f) * 100.0) as c_int);
+		delete(f);
+	}
+	let b = IntBox { value: 21 };
+	printf("%d\n".ptr, b.doubled() as c_int);
+
+	let small = Square { side: 3 };
+	let big = Square { side: 4 };
+	printf("%d\n".ptr, larger(&small, &big) as c_int);
+
+	let n = Numbers { values: [1, 2, 3, 4] };
+	swap(&n);
+	printf("%d %d %d\n".ptr, n[0] as c_int, n[1] as c_int, count(&n) as c_int);
+	return 0;
+}

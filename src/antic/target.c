@@ -85,6 +85,27 @@ bool target_from_name(const char *name, enum target *t)
    each segment of the module path after its length, '_' and the function
    name. The lengths keep a '_' inside a name from producing the symbol of
    another pair. C reserves names that start with _A. */
+/* DESIGN: the name of a copy of a generic carries its arguments, as in
+   `List<*Person>.push`, and an assembler reads none of `<`, `>`, `,`,
+   `*`, the space and the other marks of a type as part of a symbol. Each
+   byte outside letters, digits, `_` and `.` becomes `$` and its two hex
+   digits, `$` among them, so two names never give one symbol and every
+   name the language had before the copies keeps its symbol. */
+static void symbol_name(struct text *out, const char *name)
+{
+    const char *p;
+
+    for (p = name; *p != '\0'; p++) {
+        unsigned char ch = (unsigned char)*p;
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+            (ch >= '0' && ch <= '9') || ch == '_' || ch == '.') {
+            text_appendf(out, "%c", ch);
+        } else {
+            text_appendf(out, "$%02x", ch);
+        }
+    }
+}
+
 bool mangle(struct text *out, enum target t, const char *module,
             const char *name)
 {
@@ -93,10 +114,10 @@ bool mangle(struct text *out, enum target t, const char *module,
     }
     switch (infos[t].format) {
     case FORMAT_MACHO:
-        text_appendf(out, "_%s.%s", module, name);
+        text_appendf(out, "_%s.", module);
         break;
     case FORMAT_ELF:
-        text_appendf(out, "%s.%s", module, name);
+        text_appendf(out, "%s.", module);
         break;
     case FORMAT_COFF:
         text_append(out, "_A");
@@ -105,9 +126,10 @@ bool mangle(struct text *out, enum target t, const char *module,
             text_appendf(out, "%zu%.*s", n, (int)n, module);
             module += n + (module[n] == '.');
         }
-        text_appendf(out, "_%s", name);
+        text_append(out, "_");
         break;
     }
+    symbol_name(out, name);
     return true;
 }
 

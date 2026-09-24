@@ -28,6 +28,7 @@ struct symbol;  /* what a name refers to, filled in by semantic analysis */
 struct struct_field;    /* a field of a checked type */
 struct expr;
 struct item;
+struct symbolic;
 
 enum type_expr_kind {
     TYPEX_BUILTIN,  /* int, f32, str and the other type keywords */
@@ -251,6 +252,15 @@ struct expr {
     /* EXPR_NAME: a `keep own` parameter that moves into an owner, which
        lowering then clears, so its exits free nothing. */
     bool moves_snapshot;
+    /* DESIGN: the copy of a generic reads its checked tree again with
+       the arguments in place. A node the copy has already made carries
+       prechecked, and the checker then takes its type as it stands. */
+    bool prechecked;
+    /* The type a value of a type parameter had before the checker read
+       it as a pointer to an interface of its constraints. The checker
+       does so to call a function of that interface. The copy converts
+       the value of its argument there. NULL on every other node. */
+    struct type *param_type;
     union {
         uint64_t integer;           /* EXPR_INT */
         uint32_t character;         /* EXPR_CHAR */
@@ -313,6 +323,13 @@ struct expr {
             /* A method of `str` whose pattern is this literal. Its match
                knows the groups. Set by the checker. */
             const struct expr *pattern;
+            /* A call of a generic function, or of a function of a
+               generic class, keeps the arguments of its copy. Those of
+               the class come first and then those of the function, a
+               type or a constant each. Set by the checker. */
+            struct type **copy_args;
+            const struct symbolic **copy_values;
+            size_t copy_count;
         } call;
         struct {
             struct expr *base;
@@ -990,10 +1007,9 @@ struct module {
     size_t dropped_count;
     struct clause *clauses;         /* `allow` and `unchecked` */
     size_t clause_count;
-    /* Set by the checker: the first place that needs a compiled copy of
-       a generic, and the name of that generic. Line 0 where none does. */
-    struct pos generic_use;
-    struct name generic_name;
+    /* Set by the driver on a build past the front end: the checker
+       makes a compiled copy for every use of a generic. */
+    bool compile_copies;
 };
 
 /* Append the tree of module to out, one node per line, indented by two

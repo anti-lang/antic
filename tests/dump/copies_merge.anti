@@ -1,0 +1,29 @@
+// The copies of a generic over two pointer types compile to the same
+// code, so a release build keeps one of them. The copy over `int` differs
+// and stays.
+
+struct Person
+{
+	age: int,
+}
+
+struct Order
+{
+	total: int,
+}
+
+fn pick<T>(items: []T, i: int) -> T
+{
+	return items[i];
+}
+
+fn main() -> int
+{
+	let p = Person { age: 30 };
+	let o = Order { total: 12 };
+	let people = [&p];
+	let orders = [&o];
+	let numbers = [5];
+	return pick(people[0..1], 0).age + pick(orders[0..1], 0).total +
+		pick(numbers[0..1], 0);
+}

@@ -287,8 +287,8 @@ struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
                      t->name.text,
                      strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
     } else {
-        text_appendf(&name, "%.*s.%s", (int)t->name.length, t->name.text,
-                     suffix);
+        type_symbol_name(&name, t);
+        text_appendf(&name, ".%s", suffix);
     }
     g = lower_find_global(m, module, text_cstr(&name));
     /* DESIGN: a class's table and descriptor belong to the module that
@@ -323,7 +323,8 @@ static struct ir_global *struct_global(struct lowerer *l,
     struct text name = {0};
     struct ir_global *g;
 
-    text_appendf(&name, "%.*s.%s", (int)t->name.length, t->name.text, suffix);
+    type_symbol_name(&name, t);
+    text_appendf(&name, ".%s", suffix);
     g = lower_find_global(m, module, text_cstr(&name));
     /* DESIGN: a struct's descriptor belongs to the module that declares
        it, as a class's does. A module that names the struct of another
@@ -1131,7 +1132,8 @@ struct ir_function *lower_class_function(struct lowerer *l,
     struct ir_function *f;
     struct text name = {0};
 
-    text_appendf(&name, "%.*s.%s", (int)t->name.length, t->name.text, part);
+    type_symbol_name(&name, t);
+    text_appendf(&name, ".%s", part);
     f = lower_find_function(l->m, module, text_cstr(&name));
     if (f == NULL) {
         f = strcmp(module, l->module_name) == 0
@@ -1274,9 +1276,9 @@ static struct ir_function *interface_thunk(struct lowerer *l,
     struct text name = {0};
     size_t i;
 
-    text_appendf(&name, "%.*s.%.*s.%.*s.thunk", (int)t->name.length,
-                 t->name.text, (int)sub->name.length, sub->name.text,
-                 (int)fn->name.length, fn->name.text);
+    type_symbol_name(&name, t);
+    text_appendf(&name, ".%.*s.%.*s.thunk", (int)sub->name.length,
+                 sub->name.text, (int)fn->name.length, fn->name.text);
     f = lower_find_function(l->m, l->module_name, text_cstr(&name));
     if (f != NULL) {
         text_free(&name);
@@ -1404,9 +1406,10 @@ struct ir_function *lower_reach_thunk(struct lowerer *l,
     struct text name = {0};
     size_t i;
 
-    text_appendf(&name, "%.*s.%.*s.%.*s.reach", (int)sub->home->name.length,
-                 sub->home->name.text, (int)sub->name.length, sub->name.text,
-                 (int)sym->item->name.length, sym->item->name.text);
+    type_symbol_name(&name, sub->home);
+    text_appendf(&name, ".%.*s.%.*s.reach", (int)sub->name.length,
+                 sub->name.text, (int)sym->item->name.length,
+                 sym->item->name.text);
     f = lower_find_function(l->m, l->module_name, text_cstr(&name));
     if (f != NULL) {
         text_free(&name);

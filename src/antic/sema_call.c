@@ -2273,6 +2273,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
                 return sema_builtin(c, TYPE_ERROR);
             }
             base = types_pointer(c->types, (struct type *)iface);
+            callee->as.field.base->param_type = callee->as.field.base->type;
             callee->as.field.base->type = base;
             callee->as.field.checked = true;
         }

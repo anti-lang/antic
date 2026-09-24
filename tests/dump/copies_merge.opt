@@ -1,0 +1,102 @@
+type []*copies_merge.Person = struct { ptr: ptr, len: i64 }
+type []*copies_merge.Order = struct { ptr: ptr, len: i64 }
+type []int = struct { ptr: ptr, len: i64 }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }
+type copies_merge.Person = struct { age: i64 }
+type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
+type [1]anti.rt.Field = array 1 of anti.rt.Field
+type copies_merge.Order = struct { total: i64 }
+type [1]*copies_merge.Person = array 1 of ptr
+type [1]*copies_merge.Order = array 1 of ptr
+type [1]int = array 1 of i64
+type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
+type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
+type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr, descriptor: ptr }
+type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+global copies_merge.9 size 36 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 32 37 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global copies_merge.10 size 42 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 31 37 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00
+global (null).anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
+global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
+fn copies_merge.main() -> i64 {
+b0:
+    %0 = slot copies_merge.Person
+    %1 = slot copies_merge.Order
+    %2 = slot [1]*copies_merge.Person
+    %3 = slot [1]*copies_merge.Order
+    %4 = slot [1]int
+    %5 = slot []*copies_merge.Person
+    %6 = slot []*copies_merge.Order
+    %7 = slot []int
+    store i64 30, %0
+    store i64 12, %1
+    store ptr %0, %2
+    store ptr %1, %3
+    store i64 5, %4
+    %8 = ptradd %2, 0
+    store ptr %8, %5
+    %9 = ptradd %5, offset_of []*copies_merge.Person.len
+    store i64 1, %9
+    %10 = call ptr @copies_merge.pick<*copies_merge.Person>(%5, 0)
+    %11 = load i64 %10
+    %12 = ptradd %3, 0
+    store ptr %12, %6
+    %13 = ptradd %6, offset_of []*copies_merge.Order.len
+    store i64 1, %13
+    %14 = call ptr @copies_merge.pick<*copies_merge.Person>(%6, 0)
+    %15 = load i64 %14
+    %16 = addov i64 %11, %15
+    branchov %16, b1, b2
+b1:
+    %17 = addr @copies_merge.9
+    call void @anti_rt_check_failed(%17, 35, 1, %11, %15)
+    jump b2
+b2:
+    %18 = ptradd %4, 0
+    store ptr %18, %7
+    %19 = ptradd %7, offset_of []int.len
+    store i64 1, %19
+    %20 = call i64 @copies_merge.pick<int>(%7, 0)
+    %21 = addov i64 %16, %20
+    branchov %21, b3, b4
+b3:
+    %22 = addr @copies_merge.9
+    call void @anti_rt_check_failed(%22, 35, 1, %16, %20)
+    jump b4
+b4:
+    ret i64 %21
+}
+fn copies_merge.pick<*copies_merge.Person>(%0: agg []*copies_merge.Person, %1: i64) -> ptr {
+b0:
+    %2 = ptradd %0, offset_of []*copies_merge.Person.len
+    %3 = load i64 %2
+    %4 = load ptr %0
+    %5 = ult i8 %1, %3
+    branch %5, b2, b1
+b1:
+    %6 = addr @copies_merge.10
+    call void @anti_rt_check_failed(%6, 41, 0, %1, %3)
+    jump b2
+b2:
+    %7 = mul i64 %1, size_of ptr
+    %8 = ptradd %4, %7
+    %9 = load ptr %8
+    ret ptr %9
+}
+fn copies_merge.pick<int>(%0: agg []int, %1: i64) -> i64 {
+b0:
+    %2 = ptradd %0, offset_of []int.len
+    %3 = load i64 %2
+    %4 = load ptr %0
+    %5 = ult i8 %1, %3
+    branch %5, b2, b1
+b1:
+    %6 = addr @copies_merge.10
+    call void @anti_rt_check_failed(%6, 41, 0, %1, %3)
+    jump b2
+b2:
+    %7 = mul i64 %1, size_of i64
+    %8 = ptradd %4, %7
+    %9 = load i64 %8
+    ret i64 %9
+}

@@ -2868,10 +2868,14 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
 struct type *sema_check_expr(struct checker *c, struct expr *e,
                              struct type *expected)
 {
-    struct type *t = check_expr_inner(c, e, expected);
+    struct type *t;
     struct expr *read;
     struct expr *cast;
 
+    if (e->prechecked) {
+        return e->type;
+    }
+    t = check_expr_inner(c, e, expected);
     e->type = t;
     if (t->kind != TYPE_F16 || e->kind == EXPR_CAST) {
         return t;
@@ -2890,7 +2894,12 @@ struct type *sema_check_expr(struct checker *c, struct expr *e,
    of `&`. A read of an f16 there stays an f16. */
 struct type *sema_check_storage(struct checker *c, struct expr *e)
 {
-    struct type *t = check_expr_inner(c, e, NULL);
+    struct type *t;
+
+    if (e->prechecked) {
+        return e->type;
+    }
+    t = check_expr_inner(c, e, NULL);
     e->type = t;
     return t;
 }

@@ -1445,6 +1445,8 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     case TYPE_VARIANT:
         if (qualified) {
             text_appendf(out, "%.*s.", (int)t->module.length, t->module.text);
+            type_symbol_name(out, t);
+            return;
         }
         text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
         return;
@@ -1455,6 +1457,27 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         text_append(out, builtin_names[t->kind]);
         return;
     }
+}
+
+void type_symbol_name(struct text *out, const struct type *t)
+{
+    const struct type *g = t->generic;
+    size_t i;
+
+    if (g == NULL) {
+        text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
+        return;
+    }
+    text_appendf(out, "%.*s<", (int)g->name.length, g->name.text);
+    for (i = 0; i < g->type_param_count; i++) {
+        text_append(out, i > 0 ? ", " : "");
+        if (t->values[i] != NULL) {
+            symbolic_print(out, t->values[i], true);
+        } else {
+            print_type(out, t->args[i], true);
+        }
+    }
+    text_append(out, ">");
 }
 
 bool type_is_integer(const struct type *t)

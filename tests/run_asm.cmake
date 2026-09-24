@@ -8,6 +8,7 @@
 #   SOURCE    the .anti file
 #   OPTIONS   optional options of antic, separated by |
 #   WORK      a directory for the assembly and object files
+#   HOLDS     optional lines the assembly must hold, separated by |
 
 if(NOT EXISTS "${LLVM_MC}")
     message(FATAL_ERROR
@@ -27,6 +28,17 @@ execute_process(
     ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
     message(FATAL_ERROR "antic -S failed with ${status}\n${out}${err}")
+endif()
+
+if(DEFINED HOLDS AND NOT HOLDS STREQUAL "")
+    file(READ "${assembly}" text)
+    string(REPLACE "|" ";" lines "${HOLDS}")
+    foreach(line IN LISTS lines)
+        string(FIND "${text}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "${assembly} holds no line `${line}`")
+        endif()
+    endforeach()
 endif()
 
 execute_process(

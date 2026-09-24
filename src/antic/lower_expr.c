@@ -76,8 +76,12 @@ bool lower_has_default(const struct struct_field *field)
    abstract class has no complete value and therefore none. */
 void lower_init_name(const struct type *t, bool exported, struct text *out)
 {
-    text_appendf(out, exported ? "anti_%.*s_init" : "%.*s.init",
-                 (int)t->name.length, t->name.text);
+    if (exported) {
+        text_appendf(out, "anti_%.*s_init", (int)t->name.length, t->name.text);
+        return;
+    }
+    type_symbol_name(out, t);
+    text_append(out, ".init");
 }
 
 /* The init function of class t, declared in the module that declares t

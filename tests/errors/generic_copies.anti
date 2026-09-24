@@ -1,20 +1,19 @@
-// A build past the front end refuses the first use that needs a compiled
-// copy of a generic, and compiles a generic that nothing uses.
+// A build past the front end compiles a copy of every generic it uses. A
+// function of a class with type parameters of its own is not compiled yet,
+// and its first call is refused.
 
-fn max<T: lt>(a: T, b: T) -> T
+class Box<T>
 {
-	if a < b {
-		return b;
+	pub value: T,
+
+	pub fn pair<U>(self, other: U) -> U
+	{
+		return other;
 	}
-	return a;
-}
-
-fn unused<T>(a: T) -> T
-{
-	return a;
 }
 
 fn main() -> int
 {
-	return max(3, 7) - 7;
+	let b = Box<int> { value: 7 };
+	return b.pair(0);
 }

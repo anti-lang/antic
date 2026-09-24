@@ -495,6 +495,17 @@ foreach(name IN ITEMS wrapping saturating compound_wrapping mul_high flags
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
+# The copies of generics in dev mode, which compiles each module apart and
+# prints what the release build of the same program prints.
+add_test(NAME program_generic_copies_dev
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/generic_copies.anti"
+        "-DOPTIONS=--dev"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 # Locking and channels in dev mode, whose checks run inside every `sync`
 # block and every arm of a `select`. sync_exits fails with the errors of
 # anti.lang, so its dev link names the object of anti.lang.
@@ -3028,6 +3039,8 @@ foreach(case "symbolic.types|--dump-types,${DUMP}/symbolic.anti"
         "devirt.dev.ir|--dev,--dump-ir,${DUMP}/devirt.anti"
         "devirt.opt|--dump-opt,${DUMP}/devirt.anti"
         "devirt.dev.opt|--dev,--dump-opt,${DUMP}/devirt.anti"
+        "copies_merge.opt|--dump-opt,${DUMP}/copies_merge.anti"
+        "copies_merge.dev.opt|--dev,--dump-opt,${DUMP}/copies_merge.anti"
         "forward.ir|--dump-ir,${DUMP}/forward.anti"
         "forward.opt|--dump-opt,${DUMP}/forward.anti"
         "probe.ir|--dump-ir,${CMAKE_CURRENT_SOURCE_DIR}/abi/probe.anti"
@@ -3179,6 +3192,26 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
             "-DOPTIONS=-g"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-debug"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
+    # A copy of a generic in dev mode is link-once: a weak definition on
+    # ELF and Mach-O and a COMDAT section on COFF.
+    if(target MATCHES "^linux")
+        set(once ".weak copies_merge.pick$3c$2acopies_merge.Person$3e")
+    elseif(target MATCHES "^macos")
+        set(once ".weak_definition _copies_merge.pick$3c$2acopies_merge.Person$3e")
+    else()
+        set(once ".text,\"xr\",discard,_A12copies_merge_pick$3c$2acopies_merge.Person$3e")
+    endif()
+    add_test(NAME asm_copies_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DTARGET=${target}"
+            "-DTRIPLE=${triple}"
+            "-DOPTIONS=--dev"
+            "-DHOLDS=${once}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/copies_merge.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-copies"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
     # A shared library for C, with the constructor section of the target.
     add_test(NAME asm_clib_${target}

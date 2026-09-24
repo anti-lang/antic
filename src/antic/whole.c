@@ -264,6 +264,299 @@ static void devirtualise(struct whole *w, struct ir_module *m)
     }
 }
 
+/* DESIGN: the copies of a generic over types of one layout compile to
+   the same code: `List<*Person>` and `List<*Order>` both hold pointers.
+   A release build sees every copy in one IR. It keeps one of each set
+   of copies whose code is identical, and that copy serves them all. Two
+   functions are identical when their parameters, results, temporaries
+   and instructions are. An aggregate compares by its layout, not its
+   name, and a symbolic value by what it computes. A global compares as
+   itself, or by its bytes where it is data without addresses, such as
+   the text of a failed check. A call of another copy compares by the
+   copy that stands for it, so a merge can make two callers identical
+   in turn. A copy is known by its name, which carries its arguments.
+   Only copies merge, so a function the program wrote keeps its own
+   address. */
+
+static bool is_copy(const struct ir_function *f)
+{
+    return !f->is_extern && !f->exported && f->module != NULL &&
+           f->block_count > 0 && strchr(f->name, '<') != NULL;
+}
+
+static bool same_vtype(const struct ir_module *m, struct ir_vtype a,
+                       struct ir_vtype b);
+
+static bool same_agg(const struct ir_module *m, uint32_t a, uint32_t b);
+
+static bool same_sym(const struct ir_module *m, uint32_t a, uint32_t b)
+{
+    const struct ir_sym *x;
+    const struct ir_sym *y;
+
+    if (a == b) {
+        return true;
+    }
+    if (a == IR_NO_AGG || b == IR_NO_AGG || a >= m->sym_count ||
+        b >= m->sym_count) {
+        return false;
+    }
+    x = &m->syms[a];
+    y = &m->syms[b];
+    if (x->kind != y->kind || x->type != y->type) {
+        return false;
+    }
+    switch (x->kind) {
+    case IR_SYM_INT:
+        return x->value == y->value;
+    case IR_SYM_SIZE_OF:
+        return same_vtype(m, x->of, y->of);
+    case IR_SYM_OFFSET_OF:
+        return x->field == y->field && same_vtype(m, x->of, y->of);
+    case IR_SYM_OP:
+        return x->op == y->op && same_sym(m, x->a, y->a) &&
+               same_sym(m, x->b, y->b);
+    }
+    return false;
+}
+
+static bool same_agg(const struct ir_module *m, uint32_t a, uint32_t b)
+{
+    const struct ir_aggtype *x;
+    const struct ir_aggtype *y;
+    size_t i;
+
+    if (a == b) {
+        return true;
+    }
+    if (a == IR_NO_AGG || b == IR_NO_AGG) {
+        return false;
+    }
+    x = m->aggs[a];
+    y = m->aggs[b];
+    if (x->kind != y->kind || x->field_count != y->field_count ||
+        x->packed != y->packed || x->simd != y->simd || x->align != y->align) {
+        return false;
+    }
+    if (x->kind == IR_AGG_ARRAY && !same_sym(m, x->length, y->length)) {
+        return false;
+    }
+    for (i = 0; i < x->field_count; i++) {
+        if (x->fields[i].bits != y->fields[i].bits ||
+            x->fields[i].ext != y->fields[i].ext ||
+            !same_vtype(m, x->fields[i].type, y->fields[i].type)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool same_vtype(const struct ir_module *m, struct ir_vtype a,
+                       struct ir_vtype b)
+{
+    return a.type == b.type && (a.type != IR_AGG || same_agg(m, a.agg, b.agg));
+}
+
+/* Whether the globals a and b hold the same thing. They are one, or
+   both are data of the same bytes that no program writes and that holds
+   no address. */
+static bool same_global(const struct ir_module *m, uint32_t a, uint32_t b)
+{
+    const struct ir_global *x = m->globals[a];
+    const struct ir_global *y = m->globals[b];
+
+    if (a == b) {
+        return true;
+    }
+    if (x->value != NULL || y->value != NULL || x->reloc_count > 0 ||
+        y->reloc_count > 0 || x->mutable || y->mutable || x->exported ||
+        y->exported || x->is_extern || y->is_extern || x->size != y->size ||
+        x->align != y->align) {
+        return false;
+    }
+    return x->size == 0 || memcmp(x->bytes, y->bytes, x->size) == 0;
+}
+
+/* The copy that stands for function f. */
+static uint32_t stands_for(const uint32_t *rep, uint32_t f)
+{
+    while (rep[f] != f) {
+        f = rep[f];
+    }
+    return f;
+}
+
+static bool same_operand(const struct ir_module *m, const uint32_t *rep,
+                         const struct ir_operand *a,
+                         const struct ir_operand *b)
+{
+    if (a->kind != b->kind || a->type != b->type) {
+        return false;
+    }
+    switch (a->kind) {
+    case IR_NONE:
+        return true;
+    case IR_TEMP:
+        return a->as.temp == b->as.temp;
+    case IR_INT:
+        return a->as.integer == b->as.integer;
+    case IR_FLOAT:
+        return memcmp(&a->as.floating, &b->as.floating,
+                      sizeof a->as.floating) == 0;
+    case IR_GLOBAL:
+        return same_global(m, a->as.index, b->as.index);
+    case IR_FUNC:
+        return stands_for(rep, a->as.index) == stands_for(rep, b->as.index);
+    case IR_BLOCK:
+        return a->as.index == b->as.index;
+    case IR_SYM:
+        return same_sym(m, a->as.index, b->as.index);
+    }
+    return false;
+}
+
+static bool same_function(const struct ir_module *m, const uint32_t *rep,
+                          const struct ir_function *f,
+                          const struct ir_function *g)
+{
+    size_t b;
+    size_t i;
+    size_t k;
+
+    if (f->param_count != g->param_count || f->result != g->result ||
+        f->block_count != g->block_count || f->temp_count != g->temp_count ||
+        f->variadic != g->variadic || f->worker != g->worker ||
+        (f->result == IR_AGG && !same_agg(m, f->result_agg, g->result_agg))) {
+        return false;
+    }
+    for (i = 0; i < f->param_count; i++) {
+        const struct ir_param *p = &f->params[i];
+        const struct ir_param *q = &g->params[i];
+        if (p->type != q->type || p->ext != q->ext || p->temp != q->temp ||
+            (p->type == IR_AGG && !same_agg(m, p->agg, q->agg))) {
+            return false;
+        }
+    }
+    for (i = 0; i < f->temp_count; i++) {
+        if (f->temps[i] != g->temps[i]) {
+            return false;
+        }
+    }
+    for (b = 0; b < f->block_count; b++) {
+        const struct ir_block *x = f->blocks[b];
+        const struct ir_block *y = g->blocks[b];
+        if (x->count != y->count || x->fail != y->fail) {
+            return false;
+        }
+        for (i = 0; i < x->count; i++) {
+            const struct ir_inst *p = &x->insts[i];
+            const struct ir_inst *q = &y->insts[i];
+            if (p->op != q->op || p->type != q->type ||
+                p->result != q->result || p->field != q->field ||
+                p->arg_count != q->arg_count ||
+                !same_vtype(m, p->of, q->of) ||
+                !same_operand(m, rep, &p->a, &q->a) ||
+                !same_operand(m, rep, &p->b, &q->b) ||
+                !same_operand(m, rep, &p->c, &q->c)) {
+                return false;
+            }
+            for (k = 0; k < p->arg_count; k++) {
+                if (!same_operand(m, rep, &p->args[k], &q->args[k])) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+static void redirect_operand(const uint32_t *rep, struct ir_operand *o)
+{
+    if (o->kind == IR_FUNC) {
+        o->as.index = stands_for(rep, o->as.index);
+    }
+}
+
+static void redirect_const(const uint32_t *rep, struct ir_const *c)
+{
+    size_t i;
+
+    if (c->kind == IR_CONST_FUNC) {
+        c->global = stands_for(rep, c->global);
+    } else if (c->kind == IR_CONST_AGG) {
+        for (i = 0; i < c->item_count; i++) {
+            redirect_const(rep, &c->items[i]);
+        }
+    }
+}
+
+static void merge_copies(struct ir_module *m)
+{
+    uint32_t *rep = ir_alloc(m->function_count, sizeof *rep);
+    bool merged = false;
+    bool changed = true;
+    size_t i;
+    size_t j;
+    size_t b;
+    size_t k;
+
+    for (i = 0; i < m->function_count; i++) {
+        rep[i] = (uint32_t)i;
+    }
+    while (changed) {
+        changed = false;
+        for (i = 0; i < m->function_count; i++) {
+            if (rep[i] != i || !is_copy(m->functions[i])) {
+                continue;
+            }
+            for (j = 0; j < i; j++) {
+                if (rep[j] == j && is_copy(m->functions[j]) &&
+                    same_function(m, rep, m->functions[j], m->functions[i])) {
+                    rep[i] = (uint32_t)j;
+                    changed = true;
+                    merged = true;
+                    break;
+                }
+            }
+        }
+    }
+    if (!merged) {
+        free(rep);
+        return;
+    }
+    for (i = 0; i < m->function_count; i++) {
+        struct ir_function *f = m->functions[i];
+        for (b = 0; b < f->block_count; b++) {
+            for (j = 0; j < f->blocks[b]->count; j++) {
+                struct ir_inst *inst = &f->blocks[b]->insts[j];
+                redirect_operand(rep, &inst->a);
+                redirect_operand(rep, &inst->b);
+                redirect_operand(rep, &inst->c);
+                for (k = 0; k < inst->arg_count; k++) {
+                    redirect_operand(rep, &inst->args[k]);
+                }
+            }
+        }
+    }
+    for (i = 0; i < m->global_count; i++) {
+        struct ir_global *g = m->globals[i];
+        if (g->value != NULL) {
+            redirect_const(rep, g->value);
+        }
+        for (k = 0; k < g->reloc_count; k++) {
+            if (g->relocs[k].fn) {
+                g->relocs[k].global = stands_for(rep, g->relocs[k].global);
+            }
+        }
+    }
+    for (i = 0; i < m->class_count; i++) {
+        if (m->classes[i]->init != IR_NO_INDEX) {
+            m->classes[i]->init = stands_for(rep, m->classes[i]->init);
+        }
+    }
+    free(rep);
+}
+
 /* What the entries of the program reach. */
 struct reach {
     bool *functions;
@@ -2273,6 +2566,7 @@ bool whole_program(struct ir_module *program,
     }
     if (options->release) {
         devirtualise(w, program);
+        merge_copies(program);
     }
     whole_free(w);
     return ok;

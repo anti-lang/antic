@@ -374,9 +374,30 @@ void sema_declare_generics(struct checker *c);
 void sema_resolve_generics(struct checker *c);
 struct type *sema_alias_type(struct checker *c, struct symbol *sym);
 void sema_run_pending(struct checker *c);
-void sema_note_generic_use(struct checker *c, struct pos pos,
-                           const struct name *generic);
 bool sema_has_params(const struct type *t);
+/* The parameters of a generic and what stands in their place, a type or
+   a constant, and the generic type whose copy it is. */
+struct generic_map {
+    struct types *types;
+    const struct type *from;
+    struct type *to;
+    struct type *const *params;
+    struct type **args;
+    const struct symbolic **values;
+    size_t count;
+};
+/* t with the arguments of map in place of its parameters. */
+struct type *sema_subst(struct checker *c, struct type *t,
+                        const struct generic_map *map);
+const struct symbolic *sema_subst_symbolic(struct checker *c,
+                                           const struct symbolic *s,
+                                           const struct generic_map *map);
+/* The map of the generic of copy to the arguments of copy. */
+struct generic_map sema_copy_map(const struct type *copy);
+/* The copy of generic with these arguments, made on its first use. */
+struct type *sema_copy_named(struct checker *c, struct type *generic,
+                             struct type **args,
+                             const struct symbolic **values);
 void sema_generic_ready(struct checker *c, struct type *generic);
 struct type *sema_copy_of(struct checker *c, struct type *generic,
                           struct type_expr *const *written, size_t count,
@@ -401,6 +422,16 @@ struct type *sema_param_index(struct checker *c, struct expr *e,
 const struct type *sema_param_iface(const struct type *p,
                                     const struct name *name);
 void sema_check_generic_item(struct checker *c, const struct item *it);
+
+/* sema_copies.c */
+
+/* Make a compiled copy of every generic the module uses with concrete
+   arguments, and add each to the items of the module. */
+void sema_compile_copies(struct checker *c);
+/* e[i] = v in the statement s, which a copy reads again with the type of
+   its argument. Returns false when the base has no hook, and s is then a
+   plain assignment. */
+bool sema_set_index(struct checker *c, struct stmt *s);
 
 /* sema_pattern.c */
 

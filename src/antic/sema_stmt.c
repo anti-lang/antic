@@ -686,6 +686,11 @@ static bool check_set_index(struct checker *c, struct stmt *s)
     return true;
 }
 
+bool sema_set_index(struct checker *c, struct stmt *s)
+{
+    return check_set_index(c, s);
+}
+
 /* The captured variable declared deepest of the closure that the value e
    gives, or NULL when e gives none or one that captures nothing. */
 static const struct symbol *held_deepest(const struct expr *e)

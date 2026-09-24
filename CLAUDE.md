@@ -246,7 +246,8 @@ sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
 four are built. Then generics and closures. Closures are built, `snapshot fn`
 included. Round five, generics and collections, stands in the same document.
-Its first two parts, the syntax of generics and the constraints, are built, and none of the rest.
+Its first three parts, the syntax of generics, the constraints and the
+compiled copies of a module's own generics, are built, and none of the rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -507,9 +508,11 @@ reports what it finished.
   where it stands, and infers the type arguments of a call. Hooks,
   interfaces, `+`, named sets and `Number` of `anti.lang` are
   constraints, and a parameter without them is stored, copied, passed on
-  and measured alone. A build past
-  the front end refuses a use that needs a compiled copy, and leaves out a
-  generic that nothing uses. See "Generics and collections" in
+  and measured alone. Every use with concrete arguments compiles a copy of
+  its own, `max<int>` and `List<int>.push`, a clone of the checked tree
+  with the arguments in place. A dev build marks a copy link-once, and a
+  release build merges copies whose code is identical. A generic in a
+  library file comes next. See "Generics and collections" in
   `docs/decisions.md` and `docs/notes/generics.md`.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.

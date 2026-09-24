@@ -2551,11 +2551,16 @@ static void class_record(struct lowerer *l, const struct module *module,
                          const struct item *it)
 {
     const struct type *t = it->symbol->type;
-    char *name = lower_cstr(&t->name);
-    struct ir_class *c = ir_class_add(l->m, l->module_name, name);
+    struct text symbol = {0};
+    char *name;
+    struct ir_class *c;
     const struct type *up;
     size_t k;
 
+    type_symbol_name(&symbol, t);
+    name = lower_copy_text(&symbol);
+    text_free(&symbol);
+    c = ir_class_add(l->m, l->module_name, name);
     free(name);
     c->flags = (it->is_abstract ? IR_CLASS_ABSTRACT : 0u) |
                (t->is_final ? IR_CLASS_FINAL : 0u) |
