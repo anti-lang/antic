@@ -398,8 +398,13 @@ static struct type_expr *type_level(struct parser *p)
         next(p);
         ty->kind = TYPEX_BUILTIN;
         ty->builtin = t->kind;
-    } else if (t->kind == TOKEN_IDENT) {
+    } else if (t->kind == TOKEN_IDENT ||
+               (t->kind == TOKEN_QUESTION &&
+                peek_at(p, 1)->kind == TOKEN_IDENT)) {
+        /* `?Match` is a match that may be `none`. The checker refuses
+           the `?` before any other name. */
         ty->kind = TYPEX_NAMED;
+        ty->nullable = accept(p, TOKEN_QUESTION);
         expect_name(p, &ty->name);
         if (accept(p, TOKEN_DOT)) {
             ty->module = ty->name;

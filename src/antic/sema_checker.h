@@ -324,6 +324,22 @@ void sema_check_function(struct checker *c, struct item *it);
 void sema_check_main(struct checker *c, struct item *it);
 void sema_check_test_block(struct checker *c, struct item *it);
 
+/* sema_pattern.c */
+
+/* Whether the call e names a method of `str` with a pattern or a function
+   of a match. It then checks the receiver and every argument and writes
+   the call of `anti.regex` over e, and *fn holds its function type or an
+   error. */
+bool sema_pattern_call(struct checker *c, struct expr *e, struct type **fn);
+/* `m.1` and `m.name` of the match t of a pattern literal, the call of
+   `group` written over e. */
+struct type *sema_match_field(struct checker *c, struct expr *e,
+                              struct type *t);
+/* Check e where a condition stands. A match there is its test. */
+struct type *sema_check_test(struct checker *c, struct expr *e);
+/* `if let m = e { }` on the match t of the checked value. */
+void sema_if_let_match(struct checker *c, struct stmt *s, struct type *t);
+
 /* sema_export.c */
 
 void sema_check_extern_fn(struct checker *c, struct item *it);

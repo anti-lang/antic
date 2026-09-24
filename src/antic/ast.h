@@ -51,7 +51,8 @@ struct type_expr {
     struct name member;
     struct type_expr *element;      /* TYPEX_POINTER, TYPEX_ARRAY, TYPEX_SLICE,
                                        TYPEX_CHAN */
-    bool nullable;                  /* TYPEX_POINTER: `?*T` */
+    /* TYPEX_POINTER: `?*T`, and TYPEX_NAMED: `?Match` */
+    bool nullable;
     struct expr *length;            /* TYPEX_ARRAY */
     struct type_expr **params;      /* TYPEX_FN, TYPEX_TUPLE */
     size_t param_count;
@@ -293,6 +294,13 @@ struct expr {
             /* The call stands after `?.`, which gives a `?*T` whatever
                the call gives, so a `catch` may guard that. */
             bool optional;
+            /* `s.matches(r)` stands where a condition is read and is
+               only tested, so it asks for no groups. Set by the checker
+               before it checks the call. */
+            bool tested;
+            /* A method of `str` whose pattern is this literal. Its match
+               knows the groups. Set by the checker. */
+            const struct expr *pattern;
         } call;
         struct {
             struct expr *base;
@@ -309,6 +317,9 @@ struct expr {
             /* The sub-object whose table `T.f` reaches, for a body
                qualified by an interface. NULL for every other field. */
             const struct struct_field *through;
+            /* The checker checked the base already. The call of a method
+               of a pattern that it wrote reads the type there. */
+            bool checked;
             uint32_t enum_value;    /* the index of an enum value, plus 1 */
             bool promoted;          /* the checker wrote it, not the program */
             bool element;           /* `t.0`, which names the field `_0` */

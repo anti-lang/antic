@@ -444,7 +444,7 @@ static bool block_leaves(const struct block *b)
 
 static void check_condition(struct checker *c, struct expr *cond)
 {
-    struct type *t = sema_check_expr(c, cond, NULL);
+    struct type *t = sema_check_test(c, cond);
 
     if (!sema_is_error(t) && t->kind != TYPE_BOOL) {
         sema_error_at(c, cond->pos, "a condition has type `bool`, found `%s`",
@@ -586,9 +586,9 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
     sema_refuse_lock_copy(c, value, t);
 }
 
-/* Whether a value of t holds a Mutex: the Mutex itself, or a struct, a
-   class, a tuple, a variant or an array with one inside it. A pointer
-   holds none. */
+/* Whether a value of t holds a Mutex. It does when it is one, or a
+   struct, a class, a tuple, a variant or an array with one inside it. A
+   pointer holds none. */
 bool sema_holds_mutex(const struct type *t)
 {
     size_t i;
@@ -1159,7 +1159,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
                       "and a `catch` on a pointer guards no failure");
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (!type_is_nullable(value)) {
+    if (!type_is_nullable(value) || types_is_match(value)) {
         sema_error_at(c, h->pos, "`catch` here guards a `?*T`, found `%s`",
                       sema_tn(value));
         return sema_builtin(c, TYPE_ERROR);
@@ -1848,6 +1848,13 @@ static void check_stmt(struct checker *c, struct stmt *s)
                                   "and a collection gives its elements by "
                                   "`value`");
                     element = sema_builtin(c, TYPE_ERROR);
+                } else if (types_is_match(element) &&
+                           s->as.for_loop.over->kind == EXPR_CALL &&
+                           s->as.for_loop.over->as.call.pattern != NULL) {
+                    /* The matches of a pattern literal know its
+                       groups. */
+                    element = types_match(c->types,
+                                          s->as.for_loop.over->as.call.pattern);
                 }
             } else if (!sema_is_error(over)) {
                 element = over->element;
@@ -1932,6 +1939,12 @@ static void check_stmt(struct checker *c, struct stmt *s)
         bool variant;
         size_t k;
         size_t j;
+        if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
+            types_is_match(over) &&
+            s->as.switch_stmt.arms[0].binds.length == 0) {
+            sema_if_let_match(c, s, over);
+            return;
+        }
         if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
             over->kind != TYPE_VARIANT) {
             sema_error_at(c, s->as.switch_stmt.value->pos, "`if let` takes a "
@@ -2535,8 +2548,8 @@ const struct item *sema_named_function(const struct checker *c)
 }
 
 /* DESIGN: a type is thread-safe when it is built to be changed from more
-   than one thread at once: a `Mutex`, a channel, a synchronized class
-   and a concurrent class. An atomic is a field or a local marked
+   than one thread at once. Such are a `Mutex`, a channel, a synchronized
+   class and a concurrent class. An atomic is a field or a local marked
    `atomic`, so sema_thread_safe_symbol asks the variable as well. */
 bool sema_thread_safe(const struct type *t)
 {
@@ -2802,9 +2815,9 @@ static struct type *anonymous_type(struct checker *c, struct item *it,
     return types_fn(c->types, params, it->param_count, result);
 }
 
-/* Whether a value of t copies fully into a snapshot: a number, `bool`,
-   `char`, an enum, a struct of those, and a `str` at the top, whose
-   bytes the snapshot copies. */
+/* Whether a value of t copies fully into a snapshot. A number, `bool`,
+   `char`, an enum and a struct of those do. So does a `str` at the top,
+   whose bytes the snapshot copies. */
 static bool snapshot_copies(const struct type *t, bool top)
 {
     size_t i;

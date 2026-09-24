@@ -254,6 +254,18 @@ static void error_may_be_none(struct checker *c, const struct expr *e,
     struct text spelling = {0};
     const char *form = t != NULL && t->kind == TYPE_FN ? "?fn(...)" : "?*T";
 
+    /* A match that may be `none` is tested before it is read. */
+    if (types_is_match(t)) {
+        if (sema_spell(&spelling, e)) {
+            sema_error_at(c, e->pos, "`%s` may be `none`, test it before "
+                          "reading it", text_cstr(&spelling));
+        } else {
+            sema_error_at(c, e->pos, "the match may be `none`, test it before "
+                          "reading it");
+        }
+        text_free(&spelling);
+        return;
+    }
     if (sema_spell(&spelling, e)) {
         sema_error_at(c, e->pos, "`%s` may be `none`, check it or use `%s`",
                       text_cstr(&spelling), form);
@@ -637,7 +649,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         }
         return t;
     case TOKEN_BANG:
-        t = sema_check_expr(c, operand, NULL);
+        t = sema_check_test(c, operand);
         if (!sema_is_error(t) && t->kind != TYPE_BOOL) {
             sema_error_at(c, e->pos, "unary `!` needs a `bool`, found `%s`",
                           sema_tn(t));
@@ -1175,7 +1187,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
         size_t count;
         struct scope narrowed;
         size_t i;
-        left = sema_check_expr(c, e->as.binary.left, NULL);
+        left = sema_check_test(c, e->as.binary.left);
         count = sema_proved_names(e->as.binary.left, op == TOKEN_AND_AND,
                                   proved,
                                   0);
@@ -1183,7 +1195,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
         for (i = 0; i < count; i++) {
             sema_narrow(c, proved[i], sema_proved_type(c, proved[i]));
         }
-        right = sema_check_expr(c, e->as.binary.right, NULL);
+        right = sema_check_test(c, e->as.binary.right);
         sema_leave_scope(c, &narrowed);
         if (sema_is_error(left) || sema_is_error(right)) {
             return sema_builtin(c, TYPE_ERROR);
@@ -1204,6 +1216,14 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
     case TOKEN_GE:
         if (!binary_operands(c, e, NULL, &left, &right)) {
             return sema_builtin(c, TYPE_ERROR);
+        }
+        /* A match compares with `none` alone, which reads its first
+           word as a pointer's comparison reads the pointer. */
+        if ((op == TOKEN_EQ || op == TOKEN_NE) &&
+            (e->as.binary.left->kind == EXPR_NONE ||
+             e->as.binary.right->kind == EXPR_NONE) &&
+            (types_is_match(left) || types_is_match(right))) {
+            return sema_builtin(c, TYPE_BOOL);
         }
         if (type_is_simd(left) || type_is_simd(right)) {
             return check_simd_binary(c, e, left, right);
@@ -2227,6 +2247,15 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         }
         if (expected != NULL && (expected->kind == TYPE_POINTER ||
                                  expected->kind == TYPE_FN)) {
+            return expected;
+        }
+        /* A match that may be `none` holds it, and a `Match` does not. */
+        if (expected != NULL && types_is_match(expected)) {
+            if (!expected->nullable) {
+                sema_error_at(c, e->pos, "`%s` cannot hold `none`",
+                              sema_tn(expected));
+                return sema_builtin(c, TYPE_ERROR);
+            }
             return expected;
         }
         if (expected == NULL || !sema_is_error(expected)) {

@@ -51,6 +51,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/sema_const.c
     src/antic/sema_export.c
     src/antic/sema_expr.c
+    src/antic/sema_pattern.c
     src/antic/sema_safety.c
     src/antic/sema_stmt.c
     src/antic/target.c

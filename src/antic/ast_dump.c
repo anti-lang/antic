@@ -113,7 +113,7 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
         end(d, start, NULL);
         break;
     case TYPEX_NAMED:
-        label_name(d, "type", &t->module, &t->name);
+        label_name(d, t->nullable ? "type ?" : "type", &t->module, &t->name);
         end(d, start, NULL);
         break;
     case TYPEX_POINTER:

@@ -31,6 +31,40 @@ bool pattern_compiles(const char *bytes, size_t length, size_t *offset,
     return false;
 }
 
+long pattern_group_count(const char *bytes, size_t length)
+{
+    int32_t code = 0;
+    int64_t at = 0;
+    void *compiled = anti_rt_regex_compile((const unsigned char *)bytes,
+                                           (int64_t)length, &code, &at);
+    long count;
+
+    if (compiled == NULL) {
+        return 0;
+    }
+    count = (long)anti_rt_regex_group_count(compiled);
+    anti_rt_regex_free(compiled);
+    return count;
+}
+
+long pattern_group_number(const char *bytes, size_t length, const char *name,
+                          size_t name_length)
+{
+    int32_t code = 0;
+    int64_t at = 0;
+    void *compiled = anti_rt_regex_compile((const unsigned char *)bytes,
+                                           (int64_t)length, &code, &at);
+    long number;
+
+    if (compiled == NULL) {
+        return -1;
+    }
+    number = (long)anti_rt_regex_group_number(
+        compiled, (const unsigned char *)name, (int64_t)name_length);
+    anti_rt_regex_free(compiled);
+    return number;
+}
+
 /* DESIGN: the check `exponential-pattern` reads the pattern into a tree
    of its own and asks one question of every repeat: can the text it
    repeats also start the next round of an unbounded repeat around it?

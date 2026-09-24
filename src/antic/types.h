@@ -197,8 +197,8 @@ struct type {
     bool traced;                    /* TYPE_CLASS: written `trace class` */
     /* DESIGN: a thread-safe class. A synchronized class runs every
        function that is not private under one hidden lock. A concurrent
-       class has every field guarded, atomic or fixed, and a type nested
-       in one carries the mark so its fields are checked the same way.
+       class has every field guarded, atomic or fixed. A type nested in
+       one carries the mark, so its fields are checked the same way.
        unchecked_fields marks `unchecked(unguarded-field)` in the class
        header, which the check of every field passes over. */
     enum thread_safety safety;      /* TYPE_CLASS, TYPE_STRUCT */
@@ -209,7 +209,7 @@ struct type {
     /* DESIGN: `compatible 1.1;` in the body of an abstract class names
        the lowest version a plugin may have been built for. The
        descriptor of the class carries it, so the loader reads it where
-       the program runs, and a library file carries it, so every module
+       the program runs. A library file carries it, so every module
        writes the same descriptor. It is empty where the body has no
        such line. */
     struct name compatible;         /* TYPE_CLASS: `compatible <version>` */
@@ -221,6 +221,16 @@ struct type {
        no program declares. mask holds it, made on the first comparison. */
     bool simd;                      /* TYPE_STRUCT: a simd struct or a mask */
     struct type *mask;              /* TYPE_STRUCT, simd: its mask, or NULL */
+
+    /* DESIGN: a match of a pattern is the struct `Match` of `anti.lang`,
+       and a result that may be `none` is its twin `?Match`, a second
+       struct of the same fields whose first word is zero for `none`. A
+       match found with a pattern literal carries the literal, so its
+       groups are fields the checker knows. Every such struct is one type
+       per literal and per form, and each converts to the plain `Match`
+       of its form, since all of them have one layout. */
+    const struct expr *pattern;     /* Match: the literal, or NULL */
+    struct type *twin;              /* Match: the other form of it */
 
     enum layout_state layout;       /* TYPE_STRUCT, for the cycle check */
     struct type *next;              /* the list of derived types */
@@ -235,6 +245,7 @@ struct types {
     struct type *flags;             /* anti.lang.Flags */
     struct type *mutex;             /* anti.lang.Mutex */
     struct type *regex;             /* anti.lang.Regex */
+    struct type *match;             /* anti.lang.Match without a literal */
     struct type *object_lock;       /* the hidden lock of a class */
     struct type *field_record;      /* anti.lang.FieldDescriptor */
 };
@@ -253,7 +264,7 @@ struct type *types_pointer_nullable(struct types *types,
 /* Either of the two, for a caller that carries the answer in a value. */
 struct type *types_pointer_of(struct types *types, struct type *element,
                               bool nullable);
-/* Whether t is `?*T` or `?fn(...)`. */
+/* Whether t is `?*T`, `?fn(...)` or `?Match`. */
 bool type_is_nullable(const struct type *t);
 /* The same type without `none`: `*T` of a `?*T`, `fn()` of a `?fn()`. */
 struct type *types_without_none(struct types *types, struct type *t);
@@ -373,6 +384,26 @@ struct type *types_object(struct types *types);
 /* The runtime function that compiles one pattern literal before main,
    which IR_PATTERNS_START of each module calls. */
 #define REGEX_LITERAL "anti_rt_regex_literal"
+/* DESIGN: `Match` is the built-in struct of a match of a pattern, which
+   the compiler declares in `anti.lang` as it does `Regex`. Its first
+   field is the pattern that found it, zero in a `?Match` that is `none`,
+   so the test of a match reads one word as the test of a pointer does.
+   The fields a program reads follow, and then the search that found the
+   match, from which `group` finds the groups again. The hidden fields
+   have names the lexer never reads. The methods of `str` are functions
+   of `anti.regex`, which the checker calls in their place. */
+#define LANG_MATCH "Match"
+#define LANG_MATCH_NONE "?Match"
+#define MATCH_PATTERN "(pattern)"
+#define MATCH_ALL "all"
+#define MATCH_PRE "pre"
+#define MATCH_POST "post"
+#define MATCH_COUNT "count"
+#define MATCH_SUBJECT "(subject)"
+#define MATCH_FROM "(from)"
+#define MATCH_OPTIONS "(options)"
+#define MATCH_GROUP "group"
+#define MATCH_TOOK_PART "took_part"
 #define MUTEX_NEW "new"
 #define MUTEX_DESTROY "destroy"
 #define CHAN_CLOSE "close"
@@ -514,6 +545,13 @@ bool types_is_mutex(const struct type *t);
 struct type *types_regex(struct types *types);
 /* Whether t is the struct that types_regex made. */
 bool types_is_regex(const struct type *t);
+/* The `Match` of the pattern literal pattern, or the plain one for NULL.
+   types_with_none gives its `?Match`. */
+struct type *types_match(struct types *types, const struct expr *pattern);
+/* Whether t is a `Match` or a `?Match` of any literal. */
+bool types_is_match(const struct type *t);
+/* The match t without its literal, in the same form. */
+struct type *types_match_plain(struct types *types, struct type *t);
 /* `chan T`, one per element type. */
 struct type *types_chan(struct types *types, struct type *element);
 /* Whether t is a channel that types_chan made. */

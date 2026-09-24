@@ -705,6 +705,20 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
     case TYPEX_BUILTIN:
         return builtin_of_token(c, t->builtin);
     case TYPEX_NAMED:
+        /* `?` stands before a name for a match alone, since a match is
+           the one value that is not a pointer and may be `none`. */
+        if (t->nullable) {
+            struct type_expr bare = *t;
+            struct type *named;
+            bare.nullable = false;
+            named = sema_resolve_type(c, &bare);
+            if (sema_is_error(named) || types_is_match(named)) {
+                return types_with_none(c->types, named);
+            }
+            sema_error_at(c, t->pos, "`?` stands before `*T`, `fn(...)` or "
+                          "`Match`, found `%s`", sema_tn(named));
+            return sema_builtin(c, TYPE_ERROR);
+        }
         if (t->module.length > 0) {
             return sema_imported_struct(c, &t->module, &t->name, t->pos);
         }
@@ -724,6 +738,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         }
         if (sym == NULL && sema_name_is(&t->name, LANG_REGEX)) {
             return types_regex(c->types);
+        }
+        if (sym == NULL && sema_name_is(&t->name, LANG_MATCH)) {
+            return types_match(c->types, NULL);
         }
         if (sym == NULL && sema_name_is(&t->name, LANG_FIELD_DESCRIPTOR)) {
             return types_field_descriptor(c->types);

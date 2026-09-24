@@ -27,4 +27,36 @@ void anti_rt_regex_message_into(int32_t code, unsigned char *out,
 /* The room one message of PCRE2 takes, its NUL included. */
 #define ANTI_RT_REGEX_MESSAGE_ROOM 256
 
+/* The number of groups of a compiled pattern, the whole match not
+   counted. */
+int64_t anti_rt_regex_group_count(const void *compiled);
+
+/* The number of the group of a compiled pattern named by the length bytes
+   at name, or -1 when it has none of that name. `(?J)` allows two groups
+   of one name, and then it is the first. */
+int64_t anti_rt_regex_group_number(const void *compiled,
+                                   const unsigned char *name, int64_t length);
+
+/* The kinds of piece a replacement template is made of. */
+enum anti_rt_piece_kind {
+    ANTI_RT_PIECE_TEXT,     /* bytes written as they stand */
+    ANTI_RT_PIECE_NUMBER,   /* `$1` and `${1}`: a group by its number */
+    ANTI_RT_PIECE_NAME      /* `${name}`: a group by its name */
+};
+
+/* One piece of a template. start and length give the bytes of a text
+   piece and the name of a named group, both in the template. */
+struct anti_rt_piece {
+    enum anti_rt_piece_kind kind;
+    int64_t start;
+    int64_t length;
+    int64_t number;
+};
+
+/* Read the piece of the template of length bytes at bytes that starts at
+   *offset into *piece and move *offset past it. Returns 0 at the end of
+   the template and 1 otherwise. */
+int anti_rt_regex_piece(const unsigned char *bytes, int64_t length,
+                        int64_t *offset, struct anti_rt_piece *piece);
+
 #endif

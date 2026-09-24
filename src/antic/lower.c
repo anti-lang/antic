@@ -81,6 +81,14 @@ bool lower_is_context(const struct type *t)
     return t != NULL && t->kind == TYPE_FN && t->context;
 }
 
+/* DESIGN: a function with its context has its code first, and a match
+   its pattern, and each is zero for `none`. A test of either reads that
+   word as the test of a pointer reads the pointer. */
+bool lower_none_in_first_word(const struct type *t)
+{
+    return lower_is_context(t) || (t != NULL && types_is_match(t));
+}
+
 /* A str, a slice, a bound function and a function with its context are
    aggregates of two words. */
 bool lower_is_aggregate(const struct type *t)
@@ -748,8 +756,8 @@ const struct type *lower_field_owner(const struct type *t,
     return t;
 }
 
-/* Write a free lock at at: the zero word of a Mutex, or the hidden lock
-   of a synchronized object with no thread that holds it. */
+/* Write a free lock at at. It is the zero word of a Mutex, or the hidden
+   lock of a synchronized object that no thread holds. */
 void lower_zero_lock(struct lowerer *l, const struct type *t,
                      struct ir_operand at)
 {
@@ -1820,9 +1828,9 @@ static void lower_function(struct lowerer *l, const struct item *it)
         lower_hook_call(l, HOOK_ENTER);
         lower_push_leave_action(l);
     }
-    /* DESIGN: a function of a synchronized class that code outside the
-       class calls takes the hidden lock of its object when it starts,
-       and every exit gives it back, as the unlock of `sync` does. A
+    /* DESIGN: code outside a synchronized class calls a function of it,
+       which takes the hidden lock of its object when it starts. Every
+       exit gives it back, as the unlock of `sync` does. A
        private function runs inside the lock of the one that called it,
        and `construct` and `destruct` run where no other thread sees the
        object. */

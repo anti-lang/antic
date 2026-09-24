@@ -101,7 +101,9 @@ struct type *types_pointer_nullable(struct types *types, struct type *element)
 
 bool type_is_nullable(const struct type *t)
 {
-    return t != NULL && (t->kind == TYPE_POINTER || t->kind == TYPE_FN) &&
+    return t != NULL &&
+           (t->kind == TYPE_POINTER || t->kind == TYPE_FN ||
+            types_is_match(t)) &&
            t->nullable;
 }
 
@@ -111,6 +113,9 @@ struct type *types_without_none(struct types *types, struct type *t)
 
     if (!type_is_nullable(t)) {
         return t;
+    }
+    if (types_is_match(t)) {
+        return t->twin;
     }
     key = *t;
     key.nullable = false;
@@ -122,6 +127,9 @@ struct type *types_with_none(struct types *types, struct type *t)
 {
     struct type key;
 
+    if (t != NULL && types_is_match(t) && !t->nullable) {
+        return t->twin;
+    }
     if (t == NULL || type_is_nullable(t) ||
         (t->kind != TYPE_POINTER && t->kind != TYPE_FN)) {
         return t;
@@ -687,8 +695,8 @@ struct type *types_mutex(struct types *types)
 }
 
 /* DESIGN: the hidden lock of a synchronized class is a struct of
-   `anti.lang` that the compiler declares: a Mutex, the thread that holds
-   it and how often, in the order of `struct object_lock` of
+   `anti.lang` that the compiler declares. It holds a Mutex, the thread
+   that holds it and how often, in the order of `struct object_lock` of
    `src/rt/lock.c`. A thread that holds it takes it again without
    waiting, so a function of the object that calls another does not wait
    for itself. */
@@ -775,6 +783,102 @@ struct type *types_regex(struct types *types)
 bool types_is_regex(const struct type *t)
 {
     return lang_item(t, TYPE_STRUCT, LANG_REGEX);
+}
+
+/* A struct of `anti.lang` in the form of a match, with its fields. */
+static struct type *match_struct(struct types *types, const char *name,
+                                 const struct struct_field *fields,
+                                 size_t count)
+{
+    static const char module_text[] = LANG_MODULE;
+    struct type *t = arena_alloc(types->arena, sizeof *t);
+
+    t->kind = TYPE_STRUCT;
+    t->module.text = module_text;
+    t->module.length = sizeof module_text - 1;
+    t->name.text = name;
+    t->name.length = strlen(name);
+    t->next = types->derived;
+    types->derived = t;
+    types_set_fields(types, t, fields, count);
+    t->layout = LAYOUT_DONE;
+    return t;
+}
+
+/* Whether a and b are one literal: both absent, or the same bytes. */
+static bool same_literal(const struct expr *a, const struct expr *b)
+{
+    if (a == NULL || b == NULL) {
+        return a == b;
+    }
+    return a->as.text.length == b->as.text.length &&
+           memcmp(a->as.text.bytes, b->as.text.bytes, a->as.text.length) == 0;
+}
+
+/* DESIGN: the fields of a match, in the order `struct anti_match` of
+   src/rt/regex.h holds them. The hidden ones carry names no program can
+   write, so a program reads `all`, `pre`, `post` and `count` alone. */
+struct type *types_match(struct types *types, const struct expr *pattern)
+{
+    static const char *const names[] = {
+        MATCH_PATTERN, MATCH_ALL, MATCH_PRE, MATCH_POST, MATCH_COUNT,
+        MATCH_SUBJECT, MATCH_FROM, MATCH_OPTIONS
+    };
+    struct struct_field fields[sizeof names / sizeof names[0]];
+    struct type *str = types_builtin(types, TYPE_STR);
+    struct type *word = types_builtin(types, TYPE_I64);
+    struct type *plain;
+    struct type *maybe;
+    struct type *t;
+    size_t i;
+
+    for (t = types->derived; t != NULL; t = t->next) {
+        if (types_is_match(t) && !t->nullable &&
+            same_literal(t->pattern, pattern)) {
+            return t;
+        }
+    }
+    memset(fields, 0, sizeof fields);
+    for (i = 0; i < sizeof names / sizeof names[0]; i++) {
+        fields[i].name.text = names[i];
+        fields[i].name.length = strlen(names[i]);
+        fields[i].vis = VIS_PUB;
+        fields[i].hidden = names[i][0] == '(';
+        fields[i].type = str;
+    }
+    fields[0].type =
+        types_pointer_nullable(types, types_builtin(types, TYPE_U8));
+    fields[4].type = word;
+    fields[6].type = word;
+    fields[7].type = word;
+    plain = match_struct(types, LANG_MATCH, fields, i);
+    maybe = match_struct(types, LANG_MATCH_NONE, fields, i);
+    plain->pattern = pattern;
+    maybe->pattern = pattern;
+    maybe->nullable = true;
+    plain->twin = maybe;
+    maybe->twin = plain;
+    if (pattern == NULL) {
+        types->match = plain;
+    }
+    return plain;
+}
+
+bool types_is_match(const struct type *t)
+{
+    return lang_item(t, TYPE_STRUCT, LANG_MATCH) ||
+           lang_item(t, TYPE_STRUCT, LANG_MATCH_NONE);
+}
+
+struct type *types_match_plain(struct types *types, struct type *t)
+{
+    struct type *plain;
+
+    if (t->pattern == NULL) {
+        return t;
+    }
+    plain = types->match != NULL ? types->match : types_match(types, NULL);
+    return t->nullable ? plain->twin : plain;
 }
 
 bool types_is_mutex(const struct type *t)

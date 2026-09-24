@@ -46,9 +46,9 @@ struct exit_action {
     bool error;                 /* delete the error in error_temp */
     uint32_t error_temp;
     const struct type *error_type;
-    bool unlock;                /* `sync`: unlock the mutex in mutex */
-    uint32_t mutex;             /* the address of the lock */
-    const char *unlock_fn;      /* the function of the runtime that does */
+    bool unlock;                /* `sync`: unlock the mutex in mutex. */
+    uint32_t mutex;             /* the address of the lock. */
+    const char *unlock_fn;      /* the function of the runtime that does. */
     /* DESIGN: the `leave` hook of an instrumented function is an exit
        action of a scope around its body. Every exit therefore runs it,
        after the locals of the body are gone. An exit that gives an error
@@ -234,6 +234,9 @@ const struct ir_function *lower_signature(struct lowerer *l,
 const struct ir_function *lower_fatal_signature(struct lowerer *l);
 const struct ir_function *lower_provider_signature(struct lowerer *l);
 bool lower_is_context(const struct type *t);
+/* Whether t is an aggregate that may be `none`, which its first word
+   says: a function with its context and a `?Match`. */
+bool lower_none_in_first_word(const struct type *t);
 const struct ir_function *lower_context_signature(struct lowerer *l,
                                                   const struct type *t);
 void lower_push_argument(struct lowerer *l, struct ir_operand *args,

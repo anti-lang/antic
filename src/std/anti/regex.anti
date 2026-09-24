@@ -9,12 +9,47 @@
 //! pattern that does not compile, `TooExpensive` for a match that reaches the
 //! match limit and `MissingGroup` for a template that names a group the pattern
 //! lacks.
+//!
+//! The methods of `str` that take a pattern, `matches`, `find_all`, `replace`
+//! and `split`, are the functions below, which the compiler calls in their
+//! place. A method with a pattern compiled at run time calls the function of
+//! its name, which may fail. One with a pattern literal calls the function that
+//! ends in `_literal`, which cannot fail and stops the program at the match
+//! limit, with the pattern and the line. `Match` is declared by the compiler in
+//! `anti.lang`, and its groups are read by `group` and `took_part`.
 
 import anti.lang;
 
 extern fn anti_rt_regex_compile(bytes: ?*byte, length: int, code: ?*i32,
 	offset: ?*int) -> ?*byte;
 extern fn anti_rt_regex_message(code: i32) -> str;
+extern fn anti_rt_regex_first(pattern: ?*byte, s: ?*byte, length: int,
+	out: ?*?Match) -> int;
+extern fn anti_rt_regex_test(pattern: ?*byte, s: ?*byte, length: int) -> int;
+extern fn anti_rt_regex_begin(c: ?*Cursor, pattern: ?*byte, s: ?*byte,
+	length: int, limit: int, check: int) -> int;
+extern fn anti_rt_regex_next(c: ?*Cursor, current: ?*?Match) -> int;
+extern fn anti_rt_regex_current(current: ?*?Match) -> ?*Match;
+extern fn anti_rt_regex_group(m: ?*Match, n: int, out: ?*str) -> int;
+extern fn anti_rt_regex_group_named(m: ?*Match, name: ?*byte, length: int,
+	out: ?*str) -> int;
+extern fn anti_rt_regex_template_fits(pattern: ?*byte, bytes: ?*byte,
+	length: int) -> int;
+extern fn anti_rt_regex_replace(pattern: ?*byte, s: ?*byte, length: int,
+	bytes: ?*byte, template_length: int, limit: int, out: ?*str) -> int;
+extern fn anti_rt_regex_split(pattern: ?*byte, s: ?*byte, length: int,
+	limit: int, out: ?*[]str) -> int;
+extern fn anti_rt_regex_append(g: ?*Growing, bytes: ?*byte, length: int);
+extern fn anti_rt_regex_take(g: ?*Growing) -> str;
+extern fn anti_rt_regex_stop_limit(file: ?*byte, length: int, line: int,
+	pattern: ?*byte, pattern_length: int);
+extern fn anti_rt_regex_stop_group(file: ?*byte, length: int, line: int,
+	count: int, n: int, what: ?*byte, what_length: int);
+extern fn anti_rt_regex_stop_name(file: ?*byte, length: int, line: int,
+	name: ?*byte, name_length: int);
+extern fn anti_rt_regex_stop_template(file: ?*byte, length: int, line: int,
+	bytes: ?*byte, template_length: int, pattern: ?*byte,
+	pattern_length: int);
 
 /// The failure of a pattern, the base of every error of this module.
 pub class Error inherits lang.Error
@@ -57,4 +92,363 @@ pub fn compile(text: str) -> Regex may fail
 		fail e;
 	};
 	return Regex { handle: handle };
+}
+
+/// Where a walk over the matches of a pattern stands, which the runtime reads
+/// and writes in this order.
+pub struct Cursor
+{
+	/// The pattern.
+	pattern: ?*byte,
+	/// The text searched.
+	subject: str,
+	/// The byte where the next search starts.
+	at: int,
+	/// The options of PCRE2 for the next search.
+	options: int,
+	/// The end of the last match the walk gave.
+	last: int,
+	/// The matches still to pass over.
+	skip: int,
+	/// The matches still to give, or -1 without a limit.
+	left: int,
+}
+
+/// The matches of a pattern in a text, left to right, which `s.find_all(r)`
+/// gives to a `for` loop.
+///
+/// The `pre` of each match is the text between the match before it and itself,
+/// so the `pre` of every match, the matches and the `post` of the last cover
+/// the whole text.
+pub class Matches
+{
+	/// The match the walk stands at.
+	current: ?Match,
+	/// Where the walk stands.
+	cursor: Cursor,
+	/// The text of a pattern literal, for the stop at the match limit.
+	pattern: str,
+	/// The call that began the walk.
+	at: lang.SourceLocation,
+
+	/// Move to the next match, and say whether there is one. `for` calls it.
+	operator fn next(self) -> bool
+	{
+		let status = anti_rt_regex_next(&self.cursor, &self.current);
+		if status < 0 {
+			stop_expensive(self.pattern, self.at);
+		}
+		return status > 0;
+	}
+
+	/// The match the walk stands at. `for` calls it after `next`.
+	operator fn value(self) -> Match
+	{
+		let m = anti_rt_regex_current(&self.current) catch fatal;
+		return *m;
+	}
+
+	/// A walk over `s` with `r`, which has not searched yet. `find_all` and
+	/// `replace` make theirs with it.
+	pub fn walk(s: str, r: Regex, pattern: str, at: lang.SourceLocation) -> Matches
+	{
+		return Matches {
+			current: none,
+			cursor: Cursor {
+				pattern: r.handle,
+				subject: s,
+				at: 0,
+				options: 0,
+				last: 0,
+				skip: 0,
+				left: 0,
+			},
+			pattern: pattern,
+			at: at,
+		};
+	}
+
+	/// Begin the walk with a `limit`, and give -1 when the search reached the
+	/// match limit. With `check` it searches the whole text first, so that a
+	/// search fails here and never in the walk.
+	pub fn begin(self, limit: int, check: bool) -> int
+	{
+		return anti_rt_regex_begin(&self.cursor, self.cursor.pattern,
+			self.cursor.subject.ptr, self.cursor.subject.len, limit,
+			check as int);
+	}
+}
+
+/// Bytes that grow as they are appended to, in memory of the C library, which
+/// the runtime reads and writes in this order.
+struct Growing
+{
+	bytes: ?*byte,
+	length: int,
+	capacity: int,
+}
+
+/// Stop the program where a search with the pattern literal `pattern` reached
+/// the match limit.
+fn stop_expensive(pattern: str, at: lang.SourceLocation)
+{
+	anti_rt_regex_stop_limit(at.file.ptr, at.file.len, at.line, pattern.ptr,
+		pattern.len);
+}
+
+/// The failure of a search that reached the match limit.
+fn too_expensive() -> *TooExpensive
+{
+	let e = alloc TooExpensive { };
+	e.message = "the search reached the match limit of its pattern";
+	return e;
+}
+
+/// The first match of `r` in `s`, or `none`. `s.matches(r)` calls it.
+///
+/// It fails with `TooExpensive` when the search reaches the match limit.
+pub fn matches(s: str, r: Regex) -> ?Match may fail
+{
+	let found: ?Match = none;
+	if anti_rt_regex_first(r.handle, s.ptr, s.len, &found) < 0 {
+		fail too_expensive();
+	}
+	return found;
+}
+
+/// The first match of the pattern literal `r`, whose text is `pattern`, in `s`,
+/// or `none`. `s.matches(re"...")` calls it.
+///
+/// The program stops at `at` when the search reaches the match limit.
+pub fn matches_literal(s: str, r: Regex, pattern: str,
+	at: lang.SourceLocation = here) -> ?Match
+{
+	let found: ?Match = none;
+	if anti_rt_regex_first(r.handle, s.ptr, s.len, &found) < 0 {
+		stop_expensive(pattern, at);
+	}
+	return found;
+}
+
+/// Whether `r` matches in `s`. `if s.matches(r) { }` calls it, since a result
+/// that is only tested needs no groups.
+///
+/// It fails with `TooExpensive` when the search reaches the match limit.
+pub fn matched(s: str, r: Regex) -> bool may fail
+{
+	let status = anti_rt_regex_test(r.handle, s.ptr, s.len);
+	if status < 0 {
+		fail too_expensive();
+	}
+	return status > 0;
+}
+
+/// Whether the pattern literal `r`, whose text is `pattern`, matches in `s`.
+/// `if s.matches(re"...") { }` calls it.
+pub fn matched_literal(s: str, r: Regex, pattern: str,
+	at: lang.SourceLocation = here) -> bool
+{
+	let status = anti_rt_regex_test(r.handle, s.ptr, s.len);
+	if status < 0 {
+		stop_expensive(pattern, at);
+	}
+	return status > 0;
+}
+
+/// The matches of `r` in `s`, left to right, for a `for` loop. `s.find_all(r)`
+/// calls it.
+///
+/// A `limit` of 0 gives every match, a positive one that many from the start
+/// and a negative one that many from the end. It searches the whole text once
+/// before the walk, so it fails with `TooExpensive` here and the walk never
+/// does.
+pub fn find_all(s: str, r: Regex, limit: int = 0,
+	at: lang.SourceLocation = here) -> Matches may fail
+{
+	let it = Matches.walk(s, r, "", at);
+	if it.begin(limit, true) < 0 {
+		fail too_expensive();
+	}
+	return it;
+}
+
+/// The matches of the pattern literal `r`, whose text is `pattern`, in `s`.
+/// `s.find_all(re"...")` calls it.
+pub fn find_all_literal(s: str, r: Regex, pattern: str, limit: int = 0,
+	at: lang.SourceLocation = here) -> Matches
+{
+	let it = Matches.walk(s, r, pattern, at);
+	if it.begin(limit, false) < 0 {
+		stop_expensive(pattern, at);
+	}
+	return it;
+}
+
+/// `s` with the matches of `r` replaced by the template `with`. A method call
+/// with a template calls it.
+///
+/// `$1` and `${name}` in the template write a group, and `$$` writes a `$`. The
+/// text is new memory of the C library, which the program frees with
+/// `free(result.ptr)`. It fails with `MissingGroup` when the template names a
+/// group the pattern lacks, and with `TooExpensive` at the match limit.
+pub fn replace(s: str, r: Regex, with: str, limit: int = 0) -> str may fail
+{
+	if anti_rt_regex_template_fits(r.handle, with.ptr, with.len) == 0 {
+		let e = alloc MissingGroup { };
+		e.message = "the template names a group the pattern lacks";
+		fail e;
+	}
+	let out = "";
+	if anti_rt_regex_replace(r.handle, s.ptr, s.len, with.ptr, with.len, limit,
+		&out) < 0 {
+		fail too_expensive();
+	}
+	return out;
+}
+
+/// `s` with the matches of the pattern literal `r`, whose text is `pattern`,
+/// replaced by the template `with`. `s.replace(re"...", with)` calls it.
+///
+/// The compiler checks a template written as a literal. Any other template that
+/// names a group the pattern lacks stops the program at `at`.
+pub fn replace_literal(s: str, r: Regex, pattern: str, with: str,
+	limit: int = 0, at: lang.SourceLocation = here) -> str
+{
+	if anti_rt_regex_template_fits(r.handle, with.ptr, with.len) == 0 {
+		anti_rt_regex_stop_template(at.file.ptr, at.file.len, at.line, with.ptr,
+			with.len, pattern.ptr, pattern.len);
+	}
+	let out = "";
+	if anti_rt_regex_replace(r.handle, s.ptr, s.len, with.ptr, with.len, limit,
+		&out) < 0 {
+		stop_expensive(pattern, at);
+	}
+	return out;
+}
+
+/// `s` with each match of `r` replaced by what `with` returns for it.
+/// `s.replace(r, fn(m) { })` calls it.
+///
+/// It searches the whole text before it calls `with`, so it fails with
+/// `TooExpensive` before any call.
+pub fn replace_fn(s: str, r: Regex, with: fn(Match) -> str, limit: int = 0,
+	at: lang.SourceLocation = here) -> str may fail
+{
+	let it = Matches.walk(s, r, "", at);
+	if it.begin(limit, true) < 0 {
+		fail too_expensive();
+	}
+	return replaced(&it, s, with);
+}
+
+/// `s` with each match of the pattern literal `r`, whose text is `pattern`,
+/// replaced by what `with` returns for it. `s.replace(re"...", f)` calls it.
+pub fn replace_fn_literal(s: str, r: Regex, pattern: str,
+	with: fn(Match) -> str, limit: int = 0,
+	at: lang.SourceLocation = here) -> str
+{
+	let it = Matches.walk(s, r, pattern, at);
+	if it.begin(limit, false) < 0 {
+		stop_expensive(pattern, at);
+	}
+	return replaced(&it, s, with);
+}
+
+/// The text `s` with each match of the walk `it` replaced by what `with`
+/// returns for it, in new memory of the C library.
+fn replaced(it: *Matches, s: str, with: fn(Match) -> str) -> str
+{
+	let out = Growing { bytes: none, length: 0, capacity: 0 };
+	let rest = s;
+	for m in *it {
+		anti_rt_regex_append(&out, m.pre.ptr, m.pre.len);
+		let piece = with(m);
+		anti_rt_regex_append(&out, piece.ptr, piece.len);
+		rest = m.post;
+	}
+	anti_rt_regex_append(&out, rest.ptr, rest.len);
+	return anti_rt_regex_take(&out);
+}
+
+/// The pieces of `s` between the matches of `r`. `s.split(r)` calls it.
+///
+/// A `limit` takes matches as `find_all` does. The pieces are slices of `s` in
+/// a slice of memory of the C library, which the program frees with
+/// `free(parts.ptr)`. It fails with `TooExpensive` at the match limit.
+pub fn split(s: str, r: Regex, limit: int = 0) -> []str may fail
+{
+	let parts = []str { ptr: none, len: 0 };
+	if anti_rt_regex_split(r.handle, s.ptr, s.len, limit, &parts) < 0 {
+		fail too_expensive();
+	}
+	return parts;
+}
+
+/// The pieces of `s` between the matches of the pattern literal `r`, whose text
+/// is `pattern`. `s.split(re"...")` calls it.
+pub fn split_literal(s: str, r: Regex, pattern: str, limit: int = 0,
+	at: lang.SourceLocation = here) -> []str
+{
+	let parts = []str { ptr: none, len: 0 };
+	if anti_rt_regex_split(r.handle, s.ptr, s.len, limit, &parts) < 0 {
+		stop_expensive(pattern, at);
+	}
+	return parts;
+}
+
+/// Group `n` of the match `m`, 0 for the whole match. `m.group(n)` and `m.1`
+/// call it.
+///
+/// A group that did not take part gives the empty text. A number above the
+/// count of groups stops the program at `at`.
+pub fn group(m: Match, n: int, at: lang.SourceLocation = here) -> str
+{
+	let out = "";
+	if anti_rt_regex_group(&m, n, &out) < 0 {
+		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, m.count, n,
+			"group".ptr, 5);
+	}
+	return out;
+}
+
+/// The group of the match `m` named `name`. `m.group("name")` and `m.name` call
+/// it.
+///
+/// Of several groups of one name, it gives the first that took part. A name the
+/// pattern lacks stops the program at `at`.
+pub fn group_named(m: Match, name: str, at: lang.SourceLocation = here) -> str
+{
+	let out = "";
+	if anti_rt_regex_group_named(&m, name.ptr, name.len, &out) < 0 {
+		anti_rt_regex_stop_name(at.file.ptr, at.file.len, at.line, name.ptr,
+			name.len);
+	}
+	return out;
+}
+
+/// Whether group `n` of the match `m` took part in it. `m.took_part(n)` calls
+/// it.
+pub fn took_part(m: Match, n: int, at: lang.SourceLocation = here) -> bool
+{
+	let out = "";
+	let status = anti_rt_regex_group(&m, n, &out);
+	if status < 0 {
+		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, m.count, n,
+			"took_part".ptr, 9);
+	}
+	return status > 0;
+}
+
+/// Whether the group of the match `m` named `name` took part in it.
+/// `m.took_part("name")` calls it.
+pub fn took_part_named(m: Match, name: str,
+	at: lang.SourceLocation = here) -> bool
+{
+	let out = "";
+	let status = anti_rt_regex_group_named(&m, name.ptr, name.len, &out);
+	if status < 0 {
+		anti_rt_regex_stop_name(at.file.ptr, at.file.len, at.line, name.ptr,
+			name.len);
+	}
+	return status > 0;
 }

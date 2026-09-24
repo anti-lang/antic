@@ -22,6 +22,14 @@ struct pattern_span {
 bool pattern_compiles(const char *bytes, size_t length, size_t *offset,
                       char *message, size_t room);
 
+/* The number of groups of the pattern of length bytes, which compiles. */
+long pattern_group_count(const char *bytes, size_t length);
+
+/* The number of the group of the pattern named by the name_length bytes at
+   name, or -1 when the pattern has no group of that name. */
+long pattern_group_number(const char *bytes, size_t length, const char *name,
+                          size_t name_length);
+
 /* Whether the pattern, which compiles, nests a repeat inside another over
    text that overlaps, which can take exponential time. Then *inner is the
    inner repeat and *outer the one around it. */

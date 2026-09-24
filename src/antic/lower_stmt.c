@@ -135,11 +135,12 @@ static void jump_to_join(struct lowerer *l, struct ir_block **join)
 
 static void lower_stmt(struct lowerer *l, const struct stmt *s);
 
-/* DESIGN: a lock is taken by its address: the word of a Mutex, or the
-   hidden lock of a synchronized object, which a thread that holds it
-   takes again without waiting. A dev build passes the site of each lock
-   as well, `file:line`, so the runtime records the order in which each
-   thread takes its locks and reports two orders that conflict. The
+/* DESIGN: a lock is taken by its address, the word of a Mutex or the
+   hidden lock of a synchronized object. A thread that holds the hidden
+   lock takes it again without waiting. A dev build passes the site of
+   each lock as well, `file:line`. The runtime then records the order in
+   which each thread takes its locks and reports two orders that
+   conflict. The
    unlock is an exit action of the scope that l->defers holds. */
 void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
                      int line)
@@ -428,8 +429,8 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
 }
 
 /* Give the variable of a `for` the value of this pass. A closure that
-   captures the variable reads it from the place of its own, which the
-   slots of the frame hold, and every other variable is a temporary. */
+   captures the variable reads it from its own place in the slots of the
+   frame. Every other variable is a temporary. */
 static void bind_loop_name(struct lowerer *l, struct symbol *sym,
                            enum ir_type type, struct ir_operand value)
 {
@@ -1357,14 +1358,14 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         }
         return;
     }
-    /* A function with its context is an aggregate that may be `none`, so
-       the guard and the `else` below read it as well. */
+    /* A function with its context and a match are aggregates that may be
+       `none`, so the guard and the `else` below read them as well. */
     if (lower_is_aggregate(sym->type)) {
         lower_build_into(l, s->as.let.value, lower_temp(l, sym->ir));
         if (local_needs_teardown(sym->type)) {
             push_exit_action(l, NULL, sym, false);
         }
-        if (!lower_is_context(sym->type)) {
+        if (!lower_none_in_first_word(sym->type)) {
             return;
         }
     } else {
@@ -1394,7 +1395,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         struct ir_block *otherwise = lower_new_block(l);
         struct ir_block *rest = lower_new_block(l);
         struct ir_operand held =
-            sym->address_taken || lower_is_context(sym->type)
+            sym->address_taken || lower_none_in_first_word(sym->type)
                 ? lower_temp(l,
                              ir_load(l->f, l->b, IR_PTR,
                                      lower_temp(l, sym->ir)))

@@ -102,19 +102,19 @@ static uint64_t float_bits(double d)
     return bits;
 }
 
-/* DESIGN: the root class, a Job, Flags, a Mutex, a channel and the hidden
-   lock of a synchronized class carry the
-   path `anti.lang`, and the compiler declares all of them. The library
-   file of `anti.lang` names them as it names a struct of another module
-   and declares none, so a reader takes the compiler's own. The root is
-   the one class without a base. */
+/* DESIGN: the compiler declares the root class, a Job, Flags, a Mutex
+   and a channel. It declares a Regex, a Match and the hidden lock of a
+   synchronized class as well. Each carries the path `anti.lang`. The
+   library file of `anti.lang` names them as it names a struct of another
+   module and declares none. A reader so takes the compiler's own. The
+   root is the one class without a base. */
 static bool is_local_struct(const struct writer *w, const struct type *t)
 {
     const char *module = w->iface->module;
 
     if ((t->kind == TYPE_CLASS && t->base == NULL) || types_is_job(t) ||
         types_is_flags(t) || types_is_mutex(t) || types_is_chan(t) ||
-        types_is_regex(t) || types_is_object_lock(t) ||
+        types_is_regex(t) || types_is_match(t) || types_is_object_lock(t) ||
         types_is_field_descriptor(t)) {
         return false;
     }
@@ -449,8 +449,8 @@ static void put_type(struct writer *w, const struct type *t)
                                     (unsigned)t->fields[i].unchecked << 3));
                 /* DESIGN: the lock that guards the field travels by its
                    name. A lock of an enclosing class guards a field of
-                   a nested type alone, which no other module reaches,
-                   so the class it names stays behind. */
+                   a nested type alone, which no other module reaches.
+                   So the class it names stays behind. */
                 put_bytes(w, t->fields[i].guard.text,
                           t->fields[i].guard.length);
                 /* DESIGN: /// on a private item is never stored, and
@@ -1693,6 +1693,18 @@ static void read_types(struct reader *r)
             }
             if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_REGEX)) {
                 t = types_regex(r->types);
+                break;
+            }
+            /* A match of a literal is written as the plain match of its
+               form, since the literal stays in the module that wrote
+               it. */
+            if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_MATCH)) {
+                t = types_match(r->types, NULL);
+                break;
+            }
+            if (kind == TYPE_STRUCT &&
+                names_lang(&module, &name, LANG_MATCH_NONE)) {
+                t = types_with_none(r->types, types_match(r->types, NULL));
                 break;
             }
             if (kind == TYPE_STRUCT &&

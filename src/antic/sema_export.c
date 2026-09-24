@@ -82,7 +82,8 @@ static bool c_representable(const struct type *t, bool field,
             nested_in(t, cls)) {
             return true;
         }
-        if (types_is_mutex(t) || types_is_chan(t) || types_is_regex(t)) {
+        if (types_is_mutex(t) || types_is_chan(t) || types_is_regex(t) ||
+            types_is_match(t)) {
             return false;
         }
         /* The hidden lock of a synchronized class, which the header

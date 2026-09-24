@@ -347,6 +347,23 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
         return;
     }
     switch (e->kind) {
+    /* `none` of a match writes zero into every field, its pattern
+       first. */
+    case EXPR_NONE:
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            struct ir_operand at = lower_offset_address(
+                l, dest, lower_field_offset(l, t, &f->name));
+            enum ir_type word = lower_ir_type_of(f->type);
+            if (f->type->kind == TYPE_STR) {
+                ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
+                at = lower_offset_address(
+                    l, at, lower_field_offset(l, f->type, &lower_len_name));
+                word = IR_I64;
+            }
+            ir_store(l->f, l->b, word, ir_int_op(word, 0), at);
+        }
+        break;
     /* `T(args)` and `alloc T(args)` build the object in place and run
        its `construct` with the arguments. */
     case EXPR_CALL:
@@ -753,8 +770,8 @@ static void copy_captured(struct lowerer *l, const struct type *t,
 
 /* DESIGN: a snapshot copies each captured value into its record when it
    is made. At an `own` field or a `keep own` parameter the record goes
-   on the heap with the bytes of each `str` after it, and the runtime
-   counts it until it is freed. Anywhere else it sits in a slot of the
+   on the heap with the bytes of each `str` after it. The runtime counts
+   it until it is freed. Anywhere else it sits in a slot of the
    frame, and nothing is allocated. */
 static struct ir_operand lower_snapshot(struct lowerer *l,
                                         const struct expr *e,
@@ -894,7 +911,7 @@ struct ir_operand lower_address(struct lowerer *l,
         return lower_simd_cast(l, e);
     }
     if (e->kind == EXPR_BINARY && e->as.binary.op == TOKEN_QUESTION_QUESTION &&
-        lower_is_context(e->type)) {
+        lower_none_in_first_word(e->type)) {
         return coalesce(l, e);
     }
     switch (e->kind) {
@@ -1085,7 +1102,7 @@ static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
 {
     /* Of two functions with their context, the result is the address of
        the pair it takes, and the test reads the code. */
-    bool pair = lower_is_context(e->type);
+    bool pair = lower_none_in_first_word(e->type);
     enum ir_type type = pair ? IR_PTR : lower_ir_type_of(e->type);
     struct ir_operand left = lower_expr(l, e->as.binary.left);
     struct ir_operand right;
@@ -1323,12 +1340,12 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     }
     left = lower_expr(l, e->as.binary.left);
     right = lower_expr(l, e->as.binary.right);
-    /* A function with its context compares by its code, which is zero
-       for `none`. */
-    if (lower_is_context(e->as.binary.left->type)) {
+    /* A function with its context compares by its code, and a match by
+       its pattern, each zero for `none`. */
+    if (lower_none_in_first_word(e->as.binary.left->type)) {
         left = lower_temp(l, ir_load(l->f, l->b, IR_PTR, left));
     }
-    if (lower_is_context(e->as.binary.right->type)) {
+    if (lower_none_in_first_word(e->as.binary.right->type)) {
         right = lower_temp(l, ir_load(l->f, l->b, IR_PTR, right));
     }
     if (identity) {
@@ -2523,8 +2540,8 @@ struct ir_operand lower_expr(struct lowerer *l, const struct expr *e)
         return lower_pair(l, e->type, v, ir_int_op(IR_PTR, 0));
     }
     /* DESIGN: a `keep own` parameter that moves into an owner hands over
-       a copy of its two words and keeps `none` as its context, so the
-       free at the exits of the function passes over the snapshot. */
+       a copy of its two words and keeps `none` as its context. The free
+       at the exits of the function then passes over the snapshot. */
     if (e->moves_snapshot) {
         struct ir_operand copy = lower_temp(
             l, ir_entry_slot(l->f, lower_vtype_of(l, e->type)));

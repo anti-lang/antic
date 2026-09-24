@@ -2173,8 +2173,16 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
             return sema_builtin(c, TYPE_ERROR);
         }
         fixed = 0;
+    } else if (callee->kind == EXPR_FIELD && sema_pattern_call(c, e, &fn)) {
+        /* A method of `str` with a pattern, or a function of a match,
+           is now a call of `anti.regex` whose arguments are checked. */
+        callee = e->as.call.callee;
+        fixed = e->as.call.arg_count;
     } else if (callee->kind == EXPR_FIELD) {
-        struct type *base = sema_check_expr(c, callee->as.field.base, NULL);
+        struct type *base =
+            callee->as.field.checked
+                ? callee->as.field.base->type
+                : sema_check_expr(c, callee->as.field.base, NULL);
         struct type *s;
         if (sema_is_error(base)) {
             return base;
@@ -2321,6 +2329,12 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
                       "call cannot fail");
         return sema_builtin(c, TYPE_ERROR);
     }
+    if (e->as.call.handler.kind != HANDLE_NONE && types_is_match(fn->result)) {
+        sema_error_at(c, e->as.call.handler.pos,
+                      "this call cannot fail, and a match is tested with `if` "
+                      "or `let ... else`");
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (e->as.call.handler.kind != HANDLE_NONE) {
         bool after_optional =
             e->as.call.optional &&
@@ -2337,6 +2351,11 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
     if (provided != NULL) {
         return types_with_none(
             c->types, types_pointer(c->types, (struct type *)provided));
+    }
+    /* The match of a pattern literal knows its groups. */
+    if (e->as.call.pattern != NULL && types_is_match(fn->result)) {
+        return types_with_none(c->types,
+                               types_match(c->types, e->as.call.pattern));
     }
     return fn->result;
 }
@@ -2557,6 +2576,9 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
             sema_error_at(c, e->pos, "a variant has the field `tag` alone, and "
                           "`switch` reads the fields of its cases");
             return sema_builtin(c, TYPE_ERROR);
+        }
+        if (types_is_match(s) && sema_find_field(s, name) == NULL) {
+            return sema_match_field(c, e, s);
         }
         if ((f = sema_find_field(s, name)) == NULL && e->as.field.element) {
             /* `t.0` names the element `_0`, so the message names the
