@@ -932,8 +932,7 @@ static bool lock_write(const char *path, const struct dep_graph *g)
    repository stands in it, with a version its constraint takes and the
    repository it names. A dependency of a path is read from disk on
    every build, so the lock does not answer for one. */
-static bool lock_answers(const struct manifest *m, const struct dep_graph *g,
-                         const char *root)
+static bool lock_answers(const struct manifest *m, const struct dep_graph *g)
 {
     size_t i;
 
@@ -966,7 +965,6 @@ static bool lock_answers(const struct manifest *m, const struct dep_graph *g,
             }
         }
     }
-    (void)root;
     return true;
 }
 
@@ -1051,7 +1049,7 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
     r.context = context;
     text_appendf(&lock_path, "%s/%s", root, LOCK_FILE);
     lock_read(text_cstr(&lock_path), &locked);
-    if (lock_answers(m, &locked, root)) {
+    if (lock_answers(m, &locked)) {
         /* The lock file answers, so the indexes are not read at all. A
            project with no dependency still gets one, because the file is
            what `anti build` writes beside the manifest. */

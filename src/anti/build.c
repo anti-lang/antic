@@ -586,7 +586,6 @@ static bool build_c_library(struct build *b, enum target t, enum cpu_level cpu,
                             const struct strings *libraries)
 {
     struct options o;
-    struct text header = {0};
     const char *base = module_path_last(text_cstr(&b->m.name));
     bool ok;
 
@@ -610,7 +609,6 @@ static bool build_c_library(struct build *b, enum target t, enum cpu_level cpu,
         text_free(&file);
         text_free(&name);
     }
-    text_free(&header);
     return ok;
 }
 

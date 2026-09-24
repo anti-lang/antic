@@ -370,12 +370,11 @@ static bool type_word(enum token_kind kind)
 
 /* Whether the piece ends a value. The operator after one is binary, and
    a `(` after one opens a call. */
-static bool ends_value(const struct emitter *e, const struct piece *p)
+static bool ends_value(const struct piece *p)
 {
     if (p == NULL || p->kind != PIECE_TOKEN) {
         return false;
     }
-    (void)e;
     switch (p->token->kind) {
     case TOKEN_IDENT:
     case TOKEN_INT:
@@ -411,7 +410,7 @@ static bool last_ends_value(const struct emitter *e)
         e->prev != NULL && e->prev->kind == PIECE_TOKEN) {
         return true;
     }
-    return ends_value(e, e->prev);
+    return ends_value(e->prev);
 }
 
 /* Whether a value opens after the piece written last. The word before an
@@ -981,10 +980,8 @@ static void emit_comment(struct emitter *e, const struct piece *p)
 
 /* Whether the `while` of a `do` block follows the brace that closed it,
    so that the two stand on one line. */
-static bool joins_do(const struct emitter *e, const struct piece_list *l,
-                     size_t i)
+static bool joins_do(const struct emitter *e, size_t i)
 {
-    (void)l;
     return e->after_do && e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
            e->prev->token->kind == TOKEN_RBRACE && i > 0;
 }
@@ -1124,7 +1121,7 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     default:
         break;
     }
-    if (kind == TOKEN_WHILE && joins_do(e, l, index)) {
+    if (kind == TOKEN_WHILE && joins_do(e, index)) {
         e->do_tail = true;
     }
     e->after_do = false;
@@ -1158,7 +1155,7 @@ static bool breaks_line(struct emitter *e, const struct piece_list *l,
         e->prev->token->kind == TOKEN_RBRACE) {
         return false;
     }
-    if (kind == TOKEN_WHILE && joins_do(e, l, index)) {
+    if (kind == TOKEN_WHILE && joins_do(e, index)) {
         return false;
     }
     if (kind == TOKEN_LBRACE) {
