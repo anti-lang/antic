@@ -19,20 +19,20 @@ Documents only. Nothing was built.
   declare a `struct`, `enum` or `class`. The string literals, the string
   prefixes and the pattern check of `anti check` follow.
 - `docs/anti-object-model.md`: nested types and the two thread-safe class
-  forms under "Class declaration", the language hooks under "Operators" with
-  `[]` no longer refused, atomic locals, the worker exception, `catch none`,
-  and "Not in the language" without nested classes and closures.
+  forms under "Class declaration", and the language hooks under "Operators",
+  where `[]` is no longer refused. It adds atomic locals, the worker exception
+  and `catch none`. "Not in the language" drops nested classes and closures.
 - `docs/tooling-addendum.md`: the pattern check of `anti check` is replaced.
   One line of its block-form rules now reads "more than one line", which the
   docs-style checker asked for.
 - `docs/anti-syntax-overview.md`: new sections for anonymous functions and
   closures, concurrent classes, warnings and safety checks, regular
-  expressions and bytes, and paragraphs for iteration, `catch none`, nested
+  expressions and bytes. Paragraphs cover iteration, `catch none`, nested
   types and the hooks. Every round-four feature stands in a "Not built yet"
   line, and every new example is an `anti not-built` block.
 - `docs/anti-language-additions-4.md` is deleted.
 
-No `[provisional]` entry was added. Nothing failed.
+No `[provisional]` entry was added. The build and the three suites passed at the first run.
 
 ## Gates
 
@@ -42,6 +42,9 @@ Logs are in `build/drive/logs/`: `r4-host-build.log`, `r4-host-test.log`,
 - Host build: no warnings. Host suite: 100% tests passed out of 841.
 - ASan: 100% tests passed out of 840. UBSan: 100% tests passed out of 840.
 - The docs-style checker: 0 errors and 0 warnings on every touched file.
+  The first commit of this report carried two sentences over 25 words,
+  because the check ran in a chain that did not stop the commit. The next
+  commit splits them.
 
 State before this report's commit:
 
