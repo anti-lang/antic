@@ -1665,7 +1665,8 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] A match holds no positions of its groups. `group` and `took_part` run the
   search that found the match again. It starts at the same place with the same options,
   and they read the group from it. A match is so a value of twelve words that owns no
-  memory. Reason: the specification puts the positions in the caller's frame or in the
+  memory. PCRE2 takes the working memory of each search from the heap. The call gives it
+  back before it returns, so no search shares any with another. Reason: the specification puts the positions in the caller's frame or in the
   returned match. A match of fixed size cannot hold every group of every pattern.
 - [provisional] The match of a pattern literal carries the literal in its type, so `m.1`,
   `m.year`, `m.group(2)` with a number and `m.took_part("day")` with a name are checked at
