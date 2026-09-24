@@ -394,6 +394,10 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
 bool sema_param_operator(struct checker *c, struct expr *e,
                          enum token_kind op, const char *hook,
                          struct type *operand);
+bool sema_param_iterate(struct checker *c, struct expr *e, struct type *p,
+                        struct type **element);
+struct type *sema_param_index(struct checker *c, struct expr *e,
+                              struct type *p, bool write);
 const struct type *sema_param_iface(const struct type *p,
                                     const struct name *name);
 void sema_check_generic_item(struct checker *c, const struct item *it);

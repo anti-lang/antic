@@ -246,7 +246,7 @@ sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
 four are built. Then generics and closures. Closures are built, `snapshot fn`
 included. Round five, generics and collections, stands in the same document.
-Its first part, the syntax of generics, is built, and none of the rest.
+Its first two parts, the syntax of generics and the constraints, are built, and none of the rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -504,7 +504,10 @@ reports what it finished.
   body, `N: int`, type arguments in every type, the rule of C# in an
   expression and `>>` closing two lists. `constraint` and `type` are
   items. The checker checks a body against its constraints and each use
-  where it stands, and infers the type arguments of a call. A build past
+  where it stands, and infers the type arguments of a call. Hooks,
+  interfaces, `+`, named sets and `Number` of `anti.lang` are
+  constraints, and a parameter without them is stored, copied, passed on
+  and measured alone. A build past
   the front end refuses a use that needs a compiled copy, and leaves out a
   generic that nothing uses. See "Generics and collections" in
   `docs/decisions.md` and `docs/notes/generics.md`.

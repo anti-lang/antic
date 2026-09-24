@@ -3002,6 +3002,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "pattern_bytes|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_bytes.s,pattern_bytes.anti"
         "generics|--front-end,generics.anti"
         "generic_syntax|--front-end,generic_syntax.anti"
+        "constraints|--front-end,constraints.anti"
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
@@ -3017,6 +3018,7 @@ endforeach()
 set(DUMP "${CMAKE_CURRENT_SOURCE_DIR}/dump")
 foreach(case "symbolic.types|--dump-types,${DUMP}/symbolic.anti"
         "generics.types|--dump-types,${DUMP}/generics.anti"
+        "constraints.types|--dump-types,${DUMP}/constraints.anti"
         "header/main.ir|--dump-ir,${DUMP}/header/main.anti"
         "size_of/main.ir|--dump-ir,${DUMP}/size_of/main.anti"
         "size_of/main.linux-arm64.sel|--dump-select,--target,linux-arm64,${DUMP}/size_of/main.anti"

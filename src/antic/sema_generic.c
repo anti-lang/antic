@@ -27,6 +27,11 @@ static const char *const hook_names[] = {
 
 #define HOOK_COUNT (sizeof hook_names / sizeof hook_names[0])
 
+/* The hooks of `anti.lang.Number`. */
+static const char *const number_hooks[] = {
+    "add", "sub", "mul", "div", "neg", "lt"
+};
+
 static int hook_index(const struct name *name)
 {
     size_t i;
@@ -242,6 +247,13 @@ static void add_constraint(struct checker *c, struct type *p,
                 for (i = 0; i < sym->type->iface_count; i++) {
                     add_iface(c, p, sym->type->ifaces[i]);
                 }
+            }
+            return;
+        }
+        if (sym == NULL && sema_name_is(&r->name, LANG_NUMBER)) {
+            for (i = 0; i < sizeof number_hooks / sizeof number_hooks[0];
+                 i++) {
+                p->hooks |= 1u << hook_of(number_hooks[i]);
             }
             return;
         }
@@ -1342,24 +1354,118 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
 
 /* Operators on a type parameter */
 
+/* Report that the generic that declares the parameter p uses the form
+   form on it, which the hook hook would give. */
+static void param_lacks(struct checker *c, struct pos pos, const char *form,
+                        const struct type *p, const char *hook)
+{
+    const struct item *by = p->declared_by;
+
+    /* The value a hook gives has no constraints that could name one. */
+    if (p->param == NULL) {
+        sema_error_at(c, pos, "`%.*s` uses `%s` on `%.*s`, which no "
+                      "constraint gives", by != NULL ? (int)by->name.length : 0,
+                      by != NULL ? by->name.text : "", form,
+                      (int)p->name.length, p->name.text);
+        return;
+    }
+    sema_error_at(c, pos, "`%.*s` uses `%s` on `%.*s`, which its "
+                  "constraints do not give. Add `%s` to them",
+                  by != NULL ? (int)by->name.length : 0,
+                  by != NULL ? by->name.text : "", form, (int)p->name.length,
+                  p->name.text, hook);
+}
+
+static bool has_hook(const struct type *p, const char *hook)
+{
+    int bit = hook_of(hook);
+
+    return bit >= 0 && (p->hooks & (1u << bit)) != 0;
+}
+
 bool sema_param_operator(struct checker *c, struct expr *e,
                          enum token_kind op, const char *hook,
                          struct type *operand)
 {
-    const struct item *by = operand->declared_by;
     char spelling[OP_TEXT];
-    int bit = hook_of(hook);
 
-    if (bit >= 0 && (operand->hooks & (1u << bit)) != 0) {
+    if (has_hook(operand, hook)) {
         return true;
     }
-    sema_error_at(c, e->pos, "`%.*s` uses `%s` on `%.*s`, which its "
-                  "constraints do not give. Add `%s` to them",
-                  by != NULL ? (int)by->name.length : 0,
-                  by != NULL ? by->name.text : "",
-                  sema_op_text(op, spelling), (int)operand->name.length,
-                  operand->name.text, hook);
+    param_lacks(c, e->pos, sema_op_text(op, spelling), operand, hook);
     return false;
+}
+
+/* DESIGN: the constraints of a parameter name a hook and not the types
+   it takes and gives. The value a walk of the parameter gives and the
+   value `e[i]` reads are each a type parameter without constraints of
+   their own, `C.value` and `C.index`, made once per parameter. Such a
+   value can be stored, copied and passed on, as an unconstrained
+   parameter can. The index and the value `e[i] = v` writes are checked
+   without a type expected. Each copy checks the types the hooks of its
+   argument name. */
+static struct type *hook_value(struct checker *c, struct type *p,
+                               const char *hook)
+{
+    struct type *t;
+    struct name name;
+    size_t length = p->name.length + 1 + strlen(hook);
+    char *text = arena_alloc(c->arena, length + 1);
+
+    snprintf(text, length + 1, "%.*s.%s", (int)p->name.length, p->name.text,
+             hook);
+    name.text = text;
+    name.length = length;
+    t = types_param(c->types, name);
+    t->declared_by = p->declared_by;
+    return t;
+}
+
+/* A `for` over a value of the parameter p, which its constraints allow
+   through `iter`, or through `next` and `value` together. */
+bool sema_param_iterate(struct checker *c, struct expr *e, struct type *p,
+                        struct type **element)
+{
+    if (!has_hook(p, LANG_HOOK_ITER)) {
+        const char *missing = NULL;
+        if (!has_hook(p, LANG_HOOK_NEXT)) {
+            missing = has_hook(p, LANG_HOOK_VALUE) ? LANG_HOOK_NEXT
+                                                   : LANG_HOOK_ITER;
+        } else if (!has_hook(p, LANG_HOOK_VALUE)) {
+            missing = LANG_HOOK_VALUE;
+        }
+        if (missing != NULL) {
+            param_lacks(c, e->pos, "for", p, missing);
+            *element = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
+    }
+    if (p->walked == NULL) {
+        p->walked = hook_value(c, p, LANG_HOOK_VALUE);
+    }
+    *element = p->walked;
+    return true;
+}
+
+/* `e[i]` on a value of the parameter p, a read through `index` or a
+   write through `set_index`. The index is e's. */
+struct type *sema_param_index(struct checker *c, struct expr *e,
+                              struct type *p, bool write)
+{
+    const char *hook = write ? LANG_HOOK_SET_INDEX : LANG_HOOK_INDEX;
+    struct type *index = sema_check_expr(c, e->as.index.index, NULL);
+
+    if (!has_hook(p, hook)) {
+        param_lacks(c, e->pos, write ? "e[i] = v" : "e[i]", p, hook);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sema_is_error(index)) {
+        return index;
+    }
+    if (p->indexed == NULL) {
+        p->indexed = hook_value(c, p, LANG_HOOK_INDEX);
+    }
+    return p->indexed;
 }
 
 /* The interface among the constraints of the parameter p that declares

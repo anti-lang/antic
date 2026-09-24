@@ -1,0 +1,203 @@
+// What the constraints of a generic give its body, and the types that meet
+// them where it is used: hooks, interfaces, both joined with `+`, named
+// sets, `Number` of `anti.lang` and a parameter without constraints.
+
+constraint Ordered = eq + lt;
+constraint Measured = Ordered + Shape;
+
+abstract class Shape
+{
+	pub abstract fn area(self) -> f32;
+}
+
+class Square inherits Shape
+{
+	pub side: f32,
+
+	concrete fn area(self) -> f32
+	{
+		return self.side * self.side;
+	}
+
+	operator fn eq(self, o: Square) -> bool
+	{
+		return self.side == o.side;
+	}
+
+	operator fn lt(self, o: Square) -> bool
+	{
+		return self.side < o.side;
+	}
+}
+
+// A number type of the program joins `Number` by having its hooks.
+struct Money
+{
+	cents: int,
+}
+
+operator fn add(a: Money, b: Money) -> Money
+{
+	return Money { cents: a.cents + b.cents };
+}
+
+operator fn sub(a: Money, b: Money) -> Money
+{
+	return Money { cents: a.cents - b.cents };
+}
+
+operator fn mul(a: Money, b: Money) -> Money
+{
+	return Money { cents: a.cents * b.cents };
+}
+
+operator fn div(a: Money, b: Money) -> Money
+{
+	return Money { cents: a.cents / b.cents };
+}
+
+operator fn neg(a: Money) -> Money
+{
+	return Money { cents: 0 - a.cents };
+}
+
+operator fn lt(a: Money, b: Money) -> bool
+{
+	return a.cents < b.cents;
+}
+
+class Numbers
+{
+	pub items: [4]int = [0; 4],
+
+	operator fn iter(self) -> NumbersIter
+	{
+		return NumbersIter { list: self, at: -1 };
+	}
+
+	operator fn index(self, i: int) -> int
+	{
+		return self.items[i];
+	}
+
+	operator fn set_index(self, i: int, v: int)
+	{
+		self.items[i] = v;
+	}
+}
+
+class NumbersIter
+{
+	pub list: *Numbers,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < 4;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.list.items[self.at];
+	}
+}
+
+fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn middle<T: Number>(a: T, b: T) -> T
+{
+	let half = (a + b) / (b - a);
+	if half < a || half >= b {
+		return -half * a;
+	}
+	return half;
+}
+
+fn both<T: add + lt>(a: T, b: T) -> T
+{
+	if a > b {
+		return a + b;
+	}
+	return b;
+}
+
+fn same<T: Ordered>(a: T, b: T) -> bool
+{
+	return a == b || a <= b;
+}
+
+fn largest<T: Measured>(a: *T, b: *T) -> f32
+{
+	if a.area() < b.area() && a != b {
+		return b.area();
+	}
+	return max(a.area(), b.area());
+}
+
+fn count<C: iter>(c: C) -> int
+{
+	let n = 0;
+	for x in c {
+		let kept = x;
+		n = n + 1;
+	}
+	return n;
+}
+
+fn walk<I: next + value>(i: I) -> int
+{
+	let n = 0;
+	for x in i {
+		n = n + 1;
+	}
+	return n;
+}
+
+fn swap<C: index + set_index>(c: C)
+{
+	let first = c[0];
+	c[0] = c[1];
+	c[1] = first;
+}
+
+// A parameter without constraints is stored, copied, moved, passed on and
+// measured, which is what a container needs.
+struct Slot<T>
+{
+	value: T,
+}
+
+fn hold<T>(a: T, items: []T) -> Slot<T>
+{
+	let copy = a;
+	let other: T = items[0];
+	let bytes = size_of(T);
+	return Slot<T> { value: pass(other) };
+}
+
+fn pass<T>(a: T) -> T
+{
+	return a;
+}
+
+fn uses(squares: []*Square, numbers: *Numbers, it: NumbersIter, names: []str)
+{
+	let i = middle(1, 2);
+	let f = middle(1.5, 2.5);
+	let m = middle(Money { cents: 1 }, Money { cents: 2 });
+	let sum = both(1, 2);
+	let equal = same('a', 'b');
+	let area = largest(squares[0], squares[1]);
+	let bigger = max(Square { side: 1.0 }, Square { side: 2.0 });
+	let n = count(numbers);
+	let w = walk(it);
+	swap(numbers);
+	let slot = hold("one", names);
+}

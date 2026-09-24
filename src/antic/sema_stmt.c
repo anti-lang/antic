@@ -648,6 +648,17 @@ static bool check_set_index(struct checker *c, struct stmt *s)
     struct type *t = sema_check_expr(c, base, NULL);
     char spelling[OP_TEXT];
 
+    if (!sema_is_error(t) && t->kind == TYPE_PARAM) {
+        if (!sema_is_error(sema_param_index(c, target, t, true)) &&
+            s->as.assign.op != TOKEN_ASSIGN) {
+            const char *o = sema_op_text(s->as.assign.op, spelling);
+            sema_error_at(c, s->pos, "`%s` takes no `operator fn set_index`, "
+                          "and `e[i] = e[i] %.*s v` writes it", o,
+                          (int)strlen(o) - 1, o);
+        }
+        sema_check_expr(c, s->as.assign.value, NULL);
+        return true;
+    }
     if (sema_is_error(t) || (sema_hook(c, t, LANG_HOOK_INDEX) == NULL &&
                              sema_hook(c, t, LANG_HOOK_SET_INDEX) == NULL)) {
         return false;

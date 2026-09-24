@@ -1,0 +1,565 @@
+constraint_decl Ordered    Ordered
+  constraint eq
+  constraint lt
+constraint_decl Measured   Measured
+  constraint Ordered
+  constraint Shape
+class_decl Shape           Shape
+  abstract
+  pub function area        fn(*Shape) -> f32
+    abstract
+    self
+    result
+      type f32
+class_decl Square          Square
+  inherits Shape
+  field side
+    type f32
+    pub
+  pub function area        fn(*Square) -> f32
+    concrete
+    self
+    result
+      type f32
+    block
+      return_stmt
+        multiplicative *   f32
+          field side       f32
+            ident self     *Square
+          field side       f32
+            ident self     *Square
+  pub function eq          fn(*Square, Square) -> bool
+    operator
+    self
+    param o                Square
+      type Square
+    result
+      type bool
+    block
+      return_stmt
+        equality ==        bool
+          field side       f32
+            ident self     *Square
+          field side       f32
+            ident o        Square
+  pub function lt          fn(*Square, Square) -> bool
+    operator
+    self
+    param o                Square
+      type Square
+    result
+      type bool
+    block
+      return_stmt
+        relation <         bool
+          field side       f32
+            ident self     *Square
+          field side       f32
+            ident o        Square
+struct_decl Money
+  field cents              int
+    type int
+function add               fn(Money, Money) -> Money
+  param a                  Money
+    type Money
+  param b                  Money
+    type Money
+  result
+    type Money
+  block
+    return_stmt
+      struct_lit Money     Money
+        field_init cents
+          additive +       int
+            field cents    int
+              ident a      Money
+            field cents    int
+              ident b      Money
+function sub               fn(Money, Money) -> Money
+  param a                  Money
+    type Money
+  param b                  Money
+    type Money
+  result
+    type Money
+  block
+    return_stmt
+      struct_lit Money     Money
+        field_init cents
+          additive -       int
+            field cents    int
+              ident a      Money
+            field cents    int
+              ident b      Money
+function mul               fn(Money, Money) -> Money
+  param a                  Money
+    type Money
+  param b                  Money
+    type Money
+  result
+    type Money
+  block
+    return_stmt
+      struct_lit Money     Money
+        field_init cents
+          multiplicative * int
+            field cents    int
+              ident a      Money
+            field cents    int
+              ident b      Money
+function div               fn(Money, Money) -> Money
+  param a                  Money
+    type Money
+  param b                  Money
+    type Money
+  result
+    type Money
+  block
+    return_stmt
+      struct_lit Money     Money
+        field_init cents
+          multiplicative / int
+            field cents    int
+              ident a      Money
+            field cents    int
+              ident b      Money
+function neg               fn(Money) -> Money
+  param a                  Money
+    type Money
+  result
+    type Money
+  block
+    return_stmt
+      struct_lit Money     Money
+        field_init cents
+          additive -       int
+            int_lit 0      int
+            field cents    int
+              ident a      Money
+function lt                fn(Money, Money) -> bool
+  param a                  Money
+    type Money
+  param b                  Money
+    type Money
+  result
+    type bool
+  block
+    return_stmt
+      relation <           bool
+        field cents        int
+          ident a          Money
+        field cents        int
+          ident b          Money
+class_decl Numbers         Numbers
+  field items
+    type [N]
+      int_lit 4            int
+      type int
+    pub
+    default
+      array_lit ;          [4]int
+        int_lit 0          int
+        int_lit 4          int
+  pub function iter        fn(*Numbers) -> NumbersIter
+    operator
+    self
+    result
+      type NumbersIter
+    block
+      return_stmt
+        struct_lit NumbersIter NumbersIter
+          field_init list
+            ident self     *Numbers
+          field_init at
+            unary -        int
+              int_lit 1    int
+  pub function index       fn(*Numbers, int) -> int
+    operator
+    self
+    param i                int
+      type int
+    result
+      type int
+    block
+      return_stmt
+        index              int
+          field items      [4]int
+            ident self     *Numbers
+          ident i          int
+  pub function set_index   fn(*Numbers, int, int)
+    operator
+    self
+    param i                int
+      type int
+    param v                int
+      type int
+    block
+      simple_stmt =
+        index              int
+          field items      [4]int
+            ident self     *Numbers
+          ident i          int
+        ident v            int
+class_decl NumbersIter     NumbersIter
+  field list
+    type *
+      type Numbers
+    pub
+  field at
+    type int
+    pub
+  pub function next        fn(*NumbersIter) -> bool
+    operator
+    self
+    result
+      type bool
+    block
+      simple_stmt =
+        field at           int
+          ident self       *NumbersIter
+        additive +         int
+          field at         int
+            ident self     *NumbersIter
+          int_lit 1        int
+      return_stmt
+        relation <         bool
+          field at         int
+            ident self     *NumbersIter
+          int_lit 4        int
+  pub function value       fn(*NumbersIter) -> int
+    operator
+    self
+    result
+      type int
+    block
+      return_stmt
+        index              int
+          field items      [4]int
+            field list     *Numbers
+              ident self   *NumbersIter
+          field at         int
+            ident self     *NumbersIter
+function max               fn(T, T) -> T
+  type_param T
+    constraint lt
+  param a                  T
+    type T
+  param b                  T
+    type T
+  result
+    type T
+  block
+    if_stmt
+      branch
+        relation <         bool
+          ident a          T
+          ident b          T
+        block
+          return_stmt
+            ident b        T
+    return_stmt
+      ident a              T
+function middle            fn(T, T) -> T
+  type_param T
+    constraint Number
+  param a                  T
+    type T
+  param b                  T
+    type T
+  result
+    type T
+  block
+    let_stmt half          T
+      multiplicative /     T
+        additive +         T
+          ident a          T
+          ident b          T
+        additive -         T
+          ident b          T
+          ident a          T
+    if_stmt
+      branch
+        or_expr ||         bool
+          relation <       bool
+            ident half     T
+            ident a        T
+          relation >=      bool
+            ident half     T
+            ident b        T
+        block
+          return_stmt
+            multiplicative * T
+              unary -      T
+                ident half T
+              ident a      T
+    return_stmt
+      ident half           T
+function both              fn(T, T) -> T
+  type_param T
+    constraint add
+    constraint lt
+  param a                  T
+    type T
+  param b                  T
+    type T
+  result
+    type T
+  block
+    if_stmt
+      branch
+        relation >         bool
+          ident a          T
+          ident b          T
+        block
+          return_stmt
+            additive +     T
+              ident a      T
+              ident b      T
+    return_stmt
+      ident b              T
+function same              fn(T, T) -> bool
+  type_param T
+    constraint Ordered
+  param a                  T
+    type T
+  param b                  T
+    type T
+  result
+    type bool
+  block
+    return_stmt
+      or_expr ||           bool
+        equality ==        bool
+          ident a          T
+          ident b          T
+        relation <=        bool
+          ident a          T
+          ident b          T
+function largest           fn(*T, *T) -> f32
+  type_param T
+    constraint Measured
+  param a                  *T
+    type *
+      type T
+  param b                  *T
+    type *
+      type T
+  result
+    type f32
+  block
+    if_stmt
+      branch
+        and_expr &&        bool
+          relation <       bool
+            call           f32
+              ident Shape.area fn(*Shape) -> f32
+              ident a      *Shape
+            call           f32
+              ident Shape.area fn(*Shape) -> f32
+              ident b      *Shape
+          equality !=      bool
+            ident a        *T
+            ident b        *T
+        block
+          return_stmt
+            call           f32
+              ident Shape.area fn(*Shape) -> f32
+              ident b      *Shape
+    return_stmt
+      call                 f32
+        ident max          fn(f32, f32) -> f32
+        call               f32
+          ident Shape.area fn(*Shape) -> f32
+          ident a          *Shape
+        call               f32
+          ident Shape.area fn(*Shape) -> f32
+          ident b          *Shape
+function count             fn(C) -> int
+  type_param C
+    constraint iter
+  param c                  C
+    type C
+  result
+    type int
+  block
+    let_stmt n             int
+      int_lit 0            int
+    for_stmt x             C.value
+      over
+        ident c            C
+      block
+        let_stmt kept      C.value
+          ident x          C.value
+        simple_stmt =
+          ident n          int
+          additive +       int
+            ident n        int
+            int_lit 1      int
+    return_stmt
+      ident n              int
+function walk              fn(I) -> int
+  type_param I
+    constraint next
+    constraint value
+  param i                  I
+    type I
+  result
+    type int
+  block
+    let_stmt n             int
+      int_lit 0            int
+    for_stmt x             I.value
+      over
+        ident i            I
+      block
+        simple_stmt =
+          ident n          int
+          additive +       int
+            ident n        int
+            int_lit 1      int
+    return_stmt
+      ident n              int
+function swap              fn(C)
+  type_param C
+    constraint index
+    constraint set_index
+  param c                  C
+    type C
+  block
+    let_stmt first         C.index
+      index                C.index
+        ident c            C
+        int_lit 0          int
+    simple_stmt =
+      index
+        ident c            C
+        int_lit 0          int
+      index                C.index
+        ident c            C
+        int_lit 1          int
+    simple_stmt =
+      index
+        ident c            C
+        int_lit 1          int
+      ident first          C.index
+struct_decl Slot
+  type_param T
+  field value              T
+    type T
+function hold              fn(T, []T) -> Slot<T>
+  type_param T
+  param a                  T
+    type T
+  param items              []T
+    type []
+      type T
+  result
+    type Slot
+      type_args
+        type T
+  block
+    let_stmt copy          T
+      ident a              T
+    let_stmt other         T
+      type T
+      index                T
+        ident items        []T
+        int_lit 0          int
+    let_stmt bytes         int
+      size_of              int
+        type T
+    return_stmt
+      struct_lit Slot      Slot<T>
+        type_args
+          type T
+        field_init value
+          call             T
+            ident pass     fn(T) -> T
+            ident other    T
+function pass              fn(T) -> T
+  type_param T
+  param a                  T
+    type T
+  result
+    type T
+  block
+    return_stmt
+      ident a              T
+function uses              fn([]*Square, *Numbers, NumbersIter, []str)
+  param squares            []*Square
+    type []
+      type *
+        type Square
+  param numbers            *Numbers
+    type *
+      type Numbers
+  param it                 NumbersIter
+    type NumbersIter
+  param names              []str
+    type []
+      type str
+  block
+    let_stmt i             int
+      call                 int
+        ident middle       fn(int, int) -> int
+        int_lit 1          int
+        int_lit 2          int
+    let_stmt f             float
+      call                 float
+        ident middle       fn(float, float) -> float
+        float_lit 1.5      float
+        float_lit 2.5      float
+    let_stmt m             Money
+      call                 Money
+        ident middle       fn(Money, Money) -> Money
+        struct_lit Money   Money
+          field_init cents
+            int_lit 1      int
+        struct_lit Money   Money
+          field_init cents
+            int_lit 2      int
+    let_stmt sum           int
+      call                 int
+        ident both         fn(int, int) -> int
+        int_lit 1          int
+        int_lit 2          int
+    let_stmt equal         bool
+      call                 bool
+        ident same         fn(char, char) -> bool
+        char_lit 'a'       char
+        char_lit 'b'       char
+    let_stmt area          f32
+      call                 f32
+        ident largest      fn(*Square, *Square) -> f32
+        index              *Square
+          ident squares    []*Square
+          int_lit 0        int
+        index              *Square
+          ident squares    []*Square
+          int_lit 1        int
+    let_stmt bigger        Square
+      call                 Square
+        ident max          fn(Square, Square) -> Square
+        struct_lit Square  Square
+          field_init side
+            float_lit 1.0  f32
+        struct_lit Square  Square
+          field_init side
+            float_lit 2.0  f32
+    let_stmt n             int
+      call                 int
+        ident count        fn(*Numbers) -> int
+        ident numbers      *Numbers
+    let_stmt w             int
+      call                 int
+        ident walk         fn(NumbersIter) -> int
+        ident it           NumbersIter
+    simple_stmt
+      call                 void
+        ident swap         fn(*Numbers)
+        ident numbers      *Numbers
+    let_stmt slot          Slot<str>
+      call                 Slot<str>
+        ident hold         fn(str, []str) -> Slot<str>
+        string_lit "one"   str
+        ident names        []str

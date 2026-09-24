@@ -956,6 +956,9 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
 {
     struct expr *start = e;
 
+    if (t->kind == TYPE_PARAM) {
+        return sema_param_iterate(c, e, t, element);
+    }
     if (sema_hook(c, t, LANG_HOOK_ITER) != NULL) {
         start = sema_hook_call(c, e, LANG_HOOK_ITER, NULL, 0);
         t = sema_check_expr(c, start, NULL);
@@ -2487,6 +2490,9 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             struct expr *index = e->as.index.index;
             *e = *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX, &index, 1);
             return sema_check_expr(c, e, expected);
+        }
+        if (!sema_is_error(t) && t->kind == TYPE_PARAM) {
+            return sema_param_index(c, e, t, false);
         }
         if (!sema_require(c, e->as.index.index,
                           sema_check_expr(c, e->as.index.index,

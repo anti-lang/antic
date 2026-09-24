@@ -1,0 +1,162 @@
+// The refusals of constraints: a body that uses more than its constraints
+// give, and a use whose type lacks a hook or an interface.
+
+constraint Ordered = eq + lt;
+constraint Measured = Ordered + Shape;
+
+abstract class Shape
+{
+	pub abstract fn area(self) -> f32;
+}
+
+// Plain has the hooks of `Ordered` and does not inherit `Shape`.
+class Plain
+{
+	pub size: int,
+
+	operator fn eq(self, o: Plain) -> bool
+	{
+		return self.size == o.size;
+	}
+
+	operator fn lt(self, o: Plain) -> bool
+	{
+		return self.size < o.size;
+	}
+}
+
+struct Circle
+{
+	r: f32,
+}
+
+struct Sorted<T: lt>
+{
+	first: T,
+}
+
+fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn middle<T: Number>(a: T, b: T) -> T
+{
+	return (a + b) / (b - a);
+}
+
+fn same<T: Ordered>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+fn largest<T: Measured>(a: *T) -> f32
+{
+	return a.area();
+}
+
+fn both<T: add + lt>(a: T, b: T) -> T
+{
+	return a + b;
+}
+
+fn count<C: iter>(c: C) -> int
+{
+	return 0;
+}
+
+// Each body uses one thing no constraint gives.
+fn equal<T>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+fn negate<T: add>(a: T) -> T
+{
+	return -a;
+}
+
+fn scaled<T: Ordered>(a: T) -> T
+{
+	return a * a;
+}
+
+fn field<T>(a: T) -> int
+{
+	return a.size;
+}
+
+fn method<T>(a: T) -> int
+{
+	return a.len();
+}
+
+fn walk<T>(a: T) -> int
+{
+	for x in a {
+	}
+	return 0;
+}
+
+fn half<I: next>(i: I) -> int
+{
+	for x in i {
+	}
+	return 0;
+}
+
+fn read<T>(a: T) -> int
+{
+	return a[0];
+}
+
+fn write<C: index>(c: C)
+{
+	c[0] = c[1];
+}
+
+fn add_at<C: index + set_index>(c: C)
+{
+	c[0] += c[1];
+}
+
+fn compare<C: iter>(c: C) -> bool
+{
+	for x in c {
+		return x < x;
+	}
+	return false;
+}
+
+fn convert<T>(a: T) -> int
+{
+	return a as int;
+}
+
+fn test<T>(a: T) -> bool
+{
+	if a {
+		return true;
+	}
+	return false;
+}
+
+fn nested<U>(a: U) -> U
+{
+	return max(a, a);
+}
+
+fn uses(p: *Plain, bytes: u8, texts: str)
+{
+	let bigger = max(Circle { r: 1.0 }, Circle { r: 2.0 });
+	let small = middle(bytes, bytes);
+	let word = middle(texts, texts);
+	let plain = same(Plain { size: 1 }, Plain { size: 2 });
+	let shape = largest(p);
+	let summed = both(true, false);
+	let counted = count(3);
+	let sorted: ?*Sorted<Circle> = none;
+}

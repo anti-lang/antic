@@ -265,6 +265,10 @@ struct type {
     uint32_t hooks;
     const struct type **ifaces;
     size_t iface_count;
+    /* TYPE_PARAM: the value a walk of it gives and the value `e[i]`
+       reads, each made on its first use. */
+    struct type *walked;
+    struct type *indexed;
 
     enum layout_state layout;       /* TYPE_STRUCT, for the cycle check */
     struct type *next;              /* the list of derived types */
@@ -414,6 +418,12 @@ struct type *types_object(struct types *types);
    call of `compile` of `anti.regex`, which the module then imports, and
    so is a pattern literal, whose errors are classes of that module. */
 #define LANG_REGEX "Regex"
+/* DESIGN: `Number` is the constraint of numeric code that `anti.lang`
+   ships, `add + sub + mul + div + neg + lt`, which the compiler declares
+   as it does `Regex`. A type joins it by having those hooks, so the set
+   is open. A constraint, type or function named `Number` in the module
+   wins over it. */
+#define LANG_NUMBER "Number"
 /* DESIGN: `ByteRegex` is the built-in struct of a pattern of bytes, in
    the form of `Regex`, which searches a `[]byte`. A pattern literal takes
    its mode from where it stands, so it is a `ByteRegex` where one is
