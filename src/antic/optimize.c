@@ -1148,8 +1148,6 @@ static struct slot_field *field_at(struct ir_function *f,
     return &fields[(*count)++];
 }
 
-/* Whether temp is named anywhere in inst other than as the address of a
-   load or a store. */
 /* DESIGN: whether inst lets the address in temp reach somewhere the pass
    cannot follow. A load of it reads one field and never escapes. A store
    of it as the value does escape. So does an address that feeds another

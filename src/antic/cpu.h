@@ -34,7 +34,7 @@ enum cpu_feature {
 };
 
 /* The cap on the size of a simd struct, which the section calls a constant
-   in the level table. Nothing reads it until simd structs exist. */
+   in the level table. The checker and the lowering read it. */
 enum { CPU_VECTOR_BYTE_CAP = 256 };
 
 const char *cpu_name(enum cpu_level level);

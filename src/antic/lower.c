@@ -998,11 +998,6 @@ static const struct ir_global *check_text(struct lowerer *l, int line,
     return g;
 }
 
-/* DESIGN: a dev-mode check is a branch to a block that calls the runtime
-   and falls through to the rest, as an assertion is. The failure block
-   carries its own kind, so the build that compiles the program drops the
-   checks and the assertions under separate options. cond decides the
-   failure when bad is set, and decides the rest otherwise. */
 /* The value v of an integer type as the i64 the failure routine takes. */
 static struct ir_operand widen_operand(struct lowerer *l, struct ir_operand v,
                                        const struct type *t)
@@ -1047,6 +1042,11 @@ static void check_call(struct lowerer *l, struct ir_block *fail,
     l->b = rest;
 }
 
+/* DESIGN: a dev-mode check is a branch to a block that calls the runtime
+   and falls through to the rest, as an assertion is. The failure block
+   carries its own kind, so the build that compiles the program drops the
+   checks and the assertions under separate options. cond decides the
+   failure when bad is set, and decides the rest otherwise. */
 static void check_branch(struct lowerer *l, struct ir_operand cond, bool bad,
                          const struct ir_global *text, enum check_kind kind,
                          struct ir_operand a, struct ir_operand b,
@@ -1892,9 +1892,6 @@ static struct ir_global *struct_global(struct lowerer *l,
     return g;
 }
 
-/* The count of fields a descriptor lists: the class's own fields, with
-   the base and the table pointer left out. Each class lists its own, and
-   the parent descriptor holds the rest of the chain. */
 /* Whether the field list of a descriptor carries a record of the field.
    The base and the table pointer have none, and neither has a
    `transient` field, which no walk of the list reads. */
@@ -1903,6 +1900,9 @@ static bool listed_field(const struct struct_field *f)
     return f->form != FIELD_BASE && f->form != FIELD_TABLE && !f->transient;
 }
 
+/* The count of fields a descriptor lists: the class's own fields, with
+   the base and the table pointer left out. Each class lists its own, and
+   the parent descriptor holds the rest of the chain. */
 static size_t own_fields(const struct type *t)
 {
     size_t count = 0;
@@ -2075,10 +2075,6 @@ static struct ir_global *class_fields(struct lowerer *l,
     return g;
 }
 
-/* DESIGN: the ancestors of a class are its descriptors from the root
-   down to the class itself, one entry per level. The entry at a level is
-   the same address in every class below it, so `p is *T` compares the
-   entry at T's depth with T's descriptor. */
 /* A global the runtime defines. Every module refers to it and none
    writes it out. */
 static struct ir_global *runtime_global(struct lowerer *l, const char *name)
@@ -2094,6 +2090,10 @@ static struct ir_global *runtime_global(struct lowerer *l, const char *name)
     return g;
 }
 
+/* DESIGN: the ancestors of a class are its descriptors from the root
+   down to the class itself, one entry per level. The entry at a level is
+   the same address in every class below it, so `p is *T` compares the
+   entry at T's depth with T's descriptor. */
 static struct ir_global *class_ancestors(struct lowerer *l,
                                          const struct type *t)
 {
@@ -2126,7 +2126,6 @@ static struct ir_global *class_ancestors(struct lowerer *l,
     return g;
 }
 
-/* The list of public functions of the chain, in table order. */
 /* The name a signature gives a type that a reflect.Value carries, or
    NULL for a type it cannot carry. */
 static const char *value_type_name(const struct type *t)
@@ -2191,6 +2190,7 @@ static const struct ir_global *signature_text(struct lowerer *l,
     return g;
 }
 
+/* The list of public functions of the chain, in table order. */
 static struct ir_global *class_functions(struct lowerer *l,
                                          const struct type *t,
                                          size_t *count_out)
@@ -3288,8 +3288,6 @@ static void build_slice(struct lowerer *l, const struct expr *e,
     ir_store(l->f, l->b, IR_I64, length, at);
 }
 
-/* Construct the aggregate value of e at dest. A literal fills its fields
-   or elements in place, and any other value is copied. */
 static const struct name tag_name = {VARIANT_TAG, sizeof VARIANT_TAG - 1};
 static const struct name union_name = {VARIANT_UNION,
                                        sizeof VARIANT_UNION - 1};
@@ -3340,6 +3338,8 @@ static void build_variant(struct lowerer *l, const struct expr *e,
     }
 }
 
+/* Construct the aggregate value of e at dest. A literal fills its fields
+   or elements in place, and any other value is copied. */
 static void build_into(struct lowerer *l, const struct expr *e,
                        struct ir_operand dest)
 {
@@ -3585,8 +3585,6 @@ static struct ir_operand lower_format(struct lowerer *l, const struct expr *e)
     return lower_address(l, e->as.format.take);
 }
 
-/* The address of the memory that holds the aggregate value of e. A
-   literal gets a slot of its own, and a constant is read-only data. */
 static struct ir_operand lower_sync_op(struct lowerer *l,
                                        const struct expr *e);
 
@@ -3598,6 +3596,8 @@ static struct ir_operand lower_simd_cast(struct lowerer *l,
                                          const struct expr *e);
 static struct ir_operand lower_simd(struct lowerer *l, const struct expr *e);
 
+/* The address of the memory that holds the aggregate value of e. A
+   literal gets a slot of its own, and a constant is read-only data. */
 static struct ir_operand lower_address(struct lowerer *l,
                                        const struct expr *e)
 {
@@ -4968,8 +4968,6 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
     return temp(l, ir_unary(l->f, l->b, op, target, v));
 }
 
-/* The IR form of a symbolic value: the operations of lower_binary and
-   lower_cast on symbolic operands. */
 /* `a <<% n` of symbolic values, with the mask of shift_wrap. */
 static uint32_t shift_wrap_sym(struct lowerer *l, const struct symbolic *s,
                                uint32_t value, uint32_t count)
@@ -4989,6 +4987,8 @@ static uint32_t shift_wrap_sym(struct lowerer *l, const struct symbolic *s,
     return ir_sym_op(l->m, IR_AND, type, shifted, mask);
 }
 
+/* The IR form of a symbolic value: the operations of lower_binary and
+   lower_cast on symbolic operands. */
 static uint32_t sym_of(struct lowerer *l, const struct symbolic *s)
 {
     enum ir_type type = ir_type_of(s->type);
@@ -5338,10 +5338,6 @@ static struct ir_function *parallel_thunk(struct lowerer *l,
     return f;
 }
 
-/* DESIGN: `parallel a by n -> f(x)` becomes one call of the runtime. The
-   runtime decides the chunk count when n is absent. It therefore
-   allocates the array of results and writes back the pointer and the
-   count, and the expression is the slice of those results. */
 /* DESIGN: the thunk of a dispatch has the shape the runtime calls: the
    context, the object and the address of the result. It unpacks the
    context and calls the worker with the object first. */
@@ -5503,6 +5499,10 @@ static struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
     return temp(l, ir_load(l->f, l->b, ir_type_of(e->type), temp(l, out)));
 }
 
+/* DESIGN: `parallel a by n -> f(x)` becomes one call of the runtime. The
+   runtime decides the chunk count when n is absent. It therefore
+   allocates the array of results and writes back the pointer and the
+   count, and the expression is the slice of those results. */
 static struct ir_operand lower_parallel(struct lowerer *l,
                                         const struct expr *e)
 {
@@ -6587,8 +6587,6 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     hook_changed(l, &p, target);
 }
 
-/* A local that is not address-taken gets a temporary of its own. An
-   assignment to the variable it was copied from leaves it unchanged. */
 /* DESIGN: a local of a class whose chain declares `destruct` or owns
    memory is torn down at the end of its block, as if the program had
    written `defer destroy(&c)` after the `let`. A class value held inline
@@ -7116,6 +7114,8 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         return;
     }
     v = lower_expr(l, s->as.let.value);
+    /* A local that is not address-taken gets a temporary of its own. An
+       assignment to the variable it was copied from leaves it unchanged. */
     if (sym->address_taken) {
         ir_store(l->f, l->b, ir_type_of(sym->type), v, temp(l, sym->ir));
     } else {

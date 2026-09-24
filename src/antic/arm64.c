@@ -1568,9 +1568,9 @@ static void emit_jump(struct selector *s, const struct ir_inst *inst)
     jump(s, &inst->a);
 }
 
-/* When the true block follows, the negated condition jumps to the false
-   block, and control falls through otherwise. */
-/* The arm the condition takes, and the other one after it. */
+/* The arm the condition takes, and the other one after it. When the true
+   block follows, the negated condition jumps to the false block, and
+   control falls through otherwise. */
 static void conditional(struct selector *s, const struct ir_inst *inst,
                         enum mach_cond c)
 {
