@@ -535,7 +535,7 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     char why[64];
     const struct anti_provided *table;
     const char *damage;
-    struct anti_plugin *p;
+    struct anti_plugin *p = NULL;
     void *handle;
     int same = 0;
 
@@ -552,31 +552,32 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     }
     table = anti_rt_library_symbol(handle, "anti_rt_provides");
     if (table == NULL) {
-        anti_rt_library_close(handle);
         fail("%s provides nothing and is no plugin", name);
-        return NULL;
+        goto close;
     }
     damage = damage_of(table);
     if (damage != NULL) {
-        anti_rt_library_close(handle);
         fail("%s carries a damaged table of what it provides: %s", name,
              damage);
-        return NULL;
+        goto close;
     }
     if (!same_bytes(table->version, table->version_length, version.ptr,
                     version.len)) {
-        anti_rt_library_close(handle);
         fail("%s was built for runtime %.*s, and this program carries %.*s",
              name, (int)table->version_length, table->version,
              (int)version.len, version.ptr);
-        return NULL;
+        goto close;
     }
     anti_rt_plugin_hold();
     p = claim(name, handle, table, anti_rt_plugin_image(table), &same);
     anti_rt_plugin_release();
-    if (p == NULL || same) {
-        anti_rt_library_close(handle);
+    if (p != NULL && !same) {
+        return p;
     }
+    /* A refusal gives NULL. A library open already gives the slot it
+       has, and the handle this call opened goes back. */
+close:
+    anti_rt_library_close(handle);
     return p;
 }
 

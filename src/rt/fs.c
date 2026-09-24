@@ -249,17 +249,17 @@ struct anti_text *anti_rt_fs_list(const unsigned char *path, int64_t len,
         return NULL;
     }
     units = wcslen(pattern);
+    search = -1;
     if (units == 0) {
-        release(pattern);
         errno = ENOENT;
-        return NULL;
+    } else {
+        if (pattern[units - 1] != L'/' && pattern[units - 1] != L'\\') {
+            pattern[units++] = L'\\';
+        }
+        pattern[units++] = L'*';
+        pattern[units] = 0;
+        search = _wfindfirst64(pattern, &data);
     }
-    if (pattern[units - 1] != L'/' && pattern[units - 1] != L'\\') {
-        pattern[units++] = L'\\';
-    }
-    pattern[units++] = L'*';
-    pattern[units] = 0;
-    search = _wfindfirst64(pattern, &data);
     release(pattern);
     if (search == -1) {
         return NULL;
@@ -343,22 +343,17 @@ int32_t anti_rt_fs_rename(const unsigned char *from, int64_t from_len,
                           const unsigned char *to, int64_t to_len)
 {
     path_char *old_name = native_path(from, from_len, 0);
-    path_char *new_name;
-    int status;
+    path_char *new_name =
+        old_name != NULL ? native_path(to, to_len, 0) : NULL;
+    int status = -1;
 
-    if (old_name == NULL) {
-        return -1;
-    }
-    new_name = native_path(to, to_len, 0);
-    if (new_name == NULL) {
-        release(old_name);
-        return -1;
-    }
+    if (new_name != NULL) {
 #if defined(_WIN32)
-    status = _wrename(old_name, new_name);
+        status = _wrename(old_name, new_name);
 #else
-    status = rename(old_name, new_name);
+        status = rename(old_name, new_name);
 #endif
+    }
     release(old_name);
     release(new_name);
     return status == 0 ? 0 : -1;
