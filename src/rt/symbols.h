@@ -56,6 +56,12 @@ bool anti_rt_elf_symbol(const uint8_t *file, size_t size, const char *name,
 uint64_t anti_rt_elf_loaded_room(const uint8_t *headers, size_t count,
                                  uint64_t vaddr);
 
+/* The address of the __TEXT segment of a 64-bit Mach-O header, which is
+   where the header lies when the image runs. size bounds every read of a
+   file, and a mapped image passes SIZE_MAX, where the size the header
+   gives its commands bounds the walk. */
+bool anti_rt_macho_text(const uint8_t *header, size_t size, uint64_t *vmaddr);
+
 /* The symbol table of a Mach-O image or file. */
 struct anti_macho_table {
     const uint8_t *symbols;         /* the nlist_64 records */

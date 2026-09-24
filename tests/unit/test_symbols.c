@@ -458,6 +458,59 @@ static void loaded_room(void)
     CHECK(anti_rt_elf_loaded_room(headers, 3, 0x5) == 0);
 }
 
+/* The address of __TEXT of a Mach-O header, which a trace and `anti
+   symbols` both read. The header holds a __PAGEZERO segment and a
+   __TEXT segment, each of 72 bytes. Every read stays inside the size
+   given and inside the commands the header counts. */
+static void macho_text(void)
+{
+    uint8_t h[32 + 2 * 72 + 16];
+    uint64_t vmaddr = 0;
+
+    memset(h, 0, sizeof h);
+    put(h, 0xfeedfacf, 4);
+    put(h + 16, 2, 4);
+    put(h + 20, 2 * 72, 4);
+    put(h + 32, 0x19, 4);
+    put(h + 36, 72, 4);
+    memcpy(h + 40, "__PAGEZERO", 10);
+    put(h + 104, 0x19, 4);
+    put(h + 108, 72, 4);
+    memcpy(h + 112, "__TEXT", 6);
+    put(h + 104 + 24, 0x100000000, 8);
+    CHECK(anti_rt_macho_text(h, 32 + 2 * 72, &vmaddr));
+    CHECK(vmaddr == 0x100000000);
+    /* The file ends inside the second command. */
+    CHECK(!anti_rt_macho_text(h, 32 + 72 + 40, &vmaddr));
+    /* The file ends inside the header. */
+    CHECK(!anti_rt_macho_text(h, 20, &vmaddr));
+    /* Not a 64-bit Mach-O header. */
+    put(h, 0xfeedface, 4);
+    CHECK(!anti_rt_macho_text(h, sizeof h, &vmaddr));
+    put(h, 0xfeedfacf, 4);
+    /* The commands run past the size the header gives them. */
+    put(h + 20, 72 + 8, 4);
+    CHECK(!anti_rt_macho_text(h, sizeof h, &vmaddr));
+    put(h + 20, 2 * 72, 4);
+    /* A command of size 0 would stand still, and one of 16 is shorter
+       than a segment. */
+    put(h + 36, 0, 4);
+    CHECK(!anti_rt_macho_text(h, sizeof h, &vmaddr));
+    put(h + 36, 72, 4);
+    put(h + 108, 16, 4);
+    CHECK(!anti_rt_macho_text(h, sizeof h, &vmaddr));
+    put(h + 108, 72, 4);
+    /* A header that counts more commands than it holds. */
+    put(h + 16, 1000, 4);
+    memcpy(h + 112, "__DATA", 6);
+    CHECK(!anti_rt_macho_text(h, sizeof h, &vmaddr));
+    /* A mapped image has no size, and the header bounds the walk. */
+    put(h + 16, 2, 4);
+    memcpy(h + 112, "__TEXT", 6);
+    CHECK(anti_rt_macho_text(h, SIZE_MAX, &vmaddr));
+    CHECK(vmaddr == 0x100000000);
+}
+
 void test_symbols(void)
 {
     /* The forms of "Symbols" in docs/decisions.md. */
@@ -489,4 +542,5 @@ void test_symbols(void)
     empty_entry_formats();
     long_leb();
     loaded_room();
+    macho_text();
 }

@@ -1016,53 +1016,6 @@ static bool map_lookup(const struct text *map, uint64_t vaddr,
     return false;
 }
 
-static uint64_t get64(const unsigned char *p)
-{
-    uint64_t v = 0;
-    int i;
-
-    for (i = 7; i >= 0; i--) {
-        v = v << 8 | p[i];
-    }
-    return v;
-}
-
-static uint32_t get32(const unsigned char *p)
-{
-    return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 |
-           (uint32_t)p[3] << 24;
-}
-
-/* The address of the __TEXT segment of a Mach-O file, which is where
-   its header lies when it runs. A trace gives an offset from the
-   header. */
-static bool macho_text(const struct text *file, uint64_t *out)
-{
-    const unsigned char *p = (const unsigned char *)file->data;
-    size_t at = 32;
-    uint32_t commands;
-    uint32_t i;
-
-    if (file->length < 32 || get32(p) != 0xfeedfacfu) {
-        return false;
-    }
-    commands = get32(p + 16);
-    for (i = 0; i < commands && at + 8 <= file->length; i++) {
-        uint32_t kind = get32(p + at);
-        uint32_t size = get32(p + at + 4);
-        if (kind == 0x19 && at + 32 <= file->length &&
-            strncmp((const char *)p + at + 8, "__TEXT", 16) == 0) {
-            *out = get64(p + at + 24);
-            return true;
-        }
-        if (size == 0) {
-            break;
-        }
-        at += size;
-    }
-    return false;
-}
-
 /* The function and the line of offset into the module the unit holds
    the symbols of. The twin answers first. The map answers for what it
    does not. */
@@ -1084,7 +1037,8 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
         return false;
     }
     elf = twin->length >= 4 && memcmp(twin->data, "\177ELF", 4) == 0;
-    macho = macho_text(twin, &base);
+    macho = anti_rt_macho_text((const uint8_t *)twin->data, twin->length,
+                               &base);
     if (!elf && !macho) {
         return false;
     }

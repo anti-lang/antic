@@ -835,6 +835,26 @@ static bool macho_commands(const struct bytes *b, macho_visit *visit,
     return false;
 }
 
+static bool macho_text_visit(void *context, uint32_t kind,
+                             const uint8_t *command, uint32_t size)
+{
+    uint64_t *vmaddr = context;
+
+    if (kind == MACHO_SEGMENT_64 && size >= 72 &&
+        strncmp((const char *)command + 8, "__TEXT", 16) == 0) {
+        *vmaddr = get(command + 24, 8);
+        return true;
+    }
+    return false;
+}
+
+bool anti_rt_macho_text(const uint8_t *header, size_t size, uint64_t *vmaddr)
+{
+    struct bytes b = {header, size};
+
+    return macho_commands(&b, macho_text_visit, vmaddr);
+}
+
 /* What the walk over the commands of a header collects for its symbol
    table. */
 struct macho_layout {
