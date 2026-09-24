@@ -1,8 +1,8 @@
 //! A pattern literal that nests a repeat inside an unbounded repeat over text
 //! that overlaps fails the safety check `exponential-pattern`, at the inner
-//! repeat. A possessive quantifier, an atomic group or text that cannot
-//! overlap passes, and `unchecked` overrules the check where the input is
-//! known to be short.
+//! repeat. A possessive quantifier, an atomic group or text that cannot overlap
+//! passes, and `unchecked` overrules the check where the input is known to be
+//! short.
 
 import anti.regex;
 
