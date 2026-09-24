@@ -1,0 +1,8 @@
+//! The size of a Mutex, which the layout gives per target: four bytes on Linux
+//! and macOS and eight on Windows. main returns it times 1000, and the listing
+//! of each target holds that number.
+
+fn main() -> int
+{
+	return size_of(Mutex) * 1000;
+}

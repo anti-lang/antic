@@ -101,4 +101,15 @@ let a = shapes.area(c);
 <pre class="signature">pub worker fn measure(c: Circle) -&gt; int</pre>
 <p>Measure <code>c</code> on a worker.</p>
 </section>
+<section class="item" id="Tray">
+<h2>Tray</h2>
+<pre class="signature">pub synchronized class Tray</pre>
+<p>Circles that threads add to under the lock of the object.</p>
+<ul class="members">
+<li><code>pub fn add(self, c: Circle)</code>
+<p>Add one circle.</p>
+<p>Runs under the lock of its object.</p>
+</li>
+</ul>
+</section>
 </main>

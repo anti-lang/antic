@@ -1,10 +1,9 @@
 //! A synchronized class runs every function that is not private under one
 //! hidden lock of its object. The chunks of two `parallel` add to one tally,
 //! which each worker takes as a pointer to a thread-safe object, and no
-//! addition is lost. A
-//! public function that calls another on the same object takes the lock again
-//! without waiting, and so do a closure the object runs and `sync obj { }`
-//! around two calls.
+//! addition is lost. A public function that calls another on the same object
+//! takes the lock again without waiting, and so do a closure the object runs
+//! and `sync obj { }` around two calls.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

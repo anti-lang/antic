@@ -1,9 +1,9 @@
-//! A concurrent class leaves the locking to the program, and the checker
-//! proves every field guarded, atomic or fixed. The chunks of a `parallel`
-//! add people to one list and count them in an atomic field. The list's lock
-//! guards the links, and each node's own lock guards its person, so a change
-//! to one person holds that node's lock alone. An atomic local counts the
-//! calls of a `concurrent` closure.
+//! A concurrent class leaves the locking to the program, and the checker proves
+//! every field guarded, atomic or fixed. The chunks of a `parallel` add people
+//! to one list and count them in an atomic field. The list's lock guards the
+//! links, and each node's own lock guards its person, so a change to one person
+//! holds that node's lock alone. An atomic local counts the calls of a
+//! `concurrent` closure.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

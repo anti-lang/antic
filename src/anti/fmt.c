@@ -584,7 +584,10 @@ static bool space_before(const struct emitter *e, const struct piece *p)
     default:
         break;
     }
-    if (prev == TOKEN_RBRACKET && e->type_bracket && opens_type(cur)) {
+    /* `guarded by` follows the default of a field, which may be an
+       array literal, and stands apart from it. */
+    if (prev == TOKEN_RBRACKET && e->type_bracket && opens_type(cur) &&
+        !(p->length == 7 && memcmp(e->src + p->offset, "guarded", 7) == 0)) {
         return false;
     }
     return true;

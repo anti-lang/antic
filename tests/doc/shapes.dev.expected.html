@@ -125,4 +125,21 @@ let a = shapes.area(c);
 <h2>helper</h2>
 <pre class="signature">fn helper(n: int) -&gt; int</pre>
 </section>
+<section class="item" id="Tray">
+<h2>Tray</h2>
+<pre class="signature">pub synchronized class Tray</pre>
+<p>Circles that threads add to under the lock of the object.</p>
+<ul class="fields">
+<li><code>count: int</code>
+</li>
+<li><code>(lock): Object lock</code>
+</li>
+</ul>
+<ul class="members">
+<li><code>pub fn add(self, c: Circle)</code>
+<p>Add one circle.</p>
+<p>Runs under the lock of its object.</p>
+</li>
+</ul>
+</section>
 </main>

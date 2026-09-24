@@ -2097,6 +2097,24 @@ add_test(NAME error_closures_modules
 set_tests_properties(error_closures_modules PROPERTIES
     FIXTURES_REQUIRED walk_antl)
 
+# The kinds of the fields of a concurrent class and the fields of a
+# synchronized class reach the importer through the library file.
+file(MAKE_DIRECTORY "${LIBS}/sync/com/example")
+add_test(NAME antl_queue
+    COMMAND antic -c -I "${MODULES}/sync"
+            -o "${LIBS}/sync/com/example/queue.antl"
+            "${MODULES}/sync/com/example/queue.anti")
+set_tests_properties(antl_queue PROPERTIES FIXTURES_SETUP queue_antl)
+add_test(NAME error_concurrent_modules
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=-S,-I,${LIBS}/sync,-o,${CMAKE_CURRENT_BINARY_DIR}/concurrent_modules.s,concurrent_modules.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/concurrent_modules.err"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+set_tests_properties(error_concurrent_modules PROPERTIES
+    FIXTURES_REQUIRED queue_antl)
+
 # A qualified base that the module does not declare as a public class
 add_test(NAME error_inherits_module
     COMMAND "${CMAKE_COMMAND}"
@@ -2219,6 +2237,15 @@ add_test(NAME parallel_size
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/parallel_size.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_parallel_size.cmake")
+
+# The size of a Mutex per target: four bytes on Linux and macOS, eight on
+# Windows.
+add_test(NAME mutex_size
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/mutex_size.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/mutex_size"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_mutex_size.cmake")
 
 # Two threads that take two locks in opposite orders: a dev build reports
 # the conflict with its four sites, and a release build says nothing.
@@ -2593,7 +2620,11 @@ if(ANTIC_LLVM_AR)
 endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
-            failing tuples flags variants nested simd names handlers)
+            failing tuples flags variants nested simd names handlers ledger)
+        # The C program of ledger starts its threads with pthreads.
+        if(case STREQUAL "ledger" AND WIN32)
+            continue()
+        endif()
         add_test(NAME clib_${case}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"

@@ -1,5 +1,5 @@
-//! A library of shared state: a struct that holds a Mutex, and functions that
-//! make, drain and merge channels.
+//! A library of shared state: a struct that holds a Mutex, a synchronized and a
+//! concurrent class, and functions that make, drain and merge channels.
 
 /// A count that threads share under its mutex.
 pub struct Tally
@@ -17,6 +17,43 @@ pub fn add(t: *Tally, n: int)
 {
 	sync t.lock {
 		t.n += n;
+	}
+}
+
+/// A sum under the hidden lock of its object.
+pub synchronized class Ledger
+{
+	sum: int = 0,
+	pub posts: int = 0,
+
+	pub fn add(self, n: int)
+	{
+		self.sum += n;
+		self.posts += 1;
+	}
+
+	pub fn total(self) -> int
+	{
+		return self.sum;
+	}
+}
+
+/// A level guarded by the lock of the same object, a count of the reads that is
+/// atomic, and a cap that the program sets once before any thread reads it.
+pub concurrent class Gauge
+{
+	pub lock: Mutex,
+	pub level: int = 0 guarded by lock,
+	pub atomic reads: int = 0,
+	pub cap: int = 0 unchecked(unguarded-field, "set once before the threads"),
+	pub floor: int = 0,
+
+	pub fn read(self) -> int
+	{
+		self.reads.add(1);
+		sync self.lock {
+			return self.level;
+		}
 	}
 }
 

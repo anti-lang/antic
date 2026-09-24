@@ -1,7 +1,7 @@
 //! The fields of a concurrent class: each is guarded, atomic or fixed, and a
 //! field that is none of the three fails the safety check `unguarded-field`.
-//! Two threads that add to `hits` outside the lock would lose an update, so
-//! the write is refused. `unchecked` overrules the check for one field or one
+//! Two threads that add to `hits` outside the lock would lose an update, so the
+//! write is refused. `unchecked` overrules the check for one field or one
 //! statement, and one that overrules nothing is a warning.
 
 concurrent class Counter

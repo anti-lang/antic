@@ -9,8 +9,8 @@
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, simd,
-#             classes, failing, tuples, flags, variants, nested, names or
-#             handlers
+#             classes, failing, tuples, flags, ledger, variants, nested,
+#             names or handlers
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
@@ -211,6 +211,17 @@ elseif(CASE STREQUAL "flags")
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/flags${EXE}")
     expect_output("${dir}/flags${EXE}" "${SOURCES}/flags.expected")
+elseif(CASE STREQUAL "ledger")
+    # A synchronized class crosses with the bytes of its hidden lock, and
+    # two threads of C call it without losing an addition.
+    library(ledger static "${dir}")
+    expect_header("${dir}/ledger.h" ledger.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/ledger.c"
+        "${library_file}" "${runtime_library}" ${LINK} -lpthread
+        -o "${dir}/ledger${EXE}")
+    expect_output("${dir}/ledger${EXE}" "${SOURCES}/ledger.expected")
 elseif(CASE STREQUAL "handlers")
     # An `own fn` field crosses as the struct of its code and its
     # snapshot. C calls the code with the snapshot, and the delete of the

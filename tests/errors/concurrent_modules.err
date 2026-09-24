@@ -1,0 +1,3 @@
+concurrent_modules.anti:12:2: error: `level` is guarded by `lock`, and no `sync` holds it here [unguarded-field]
+concurrent_modules.anti:13:2: error: `floor` is not guarded, atomic or fixed [unguarded-field]
+concurrent_modules.anti:17:14: error: `posts` is a field of the synchronized class `Ledger`, which its own functions reach alone

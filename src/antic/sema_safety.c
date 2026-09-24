@@ -394,6 +394,17 @@ void sema_note_field_write(struct checker *c, const struct expr *e)
     c->written[c->written_count++].field = f;
 }
 
+/* DESIGN: a field that code outside the class reaches may be written in
+   another module, which this one does not see. Its `unchecked` is
+   therefore never unused: the field is reported here as well, where
+   the clause covers it. */
+static bool written_elsewhere(const struct type *t,
+                              const struct struct_field *f)
+{
+    return f->vis != VIS_PRIVATE && !is_free_field(f) &&
+           (f->unchecked || t->unchecked_fields);
+}
+
 /* Report each field of the module that a write made none of the three,
    in the order of the declarations. */
 void sema_report_unfixed(struct checker *c)
@@ -411,8 +422,10 @@ void sema_report_unfixed(struct checker *c)
         }
         t = it->symbol->type;
         for (j = 0; j < t->field_count; j++) {
-            for (k = 0; k < c->written_count; k++) {
-                if (c->written[k].field == &t->fields[j]) {
+            for (k = 0; k <= c->written_count; k++) {
+                if (k == c->written_count
+                        ? written_elsewhere(t, &t->fields[j])
+                        : c->written[k].field == &t->fields[j]) {
                     sema_check_at(c, NAME_UNGUARDED_FIELD, t->fields[j].pos,
                                   "`%.*s` is not guarded, atomic or fixed",
                                   (int)t->fields[j].name.length,

@@ -1,0 +1,21 @@
+//! The fields of a concurrent class of a library keep their kinds in the
+//! library file. A guarded field is reached inside a `sync` on its lock, and a
+//! fixed one is written by `construct` alone, so the importer's writes are
+//! refused where they stand. A field of a synchronized class is reached by the
+//! functions of its class alone.
+
+import com.example.queue;
+
+fn main() -> int
+{
+	let gauge = alloc queue.Gauge { };
+	gauge.level = 3;
+	gauge.floor = 1;
+	gauge.cap = 2;
+	let ledger = alloc queue.Ledger { };
+	ledger.add(gauge.floor);
+	let posts = ledger.posts;
+	free(gauge);
+	free(ledger);
+	return posts;
+}

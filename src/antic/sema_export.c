@@ -85,6 +85,11 @@ static bool c_representable(const struct type *t, bool field,
         if (types_is_mutex(t) || types_is_chan(t)) {
             return false;
         }
+        /* The hidden lock of a synchronized class, which the header
+           writes as its bytes. */
+        if (types_is_object_lock(t)) {
+            return true;
+        }
         *hidden = t;
         return false;
     /* A tuple crosses as the named struct the header writes for it, so

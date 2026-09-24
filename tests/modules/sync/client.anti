@@ -1,5 +1,6 @@
-//! A Mutex inside a struct of a library, which the program holds with `sync`,
-//! and channels that pass between the program and the library.
+//! A Mutex inside a struct of a library, which the program holds with `sync`, a
+//! synchronized and a concurrent class of the library, and channels that pass
+//! between the program and the library.
 
 import com.example.queue;
 
@@ -13,6 +14,14 @@ worker fn feed(chunk: []int, out: chan int) -> int
 	return chunk.len;
 }
 
+worker fn post(chunk: []int, ledger: *queue.Ledger) -> int
+{
+	for x in chunk {
+		ledger.add(x);
+	}
+	return chunk.len;
+}
+
 fn main() -> int
 {
 	let t = queue.tally();
@@ -22,6 +31,24 @@ fn main() -> int
 	}
 	printf("%d\n".ptr, t.n as c_int);
 	t.lock.destroy();
+
+	let ledger = alloc queue.Ledger { };
+	let ones = [1, 1, 1, 1, 1, 1, 1, 1];
+	let posted = parallel ones[0..8] by 4 -> post(ledger);
+	free(posted.ptr);
+	sync ledger {
+		ledger.add(2);
+	}
+	let gauge = alloc queue.Gauge { };
+	gauge.cap = 9;
+	sync gauge.lock {
+		gauge.level += 5;
+	}
+	printf("%d %d %d %d\n".ptr, ledger.total() as c_int,
+		gauge.read() as c_int, gauge.reads.load() as c_int,
+		gauge.cap as c_int);
+	free(ledger);
+	free(gauge);
 
 	let c = queue.channel(8);
 	let numbers = [1, 2, 3, 4];

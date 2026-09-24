@@ -128,3 +128,15 @@ fn helper(n: int) -> int
 {
 	return n + 1;
 }
+
+/// Circles that threads add to under the lock of the object.
+pub synchronized class Tray
+{
+	count: int = 0,
+
+	/// Add one circle.
+	pub fn add(self, c: Circle)
+	{
+		self.count += 1;
+	}
+}

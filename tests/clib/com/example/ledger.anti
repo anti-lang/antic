@@ -1,0 +1,20 @@
+//! A synchronized class for C. Its header lays out the hidden lock of the
+//! object and marks each function that runs under it.
+
+/// A sum that threads add to.
+export synchronized class Ledger
+{
+	sum: i64 = 0,
+
+	/// Add n to the sum.
+	pub fn add(self, n: i64)
+	{
+		self.sum += n;
+	}
+
+	/// The sum so far.
+	pub fn total(self) -> i64
+	{
+		return self.sum;
+	}
+}

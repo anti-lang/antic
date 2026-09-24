@@ -119,3 +119,15 @@ pub worker fn measure(c: Circle) -> int
 
 Measure `c` on a worker.
 
+## Tray
+
+```anti
+pub synchronized class Tray
+```
+
+Circles that threads add to under the lock of the object.
+
+- `pub fn add(self, c: Circle)`
+  Runs under the lock of its object.
+  Add one circle.
+

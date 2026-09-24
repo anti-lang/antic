@@ -699,6 +699,22 @@ static void class_fields(struct text *out, const struct type *t)
             text_append(out, " base;\n");
             continue;
         }
+        /* DESIGN: the hidden lock of a synchronized class is a field
+           of the layout that no program names. C sees its bytes, a
+           Mutex word of the width of the system and two `int64_t`, and
+           takes it through the functions of the class alone. */
+        if (f->hidden) {
+            text_append(out, "    struct {\n"
+                             "#if defined(_WIN32)\n"
+                             "        void *word;\n"
+                             "#else\n"
+                             "        uint32_t word;\n"
+                             "#endif\n"
+                             "        int64_t owner;\n"
+                             "        int64_t depth;\n"
+                             "    } anti_lock;   /* the lock of the object */\n");
+            continue;
+        }
         c_name(&buffer, &f->name);
         doc_comment(out, &f->doc, "    ");
         text_append(out, "    ");
@@ -1004,6 +1020,19 @@ static const struct item *construct_with_arguments(const struct type *t)
    also becomes an extern table and descriptor, one prototype per public
    function, and the helpers under the `anti_` prefix. An abstract class
    has no complete value, so it gets no table symbol and no `init`. */
+/* DESIGN: a function of a synchronized class that code outside the
+   class calls runs under the lock of its object, and the header says so
+   where it declares the function. */
+static void locked_note(struct text *out, const struct type *t,
+                        const struct item *fn)
+{
+    if (t->safety == SAFETY_SYNCHRONIZED && fn->vis != VIS_PRIVATE &&
+        !(fn->name.length == 9 && memcmp(fn->name.text, "construct", 9) == 0) &&
+        !(fn->name.length == 8 && memcmp(fn->name.text, "destruct", 8) == 0)) {
+        text_append(out, "/* Runs under the lock of its object. */\n");
+    }
+}
+
 static void class_view(struct text *out, const struct symbol *sym)
 {
     const struct type *t = sym->type;
@@ -1130,6 +1159,7 @@ static void class_view(struct text *out, const struct symbol *sym)
         }
         doc_comment(out, &entries[i]->doc, "");
         may_fail_note(out, entries[i]->symbol, "");
+        locked_note(out, t, entries[i]);
         member_signature(out, t, entries[i], "", false);
         text_append(out, ";\n");
     }

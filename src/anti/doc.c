@@ -45,6 +45,10 @@
 #define DOC_CLASS_INTERNALS "internals"
 #define DOC_CLASS_CODE "code"
 
+/* The sentence at each function of a synchronized class that runs under
+   the lock of its object. */
+#define DOC_LOCKED "Runs under the lock of its object."
+
 /* The suffix of a page and of the index, one per form. */
 #define DOC_HTML_SUFFIX ".html"
 #define DOC_MARKDOWN_SUFFIX ".md"
@@ -61,6 +65,9 @@ struct entry {
     struct entry *members;      /* the functions of a class body */
     size_t member_count;
     size_t member_capacity;
+    /* A function of a synchronized class that runs under the lock of its
+       object, which the page says at the function. */
+    bool locked;
 };
 
 /* One page: a module with its items. */
@@ -263,9 +270,12 @@ static void type_signature(struct text *out, const char *lead,
                      name->text);
         break;
     case TYPE_CLASS:
-        text_appendf(out, "%s%s%s%sclass %.*s", lead,
+        text_appendf(out, "%s%s%s%s%sclass %.*s", lead,
                      t->has_abstract ? "abstract " : "",
                      t->is_final ? "final " : "", t->traced ? "trace " : "",
+                     t->safety == SAFETY_SYNCHRONIZED ? "synchronized "
+                     : t->safety == SAFETY_CONCURRENT ? "concurrent "
+                                                      : "",
                      (int)name->length, name->text);
         /* DESIGN: `anti.lang.Object` is the root of every class chain,
            so naming it after `inherits` says nothing a reader does not
@@ -427,6 +437,9 @@ static void body_entries(struct entry *item, const struct type *t, bool all)
         one = entry_add(&item->members, &item->member_count,
                         &item->member_capacity);
         text_append_bytes(&one->name, m->name.text, m->name.length);
+        one->locked = t->safety == SAFETY_SYNCHRONIZED && self &&
+                      m->vis != VIS_PRIVATE && !name_is(&m->name, "construct") &&
+                      !name_is(&m->name, "destruct");
         text_append(&one->signature, visibility_word(m->vis));
         if (m->contract == FN_ABSTRACT) {
             text_append(&one->signature, "abstract ");
@@ -918,9 +931,15 @@ static void entry_list(struct text *out, const struct entry *list,
                         list[i].signature.length);
             text_append(out, "</code>\n");
             doc_body(out, &list[i].doc, iface, form);
+            if (list[i].locked) {
+                text_append(out, "<p>" DOC_LOCKED "</p>\n");
+            }
             text_append(out, "</li>\n");
         } else {
             text_appendf(out, "- `%s`\n", text_cstr(&list[i].signature));
+            if (list[i].locked) {
+                text_append(out, "  " DOC_LOCKED "\n");
+            }
             if (list[i].doc.length > 0) {
                 size_t at = 0;
                 while (at < list[i].doc.length) {
