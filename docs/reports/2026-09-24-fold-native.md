@@ -75,3 +75,18 @@ The build of each preset wrote no warning.
 - host: 100% tests passed out of 951
 - asan: 100% tests passed out of 950
 - ubsan: 100% tests passed out of 950
+
+## Proof
+
+The state after the push of the report commit.
+
+```text
+$ git log --oneline -3
+6e4232b Report the fold of the native lane
+026ed4f Move the X11 and OpenGL packages into the glibc sysroot
+bfd7904 Build raylib against the miniaudio library of the runtime tree
+$ git status --short
+$ git rev-parse HEAD origin/main
+6e4232b0cc38a7072f1aa04a7fca21659cef1f7b
+6e4232b0cc38a7072f1aa04a7fca21659cef1f7b
+```
