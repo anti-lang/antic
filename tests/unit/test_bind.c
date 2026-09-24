@@ -7,6 +7,7 @@
 #include "bindexpr.h"
 #include "bindmodel.h"
 #include "check.h"
+#include "jsontree.h"
 
 static const struct bind_type *no_typedef(void *context, const char *name)
 {
@@ -221,8 +222,25 @@ static void deep_input(void)
     arena_free(&b.arena);
 }
 
+/* A message of the JSON reader that its buffer cannot hold ends in
+   `...`, and one that fits is whole. */
+static void json_messages(void)
+{
+    static const unsigned char broken[] = "[1, 2,";
+    struct json_tree tree;
+    char small[16];
+    char large[128];
+
+    CHECK(!json_read(broken, sizeof broken - 1, &tree, small, sizeof small));
+    CHECK(strlen(small) == sizeof small - 1);
+    CHECK(strcmp(small + sizeof small - 4, "...") == 0);
+    CHECK(!json_read(broken, sizeof broken - 1, &tree, large, sizeof large));
+    CHECK(strstr(large, "at line 1, column 7") != NULL);
+}
+
 void test_bind(void)
 {
+    json_messages();
     spellings();
     expressions();
     deep_input();

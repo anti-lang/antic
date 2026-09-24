@@ -566,12 +566,11 @@ bool bind_eval(struct bind_module *b, const char *expr, bind_lookup lookup,
    without either gains `.0`. */
 void bind_float_text(double f, const char *type, struct text *out)
 {
-    char digits[64];
+    size_t start = out->length;
+    const char *digits;
 
-    snprintf(digits, sizeof digits, strcmp(type, "c_float") == 0 ? "%.9g"
-                                                                 : "%.17g",
-             f);
-    text_append(out, digits);
+    text_appendf(out, strcmp(type, "c_float") == 0 ? "%.9g" : "%.17g", f);
+    digits = text_cstr(out) + start;
     if (strchr(digits, '.') == NULL && strchr(digits, 'e') == NULL) {
         text_append(out, ".0");
     }

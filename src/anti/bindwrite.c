@@ -491,12 +491,13 @@ void bind_write_shim(const struct bind_module *b, struct text *out)
             text_append(out, "void");
         }
         for (j = 0; j < f->param_count; j++) {
-            char name[32];
-            snprintf(name, sizeof name, "a%zu", j);
+            struct text name = {0};
+            text_appendf(&name, "a%zu", j);
             if (j > 0) {
                 text_append(out, ", ");
             }
-            declare(f->params[j].c_type, name, out);
+            declare(f->params[j].c_type, text_cstr(&name), out);
+            text_free(&name);
         }
         text_appendf(out, ")\n{\n    %s" SHIM_PREFIX "%s(",
                      f->result->kind == BIND_VOID ? "" : "return ", f->name);

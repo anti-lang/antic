@@ -57,6 +57,7 @@ add_executable(antic_unit_tests
     ../src/anti/bindtype.c
     ../src/anti/deps.c
     ../src/anti/files.c
+    ../src/anti/jsontree.c
     ../src/anti/manifest.c
     ../src/anti/repo.c
     ../src/anti/symmap.c

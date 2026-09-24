@@ -603,16 +603,17 @@ static void read_fields(struct reader *r, struct bind_record *rec,
             if (fname != NULL) {
                 declare_record(r, item, fname);
             } else {
-                char synth[256];
+                struct text synth = {0};
                 const struct json_value *next =
                     i + 1 < inner->count ? inner->items[i + 1] : NULL;
                 const char *field = json_member_string(next, "name");
                 if (field != NULL) {
-                    snprintf(synth, sizeof synth, "%s_%s", rec->name, field);
+                    text_appendf(&synth, "%s_%s", rec->name, field);
                 } else {
-                    snprintf(synth, sizeof synth, "%s_anon%zu", rec->name, anon);
+                    text_appendf(&synth, "%s_anon%zu", rec->name, anon);
                 }
-                anonymous = declare_record(r, item, synth);
+                anonymous = declare_record(r, item, text_cstr(&synth));
+                text_free(&synth);
                 /* C names an anonymous record through the field that holds
                    it, and an anonymous member not at all. */
                 if (field != NULL && rec->c_name != NULL) {
@@ -646,11 +647,12 @@ static void read_fields(struct reader *r, struct bind_record *rec,
             /* DESIGN: an anonymous member of C11 has no Anti form, so it
                becomes a field named anon<n>. Its layout is the layout of
                C, and its members are read through that name. */
-            char synth[32];
-            snprintf(synth, sizeof synth, "anon%zu", anon++);
-            f->name = bind_strdup(r->b, synth);
+            struct text synth = {0};
+            text_appendf(&synth, "anon%zu", anon++);
+            f->name = bind_strdup(r->b, text_cstr(&synth));
+            text_free(&synth);
             bind_warn(r->b, "an anonymous member of `%s` is the field `%s`",
-                      rec->name, synth);
+                      rec->name, f->name);
         }
         if (json_member_true(item, "isBitfield")) {
             f->bits = constant_of(item);
@@ -1139,6 +1141,15 @@ static const char *skip_space(const char *s)
     return s;
 }
 
+/* Whether body is param in one pair of parentheses. */
+static bool in_parentheses(const char *body, const char *param)
+{
+    size_t n = strlen(param);
+
+    return body[0] == '(' && strncmp(body + 1, param, n) == 0 &&
+           body[n + 1] == ')' && body[n + 2] == '\0';
+}
+
 /* The text of a macro with its leading call expanded. The call names a
    macro of one parameter whose body is that parameter, bare or in
    parentheses. `CLITERAL(Color){ 1, 2 }` becomes `(Color){ 1, 2 }`. */
@@ -1153,12 +1164,11 @@ static const char *expand_identity(struct reader *r, const char *text)
         const char *close;
         struct text out = {0};
         const char *result;
-        char paren[160];
         if (strncmp(text, f->name, n) != 0 || text[n] != '(') {
             continue;
         }
-        snprintf(paren, sizeof paren, "(%s)", f->param);
-        if (strcmp(f->body, f->param) != 0 && strcmp(f->body, paren) != 0) {
+        if (strcmp(f->body, f->param) != 0 &&
+            !in_parentheses(f->body, f->param)) {
             continue;
         }
         arg = text + n + 1;

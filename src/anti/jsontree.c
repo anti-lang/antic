@@ -22,6 +22,7 @@ static bool fail(struct builder *b, const char *what)
     const unsigned char *p;
     long long line = 1;
     long long column = 1;
+    int written;
 
     for (p = b->start; p < b->scan.at; p++) {
         if (*p == '\n') {
@@ -31,8 +32,14 @@ static bool fail(struct builder *b, const char *what)
             column++;
         }
     }
-    snprintf(b->error, b->error_size, "%s at line %lld, column %lld", what,
-             line, column);
+    written = snprintf(b->error, b->error_size, "%s at line %lld, column %lld",
+                       what, line, column);
+    /* A message the buffer cannot hold is cut, and ends in `...` so the
+       reader sees that it was. */
+    if (written >= 0 && (size_t)written >= b->error_size &&
+        b->error_size >= 4) {
+        memcpy(b->error + b->error_size - 4, "...", 4);
+    }
     return false;
 }
 

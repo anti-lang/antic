@@ -255,12 +255,18 @@ elseif(CASE STREQUAL "clang_malformed")
     string(APPEND text "#define CHAIN5000 1\n")
     string(APPEND text "#pragma pack(push, 99999999999)\n"
            "struct After { int a; };\n#pragma pack(pop)\n")
+    # Two anonymous records whose names, the record's and the field's
+    # joined, agree in their first 256 bytes and differ after them.
+    string(REPEAT "x" 260 long)
+    string(APPEND text "struct L${long} { struct { int a; } f1; "
+           "struct { float b; } f2; };\n"
+           "void g(struct L${long} *p);\n")
     file(WRITE "${h}" "${text}")
     run("${ANTI}" bind --clang "${h}" --module bindtest.malformed
         -o "${WORK}/out" --runtime "${RUNTIME}")
     file(READ "${WORK}/out/malformed.anti" module)
     foreach(line "pub extern fn f(m: Mode);" "pub const F: c_int = 1;"
-            "pub const CHAIN5000: c_int = 1;")
+            "pub const CHAIN5000: c_int = 1;" "_f1\n{\n\ta: c_int," "_f2\n{\n\tb: c_float,")
         string(FIND "${module}" "${line}" at)
         if(at EQUAL -1)
             message(FATAL_ERROR "malformed.anti holds no line `${line}`\n${module}")
