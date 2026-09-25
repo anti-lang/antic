@@ -105,7 +105,20 @@ let ages = Map<str, int>.new();
 let seen = map.HashMap<str, bool>.new();
 ```
 
-Not built yet: direct imports.
+The same over modules that are built:
+
+```anti
+import anti.io.{println};
+import anti.text.{Builder, equal};
+
+let b = Builder.new();
+b.append("one");
+if equal(b.text(), "one") && text.equal("a", "a") {
+	println(b.text());
+}
+```
+
+Built: direct imports. The first example waits for `anti.collection.map` and `Shared`, which are not built yet.
 
 ## Types
 
@@ -1507,7 +1520,7 @@ Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.
 
 ## Later
 
-Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it. The syntax of generics, its constraints, the compiled copies, the generics of library files and of C, what can be generic, the other features with generics, the optional values, ownership at a call, lending, the language part of walking a collection and hashing and order are built, and none of the rest. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
+Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it. The syntax of generics, its constraints, the compiled copies, the generics of library files and of C, what can be generic, the other features with generics, the optional values, ownership at a call, lending, the language part of walking a collection, hashing and order and direct imports are built, and none of the rest. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
 
 ## Reserved words
 

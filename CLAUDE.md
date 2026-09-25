@@ -250,7 +250,7 @@ Its first nine parts, the syntax of generics, the constraints, the
 compiled copies, the generics of library files and of C, what can be
 generic, the other features with generics, the optional values, ownership
 at a call and lending, are built. So are the language part of walking a
-collection and hashing and order, and none of the rest.
+collection, hashing and order and direct imports, and none of the rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -547,6 +547,11 @@ reports what it finished.
   hashing collections at start, `lang.hash_seed()` gives it and
   `--anti.hash_seed` fixes it. See "Generics and collections" in
   `docs/decisions.md` and `docs/notes/hashing.md`.
+- Direct imports are built. `import anti.text.{Builder, equal};` makes the
+  listed items of a module visible without its name, and the module stays
+  reachable by its name. A listed name that clashes with a name of the file
+  is refused, naming both, and `anti fmt` sorts the list. See "Generics and
+  collections" in `docs/decisions.md` and `docs/notes/direct-imports.md`.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
   See "Small things" in `docs/decisions.md`.
