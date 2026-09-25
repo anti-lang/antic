@@ -12,6 +12,7 @@ import anti.lang;
 import anti.mem;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn memmove(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 
 /// An allocator over the C library that counts what it hands out.
 class Counting inherits mem.Allocator
@@ -82,13 +83,14 @@ fn show(s: str)
 	free(s.ptr);
 }
 
-/// The address of the element `h` finds. The test compares it and never follows
-/// it.
-fn address(p: *Pool<Point>, h: Handle<Point>) -> ?*int
+/// The address of the element `h` finds. The pointer is lent for the call
+/// alone, and `memmove` of no bytes gives it back as a plain one, as a lent
+/// pointer passes to an `extern fn`. The test compares it and never follows it.
+fn address(p: *Pool<Point>, h: Handle<Point>) -> ?*byte
 {
-	let at: ?*int = none;
+	let at: ?*byte = none;
 	p.read(h, fn(e) {
-		at = &e.x;
+		at = memmove(&e.x as ?*byte, &e.x as ?*byte, 0);
 	});
 	return at;
 }
