@@ -1966,7 +1966,8 @@ uint32_t lower_sym_of(struct lowerer *l, const struct symbolic *s)
 
 /* DESIGN: an argument that moves the error a handler binds into an `own`
    parameter reads the error, then writes `none` into the handler's copy.
-   The delete that every exit of the handler runs then passes over it. */
+   The delete that every exit of the handler runs then passes over it. Any
+   other local that moves is handed over by `lower_move_argument`. */
 struct ir_operand lower_argument(struct lowerer *l,
                                  const struct expr *arg)
 {
@@ -1974,6 +1975,9 @@ struct ir_operand lower_argument(struct lowerer *l,
 
     if (!arg->moves || l->b == NULL) {
         return value;
+    }
+    if (!arg->symbol->caught) {
+        return lower_move_argument(l, arg, value);
     }
     value = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, value));
     ir_assign(l->f, l->b, arg->symbol->ir, ir_int_op(IR_PTR, 0));

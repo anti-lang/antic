@@ -51,10 +51,6 @@ fn passed_on() may fail
 	};
 }
 
-fn not_a_pointer(own n: int)
-{
-}
-
 fn main() -> int
 {
 	return 0;

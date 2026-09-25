@@ -1,4 +1,3 @@
-own_moves.anti:54:22: error: `own` needs a pointer or a slice, and `n` has type `int`
 own_moves.anti:19:8: error: `e` has moved into `Error.wrap` and is not named after it
 own_moves.anti:30:42: error: `e` moves into `Error.wrap` inside a loop of its handler, which would move it again
 own_moves.anti:40:41: error: `e` moves into `Error.wrap` while a `defer` or an `undo` of its handler names it

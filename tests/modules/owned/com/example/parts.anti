@@ -1,5 +1,6 @@
 //! Classes that own memory, which the test `owned_modules` holds and extends in
-//! a program. Each prints when it is destroyed.
+//! a program. Each prints when it is destroyed. A function takes a part with an
+//! `own` parameter, and two lend one with `lent`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -40,4 +41,22 @@ pub class Box
 	{
 		self.leaf = alloc Leaf { n: n };
 	}
+}
+
+/// Take the part p over and tear it down when done.
+pub fn take(own p: Part)
+{
+	printf("take %d\n".ptr, p.n as c_int);
+}
+
+/// Lend the part p to f for the call.
+pub fn lend(p: *Part, f: fn(lent * Part))
+{
+	f(p);
+}
+
+/// Count the lent part p one up.
+pub fn grow(lent p: *Part)
+{
+	p.n += 1;
 }

@@ -1,0 +1,4 @@
+own_modules.anti:16:9: error: `q` was moved into `take`
+own_modules.anti:21:16: error: expected `fn(lent *Part)`, found `fn(*Part)`
+own_modules.anti:26:13: error: `Part` has `own` fields, and a value that stays where it is does not move into `take`, use `dup`
+own_modules.anti:27:8: error: `p` is lent for the call and passes on to a `lent` parameter alone

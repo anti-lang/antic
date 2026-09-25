@@ -162,6 +162,9 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
                                             : "type fn");
         end(d, start, NULL);
         for (i = 0; i < t->param_count; i++) {
+            if (t->params[i]->lent) {
+                simple(d, depth + 1, "lent", NULL);
+            }
             dump_type(d, depth + 1, t->params[i]);
         }
         if (t->result != NULL) {
@@ -811,6 +814,9 @@ static void dump_params(struct dumper *d, int depth, const char *label,
         }
         if (params[i].concurrent) {
             simple(d, depth + 1, "concurrent", NULL);
+        }
+        if (params[i].lent) {
+            simple(d, depth + 1, "lent", NULL);
         }
         if (params[i].value != NULL) {
             simple(d, depth + 1, "default", NULL);

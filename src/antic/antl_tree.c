@@ -803,6 +803,7 @@ static void io_typex_body(struct io *io, struct type_expr *x)
     io_bool(io, &x->keep);
     io_bool(io, &x->concurrent);
     io_bool(io, &x->owned);
+    io_bool(io, &x->lent);
     io_type(io, &x->type);
 }
 
@@ -828,6 +829,12 @@ static void io_sym_body(struct io *io, struct symbol *s)
     io_bool(io, &s->deferred);
     io_bool(io, &s->snapshot_moved);
     io_pos(io, &s->snapshot_move);
+    io_bool(io, &s->moved);
+    io_name(io, &s->moved_to);
+    io_name(io, &s->moved_by);
+    io_int(io, &s->loops);
+    io_bool(io, &s->captured);
+    io_bool(io, &s->own_param);
     io_u8(io, &s->flags_read);
     io_citem(io, &s->frame);
     io_int(io, &s->depth);
@@ -851,6 +858,7 @@ static void io_params(struct io *io, struct param **list, size_t *count)
         io_bool(io, &p->owned);
         io_bool(io, &p->keep);
         io_bool(io, &p->concurrent);
+        io_bool(io, &p->lent);
     }
 }
 

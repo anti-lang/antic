@@ -1,0 +1,15 @@
+lent_params.anti:93:23: error: `lent` marks a pointer parameter, and this one is `int`
+lent_params.anti:97:28: error: `own` and `lent` do not stand together, since a lent pointer stays with its owner
+lent_params.anti:101:23: error: an `extern fn` takes no `lent` parameter, since C may keep the pointer
+lent_params.anti:25:11: error: `p` is lent for the call and cannot be stored
+lent_params.anti:30:19: error: `p` is lent for the call and cannot be stored
+lent_params.anti:36:9: error: `p` is lent for the call and cannot be returned
+lent_params.anti:42:9: error: `q` is lent for the call and cannot be returned
+lent_params.anti:47:8: error: `p` is lent for the call and passes on to a `lent` parameter alone
+lent_params.anti:52:8: error: `p` is lent for the call and passes on to a `lent` parameter alone
+lent_params.anti:57:10: error: a snapshot holds values that copy fully, and `p` is `lent *Person`
+lent_params.anti:63:25: error: `p` is lent for the call and cannot be stored
+lent_params.anti:69:9: error: the object is lent for the call and stays with its owner, so `delete` does not take it
+lent_params.anti:74:9: error: the pointer is lent for the call and cannot be returned
+lent_params.anti:90:7: error: expected `fn(lent *Person)`, found `fn(*Person)`
+lent_params.anti:110:15: error: `p` is lent for the call and passes on to a `lent` parameter alone

@@ -737,9 +737,11 @@ static struct type *subst(struct checker *c, struct type *t,
         return t;
     case TYPE_POINTER:
         element = subst(c, t->element, map);
-        return element == t->element
-                   ? t
-                   : types_pointer_of(c->types, element, t->nullable);
+        if (element == t->element) {
+            return t;
+        }
+        element = types_pointer_of(c->types, element, t->nullable);
+        return t->lent ? types_lent(c->types, element) : element;
     case TYPE_SLICE:
         element = subst(c, t->element, map);
         return element == t->element ? t : types_slice(c->types, element);
@@ -1246,6 +1248,11 @@ static void unify(struct type *param, struct type *arg,
     if (param->kind == TYPE_PARAM) {
         if (arg->kind == TYPE_FN && arg->context && map->types != NULL) {
             arg = types_fn_form(map->types, arg, false, false);
+        }
+        /* A type argument is never `lent`, so a lent pointer at a
+           parameter of a type parameter meets the rule of `lent` there. */
+        if (map->types != NULL) {
+            arg = types_unlent(map->types, arg);
         }
         for (i = 0; i < map->count; i++) {
             if (map->params[i] == param && map->args[i] == NULL &&

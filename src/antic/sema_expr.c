@@ -366,6 +366,46 @@ static void refuse_kept(struct checker *c, const struct expr *e)
     }
 }
 
+/* Refuse the name e of sym, which moved before it in the order of the
+   text. */
+static void refuse_moved(struct checker *c, const struct expr *e,
+                         const struct symbol *sym)
+{
+    if (sym->moved_by.length > 0 && sym->moved_to.length > 0) {
+        sema_error_at(c, e->pos, "`%.*s` was moved into `%.*s` by `%.*s`",
+                      (int)e->as.name.length, e->as.name.text,
+                      (int)sym->moved_to.length, sym->moved_to.text,
+                      (int)sym->moved_by.length, sym->moved_by.text);
+    } else if (sym->moved_by.length == 0 && sym->moved_to.length == 0) {
+        sema_error_at(c, e->pos, "`%.*s` was moved", (int)e->as.name.length,
+                      e->as.name.text);
+    } else {
+        const struct name *to = sym->moved_by.length > 0 ? &sym->moved_by
+                                                         : &sym->moved_to;
+        sema_error_at(c, e->pos, "`%.*s` was moved into `%.*s`",
+                      (int)e->as.name.length, e->as.name.text,
+                      (int)to->length, to->text);
+    }
+}
+
+/* Refuse the `lent` pointer e where a pointer is kept. */
+static void refuse_lent(struct checker *c, const struct expr *e)
+{
+    static const char *const uses[] = {
+        [LENT_STORED] = "cannot be stored",
+        [LENT_RETURNED] = "cannot be returned",
+        [LENT_PASSED] = "passes on to a `lent` parameter alone",
+    };
+    if (e->kind == EXPR_NAME) {
+        sema_error_at(c, e->pos, "`%.*s` is lent for the call and %s",
+                      (int)e->as.name.length, e->as.name.text,
+                      uses[c->lent_use]);
+    } else {
+        sema_error_at(c, e->pos, "the pointer is lent for the call and %s",
+                      uses[c->lent_use]);
+    }
+}
+
 /* Whether e is `dup` of a function value, a copy that no one owns yet. */
 static bool is_fn_dup(const struct expr *e)
 {
@@ -524,6 +564,19 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
 
     if (sema_is_error(got) || sema_is_error(expected)) {
         return !sema_is_error(got);
+    }
+    /* DESIGN: a `lent` pointer goes where a `lent` pointer is expected,
+       and nowhere else a pointer is kept. Any pointer goes where a `lent`
+       one is expected, since lending promises the callee less. Past that
+       the two forms follow the rules of `*T`. */
+    if (type_is_lent(got) && !type_is_lent(expected) &&
+        expected->kind == TYPE_POINTER) {
+        refuse_lent(c, e);
+        return false;
+    }
+    if (type_is_lent(got) || type_is_lent(expected)) {
+        return sema_require(c, e, types_unlent(c->types, got),
+                            types_unlent(c->types, expected));
     }
     if ((form = require_fn_form(c, e, got, expected)) >= 0) {
         return form == 1;
@@ -2498,7 +2551,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                           sym->moved_into->name.text);
             return sema_builtin(c, TYPE_ERROR);
         }
-        if (sym->caught && c->deferring > 0) {
+        if (sym->moved) {
+            refuse_moved(c, e, sym);
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
+            c->deferring > 0) {
             sym->deferred = true;
         }
         /* An atomic local is read and written by its own calls alone,
@@ -2542,8 +2600,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return sema_check_anonymous(c, e, expected);
     case EXPR_BINARY:
         return sema_check_binary(c, e, expected);
+    /* A pointer converted from a `lent` one is lent as well. */
     case EXPR_CAST:
-        return check_cast(c, e);
+        t = check_cast(c, e);
+        return !e->as.cast.test && e->as.cast.operand->type != NULL &&
+                       type_is_lent(e->as.cast.operand->type)
+                   ? types_lent(c->types, t)
+                   : t;
     case EXPR_CALL:
         if (e->as.call.callee->kind == EXPR_FIELD &&
             e->as.call.callee->as.field.optional) {
@@ -2943,7 +3006,16 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                           sema_tn(t));
             return sema_builtin(c, TYPE_ERROR);
         }
-        return e->as.object.op == TOKEN_DUP ? t : sema_builtin(c, TYPE_VOID);
+        /* A lent object stays with its owner, and `dup` makes one that
+           belongs to no one yet. */
+        if (e->as.object.op != TOKEN_DUP && type_is_lent(t)) {
+            sema_error_at(c, e->as.object.operand->pos, "the object is lent "
+                          "for the call and stays with its owner, so `%s` "
+                          "does not take it", what);
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        return e->as.object.op == TOKEN_DUP ? types_unlent(c->types, t)
+                                            : sema_builtin(c, TYPE_VOID);
     }
     case EXPR_SIZE_OF:
         t = sema_resolve_type(c, e->as.size_of);

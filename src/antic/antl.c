@@ -466,9 +466,10 @@ static void put_type(struct writer *w, const struct type *t)
     switch (t->kind) {
     case TYPE_POINTER:
         put_type_ref(w, t->element);
-        /* `*T` and `?*T` are two types, and a module that imports this
-           one reads which of them a signature names. */
-        put_u8(w, t->nullable);
+        /* `*T`, `?*T` and their `lent` forms are four types, and a module
+           that imports this one reads which of them a signature names.
+           Bit 0 is `?` and bit 1 `lent`. */
+        put_u8(w, (uint8_t)((unsigned)t->nullable | (unsigned)t->lent << 1));
         break;
     /* `?T` is its value type alone, since one element makes one. */
     case TYPE_SLICE:
@@ -1912,9 +1913,15 @@ static void read_types(struct reader *r)
         switch (kind) {
         case TYPE_POINTER: {
             struct type *element = type_ref(r, i);
-            bool nullable = get_u8(r) != 0;
+            uint8_t form = get_u8(r);
+            if (form > 3) {
+                damaged(r);
+            }
             if (element != NULL && !r->failed) {
-                t = types_pointer_of(r->types, element, nullable);
+                t = types_pointer_of(r->types, element, (form & 1) != 0);
+                if ((form & 2) != 0) {
+                    t = types_lent(r->types, t);
+                }
             }
             break;
         }

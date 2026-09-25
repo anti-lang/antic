@@ -469,6 +469,10 @@ struct ir_operand lower_simd(struct lowerer *l, const struct expr *e);
 
 void lower_push_leave_action(struct lowerer *l);
 void lower_push_snapshot_action(struct lowerer *l, const struct symbol *param);
+void lower_push_own_action(struct lowerer *l, const struct symbol *param);
+struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
+                                      struct ir_operand value);
+void lower_clear_moved(struct lowerer *l, const struct expr *value);
 bool lower_type_needs_destruct(const struct type *t);
 /* Whether t is a `?T` of a class value that needs the teardown. */
 bool lower_optional_needs_destruct(const struct type *t);

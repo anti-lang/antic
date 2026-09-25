@@ -1908,6 +1908,8 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
         const struct symbol *sym = it->params[i].symbol;
         if (sym->type->kind == TYPE_FN && sym->type->owned) {
             lower_push_snapshot_action(l, sym);
+        } else if (sym->own_param) {
+            lower_push_own_action(l, sym);
         }
     }
     if (traced_function(l, it)) {

@@ -557,7 +557,7 @@ bool sema_type_owns(const struct type *t)
 
 /* Whether e reads a value that already lives somewhere. A literal, a
    call and `*dup(p)` make a fresh one instead. */
-static bool reads_existing(const struct expr *e)
+bool sema_reads_existing(const struct expr *e)
 {
     switch (e->kind) {
     case EXPR_NAME:
@@ -573,6 +573,25 @@ static bool reads_existing(const struct expr *e)
     }
 }
 
+/* DESIGN: an `own` parameter owns its value, so `=` and `let` move one
+   that owns memory rather than copy it, and the function tears it down
+   no more. A value of a type parameter may own memory in a copy, so it
+   moves as well. into names the place. Returns whether value moved. */
+static bool moves_own_param(struct checker *c, struct expr *value,
+                            struct name into)
+{
+    static const struct name no_name = {"", 0};
+    struct symbol *sym = value->kind == EXPR_NAME ? value->symbol : NULL;
+
+    if (sym == NULL || !sym->own_param || value->type == NULL ||
+        sema_is_error(value->type) ||
+        !(sema_type_owns(value->type) || sema_has_params(value->type))) {
+        return false;
+    }
+    sema_move_local(c, value, &into, &no_name);
+    return true;
+}
+
 /* DESIGN: `=` refuses to copy an existing value that owns memory, since
    the bytes would give it two owners. A fresh value on the right has no
    other owner, so `=` moves it. The bytes it replaces are not destroyed:
@@ -580,7 +599,7 @@ static bool reads_existing(const struct expr *e)
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             struct type *t)
 {
-    if (!sema_is_error(t) && sema_type_owns(t) && reads_existing(value)) {
+    if (!sema_is_error(t) && sema_type_owns(t) && sema_reads_existing(value)) {
         sema_error_at(c, value->pos, "`%s` has `own` fields, use `dup` instead "
                       "of `=`", sema_tn(t));
     }
@@ -622,7 +641,8 @@ bool sema_holds_mutex(const struct type *t)
 void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
                            const struct type *t)
 {
-    if (!sema_is_error(t) && sema_holds_mutex(t) && reads_existing(value)) {
+    if (!sema_is_error(t) && sema_holds_mutex(t) &&
+        sema_reads_existing(value)) {
         if (types_is_mutex(t)) {
             sema_error_at(c, value->pos, "a `" LANG_MUTEX "` cannot be "
                           "copied, pass a pointer to it");
@@ -848,7 +868,9 @@ static void check_assign(struct checker *c, struct stmt *s)
         return;
     }
     if (op == TOKEN_ASSIGN) {
-        sema_refuse_owned_copy(c, s->as.assign.value, t);
+        if (!moves_own_param(c, s->as.assign.value, sema_place_name(target))) {
+            sema_refuse_owned_copy(c, s->as.assign.value, t);
+        }
         check_closure_lifetime(c, target, s->as.assign.value);
         return;
     }
@@ -1511,7 +1533,7 @@ static void check_sync(struct checker *c, struct stmt *s)
                       "`, a synchronized object or a pointer to either, "
                       "found `%s`", sema_tn(t));
     } else if (!sema_is_error(t) && !pointer &&
-               !reads_existing(s->as.sync.mutex)) {
+               !sema_reads_existing(s->as.sync.mutex)) {
         sema_error_at(c, s->as.sync.mutex->pos, "`sync` takes a `" LANG_MUTEX
                       "` that lives in a place, or a pointer to one");
     }
@@ -1655,14 +1677,15 @@ static void check_stmt(struct checker *c, struct stmt *s)
             declared = types_fn_form(c->types, t, true, true);
         }
         if (declared != NULL) {
-            if (sema_require(c, s->as.let.value, t, declared)) {
+            if (sema_require(c, s->as.let.value, t, declared) &&
+                !moves_own_param(c, s->as.let.value, s->as.let.name)) {
                 sema_refuse_owned_copy(c, s->as.let.value, declared);
             }
             t = declared;
         } else if (!sema_is_error(t) && t->kind == TYPE_VOID) {
             sema_require(c, s->as.let.value, t, sema_builtin(c, TYPE_I64));
             t = sema_builtin(c, TYPE_ERROR);
-        } else {
+        } else if (!moves_own_param(c, s->as.let.value, s->as.let.name)) {
             sema_refuse_owned_copy(c, s->as.let.value, t);
         }
         if (sema_refuse_abstract_value(c, s->as.let.name_pos, "this local",
@@ -2149,11 +2172,17 @@ static void check_stmt(struct checker *c, struct stmt *s)
                           c->function->name.text);
             return;
         }
-        if (sema_require(c, s->as.return_value,
-                         sema_check_expr(c, s->as.return_value, result),
-                         result)) {
-            sema_refuse_lock_copy(c, s->as.return_value, result);
-            sema_check_leak_return(c, s->as.return_value, result);
+        {
+            struct type *given =
+                sema_check_expr(c, s->as.return_value, result);
+            bool held;
+            c->lent_use = LENT_RETURNED;
+            held = sema_require(c, s->as.return_value, given, result);
+            c->lent_use = LENT_STORED;
+            if (held) {
+                sema_refuse_lock_copy(c, s->as.return_value, result);
+                sema_check_leak_return(c, s->as.return_value, result);
+            }
         }
         return;
     case STMT_BLOCK:
@@ -2521,6 +2550,7 @@ void sema_check_function(struct checker *c, struct item *it)
                          "`%.*s` is already declared in this block");
         if (sym != NULL) {
             sym->type = it->symbol->type->params[i + (it->has_self ? 1 : 0)];
+            sym->own_param = it->params[i].owned;
             it->params[i].symbol = sym;
         }
     }
@@ -2632,6 +2662,7 @@ void sema_capture(struct checker *c, struct symbol *sym)
     struct item *it;
 
     sym->address_taken = true;
+    sym->captured = true;
     for (it = c->function; it != NULL && it != sym->frame;
          it = it->enclosing) {
         capture_in(it, sym);
@@ -2810,6 +2841,7 @@ static struct type *anonymous_type(struct checker *c, struct item *it,
                           "function type", (int)p->name.length, p->name.text);
             return NULL;
         }
+        params[i] = sema_lent_form(c, params[i], p->lent, p->owned, p->pos);
         if (sema_is_error(params[i])) {
             return NULL;
         }

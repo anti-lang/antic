@@ -394,6 +394,17 @@ static void fn_param_marks(struct parser *p, bool *keep, bool *concurrent,
     }
 }
 
+/* `lent name`: the pointer the parameter takes is valid only during the
+   call. `lent` is a contextual word, so a parameter may carry that name. */
+static bool lent_mark(struct parser *p)
+{
+    if (is_word(p, peek(p), "lent") && peek_at(p, 1)->kind == TOKEN_IDENT) {
+        next(p);
+        return true;
+    }
+    return false;
+}
+
 /* Types */
 
 static bool is_builtin_type(enum token_kind kind)
@@ -729,8 +740,17 @@ static struct type_expr *type_level(struct parser *p)
             bool keep = false;
             bool concurrent = false;
             bool owned = false;
+            bool lent = false;
             struct type_expr *param;
             fn_param_marks(p, &keep, &concurrent, &owned);
+            /* `fn(lent *T)`: `lent` is a contextual word, so a type of
+               that name still stands alone in the list. */
+            if (is_word(p, peek(p), "lent") &&
+                peek_at(p, 1)->kind != TOKEN_COMMA &&
+                peek_at(p, 1)->kind != TOKEN_RPAREN) {
+                next(p);
+                lent = true;
+            }
             param = type(p);
             if (param == NULL) {
                 free(params.data);
@@ -739,6 +759,7 @@ static struct type_expr *type_level(struct parser *p)
             param->keep = keep;
             param->concurrent = concurrent;
             param->owned = owned;
+            param->lent = lent;
             list_push(&params, &param);
             if (!accept(p, TOKEN_COMMA)) {
                 break;
@@ -992,6 +1013,7 @@ static struct expr *anonymous_fn(struct parser *p, const struct token *at)
         struct param param;
         memset(&param, 0, sizeof param);
         fn_param_marks(p, &param.keep, &param.concurrent, &param.owned);
+        param.lent = lent_mark(p);
         param.pos = pos_of(peek(p));
         if (!expect_name(p, &param.name) ||
             (accept(p, TOKEN_COLON) && (param.type = type(p)) == NULL)) {
@@ -2694,6 +2716,7 @@ static struct param *params(struct parser *p, bool allow_variadic,
             param.owned = true;
         }
         fn_param_marks(p, &param.keep, &param.concurrent, &param.owned);
+        param.lent = lent_mark(p);
         param.pos = pos_of(peek(p));
         if (!expect_name(p, &param.name) || !expect(p, TOKEN_COLON) ||
             (param.type = type(p)) == NULL) {

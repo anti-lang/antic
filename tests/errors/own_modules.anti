@@ -1,0 +1,33 @@
+//! The `own` and `lent` parameters of `com.example.parts` reach this module
+//! through the library file. A part moved into `take` is not named after the
+//! move, a function that may keep its parameter does not go where a part is
+//! lent, and a lent part does not pass on to `take`.
+
+import com.example.parts;
+
+fn keeps(p: *parts.Part)
+{
+}
+
+fn named_after() -> int
+{
+	let q = parts.Part { };
+	parts.take(q);
+	return q.n;
+}
+
+fn lends_to_a_keeper(p: *parts.Part)
+{
+	parts.lend(p, keeps);
+}
+
+fn passes_on(lent p: *parts.Part)
+{
+	parts.take(*p);
+	keeps(p);
+}
+
+fn main() -> int
+{
+	return 0;
+}

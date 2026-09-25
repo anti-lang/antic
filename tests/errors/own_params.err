@@ -1,0 +1,11 @@
+own_params.anti:36:9: error: `b` was moved into `take`
+own_params.anti:43:9: error: `b` was moved into `s` by `put`
+own_params.anti:50:9: error: `k` was moved into `number`
+own_params.anti:59:8: error: `b` moves into `take` inside a loop, which would move it again
+own_params.anti:67:7: error: `b` moves into `take` while a `defer` or an `undo` names it
+own_params.anti:74:7: error: `b` is captured by a closure, which may read it after it moves into `take`
+own_params.anti:86:19: error: `b` is captured, and a closure does not move what it captures
+own_params.anti:91:7: error: `b` belongs to the caller and does not move. Mark it `own` or pass `dup(b)`
+own_params.anti:96:7: error: `Box` has `own` fields, and a value that stays where it is does not move into `take`, use `dup`
+own_params.anti:102:9: error: `b` was moved into `c`
+own_params.anti:19:17: error: `b` was moved into `slot`

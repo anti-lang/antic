@@ -1,0 +1,140 @@
+//! An `own` parameter takes the value it is given, of any type. A local passed
+//! there moves: the caller tears it down no more, and the function tears it
+//! down at every exit unless it moves on, by a call, by `=`, by `let` or by
+//! `return`. A move on one path of an `if` leaves the other path to tear the
+//! local down at the end of its block. A literal and a call result need
+//! nothing. Each `Box` counts itself alive, so a teardown missed or run twice
+//! shows in the count and in the lines it prints.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub own inner: ?*Box = none,
+	pub n: int = 0,
+	static atomic live: int = 0;
+
+	pub fn make(n: int) -> Box
+	{
+		Box.live.add(1);
+		return Box { n: n };
+	}
+
+	concrete fn destruct(self)
+	{
+		Box.live.sub(1);
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Shelf
+{
+	pub slot: Box,
+
+	pub fn put(self, own b: Box)
+	{
+		self.slot = b;
+	}
+}
+
+class Bin<T>
+{
+	pub held: T,
+
+	pub fn put(self, own x: T)
+	{
+		self.held = x;
+	}
+}
+
+fn take(own b: Box)
+{
+	printf("take %d\n".ptr, b.n as c_int);
+}
+
+fn pass_on(own b: Box)
+{
+	take(b);
+	printf("passed on\n".ptr);
+}
+
+fn give_back(own b: Box) -> Box
+{
+	return b;
+}
+
+fn keep_in_local(own b: Box) -> int
+{
+	let mine = b;
+	return mine.n;
+}
+
+fn maybe_take(own b: Box, yes: bool)
+{
+	if yes {
+		take(b);
+	}
+	printf("maybe %d\n".ptr, yes as c_int);
+}
+
+fn next(own n: int) -> int
+{
+	return n + 1;
+}
+
+fn free_it(own p: *Box)
+{
+	delete(p);
+}
+
+fn hold<T>(own x: T) -> T
+{
+	return x;
+}
+
+fn run()
+{
+	let a = Box.make(1);
+	take(a);
+	let b = Box.make(2);
+	pass_on(b);
+	take(Box.make(3));
+	let c = Box.make(4);
+	let kept = give_back(c);
+	printf("kept %d\n".ptr, kept.n as c_int);
+	let d = Box.make(5);
+	printf("local %d\n".ptr, keep_in_local(d) as c_int);
+	maybe_take(Box.make(6), true);
+	maybe_take(Box.make(7), false);
+	{
+		let e = Box.make(8);
+		if next(0) == 2 {
+			take(e);
+		}
+		printf("end of block\n".ptr);
+	}
+	let s = Shelf { slot: Box.make(9) };
+	let f = Box.make(10);
+	s.put(f);
+	printf("shelf %d\n".ptr, s.slot.n as c_int);
+	let k = 41;
+	printf("next %d\n".ptr, next(k) as c_int);
+	Box.live.add(1);
+	let p = alloc Box { n: 11 };
+	free_it(p);
+	let bin = Bin<Box> { held: Box.make(12) };
+	let g = Box.make(13);
+	bin.put(g);
+	printf("bin %d\n".ptr, bin.held.n as c_int);
+	let h = Box.make(14);
+	let back = hold(h);
+	printf("held %d\n".ptr, back.n as c_int);
+	printf("hold %d\n".ptr, hold(7) as c_int);
+}
+
+fn main() -> int
+{
+	run();
+	printf("live %d\n".ptr, Box.live.load() as c_int);
+	return 0;
+}

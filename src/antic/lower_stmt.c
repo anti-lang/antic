@@ -810,6 +810,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
             }
         }
         ir_memcopy(l->f, l->b, p.address, v, lower_vtype_of(l, target->type));
+        lower_clear_moved(l, value);
         hook_changed(l, &p, target);
         return;
     }
@@ -1037,17 +1038,62 @@ void lower_clear_tables(struct lowerer *l, struct ir_operand base,
     l->b = done;
 }
 
+/* A local that may have moved, and an `own` parameter, are torn down
+   only when their table is not zero. */
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
+    bool made_only = sym->moved || sym->own_param;
+
     if (sym->type->kind == TYPE_OPTIONAL) {
-        destroy_optional(l, lower_temp(l, sym->ir), sym->type, false);
+        destroy_optional(l, lower_temp(l, sym->ir), sym->type, made_only);
         return;
     }
     if (sym->type->kind == TYPE_ARRAY) {
-        destroy_array(l, lower_temp(l, sym->ir), sym->type, false);
+        destroy_array(l, lower_temp(l, sym->ir), sym->type, made_only);
         return;
     }
-    destroy_value(l, lower_temp(l, sym->ir), sym->type, false);
+    destroy_value(l, lower_temp(l, sym->ir), sym->type, made_only);
+}
+
+/* DESIGN: an `own` parameter belongs to its function, which tears it
+   down at every exit unless it moved on. A move clears its table, so the
+   teardown passes over a value whose table is zero. */
+void lower_push_own_action(struct lowerer *l, const struct symbol *param)
+{
+    if (local_needs_teardown(param->type)) {
+        push_exit_action(l, NULL, param, false);
+    }
+}
+
+/* DESIGN: a local that moves into an `own` parameter hands its value to
+   the call. A value that needs a teardown is copied into a slot of the
+   frame, which the call takes. The local's table is then cleared, so its
+   own teardown passes over it. value is what the argument lowered to. */
+struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
+                                      struct ir_operand value)
+{
+    uint32_t slot;
+
+    if (!local_needs_teardown(arg->type) || l->b == NULL) {
+        return value;
+    }
+    slot = ir_entry_slot(l->f, lower_vtype_of(l, arg->type));
+    ir_memcopy(l->f, l->b, lower_temp(l, slot), value,
+               lower_vtype_of(l, arg->type));
+    lower_clear_tables(l, value, arg->type);
+    return lower_temp(l, slot);
+}
+
+/* An `own` parameter that `=` or `let` moved into a place holds its value
+   no more, so its table is cleared once the bytes are copied. */
+void lower_clear_moved(struct lowerer *l, const struct expr *value)
+{
+    if (value->kind != EXPR_NAME || !value->moves || value->symbol == NULL ||
+        value->symbol->caught || !local_needs_teardown(value->type) ||
+        l->b == NULL) {
+        return;
+    }
+    lower_clear_tables(l, lower_temp(l, value->symbol->ir), value->type);
 }
 
 /* DESIGN: the error a handler binds is the exit action of a scope around
@@ -1494,6 +1540,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
        the guard and the `else` below read it as well. */
     if (lower_is_aggregate(sym->type)) {
         lower_build_into(l, s->as.let.value, lower_temp(l, sym->ir));
+        lower_clear_moved(l, s->as.let.value);
         if (local_needs_teardown(sym->type)) {
             push_exit_action(l, NULL, sym, false);
         }

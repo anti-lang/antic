@@ -293,6 +293,7 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
     sym->pos = pos;
     sym->frame = c->function;
     sym->depth = s->depth;
+    sym->loops = c->loop_depth;
     s->entries[s->count].name = *name;
     s->entries[s->count].symbol = sym;
     s->count++;
@@ -847,6 +848,8 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
                                         t->params[i]->concurrent,
                                         t->params[i]->owned,
                                         t->params[i]->pos);
+            params[i] = sema_lent_form(c, params[i], t->params[i]->lent, false,
+                                       t->params[i]->pos);
             if (sema_is_error(params[i])) {
                 return params[i];
             }
@@ -954,6 +957,36 @@ struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
         return types_fn_owned(c->types, t);
     }
     return types_fn_form(c->types, t, !keep && c->plain_fns == 0, concurrent);
+}
+
+/* DESIGN: `lent` marks a pointer parameter whose pointer is valid only
+   during the call, and the parameter then has the type `lent *T`. The
+   function may pass it on to another `lent` parameter and keeps it
+   nowhere, which the checker enforces through the type as it enforces
+   `keep`. It does not stand with `own`, which takes the object over,
+   and an `extern fn` refuses it, since C keeps what it likes. */
+struct type *sema_lent_form(struct checker *c, struct type *t, bool lent,
+                            bool owned, struct pos pos)
+{
+    if (!lent || sema_is_error(t)) {
+        return t;
+    }
+    if (t->kind != TYPE_POINTER) {
+        sema_error_at(c, pos, "`lent` marks a pointer parameter, and this one "
+                      "is `%s`", sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (owned) {
+        sema_error_at(c, pos, "`own` and `lent` do not stand together, since "
+                      "a lent pointer stays with its owner");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (c->plain_fns > 0) {
+        sema_error_at(c, pos, "an `extern fn` takes no `lent` parameter, "
+                      "since C may keep the pointer");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return types_lent(c->types, t);
 }
 
 /* Resolve t and record the result in the node for later stages. */
@@ -1123,6 +1156,9 @@ static struct type *function_type_of(struct checker *c, struct item *it)
             it->params[i].concurrent,
             it->params[i].owned && it->params[i].type->kind == TYPEX_FN,
             it->params[i].pos);
+        params[i + extra] =
+            sema_lent_form(c, params[i + extra], it->params[i].lent,
+                           it->params[i].owned, it->params[i].pos);
         if (it->kind == ITEM_EXTERN_FN) {
             c->plain_fns--;
         }
@@ -1522,10 +1558,12 @@ static void check_defaults(struct checker *c, struct item *it)
     it->symbol->default_count = list != NULL ? count : 0;
 }
 
-/* DESIGN: `own` on a parameter says the function takes over the object,
-   as `own` on a field says the object frees the memory. The rule of the
-   field holds: a pointer or a slice. The error a handler binds moves
-   into such a parameter, and nothing else changes at a call. */
+/* DESIGN: `own` on a parameter says the function takes over the value
+   it is given, of any type. A local passed there moves, and the caller
+   names it no more. A value that owns no memory moves as a copy of its
+   bytes. One that does keeps one owner. The caller tears it down no
+   more, and the function tears it down at every exit unless it moves
+   on. */
 static void check_owned(struct checker *c, struct item *it)
 {
     const struct type *fn = it->symbol != NULL ? it->symbol->type : NULL;
@@ -1545,14 +1583,6 @@ static void check_owned(struct checker *c, struct item *it)
             continue;
         }
         if (sema_is_error(t)) {
-            continue;
-        }
-        if (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE &&
-            !(t->kind == TYPE_FN && t->owned)) {
-            sema_error_at(c, p->pos,
-                          "`own` needs a pointer or a slice, and `%.*s` "
-                          "has type `%s`", (int)p->name.length, p->name.text,
-                          sema_tn(t));
             continue;
         }
         if (list == NULL) {

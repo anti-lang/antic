@@ -1,0 +1,108 @@
+//! A local passed to an `own` parameter moves, and the checker refuses every
+//! mention of it after the move. A move that a loop, a `defer` or a closure
+//! would repeat or outlive is refused, and so is a value that stays where it is
+//! and owns memory.
+
+class Box
+{
+	pub own data: ?*int = none,
+	pub n: int = 0,
+}
+
+class Shelf
+{
+	pub slot: Box,
+
+	pub fn put(self, own b: Box)
+	{
+		self.slot = b;
+		self.slot.n = b.n;
+	}
+}
+
+fn take(own b: Box)
+{
+}
+
+fn number(own n: int) -> int
+{
+	return n;
+}
+
+fn named_after() -> int
+{
+	let b = Box { };
+	take(b);
+	return b.n;
+}
+
+fn named_after_a_method(s: *Shelf) -> int
+{
+	let b = Box { };
+	s.put(b);
+	return b.n;
+}
+
+fn a_number() -> int
+{
+	let k = 1;
+	let m = number(k);
+	return k + m;
+}
+
+fn in_a_loop()
+{
+	let b = Box { };
+	let i = 0;
+	while i < 2 do {
+		i += 1;
+		take(b);
+	}
+}
+
+fn deferred()
+{
+	let b = Box { };
+	defer number(b.n);
+	take(b);
+}
+
+fn captured() -> int
+{
+	let b = Box { };
+	let read = fn() -> int { return b.n; };
+	take(b);
+	return read();
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn inside_a_closure()
+{
+	let b = Box { };
+	call(fn() { take(b); });
+}
+
+fn not_owned(b: Box)
+{
+	take(b);
+}
+
+fn stays(s: *Shelf)
+{
+	take(s.slot);
+}
+
+fn let_after(own b: Box) -> int
+{
+	let c = b;
+	return b.n + c.n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

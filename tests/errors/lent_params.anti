@@ -1,0 +1,117 @@
+//! A `lent` pointer is valid for the call alone. The function reads and changes
+//! through it and passes it on to another `lent` parameter, and the checker
+//! refuses every place that would keep it.
+
+class Person
+{
+	pub age: int = 0,
+}
+
+class Holder
+{
+	pub held: ?*Person = none,
+}
+
+fn plain(p: *Person)
+{
+}
+
+fn owner(own p: *Person)
+{
+}
+
+fn stored_in_a_field(h: *Holder, lent p: *Person)
+{
+	h.held = p;
+}
+
+fn stored_in_a_local(lent p: *Person)
+{
+	let q: *Person = p;
+	plain(q);
+}
+
+fn returned(lent p: *Person) -> *Person
+{
+	return p;
+}
+
+fn returned_through_a_local(lent p: *Person) -> *Person
+{
+	let q = p;
+	return q;
+}
+
+fn passed_to_a_plain_parameter(lent p: *Person)
+{
+	plain(p);
+}
+
+fn passed_to_an_own_parameter(lent p: *Person)
+{
+	owner(p);
+}
+
+fn in_a_snapshot(lent p: *Person)
+{
+	let f = snapshot fn() -> int { return p.age; };
+	f();
+}
+
+fn in_an_array(lent p: *Person)
+{
+	let all: [1]*Person = [p];
+	plain(all[0]);
+}
+
+fn deleted(lent p: *Person)
+{
+	delete(p);
+}
+
+fn returned_through_a_cast(lent p: *Person) -> *Object
+{
+	return p as *Object;
+}
+
+fn kept_function(p: *Person)
+{
+	plain(p);
+}
+
+fn lend(f: fn(lent * Person))
+{
+	let one = Person { };
+	f(&one);
+}
+
+fn lends_to_a_function_that_keeps()
+{
+	lend(kept_function);
+}
+
+fn not_a_pointer(lent n: int)
+{
+}
+
+fn owned_and_lent(own lent p: *Person)
+{
+}
+
+extern fn c_side(lent p: ?*Person);
+
+fn hold<T>(x: T) -> T
+{
+	return x;
+}
+
+fn passed_to_a_generic(lent p: *Person) -> int
+{
+	let q = hold(p);
+	return q.age;
+}
+
+fn main() -> int
+{
+	return 0;
+}

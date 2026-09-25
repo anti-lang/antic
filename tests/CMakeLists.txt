@@ -2237,6 +2237,24 @@ add_test(NAME error_closures_modules
 set_tests_properties(error_closures_modules PROPERTIES
     FIXTURES_REQUIRED walk_antl)
 
+# The `own` and `lent` parameters of a library reach the importer through
+# the library file.
+file(MAKE_DIRECTORY "${LIBS}/owned/com/example")
+add_test(NAME antl_parts
+    COMMAND antic -c -I "${MODULES}/owned"
+            -o "${LIBS}/owned/com/example/parts.antl"
+            "${MODULES}/owned/com/example/parts.anti")
+set_tests_properties(antl_parts PROPERTIES FIXTURES_SETUP parts_antl)
+add_test(NAME error_own_modules
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=-S,-I,${LIBS}/owned,-o,${CMAKE_CURRENT_BINARY_DIR}/own_modules.s,own_modules.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/own_modules.err"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+set_tests_properties(error_own_modules PROPERTIES
+    FIXTURES_REQUIRED parts_antl)
+
 # The kinds of the fields of a concurrent class and the fields of a
 # synchronized class reach the importer through the library file.
 file(MAKE_DIRECTORY "${LIBS}/sync/com/example")
@@ -2998,6 +3016,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "catch_place|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_place.s,catch_place.anti"
         "failing|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/failing.s,failing.anti"
         "own_moves|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_moves.s,own_moves.anti"
+        "own_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_params.s,own_params.anti"
+        "lent_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_params.s,lent_params.anti"
         "fn_may_fail|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fn_may_fail.s,fn_may_fail.anti"
         "concrete_signature|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/concrete_signature.s,concrete_signature.anti"
         "qualified_bodies|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_bodies.s,qualified_bodies.anti"

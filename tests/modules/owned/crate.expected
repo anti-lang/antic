@@ -13,3 +13,7 @@ leaf out 3
 part out 4
 leaf out 5
 leaf out 6
+take 7
+part out 7
+lent 19
+part out 19

@@ -198,11 +198,15 @@ static void tuple_c_name(struct text *out, const struct type *t)
     element_c_name(out, t);
 }
 
-/* The comment before parameter i of sym when it is `own`. The function
-   takes over what C passes there, as an `own` field is freed by its
-   object. */
+/* The comment before parameter i of sym when it is `own` or `lent`. The
+   function takes over what C passes to an `own` one, as an `own` field is
+   freed by its object, and keeps nothing it takes at a `lent` one. */
 static const char *owned_note(const struct symbol *sym, size_t i)
 {
+    if (sym != NULL && sym->type != NULL && sym->type->kind == TYPE_FN &&
+        i < sym->type->param_count && type_is_lent(sym->type->params[i])) {
+        return "/* lent */ ";
+    }
     return sym != NULL && sym->owned != NULL && i < sym->owned_count &&
                    sym->owned[i]
                ? "/* own */ "

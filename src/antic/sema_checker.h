@@ -60,6 +60,9 @@ struct held_mutex {
     const struct held_mutex *outer;
 };
 
+/* Where a `lent` pointer is refused, for the message. */
+enum lent_use { LENT_STORED, LENT_RETURNED, LENT_PASSED };
+
 struct checker {
     struct types *types;
     struct arena *arena;
@@ -95,6 +98,9 @@ struct checker {
        place, a parameter of it included. The signature of an `extern fn`
        is checked so. */
     int plain_fns;
+    /* What a `lent` pointer refused where it stands would be: stored,
+       returned or passed on. The message of the refusal names it. */
+    enum lent_use lent_use;
     /* The function whose signature is resolved now, whose type
        parameters its types name. NULL outside a signature. */
     const struct item *signature;
@@ -219,6 +225,8 @@ struct type *sema_chan_element(struct checker *c, struct type_expr *t);
 struct type *sema_resolve_type(struct checker *c, struct type_expr *t);
 struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
                              bool concurrent, bool owned, struct pos pos);
+struct type *sema_lent_form(struct checker *c, struct type *t, bool lent,
+                            bool owned, struct pos pos);
 struct symbol *sema_std_item(struct checker *c, const struct name *module,
                              const struct name *name, bool own);
 struct type *sema_error_class(struct checker *c, struct pos pos);
@@ -327,6 +335,10 @@ size_t sema_proved_names(const struct expr *cond, bool want_true,
                          struct symbol **out, size_t count);
 struct type *sema_proved_type(struct checker *c, const struct symbol *sym);
 bool sema_type_owns(const struct type *t);
+bool sema_reads_existing(const struct expr *e);
+struct name sema_place_name(const struct expr *e);
+bool sema_move_local(struct checker *c, struct expr *e,
+                     const struct name *into, const struct name *by);
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             struct type *t);
 bool sema_holds_mutex(const struct type *t);

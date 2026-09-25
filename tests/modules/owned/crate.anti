@@ -1,7 +1,8 @@
 //! A class whose base, inline field and `own` slice come from
 //! `com.example.parts`. Its teardown and its copy, which the compiler writes in
 //! this module, reach the ones that module writes, in release mode and in dev
-//! mode.
+//! mode. A part moves into an `own` parameter of that module, which tears it
+//! down, and a part is lent to its functions.
 
 import com.example.parts;
 
@@ -36,5 +37,11 @@ fn main() -> int
 		(d.list[0].leaf != c.list[0].leaf) as c_int);
 	delete(d);
 	delete(c);
+	let q = parts.Part { n: 7 };
+	parts.take(q);
+	let r = parts.Part { n: 8 };
+	parts.lend(&r, parts.grow);
+	parts.lend(&r, fn(p) { p.n += 10; });
+	printf("lent %d\n".ptr, r.n as c_int);
 	return 0;
 }

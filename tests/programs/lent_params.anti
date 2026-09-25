@@ -1,0 +1,88 @@
+//! A `lent` parameter takes a pointer valid for the call alone. The function
+//! reads and changes through it, calls functions of its object, compares it,
+//! tests it for `none` and passes it on to another `lent` parameter, through a
+//! local or a closure as well. A collection lends its element this way with
+//! `read` and `modify`, and an anonymous function takes `lent` from the
+//! parameter it is passed to. Any pointer goes where a lent one is expected,
+//! and `dup` of a lent object gives a copy of its own.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Person
+{
+	pub age: int = 0,
+
+	pub fn greet(self)
+	{
+		printf("age %d\n".ptr, self.age as c_int);
+	}
+}
+
+class People
+{
+	pub one: Person,
+	pub lender: fn(lent * Person) = grow,
+
+	pub fn read(self, f: fn(lent * Person))
+	{
+		f(&self.one);
+	}
+
+	pub fn modify(self, f: fn(lent * Person))
+	{
+		f(&self.one);
+	}
+}
+
+fn grow(lent p: *Person)
+{
+	p.age += 1;
+}
+
+fn older(lent p: *Person)
+{
+	let q = p;
+	grow(q);
+	let twice = fn() { grow(p); };
+	twice();
+	p.greet();
+}
+
+fn same(lent p: *Person, q: *Person) -> bool
+{
+	return p == q;
+}
+
+fn age_of(lent p: ?*Person) -> int
+{
+	if p != none {
+		return p.age;
+	}
+	return -1;
+}
+
+fn copy(lent p: *Person) -> *Person
+{
+	return dup(p);
+}
+
+fn main() -> int
+{
+	let people = People { one: Person { age: 40 } };
+	people.read(fn(p) { p.greet(); });
+	people.modify(fn(p) { p.age += 1; });
+	people.modify(grow);
+	people.modify(people.lender);
+	older(&people.one);
+	let q = &people.one;
+	if same(q, q) {
+		printf("same\n".ptr);
+	}
+	printf("%d %d\n".ptr, age_of(q) as c_int, age_of(none) as c_int);
+	people.read(fn(lent p: *Person) { p.greet(); });
+	let c = copy(q);
+	c.age = 1;
+	printf("copy %d, one %d\n".ptr, c.age as c_int, people.one.age as c_int);
+	delete(c);
+	return 0;
+}

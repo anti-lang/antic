@@ -71,6 +71,7 @@ struct type_expr {
     bool keep;
     bool concurrent;
     bool owned;                     /* `keep own fn(E)`: owns what it keeps */
+    bool lent;                      /* `lent *T`: valid for the call alone */
     struct type *type;              /* set by semantic analysis */
 };
 
@@ -766,6 +767,9 @@ struct param {
        `concurrent` may call it from more than one thread at once. */
     bool keep;
     bool concurrent;
+    /* `lent` before a pointer parameter: the pointer is valid only during
+       the call. */
+    bool lent;
     /* `guarded by lock` or `guarded by PeopleList.lock` after a field's
        type: the Mutex field, and the enclosing class that holds it or
        an empty name. unchecked marks a field that

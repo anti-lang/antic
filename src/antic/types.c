@@ -45,7 +45,8 @@ static struct type *find_or_add_params(struct types *types,
         if (t->kind != key->kind || t->element != key->element ||
             t->length != key->length || t->length_of != key->length_of ||
             t->result != key->result || t->bound != key->bound ||
-            t->nullable != key->nullable || t->may_fail != key->may_fail ||
+            t->nullable != key->nullable || t->lent != key->lent ||
+            t->may_fail != key->may_fail ||
             t->has_out != key->has_out || t->context != key->context ||
             t->concurrent != key->concurrent || t->owned != key->owned ||
             t->param_count != key->param_count) {
@@ -87,6 +88,34 @@ struct type *types_pointer_of(struct types *types, struct type *element,
     key.element = element;
     key.nullable = nullable;
     return find_or_add(types, &key);
+}
+
+static struct type *lent_form(struct types *types, struct type *t, bool lent)
+{
+    struct type key;
+
+    if (t == NULL || t->kind != TYPE_POINTER || t->lent == lent) {
+        return t;
+    }
+    key = *t;
+    key.lent = lent;
+    key.next = NULL;
+    return find_or_add(types, &key);
+}
+
+struct type *types_lent(struct types *types, struct type *t)
+{
+    return lent_form(types, t, true);
+}
+
+struct type *types_unlent(struct types *types, struct type *t)
+{
+    return lent_form(types, t, false);
+}
+
+bool type_is_lent(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_POINTER && t->lent;
 }
 
 struct type *types_pointer(struct types *types, struct type *element)
@@ -1411,6 +1440,9 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     }
     switch (t->kind) {
     case TYPE_POINTER:
+        if (t->lent) {
+            text_append(out, "lent ");
+        }
         text_append(out, t->nullable ? "?*" : "*");
         print_type(out, t->element, qualified);
         return;
