@@ -1,0 +1,12 @@
+exit 0
+class early: alive 0, torn 1
+class after the block: alive 0, torn 0
+struct early: alive 0, torn 1
+struct after the block: alive 0, torn 0
+class destroyed in the branch
+class branch taken: alive 0, torn 1
+class branch passed: alive 0, torn 1
+struct destroyed in the branch
+struct branch taken: alive 0, torn 1
+struct branch passed: alive 0, torn 1
+through a pointer: alive 0, torn 1

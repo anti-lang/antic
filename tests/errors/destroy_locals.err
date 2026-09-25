@@ -1,0 +1,5 @@
+destroy_locals.anti:26:10: error: `k` was moved into `destroy`
+destroy_locals.anti:31:10: error: `p` was moved into `destroy`
+destroy_locals.anti:33:11: error: `q.k` is a part of `q`. Destroy the whole of `q`, or give the part a class with its own teardown
+destroy_locals.anti:35:11: error: `box.k` is a part of `box`. Destroy the whole of `box`, or give the part a class with its own teardown
+destroy_locals.anti:37:11: error: the element is a part of `keys`. Destroy the whole of `keys`, or give the part a class with its own teardown

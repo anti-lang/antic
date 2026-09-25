@@ -383,6 +383,15 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
     build_value_into(l, e, dest);
 }
 
+/* `destroy(&c)` of a local moved `c` out, so the teardown of its block
+   passes over it: its tables are cleared, as after every move. */
+static void destroyed_local(struct lowerer *l, const struct expr *operand)
+{
+    if (operand->kind == EXPR_UNARY && operand->as.unary.op == TOKEN_AMP) {
+        lower_clear_moved(l, operand->as.unary.operand);
+    }
+}
+
 /* The copy of every part of the value of an iterator, `*v` over a tuple
    with lent parts that only the checker writes, into dest. A part that is
    a lent pointer gives what it points at, and every other part itself. */
@@ -3002,6 +3011,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                                         : ir_int_op(IR_PTR, 0),
                                     false);
             }
+            destroyed_local(l, e->as.object.operand);
             return lower_none();
         }
         if (e->as.object.from != NULL) {
@@ -3010,11 +3020,15 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
             args[0] = v;
             args[1] = lower_static_descriptor(l, e->as.object.operand->type);
             args[2] = lower_expr(l, e->as.object.from);
-            return lower_rt_call(l,
-                                 e->as.object.op == TOKEN_DELETE
-                                     ? "anti_rt_delete_from"
-                                     : "anti_rt_destroy_from",
-                                 IR_VOID, three, args, 3);
+            lower_rt_call(l,
+                          e->as.object.op == TOKEN_DELETE
+                              ? "anti_rt_delete_from"
+                              : "anti_rt_destroy_from",
+                          IR_VOID, three, args, 3);
+            if (e->as.object.op == TOKEN_DESTROY) {
+                destroyed_local(l, e->as.object.operand);
+            }
+            return lower_none();
         }
         if (e->as.object.op == TOKEN_DUP) {
             struct ir_operand made =
@@ -3022,7 +3036,11 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
             lower_hook_copied(l, made, v);
             return made;
         }
-        return lower_object_call(l, name, v, e->as.object.operand->type);
+        lower_object_call(l, name, v, e->as.object.operand->type);
+        if (e->as.object.op == TOKEN_DESTROY) {
+            destroyed_local(l, e->as.object.operand);
+        }
+        return lower_none();
     }
     case EXPR_SIZE_OF:
         return lower_size_operand(l, e->as.size_of->type);

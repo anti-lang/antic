@@ -1,0 +1,106 @@
+//! `destroy(&c)` of a local counts as moving `c` out. The block then skips the
+//! teardown of `c`, and a `destroy` in one branch is a move in one branch. A
+//! class local and an owning struct local are destroyed early, in one branch
+//! and not at all, each under a leak check, the count of the leaves alive.
+//! `destroy(p)` through a pointer the rules of locals do not govern, such as
+//! the memory of `alloc`, is unchanged.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Leaf.live.sub(1);
+	}
+}
+
+/// A class value that owns a leaf and counts its teardowns, which a second
+/// teardown of one value would count twice.
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic torn: int = 0;
+
+	fn destruct(self)
+	{
+		Key.torn.add(1);
+	}
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+fn key(n: int) -> Key
+{
+	Leaf.live.add(1);
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn check(name: str)
+{
+	printf("%.*s: alive %d, torn %d\n".ptr, name.len as c_int, name.ptr,
+		Leaf.live.load() as c_int, Key.torn.load() as c_int);
+	Key.torn.store(0);
+}
+
+fn class_in_branch(early: bool)
+{
+	let k = key(3);
+	if early {
+		destroy(&k);
+		printf("class destroyed in the branch\n".ptr);
+	}
+}
+
+fn struct_in_branch(early: bool)
+{
+	let p = Pair { k: key(4), n: 4 };
+	if early {
+		destroy(&p);
+		printf("struct destroyed in the branch\n".ptr);
+	}
+}
+
+fn main() -> int
+{
+	{
+		let k = key(1);
+		destroy(&k);
+		check("class early");
+	}
+	check("class after the block");
+	{
+		let p = Pair { k: key(2), n: 2 };
+		destroy(&p);
+		check("struct early");
+	}
+	check("struct after the block");
+	class_in_branch(true);
+	check("class branch taken");
+	class_in_branch(false);
+	check("class branch passed");
+	struct_in_branch(true);
+	check("struct branch taken");
+	struct_in_branch(false);
+	check("struct branch passed");
+	{
+		let room = alloc(Pair, 1) else {
+			return 1;
+		};
+		room[0] = Pair { k: key(5), n: 5 };
+		destroy(&room[0]);
+		free(room);
+	}
+	check("through a pointer");
+	return 0;
+}

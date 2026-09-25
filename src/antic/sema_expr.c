@@ -498,6 +498,67 @@ void sema_refuse_lent_tuple(struct checker *c, const struct expr *e)
                   "that holds one is bound by its loop alone");
 }
 
+/* DESIGN: `destroy(&c)` of a local counts as moving `c` out. The block
+   then skips its teardown, naming it again is refused, and a `destroy` in
+   one branch is a move in one branch, as for every move. `destroy` of a
+   part of a local, `&s.k`, is refused, since the block would tear the
+   part down again. A pointer the rules of locals do not govern, the
+   memory of an allocator or an object on the heap, is destroyed as
+   before. Returns false after a message. */
+static bool destroy_of_local(struct checker *c, struct expr *operand)
+{
+    static const struct name destroy_name = {"destroy", 7};
+    static const struct name nobody = {"", 0};
+    struct expr *place;
+    struct expr *root;
+
+    if (operand->kind != EXPR_UNARY || operand->as.unary.op != TOKEN_AMP) {
+        return true;
+    }
+    place = operand->as.unary.operand;
+    for (root = place;;) {
+        const struct type *base;
+        if (root->kind == EXPR_FIELD) {
+            base = root->as.field.base->type;
+            if (base == NULL || base->kind == TYPE_POINTER) {
+                return true;
+            }
+            root = root->as.field.base;
+        } else if (root->kind == EXPR_INDEX) {
+            base = root->as.index.base->type;
+            if (base == NULL || base->kind != TYPE_ARRAY) {
+                return true;
+            }
+            root = root->as.index.base;
+        } else {
+            break;
+        }
+    }
+    if (root->kind != EXPR_NAME || root->symbol == NULL ||
+        (root->symbol->kind != SYMBOL_LOCAL &&
+         root->symbol->kind != SYMBOL_PARAM)) {
+        return true;
+    }
+    if (root != place) {
+        struct text spelled = {0};
+        struct text part = {0};
+        if (sema_spell(&spelled, place)) {
+            text_appendf(&part, "`%s`", text_cstr(&spelled));
+        } else {
+            text_append(&part, "the element");
+        }
+        sema_error_at(c, place->pos, "%s is a part of `%.*s`. Destroy the "
+                      "whole of `%.*s`, or give the part a class with its own "
+                      "teardown", text_cstr(&part),
+                      (int)root->symbol->name.length, root->symbol->name.text,
+                      (int)root->symbol->name.length, root->symbol->name.text);
+        text_free(&spelled);
+        text_free(&part);
+        return false;
+    }
+    return sema_move_local(c, root, &destroy_name, &nobody);
+}
+
 /* Whether e is `dup` of a function value, a copy that no one owns yet. */
 static bool is_fn_dup(const struct expr *e)
 {
@@ -3250,6 +3311,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             !t->is_union && !types_is_chan(t) && !types_is_mutex(t) &&
             !types_is_object_lock(t) && !types_is_job(t)) {
             return t;
+        }
+        if (e->as.object.op == TOKEN_DESTROY &&
+            !destroy_of_local(c, e->as.object.operand)) {
+            return sema_builtin(c, TYPE_ERROR);
         }
         /* All three read the table of the object, so all three need a
            pointer the program has checked. `dup(p)` then gives the type

@@ -1,0 +1,39 @@
+//! `destroy(&c)` of a local counts as moving `c` out, so naming `c` again is
+//! refused. `destroy` of a part of a local is refused: it takes the whole
+//! value, or the part a class with its own teardown holds.
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Key = none,
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+class Box
+{
+	pub k: Key,
+}
+
+fn main() -> int
+{
+	let k = Key { };
+	destroy(&k);
+	let a = k.n;
+	let p = Pair { k: Key { }, n: 1 };
+	if a > 0 {
+		destroy(&p);
+	}
+	let b = p.n;
+	let q = Pair { k: Key { }, n: 2 };
+	destroy(&q.k);
+	let box = Box { k: Key { } };
+	destroy(&box.k);
+	let keys: [2]Key = [Key { }, Key { }];
+	destroy(&keys[0]);
+	return a + b;
+}
