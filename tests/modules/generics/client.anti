@@ -146,6 +146,9 @@ fn main() -> int
 	let plane = Plane { values: [1, 2, 3, 4] };
 	gen.swap_corners(&plane);
 	printf("%d %d\n".ptr, plane[0, 0] as c_int, plane[1, 1] as c_int);
+	let tally: [2](str, int) = [("a", 3), ("b", 4)];
+	gen.bump(tally[0..2]);
+	printf("%d\n".ptr, gen.counted(tally[0..2]) as c_int);
 
 	let values = [7, 8];
 	let one = gen.first(values[0..2]) catch fatal;

@@ -18,6 +18,14 @@ and iteration" in `docs/decisions.md`.
   path, so an abstract `next` dispatches through the table.
 - `e[i]` becomes the call `e.index(i)` in place. `e[i] = v` becomes the
   statement `e.set_index(i, v);`.
+- `for (k, v) in e` sets `pattern` on the loop. The checker declares the
+  names from the parts of the tuple and gives the loop `element`, a symbol
+  in no scope that holds the whole element, or the lent pointer to it in
+  the form `for (k, v) in &e`. Lowering binds `element` as it binds the
+  variable of `for x in e`, and `bind_pattern` then gives each name its
+  part from the address of the element: a copy, or in the second form the
+  address of every part after the key. No pair is built, and only the
+  element is torn down.
 - `e[x, y]` reaches the checker as an index node whose index is the tuple
   `(x, y)`, marked `several`. It becomes `e.index(x, y)`, and `e[x, y] = v`
   becomes `e.set_index(x, y, v);`.

@@ -104,6 +104,9 @@ struct symbol {
     struct name copy_of;
     /* The variable of `for x in &e`, lent for one turn of the loop. */
     bool lent_turn;
+    /* The key of `for (k, v) in &e`, a copy that never changes in place,
+       with the source of e in copy_of. */
+    bool walked_key;
     bool variadic;                  /* SYMBOL_EXTERN_FN */
     bool worker;                    /* SYMBOL_FN written `worker fn` */
     /* SYMBOL_FN of a library file written `operator fn`, whose item the

@@ -1,0 +1,112 @@
+//! `for` with a tuple pattern over a collection, an iterator, a slice and an
+//! array whose elements are tuples. `for (k, v) in m` gives a copy of each
+//! part, and `for (k, v) in &m` gives the key as a copy and the value as a lent
+//! pointer, which changes the element in place. A pattern takes any number of
+//! parts, a closure captures a part and a generic walks with one.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// Three entries in insertion order, each a key and a value.
+class Ages
+{
+	pub entries: [3](str, int) = [("ann", 41), ("bob", 30), ("cy", 7)],
+
+	operator fn iter(self) -> AgesIter
+	{
+		return AgesIter { ages: self, at: -1 };
+	}
+}
+
+class AgesIter
+{
+	pub ages: *Ages,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 3;
+	}
+
+	operator fn value(self) -> lent *(str, int)
+	{
+		return &self.ages.entries[self.at];
+	}
+}
+
+/// Gives the pairs of two counts as new tuples.
+class Zip
+{
+	pub at: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at <= 3;
+	}
+
+	operator fn value(self) -> (int, int)
+	{
+		return (self.at, self.at * self.at);
+	}
+}
+
+fn total<K>(items: [](K, int)) -> int
+{
+	let sum = 0;
+	for (k, v) in items {
+		sum += v;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let ages = Ages { };
+	for (name, age) in ages {
+		printf("%.*s %d\n".ptr, name.len as c_int, name.ptr, age as c_int);
+	}
+	for (name, age) in &ages {
+		*age += 1;
+	}
+	for (name, age) in ages {
+		printf("older %.*s %d\n".ptr, name.len as c_int, name.ptr,
+			age as c_int);
+	}
+
+	let zip = Zip { };
+	for (n, square) in zip {
+		printf("zip %d %d\n".ptr, n as c_int, square as c_int);
+	}
+
+	let marks: [2](int, Point) = [(1, Point { x: 1, y: 2 }), (2,
+		Point { x: 3, y: 4 })];
+	for (c, p) in marks {
+		printf("mark %d %d %d\n".ptr, c as c_int, p.x as c_int, p.y as c_int);
+	}
+	for (c, p) in &marks {
+		p.x *= 10;
+	}
+	let all = marks[0..2];
+	for (c, p) in all {
+		printf("moved %d %d\n".ptr, c as c_int, p.x as c_int);
+	}
+
+	let triples: [2](int, int, int) = [(1, 2, 3), (4, 5, 6)];
+	let seen = 0;
+	for (a, b, c) in triples {
+		let f = fn() -> int { return a * 100 + b * 10 + c; };
+		seen += f();
+	}
+	printf("triples %d\n".ptr, seen as c_int);
+
+	let counts: [2](str, int) = [("x", 5), ("y", 6)];
+	printf("total %d\n".ptr, total(counts[0..2]) as c_int);
+	return 0;
+}

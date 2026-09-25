@@ -790,6 +790,73 @@ static void mark_walked(const struct stmt *s, struct symbol *sym)
     sym->copy_of.length = s->as.for_loop.over_text.length;
 }
 
+/* DESIGN: `for (k, v) in e` takes apart the tuple each element is. In
+   the form `for (k, v) in e` every name is a read-only copy of its part,
+   as the variable of `for x in e` is. In the form `for (k, v) in &e` the
+   first name is a read-only copy of the key, which never changes in
+   place, and every other name is a lent pointer to its part for the turn.
+   The whole element, or the lent pointer to it, lives in a symbol of no
+   scope that lowering binds and the names read. */
+static void bind_pattern(struct checker *c, struct stmt *s,
+                         struct type *element)
+{
+    struct binding *names = s->as.for_loop.names;
+    size_t count = s->as.for_loop.name_count;
+    bool lent = s->as.for_loop.by_pointer;
+    struct type *tuple = element;
+    struct symbol *whole;
+    size_t i;
+
+    if (s->as.for_loop.over == NULL) {
+        sema_error_at(c, names[0].pos, "a pattern of `for` takes apart the "
+                      "tuple of each element, and a range gives integers");
+        tuple = sema_builtin(c, TYPE_ERROR);
+    } else if (!sema_is_error(tuple)) {
+        if (lent && tuple->kind == TYPE_POINTER) {
+            tuple = tuple->element;
+        }
+        if (tuple->kind != TYPE_TUPLE) {
+            sema_error_at(c, names[0].pos, "a pattern of `for` takes apart the "
+                          "tuple of each element, and each element of `%.*s` "
+                          "is `%s`", (int)s->as.for_loop.over_text.length,
+                          s->as.for_loop.over_text.bytes, sema_tn(tuple));
+            tuple = sema_builtin(c, TYPE_ERROR);
+        } else if (tuple->param_count != count) {
+            sema_error_at(c, names[0].pos, "`%s` has %d elements, and the "
+                          "pattern names %d", sema_tn(tuple),
+                          (int)tuple->param_count, (int)count);
+            tuple = sema_builtin(c, TYPE_ERROR);
+        }
+    }
+    whole = arena_alloc(c->arena, sizeof *whole);
+    whole->kind = SYMBOL_LOCAL;
+    whole->pos = names[0].pos;
+    whole->type = sema_is_error(tuple) ? tuple : element;
+    s->as.for_loop.element = whole;
+    for (i = 0; i < count; i++) {
+        struct type *part = sema_is_error(tuple) ? tuple : tuple->fields[i].type;
+        struct symbol *sym =
+            sema_declare(c, SYMBOL_LOCAL, &names[i].name, names[i].pos,
+                         "`%.*s` is already declared in this block");
+        if (lent && i > 0 && !sema_is_error(part)) {
+            part = types_lent(c->types, types_pointer(c->types, part));
+        }
+        if (sym == NULL) {
+            continue;
+        }
+        sym->type = part;
+        sym->read_only = true;
+        names[i].symbol = sym;
+        if (lent && i > 0) {
+            sym->lent_turn = true;
+        } else {
+            sym->copy_of.text = s->as.for_loop.over_text.bytes;
+            sym->copy_of.length = s->as.for_loop.over_text.length;
+            sym->walked_key = lent;
+        }
+    }
+}
+
 /* DESIGN: the variable of `for x in e` is a copy of each element, so a
    change reaches the element only through a pointer the copy holds. This
    gives the variable whose copy alone the place target would change. The
@@ -829,6 +896,13 @@ static struct symbol *walked_copy(const struct expr *target)
 static void refuse_read_only(struct checker *c, struct pos pos,
                              const struct symbol *sym)
 {
+    if (sym->walked_key) {
+        sema_error_at(c, pos, "`%.*s` is a copy of the key of each element "
+                      "of `%.*s`, and a key never changes in place",
+                      (int)sym->name.length, sym->name.text,
+                      (int)sym->copy_of.length, sym->copy_of.text);
+        return;
+    }
     if (sym->copy_of.length > 0) {
         sema_error_at(c, pos, "`%.*s` is a copy of each element of `%.*s`. "
                       "Walk with `&%.*s` to change the elements",
@@ -2026,7 +2100,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
            name binds the element itself, and a range without a name
            repeats its block and counts in a temporary that no body can
            read. */
-        if (names > 1) {
+        if (s->as.for_loop.pattern) {
+            bind_pattern(c, s, element);
+        } else if (names > 1) {
             struct type *pair[2];
             if (names > 2 || s->as.for_loop.over == NULL ||
                 s->as.for_loop.hooks.cursor != NULL) {

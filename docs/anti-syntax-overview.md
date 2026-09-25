@@ -333,7 +333,7 @@ let all = people.iter().to_slice();
 free(all.ptr);
 ```
 
-`for x in c` gives a copy of each element, and the loop variable is read-only, so a change that would reach the copy alone is refused. `for x in &c` gives each element as a `lent` pointer for one turn of the loop, and a change through it reaches the element. Both forms hold for slices and for the collections of [Collections](#collections). A collection must not change its size while a loop walks it. A dev build traps when it does, naming the collection and both places, and `remove_all(test)` removes while it walks.
+`for x in c` gives a copy of each element, and the loop variable is read-only, so a change that would reach the copy alone is refused. `for x in &c` gives each element as a `lent` pointer for one turn of the loop, and a change through it reaches the element. Both forms hold for slices and for the collections of [Collections](#collections). `for (k, v) in m` takes apart the tuple of each element, over any iterator whose value is a tuple, and `for (k, v) in &m` gives `k` as a copy, since keys never change in place, and `v` as a lent pointer. A collection must not change its size while a loop walks it. A dev build traps when it does, naming the collection and both places, and `remove_all(test)` removes while it walks.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -360,7 +360,7 @@ for p in &people {
 }
 ```
 
-Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice`. `for x in &c` over a slice, an array and a collection whose `value` gives a `lent` pointer, the read-only loop variable of the copy form with its refusal, and the trap of a dev build on a collection that changes its size while a loop walks it, through `anti.lang.Changes` and `anti.lang.Watch`. Not built yet: labels.
+Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice`. `for x in &c` over a slice, an array and a collection whose `value` gives a `lent` pointer, the read-only loop variable of the copy form with its refusal, `for (k, v) in m` and `for (k, v) in &m`, and the trap of a dev build on a collection that changes its size while a loop walks it, through `anti.lang.Changes` and `anti.lang.Watch`. Not built yet: labels.
 
 ## Functions
 

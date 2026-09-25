@@ -826,6 +826,7 @@ static void io_sym_body(struct io *io, struct symbol *s)
     io_bool(io, &s->read_only);
     io_name(io, &s->copy_of);
     io_bool(io, &s->lent_turn);
+    io_bool(io, &s->walked_key);
     io_bool(io, &s->worker);
     io_bool(io, &s->may_fail);
     io_bool(io, &s->caught);
@@ -1221,6 +1222,8 @@ static void io_stmt_body(struct io *io, struct stmt *s)
         break;
     case STMT_FOR:
         io_bindings(io, &s->as.for_loop.names, &s->as.for_loop.name_count);
+        io_bool(io, &s->as.for_loop.pattern);
+        io_sym(io, &s->as.for_loop.element);
         io_expr(io, &s->as.for_loop.low);
         io_expr(io, &s->as.for_loop.high);
         io_expr(io, &s->as.for_loop.over);

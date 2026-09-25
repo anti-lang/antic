@@ -647,6 +647,13 @@ struct stmt {
                element into the index and the element. */
             struct binding *names;
             size_t name_count;
+            /* DESIGN: `for (k, v) in e` names the parts of the tuple each
+               element is, and sets pattern. The checker gives the loop
+               element, a symbol in no scope that holds the whole element,
+               or the lent pointer to it in the form `for (k, v) in &e`.
+               Lowering binds each name from it, and no pair is built. */
+            bool pattern;
+            struct symbol *element;
             struct expr *low;
             struct expr *high;
             struct expr *over;

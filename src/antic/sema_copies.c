@@ -1366,6 +1366,7 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
         }
         n->as.for_loop.names =
             xbind(cl, s->as.for_loop.names, s->as.for_loop.name_count);
+        n->as.for_loop.element = xsym(cl, s->as.for_loop.element);
         n->as.for_loop.body = xb(cl, s->as.for_loop.body);
         break;
     }

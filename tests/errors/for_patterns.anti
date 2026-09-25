@@ -1,0 +1,42 @@
+//! The refusals of `for` with a tuple pattern.
+
+class Zip
+{
+	pub at: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at <= 3;
+	}
+
+	operator fn value(self) -> (int, int)
+	{
+		return (self.at, self.at);
+	}
+}
+
+fn main() -> int
+{
+	for (a, b) in 0..10 {
+	}
+	let ints: [2]int = [1, 2];
+	for (a, b) in ints {
+	}
+	let pairs: [2](int, int) = [(1, 2), (3, 4)];
+	for (a, b, c) in pairs {
+	}
+	for (a, b) in pairs {
+		b = 1;
+	}
+	for (a, b) in &pairs {
+		a = 1;
+		*b = 1;
+	}
+	let zip = Zip { };
+	for (a, b) in &zip {
+	}
+	for (a, a) in pairs {
+	}
+	return 0;
+}

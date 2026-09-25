@@ -2286,6 +2286,30 @@ static struct pos declaration_start(const struct item *it)
     return at;
 }
 
+/* Whether the `for` at the current token names a tuple pattern, `for (k,
+   v) in e`. The pattern is a parenthesis, two names or more apart by
+   commas, the closing parenthesis and `in`. A range that begins with a
+   parenthesis names no variable. */
+static bool tuple_pattern(struct parser *p)
+{
+    size_t at = 2;
+
+    if (peek_at(p, 1)->kind != TOKEN_LPAREN) {
+        return false;
+    }
+    for (;;) {
+        if (peek_at(p, at)->kind != TOKEN_IDENT) {
+            return false;
+        }
+        if (peek_at(p, at + 1)->kind != TOKEN_COMMA) {
+            break;
+        }
+        at += 2;
+    }
+    return at > 2 && peek_at(p, at + 1)->kind == TOKEN_RPAREN &&
+           is_word(p, peek_at(p, at + 2), "in");
+}
+
 static struct stmt *statement(struct parser *p);
 
 static struct stmt *statement_level(struct parser *p)
@@ -2322,9 +2346,14 @@ static struct stmt *statement_level(struct parser *p)
                       (peek_at(p, 2)->kind == TOKEN_COMMA &&
                        peek_at(p, 3)->kind == TOKEN_IDENT &&
                        is_word(p, peek_at(p, 4), "in")));
+        bool pattern = tuple_pattern(p);
         next(p);
         s = new_stmt(p, STMT_FOR, t);
-        if (bound) {
+        if (pattern) {
+            next(p);
+        }
+        s->as.for_loop.pattern = pattern;
+        if (bound || pattern) {
             struct list names = {NULL, 0, 0, sizeof(struct binding)};
             do {
                 struct binding b;
@@ -2338,6 +2367,9 @@ static struct stmt *statement_level(struct parser *p)
             } while (accept(p, TOKEN_COMMA));
             s->as.for_loop.names =
                 list_finish(p, &names, &s->as.for_loop.name_count);
+            if (pattern) {
+                next(p);
+            }
             /* DESIGN: `in` is a contextual word, as `packed` and `align`
                are. The decision adds four keywords and `in` is not among
                them, so a program may still name a variable `in`. */

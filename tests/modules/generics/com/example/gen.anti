@@ -206,6 +206,24 @@ pub fn swap_corners<G: index + set_index>(g: G)
 	g[1, 1] = first;
 }
 
+/// The sum of the counts of the pairs in items.
+pub fn counted<K>(items: [](K, int)) -> int
+{
+	let sum = 0;
+	for (k, n) in items {
+		sum += n;
+	}
+	return sum;
+}
+
+/// Count every pair of items one up, in place.
+pub fn bump<K>(items: [](K, int))
+{
+	for (k, n) in &items {
+		*n += 1;
+	}
+}
+
 /// The count of values a walk gives.
 pub fn count<C: iter>(c: C) -> int
 {

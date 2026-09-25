@@ -1,0 +1,7 @@
+for_patterns.anti:21:7: error: a pattern of `for` takes apart the tuple of each element, and a range gives integers
+for_patterns.anti:24:7: error: a pattern of `for` takes apart the tuple of each element, and each element of `ints` is `int`
+for_patterns.anti:27:7: error: `(int, int)` has 2 elements, and the pattern names 3
+for_patterns.anti:30:3: error: `b` is a copy of each element of `pairs`. Walk with `&pairs` to change the elements
+for_patterns.anti:33:3: error: `a` is a copy of the key of each element of `pairs`, and a key never changes in place
+for_patterns.anti:37:17: error: `for x in &e` takes each element in place, and the `operator fn value` of `Zip` gives a copy of `(int, int)`
+for_patterns.anti:39:10: error: `a` is already declared in this block

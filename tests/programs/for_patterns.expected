@@ -1,0 +1,16 @@
+exit 0
+ann 41
+bob 30
+cy 7
+older ann 42
+older bob 31
+older cy 8
+zip 1 1
+zip 2 4
+zip 3 9
+mark 1 1 2
+mark 2 3 4
+moved 1 10
+moved 2 30
+triples 579
+total 11

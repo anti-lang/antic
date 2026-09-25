@@ -403,6 +403,40 @@ static void walk_check(struct lowerer *l, const struct stmt *s)
     l->b = rest;
 }
 
+static void bind_loop_name(struct lowerer *l, struct symbol *sym,
+                           enum ir_type type, struct ir_operand value);
+
+/* Give the names of `for (k, v) in e` the parts of the element at the
+   address at. A name of the copy form, and the key of the form
+   `for (k, v) in &e`, takes a copy of its part. Every other name of the
+   second form takes the address of its part. The element keeps its
+   teardown, and the names, which are read-only, take none. */
+static void bind_pattern(struct lowerer *l, const struct stmt *s,
+                         struct ir_operand at)
+{
+    const struct type *tuple = s->as.for_loop.element->type;
+    size_t i;
+
+    if (tuple->kind == TYPE_POINTER) {
+        tuple = tuple->element;
+    }
+    for (i = 0; i < s->as.for_loop.name_count; i++) {
+        struct symbol *name = s->as.for_loop.names[i].symbol;
+        struct ir_operand part = lower_offset_address(
+            l, at, lower_field_offset(l, tuple, &tuple->fields[i].name));
+        if (s->as.for_loop.by_pointer && i > 0) {
+            bind_loop_name(l, name, IR_PTR, part);
+        } else if (lower_is_aggregate(name->type)) {
+            ir_memcopy(l->f, l->b, lower_temp(l, name->ir), part,
+                       lower_vtype_of(l, name->type));
+        } else {
+            enum ir_type type = lower_ir_type_of(name->type);
+            bind_loop_name(l, name, type,
+                           lower_temp(l, ir_load(l->f, l->b, type, part)));
+        }
+    }
+}
+
 /* DESIGN: `for x in e` over a collection or an iterator is the loop of
    its `while` form. It binds the iterator once, calls `next` in the test
    and `value` at the head of the body, and `continue` goes to the test.
@@ -412,7 +446,10 @@ static void walk_check(struct lowerer *l, const struct stmt *s)
 static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
 {
     const struct iteration *it = &s->as.for_loop.hooks;
-    struct symbol *sym = s->as.for_loop.names[0].symbol;
+    /* A pattern binds the whole element first, and its names from it. */
+    struct symbol *sym = s->as.for_loop.pattern
+                             ? s->as.for_loop.element
+                             : s->as.for_loop.names[0].symbol;
     /* `for x in &e` binds the lent pointer, and `for x in e` the copy. */
     const struct expr *current =
         s->as.for_loop.by_pointer ? it->place : it->current;
@@ -465,6 +502,9 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     if (it->place == NULL && local_needs_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
+    if (s->as.for_loop.pattern) {
+        bind_pattern(l, s, lower_temp(l, sym->ir));
+    }
     lower_block(l, s->as.for_loop.body);
     lower_run_defers(l, &pass, false);
     if (l->b != NULL) {
@@ -504,7 +544,9 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
        names the index before it. */
     struct symbol *sym = names > 0 ? s->as.for_loop.names[names - 1].symbol
                                    : NULL;
-    struct symbol *index = names > 1 ? s->as.for_loop.names[0].symbol : NULL;
+    struct symbol *index = names > 1 && !s->as.for_loop.pattern
+                               ? s->as.for_loop.names[0].symbol
+                               : NULL;
     const struct expr *over = s->as.for_loop.over;
     struct ir_block *test = lower_new_block(l);
     struct ir_block *body = lower_new_block(l);
@@ -637,7 +679,10 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
         if (index != NULL) {
             bind_loop_name(l, index, IR_I64, lower_temp(l, counter));
         }
-        if (s->as.for_loop.by_pointer) {
+        /* A pattern reads its parts where the element stands. */
+        if (s->as.for_loop.pattern) {
+            bind_pattern(l, s, at);
+        } else if (s->as.for_loop.by_pointer) {
             bind_loop_name(l, sym, IR_PTR, at);
         } else if (lower_is_aggregate(sym->type)) {
             ir_memcopy(l->f, l->b, lower_temp(l, sym->ir), at,
@@ -2333,7 +2378,8 @@ static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
     case STMT_FOR:
         /* The element of a `for` over an array or a slice is copied
            into a place of its own when it is an aggregate. */
-        sym = s->as.for_loop.name_count > 0
+        sym = s->as.for_loop.pattern ? s->as.for_loop.element
+              : s->as.for_loop.name_count > 0
                   ? s->as.for_loop
                         .names[s->as.for_loop.name_count - 1].symbol
                   : NULL;
@@ -2342,10 +2388,17 @@ static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
             sym->ir = ir_slot(l->f, entry, lower_vtype_of(l, sym->type));
         }
         /* The index of `for i, x in items` has a place of its own when a
-           closure captures it. */
-        for (j = 0; j + 1 < s->as.for_loop.name_count; j++) {
+           closure captures it. So has each name of a pattern, and one
+           that is an aggregate always. */
+        for (j = 0; j < s->as.for_loop.name_count; j++) {
             struct symbol *name = s->as.for_loop.names[j].symbol;
-            if (name != NULL && name->address_taken) {
+            if (name == NULL || name == sym ||
+                (j + 1 == s->as.for_loop.name_count &&
+                 !s->as.for_loop.pattern)) {
+                continue;
+            }
+            if (name->address_taken ||
+                (s->as.for_loop.pattern && lower_is_aggregate(name->type))) {
                 name->ir = ir_slot(l->f, entry,
                                    lower_vtype_of(l, name->type));
             }
