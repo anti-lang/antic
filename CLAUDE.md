@@ -249,7 +249,8 @@ included. Round five, generics and collections, stands in the same document.
 Its first nine parts, the syntax of generics, the constraints, the
 compiled copies, the generics of library files and of C, what can be
 generic, the other features with generics, the optional values, ownership
-at a call and lending, are built, and none of the rest.
+at a call and lending, are built. So are the language part of walking a
+collection and hashing and order, and none of the rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -536,6 +537,16 @@ reports what it finished.
   generic workers compile for the module's own source, and a library file
   carries neither of the first two yet. See "Generics and collections" in
   `docs/decisions.md` and `docs/notes/generics.md`.
+- Hashing and order are built. `operator fn hash(self) -> u64` is a hook,
+  `x.hash()` gives a `u64` on every type, a struct, a tuple, a variant, a
+  `?T`, an array and a slice take the default over their parts in order,
+  and a class takes the `hash` of `Object` and replaces it with `concrete
+  fn hash`. `lower_hash.c` writes the default, and `src/rt/hash.h` holds
+  the constants antic and the runtime share. `anti.lang` ships
+  `constraint Ordered = eq + lt;`, and the runtime chooses the seed of the
+  hashing collections at start, `lang.hash_seed()` gives it and
+  `--anti.hash_seed` fixes it. See "Generics and collections" in
+  `docs/decisions.md` and `docs/notes/hashing.md`.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
   See "Small things" in `docs/decisions.md`.
@@ -605,7 +616,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 65. See "The doc
+  class body and the `worker` mark, and its format version is 66. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
