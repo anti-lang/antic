@@ -80,3 +80,20 @@ No compiler warning on the host, ASan and UBSan trees. The linker note about
 `t-asan-final2.log` and `t-ubsan-final2.log`. The docs-style checker reports
 nothing on every file touched but `tests/CMakeLists.txt`, which it reads as
 prose and has always failed on.
+
+## Proof of the push
+
+Taken after the push of the code and the report.
+
+```text
+$ git log --oneline -3
+d2192ef Report the generics of library files and of C
+0429dc6 Record the generics of library files and of C
+da5e5b6 Use a generic of a library, offer a copy to C, and document generics
+$ git status --short
+$ git rev-parse HEAD origin/main
+d2192ef901074f44224db7f11b1891ca1b840061
+d2192ef901074f44224db7f11b1891ca1b840061
+```
+
+Suites: host 1006 of 1006, ASan 1005 of 1005, UBSan 1005 of 1005.
