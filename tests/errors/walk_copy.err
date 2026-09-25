@@ -1,0 +1,8 @@
+walk_copy.anti:49:3: error: `p` is a copy of each element of `points`. Walk with `&points` to change the elements
+walk_copy.anti:56:3: error: `p` is a copy of each element of `points`. Walk with `&points` to change the elements
+walk_copy.anti:64:3: error: `v` is a copy of each element of `values`. Walk with `&values` to change the elements
+walk_copy.anti:71:3: error: `s` is a copy of each element of `segments`. Walk with `&segments` to change the elements
+walk_copy.anti:72:3: error: `s` is a copy of each element of `segments`. Walk with `&segments` to change the elements
+walk_copy.anti:80:3: error: `age` is a copy of each element of `ages`. Walk with `&ages` to change the elements
+walk_copy.anti:87:3: error: `i` is the variable of a `for` and is read-only
+walk_copy.anti:95:3: error: `p` is the variable of a `for` and is read-only

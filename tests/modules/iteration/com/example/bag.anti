@@ -1,5 +1,9 @@
-//! A public collection with the language hooks and its iterator. Another module
-//! walks, indexes and collects them through the library file alone.
+//! Two public collections with the language hooks and their iterators. Another
+//! module walks, indexes and collects them through the library file alone.
+//! `Shelf` lends its elements and counts its changes, and its iterator keeps
+//! the `Watch` of them.
+
+import anti.lang;
 
 pub class Bag
 {
@@ -42,5 +46,57 @@ pub class BagIter
 	operator fn value(self) -> int
 	{
 		return self.bag.items[self.at];
+	}
+}
+
+/// A collection that lends its elements through its iterator.
+pub class Shelf
+{
+	pub items: [4]int = [0; 4],
+	pub count: int = 0,
+	changes: lang.Changes = lang.Changes {
+		count: 0,
+		at: lang.SourceLocation {
+			file: "", line: 0, column: 0, function: "",
+			module: ""
+		},
+	},
+
+	pub fn add(self, n: int, at: lang.SourceLocation = here)
+	{
+		self.items[self.count] = n;
+		self.count = self.count + 1;
+		self.changes.count += 1;
+		self.changes.at = at;
+	}
+
+	operator fn iter(self) -> ShelfIter
+	{
+		return ShelfIter {
+			shelf: self,
+			at: -1,
+			watch: lang.Watch {
+				changes: &self.changes,
+				count: self.changes.count
+			},
+		};
+	}
+}
+
+pub class ShelfIter
+{
+	pub shelf: *Shelf,
+	pub at: int,
+	pub watch: lang.Watch,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < self.shelf.count;
+	}
+
+	operator fn value(self) -> lent *int
+	{
+		return &self.shelf.items[self.at];
 	}
 }

@@ -58,6 +58,13 @@ enum anti_check {
 void anti_rt_check_failed(const unsigned char *text, int64_t length,
                           int32_t kind, int64_t a, int64_t b);
 
+/* Print the text of a walk whose collection changed, which names the
+   loop and the collection. Then print the file and the line of the last
+   change when the collection recorded one, and abort. */
+void anti_rt_walk_changed(const unsigned char *text, int64_t length,
+                          const unsigned char *file, int64_t file_length,
+                          int64_t line);
+
 /* Print the name of the class a checked cast wanted and abort. The name
    is not a C string, so its length comes with it. */
 void anti_rt_cast_failed(const unsigned char *name, int64_t length);

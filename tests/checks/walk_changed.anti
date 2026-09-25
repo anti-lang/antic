@@ -1,0 +1,74 @@
+//! A collection that grows while a `for` walks it. The collection counts its
+//! changes in an `anti.lang.Changes`, and its iterator watches them with an
+//! `anti.lang.Watch`. The loop of a dev build stops at the next turn and names
+//! the collection, the loop and the change.
+
+import anti.lang;
+
+class Bag
+{
+	pub items: [8]int = [0; 8],
+	pub count: int = 0,
+	changes: lang.Changes = lang.Changes {
+		count: 0,
+		at: lang.SourceLocation {
+			file: "", line: 0, column: 0, function: "",
+			module: ""
+		},
+	},
+
+	pub fn push(self, n: int, at: lang.SourceLocation = here)
+	{
+		self.items[self.count] = n;
+		self.count += 1;
+		self.changes.count += 1;
+		self.changes.at = at;
+	}
+
+	operator fn iter(self) -> BagIter
+	{
+		return BagIter {
+			of: self,
+			at: -1,
+			watch: lang.Watch {
+				changes: &self.changes,
+				count: self.changes.count
+			},
+		};
+	}
+}
+
+class BagIter
+{
+	pub of: *Bag,
+	pub at: int,
+	pub watch: lang.Watch,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.of.count;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.of.items[self.at];
+	}
+}
+
+fn main() -> int
+{
+	let bag = Bag { };
+	bag.push(1);
+	bag.push(2);
+	let sum = 0;
+	for n in bag {
+		sum += n;
+	}
+	for n in bag {
+		if n == 2 {
+			bag.push(3);
+		}
+	}
+	return 7;
+}

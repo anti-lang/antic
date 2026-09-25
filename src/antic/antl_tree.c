@@ -774,6 +774,11 @@ static void io_iteration(struct io *io, struct iteration *it)
     io_expr(io, &it->start);
     io_expr(io, &it->advance);
     io_expr(io, &it->current);
+    io_expr(io, &it->place);
+    io_expr(io, &it->changed);
+    io_expr(io, &it->change_file);
+    io_expr(io, &it->change_file_length);
+    io_expr(io, &it->change_line);
 }
 
 /* Records */
@@ -819,6 +824,8 @@ static void io_sym_body(struct io *io, struct symbol *s)
     IO_ENUM(io, s->state, EVAL_DONE);
     io_bool(io, &s->address_taken);
     io_bool(io, &s->read_only);
+    io_name(io, &s->copy_of);
+    io_bool(io, &s->lent_turn);
     io_bool(io, &s->worker);
     io_bool(io, &s->may_fail);
     io_bool(io, &s->caught);
@@ -874,6 +881,8 @@ static void io_item_body(struct io *io, struct item *it)
     io_pos(io, &it->name_pos);
     io_params(io, &it->params, &it->param_count);
     io_typex(io, &it->result);
+    io_bool(io, &it->result_lent);
+    io_pos(io, &it->result_lent_pos);
     io_bool(io, &it->may_fail);
     io_pos(io, &it->may_fail_pos);
     io_bool(io, &it->worker);
@@ -1216,6 +1225,7 @@ static void io_stmt_body(struct io *io, struct stmt *s)
         io_pos(io, &s->as.for_loop.step_pos);
         io_i64(io, &s->as.for_loop.step_value);
         io_bool(io, &s->as.for_loop.by_pointer);
+        io_text(io, &s->as.for_loop.over_text);
         io_block(io, &s->as.for_loop.body);
         io_iteration(io, &s->as.for_loop.hooks);
         break;
@@ -1760,6 +1770,7 @@ static void io_root(struct io *io, struct item *fn)
     io_bool(io, &fn->has_self);
     io_sym(io, &fn->self);
     io_typex(io, &fn->result);
+    io_bool(io, &fn->result_lent);
     io_block(io, &fn->body);
     io_bool(io, &fn->trace);
     io_pos(io, &fn->may_fail_pos);

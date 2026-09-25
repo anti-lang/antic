@@ -859,6 +859,11 @@ static void xiter(struct clone *cl, struct iteration *n,
     n->start = xe(cl, it->start);
     n->advance = xe(cl, it->advance);
     n->current = xe(cl, it->current);
+    n->place = xe(cl, it->place);
+    n->changed = xe(cl, it->changed);
+    n->change_file = xe(cl, it->change_file);
+    n->change_file_length = xe(cl, it->change_file_length);
+    n->change_line = xe(cl, it->change_line);
 }
 
 static struct binding *xbind(struct clone *cl, struct binding *list,
@@ -1314,6 +1319,11 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
             redirect(cl, n->as.for_loop.hooks.start);
             redirect(cl, n->as.for_loop.hooks.advance);
             redirect(cl, n->as.for_loop.hooks.current);
+            redirect(cl, n->as.for_loop.hooks.place);
+            redirect(cl, n->as.for_loop.hooks.changed);
+            redirect(cl, n->as.for_loop.hooks.change_file);
+            redirect(cl, n->as.for_loop.hooks.change_file_length);
+            redirect(cl, n->as.for_loop.hooks.change_line);
             map_add(cl, over->type->walked, element);
         } else {
             xiter(cl, &n->as.for_loop.hooks, &s->as.for_loop.hooks);

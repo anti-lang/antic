@@ -25,7 +25,7 @@ endfunction()
 # One check: the release build carries no text of it and runs to its end,
 # and the dev build prints the failure and aborts. A program whose
 # operation traps by itself without the check is built in release mode
-# and not run.
+# and not run. Further arguments are objects that the dev build links.
 function(check name phrase pattern runs)
     set(source "${SOURCES}/${name}.anti")
     build("${name}.release" "${source}")
@@ -42,7 +42,7 @@ function(check name phrase pattern runs)
                                 "${code}, expected 7\n${out}${err}")
         endif()
     endif()
-    build("${name}.dev" "${source}" --dev)
+    build("${name}.dev" "${source}" --dev ${ARGN})
     execute_process(COMMAND "${WORK}/${name}.dev" RESULT_VARIABLE code
                     OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
     if(code EQUAL 7)
@@ -91,6 +91,19 @@ check(shift_wide "shift count out of range"
       "shift_wide\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64" ON)
 check(shift_negative "shift count out of range"
       "shift_negative\\.anti:[0-9]+: shift count out of range for >>: count -1, width 64" ON)
+# A walk of a collection that changes. The program imports anti.lang, and
+# no tool builds the dev objects of the standard library yet, so the test
+# builds that one.
+execute_process(COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}"
+                        --runtime "${RUNTIME}" -o "${WORK}/anti_lang_dev"
+                        "${RUNTIME}/std/anti/lang.antl"
+                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "antic --dev of anti.lang failed\n${err}")
+endif()
+check(walk_changed "was changed while"
+      "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
+      ON "${WORK}/anti_lang_dev.o")
 
 # --checks puts them into a release build, and --no-checks takes them out
 # of a dev build. Both override the mode.

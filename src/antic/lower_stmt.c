@@ -359,6 +359,50 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
 
 static bool local_needs_teardown(const struct type *t);
 
+/* DESIGN: the check of a walk over a collection that counts its changes.
+   The test of every turn compares the two counts before it calls `next`.
+   A change in the body then stops the program before the iterator reads
+   the collection again. The text names the loop and the collection. The
+   failure block reads the place of the last change, and the runtime
+   adds it. A build without the checks cuts the branch, and the
+   ordinary passes remove the block, the call and the text. */
+static void walk_check(struct lowerer *l, const struct stmt *s)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_PTR, IR_I64,
+                                          IR_I64};
+    const struct iteration *it = &s->as.for_loop.hooks;
+    struct token_text text;
+    struct text message = {0};
+    const struct ir_global *global;
+    struct ir_operand changed = lower_expr(l, it->changed);
+    struct ir_block *fail = lower_new_block(l);
+    struct ir_block *rest = lower_new_block(l);
+    struct ir_operand args[5];
+
+    text_appendf(&message, "%s:%d: `%.*s` was changed while `for` walked it",
+                 l->file, s->pos.line,
+                 (int)s->as.for_loop.over_text.length,
+                 s->as.for_loop.over_text.bytes);
+    text.bytes = text_cstr(&message);
+    text.length = message.length;
+    global = lower_literal_global(l, &text);
+    text_free(&message);
+    fail->fail = IR_FAIL_CHECK;
+    ir_branch(l->f, l->b, changed, fail, rest);
+    l->b = fail;
+    args[0] = lower_temp(l, ir_addr(l->f, l->b, ir_global_op(global)));
+    args[1] = ir_int_op(IR_I64, global->size - 1);
+    args[2] = lower_expr(l, it->change_file);
+    args[3] = lower_expr(l, it->change_file_length);
+    args[4] = lower_expr(l, it->change_line);
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(lower_rt_function(l, "anti_rt_walk_changed", params,
+                                         5)),
+            args, 5);
+    ir_jump(l->f, l->b, rest);
+    l->b = rest;
+}
+
 /* DESIGN: `for x in e` over a collection or an iterator is the loop of
    its `while` form. It binds the iterator once, calls `next` in the test
    and `value` at the head of the body, and `continue` goes to the test.
@@ -369,6 +413,9 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
 {
     const struct iteration *it = &s->as.for_loop.hooks;
     struct symbol *sym = s->as.for_loop.names[0].symbol;
+    /* `for x in &e` binds the lent pointer, and `for x in e` the copy. */
+    const struct expr *current =
+        s->as.for_loop.by_pointer ? it->place : it->current;
     struct ir_block *test = lower_new_block(l);
     struct ir_block *body = lower_new_block(l);
     struct ir_block *exit = lower_new_block(l);
@@ -390,6 +437,9 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     l->loop_depth++;
     ir_jump(l->f, l->b, test);
     l->b = test;
+    if (it->changed != NULL) {
+        walk_check(l, s);
+    }
     lower_branch(l, it->advance, body, exit);
     l->loop = &loop;
     l->b = body;
@@ -397,11 +447,11 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     pass.outer = l->defers;
     l->defers = &pass;
     if (lower_is_aggregate(sym->type)) {
-        lower_build_into(l, it->current, lower_temp(l, sym->ir));
+        lower_build_into(l, current, lower_temp(l, sym->ir));
     } else {
         /* The call may end the block it starts in, so the value is
            bound in the block that follows it. */
-        struct ir_operand v = lower_expr(l, it->current);
+        struct ir_operand v = lower_expr(l, current);
         if (sym->address_taken) {
             ir_store(l->f, l->b, lower_ir_type_of(sym->type), v,
                      lower_temp(l, sym->ir));
@@ -410,7 +460,9 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
                                lower_ir_type_of(sym->type), v);
         }
     }
-    if (local_needs_teardown(sym->type)) {
+    /* A copy of an element that the iterator lends belongs to the
+       collection, as the copy of a slice element does. */
+    if (it->place == NULL && local_needs_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
     lower_block(l, s->as.for_loop.body);

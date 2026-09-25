@@ -99,6 +99,11 @@ struct symbol {
     enum eval_state state;          /* SYMBOL_CONST */
     bool address_taken;             /* SYMBOL_LOCAL, SYMBOL_PARAM */
     bool read_only;                 /* the variable of a `for` */
+    /* Set for `for x in e`. The variable is a copy of each element of
+       e, and this holds the source of e. Empty for every other one. */
+    struct name copy_of;
+    /* The variable of `for x in &e`, lent for one turn of the loop. */
+    bool lent_turn;
     bool variadic;                  /* SYMBOL_EXTERN_FN */
     bool worker;                    /* SYMBOL_FN written `worker fn` */
     bool may_fail;                  /* SYMBOL_FN written `may fail` */

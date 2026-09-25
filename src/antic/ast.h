@@ -225,6 +225,19 @@ struct iteration {
     struct expr *start;
     struct expr *advance;
     struct expr *current;
+    /* The call of `value` where it gives a `lent` pointer, which
+       `for x in &e` binds. current is then the copy it points at. NULL
+       for every other `value`. */
+    struct expr *place;
+    /* DESIGN: the check of the changes of a collection, where the
+       iterator holds an `anti.lang.Watch`. changed compares the count of
+       the collection with the count the watch remembers. The three
+       others give the file and the line of the last change. All four
+       are NULL for an iterator without a watch. */
+    struct expr *changed;
+    struct expr *change_file;
+    struct expr *change_file_length;
+    struct expr *change_line;
 };
 
 struct expr {
@@ -626,6 +639,8 @@ struct stmt {
             struct pos step_pos;
             int64_t step_value;         /* the folded `by k`, or 1 */
             bool by_pointer;
+            /* The source of over, which the messages of a walk name. */
+            struct token_text over_text;
             struct block *body;
             /* Set by the checker where e is a collection or an
                iterator. cursor is NULL for a range, a slice and an
@@ -837,6 +852,10 @@ struct item {
     bool variadic;                  /* ITEM_EXTERN_FN */
     bool worker;                    /* ITEM_FN, may run on a worker */
     struct type_expr *result;       /* NULL without a result */
+    /* `-> lent *T`: the result is a pointer valid for one turn of a
+       loop. The checker gives it to `operator fn value` alone. */
+    bool result_lent;
+    struct pos result_lent_pos;
     /* `may fail` after the signature. The ABI is then `?*Error f(args,
        R *out)`, with `out` absent without a result. */
     bool may_fail;

@@ -394,6 +394,25 @@ static void fn_param_marks(struct parser *p, bool *keep, bool *concurrent,
     }
 }
 
+/* `-> R` after the parameters of the function it, where R may be written
+   `lent *T` or `lent ?*T`. It reports false after an error. `lent` is a
+   contextual word, and no type name is followed by `*` or `?`. */
+static bool result_type(struct parser *p, struct item *it)
+{
+    if (!accept(p, TOKEN_ARROW)) {
+        return true;
+    }
+    if (is_word(p, peek(p), "lent") &&
+        (peek_at(p, 1)->kind == TOKEN_STAR ||
+         peek_at(p, 1)->kind == TOKEN_QUESTION ||
+         peek_at(p, 1)->kind == TOKEN_QUESTION_STAR)) {
+        it->result_lent = true;
+        it->result_lent_pos = pos_of(peek(p));
+        next(p);
+    }
+    return (it->result = type(p)) != NULL;
+}
+
 /* `lent name`: the pointer the parameter takes is valid only during the
    call. `lent` is a contextual word, so a parameter may carry that name. */
 static bool lent_mark(struct parser *p)
@@ -1030,7 +1049,7 @@ static struct expr *anonymous_fn(struct parser *p, const struct token *at)
         return NULL;
     }
     it->params = list_finish(p, &list, &it->param_count);
-    if (accept(p, TOKEN_ARROW) && (it->result = type(p)) == NULL) {
+    if (!result_type(p, it)) {
         return NULL;
     }
     may_fail_after(p, it);
@@ -2274,6 +2293,7 @@ static struct stmt *statement_level(struct parser *p)
        names two, which is the destructuring of the `(int, T)` of each
        element. */
     case TOKEN_FOR: {
+        size_t from;
         /* DESIGN: the binding is optional over a range, because a loop
            that repeats a block needs no counter. A name and `in` open the
            bound form, and anything else is the range itself. */
@@ -2304,6 +2324,7 @@ static struct stmt *statement_level(struct parser *p)
             next(p);
         }
         p->no_struct_literal = true;
+        from = peek_at(p, check(p, TOKEN_AMP) ? 1 : 0)->offset;
         if (accept(p, TOKEN_AMP)) {
             s->as.for_loop.by_pointer = true;
             s->as.for_loop.over = expression(p);
@@ -2313,6 +2334,14 @@ static struct stmt *statement_level(struct parser *p)
         } else {
             s->as.for_loop.over = s->as.for_loop.low;
             s->as.for_loop.low = NULL;
+        }
+        /* The source of the walked expression, which the refusal of a
+           change to a copy and the trap of a dev build name. */
+        if (s->as.for_loop.over != NULL) {
+            size_t to = p->all[p->origin[p->pos - 1]].offset +
+                        p->all[p->origin[p->pos - 1]].length;
+            s->as.for_loop.over_text.bytes = p->source + from;
+            s->as.for_loop.over_text.length = to > from ? to - from : 0;
         }
         /* `by k` steps a range. It is the contextual word that `parallel`
            uses for its chunk count. */
@@ -2978,7 +3007,7 @@ static struct item *member_level(struct parser *p, const struct item *owner)
     m->params = params(p, false, &m->variadic, &m->has_self,
                        &m->param_count);
     if (p->panic ||
-        (accept(p, TOKEN_ARROW) && (m->result = type(p)) == NULL)) {
+        !result_type(p, m)) {
         return NULL;
     }
     may_fail_after(p, m);
@@ -3636,7 +3665,7 @@ static struct item *item_level(struct parser *p)
         it->params = params(p, false, &it->variadic, NULL,
                             &it->param_count);
         if (p->panic ||
-            (accept(p, TOKEN_ARROW) && (it->result = type(p)) == NULL)) {
+            !result_type(p, it)) {
             return NULL;
         }
         may_fail_after(p, it);
@@ -3654,7 +3683,7 @@ static struct item *item_level(struct parser *p)
         it->params = params(p, true, &it->variadic, NULL,
                             &it->param_count);
         if (p->panic ||
-            (accept(p, TOKEN_ARROW) && (it->result = type(p)) == NULL)) {
+            !result_type(p, it)) {
             return NULL;
         }
         /* A binding declares what C declares, and C has no error

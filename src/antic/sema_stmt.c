@@ -765,9 +765,77 @@ static void check_closure_lifetime(struct checker *c, const struct expr *target,
     }
 }
 
+/* Mark sym, the element variable of the `for` s over a sequence. It is
+   a copy of each element in the form `for x in e`. It is lent for one
+   turn in the form `for x in &e`. */
+static void mark_walked(const struct stmt *s, struct symbol *sym)
+{
+    if (sym == NULL || s->as.for_loop.over == NULL) {
+        return;
+    }
+    if (s->as.for_loop.by_pointer) {
+        sym->lent_turn = true;
+        return;
+    }
+    sym->copy_of.text = s->as.for_loop.over_text.bytes;
+    sym->copy_of.length = s->as.for_loop.over_text.length;
+}
+
+/* DESIGN: the variable of `for x in e` is a copy of each element, so a
+   change reaches the element only through a pointer the copy holds. This
+   gives the variable whose copy alone the place target would change. The
+   place is the variable itself, or a field, an element of an array or an
+   element of a tuple held inline in it. NULL where the path passes a
+   pointer or a slice, whose change reaches what they point at. A call of
+   a function on the copy is not refused, since no signature says whether
+   it changes `self`. */
+static struct symbol *walked_copy(const struct expr *target)
+{
+    for (;;) {
+        const struct expr *base;
+        if (target->kind == EXPR_NAME) {
+            return target->symbol != NULL &&
+                           target->symbol->copy_of.length > 0
+                       ? target->symbol
+                       : NULL;
+        }
+        if (target->kind == EXPR_FIELD) {
+            base = target->as.field.base;
+        } else if (target->kind == EXPR_INDEX) {
+            base = target->as.index.base;
+            if (base->type == NULL || base->type->kind != TYPE_ARRAY) {
+                return NULL;
+            }
+        } else {
+            return NULL;
+        }
+        if (base->type == NULL || base->type->kind == TYPE_POINTER) {
+            return NULL;
+        }
+        target = base;
+    }
+}
+
+/* Refuse a change of the variable sym of a `for` at pos. */
+static void refuse_read_only(struct checker *c, struct pos pos,
+                             const struct symbol *sym)
+{
+    if (sym->copy_of.length > 0) {
+        sema_error_at(c, pos, "`%.*s` is a copy of each element of `%.*s`. "
+                      "Walk with `&%.*s` to change the elements",
+                      (int)sym->name.length, sym->name.text,
+                      (int)sym->copy_of.length, sym->copy_of.text,
+                      (int)sym->copy_of.length, sym->copy_of.text);
+        return;
+    }
+    sema_error_at(c, pos, "`%.*s` is the variable of a `for` and is read-only",
+                  (int)sym->name.length, sym->name.text);
+}
+
 static void check_assign(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
+    struct symbol *copy;
     struct type *t;
     struct type *v;
     enum token_kind op = s->as.assign.op;
@@ -808,13 +876,14 @@ static void check_assign(struct checker *c, struct stmt *s)
         return;
     }
     /* The variable of a `for` is read-only, so the loop keeps its step
-       and the sequence it walks. */
-    if (target->kind == EXPR_NAME && target->symbol != NULL &&
-        target->symbol->read_only) {
-        sema_error_at(c, target->pos,
-                      "`%.*s` is the variable of a `for` and is "
-                      "read-only", (int)target->as.name.length,
-                      target->as.name.text);
+       and the sequence it walks. A change that reaches the copy of an
+       element alone is refused with it. */
+    copy = walked_copy(target);
+    if (copy != NULL || (target->kind == EXPR_NAME &&
+                         target->symbol != NULL &&
+                         target->symbol->read_only)) {
+        refuse_read_only(c, target->pos,
+                         copy != NULL ? copy : target->symbol);
         sema_check_expr(c, s->as.assign.value, NULL);
         return;
     }
@@ -1354,10 +1423,7 @@ static void check_flags_let(struct checker *c, struct stmt *s, struct type *t)
         (sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
         sym->type == flags) {
         if (sym->read_only) {
-            sema_error_at(c, names[1].pos,
-                          "`%.*s` is the variable of a `for` and "
-                          "is read-only", (int)names[1].name.length,
-                          names[1].name.text);
+            refuse_read_only(c, names[1].pos, sym);
         }
         names[1].symbol = sym;
         names[1].assigns = true;
@@ -1408,10 +1474,7 @@ static void check_flags_assign(struct checker *c, struct stmt *s)
             return;
         }
         if (sym->read_only) {
-            sema_error_at(c, name->pos,
-                          "`%.*s` is the variable of a `for` and is "
-                          "read-only", (int)name->as.name.length,
-                          name->as.name.text);
+            refuse_read_only(c, name->pos, sym);
             return;
         }
         name->symbol = sym;
@@ -1892,11 +1955,23 @@ static void check_stmt(struct checker *c, struct stmt *s)
                                   "collection or an iterator, found `%s`",
                                   sema_tn(over));
                     element = sema_builtin(c, TYPE_ERROR);
+                } else if (s->as.for_loop.by_pointer &&
+                           s->as.for_loop.hooks.place != NULL) {
+                    element = s->as.for_loop.hooks.place->type;
                 } else if (s->as.for_loop.by_pointer) {
-                    sema_error_at(c, s->as.for_loop.over->pos,
-                                  "`for x in &e` walks a slice or an array, "
-                                  "and a collection gives its elements by "
-                                  "`value`");
+                    const struct symbol *cursor = s->as.for_loop.hooks.cursor;
+                    const struct type *walker =
+                        cursor != NULL ? cursor->type : over;
+                    if (walker->kind == TYPE_POINTER) {
+                        walker = walker->element;
+                    }
+                    if (!sema_is_error(element)) {
+                        sema_error_at(c, s->as.for_loop.over->pos,
+                                      "`for x in &e` takes each element in "
+                                      "place, and the `operator fn value` of "
+                                      "`%s` gives a copy of `%s`",
+                                      sema_tn(walker), sema_tn(element));
+                    }
                     element = sema_builtin(c, TYPE_ERROR);
                 } else if (types_is_match(element) &&
                            s->as.for_loop.over->kind == EXPR_CALL &&
@@ -1909,7 +1984,8 @@ static void check_stmt(struct checker *c, struct stmt *s)
             } else if (!sema_is_error(over)) {
                 element = over->element;
                 if (s->as.for_loop.by_pointer) {
-                    element = types_pointer(c->types, element);
+                    element = types_lent(c->types,
+                                         types_pointer(c->types, element));
                 }
             } else {
                 element = over;
@@ -1957,6 +2033,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
                               ? element
                               : types_tuple(c->types, pair, 2),
                           s->pos, true);
+            mark_walked(s, s->as.for_loop.names[names - 1].symbol);
         } else if (names == 1) {
             loop_var = sema_declare(c, SYMBOL_LOCAL,
                                     &s->as.for_loop.names[0].name,
@@ -1966,6 +2043,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
                 loop_var->type = element;
                 loop_var->read_only = true;
                 s->as.for_loop.names[0].symbol = loop_var;
+                mark_walked(s, loop_var);
             }
         }
         c->loop_depth++;

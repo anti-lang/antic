@@ -1,4 +1,5 @@
-//! A program that walks, indexes and collects a collection of another module.
+//! A program that walks, indexes and collects the collections of another
+//! module, and changes the elements of one in place.
 
 import com.example.bag;
 
@@ -22,5 +23,16 @@ fn main() -> int
 	let all = b.iter().to_slice();
 	printf("all %d %d\n".ptr, all.len as c_int, all[0] as c_int);
 	free(all.ptr);
+	let s = bag.Shelf { };
+	s.add(1);
+	s.add(2);
+	for x in &s {
+		*x = *x * 10;
+	}
+	let kept = 0;
+	for x in s {
+		kept += x;
+	}
+	printf("shelf %d\n".ptr, kept as c_int);
 	return 0;
 }

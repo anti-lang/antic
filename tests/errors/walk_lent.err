@@ -1,0 +1,5 @@
+walk_lent.anti:70:34: error: `lent` stands before the result of `operator fn value` alone
+walk_lent.anti:45:12: error: `v` is lent for one turn of the loop and cannot be stored
+walk_lent.anti:52:10: error: `v` is lent for one turn of the loop and cannot be returned
+walk_lent.anti:60:9: error: `v` is lent for one turn of the loop and passes on to a `lent` parameter alone
+walk_lent.anti:66:12: error: `for x in &e` takes each element in place, and the `operator fn value` of `NumbersIter` gives a copy of `int`

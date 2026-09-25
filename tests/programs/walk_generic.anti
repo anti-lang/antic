@@ -1,0 +1,98 @@
+//! A generic collection whose iterator lends its elements and watches the
+//! changes of the collection. Every copy walks in both forms, and generic
+//! functions walk a copy by value and in place.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Stack<T>
+{
+	pub items: [4]T,
+	pub count: int = 0,
+	changes: lang.Changes = lang.Changes {
+		count: 0,
+		at: lang.SourceLocation {
+			file: "", line: 0, column: 0, function: "",
+			module: ""
+		},
+	},
+
+	pub fn push(self, v: T, at: lang.SourceLocation = here)
+	{
+		self.items[self.count] = v;
+		self.count += 1;
+		self.changes.count += 1;
+		self.changes.at = at;
+	}
+
+	operator fn iter(self) -> StackIter<T>
+	{
+		return StackIter<T> {
+			of: self,
+			at: -1,
+			watch: lang.Watch {
+				changes: &self.changes,
+				count: self.changes.count
+			},
+		};
+	}
+}
+
+class StackIter<T>
+{
+	pub of: *Stack<T>,
+	pub at: int,
+	pub watch: lang.Watch,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.of.count;
+	}
+
+	operator fn value(self) -> lent *T
+	{
+		return &self.of.items[self.at];
+	}
+}
+
+fn count_of<T>(s: *Stack<T>) -> int
+{
+	let n = 0;
+	for x in s {
+		n += 1;
+	}
+	return n;
+}
+
+fn fill<T>(s: *Stack<T>, v: T)
+{
+	for x in &s {
+		*x = v;
+	}
+}
+
+fn main() -> int
+{
+	let a = Stack<int> { items: [0; 4] };
+	a.push(1);
+	a.push(2);
+	a.push(3);
+	for x in &a {
+		*x += 1;
+	}
+	let total = 0;
+	for x in a {
+		total += x;
+	}
+	printf("int %d %d\n".ptr, total as c_int, count_of(&a) as c_int);
+	let b = Stack<float> { items: [0.0; 4] };
+	b.push(1.5);
+	b.push(0.5);
+	fill(&b, 2.5);
+	for x in b {
+		printf("float %.1f\n".ptr, x);
+	}
+	return 0;
+}

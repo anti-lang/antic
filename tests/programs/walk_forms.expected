@@ -1,0 +1,8 @@
+exit 0
+slice 39
+indexed 0 1 2
+doubled 36
+age 20
+age 22
+age 24
+copies 3 21, first 19

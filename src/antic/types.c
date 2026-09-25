@@ -1010,6 +1010,11 @@ bool types_is_field_descriptor(const struct type *t)
     return lang_item(t, TYPE_STRUCT, LANG_FIELD_DESCRIPTOR);
 }
 
+bool types_is_watch(const struct type *t)
+{
+    return lang_item(t, TYPE_STRUCT, LANG_WATCH);
+}
+
 bool types_is_flags(const struct type *t)
 {
     return lang_item(t, TYPE_STRUCT, LANG_FLAGS) && t->result == NULL;

@@ -494,6 +494,17 @@ struct type *types_object(struct types *types);
    a `Match` in the same order, and `all`, `pre`, `post` and its groups are
    `[]byte` slices of the searched data. */
 #define LANG_BYTE_MATCH "ByteMatch"
+/* DESIGN: `Changes` and `Watch` are the structs of `anti.lang` through
+   which a collection counts its changes and its iterator watches them.
+   `src/std/anti/lang.anti` declares both. A `for` over an iterator with
+   a field of type `Watch` compares `changes.count` with `count` before
+   every turn, and a dev build stops the program when they differ, at the
+   `at` of the last change. */
+#define LANG_WATCH "Watch"
+#define WATCH_CHANGES "changes"
+#define WATCH_COUNT "count"
+#define CHANGES_COUNT "count"
+#define CHANGES_AT "at"
 #define MATCH_PATTERN "(pattern)"
 #define MATCH_ALL "all"
 #define MATCH_PRE "pre"
@@ -635,6 +646,7 @@ bool types_is_flags(const struct type *t);
 struct type *types_field_descriptor(struct types *types);
 /* Whether t is the struct that types_field_descriptor made. */
 bool types_is_field_descriptor(const struct type *t);
+bool types_is_watch(const struct type *t);
 /* The struct `anti.lang.Mutex`, one for the compilation. */
 struct type *types_mutex(struct types *types);
 struct type *types_object_lock(struct types *types);

@@ -32,3 +32,18 @@ void anti_rt_check_failed(const unsigned char *text, int64_t length,
                            (long long)a, (long long)b);
     }
 }
+
+/* DESIGN: a collection records the place of each change with `here`, and
+   the loop that finds the counts apart passes the last one on. A place of
+   line 0 was never written, and the message then names the loop alone. */
+void anti_rt_walk_changed(const unsigned char *text, int64_t length,
+                          const unsigned char *file, int64_t file_length,
+                          int64_t line)
+{
+    if (line == 0) {
+        anti_rt_fail_abort("%.*s", (int)length, (const char *)text);
+    }
+    anti_rt_fail_abort("%.*s: changed at %.*s:%lld", (int)length,
+                       (const char *)text, (int)file_length,
+                       (const char *)file, (long long)line);
+}

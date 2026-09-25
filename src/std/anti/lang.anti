@@ -42,6 +42,31 @@ pub struct SourceLocation
 	module: str,
 }
 
+/// The changes of the size of a collection: how many there were, and where the
+/// last one stood.
+///
+/// A collection holds one, adds 1 to `count` on every change of its size and
+/// writes the `here` of the caller into `at`. Its iterator watches it with a
+/// `Watch`.
+pub struct Changes
+{
+	count: int,
+	at: SourceLocation,
+}
+
+/// An iterator's view of the changes of the collection it walks: the changes
+/// and their count when the walk began.
+///
+/// A `for` over an iterator with a field of this type compares the two counts
+/// before every turn. A dev build stops the program when they differ and names
+/// the collection, the loop and the last change. A release build carries no
+/// check.
+pub struct Watch
+{
+	changes: *Changes,
+	count: int,
+}
+
 /// One return address of a trace, as the capture took it.
 ///
 /// `module` is the path of the executable or the library the address lies in,

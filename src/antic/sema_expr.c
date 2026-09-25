@@ -396,7 +396,11 @@ static void refuse_lent(struct checker *c, const struct expr *e)
         [LENT_RETURNED] = "cannot be returned",
         [LENT_PASSED] = "passes on to a `lent` parameter alone",
     };
-    if (e->kind == EXPR_NAME) {
+    if (e->kind == EXPR_NAME && e->symbol != NULL && e->symbol->lent_turn) {
+        sema_error_at(c, e->pos, "`%.*s` is lent for one turn of the loop "
+                      "and %s", (int)e->as.name.length, e->as.name.text,
+                      uses[c->lent_use]);
+    } else if (e->kind == EXPR_NAME) {
         sema_error_at(c, e->pos, "`%.*s` is lent for the call and %s",
                       (int)e->as.name.length, e->as.name.text,
                       uses[c->lent_use]);
@@ -1056,6 +1060,87 @@ static struct expr *cursor_call(struct checker *c, struct pos pos,
                           NULL, 0);
 }
 
+/* The field name of base, written by the checker, so the visibility of
+   the program does not apply. */
+static struct expr *watch_field(struct checker *c, struct expr *base,
+                                const struct name *name)
+{
+    struct expr *e = sema_new_node(c, EXPR_FIELD, base->pos);
+
+    e->as.field.base = base;
+    e->as.field.name = *name;
+    e->as.field.promoted = true;
+    return e;
+}
+
+static struct expr *watch_word(struct checker *c, struct expr *base,
+                               const char *text)
+{
+    struct name name;
+
+    name.text = text;
+    name.length = strlen(text);
+    return watch_field(c, base, &name);
+}
+
+/* `<iterator>.watch.changes.at`, or `<iterator>.watch` when at is false,
+   a new tree on every call. */
+static struct expr *watch_path(struct checker *c, struct pos pos,
+                               const struct struct_field *watch, bool at)
+{
+    struct expr *e = watch_field(c, format_word(c, pos, &hidden_iterator),
+                                 &watch->name);
+
+    return at ? watch_word(c, watch_word(c, e, WATCH_CHANGES), CHANGES_AT) : e;
+}
+
+/* DESIGN: an iterator watches the changes of its collection through its
+   first field of type `anti.lang.Watch`. The loop compares the count of
+   the changes with the count the watch remembers before every turn. It
+   reads the file and the line of the last change for the message. The
+   collection and the iterator hold the two counts, so the compiler
+   needs no name of a field of either. Fields of a base are not read. */
+static void watch_changes(struct checker *c, struct pos pos,
+                          struct iteration *it)
+{
+    struct type *s = sema_struct_of(it->cursor->type);
+    const struct struct_field *watch = NULL;
+    struct expr *e;
+    size_t i;
+
+    for (i = 0; s != NULL && i < s->field_count && watch == NULL; i++) {
+        if (s->fields[i].form == FIELD_PLAIN &&
+            types_is_watch(s->fields[i].type)) {
+            watch = &s->fields[i];
+        }
+    }
+    if (watch == NULL) {
+        return;
+    }
+    e = sema_new_node(c, EXPR_BINARY, pos);
+    e->as.binary.op = TOKEN_NE;
+    e->as.binary.left = watch_word(
+        c, watch_word(c, watch_path(c, pos, watch, false), WATCH_CHANGES),
+        CHANGES_COUNT);
+    e->as.binary.right =
+        watch_word(c, watch_path(c, pos, watch, false), WATCH_COUNT);
+    it->changed = e;
+    it->change_file = watch_word(
+        c, watch_word(c, watch_path(c, pos, watch, true), LANG_LOCATION_FILE),
+        "ptr");
+    it->change_file_length = watch_word(
+        c, watch_word(c, watch_path(c, pos, watch, true), LANG_LOCATION_FILE),
+        "len");
+    it->change_line =
+        watch_word(c, watch_path(c, pos, watch, true), LANG_LOCATION_LINE);
+    if (sema_is_error(sema_check_expr(c, it->changed, NULL)) ||
+        sema_is_error(sema_check_expr(c, it->change_file, NULL)) ||
+        sema_is_error(sema_check_expr(c, it->change_file_length, NULL)) ||
+        sema_is_error(sema_check_expr(c, it->change_line, NULL))) {
+        it->changed = NULL;
+    }
+}
+
 /* DESIGN: an iteration binds its iterator to a hidden local and calls
    `next` and `value` on that local by name, as the `while` form of the
    same loop does. A collection gives a new iterator from `iter`, so every
@@ -1110,6 +1195,20 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
         return true;
     }
     *element = sema_check_expr(c, it->current, NULL);
+    /* DESIGN: a `value` that gives a `lent` pointer gives each element in
+       place. `for x in &e` binds the pointer, and `for x in e` and
+       `to_slice` take a copy of what it points at, so one iterator serves
+       both forms of a walk. */
+    if (type_is_lent(*element)) {
+        struct expr *copy = sema_new_node(c, EXPR_UNARY, e->pos);
+        copy->as.unary.op = TOKEN_STAR;
+        copy->as.unary.operand = it->current;
+        copy->type = (*element)->element;
+        it->place = it->current;
+        it->current = copy;
+        *element = copy->type;
+    }
+    watch_changes(c, e->pos, it);
     return true;
 }
 

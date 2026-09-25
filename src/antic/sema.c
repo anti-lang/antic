@@ -1178,6 +1178,21 @@ static struct type *function_type_of(struct checker *c, struct item *it)
         refuses_half_value(c, it->result->pos, result, "a result")) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    /* DESIGN: `-> lent *T` is the result of `operator fn value` alone. It
+       lends an element of a collection for one turn of a loop, so that
+       `for x in &c` walks the elements in place and `for x in c` copies
+       each one. */
+    if (it->result_lent) {
+        if (!it->is_operator || !sema_name_is(&it->name, LANG_HOOK_VALUE)) {
+            sema_error_at(c, it->result_lent_pos, "`lent` stands before the "
+                          "result of `operator fn value` alone");
+        } else if (result->kind != TYPE_POINTER) {
+            sema_error_at(c, it->result_lent_pos, "`lent` marks a pointer "
+                          "result, and this one is `%s`", sema_tn(result));
+        } else {
+            result = types_lent(c->types, result);
+        }
+    }
     /* DESIGN: `construct` and `destruct` keep the forms the object model
        gives them. A `construct` with arguments that can fail is written
        `may fail` and names no result, so `-> ?*Error` written by hand is

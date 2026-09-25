@@ -1,0 +1,97 @@
+//! `for x in e` gives a copy of each element, and a change that would reach the
+//! copy alone is refused. A change through a pointer that the copy holds
+//! reaches the object it points at and stands, and so does every change through
+//! the pointer of `for x in &e`.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+struct Segment
+{
+	from: Point,
+	far: *Point,
+	corners: [2]Point,
+}
+
+class Ages
+{
+	pub ages: [4]int = [0; 4],
+
+	operator fn iter(self) -> AgesIter
+	{
+		return AgesIter { of: self, at: -1 };
+	}
+}
+
+class AgesIter
+{
+	pub of: *Ages,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < 4;
+	}
+
+	operator fn value(self) -> lent *int
+	{
+		return &self.of.ages[self.at];
+	}
+}
+
+fn replaced(points: []Point)
+{
+	for p in points {
+		p = Point { x: 0, y: 0 };
+	}
+}
+
+fn field(points: []Point)
+{
+	for p in points {
+		p.x = 1;
+	}
+}
+
+fn compound()
+{
+	let values = [1, 2, 3];
+	for v in values {
+		v += 1;
+	}
+}
+
+fn nested(segments: []Segment)
+{
+	for s in segments {
+		s.from.y = 2;
+		s.corners[1].x = 3;
+		s.far.x = 4;
+	}
+}
+
+fn walked(ages: *Ages)
+{
+	for age in ages {
+		age += 1;
+	}
+}
+
+fn counted()
+{
+	for i in 0..3 {
+		i = 2;
+	}
+}
+
+fn in_place(points: []Point)
+{
+	for p in &points {
+		p.x = 5;
+		p = &points[0];
+	}
+}

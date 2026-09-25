@@ -1,0 +1,73 @@
+//! `for x in &e` lends each element for one turn of the loop, and the checker
+//! refuses every place that would keep the pointer. An iterator lends its
+//! elements through a `value` that gives a `lent` pointer, and a `value` of any
+//! other type gives copies alone.
+
+class Holder
+{
+	pub held: ?*int = none,
+}
+
+class Numbers
+{
+	pub items: [4]int = [0; 4],
+
+	operator fn iter(self) -> NumbersIter
+	{
+		return NumbersIter { of: self, at: -1 };
+	}
+}
+
+class NumbersIter
+{
+	pub of: *Numbers,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < 4;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.of.items[self.at];
+	}
+}
+
+fn plain(p: *int)
+{
+}
+
+fn stored(h: *Holder, values: []int)
+{
+	for v in &values {
+		h.held = v;
+	}
+}
+
+fn returned(values: []int) -> *int
+{
+	for v in &values {
+		return v;
+	}
+	return &values[0];
+}
+
+fn passed(values: []int)
+{
+	for i, v in &values {
+		plain(v);
+	}
+}
+
+fn copies_alone(numbers: *Numbers)
+{
+	for n in &numbers {
+	}
+}
+
+fn lent_result(values: []int) -> lent *int
+{
+	return &values[0];
+}

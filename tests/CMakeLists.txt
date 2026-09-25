@@ -495,13 +495,25 @@ foreach(name IN ITEMS wrapping saturating compound_wrapping mul_high flags
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
+# The two forms of a walk in dev mode, whose loops over a collection
+# carry the check of its changes.
+add_test(NAME program_walk_forms_dev
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/walk_forms.anti"
+        "-DOPTIONS=--dev"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 # The copies of generics in dev mode, which compiles each module apart and
 # prints what the release build of the same program prints.
 foreach(name IN ITEMS generic_copies generic_constants generic_methods
         generic_nested generic_sync generic_hooks generic_may_fail
-        generic_fn_args generic_variants construct_keep_own)
+        generic_fn_args generic_variants construct_keep_own walk_generic)
     set(objects "")
-    if(name STREQUAL "generic_may_fail" OR name STREQUAL "generic_fn_args")
+    if(name STREQUAL "generic_may_fail" OR name STREQUAL "generic_fn_args" OR
+       name STREQUAL "walk_generic")
         set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o")
     endif()
     add_test(NAME program_${name}_dev
@@ -2105,6 +2117,7 @@ foreach(mode release dev)
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/iteration"
             "-DLIBRARIES=bag"
+            "-DSTD=lang"
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/iteration-${mode}"
@@ -3018,6 +3031,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "own_moves|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_moves.s,own_moves.anti"
         "own_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_params.s,own_params.anti"
         "lent_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_params.s,lent_params.anti"
+        "walk_copy|-S,-o,${LISTINGS}/walk_copy.s,walk_copy.anti"
+        "walk_lent|-S,-o,${LISTINGS}/walk_lent.s,walk_lent.anti"
         "fn_may_fail|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fn_may_fail.s,fn_may_fail.anti"
         "concrete_signature|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/concrete_signature.s,concrete_signature.anti"
         "qualified_bodies|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_bodies.s,qualified_bodies.anti"

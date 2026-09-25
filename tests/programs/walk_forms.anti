@@ -1,0 +1,101 @@
+//! The two forms of a walk. `for x in e` gives a copy of each element. The form
+//! `for x in &e` lends each element for one turn, and the loop changes the
+//! element in place through it. Both hold for an array, a slice and a
+//! collection whose iterator lends its elements through `value`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Person
+{
+	age: int,
+}
+
+class People
+{
+	pub items: [3]Person,
+	pub count: int = 3,
+
+	operator fn iter(self) -> PeopleIter
+	{
+		return PeopleIter { of: self, at: -1 };
+	}
+}
+
+class PeopleIter
+{
+	pub of: *People,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < self.of.count;
+	}
+
+	operator fn value(self) -> lent *Person
+	{
+		return &self.of.items[self.at];
+	}
+}
+
+fn older(lent p: *Person)
+{
+	p.age += 10;
+}
+
+fn total(people: *People) -> int
+{
+	let sum = 0;
+	for p in people {
+		sum += p.age;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let ages = [Person { age: 1 }, Person { age: 2 }, Person { age: 3 }];
+	for p in &ages {
+		p.age += 1;
+	}
+	let s = ages[0..3];
+	for p in &s {
+		older(p);
+	}
+	let sum = 0;
+	for p in s {
+		sum += p.age;
+	}
+	printf("slice %d\n".ptr, sum as c_int);
+	for i, p in &s {
+		p.age = i;
+	}
+	printf("indexed %d %d %d\n".ptr, ages[0].age as c_int,
+		ages[1].age as c_int, ages[2].age as c_int);
+
+	let people = People {
+		items: [Person { age: 5 }, Person { age: 6 },
+			Person { age: 7 }]
+	};
+	for p in &people {
+		p.age *= 2;
+	}
+	printf("doubled %d\n".ptr, total(&people) as c_int);
+	for p in &people {
+		older(p);
+	}
+	for p in people {
+		printf("age %d\n".ptr, p.age as c_int);
+	}
+	let it = people.iter();
+	while it.next() do {
+		let p = it.value();
+		p.age -= 1;
+	}
+	let copies = people.iter().to_slice();
+	copies[0].age = 0;
+	printf("copies %d %d, first %d\n".ptr, copies.len as c_int,
+		copies[1].age as c_int, people.items[0].age as c_int);
+	free(copies.ptr);
+	return 0;
+}

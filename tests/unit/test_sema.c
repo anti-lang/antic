@@ -955,7 +955,8 @@ void test_sema(void)
     rejects("fn f(items: []int) { for i, x in items { i = 0; } }\n", 1, 42,
             "`i` is the variable of a `for` and is read-only");
     rejects("fn f(items: []int) { for i, x in items { x = 0; } }\n", 1, 42,
-            "`x` is the variable of a `for` and is read-only");
+            "`x` is a copy of each element of `items`. Walk with `&items` "
+            "to change the elements");
     rejects("fn f(items: []int) { for i, p in &items { p = &items[0]; } }\n",
             1, 43, "`p` is the variable of a `for` and is read-only");
     /* A tuple crosses to C as the struct the header writes for it, so it
