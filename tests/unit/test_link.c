@@ -15,39 +15,39 @@ static const char *const extra_windows[] = {"shapes.obj"};
 static const struct link_inputs unix_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/x86_64-linux-gnu",
     NULL, 0, LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL
+    NULL, 0, false, NULL, NULL, false, NULL
 };
 
 static const struct link_inputs windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, NULL, 0,
     LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL
+    NULL, 0, false, NULL, NULL, false, NULL
 };
 
 static const struct link_inputs extra_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/aarch64-linux-gnu",
     extra_unix, 2, LINKER_PLATFORM, CPU_ARMV8_5, NULL, NULL, NULL, 0, false,
     false,
-    NULL, 0, false, NULL, NULL
+    NULL, 0, false, NULL, NULL, false, NULL
 };
 
 static const struct link_inputs extra_windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, extra_windows, 1,
     LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL
+    NULL, 0, false, NULL, NULL, false, NULL
 };
 
 /* lld of the runtime archive with the sysroot of the target. */
 static const struct link_inputs lld_inputs = {
     "prog.o", "prog", "/rt", NULL, "26.5", NULL, extra_unix, 1, LINKER_LLD,
     CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL
+    NULL, 0, false, NULL, NULL, false, NULL
 };
 
 static const struct link_inputs lld_windows_inputs = {
     "prog.obj", "prog.exe", "/rt", NULL, NULL, NULL, NULL, 0, LINKER_LLD,
     CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL
+    NULL, 0, false, NULL, NULL, false, NULL
 };
 
 /* Build the command line of target t and compare it, joined by spaces.
@@ -595,6 +595,55 @@ static void dynamic_modes(void)
     }
 }
 
+/* --memory-checks links the runtime of AddressSanitizer from lib/<target>/
+   of the runtime archive. macOS links the dynamic library and names its
+   directory as an rpath. The glibc mode of Linux takes the two archives
+   whole before the objects and exports the names of the .syms list. It
+   adds the libraries of glibc the runtime calls. Windows links the import
+   library and the whole thunk, and keeps the handler of exceptions. */
+static void memory_checks_links(void)
+{
+    struct link_inputs in = lld_inputs;
+
+    in.memory_checks = true;
+    in.rpath = "/abs/rt/lib/macos-arm64";
+    links(TARGET_MACOS_ARM64, &in,
+          "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
+          "-syslibroot /rt/sysroot/t -o prog prog.o shapes.o "
+          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+          "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib "
+          "-rpath /abs/rt/lib/macos-arm64 -lSystem");
+    in.glibc = true;
+    links(TARGET_LINUX_X86_64, &in,
+          "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
+          "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
+          "-o prog /rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o --whole-archive "
+          "/rt/lib/linux-x86_64-glibc/libclang_rt.asan_static.a "
+          "--no-whole-archive --whole-archive "
+          "/rt/lib/linux-x86_64-glibc/libclang_rt.asan.a --no-whole-archive "
+          "--dynamic-list=/rt/lib/linux-x86_64-glibc/libclang_rt.asan.a.syms "
+          "prog.o shapes.o /rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
+          "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
+          "-L/rt/sysroot/t/lib/x86_64-linux-gnu -lpthread -lrt -ldl -lresolv "
+          "-lm -lc /rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
+    in = lld_windows_inputs;
+    in.memory_checks = true;
+    links(TARGET_WINDOWS_X86_64, &in,
+          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
+          "/PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
+          "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
+          "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 "
+          "/rt/lib/windows-x86_64/clang_rt.asan_dynamic.lib "
+          "/INCLUDE:__asan_seh_interceptor "
+          "/WHOLEARCHIVE:/rt/lib/windows-x86_64/"
+          "clang_rt.asan_dynamic_runtime_thunk.lib prog.obj "
+          "/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
+          "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+}
+
 /* The version of an SDK directory name, or a refusal of the name. */
 static void sdk_name(const char *name, bool ok, int major, int minor)
 {
@@ -640,6 +689,7 @@ void test_link(void)
     libraries();
     frameworks();
     dynamic_modes();
+    memory_checks_links();
     strips_debug();
     relative_paths();
     pdb_names();

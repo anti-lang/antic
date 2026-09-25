@@ -2748,6 +2748,29 @@ add_test(NAME lock_order
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_lock_order.cmake")
 set_tests_properties(lock_order PROPERTIES TIMEOUT 120)
 
+# --memory-checks reports a read after free, a double free, a write past a
+# heap block and a leak, where the runtime archive holds AddressSanitizer
+# for the host. Every host checks that windows-arm64 refuses the option.
+set(memory_checks_run OFF)
+foreach(file libclang_rt.asan_osx_dynamic.dylib libclang_rt.asan.a
+        clang_rt.asan_dynamic.lib)
+    foreach(dir "${ANTIC_HOST_TARGET}" "${ANTIC_HOST_TARGET}-glibc")
+        if(EXISTS "${ANTIC_RUNTIME_DIR}/lib/${dir}/${file}")
+            set(memory_checks_run ON)
+        endif()
+    endforeach()
+endforeach()
+add_test(NAME memory_checks
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DRUN=${memory_checks_run}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks.cmake")
+set_tests_properties(memory_checks PROPERTIES TIMEOUT 120)
+
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)
     add_test(NAME abi_probe

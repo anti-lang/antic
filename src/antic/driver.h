@@ -58,6 +58,12 @@ struct options {
        debug sections of the link. anti build passes it in dev mode, and
        release mode never does. */
     bool debug;
+    /* DESIGN: --memory-checks puts a check of AddressSanitizer before
+       every load and store and links its runtime from the runtime
+       archive. It is off by default in every mode, and windows-arm64,
+       which has no such runtime, refuses it. It turns -g on, so a report
+       names the function and the line of each frame. */
+    bool memory_checks;
     /* DESIGN: --tests keeps the `tests` and `fixtures` blocks and is what
        `anti test` passes. Every other build drops them after parsing, so
        no later pass sees them and no object or `.antl` carries them. */

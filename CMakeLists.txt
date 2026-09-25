@@ -389,6 +389,36 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
     endforeach()
 endif()
 
+# DESIGN: --memory-checks links the runtime of AddressSanitizer of the
+# pinned clang, which the runtime archive carries in lib/<target>/ beside
+# the native libraries. macOS takes the dynamic library. The glibc mode of
+# Linux takes the static archives and the list of the names they export.
+# windows-x86_64 takes the DLL, its import library and the thunk. compiler-rt
+# builds none for windows-arm64, and musl has no AddressSanitizer. The
+# MEMCHECK_ names of src/antic/linker.h spell the same files.
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
+        OUTPUT_VARIABLE clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(asan_macos-arm64 darwin libclang_rt.asan_osx_dynamic.dylib)
+    set(asan_macos-x86_64 darwin libclang_rt.asan_osx_dynamic.dylib)
+    set(asan_linux-x86_64-glibc x86_64-unknown-linux-gnu libclang_rt.asan.a
+        libclang_rt.asan_static.a libclang_rt.asan.a.syms)
+    set(asan_linux-arm64-glibc aarch64-unknown-linux-gnu libclang_rt.asan.a
+        libclang_rt.asan_static.a libclang_rt.asan.a.syms)
+    set(asan_windows-x86_64 x86_64-pc-windows-msvc clang_rt.asan_dynamic.lib
+        clang_rt.asan_dynamic.dll clang_rt.asan_dynamic_runtime_thunk.lib)
+    foreach(target macos-arm64 macos-x86_64 linux-x86_64-glibc
+            linux-arm64-glibc windows-x86_64)
+        list(POP_FRONT asan_${target} dir)
+        foreach(file IN LISTS asan_${target})
+            if(EXISTS "${clang_resource}/lib/${dir}/${file}")
+                file(COPY "${clang_resource}/lib/${dir}/${file}"
+                    DESTINATION "${ANTIC_RUNTIME_DIR}/lib/${target}")
+            endif()
+        endforeach()
+    endforeach()
+endif()
+
 # The standard library in src/std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
 set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection toml config args json log simd trace plugin)

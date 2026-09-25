@@ -72,6 +72,12 @@ struct link_inputs {
        exports, and the import library the link writes beside it. */
     const char *def_file;
     const char *import_library;
+    /* --memory-checks: link the runtime of AddressSanitizer that the
+       runtime archive holds beside the native libraries. */
+    bool memory_checks;
+    /* macOS with --memory-checks: the absolute directory of that
+       runtime, where the program finds it at run time. */
+    const char *rpath;
 };
 
 /* The suffixes of the object files and archives that antic passes to the
@@ -81,7 +87,7 @@ struct link_inputs {
 #define LINK_COFF_OBJECT_SUFFIX ".obj"
 #define LINK_COFF_ARCHIVE_SUFFIX ".lib"
 
-enum { LINK_MAX_STRINGS = 12 };
+enum { LINK_MAX_STRINGS = 16 };
 
 /* A linker command line. The arguments that it builds live in strings,
    and argv holds the fixed arguments and every extra input. */
@@ -150,6 +156,27 @@ void link_runtime_library(struct text *out, const char *runtime, enum target t,
    beside it. */
 #define NATIVE_PCRE2 "pcre2-8"
 #define NATIVE_REGEX_GLUE "anti_rt_regex"
+
+/* DESIGN: the runtime archive carries the runtime of AddressSanitizer
+   of the pinned clang in lib/<target>/, under the names compiler-rt
+   gives it. macOS links the dynamic library and finds it at run time
+   through an rpath to that directory. Linux links the static archives
+   into a program of the glibc mode, whose symbols the list of .syms
+   exports. Windows links the import library and the thunk, and the DLL
+   stands beside the program. CMakeLists.txt copies the same names. */
+#define MEMCHECK_MACOS_DYLIB "libclang_rt.asan_osx_dynamic.dylib"
+#define MEMCHECK_LINUX_ARCHIVE "libclang_rt.asan.a"
+#define MEMCHECK_LINUX_STATIC "libclang_rt.asan_static.a"
+#define MEMCHECK_LINUX_SYMS "libclang_rt.asan.a.syms"
+#define MEMCHECK_WINDOWS_LIB "clang_rt.asan_dynamic.lib"
+#define MEMCHECK_WINDOWS_THUNK "clang_rt.asan_dynamic_runtime_thunk.lib"
+#define MEMCHECK_WINDOWS_DLL "clang_rt.asan_dynamic.dll"
+
+/* Append the path of the file name of the runtime of AddressSanitizer
+   for target t below runtime. With glibc it lies in the directory of
+   the glibc mode. */
+void link_memcheck_file(struct text *out, const char *runtime, enum target t,
+                        bool glibc, const char *name);
 
 /* Append the path of the native library name of target t below runtime,
    which stays at the default level of the target. */

@@ -13,6 +13,7 @@
 #include "lexer.h"
 #include "linker.h"
 #include "lower.h"
+#include "memcheck.h"
 #include "header.h"
 #include "modpath.h"
 #include "platform.h"
@@ -693,11 +694,41 @@ static bool native_inputs(const struct options *o, const struct extras *extras,
     return true;
 }
 
+/* DESIGN: a Windows program of --memory-checks loads the DLL of
+   AddressSanitizer. The link copies it from the runtime archive to the
+   directory of the program, where the loader looks first. */
+static bool copy_memcheck_dll(const struct options *o, const char *executable)
+{
+    struct text from = {0};
+    struct text to = {0};
+    struct text bytes = {0};
+    const char *slash = strrchr(executable, '/');
+    const char *back = strrchr(executable, '\\');
+    bool ok;
+
+    if (back != NULL && (slash == NULL || back > slash)) {
+        slash = back;
+    }
+    link_memcheck_file(&from, o->runtime, o->target, false,
+                       MEMCHECK_WINDOWS_DLL);
+    if (slash != NULL) {
+        text_append_bytes(&to, executable, (size_t)(slash - executable) + 1);
+    }
+    text_append(&to, MEMCHECK_WINDOWS_DLL);
+    ok = read_bytes(text_cstr(&from), &bytes) &&
+         write_file(text_cstr(&to), &bytes);
+    text_free(&from);
+    text_free(&to);
+    text_free(&bytes);
+    return ok;
+}
+
 static bool link_program(const struct options *o, const char *object,
                          const char *executable, const struct extras *extras)
 {
     struct text glue = {0};
     struct text pcre2 = {0};
+    struct text rpath = {0};
     const char **extra;
     size_t extra_count;
     struct link_inputs in;
@@ -725,8 +756,20 @@ static bool link_program(const struct options *o, const char *object,
     in.linux_libraries = o->linux_libraries;
     in.linux_library_count = o->linux_library_count;
     in.exports = extras->hosts_plugins;
+    /* DESIGN: the runtime of AddressSanitizer is built against glibc,
+       so a Linux program of --memory-checks links in the glibc mode. */
     in.glibc = os == OS_LINUX &&
-               (o->linux_library_count > 0 || extras->hosts_plugins);
+               (o->linux_library_count > 0 || extras->hosts_plugins ||
+                o->memory_checks);
+    in.memory_checks = o->memory_checks;
+    if (o->memory_checks && os == OS_MACOS) {
+        struct text dir = {0};
+        text_appendf(&dir, "%s/%s/", o->runtime, RUNTIME_LIB_DIR);
+        link_target_dir(&dir, o->target, false);
+        ok = absolute_path(text_cstr(&dir), &rpath);
+        text_free(&dir);
+        in.rpath = text_cstr(&rpath);
+    }
     memset(&w, 0, sizeof w);
     memset(&facts, 0, sizeof facts);
     if (in.exports && os == OS_WINDOWS) {
@@ -745,6 +788,9 @@ static bool link_program(const struct options *o, const char *object,
         ok = run_link(&w, &command);
         link_command_free(&command);
     }
+    if (ok && o->memory_checks && os == OS_WINDOWS) {
+        ok = copy_memcheck_dll(o, executable);
+    }
     windows_link_free(&w);
     link_facts_free(&facts);
     text_free(&def);
@@ -754,6 +800,7 @@ static bool link_program(const struct options *o, const char *object,
     }
     text_free(&glue);
     text_free(&pcre2);
+    text_free(&rpath);
     return ok;
 }
 
@@ -1191,6 +1238,10 @@ static int back_end(const struct options *o, struct module *tree,
         return 1;
     }
     program->plugin = is_plugin(o);
+    if (o->memory_checks) {
+        memcheck_declare(program, module,
+                         o->lib == LIB_NONE && has_main(program, module));
+    }
     functions = calloc(program->function_count + 1, sizeof *functions);
     if (functions == NULL) {
         fputs("antic: out of memory\n", stderr);
@@ -2858,6 +2909,11 @@ int driver_run(const struct options *o)
         return 2;
     }
 
+    if (o->memory_checks && !memcheck_available(o->target)) {
+        fprintf(stderr, "antic: `--memory-checks` is not available for %s\n",
+                target_name(o->target));
+        return 2;
+    }
     memset(&extras, 0, sizeof extras);
 
     if (!ends_with(o->input, SOURCE_SUFFIX) &&

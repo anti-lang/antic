@@ -22,6 +22,9 @@ static int usage(FILE *out)
           "  -c                   write the library file <file.antl>\n"
           "  -g                   write the source positions, and keep the\n"
           "                       debug sections of the link\n"
+          "  --memory-checks      find use after free, double free, access\n"
+          "                       outside a heap block and leaks while the\n"
+          "                       program runs, with AddressSanitizer\n"
           "  --dev                compile the module alone into its object,\n"
           "                       and link it when it defines main. The\n"
           "                       input may be a library file instead\n"
@@ -229,6 +232,10 @@ static int run(int argc, char **argv, struct options *o)
         } else if (strcmp(arg, "--llvm-ar") == 0) {
             slot = &options.llvm_ar;
         } else if (strcmp(arg, "-g") == 0) {
+            options.debug = true;
+            continue;
+        } else if (strcmp(arg, "--memory-checks") == 0) {
+            options.memory_checks = true;
             options.debug = true;
             continue;
         } else if (strcmp(arg, "--dev") == 0) {

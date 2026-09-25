@@ -62,6 +62,14 @@ void link_native_library(struct text *out, const char *runtime, enum target t,
                  name);
 }
 
+void link_memcheck_file(struct text *out, const char *runtime, enum target t,
+                        bool glibc, const char *name)
+{
+    text_appendf(out, "%s/%s/", runtime, RUNTIME_LIB_DIR);
+    link_target_dir(out, t, glibc);
+    text_appendf(out, "/%s", name);
+}
+
 /* The runtime library of t at level cpu, of the glibc mode with glibc. */
 static void runtime_library(struct text *out, const char *runtime,
                             enum target t, enum cpu_level cpu, bool glibc)
@@ -169,8 +177,55 @@ static void macos(struct link_command *c, enum target t,
     }
     add_inputs(c, in);
     add(c, text_cstr(library));
+    if (in->memory_checks) {
+        struct text *dylib = next(c);
+        link_memcheck_file(dylib, in->runtime, t, false, MEMCHECK_MACOS_DYLIB);
+        add(c, text_cstr(dylib));
+        add(c, "-rpath");
+        add(c, in->rpath);
+    }
     add(c, "-lSystem");
     macos_frameworks(c, in);
+}
+
+/* The archives of AddressSanitizer in a Linux program, whole, as clang
+   links them, before the objects of the program. The list of .syms keeps
+   the names the runtime intercepts in the dynamic symbol table. */
+static void linux_memcheck(struct link_command *c, enum target t,
+                           const struct link_inputs *in)
+{
+    struct text *files[2];
+    struct text *list;
+    size_t i;
+
+    if (!in->memory_checks) {
+        return;
+    }
+    files[0] = next(c);
+    files[1] = next(c);
+    list = next(c);
+    link_memcheck_file(files[0], in->runtime, t, true, MEMCHECK_LINUX_STATIC);
+    link_memcheck_file(files[1], in->runtime, t, true, MEMCHECK_LINUX_ARCHIVE);
+    text_append(list, "--dynamic-list=");
+    link_memcheck_file(list, in->runtime, t, true, MEMCHECK_LINUX_SYMS);
+    for (i = 0; i < 2; i++) {
+        add(c, "--whole-archive");
+        add(c, text_cstr(files[i]));
+        add(c, "--no-whole-archive");
+    }
+    add(c, text_cstr(list));
+}
+
+/* The libraries of glibc that the runtime of AddressSanitizer calls. */
+static void linux_memcheck_libraries(struct link_command *c,
+                                     const struct link_inputs *in)
+{
+    if (in->memory_checks) {
+        add(c, "-lpthread");
+        add(c, "-lrt");
+        add(c, "-ldl");
+        add(c, "-lresolv");
+    }
 }
 
 /* The dynamic linker of a Linux program linked against glibc. */
@@ -240,11 +295,13 @@ static void linux_glibc(struct link_command *c, enum target t,
         text_appendf(file, "%s/usr/lib/%s/%s", in->sysroot, triple, before[i]);
         add(c, text_cstr(file));
     }
+    linux_memcheck(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
     add(c, text_cstr(search));
     add(c, text_cstr(shared));
     linux_libraries(c, in);
+    linux_memcheck_libraries(c, in);
     add(c, "-lm");
     add(c, "-lc");
     add(c, text_cstr(builtins));
@@ -400,10 +457,12 @@ static void linux_ld(struct link_command *c, enum target t,
     add(c, in->executable);
     add(c, text_cstr(start));
     add(c, text_cstr(crti));
+    linux_memcheck(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
     add(c, text_cstr(search));
     linux_libraries(c, in);
+    linux_memcheck_libraries(c, in);
     add(c, "-lc");
     add(c, text_cstr(crtn));
 }
@@ -441,6 +500,19 @@ static void windows(struct link_command *c, enum target t,
         add(c, text_cstr(implib));
     }
     windows_libpaths(c, t, in);
+    /* The thunk links whole, and the handler of structured exceptions
+       stays, as clang links them for a program of the DLL C runtime. */
+    if (in->memory_checks) {
+        struct text *dll = next(c);
+        struct text *thunk = next(c);
+        link_memcheck_file(dll, in->runtime, t, false, MEMCHECK_WINDOWS_LIB);
+        text_append(thunk, "/WHOLEARCHIVE:");
+        link_memcheck_file(thunk, in->runtime, t, false,
+                           MEMCHECK_WINDOWS_THUNK);
+        add(c, text_cstr(dll));
+        add(c, "/INCLUDE:__asan_seh_interceptor");
+        add(c, text_cstr(thunk));
+    }
     add_inputs(c, in);
     add(c, text_cstr(library));
     add(c, "msvcrt.lib");

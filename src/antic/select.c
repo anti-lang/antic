@@ -8,6 +8,7 @@
 #include "arith.h"
 #include "attributes.h"
 #include "expand.h"
+#include "memcheck.h"
 #include "optimize.h"
 
 static void fail(struct selector *s, const char *format, ...)
@@ -558,6 +559,9 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
         }
         if (resolved && !m->functions[i]->is_extern) {
             ir_optimize_function(m->functions[i]);
+        }
+        if (m->memory_checks && !m->functions[i]->is_extern) {
+            memcheck_function(m, m->functions[i], &layouts);
         }
     }
     s.target = target_desc(t);

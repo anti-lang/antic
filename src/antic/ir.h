@@ -453,6 +453,12 @@ struct ir_module {
        through the GOT, and on COFF through the __imp_ entry the import
        library of the host gives. */
     bool plugin;
+    /* --memory-checks: selection puts a check before every load and
+       store, a call of one of these two functions. memcheck_declare of
+       src/antic/memcheck.c sets all three. */
+    bool memory_checks;
+    uint32_t memcheck_load;
+    uint32_t memcheck_store;
 };
 
 /* Checked heap memory for the back end. The compiler cannot continue

@@ -1,0 +1,70 @@
+//! Each case makes one memory error that `--memory-checks` finds while the
+//! program runs: a read after `free`, a second `free` of one block, a write
+//! past the end of a heap block and a block that is never freed. The argument
+//! names the case. `clean` makes none, so a build with the checks runs it to
+//! its end and reports nothing.
+
+import anti.text;
+
+extern fn malloc(n: u64) -> ?*Pair;
+
+struct Cell
+{
+	n: int,
+}
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+fn read_after_free() -> int
+{
+	let p = alloc Cell { n: 7 };
+	let q = p;
+	free(p);
+	return q.n;
+}
+
+fn free_twice() -> int
+{
+	let p = alloc Cell { n: 7 };
+	let q = p;
+	free(p);
+	free(q);
+	return 0;
+}
+
+fn write_past_end() -> int
+{
+	let p = malloc(8) else { return 1; };
+	p.b = 5;
+	return 0;
+}
+
+fn kept() -> *Cell
+{
+	return alloc Cell { n: 7 };
+}
+
+fn clean() -> int
+{
+	let p = alloc Cell { n: 7 };
+	let n = p.n;
+	free(p);
+	return n - 7;
+}
+
+fn main(args: []str, env: []str) -> int
+{
+	let status = 0;
+	switch args[1] {
+		"use_after_free" => status = read_after_free(),
+		"double_free" => status = free_twice(),
+		"overflow" => status = write_past_end(),
+		"leak" => status = kept().n - 7,
+		else => status = clean(),
+	}
+	return status;
+}
