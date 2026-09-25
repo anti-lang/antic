@@ -96,9 +96,9 @@ struct ir_function *lower_init_function(struct lowerer *l,
     lower_init_name(t, t->item_exported, &name);
     f = lower_find_function(l->m, module, text_cstr(&name));
     if (f == NULL) {
-        f = strcmp(module, l->module_name) == 0
-                ? ir_function_add(l->m, l->module_name, text_cstr(&name),
-                                  IR_VOID, IR_NO_AGG)
+        f = lower_defines(l, t, module)
+                ? ir_function_add(l->m, module, text_cstr(&name), IR_VOID,
+                                  IR_NO_AGG)
                 : ir_declare_add(l->m, module, text_cstr(&name), IR_VOID,
                                  IR_NO_AGG);
         f->exported = t->item_exported;

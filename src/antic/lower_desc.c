@@ -264,6 +264,16 @@ uint32_t lower_class_depth(const struct type *t)
     return depth;
 }
 
+/* Whether the module being lowered writes the data and the functions of
+   the type t, whose module is module. It writes those of its own types.
+   It also writes those of every copy of a generic it uses that no library
+   file of the program holds. The caller has found none. */
+bool lower_defines(const struct lowerer *l, const struct type *t,
+                   const char *module)
+{
+    return strcmp(module, l->module_name) == 0 || t->generic != NULL;
+}
+
 /* A global of the module named `<class>.<suffix>`, or NULL when the
    module has none. Every class builds its data once. On NULL,
    *module_out and *name_out receive the module and the name to give the
@@ -294,8 +304,12 @@ struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
     /* DESIGN: a class's table and descriptor belong to the module that
        declares it, which writes them whether it builds one or not. A
        module that names a class of another refers to them, so a program
-       holds one descriptor per class and `is` compares one address. */
-    if (g == NULL && strcmp(module, l->module_name) != 0) {
+       holds one descriptor per class and `is` compares one address. A
+       copy of a generic of another module is the exception. The module
+       that uses it writes its data under the path of the generic's
+       module. Every module that uses it does the same, and the link
+       keeps one. */
+    if (g == NULL && !lower_defines(l, t, module)) {
         g = ir_global_add(m, module, text_cstr(&name), NULL, 0, 1);
         g->is_extern = true;
         g->exported = t->item_exported;
@@ -329,8 +343,9 @@ static struct ir_global *struct_global(struct lowerer *l,
     /* DESIGN: a struct's descriptor belongs to the module that declares
        it, as a class's does. A module that names the struct of another
        refers to it. A program then holds one descriptor per struct, and
-       two field records of one struct hold one address. */
-    if (g == NULL && strcmp(module, l->module_name) != 0) {
+       two field records of one struct hold one address. A copy of a
+       generic follows the rule of a class above. */
+    if (g == NULL && !lower_defines(l, t, module)) {
         g = ir_global_add(m, module, text_cstr(&name), NULL, 0, 1);
         g->is_extern = true;
     }
@@ -1136,9 +1151,9 @@ struct ir_function *lower_class_function(struct lowerer *l,
     text_appendf(&name, ".%s", part);
     f = lower_find_function(l->m, module, text_cstr(&name));
     if (f == NULL) {
-        f = strcmp(module, l->module_name) == 0
-                ? ir_function_add(l->m, l->module_name, text_cstr(&name),
-                                  IR_VOID, IR_NO_AGG)
+        f = lower_defines(l, t, module)
+                ? ir_function_add(l->m, module, text_cstr(&name), IR_VOID,
+                                  IR_NO_AGG)
                 : ir_declare_add(l->m, module, text_cstr(&name), IR_VOID,
                                  IR_NO_AGG);
         ir_param_add(f, IR_PTR, IR_NO_AGG);

@@ -31,10 +31,10 @@ enum ir_type {
     IR_F32,
     IR_F64,
     IR_PTR,
-    IR_AGG,     /* a struct, union, array, str or slice passed by value */
-    IR_CLONG,   /* c_long and c_ulong: 32 bits on Windows, else 64 */
-    IR_CWCHAR,  /* c_wchar: 16 bits on Windows, else 32 */
-    IR_LOCK     /* the word of a Mutex: 64 bits on Windows, else 32 */
+    IR_AGG,     /* a struct, union, array, str or slice passed by value. */
+    IR_CLONG,   /* c_long and c_ulong: 32 bits on Windows, else 64. */
+    IR_CWCHAR,  /* c_wchar: 16 bits on Windows, else 32. */
+    IR_LOCK     /* the word of a Mutex: 64 bits on Windows, else 32. */
 };
 
 #define IR_NO_AGG UINT32_MAX
@@ -273,6 +273,12 @@ struct ir_function {
     uint32_t at_line;               /* the line the appenders stamp */
     const char *module;             /* NULL for a C function */
     const char *name;
+    /* DESIGN: the module whose object defines the function when that is
+       not module. A module that uses a generic of another module makes
+       the copy under the path of that module. Every module that makes it
+       then writes one symbol, and the link keeps one. The object of the
+       module that made it holds it. NULL for every other function. */
+    const char *unit;
     struct ir_param *params;
     size_t param_count;
     size_t param_capacity;
@@ -331,6 +337,7 @@ struct ir_global {
     uint32_t index;
     const char *module;
     const char *name;
+    const char *unit;               /* as for a function */
     uint8_t *bytes;
     uint64_t size;
     uint64_t align;
@@ -534,6 +541,9 @@ struct ir_operand ir_sym_operand(const struct ir_module *m, uint32_t sym);
 
 /* Whether f is the IR_PATTERNS_START of its module, defined here. */
 bool ir_is_patterns_start(const struct ir_function *f);
+/* Whether a function or a global of module, made in unit, belongs to the
+   object of module entry. */
+bool ir_in_unit(const char *module, const char *unit, const char *entry);
 
 struct ir_function *ir_function_add(struct ir_module *m, const char *module,
                                     const char *name, enum ir_type result,

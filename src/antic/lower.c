@@ -1641,14 +1641,27 @@ static void declare_function(struct lowerer *l, const struct item *it)
     /* A function of a struct body carries the name `T.f`, which its
        symbol holds, so its symbol becomes `module.T.f`. */
     char *name = lower_cstr(it->owner != NULL ? &it->symbol->name : &it->name);
+    const char *module =
+        it->home_module != NULL ? it->home_module : l->module_name;
     struct ir_function *f;
     size_t i;
 
     f = it->kind == ITEM_EXTERN_FN ? lower_find_function(l->m, NULL,
                                                          name) : NULL;
+    /* A copy of a generic of another module that a library file of the
+       program holds already is that one. */
+    if (f == NULL && it->home_module != NULL) {
+        f = lower_find_function(l->m, module, name);
+        if (f != NULL && !f->is_extern) {
+            free(name);
+            it->symbol->ir = f->index;
+            return;
+        }
+        f = NULL;
+    }
     if (f == NULL) {
         f = it->kind == ITEM_FN
-                ? ir_function_add(l->m, l->module_name, name,
+                ? ir_function_add(l->m, module, name,
                                   lower_ir_type_of(t->result),
                                   lower_result_agg(l, t->result))
                 : ir_extern_add(l->m, name, lower_ir_type_of(t->result),
@@ -1694,7 +1707,7 @@ static void take_trace_name(struct lowerer *l)
     struct token_text text;
     struct text name = {0};
 
-    text_appendf(&name, "%s.%s", l->module_name, l->f->name);
+    text_appendf(&name, "%s.%s", l->f->module, l->f->name);
     text.bytes = text_cstr(&name);
     text.length = name.length;
     l->trace_name = lower_literal_global(l, &text);
@@ -1717,7 +1730,39 @@ static bool synchronized_function(const struct item *it)
            !lower_name_is(&it->name, "destruct");
 }
 
+/* The copy of a generic of another module, or an anonymous function of
+   one, and so the source its lines name. NULL for any other function. */
+static const char *home_file_of(const struct item *it)
+{
+    while (it->enclosing != NULL) {
+        it = it->enclosing;
+    }
+    return it->home_file;
+}
+
+static void lower_function_body(struct lowerer *l, const struct item *it);
+
 static void lower_function(struct lowerer *l, const struct item *it)
+{
+    const char *home = home_file_of(it);
+    const char *file = l->file;
+    uint32_t file_index = l->file_index;
+
+    /* A function a library file brought has its body there. */
+    if (it->symbol->ir < l->first_function) {
+        return;
+    }
+    if (home != NULL) {
+        l->file = home;
+        l->file_index = ir_file_add(l->m, home);
+        l->m->functions[it->symbol->ir]->file = l->file_index;
+    }
+    lower_function_body(l, it);
+    l->file = file;
+    l->file_index = file_index;
+}
+
+static void lower_function_body(struct lowerer *l, const struct item *it)
 {
     struct defers around;
     struct ir_block *entry;
@@ -2042,6 +2087,11 @@ static void lower_singleton_get(struct lowerer *l, const struct item *it)
     struct ir_block *done;
     uint32_t result;
     uint32_t width;
+
+    /* A function a library file brought has its body there. */
+    if (it->symbol->ir < l->first_function) {
+        return;
+    }
 
     l->f = l->m->functions[it->symbol->ir];
     l->b = lower_new_block(l);
@@ -2552,6 +2602,7 @@ static void class_record(struct lowerer *l, const struct module *module,
 {
     const struct type *t = it->symbol->type;
     struct text symbol = {0};
+    char *module_path;
     char *name;
     struct ir_class *c;
     const struct type *up;
@@ -2560,7 +2611,8 @@ static void class_record(struct lowerer *l, const struct module *module,
     type_symbol_name(&symbol, t);
     name = lower_copy_text(&symbol);
     text_free(&symbol);
-    c = ir_class_add(l->m, l->module_name, name);
+    module_path = lower_cstr(&t->module);
+    c = ir_class_add(l->m, module_path, name);
     free(name);
     c->flags = (it->is_abstract ? IR_CLASS_ABSTRACT : 0u) |
                (t->is_final ? IR_CLASS_FINAL : 0u) |
@@ -2574,7 +2626,7 @@ static void class_record(struct lowerer *l, const struct module *module,
         struct text init = {0};
         const struct ir_function *f;
         lower_init_name(t, it->exported, &init);
-        f = lower_find_function(l->m, l->module_name, text_cstr(&init));
+        f = lower_find_function(l->m, module_path, text_cstr(&init));
         text_free(&init);
         c->init = f != NULL ? f->index : IR_NO_INDEX;
         c->table = lower_class_table(l, t)->index;
@@ -2631,6 +2683,28 @@ static void class_record(struct lowerer *l, const struct module *module,
                           lower_class_descriptor(l, pr->type)->index);
         text_free(&path);
     }
+    free(module_path);
+}
+
+/* Whether it is a copy of a generic of another module whose data a
+   library file of the program holds already. Its descriptor tells. */
+static bool known_copy(struct lowerer *l, const struct item *it)
+{
+    const struct type *t;
+    struct text name = {0};
+    const struct ir_global *g;
+
+    if (it->home_module == NULL || it->symbol == NULL ||
+        it->symbol->type == NULL ||
+        (it->kind != ITEM_CLASS && it->kind != ITEM_STRUCT)) {
+        return false;
+    }
+    t = it->symbol->type;
+    type_symbol_name(&name, t);
+    text_append(&name, ".descriptor");
+    g = lower_find_global(l->m, it->home_module, text_cstr(&name));
+    text_free(&name);
+    return g != NULL && g->index < l->first_global && !g->is_extern;
 }
 
 bool lower_module(struct module *module, const char *module_name,
@@ -2651,6 +2725,8 @@ bool lower_module(struct module *module, const char *module_name,
     memset(&l, 0, sizeof l);
     l.m = out;
     l.module_name = module_name;
+    l.first_function = out->function_count;
+    l.first_global = out->global_count;
     l.file = module->file != NULL ? module->file : module_name;
     l.file_index = ir_file_add(out, l.file);
     l.no_reflect = (options & LOWER_NO_REFLECT) != 0;
@@ -2684,6 +2760,9 @@ bool lower_module(struct module *module, const char *module_name,
        value and therefore no table. */
     for (i = 0; i < module->item_count; i++) {
         const struct item *it = module->items[i];
+        if (known_copy(&l, it)) {
+            continue;
+        }
         if (it->kind == ITEM_CLASS && !it->is_abstract &&
             it->symbol != NULL && it->symbol->type != NULL) {
             const struct type *t = it->symbol->type;
@@ -2712,6 +2791,9 @@ bool lower_module(struct module *module, const char *module_name,
     }
     for (i = 0; i < module->item_count; i++) {
         const struct item *it = module->items[i];
+        if (known_copy(&l, it)) {
+            continue;
+        }
         if (it->kind == ITEM_CLASS && it->symbol != NULL &&
             it->symbol->type != NULL) {
             class_record(&l, module, it);
@@ -2744,11 +2826,26 @@ bool lower_module(struct module *module, const char *module_name,
     free(l.anonymous);
     patterns_start(&l);
     free(l.regex_literals);
+    /* A function or a datum defined here under the path of another
+       module is a copy of a generic of that module. The object of the
+       module being lowered holds it. */
     for (i = first; i < out->function_count; i++) {
         struct ir_function *f = out->functions[i];
         if (!f->is_extern && f->module != NULL &&
-            strcmp(f->module, module_name) == 0) {
+            strcmp(f->module, module_name) != 0) {
+            f->unit = module_name;
+        }
+        if (!f->is_extern && f->module != NULL && f->file == IR_NO_INDEX &&
+            ir_in_unit(f->module, f->unit, module_name)) {
             f->file = l.file_index;
+        }
+    }
+    for (i = l.first_global; i < out->global_count; i++) {
+        struct ir_global *g = out->globals[i];
+        if (!g->is_extern && g->module != NULL &&
+            strcmp(g->module, module_name) != 0 &&
+            strcmp(g->module, RUNTIME_MODULE) != 0) {
+            g->unit = module_name;
         }
     }
     return true;

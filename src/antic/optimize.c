@@ -1456,7 +1456,7 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
         const struct ir_function *f = m->functions[i];
         if (!f->is_extern &&
             (f->exported || ir_is_patterns_start(f) ||
-             (strcmp(f->module, entry) == 0 &&
+             (ir_in_unit(f->module, f->unit, entry) &&
               (!has_main || strcmp(f->name, "main") == 0)))) {
             mark_function(m, (uint32_t)i, live, live_globals);
         }
@@ -1468,7 +1468,7 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
     for (i = 0; i < m->global_count; i++) {
         const struct ir_global *g = m->globals[i];
         if (g->exported || (all && !g->is_extern && g->module != NULL &&
-                            strcmp(g->module, entry) == 0)) {
+                            ir_in_unit(g->module, g->unit, entry))) {
             live_globals[i] = true;
         }
     }
@@ -1601,7 +1601,7 @@ void ir_optimize_module(struct ir_module *program, const char *module)
         }
         /* The passes over the whole program write the functions of the
            runtime module, and the object that links holds them. */
-        if (strcmp(f->module, module) != 0 &&
+        if (!ir_in_unit(f->module, f->unit, module) &&
             strcmp(f->module, RUNTIME_MODULE) != 0) {
             drop_body(f);
         } else {
@@ -1617,7 +1617,7 @@ void ir_optimize_module(struct ir_module *program, const char *module)
     for (i = 0; i < program->global_count; i++) {
         struct ir_global *g = program->globals[i];
         if (!g->is_extern && g->module != NULL &&
-            strcmp(g->module, module) != 0 &&
+            !ir_in_unit(g->module, g->unit, module) &&
             strcmp(g->module, RUNTIME_MODULE) != 0) {
             drop_data(g);
         }

@@ -269,6 +269,9 @@ struct type {
        reads, each made on its first use. */
     struct type *walked;
     struct type *indexed;
+    /* TYPE_PARAM: the parameter whose walk or `e[i]` gives this value,
+       NULL for any other parameter. */
+    struct type *hook_owner;
 
     enum layout_state layout;       /* TYPE_STRUCT, for the cycle check */
     struct type *next;              /* the list of derived types */

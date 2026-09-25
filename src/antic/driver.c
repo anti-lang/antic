@@ -1916,7 +1916,7 @@ static int compile(const struct options *o, struct text *source,
        then leave the module, with its `type` names and its constraints, so
        the passes after the checker see no type parameter. */
     if (o->library || !o->front_end) {
-        sema_strip_generics(tree);
+        sema_strip_generics(tree, &arena);
     }
     if (o->library) {
         status = write_library(o, tree, text_cstr(module), &arena, &diags);
@@ -2117,7 +2117,7 @@ const struct interface *driver_interface(const struct options *o,
         report_diagnostics(o, &diags);
         goto done;
     }
-    sema_strip_generics(parsed);
+    sema_strip_generics(parsed, arena);
     warnings_apply(parsed, &diags, 0, false);
     report_diagnostics(o, &diags);
     iface = arena_alloc(arena, sizeof *iface);

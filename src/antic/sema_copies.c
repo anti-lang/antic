@@ -382,6 +382,15 @@ static struct name symbol_name(struct copies *k, const struct type *copy,
     return made;
 }
 
+/* The module of a generic of a library, or NULL for a generic of the
+   module. The functions and the data of its copies carry its path. */
+static const char *generic_home(const struct item *generic)
+{
+    const struct symbol *sym = generic->symbol;
+
+    return sym != NULL && sym->home != NULL ? sym->home->module : NULL;
+}
+
 /* The copy of the function member of a generic, as a member of the copy
    item owner of the type copy. Its body is made later. */
 static struct item *member_copy(struct copies *k, struct item *owner,
@@ -397,8 +406,10 @@ static struct item *member_copy(struct copies *k, struct item *owner,
     sym->item = n;
     sym->name = symbol_name(k, copy, &member->name);
     sym->type = sema_subst(k->c, member->symbol->type, &map);
+    sym->home = NULL;
     n->symbol = sym;
     n->owner = owner;
+    n->home_module = owner->home_module;
     n->pub = member->pub;
     n->exported = false;
     if (member->body != NULL) {
@@ -436,8 +447,10 @@ static struct item *type_item(struct copies *k, struct type *copy)
     sym->item = made;
     sym->name = copy->name;
     sym->type = copy;
+    sym->home = NULL;
     made->symbol = sym;
     made->name = copy->name;
+    made->home_module = generic_home(generic);
     made->type_params = NULL;
     made->type_param_count = 0;
     /* A copy stands in no interface: each module that uses the generic
@@ -546,8 +559,10 @@ static struct item *fn_copy(struct copies *k, struct item *generic,
     sym->item = n;
     sym->name = copy_name(k, &generic->name, args, values, count);
     sym->type = sema_subst(k->c, generic->symbol->type, &map);
+    sym->home = NULL;
     n->symbol = sym;
     n->name = sym->name;
+    n->home_module = generic_home(generic);
     n->type_params = NULL;
     n->type_param_count = 0;
     n->pub = false;
@@ -1426,26 +1441,44 @@ static bool generic_type_item(const struct item *it)
             it->kind == ITEM_VARIANT);
 }
 
-/* Whether a concrete copy of a generic of the module has no item yet,
-   after making the items of those that do not. */
+/* Make the items of the concrete copies of the generic type item that
+   have none yet. Returns whether it made one. */
+static bool items_of_copies(struct copies *k, const struct item *it)
+{
+    struct type *copy;
+    bool made = false;
+
+    if (!generic_type_item(it)) {
+        return false;
+    }
+    for (copy = it->symbol->type->copies; copy != NULL;
+         copy = copy->next_copy) {
+        if (!sema_has_params(copy) && map_get(&k->items, copy) == NULL) {
+            type_item(k, copy);
+            made = true;
+        }
+    }
+    return made;
+}
+
+/* Whether a concrete copy of a generic of the module or of a library had
+   no item yet. Makes the items of those that had none. A copy of a
+   generic of a library is made here as well. No module but the one that
+   uses it need have compiled it. */
 static bool copies_without_items(struct copies *k)
 {
     struct module *module = k->c->module;
     bool made = false;
     size_t i;
+    size_t j;
 
     for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        struct type *copy;
-        if (!generic_type_item(it)) {
-            continue;
-        }
-        for (copy = it->symbol->type->copies; copy != NULL;
-             copy = copy->next_copy) {
-            if (!sema_has_params(copy) && map_get(&k->items, copy) == NULL) {
-                type_item(k, copy);
-                made = true;
-            }
+        made = items_of_copies(k, module->items[i]) || made;
+    }
+    for (i = 0; i < k->c->library_count; i++) {
+        const struct interface *lib = k->c->libraries[i];
+        for (j = 0; j < lib->generic_count; j++) {
+            made = items_of_copies(k, lib->generics[j]) || made;
         }
     }
     return made;
@@ -1467,6 +1500,15 @@ void sema_compile_copies(struct checker *c)
         struct item *it = module->items[i];
         if (generic_type_item(it)) {
             map_put(&k.generics, it->symbol->type, it);
+        }
+    }
+    for (i = 0; i < c->library_count; i++) {
+        const struct interface *lib = c->libraries[i];
+        for (j = 0; j < lib->generic_count; j++) {
+            struct item *it = lib->generics[j];
+            if (generic_type_item(it)) {
+                map_put(&k.generics, it->symbol->type, it);
+            }
         }
     }
     for (i = 0; i < count; i++) {

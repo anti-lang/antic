@@ -265,6 +265,22 @@ static void add_constraint(struct checker *c, struct type *p,
         }
         t = sym->type;
     } else {
+        /* A `constraint` of another module comes with its library
+           file, which holds its set. */
+        const struct symbol *module = sema_scope_find_local(&c->module_scope,
+                                                            &r->module);
+        const struct interface *lib =
+            module != NULL && module->kind == SYMBOL_MODULE
+                ? module->home
+                : sema_find_library(c, &r->module);
+        sym = lib != NULL ? sema_library_item(c, lib, &r->name) : NULL;
+        if (sym != NULL && sym->kind == SYMBOL_CONSTRAINT) {
+            p->hooks |= sym->type->hooks;
+            for (i = 0; i < sym->type->iface_count; i++) {
+                add_iface(c, p, sym->type->ifaces[i]);
+            }
+            return;
+        }
         t = sema_interface_named(c, &r->module, &r->name, r->pos);
         if (t == NULL) {
             return;
@@ -1405,6 +1421,7 @@ static struct type *hook_value(struct checker *c, struct type *p,
     name.length = length;
     t = types_param(c->types, name);
     t->declared_by = p->declared_by;
+    t->hook_owner = p;
     return t;
 }
 
@@ -1517,16 +1534,20 @@ static bool stripped(const struct item *it)
            it->kind == ITEM_CONSTRAINT;
 }
 
-void sema_strip_generics(struct module *module)
+void sema_strip_generics(struct module *module, struct arena *arena)
 {
     size_t kept = 0;
     size_t i;
     size_t j;
 
+    module->stripped = types_alloc_array(arena, module->item_count + 1,
+                                         sizeof *module->stripped);
+    module->stripped_count = 0;
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         size_t members = 0;
         if (stripped(it)) {
+            module->stripped[module->stripped_count++] = it;
             continue;
         }
         for (j = 0; j < it->member_count; j++) {

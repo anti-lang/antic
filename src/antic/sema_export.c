@@ -923,10 +923,18 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
     }
 }
 
+/* Whether a stands before b in the source. */
+static bool before(const struct item *a, const struct item *b)
+{
+    return a->pos.line < b->pos.line ||
+           (a->pos.line == b->pos.line && a->pos.column < b->pos.column);
+}
+
 void sema_interface(const struct module *module, const char *module_name,
                     struct arena *arena, struct interface *out)
 {
     size_t i;
+    size_t k;
 
     memset(out, 0, sizeof *out);
     out->module = keep_name(arena, module_name, strlen(module_name));
@@ -958,11 +966,35 @@ void sema_interface(const struct module *module, const char *module_name,
                       module->linux_libraries[i].name.length);
     }
     out->linux_library_count = module->linux_library_count;
-    out->items = types_alloc_array(arena, module->item_count + 1,
-                                   sizeof *out->items);
-    for (i = 0; i < module->item_count; i++) {
-        const struct item *it = module->items[i];
+    out->items = types_alloc_array(
+        arena, module->item_count + module->stripped_count + 1,
+        sizeof *out->items);
+    out->generics = types_alloc_array(arena, module->stripped_count + 1,
+                                      sizeof *out->generics);
+    for (i = 0; i < module->stripped_count; i++) {
+        struct item *it = module->stripped[i];
+        if (it->type_param_count > 0 && it->outer == NULL &&
+            it->symbol != NULL &&
+            (it->kind == ITEM_FN || it->kind == ITEM_STRUCT ||
+             it->kind == ITEM_CLASS || it->kind == ITEM_VARIANT)) {
+            out->generics[out->generic_count++] = it;
+        }
+    }
+    /* The items the checker kept and those it took out, merged in the
+       order of the source. */
+    for (i = 0, k = 0; i < module->item_count || k < module->stripped_count;) {
+        const struct item *it;
         struct symbol *sym;
+        bool take_stripped =
+            i == module->item_count ||
+            (k < module->stripped_count &&
+             before(module->stripped[k], module->items[i]));
+        it = take_stripped ? module->stripped[k++] : module->items[i++];
+        if (take_stripped &&
+            (it->outer != NULL || it->symbol == NULL ||
+             (it->kind == ITEM_TYPE && sema_is_error(it->symbol->type)))) {
+            continue;
+        }
         /* DESIGN: an `internal` item goes into the interface marked
            as internal. A module of the same package may then import it,
            and a module of another package may not. */
@@ -996,7 +1028,12 @@ void sema_interface(const struct module *module, const char *module_name,
             }
             sym->params = names;
         }
-        sym->item = NULL;
+        /* A generic function keeps its declaration, which the section
+           of the generics writes. */
+        sym->item = it->kind == ITEM_FN && it->type_param_count > 0
+                        ? (struct item *)it
+                        : NULL;
+        sym->alias = it->kind == ITEM_TYPE;
         sym->home = out;
         out->items[out->item_count++] = sym;
     }

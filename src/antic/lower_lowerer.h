@@ -101,6 +101,11 @@ struct lowerer {
     const char *file;           /* the source path, for an assertion */
     uint32_t file_index;        /* the same path in the module's table */
     const char *module_name;
+    /* The functions and the globals the library files brought, which
+       come before those of the module. A copy of a generic of another
+       module that one of them holds is used and not made again. */
+    size_t first_function;
+    size_t first_global;
     struct ir_function *f;
     struct ir_block *b;         /* NULL after a terminator */
     struct loop *loop;
@@ -471,5 +476,8 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
 void lower_block(struct lowerer *l, const struct block *b);
 void lower_reserve_slots(struct lowerer *l, struct ir_block *entry,
                          const struct block *b);
+
+bool lower_defines(const struct lowerer *l, const struct type *t,
+                   const char *module);
 
 #endif

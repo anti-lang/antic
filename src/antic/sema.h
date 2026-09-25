@@ -151,6 +151,9 @@ struct symbol {
     const struct symbol *holds;
     /* An export item, whose function has the C symbol of its name. */
     bool exported;
+    /* The name a `type` declares, in an interface. Its type is the one
+       the name stands for. */
+    bool alias;
     struct doc_text doc;            /* the /// text of a pub item */
     const struct interface *home;   /* the library of an imported item */
     uint32_t ir;                    /* set by lowering, see lower.h */
@@ -169,6 +172,11 @@ struct interface {
     size_t import_count;
     struct symbol **items;          /* pub fn, extern fn, struct and const */
     size_t item_count;
+    /* Every generic function, struct, class and variant of the module,
+       private ones among them, with the checked tree of each body. A
+       module that uses one makes its copies from these. */
+    struct item **generics;
+    size_t generic_count;
     const char **frameworks;        /* of its `link framework` lines */
     size_t framework_count;
     const char **linux_libraries;   /* of its `link linux` lines */
@@ -193,7 +201,7 @@ bool sema_check(struct module *module, const char *module_name,
    every `type` and every `constraint`, and every function of a class body
    with type parameters of its own. The passes after the checker compile
    what remains. */
-void sema_strip_generics(struct module *module);
+void sema_strip_generics(struct module *module, struct arena *arena);
 
 /* The `fallthrough;` that ends the body of a switch arm, the last
    statement of its block, or NULL when the arm ends otherwise. */

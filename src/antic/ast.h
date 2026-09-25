@@ -918,6 +918,14 @@ struct item {
        `own` field or a `keep own` parameter. */
     bool snapshot;
     bool snapshot_heap;
+    /* A copy of a generic of another module: the path of that module.
+       Its functions and its data carry that module in their symbols, so
+       every module that makes the copy writes the same ones. NULL for
+       every other item. */
+    const char *home_module;
+    /* The source of that generic, which its lines and its positions
+       name, or NULL. */
+    const char *home_file;
 };
 
 struct import {
@@ -1010,6 +1018,10 @@ struct module {
     /* Set by the driver on a build past the front end: the checker
        makes a compiled copy for every use of a generic. */
     bool compile_copies;
+    /* The items sema_strip_generics took out: the generics, every `type`
+       and every `constraint`. The interface of the module carries them. */
+    struct item **stripped;
+    size_t stripped_count;
 };
 
 /* Append the tree of module to out, one node per line, indented by two

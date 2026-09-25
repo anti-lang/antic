@@ -1,4 +1,5 @@
 #include "antl.h"
+#include "antl_io.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -12,7 +13,8 @@
    fail when one of them changes, and the version changes with it. */
 _Static_assert(TYPE_STRUCT == 24, "raise ANTL_VERSION, then update this");
 _Static_assert(TYPE_VARIANT == 28, "raise ANTL_VERSION, then update this");
-_Static_assert(SYMBOL_GLOBAL == 7, "raise ANTL_VERSION, then update this");
+_Static_assert(TYPE_PARAM == 29, "raise ANTL_VERSION, then update this");
+_Static_assert(SYMBOL_CONSTRAINT == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
 _Static_assert(TOKEN_KIND_COUNT == 180, "raise ANTL_VERSION, then update this");
@@ -28,16 +30,6 @@ _Static_assert(IR_SYM_OP == 3, "raise ANTL_VERSION, then update this");
 static const uint8_t magic[4] = {'A', 'N', 'T', 'L'};
 
 /* Writing */
-
-struct writer {
-    struct text *out;
-    const struct interface *iface;
-    bool strip_docs;
-    const struct type **types;      /* the type table in index order */
-    size_t type_count;
-    size_t type_capacity;
-    bool failed;    /* a count or an index did not fit in 32 bits */
-};
 
 static void put_u8(struct writer *w, uint8_t v)
 {
@@ -118,8 +110,12 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
         types_is_field_descriptor(t)) {
         return false;
     }
-    return type_has_fields(t) && t->module.length == strlen(module) &&
-           memcmp(t->module.text, module, t->module.length) == 0;
+    /* A copy of a generic is written in full wherever it stands, so the
+       reader can make it when no module read before has. */
+    return type_has_fields(t) &&
+           (t->generic != NULL ||
+            (t->module.length == strlen(module) &&
+             memcmp(t->module.text, module, t->module.length) == 0));
 }
 
 /* The count of functions of the body of t that another module may see.
@@ -131,12 +127,22 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
    name. */
 static bool name_equals(const struct name *n, const char *s);
 
-static bool carried_member(const struct item *m)
+/* DESIGN: a generic struct, class or variant carries every function of
+   its body, private ones among them. A module that makes a copy of it
+   compiles the body of each. A function with type parameters of
+   its own stays behind, as no copy compiles one yet. A copy carries no
+   function: it has those of its generic, as the checker gives it. */
+static bool carried_member(const struct type *t, const struct item *m)
 {
-    return m->kind == ITEM_FN && m->symbol != NULL &&
-           (m->vis != VIS_PRIVATE ||
-            (m->body != NULL && (name_equals(&m->name, "construct") ||
-                                 name_equals(&m->name, "destruct"))));
+    if (m->kind != ITEM_FN || m->symbol == NULL) {
+        return false;
+    }
+    if (t->type_param_count > 0) {
+        return m->type_param_count == 0;
+    }
+    return m->vis != VIS_PRIVATE ||
+           (m->body != NULL && (name_equals(&m->name, "construct") ||
+                                name_equals(&m->name, "destruct")));
 }
 
 static size_t public_members(const struct type *t)
@@ -144,12 +150,22 @@ static size_t public_members(const struct type *t)
     size_t count = 0;
     size_t i;
 
-    for (i = 0; i < t->member_count; i++) {
-        if (carried_member(t->members[i])) {
+    for (i = 0; t->generic == NULL && i < t->member_count; i++) {
+        if (carried_member(t, t->members[i])) {
             count++;
         }
     }
     return count;
+}
+
+/* The form of a struct, a class or a variant in the type table. */
+enum { FORM_PLAIN, FORM_GENERIC, FORM_COPY };
+
+static uint8_t struct_form(const struct type *t)
+{
+    return t->generic != NULL          ? FORM_COPY
+           : t->type_param_count > 0 ? FORM_GENERIC
+                                     : FORM_PLAIN;
 }
 
 /* Whether t is a pub struct or union of the interface. */
@@ -274,9 +290,28 @@ static void visit_type(struct writer *w, const struct type *t)
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
-        /* A channel names its element, which comes first. */
+        /* A channel names its element, which comes first. So do the
+           parameters of a generic, and the generic and the arguments of
+           a copy. */
         if (types_is_chan(t)) {
             visit_type(w, t->element);
+        }
+        for (i = 0; i < t->type_param_count; i++) {
+            visit_type(w, t->type_params[i]);
+        }
+        if (t->generic != NULL) {
+            visit_type(w, t->generic);
+            for (i = 0; i < t->generic->type_param_count; i++) {
+                if (t->values[i] != NULL) {
+                    visit_symbolic(w, t->values[i]);
+                } else {
+                    visit_type(w, t->args[i]);
+                }
+            }
+        }
+        /* The generic may name this copy in a field. */
+        if (find_type(w, t, &index)) {
+            return;
         }
         add_type(w, t);
         if (is_local_struct(w, t)) {
@@ -286,13 +321,33 @@ static void visit_type(struct writer *w, const struct type *t)
                     visit_value(w, t->fields[i].constant);
                 }
             }
-            for (i = 0; i < t->member_count; i++) {
+            for (i = 0; t->generic == NULL && i < t->member_count; i++) {
                 const struct item *m = t->members[i];
-                if (carried_member(m)) {
+                if (carried_member(t, m)) {
                     visit_type(w, m->symbol->type);
                     visit_defaults(w, m->symbol);
                 }
             }
+        }
+        return;
+    /* The value a hook of a parameter gives follows the parameter, and a
+       parameter follows the interfaces of its constraints. */
+    case TYPE_PARAM:
+        if (t->hook_owner != NULL) {
+            visit_type(w, t->hook_owner);
+        }
+        for (i = 0; i < t->iface_count; i++) {
+            visit_type(w, t->ifaces[i]);
+        }
+        if (find_type(w, t, &index)) {
+            return;
+        }
+        add_type(w, t);
+        if (t->walked != NULL) {
+            visit_type(w, t->walked);
+        }
+        if (t->indexed != NULL) {
+            visit_type(w, t->indexed);
         }
         return;
     /* The underlying integer comes first, because an enum names it by
@@ -339,11 +394,64 @@ static void put_symbolic(struct writer *w, const struct symbolic *s)
         put_u8(w, (uint8_t)s->op);
         put_symbolic(w, s->a);
         put_symbolic(w, s->b);
-        break;    case SYMBOLIC_PARAM:
-        /* A library file carries no generic yet, so nothing it writes
-           names a parameter. */
-        w->failed = true;
         break;
+    /* A constant parameter of a generic, `N`, names its parameter. */
+    case SYMBOLIC_PARAM:
+        put_type_ref(w, s->of);
+        break;
+    }
+}
+
+/* The constraints of a parameter or of a `constraint` as written, each
+   a module and a name. `anti doc` prints them. */
+static void put_constraint_refs(struct writer *w,
+                                const struct constraint_ref *refs,
+                                size_t count)
+{
+    size_t i;
+
+    put_count(w, count);
+    for (i = 0; i < count; i++) {
+        put_bytes(w, refs[i].module.text, refs[i].module.length);
+        put_bytes(w, refs[i].name.text, refs[i].name.length);
+    }
+}
+
+/* DESIGN: a type parameter is an entry of the type table. It carries its
+   name and a role: 0 for a parameter a generic declares, 1 for the value
+   a walk of one gives, 2 for the value `e[i]` of one reads, and 3 for
+   the set a `constraint` names. The value of a hook follows the index of
+   its parameter. A declared parameter carries the mark of `N: int` and
+   its constraints as written, and a set carries those of its
+   `constraint`. Every one then carries the hooks it meets, one bit per
+   entry of the hook table, and the interfaces it names. */
+static void put_param_type(struct writer *w, const struct type *t)
+{
+    size_t i;
+
+    put_bytes(w, t->name.text, t->name.length);
+    if (t->hook_owner != NULL) {
+        put_u8(w, t->hook_owner->walked == t ? 1 : 2);
+        put_type_ref(w, t->hook_owner);
+    } else if (t->param != NULL) {
+        put_u8(w, 0);
+        put_u8(w, t->param->constant);
+        put_constraint_refs(w, t->param->constraints,
+                            t->param->constraint_count);
+    } else {
+        put_u8(w, 3);
+        put_constraint_refs(w,
+                            t->declared_by != NULL
+                                ? t->declared_by->constraints
+                                : NULL,
+                            t->declared_by != NULL
+                                ? t->declared_by->constraint_count
+                                : 0);
+    }
+    put_u32(w, t->hooks);
+    put_count(w, t->iface_count);
+    for (i = 0; i < t->iface_count; i++) {
+        put_type_ref(w, t->ifaces[i]);
     }
 }
 
@@ -409,6 +517,24 @@ static void put_type(struct writer *w, const struct type *t)
     case TYPE_VARIANT:
         put_bytes(w, t->module.text, t->module.length);
         put_bytes(w, t->name.text, t->name.length);
+        /* DESIGN: a form byte follows the name. A generic carries its
+           parameters after its body. A copy names its generic and its
+           arguments, a type or a constant each, before its body. It
+           carries that body in full wherever it stands. A reader that
+           has the copy already takes that one. The copies of one generic
+           with the same arguments are then one type in the program. */
+        put_u8(w, struct_form(t));
+        if (t->generic != NULL) {
+            put_type_ref(w, t->generic);
+            for (i = 0; i < t->generic->type_param_count; i++) {
+                put_u8(w, t->values[i] != NULL);
+                if (t->values[i] != NULL) {
+                    put_symbolic(w, t->values[i]);
+                } else {
+                    put_type_ref(w, t->args[i]);
+                }
+            }
+        }
         /* `chan T` is one struct per element type, so the element
            follows its name. */
         if (types_is_chan(t)) {
@@ -465,9 +591,9 @@ static void put_type(struct writer *w, const struct type *t)
             /* The public functions of the body, so a call on a value of
                another module resolves and reaches the right symbol. */
             put_count(w, public_members(t));
-            for (i = 0; i < t->member_count; i++) {
+            for (i = 0; t->generic == NULL && i < t->member_count; i++) {
                 const struct item *m = t->members[i];
-                if (!carried_member(m)) {
+                if (!carried_member(t, m)) {
                     continue;
                 }
                 put_bytes(w, m->name.text, m->name.length);
@@ -497,7 +623,16 @@ static void put_type(struct writer *w, const struct type *t)
                     put_bytes(w, n->text, n->length);
                 }
             }
+            if (t->type_param_count > 0) {
+                put_count(w, t->type_param_count);
+                for (i = 0; i < t->type_param_count; i++) {
+                    put_type_ref(w, t->type_params[i]);
+                }
+            }
         }
+        break;
+    case TYPE_PARAM:
+        put_param_type(w, t);
         break;
     /* An enum is its module, its name, its underlying integer and the
        name and number of each value. */
@@ -602,8 +737,8 @@ static void put_defaults(struct writer *w, const struct type *t)
     }
     /* The functions of the body, in the order the type carries them, so
        the reader has their types in place. */
-    for (i = 0; i < t->member_count; i++) {
-        if (carried_member(t->members[i])) {
+    for (i = 0; t->generic == NULL && i < t->member_count; i++) {
+        if (carried_member(t, t->members[i])) {
             put_param_defaults(w, t->members[i]->symbol);
             put_param_owned(w, t->members[i]->symbol);
         }
@@ -912,6 +1047,7 @@ bool antl_write(struct text *out, const struct interface *iface,
         }
         visit_defaults(&w, iface->items[i]);
     }
+    antl_visit_generics(&w);
     put_header(&w, iface);
     put_count(&w, w.type_count);
     for (i = 0; i < w.type_count; i++) {
@@ -930,10 +1066,18 @@ bool antl_write(struct text *out, const struct interface *iface,
            file sees the form the declaration wrote. The type alone gives
            the `?*Error` of the ABI and never the form. `worker` is
            recorded for the same reason, and `anti doc` prints it. */
+        /* Bit 4 marks the name a `type` declares, and bit 5 a generic
+           function, whose declaration the section of the generics
+           holds. */
         put_u8(&w, (uint8_t)((unsigned)sym->exported |
                              (unsigned)sym->internal << 1 |
                              (unsigned)sym->may_fail << 2 |
-                             (unsigned)sym->worker << 3));
+                             (unsigned)sym->worker << 3 |
+                             (unsigned)sym->alias << 4 |
+                             (unsigned)(sym->kind == SYMBOL_FN &&
+                                        sym->item != NULL &&
+                                        sym->item->type_param_count > 0)
+                                 << 5));
         put_doc(&w, sym->doc.text, sym->doc.length);
         if (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN) {
             size_t j;
@@ -949,28 +1093,14 @@ bool antl_write(struct text *out, const struct interface *iface,
             put_value(&w, sym->value);
         }
     }
+    antl_put_generics(&w);
     put_ir(&w, ir);
     free((void *)w.types);
+    free((void *)w.externs);
     return !w.failed;
 }
 
 /* Reading */
-
-struct reader {
-    const uint8_t *data;
-    size_t size;
-    size_t pos;
-    bool failed;
-    char *error;
-    size_t error_size;
-    struct arena *arena;
-    struct types *types;
-    const struct interface *const *libraries;
-    size_t library_count;
-    struct interface *iface;
-    struct type **table;
-    uint32_t table_count;
-};
 
 static void fail(struct reader *r, const char *format, ...)
 #if defined(__GNUC__) || defined(__clang__)
@@ -1267,9 +1397,18 @@ static struct type *foreign_struct(struct reader *r, const struct name *module,
     }
     for (i = 0; i < lib->item_count; i++) {
         const struct symbol *sym = lib->items[i];
-        if (sym->kind == SYMBOL_STRUCT && sym->name.length == name->length &&
+        if (sym->kind == SYMBOL_STRUCT && !sym->alias &&
+            sym->name.length == name->length &&
             memcmp(sym->name.text, name->text, name->length) == 0) {
             return sym->type;
+        }
+    }
+    /* A copy may name a private generic of another module, which the
+       section of the generics of that module declares. */
+    for (i = 0; i < lib->generic_count; i++) {
+        const struct item *it = lib->generics[i];
+        if (it->kind != ITEM_FN && name_equals_name(&it->name, name)) {
+            return it->symbol->type;
         }
     }
     fail(r, "needs struct `%.*s.%.*s`", (int)module->length, module->text,
@@ -1301,7 +1440,7 @@ static const struct symbolic *read_symbolic(struct reader *r, uint32_t limit,
     memset(&key, 0, sizeof key);
     key.kind = (enum symbolic_kind)kind;
     key.type = type_ref(r, limit);
-    if (r->failed || kind > SYMBOLIC_CAST || depth > 64) {
+    if (r->failed || kind > SYMBOLIC_PARAM || depth > 64) {
         damaged(r);
         return NULL;
     }
@@ -1324,7 +1463,15 @@ static const struct symbolic *read_symbolic(struct reader *r, uint32_t limit,
         if (key.kind == SYMBOLIC_BINARY && !r->failed) {
             key.b = read_symbolic(r, limit, depth + 1);
         }
-        break;    case SYMBOLIC_PARAM:
+        break;
+    case SYMBOLIC_PARAM:
+        key.of = type_ref(r, limit);
+        if (!r->failed && (key.of->kind != TYPE_PARAM ||
+                           key.of->param == NULL ||
+                           !key.of->param->constant)) {
+            damaged(r);
+            return NULL;
+        }
         break;
     }
     if (r->failed || !(type_is_integer(key.type) || key.type->kind == TYPE_BOOL)) {
@@ -1574,6 +1721,174 @@ static void check_nesting(struct reader *r, uint32_t count)
     free(n.states);
 }
 
+/* The number of hooks a type parameter can meet, one bit each. */
+enum { HOOK_BITS = 20 };
+
+/* The constraints as written of a parameter or a `constraint`. */
+static struct constraint_ref *read_constraint_refs(struct reader *r,
+                                                   size_t *count)
+{
+    uint32_t n = get_count(r, 8);
+    struct constraint_ref *refs = allocate(r, n, sizeof *refs);
+    uint32_t i;
+
+    for (i = 0; i < n && !r->failed; i++) {
+        memset(&refs[i], 0, sizeof refs[i]);
+        refs[i].module = get_name(r);
+        refs[i].name = get_name(r);
+    }
+    *count = r->failed ? 0 : n;
+    return refs;
+}
+
+/* A type parameter of the table, entry at, as put_param_type wrote it. */
+static struct type *read_param_type(struct reader *r, uint32_t at)
+{
+    struct name name = get_name(r);
+    uint8_t role = get_u8(r);
+    struct type *t;
+    uint32_t n;
+    uint32_t i;
+
+    if (r->failed) {
+        return NULL;
+    }
+    t = types_param(r->types, name);
+    if (role == 1 || role == 2) {
+        struct type *owner = type_ref(r, at);
+        if (r->failed || owner->kind != TYPE_PARAM || owner->param == NULL ||
+            (role == 1 ? owner->walked : owner->indexed) != NULL) {
+            damaged(r);
+            return NULL;
+        }
+        if (role == 1) {
+            owner->walked = t;
+        } else {
+            owner->indexed = t;
+        }
+        t->hook_owner = owner;
+    } else if (role == 0) {
+        struct type_param *tp = allocate(r, 1, sizeof *tp);
+        uint8_t constant = get_u8(r);
+        tp->name = name;
+        tp->constant = constant == 1;
+        tp->constraints = read_constraint_refs(r, &tp->constraint_count);
+        tp->type = t;
+        t->param = tp;
+        if (constant > 1) {
+            damaged(r);
+        }
+    } else if (role == 3) {
+        struct item *set = allocate(r, 1, sizeof *set);
+        set->kind = ITEM_CONSTRAINT;
+        set->name = name;
+        set->constraints = read_constraint_refs(r, &set->constraint_count);
+        t->declared_by = set;
+    } else {
+        damaged(r);
+        return NULL;
+    }
+    t->hooks = get_u32(r);
+    if (t->hooks >> HOOK_BITS != 0) {
+        damaged(r);
+    }
+    n = get_count(r, 4);
+    t->ifaces = allocate(r, n, sizeof *t->ifaces);
+    for (i = 0; i < n && !r->failed; i++) {
+        const struct type *iface = type_ref(r, at);
+        if (r->failed || iface->kind != TYPE_CLASS || !iface->has_abstract) {
+            damaged(r);
+            return NULL;
+        }
+        t->ifaces[i] = iface;
+    }
+    t->iface_count = r->failed ? 0 : n;
+    return t;
+}
+
+/* The parameters of the generic t, which follow its body. */
+static void read_type_params(struct reader *r, uint32_t at, struct type *t)
+{
+    uint32_t n = get_count(r, 4);
+    uint32_t i;
+
+    t->type_params = allocate(r, n, sizeof *t->type_params);
+    for (i = 0; i < n && !r->failed; i++) {
+        struct type *p = type_ref(r, at);
+        if (r->failed || p->kind != TYPE_PARAM || p->param == NULL) {
+            damaged(r);
+            return;
+        }
+        t->type_params[i] = p;
+    }
+    if (n == 0) {
+        damaged(r);
+        return;
+    }
+    t->type_param_count = n;
+    t->generic_ready = true;
+}
+
+/* The generic a copy names and its arguments, each a type or a constant
+   as its parameter asks, or NULL when the file is damaged. */
+static struct type *read_copy_args(struct reader *r, uint32_t at,
+                                   uint8_t kind, struct type ***args_out,
+                                   const struct symbolic ***values_out)
+{
+    struct type *generic = type_ref(r, at);
+    struct type **args;
+    const struct symbolic **values;
+    size_t i;
+
+    if (r->failed || generic->type_param_count == 0 ||
+        generic->kind != (enum type_kind)kind) {
+        damaged(r);
+        return NULL;
+    }
+    args = allocate(r, generic->type_param_count, sizeof *args);
+    values = allocate(r, generic->type_param_count, sizeof *values);
+    for (i = 0; i < generic->type_param_count && !r->failed; i++) {
+        bool constant = generic->type_params[i]->param->constant;
+        uint8_t is_value = get_u8(r);
+        if (r->failed || is_value != (constant ? 1 : 0)) {
+            damaged(r);
+            return NULL;
+        }
+        if (constant) {
+            values[i] = read_symbolic(r, at, 0);
+        } else {
+            args[i] = type_ref(r, at);
+        }
+    }
+    if (r->failed) {
+        return NULL;
+    }
+    *args_out = args;
+    *values_out = values;
+    return generic;
+}
+
+/* The copy of generic with these arguments that the program has, or
+   NULL. Types and symbolic values are interned, so equal arguments are
+   equal pointers. */
+static struct type *copy_among(struct type *generic, struct type **args,
+                               const struct symbolic **values)
+{
+    struct type *copy;
+    size_t i;
+
+    for (copy = generic->copies; copy != NULL; copy = copy->next_copy) {
+        bool same = true;
+        for (i = 0; i < generic->type_param_count && same; i++) {
+            same = copy->args[i] == args[i] && copy->values[i] == values[i];
+        }
+        if (same) {
+            return copy;
+        }
+    }
+    return NULL;
+}
+
 static void read_types(struct reader *r)
 {
     uint32_t count = get_count(r, 1);
@@ -1680,12 +1995,28 @@ static void read_types(struct reader *r)
         case TYPE_VARIANT: {
             struct name module = get_name(r);
             struct name name = get_name(r);
+            uint8_t struct_form_byte = get_u8(r);
+            struct type *generic = NULL;
+            struct type **args = NULL;
+            const struct symbolic **values = NULL;
+            struct type *existing = NULL;
             uint8_t flags;
             uint8_t safety;
             if (r->failed) {
                 break;
             }
-            if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_CHAN)) {
+            if (struct_form_byte > FORM_COPY) {
+                damaged(r);
+                break;
+            }
+            if (struct_form_byte == FORM_COPY) {
+                generic = read_copy_args(r, i, kind, &args, &values);
+                if (generic == NULL) {
+                    break;
+                }
+                existing = copy_among(generic, args, values);
+            } else if (kind == TYPE_STRUCT &&
+                       names_lang(&module, &name, LANG_CHAN)) {
                 struct type *element = type_ref(r, i);
                 if (!r->failed) {
                     t = types_chan(r->types, element);
@@ -1734,7 +2065,8 @@ static void read_types(struct reader *r)
             }
             /* The root carries the path of `anti.lang` and is still
                no struct of its library file. */
-            if (!name_equals(&module, r->iface->module) ||
+            if ((struct_form_byte != FORM_COPY &&
+                 !name_equals(&module, r->iface->module)) ||
                 names_lang(&module, &name, LANG_OBJECT) ||
                 names_lang(&module, &name, LANG_FLAGS) ||
                 names_lang(&module, &name, LANG_FIELD_DESCRIPTOR)) {
@@ -1851,8 +2183,27 @@ static void read_types(struct reader *r)
                 sym->doc = m->doc;
                 s->members[j] = m;
             }
+            if (struct_form_byte == FORM_GENERIC) {
+                read_type_params(r, i, t);
+            } else if (struct_form_byte == FORM_COPY && existing != NULL) {
+                /* The body read stays behind, and the copy the program
+                   has already stands for it. */
+                t = existing;
+            } else if (struct_form_byte == FORM_COPY) {
+                if (s->member_count > 0) {
+                    damaged(r);
+                }
+                t->generic = generic;
+                t->args = args;
+                t->values = values;
+                t->next_copy = generic->copies;
+                generic->copies = t;
+            }
             break;
         }
+        case TYPE_PARAM:
+            t = read_param_type(r, i);
+            break;
         /* An enum carries its values, each with a name and a number. */
         case TYPE_ENUM: {
             struct name module = get_name(r);
@@ -1959,6 +2310,15 @@ static void read_types(struct reader *r)
         if (!r->failed && s->member_count > 0) {
             s->s->members = s->members;
             s->s->member_count = s->member_count;
+        }
+    }
+    /* A copy has the functions of its generic, whose types name the
+       parameters. The checker puts the arguments in at each use. */
+    for (i = 0; i < struct_count && !r->failed; i++) {
+        struct type *t = structs[i].s;
+        if (t->generic != NULL) {
+            t->members = t->generic->members;
+            t->member_count = t->generic->member_count;
         }
     }
     /* The cases of a variant come from its union, whose fields are in
@@ -2076,9 +2436,11 @@ static void read_items(struct reader *r)
     uint32_t i;
 
     iface->items = allocate(r, count, sizeof *iface->items);
+    r->marked_generic = allocate(r, count, sizeof *r->marked_generic);
     for (i = 0; i < count && !r->failed; i++) {
         struct symbol *sym = arena_alloc(r->arena, sizeof *sym);
         uint8_t kind = get_u8(r);
+        bool generic = false;
         bool ok;
         sym->name = get_name(r);
         sym->type = type_ref(r, r->table_count);
@@ -2088,6 +2450,14 @@ static void read_items(struct reader *r)
             sym->internal = (marks >> 1 & 1) != 0;
             sym->may_fail = (marks >> 2 & 1) != 0;
             sym->worker = (marks >> 3 & 1) != 0;
+            sym->alias = (marks >> 4 & 1) != 0;
+            /* A generic function is linked to its declaration once the
+               section of the generics is read. */
+            generic = (marks >> 5 & 1) != 0;
+            if (marks > 63 || (sym->alias && kind != SYMBOL_STRUCT) ||
+                (generic && kind != SYMBOL_FN)) {
+                damaged(r);
+            }
         }
         {
             struct name doc = get_name(r);
@@ -2125,10 +2495,16 @@ static void read_items(struct reader *r)
             break;
         case SYMBOL_STRUCT:
             /* A struct, a class, a variant and an enum share this
-               symbol kind. */
-            ok = (type_has_fields(sym->type) ||
-                  sym->type->kind == TYPE_ENUM) &&
-                 name_equals(&sym->type->module, iface->module);
+               symbol kind. The name a `type` declares may stand for
+               any type. */
+            ok = sym->alias ||
+                 ((type_has_fields(sym->type) ||
+                   sym->type->kind == TYPE_ENUM) &&
+                  name_equals(&sym->type->module, iface->module));
+            break;
+        case SYMBOL_CONSTRAINT:
+            ok = sym->type->kind == TYPE_PARAM && sym->type->param == NULL &&
+                 sym->type->hook_owner == NULL;
             break;
         case SYMBOL_CONST:
             sym->value = arena_alloc(r->arena, sizeof *sym->value);
@@ -2141,6 +2517,7 @@ static void read_items(struct reader *r)
         if (!ok) {
             damaged(r);
         }
+        r->marked_generic[iface->item_count] = generic;
         iface->items[iface->item_count++] = sym;
     }
 }
@@ -2780,8 +3157,16 @@ static void read_body(struct reader *r, struct ir_module *program,
 
 /* A function signature, mapped to a function of the program. A C function
    and a declaration share an existing entry of the same name. */
+/* Whether name is that of a copy of a generic, or of a function or a
+   datum of one. Only a copy carries `<`. */
+static bool copy_name(const char *name)
+{
+    return strchr(name, '<') != NULL;
+}
+
 static uint32_t read_signature(struct reader *r, struct ir_module *program,
-                               struct ir_maps *maps, bool *has_body)
+                               struct ir_maps *maps, bool *has_body,
+                               bool *skip)
 {
     uint8_t flags = get_u8(r);
     const char *module = get_cstr(r);
@@ -2795,6 +3180,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     size_t i;
 
     *has_body = false;
+    *skip = false;
     if (r->failed) {
         return 0;
     }
@@ -2818,7 +3204,18 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
             f = g;
         }
     }
-    if (f != NULL && (flags & 1) == 0) {
+    /* DESIGN: each module that uses a copy of a generic defines it, so
+       two library files may both define one. The program keeps the
+       first, and the second stands for it. The copies are made from one
+       tree with the same arguments, so they are the same code. */
+    if (f != NULL && (flags & 1) == 0 && module != NULL && copy_name(name)) {
+        if (f->is_extern) {
+            f->is_extern = false;
+            *has_body = true;
+        } else {
+            *skip = true;
+        }
+    } else if (f != NULL && (flags & 1) == 0) {
         fail(r, "defines `%s.%s`, which another library defines", module, name);
         return 0;
     }
@@ -2831,6 +3228,11 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
             f = ir_function_add(program, module, name, (enum ir_type)result,
                                 result_agg);
             *has_body = true;
+            /* A copy of a generic of another module belongs to the object
+               of the module whose file defines it. */
+            if (module != NULL && strcmp(module, r->iface->module) != 0) {
+                f->unit = r->iface->module;
+            }
         } else if (module == NULL) {
             f = ir_extern_add(program, name, (enum ir_type)result, flags & 2);
             f->result_agg = result_agg;
@@ -2878,6 +3280,20 @@ static uint32_t map_global(struct reader *r, const struct ir_maps *maps,
         return 0;
     }
     return maps->globals[g];
+}
+
+/* Whether the program holds a record of the class of c before c. */
+static bool has_class(const struct ir_module *program, const struct ir_class *c)
+{
+    size_t i;
+
+    for (i = 0; i + 1 < program->class_count; i++) {
+        if (strcmp(program->classes[i]->module, c->module) == 0 &&
+            strcmp(program->classes[i]->name, c->name) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /* The class records of the file. Each names globals, a function and an
@@ -2971,7 +3387,70 @@ static void read_classes(struct reader *r, struct ir_module *program,
             ir_class_provides(program, c, path, map_global(r, maps, of,
                                                            false));
         }
+        /* The record of a copy of a generic that the program has
+           already stays behind. */
+        if (copy_name(name) && has_class(program, c)) {
+            ir_class_free(c);
+            program->class_count--;
+        }
     }
+}
+
+/* The body of a copy the program has already: read to move past it,
+   and dropped. */
+static void skip_body(struct reader *r, struct ir_module *program,
+                      const struct ir_function *f, struct ir_maps *maps)
+{
+    struct ir_function scratch;
+
+    memset(&scratch, 0, sizeof scratch);
+    scratch.params = f->params;
+    scratch.param_count = f->param_count;
+    scratch.temps = malloc((f->param_count + 1) * sizeof *scratch.temps);
+    if (scratch.temps == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    memcpy(scratch.temps, f->temps, f->param_count * sizeof *scratch.temps);
+    scratch.temp_count = (uint32_t)f->param_count;
+    scratch.temp_capacity = f->param_count + 1;
+    read_body(r, program, &scratch, maps);
+    ir_function_free_body(&scratch);
+}
+
+/* A datum of a copy of a generic that the program has already, as g,
+   the global read last. The program keeps the first, and *index
+   receives it. Returns whether g is such a twin, which the program then
+   drops. */
+static bool merge_copy_global(struct ir_module *program, struct ir_global *g,
+                              uint32_t *index)
+{
+    size_t i;
+
+    for (i = 0; i + 1 < program->global_count; i++) {
+        struct ir_global *old = program->globals[i];
+        if (old->module == NULL || strcmp(old->module, g->module) != 0 ||
+            strcmp(old->name, g->name) != 0) {
+            continue;
+        }
+        if (old->is_extern) {
+            /* A declaration takes the definition. */
+            old->bytes = g->bytes;
+            old->size = g->size;
+            old->align = g->align;
+            old->value = g->value;
+            old->exported = g->exported;
+            old->mutable = g->mutable;
+            old->is_extern = false;
+            program->global_count--;
+            *index = old->index;
+            return false;
+        }
+        program->global_count--;
+        *index = old->index;
+        return true;
+    }
+    return false;
 }
 
 struct relocs {
@@ -2986,6 +3465,8 @@ static void read_ir(struct reader *r, struct ir_module *program)
     struct ir_maps maps;
     struct relocs *relocs;
     struct ir_function **bodies;
+    bool *skips;
+    bool *twins;
     uint32_t i;
     uint32_t j;
 
@@ -2994,6 +3475,7 @@ static void read_ir(struct reader *r, struct ir_module *program)
     maps.global_count = get_count(r, 28);
     maps.globals = allocate(r, maps.global_count, sizeof *maps.globals);
     relocs = allocate(r, maps.global_count, sizeof *relocs);
+    twins = allocate(r, maps.global_count, sizeof *twins);
     for (i = 0; i < maps.global_count && !r->failed; i++) {
         const char *module = get_cstr(r);
         const char *name = get_cstr(r);
@@ -3033,10 +3515,22 @@ static void read_ir(struct reader *r, struct ir_module *program)
                 g->value = read_const(r, program, &maps, 0);
             }
         }
+        if (!g->is_extern && module != NULL && !r->failed) {
+            if (copy_name(name)) {
+                twins[i] = merge_copy_global(program, g, &maps.globals[i]);
+                g = program->globals[maps.globals[i]];
+            }
+            if (!twins[i] && strcmp(module, r->iface->module) != 0) {
+                g->unit = r->iface->module;
+            }
+        }
     }
     /* A pointer may name a global that the file lists later. */
     for (i = 0; i < maps.global_count && !r->failed; i++) {
         struct ir_global *g = program->globals[maps.globals[i]];
+        if (twins[i]) {
+            continue;
+        }
         if (g->value != NULL) {
             remap_const(r, g->value, &maps, false);
         }
@@ -3055,20 +3549,28 @@ static void read_ir(struct reader *r, struct ir_module *program)
     maps.function_count = get_count(r, 15);
     maps.functions = allocate(r, maps.function_count, sizeof *maps.functions);
     bodies = allocate(r, maps.function_count, sizeof *bodies);
+    skips = allocate(r, maps.function_count, sizeof *skips);
     for (i = 0; i < maps.function_count && !r->failed; i++) {
         bool has_body;
-        maps.functions[i] = read_signature(r, program, &maps, &has_body);
+        maps.functions[i] = read_signature(r, program, &maps, &has_body,
+                                           &skips[i]);
         bodies[i] = has_body ? program->functions[maps.functions[i]] : NULL;
     }
     for (i = 0; i < maps.function_count && !r->failed; i++) {
         if (bodies[i] != NULL) {
             read_body(r, program, bodies[i], &maps);
+        } else if (skips[i]) {
+            skip_body(r, program, program->functions[maps.functions[i]],
+                      &maps);
         }
     }
     /* A table entry names a function, and the file lists the functions
        after the globals, so those addresses wait until here. */
     for (i = 0; i < maps.global_count && !r->failed; i++) {
         struct ir_global *g = program->globals[maps.globals[i]];
+        if (twins[i]) {
+            continue;
+        }
         if (g->value != NULL) {
             remap_const(r, g->value, &maps, true);
         }
@@ -3087,6 +3589,121 @@ static void read_ir(struct reader *r, struct ir_module *program)
     if (!r->failed) {
         read_classes(r, program, &maps);
     }
+}
+
+/* The helpers antl_tree.c shares, see antl_io.h. */
+
+void antl_put_u8(struct writer *w, uint8_t v) { put_u8(w, v); }
+void antl_put_u32(struct writer *w, uint32_t v) { put_u32(w, v); }
+void antl_put_u64(struct writer *w, uint64_t v) { put_u64(w, v); }
+void antl_put_count(struct writer *w, size_t n) { put_count(w, n); }
+
+void antl_put_bytes(struct writer *w, const char *s, size_t length)
+{
+    put_bytes(w, s, length);
+}
+
+void antl_put_type_ref(struct writer *w, const struct type *t)
+{
+    put_type_ref(w, t);
+}
+
+void antl_visit_type(struct writer *w, const struct type *t)
+{
+    visit_type(w, t);
+}
+
+void antl_visit_value(struct writer *w, const struct const_value *v)
+{
+    visit_value(w, v);
+}
+
+void antl_visit_defaults(struct writer *w, const struct symbol *sym)
+{
+    visit_defaults(w, sym);
+}
+
+void antl_visit_symbolic(struct writer *w, const struct symbolic *s)
+{
+    visit_symbolic(w, s);
+}
+
+void antl_put_symbolic(struct writer *w, const struct symbolic *s)
+{
+    put_symbolic(w, s);
+}
+
+const struct symbolic *antl_read_symbolic(struct reader *r)
+{
+    return read_symbolic(r, r->table_count, 0);
+}
+
+void antl_put_value(struct writer *w, const struct const_value *v)
+{
+    put_value(w, v);
+}
+
+void antl_put_param_defaults(struct writer *w, const struct symbol *sym)
+{
+    put_param_defaults(w, sym);
+}
+
+void antl_put_param_owned(struct writer *w, const struct symbol *sym)
+{
+    put_param_owned(w, sym);
+}
+
+uint64_t antl_float_bits(double d) { return float_bits(d); }
+
+void antl_damaged(struct reader *r) { damaged(r); }
+
+void antl_fail_needs(struct reader *r, const char *what, const char *module,
+                     const struct name *name)
+{
+    fail(r, "needs %s `%s.%.*s`", what, module, (int)name->length,
+         name->text);
+}
+
+uint8_t antl_get_u8(struct reader *r) { return get_u8(r); }
+uint32_t antl_get_u32(struct reader *r) { return get_u32(r); }
+uint64_t antl_get_u64(struct reader *r) { return get_u64(r); }
+
+uint32_t antl_get_count(struct reader *r, size_t min)
+{
+    return get_count(r, min);
+}
+
+void *antl_allocate(struct reader *r, size_t count, size_t size)
+{
+    return allocate(r, count, size);
+}
+
+struct name antl_get_name(struct reader *r) { return get_name(r); }
+
+struct type *antl_type_ref(struct reader *r, uint32_t limit)
+{
+    return type_ref(r, limit);
+}
+
+bool antl_read_value(struct reader *r, struct type *t, struct const_value *v)
+{
+    return read_value(r, t, v, 0);
+}
+
+void antl_read_param_defaults(struct reader *r, struct symbol *sym)
+{
+    read_param_defaults(r, sym);
+}
+
+void antl_read_param_owned(struct reader *r, struct symbol *sym)
+{
+    read_param_owned(r, sym);
+}
+
+const struct interface *antl_library(const struct reader *r,
+                                     const struct name *module)
+{
+    return library(r, module);
 }
 
 struct interface *antl_read(const uint8_t *data, size_t size,
@@ -3122,6 +3739,9 @@ struct interface *antl_read(const uint8_t *data, size_t size,
     }
     if (!r.failed) {
         read_items(&r);
+    }
+    if (!r.failed) {
+        antl_read_generics(&r);
     }
     if (!r.failed) {
         read_ir(&r, program);
