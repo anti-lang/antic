@@ -79,3 +79,18 @@ of 1037, ASan 1036 of 1036 and UBSan 1036 of 1036. Logs:
 `opt-ubsan-test.log`. The docs-style checker reports nothing on every
 touched file but `tests/CMakeLists.txt`, whose `#` comments it reads as
 Markdown, with 290 findings before and after.
+
+## Proof of the push
+
+After the push of `1d7a919`:
+
+```text
+$ git log --oneline -3
+1d7a919 Report the optional values
+4b4bb38 Record the optional values in the decisions and the overview
+bb6c902 Record the assembly of the programs of optional values
+$ git status --short
+$ git rev-parse HEAD origin/main
+1d7a91905a796cf142e427aee80fe7873207b675
+1d7a91905a796cf142e427aee80fe7873207b675
+```
