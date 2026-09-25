@@ -1,0 +1,26 @@
+//! The refusals of the collections on handles and of the heap.
+//!
+//! A queue lends no element in a walk, since a change in place would break the
+//! order of its heap, and it takes only elements that have an order.
+
+import anti.collection.pool.{Handle, Pool};
+import anti.collection.queue.{PriorityQueue};
+
+struct Plain
+{
+	x: int,
+}
+
+fn main() -> int
+{
+	let q = PriorityQueue<int>.new();
+	q.push(1);
+	for x in &q {
+		*x = 2;
+	}
+	let p = PriorityQueue<Plain>.new();
+	let slots = Pool<int>.new();
+	let h: Handle<int> = slots.add(1);
+	let n: Handle<str> = h;
+	return 0;
+}

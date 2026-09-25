@@ -1,0 +1,24 @@
+exit 0
+empty: pop -1, peek -1
+count 42, peek 0
+ 0 0 2 2 7 9 9 11
+popped 42 in order: true, count 0
+event 1 at 10
+event 2 at 10
+event 3 at 20
+event 1 at 30
+update_all 5, smallest now 1
+update_first true, update_one, smallest now 0
+remove_all 5, remove_first 3, count 4, below 5 1
+ 0 5 7 9
+total of the walk 21
+clear: 0 true
+made for 100: 1 allocation
+past it: 2 allocations
+after the block: 2 frees
+peek 1, torn 0
+walked 11, torn 4
+pop 1, torn 4
+removed 1, torn 5
+pop 2
+after the block, torn 9

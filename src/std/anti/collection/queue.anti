@@ -1,0 +1,296 @@
+//! Ordered retrieval.
+//!
+//! `PriorityQueue<T>` is a binary heap in one array. `pop` and `peek` give the
+//! smallest element first, for schedulers, event queues, timers and path
+//! finding.
+
+import anti.collection;
+import anti.lang;
+import anti.mem;
+
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+
+/// A binary heap in one array, which gives the smallest element first.
+///
+/// The element at `i` is no larger than those at `2i + 1` and `2i + 2`, so the
+/// smallest stands at 0. `push` and `pop` take a number of steps logarithmic in
+/// the count. The array grows as a list does: from 8 elements, or from the
+/// capacity it was made with, doubling as it fills.
+///
+/// `for` walks copies of the elements in the order of the array, which is not
+/// the order of `pop`. An element is never lent in a walk, since a change in
+/// place would break the order of the heap. `update_all`, `update_first` and
+/// `update_one` restore the order after their changes.
+pub class PriorityQueue<T: Ordered> inherits collection.Collection<T>
+{
+	/// The array, with one slot more than `capacity` that swaps go through.
+	items: ?*T = none,
+	capacity: int = 0,
+
+	/// An empty queue with room for `capacity` elements from `from`, or from
+	/// the C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> PriorityQueue<T>
+	{
+		let made = PriorityQueue<T> { from: collection.allocator(from) };
+		if capacity > 0 {
+			made.items = made.room(capacity + 1);
+			if made.items != none {
+				made.capacity = capacity;
+			}
+		}
+		return made;
+	}
+
+	/// Add `x`, which the queue now owns.
+	pub fn push(self, own x: T, at: lang.SourceLocation = here)
+	{
+		if self.count == self.capacity {
+			let size = self.grown(self.capacity, self.count + 1);
+			let made = self.moved(self.items, self.count, size + 1) catch fatal;
+			self.items = made;
+			self.capacity = size;
+		}
+		let items = self.items catch fatal;
+		items[self.count] = x;
+		self.resized(1, at);
+		self.sift_up(self.count - 1);
+	}
+
+	/// Remove the smallest element and give it, or `none` when the queue is
+	/// empty.
+	pub fn pop(self, at: lang.SourceLocation = here) -> ?T
+	{
+		if self.count == 0 {
+			return none;
+		}
+		let (taken, after) = self.take_place(0);
+		self.resized(-1, at);
+		return taken;
+	}
+
+	/// A copy of the smallest element, or `none` when the queue is empty.
+	pub fn peek(self) -> ?T
+	{
+		if self.count == 0 {
+			return none;
+		}
+		let items = self.items catch fatal;
+		return self.copy_element(&items[0]);
+	}
+
+	operator fn iter(self) -> QueueWalk<T>
+	{
+		return QueueWalk<T> { watch: self.watch(), queue: self };
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		if self.count == 0 {
+			return -1;
+		}
+		return 0;
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		if at + 1 >= self.count {
+			return -1;
+		}
+		return at + 1;
+	}
+
+	/// Lend the element at `at` to `f` and move it to where its new value
+	/// belongs.
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		let items = self.items catch fatal;
+		f(&items[at]);
+		self.fix(at, self.count);
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		let items = self.items catch fatal;
+		return self.copy_element(&items[at]);
+	}
+
+	/// Move the element at `at` out, put the last element in its place and
+	/// restore the order. The element after it in the array is then at `at`.
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let items = self.items catch fatal;
+		let last = self.count - 1;
+		let after = -1;
+		if at < last {
+			after = at;
+		}
+		let taken = (items[at], after);
+		if at < last {
+			self.copy_slot(at, last);
+		}
+		memset(&items[last] as ?*byte, 0, size_of(T) as c_size_t);
+		if at < last {
+			self.fix(at, last);
+		}
+		return taken;
+	}
+
+	/// Run `change` on every element that `test` accepts, in place, then
+	/// restore the order, and give their number.
+	concrete fn update_all(self, test: fn(T) -> bool, change: fn(lent *T)) -> int
+	{
+		let items = self.items else {
+			return 0;
+		};
+		let n = 0;
+		for i in 0..self.count {
+			if test(items[i]) {
+				change(&items[i]);
+				n += 1;
+			}
+		}
+		if n > 0 {
+			self.heapify();
+		}
+		return n;
+	}
+
+	/// Remove every element that `test` accepts, tear each down, restore the
+	/// order and give their number.
+	concrete fn remove_all(self, test: fn(T) -> bool,
+		at: lang.SourceLocation = here) -> int
+	{
+		let items = self.items else {
+			return 0;
+		};
+		let kept = 0;
+		for i in 0..self.count {
+			if test(items[i]) {
+				self.destroy_element(&items[i]);
+			} else if kept < i {
+				self.copy_slot(kept, i);
+				kept += 1;
+			} else {
+				kept += 1;
+				continue;
+			}
+			memset(&items[i] as ?*byte, 0, size_of(T) as c_size_t);
+		}
+		let n = self.count - kept;
+		if n > 0 {
+			self.resized(-n, at);
+			self.heapify();
+		}
+		return n;
+	}
+
+	/// Move the element at `i` up while it is smaller than its parent.
+	fn sift_up(self, i: int)
+	{
+		let items = self.items catch fatal;
+		let at = i;
+		while at > 0 do {
+			let up = (at - 1) / 2;
+			if !(items[at] < items[up]) {
+				break;
+			}
+			self.swap(at, up);
+			at = up;
+		}
+	}
+
+	/// Move the element at `i` down while a child of it among the first `n`
+	/// elements is smaller.
+	fn sift_down(self, i: int, n: int)
+	{
+		let items = self.items catch fatal;
+		let at = i;
+		while 2 * at + 1 < n do {
+			let child = 2 * at + 1;
+			if child + 1 < n && items[child + 1] < items[child] {
+				child += 1;
+			}
+			if !(items[child] < items[at]) {
+				break;
+			}
+			self.swap(at, child);
+			at = child;
+		}
+	}
+
+	/// Move the element at `i` of the first `n` to where its value belongs.
+	fn fix(self, i: int, n: int)
+	{
+		self.sift_up(i);
+		self.sift_down(i, n);
+	}
+
+	/// Restore the order of the whole array, from the last parent up.
+	fn heapify(self)
+	{
+		let i = self.count / 2 - 1;
+		while i >= 0 do {
+			self.sift_down(i, self.count);
+			i -= 1;
+		}
+	}
+
+	/// Exchange the elements at `a` and `b` as bytes, through the spare slot,
+	/// which holds zero bytes again after.
+	fn swap(self, a: int, b: int)
+	{
+		let items = self.items catch fatal;
+		let spare = self.capacity;
+		self.copy_slot(spare, a);
+		self.copy_slot(a, b);
+		self.copy_slot(b, spare);
+		memset(&items[spare] as ?*byte, 0, size_of(T) as c_size_t);
+	}
+
+	/// Copy the bytes of the element at `from` over the slot `to`.
+	fn copy_slot(self, to: int, from: int)
+	{
+		let items = self.items catch fatal;
+		memcpy(&items[to] as ?*byte, &items[from] as ?*byte, size_of(T) as c_size_t);
+	}
+
+	fn destruct(self)
+	{
+		let items = self.items else {
+			return;
+		};
+		let i = self.count - 1;
+		while i >= 0 do {
+			self.destroy_element(&items[i]);
+			i -= 1;
+		}
+		self.give_back(items);
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the order of their arrays.
+pub operator fn eq<T: Ordered>(a: PriorityQueue<T>, b: PriorityQueue<T>) -> bool
+{
+	return collection.equal<T>(&a, &b);
+}
+
+/// The iterator of `PriorityQueue<T>`, which gives a copy of each element in
+/// the order of the array. The loop tears each copy down.
+pub class QueueWalk<T: Ordered>
+{
+	pub watch: lang.Watch,
+	pub queue: *PriorityQueue<T>,
+	pub at: int = -1,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.queue.count;
+	}
+
+	operator fn value(self) -> T
+	{
+		return self.queue.copy_place(self.at);
+	}
+}

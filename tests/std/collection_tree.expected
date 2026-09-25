@@ -1,0 +1,23 @@
+exit 0
+count 9: ["world", "ui", "car", "house", "wheel", "door", "roof", "menu", "tyre"]
+parent of wheel: car, of world: true
+children of world: car house
+depth first: world car wheel tyre door house roof
+breadth first: world car house wheel door roof tyre
+below roof: 0
+removed 4 with car, count 5: ["world", "ui", "house", "roof", "menu"]
+wheel: gone, add_child true, depth first 0, remove 0
+world now: world house roof
+bus reuses slot 2 in generation 1, car finds nothing
+children of world: house bus
+modify: 20 at version 1
+the element changed from version 1 to 2
+read 21
+update_all 4: [1, 121, 103, 104, 105]
+find_all: [121, 103, 104, 105]
+remove_first 121, the children lifted: 1<-1 103<1 104<1 105<1
+remove_all 3: [1], children of 1: 0
+clear: 0 false
+removed 3, torn 3
+stale parent 1, torn 4
+after the block, torn 6

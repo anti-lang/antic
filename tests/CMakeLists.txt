@@ -910,6 +910,47 @@ set_tests_properties(std_collection_parts_dev PROPERTIES
     FIXTURES_REQUIRED
         "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object")
 
+# The collections on handles and the heap in dev mode. Each module below
+# anti.collection writes an object of its own, and a program links the
+# objects of every module it reaches.
+foreach(module IN ITEMS pool tree queue)
+    add_test(NAME dev_object_collection_${module}
+        COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+                -I "${ANTIC_RUNTIME_DIR}/std"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev"
+                "${ANTIC_RUNTIME_DIR}/std/anti/collection/${module}.antl")
+    set_tests_properties(dev_object_collection_${module} PROPERTIES
+        FIXTURES_SETUP collection_${module}_dev_object)
+endforeach()
+set(collection_dev_objects
+    "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev.o")
+foreach(case "pool|pool" "tree|pool,tree" "queue|queue")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 modules)
+    string(REPLACE "," ";" modules "${modules}")
+    set(objects "${collection_dev_objects}")
+    set(fixtures lang_dev_object mem_dev_object text_dev_object
+        collection_dev_object)
+    foreach(module IN LISTS modules)
+        string(APPEND objects
+            ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev.o")
+        list(APPEND fixtures collection_${module}_dev_object)
+    endforeach()
+    add_test(NAME std_collection_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/collection_${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${objects}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_tests_properties(std_collection_${name}_dev PROPERTIES
+        FIXTURES_REQUIRED "${fixtures}")
+endforeach()
+
 # Every failing function of src/std/ is written with `may fail`, apart from
 # a binding, which refuses it.
 add_test(NAME std_may_fail_only
@@ -3238,6 +3279,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "hashing|--front-end,hashing.anti"
         "direct_imports|--front-end,--runtime,${ANTIC_RUNTIME_DIR},direct_imports.anti"
         "walk_interfaces|--front-end,--runtime,${ANTIC_RUNTIME_DIR},walk_interfaces.anti"
+        "handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},handles.anti"
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

@@ -1,0 +1,240 @@
+//! `PriorityQueue<T>` of `anti.collection.queue`.
+//!
+//! Numbers pushed in a scrambled order come out smallest first, a queue of
+//! events orders a struct by its own `lt`, and a class that owns memory shows
+//! that every element is torn down once. The shared forms keep the order of the
+//! heap after they change it.
+
+import anti.collection.queue.{PriorityQueue};
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// An event at a time, which the queue orders by `at` and then by `id`.
+struct Event
+{
+	at: int,
+	id: int,
+}
+
+operator fn eq(a: Event, b: Event) -> bool
+{
+	return a.at == b.at && a.id == b.id;
+}
+
+operator fn lt(a: Event, b: Event) -> bool
+{
+	return a.at < b.at || (a.at == b.at && a.id < b.id);
+}
+
+/// A class that owns memory, orders by its number and counts its teardowns.
+class Job
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Job
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Job { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Job) -> bool
+	{
+		return self.number() == other.number();
+	}
+
+	operator fn lt(self, other: Job) -> bool
+	{
+		return self.number() < other.number();
+	}
+
+	fn destruct(self)
+	{
+		Job.torn.add(1);
+	}
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn numbers()
+{
+	let q = PriorityQueue<int>.new();
+	let empty = q.pop() ?? -1;
+	let nothing = q.peek() ?? -1;
+	show(f"empty: pop {empty}, peek {nothing}");
+	let x = 7;
+	for i in 0..40 {
+		x = (x * 37 + 11) % 101;
+		let pushed = x;
+		q.push(pushed);
+	}
+	q.push(50);
+	q.push(50);
+	let top = q.peek() ?? -1;
+	show(f"count {q.count}, peek {top}");
+	let sorted = true;
+	let last = -1;
+	let n = 0;
+	while true do {
+		let next = q.pop() else {
+			break;
+		};
+		if next < last {
+			sorted = false;
+		}
+		if n < 8 {
+			printf(" %d".ptr, next as c_int);
+		}
+		last = next;
+		n += 1;
+	}
+	show(f"\npopped {n} in order: {sorted}, count {q.count}");
+}
+
+fn events()
+{
+	let q = PriorityQueue<Event>.new();
+	q.push(Event { at: 30, id: 1 });
+	q.push(Event { at: 10, id: 2 });
+	q.push(Event { at: 20, id: 3 });
+	q.push(Event { at: 10, id: 1 });
+	while q.count > 0 do {
+		let e = q.pop() catch fatal;
+		printf("event %d at %d\n".ptr, e.id as c_int, e.at as c_int);
+	}
+}
+
+fn shared() may fail
+{
+	let q = PriorityQueue<int>.new();
+	for i in 1..11 {
+		q.push(i);
+	}
+	let n = q.update_all(fn(x) {
+		return x % 2 == 0;
+	}, fn(x) {
+		*x = 20 - *x;
+	});
+	let first = q.peek() ?? -1;
+	show(f"update_all {n}, smallest now {first}");
+	let hit = q.update_first(fn(x) {
+		return x == 1;
+	}, fn(x) {
+		*x = 100;
+	});
+	try q.update_one(fn(x) {
+		return x == 18;
+	}, fn(x) {
+		*x = 0;
+	});
+	let smallest = q.peek() ?? -1;
+	show(f"update_first {hit}, update_one, smallest now {smallest}");
+	let removed = q.remove_all(fn(x) {
+		return x > 9;
+	});
+	let odd = q.remove_first(fn(x) {
+		return x % 2 == 1;
+	}) ?? -1;
+	let found = q.find_all(fn(x) {
+		return x < 5;
+	});
+	show(f"remove_all {removed}, remove_first {odd}, count {q.count}, below 5 {found.count}");
+	let total = 0;
+	for x in q {
+		total += x;
+	}
+	while q.count > 0 do {
+		let next = q.pop() ?? -1;
+		printf(" %d".ptr, next as c_int);
+	}
+	show(f"\ntotal of the walk {total}");
+	q.push(3);
+	q.clear();
+	show(f"clear: {q.count} {q.is_empty()}");
+}
+
+fn allocation()
+{
+	let counting = Counting { };
+	{
+		let q = PriorityQueue<int>.new(100, &counting);
+		for i in 0..100 {
+			q.push(100 - i);
+		}
+		printf("made for 100: %d allocation\n".ptr, counting.allocs as c_int);
+		q.push(0);
+		printf("past it: %d allocations\n".ptr, counting.allocs as c_int);
+	}
+	printf("after the block: %d frees\n".ptr, counting.frees as c_int);
+}
+
+fn owned()
+{
+	{
+		let q = PriorityQueue<Job>.new();
+		q.push(Job.of(3));
+		q.push(Job.of(1));
+		q.push(Job.of(2));
+		q.push(Job.of(5));
+		let top = q.peek() catch fatal;
+		printf("peek %d, torn %d\n".ptr, top.number() as c_int, Job.torn.load() as c_int);
+		let walked = 0;
+		for j in q {
+			walked += j.number();
+		}
+		printf("walked %d, torn %d\n".ptr, walked as c_int, Job.torn.load() as c_int);
+		let first = q.pop() catch fatal;
+		printf("pop %d, torn %d\n".ptr, first.number() as c_int, Job.torn.load() as c_int);
+		let gone = q.remove_all(fn(j) {
+			return j.number() == 5;
+		});
+		printf("removed %d, torn %d\n".ptr, gone as c_int, Job.torn.load() as c_int);
+		let next = q.pop() catch fatal;
+		printf("pop %d\n".ptr, next.number() as c_int);
+	}
+	printf("after the block, torn %d\n".ptr, Job.torn.load() as c_int);
+}
+
+fn main() -> int
+{
+	numbers();
+	events();
+	shared() catch fatal;
+	allocation();
+	owned();
+	return 0;
+}
