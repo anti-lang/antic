@@ -86,3 +86,18 @@ of 1045, ASan 1044 of 1044 and UBSan 1044 of 1044. Logs:
 `own-ubsan-test.log`. The docs-style checker reports nothing on every
 touched file but `tests/CMakeLists.txt`, whose `#` comments it reads as
 Markdown, as before.
+
+## Proof of the push
+
+After the push of `e50b79b`:
+
+```text
+$ git log --oneline -3
+e50b79b Report own and lent parameters
+1c652c8 Record own and lent parameters in the decisions and the overview
+4103553 Build own parameters of any type and lent parameters
+$ git status --short
+$ git rev-parse HEAD origin/main
+e50b79baa9166602eb2ce5d15d5bfa796b2e6758
+e50b79baa9166602eb2ce5d15d5bfa796b2e6758
+```
