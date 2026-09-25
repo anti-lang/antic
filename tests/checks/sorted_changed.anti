@@ -1,0 +1,19 @@
+//! A `SortedMap` that loses an entry while a `for` walks it. The map counts the
+//! change in `remove`, and the loop of a dev build stops at the next turn and
+//! names the map, the loop and the change.
+
+import anti.collection.sorted.{SortedMap};
+
+fn main() -> int
+{
+	let ages = SortedMap<int, int>.new();
+	ages.set(1, 10);
+	ages.set(2, 20);
+	ages.set(3, 30);
+	for e in ages {
+		if e.0 == 1 {
+			let gone = ages.remove(2);
+		}
+	}
+	return 7;
+}

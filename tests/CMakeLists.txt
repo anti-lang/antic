@@ -1026,6 +1026,30 @@ add_test(NAME std_shared_dev
 set_tests_properties(std_shared_dev PROPERTIES
     FIXTURES_REQUIRED
         "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object")
+# The sorted collections in dev mode, whose copies come from the library
+# file of anti.collection.sorted and whose base comes from anti.collection.
+add_test(NAME dev_object_collection_sorted
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_sorted_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/collection/sorted.antl")
+set_tests_properties(dev_object_collection_sorted PROPERTIES
+    FIXTURES_SETUP collection_sorted_dev_object)
+foreach(name IN ITEMS sorted_map sorted_set sorted_order sorted_trap)
+    add_test(NAME std_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_sorted_dev${anti_object}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_tests_properties(std_${name}_dev PROPERTIES
+        FIXTURES_REQUIRED
+            "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_sorted_dev_object")
+endforeach()
 
 # Every failing function of src/std/ is written with `may fail`, apart from
 # a binding, which refuses it.

@@ -1,0 +1,29 @@
+exit 0
+add true true false true [1, 3, 5] count 3
+contains true false
+remove true false [3, 5]
+3 5 
+floor 30 30 -1 ceiling 40 -1
+first 10 last 70
+20 30 40 | | 60 70 | 
+empty -1 -1 -1 []
+intersect [3, 5, 7] minus [1, 9, 11] [4, 6]
+subset true true false true true
+with empty [] [1, 3, 5, 7, 9, 11]
+large: 250 even from 0 to 498, 250 shared, true false
+find_all 3 find_first 4 find_one 5
+update_all 1 [1, 2, 3, 4, 5, 6, 7, 8, 19]
+remove_all 4 remove_first 5 remove_one 1 [3, 7, 19]
+[3,7,19]
+clear 0 true []
+eq true false true
+duplicate refused 1, torn 1
+[#1, #2, #3]
+removed 1, torn 5
+copies 2, torn 5
+after the block, torn 10 of 10
+made with room: 1 allocation
+shrink: 2 allocations
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+empty shrink: 2 allocations, 2 frees
+after the block: 3 allocations, 3 frees

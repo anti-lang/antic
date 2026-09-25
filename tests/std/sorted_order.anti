@@ -1,0 +1,319 @@
+//! The order of `SortedSet` and `SortedMap` after many insertions and removals.
+//!
+//! Three thousand keys go in and out in an order a fixed generator gives, and a
+//! plain array of flags says which keys each collection must hold. After every
+//! hundred changes a check walks the B-tree itself, through a class that
+//! inherits the collection: every node but the root holds 5 to 11 elements,
+//! every leaf lies at the same depth, the elements of a walk of the nodes rise,
+//! and the walks forward and backward by place see the same elements. `floor`,
+//! `ceiling`, `range`, `first` and `last` are compared with the flags, and
+//! `shrink` moves the nodes of a tree that lost most of its keys.
+
+import anti.collection;
+import anti.collection.sorted.{SortedMap, SortedSet};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The number of keys, from 0 to `KEYS - 1`.
+const KEYS: int = 3000;
+
+/// A generator of the order of the changes, the same on every run.
+struct Order
+{
+	state: u64,
+}
+
+fn next_key(order: *Order) -> int
+{
+	order.state = order.state * 6364136223846793005 + 1442695040888963407;
+	return ((order.state >> 33) % (KEYS as u64)) as int;
+}
+
+/// A set that checks the shape of its own tree.
+class CheckedSet inherits SortedSet<int>
+{
+	/// The depth of the leaves, -1 before the first leaf.
+	leaf_depth: int = -1,
+	/// The last element the walk of the nodes gave.
+	last_seen: int = -1,
+	/// The elements the walk of the nodes gave.
+	seen: int = 0,
+	/// The first fault found, or 0.
+	fault: int = 0,
+
+	pub fn make() -> CheckedSet
+	{
+		return CheckedSet { from: collection.allocator(none) };
+	}
+
+	/// 0 when the tree has its shape, or the number of the first fault.
+	pub fn shape(self) -> int
+	{
+		self.leaf_depth = -1;
+		self.last_seen = -1;
+		self.seen = 0;
+		self.fault = 0;
+		if self.root >= 0 {
+			self.node(self.root, 0);
+		}
+		if self.fault == 0 && self.seen != self.count {
+			self.fault = 4;
+		}
+		if self.fault == 0 {
+			self.fault = self.walks();
+		}
+		return self.fault;
+	}
+
+	fn node(self, n: int, depth: int)
+	{
+		let held = self.held(n);
+		if held > 11 || (n != self.root && held < 5) || held < 1 {
+			self.fault = 1;
+			return;
+		}
+		let i = 0;
+		while i <= held do {
+			if !self.is_leaf(n) {
+				self.node(self.child(n, i), depth + 1);
+			}
+			if i < held {
+				let x = *self.slot(n * 11 + i);
+				if x <= self.last_seen {
+					self.fault = 2;
+				}
+				self.last_seen = x;
+				self.seen += 1;
+			}
+			i += 1;
+		}
+		if self.is_leaf(n) {
+			if self.leaf_depth < 0 {
+				self.leaf_depth = depth;
+			} else if self.leaf_depth != depth {
+				self.fault = 3;
+			}
+		}
+	}
+
+	/// 0 when the walks by place forward and backward see every element in
+	/// order, or the number of the fault.
+	fn walks(self) -> int
+	{
+		let n = 0;
+		let before = -1;
+		let at = self.first_place();
+		while at >= 0 do {
+			let x = *self.slot(at);
+			if x <= before {
+				return 5;
+			}
+			before = x;
+			n += 1;
+			at = self.next_place(at);
+		}
+		if n != self.count {
+			return 6;
+		}
+		let after = KEYS;
+		at = self.last_place();
+		while at >= 0 do {
+			let x = *self.slot(at);
+			if x >= after {
+				return 7;
+			}
+			after = x;
+			n -= 1;
+			at = self.prev_place(at);
+		}
+		if n != 0 {
+			return 8;
+		}
+		return 0;
+	}
+}
+
+/// The greatest key at or below `k` the flags hold, or -1.
+fn floor_of(flags: *[KEYS]bool, k: int) -> int
+{
+	let i = k;
+	while i >= 0 do {
+		if (*flags)[i] {
+			return i;
+		}
+		i -= 1;
+	}
+	return -1;
+}
+
+/// The least key at or above `k` the flags hold, or -1.
+fn ceiling_of(flags: *[KEYS]bool, k: int) -> int
+{
+	let i = k;
+	while i < KEYS do {
+		if (*flags)[i] {
+			return i;
+		}
+		i += 1;
+	}
+	return -1;
+}
+
+/// Whether the lookups by order of `s` agree with the flags at `k`.
+fn lookups_agree(s: *CheckedSet, flags: *[KEYS]bool, k: int) -> bool
+{
+	let floor = s.floor(k) ?? -1;
+	let ceiling = s.ceiling(k) ?? -1;
+	if floor != floor_of(flags, k) || ceiling != ceiling_of(flags, k) {
+		return false;
+	}
+	let first = s.first() ?? -1;
+	let last = s.last() ?? -1;
+	return first == ceiling_of(flags, 0) && last == floor_of(flags, KEYS - 1);
+}
+
+/// Whether `range(lo, lo + 50)` of `s` gives the keys the flags hold there.
+fn range_agrees(s: *CheckedSet, flags: *[KEYS]bool, lo: int) -> bool
+{
+	let expect = ceiling_of(flags, lo);
+	for x in s.range(lo, lo + 50) {
+		if x != expect {
+			return false;
+		}
+		expect = ceiling_of(flags, x + 1);
+	}
+	return expect < 0 || expect >= lo + 50;
+}
+
+fn set_order() -> int
+{
+	let s = CheckedSet.make();
+	let flags = [false; KEYS];
+	let order = Order { state: 7 };
+	let held = 0;
+	let changes = 0;
+	let checks = 0;
+	// Grow to most keys, then shrink to few, then grow and empty again.
+	let phase = 0;
+	while phase < 4 do {
+		let steps = 0;
+		while steps < 6000 do {
+			let k = next_key(&order);
+			let adding = phase % 2 == 0;
+			if adding {
+				let key = k;
+				let added = s.add(key);
+				if added == flags[k] {
+					printf("add %d gave %d\n".ptr, k as c_int, added as c_int);
+					return 1;
+				}
+				if added {
+					held += 1;
+				}
+				flags[k] = true;
+			} else {
+				let removed = s.remove(k);
+				if removed != flags[k] {
+					printf("remove %d gave %d\n".ptr, k as c_int, removed as c_int);
+					return 1;
+				}
+				if removed {
+					held -= 1;
+				}
+				flags[k] = false;
+			}
+			changes += 1;
+			if changes % 100 == 0 {
+				let fault = s.shape();
+				if fault != 0 || s.count != held {
+					printf("fault %d after %d changes\n".ptr, fault as c_int,
+						changes as c_int);
+					return 1;
+				}
+				if !lookups_agree(&s, &flags, k) || !range_agrees(&s, &flags, k) {
+					printf("lookups differ at %d\n".ptr, k as c_int);
+					return 1;
+				}
+				checks += 1;
+			}
+			steps += 1;
+		}
+		// After a phase that removed most keys, move the nodes down and give
+		// the rest of the block back.
+		if phase % 2 == 1 {
+			s.shrink();
+		}
+		printf("set phase %d: %d elements, shape %d\n".ptr, phase as c_int,
+			s.count as c_int, s.shape() as c_int);
+		phase += 1;
+	}
+	// Remove the rest, from the ends inward.
+	while s.count > 0 do {
+		let low = s.first() ?? -1;
+		let high = s.last() ?? -1;
+		let gone = s.remove(low);
+		if low != high {
+			gone = s.remove(high);
+		}
+		if s.shape() != 0 {
+			printf("fault while emptying\n".ptr);
+			return 1;
+		}
+	}
+	printf("set emptied: %d elements, %d checks\n".ptr, s.count as c_int,
+		checks as c_int);
+	return 0;
+}
+
+fn map_order() -> int
+{
+	let m = SortedMap<int, int>.new();
+	let flags = [false; KEYS];
+	let order = Order { state: 11 };
+	let steps = 0;
+	while steps < 20000 do {
+		let k = next_key(&order);
+		if steps % 3 == 2 {
+			let v = m.remove(k) ?? -1;
+			if (v >= 0) != flags[k] || (v >= 0 && v != k * 2) {
+				printf("remove %d gave %d\n".ptr, k as c_int, v as c_int);
+				return 1;
+			}
+			flags[k] = false;
+		} else {
+			m.set(k, k * 2);
+			flags[k] = true;
+		}
+		steps += 1;
+	}
+	let expect = ceiling_of(&flags, 0);
+	let n = 0;
+	for e in m {
+		let (k, v) = e;
+		if k != expect || v != k * 2 {
+			printf("walk gave %d: %d\n".ptr, k as c_int, v as c_int);
+			return 1;
+		}
+		expect = ceiling_of(&flags, k + 1);
+		n += 1;
+	}
+	printf("map: %d entries in order, count %d\n".ptr, n as c_int, m.count as c_int);
+	while m.count > 0 do {
+		let low = m.pop_first() ?? (-1, -1);
+		let high = m.pop_last() ?? (-1, -1);
+		if low.0 >= high.0 && high.0 >= 0 {
+			printf("pop gave %d and %d\n".ptr, low.0 as c_int, high.0 as c_int);
+			return 1;
+		}
+	}
+	printf("map emptied: %d\n".ptr, m.count as c_int);
+	return 0;
+}
+
+fn main() -> int
+{
+	if set_order() != 0 {
+		return 1;
+	}
+	return map_order();
+}

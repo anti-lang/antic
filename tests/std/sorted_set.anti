@@ -1,0 +1,294 @@
+//! `SortedSet<T>` of `anti.collection.sorted`, one part of it per function.
+//!
+//! The set holds each element once and walks in order. `range`, `floor`,
+//! `ceiling`, `first` and `last` find elements by the order, `intersect` and
+//! `minus` make new sets, and `is_subset` compares two. The parts every
+//! collection shares, `==`, the allocator and a class element that owns memory
+//! come last.
+
+import anti.collection;
+import anti.collection.sorted.{SortedSet};
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// An element that owns memory, ordered by its number, which counts its
+/// teardowns.
+class Tag
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn lt(self, other: Tag) -> bool
+	{
+		return self.number() < other.number();
+	}
+
+	operator fn eq(self, other: Tag) -> bool
+	{
+		return self.number() == other.number();
+	}
+
+	concrete fn to_text(self) -> str
+	{
+		return f"#{self.number()}";
+	}
+
+	fn destruct(self)
+	{
+		Tag.torn.add(1);
+	}
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn of(numbers: []int) -> SortedSet<int>
+{
+	let s = SortedSet<int>.new();
+	for n in numbers {
+		let copy = n;
+		let added = s.add(copy);
+	}
+	return s;
+}
+
+fn members()
+{
+	let s = SortedSet<int>.new();
+	let a = s.add(5);
+	let b = s.add(1);
+	let c = s.add(5);
+	let d = s.add(3);
+	show(f"add {a} {b} {c} {d} {s.to_text()} count {s.count}");
+	show(f"contains {s.contains(3)} {s.contains(4)}");
+	let gone = s.remove(1);
+	let absent = s.remove(1);
+	show(f"remove {gone} {absent} {s.to_text()}");
+	for x in s {
+		printf("%d ".ptr, x as c_int);
+	}
+	printf("\n".ptr);
+}
+
+fn order()
+{
+	let s = SortedSet<int>.new();
+	for k in 1..8 {
+		let added = s.add(k * 10);
+	}
+	let f = s.floor(35) ?? -1;
+	let exact = s.floor(30) ?? -1;
+	let below = s.floor(9) ?? -1;
+	let c = s.ceiling(35) ?? -1;
+	let above = s.ceiling(71) ?? -1;
+	show(f"floor {f} {exact} {below} ceiling {c} {above}");
+	let first = s.first() ?? -1;
+	let last = s.last() ?? -1;
+	show(f"first {first} last {last}");
+	for x in s.range(20, 50) {
+		printf("%d ".ptr, x as c_int);
+	}
+	printf("| ".ptr);
+	for x in s.range(15, 16) {
+		printf("%d ".ptr, x as c_int);
+	}
+	printf("| ".ptr);
+	for x in s.range(60, 1000) {
+		printf("%d ".ptr, x as c_int);
+	}
+	printf("| ".ptr);
+	for x in s.range(50, 20) {
+		printf("%d ".ptr, x as c_int);
+	}
+	printf("\n".ptr);
+	let empty = SortedSet<int>.new();
+	let none_first = empty.first() ?? -1;
+	let none_last = empty.last() ?? -1;
+	let none_ceiling = empty.ceiling(0) ?? -1;
+	show(f"empty {none_first} {none_last} {none_ceiling} {empty.to_text()}");
+}
+
+fn algebra()
+{
+	let odds = [1, 3, 5, 7, 9, 11];
+	let middle = [3, 4, 5, 6, 7];
+	let a = of(odds[0..odds.len]);
+	let b = of(middle[0..middle.len]);
+	let both = a.intersect(&b);
+	let only = a.minus(&b);
+	let rest = b.minus(&a);
+	show(f"intersect {both.to_text()} minus {only.to_text()} {rest.to_text()}");
+	let pair = [3, 7];
+	let small = of(pair[0..pair.len]);
+	let empty = SortedSet<int>.new();
+	show(f"subset {small.is_subset(&a)} {small.is_subset(&b)} {a.is_subset(&b)} {empty.is_subset(&a)} {a.is_subset(&a)}");
+	let none_shared = a.intersect(&empty);
+	let all = a.minus(&empty);
+	show(f"with empty {none_shared.to_text()} {all.to_text()}");
+	let big = SortedSet<int>.new();
+	let odd = SortedSet<int>.new();
+	for k in 0..500 {
+		let odd_one = k % 2 == 1;
+		let copy = k;
+		let added = big.add(copy);
+		if odd_one {
+			let again = k;
+			added = odd.add(again);
+		}
+	}
+	let even = big.minus(&odd);
+	let shared = big.intersect(&odd);
+	let first = even.first() ?? -1;
+	let last = even.last() ?? -1;
+	show(f"large: {even.count} even from {first} to {last}, {shared.count} shared, {odd.is_subset(&big)} {big.is_subset(&odd)}");
+}
+
+fn shared() may fail
+{
+	let s = SortedSet<int>.new();
+	for k in 1..10 {
+		let added = s.add(k);
+	}
+	let big = s.find_all(fn(x) {
+		return x > 6;
+	});
+	let first = s.find_first(fn(x) {
+		return x % 4 == 0;
+	}) ?? -1;
+	let one = try s.find_one(fn(x) {
+		return x == 5;
+	});
+	show(f"find_all {big.count} find_first {first} find_one {one}");
+	let n = s.update_all(fn(x) {
+		return x > 8;
+	}, fn(p) {
+		*p += 10;
+	});
+	show(f"update_all {n} {s.to_text()}");
+	let removed = s.remove_all(fn(x) {
+		return x % 2 == 0;
+	});
+	let gone = s.remove_first(fn(x) {
+		return x > 4;
+	}) ?? -1;
+	let only = try s.remove_one(fn(x) {
+		return x == 1;
+	});
+	show(f"remove_all {removed} remove_first {gone} remove_one {only} {s.to_text()}");
+	let out = text.Builder.new();
+	s.serialize(&out);
+	show(out.take());
+	s.clear();
+	show(f"clear {s.count} {s.is_empty()} {s.to_text()}");
+}
+
+fn equality()
+{
+	let mixed = [3, 1, 2];
+	let sorted = [1, 2, 3];
+	let a = of(mixed[0..mixed.len]);
+	let b = of(sorted[0..sorted.len]);
+	let same = a == b;
+	let added = b.add(4);
+	let longer = a == b;
+	show(f"eq {same} {longer} {a != b}");
+}
+
+fn owned()
+{
+	{
+		let tags = SortedSet<Tag>.new();
+		let added = tags.add(Tag.of(2));
+		added = tags.add(Tag.of(1));
+		added = tags.add(Tag.of(2));
+		printf("duplicate refused %d, torn %d\n".ptr, (!added) as c_int,
+			Tag.torn.load() as c_int);
+		added = tags.add(Tag.of(3));
+		show(tags.to_text());
+		let one = Tag.of(1);
+		let gone = tags.remove(one);
+		printf("removed %d, torn %d\n".ptr, gone as c_int, Tag.torn.load() as c_int);
+		let big = tags.find_all(fn(t) {
+			return t.number() > 1;
+		});
+		printf("copies %d, torn %d\n".ptr, big.count as c_int, Tag.torn.load() as c_int);
+	}
+	printf("after the block, torn %d of 10\n".ptr, Tag.torn.load() as c_int);
+}
+
+fn allocations()
+{
+	let counting = Counting { };
+	{
+		let s = SortedSet<int>.new(300, &counting);
+		for k in 0..300 {
+			let added = s.add(k * 7 % 300);
+		}
+		printf("made with room: %d allocation\n".ptr, counting.allocs as c_int);
+		let removed = s.remove_all(fn(x) {
+			return x >= 10;
+		});
+		s.shrink();
+		printf("shrink: %d allocations\n".ptr, counting.allocs as c_int);
+		show(s.to_text());
+		s.clear();
+		s.shrink();
+		printf("empty shrink: %d allocations, %d frees\n".ptr, counting.allocs as c_int,
+			counting.frees as c_int);
+		let added = s.add(1);
+	}
+	printf("after the block: %d allocations, %d frees\n".ptr, counting.allocs as c_int,
+		counting.frees as c_int);
+}
+
+fn main() -> int
+{
+	members();
+	order();
+	algebra();
+	shared() catch fatal;
+	equality();
+	owned();
+	allocations();
+	return 0;
+}

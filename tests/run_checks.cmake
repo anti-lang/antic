@@ -151,6 +151,19 @@ check(list_bounds "index out of bounds"
 check(grid_bounds "index out of bounds"
       "\\.anti:[0-9]+: index out of bounds: index 3, length 3"
       ON ${collection_objects} "${WORK}/anti_collection_grid_dev${OBJECT}")
+# The same over a sorted map, whose module links an object of its own.
+execute_process(COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}"
+                        --runtime "${RUNTIME}" -o "${WORK}/anti_collection_sorted_dev"
+                        "${RUNTIME}/std/anti/collection/sorted.antl"
+                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "antic --dev of anti.collection.sorted failed\n${err}")
+endif()
+check(sorted_changed "was changed while"
+      "sorted_changed\\.anti:13: `ages` was changed while `for` walked it: changed at sorted_changed\\.anti:15"
+      ON "${WORK}/anti_lang_dev${OBJECT}" "${WORK}/anti_mem_dev${OBJECT}"
+      "${WORK}/anti_text_dev${OBJECT}" "${WORK}/anti_collection_dev${OBJECT}"
+      "${WORK}/anti_collection_sorted_dev${OBJECT}")
 
 # --checks puts them into a release build, and --no-checks takes them out
 # of a dev build. Both override the mode.

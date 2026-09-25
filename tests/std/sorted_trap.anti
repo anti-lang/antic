@@ -1,0 +1,30 @@
+//! A function that `update_all` lends an entry of a `SortedMap` changes its key
+//! out of the order. The map checks the order around the entry after each lend,
+//! and the program ends with the error of the map before the loop of
+//! `update_all` reaches the next entry. A change of the key that keeps the
+//! order passes.
+
+import anti.collection.sorted.{SortedMap};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let m = SortedMap<int, int>.new();
+	for k in 1..6 {
+		m.set(k * 10, k);
+	}
+	let kept = m.update_all(fn(e) {
+		return e.0 == 30;
+	}, fn(e) {
+		e.0 = 35;
+	});
+	printf("a key kept in order: %d\n".ptr, kept as c_int);
+	let n = m.update_all(fn(e) {
+		return e.0 == 20;
+	}, fn(e) {
+		e.0 = 45;
+	});
+	printf("not reached %d\n".ptr, n as c_int);
+	return 0;
+}

@@ -1,0 +1,37 @@
+exit 0
+{10: 1, 20: 2.5, 30: 3, 40: 4} count 4
+get 2.5 -1 contains true false
+add true false
+remove 1 -1 {20: 2.5, 30: 3, 40: 4}
+update true false modify true read true 2.5
+{20: 2.5, 30: 3.5, 40: 8}
+0=81 1=64 2=49 3=36 4=25 5=16 6=9 7=4 8=1 9=0 
+0 1 2 3 4 5 6 7 8 9 
+82 65 50 37 26 17 10 5 2 1 
+3 4 5 6 | 0 1 | 8 9 | | 
+floor 30:3 30 -1 ceiling 40:4 -1
+first 10:1 last 50:5
+pop 10 50 {20: 2, 30: 3, 40: 4}
+empty -1 -1 -1 {}
+find_all 3: 6 7 8
+find_first 3 find_one 400
+update_all 4 update_first true {1: 1, 2: -200, 3: 300, 4: -400, 5: 500, 6: -600, 7: 700, 8: -800}
+remove_all 4 remove_first 5 remove_one 7 {1: 1, 3: 300}
+`find_one` found 2 elements where it needs exactly one
+clear 0 true {} -1
+after clear {1: 1}
+{{"month": 1, "day": 1}: "New Year", {"month": 5, "day": 1}: "May Day", {"month": 12, "day": 25}: "Christmas"}
+[[{"month":1,"day":1},"New Year"],[{"month":5,"day":1},"May Day"],[{"month":12,"day":25},"Christmas"]][["a",1],["b",2]]
+after June: Christmas
+{1: one, 2: other, 3: one}
+replaced with 5, torn 1, copy 1
+removed, torn 1
+remove_all 1, torn 2
+clear, torn 5
+after the block, torn 8 of 8
+made with room: 1 allocation
+past it: 2 allocations
+shrink after 1980 removed: 3 allocations
+{0: 0, 100: 100, 200: 200, 300: 300, 400: 400, 500: 500, 600: 600, 700: 700, 800: 800, 900: 900, 1000: 0, 1100: 100, 1200: 200, 1300: 300, 1400: 400, 1500: 500, 1600: 600, 1700: 700, 1800: 800, 1900: 900}
+reserve: 1 allocation, 515 entries
+after the block: 4 allocations, 4 frees

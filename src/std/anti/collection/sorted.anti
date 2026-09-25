@@ -1,0 +1,1628 @@
+//! Sorted collections, which walk their elements in the order of their keys.
+//!
+//! `SortedMap<K, V>` maps keys to values and `SortedSet<T>` holds each element
+//! once. Both are B-trees over `BTree<T>`. A node holds up to `NODE_MAX`
+//! elements side by side in one block, so a lookup touches few cache lines, and
+//! every node but the root holds at least `NODE_MIN`. A lookup, an insertion
+//! and a removal take logarithmic time.
+//!
+//! Beside the operations every collection has, both give `range`, `floor`,
+//! `ceiling`, `first` and `last`, and the map gives `pop_first` and `pop_last`.
+
+import anti.collection;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memmove(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
+extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
+	arg: ?*byte);
+extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
+	arg: ?*byte);
+extern fn anti_rt_element_copy(into: ?*byte, from: ?*byte, arg: ?*byte);
+extern fn anti_rt_element_destroy(bytes: ?*byte, arg: ?*byte);
+
+/// The most elements a node holds.
+///
+/// DESIGN: eleven elements and twelve children per node, the order of the
+/// B-tree of Rust's standard library. A search walks the elements of a node in
+/// a line, which beats a binary search at this size, and a node of small
+/// elements still fills few cache lines.
+const NODE_MAX: int = 11;
+
+/// The fewest elements a node other than the root holds. A full node splits
+/// into two of this size and the element between them.
+const NODE_MIN: int = 5;
+
+/// The words of links per node: the count of its elements, its parent and one
+/// child per gap between its elements.
+const LINKS: int = 14;
+
+/// The word of the links of a node that holds its count, -1 for a free node.
+const HELD: int = 0;
+
+/// The word that holds the parent, or the next free node of a free node.
+const PARENT: int = 1;
+
+/// The word of the first child, -1 in a leaf.
+const CHILDREN: int = 2;
+
+/// The number of elements of the node `n`.
+fn held_in(links: *int, n: int) -> int
+{
+	return links[n * LINKS + HELD];
+}
+
+/// The child `i` of the node `n`, or -1 when `n` is a leaf.
+fn child_in(links: *int, n: int, i: int) -> int
+{
+	return links[n * LINKS + CHILDREN + i];
+}
+
+/// The parent of the node `n`, or -1 for the root.
+fn parent_in(links: *int, n: int) -> int
+{
+	return links[n * LINKS + PARENT];
+}
+
+/// Which child of the node `up` the node `n` is.
+fn gap_in(links: *int, up: int, n: int) -> int
+{
+	let i = 0;
+	let last = held_in(links, up);
+	while i < last && child_in(links, up, i) != n do {
+		i += 1;
+	}
+	return i;
+}
+
+/// The place of the first element of the tree under `root`, or -1.
+fn first_in(links: *int, root: int) -> int
+{
+	if root < 0 {
+		return -1;
+	}
+	let n = root;
+	while child_in(links, n, 0) >= 0 do {
+		n = child_in(links, n, 0);
+	}
+	return n * NODE_MAX;
+}
+
+/// The place of the last element of the tree under `root`, or -1.
+fn last_in(links: *int, root: int) -> int
+{
+	if root < 0 {
+		return -1;
+	}
+	let n = root;
+	while child_in(links, n, 0) >= 0 do {
+		n = child_in(links, n, held_in(links, n));
+	}
+	return n * NODE_MAX + held_in(links, n) - 1;
+}
+
+/// The place of the element after the one at `at`, or -1 after the last.
+fn next_in(links: *int, at: int) -> int
+{
+	let n = at / NODE_MAX;
+	let i = at % NODE_MAX;
+	if child_in(links, n, 0) >= 0 {
+		let c = child_in(links, n, i + 1);
+		while child_in(links, c, 0) >= 0 do {
+			c = child_in(links, c, 0);
+		}
+		return c * NODE_MAX;
+	}
+	if i + 1 < held_in(links, n) {
+		return at + 1;
+	}
+	let up = parent_in(links, n);
+	while up >= 0 do {
+		let gap = gap_in(links, up, n);
+		if gap < held_in(links, up) {
+			return up * NODE_MAX + gap;
+		}
+		n = up;
+		up = parent_in(links, n);
+	}
+	return -1;
+}
+
+/// The place of the element before the one at `at`, or -1 before the first.
+fn prev_in(links: *int, at: int) -> int
+{
+	let n = at / NODE_MAX;
+	let i = at % NODE_MAX;
+	if child_in(links, n, 0) >= 0 {
+		let c = child_in(links, n, i);
+		while child_in(links, c, 0) >= 0 do {
+			c = child_in(links, c, held_in(links, c));
+		}
+		return c * NODE_MAX + held_in(links, c) - 1;
+	}
+	if i > 0 {
+		return at - 1;
+	}
+	let up = parent_in(links, n);
+	while up >= 0 do {
+		let gap = gap_in(links, up, n);
+		if gap > 0 {
+			return up * NODE_MAX + gap - 1;
+		}
+		n = up;
+		up = parent_in(links, n);
+	}
+	return -1;
+}
+
+/// The nodes a tree of `n` elements needs at most: every node but the root
+/// holds `NODE_MIN` elements or more.
+fn nodes_for(n: int) -> int
+{
+	if n <= 0 {
+		return 0;
+	}
+	return (n - 1) / NODE_MIN + 1;
+}
+
+/// The alignment of the room of an element: the largest power of two that
+/// divides its size, which every alignment the layout gives it divides.
+fn element_align<T>() -> int
+{
+	let size = size_of(T);
+	if size <= 0 {
+		return 1;
+	}
+	return size & -size;
+}
+
+/// The failure of a function lent an element of a sorted collection that moved
+/// the element out of the order of its keys.
+fn out_of_order()
+{
+	let e = lang.Error.new(0,
+		"a lent element of a sorted collection was moved out of its order");
+	e.fatal();
+}
+
+/// The B-tree under `SortedMap<K, V>` and `SortedSet<T>`.
+///
+/// Every node sits in one block from the allocator of the collection: the
+/// elements of all nodes, `NODE_MAX` slots each, and then the links of all
+/// nodes. The place of an element is its node times `NODE_MAX` plus its slot,
+/// which the functions of `collection.Collection<T>` walk in key order. The
+/// tree finds no key. Each collection above it searches by its own key and
+/// hands the tree the leaf and the slot where an element goes.
+///
+/// DESIGN: a node is an index into the block, not a pointer of its own, so the
+/// block grows by doubling in one allocation, `new(capacity)` and `reserve(n)`
+/// allocate once, and `shrink()` moves the nodes down and gives the rest back.
+/// A removed node joins a list of free nodes that the next split takes first.
+pub abstract class BTree<T> inherits collection.Collection<T>
+{
+	/// The block of the nodes, which the collection gives back when it ends.
+	block: ?*byte = none,
+	/// The elements of the nodes, `NODE_MAX` slots per node. A slot that holds
+	/// no element holds zero bytes.
+	protected slots: ?*T = none,
+	/// The links of the nodes, `LINKS` words per node.
+	protected links: ?*int = none,
+	/// The root, or -1 when the tree is empty.
+	protected root: int = -1,
+	/// The nodes the block has room for.
+	nodes: int = 0,
+	/// The nodes handed out at least once, which are the first ones.
+	used: int = 0,
+	/// The nodes in the tree.
+	live: int = 0,
+	/// The first free node below `used`, or -1.
+	spare: int = -1,
+
+	/// Make room for `n` more elements in one allocation, so that adding them
+	/// allocates nothing.
+	pub fn reserve(self, n: int)
+	{
+		let need = nodes_for(self.count + n);
+		if need < self.used {
+			need = self.used;
+		}
+		if need > self.nodes {
+			self.resize(need);
+		}
+	}
+
+	/// Give back the room that holds no element. The nodes move down to the
+	/// start of the block first.
+	pub fn shrink(self)
+	{
+		self.compact();
+		if self.nodes > self.used {
+			self.resize(self.used);
+		}
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		let links = self.links else {
+			return -1;
+		};
+		return first_in(links, self.root);
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		let links = self.links catch fatal;
+		return next_in(links, at);
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		return self.copy_element(self.slot(at));
+	}
+
+	/// Remove every element.
+	concrete fn clear(self, at: lang.SourceLocation = here)
+	{
+		self.destroy_all();
+		self.emptied(at);
+	}
+
+	/// Forget every node, once every element is torn down and every slot holds
+	/// zero bytes, and count the change at `at`. The block stays.
+	protected fn emptied(self, at: lang.SourceLocation)
+	{
+		self.used = 0;
+		self.live = 0;
+		self.spare = -1;
+		self.root = -1;
+		self.count = 0;
+		self.resized(0, at);
+	}
+
+	/// The place of the last element, or -1 when there is none.
+	protected fn last_place(self) -> int
+	{
+		let links = self.links else {
+			return -1;
+		};
+		return last_in(links, self.root);
+	}
+
+	/// The place of the element before the one at `at`, or -1.
+	protected fn prev_place(self, at: int) -> int
+	{
+		let links = self.links catch fatal;
+		return prev_in(links, at);
+	}
+
+	/// The element at the place `at`.
+	protected fn slot(self, at: int) -> *T
+	{
+		let slots = self.slots catch fatal;
+		return &slots[at];
+	}
+
+	/// The number of elements of the node `n`.
+	protected fn held(self, n: int) -> int
+	{
+		let links = self.links catch fatal;
+		return links[n * LINKS + HELD];
+	}
+
+	/// The child `i` of the node `n`, or -1 when `n` is a leaf.
+	protected fn child(self, n: int, i: int) -> int
+	{
+		let links = self.links catch fatal;
+		return links[n * LINKS + CHILDREN + i];
+	}
+
+	/// Whether the node `n` has no children.
+	protected fn is_leaf(self, n: int) -> bool
+	{
+		return self.child(n, 0) < 0;
+	}
+
+	/// Make an empty slot before the slot `i` of the leaf `n`, or the first
+	/// slot of a new root when the tree is empty, and give its place. The
+	/// change counts at `at`, and the caller moves the new element into the
+	/// slot, which holds zero bytes.
+	protected fn open_place(self, n: int, i: int, at: lang.SourceLocation) -> int
+	{
+		let node = n;
+		let slot = i;
+		if self.root < 0 {
+			node = self.take_node();
+			self.root = node;
+			slot = 0;
+		} else if self.held(node) == NODE_MAX {
+			let right = self.split(node);
+			if slot > NODE_MIN {
+				node = right;
+				slot -= NODE_MIN + 1;
+			}
+		}
+		self.open(node, slot, slot);
+		self.resized(1, at);
+		return node * NODE_MAX + slot;
+	}
+
+	/// Make an empty slot after the last element, for an element above every
+	/// other, and give its place.
+	protected fn append_place(self, at: lang.SourceLocation) -> int
+	{
+		let last = self.last_place();
+		if last < 0 {
+			return self.open_place(-1, 0, at);
+		}
+		return self.open_place(last / NODE_MAX, last % NODE_MAX + 1, at);
+	}
+
+	/// Move the element at the place `at` out of the tree and give it. The tree
+	/// stays balanced. `count` still counts the element, and the caller takes
+	/// it off.
+	protected fn take_out(self, at: int) -> T
+	{
+		let slots = self.slots catch fatal;
+		let gone = slots[at];
+		memset(&slots[at] as ?*byte, 0, size_of(T) as c_size_t);
+		let n = at / NODE_MAX;
+		let i = at % NODE_MAX;
+		if !self.is_leaf(n) {
+			let leaf = self.child(n, i);
+			while !self.is_leaf(leaf) do {
+				leaf = self.child(leaf, self.held(leaf));
+			}
+			let last = self.held(leaf) - 1;
+			self.move_run(n, i, leaf, last, 1);
+			n = leaf;
+			i = last;
+		}
+		self.close(n, i, i);
+		self.rebalance(n);
+		return gone;
+	}
+
+	/// Take a node from the free ones or from the block, which grows when it is
+	/// full, and give it as an empty leaf.
+	fn take_node(self) -> int
+	{
+		let n = self.spare;
+		if n >= 0 {
+			self.spare = self.parent(n);
+		} else {
+			if self.used == self.nodes {
+				let size = self.nodes * 2;
+				if size == 0 {
+					size = 1;
+				}
+				self.resize(size);
+			}
+			n = self.used;
+			self.used += 1;
+		}
+		self.live += 1;
+		self.set_held(n, 0);
+		self.set_parent(n, -1);
+		self.set_child(n, 0, -1);
+		return n;
+	}
+
+	/// Put the node `n`, whose slots hold zero bytes, on the list of free ones.
+	fn drop_node(self, n: int)
+	{
+		self.set_held(n, -1);
+		self.set_parent(n, self.spare);
+		self.spare = n;
+		self.live -= 1;
+	}
+
+	/// Split the full node `n` into itself and a new node to its right, and
+	/// move the element between them up into the parent, which splits first
+	/// when it is full. Gives the new node.
+	fn split(self, n: int) -> int
+	{
+		let up = self.parent(n);
+		if up < 0 {
+			up = self.take_node();
+			self.root = up;
+			self.set_child(up, 0, n);
+		} else if self.held(up) == NODE_MAX {
+			let beside = self.split(up);
+			up = self.parent(n);
+		}
+		let right = self.take_node();
+		let moving = NODE_MAX - NODE_MIN - 1;
+		self.move_run(right, 0, n, NODE_MIN + 1, moving);
+		if !self.is_leaf(n) {
+			let c = 0;
+			while c <= moving do {
+				let grandchild = self.child(n, NODE_MIN + 1 + c);
+				self.set_child(right, c, grandchild);
+				c += 1;
+			}
+		}
+		self.set_held(right, moving);
+		let gap = self.gap(up, n);
+		self.open(up, gap, gap + 1);
+		self.move_run(up, gap, n, NODE_MIN, 1);
+		self.set_child(up, gap + 1, right);
+		self.set_held(n, NODE_MIN);
+		return right;
+	}
+
+	/// Refill the node `n` after a removal left it with too few elements, from
+	/// a sibling that can spare one or by merging it with a sibling, and so on
+	/// up the tree. A root left empty gives way to its only child.
+	fn rebalance(self, n: int)
+	{
+		let node = n;
+		while node != self.root && self.held(node) < NODE_MIN do {
+			let up = self.parent(node);
+			let gap = self.gap(up, node);
+			if gap > 0 && self.held(self.child(up, gap - 1)) > NODE_MIN {
+				self.from_left(up, gap);
+				return;
+			}
+			if gap < self.held(up) && self.held(self.child(up, gap + 1)) > NODE_MIN {
+				self.from_right(up, gap);
+				return;
+			}
+			if gap > 0 {
+				self.merge(up, gap - 1);
+			} else {
+				self.merge(up, gap);
+			}
+			node = up;
+		}
+		let old = self.root;
+		if old >= 0 && self.held(old) == 0 {
+			self.root = self.child(old, 0);
+			if self.root >= 0 {
+				self.set_parent(self.root, -1);
+			}
+			self.drop_node(old);
+		}
+	}
+
+	/// Move the last element of the left sibling of the child `gap` of `up` up,
+	/// and the element between them down into the child.
+	fn from_left(self, up: int, gap: int)
+	{
+		let node = self.child(up, gap);
+		let left = self.child(up, gap - 1);
+		let last = self.held(left) - 1;
+		self.open(node, 0, 0);
+		self.move_run(node, 0, up, gap - 1, 1);
+		self.move_run(up, gap - 1, left, last, 1);
+		if !self.is_leaf(node) {
+			let moved = self.child(left, last + 1);
+			self.set_child(node, 0, moved);
+		}
+		self.set_held(left, last);
+	}
+
+	/// Move the first element of the right sibling of the child `gap` of `up`
+	/// up, and the element between them down into the child.
+	fn from_right(self, up: int, gap: int)
+	{
+		let node = self.child(up, gap);
+		let right = self.child(up, gap + 1);
+		let end = self.held(node);
+		self.move_run(node, end, up, gap, 1);
+		if !self.is_leaf(node) {
+			let moved = self.child(right, 0);
+			self.set_child(node, end + 1, moved);
+		}
+		self.set_held(node, end + 1);
+		self.move_run(up, gap, right, 0, 1);
+		self.close(right, 0, 0);
+	}
+
+	/// Merge the children `at` and `at + 1` of `up` and the element between
+	/// them into the first, and free the second.
+	fn merge(self, up: int, at: int)
+	{
+		let left = self.child(up, at);
+		let right = self.child(up, at + 1);
+		let end = self.held(left);
+		let moving = self.held(right);
+		self.move_run(left, end, up, at, 1);
+		self.move_run(left, end + 1, right, 0, moving);
+		if !self.is_leaf(left) {
+			let c = 0;
+			while c <= moving do {
+				let moved = self.child(right, c);
+				self.set_child(left, end + 1 + c, moved);
+				c += 1;
+			}
+		}
+		self.set_held(left, end + 1 + moving);
+		self.close(up, at, at + 1);
+		self.drop_node(right);
+	}
+
+	/// Make an empty slot `i` in the node `n` and, when it has children, an
+	/// empty child `gap`, moving the ones after them one to the right.
+	fn open(self, n: int, i: int, gap: int)
+	{
+		let held = self.held(n);
+		let slots = self.slots catch fatal;
+		let base = n * NODE_MAX;
+		if i < held {
+			memmove(&slots[base + i + 1] as ?*byte, &slots[base + i] as ?*byte,
+				((held - i) * size_of(T)) as c_size_t);
+			memset(&slots[base + i] as ?*byte, 0, size_of(T) as c_size_t);
+		}
+		if !self.is_leaf(n) {
+			let links = self.links catch fatal;
+			let c = held;
+			while c >= gap do {
+				links[n * LINKS + CHILDREN + c + 1] = links[n * LINKS + CHILDREN + c];
+				c -= 1;
+			}
+		}
+		self.set_held(n, held + 1);
+	}
+
+	/// Close the slot `i` of the node `n`, which holds zero bytes, and when it
+	/// has children drop the child `gap`, moving the ones after them one to the
+	/// left.
+	fn close(self, n: int, i: int, gap: int)
+	{
+		let held = self.held(n);
+		let slots = self.slots catch fatal;
+		let base = n * NODE_MAX;
+		if i + 1 < held {
+			memmove(&slots[base + i] as ?*byte, &slots[base + i + 1] as ?*byte,
+				((held - i - 1) * size_of(T)) as c_size_t);
+			memset(&slots[base + held - 1] as ?*byte, 0, size_of(T) as c_size_t);
+		}
+		if !self.is_leaf(n) {
+			let links = self.links catch fatal;
+			let c = gap;
+			while c < held do {
+				links[n * LINKS + CHILDREN + c] = links[n * LINKS + CHILDREN + c + 1];
+				c += 1;
+			}
+		}
+		self.set_held(n, held - 1);
+	}
+
+	/// Move `k` elements from the slot `from_i` of the node `from_n` to the
+	/// slot `to_i` of the node `to_n` as bytes, and zero the slots they leave.
+	fn move_run(self, to_n: int, to_i: int, from_n: int, from_i: int, k: int)
+	{
+		if k <= 0 {
+			return;
+		}
+		let slots = self.slots catch fatal;
+		let to = to_n * NODE_MAX + to_i;
+		let from = from_n * NODE_MAX + from_i;
+		memcpy(&slots[to] as ?*byte, &slots[from] as ?*byte,
+			(k * size_of(T)) as c_size_t);
+		memset(&slots[from] as ?*byte, 0, (k * size_of(T)) as c_size_t);
+	}
+
+	/// Which child of the node `up` the node `n` is.
+	fn gap(self, up: int, n: int) -> int
+	{
+		let links = self.links catch fatal;
+		return gap_in(links, up, n);
+	}
+
+	fn parent(self, n: int) -> int
+	{
+		let links = self.links catch fatal;
+		return links[n * LINKS + PARENT];
+	}
+
+	fn set_held(self, n: int, held: int)
+	{
+		let links = self.links catch fatal;
+		links[n * LINKS + HELD] = held;
+	}
+
+	fn set_parent(self, n: int, up: int)
+	{
+		let links = self.links catch fatal;
+		links[n * LINKS + PARENT] = up;
+	}
+
+	/// Make `c` the child `i` of the node `n`, and `n` the parent of `c`.
+	fn set_child(self, n: int, i: int, c: int)
+	{
+		let links = self.links catch fatal;
+		links[n * LINKS + CHILDREN + i] = c;
+		if c >= 0 {
+			links[c * LINKS + PARENT] = n;
+		}
+	}
+
+	/// Move every node at or above `live` into a free node below it, so that
+	/// the nodes of the tree are the first ones and none is free.
+	fn compact(self)
+	{
+		let low = 0;
+		let n = self.live;
+		while n < self.used do {
+			if self.held(n) >= 0 {
+				while self.held(low) >= 0 do {
+					low += 1;
+				}
+				self.move_node(low, n);
+			}
+			n += 1;
+		}
+		self.used = self.live;
+		self.spare = -1;
+	}
+
+	/// Move the node `from` into the free node `to` and point its parent and
+	/// its children at the new place.
+	fn move_node(self, to: int, from: int)
+	{
+		let held = self.held(from);
+		self.move_run(to, 0, from, 0, held);
+		let links = self.links catch fatal;
+		memcpy(&links[to * LINKS] as ?*byte, &links[from * LINKS] as ?*byte,
+			(LINKS * size_of(int)) as c_size_t);
+		self.set_held(from, -1);
+		let up = self.parent(to);
+		if up < 0 {
+			self.root = to;
+		} else {
+			let gap = self.gap(up, from);
+			self.set_child(up, gap, to);
+		}
+		if !self.is_leaf(to) {
+			let c = 0;
+			while c <= held do {
+				let below = self.child(to, c);
+				self.set_child(to, c, below);
+				c += 1;
+			}
+		}
+	}
+
+	/// The bytes of the elements of `n` nodes, rounded up to a whole word, and
+	/// so the offset of the links in the block.
+	fn slot_bytes(self, n: int) -> int
+	{
+		let bytes = n * NODE_MAX * size_of(T);
+		let word = size_of(int);
+		return (bytes + word - 1) / word * word;
+	}
+
+	/// Move the first `used` nodes into a new block for `size` nodes, whose
+	/// other slots and links hold zero bytes, and give back the old block.
+	fn resize(self, size: int)
+	{
+		let made: ?*byte = none;
+		if size > 0 {
+			let elements = self.slot_bytes(size);
+			let bytes = elements + size * LINKS * size_of(int);
+			let align = element_align<T>();
+			if align < size_of(int) {
+				align = size_of(int);
+			}
+			let block = self.from.alloc(bytes, align) catch fatal;
+			memset(block, 0, bytes as c_size_t);
+			if self.used > 0 {
+				memcpy(block, self.slots as ?*byte,
+					(self.used * NODE_MAX * size_of(T)) as c_size_t);
+				memcpy(&block[elements] as ?*byte, self.links as ?*byte,
+					(self.used * LINKS * size_of(int)) as c_size_t);
+			}
+			made = block;
+			self.slots = block as ?*T;
+			self.links = &block[elements] as ?*int;
+		} else {
+			self.slots = none;
+			self.links = none;
+		}
+		if self.block != none {
+			self.from.free(self.block);
+		}
+		self.block = made;
+		self.nodes = size;
+	}
+
+	/// Tear down every element and zero the slots of every node.
+	fn destroy_all(self)
+	{
+		let slots = self.slots else {
+			return;
+		};
+		let n = 0;
+		while n < self.used do {
+			let i = 0;
+			let held = self.held(n);
+			while i < held do {
+				self.destroy_element(&slots[n * NODE_MAX + i]);
+				i += 1;
+			}
+			n += 1;
+		}
+		memset(slots as ?*byte, 0,
+			(self.used * NODE_MAX * size_of(T)) as c_size_t);
+	}
+
+	fn destruct(self)
+	{
+		self.destroy_all();
+		if self.block != none {
+			self.from.free(self.block);
+		}
+	}
+}
+
+/// A map from keys to values that walks in the order of its keys.
+///
+/// A key is found in logarithmic time. `for e in m` gives a copy of each entry
+/// as a `(K, V)`, and `keys()` and `values()` walk one side. `for v in
+/// &m.values()` changes the values in place. `range(lo, hi)`, `floor(k)`,
+/// `ceiling(k)`, `first()` and `last()` find entries by the order, and
+/// `pop_first()` and `pop_last()` take them out.
+///
+/// The functions of `collection.Collection` see each entry as a `(K, V)`. A
+/// function that the `update` forms of the base lend one may change the value.
+/// A change of the key that breaks the order ends the program.
+pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
+{
+	/// An empty map with room for `capacity` entries from `from`, or from the C
+	/// library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> SortedMap<K, V>
+	{
+		let made = SortedMap<K, V> { from: collection.allocator(from) };
+		made.reserve(capacity);
+		return made;
+	}
+
+	operator fn iter(self) -> SortedWalk<(K, V)>
+	{
+		return SortedWalk<(K, V)>.over(self, self.first_place(), -1,
+			self.watch());
+	}
+
+	/// A copy of the value of the key `k`, or `none`.
+	pub fn get(self, k: K) -> ?V
+	{
+		let at = self.find(&k);
+		if at < 0 {
+			return none;
+		}
+		return self.copy_value(at);
+	}
+
+	/// Whether the map holds the key `k`.
+	pub fn contains(self, k: K) -> bool
+	{
+		return self.find(&k) >= 0;
+	}
+
+	/// Put `v` under the key `k`, replacing the value that was there. The map
+	/// keeps a copy of the key.
+	pub fn set(self, k: K, own v: V, at: lang.SourceLocation = here)
+	{
+		let (found, leaf, i) = self.locate(&k);
+		let place = found;
+		if place < 0 {
+			place = self.open_place(leaf, i, at);
+			self.slot(place).0 = self.copy_key(&k);
+		}
+		self.slot(place).1 = v;
+	}
+
+	/// Put `v` under the key `k` when the map does not hold `k`. Gives `false`
+	/// and changes nothing when it does.
+	pub fn add(self, k: K, own v: V, at: lang.SourceLocation = here) -> bool
+	{
+		let (found, leaf, i) = self.locate(&k);
+		if found >= 0 {
+			return false;
+		}
+		let place = self.open_place(leaf, i, at);
+		self.slot(place).0 = self.copy_key(&k);
+		self.slot(place).1 = v;
+		return true;
+	}
+
+	/// Remove the key `k` and give its value, or `none` when the map does not
+	/// hold it.
+	pub fn remove(self, k: K, at: lang.SourceLocation = here) -> ?V
+	{
+		let found = self.find(&k);
+		if found < 0 {
+			return none;
+		}
+		let (key, value) = self.take_out(found);
+		self.resized(-1, at);
+		return value;
+	}
+
+	/// Run `change` on the value of the key `k`, in place. Gives `false` when
+	/// the map does not hold `k`.
+	pub fn update(self, k: K, change: fn(lent *V)) -> bool
+	{
+		let found = self.find(&k);
+		if found < 0 {
+			return false;
+		}
+		change(&self.slot(found).1);
+		return true;
+	}
+
+	/// Lend the value of the key `k` to `f`. Gives `false` when the map does
+	/// not hold `k`.
+	pub fn read(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.update(k, f);
+	}
+
+	/// Lend the value of the key `k` to `f`, which may change it. Gives `false`
+	/// when the map does not hold `k`.
+	pub fn modify(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.update(k, f);
+	}
+
+	/// A walk of copies of the keys, in order.
+	pub fn keys(self) -> SortedKeys<K, V>
+	{
+		return SortedKeys<K, V>.over(self, self.slots, self.first_place(),
+			self.key_type(), self.watch());
+	}
+
+	/// A walk of the values in the order of their keys, which lends each value
+	/// in place to `for v in &m.values()`.
+	pub fn values(self) -> SortedValues<K, V>
+	{
+		return SortedValues<K, V>.over(self, self.slots, self.first_place(),
+			self.watch());
+	}
+
+	/// A walk of copies of the entries from the key `lo` up to and not
+	/// including the key `hi`.
+	pub fn range(self, lo: K, hi: K) -> SortedWalk<(K, V)>
+	{
+		let first = -1;
+		let stop = -1;
+		if lo < hi {
+			first = self.ceiling_place(&lo);
+			stop = self.ceiling_place(&hi);
+		}
+		return SortedWalk<(K, V)>.over(self, first, stop, self.watch());
+	}
+
+	/// A copy of the entry with the greatest key not above `k`, or `none`.
+	pub fn floor(self, k: K) -> ?(K, V)
+	{
+		let at = self.floor_place(&k);
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// A copy of the entry with the least key not below `k`, or `none`.
+	pub fn ceiling(self, k: K) -> ?(K, V)
+	{
+		let at = self.ceiling_place(&k);
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// A copy of the entry with the least key, or `none` when the map is empty.
+	pub fn first(self) -> ?(K, V)
+	{
+		let at = self.first_place();
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// A copy of the entry with the greatest key, or `none` when the map is
+	/// empty.
+	pub fn last(self) -> ?(K, V)
+	{
+		let at = self.last_place();
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// Remove the entry with the least key and give it, or `none` when the map
+	/// is empty.
+	pub fn pop_first(self, at: lang.SourceLocation = here) -> ?(K, V)
+	{
+		let place = self.first_place();
+		if place < 0 {
+			return none;
+		}
+		let gone = self.take_out(place);
+		self.resized(-1, at);
+		return gone;
+	}
+
+	/// Remove the entry with the greatest key and give it, or `none` when the
+	/// map is empty.
+	pub fn pop_last(self, at: lang.SourceLocation = here) -> ?(K, V)
+	{
+		let place = self.last_place();
+		if place < 0 {
+			return none;
+		}
+		let gone = self.take_out(place);
+		self.resized(-1, at);
+		return gone;
+	}
+
+	/// A copy of the entry at the place `at`, whose key and value own what they
+	/// hold.
+	concrete fn copy_place(self, at: int) -> (K, V)
+	{
+		let key = self.copy_key(&self.slot(at).0);
+		let value = self.copy_value(at);
+		return (key, value);
+	}
+
+	/// Remove every entry.
+	concrete fn clear(self, at: lang.SourceLocation = here)
+	{
+		self.destroy_entries();
+		self.emptied(at);
+	}
+
+	/// Remove every entry that `test` accepts and give their number.
+	concrete fn remove_all(self, test: fn((K, V)) -> bool,
+		at: lang.SourceLocation = here) -> int
+	{
+		let n = 0;
+		let place = self.first_place();
+		while place >= 0 do {
+			if test(*self.slot(place)) {
+				let (key, value) = self.take_out(place);
+				self.resized(-1, at);
+				place = self.ceiling_place(&key);
+				n += 1;
+			} else {
+				place = self.next_place(place);
+			}
+		}
+		return n;
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *(K, V)))
+	{
+		f(self.slot(at));
+		self.check_order(at);
+	}
+
+	concrete fn take_place(self, at: int) -> ((K, V), int)
+	{
+		let taken = (self.take_out(at), -1);
+		taken.1 = self.ceiling_place(&taken.0.0);
+		return taken;
+	}
+
+	/// The entries as text, `{1: 10, 2: 20}`, each key and value as `to_text`
+	/// of a collection writes an element.
+	concrete fn to_text(self) -> str
+	{
+		let out = text.Builder.new();
+		let keys = self.key_type();
+		let values = self.value_type();
+		let place = self.first_place();
+		out.append("{");
+		while place >= 0 do {
+			let entry = self.slot(place);
+			if place != self.first_place() {
+				out.append(", ");
+			}
+			anti_rt_element_text(&out, &entry.0 as ?*byte, keys);
+			out.append(": ");
+			anti_rt_element_text(&out, &entry.1 as ?*byte, values);
+			place = self.next_place(place);
+		}
+		out.append("}");
+		return out.take();
+	}
+
+	/// Write the entries to `out` as a JSON array of pairs, `[[1,10],[2,20]]`,
+	/// each key and value as `serialize` writes a field of its type.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		let keys = self.key_type();
+		let values = self.value_type();
+		let place = self.first_place();
+		out.append("[");
+		while place >= 0 do {
+			let entry = self.slot(place);
+			if place != self.first_place() {
+				out.append(",");
+			}
+			out.append("[");
+			anti_rt_element_serialize(out, &entry.0 as ?*byte, keys);
+			out.append(",");
+			anti_rt_element_serialize(out, &entry.1 as ?*byte, values);
+			out.append("]");
+			place = self.next_place(place);
+		}
+		out.append("]");
+	}
+
+	/// The first slot of the node `n` whose key is not below `k`.
+	fn lower(self, n: int, k: *K) -> int
+	{
+		let held = self.held(n);
+		let base = n * NODE_MAX;
+		let i = 0;
+		while i < held && self.slot(base + i).0 < *k do {
+			i += 1;
+		}
+		return i;
+	}
+
+	/// The place of the key `k`, or -1 with the leaf and the slot where it
+	/// would go.
+	fn locate(self, k: *K) -> (int, int, int)
+	{
+		let n = self.root;
+		let leaf = -1;
+		let slot = 0;
+		while n >= 0 do {
+			let i = self.lower(n, k);
+			if i < self.held(n) && self.slot(n * NODE_MAX + i).0 == *k {
+				return (n * NODE_MAX + i, n, i);
+			}
+			leaf = n;
+			slot = i;
+			let below = -1;
+			if !self.is_leaf(n) {
+				below = self.child(n, i);
+			}
+			n = below;
+		}
+		return (-1, leaf, slot);
+	}
+
+	/// The place of the key `k`, or -1.
+	fn find(self, k: *K) -> int
+	{
+		let (found, leaf, i) = self.locate(k);
+		return found;
+	}
+
+	/// The place of the least key not below `k`, or -1.
+	fn ceiling_place(self, k: *K) -> int
+	{
+		let n = self.root;
+		let best = -1;
+		while n >= 0 do {
+			let i = self.lower(n, k);
+			if i < self.held(n) {
+				best = n * NODE_MAX + i;
+				if self.slot(best).0 == *k {
+					return best;
+				}
+			}
+			let below = -1;
+			if !self.is_leaf(n) {
+				below = self.child(n, i);
+			}
+			n = below;
+		}
+		return best;
+	}
+
+	/// The place of the greatest key not above `k`, or -1.
+	fn floor_place(self, k: *K) -> int
+	{
+		let n = self.root;
+		let best = -1;
+		while n >= 0 do {
+			let i = self.lower(n, k);
+			if i < self.held(n) && self.slot(n * NODE_MAX + i).0 == *k {
+				return n * NODE_MAX + i;
+			}
+			if i > 0 {
+				best = n * NODE_MAX + i - 1;
+			}
+			let below = -1;
+			if !self.is_leaf(n) {
+				below = self.child(n, i);
+			}
+			n = below;
+		}
+		return best;
+	}
+
+	/// End the program when the key at `at` no longer lies between the keys of
+	/// its neighbours.
+	fn check_order(self, at: int)
+	{
+		let before = self.prev_place(at);
+		let after = self.next_place(at);
+		if before >= 0 && !(self.slot(before).0 < self.slot(at).0) {
+			out_of_order();
+		}
+		if after >= 0 && !(self.slot(at).0 < self.slot(after).0) {
+			out_of_order();
+		}
+	}
+
+	/// A copy of the key at `k`, which owns what it holds.
+	fn copy_key(self, k: *K) -> K
+	{
+		let made = *k;
+		anti_rt_element_copy(&made as ?*byte, k as ?*byte, self.key_type());
+		return made;
+	}
+
+	/// A copy of the value at the place `at`, which owns what it holds.
+	fn copy_value(self, at: int) -> V
+	{
+		let p = &self.slot(at).1;
+		let made = *p;
+		anti_rt_element_copy(&made as ?*byte, p as ?*byte, self.value_type());
+		return made;
+	}
+
+	/// Tear down the key and the value of every entry and zero their slots.
+	///
+	/// DESIGN: the map tears down and copies the key and the value of an entry
+	/// by the records of the key type and the value type, since the runtime
+	/// copies and tears down a tuple as bytes. A value of a class that owns
+	/// memory is then torn down once and copied whole.
+	fn destroy_entries(self)
+	{
+		let keys = self.key_type();
+		let values = self.value_type();
+		let place = self.first_place();
+		while place >= 0 do {
+			let after = self.next_place(place);
+			let entry = self.slot(place);
+			anti_rt_element_destroy(&entry.0 as ?*byte, keys);
+			anti_rt_element_destroy(&entry.1 as ?*byte, values);
+			memset(entry as ?*byte, 0, size_of((K, V)) as c_size_t);
+			place = after;
+		}
+	}
+
+	fn destruct(self)
+	{
+		self.destroy_entries();
+	}
+
+	/// The record of the key type in the descriptor of this copy of the class,
+	/// which sits three levels below the root.
+	fn key_type(self) -> ?*byte
+	{
+		return anti_rt_type_arg(self as ?*byte, 3, 0);
+	}
+
+	/// The record of the value type in the descriptor of this copy of the
+	/// class.
+	fn value_type(self) -> ?*byte
+	{
+		return anti_rt_type_arg(self as ?*byte, 3, 1);
+	}
+}
+
+/// A set that walks its elements in order.
+///
+/// An element is found in logarithmic time. `for x in s` gives a copy of each
+/// element, `range(lo, hi)`, `floor(x)`, `ceiling(x)`, `first()` and `last()`
+/// find elements by the order, and `intersect(o)` and `minus(o)` make new sets
+/// from the allocator of this one.
+///
+/// A function that the `update` forms of the base lend an element may change it
+/// only in ways that keep its place in the order. A change that breaks the
+/// order ends the program.
+pub class SortedSet<T: Ordered> inherits BTree<T>
+{
+	/// An empty set with room for `capacity` elements from `from`, or from the
+	/// C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> SortedSet<T>
+	{
+		let made = SortedSet<T> { from: collection.allocator(from) };
+		made.reserve(capacity);
+		return made;
+	}
+
+	operator fn iter(self) -> SortedWalk<T>
+	{
+		return SortedWalk<T>.over(self, self.first_place(), -1, self.watch());
+	}
+
+	/// Add `x` when the set does not hold it. Gives `false` and changes nothing
+	/// when it does.
+	pub fn add(self, own x: T, at: lang.SourceLocation = here) -> bool
+	{
+		let (found, leaf, i) = self.locate(&x);
+		if found >= 0 {
+			return false;
+		}
+		let place = self.open_place(leaf, i, at);
+		*self.slot(place) = x;
+		return true;
+	}
+
+	/// Remove `x`. Gives `false` when the set does not hold it.
+	pub fn remove(self, x: T, at: lang.SourceLocation = here) -> bool
+	{
+		let found = self.find(&x);
+		if found < 0 {
+			return false;
+		}
+		let gone = self.take_out(found);
+		self.resized(-1, at);
+		return true;
+	}
+
+	/// Whether the set holds `x`.
+	pub fn contains(self, x: T) -> bool
+	{
+		return self.find(&x) >= 0;
+	}
+
+	/// A new set of the elements that this set and `o` both hold.
+	pub fn intersect(self, o: *SortedSet<T>) -> SortedSet<T>
+	{
+		let made = SortedSet<T> { from: self.from };
+		let mine = self.first_place();
+		let theirs = o.first_place();
+		while mine >= 0 && theirs >= 0 do {
+			if *self.slot(mine) < *o.slot(theirs) {
+				mine = self.next_place(mine);
+			} else if *o.slot(theirs) < *self.slot(mine) {
+				theirs = o.next_place(theirs);
+			} else {
+				let place = made.append_place(here);
+				*made.slot(place) = self.copy_place(mine);
+				mine = self.next_place(mine);
+				theirs = o.next_place(theirs);
+			}
+		}
+		return made;
+	}
+
+	/// A new set of the elements of this set that `o` does not hold.
+	pub fn minus(self, o: *SortedSet<T>) -> SortedSet<T>
+	{
+		let made = SortedSet<T> { from: self.from };
+		let mine = self.first_place();
+		let theirs = o.first_place();
+		while mine >= 0 do {
+			if theirs < 0 || *self.slot(mine) < *o.slot(theirs) {
+				let place = made.append_place(here);
+				*made.slot(place) = self.copy_place(mine);
+				mine = self.next_place(mine);
+			} else if *o.slot(theirs) < *self.slot(mine) {
+				theirs = o.next_place(theirs);
+			} else {
+				mine = self.next_place(mine);
+				theirs = o.next_place(theirs);
+			}
+		}
+		return made;
+	}
+
+	/// Whether `o` holds every element of this set.
+	pub fn is_subset(self, o: *SortedSet<T>) -> bool
+	{
+		if self.count > o.count {
+			return false;
+		}
+		let mine = self.first_place();
+		let theirs = o.first_place();
+		while mine >= 0 do {
+			if theirs < 0 || *self.slot(mine) < *o.slot(theirs) {
+				return false;
+			}
+			if *o.slot(theirs) < *self.slot(mine) {
+				theirs = o.next_place(theirs);
+			} else {
+				mine = self.next_place(mine);
+				theirs = o.next_place(theirs);
+			}
+		}
+		return true;
+	}
+
+	/// A walk of copies of the elements from `lo` up to and not including `hi`.
+	pub fn range(self, lo: T, hi: T) -> SortedWalk<T>
+	{
+		let first = -1;
+		let stop = -1;
+		if lo < hi {
+			first = self.ceiling_place(&lo);
+			stop = self.ceiling_place(&hi);
+		}
+		return SortedWalk<T>.over(self, first, stop, self.watch());
+	}
+
+	/// A copy of the greatest element not above `x`, or `none`.
+	pub fn floor(self, x: T) -> ?T
+	{
+		let at = self.floor_place(&x);
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// A copy of the least element not below `x`, or `none`.
+	pub fn ceiling(self, x: T) -> ?T
+	{
+		let at = self.ceiling_place(&x);
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// A copy of the least element, or `none` when the set is empty.
+	pub fn first(self) -> ?T
+	{
+		let at = self.first_place();
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// A copy of the greatest element, or `none` when the set is empty.
+	pub fn last(self) -> ?T
+	{
+		let at = self.last_place();
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// Whether this set and `other` hold equal elements.
+	operator fn eq(self, other: SortedSet<T>) -> bool
+	{
+		return collection.equal<T>(self, &other);
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		f(self.slot(at));
+		self.check_order(at);
+	}
+
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let taken = (self.take_out(at), -1);
+		taken.1 = self.ceiling_place(&taken.0);
+		return taken;
+	}
+
+	/// The first slot of the node `n` whose element is not below `x`.
+	fn lower(self, n: int, x: *T) -> int
+	{
+		let held = self.held(n);
+		let base = n * NODE_MAX;
+		let i = 0;
+		while i < held && *self.slot(base + i) < *x do {
+			i += 1;
+		}
+		return i;
+	}
+
+	/// The place of `x`, or -1 with the leaf and the slot where it would go.
+	fn locate(self, x: *T) -> (int, int, int)
+	{
+		let n = self.root;
+		let leaf = -1;
+		let slot = 0;
+		while n >= 0 do {
+			let i = self.lower(n, x);
+			if i < self.held(n) && *self.slot(n * NODE_MAX + i) == *x {
+				return (n * NODE_MAX + i, n, i);
+			}
+			leaf = n;
+			slot = i;
+			let below = -1;
+			if !self.is_leaf(n) {
+				below = self.child(n, i);
+			}
+			n = below;
+		}
+		return (-1, leaf, slot);
+	}
+
+	/// The place of `x`, or -1.
+	fn find(self, x: *T) -> int
+	{
+		let (found, leaf, i) = self.locate(x);
+		return found;
+	}
+
+	/// The place of the least element not below `x`, or -1.
+	fn ceiling_place(self, x: *T) -> int
+	{
+		let n = self.root;
+		let best = -1;
+		while n >= 0 do {
+			let i = self.lower(n, x);
+			if i < self.held(n) {
+				best = n * NODE_MAX + i;
+				if *self.slot(best) == *x {
+					return best;
+				}
+			}
+			let below = -1;
+			if !self.is_leaf(n) {
+				below = self.child(n, i);
+			}
+			n = below;
+		}
+		return best;
+	}
+
+	/// The place of the greatest element not above `x`, or -1.
+	fn floor_place(self, x: *T) -> int
+	{
+		let n = self.root;
+		let best = -1;
+		while n >= 0 do {
+			let i = self.lower(n, x);
+			if i < self.held(n) && *self.slot(n * NODE_MAX + i) == *x {
+				return n * NODE_MAX + i;
+			}
+			if i > 0 {
+				best = n * NODE_MAX + i - 1;
+			}
+			let below = -1;
+			if !self.is_leaf(n) {
+				below = self.child(n, i);
+			}
+			n = below;
+		}
+		return best;
+	}
+
+	/// End the program when the element at `at` no longer lies between its
+	/// neighbours.
+	fn check_order(self, at: int)
+	{
+		let before = self.prev_place(at);
+		let after = self.next_place(at);
+		if before >= 0 && !(*self.slot(before) < *self.slot(at)) {
+			out_of_order();
+		}
+		if after >= 0 && !(*self.slot(at) < *self.slot(after)) {
+			out_of_order();
+		}
+	}
+}
+
+/// A walk of copies of the elements of a sorted collection, from one place up
+/// to and not including another.
+pub class SortedWalk<T>
+{
+	watch: lang.Watch,
+	tree: *BTree<T>,
+	at: int,
+	stop: int,
+	started: bool = false,
+
+	/// A walk of `tree` from the place `first` up to and not including the
+	/// place `stop`, or to the end when it is -1, which `watch` guards.
+	pub fn over(tree: *BTree<T>, first: int, stop: int, watch: lang.Watch)
+		-> SortedWalk<T>
+	{
+		return SortedWalk<T> { watch: watch, tree: tree, at: first, stop: stop };
+	}
+
+	operator fn next(self) -> bool
+	{
+		if self.started {
+			self.at = self.tree.next_place(self.at);
+		}
+		self.started = true;
+		if self.at == self.stop {
+			self.at = -1;
+		}
+		return self.at >= 0;
+	}
+
+	operator fn value(self) -> T
+	{
+		return self.tree.copy_place(self.at);
+	}
+}
+
+/// A walk of copies of the keys of a `SortedMap`.
+pub class SortedKeys<K: Ordered, V>
+{
+	watch: lang.Watch,
+	map: *SortedMap<K, V>,
+	slots: ?*(K, V),
+	key_type: ?*byte,
+	at: int,
+	started: bool = false,
+
+	/// A walk of the keys of `map`, whose entries lie at `slots`, from the
+	/// place `first`. `key_type` is the record of the key type.
+	pub fn over(map: *SortedMap<K, V>, slots: ?*(K, V), first: int,
+		key_type: ?*byte, watch: lang.Watch) -> SortedKeys<K, V>
+	{
+		return SortedKeys<K, V> {
+			watch: watch,
+			map: map,
+			slots: slots,
+			key_type: key_type,
+			at: first,
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		if self.started {
+			self.at = self.map.next_place(self.at);
+		}
+		self.started = true;
+		return self.at >= 0;
+	}
+
+	operator fn value(self) -> K
+	{
+		let slots = self.slots catch fatal;
+		let p = &slots[self.at].0;
+		let made = *p;
+		anti_rt_element_copy(&made as ?*byte, p as ?*byte, self.key_type);
+		return made;
+	}
+}
+
+/// A walk of the values of a `SortedMap` in the order of their keys, which
+/// lends each value in place.
+pub class SortedValues<K: Ordered, V>
+{
+	watch: lang.Watch,
+	map: *SortedMap<K, V>,
+	slots: ?*(K, V),
+	at: int,
+	started: bool = false,
+
+	/// A walk of the values of `map`, whose entries lie at `slots`, from the
+	/// place `first`.
+	pub fn over(map: *SortedMap<K, V>, slots: ?*(K, V), first: int,
+		watch: lang.Watch) -> SortedValues<K, V>
+	{
+		return SortedValues<K, V> {
+			watch: watch,
+			map: map,
+			slots: slots,
+			at: first,
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		if self.started {
+			self.at = self.map.next_place(self.at);
+		}
+		self.started = true;
+		return self.at >= 0;
+	}
+
+	operator fn value(self) -> lent *V
+	{
+		let slots = self.slots catch fatal;
+		return &slots[self.at].1;
+	}
+}

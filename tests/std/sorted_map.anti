@@ -1,0 +1,343 @@
+//! `SortedMap<K, V>` of `anti.collection.sorted`, one part of it per function.
+//!
+//! The map looks up, inserts, replaces and removes by key and walks in key
+//! order. `range`, `floor`, `ceiling`, `first`, `last`, `pop_first` and
+//! `pop_last` find entries by the order. The parts every collection shares see
+//! each entry as a `(K, V)`. A counting allocator shows where the block of the
+//! nodes comes from, and a class that counts its teardowns shows that every
+//! value is torn down once.
+
+import anti.collection;
+import anti.collection.sorted.{SortedMap};
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A key of two parts, ordered by the first and then the second.
+struct Date
+{
+	month: int,
+	day: int,
+}
+
+operator fn lt(a: Date, b: Date) -> bool
+{
+	return a.month < b.month || a.month == b.month && a.day < b.day;
+}
+
+operator fn eq(a: Date, b: Date) -> bool
+{
+	return a.month == b.month && a.day == b.day;
+}
+
+/// A value that owns memory and counts its teardowns.
+class Tag
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	concrete fn to_text(self) -> str
+	{
+		if self.number() == 1 {
+			return "one";
+		}
+		return "other";
+	}
+
+	fn destruct(self)
+	{
+		Tag.torn.add(1);
+	}
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn lookups()
+{
+	let m = SortedMap<int, float>.new();
+	m.set(30, 3.0);
+	m.set(10, 1.0);
+	m.set(20, 2.0);
+	m.set(20, 2.5);
+	let fresh = m.add(40, 4.0);
+	let again = m.add(10, 9.0);
+	show(f"{m.to_text()} count {m.count}");
+	let hit = m.get(20) ?? -1.0;
+	let miss = m.get(25) ?? -1.0;
+	show(f"get {hit} {miss} contains {m.contains(30)} {m.contains(31)}");
+	show(f"add {fresh} {again}");
+	let gone = m.remove(10) ?? -1.0;
+	let absent = m.remove(10) ?? -1.0;
+	show(f"remove {gone} {absent} {m.to_text()}");
+	let changed = m.update(30, fn(v) {
+		*v += 0.5;
+	});
+	let unknown = m.update(31, fn(v) {
+		*v = 0.0;
+	});
+	let doubled = m.modify(40, fn(v) {
+		*v *= 2.0;
+	});
+	let seen = 0.0;
+	let read = m.read(20, fn(v) {
+		seen = *v;
+	});
+	show(f"update {changed} {unknown} modify {doubled} read {read} {seen}");
+	show(m.to_text());
+}
+
+fn walks()
+{
+	let m = SortedMap<int, int>.new();
+	for i in 0..10 {
+		m.set(9 - i, i * i);
+	}
+	for e in m {
+		let (k, v) = e;
+		printf("%d=%d ".ptr, k as c_int, v as c_int);
+	}
+	printf("\n".ptr);
+	for k in m.keys() {
+		printf("%d ".ptr, k as c_int);
+	}
+	printf("\n".ptr);
+	for v in &m.values() {
+		*v += 1;
+	}
+	for v in m.values() {
+		printf("%d ".ptr, v as c_int);
+	}
+	printf("\n".ptr);
+	for e in m.range(3, 7) {
+		printf("%d ".ptr, e.0 as c_int);
+	}
+	printf("| ".ptr);
+	for e in m.range(-5, 2) {
+		printf("%d ".ptr, e.0 as c_int);
+	}
+	printf("| ".ptr);
+	for e in m.range(8, 100) {
+		printf("%d ".ptr, e.0 as c_int);
+	}
+	printf("| ".ptr);
+	for e in m.range(5, 5) {
+		printf("%d ".ptr, e.0 as c_int);
+	}
+	printf("| ".ptr);
+	for e in m.range(7, 3) {
+		printf("%d ".ptr, e.0 as c_int);
+	}
+	printf("\n".ptr);
+}
+
+fn order()
+{
+	let m = SortedMap<int, int>.new();
+	for k in 1..6 {
+		m.set(k * 10, k);
+	}
+	let f = m.floor(35) ?? (-1, -1);
+	let exact = m.floor(30) ?? (-1, -1);
+	let below = m.floor(5) ?? (-1, -1);
+	let c = m.ceiling(35) ?? (-1, -1);
+	let above = m.ceiling(55) ?? (-1, -1);
+	show(f"floor {f.0}:{f.1} {exact.0} {below.0} ceiling {c.0}:{c.1} {above.0}");
+	let first = m.first() ?? (-1, -1);
+	let last = m.last() ?? (-1, -1);
+	show(f"first {first.0}:{first.1} last {last.0}:{last.1}");
+	let low = m.pop_first() ?? (-1, -1);
+	let high = m.pop_last() ?? (-1, -1);
+	show(f"pop {low.0} {high.0} {m.to_text()}");
+	let empty = SortedMap<int, int>.new();
+	let none_first = empty.first() ?? (-1, -1);
+	let none_pop = empty.pop_last() ?? (-1, -1);
+	let none_floor = empty.floor(3) ?? (-1, -1);
+	show(f"empty {none_first.0} {none_pop.0} {none_floor.0} {empty.to_text()}");
+}
+
+fn shared() may fail
+{
+	let m = SortedMap<int, int>.new();
+	for k in 1..9 {
+		m.set(k, k * 100);
+	}
+	let big = m.find_all(fn(e) {
+		return e.1 > 500;
+	});
+	printf("find_all %d:".ptr, big.count as c_int);
+	for e in big {
+		printf(" %d".ptr, e.0 as c_int);
+	}
+	printf("\n".ptr);
+	let first = m.find_first(fn(e) {
+		return e.1 % 300 == 0;
+	}) ?? (-1, -1);
+	let one = try m.find_one(fn(e) {
+		return e.0 == 4;
+	});
+	show(f"find_first {first.0} find_one {one.1}");
+	let n = m.update_all(fn(e) {
+		return e.0 % 2 == 0;
+	}, fn(e) {
+		e.1 = -e.1;
+	});
+	let hit = m.update_first(fn(e) {
+		return e.1 == 100;
+	}, fn(e) {
+		e.1 = 1;
+	});
+	show(f"update_all {n} update_first {hit} {m.to_text()}");
+	let removed = m.remove_all(fn(e) {
+		return e.1 < 0;
+	});
+	let gone = m.remove_first(fn(e) {
+		return e.0 > 4;
+	}) ?? (-1, -1);
+	let only = try m.remove_one(fn(e) {
+		return e.0 == 7;
+	});
+	show(f"remove_all {removed} remove_first {gone.0} remove_one {only.0} {m.to_text()}");
+	let many = m.find_one(fn(e) {
+		return e.0 > 0;
+	}) catch e {
+		printf("%.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield (-1, -1);
+	};
+	m.clear();
+	show(f"clear {m.count} {m.is_empty()} {m.to_text()} {many.0}");
+	m.set(1, 1);
+	show(f"after clear {m.to_text()}");
+}
+
+fn texts()
+{
+	let days = SortedMap<Date, str>.new();
+	days.set(Date { month: 12, day: 25 }, "Christmas");
+	days.set(Date { month: 1, day: 1 }, "New Year");
+	days.set(Date { month: 5, day: 1 }, "May Day");
+	show(days.to_text());
+	let out = text.Builder.new();
+	days.serialize(&out);
+	let letters = SortedMap<char, int>.new();
+	letters.set('b', 2);
+	letters.set('a', 1);
+	letters.serialize(&out);
+	show(out.take());
+	let later = days.ceiling(Date { month: 6, day: 1 }) ?? (Date { month: 0, day: 0 }, "");
+	show(f"after June: {later.1}");
+}
+
+fn owned()
+{
+	{
+		let tags = SortedMap<int, Tag>.new();
+		tags.set(2, Tag.of(2));
+		tags.set(1, Tag.of(1));
+		tags.set(3, Tag.of(1));
+		show(tags.to_text());
+		tags.set(2, Tag.of(5));
+		let copy = tags.get(2);
+		let seen = 0;
+		let read = tags.read(2, fn(t) {
+			seen = t.number();
+		});
+		printf("replaced with %d, torn %d, copy %d\n".ptr, seen as c_int,
+			Tag.torn.load() as c_int, (copy != none) as c_int);
+		let gone = tags.remove(1);
+		printf("removed, torn %d\n".ptr, Tag.torn.load() as c_int);
+		let ones = tags.remove_all(fn(e) {
+			return e.1.number() == 1;
+		});
+		printf("remove_all %d, torn %d\n".ptr, ones as c_int, Tag.torn.load() as c_int);
+		tags.set(4, Tag.of(4));
+		tags.set(6, Tag.of(6));
+		tags.clear();
+		printf("clear, torn %d\n".ptr, Tag.torn.load() as c_int);
+		tags.set(7, Tag.of(7));
+	}
+	printf("after the block, torn %d of 8\n".ptr, Tag.torn.load() as c_int);
+}
+
+fn allocations()
+{
+	let counting = Counting { };
+	{
+		let m = SortedMap<int, int>.new(1000, &counting);
+		for i in 0..1000 {
+			m.set(i, i);
+		}
+		printf("made with room: %d allocation\n".ptr, counting.allocs as c_int);
+		for i in 0..1000 {
+			m.set(i + 1000, i);
+		}
+		printf("past it: %d allocations\n".ptr, counting.allocs as c_int);
+		let removed = m.remove_all(fn(e) {
+			return e.0 % 100 != 0;
+		});
+		m.shrink();
+		printf("shrink after %d removed: %d allocations\n".ptr, removed as c_int,
+			counting.allocs as c_int);
+		show(m.to_text());
+		let before = counting.allocs;
+		m.reserve(500);
+		for i in 0..500 {
+			m.set(i * 3 + 1, i);
+		}
+		printf("reserve: %d allocation, %d entries\n".ptr,
+			(counting.allocs - before) as c_int, m.count as c_int);
+	}
+	printf("after the block: %d allocations, %d frees\n".ptr, counting.allocs as c_int,
+		counting.frees as c_int);
+}
+
+fn main() -> int
+{
+	lookups();
+	walks();
+	order();
+	shared() catch fatal;
+	texts();
+	owned();
+	allocations();
+	return 0;
+}
