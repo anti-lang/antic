@@ -1,0 +1,34 @@
+exit 0
+made with room: 1 allocation, capacity 100
+past it: 2 allocations
+after the block: 2 frees
+small start: capacity 8
+doubled: capacity 16
+reserve: capacity 109 in 1 allocation
+shrink: capacity 9
+find_all: 3 copies
+  2
+  4
+  6
+find_first: 3 -1
+find_one: 4
+`find_one` found 3 elements where it needs exactly one (count 3)
+`find_one` found no element where it needs exactly one (count 0)
+gave 0
+`update_one` found 2 elements where it needs exactly one
+`remove_one` found no element where it needs exactly one
+unchanged -1: 2
+update: 3 true false [10, 200, 30, 400, 50, 6]
+remove: 2 10 50 2
+[31, 7]
+clear: 0 true
+["Ann", "say \"hi\""]
+[{"x": 1, "y": 2}, {"x": 3, "y": 4}]
+[{"x":1,"y":2},{"x":3,"y":4}]["Ann","say \"hi\""][1.5]
+[]
+eq: true false false true false
+[one, other, one]
+copies 2, torn 3
+removed 1, torn 4
+after the block, torn 8
+total 7

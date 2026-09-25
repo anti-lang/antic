@@ -1,13 +1,35 @@
-//! A list and two maps over objects.
+//! The interfaces of walking and the parts every collection shares.
 //!
-//! Anti has no generics, so a collection holds `*anti.lang.Object` and the
-//! program casts what it takes out with `as` or `as?`. Every class descends
-//! from that root, so any object goes in. A collection owns its own memory and
-//! never the objects, which the program still deletes.
+//! `Iterable<T>` and `Iterator<T>` are the constraints of a function that takes
+//! any collection or iterator of a given element type. `Collection<T>` is the
+//! base of every generic collection. It holds the allocator, the count and the
+//! changes, and it gives the functions every collection has: the `find`,
+//! `update` and `remove` forms, `clear`, `to_text` and `serialize`. A
+//! collection fills five functions that reach its elements by place, and each
+//! collection module gives its class `==` through `equal`.
+//!
+//! The module also holds a list and two maps over objects from before generics,
+//! which hold `*anti.lang.Object` and which the program casts back with `as` or
+//! `as?`. A collection of those owns its own memory and never the objects,
+//! which the program still deletes.
 
+import anti.lang;
+import anti.mem;
 import anti.text;
 
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memmove(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
+extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
+	arg: ?*byte);
+extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
+	arg: ?*byte);
+extern fn anti_rt_element_copy(into: ?*byte, from: ?*byte, arg: ?*byte);
+extern fn anti_rt_element_destroy(bytes: ?*byte, arg: ?*byte);
+
+/// The capacity a growing collection starts with when it is made without one.
+const FIRST_CAPACITY: int = 8;
 
 /// A type that `for` walks, giving elements of type `T`.
 ///
@@ -27,6 +49,602 @@ pub abstract class Iterable<T>
 pub abstract class Iterator<T>
 	allow(unfilled-abstract, "a type meets it through its hooks")
 {
+}
+
+/// The failure of a `_one` form, which found no element or more than one.
+///
+/// `count` holds the number of elements that matched, and the message names the
+/// form: `` `find_one` found 3 elements where it needs exactly one ``.
+pub class NotOne inherits lang.Error
+{
+	/// The number of elements that matched, 0 or more than 1.
+	pub count: int = 0,
+	/// The bytes of the message, which the error frees. A copy made with `dup`
+	/// shares them with the error it copies.
+	transient made: ?*byte = none,
+
+	/// The failure of the form named `form`, which found `count` elements.
+	pub fn found(form: str, count: int) -> *NotOne
+	{
+		let e = alloc NotOne { count: count };
+		let message = "";
+		if count == 0 {
+			message = f"`{form}` found no element where it needs exactly one";
+		} else {
+			message = f"`{form}` found {count} elements where it needs exactly one";
+		}
+		e.message = message;
+		e.made = message.ptr;
+		return e;
+	}
+
+	concrete fn destruct(self)
+	{
+		free(self.made);
+	}
+}
+
+/// The allocator a collection made with `from` takes: `from` itself, or the C
+/// library when it is `none`.
+pub fn allocator(from: ?*mem.Allocator) -> *mem.Allocator
+{
+	if let chosen = from {
+		return chosen;
+	}
+	return mem.LibcAllocator.get();
+}
+
+/// The base of every generic collection, with the parts they all share.
+///
+/// A collection is a class used as a value. It holds its elements by value in
+/// memory of its own, which comes from the allocator it was made with and goes
+/// back to it. `count` is the number of elements, and the changes of the size
+/// are what the iterator of a collection watches, so a dev build stops a `for`
+/// over a collection that changed.
+///
+/// Criteria come in three forms. `_all` acts on every match and gives the
+/// count, `_first` on the first match in the order of the collection, and
+/// `_one` on the one match. `_one` fails with `NotOne` when nothing matches and
+/// when more than one element does.
+///
+/// A collection fills five functions that reach an element by its place, an
+/// `int` of its own choosing that the order of the collection walks from
+/// `first_place` through `next_place` to `-1`. They serve the functions of this
+/// class, which a collection may replace with faster ones.
+pub abstract class Collection<T>
+{
+	/// The number of elements.
+	pub count: int = 0,
+	/// The allocator of every block the collection holds.
+	protected from: *mem.Allocator,
+	/// The changes of the size, which an iterator of the collection watches.
+	protected changes: lang.Changes = lang.Changes {
+		count: 0,
+		at: lang.SourceLocation {
+			file: "",
+			line: 0,
+			column: 0,
+			function: "",
+			module: "",
+		},
+	},
+
+	/// The place of the first element, or -1 when there is none.
+	abstract fn first_place(self) -> int;
+
+	/// The place of the element after the one at `at`, or -1 after the last.
+	abstract fn next_place(self, at: int) -> int;
+
+	/// Lend the element at the place `at` to `f`, which may change it.
+	abstract fn lend_place(self, at: int, f: fn(lent *T));
+
+	/// A copy of the element at the place `at`, which owns what it holds.
+	abstract fn copy_place(self, at: int) -> T;
+
+	/// Move the element at the place `at` out of the collection and give it
+	/// with the place of the element after it, or -1.
+	///
+	/// `count` still counts the element, and the caller takes it off.
+	abstract fn take_place(self, at: int) -> (T, int);
+
+	/// Whether the collection holds no element.
+	pub fn is_empty(self) -> bool
+	{
+		return self.count == 0;
+	}
+
+	/// Copies of every element that `test` accepts, in the order of the
+	/// collection, from the allocator of the collection.
+	pub fn find_all(self, test: fn(T) -> bool) -> Copies<T>
+	{
+		let found = Copies<T>.new(0, self.from);
+		let at = self.first_place();
+		while at >= 0 do {
+			if self.accepts(at, test) {
+				found.add(self.copy_place(at));
+			}
+			at = self.next_place(at);
+		}
+		return found;
+	}
+
+	/// A copy of the first element that `test` accepts, or `none`.
+	pub fn find_first(self, test: fn(T) -> bool) -> ?T
+	{
+		let at = self.first_match(test);
+		if at < 0 {
+			return none;
+		}
+		return self.copy_place(at);
+	}
+
+	/// A copy of the one element that `test` accepts.
+	///
+	/// It fails with `NotOne` when no element or more than one matches.
+	pub fn find_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		let at = try self.one_match("find_one", test);
+		return self.copy_place(at);
+	}
+
+	/// Run `change` on every element that `test` accepts, in place, and give
+	/// their number.
+	pub fn update_all(self, test: fn(T) -> bool, change: fn(lent *T)) -> int
+	{
+		let n = 0;
+		let at = self.first_place();
+		while at >= 0 do {
+			if self.accepts(at, test) {
+				self.lend_place(at, change);
+				n += 1;
+			}
+			at = self.next_place(at);
+		}
+		return n;
+	}
+
+	/// Run `change` on the first element that `test` accepts, in place. Gives
+	/// `false` when no element matches.
+	pub fn update_first(self, test: fn(T) -> bool, change: fn(lent *T)) -> bool
+	{
+		let at = self.first_match(test);
+		if at < 0 {
+			return false;
+		}
+		self.lend_place(at, change);
+		return true;
+	}
+
+	/// Run `change` on the one element that `test` accepts, in place.
+	///
+	/// It fails with `NotOne` and changes nothing when no element or more than
+	/// one matches.
+	pub fn update_one(self, test: fn(T) -> bool, change: fn(lent *T)) may fail
+	{
+		let at = try self.one_match("update_one", test);
+		self.lend_place(at, change);
+	}
+
+	/// Remove every element that `test` accepts and give their number.
+	///
+	/// It is the way to remove while walking, since a `for` over a collection
+	/// that changes stops a dev build.
+	pub fn remove_all(self, test: fn(T) -> bool,
+		at: lang.SourceLocation = here) -> int
+	{
+		let n = 0;
+		let place = self.first_place();
+		while place >= 0 do {
+			if self.accepts(place, test) {
+				let (gone, after) = self.take_place(place);
+				self.resized(-1, at);
+				place = after;
+				n += 1;
+			} else {
+				place = self.next_place(place);
+			}
+		}
+		return n;
+	}
+
+	/// Remove the first element that `test` accepts and give it, or `none`.
+	pub fn remove_first(self, test: fn(T) -> bool,
+		at: lang.SourceLocation = here) -> ?T
+	{
+		let place = self.first_match(test);
+		if place < 0 {
+			return none;
+		}
+		let (taken, after) = self.take_place(place);
+		self.resized(-1, at);
+		return taken;
+	}
+
+	/// Remove the one element that `test` accepts and give it.
+	///
+	/// It fails with `NotOne` and removes nothing when no element or more than
+	/// one matches.
+	pub fn remove_one(self, test: fn(T) -> bool,
+		at: lang.SourceLocation = here) -> T may fail
+	{
+		let place = try self.one_match("remove_one", test);
+		let (taken, after) = self.take_place(place);
+		self.resized(-1, at);
+		return taken;
+	}
+
+	/// Remove every element.
+	pub fn clear(self, at: lang.SourceLocation = here)
+	{
+		let place = self.first_place();
+		while place >= 0 do {
+			let (gone, after) = self.take_place(place);
+			self.count -= 1;
+			place = after;
+		}
+		self.resized(0, at);
+	}
+
+	/// The elements as text, `[1, 2, 3]`.
+	///
+	/// A number stands as it is, a `str` and a `char` as a quoted string, and a
+	/// class as its own `to_text`. The text is memory of its own from the C
+	/// library, which `free(s.ptr)` returns.
+	concrete fn to_text(self) -> str
+	{
+		let out = text.Builder.new();
+		let arg = self.element_type();
+		let place = self.first_place();
+		out.append("[");
+		while place >= 0 do {
+			let copy = self.copy_place(place);
+			if place != self.first_place() {
+				out.append(", ");
+			}
+			anti_rt_element_text(&out, &copy as ?*byte, arg);
+			place = self.next_place(place);
+		}
+		out.append("]");
+		return out.take();
+	}
+
+	/// Write the elements to `out` as a JSON array, each as `serialize` writes
+	/// a field of its type.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		let arg = self.element_type();
+		let place = self.first_place();
+		out.append("[");
+		while place >= 0 do {
+			let copy = self.copy_place(place);
+			if place != self.first_place() {
+				out.append(",");
+			}
+			anti_rt_element_serialize(out, &copy as ?*byte, arg);
+			place = self.next_place(place);
+		}
+		out.append("]");
+	}
+
+	/// Whether `other` holds as many elements as this one and `same` accepts
+	/// each pair of them in order. A collection module gives its class `==`
+	/// with `equal`, which passes `==` of the elements.
+	pub fn equal_by(self, other: *Collection<T>,
+		same: fn(lent *T, lent *T) -> bool) -> bool
+	{
+		if self.count != other.count {
+			return false;
+		}
+		let mine = self.first_place();
+		let theirs = other.first_place();
+		while mine >= 0 && theirs >= 0 do {
+			let a = self.copy_place(mine);
+			let b = other.copy_place(theirs);
+			if !same(&a, &b) {
+				return false;
+			}
+			mine = self.next_place(mine);
+			theirs = other.next_place(theirs);
+		}
+		return mine < 0 && theirs < 0;
+	}
+
+	/// Count a change of the size by `by` elements, made at `at`, which a `for`
+	/// over the collection sees.
+	protected fn resized(self, by: int, at: lang.SourceLocation)
+	{
+		self.count += by;
+		self.changes.count += 1;
+		self.changes.at = at;
+	}
+
+	/// The watch of the changes that an iterator of the collection holds.
+	protected fn watch(self) -> lang.Watch
+	{
+		return lang.Watch { changes: &self.changes, count: self.changes.count };
+	}
+
+	/// Room for `n` elements from the allocator, or `none` when it has run out.
+	/// A request for none gives `none`.
+	///
+	/// DESIGN: every slot that holds no element holds zero bytes. `=` into a
+	/// slot then finds a zero table and tears nothing down, as it does in the
+	/// room `alloc(T, n)` gives. A collection moves its elements as bytes and
+	/// zeroes the slots they leave, with `close_gap`.
+	protected fn room(self, n: int) -> ?*T
+	{
+		if n <= 0 {
+			return none;
+		}
+		let made = self.from.alloc(n * size_of(T), element_align<T>());
+		if made != none {
+			memset(made, 0, (n * size_of(T)) as c_size_t);
+		}
+		return made as ?*T;
+	}
+
+	/// Give back room that `room` gave.
+	protected fn give_back(self, p: ?*T)
+	{
+		self.from.free(p as ?*byte);
+	}
+
+	/// Move the first `used` elements at `p` into new room for `n` and give
+	/// back the old room. Gives `none` and keeps `p` when the allocator has run
+	/// out.
+	protected fn moved(self, p: ?*T, used: int, n: int) -> ?*T
+	{
+		let made = self.room(n) else {
+			return none;
+		};
+		if used > 0 {
+			memcpy(made as ?*byte, p as ?*byte,
+				(used * size_of(T)) as c_size_t);
+		}
+		self.give_back(p);
+		return made;
+	}
+
+	/// Move the elements after the slot `at` of the `used` at `p` one slot down
+	/// as bytes, over the element that left `at`, and zero the last slot.
+	protected fn close_gap(self, p: *T, at: int, used: int)
+	{
+		if at + 1 < used {
+			memmove(&p[at] as ?*byte, &p[at + 1] as ?*byte,
+				((used - at - 1) * size_of(T)) as c_size_t);
+		}
+		memset(&p[used - 1] as ?*byte, 0, size_of(T) as c_size_t);
+	}
+
+	/// The capacity that holds `need` elements when `have` does not: the first
+	/// capacity, doubled as often as it takes.
+	protected fn grown(self, have: int, need: int) -> int
+	{
+		let size = have;
+		if size < FIRST_CAPACITY {
+			size = FIRST_CAPACITY;
+		}
+		while size < need do {
+			size *= 2;
+		}
+		return size;
+	}
+
+	/// A copy of the element at `p`, which owns what it holds: a class value
+	/// takes the copy of its class, and every other type its bytes.
+	protected fn copy_element(self, p: *T) -> T
+	{
+		let made = *p;
+		anti_rt_element_copy(&made as ?*byte, p as ?*byte, self.element_type());
+		return made;
+	}
+
+	/// Tear down the element at `p`, which the collection then forgets.
+	protected fn destroy_element(self, p: *T)
+	{
+		anti_rt_element_destroy(p as ?*byte, self.element_type());
+	}
+
+	/// The record of `T` in the descriptor of this copy of the class, which
+	/// sits one level below the root in every chain.
+	fn element_type(self) -> ?*byte
+	{
+		return anti_rt_type_arg(self as ?*byte, 1, 0);
+	}
+
+	/// Whether `test` accepts the element at the place `at`.
+	fn accepts(self, at: int, test: fn(T) -> bool) -> bool
+	{
+		let yes = false;
+		self.lend_place(at, fn(p) {
+			yes = test(*p);
+		});
+		return yes;
+	}
+
+	/// The place of the first element `test` accepts, or -1.
+	fn first_match(self, test: fn(T) -> bool) -> int
+	{
+		let at = self.first_place();
+		while at >= 0 do {
+			if self.accepts(at, test) {
+				return at;
+			}
+			at = self.next_place(at);
+		}
+		return -1;
+	}
+
+	/// The place of the one element `test` accepts. It fails with `NotOne`,
+	/// named after `form`, when no element or more than one matches.
+	fn one_match(self, form: str, test: fn(T) -> bool) -> int may fail
+	{
+		let found = -1;
+		let n = 0;
+		let at = self.first_place();
+		while at >= 0 do {
+			if self.accepts(at, test) {
+				if n == 0 {
+					found = at;
+				}
+				n += 1;
+			}
+			at = self.next_place(at);
+		}
+		if n != 1 {
+			fail NotOne.found(form, n);
+		}
+		return found;
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the same order.
+///
+/// A collection module gives its class `==` through it, as `operator fn eq<T:
+/// eq>(a: List<T>, b: List<T>) -> bool`, so a collection has `==` exactly when
+/// its elements do.
+pub fn equal<T: eq>(a: *Collection<T>, b: *Collection<T>) -> bool
+{
+	return a.equal_by(b, fn(x, y) {
+		return *x == *y;
+	});
+}
+
+/// The alignment of the room of an element: the largest power of two that
+/// divides its size, which every alignment the layout gives it divides.
+fn element_align<T>() -> int
+{
+	let size = size_of(T);
+	if size <= 0 {
+		return 1;
+	}
+	return size & -size;
+}
+
+/// Copies of elements of another collection, which `find_all` gives.
+///
+/// It is a collection of its own and owns its copies, which it tears down at
+/// the end of its block. Its room comes from the allocator of the collection
+/// that made it.
+pub class Copies<T> inherits Collection<T>
+{
+	items: ?*T = none,
+	capacity: int = 0,
+
+	/// An empty collection with room for `capacity` copies from `from`, or from
+	/// the C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Copies<T>
+	{
+		let made = Copies<T> { from: allocator(from) };
+		if capacity > 0 {
+			made.items = made.room(capacity);
+			if made.items != none {
+				made.capacity = capacity;
+			}
+		}
+		return made;
+	}
+
+	operator fn iter(self) -> CopiesWalk<T>
+	{
+		return CopiesWalk<T>.over(self.items, self.count, self.watch());
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		if self.count == 0 {
+			return -1;
+		}
+		return 0;
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		if at + 1 >= self.count {
+			return -1;
+		}
+		return at + 1;
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		let items = self.items else {
+			return;
+		};
+		f(&items[at]);
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		let items = self.items catch fatal;
+		return self.copy_element(&items[at]);
+	}
+
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let items = self.items catch fatal;
+		let after = -1;
+		if at + 1 < self.count {
+			after = at;
+		}
+		let taken = (items[at], after);
+		self.close_gap(items, at, self.count);
+		return taken;
+	}
+
+	/// Add `x` at the end, which the collection now owns.
+	pub fn add(self, own x: T, at: lang.SourceLocation = here)
+	{
+		if self.count == self.capacity {
+			let size = self.grown(self.capacity, self.count + 1);
+			let made = self.moved(self.items, self.count, size) catch fatal;
+			self.items = made;
+			self.capacity = size;
+		}
+		let items = self.items catch fatal;
+		items[self.count] = x;
+		self.resized(1, at);
+	}
+
+	fn destruct(self)
+	{
+		let items = self.items else {
+			return;
+		};
+		let i = self.count - 1;
+		while i >= 0 do {
+			self.destroy_element(&items[i]);
+			i -= 1;
+		}
+		self.give_back(items);
+	}
+}
+
+/// The iterator of `Copies<T>`, which lends each copy in turn.
+pub class CopiesWalk<T>
+{
+	watch: lang.Watch,
+	items: ?*T,
+	count: int,
+	at: int = -1,
+
+	/// A walk of the `count` elements at `items`, which `watch` guards.
+	pub fn over(items: ?*T, count: int, watch: lang.Watch) -> CopiesWalk<T>
+	{
+		return CopiesWalk<T> { watch: watch, items: items, count: count };
+	}
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.count;
+	}
+
+	operator fn value(self) -> lent *T
+	{
+		let items = self.items catch fatal;
+		return &items[self.at];
+	}
 }
 
 /// A growing array of objects.

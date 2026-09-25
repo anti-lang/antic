@@ -104,6 +104,22 @@ endif()
 check(walk_changed "was changed while"
       "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
       ON "${WORK}/anti_lang_dev.o")
+# The same over the base of the generic collections, which counts the
+# change in `remove_all`. anti.collection imports anti.mem and anti.text,
+# so the dev build links an object of each.
+foreach(module mem text collection)
+    execute_process(COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}"
+                            --runtime "${RUNTIME}" -o "${WORK}/anti_${module}_dev"
+                            "${RUNTIME}/std/anti/${module}.antl"
+                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "antic --dev of anti.${module} failed\n${err}")
+    endif()
+endforeach()
+check(collection_changed "was changed while"
+      "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
+      ON "${WORK}/anti_lang_dev.o" "${WORK}/anti_mem_dev.o"
+      "${WORK}/anti_text_dev.o" "${WORK}/anti_collection_dev.o")
 
 # --checks puts them into a release build, and --no-checks takes them out
 # of a dev build. Both override the mode.

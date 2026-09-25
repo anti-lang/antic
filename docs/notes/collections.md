@@ -1,0 +1,20 @@
+# The parts every collection shares
+
+Choices made for the parts every collection shares, from "Collections" of
+round five, in each pass. They describe the inside of the compiler, the
+runtime and `anti.collection`. `docs/decisions.md` holds what a reader of
+the language or a user of the library can observe, under "Generics and
+collections".
+
+- `struct constraint_ref` of `ast.h` carries the type arguments of a generic interface. `constraint_list` of `parser.c` reads them with `type_args`, and `type_params` counts its list among the open ones, so `>>` closes both. `add_constraint` of `sema_generic.c` makes the copy with `sema_copy_of`. `resolve_params` sets `signature` and `within` for it, so the arguments may name the parameters of the generic or of its class.
+- `walk_iface` knows the two interfaces of walking by the module and the name of their generic, `COLLECTION_MODULE`, `COLLECTION_ITERABLE` and `COLLECTION_ITERATOR` of `types.h`. A constraint of one adds the hooks that `for` needs to the parameter, `iter` or `next` with `value`, so the hook bits the library file carries already say it. `meets_iface` asks `walks_as` for a type that is no parameter, which reads the result of `iter` and then of `value` through `hook_result`, a lent pointer as what it points at. `sema_param_iterate` gives the argument of the interface as the element.
+- `sema_iterate` of `sema_expr.c` takes a `*C` of a type parameter as it takes a `C`, and `walked_param` of `sema_copies.c` reads such a walk again in each copy.
+- `level_allows` of `sema_call.c` lets a protected member through when `descends_or_copies` finds its class in the chain, a copy of a generic base among them. `method_call` types the receiver of an inherited function with `sema_member_type_in`, which takes the copy of the declaring generic in the chain of the receiver.
+- `direct_callee` of `sema_copies.c` redirects a callee `T.f` as it redirects a name. A static call on a copy of a generic class then calls the function of that copy.
+- The variable of a range gets `loops` one level inside its loop in `sema_stmt.c`. A move of it inside the body is then no move that the loop repeats.
+- `lower_class_descriptor` of `lower_desc.c` writes the two items after `versions`, `DESCRIPTOR_ITEMS` in all, and `class_type_args` writes one field record per parameter of a copy. The offset of a record is `size_of` the argument, the type id and the descriptor follow the rules of a field, and an array reaches the descriptor of its element. A constant argument has type id none.
+- `src/rt/object.c` finds the record with `anti_rt_type_arg`, at depth 1, where `Collection<T>` sits below the root. `show_value` writes the text of `to_text` beside `put_value`, which writes JSON. A class goes through the `to_text` and the `serialize` entries of its own table. Copy and teardown reach `anti_rt_copy_elements` and `anti_rt_destroy_elements`, whose count an array record gives by its size.
+- `Collection<T>` keeps no storage of its own. `room` zeroes what it takes, `moved` carries the elements into new room as bytes, and `close_gap` closes a removal with `memmove` and zeroes the slot it leaves. `copy_element` copies the bytes of an element into a local and runs `anti_rt_element_copy` over it. The local then owns a copy of what the element owns. A local of `T` in a copy is torn down at the end of its block, so an element leaves the room only by a move, as `take_place` does with the tuple it returns.
+- The shared functions test an element through `lend_place`, with a closure that keeps the answer in a captured `bool`. `to_text`, `serialize` and `equal_by` work on copies, because a lent pointer reaches no function of C.
+- `Copies<T>` is the collection `find_all` fills. Its iterator `CopiesWalk<T>` holds the room, the count and the watch that `iter` gives it, since a class of the module reaches no private field of another.
+- The tests: `std_collection_parts` and `std_collection_parts_dev`, `listing_error_walk_interfaces`, the check `collection_changed` of `run_checks.cmake`, `program_generic_static` in both modes, and the constraint and `fn(lent *T)` of `tests/fmt/loose.anti`.

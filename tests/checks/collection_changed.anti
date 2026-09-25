@@ -1,0 +1,90 @@
+//! A collection over `anti.collection.Collection<T>` that loses an element
+//! while a `for` walks it. The base counts the change in `remove_all`, and the
+//! loop of a dev build stops at the next turn and names the collection, the
+//! loop and the change.
+
+import anti.collection;
+import anti.lang;
+
+class Pair<T> inherits collection.Collection<T>
+{
+	items: [2]T,
+
+	pub fn of(a: T, b: T) -> Pair<T>
+	{
+		return Pair<T> { from: collection.allocator(none), items: [a, b], count: 2 };
+	}
+
+	operator fn iter(self) -> PairWalk<T>
+	{
+		return PairWalk<T> { watch: self.watch(), of: self };
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		if self.count == 0 {
+			return -1;
+		}
+		return 0;
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		if at + 1 >= self.count {
+			return -1;
+		}
+		return at + 1;
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		f(&self.items[at]);
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		return self.copy_element(&self.items[at]);
+	}
+
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let after = -1;
+		if at + 1 < self.count {
+			after = at;
+		}
+		let taken = (self.items[at], after);
+		self.close_gap(&self.items[0], at, self.count);
+		return taken;
+	}
+}
+
+class PairWalk<T>
+{
+	pub watch: lang.Watch,
+	pub of: *Pair<T>,
+	pub at: int = -1,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.of.count;
+	}
+
+	operator fn value(self) -> T
+	{
+		return self.of.copy_place(self.at);
+	}
+}
+
+fn main() -> int
+{
+	let pair = Pair<int>.of(1, 2);
+	for n in pair {
+		if n == 1 {
+			pair.remove_all(fn(x) {
+				return x == 2;
+			});
+		}
+	}
+	return 7;
+}

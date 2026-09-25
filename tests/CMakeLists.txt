@@ -875,6 +875,30 @@ foreach(source IN LISTS std_sources)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
 
+# The parts every collection shares in dev mode. The copies of the
+# generics of anti.collection come from its library file into the module
+# of the program, and the link names an object of each module it imports.
+add_test(NAME dev_object_collection
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/collection.antl")
+set_tests_properties(dev_object_collection PROPERTIES
+    FIXTURES_SETUP collection_dev_object)
+add_test(NAME std_collection_parts_dev
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/collection_parts.anti"
+        "-DOPTIONS=--dev"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev.o"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+set_tests_properties(std_collection_parts_dev PROPERTIES
+    FIXTURES_REQUIRED
+        "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object")
+
 # Every failing function of src/std/ is written with `may fail`, apart from
 # a binding, which refuses it.
 add_test(NAME std_may_fail_only

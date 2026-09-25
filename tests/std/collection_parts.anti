@@ -1,0 +1,465 @@
+//! The parts every collection shares, over a small collection of the test.
+//!
+//! `Bag<T>` keeps its elements in one block of room from its allocator and
+//! fills the five functions of `collection.Collection<T>` that reach an element
+//! by its place. Everything else comes from the base: the count, the changes,
+//! the `find`, `update` and `remove` forms, `clear`, `to_text`, `serialize` and
+//! `==` through `collection.equal`. A counting allocator shows where the room
+//! comes from, and a class that counts its teardowns shows that every element
+//! is torn down once.
+
+import anti.collection;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A test collection over the shared parts.
+class Bag<T> inherits collection.Collection<T>
+{
+	items: ?*T = none,
+	size: int = 0,
+
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Bag<T>
+	{
+		let made = Bag<T> { from: collection.allocator(from) };
+		if capacity > 0 {
+			made.items = made.room(capacity);
+			made.size = capacity;
+		}
+		return made;
+	}
+
+	/// The number of elements the room holds.
+	pub fn capacity(self) -> int
+	{
+		return self.size;
+	}
+
+	pub fn push(self, own x: T, at: lang.SourceLocation = here)
+	{
+		if self.count == self.size {
+			self.resize(self.grown(self.size, self.count + 1));
+		}
+		let items = self.items catch fatal;
+		items[self.count] = x;
+		self.resized(1, at);
+	}
+
+	/// Room for `n` more elements, in one allocation.
+	pub fn reserve(self, n: int)
+	{
+		if self.count + n > self.size {
+			self.resize(self.count + n);
+		}
+	}
+
+	/// Give back the room that holds no element.
+	pub fn shrink(self)
+	{
+		if self.size > self.count {
+			self.resize(self.count);
+		}
+	}
+
+	operator fn iter(self) -> BagWalk<T>
+	{
+		return BagWalk<T> {
+			watch: self.watch(),
+			items: self.items,
+			count: self.count,
+		};
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		if self.count == 0 {
+			return -1;
+		}
+		return 0;
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		if at + 1 >= self.count {
+			return -1;
+		}
+		return at + 1;
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		let items = self.items catch fatal;
+		f(&items[at]);
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		let items = self.items catch fatal;
+		return self.copy_element(&items[at]);
+	}
+
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let items = self.items catch fatal;
+		let after = -1;
+		if at + 1 < self.count {
+			after = at;
+		}
+		let taken = (items[at], after);
+		self.close_gap(items, at, self.count);
+		return taken;
+	}
+
+	fn resize(self, n: int)
+	{
+		let made = self.moved(self.items, self.count, n);
+		if n > 0 && made == none {
+			return;
+		}
+		self.items = made;
+		self.size = n;
+	}
+
+	fn destruct(self)
+	{
+		let i = self.count - 1;
+		while i >= 0 do {
+			let items = self.items catch fatal;
+			self.destroy_element(&items[i]);
+			i -= 1;
+		}
+		self.give_back(self.items);
+	}
+}
+
+class BagWalk<T>
+{
+	pub watch: lang.Watch,
+	pub items: ?*T,
+	pub count: int,
+	pub at: int = -1,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.count;
+	}
+
+	operator fn value(self) -> lent *T
+	{
+		let items = self.items catch fatal;
+		return &items[self.at];
+	}
+}
+
+operator fn eq<T: eq>(a: Bag<T>, b: Bag<T>) -> bool
+{
+	return collection.equal<T>(&a, &b);
+}
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// A class value with `==`, as an element that `collection.equal` compares.
+class Spot
+{
+	pub x: int = 0,
+
+	operator fn eq(self, other: Spot) -> bool
+	{
+		return self.x == other.x;
+	}
+}
+
+/// A class that owns memory and counts its teardowns.
+class Tag
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Tag { n: p };
+	}
+
+	concrete fn to_text(self) -> str
+	{
+		let p = self.n catch fatal;
+		if p[0] == 1 {
+			return "one";
+		}
+		return "other";
+	}
+
+	fn destruct(self)
+	{
+		Tag.torn.add(1);
+	}
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn allocations()
+{
+	let counting = Counting { };
+	{
+		let b = Bag<int>.new(100, &counting);
+		for i in 0..100 {
+			b.push(i);
+		}
+		printf("made with room: %d allocation, capacity %d\n".ptr,
+			counting.allocs as c_int, b.capacity() as c_int);
+		b.push(100);
+		printf("past it: %d allocations\n".ptr, counting.allocs as c_int);
+	}
+	printf("after the block: %d frees\n".ptr, counting.frees as c_int);
+	let c = Bag<int>.new(0, &counting);
+	c.push(1);
+	printf("small start: capacity %d\n".ptr, c.capacity() as c_int);
+	for k in 1..9 {
+		c.push(k);
+	}
+	printf("doubled: capacity %d\n".ptr, c.capacity() as c_int);
+	let before = counting.allocs;
+	c.reserve(100);
+	printf("reserve: capacity %d in %d allocation\n".ptr,
+		c.capacity() as c_int, (counting.allocs - before) as c_int);
+	c.shrink();
+	printf("shrink: capacity %d\n".ptr, c.capacity() as c_int);
+}
+
+fn criteria() may fail
+{
+	let b = Bag<int>.new();
+	for i in 1..7 {
+		b.push(i);
+	}
+	let evens = b.find_all(fn(x) {
+		return x % 2 == 0;
+	});
+	printf("find_all: %d copies\n".ptr, evens.count as c_int);
+	for x in evens {
+		printf("  %d\n".ptr, x as c_int);
+	}
+	let first = b.find_first(fn(x) {
+		return x > 2;
+	}) ?? -1;
+	let missing = b.find_first(fn(x) {
+		return x > 20;
+	}) ?? -1;
+	printf("find_first: %d %d\n".ptr, first as c_int, missing as c_int);
+	let four = try b.find_one(fn(x) {
+		return x == 4;
+	});
+	printf("find_one: %d\n".ptr, four as c_int);
+	let many = b.find_one(fn(x) {
+		return x > 3;
+	}) catch e {
+		let n = e as *collection.NotOne;
+		printf("%.*s (count %d)\n".ptr, e.message.len as c_int, e.message.ptr,
+			n.count as c_int);
+		return;
+	};
+	printf("not reached %d\n".ptr, many as c_int);
+}
+
+fn failures()
+{
+	let b = Bag<int>.new();
+	b.push(5);
+	b.push(7);
+	let none_found = b.find_one(fn(x) {
+		return x > 10;
+	}) catch e {
+		let n = e as *collection.NotOne;
+		printf("%.*s (count %d)\n".ptr, e.message.len as c_int, e.message.ptr,
+			n.count as c_int);
+		yield 0;
+	};
+	printf("gave %d\n".ptr, none_found as c_int);
+	b.update_one(fn(x) {
+		return x > 0;
+	}, fn(p) {
+		*p = 0;
+	}) catch e {
+		printf("%.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+	};
+	let gone = b.remove_one(fn(x) {
+		return x == 9;
+	}) catch e {
+		printf("%.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield -1;
+	};
+	show(f"unchanged {gone}: {b.count}");
+}
+
+fn updates()
+{
+	let b = Bag<int>.new();
+	for i in 1..7 {
+		b.push(i);
+	}
+	let n = b.update_all(fn(x) {
+		return x % 2 == 1;
+	}, fn(p) {
+		*p *= 10;
+	});
+	let hit = b.update_first(fn(x) {
+		return x == 2;
+	}, fn(p) {
+		*p = 200;
+	});
+	let miss = b.update_first(fn(x) {
+		return x == 99;
+	}, fn(p) {
+		*p = 0;
+	});
+	b.update_one(fn(x) {
+		return x == 4;
+	}, fn(p) {
+		*p = 400;
+	}) catch fatal;
+	show(f"update: {n} {hit} {miss} {b.to_text()}");
+	let removed = b.remove_all(fn(x) {
+		return x >= 100;
+	});
+	let first = b.remove_first(fn(x) {
+		return x > 0;
+	}) ?? -1;
+	let one = b.remove_one(fn(x) {
+		return x == 50;
+	}) catch fatal;
+	show(f"remove: {removed} {first} {one} {b.count}");
+	for p in &b {
+		*p += 1;
+	}
+	show(b.to_text());
+	b.clear();
+	show(f"clear: {b.count} {b.is_empty()}");
+}
+
+fn texts()
+{
+	let words = Bag<str>.new();
+	words.push("Ann");
+	words.push("say \"hi\"");
+	show(words.to_text());
+	let points = Bag<Point>.new();
+	points.push(Point { x: 1, y: 2 });
+	points.push(Point { x: 3, y: 4 });
+	show(points.to_text());
+	let out = text.Builder.new();
+	points.serialize(&out);
+	words.serialize(&out);
+	let floats = Bag<float>.new();
+	floats.push(1.5);
+	floats.serialize(&out);
+	show(out.take());
+	let empty = Bag<int>.new();
+	show(empty.to_text());
+}
+
+fn equality()
+{
+	let a = Bag<int>.new();
+	let b = Bag<int>.new(4);
+	a.push(1);
+	a.push(2);
+	b.push(1);
+	b.push(2);
+	let same = a == b;
+	b.push(3);
+	let longer = a == b;
+	a.push(4);
+	let other = a == b;
+	let p = Bag<Spot>.new();
+	let q = Bag<Spot>.new();
+	p.push(Spot { x: 1 });
+	q.push(Spot { x: 1 });
+	show(f"eq: {same} {longer} {other} {p == q} {p != q}");
+}
+
+fn owned()
+{
+	{
+		let tags = Bag<Tag>.new();
+		tags.push(Tag.of(1));
+		tags.push(Tag.of(2));
+		tags.push(Tag.of(1));
+		show(tags.to_text());
+		let ones = tags.find_all(fn(t) {
+			let p = t.n catch fatal;
+			return p[0] == 1;
+		});
+		printf("copies %d, torn %d\n".ptr, ones.count as c_int, Tag.torn.load() as c_int);
+		let gone = tags.remove_all(fn(t) {
+			let p = t.n catch fatal;
+			return p[0] == 2;
+		});
+		printf("removed %d, torn %d\n".ptr, gone as c_int, Tag.torn.load() as c_int);
+	}
+	printf("after the block, torn %d\n".ptr, Tag.torn.load() as c_int);
+}
+
+fn walks()
+{
+	let b = Bag<int>.new();
+	b.push(3);
+	b.push(4);
+	printf("total %d\n".ptr, total(&b) as c_int);
+}
+
+fn main() -> int
+{
+	allocations();
+	criteria() catch fatal;
+	failures();
+	updates();
+	texts();
+	equality();
+	owned();
+	walks();
+	return 0;
+}
