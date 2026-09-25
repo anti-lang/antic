@@ -1,0 +1,475 @@
+//! `List<T>` of `anti.collection.list`, every operation of the round.
+//!
+//! The ends, a position and an index, lending, sorting and reshaping, the room
+//! under a counting allocator, the operations every collection has, a list of a
+//! class whose `destruct` counts its calls, and a list of pointers that owns
+//! the pointers and not the objects.
+
+import anti.collection;
+import anti.collection.list.{List};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A class that owns memory and counts its teardowns.
+class Tag
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	concrete fn to_text(self) -> str
+	{
+		let p = self.n catch fatal;
+		if p[0] == 1 {
+			return "one";
+		}
+		return "other";
+	}
+
+	fn destruct(self)
+	{
+		Tag.torn.add(1);
+	}
+}
+
+/// An object a list of pointers points at, which counts the ones alive.
+class Circle
+{
+	pub r: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(r: int) -> *Circle
+	{
+		Circle.live.add(1);
+		return alloc Circle { r: r };
+	}
+
+	fn destruct(self)
+	{
+		Circle.live.sub(1);
+	}
+}
+
+struct Person
+{
+	name: str,
+	age: int,
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn numbers(n: int) -> List<int>
+{
+	let l = List<int>.new();
+	for i in 1..n + 1 {
+		l.push(i);
+	}
+	return l;
+}
+
+fn half(x: int) -> float
+{
+	return x as float / 2.0;
+}
+
+fn ends()
+{
+	let l = List<int>.new();
+	let empty_pop = l.pop() ?? -1;
+	let empty_first = l.first() ?? -1;
+	let empty_last = l.last() ?? -1;
+	printf("empty: %d %d %d %d\n".ptr, l.is_empty() as c_int,
+		empty_pop as c_int, empty_first as c_int, empty_last as c_int);
+	l.push(1);
+	l.push(2);
+	l.push(3);
+	let top = l.pop() ?? -1;
+	show(f"push and pop: {top} {l.to_text()} count {l.count}");
+	l.insert(0, 10);
+	l.insert(1, 20);
+	l.insert(l.count, 30);
+	show(f"insert: {l.to_text()}");
+	let gone = l.remove_at(1);
+	let front = l.remove_at(0);
+	show(f"remove_at: {gone} {front} {l.to_text()}");
+	l[0] = 7;
+	l[l.count - 1] = l[0] + 1;
+	show(f"index: {l[0]} {l[1]} {l.to_text()}");
+	let inside = l.get(1) ?? -1;
+	let outside = l.get(5) ?? -1;
+	let below = l.get(-1) ?? -1;
+	let first = l.first() ?? -1;
+	let last = l.last() ?? -1;
+	printf("get: %d %d %d first %d last %d\n".ptr, inside as c_int,
+		outside as c_int, below as c_int, first as c_int, last as c_int);
+}
+
+fn lending()
+{
+	let l = numbers(4);
+	let seen = 0;
+	let read = l.read(2, fn(p) {
+		seen = *p;
+	});
+	let modified = l.modify(0, fn(p) {
+		*p = *p * 100;
+	});
+	let missed = l.modify(4, fn(p) {
+		*p = 0;
+	});
+	show(f"read and modify: {read} {seen} {modified} {missed} {l.to_text()}");
+	let total = 0;
+	l.lend_slice(fn(s) {
+		for x in s {
+			total += x;
+		}
+		s[1] = -2;
+	});
+	show(f"lend_slice: {total} {l.to_text()}");
+	for p in &l {
+		*p += 1;
+	}
+	let sum = 0;
+	for x in l {
+		sum += x;
+	}
+	show(f"walks: {l.to_text()} sum {sum}");
+}
+
+fn sorting()
+{
+	let l = List<int>.new();
+	let given = [5, 3, 9, 1, 5, 0, -4, 8, 2, 7];
+	for i in 0..10 {
+		l.push(given[i]);
+	}
+	l.sort();
+	show(f"sort: {l.to_text()}");
+	let big = List<int>.new();
+	let seed = 12345;
+	for i in 0..1000 {
+		seed = (seed * 1103515245 + 12345) % 2147483648;
+		big.push(seed % 100);
+	}
+	big.sort();
+	let ordered = true;
+	for i in 1..big.count {
+		if big[i - 1] > big[i] {
+			ordered = false;
+		}
+	}
+	show(f"sort of 1000: {ordered} {big.count}");
+	let people = List<Person>.new();
+	people.push(Person { name: "Cleo", age: 30 });
+	people.push(Person { name: "Ann", age: 41 });
+	people.push(Person { name: "Bob", age: 30 });
+	people.push(Person { name: "Dan", age: 41 });
+	people.push(Person { name: "Eve", age: 25 });
+	people.sort_by(fn(p: Person) -> int {
+		return p.age;
+	});
+	for p in people {
+		printf("  %.*s %d\n".ptr, p.name.len as c_int, p.name.ptr,
+			p.age as c_int);
+	}
+	people.sort_by(fn(p: Person) -> str {
+		return p.name;
+	});
+	let names = people.map(fn(p: Person) -> str {
+		return p.name;
+	});
+	show(f"sort_by name: {names.to_text()}");
+	let words = List<str>.new();
+	words.push("pear");
+	words.push("apple");
+	words.push("fig");
+	words.sort();
+	show(f"sort of str: {words.to_text()}");
+	l.reverse();
+	show(f"reverse: {l.to_text()}");
+	let one = List<int>.new();
+	one.push(1);
+	one.reverse();
+	let none_at_all = List<int>.new();
+	none_at_all.reverse();
+	none_at_all.sort();
+	show(f"reverse of one and none: {one.to_text()} {none_at_all.to_text()}");
+}
+
+fn reshaping()
+{
+	let l = numbers(6);
+	let halves = l.map(half);
+	let doubled = l.map(fn(x: int) -> int {
+		return x * 2;
+	});
+	let texts = l.map<int, str>(fn(x) {
+		if x % 2 == 0 {
+			return "even";
+		}
+		return "odd";
+	});
+	let evens = l.filter(fn(x) {
+		return x % 2 == 0;
+	});
+	show(f"map: {halves.to_text()} {doubled.to_text()} {texts.to_text()}");
+	show(f"filter: {evens.to_text()} of {l.to_text()}");
+	let counting = Counting { };
+	{
+		let kept = l.filter(fn(x) {
+			return x > 3;
+		}, &counting);
+		let mapped = l.map(half, &counting);
+		printf("from an allocator: %d allocations, %d elements\n".ptr,
+			counting.allocs as c_int, (kept.count + mapped.count) as c_int);
+	}
+	printf("given back: %d\n".ptr, counting.frees as c_int);
+}
+
+fn room()
+{
+	let counting = Counting { };
+	{
+		let l = List<int>.new(100, &counting);
+		for i in 0..100 {
+			l.push(i);
+		}
+		printf("made with room: %d allocation\n".ptr, counting.allocs as c_int);
+		l.push(100);
+		printf("past it: %d allocations\n".ptr, counting.allocs as c_int);
+	}
+	printf("after the block: %d frees\n".ptr, counting.frees as c_int);
+	counting.allocs = 0;
+	counting.frees = 0;
+	let small = List<int>.new(0, &counting);
+	for i in 0..8 {
+		small.push(i);
+	}
+	printf("small start: %d allocation for 8\n".ptr, counting.allocs as c_int);
+	small.push(8);
+	printf("doubled: %d allocations\n".ptr, counting.allocs as c_int);
+	small.reserve(100);
+	printf("reserve: %d allocations\n".ptr, counting.allocs as c_int);
+	for i in 0..100 {
+		small.push(i);
+	}
+	printf("within the reserve: %d allocations\n".ptr, counting.allocs as c_int);
+	for i in 0..100 {
+		small.pop();
+	}
+	small.shrink();
+	small.shrink();
+	printf("shrink: %d allocations, %d frees, count %d\n".ptr,
+		counting.allocs as c_int, counting.frees as c_int,
+		small.count as c_int);
+	small.clear();
+	small.shrink();
+	printf("shrink of none: %d frees\n".ptr, counting.frees as c_int);
+	small.push(1);
+	printf("again: %d allocations %d\n".ptr, counting.allocs as c_int,
+		small[0] as c_int);
+}
+
+fn shared() may fail
+{
+	let l = numbers(6);
+	let evens = l.find_all(fn(x) {
+		return x % 2 == 0;
+	});
+	let first = l.find_first(fn(x) {
+		return x > 2;
+	}) ?? -1;
+	let one = try l.find_one(fn(x) {
+		return x == 4;
+	});
+	show(f"find: {evens.count} {first} {one}");
+	let n = l.update_all(fn(x) {
+		return x % 2 == 1;
+	}, fn(p) {
+		*p *= 10;
+	});
+	let hit = l.update_first(fn(x) {
+		return x == 2;
+	}, fn(p) {
+		*p = 200;
+	});
+	try l.update_one(fn(x) {
+		return x == 4;
+	}, fn(p) {
+		*p = 400;
+	});
+	show(f"update: {n} {hit} {l.to_text()}");
+	let removed = l.remove_all(fn(x) {
+		return x >= 100;
+	});
+	let gone = l.remove_first(fn(x) {
+		return x > 0;
+	}) ?? -1;
+	let last = try l.remove_one(fn(x) {
+		return x == 50;
+	});
+	show(f"remove: {removed} {gone} {last} {l.to_text()}");
+	let many = l.find_one(fn(x) {
+		return x > 0;
+	}) catch e {
+		let e1 = e as *collection.NotOne;
+		printf("%.*s (count %d)\n".ptr, e.message.len as c_int, e.message.ptr,
+			e1.count as c_int);
+		yield -1;
+	};
+	printf("gave %d\n".ptr, many as c_int);
+	let a = numbers(3);
+	let b = numbers(3);
+	let c = numbers(4);
+	show(f"eq: {a == b} {a == c} {a != c}");
+	let words = List<str>.new();
+	words.push("Ann");
+	words.push("Bob");
+	let out = text.Builder.new();
+	words.serialize(&out);
+	a.serialize(&out);
+	show(out.take());
+	l.clear();
+	show(f"clear: {l.count} {l.is_empty()} {l.to_text()}");
+}
+
+fn owned()
+{
+	let before = Tag.torn.load();
+	{
+		let tags = List<Tag>.new();
+		tags.push(Tag.of(1));
+		tags.push(Tag.of(2));
+		tags.push(Tag.of(3));
+		tags.insert(1, Tag.of(4));
+		show(f"tags: {tags.to_text()} torn {Tag.torn.load() - before}");
+		tags[0] = Tag.of(5);
+		printf("replaced, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+		{
+			let out = tags.remove_at(1);
+			let top = tags.pop();
+			printf("taken %d, torn %d\n".ptr, out.number() as c_int,
+				(Tag.torn.load() - before) as c_int);
+		}
+		printf("taken ones torn at their block, torn %d\n".ptr,
+			(Tag.torn.load() - before) as c_int);
+		let copy = tags[0];
+		let other = tags.get(1);
+		printf("copies %d, torn %d\n".ptr, copy.number() as c_int,
+			(Tag.torn.load() - before) as c_int);
+		let picked = tags.filter(fn(t) {
+			return t.number() > 1;
+		});
+		tags.sort_by(fn(t: Tag) -> int {
+			return 0 - t.number();
+		});
+		tags.reverse();
+		printf("sorted and reversed, torn %d, count %d\n".ptr,
+			(Tag.torn.load() - before) as c_int, tags.count as c_int);
+	}
+	printf("after the block, torn %d\n".ptr,
+		(Tag.torn.load() - before) as c_int);
+	before = Tag.torn.load();
+	{
+		let tags = List<Tag>.new();
+		tags.push(Tag.of(1));
+		tags.push(Tag.of(2));
+		tags.clear();
+		printf("clear, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+	}
+	printf("cleared list at its end, torn %d\n".ptr,
+		(Tag.torn.load() - before) as c_int);
+}
+
+fn pointers()
+{
+	let made = [Circle.make(1), Circle.make(2), Circle.make(3)];
+	{
+		let circles = List<*Circle>.new();
+		circles.push(made[0]);
+		circles.push(made[1]);
+		circles.push(made[2]);
+		circles.push(made[0]);
+		let big = circles.filter(fn(p) {
+			return p.r > 1;
+		});
+		let top = circles.pop() ?? made[1];
+		circles.remove_at(0);
+		circles[0] = made[2];
+		circles.clear();
+		printf("pointers: %d alive, top %d, filtered %d\n".ptr,
+			Circle.live.load() as c_int, top.r as c_int, big.count as c_int);
+		circles.push(made[1]);
+	}
+	printf("after the list, %d alive\n".ptr, Circle.live.load() as c_int);
+	for i in 0..3 {
+		delete(made[i]);
+	}
+	printf("after delete, %d alive\n".ptr, Circle.live.load() as c_int);
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	ends();
+	lending();
+	sorting();
+	reshaping();
+	room();
+	shared() catch fatal;
+	owned();
+	pointers();
+	let l = numbers(4);
+	printf("through Iterable: %d\n".ptr, total(&l) as c_int);
+	return 0;
+}

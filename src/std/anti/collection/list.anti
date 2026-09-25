@@ -1,0 +1,532 @@
+//! `List<T>`, a sequence in one contiguous buffer.
+//!
+//! A list holds its elements by value, in order, in one block of room from the
+//! allocator it was made with. It grows by doubling, or by `reserve` in one
+//! allocation, and `shrink` gives back the room past the last element. It has
+//! every operation of `anti.collection.Collection<T>` and adds the operations
+//! at the end, at a position and by index, lending, sorting and reshaping.
+//!
+//! `sort`, `sort_by` and `map` are functions of this module that a call on a
+//! list reaches as its own, `people.sort()`. `sort` needs `T: Ordered`, which a
+//! function of the class body cannot state, and a library file carries no
+//! function of a class with type parameters of its own, which `sort_by` and
+//! `map` have.
+
+import anti.collection;
+import anti.lang;
+import anti.mem;
+
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memmove(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+
+/// A sequence of elements of type `T` in one contiguous buffer.
+///
+/// `l[i]` gives a copy of an element and `l[i] = x` replaces it. An index
+/// outside the list traps in a dev build, as it does for an array. `get`,
+/// `first` and `last` give `none` there instead.
+pub class List<T> inherits collection.Collection<T>
+{
+	items: ?*T = none,
+	capacity: int = 0,
+
+	/// An empty list with room for `capacity` elements from `from`, or from the
+	/// C library when it is `none`. The room comes in one allocation.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> List<T>
+	{
+		let made = List<T> { from: collection.allocator(from) };
+		if capacity > 0 {
+			made.resize(capacity);
+		}
+		return made;
+	}
+
+	/// Add `x` at the end, which the list now owns.
+	pub fn push(self, own x: T, at: lang.SourceLocation = here)
+	{
+		self.make_room(1);
+		let items = self.items catch fatal;
+		items[self.count] = x;
+		self.resized(1, at);
+	}
+
+	/// Take the last element off the end, or `none` when the list is empty.
+	pub fn pop(self, at: lang.SourceLocation = here) -> ?T
+	{
+		if self.count == 0 {
+			return none;
+		}
+		let (taken, after) = self.take_place(self.count - 1);
+		self.resized(-1, at);
+		return taken;
+	}
+
+	/// Insert `x` before the element at `i`, or at the end when `i` is `count`.
+	/// The elements from `i` on move one place up.
+	pub fn insert(self, i: int, own x: T, at: lang.SourceLocation = here)
+	{
+		self.make_room(1);
+		let items = self.items catch fatal;
+		let slots = []T { ptr: items, len: self.count + 1 };
+		let slot = &slots[i];
+		if i < self.count {
+			memmove(&items[i + 1] as ?*byte, slot as ?*byte,
+				((self.count - i) * size_of(T)) as c_size_t);
+			memset(slot as ?*byte, 0, size_of(T) as c_size_t);
+		}
+		items[i] = x;
+		self.resized(1, at);
+	}
+
+	/// Remove the element at `i` and give it. The elements after it move one
+	/// place down.
+	pub fn remove_at(self, i: int, at: lang.SourceLocation = here) -> T
+	{
+		self.slot(i);
+		let (taken, after) = self.take_place(i);
+		self.resized(-1, at);
+		return taken;
+	}
+
+	/// A copy of the element at `i`.
+	operator fn index(self, i: int) -> T
+	{
+		return self.copy_element(self.slot(i));
+	}
+
+	/// Replace the element at `i` with `x`, which the list now owns. The
+	/// element it replaces is torn down.
+	operator fn set_index(self, i: int, own x: T)
+	{
+		let p = self.slot(i);
+		self.destroy_element(p);
+		memset(p as ?*byte, 0, size_of(T) as c_size_t);
+		let items = self.items catch fatal;
+		items[i] = x;
+	}
+
+	/// A copy of the element at `i`, or `none` outside the list.
+	pub fn get(self, i: int) -> ?T
+	{
+		if i < 0 || i >= self.count {
+			return none;
+		}
+		return self.copy_place(i);
+	}
+
+	/// A copy of the first element, or `none` when the list is empty.
+	pub fn first(self) -> ?T
+	{
+		return self.get(0);
+	}
+
+	/// A copy of the last element, or `none` when the list is empty.
+	pub fn last(self) -> ?T
+	{
+		return self.get(self.count - 1);
+	}
+
+	/// Lend the element at `i` to `f` for reading. Gives `false` and calls
+	/// nothing outside the list.
+	pub fn read(self, i: int, f: fn(lent *T)) -> bool
+	{
+		return self.lend(i, f);
+	}
+
+	/// Lend the element at `i` to `f`, which may change it in place. Gives
+	/// `false` and calls nothing outside the list.
+	pub fn modify(self, i: int, f: fn(lent *T)) -> bool
+	{
+		return self.lend(i, f);
+	}
+
+	/// Lend the whole buffer to `f` as one slice of `count` elements, for C and
+	/// simd. The slice is valid only for the call.
+	pub fn lend_slice(self, f: fn(lent []T))
+	{
+		f([]T { ptr: self.items, len: self.count });
+	}
+
+	/// Reverse the order of the elements in place.
+	pub fn reverse(self)
+	{
+		let elements = []T { ptr: self.items, len: self.count };
+		let i = 0;
+		let j = self.count - 1;
+		while i < j do {
+			swap(elements, i, j);
+			i += 1;
+			j -= 1;
+		}
+	}
+
+	/// A new list of copies of the elements `test` accepts, in order, with room
+	/// from `from`, or from the C library when it is `none`.
+	pub fn filter(self, test: fn(T) -> bool, from: ?*mem.Allocator = none)
+		-> List<T>
+	{
+		let out = List<T> { from: collection.allocator(from) };
+		let i = 0;
+		while i < self.count do {
+			let items = self.items catch fatal;
+			if test(items[i]) {
+				out.push(self.copy_element(&items[i]));
+			}
+			i += 1;
+		}
+		return out;
+	}
+
+	/// Sort the elements in place by `less`, which says whether its first
+	/// element comes before its second. The sort is stable, so elements that
+	/// `less` holds equal keep their order, and it allocates nothing. `sort`
+	/// and `sort_by` of this module call it.
+	pub fn sort_with(self, less: fn(lent *T, lent *T) -> bool)
+	{
+		stable([]T { ptr: self.items, len: self.count }, less);
+	}
+
+	/// Room for `n` more elements, in one allocation.
+	pub fn reserve(self, n: int)
+	{
+		if self.count + n > self.capacity {
+			self.resize(self.count + n);
+		}
+	}
+
+	/// Give back the room past the last element.
+	pub fn shrink(self)
+	{
+		if self.capacity > self.count {
+			self.resize(self.count);
+		}
+	}
+
+	operator fn iter(self) -> ListWalk<T>
+	{
+		return ListWalk<T>.over(self.items, self.count, self.watch());
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		if self.count == 0 {
+			return -1;
+		}
+		return 0;
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		if at + 1 >= self.count {
+			return -1;
+		}
+		return at + 1;
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		let items = self.items catch fatal;
+		f(&items[at]);
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		let items = self.items catch fatal;
+		return self.copy_element(&items[at]);
+	}
+
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let items = self.items catch fatal;
+		let after = -1;
+		if at + 1 < self.count {
+			after = at;
+		}
+		let taken = (items[at], after);
+		self.close_gap(items, at, self.count);
+		return taken;
+	}
+
+	/// The element at `i`, which must be inside the list. A dev build traps
+	/// outside it, as it does for an array.
+	fn slot(self, i: int) -> *T
+	{
+		let elements = []T { ptr: self.items, len: self.count };
+		return &elements[i];
+	}
+
+	/// Lend the element at `i` to `f`, or give `false` outside the list.
+	fn lend(self, i: int, f: fn(lent *T)) -> bool
+	{
+		if i < 0 || i >= self.count {
+			return false;
+		}
+		self.lend_place(i, f);
+		return true;
+	}
+
+	/// Make room for `n` more elements, doubling the capacity as often as it
+	/// takes.
+	fn make_room(self, n: int)
+	{
+		if self.count + n > self.capacity {
+			self.resize(self.grown(self.capacity, self.count + n));
+		}
+	}
+
+	/// Move the elements into room for `n`, which is at least `count`. Stops
+	/// the program when the allocator has run out.
+	fn resize(self, n: int)
+	{
+		if n == 0 {
+			self.give_back(self.items);
+			self.items = none;
+			self.capacity = 0;
+			return;
+		}
+		let made = self.moved(self.items, self.count, n) catch fatal;
+		self.items = made;
+		self.capacity = n;
+	}
+
+	fn destruct(self)
+	{
+		let items = self.items else {
+			return;
+		};
+		let i = self.count - 1;
+		while i >= 0 do {
+			self.destroy_element(&items[i]);
+			i -= 1;
+		}
+		self.give_back(items);
+	}
+}
+
+/// The iterator of `List<T>`, which lends each element in turn.
+pub class ListWalk<T>
+{
+	watch: lang.Watch,
+	items: ?*T,
+	count: int,
+	at: int = -1,
+
+	/// A walk of the `count` elements at `items`, which `watch` guards.
+	pub fn over(items: ?*T, count: int, watch: lang.Watch) -> ListWalk<T>
+	{
+		return ListWalk<T> { watch: watch, items: items, count: count };
+	}
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.count;
+	}
+
+	operator fn value(self) -> lent *T
+	{
+		let items = self.items catch fatal;
+		return &items[self.at];
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the same order.
+pub operator fn eq<T: eq>(a: List<T>, b: List<T>) -> bool
+{
+	return collection.equal<T>(&a, &b);
+}
+
+/// Sort the elements of `l` in place, smallest first. The sort is stable, so
+/// equal elements keep their order, and it allocates nothing. A call on a list
+/// reaches it as `l.sort()`.
+pub fn sort<T: Ordered>(l: *List<T>)
+{
+	l.sort_with(fn(a, b) {
+		return *a < *b;
+	});
+}
+
+/// Sort the elements of `l` in place by the key `key` gives each, smallest
+/// first. The sort is stable and allocates nothing. A call on a list reaches it
+/// as `l.sort_by(key)`.
+pub fn sort_by<T, K: Ordered>(l: *List<T>, key: fn(T) -> K)
+{
+	l.sort_with(fn(a, b) {
+		return key(*a) < key(*b);
+	});
+}
+
+/// A new list of what `f` gives for each element of `l`, in order, with room
+/// from `from`, or from the C library when it is `none`. A call on a list
+/// reaches it as `l.map(f)`, and `l.map<T, U>(f)` names both types where `f`
+/// gives neither.
+pub fn map<T, U>(l: *List<T>, f: fn(T) -> U, from: ?*mem.Allocator = none)
+	-> List<U>
+{
+	let out = List<U>.new(l.count, from);
+	for p in &l {
+		out.push(f(*p));
+	}
+	return out;
+}
+
+/// The length of the runs that `stable` sorts by insertion before it merges.
+const RUN: int = 20;
+
+/// Sort `s` in place by `less`, keeping the order of equal elements, without
+/// room of its own: runs of `RUN` elements by insertion, then merges of runs
+/// that double in length, each merged in place by rotations.
+///
+/// PERF DECISION: a merge in place costs a factor of log n over a merge into a
+/// second buffer. It allocates nothing, so a sort never fails and never takes
+/// room from the allocator of the list.
+fn stable<T>(s: []T, less: fn(lent *T, lent *T) -> bool)
+{
+	let n = s.len;
+	let a = 0;
+	while a + RUN <= n do {
+		insertion(s, a, a + RUN, less);
+		a += RUN;
+	}
+	insertion(s, a, n, less);
+	let run = RUN;
+	while run < n do {
+		a = 0;
+		while a + 2 * run <= n do {
+			merge(s, a, a + run, a + 2 * run, less);
+			a += 2 * run;
+		}
+		if a + run < n {
+			merge(s, a, a + run, n, less);
+		}
+		run *= 2;
+	}
+}
+
+/// Sort the elements from `a` up to `b` of `s` by insertion.
+fn insertion<T>(s: []T, a: int, b: int,
+	less: fn(lent *T, lent *T) -> bool)
+{
+	let i = a + 1;
+	while i < b do {
+		let j = i;
+		while j > a && less(&s[j], &s[j - 1]) do {
+			swap(s, j, j - 1);
+			j -= 1;
+		}
+		i += 1;
+	}
+}
+
+/// Merge the sorted runs from `a` up to `m` and from `m` up to `b` of `s` in
+/// place, the SymMerge of Kim and Kutzner, 2004.
+fn merge<T>(s: []T, a: int, m: int, b: int,
+	less: fn(lent *T, lent *T) -> bool)
+{
+	if m - a == 1 {
+		let i = m;
+		let j = b;
+		while i < j do {
+			let h = (i + j) / 2;
+			if less(&s[h], &s[a]) {
+				i = h + 1;
+			} else {
+				j = h;
+			}
+		}
+		let k = a;
+		while k < i - 1 do {
+			swap(s, k, k + 1);
+			k += 1;
+		}
+		return;
+	}
+	if b - m == 1 {
+		let i = a;
+		let j = m;
+		while i < j do {
+			let h = (i + j) / 2;
+			if !less(&s[m], &s[h]) {
+				i = h + 1;
+			} else {
+				j = h;
+			}
+		}
+		let k = m;
+		while k > i do {
+			swap(s, k, k - 1);
+			k -= 1;
+		}
+		return;
+	}
+	let mid = (a + b) / 2;
+	let n = mid + m;
+	let start = a;
+	let r = m;
+	if m > mid {
+		start = n - b;
+		r = mid;
+	}
+	let p = n - 1;
+	while start < r do {
+		let c = (start + r) / 2;
+		if !less(&s[p - c], &s[c]) {
+			start = c + 1;
+		} else {
+			r = c;
+		}
+	}
+	let end = n - start;
+	if start < m && m < end {
+		rotate(s, start, m, end);
+	}
+	if a < start && start < mid {
+		merge(s, a, start, mid, less);
+	}
+	if mid < end && end < b {
+		merge(s, mid, end, b, less);
+	}
+}
+
+/// Turn the elements from `a` up to `b` of `s` so that the one at `m` comes
+/// first, by swaps of blocks.
+fn rotate<T>(s: []T, a: int, m: int, b: int)
+{
+	let i = m - a;
+	let j = b - m;
+	while i != j do {
+		if i > j {
+			swap_run(s, m - i, m, j);
+			i -= j;
+		} else {
+			swap_run(s, m - i, m + j - i, i);
+			j -= i;
+		}
+	}
+	swap_run(s, m - i, m, i);
+}
+
+/// Swap the `n` elements from `a` of `s` with the `n` elements from `b`.
+fn swap_run<T>(s: []T, a: int, b: int, n: int)
+{
+	let i = 0;
+	while i < n do {
+		swap(s, a + i, b + i);
+		i += 1;
+	}
+}
+
+/// Swap the elements `i` and `j` of `s` as bytes, so neither is copied or torn
+/// down.
+fn swap<T>(s: []T, i: int, j: int)
+{
+	let x = &s[i] as *byte;
+	let y = &s[j] as *byte;
+	let k = 0;
+	while k < size_of(T) do {
+		let t = x[k];
+		x[k] = y[k];
+		y[k] = t;
+		k += 1;
+	}
+}

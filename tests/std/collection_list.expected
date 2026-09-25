@@ -1,0 +1,56 @@
+exit 0
+empty: 1 -1 -1 -1
+push and pop: 3 [1, 2] count 2
+insert: [10, 20, 1, 2, 30]
+remove_at: 20 10 [1, 2, 30]
+index: 7 2 [7, 2, 8]
+get: 2 -1 -1 first 7 last 8
+read and modify: true 3 true false [100, 2, 3, 4]
+lend_slice: 109 [100, -2, 3, 4]
+walks: [101, -1, 4, 5] sum 109
+sort: [-4, 0, 1, 2, 3, 5, 5, 7, 8, 9]
+sort of 1000: true 1000
+  Eve 25
+  Cleo 30
+  Bob 30
+  Ann 41
+  Dan 41
+sort_by name: ["Ann", "Bob", "Cleo", "Dan", "Eve"]
+sort of str: ["apple", "fig", "pear"]
+reverse: [9, 8, 7, 5, 5, 3, 2, 1, 0, -4]
+reverse of one and none: [1] []
+map: [0.5, 1, 1.5, 2, 2.5, 3] [2, 4, 6, 8, 10, 12] ["odd", "even", "odd", "even", "odd", "even"]
+filter: [2, 4, 6] of [1, 2, 3, 4, 5, 6]
+from an allocator: 2 allocations, 9 elements
+given back: 2
+made with room: 1 allocation
+past it: 2 allocations
+after the block: 2 frees
+small start: 1 allocation for 8
+doubled: 2 allocations
+reserve: 3 allocations
+within the reserve: 3 allocations
+shrink: 4 allocations, 3 frees, count 9
+shrink of none: 4 frees
+again: 5 allocations 1
+find: 3 3 4
+update: 3 true [10, 200, 30, 400, 50, 6]
+remove: 2 10 50 [30, 6]
+`find_one` found 2 elements where it needs exactly one (count 2)
+gave -1
+eq: true false true
+["Ann","Bob"][1,2,3]
+clear: 0 true []
+tags: [one, other, other, other] torn 4
+replaced, torn 5
+taken 4, torn 5
+taken ones torn at their block, torn 7
+copies 5, torn 7
+sorted and reversed, torn 7, count 2
+after the block, torn 13
+clear, torn 2
+cleared list at its end, torn 2
+pointers: 3 alive, top 1, filtered 2
+after the list, 3 alive
+after delete, 0 alive
+through Iterable: 10
