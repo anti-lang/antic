@@ -792,6 +792,15 @@ static struct symbol *callee_copy(struct clone *cl, const struct expr *e,
     return fn_copy(k, it, args, values)->symbol;
 }
 
+/* Whether the callee of a call names its function directly: a name, or
+   `T.f` for a function of the body of a type, which takes no `self`. */
+static bool direct_callee(const struct expr *callee)
+{
+    return callee->kind == EXPR_NAME ||
+           (callee->kind == EXPR_FIELD && callee->symbol != NULL &&
+            callee->symbol->kind == SYMBOL_FN);
+}
+
 /* Whether sym names a generic function or a function of a generic type,
    which no copy may reach but through a call. */
 static bool names_generic(const struct symbol *sym)
@@ -911,7 +920,7 @@ static void redirect(struct clone *cl, struct expr *e)
         redirect(cl, e->as.call.callee);
         redirect_list(cl, e->as.call.args, e->as.call.arg_count);
         redirect_list(cl, e->as.call.hash_calls, e->as.call.hash_count);
-        if (e->as.call.callee->kind == EXPR_NAME &&
+        if (direct_callee(e->as.call.callee) &&
             (copy = callee_copy(cl, e, e->as.call.callee->symbol)) != NULL) {
             e->as.call.callee->symbol = copy;
         }
@@ -1083,7 +1092,7 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         xh(cl, &n->as.call.handler, &e->as.call.handler);
         n->as.call.out = e->as.call.out == e ? n : xe(cl, e->as.call.out);
         n->as.call.builds = ty(cl, (struct type *)e->as.call.builds, e->pos);
-        if (n->as.call.callee->kind == EXPR_NAME &&
+        if (direct_callee(n->as.call.callee) &&
             (copy = callee_copy(cl, e, n->as.call.callee->symbol)) != NULL) {
             n->as.call.callee->symbol = copy;
         }

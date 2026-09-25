@@ -1,0 +1,39 @@
+//! A function of a generic class that takes no `self` is called on a copy, with
+//! its type arguments written out or inferred from the arguments, and from
+//! another function of the class. The copy owns a slice.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub own items: []T,
+	pub count: int = 0,
+
+	pub fn make(n: int, fill: T) -> Box<T>
+	{
+		let room = alloc(T, n) else {
+			return Box<T> { items: []T { ptr: none, len: 0 } };
+		};
+		let i = 0;
+		while i < n do {
+			room[i] = fill;
+			i += 1;
+		}
+		return Box<T> { items: []T { ptr: room, len: n }, count: n };
+	}
+
+	pub fn twice(self) -> Box<T>
+	{
+		return Box<T>.make(self.count * 2, self.items[0]);
+	}
+}
+
+fn main() -> int
+{
+	let a = Box<int>.make(3, 7);
+	let b = Box.make(2, 1.5);
+	let c = a.twice();
+	printf("%d %d %.1f %d\n".ptr, a.count as c_int, a.items[2] as c_int,
+		b.items[1], c.count as c_int);
+	return 0;
+}
