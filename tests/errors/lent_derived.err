@@ -1,0 +1,8 @@
+lent_derived.anti:22:11: error: the pointer is lent for the call and cannot be stored
+lent_derived.anti:27:9: error: the pointer is lent for the call and cannot be returned
+lent_derived.anti:32:8: error: the pointer is lent for the call and passes on to a `lent` parameter alone
+lent_derived.anti:37:11: error: the slice is lent for the call and cannot be stored
+lent_derived.anti:42:9: error: the pointer is lent for the call and cannot be returned
+lent_derived.anti:47:11: error: the pointer is lent for the call and cannot be stored
+lent_derived.anti:53:9: error: `a` is lent for the call and cannot be returned
+lent_derived.anti:59:12: error: the pointer is lent for one turn of the loop and cannot be stored

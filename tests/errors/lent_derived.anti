@@ -1,0 +1,66 @@
+//! A pointer or a slice derived from a lent one is lent as well, and the
+//! checker refuses every place that would keep it.
+
+class Person
+{
+	pub age: int = 0,
+	pub scores: [3]int = [0; 3],
+}
+
+class Holder
+{
+	pub held: ?*int = none,
+	pub room: []int,
+}
+
+fn plain(n: *int)
+{
+}
+
+fn field_stored(h: *Holder, lent p: *Person)
+{
+	h.held = &p.age;
+}
+
+fn field_returned(lent p: *Person) -> *int
+{
+	return &p.age;
+}
+
+fn field_passed(lent p: *Person)
+{
+	plain(&p.scores[2]);
+}
+
+fn array_part_stored(h: *Holder, lent p: *Person)
+{
+	h.room = p.scores[0..2];
+}
+
+fn element_returned(lent xs: []int) -> *int
+{
+	return &xs[1];
+}
+
+fn ptr_stored(h: *Holder, lent xs: []int)
+{
+	h.held = xs.ptr;
+}
+
+fn local_returned(lent p: *Person) -> *int
+{
+	let a = &p.age;
+	return a;
+}
+
+fn turn_stored(h: *Holder, people: []Person)
+{
+	for q in &people {
+		h.held = &q.age;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -15,6 +15,11 @@ under "Generics and collections" in `docs/decisions.md` hold the decisions.
   both kinds. Every rule of the checker keys on `type_is_lent`, so a lent
   slice meets the refusals of a lent pointer. Slicing a slice gives its own
   type, so a part of a lent slice is lent.
+- `&` of a place, `ptr` of a slice and a slice of an array give the lent
+  form when `through_lent` of `sema_expr.c` finds a lent pointer or a lent
+  slice on the path of the place. `sema_require` lets a lent pointer or
+  slice go to a parameter of an `extern fn`, which the checker marks with
+  `LENT_TO_C` while it checks the argument.
 
 ## Parser
 

@@ -1,0 +1,70 @@
+//! A pointer or a slice derived from a lent one is lent as well: `&p.field`,
+//! `&s[i]`, `s.ptr`, a part of a lent slice and a slice of an array in a lent
+//! object. Each goes on to a `lent` parameter, and to C as the argument of an
+//! `extern fn`, whose contract decides whether C keeps it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn puts(s: ?*byte) -> i32;
+
+class Person
+{
+	pub age: int = 0,
+	pub scores: [3]int = [0; 3],
+	pub name: [4]byte = [0; 4],
+}
+
+fn bump(lent n: *int)
+{
+	*n += 1;
+}
+
+fn total(lent xs: []int) -> int
+{
+	let sum = 0;
+	for x in xs {
+		sum += x;
+	}
+	return sum;
+}
+
+fn grow(lent p: *Person)
+{
+	bump(&p.age);
+	bump(&p.scores[1]);
+	let scores = p.scores[0..3];
+	printf("scores %d\n".ptr, total(scores) as c_int);
+	puts(&p.name[0]);
+}
+
+fn first(lent xs: []int)
+{
+	bump(&xs[0]);
+	printf("rest %d\n".ptr, total(xs[1..xs.len]) as c_int);
+}
+
+fn shout(lent text: []byte)
+{
+	puts(text.ptr);
+}
+
+fn main() -> int
+{
+	let p = Person { age: 40, scores: [1, 2, 3], name: [97, 110, 110, 0] };
+	grow(&p);
+	printf("age %d score %d\n".ptr, p.age as c_int, p.scores[1] as c_int);
+
+	let xs: [3]int = [5, 6, 7];
+	first(xs[0..3]);
+	printf("first %d\n".ptr, xs[0] as c_int);
+
+	let word: [4]byte = [98, 111, 98, 0];
+	shout(word[0..4]);
+
+	let people: [2]Person = [Person { }; 2];
+	for q in &people {
+		bump(&q.age);
+	}
+	printf("people %d %d\n".ptr, people[0].age as c_int,
+		people[1].age as c_int);
+	return 0;
+}

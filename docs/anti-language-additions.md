@@ -1021,6 +1021,7 @@ list.modify(3, fn(p) { p.age += 1; });
 
 - `lent` before a pointer parameter says the pointer is valid only during the call: `fn(lent *T)`. The function may read and change through it, and pass it on to another `lent` parameter. It may not store it, return it, capture it in a closure that outlives the call, or pass it to a `keep` or `own` place. The checker enforces this as it enforces `keep`.
 - `lent` before a slice parameter, `fn(lent []T)`, follows the same rules. The slice is valid only for the call, and is never stored, returned, captured beyond the call or passed to a `keep` or `own` place.
+- A pointer or a slice derived from a lent one is lent as well, under the same rules: `s.ptr`, `&p.field`, `&s[i]` and a part of a slice. The one exit is an argument of an `extern fn` call, since C cannot be checked. Whether C keeps it is C's contract, as for every pointer given to C, and the guide says so.
 - A lending function runs while the collection holds the element in place, so the pointer never outlives the element.
 - The word is `lent`, chosen over `borrowed` and `scoped`. `borrowed` would suggest Rust's whole system of references.
 

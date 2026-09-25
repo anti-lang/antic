@@ -60,8 +60,9 @@ struct held_mutex {
     const struct held_mutex *outer;
 };
 
-/* Where a `lent` pointer is refused, for the message. */
-enum lent_use { LENT_STORED, LENT_RETURNED, LENT_PASSED };
+/* Where a `lent` pointer is refused, for the message. LENT_TO_C is an
+   argument of an `extern fn`, where it is not refused. */
+enum lent_use { LENT_STORED, LENT_RETURNED, LENT_PASSED, LENT_TO_C };
 
 struct checker {
     struct types *types;

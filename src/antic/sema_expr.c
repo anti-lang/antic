@@ -388,6 +388,70 @@ static void refuse_moved(struct checker *c, const struct expr *e,
     }
 }
 
+/* The variable that the place or the address e starts from, or NULL. */
+static const struct symbol *root_of(const struct expr *e)
+{
+    for (;;) {
+        switch (e->kind) {
+        case EXPR_NAME:
+            return e->symbol;
+        case EXPR_FIELD:
+            e = e->as.field.base;
+            break;
+        case EXPR_INDEX:
+            e = e->as.index.base;
+            break;
+        case EXPR_SLICE:
+            e = e->as.slice.base;
+            break;
+        case EXPR_UNARY:
+            e = e->as.unary.operand;
+            break;
+        default:
+            return NULL;
+        }
+    }
+}
+
+/* DESIGN: a pointer or a slice derived from a lent one is lent as well:
+   `&p.field`, `&s[i]` and `&(*p)`, `s.ptr`, a part of a lent slice and a
+   slice of an array that a lent pointer reaches. The place e is derived
+   when its path passes through a lent pointer or a lent slice. A pointer
+   the object holds in a field is its own value and not derived. */
+static bool through_lent(const struct expr *e)
+{
+    for (;;) {
+        const struct type *base;
+        switch (e->kind) {
+        case EXPR_FIELD:
+            base = e->as.field.base->type;
+            if (base == NULL || type_is_lent(base)) {
+                return base != NULL;
+            }
+            if (base->kind == TYPE_POINTER) {
+                return false;
+            }
+            e = e->as.field.base;
+            break;
+        case EXPR_INDEX:
+            base = e->as.index.base->type;
+            if (base == NULL || type_is_lent(base)) {
+                return base != NULL;
+            }
+            if (base->kind != TYPE_ARRAY) {
+                return false;
+            }
+            e = e->as.index.base;
+            break;
+        case EXPR_UNARY:
+            return e->as.unary.op == TOKEN_STAR &&
+                   type_is_lent(e->as.unary.operand->type);
+        default:
+            return false;
+        }
+    }
+}
+
 /* Refuse the `lent` pointer e where a pointer is kept. */
 static void refuse_lent(struct checker *c, const struct expr *e)
 {
@@ -395,7 +459,10 @@ static void refuse_lent(struct checker *c, const struct expr *e)
         [LENT_STORED] = "cannot be stored",
         [LENT_RETURNED] = "cannot be returned",
         [LENT_PASSED] = "passes on to a `lent` parameter alone",
+        [LENT_TO_C] = "passes on to a `lent` parameter alone",
     };
+    const struct symbol *root = root_of(e);
+
     if (e->kind == EXPR_NAME && e->symbol != NULL && e->symbol->lent_turn) {
         sema_error_at(c, e->pos, "`%.*s` is lent for one turn of the loop "
                       "and %s", (int)e->as.name.length, e->as.name.text,
@@ -405,10 +472,13 @@ static void refuse_lent(struct checker *c, const struct expr *e)
                       (int)e->as.name.length, e->as.name.text,
                       uses[c->lent_use]);
     } else {
-        sema_error_at(c, e->pos, "the %s is lent for the call and %s",
+        sema_error_at(c, e->pos, "the %s is lent for %s and %s",
                       e->type != NULL && e->type->kind == TYPE_SLICE
                           ? "slice"
                           : "pointer",
+                      root != NULL && root->lent_turn
+                          ? "one turn of the loop"
+                          : "the call",
                       uses[c->lent_use]);
     }
 }
@@ -576,8 +646,12 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
        and nowhere else a pointer is kept. Any pointer goes where a `lent`
        one is expected, since lending promises the callee less. Past that
        the two forms follow the rules of `*T`. */
+    /* DESIGN: the one exit of a lent pointer or slice is an argument of an
+       `extern fn`. C cannot be checked, and whether it keeps what it takes
+       is its contract, as for every pointer given to C. */
     if (type_is_lent(got) && !type_is_lent(expected) &&
-        (expected->kind == TYPE_POINTER || expected->kind == TYPE_SLICE)) {
+        (expected->kind == TYPE_POINTER || expected->kind == TYPE_SLICE) &&
+        c->lent_use != LENT_TO_C) {
         refuse_lent(c, e);
         return false;
     }
@@ -809,7 +883,9 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             return sema_builtin(c, TYPE_ERROR);
         }
         sema_mark_address_taken(c, operand);
-        return types_pointer(c->types, t);
+        return through_lent(operand)
+                   ? types_lent(c->types, types_pointer(c->types, t))
+                   : types_pointer(c->types, t);
     default:
         return sema_builtin(c, TYPE_ERROR);
     }
@@ -2816,7 +2892,9 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                 return sema_builtin(c, TYPE_ERROR);
             }
             sema_mark_address_taken(c, e->as.slice.base);
-            return types_slice(c->types, t->element);
+            return through_lent(e->as.slice.base)
+                       ? types_lent(c->types, types_slice(c->types, t->element))
+                       : types_slice(c->types, t->element);
         }
         if (t->kind == TYPE_SLICE) {
             return t;

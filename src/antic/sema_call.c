@@ -2568,7 +2568,9 @@ static struct type *check_call(struct checker *c, struct expr *e,
             struct type *t = g->prechecked[i] != NULL
                                  ? g->prechecked[i]
                                  : sema_check_expr(c, arg, fn->params[i]);
-            c->lent_use = LENT_PASSED;
+            c->lent_use = sym != NULL && sym->kind == SYMBOL_EXTERN_FN
+                              ? LENT_TO_C
+                              : LENT_PASSED;
             ok = sema_require(c, arg, t, fn->params[i]) && ok;
             c->lent_use = LENT_STORED;
             sema_refuse_lock_copy(c, arg, fn->params[i]);
@@ -2970,7 +2972,8 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
         return types_pointer_nullable(c->types, sema_builtin(c, TYPE_U8));
     }
     if (sema_name_is(name, "ptr") && base->kind == TYPE_SLICE) {
-        return types_pointer_nullable(c->types, base->element);
+        struct type *ptr = types_pointer_nullable(c->types, base->element);
+        return base->lent ? types_lent(c->types, ptr) : ptr;
     }
     if (e->as.field.element) {
         sema_error_at(c, e->pos, "`%s` is not a tuple, so it has no element "
