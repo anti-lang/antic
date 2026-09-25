@@ -2,7 +2,7 @@
 //! `com.example.parts`. Its teardown and its copy, which the compiler writes in
 //! this module, reach the ones that module writes, in release mode and in dev
 //! mode. A part moves into an `own` parameter of that module, which tears it
-//! down, and a part is lent to its functions.
+//! down, and a part and a slice are lent to its functions.
 
 import com.example.parts;
 
@@ -43,5 +43,8 @@ fn main() -> int
 	parts.lend(&r, parts.grow);
 	parts.lend(&r, fn(p) { p.n += 10; });
 	printf("lent %d\n".ptr, r.n as c_int);
+	let numbers: [3]int = [1, 2, 3];
+	parts.lend_numbers(numbers[0..3], fn(xs) { xs[0] = parts.total(xs); });
+	printf("lent slice %d\n".ptr, numbers[0] as c_int);
 	return 0;
 }

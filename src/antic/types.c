@@ -94,7 +94,8 @@ static struct type *lent_form(struct types *types, struct type *t, bool lent)
 {
     struct type key;
 
-    if (t == NULL || t->kind != TYPE_POINTER || t->lent == lent) {
+    if (t == NULL || (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE) ||
+        t->lent == lent) {
         return t;
     }
     key = *t;
@@ -115,7 +116,8 @@ struct type *types_unlent(struct types *types, struct type *t)
 
 bool type_is_lent(const struct type *t)
 {
-    return t != NULL && t->kind == TYPE_POINTER && t->lent;
+    return t != NULL && (t->kind == TYPE_POINTER || t->kind == TYPE_SLICE) &&
+           t->lent;
 }
 
 struct type *types_pointer(struct types *types, struct type *element)
@@ -1452,6 +1454,9 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         print_type(out, t->element, qualified);
         return;
     case TYPE_SLICE:
+        if (t->lent) {
+            text_append(out, "lent ");
+        }
         text_append(out, "[]");
         print_type(out, t->element, qualified);
         return;

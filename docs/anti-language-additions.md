@@ -1018,6 +1018,7 @@ list.modify(3, fn(p) { p.age += 1; });
 ```
 
 - `lent` before a pointer parameter says the pointer is valid only during the call: `fn(lent *T)`. The function may read and change through it, and pass it on to another `lent` parameter. It may not store it, return it, capture it in a closure that outlives the call, or pass it to a `keep` or `own` place. The checker enforces this as it enforces `keep`.
+- `lent` before a slice parameter, `fn(lent []T)`, follows the same rules. The slice is valid only for the call, and is never stored, returned, captured beyond the call or passed to a `keep` or `own` place.
 - A lending function runs while the collection holds the element in place, so the pointer never outlives the element.
 - The word is `lent`, chosen over `borrowed` and `scoped`. `borrowed` would suggest Rust's whole system of references.
 
@@ -1287,7 +1288,7 @@ list.push(c.share());
 
 - Keywords added: `variant`, `tests`, `fixtures`, `provides`, `undo`, `unreachable`, `undefined`, `show`, `embed`, `fail`, `here`, `fallthrough`. `sync`, `chan`, `send`, `recv`, `select` were reserved.
 - Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range, `may fail` after a signature, `simd` before `struct`. Round four adds `snapshot` before an anonymous `fn`, `keep`, `keep own` and `concurrent` before a parameter of function type, `synchronized` and `concurrent` before `class`, `guarded by` and `unchecked` after a field's type, `unchecked` in a class header, `allow` for silencing a warning, and `none` after `catch`.
-- Round five adds the keywords `constraint` and `type`, and the contextual word `lent` before a pointer parameter.
+- Round five adds the keywords `constraint` and `type`, and the contextual word `lent` before a pointer or slice parameter.
 - String prefixes added: `rf`, `x` and `re`.
 - Labels added: an identifier and `:` before `for`, `while` or a block.
 - Tokens added: `?*`, `+% -% *% <<%`, `+| -| *|`, `+%= -%= *%= <<%=`, `+|= -|= *|=`, the two-name `let` form `let (a, b) =`. Round five adds `<` and `>` around type parameters and type arguments, `>>` closing two lists of them, `?` before any type, and `.{` of a direct import.

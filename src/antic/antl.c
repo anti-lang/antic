@@ -471,8 +471,12 @@ static void put_type(struct writer *w, const struct type *t)
            Bit 0 is `?` and bit 1 `lent`. */
         put_u8(w, (uint8_t)((unsigned)t->nullable | (unsigned)t->lent << 1));
         break;
-    /* `?T` is its value type alone, since one element makes one. */
+    /* `[]T` and `lent []T` are two types, told apart by one byte. */
     case TYPE_SLICE:
+        put_type_ref(w, t->element);
+        put_u8(w, (uint8_t)t->lent);
+        break;
+    /* `?T` is its value type alone, since one element makes one. */
     case TYPE_OPTIONAL:
         put_type_ref(w, t->element);
         break;
@@ -1929,12 +1933,20 @@ static void read_types(struct reader *r)
             }
             break;
         }
-        case TYPE_SLICE:
-            t = type_ref(r, i);
-            if (t != NULL) {
-                t = types_slice(r->types, t);
+        case TYPE_SLICE: {
+            struct type *element = type_ref(r, i);
+            uint8_t lent = get_u8(r);
+            if (lent > 1) {
+                damaged(r);
+            }
+            if (element != NULL && !r->failed) {
+                t = types_slice(r->types, element);
+                if (lent != 0) {
+                    t = types_lent(r->types, t);
+                }
             }
             break;
+        }
         /* The element of a `?T` is never a `*U` or a `fn(...)`, which
            would make a `?*U` of it. */
         case TYPE_OPTIONAL:

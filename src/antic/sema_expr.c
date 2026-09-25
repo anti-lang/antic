@@ -405,7 +405,10 @@ static void refuse_lent(struct checker *c, const struct expr *e)
                       (int)e->as.name.length, e->as.name.text,
                       uses[c->lent_use]);
     } else {
-        sema_error_at(c, e->pos, "the pointer is lent for the call and %s",
+        sema_error_at(c, e->pos, "the %s is lent for the call and %s",
+                      e->type != NULL && e->type->kind == TYPE_SLICE
+                          ? "slice"
+                          : "pointer",
                       uses[c->lent_use]);
     }
 }
@@ -574,7 +577,7 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
        one is expected, since lending promises the callee less. Past that
        the two forms follow the rules of `*T`. */
     if (type_is_lent(got) && !type_is_lent(expected) &&
-        expected->kind == TYPE_POINTER) {
+        (expected->kind == TYPE_POINTER || expected->kind == TYPE_SLICE)) {
         refuse_lent(c, e);
         return false;
     }

@@ -1,4 +1,4 @@
-lent_params.anti:93:23: error: `lent` marks a pointer parameter, and this one is `int`
+lent_params.anti:93:23: error: `lent` marks a pointer or slice parameter, and this one is `int`
 lent_params.anti:97:28: error: `own` and `lent` do not stand together, since a lent pointer stays with its owner
 lent_params.anti:101:23: error: an `extern fn` takes no `lent` parameter, since C may keep the pointer
 lent_params.anti:25:11: error: `p` is lent for the call and cannot be stored

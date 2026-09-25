@@ -94,6 +94,14 @@ pub fn bounds(c: Circle) -> (int, int)
 
 The width and the height of `c`.
 
+## widest
+
+```anti
+pub fn widest(lent list: []Circle) -> int
+```
+
+The largest radius of the circles `list` lends.
+
 ## visit
 
 ```anti

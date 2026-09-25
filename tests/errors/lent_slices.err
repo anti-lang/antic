@@ -1,0 +1,13 @@
+lent_slices.anti:82:21: error: `lent` marks a pointer or slice parameter, and this one is `str`
+lent_slices.anti:86:28: error: `own` and `lent` do not stand together, since a lent slice stays with its owner
+lent_slices.anti:19:11: error: `xs` is lent for the call and cannot be stored
+lent_slices.anti:24:18: error: `xs` is lent for the call and cannot be stored
+lent_slices.anti:30:9: error: `xs` is lent for the call and cannot be returned
+lent_slices.anti:36:9: error: `ys` is lent for the call and cannot be returned
+lent_slices.anti:41:9: error: the slice is lent for the call and cannot be returned
+lent_slices.anti:46:8: error: `xs` is lent for the call and passes on to a `lent` parameter alone
+lent_slices.anti:51:8: error: `xs` is lent for the call and passes on to a `lent` parameter alone
+lent_slices.anti:56:10: error: a snapshot holds values that copy fully, and `xs` is `lent []int`
+lent_slices.anti:62:23: error: `xs` is lent for the call and cannot be stored
+lent_slices.anti:79:7: error: expected `fn(lent []int)`, found `fn([]int)`
+lent_slices.anti:97:16: error: `xs` is lent for the call and passes on to a `lent` parameter alone

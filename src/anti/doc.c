@@ -278,7 +278,7 @@ static void fn_signature(struct text *out, const char *lead,
                                              : "");
         }
         /* `lent` stands before the name, as the declaration writes it. */
-        if (p->kind == TYPE_POINTER && p->lent && params != NULL &&
+        if (type_is_lent(p) && params != NULL &&
             params[i].length > 0) {
             struct type bare = *p;
             bare.lent = false;

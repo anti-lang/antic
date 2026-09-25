@@ -79,3 +79,9 @@ fn walked<C: collection.Iterable<int>>(c: *C, f: fn(lent *int, lent *int)) -> in
 {
 	return 0;
 }
+
+/// A slice lent to a function.
+fn lends(xs: []int, f: fn(lent []int, lent [][]byte))
+{
+	f(xs, [][]byte { });
+}

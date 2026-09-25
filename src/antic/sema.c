@@ -974,7 +974,8 @@ struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
 }
 
 /* DESIGN: `lent` marks a pointer parameter whose pointer is valid only
-   during the call, and the parameter then has the type `lent *T`. The
+   during the call, and the parameter then has the type `lent *T`. A slice
+   parameter takes `lent []T` under the same rules. The
    function may pass it on to another `lent` parameter and keeps it
    nowhere, which the checker enforces through the type as it enforces
    `keep`. It does not stand with `own`, which takes the object over,
@@ -985,14 +986,15 @@ struct type *sema_lent_form(struct checker *c, struct type *t, bool lent,
     if (!lent || sema_is_error(t)) {
         return t;
     }
-    if (t->kind != TYPE_POINTER) {
-        sema_error_at(c, pos, "`lent` marks a pointer parameter, and this one "
-                      "is `%s`", sema_tn(t));
+    if (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE) {
+        sema_error_at(c, pos, "`lent` marks a pointer or slice parameter, and "
+                      "this one is `%s`", sema_tn(t));
         return sema_builtin(c, TYPE_ERROR);
     }
     if (owned) {
         sema_error_at(c, pos, "`own` and `lent` do not stand together, since "
-                      "a lent pointer stays with its owner");
+                      "a lent %s stays with its owner",
+                      t->kind == TYPE_SLICE ? "slice" : "pointer");
         return sema_builtin(c, TYPE_ERROR);
     }
     if (c->plain_fns > 0) {

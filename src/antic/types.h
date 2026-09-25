@@ -160,8 +160,10 @@ struct type {
        only during the call. It is a form of the pointer, as `?*T` is, so
        a function type that lends names it among its parameters and the
        checker refuses it where `*T` is kept, as it refuses a function of
-       two words at a `keep` place. It has the layout of `*T`. */
-    bool lent;                      /* TYPE_POINTER: `lent *T` */
+       two words at a `keep` place. It has the layout of `*T`. `lent []T`
+       is the slice of a `lent` parameter under the same rules, with the
+       layout of `[]T`. */
+    bool lent;                      /* TYPE_POINTER, TYPE_SLICE: `lent` */
     uint64_t length;                /* TYPE_ARRAY, 0 when symbolic */
     const struct symbolic *length_of; /* TYPE_ARRAY, a symbolic length */
     struct type **params;           /* TYPE_FN */
@@ -331,9 +333,11 @@ struct type *types_pointer(struct types *types, struct type *element);
 /* `?*T`, the pointer that may hold `none`. */
 struct type *types_pointer_nullable(struct types *types,
                                     struct type *element);
-/* The `lent` form of the pointer t, and t itself for any other type. */
+/* The `lent` form of the pointer or slice t, and t itself for any other
+   type. */
 struct type *types_lent(struct types *types, struct type *t);
-/* The pointer t without `lent`, and t itself for any other type. */
+/* The pointer or slice t without `lent`, and t itself for any other
+   type. */
 struct type *types_unlent(struct types *types, struct type *t);
 bool type_is_lent(const struct type *t);
 /* Either of the two, for a caller that carries the answer in a value. */

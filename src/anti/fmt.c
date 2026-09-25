@@ -811,11 +811,28 @@ static bool ends_value(const struct piece *p)
     }
 }
 
+/* Whether the piece written last is the `lent` of a result, `-> lent *T`,
+   or of a parameter of a function type, `fn(lent *T)` and `fn(lent []T)`,
+   which opens the type after it. */
+static bool last_is_lent(const struct emitter *e)
+{
+    return e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
+           e->prev->token->kind == TOKEN_IDENT && e->prev->length == 4 &&
+           memcmp(e->src + e->prev->offset, "lent", 4) == 0 &&
+           e->prev2 != NULL && e->prev2->kind == PIECE_TOKEN &&
+           (e->prev2->token->kind == TOKEN_ARROW ||
+            e->prev2->token->kind == TOKEN_LPAREN ||
+            e->prev2->token->kind == TOKEN_COMMA);
+}
+
 /* Whether the piece written last ends a value. A name behind a dot is
    one whatever the lexer calls the word, so `simd.select(m, a, b)` calls
    a function of a module and `chan.recv` reads a field. */
 static bool last_ends_value(const struct emitter *e)
 {
+    if (last_is_lent(e)) {
+        return false;
+    }
     if (e->prev2 != NULL && e->prev2->kind == PIECE_TOKEN &&
         (e->prev2->token->kind == TOKEN_DOT ||
          e->prev2->token->kind == TOKEN_QUESTION_DOT ||
@@ -841,17 +858,6 @@ static bool last_opens_value(const struct emitter *e)
     if (e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
         e->prev->token->kind == TOKEN_IDENT &&
         contextual_word(e->src + e->prev->offset, e->prev->length)) {
-        return true;
-    }
-    /* The `lent` of a result, `-> lent *T`, and of a parameter of a
-       function type, `fn(lent *T)`, opens the type after it. */
-    if (e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
-        e->prev->token->kind == TOKEN_IDENT && e->prev->length == 4 &&
-        memcmp(e->src + e->prev->offset, "lent", 4) == 0 &&
-        e->prev2 != NULL && e->prev2->kind == PIECE_TOKEN &&
-        (e->prev2->token->kind == TOKEN_ARROW ||
-         e->prev2->token->kind == TOKEN_LPAREN ||
-         e->prev2->token->kind == TOKEN_COMMA)) {
         return true;
     }
     return !last_ends_value(e);

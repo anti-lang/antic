@@ -827,7 +827,7 @@ class Buffer
 }
 ```
 
-`own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
+`own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `lent` before a slice parameter, `fn(lent []T)`, follows the same rules. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -846,6 +846,7 @@ class Texture
 fn take(own t: Texture) { }
 fn grow(lent p: *Person) { p.age += 1; }
 fn lend(f: fn(lent *Person)) { let one = Person { }; f(&one); }
+fn total(lent xs: []int) -> int { return xs.len; }
 
 let t = Texture { id: 7 };
 take(t);
@@ -858,7 +859,7 @@ let shapes = List<Shared<Circle>>.new();
 shapes.push(c.share());
 ```
 
-Built: `own` and `transient` fields, the `own` parameter of any type and `lent`. A local passed to an `own` parameter moves, the caller tears it down no more and names it no more, and the function tears it down at every exit unless it moves on by a call, `=`, `let` or `return`. A `lent` parameter has the type `lent *T`, which goes to another `lent` parameter, the object of a call and a comparison, and which `=`, `return`, a parameter without `lent`, `own`, a snapshot and `delete` refuse. `tests/programs/own_params.anti` and `tests/programs/lent_params.anti` run them, and `tests/errors/own_params.anti` and `tests/errors/lent_params.anti` hold the refusals. Not built yet: `Shared<T>`.
+Built: `own` and `transient` fields, the `own` parameter of any type and `lent`. A local passed to an `own` parameter moves, the caller tears it down no more and names it no more, and the function tears it down at every exit unless it moves on by a call, `=`, `let` or `return`. A `lent` parameter has the type `lent *T`, which goes to another `lent` parameter, the object of a call and a comparison, and which `=`, `return`, a parameter without `lent`, `own`, a snapshot and `delete` refuse. A `lent` slice parameter has the type `lent []T` under the same rules, and a part of it is lent as well. `tests/programs/own_params.anti`, `tests/programs/lent_params.anti` and `tests/programs/lent_slices.anti` run them, and `tests/errors/own_params.anti`, `tests/errors/lent_params.anti` and `tests/errors/lent_slices.anti` hold the refusals. Not built yet: `Shared<T>`.
 
 ## Pointers
 

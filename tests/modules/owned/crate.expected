@@ -16,4 +16,5 @@ leaf out 6
 take 7
 part out 7
 lent 19
+lent slice 6
 part out 19

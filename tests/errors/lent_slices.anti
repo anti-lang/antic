@@ -1,0 +1,104 @@
+//! A `lent` slice is valid for the call alone, as a `lent` pointer is. The
+//! checker refuses every place that would keep it or a part of it.
+
+class Holder
+{
+	pub held: []int,
+}
+
+fn plain(xs: []int)
+{
+}
+
+fn owner(own xs: []int)
+{
+}
+
+fn stored_in_a_field(h: *Holder, lent xs: []int)
+{
+	h.held = xs;
+}
+
+fn stored_in_a_local(lent xs: []int)
+{
+	let ys: []int = xs;
+	plain(ys);
+}
+
+fn returned(lent xs: []int) -> []int
+{
+	return xs;
+}
+
+fn returned_through_a_local(lent xs: []int) -> []int
+{
+	let ys = xs;
+	return ys;
+}
+
+fn part_returned(lent xs: []int) -> []int
+{
+	return xs[0..1];
+}
+
+fn passed_to_a_plain_parameter(lent xs: []int)
+{
+	plain(xs);
+}
+
+fn passed_to_an_own_parameter(lent xs: []int)
+{
+	owner(xs);
+}
+
+fn in_a_snapshot(lent xs: []int)
+{
+	let f = snapshot fn() -> int { return xs.len; };
+	f();
+}
+
+fn in_an_array(lent xs: []int)
+{
+	let all: [1][]int = [xs];
+	plain(all[0]);
+}
+
+fn kept_function(xs: []int)
+{
+	plain(xs);
+}
+
+fn lend(f: fn(lent []int))
+{
+	let room: [2]int = [1, 2];
+	f(room[0..2]);
+}
+
+fn lends_to_a_function_that_keeps()
+{
+	lend(kept_function);
+}
+
+fn not_a_slice(lent s: str)
+{
+}
+
+fn owned_and_lent(own lent xs: []int)
+{
+}
+
+fn hold<T>(x: T) -> T
+{
+	return x;
+}
+
+fn passed_to_a_generic(lent xs: []int) -> int
+{
+	let ys = hold(xs);
+	return ys.len;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -93,6 +93,18 @@ pub fn bounds(c: Circle) -> (int, int)
 	return (c.radius * 2, c.radius * 2);
 }
 
+/// The largest radius of the circles `list` lends.
+pub fn widest(lent list: []Circle) -> int
+{
+	let most = 0;
+	for c in list {
+		if c.radius > most {
+			most = c.radius;
+		}
+	}
+	return most;
+}
+
 /// Give `each` every circle of `list`, add up what `weigh` says of them and
 /// keep `done` for later.
 pub fn visit(list: []Circle, each: fn(Circle), concurrent weigh: fn(Circle) -> int,
