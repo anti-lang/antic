@@ -875,6 +875,14 @@ foreach(source IN LISTS std_sources)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
 
+# Every .anti file under src/std/anti/collection/ is a module the build
+# compiles by itself, after the modules it imports.
+add_test(NAME std_collection_modules
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-collection-modules"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_std_collection_modules.cmake")
+
 # The parts every collection shares in dev mode. The copies of the
 # generics of anti.collection come from its library file into the module
 # of the program, and the link names an object of each module it imports.

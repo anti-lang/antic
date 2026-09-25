@@ -432,11 +432,26 @@ endif()
 # runtime archive, where antic finds the modules under anti. without -I.
 set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection toml config args json log simd trace plugin)
 set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/std/anti")
+# Every .anti file under src/std/anti/collection/ is a module of its own,
+# found here and never listed. They compile after anti.collection, each
+# after the modules it imports, and a new file makes the build configure
+# again.
+include(tools/std-modules.cmake)
+file(GLOB_RECURSE std_collection_sources CONFIGURE_DEPENDS
+    "${ANTIC_STD_SOURCE_DIR}/${ANTI_STD_COLLECTION_DIR}/*.anti")
+anti_std_collection_modules(
+    "${ANTIC_STD_SOURCE_DIR}/${ANTI_STD_COLLECTION_DIR}" std_collection_modules)
+list(FIND ANTIC_STD_MODULES "${ANTI_STD_COLLECTION_DIR}" at)
+math(EXPR at "${at} + 1")
+if(std_collection_modules)
+    list(INSERT ANTIC_STD_MODULES ${at} ${std_collection_modules})
+endif()
 set(std_files "")
 foreach(module IN LISTS ANTIC_STD_MODULES)
     set(output "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
+    get_filename_component(output_dir "${output}" DIRECTORY)
     add_custom_command(OUTPUT "${output}"
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "${ANTIC_RUNTIME_DIR}/std/anti"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_dir}"
         COMMAND antic -c --anti-internal -I "${PROJECT_SOURCE_DIR}/src/std"
             -I "${ANTIC_RUNTIME_DIR}/std"
             --package-name anti --package-version "${PROJECT_VERSION}"

@@ -1982,6 +1982,8 @@ What antic does that the design above leaves open, as far as a user of the langu
 - `dup` of a collection and the refusal of `=` between two collections are not built. A collection holds its room through a pointer that is not `own`, since `own` memory goes back to the C library, so `=` copies the bytes of one and `dup` shares its room. A replaced `copy` never allocates, so a collection cannot copy its room there either.
 - [provisional] The variable of a range moves into an `own` parameter inside its loop, since each turn has a new one. A walked copy keeps the refusal. Reason: the rule that refuses a move inside a loop guards a local that the loop would move twice.
 
+- The build compiles every `.anti` file under `src/std/anti/collection/` as a module of its own, `collection/list.anti` as `anti.collection.list`, so a new collection module needs no change to `CMakeLists.txt`. `tools/std-modules.cmake` finds the files, and the test `std_collection_modules` checks their order and their library files.
+- [provisional] The collection modules compile after `anti.collection`. Each compiles after the modules of the tree that its lines `import anti.collection.<module>` name, and in the order of the paths where no import orders them. Modules that import each other stop the configure step, which names them. Reason: antic resolves an import from a library file alone, and the imports give the order without a list.
 
 ## Open
 
