@@ -995,6 +995,9 @@ static void io_expr_body(struct io *io, struct expr *e)
     io_type(io, &e->type);
     io_sym(io, &e->symbol);
     io_bool(io, &e->moves);
+    /* A node the checker built checked, as the receiver of a nested
+       hash call, which a copy hands to the checker again as it stands. */
+    io_bool(io, &e->prechecked);
     io_field(io, &e->to_iface, e->type);
     io_bool(io, &e->to_context);
     io_type(io, &e->to_optional);
@@ -1552,11 +1555,13 @@ static struct symbol *read_extern(struct reader *r)
 
 /* DESIGN: the declaration of a generic follows the type table. A
    function carries its name, its position, its level, its type and its
-   marks. The names and defaults of its parameters and its type
-   parameters follow. A struct, a class or a variant carries its type and
-   the marks of its declaration. The entry of the type holds its fields,
-   its functions and its parameters. A `pub` generic stands among the items as
-   well, and the reader gives that symbol the declaration. */
+   marks: `may fail`, `worker` and `operator`. The checker reads them
+   from the declaration when it looks for the hook of a type. The names
+   and defaults of its parameters and its type parameters follow. A
+   struct, a class or a variant carries its type and the marks of its
+   declaration. The entry of the type holds its fields, its functions and
+   its parameters. A `pub` generic stands among the items as well, and
+   the reader gives that symbol the declaration. */
 static void put_declaration(struct writer *w, const struct item *it)
 {
     size_t i;
@@ -1569,7 +1574,8 @@ static void put_declaration(struct writer *w, const struct item *it)
     antl_put_type_ref(w, it->symbol->type);
     if (it->kind == ITEM_FN) {
         antl_put_u8(w, (uint8_t)((unsigned)it->may_fail |
-                                 (unsigned)it->worker << 1));
+                                 (unsigned)it->worker << 1 |
+                                 (unsigned)it->is_operator << 2));
         antl_put_count(w, it->param_count);
         for (i = 0; i < it->param_count; i++) {
             antl_put_bytes(w, it->params[i].name.text,
@@ -1679,15 +1685,17 @@ static struct item *read_declaration(struct reader *r)
         marks = antl_get_u8(r);
         it->may_fail = (marks & 1) != 0;
         it->worker = (marks >> 1 & 1) != 0;
+        it->is_operator = (marks >> 2 & 1) != 0;
         sym->may_fail = it->may_fail;
         sym->worker = it->worker;
+        sym->is_operator = it->is_operator;
         n = antl_get_count(r, 4);
         it->params = antl_allocate(r, n, sizeof *it->params);
         for (i = 0; i < n && !r->failed; i++) {
             it->params[i].name = antl_get_name(r);
         }
         it->param_count = n;
-        if (type->kind != TYPE_FN || marks > 3) {
+        if (type->kind != TYPE_FN || marks > 7) {
             antl_damaged(r);
             return NULL;
         }
@@ -1773,6 +1781,7 @@ static void io_root(struct io *io, struct item *fn)
         io_bool(io, &fn->params[i].owned);
         io_bool(io, &fn->params[i].keep);
         io_bool(io, &fn->params[i].concurrent);
+        io_bool(io, &fn->params[i].lent);
     }
     io_bool(io, &fn->has_self);
     io_sym(io, &fn->self);

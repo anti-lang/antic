@@ -248,6 +248,10 @@ static bool build_library(struct session *s, const char *name,
     bool ok;
 
     module = check_module(s, name, source, &ok);
+    /* The generics leave the module before lowering, as in the driver. */
+    if (ok) {
+        sema_strip_generics(module, &s->arena);
+    }
     ir_module_init(&ir, &s->arena, name);
     ok = ok && lower_module(module, name, &ir, &s->diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
     if (!ok) {
@@ -270,7 +274,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 70, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 71, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1206,6 +1210,87 @@ static void keeps_signatures(void)
     close_session(&a);
 }
 
+/* The generic named name among the generics of lib, or NULL. */
+static const struct item *generic_of(const struct interface *lib,
+                                     const char *name)
+{
+    size_t i;
+
+    for (i = 0; lib != NULL && i < lib->generic_count; i++) {
+        const struct item *it = lib->generics[i];
+        if (it->name.length == strlen(name) &&
+            memcmp(it->name.text, name, it->name.length) == 0) {
+            return it;
+        }
+    }
+    return NULL;
+}
+
+/* Every mark the checker leaves on a generic survives the library file.
+   The declaration and its symbol keep `operator`, a parameter keeps
+   `lent`, and the receiver of a nested hash call keeps `prechecked`. A
+   copy hands that receiver to the checker again as it stands. */
+static void keeps_generic_marks(void)
+{
+    struct session a;
+    struct session b;
+    struct text bytes = {0};
+    struct ir_module program;
+    char error[160] = "";
+    const struct interface *lib;
+    const struct item *eq;
+    const struct item *peek;
+    const struct item *mixed;
+    const struct expr *call = NULL;
+    const struct expr *at = NULL;
+
+    open_session(&a);
+    build_library(&a, "marks",
+                  "pub struct Box<T> { v: T }\n"
+                  "pub operator fn eq<T: eq>(a: Box<T>, b: Box<T>) -> bool {\n"
+                  "    return a.v == b.v;\n"
+                  "}\n"
+                  "pub fn peek<T>(lent p: *T) -> T {\n"
+                  "    return *p;\n"
+                  "}\n"
+                  "pub struct Name { n: int }\n"
+                  "pub operator fn hash(a: Name) -> u64 {\n"
+                  "    return a.n as u64;\n"
+                  "}\n"
+                  "pub fn mixed<T: hash>(v: T) -> u64 {\n"
+                  "    return (v, Name { n: 1 }).hash();\n"
+                  "}\n",
+                  &bytes);
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "marks");
+    lib = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
+                    &b.types, &b.arena, &program, error, sizeof error);
+    CHECK(lib != NULL);
+    CHECK_STR(error, "");
+    eq = generic_of(lib, "eq");
+    CHECK(eq != NULL && eq->is_operator && eq->symbol->is_operator);
+    peek = generic_of(lib, "peek");
+    CHECK(peek != NULL && peek->param_count == 1 && peek->params[0].lent);
+    mixed = generic_of(lib, "mixed");
+    if (mixed != NULL && mixed->body != NULL && mixed->body->count == 1 &&
+        mixed->body->stmts[0]->kind == STMT_RETURN) {
+        call = mixed->body->stmts[0]->as.return_value;
+    }
+    /* The hash of the `Name` in the tuple is `hash(*hole)`. */
+    if (call != NULL && call->kind == EXPR_CALL &&
+        call->as.call.hash_count == 1 &&
+        call->as.call.hash_calls[0]->as.call.arg_count == 1) {
+        at = call->as.call.hash_calls[0]->as.call.args[0];
+    }
+    CHECK(at != NULL && at->kind == EXPR_UNARY &&
+          at->as.unary.operand->kind == EXPR_NONE);
+    CHECK(at != NULL && at->prechecked && at->as.unary.operand->prechecked);
+    text_free(&bytes);
+    ir_module_free(&program);
+    close_session(&b);
+    close_session(&a);
+}
+
 /* A struct keeps one identity when two libraries mention it. */
 static void dependencies(void)
 {
@@ -1349,9 +1434,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 71;
+    copy[4] = 72;
     refuses_file(copy, sizeof copy,
-                 "has format version 71, and antic reads version 70");
+                 "has format version 72, and antic reads version 71");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1971,6 +2056,7 @@ void test_modules(void)
     keeps_constants();
     keeps_halves();
     keeps_signatures();
+    keeps_generic_marks();
     keeps_context_signatures();
     keeps_extern_aggregates();
     keeps_classes();

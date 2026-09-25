@@ -1,0 +1,10 @@
+eq 1 0
+lt 1 0
+add 2 4 7
+for 13
+f64 1 1
+list eq 1 0
+list lt 1 0
+list index 5
+list for 8
+list add 6 9

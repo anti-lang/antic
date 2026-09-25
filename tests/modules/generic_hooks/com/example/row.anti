@@ -1,0 +1,121 @@
+//! A generic class with the operator hooks, and its iterator. Another module
+//! compares, adds, indexes and walks copies of it through the library file
+//! alone, so every mark of a function the file carries reaches that module.
+
+import anti.lang;
+
+/// Three values, compared and added element by element.
+pub class Row<T: eq + lt + add>
+{
+	pub items: [3]T,
+
+	operator fn eq(self, other: Row<T>) -> bool
+	{
+		for i in 0..3 {
+			if self.items[i] != other.items[i] {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	operator fn lt(self, other: Row<T>) -> bool
+	{
+		for i in 0..3 {
+			if self.items[i] != other.items[i] {
+				return self.items[i] < other.items[i];
+			}
+		}
+		return false;
+	}
+
+	operator fn add(self, other: Row<T>) -> Row<T>
+	{
+		let sum = Row<T> { items: self.items };
+		for i in 0..3 {
+			sum.items[i] = self.items[i] + other.items[i];
+		}
+		return sum;
+	}
+
+	operator fn index(self, i: int) -> T
+	{
+		return self.items[i];
+	}
+
+	operator fn iter(self) -> RowIter<T>
+	{
+		return RowIter<T> { row: self, at: -1 };
+	}
+}
+
+/// The walk over a `Row`.
+pub class RowIter<T: eq + lt + add>
+{
+	pub row: *Row<T>,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < 3;
+	}
+
+	operator fn value(self) -> T
+	{
+		return self.row.items[self.at];
+	}
+}
+
+/// A generic class that takes its operators from functions of its module, the
+/// form a collection module gives its class `==` in.
+pub class List<T>
+{
+	pub items: [2]T,
+}
+
+pub operator fn eq<T: eq>(a: List<T>, b: List<T>) -> bool
+{
+	return a.items[0] == b.items[0] && a.items[1] == b.items[1];
+}
+
+pub operator fn lt<T: lt>(a: List<T>, b: List<T>) -> bool
+{
+	if a.items[0] < b.items[0] {
+		return true;
+	}
+	return !(b.items[0] < a.items[0]) && a.items[1] < b.items[1];
+}
+
+pub operator fn add<T: add>(a: List<T>, b: List<T>) -> List<T>
+{
+	return List<T> { items: [a.items[0] + b.items[0], a.items[1] + b.items[1]] };
+}
+
+pub operator fn index<T>(a: List<T>, i: int) -> T
+{
+	return a.items[i];
+}
+
+pub operator fn iter<T>(a: *List<T>) -> ListIter<T>
+{
+	return ListIter<T> { list: a, at: -1 };
+}
+
+/// The walk over a `List`, which lends each element.
+pub class ListIter<T>
+{
+	pub list: *List<T>,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < 2;
+	}
+
+	operator fn value(self) -> lent *T
+	{
+		return &self.list.items[self.at];
+	}
+}

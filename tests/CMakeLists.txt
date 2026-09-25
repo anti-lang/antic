@@ -2194,6 +2194,27 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# A generic class with operator hooks in a library, which another module
+# compares, adds, indexes and walks. The library file carries the mark of
+# each hook, in the class and at module level.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME generic_hooks_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_hooks"
+            "-DLIBRARIES=row"
+            "-DSTD=lang"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/generic-hooks-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # A collection, its iterator and a struct with the language hooks in a
 # library, which another module walks, indexes and collects.
 foreach(mode release dev)

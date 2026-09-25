@@ -1,0 +1,40 @@
+//! A program that uses the operator hooks of a generic class of another module
+//! through `==`, `<`, `+`, `[ ]` and `for`, written in the class and as
+//! functions of its module.
+
+import com.example.row;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let a = row.Row<int> { items: [1, 2, 3] };
+	let b = row.Row<int> { items: [1, 2, 4] };
+	let c = row.Row<int> { items: [1, 2, 3] };
+	printf("eq %d %d\n".ptr, (a == c) as c_int, (a == b) as c_int);
+	printf("lt %d %d\n".ptr, (a < b) as c_int, (b < a) as c_int);
+	let s = a + b;
+	printf("add %d %d %d\n".ptr, s[0] as c_int, s[1] as c_int,
+		s[2] as c_int);
+	let total = 0;
+	for x in s {
+		total += x;
+	}
+	printf("for %d\n".ptr, total as c_int);
+	let f = row.Row<f64> { items: [0.5, 1.5, 2.5] };
+	let g = f + f;
+	printf("f64 %d %d\n".ptr, (g == g) as c_int, (f < g) as c_int);
+	let l = row.List<int> { items: [3, 4] };
+	let m = row.List<int> { items: [3, 5] };
+	printf("list eq %d %d\n".ptr, (l == l) as c_int, (l == m) as c_int);
+	printf("list lt %d %d\n".ptr, (l < m) as c_int, (m < l) as c_int);
+	printf("list index %d\n".ptr, m[1] as c_int);
+	let sum = 0;
+	for x in &m {
+		sum += *x;
+	}
+	printf("list for %d\n".ptr, sum as c_int);
+	let n = l + m;
+	printf("list add %d %d\n".ptr, n.items[0] as c_int, n.items[1] as c_int);
+	return 0;
+}
