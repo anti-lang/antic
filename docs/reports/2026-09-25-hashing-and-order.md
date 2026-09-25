@@ -96,3 +96,18 @@ No compile warning on the host, ASan and UBSan builds. The linker prints
 1071, ASan 1070 of 1070 and UBSan 1070 of 1070. The docs-style checker reports
 nothing on every touched file but `CMakeLists.txt` and `tests/CMakeLists.txt`,
 whose `#` comments it reads as Markdown headings, as before.
+
+## Proof of the push
+
+After the push of `1fd2d1a`:
+
+```text
+$ git log --oneline -3
+1fd2d1a Report hashing and order
+339ba23 Split the long sentences of the comments of hashing
+732824a Record hashing and order in the decisions and the overview
+$ git status --short
+$ git rev-parse HEAD origin/main
+1fd2d1af5715aeae84fc3db295cd470dc91c0b93
+1fd2d1af5715aeae84fc3db295cd470dc91c0b93
+```
