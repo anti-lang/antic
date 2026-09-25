@@ -798,15 +798,36 @@ class Buffer
 
 `own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
 
-```anti not-built
-fn grow(lent p: *Person) { p.age += 1; }
+<!-- overview: context, docs-style:ignore
+```anti
+class Person
+{
+	pub age: int = 0,
+}
 
+class Texture
+{
+	pub id: int = 0,
+}
+```
+-->
+```anti
+fn take(own t: Texture) { }
+fn grow(lent p: *Person) { p.age += 1; }
+fn lend(f: fn(lent *Person)) { let one = Person { }; f(&one); }
+
+let t = Texture { id: 7 };
+take(t);
+lend(fn(p) { p.age += 1; });
+```
+
+```anti not-built
 let c = Shared<Circle>.new(Circle { r: 2.0 });
 let shapes = List<Shared<Circle>>.new();
 shapes.push(c.share());
 ```
 
-Built: `own` and `transient` fields, and the `own` parameter that takes an error. Not built yet: the `own` parameter of any other type, `lent` and `Shared<T>`.
+Built: `own` and `transient` fields, the `own` parameter of any type and `lent`. A local passed to an `own` parameter moves, the caller tears it down no more and names it no more, and the function tears it down at every exit unless it moves on by a call, `=`, `let` or `return`. A `lent` parameter has the type `lent *T`, which goes to another `lent` parameter, the object of a call and a comparison, and which `=`, `return`, a parameter without `lent`, `own`, a snapshot and `delete` refuse. `tests/programs/own_params.anti` and `tests/programs/lent_params.anti` run them, and `tests/errors/own_params.anti` and `tests/errors/lent_params.anti` hold the refusals. Not built yet: `Shared<T>`.
 
 ## Pointers
 
@@ -1468,4 +1489,4 @@ String prefixes: `r b br f rf x re`.
 
 Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
 
-Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. `synchronized` and `guarded by` are built as well. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today. Built of round five: `constraint` and `type`. Not built yet: `lent`, which the lexer reads as a name today.
+Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. `synchronized` and `guarded by` are built as well. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today. Built of round five: `constraint`, `type` and `lent`.

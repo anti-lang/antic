@@ -246,10 +246,10 @@ sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
 four are built. Then generics and closures. Closures are built, `snapshot fn`
 included. Round five, generics and collections, stands in the same document.
-Its first seven parts, the syntax of generics, the constraints, the
+Its first nine parts, the syntax of generics, the constraints, the
 compiled copies, the generics of library files and of C, what can be
-generic, the other features with generics and the optional values, are
-built, and none of the rest.
+generic, the other features with generics, the optional values, ownership
+at a call and lending, are built, and none of the rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
