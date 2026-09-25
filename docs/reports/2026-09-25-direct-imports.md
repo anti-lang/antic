@@ -73,3 +73,20 @@ No compile warning on the host, ASan and UBSan builds. The linker prints
 1075, ASan 1074 of 1074 and UBSan 1074 of 1074. The docs-style checker reports
 nothing on every touched file but `tests/CMakeLists.txt`, whose `#` comments it
 reads as Markdown headings, as before.
+
+## Proof of the push
+
+After the push of `5827674`:
+
+```text
+$ git log --oneline -3
+5827674 Report direct imports
+b68714e Record direct imports in the decisions and the overview
+f4f2040 Build direct imports of round five
+$ git status --short
+$ git rev-parse HEAD origin/main
+5827674607af50c02d8cd7695a0edca6a45e5e33
+5827674607af50c02d8cd7695a0edca6a45e5e33
+```
+
+Suite pass counts: host 1075 of 1075, ASan 1074 of 1074, UBSan 1074 of 1074.
