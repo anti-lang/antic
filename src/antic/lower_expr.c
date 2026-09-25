@@ -383,6 +383,36 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
     build_value_into(l, e, dest);
 }
 
+/* The copy of every part of the value of an iterator, `*v` over a tuple
+   with lent parts that only the checker writes, into dest. A part that is
+   a lent pointer gives what it points at, and every other part itself. */
+static void copy_parts_into(struct lowerer *l, const struct expr *e,
+                            struct ir_operand dest)
+{
+    const struct type *lent = e->as.unary.operand->type;
+    const struct type *copy = e->type;
+    struct ir_operand src = lower_address(l, e->as.unary.operand);
+    size_t i;
+
+    for (i = 0; i < lent->param_count; i++) {
+        const struct type *part = copy->params[i];
+        struct ir_operand from = lower_offset_address(
+            l, src, lower_field_offset(l, lent, &lent->fields[i].name));
+        struct ir_operand to = lower_offset_address(
+            l, dest, lower_field_offset(l, copy, &copy->fields[i].name));
+        if (type_is_lent(lent->params[i])) {
+            from = lower_temp(l, ir_load(l->f, l->b, IR_PTR, from));
+        }
+        if (lower_is_aggregate(part)) {
+            ir_memcopy(l->f, l->b, to, from, lower_vtype_of(l, part));
+        } else {
+            enum ir_type type = lower_ir_type_of(part);
+            ir_store(l->f, l->b, type,
+                     lower_temp(l, ir_load(l->f, l->b, type, from)), to);
+        }
+    }
+}
+
 /* The value of e, of its own type, written to dest. */
 static void build_value_into(struct lowerer *l, const struct expr *e,
                              struct ir_operand dest)
@@ -392,6 +422,11 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
     struct ir_operand src;
     size_t i;
 
+    if (e->kind == EXPR_UNARY && e->as.unary.op == TOKEN_STAR &&
+        e->as.unary.operand->type->kind == TYPE_TUPLE) {
+        copy_parts_into(l, e, dest);
+        return;
+    }
     switch (e->kind) {
     /* `none` of a `?T` writes its flag, and the value stays as it is. */
     case EXPR_NONE:

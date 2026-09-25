@@ -1035,7 +1035,9 @@ for p in &people { }     // p is a lent *Person: the element itself, for this tu
 - `for x in c` gives a copy of each element. The loop variable is read-only, so a change that would only reach the copy is a compile error: `` `p` is a copy of each element of `people`. Walk with `&people` to change the elements ``.
 - `for x in &c` gives each element as a `lent` pointer, valid for one turn of the loop. The element may be changed in place through it.
 - The same two forms hold for slices, with the same read-only rule for the copy form.
-- `for (k, v) in m` takes apart the tuple of each element, over any iterator whose value is a tuple. With `&`, `for (k, v) in &m` gives `k` as a copy, since keys never change in place, and `v` as a lent pointer.
+- The iterator decides what walking with `&` gives. `for x in &c` uses the iterator of `c`, and the `value` of that iterator returns exactly what the loop binds: a `lent *T` for a list, and a `(K, lent *V)` for a map, whose keys never change in place. A `SortedMap` whose keys and values stand in two arrays returns `(K, lent *V)` as well.
+- A tuple may hold a lent pointer only as the value of such an iterator, bound by its loop. It cannot be stored, returned or passed on as a whole.
+- `for (k, v) in m` takes apart the tuple of each element, over any iterator whose value is a tuple. The parts of a pattern are what the value type says, in any position: `(K, int, lent *V)` gives a copy, a copy and a lent pointer. `for (k, v) in &m` over a map therefore gives `k` as a copy and `v` as a lent pointer.
 - A collection must not change its size while a loop walks it. Every collection keeps a count of its changes, and its iterator remembers the count. A dev build traps when they differ, naming the collection and both places: `` `people` was changed while `for` walked it ``. A release build carries no check. Removing while walking is `remove_all(test)`, which is built for it.
 
 ## Hashing and order

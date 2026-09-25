@@ -114,6 +114,52 @@ struct type *types_unlent(struct types *types, struct type *t)
     return lent_form(types, t, false);
 }
 
+bool type_holds_lent(const struct type *t)
+{
+    size_t i;
+
+    if (t == NULL || t->kind != TYPE_TUPLE) {
+        return false;
+    }
+    for (i = 0; i < t->param_count; i++) {
+        if (type_is_lent(t->params[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+struct type *types_copy_of_parts(struct types *types, struct type *t)
+{
+    struct type **parts;
+    size_t i;
+
+    if (!type_holds_lent(t)) {
+        return t;
+    }
+    parts = types_alloc_array(types->arena, t->param_count, sizeof *parts);
+    for (i = 0; i < t->param_count; i++) {
+        parts[i] = type_is_lent(t->params[i]) ? t->params[i]->element
+                                              : t->params[i];
+    }
+    return types_tuple(types, parts, t->param_count);
+}
+
+struct type *types_unlent_parts(struct types *types, struct type *t)
+{
+    struct type **parts;
+    size_t i;
+
+    if (!type_holds_lent(t)) {
+        return t;
+    }
+    parts = types_alloc_array(types->arena, t->param_count, sizeof *parts);
+    for (i = 0; i < t->param_count; i++) {
+        parts[i] = types_unlent(types, t->params[i]);
+    }
+    return types_tuple(types, parts, t->param_count);
+}
+
 bool type_is_lent(const struct type *t)
 {
     return t != NULL && (t->kind == TYPE_POINTER || t->kind == TYPE_SLICE) &&

@@ -340,6 +340,14 @@ struct type *types_lent(struct types *types, struct type *t);
    type. */
 struct type *types_unlent(struct types *types, struct type *t);
 bool type_is_lent(const struct type *t);
+/* Whether t is a tuple with a lent pointer among its parts, which the
+   `operator fn value` of an iterator alone gives. */
+bool type_holds_lent(const struct type *t);
+/* The tuple t with the type each lent part points at in its place: the
+   copy of the value of an iterator that `for x in e` binds. */
+struct type *types_copy_of_parts(struct types *types, struct type *t);
+/* The tuple t with a plain pointer for each lent part. */
+struct type *types_unlent_parts(struct types *types, struct type *t);
 /* Either of the two, for a caller that carries the answer in a value. */
 struct type *types_pointer_of(struct types *types, struct type *element,
                               bool nullable);

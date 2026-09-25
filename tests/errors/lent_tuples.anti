@@ -1,0 +1,98 @@
+//! A tuple may hold a lent pointer only as the value of an iterator, bound by
+//! its loop. It is never stored, returned or passed on as a whole, and a part
+//! that the value gives as a copy changes no element.
+
+class Split
+{
+	pub keys: [2]int = [1, 2],
+	pub values: [2]int = [3, 4],
+
+	operator fn iter(self) -> SplitIter
+	{
+		return SplitIter { map: self, at: -1 };
+	}
+}
+
+class SplitIter
+{
+	pub map: *Split,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 2;
+	}
+
+	operator fn value(self) -> (int, lent *int)
+	{
+		return (self.map.keys[self.at], &self.map.values[self.at]);
+	}
+}
+
+class Bad
+{
+	operator fn next(self) -> bool
+	{
+		return false;
+	}
+
+	operator fn value(self) -> (int, lent int)
+	{
+		return (1, 2);
+	}
+}
+
+class Pairs
+{
+	operator fn next(self) -> bool
+	{
+		return false;
+	}
+
+	operator fn value(self) -> (int, int)
+	{
+		return (1, 2);
+	}
+}
+
+fn outside() -> (int, lent *int)
+{
+	let n = 0;
+	return (n, &n);
+}
+
+fn take(t: (int, *int))
+{
+}
+
+fn hold<T>(x: T) -> T
+{
+	return x;
+}
+
+fn walks(m: *Split) -> int
+{
+	for e in &m {
+		let kept = e;
+		take(e);
+		hold(e);
+		return e;
+	}
+	let it = m.iter();
+	let t = it.value();
+	let typed: (int, lent *int) = it.value();
+	for (k, v) in &m {
+		k = 3;
+		v = v;
+	}
+	let p = Pairs { };
+	for (a, b) in &p {
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

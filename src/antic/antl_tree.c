@@ -826,7 +826,7 @@ static void io_sym_body(struct io *io, struct symbol *s)
     io_bool(io, &s->read_only);
     io_name(io, &s->copy_of);
     io_bool(io, &s->lent_turn);
-    io_bool(io, &s->walked_key);
+    io_bool(io, &s->walked_part);
     io_bool(io, &s->worker);
     io_bool(io, &s->may_fail);
     io_bool(io, &s->caught);

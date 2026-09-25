@@ -790,12 +790,14 @@ static void mark_walked(const struct stmt *s, struct symbol *sym)
     sym->copy_of.length = s->as.for_loop.over_text.length;
 }
 
-/* DESIGN: `for (k, v) in e` takes apart the tuple each element is. In
-   the form `for (k, v) in e` every name is a read-only copy of its part,
-   as the variable of `for x in e` is. In the form `for (k, v) in &e` the
-   first name is a read-only copy of the key, which never changes in
-   place, and every other name is a lent pointer to its part for the turn.
-   The whole element, or the lent pointer to it, lives in a symbol of no
+/* DESIGN: `for (k, v) in e` takes apart the tuple each element is, and
+   its parts are what the type of the element says. In the form
+   `for (k, v) in e` every name is a read-only copy of its part, as the
+   variable of `for x in e` is. In the form `for (k, v) in &e` the iterator
+   decides: a value `(K, lent *V)` gives a read-only copy of the key and a
+   lent pointer to the value, in whatever places the parts stand. An
+   element lent whole, `lent *(A, B)`, as a slice lends each one, gives a
+   lent pointer to every part. The whole element lives in a symbol of no
    scope that lowering binds and the names read. */
 static void bind_pattern(struct checker *c, struct stmt *s,
                          struct type *element)
@@ -804,6 +806,7 @@ static void bind_pattern(struct checker *c, struct stmt *s,
     size_t count = s->as.for_loop.name_count;
     bool lent = s->as.for_loop.by_pointer;
     struct type *tuple = element;
+    bool whole_lent = false;
     struct symbol *whole;
     size_t i;
 
@@ -814,6 +817,7 @@ static void bind_pattern(struct checker *c, struct stmt *s,
     } else if (!sema_is_error(tuple)) {
         if (lent && tuple->kind == TYPE_POINTER) {
             tuple = tuple->element;
+            whole_lent = true;
         }
         if (tuple->kind != TYPE_TUPLE) {
             sema_error_at(c, names[0].pos, "a pattern of `for` takes apart the "
@@ -838,7 +842,7 @@ static void bind_pattern(struct checker *c, struct stmt *s,
         struct symbol *sym =
             sema_declare(c, SYMBOL_LOCAL, &names[i].name, names[i].pos,
                          "`%.*s` is already declared in this block");
-        if (lent && i > 0 && !sema_is_error(part)) {
+        if (whole_lent && !sema_is_error(part)) {
             part = types_lent(c->types, types_pointer(c->types, part));
         }
         if (sym == NULL) {
@@ -847,12 +851,12 @@ static void bind_pattern(struct checker *c, struct stmt *s,
         sym->type = part;
         sym->read_only = true;
         names[i].symbol = sym;
-        if (lent && i > 0) {
+        if (type_is_lent(part)) {
             sym->lent_turn = true;
         } else {
             sym->copy_of.text = s->as.for_loop.over_text.bytes;
             sym->copy_of.length = s->as.for_loop.over_text.length;
-            sym->walked_key = lent;
+            sym->walked_part = lent;
         }
     }
 }
@@ -896,9 +900,9 @@ static struct symbol *walked_copy(const struct expr *target)
 static void refuse_read_only(struct checker *c, struct pos pos,
                              const struct symbol *sym)
 {
-    if (sym->walked_key) {
-        sema_error_at(c, pos, "`%.*s` is a copy of the key of each element "
-                      "of `%.*s`, and a key never changes in place",
+    if (sym->walked_part) {
+        sema_error_at(c, pos, "`%.*s` is a copy that the iterator of `%.*s` "
+                      "gives, so a change reaches no element",
                       (int)sym->name.length, sym->name.text,
                       (int)sym->copy_of.length, sym->copy_of.text);
         return;
@@ -1602,6 +1606,9 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
         sema_error_at(c, s->as.let.value->pos,
                       "a destructuring takes a tuple, found `%s`", sema_tn(t));
         t = sema_builtin(c, TYPE_ERROR);
+    } else if (type_holds_lent(t)) {
+        sema_refuse_lent_tuple(c, s->as.let.value);
+        t = sema_builtin(c, TYPE_ERROR);
     } else {
         sema_refuse_owned_copy(c, s->as.let.value, t);
     }
@@ -1830,6 +1837,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
             t = declared;
         } else if (!sema_is_error(t) && t->kind == TYPE_VOID) {
             sema_require(c, s->as.let.value, t, sema_builtin(c, TYPE_I64));
+            t = sema_builtin(c, TYPE_ERROR);
+        } else if (type_holds_lent(t)) {
+            sema_refuse_lent_tuple(c, s->as.let.value);
             t = sema_builtin(c, TYPE_ERROR);
         } else if (!moves_own_param(c, s->as.let.value, s->as.let.name)) {
             sema_refuse_owned_copy(c, s->as.let.value, t);

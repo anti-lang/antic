@@ -483,6 +483,21 @@ static void refuse_lent(struct checker *c, const struct expr *e)
     }
 }
 
+/* DESIGN: a tuple that holds a lent pointer is the value of an iterator,
+   bound by its loop. It is never stored, returned or passed on as a
+   whole. Each part keeps the rules of its own type. */
+void sema_refuse_lent_tuple(struct checker *c, const struct expr *e)
+{
+    if (e->kind == EXPR_NAME) {
+        sema_error_at(c, e->pos, "`%.*s` holds a lent pointer, and a tuple "
+                      "that holds one is bound by its loop alone",
+                      (int)e->as.name.length, e->as.name.text);
+        return;
+    }
+    sema_error_at(c, e->pos, "the value holds a lent pointer, and a tuple "
+                  "that holds one is bound by its loop alone");
+}
+
 /* Whether e is `dup` of a function value, a copy that no one owns yet. */
 static bool is_fn_dup(const struct expr *e)
 {
@@ -646,6 +661,11 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
        and nowhere else a pointer is kept. Any pointer goes where a `lent`
        one is expected, since lending promises the callee less. Past that
        the two forms follow the rules of `*T`. */
+    /* The result of `operator fn value` takes the tuple it declares. */
+    if (type_holds_lent(got) && got != expected) {
+        sema_refuse_lent_tuple(c, e);
+        return false;
+    }
     /* DESIGN: the one exit of a lent pointer or slice is an argument of an
        `extern fn`. C cannot be checked, and whether it keeps what it takes
        is its contract, as for every pointer given to C. */
@@ -1297,6 +1317,19 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
         copy->as.unary.op = TOKEN_STAR;
         copy->as.unary.operand = it->current;
         copy->type = (*element)->element;
+        it->place = it->current;
+        it->current = copy;
+        *element = copy->type;
+    }
+    /* DESIGN: a value that gives a tuple with lent parts, `(K, lent *V)`,
+       walks in place as well. `for x in &e` binds the tuple as it is, and
+       `for x in e` and `to_slice` a copy of every part, which the node
+       `*` over the tuple writes and no program can. */
+    if (type_holds_lent(*element)) {
+        struct expr *copy = sema_new_node(c, EXPR_UNARY, e->pos);
+        copy->as.unary.op = TOKEN_STAR;
+        copy->as.unary.operand = it->current;
+        copy->type = types_copy_of_parts(c->types, *element);
         it->place = it->current;
         it->current = copy;
         *element = copy->type;

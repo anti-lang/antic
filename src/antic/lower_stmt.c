@@ -407,10 +407,10 @@ static void bind_loop_name(struct lowerer *l, struct symbol *sym,
                            enum ir_type type, struct ir_operand value);
 
 /* Give the names of `for (k, v) in e` the parts of the element at the
-   address at. A name of the copy form, and the key of the form
-   `for (k, v) in &e`, takes a copy of its part. Every other name of the
-   second form takes the address of its part. The element keeps its
-   teardown, and the names, which are read-only, take none. */
+   address at. An element lent whole gives each name the address of its
+   part. Any other element gives each name the value of its part: a copy,
+   or the lent pointer the value of the iterator holds there. The element
+   keeps its teardown, and the names, which are read-only, take none. */
 static void bind_pattern(struct lowerer *l, const struct stmt *s,
                          struct ir_operand at)
 {
@@ -424,7 +424,7 @@ static void bind_pattern(struct lowerer *l, const struct stmt *s,
         struct symbol *name = s->as.for_loop.names[i].symbol;
         struct ir_operand part = lower_offset_address(
             l, at, lower_field_offset(l, tuple, &tuple->fields[i].name));
-        if (s->as.for_loop.by_pointer && i > 0) {
+        if (s->as.for_loop.element->type->kind == TYPE_POINTER) {
             bind_loop_name(l, name, IR_PTR, part);
         } else if (lower_is_aggregate(name->type)) {
             ir_memcopy(l->f, l->b, lower_temp(l, name->ir), part,

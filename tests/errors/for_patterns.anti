@@ -30,7 +30,7 @@ fn main() -> int
 		b = 1;
 	}
 	for (a, b) in &pairs {
-		a = 1;
+		a = b;
 		*b = 1;
 	}
 	let zip = Zip { };

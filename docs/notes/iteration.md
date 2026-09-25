@@ -23,9 +23,14 @@ and iteration" in `docs/decisions.md`.
   in no scope that holds the whole element, or the lent pointer to it in
   the form `for (k, v) in &e`. Lowering binds `element` as it binds the
   variable of `for x in e`, and `bind_pattern` then gives each name its
-  part from the address of the element: a copy, or in the second form the
-  address of every part after the key. No pair is built, and only the
+  part from the address of the element. An element lent whole gives the
+  address of each part, and any other element the value of each part, a
+  copy or the lent pointer it holds. No pair is built, and only the
   element is torn down.
+- A `value` that returns a tuple with lent parts sets `place` to the call,
+  and `current` to `*` over it, a node the checker alone writes. Lowering
+  builds that node with `copy_parts_into`, which reads each lent part
+  through its pointer.
 - `e[x, y]` reaches the checker as an index node whose index is the tuple
   `(x, y)`, marked `several`. It becomes `e.index(x, y)`, and `e[x, y] = v`
   becomes `e.set_index(x, y, v);`.

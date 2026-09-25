@@ -99,6 +99,9 @@ struct checker {
        place, a parameter of it included. The signature of an `extern fn`
        is checked so. */
     int plain_fns;
+    /* Set while the result of an `operator fn value` resolves, where a
+       part of a tuple may be written `lent *T`. */
+    bool value_result;
     /* What a `lent` pointer refused where it stands would be: stored,
        returned or passed on. The message of the refusal names it. */
     enum lent_use lent_use;
@@ -248,6 +251,7 @@ bool sema_spell(struct text *out, const struct expr *e);
 struct type *sema_usable_pointer(struct checker *c, const struct expr *e,
                                  struct type *t);
 struct type *sema_whole_optional(struct type *t, struct expr *e);
+void sema_refuse_lent_tuple(struct checker *c, const struct expr *e);
 bool sema_require(struct checker *c, struct expr *e, struct type *got,
                   struct type *expected);
 bool sema_simd_numeric(const struct type *lane);

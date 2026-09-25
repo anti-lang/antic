@@ -1,8 +1,9 @@
 //! `for` with a tuple pattern over a collection, an iterator, a slice and an
 //! array whose elements are tuples. `for (k, v) in m` gives a copy of each
-//! part, and `for (k, v) in &m` gives the key as a copy and the value as a lent
-//! pointer, which changes the element in place. A pattern takes any number of
-//! parts, a closure captures a part and a generic walks with one.
+//! part. These collections lend each element whole, so `for (k, v) in &m` gives
+//! a lent pointer to every part, which changes the element in place. A pattern
+//! takes any number of parts, a closure captures a part and a generic walks
+//! with one.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

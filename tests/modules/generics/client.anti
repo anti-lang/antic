@@ -149,6 +149,13 @@ fn main() -> int
 	let tally: [2](str, int) = [("a", 3), ("b", 4)];
 	gen.bump(tally[0..2]);
 	printf("%d\n".ptr, gen.counted(tally[0..2]) as c_int);
+	let lent_tally = gen.Tally { };
+	for (key, count) in &lent_tally {
+		*count += key;
+	}
+	for (key, count) in lent_tally {
+		printf("%d %d\n".ptr, key as c_int, count as c_int);
+	}
 
 	let values = [7, 8];
 	let one = gen.first(values[0..2]) catch fatal;

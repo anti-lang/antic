@@ -725,10 +725,24 @@ static struct type_expr *type_level(struct parser *p)
 
         ty->kind = TYPEX_TUPLE;
         while (!check(p, TOKEN_RPAREN)) {
-            struct type_expr *element = type(p);
+            struct type_expr *element;
+            /* `(K, lent *V)`: `lent` is a contextual word, so a type of
+               that name still stands alone as an element. */
+            bool lent = is_word(p, peek(p), "lent") &&
+                        peek_at(p, 1)->kind != TOKEN_COMMA &&
+                        peek_at(p, 1)->kind != TOKEN_RPAREN;
+            struct pos lent_pos = pos_of(peek(p));
+            if (lent) {
+                next(p);
+            }
+            element = type(p);
             if (element == NULL) {
                 free(elements.data);
                 return NULL;
+            }
+            element->lent = lent;
+            if (lent) {
+                element->pos = lent_pos;
             }
             list_push(&elements, &element);
             if (!accept(p, TOKEN_COMMA)) {

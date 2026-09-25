@@ -1,0 +1,14 @@
+exit 0
+ann 42
+bob 31
+cy 8
+entry ann
+entry bob
+entry cy
+copy ann 52
+copy bob 41
+copy cy 18
+slice 3 18
+row 0 10
+row 1 20
+pairs 101 202 103 204

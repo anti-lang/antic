@@ -900,14 +900,36 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         return t->nullable ? types_with_none(c->types, fn) : fn;
     }
     case TYPEX_TUPLE: {
+        /* DESIGN: a part of a tuple is written `lent *T` in the result
+           of `operator fn value` alone, at the top level of the tuple.
+           A map whose keys and values stand apart gives `(K, lent *V)`,
+           and the loop binds what it gives. */
         struct type **elements =
             types_alloc_array(c->arena, t->param_count, sizeof *elements);
+        bool value_result = c->value_result;
+        c->value_result = false;
         for (i = 0; i < t->param_count; i++) {
             elements[i] = sema_resolve_type(c, t->params[i]);
+            if (!sema_is_error(elements[i]) && t->params[i]->lent &&
+                !value_result) {
+                sema_error_at(c, t->params[i]->pos, "`lent` stands before "
+                              "the result of `operator fn value` alone");
+                elements[i] = sema_builtin(c, TYPE_ERROR);
+            } else if (!sema_is_error(elements[i]) && t->params[i]->lent &&
+                       elements[i]->kind != TYPE_POINTER) {
+                sema_error_at(c, t->params[i]->pos, "`lent` marks a pointer "
+                              "part, and this one is `%s`",
+                              sema_tn(elements[i]));
+                elements[i] = sema_builtin(c, TYPE_ERROR);
+            } else if (!sema_is_error(elements[i]) && t->params[i]->lent) {
+                elements[i] = types_lent(c->types, elements[i]);
+            }
             if (sema_is_error(elements[i])) {
+                c->value_result = value_result;
                 return elements[i];
             }
         }
+        c->value_result = value_result;
         return types_tuple(c->types, elements, t->param_count);
     }
     case TYPEX_CHAN:
@@ -1186,8 +1208,13 @@ static struct type *function_type_of(struct checker *c, struct item *it)
             return sema_builtin(c, TYPE_ERROR);
         }
     }
-    if (it->result != NULL &&
-        sema_is_error(result = sema_resolve_type(c, it->result))) {
+    c->value_result = it->is_operator && it->result != NULL &&
+                      sema_name_is(&it->name, LANG_HOOK_VALUE);
+    if (it->result != NULL) {
+        result = sema_resolve_type(c, it->result);
+    }
+    c->value_result = false;
+    if (it->result != NULL && sema_is_error(result)) {
         return result;
     }
     if (it->result != NULL &&

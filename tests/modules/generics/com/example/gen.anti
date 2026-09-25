@@ -206,6 +206,36 @@ pub fn swap_corners<G: index + set_index>(g: G)
 	g[1, 1] = first;
 }
 
+/// Two keys and their counts in two arrays, which lends each count.
+pub class Tally
+{
+	pub keys: [2]int = [1, 2],
+	pub counts: [2]int = [10, 20],
+
+	operator fn iter(self) -> TallyIter
+	{
+		return TallyIter { tally: self, at: -1 };
+	}
+}
+
+/// Walks a `Tally`, giving each key and its count in place.
+pub class TallyIter
+{
+	pub tally: *Tally,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 2;
+	}
+
+	operator fn value(self) -> (int, lent *int)
+	{
+		return (self.tally.keys[self.at], &self.tally.counts[self.at]);
+	}
+}
+
 /// The sum of the counts of the pairs in items.
 pub fn counted<K>(items: [](K, int)) -> int
 {

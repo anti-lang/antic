@@ -1375,9 +1375,11 @@ static void unify(struct type *param, struct type *arg,
             arg = types_fn_form(map->types, arg, false, false);
         }
         /* A type argument is never `lent`, so a lent pointer at a
-           parameter of a type parameter meets the rule of `lent` there. */
+           parameter of a type parameter meets the rule of `lent` there.
+           So does a tuple that holds one. */
         if (map->types != NULL) {
-            arg = types_unlent(map->types, arg);
+            arg = types_unlent_parts(map->types,
+                                     types_unlent(map->types, arg));
         }
         for (i = 0; i < map->count; i++) {
             if (map->params[i] == param && map->args[i] == NULL &&

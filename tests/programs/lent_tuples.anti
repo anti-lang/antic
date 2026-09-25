@@ -1,0 +1,104 @@
+//! The iterator decides what `for x in &c` binds. A map that keeps its keys and
+//! its values in two arrays gives `(K, lent *V)`, so `for (k, v) in &m` gives a
+//! copy of the key and a lent pointer to the value. The parts of a pattern are
+//! what the value type says, in any position. `for x in &m` binds the tuple
+//! itself, and `for x in m` and `to_slice` take a copy of every part.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Keys and values in two arrays, as a B-tree node holds them.
+class Split
+{
+	pub keys: [3]str = ["ann", "bob", "cy"],
+	pub values: [3]int = [41, 30, 7],
+
+	operator fn iter(self) -> SplitIter
+	{
+		return SplitIter { map: self, at: -1 };
+	}
+}
+
+class SplitIter
+{
+	pub map: *Split,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 3;
+	}
+
+	operator fn value(self) -> (str, lent *int)
+	{
+		return (self.map.keys[self.at], &self.map.values[self.at]);
+	}
+}
+
+/// Three parts, the lent one last.
+class Rows
+{
+	pub counts: [2]int = [1, 2],
+
+	operator fn iter(self) -> RowsIter
+	{
+		return RowsIter { rows: self, at: -1 };
+	}
+}
+
+class RowsIter
+{
+	pub rows: *Rows,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 2;
+	}
+
+	operator fn value(self) -> (int, str, lent *int)
+	{
+		return (self.at, "row", &self.rows.counts[self.at]);
+	}
+}
+
+fn main() -> int
+{
+	let m = Split { };
+	for (k, v) in &m {
+		*v += 1;
+	}
+	for (k, v) in m {
+		printf("%.*s %d\n".ptr, k.len as c_int, k.ptr, v as c_int);
+	}
+	for e in &m {
+		*e.1 += 10;
+		printf("entry %.*s\n".ptr, e.0.len as c_int, e.0.ptr);
+	}
+	for e in m {
+		printf("copy %.*s %d\n".ptr, e.0.len as c_int, e.0.ptr, e.1 as c_int);
+	}
+	let all = m.iter().to_slice();
+	printf("slice %d %d\n".ptr, all.len as c_int, all[2].1 as c_int);
+	free(all.ptr);
+
+	let rows = Rows { };
+	for (n, label, count) in &rows {
+		*count *= 10;
+	}
+	for (n, label, count) in rows {
+		printf("%.*s %d %d\n".ptr, label.len as c_int, label.ptr, n as c_int,
+			count as c_int);
+	}
+
+	/* A slice lends each element in place, so every part is lent. */
+	let pairs: [2](int, int) = [(1, 2), (3, 4)];
+	for (a, b) in &pairs {
+		*a += 100;
+		*b += 200;
+	}
+	printf("pairs %d %d %d %d\n".ptr, pairs[0].0 as c_int, pairs[0].1 as c_int,
+		pairs[1].0 as c_int, pairs[1].1 as c_int);
+	return 0;
+}

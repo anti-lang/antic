@@ -509,7 +509,8 @@ add_test(NAME program_walk_forms_dev
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 # The default hash in dev mode, which writes it in each module apart, and
 # the patterns of `for`.
-foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived)
+foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived
+        lent_tuples)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -3139,6 +3140,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "index_several|-S,-o,${LISTINGS}/index_several.s,index_several.anti"
         "for_patterns|-S,-o,${LISTINGS}/for_patterns.s,for_patterns.anti"
         "lent_derived|-S,-o,${LISTINGS}/lent_derived.s,lent_derived.anti"
+        "lent_tuples|-S,-o,${LISTINGS}/lent_tuples.s,lent_tuples.anti"
         "walk_copy|-S,-o,${LISTINGS}/walk_copy.s,walk_copy.anti"
         "walk_lent|-S,-o,${LISTINGS}/walk_lent.s,walk_lent.anti"
         "fn_may_fail|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fn_may_fail.s,fn_may_fail.anti"

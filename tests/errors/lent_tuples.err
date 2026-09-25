@@ -1,0 +1,11 @@
+lent_tuples.anti:59:23: error: `lent` stands before the result of `operator fn value` alone
+lent_tuples.anti:40:35: error: `lent` marks a pointer part, and this one is `int`
+lent_tuples.anti:77:14: error: `e` holds a lent pointer, and a tuple that holds one is bound by its loop alone
+lent_tuples.anti:78:8: error: `e` holds a lent pointer, and a tuple that holds one is bound by its loop alone
+lent_tuples.anti:79:8: error: `e` holds a lent pointer, and a tuple that holds one is bound by its loop alone
+lent_tuples.anti:80:10: error: `e` holds a lent pointer, and a tuple that holds one is bound by its loop alone
+lent_tuples.anti:83:10: error: the value holds a lent pointer, and a tuple that holds one is bound by its loop alone
+lent_tuples.anti:84:19: error: `lent` stands before the result of `operator fn value` alone
+lent_tuples.anti:86:3: error: `k` is a copy that the iterator of `m` gives, so a change reaches no element
+lent_tuples.anti:87:3: error: `v` is the variable of a `for` and is read-only
+lent_tuples.anti:90:17: error: `for x in &e` takes each element in place, and the `operator fn value` of `Pairs` gives a copy of `(int, int)`
