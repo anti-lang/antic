@@ -738,7 +738,40 @@ export type PersonList = List<Person>;
 
 Type arguments are inferred from the arguments of a call and written out where nothing gives them. In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows and the token after it is `(`, `.` or `{`, so `a < b > c` stays two comparisons. `>>` closes two lists. Every use with concrete arguments gets its own compiled copy, with no boxing, and two uses with the same arguments are one type in every module. The whole-program pass merges copies whose code is identical. A method with type parameters of its own is called directly and never stands in the table, so it cannot be `abstract` or replaced. A library file stores a generic as its checked syntax tree with its parameters open, and each use lowers that tree with its arguments. C sees no open generic: `export type PersonList = List<Person>;` writes a copy into the header as an exported class, and a generic `export fn` is refused.
 
-Built: the syntax of generics and its checks. Type parameters in `<>` on functions, structs, classes, variants, interfaces and the functions of a class body, `N: int`, type arguments in every type, the rule of C# in an expression with the refusal of a name that is not generic, and `>>` closing two lists. `constraint` and `type` are built, and `export type` is checked. The checker infers the type arguments of a call from its arguments. A generic that nothing uses compiles to nothing. `tests/dump/generics.anti` and `tests/errors/generics.anti` hold the forms and the refusals. The constraints are built: hooks, interfaces, `+`, named sets and `Number` of `anti.lang`, the check of a body where it is written and of every use where it stands, and what a parameter without constraints allows. `tests/dump/constraints.anti` and `tests/errors/constraints.anti` hold both sides. The compiled copies are built for the generics of the module's own source: one copy per use with concrete arguments, `size_of(T)` per copy, a descriptor per copy of a class, link-once copies in a dev build and the whole-program merge of identical copies in a release build. `tests/programs/generic_copies.anti` runs in both modes. A generic, a `type` and a `constraint` in a library file are built. The file carries the checked tree of every generic, a module that uses one makes its copies from it, and one copy is one type across modules. `export type` writes its copy into the C header as an exported class, and `anti doc` shows the parameters of a generic with their constraints. `tests/modules/generics/` runs a program and two libraries in both modes, and `clib_generics` calls a named copy from C. Not built yet: the cache of copies in a dev build. A function of a class with type parameters of its own is refused at its first call. `Ordered` of `anti.lang` is not built either.
+A type nested in a generic class sees the parameters of the class, and each copy of the class has a copy of it. A generic class may be `synchronized` or `concurrent`, and its rules hold in every copy. A generic `worker fn` is checked against the rules of workers in every copy, with the concrete types. A generic type declares language hooks, so `for x in list` works for every copy of a `List<T>` with `operator fn iter`. A generic function may be `may fail`. Function types, closures and snapshots appear as type arguments, `List<fn(int) -> int>`, under the rules of `keep` and `concurrent`.
+
+```anti
+class Stack<T>
+{
+	struct Node { value: T, next: ?*Node, }
+
+	head: ?*Node = none,
+
+	pub fn push(self, v: T)
+	{
+		self.head = alloc Node { value: v, next: self.head };
+	}
+
+	pub fn top<U>(self, fallback: T, f: fn(T) -> U) -> U
+	{
+		let h = self.head else {
+			return f(fallback);
+		};
+		return f(h.value);
+	}
+}
+
+worker fn total<T: add>(chunk: []T, zero: T) -> T
+{
+	let sum = zero;
+	for x in chunk {
+		sum = sum + x;
+	}
+	return sum;
+}
+```
+
+Built: the syntax of generics and its checks. Type parameters in `<>` on functions, structs, classes, variants, interfaces and the functions of a class body, `N: int`, type arguments in every type, the rule of C# in an expression with the refusal of a name that is not generic, and `>>` closing two lists. `constraint` and `type` are built, and `export type` is checked. The checker infers the type arguments of a call from its arguments. A generic that nothing uses compiles to nothing. `tests/dump/generics.anti` and `tests/errors/generics.anti` hold the forms and the refusals. The constraints are built: hooks, interfaces, `+`, named sets and `Number` of `anti.lang`, the check of a body where it is written and of every use where it stands, and what a parameter without constraints allows. `tests/dump/constraints.anti` and `tests/errors/constraints.anti` hold both sides. The compiled copies are built for the generics of the module's own source: one copy per use with concrete arguments, `size_of(T)` per copy, a descriptor per copy of a class, link-once copies in a dev build and the whole-program merge of identical copies in a release build. `tests/programs/generic_copies.anti` runs in both modes. A generic, a `type` and a `constraint` in a library file are built. The file carries the checked tree of every generic, a module that uses one makes its copies from it, and one copy is one type across modules. `export type` writes its copy into the C header as an exported class, and `anti doc` shows the parameters of a generic with their constraints. `tests/modules/generics/` runs a program and two libraries in both modes, and `clib_generics` calls a named copy from C. What can be generic and the other features with generics are built for the generics of the module's own source. `N: int` sizes a type and reads as a value. A function of a class with type parameters of its own compiles a copy per class and argument and stands in no table. A type nested in a generic class has a copy per copy of the class. Synchronized and concurrent generic classes keep their rules in every copy, and `parallel` and `dispatch` check a generic worker in every copy. Hooks in generic types, generic `may fail` functions, function types as type arguments and generic variants are built. `tests/programs/generic_constants.anti`, `generic_methods.anti`, `generic_nested.anti`, `generic_sync.anti`, `generic_hooks.anti`, `generic_may_fail.anti`, `generic_fn_args.anti` and `generic_variants.anti` run in both modes, and `tests/errors/generic_copies.anti` holds the refusals of a copy. Not built yet: the cache of copies in a dev build. A library file carries no function of a class with type parameters of its own and no type nested in a generic class. `Ordered` of `anti.lang` is not built either.
 
 ## Ownership
 
@@ -1414,7 +1447,7 @@ Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.
 
 ## Later
 
-Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it. The syntax of generics, its constraints, the compiled copies and the generics of library files and of C are built, and none of the rest. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
+Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it. The syntax of generics, its constraints, the compiled copies, the generics of library files and of C, what can be generic and the other features with generics are built, and none of the rest. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
 
 ## Reserved words
 

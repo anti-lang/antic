@@ -246,9 +246,10 @@ sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
 four are built. Then generics and closures. Closures are built, `snapshot fn`
 included. Round five, generics and collections, stands in the same document.
-Its first four parts, the syntax of generics, the constraints, the
-compiled copies and the generics of library files and of C, are built, and
-none of the rest.
+Its first six parts, the syntax of generics, the constraints, the
+compiled copies, the generics of library files and of C, what can be
+generic and the other features with generics, are built, and none of the
+rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -517,8 +518,11 @@ reports what it finished.
   carries the checked tree of every generic, and a module that uses one
   makes its copies from it under the path of the generic's module.
   `export type` writes a copy into the C header, and `anti doc` shows
-  generics. See "Generics and collections" in `docs/decisions.md` and
-  `docs/notes/generics.md`.
+  generics. A function of a class with type parameters of its own, a type
+  nested in a generic class, generic synchronized and concurrent classes and
+  generic workers compile for the module's own source, and a library file
+  carries neither of the first two yet. See "Generics and collections" in
+  `docs/decisions.md` and `docs/notes/generics.md`.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
   See "Small things" in `docs/decisions.md`.
