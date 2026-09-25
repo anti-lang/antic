@@ -23,6 +23,8 @@ clear 0 true {} -1
 after clear {1: 1}
 {{"month": 1, "day": 1}: "New Year", {"month": 5, "day": 1}: "May Day", {"month": 12, "day": 25}: "Christmas"}
 [[{"month":1,"day":1},"New Year"],[{"month":5,"day":1},"May Day"],[{"month":12,"day":25},"Christmas"]][["a",1],["b",2]]
+{"Ann": 41, "Bob": 7}
+{"Ann":41,"Bob":7}
 after June: Christmas
 {1: one, 2: other, 3: one}
 replaced with 5, torn 1, copy 1

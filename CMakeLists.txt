@@ -391,7 +391,7 @@ endif()
 
 # The standard library in src/std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
-set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection collection/sorted toml config args json log simd trace plugin)
+set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection toml config args json log simd trace plugin)
 set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/std/anti")
 # Every .anti file under src/std/anti/collection/ is a module of its own,
 # found here and never listed. They compile after anti.collection, each

@@ -273,6 +273,13 @@ fn texts()
 	letters.set('a', 1);
 	letters.serialize(&out);
 	show(out.take());
+	let ages = SortedMap<str, int>.new();
+	ages.set("Bob", 7);
+	ages.set("Ann", 41);
+	show(ages.to_text());
+	let named = text.Builder.new();
+	ages.serialize(&named);
+	show(named.take());
 	let later = days.ceiling(Date { month: 6, day: 1 }) ?? (Date { month: 0, day: 0 }, "");
 	show(f"after June: {later.1}");
 }
