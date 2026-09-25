@@ -1147,6 +1147,7 @@ struct ir_operand lower_construct(struct lowerer *l,
     const struct item *m = NULL;
     uint32_t result;
     bool fails;
+    size_t count;
     size_t i;
 
     ir_store(l->f, l->b, IR_PTR,
@@ -1158,6 +1159,18 @@ struct ir_operand lower_construct(struct lowerer *l,
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *field = &up->fields[i];
+            /* An `own fn` field holds no snapshot before `construct`
+               runs, since `=` into it frees the one it held. The memory
+               of a local or of `malloc` holds whatever it held. */
+            if (!lower_has_default(field) && field->type->kind == TYPE_FN &&
+                field->type->owned) {
+                struct ir_operand at = lower_offset_address(
+                    l, dest, lower_field_offset(l, up, &field->name));
+                ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
+                ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
+                         lower_context_word(l, field->type, at));
+                continue;
+            }
             if (!lower_has_default(field)) {
                 continue;
             }
@@ -1177,17 +1190,24 @@ struct ir_operand lower_construct(struct lowerer *l,
         lower_hook_object(l, HOOK_CREATED, dest);
         return lower_none();
     }
-    args = ir_alloc(e->as.call.arg_count + 1, sizeof *args);
+    args = ir_alloc(2 * e->as.call.arg_count + 1, sizeof *args);
     args[0] = dest;
+    count = 1;
+    /* An argument at a parameter of the form of two words, a `keep own`
+       one among them, passes as two words, as at any call. */
     for (i = 0; i < e->as.call.arg_count; i++) {
-        args[i + 1] = lower_argument(l, e->as.call.args[i]);
+        const struct type *sig = m->symbol->type;
+        struct ir_operand value = lower_argument(l, e->as.call.args[i]);
+        lower_push_argument(l, args, &count, value,
+                            i + 1 < sig->param_count ? sig->params[i + 1]
+                                                     : NULL);
     }
     /* A `construct` that may fail returns `?*Error`, which the checker
        gave its type. One that cannot fail returns nothing. */
     fails = m->symbol->type->result->kind != TYPE_VOID;
     result = ir_call(l->f, l->b, fails ? IR_PTR : IR_VOID,
                      ir_func_op(lower_callee_function(l, m->symbol)), args,
-                     e->as.call.arg_count + 1);
+                     count);
     free(args);
     if (!fails) {
         lower_hook_object(l, HOOK_CREATED, dest);

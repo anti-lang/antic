@@ -1,0 +1,39 @@
+//! A `construct` that takes a `keep own` function receives its two words, the
+//! code and the snapshot, from `T(args)` and `alloc T(args)` as from any call.
+//! The object owns the snapshot and frees it with itself.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_rt_snapshots_alive() -> int;
+
+class Slot
+{
+	own f: fn(int) -> int,
+
+	fn construct(self, keep own f: fn(int) -> int)
+	{
+		self.f = f;
+	}
+
+	pub fn run(self, v: int) -> int
+	{
+		return self.f(v);
+	}
+}
+
+fn main() -> int
+{
+	let k = 10;
+	let slot = alloc Slot(snapshot fn(x: int) -> int { return x + k; });
+	k = 20;
+	printf("%d %d\n".ptr, slot.run(5) as c_int,
+		anti_rt_snapshots_alive() as c_int);
+	delete(slot);
+	printf("%d\n".ptr, anti_rt_snapshots_alive() as c_int);
+	{
+		let local = Slot(snapshot fn(x: int) -> int { return x * k; });
+		printf("%d %d\n".ptr, local.run(2) as c_int,
+			anti_rt_snapshots_alive() as c_int);
+	}
+	printf("%d\n".ptr, anti_rt_snapshots_alive() as c_int);
+	return 0;
+}
