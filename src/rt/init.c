@@ -11,6 +11,7 @@ int anti_rt_option_backtrace = -1;
 
 void anti_rt_init(void)
 {
+    anti_rt_hash_seed_start();
     anti_rt_atomic_store(&ready, (int64_t)sizeof ready, 1);
 }
 

@@ -14,6 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#if !defined(__APPLE__)
+#include <sys/random.h>
+#endif
 
 #include "platform.h"
 #include "std.h"
@@ -92,6 +95,26 @@ const char *anti_rt_library_error(char *text, size_t size)
     (void)text;
     (void)size;
     return reason != NULL ? reason : "cannot open the file";
+}
+
+int anti_rt_entropy(void *out, size_t count)
+{
+#if defined(__APPLE__)
+    arc4random_buf(out, count);
+    return 0;
+#else
+    unsigned char *at = out;
+
+    while (count > 0) {
+        ssize_t n = getrandom(at, count, 0);
+        if (n <= 0) {
+            return -1;
+        }
+        at += n;
+        count -= (size_t)n;
+    }
+    return 0;
+#endif
 }
 
 /* DESIGN: the monotonic clock never moves backwards and has no relation

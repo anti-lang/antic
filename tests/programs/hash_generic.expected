@@ -1,0 +1,9 @@
+exit 0
+int 1
+str 1
+struct 1
+box 1000
+class 15
+tuple 1 1
+holder 1 0
+ordered 9 3 1

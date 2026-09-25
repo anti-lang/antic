@@ -933,7 +933,8 @@ bool sema_operator_named(const struct name *name)
     static const char *const names[] = {
         "add", "sub", "mul", "div", "rem", "neg", "eq",
         "lt", "and", "or", "xor", "shl", "shr", "not",
-        LANG_HOOK_ITER, LANG_HOOK_NEXT, LANG_HOOK_VALUE, LANG_HOOK_INDEX, LANG_HOOK_SET_INDEX
+        LANG_HOOK_ITER, LANG_HOOK_NEXT, LANG_HOOK_VALUE, LANG_HOOK_INDEX,
+        LANG_HOOK_SET_INDEX, LANG_HOOK_HASH
     };
     size_t i;
 
@@ -956,6 +957,13 @@ struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
     return operator_symbol(c, t, text);
 }
 
+/* Whether sym is a function written `operator fn`, of this module or of
+   a library file. */
+static bool symbol_is_operator(const struct symbol *sym)
+{
+    return sym->item != NULL ? sym->item->is_operator : sym->is_operator;
+}
+
 static struct symbol *operator_symbol(struct checker *c, struct type *t,
                                       const char *text)
 {
@@ -973,7 +981,7 @@ static struct symbol *operator_symbol(struct checker *c, struct type *t,
         return m->symbol;
     }
     sym = sema_method_symbol(c, t, &name);
-    if (sym != NULL && sym->item != NULL && sym->item->is_operator) {
+    if (sym != NULL && symbol_is_operator(sym)) {
         return sym;
     }
     return NULL;
@@ -1013,7 +1021,7 @@ struct symbol *sema_hook(struct checker *c, struct type *t, const char *text)
         return m->kind == ITEM_FN && m->is_operator ? m->symbol : NULL;
     }
     sym = sema_method_symbol(c, t, &name);
-    if (sym == NULL || sym->item == NULL || !sym->item->is_operator ||
+    if (sym == NULL || !symbol_is_operator(sym) ||
         sym->type == NULL || sym->type->kind != TYPE_FN ||
         sym->type->param_count == 0) {
         return NULL;

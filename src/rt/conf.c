@@ -37,6 +37,7 @@ struct key {
 /* The keys of [runtime], in the order --anti.inspect prints them. */
 static struct key keys[] = {
     {"backtrace", NULL, 0, NULL, LAYER_BUILD},
+    {"hash_seed", NULL, 0, NULL, LAYER_BUILD},
     {"logger", NULL, 0, NULL, LAYER_BUILD},
     {"plugins", NULL, 0, NULL, LAYER_BUILD},
     {"threads", NULL, 0, NULL, LAYER_BUILD},
@@ -55,6 +56,7 @@ struct option {
 static const struct option options[] = {
     {"backtrace", "[=true|false]", "capture the frames of an error"},
     {"conf", "=<path>", "read the configuration file"},
+    {"hash_seed", "=<number>", "the seed of the hashing collections"},
     {"help", "", "print these options and end"},
     {"inject", "=<interface>=<path>", "take an interface from a library"},
     {"inspect", "", "print the effective configuration and end"},
@@ -187,6 +189,27 @@ static int same_word(const char *text, size_t length, const char *word)
     return strlen(word) == length && memcmp(text, word, length) == 0;
 }
 
+/* The seed that value, of length bytes, names in decimal digits, into
+   *out. Returns 0 when it holds anything else or passes UINT64_MAX. */
+static int seed_of(const char *value, size_t length, uint64_t *out)
+{
+    uint64_t n = 0;
+    size_t i;
+
+    if (length == 0) {
+        return 0;
+    }
+    for (i = 0; i < length; i++) {
+        unsigned digit = (unsigned)(unsigned char)value[i] - '0';
+        if (digit > 9 || n > (UINT64_MAX - digit) / 10) {
+            return 0;
+        }
+        n = n * 10 + digit;
+    }
+    *out = n;
+    return 1;
+}
+
 /* Take the value, of length bytes, into the key, unless a higher layer
    named it. `where` names the option or the line of the file, for a
    message about a value the key does not take. */
@@ -194,6 +217,7 @@ static void set_key(struct key *k, const char *value, size_t length,
                     enum layer layer, const char *source, const char *where)
 {
     int on = same_word(value, length, "true");
+    uint64_t seed = 0;
     struct retired *old;
     char *kept;
 
@@ -204,6 +228,12 @@ static void set_key(struct key *k, const char *value, size_t length,
         if (!on && !same_word(value, length, "false")) {
             startup_error("%s takes true or false, found %.*s", where,
                           (int)length, value);
+        }
+    } else if (strcmp(k->name, "hash_seed") == 0) {
+        if (!seed_of(value, length, &seed)) {
+            startup_error("%s takes a number from 0 to %llu, found %.*s",
+                          where, (unsigned long long)UINT64_MAX, (int)length,
+                          value);
         }
     } else if (strcmp(k->name, "threads") == 0) {
         struct anti_text text;
@@ -238,6 +268,8 @@ static void set_key(struct key *k, const char *value, size_t length,
             anti_rt_atomic_store(&anti_rt_option_backtrace,
                                  (int64_t)sizeof anti_rt_option_backtrace,
                                  on);
+        } else if (strcmp(k->name, "hash_seed") == 0) {
+            anti_rt_hash_seed_set(seed);
         }
     }
     release();

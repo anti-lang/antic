@@ -351,6 +351,16 @@ struct expr {
             struct type **copy_args;
             const struct symbolic **copy_values;
             size_t copy_count;
+            /* DESIGN: `x.hash()` on a type without a hash function of
+               its own is the default hash of x, which lowering writes
+               from the type. A struct, a variant or a class value inside
+               x that has a function of its own is hashed by it. Each such
+               type has one checked call in hash_calls, whose callee names
+               the function, and a copy of a generic names its copy there.
+               Set by the checker. */
+            bool hashes;
+            struct expr **hash_calls;
+            size_t hash_count;
         } call;
         struct {
             struct expr *base;

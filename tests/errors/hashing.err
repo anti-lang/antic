@@ -1,0 +1,6 @@
+hashing.anti:29:9: error: `plain` uses `hash` on `T`, which its constraints do not give. Add `hash` to them
+hashing.anti:35:9: error: `wrapped` uses `hash` on `T`, which its constraints do not give. Add `hash` to them
+hashing.anti:40:9: error: `total` uses `+` on `T`, which its constraints do not give. Add `add` to them
+hashing.anti:54:10: error: `Point` has no `eq`, which `larger` needs for `T`
+hashing.anti:22:13: error: `operator fn hash` is written `operator fn hash(p: Point) -> u64`
+hashing.anti:11:14: error: a class replaces `hash` of `Object` with `concrete fn hash(self) -> u64`

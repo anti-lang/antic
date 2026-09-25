@@ -200,9 +200,9 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # builds both read it, so a new source reaches every target at once.
 # license_stub.c is not here, because it sits beside the library.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
-    errno f16 fs hooks init io json license loaded lock mem object platform_posix
-    platform_windows plugin reflect registry signal snapshot start symbols sync
-    text threads toml trace utf)
+    errno f16 fs hash hooks init io json license loaded lock mem object
+    platform_posix platform_windows plugin reflect registry signal snapshot start
+    symbols sync text threads toml trace utf)
 set(anti_rt_files "")
 foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
     list(APPEND anti_rt_files "src/rt/${source}.c")
@@ -337,6 +337,7 @@ function(anti_cross_runtime_at target triple level root)
                 "${PROJECT_SOURCE_DIR}/src/rt/reflect.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/registry.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/digest.h"
+                "${PROJECT_SOURCE_DIR}/src/rt/hash.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/signal.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/symbols.h"
                 "${PROJECT_SOURCE_DIR}/src/rt/toml.h"

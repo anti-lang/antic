@@ -1,0 +1,122 @@
+//! The default hash of a struct takes its fields in order, each by its own
+//! hash, so two structs with equal fields hash alike and the order of the
+//! fields counts. A field of a struct with `operator fn hash` goes through that
+//! function, and a class value through the `hash` of its class. A class hashes
+//! the fields its descriptor lists by default and replaces that with `concrete
+//! fn hash`. A pointer to a struct reaches the struct, as the call of a method
+//! does.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// A name whose hash reads the length alone, so names of one length collide.
+struct Name
+{
+	text: str,
+}
+
+operator fn hash(n: Name) -> u64
+{
+	return n.text.len as u64;
+}
+
+operator fn eq(a: Name, b: Name) -> bool
+{
+	return a.text.len == b.text.len;
+}
+
+class Counter
+{
+	pub count: int = 0,
+	pub label: int = 0,
+}
+
+class Tally inherits Counter
+{
+	pub extra: int = 0,
+}
+
+class Badge
+{
+	pub number: int = 0,
+
+	concrete fn hash(self) -> u64
+	{
+		return self.number as u64 + 100;
+	}
+}
+
+struct Entry
+{
+	name: Name,
+	at: Point,
+	counter: Counter,
+	badge: Badge,
+	weight: f64,
+	flags: u8 : 3,
+	level: u8 : 5,
+}
+
+fn same(a: u64, b: u64) -> c_int
+{
+	return (a == b) as c_int;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1, y: 2 };
+	let q = Point { x: 1, y: 2 };
+	let r = Point { x: 2, y: 1 };
+	printf("point %016llx\n".ptr, p.hash());
+	printf("fields %d %d\n".ptr, same(p.hash(), q.hash()), same(p.hash(),
+		r.hash()));
+	let at = &p;
+	printf("through %d\n".ptr, same(at.hash(), p.hash()));
+
+	let ada = Name { text: "ada" };
+	let bob = Name { text: "bob" };
+	printf("own %llu %d %d\n".ptr, ada.hash(), (ada == bob) as c_int,
+		same(ada.hash(), bob.hash()));
+
+	let c = Counter { count: 3, label: 4 };
+	let d = Counter { count: 3, label: 4 };
+	let e = Counter { count: 4, label: 3 };
+	printf("class %d %d %d\n".ptr, c.equals(&d) as c_int, same(c.hash(),
+		d.hash()), same(c.hash(), e.hash()));
+	let t = Tally { count: 1, label: 2, extra: 3 };
+	let u = Tally { count: 1, label: 2, extra: 3 };
+	let w = Tally { count: 1, label: 2, extra: 4 };
+	printf("chain %d %d %d\n".ptr, t.equals(&u) as c_int, same(t.hash(),
+		u.hash()), same(t.hash(), w.hash()));
+	let b = Badge { number: 7 };
+	printf("badge %llu\n".ptr, b.hash());
+
+	let one = Entry {
+		name: Name { text: "ada" }, at: Point { x: 1, y: 2 },
+		counter: Counter { count: 3, label: 4 }, badge: Badge { number: 7 },
+		weight: 0.0, flags: 5, level: 9
+	};
+	let two = Entry {
+		name: Name { text: "bob" }, at: Point { x: 1, y: 2 },
+		counter: Counter { count: 3, label: 4 }, badge: Badge { number: 7 },
+		weight: -0.0, flags: 5, level: 9
+	};
+	let three = Entry {
+		name: Name { text: "ada" }, at: Point { x: 1, y: 2 },
+		counter: Counter { count: 3, label: 4 }, badge: Badge { number: 8 },
+		weight: 0.0, flags: 5, level: 9
+	};
+	let four = Entry {
+		name: Name { text: "ada" }, at: Point { x: 1, y: 2 },
+		counter: Counter { count: 3, label: 4 }, badge: Badge { number: 7 },
+		weight: 0.0, flags: 5, level: 10
+	};
+	printf("entry %d %d %d\n".ptr, same(one.hash(), two.hash()),
+		same(one.hash(), three.hash()), same(one.hash(), four.hash()));
+	return 0;
+}

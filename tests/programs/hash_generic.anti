@@ -1,0 +1,97 @@
+//! `hash` as a constraint. A generic with `T: hash` hashes a value of `T`, and
+//! each copy hashes as code written for its type does: the hash of an `int`,
+//! the text of a `str`, the function of a struct that has one, the default of a
+//! struct, and the class of an object reached through a pointer. A tuple that
+//! holds a `T` takes its default hash in the copy. A struct with a generic
+//! `operator fn hash` is hashed through its copy inside the default hash of
+//! another struct. `Ordered` of `anti.lang` gives `==` and `<`, named bare and
+//! as `lang.Ordered`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+struct Box<T>
+{
+	item: T,
+}
+
+operator fn hash<T: hash>(b: Box<T>) -> u64
+{
+	return b.item.hash() + 1000;
+}
+
+struct Holder
+{
+	box: Box<int>,
+	at: Point,
+}
+
+class Counter
+{
+	pub count: int = 0,
+
+	concrete fn hash(self) -> u64
+	{
+		return self.count as u64 * 3;
+	}
+}
+
+fn key<T: hash>(v: T) -> u64
+{
+	return v.hash();
+}
+
+fn with_one<T: hash>(v: T) -> u64
+{
+	let t = (v, 1);
+	return t.hash();
+}
+
+fn larger<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn smaller<T: lang.Ordered>(a: T, b: T) -> T
+{
+	if a < b || a == b {
+		return a;
+	}
+	return b;
+}
+
+fn same(a: u64, b: u64) -> c_int
+{
+	return (a == b) as c_int;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1, y: 2 };
+	let c = Counter { count: 5 };
+	printf("int %d\n".ptr, same(key(5), (5).hash()));
+	printf("str %d\n".ptr, same(key("word"), "word".hash()));
+	printf("struct %d\n".ptr, same(key(p), p.hash()));
+	printf("box %llu\n".ptr, key(Box<int> { item: 3 }) - (3).hash());
+	printf("class %llu\n".ptr, key(&c));
+	printf("tuple %d %d\n".ptr, same(with_one(p), (p, 1).hash()),
+		same(with_one(Box<int> { item: 3 }), (Box<int> { item: 3 },
+		1).hash()));
+	let h = Holder { box: Box<int> { item: 3 }, at: p };
+	let g = Holder { box: Box<int> { item: 4 }, at: p };
+	printf("holder %d %d\n".ptr, same(h.hash(), h.hash()), same(h.hash(),
+		g.hash()));
+	printf("ordered %d %d %d\n".ptr, larger(3, 9) as c_int, smaller(3, 9) as
+		c_int, (larger('a', 'b') == 'b') as c_int);
+	return 0;
+}

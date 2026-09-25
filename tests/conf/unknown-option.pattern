@@ -1,1 +1,1 @@
-anti: --anti\.nonsense is no option of the runtime, which takes --anti\.backtrace, --anti\.conf, --anti\.help, --anti\.inject, --anti\.inspect, --anti\.logger, --anti\.plugins, --anti\.threads and --anti\.trace
+anti: --anti\.nonsense is no option of the runtime, which takes --anti\.backtrace, --anti\.conf, --anti\.hash_seed, --anti\.help, --anti\.inject, --anti\.inspect, --anti\.logger, --anti\.plugins, --anti\.threads and --anti\.trace

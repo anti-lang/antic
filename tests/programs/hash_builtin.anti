@@ -1,0 +1,103 @@
+//! `x.hash()` on every built-in type. Two values that are equal by `==` hash
+//! alike: an integer of each width, `bool`, `char`, an enum, a float of each
+//! width with zero of either sign, a pointer and a `?*T` to the same place, a
+//! function value, and a `str` whose bytes stand at two addresses. A value made
+//! of parts takes them in order: a `?T`, an array, a slice, a tuple and a
+//! variant. The hash of a scalar and of a text is the same on every target, so
+//! the first lines pin the values themselves.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Color { Red, Green, Blue }
+
+variant Shape { Circle { r: f32 }, Rect { w: int, h: int }, Empty }
+
+fn same(a: u64, b: u64) -> c_int
+{
+	return (a == b) as c_int;
+}
+
+fn twice(x: int) -> int
+{
+	return x * 2;
+}
+
+fn main() -> int
+{
+	printf("5 %016llx\n".ptr, (5).hash());
+	printf("ab %016llx\n".ptr, "ab".hash());
+	printf("empty %016llx\n".ptr, "".hash());
+
+	let small: i8 = -1;
+	let other: i8 = -1;
+	let wide: u16 = 7;
+	let cl: c_long = 9;
+	printf("integers %d %d %d %d\n".ptr, same(small.hash(), other.hash()),
+		same(wide.hash(), (7 as u16).hash()), same(cl.hash(),
+		(9 as c_long).hash()), same((1).hash(), (2).hash()));
+	printf("bool %d %d\n".ptr, same(true.hash(), true.hash()),
+		same(true.hash(), false.hash()));
+	printf("char %d %d\n".ptr, same('a'.hash(), 'a'.hash()), same('a'.hash(),
+		'b'.hash()));
+	printf("enum %d %d\n".ptr, same(Color.Red.hash(), Color.Red.hash()),
+		same(Color.Red.hash(), Color.Blue.hash()));
+
+	let zero = 0.0;
+	let negative = -0.0;
+	let half: f32 = 0.5;
+	let quiet: f32 = -0.0;
+	let loud: f32 = 0.0;
+	let h1: f16 = -0.0 as f16;
+	let h2: f16 = 0.0 as f16;
+	printf("floats %d %d %d %d %d\n".ptr, (zero == negative) as c_int,
+		same(zero.hash(), negative.hash()), same(quiet.hash(), loud.hash()),
+		same(h1.hash(), h2.hash()), same(half.hash(), loud.hash()));
+
+	let n = 5;
+	let p: *int = &n;
+	let q: ?*int = &n;
+	let nothing: ?*int = none;
+	let f = twice;
+	printf("pointers %d %d %d\n".ptr, same(p.hash(), q.hash()),
+		same(nothing.hash(), nothing.hash()), same(f.hash(), twice.hash()));
+
+	/* The same bytes at two addresses. */
+	let sentence = "say hello";
+	let word = sentence[4..9];
+	printf("text %d %d %d\n".ptr, (word.ptr != "hello".ptr) as c_int,
+		same("hello".hash(), word.hash()), same("hello".hash(),
+		"hellO".hash()));
+
+	let one: ?int = 4;
+	let two: ?int = 4;
+	let none_one: ?int = none;
+	let none_two: ?int = none;
+	printf("optional %d %d %d\n".ptr, same(one.hash(), two.hash()),
+		same(none_one.hash(), none_two.hash()), same(one.hash(),
+		none_one.hash()));
+
+	let a: [3]int = [1, 2, 3];
+	let b: [3]int = [1, 2, 3];
+	let c: [3]int = [3, 2, 1];
+	printf("array %d %d\n".ptr, same(a.hash(), b.hash()), same(a.hash(),
+		c.hash()));
+	printf("slice %d %d\n".ptr, same(a[0..2].hash(), b[0..2].hash()),
+		same(a[0..2].hash(), a[1..3].hash()));
+	let bytes: [2]byte = [1, 2];
+	let more: [2]byte = [1, 2];
+	printf("bytes %d\n".ptr, same(bytes.hash(), more.hash()));
+
+	let t = (1, "a", 2.5);
+	let u = (1, "a", 2.5);
+	let v = ("a", 1, 2.5);
+	printf("tuple %d %d\n".ptr, same(t.hash(), u.hash()), same(t.0.hash(),
+		v.1.hash()));
+
+	let r = Shape.Rect { w: 2, h: 3 };
+	let s = Shape.Rect { w: 2, h: 3 };
+	let flipped = Shape.Rect { w: 3, h: 2 };
+	let empty = Shape.Empty;
+	printf("variant %d %d %d\n".ptr, same(r.hash(), s.hash()), same(r.hash(),
+		flipped.hash()), same(empty.hash(), Shape.Empty.hash()));
+	return 0;
+}

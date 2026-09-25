@@ -1586,6 +1586,19 @@ bool type_has_fields(const struct type *t)
                          t->kind == TYPE_OPTIONAL);
 }
 
+const struct type *types_hash_call_type(const struct expr *call)
+{
+    const struct expr *callee = call->as.call.callee;
+    const struct type *first;
+
+    if (callee->kind != EXPR_NAME || callee->type == NULL ||
+        callee->type->kind != TYPE_FN || callee->type->param_count == 0) {
+        return NULL;
+    }
+    first = callee->type->params[0];
+    return first->kind == TYPE_POINTER ? first->element : first;
+}
+
 bool type_field_is_unit_break(const struct struct_field *f)
 {
     return f->name.length == 1 && f->name.text[0] == '_';

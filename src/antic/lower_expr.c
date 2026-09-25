@@ -2012,7 +2012,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
        the arguments are lowered. A failing call among them sets the out
        address of its own slot, which is no place of this call. */
     struct ir_operand out = l->out_address;
-    struct ir_operand target = lower_none();
+    struct ir_operand target;
     struct ir_operand bound = lower_none();
     struct ir_operand context = lower_none();
     struct ir_operand *args;
@@ -2022,6 +2022,10 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     size_t given;
     size_t i;
 
+    if (e->as.call.hashes) {
+        return lower_hash(l, e);
+    }
+    target = lower_none();
     /* The callee comes before the arguments, from left to right. A
        bound function gives its object as the first argument and its
        entry as the target. A function with its context gives its code

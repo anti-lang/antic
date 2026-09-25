@@ -52,6 +52,11 @@ void anti_rt_library_close(void *handle);
 void *anti_rt_library_symbol(void *handle, const char *name);
 const char *anti_rt_library_error(char *text, size_t size);
 
+/* Fill the count bytes at out from the random source of the system:
+   arc4random on macOS, getrandom on Linux and rand_s on Windows. Returns
+   0, or -1 when the system gave fewer bytes. */
+int anti_rt_entropy(void *out, size_t count);
+
 /* DESIGN: a Sleep of Windows takes 32 bits of milliseconds, and the
    largest of them means to wait for ever. A long wait is therefore a
    loop of steps of at most a day. A step rounds up to the whole

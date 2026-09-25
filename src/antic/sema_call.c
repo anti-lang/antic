@@ -2402,6 +2402,18 @@ static struct type *check_call(struct checker *c, struct expr *e,
         if (sema_is_error(base)) {
             return base;
         }
+        /* `x.hash()` on a type without a function of that name is its
+           default hash, and on a type parameter the hook. */
+        if (e->as.call.arg_count == 0 &&
+            sema_name_is(&callee->as.field.name, LANG_HOOK_HASH) &&
+            (base->kind == TYPE_PARAM || sema_struct_of(base) == NULL ||
+             sema_find_field(sema_struct_of(base),
+                             &callee->as.field.name) == NULL)) {
+            struct type *hashed;
+            if (sema_hash_call(c, e, base, &hashed)) {
+                return hashed;
+            }
+        }
         /* A value of a type parameter reaches the functions of the
            interfaces its constraints name, as a pointer to the one that
            declares the function. */

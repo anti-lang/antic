@@ -1071,9 +1071,10 @@ bool antl_write(struct text *out, const struct interface *iface,
            file sees the form the declaration wrote. The type alone gives
            the `?*Error` of the ABI and never the form. `worker` is
            recorded for the same reason, and `anti doc` prints it. */
-        /* Bit 4 marks the name a `type` declares, and bit 5 a generic
+        /* Bit 4 marks the name a `type` declares, bit 5 a generic
            function, whose declaration the section of the generics
-           holds. */
+           holds, and bit 6 a function written `operator fn`, which an
+           importing module finds as the hook of a struct. */
         put_u8(&w, (uint8_t)((unsigned)sym->exported |
                              (unsigned)sym->internal << 1 |
                              (unsigned)sym->may_fail << 2 |
@@ -1082,7 +1083,10 @@ bool antl_write(struct text *out, const struct interface *iface,
                              (unsigned)(sym->kind == SYMBOL_FN &&
                                         sym->item != NULL &&
                                         sym->item->type_param_count > 0)
-                                 << 5));
+                                 << 5 |
+                             (unsigned)(sym->kind == SYMBOL_FN &&
+                                        sym->is_operator)
+                                 << 6));
         put_doc(&w, sym->doc.text, sym->doc.length);
         if (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN) {
             size_t j;
@@ -2472,8 +2476,9 @@ static void read_items(struct reader *r)
             /* A generic function is linked to its declaration once the
                section of the generics is read. */
             generic = (marks >> 5 & 1) != 0;
-            if (marks > 63 || (sym->alias && kind != SYMBOL_STRUCT) ||
-                (generic && kind != SYMBOL_FN)) {
+            sym->is_operator = (marks >> 6 & 1) != 0;
+            if (marks > 127 || (sym->alias && kind != SYMBOL_STRUCT) ||
+                ((generic || sym->is_operator) && kind != SYMBOL_FN)) {
                 damaged(r);
             }
         }

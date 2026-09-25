@@ -910,6 +910,7 @@ static void redirect(struct clone *cl, struct expr *e)
     case EXPR_CALL:
         redirect(cl, e->as.call.callee);
         redirect_list(cl, e->as.call.args, e->as.call.arg_count);
+        redirect_list(cl, e->as.call.hash_calls, e->as.call.hash_count);
         if (e->as.call.callee->kind == EXPR_NAME &&
             (copy = callee_copy(cl, e, e->as.call.callee->symbol)) != NULL) {
             e->as.call.callee->symbol = copy;
@@ -992,10 +993,14 @@ static struct expr *receiver(struct clone *cl, struct expr *n,
 }
 
 /* Whether e means what the argument of a type parameter makes of it: an
-   operator, or `e[i]`, on a value of one. */
+   operator, or `e[i]`, on a value of one, and `x.hash()` on a value of a
+   type that names one. */
 static bool open_node(const struct expr *e)
 {
     switch (e->kind) {
+    case EXPR_CALL:
+        return sema_is_hash_call(e) &&
+               sema_has_params(e->as.call.callee->as.field.base->type);
     case EXPR_UNARY:
         return is_param(e->as.unary.operand->type) &&
                (e->as.unary.op == TOKEN_MINUS || e->as.unary.op == TOKEN_TILDE);
@@ -1086,6 +1091,18 @@ static struct expr *xe(struct clone *cl, struct expr *e)
             n->as.call.copy_args = NULL;
             n->as.call.copy_values = NULL;
             n->as.call.copy_count = 0;
+        }
+        /* The default hash of a type that names a parameter is read
+           again, and finds the functions of the types of the argument. */
+        if (cl->fresh && open_node(e)) {
+            mark(n->as.call.callee->as.field.base);
+            n->as.call.hashes = false;
+            n->as.call.hash_calls = NULL;
+            n->as.call.hash_count = 0;
+            recheck(cl, n);
+        } else {
+            n->as.call.hash_calls =
+                xlist(cl, e->as.call.hash_calls, e->as.call.hash_count);
         }
         break;
     }

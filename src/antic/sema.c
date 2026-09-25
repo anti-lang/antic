@@ -2910,6 +2910,12 @@ static void refuse_redeclared(struct checker *c, const struct item *it,
                 sema_name_is(&m->name, "destruct")) {
                 continue;
             }
+            /* `operator fn hash` has a refusal of its own, which names
+               the form that replaces `hash`. */
+            if (m->is_operator && sema_name_is(&m->name, LANG_HOOK_HASH) &&
+                t->kind == TYPE_CLASS) {
+                continue;
+            }
             /* DESIGN: a static function is namespaced by its class and
                reached as `Class.f`, never through a value and never
                through a table. Two statics of one name in a chain name
@@ -2966,7 +2972,13 @@ static void require_filled_chain(struct checker *c, const struct item *it,
    the index and the element that `index` of the same type reads, so
    `e[i] = e[i]` holds for every type that has both. A class writes the
    receiver `self`, and a free function of a struct its first parameter
-   as declared. */
+   as declared.
+
+   DESIGN: every class has `hash` from `anti.lang.Object`, and replaces
+   it with `concrete fn hash(self) -> u64`, as it replaces every function
+   of the root. `operator fn hash` in a class body would declare a second
+   function of that name, so it is refused with the form that replaces
+   it. */
 static void check_hook(struct checker *c, const struct item *m,
                        struct type *owner)
 {
@@ -3012,6 +3024,18 @@ static void check_hook(struct checker *c, const struct item *m,
             sema_error_at(c, m->name_pos, "`operator fn index` is written "
                           "`operator fn index(%s, i: I) -> T`", self);
         }
+    } else if (sema_name_is(&m->name, LANG_HOOK_HASH)) {
+        if (owner != NULL && owner->kind == TYPE_CLASS) {
+            sema_error_at(c, m->name_pos, "a class replaces `hash` of "
+                          "`Object` with `concrete fn hash(self) -> u64`");
+            return;
+        }
+        ok = !sig->may_fail && sig->param_count == 1 &&
+             sig->result->kind == TYPE_U64;
+        if (!ok) {
+            sema_error_at(c, m->name_pos, "`operator fn hash` is written "
+                          "`operator fn hash(%s) -> u64`", self);
+        }
     } else if (sema_name_is(&m->name, LANG_HOOK_SET_INDEX)) {
         struct symbol *index = sema_hook(c, owner, LANG_HOOK_INDEX);
         const struct type *read = index != NULL ? index->type : NULL;
@@ -3035,7 +3059,7 @@ static void check_hook(struct checker *c, const struct item *m,
     }
 }
 
-/* An `operator fn` carries one of the nineteen names the table holds,
+/* An `operator fn` carries one of the twenty names the table holds,
    and nothing else, and a hook the signature its construct calls. owner
    is the type the functions belong to. */
 static void check_operator_item(struct checker *c, const struct item *m,
@@ -3047,7 +3071,7 @@ static void check_operator_item(struct checker *c, const struct item *m,
     if (!sema_operator_named(&m->name)) {
         sema_error_at(c, m->name_pos, "`operator fn` takes one of `add sub "
                       "mul div rem neg eq lt and or xor shl shr not iter "
-                      "next value index set_index`");
+                      "next value index set_index hash`");
         return;
     }
     check_hook(c, m, owner);

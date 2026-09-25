@@ -463,6 +463,12 @@ struct type *types_object(struct types *types);
    is open. A constraint, type or function named `Number` in the module
    wins over it. */
 #define LANG_NUMBER "Number"
+/* DESIGN: `Ordered` is `eq + lt`, which `anti.lang` ships. The source of
+   `anti.lang` declares it, so `lang.Ordered` names it through the library
+   file, and the compiler gives it to a bare `Ordered` as it gives
+   `Number`. A constraint, type or function named `Ordered` in the module
+   wins over it. */
+#define LANG_ORDERED "Ordered"
 /* DESIGN: `ByteRegex` is the built-in struct of a pattern of bytes, in
    the form of `Regex`, which searches a `[]byte`. A pattern literal takes
    its mode from where it stands, so it is a `ByteRegex` where one is
@@ -805,5 +811,10 @@ bool type_pointer_free(const struct type *t);
 
 /* Whether t declares fields, which a struct, a union and a class do. */
 bool type_has_fields(const struct type *t);
+
+/* The type whose `operator fn hash` the checked call names, one of the
+   calls of a default hash: the first parameter of the function, through
+   a pointer. NULL when the call names no function. */
+const struct type *types_hash_call_type(const struct expr *call);
 
 #endif

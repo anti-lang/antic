@@ -105,7 +105,8 @@ add_test(NAME rt_signal COMMAND rt_signal_tests)
 # sanitizer, and this program does in the sanitizer builds.
 add_executable(rt_conf_tests unit/test_conf_race.c ../src/rt/conf.c
     ../src/rt/assert.c ../src/rt/toml.c ../src/rt/atomic.c ../src/rt/fs.c
-    ../src/rt/utf.c ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
+    ../src/rt/hash.c ../src/rt/utf.c ../src/rt/platform_posix.c
+    ../src/rt/platform_windows.c)
 target_link_libraries(rt_conf_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_conf_tests PRIVATE
@@ -506,14 +507,27 @@ add_test(NAME program_walk_forms_dev
         "-DOPTIONS=--dev"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+# The default hash in dev mode, which writes it in each module apart.
+foreach(name IN ITEMS hash_builtin hash_default)
+    add_test(NAME program_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+endforeach()
 # The copies of generics in dev mode, which compiles each module apart and
 # prints what the release build of the same program prints.
 foreach(name IN ITEMS generic_copies generic_constants generic_methods
         generic_nested generic_sync generic_hooks generic_may_fail
-        generic_fn_args generic_variants construct_keep_own walk_generic)
+        generic_fn_args generic_variants construct_keep_own walk_generic
+        hash_generic)
     set(objects "")
     if(name STREQUAL "generic_may_fail" OR name STREQUAL "generic_fn_args" OR
-       name STREQUAL "walk_generic")
+       name STREQUAL "walk_generic" OR name STREQUAL "hash_generic")
         set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o")
     endif()
     add_test(NAME program_${name}_dev
@@ -2104,6 +2118,26 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# The hash of the types of a library and its generics that hash and order,
+# which another module uses and hashes inside a struct of its own.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME hashing_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/hashing"
+            "-DLIBRARIES=keys"
+            "-DSTD=lang"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hashing-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # A collection, its iterator and a struct with the language hooks in a
 # library, which another module walks, indexes and collects.
 foreach(mode release dev)
@@ -2531,7 +2565,7 @@ endforeach()
 set(CONF "${CMAKE_CURRENT_SOURCE_DIR}/conf")
 foreach(case
         "inspect_build|report||--anti.inspect|inspect.build.pattern||0"
-        "inspect_options|report||--anti.backtrace,--anti.logger=log.toml,--anti.plugins=a:b,--anti.threads=4,--anti.trace=leaks,--anti.inspect|inspect.options.pattern||0"
+        "inspect_options|report||--anti.backtrace,--anti.hash_seed=42,--anti.logger=log.toml,--anti.plugins=a:b,--anti.threads=4,--anti.trace=leaks,--anti.inspect|inspect.options.pattern||0"
         "inspect_file|report||--anti.conf=${CONF}/basic.toml,--anti.inspect|inspect.file.pattern||0"
         "precedence|report||--anti.conf=${CONF}/basic.toml,--anti.threads=9,--anti.inspect|inspect.precedence.pattern||0"
         "include|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
@@ -2557,7 +2591,12 @@ foreach(case
         "threads_option|report||--anti.threads=99999999999|empty.pattern|threads-option.pattern|70"
         "threads_zero|report||--anti.threads=0|empty.pattern|threads-zero.pattern|70"
         "injection|report||--anti.conf=${CONF}/injection.toml|empty.pattern|injection.pattern|70"
-        "inject_option|report||--anti.inject=anti.log.Logger=lib/x.so|empty.pattern|inject-option.pattern|70")
+        "inject_option|report||--anti.inject=anti.log.Logger=lib/x.so|empty.pattern|inject-option.pattern|70"
+        "hash_seed_option|seed||--anti.hash_seed=42|seed.fixed.pattern||0"
+        "hash_seed_file|seed||--anti.conf=${CONF}/seed.toml|seed.file.pattern||0"
+        "hash_seed_configure|seed||${CONF}/seed.toml|seed.configure.pattern||0"
+        "hash_seed_range|report||--anti.hash_seed=18446744073709551616|empty.pattern|seed-range.pattern|70"
+        "hash_seed_text|report||--anti.conf=${CONF}/seed-text.toml|empty.pattern|seed-text.pattern|70")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 source)
@@ -2590,6 +2629,17 @@ foreach(case
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-${name}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
 endforeach()
+
+# The seed of the hashing collections without a fixed one: two runs of one
+# program choose two seeds.
+add_test(NAME conf_hash_seed_random
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CONF}/seed.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-hash_seed_random"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_hash_seed.cmake")
 
 # Injection. The program of tests/inject names three interfaces and takes
 # a provider of each from --inject: the `get` of a singleton that
@@ -3101,6 +3151,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "generics|--front-end,generics.anti"
         "generic_syntax|--front-end,generic_syntax.anti"
         "constraints|--front-end,constraints.anti"
+        "hashing|--front-end,hashing.anti"
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

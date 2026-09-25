@@ -1,0 +1,17 @@
+exit 0
+5 d66ad737d54c5575
+ab 234f15c8b040bdae
+empty efd01f60ba992926
+integers 1 1 1 0
+bool 1 0
+char 1 0
+enum 1 0
+floats 1 1 1 1 0
+pointers 1 1 1
+text 1 1 0
+optional 1 1 0
+array 1 0
+slice 1 0
+bytes 1
+tuple 1 1
+variant 1 0 1

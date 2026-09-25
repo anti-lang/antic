@@ -1,6 +1,7 @@
 anti: the options of the runtime, which it takes before the program sees its arguments
   --anti\.backtrace\[=true.false\] +capture the frames of an error
   --anti\.conf=<path> +read the configuration file
+  --anti\.hash_seed=<number> +the seed of the hashing collections
   --anti\.help +print these options and end
   --anti\.inject=<interface>=<path> +take an interface from a library
   --anti\.inspect +print the effective configuration and end

@@ -1,5 +1,6 @@
 anti runtime [0-9]+\.[0-9]+\.[0-9]+
 backtrace = true \(command line\)
+hash_seed = 42 \(command line\)
 logger = log\.toml \(command line\)
 plugins = a:b \(command line\)
 threads = 4 \(command line\)

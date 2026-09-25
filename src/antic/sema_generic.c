@@ -22,7 +22,7 @@
 static const char *const hook_names[] = {
     "add", "sub", "mul", "div", "rem", "neg", "eq", "lt", "and", "or",
     "xor", "shl", "shr", "not", LANG_HOOK_ITER, LANG_HOOK_NEXT,
-    LANG_HOOK_VALUE, LANG_HOOK_INDEX, LANG_HOOK_SET_INDEX, "hash"
+    LANG_HOOK_VALUE, LANG_HOOK_INDEX, LANG_HOOK_SET_INDEX, LANG_HOOK_HASH
 };
 
 #define HOOK_COUNT (sizeof hook_names / sizeof hook_names[0])
@@ -31,6 +31,10 @@ static const char *const hook_names[] = {
 static const char *const number_hooks[] = {
     "add", "sub", "mul", "div", "neg", "lt"
 };
+
+/* The hooks of `anti.lang.Ordered`, which the source of `anti.lang`
+   declares as well. */
+static const char *const ordered_hooks[] = {"eq", "lt"};
 
 static int hook_index(const struct name *name)
 {
@@ -291,6 +295,13 @@ static void add_constraint(struct checker *c, struct type *p,
             }
             return;
         }
+        if (sym == NULL && sema_name_is(&r->name, LANG_ORDERED)) {
+            for (i = 0; i < sizeof ordered_hooks / sizeof ordered_hooks[0];
+                 i++) {
+                p->hooks |= 1u << hook_of(ordered_hooks[i]);
+            }
+            return;
+        }
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
             sema_error_at(c, r->pos, "`%.*s` is no hook of the operator "
                           "table, no interface and no constraint",
@@ -430,7 +441,7 @@ static bool builtin_meets(const struct type *t, const char *hook)
     bool integer = type_is_integer(t);
     bool numeric = type_is_numeric(t);
 
-    if (strcmp(hook, "hash") == 0) {
+    if (strcmp(hook, LANG_HOOK_HASH) == 0) {
         return true;
     }
     if (strcmp(hook, "eq") == 0) {
@@ -471,7 +482,7 @@ static bool meets_hook(struct checker *c, struct type *t, const char *hook)
         strcmp(hook, LANG_HOOK_SET_INDEX) == 0) {
         return sema_hook(c, t, hook) != NULL;
     }
-    if (type_has_fields(t) && strcmp(hook, "hash") != 0) {
+    if (type_has_fields(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
         return sema_operator_symbol(c, t, hook) != NULL;
     }
     return builtin_meets(t, hook);
@@ -1726,6 +1737,22 @@ struct type *sema_param_index(struct checker *c, struct expr *e,
         p->indexed = hook_value(c, p, LANG_HOOK_INDEX);
     }
     return p->indexed;
+}
+
+bool sema_param_has(const struct type *p, const char *hook)
+{
+    return has_hook(p, hook);
+}
+
+/* `x.hash()` on a value of the parameter p, which its constraints allow
+   through `hash`. */
+bool sema_param_hash(struct checker *c, struct expr *e, const struct type *p)
+{
+    if (has_hook(p, LANG_HOOK_HASH)) {
+        return true;
+    }
+    param_lacks(c, e->pos, "hash", p, LANG_HOOK_HASH);
+    return false;
 }
 
 /* The interface among the constraints of the parameter p that declares

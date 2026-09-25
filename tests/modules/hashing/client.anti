@@ -1,0 +1,44 @@
+//! A program that hashes the types of another module, through its generics and
+//! inside a struct of its own.
+
+import com.example.keys;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Entry
+{
+	name: keys.Name,
+	tag: keys.Tag<int>,
+}
+
+fn same(a: u64, b: u64) -> c_int
+{
+	return (a == b) as c_int;
+}
+
+fn main() -> int
+{
+	let n = keys.Name { text: "ada" };
+	printf("own %llu\n".ptr, n.hash());
+	printf("key %llu %d\n".ptr, keys.key(n), same(keys.key(7), (7).hash()));
+	let e = Entry {
+		name: keys.Name { text: "alan" }, tag: keys.Tag<int> {
+			item: 3, mark: 1
+		}
+	};
+	let f = Entry {
+		name: keys.Name { text: "ada" }, tag: keys.Tag<int> {
+			item: 3, mark: 1
+		}
+	};
+	let g = Entry {
+		name: keys.Name { text: "ada" }, tag: keys.Tag<int> {
+			item: 3, mark: 2
+		}
+	};
+	printf("entry %d %d\n".ptr, same(e.hash(), f.hash()), same(f.hash(),
+		g.hash()));
+	printf("tuple %d\n".ptr, same(keys.with_one("x"), ("x", 1).hash()));
+	printf("larger %d\n".ptr, keys.larger(4, 9) as c_int);
+	return 0;
+}

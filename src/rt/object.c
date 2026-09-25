@@ -185,8 +185,8 @@ static size_t compared_size(int64_t type)
                                                       : anti_rt_type_size(t);
 }
 
-/* Compare the fields the chain declares, from the root down. Two objects
-   of different classes are never equal. */
+/* Compare the fields the chain declares, from the class up to the root.
+   Two objects of different classes are never equal. */
 int8_t anti_lang_Object_equals(struct anti_object *self,
                                struct anti_object *other)
 {
@@ -216,27 +216,35 @@ int8_t anti_lang_Object_equals(struct anti_object *self,
     return 1;
 }
 
-/* FNV-1a over the same fields that equals compares, so two equal objects
-   hash alike. */
-uint64_t anti_lang_Object_hash(struct anti_object *self)
+/* FNV-1a over the fields that the level d of the chain of self declares,
+   and those of every level above it first, into h. */
+static uint64_t hash_level(const struct anti_object *self,
+                           const struct anti_descriptor *d, uint64_t h)
 {
-    const struct anti_descriptor *d = anti_rt_descriptor(self);
-    uint64_t h = 1469598103934665603u;
     int64_t i;
     size_t k;
 
-    for (; d != NULL; d = d->parent) {
-        for (i = 0; i < d->field_count; i++) {
-            const struct anti_field *f = &d->fields[i];
-            const unsigned char *bytes =
-                (const unsigned char *)self + f->offset;
-            size_t size = compared_size(f->type);
-            for (k = 0; k < size; k++) {
-                h = (h ^ bytes[k]) * 1099511628211u;
-            }
+    if (d == NULL) {
+        return h;
+    }
+    h = hash_level(self, d->parent, h);
+    for (i = 0; i < d->field_count; i++) {
+        const struct anti_field *f = &d->fields[i];
+        const unsigned char *bytes = (const unsigned char *)self + f->offset;
+        size_t size = compared_size(f->type);
+        for (k = 0; k < size; k++) {
+            h = (h ^ bytes[k]) * 1099511628211u;
         }
     }
     return h;
+}
+
+/* FNV-1a over the same fields that equals compares, so two equal objects
+   hash alike. The fields go in the order of the object, those of the root
+   of the chain first. */
+uint64_t anti_lang_Object_hash(struct anti_object *self)
+{
+    return hash_level(self, anti_rt_descriptor(self), 1469598103934665603u);
 }
 
 /* Append the bytes of a C string. */

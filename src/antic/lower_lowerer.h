@@ -455,6 +455,12 @@ void lower_branch(struct lowerer *l, const struct expr *e,
                   struct ir_block *then_block,
                   struct ir_block *else_block);
 
+/* lower_hash.c */
+
+/* The default hash of the receiver of e, a call that the checker marked
+   `hashes`. */
+struct ir_operand lower_hash(struct lowerer *l, const struct expr *e);
+
 /* lower_simd.c */
 
 struct ir_operand lower_simd_binary(struct lowerer *l,

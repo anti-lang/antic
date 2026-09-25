@@ -106,6 +106,9 @@ struct symbol {
     bool lent_turn;
     bool variadic;                  /* SYMBOL_EXTERN_FN */
     bool worker;                    /* SYMBOL_FN written `worker fn` */
+    /* SYMBOL_FN of a library file written `operator fn`, whose item the
+       reader does not make. A symbol with an item reads the item. */
+    bool is_operator;
     bool may_fail;                  /* SYMBOL_FN written `may fail` */
     bool internal;                  /* `internal`: the package alone sees it */
     bool caught;                    /* the error a `catch` binds */

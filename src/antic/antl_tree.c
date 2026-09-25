@@ -966,6 +966,8 @@ static void io_call(struct io *io, struct expr *e)
     io_bool(io, &e->as.call.optional);
     io_bool(io, &e->as.call.tested);
     io_cexpr(io, &e->as.call.pattern);
+    io_bool(io, &e->as.call.hashes);
+    io_exprs(io, &e->as.call.hash_calls, &e->as.call.hash_count);
     array = e->as.call.copy_args;
     io_count(io, &array, &e->as.call.copy_count,
              sizeof *e->as.call.copy_args);

@@ -24,6 +24,8 @@ extern fn anti_rt_trace_frame(address: u64, out: ?*RawFrame);
 extern fn anti_rt_trace_text(frames: ?*RawFrame, count: int) -> ?*byte;
 extern fn anti_rt_trace_symbolize(frame: ?*RawFrame, out: ?*Frame);
 extern fn anti_rt_trace_install(handler: ?*TraceHandler);
+extern fn anti_rt_hash_seed() -> u64;
+extern fn anti_rt_hash_seeded(hash: u64, with: u64) -> u64;
 
 /// The most frames a trace keeps, the innermost ones.
 const TRACE_DEPTH: int = 64;
@@ -351,6 +353,30 @@ pub abstract class TraceHandler
 	abstract fn failed(self, o: *Object, name: str, e: *Error);
 	/// A field of the instrumented `o` was written.
 	abstract fn changed(self, o: *Object, field: *FieldDescriptor);
+}
+
+/// The types a generic may compare with `==` and order with `<`.
+pub constraint Ordered = eq + lt;
+
+/// The seed of the hashing collections.
+///
+/// The runtime chooses it from the random source of the system when the program
+/// starts, so the keys an attacker picks cannot all land in one bucket.
+/// `--anti.hash_seed=<n>` and the key `hash_seed` of the configuration fix it,
+/// for a test that needs the same buckets on every run. A collection reads it
+/// once, when it is made. The seed never decides the order a program sees.
+pub fn hash_seed() -> u64
+{
+	return anti_rt_hash_seed();
+}
+
+/// The hash `hash` of a key, mixed with the seed `with` of a collection.
+///
+/// Two keys whose hashes are equal stay equal under one seed. Under another
+/// seed they land elsewhere, and so does every other key.
+pub fn seeded(hash: u64, with: u64) -> u64
+{
+	return anti_rt_hash_seeded(hash, with);
 }
 
 /// The one handler that every hook of every object calls.

@@ -1,6 +1,10 @@
 /* The platform layer on Windows. See platform.h. */
 #if defined(_WIN32)
 
+/* rand_s stands behind this macro, which comes before the first header
+   that includes stdlib.h. */
+#define _CRT_RAND_S
+
 #include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -222,6 +226,23 @@ const char *anti_rt_library_error(char *text, size_t size)
         text[0] = '\0';
     }
     return text;
+}
+
+int anti_rt_entropy(void *out, size_t count)
+{
+    unsigned char *at = out;
+
+    while (count > 0) {
+        unsigned int word;
+        size_t n = count < sizeof word ? count : sizeof word;
+        if (rand_s(&word) != 0) {
+            return -1;
+        }
+        memcpy(at, &word, n);
+        at += n;
+        count -= n;
+    }
+    return 0;
 }
 
 /* See the DESIGN comment on the clocks in platform_posix.c. */

@@ -1,0 +1,47 @@
+//! Types and generics of hashing that another module uses: a struct with a hash
+//! of its own, a generic struct whose hash is generic, and generic functions
+//! that hash and order a value of a type parameter.
+
+/// A name whose hash reads the first letter alone.
+pub struct Name
+{
+	text: str,
+}
+
+/// The hash of `n`, its first letter, so two names that start alike collide.
+pub operator fn hash(n: Name) -> u64
+{
+	if n.text.len == 0 {
+		return 0;
+	}
+	return n.text[0] as u64;
+}
+
+/// A value of any type that hashes, with the mark it carries.
+pub struct Tag<T>
+{
+	item: T,
+	mark: int,
+}
+
+/// The hash of a key of any type that has one.
+pub fn key<T: hash>(v: T) -> u64
+{
+	return v.hash();
+}
+
+/// The hash of `v` with 1 after it, as the default hash of a tuple gives.
+pub fn with_one<T: hash>(v: T) -> u64
+{
+	let t = (v, 1);
+	return t.hash();
+}
+
+/// The larger of `a` and `b`.
+pub fn larger<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}

@@ -1,0 +1,20 @@
+//! The seed of the hashing collections, which `--anti.hash_seed` and the key
+//! `hash_seed` of the configuration fix. A path among the arguments names a
+//! file for `rt.configure`, whose key replaces the seed chosen at start. The
+//! hash of a key mixed with a fixed seed is the same on every run.
+
+import anti.lang;
+import anti.runtime as rt;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	if args.len > 1 {
+		rt.configure(args[1]);
+	}
+	let seed = lang.hash_seed();
+	printf("seed %llu\n".ptr, seed);
+	printf("seeded %016llx\n".ptr, lang.seeded("x".hash(), seed));
+	return 0;
+}

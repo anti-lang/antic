@@ -33,6 +33,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/lower.c
     src/antic/lower_desc.c
     src/antic/lower_expr.c
+    src/antic/lower_hash.c
     src/antic/lower_simd.c
     src/antic/lower_stmt.c
     src/antic/mach.c
@@ -50,6 +51,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/sema.c
     src/antic/sema_call.c
     src/antic/sema_generic.c
+    src/antic/sema_hash.c
     src/antic/sema_copies.c
     src/antic/sema_const.c
     src/antic/sema_export.c

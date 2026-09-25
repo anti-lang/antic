@@ -1037,6 +1037,7 @@ void sema_interface(const struct module *module, const char *module_name,
         sym->item = it->kind == ITEM_FN && it->type_param_count > 0
                         ? (struct item *)it
                         : NULL;
+        sym->is_operator = it->kind == ITEM_FN && it->is_operator;
         sym->alias = it->kind == ITEM_TYPE;
         sym->home = out;
         out->items[out->item_count++] = sym;

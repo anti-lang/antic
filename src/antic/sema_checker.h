@@ -157,12 +157,14 @@ struct generic_call {
 #define OP_TEXT 16
 
 /* The language hooks of the operator table. `for x in e` calls the
-   first three, `e[i]` and `e[i] = v` the last two. */
+   first three, `e[i]` and `e[i] = v` the next two, and a hashing
+   collection `hash`. */
 #define LANG_HOOK_ITER "iter"
 #define LANG_HOOK_NEXT "next"
 #define LANG_HOOK_VALUE "value"
 #define LANG_HOOK_INDEX "index"
 #define LANG_HOOK_SET_INDEX "set_index"
+#define LANG_HOOK_HASH "hash"
 /* Not a hook: the function every iterator has, which collects it. */
 #define LANG_HOOK_TO_SLICE "to_slice"
 
@@ -449,6 +451,9 @@ struct type *sema_param_index(struct checker *c, struct expr *e,
                               struct type *p, bool write);
 const struct type *sema_param_iface(const struct type *p,
                                     const struct name *name);
+/* Whether the constraints of the parameter p give the hook named hook. */
+bool sema_param_has(const struct type *p, const char *hook);
+bool sema_param_hash(struct checker *c, struct expr *e, const struct type *p);
 void sema_check_generic_item(struct checker *c, const struct item *it);
 
 /* sema_copies.c */
@@ -460,6 +465,17 @@ void sema_compile_copies(struct checker *c);
    its argument. Returns false when the base has no hook, and s is then a
    plain assignment. */
 bool sema_set_index(struct checker *c, struct stmt *s);
+
+/* sema_hash.c */
+
+/* Whether the call e, `x.hash()` with x of type t, is the default hash
+   of x or the hook of a type parameter. The call then has its type in
+   *result. Returns false when `hash` is a function of t, which the call
+   of a method reaches. */
+bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
+                    struct type **result);
+/* Whether e is `x.hash()` in the form that sema_hash_call gives. */
+bool sema_is_hash_call(const struct expr *e);
 
 /* sema_pattern.c */
 

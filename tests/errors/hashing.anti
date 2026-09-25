@@ -1,0 +1,56 @@
+//! The refusals of hashing and of `Ordered`. `operator fn hash` takes the value
+//! and gives a `u64`, and a class replaces the `hash` of `Object` instead. A
+//! generic hashes a value of `T` only when its constraints give `hash`, and a
+//! tuple that holds one needs it as well. `Ordered` gives `==` and `<` and
+//! nothing else, and a use needs both.
+
+class Circle
+{
+	pub r: int = 0,
+
+	operator fn hash(self) -> u64
+	{
+		return 1;
+	}
+}
+
+struct Point
+{
+	x: int,
+}
+
+operator fn hash(p: Point) -> int
+{
+	return p.x;
+}
+
+fn plain<T>(v: T) -> u64
+{
+	return v.hash();
+}
+
+fn wrapped<T>(v: T) -> u64
+{
+	let t = (v, 1);
+	return t.hash();
+}
+
+fn total<T: Ordered>(a: T, b: T) -> T
+{
+	return a + b;
+}
+
+fn larger<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1 };
+	let q = larger(p, p);
+	return q.x;
+}

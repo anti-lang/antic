@@ -1,5 +1,6 @@
 anti runtime [0-9]+\.[0-9]+\.[0-9]+
 backtrace =  \(build\)
+hash_seed =  \(build\)
 logger = first-log\.toml \(.*first\.toml\)
 plugins =  \(build\)
 threads = 2 \(.*second\.toml\)

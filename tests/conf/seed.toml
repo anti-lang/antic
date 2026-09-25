@@ -1,0 +1,3 @@
+# A fixed seed of the hashing collections.
+[runtime]
+hash_seed = 7
