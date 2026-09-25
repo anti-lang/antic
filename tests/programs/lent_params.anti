@@ -21,14 +21,14 @@ class Person
 class People
 {
 	pub one: Person,
-	pub lender: fn(lent * Person) = grow,
+	pub lender: fn(lent *Person) = grow,
 
-	pub fn read(self, f: fn(lent * Person))
+	pub fn read(self, f: fn(lent *Person))
 	{
 		f(&self.one);
 	}
 
-	pub fn modify(self, f: fn(lent * Person))
+	pub fn modify(self, f: fn(lent *Person))
 	{
 		f(&self.one);
 	}

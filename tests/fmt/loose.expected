@@ -72,3 +72,10 @@ fn closures(items: []int) -> int
 	};
 	return total + pick(1);
 }
+
+/// A constraint that names a generic interface, and a parameter lent to a
+/// function.
+fn walked<C: collection.Iterable<int>>(c: *C, f: fn(lent *int, lent *int)) -> int
+{
+	return 0;
+}

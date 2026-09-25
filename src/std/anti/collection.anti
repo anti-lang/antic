@@ -9,6 +9,26 @@ import anti.text;
 
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 
+/// A type that `for` walks, giving elements of type `T`.
+///
+/// It is a constraint: `fn total<C: Iterable<int>>(c: *C) -> int` takes any
+/// collection of `int`. A type meets it when its `iter` hook gives an iterator
+/// that meets `Iterator<T>`, so a class with the hook meets it without a line
+/// of its own.
+pub abstract class Iterable<T>
+	allow(unfilled-abstract, "a type meets it through its hooks")
+{
+}
+
+/// An iterator that gives elements of type `T`.
+///
+/// A type meets it as a constraint when its `next` hook moves on and its
+/// `value` hook gives a `T`, or a `lent *T` of an element in place.
+pub abstract class Iterator<T>
+	allow(unfilled-abstract, "a type meets it through its hooks")
+{
+}
+
 /// A growing array of objects.
 pub class List
 {

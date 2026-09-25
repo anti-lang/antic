@@ -330,6 +330,8 @@ static bool from_test_block(const struct checker *c, const struct type *t)
            sema_same_name(&t->module, &c->module_name);
 }
 
+static bool descends_or_copies(const struct type *a, const struct type *b);
+
 /* DESIGN: the four levels of the object model document. A public member
    is visible everywhere. A protected one reaches the class that declares
    it and every class below it. A private one reaches its own class
@@ -351,8 +353,11 @@ static bool level_allows(const struct checker *c, enum visibility vis,
     if (declared_in == NULL) {
         declared_in = t;
     }
+    /* A generic class below a generic base inherits a copy of it, whose
+       members are those of the generic. */
     if (vis == VIS_PROTECTED) {
-        return sema_descends_from(from, declared_in);
+        return sema_descends_from(from, declared_in) ||
+               descends_or_copies(from, declared_in);
     }
     return from == declared_in;
 }
@@ -878,7 +883,8 @@ static bool method_call(struct checker *c, struct expr *call)
                       field->as.field.name.text);
         return false;
     }
-    first = sema_member_type(c, f->type->params[0], s);
+    first = sema_member_type_in(c, f->type->params[0],
+                                f->item != NULL ? f->item->owner : NULL, s);
     /* A generic function takes the receiver as it stands, and its call
        infers the arguments from it. */
     if (sema_has_params(first) && f->item != NULL &&

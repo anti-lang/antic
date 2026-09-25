@@ -756,6 +756,10 @@ struct constraint_ref {
     struct name module;
     struct name name;
     struct pos pos;
+    /* The type arguments of a generic interface, `Iterable<int>`. */
+    struct type_expr **type_args;
+    size_t type_arg_count;
+    struct pos type_args_pos;       /* the `<` */
 };
 
 /* A type parameter of a generic, `T: lt + eq` or `N: int`. */

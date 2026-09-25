@@ -972,6 +972,16 @@ static bool is_param(const struct type *t)
     return t != NULL && t->kind == TYPE_PARAM;
 }
 
+/* The type parameter a `for` walks, directly or through a pointer that
+   cannot be `none`, or NULL. */
+static struct type *walked_param(struct type *t)
+{
+    if (t != NULL && t->kind == TYPE_POINTER && !t->nullable) {
+        t = t->element;
+    }
+    return is_param(t) ? t : NULL;
+}
+
 /* The receiver of a call of a function of an interface that constrains
    a type parameter. It stands as its argument now, which reaches the
    interface as any class value does. */
@@ -1328,7 +1338,7 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
         n->as.for_loop.high = xe(cl, s->as.for_loop.high);
         n->as.for_loop.over = xe(cl, over);
         n->as.for_loop.step = xe(cl, s->as.for_loop.step);
-        if (over != NULL && is_param(over->type) && cl->fresh) {
+        if (over != NULL && walked_param(over->type) != NULL && cl->fresh) {
             struct scope scope;
             struct type *element = NULL;
             struct type *t = n->as.for_loop.over->type;
@@ -1350,7 +1360,7 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
             redirect(cl, n->as.for_loop.hooks.change_file);
             redirect(cl, n->as.for_loop.hooks.change_file_length);
             redirect(cl, n->as.for_loop.hooks.change_line);
-            map_add(cl, over->type->walked, element);
+            map_add(cl, walked_param(over->type)->walked, element);
         } else {
             xiter(cl, &n->as.for_loop.hooks, &s->as.for_loop.hooks);
         }

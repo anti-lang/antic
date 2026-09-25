@@ -2046,6 +2046,13 @@ static void check_stmt(struct checker *c, struct stmt *s)
                 mark_walked(s, loop_var);
             }
         }
+        /* DESIGN: the variable of a range is a new integer on every turn,
+           so it moves as a local of the body does. The copy a walk gives
+           stays with its collection and keeps the rule of the loop. */
+        if (s->as.for_loop.over == NULL && names == 1 &&
+            s->as.for_loop.names[0].symbol != NULL) {
+            s->as.for_loop.names[0].symbol->loops = c->loop_depth + 1;
+        }
         c->loop_depth++;
         sema_check_block(c, s->as.for_loop.body);
         c->loop_depth--;

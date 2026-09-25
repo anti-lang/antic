@@ -1,0 +1,65 @@
+// The refusals of the interfaces of walking: a generic interface named as a
+// constraint without its type arguments, and types whose elements are of
+// another type than the constraint names.
+
+import anti.collection;
+
+class Stack<T>
+{
+	pub items: [4]T,
+	pub count: int = 0,
+
+	operator fn iter(self) -> StackIter<T>
+	{
+		return StackIter<T> { of: self, at: -1 };
+	}
+}
+
+class StackIter<T>
+{
+	pub of: *Stack<T>,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.of.count;
+	}
+
+	operator fn value(self) -> T
+	{
+		return self.of.items[self.at];
+	}
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn drain<I: collection.Iterator<int>>(it: I) -> int
+{
+	let n = 0;
+	for x in it {
+		n += x;
+	}
+	return n;
+}
+
+fn bare<C: collection.Iterable>(c: *C)
+{
+}
+
+fn main() -> int
+{
+	let f = Stack<float> { items: [0.0; 4] };
+	let n = total(&f);
+	let m = drain(f.iter());
+	let k = 3;
+	let o = total(&k);
+	return 0;
+}

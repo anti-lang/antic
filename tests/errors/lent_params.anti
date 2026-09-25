@@ -79,7 +79,7 @@ fn kept_function(p: *Person)
 	plain(p);
 }
 
-fn lend(f: fn(lent * Person))
+fn lend(f: fn(lent *Person))
 {
 	let one = Person { };
 	f(&one);

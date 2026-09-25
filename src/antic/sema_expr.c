@@ -1165,8 +1165,14 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
 {
     struct expr *start = e;
 
+    /* A value of a type parameter walks as its constraints allow, and so
+       does one a pointer reaches, as a collection is walked through one. */
     if (t->kind == TYPE_PARAM) {
         return sema_param_iterate(c, e, t, element);
+    }
+    if (t->kind == TYPE_POINTER && !t->nullable &&
+        t->element->kind == TYPE_PARAM) {
+        return sema_param_iterate(c, e, t->element, element);
     }
     if (sema_hook(c, t, LANG_HOOK_ITER) != NULL) {
         start = sema_hook_call(c, e, LANG_HOOK_ITER, NULL, 0);

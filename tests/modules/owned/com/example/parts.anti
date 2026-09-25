@@ -50,7 +50,7 @@ pub fn take(own p: Part)
 }
 
 /// Lend the part p to f for the call.
-pub fn lend(p: *Part, f: fn(lent * Part))
+pub fn lend(p: *Part, f: fn(lent *Part))
 {
 	f(p);
 }

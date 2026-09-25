@@ -844,6 +844,8 @@ static void dump_type_params(struct dumper *d, int depth,
             label_name(d, "constraint", &tp->constraints[j].module,
                        &tp->constraints[j].name);
             end(d, at, NULL);
+            dump_type_args(d, depth + 2, tp->constraints[j].type_args,
+                           tp->constraints[j].type_arg_count);
         }
     }
 }

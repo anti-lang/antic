@@ -253,6 +253,8 @@ bool sema_simd_numeric(const struct type *lane);
 const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT]);
 bool sema_operator_named(const struct name *name);
 struct symbol *sema_hook(struct checker *c, struct type *t, const char *text);
+struct type *sema_member_type_in(struct checker *c, struct type *fn,
+                                 const struct item *owner, struct type *s);
 struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
                                     const char *text);
 bool sema_is_iterator(struct checker *c, struct type *t);

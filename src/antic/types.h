@@ -507,6 +507,16 @@ struct type *types_object(struct types *types);
    every turn, and a dev build stops the program when they differ, at the
    `at` of the last change. */
 #define LANG_WATCH "Watch"
+/* DESIGN: `Iterable<T>` and `Iterator<T>` of `anti.collection` are the
+   interfaces of walking. A type meets `Iterable<T>` as a constraint when
+   its `iter` hook gives an iterator that meets `Iterator<T>`, and meets
+   `Iterator<T>` when its `next` and `value` hooks give elements of type
+   `T`, as a copy or lent. So a class with the `iter` hook meets them
+   without a line of its own. A walk of a type parameter that names one
+   gives a `T`. */
+#define COLLECTION_MODULE "anti.collection"
+#define COLLECTION_ITERABLE "Iterable"
+#define COLLECTION_ITERATOR "Iterator"
 #define WATCH_CHANGES "changes"
 #define WATCH_COUNT "count"
 #define CHANGES_COUNT "count"

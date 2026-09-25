@@ -48,6 +48,8 @@ static int hook_index(const struct name *name)
     return -1;
 }
 
+static struct type *copy_in_chain(struct type *t, const struct type *g);
+
 static int hook_of(const char *text)
 {
     struct name name;
@@ -223,6 +225,27 @@ void sema_declare_generics(struct checker *c)
 static void add_constraint(struct checker *c, struct type *p,
                            const struct constraint_ref *r);
 
+/* Which interface of walking the copy t is: WALK_ITERABLE for a copy of
+   `Iterable` of `anti.collection`, WALK_ITERATOR for one of `Iterator`,
+   and WALK_NONE for every other type. */
+enum walk_iface { WALK_NONE, WALK_ITERABLE, WALK_ITERATOR };
+
+static enum walk_iface walk_iface(const struct type *t)
+{
+    const struct type *g = t != NULL ? t->generic : NULL;
+
+    if (g == NULL || g->kind != TYPE_CLASS ||
+        !sema_name_is(&g->module, COLLECTION_MODULE) ||
+        t->args == NULL || t->args[0] == NULL) {
+        return WALK_NONE;
+    }
+    if (sema_name_is(&g->name, COLLECTION_ITERABLE)) {
+        return WALK_ITERABLE;
+    }
+    return sema_name_is(&g->name, COLLECTION_ITERATOR) ? WALK_ITERATOR
+                                                         : WALK_NONE;
+}
+
 static void add_iface(struct checker *c, struct type *p,
                       const struct type *iface)
 {
@@ -337,20 +360,56 @@ static void add_constraint(struct checker *c, struct type *p,
                       (int)r->name.length, r->name.text);
         return;
     }
+    /* A generic interface is named with its type arguments, and the
+       constraint is the copy they give. */
+    if (t->type_param_count > 0 && r->type_arg_count == 0) {
+        sema_error_at(c, r->pos, "`%.*s` is generic, and a constraint "
+                      "writes its type arguments after its name",
+                      (int)r->name.length, r->name.text);
+        return;
+    }
+    if (r->type_arg_count > 0) {
+        struct type *copy = sema_copy_of(c, (struct type *)t, r->type_args,
+                                         r->type_arg_count, r->type_args_pos);
+        if (sema_is_error(copy)) {
+            return;
+        }
+        t = copy;
+    }
     add_iface(c, p, t);
+    /* An interface of walking gives the hooks that `for` needs. */
+    if (walk_iface(t) == WALK_ITERABLE) {
+        p->hooks |= 1u << hook_of(LANG_HOOK_ITER);
+    } else if (walk_iface(t) == WALK_ITERATOR) {
+        p->hooks |= 1u << hook_of(LANG_HOOK_NEXT);
+        p->hooks |= 1u << hook_of(LANG_HOOK_VALUE);
+    }
 }
 
 static void resolve_params(struct checker *c, struct item *it)
 {
+    const struct item *within = c->within;
+    const struct item *signature = c->signature;
     size_t i;
     size_t j;
 
+    /* The type arguments of a constraint may name the parameters of the
+       generic, or those of the class around a function. */
+    if (it->kind == ITEM_FN) {
+        c->signature = it;
+        c->within = it->owner;
+    } else {
+        c->signature = NULL;
+        c->within = it;
+    }
     for (i = 0; i < it->type_param_count; i++) {
         struct type_param *tp = &it->type_params[i];
         for (j = 0; j < tp->constraint_count; j++) {
             add_constraint(c, tp->type, &tp->constraints[j]);
         }
     }
+    c->within = within;
+    c->signature = signature;
 }
 
 /* DESIGN: `type Name = T;` names T, and every use of the name is T.
@@ -488,10 +547,50 @@ static bool meets_hook(struct checker *c, struct type *t, const char *hook)
     return builtin_meets(t, hook);
 }
 
-static bool meets_iface(struct type *t, const struct type *iface)
+/* The type of the element that the hook of the type t gives, or NULL
+   when t has no such hook. A lent pointer gives what it points at. */
+static struct type *hook_result(struct checker *c, struct type *t,
+                                const char *hook)
+{
+    struct symbol *sym = sema_hook(c, t, hook);
+    struct type *fn;
+
+    if (sym == NULL || sym->type == NULL || sym->type->kind != TYPE_FN) {
+        return NULL;
+    }
+    fn = sema_member_type(c, sym->type,
+                          t->kind == TYPE_POINTER ? t->element : t);
+    if (fn->result != NULL && fn->result->kind == TYPE_POINTER &&
+        fn->result->lent) {
+        return fn->result->element;
+    }
+    return fn->result;
+}
+
+/* Whether the type t walks as the interface iface of walking says: an
+   iterator of iface's element, or through `iter` a collection of it. */
+static bool walks_as(struct checker *c, struct type *t,
+                     const struct type *iface)
+{
+    if (walk_iface(iface) == WALK_ITERABLE) {
+        t = hook_result(c, t, LANG_HOOK_ITER);
+        if (t == NULL) {
+            return false;
+        }
+    }
+    return sema_hook(c, t, LANG_HOOK_NEXT) != NULL &&
+           hook_result(c, t, LANG_HOOK_VALUE) == iface->args[0];
+}
+
+static bool meets_iface(struct checker *c, struct type *t,
+                        const struct type *iface)
 {
     size_t i;
 
+    if (t->kind != TYPE_PARAM && walk_iface(iface) != WALK_NONE &&
+        walks_as(c, t, iface)) {
+        return true;
+    }
     if (t->kind == TYPE_PARAM) {
         for (i = 0; i < t->iface_count; i++) {
             if (sema_descends_from(t->ifaces[i], iface)) {
@@ -525,7 +624,7 @@ static void check_meets(struct checker *c, struct type *t,
         }
     }
     for (i = 0; i < p->iface_count; i++) {
-        if (!meets_iface(t, p->ifaces[i])) {
+        if (!meets_iface(c, t, p->ifaces[i])) {
             sema_error_at(c, pos, "`%s` has no `%s`, which `%.*s` needs for "
                           "`%.*s`", sema_tn(t), sema_tn(p->ifaces[i]),
                           (int)generic->length, generic->text,
@@ -1174,6 +1273,21 @@ struct type *sema_member_type(struct checker *c, struct type *fn,
     return subst(c, fn, &map);
 }
 
+/* The type fn of a function that the class of the item owner declares,
+   as the class s reaches it. That is through the copy of owner in the
+   chain of s, or through s itself when owner is no generic. */
+struct type *sema_member_type_in(struct checker *c, struct type *fn,
+                                 const struct item *owner, struct type *s)
+{
+    struct type *level;
+
+    if (owner != NULL && owner->type_param_count > 0 && owner->symbol != NULL &&
+        (level = copy_in_chain(s, owner->symbol->type)) != NULL) {
+        return sema_member_type(c, fn, level);
+    }
+    return sema_member_type(c, fn, s);
+}
+
 /* Uses in expressions */
 
 void sema_refuse_type_args(struct checker *c, const struct expr *e,
@@ -1697,6 +1811,8 @@ static struct type *hook_value(struct checker *c, struct type *p,
 bool sema_param_iterate(struct checker *c, struct expr *e, struct type *p,
                         struct type **element)
 {
+    size_t i;
+
     if (!has_hook(p, LANG_HOOK_ITER)) {
         const char *missing = NULL;
         if (!has_hook(p, LANG_HOOK_NEXT)) {
@@ -1708,6 +1824,13 @@ bool sema_param_iterate(struct checker *c, struct expr *e, struct type *p,
         if (missing != NULL) {
             param_lacks(c, e->pos, "for", p, missing);
             *element = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
+    }
+    /* An interface of walking names the element. */
+    for (i = 0; i < p->iface_count; i++) {
+        if (walk_iface(p->ifaces[i]) != WALK_NONE) {
+            *element = p->ifaces[i]->args[0];
             return true;
         }
     }

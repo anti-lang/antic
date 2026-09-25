@@ -1,0 +1,4 @@
+walk_interfaces.anti:53:12: error: `Iterable` is generic, and a constraint writes its type arguments after its name
+walk_interfaces.anti:60:10: error: `Stack<float>` has no `Iterable<int>`, which `total` needs for `C`
+walk_interfaces.anti:61:10: error: `StackIter<float>` has no `Iterator<int>`, which `drain` needs for `I`
+walk_interfaces.anti:63:10: error: `int` has no `iter`, which `total` needs for `C`

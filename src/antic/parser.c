@@ -2847,6 +2847,16 @@ static struct constraint_ref *constraint_list(struct parser *p,
             *count = 0;
             return NULL;
         }
+        /* A generic interface takes its type arguments, as a type does. */
+        if (check(p, TOKEN_LT)) {
+            r.type_args_pos = pos_of(peek(p));
+            r.type_args = type_args(p, &r.type_arg_count);
+            if (r.type_args == NULL) {
+                free(refs.data);
+                *count = 0;
+                return NULL;
+            }
+        }
         list_push(&refs, &r);
     } while (accept(p, TOKEN_PLUS));
     return list_finish(p, &refs, count);
@@ -2858,16 +2868,22 @@ static bool type_params(struct parser *p, struct item *it)
 {
     struct list list = {NULL, 0, 0, sizeof(struct type_param)};
 
+    bool ok;
+
     if (!check(p, TOKEN_LT)) {
         return true;
     }
     next(p);
+    /* The list counts as open, so that `>>` after the arguments of a
+       constraint closes both. */
+    p->angles++;
     do {
         struct type_param tp;
         memset(&tp, 0, sizeof tp);
         tp.pos = pos_of(peek(p));
         if (!expect_name(p, &tp.name)) {
             free(list.data);
+            p->angles--;
             return false;
         }
         if (accept(p, TOKEN_COLON)) {
@@ -2876,17 +2892,21 @@ static bool type_params(struct parser *p, struct item *it)
             } else if (is_builtin_type(peek(p)->kind)) {
                 error_here(p, "a constant parameter is written `N: int`");
                 free(list.data);
+                p->angles--;
                 return false;
             } else if ((tp.constraints = constraint_list(
                             p, &tp.constraint_count)) == NULL) {
                 free(list.data);
+                p->angles--;
                 return false;
             }
         }
         list_push(&list, &tp);
-    } while (accept(p, TOKEN_COMMA));
+    } while (!p->half && accept(p, TOKEN_COMMA));
     it->type_params = list_finish(p, &list, &it->type_param_count);
-    return expect(p, TOKEN_GT);
+    ok = close_angle(p);
+    p->angles--;
+    return ok;
 }
 
 static struct item *member_level(struct parser *p, const struct item *owner)

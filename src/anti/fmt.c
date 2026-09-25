@@ -401,7 +401,12 @@ static bool angle_list(struct angles *a, size_t *at, bool declaration)
                     if (angle_kind(a, *at) == TOKEN_DOT) {
                         *at += 2;
                     }
-                } while (angle_kind(a, *at) == TOKEN_PLUS);
+                    /* A generic interface takes its type arguments. */
+                    if (angle_kind(a, *at) == TOKEN_LT &&
+                        !angle_list(a, at, false)) {
+                        return false;
+                    }
+                } while (!a->half && angle_kind(a, *at) == TOKEN_PLUS);
             }
         } else if (k == TOKEN_INT) {
             (*at)++;
@@ -838,12 +843,15 @@ static bool last_opens_value(const struct emitter *e)
         contextual_word(e->src + e->prev->offset, e->prev->length)) {
         return true;
     }
-    /* The `lent` of a result, `-> lent *T`, opens the type after it. */
+    /* The `lent` of a result, `-> lent *T`, and of a parameter of a
+       function type, `fn(lent *T)`, opens the type after it. */
     if (e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
         e->prev->token->kind == TOKEN_IDENT && e->prev->length == 4 &&
         memcmp(e->src + e->prev->offset, "lent", 4) == 0 &&
         e->prev2 != NULL && e->prev2->kind == PIECE_TOKEN &&
-        e->prev2->token->kind == TOKEN_ARROW) {
+        (e->prev2->token->kind == TOKEN_ARROW ||
+         e->prev2->token->kind == TOKEN_LPAREN ||
+         e->prev2->token->kind == TOKEN_COMMA)) {
         return true;
     }
     return !last_ends_value(e);
