@@ -33,6 +33,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/lower.c
     src/antic/lower_desc.c
     src/antic/lower_expr.c
+    src/antic/lower_eq.c
     src/antic/lower_hash.c
     src/antic/lower_simd.c
     src/antic/lower_stmt.c

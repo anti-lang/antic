@@ -931,6 +931,7 @@ static void redirect(struct clone *cl, struct expr *e)
     case EXPR_BINARY:
         redirect(cl, e->as.binary.left);
         redirect(cl, e->as.binary.right);
+        redirect_list(cl, e->as.binary.eq_calls, e->as.binary.eq_count);
         break;
     case EXPR_FIELD:
         redirect(cl, e->as.field.base);
@@ -1025,7 +1026,9 @@ static bool open_node(const struct expr *e)
                (e->as.unary.op == TOKEN_MINUS || e->as.unary.op == TOKEN_TILDE);
     case EXPR_BINARY:
         return is_param(e->as.binary.left->type) ||
-               is_param(e->as.binary.right->type);
+               is_param(e->as.binary.right->type) ||
+               (e->as.binary.equals &&
+                sema_has_params(e->as.binary.left->type));
     case EXPR_INDEX:
         return is_param(e->as.index.base->type);
     default:
@@ -1074,10 +1077,18 @@ static struct expr *xe(struct clone *cl, struct expr *e)
     case EXPR_BINARY:
         n->as.binary.left = xe(cl, e->as.binary.left);
         n->as.binary.right = xe(cl, e->as.binary.right);
+        /* The default `==` of a type that names a parameter is read
+           again, and finds the functions of the types of the argument. */
         if (cl->fresh && open_node(e)) {
             mark(n->as.binary.left);
             mark(n->as.binary.right);
+            n->as.binary.equals = false;
+            n->as.binary.eq_calls = NULL;
+            n->as.binary.eq_count = 0;
             recheck(cl, n);
+        } else {
+            n->as.binary.eq_calls =
+                xlist(cl, e->as.binary.eq_calls, e->as.binary.eq_count);
         }
         break;
     case EXPR_CAST:

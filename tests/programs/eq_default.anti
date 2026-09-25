@@ -1,0 +1,161 @@
+//! A struct or a class gets a default `==` and no default `<`. The default of a
+//! struct compares its fields in order, each with its own `==`, and stops at
+//! the first that differs. A field with `operator fn eq` goes through that
+//! function, a class value through the `equals` of its class, a `str` by its
+//! bytes and a float by its value, so zero of either sign is one value and NaN
+//! equals nothing. Two values equal by the default have the same default hash.
+//! A generic takes the default where its constraints give `eq`, and a generic
+//! struct compares the fields of its argument.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// Counts the calls of the `==` of `Name`.
+class Tally
+{
+	pub n: int = 0,
+}
+
+/// A name equal by its length alone.
+struct Name
+{
+	text: str,
+	seen: *Tally,
+}
+
+operator fn eq(a: Name, b: Name) -> bool
+{
+	a.seen.n += 1;
+	return a.text.len == b.text.len;
+}
+
+operator fn hash(n: Name) -> u64
+{
+	return n.text.len as u64;
+}
+
+class Counter
+{
+	pub count: int = 0,
+	pub label: int = 0,
+}
+
+class Badge
+{
+	pub number: int = 0,
+	pub note: int = 0,
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		if !(other is *Badge) {
+			return false;
+		}
+		let o = other as *Badge;
+		return self.number == o.number;
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.number as u64;
+	}
+}
+
+struct Entry
+{
+	at: Point,
+	name: Name,
+	counter: Counter,
+	badge: Badge,
+	weight: f64,
+	next: ?*Entry,
+	flags: u8 : 3,
+	level: u8 : 5,
+}
+
+/// A text with a size, whose `==` reads the bytes of the text.
+struct Label
+{
+	text: str,
+	size: int,
+}
+
+struct Pair<T>
+{
+	first: T,
+	second: T,
+}
+
+fn same<T: eq>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+fn twins<T: eq>(a: T, b: T) -> bool
+{
+	let p = Pair<T> { first: a, second: b };
+	let q = Pair<T> { first: a, second: a };
+	return p == q;
+}
+
+fn entry(name: str, x: int, number: int, weight: f64, level: u8,
+	seen: *Tally) -> Entry
+{
+	return Entry {
+		at: Point { x: x, y: 2 }, name: Name { text: name, seen: seen },
+		counter: Counter { count: 3, label: 4 },
+		badge: Badge { number: number, note: x }, weight: weight, next: none,
+		flags: 5, level: level
+	};
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1, y: 2 };
+	let q = Point { x: 1, y: 2 };
+	let r = Point { x: 2, y: 1 };
+	printf("point %d %d %d %d\n".ptr, b(p == q), b(p == r), b(p != r),
+		b(same(p, q)));
+
+	let c = Counter { count: 3, label: 4 };
+	let d = Counter { count: 3, label: 4 };
+	let e = Counter { count: 3, label: 5 };
+	printf("class %d %d %d\n".ptr, b(c == d), b(c == e), b(same(c, e)));
+	let s = Badge { number: 7, note: 1 };
+	let t = Badge { number: 7, note: 2 };
+	printf("equals %d\n".ptr, b(s == t));
+
+	let seen = alloc Tally { };
+	let zero = 0.0;
+	let one = entry("ada", 1, 7, zero, 9, seen);
+	let two = entry("bob", 1, 7, -zero, 9, seen);
+	let three = entry("ada", 1, 8, zero, 9, seen);
+	let four = entry("ada", 1, 7, zero, 10, seen);
+	let five = entry("ada", 2, 7, zero, 9, seen);
+	let nan = entry("ada", 1, 7, zero / zero, 9, seen);
+	printf("entry %d %d %d %d %d\n".ptr, b(one == two), b(one == three),
+		b(one == four), b(nan == nan), b(one.hash() == two.hash()));
+	seen.n = 0;
+	printf("stops %d %d\n".ptr, b(one == five), seen.n as c_int);
+	let made = f"{12}";
+	let x = Label { text: made, size: 1 };
+	let y = Label { text: "12", size: 1 };
+	let z = Label { text: "21", size: 1 };
+	printf("text %d %d\n".ptr, b(x == y), b(x == z));
+	free(made.ptr);
+	printf("pairs %d %d %d\n".ptr, b(twins(1, 1)), b(twins(1, 2)),
+		b(twins(p, r)));
+	delete(seen);
+	return 0;
+}

@@ -3277,6 +3277,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "generic_syntax|--front-end,generic_syntax.anti"
         "constraints|--front-end,constraints.anti"
         "hashing|--front-end,hashing.anti"
+        "equality|--front-end,equality.anti"
         "direct_imports|--front-end,--runtime,${ANTIC_RUNTIME_DIR},direct_imports.anti"
         "walk_interfaces|--front-end,--runtime,${ANTIC_RUNTIME_DIR},walk_interfaces.anti"
         "handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},handles.anti"

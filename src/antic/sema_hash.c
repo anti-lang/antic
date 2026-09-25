@@ -3,6 +3,8 @@
    own, which the call of a method reaches. Every other type has the
    default hash, which lowering writes from the type. A value of a type
    parameter has the hook when its constraints name `hash`. */
+/* The default `==` of a struct and of a class value lives here as well,
+   since it keeps the rule that two values equal by `eq` hash alike. */
 
 #include <string.h>
 
@@ -58,30 +60,45 @@ static struct expr *nested_call(struct checker *c, struct pos pos,
     return call;
 }
 
+/* Whether the list calls of count checked calls holds one for type t. */
+static bool listed(struct expr **calls, size_t count, const struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (types_hash_call_type(calls[i]) == t) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Append call to the list *calls of *count. */
+static void append(struct checker *c, struct expr ***calls, size_t *count,
+                   struct expr *call)
+{
+    struct expr **grown = types_alloc_array(c->arena, *count + 1,
+                                            sizeof *grown);
+
+    if (*count > 0) {
+        memcpy(grown, *calls, *count * sizeof *grown);
+    }
+    grown[(*count)++] = call;
+    *calls = grown;
+}
+
 /* Add the call of the function of t to e, once per type. */
 static void add_call(struct checker *c, struct expr *e, struct type *t)
 {
-    struct expr **calls;
     struct expr *call;
-    size_t i;
 
-    for (i = 0; i < e->as.call.hash_count; i++) {
-        if (types_hash_call_type(e->as.call.hash_calls[i]) == t) {
-            return;
-        }
-    }
-    call = nested_call(c, e->pos, t);
-    if (call == NULL) {
+    if (listed(e->as.call.hash_calls, e->as.call.hash_count, t)) {
         return;
     }
-    calls = types_alloc_array(c->arena, e->as.call.hash_count + 1,
-                              sizeof *calls);
-    if (e->as.call.hash_count > 0) {
-        memcpy(calls, e->as.call.hash_calls,
-               e->as.call.hash_count * sizeof *calls);
+    call = nested_call(c, e->pos, t);
+    if (call != NULL) {
+        append(c, &e->as.call.hash_calls, &e->as.call.hash_count, call);
     }
-    calls[e->as.call.hash_count++] = call;
-    e->as.call.hash_calls = calls;
 }
 
 /* Walk the value of type t that the default hash of the call e reaches.
@@ -184,4 +201,132 @@ bool sema_is_hash_call(const struct expr *e)
            (e->as.call.hashes ||
             (callee->as.field.base->type != NULL &&
              callee->as.field.base->type->kind == TYPE_PARAM));
+}
+
+/* The default `==` */
+
+/* The value of type t that a hidden operand stands for, `*p`. It is
+   checked already and never lowered. */
+static struct expr *stand_in(struct checker *c, struct pos pos,
+                             struct type *t)
+{
+    struct expr *hole = sema_new_node(c, EXPR_NONE, pos);
+    struct expr *at = sema_new_node(c, EXPR_UNARY, pos);
+
+    hole->type = types_pointer(c->types, t);
+    hole->prechecked = true;
+    at->as.unary.op = TOKEN_STAR;
+    at->as.unary.operand = hole;
+    at->type = t;
+    at->prechecked = true;
+    return at;
+}
+
+/* The checked call of the `operator fn eq` of type t that compares two
+   values of it inside the operands of a default `==`. Lowering reads
+   the function the callee names, and a copy of a generic names its copy
+   there. */
+static struct expr *nested_eq(struct checker *c, struct pos pos,
+                              struct type *t)
+{
+    struct expr *e = sema_new_node(c, EXPR_BINARY, pos);
+
+    e->as.binary.op = TOKEN_EQ;
+    e->as.binary.left = stand_in(c, pos, t);
+    e->as.binary.right = stand_in(c, pos, t);
+    if (sema_is_error(sema_check_expr(c, e, NULL)) || e->kind != EXPR_CALL) {
+        return NULL;
+    }
+    return e;
+}
+
+/* Give the default `==` e the call of every `operator fn eq` of a part
+   of the struct t. A part is a field of struct or class type, or such a
+   field of a struct part that takes the default. A class value without one
+   calls the `equals` of its chain, which lowering finds in its members.
+   A field of a type parameter is read again in each copy. */
+static void walk_eq(struct checker *c, struct expr *e, struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        struct type *f = t->fields[i].type;
+        if (type_field_is_unit_break(&t->fields[i]) ||
+            (f->kind != TYPE_STRUCT && f->kind != TYPE_CLASS)) {
+            continue;
+        }
+        if (sema_operator_symbol(c, f, LANG_HOOK_EQ) != NULL) {
+            struct expr *call;
+            if (listed(e->as.binary.eq_calls, e->as.binary.eq_count, f)) {
+                continue;
+            }
+            call = nested_eq(c, e->pos, f);
+            if (call != NULL) {
+                append(c, &e->as.binary.eq_calls, &e->as.binary.eq_count,
+                       call);
+            }
+        } else if (f->kind == TYPE_STRUCT) {
+            walk_eq(c, e, f);
+        }
+    }
+}
+
+const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        const struct struct_field *f = &t->fields[i];
+        if (type_field_is_unit_break(f) || types_is_mutex(f->type)) {
+            continue;
+        }
+        if (!sema_meets_hook(c, f->type, LANG_HOOK_EQ)) {
+            return f;
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: a struct and a class get a default `==` and no default `<`,
+   since what order means is the type's own choice. The default of a
+   class value is the `equals` of its class, which the class replaces
+   with `concrete fn equals`. That of a struct compares its fields in
+   order, each with its own `==`, so it keeps the rule that values equal
+   by `eq` hash alike wherever each field keeps it. A union holds one
+   field and says not which, a simd struct compares lane by lane, and a
+   Mutex is no value, so none of the three has the default. */
+bool sema_default_eq(struct checker *c, struct type *t)
+{
+    if (t->kind == TYPE_CLASS) {
+        return true;
+    }
+    if (t->kind != TYPE_STRUCT || t->is_union || type_is_simd(t) ||
+        types_is_mutex(t)) {
+        return false;
+    }
+    return sema_eq_gap(c, t) == NULL;
+}
+
+bool sema_equals(struct checker *c, struct expr *e, struct type *t)
+{
+    if (!sema_default_eq(c, t)) {
+        return false;
+    }
+    e->as.binary.equals = true;
+    e->as.binary.eq_calls = NULL;
+    e->as.binary.eq_count = 0;
+    if (t->kind == TYPE_STRUCT) {
+        walk_eq(c, e, t);
+    }
+    return true;
+}
+
+const char *sema_no_order(const struct type *t, const char *hook)
+{
+    if (strcmp(hook, LANG_HOOK_LT) != 0 ||
+        (t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS)) {
+        return "";
+    }
+    return ". A struct or a class has no default order and declares "
+           "`operator fn lt`";
 }

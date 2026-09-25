@@ -1031,6 +1031,8 @@ static void io_expr_body(struct io *io, struct expr *e)
         io_expr(io, &e->as.binary.left);
         io_expr(io, &e->as.binary.right);
         io_bool(io, &e->as.binary.carry);
+        io_bool(io, &e->as.binary.equals);
+        io_exprs(io, &e->as.binary.eq_calls, &e->as.binary.eq_count);
         break;
     case EXPR_CAST:
         io_expr(io, &e->as.cast.operand);

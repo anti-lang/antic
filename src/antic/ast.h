@@ -300,6 +300,15 @@ struct expr {
                `carry` of a Flags value, which goes in as a carry or a
                borrow. Set by the checker. */
             bool carry;
+            /* DESIGN: `a == b` on a struct or a class value without
+               `operator fn eq` is the default equality, which lowering
+               writes from the type. A struct or a class value inside
+               the operands that has an `operator fn eq` is compared by
+               it. Each such type has one checked call in eq_calls, as a
+               default hash has in hash_calls. Set by the checker. */
+            bool equals;
+            struct expr **eq_calls;
+            size_t eq_count;
         } binary;
         struct {
             struct expr *operand;

@@ -1477,10 +1477,9 @@ static struct ir_operand lower_carry(struct lowerer *l, const struct expr *e)
 /* A comparison of two `str` values at a and b. `==` and `!=` ask the
    runtime whether the bytes are the same, and the orderings compare them
    as unsigned bytes, which gives -1, 0 or 1. */
-static struct ir_operand compare_text(struct lowerer *l, enum token_kind op,
-                                      const struct type *t,
-                                      struct ir_operand a,
-                                      struct ir_operand b)
+struct ir_operand lower_compare_text(struct lowerer *l, enum token_kind op,
+                                     const struct type *t,
+                                     struct ir_operand a, struct ir_operand b)
 {
     static const enum ir_type params[] = {IR_PTR, IR_I64, IR_PTR, IR_I64};
     struct ir_operand args[4];
@@ -1528,6 +1527,9 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     if (e->as.binary.carry) {
         return lower_carry(l, e);
     }
+    if (e->as.binary.equals) {
+        return lower_equals(l, e);
+    }
     /* A `?T` of a value compares with `none` by its flag. */
     if ((op == TOKEN_EQ || op == TOKEN_NE) &&
         (e->as.binary.left->type->kind == TYPE_OPTIONAL ||
@@ -1544,7 +1546,7 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     left = lower_expr(l, e->as.binary.left);
     right = lower_expr(l, e->as.binary.right);
     if (operands->kind == TYPE_STR && lower_is_comparison(op)) {
-        return compare_text(l, op, operands, left, right);
+        return lower_compare_text(l, op, operands, left, right);
     }
     /* A function with its context compares by its code, and a match by
        its pattern, each zero for `none`. */

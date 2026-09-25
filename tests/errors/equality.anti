@@ -1,0 +1,63 @@
+//! The refusals of the default `==` and of order. A struct or a class gets a
+//! default `==` and no default `<`, so a type used where `lt` or `Ordered` is
+//! needed declares `operator fn lt`, and the refusal says so. A struct with a
+//! field that has no `==` gets no default and the refusal names the field. A
+//! union gets none.
+
+struct Point
+{
+	x: int,
+}
+
+struct Buffer
+{
+	data: []int,
+}
+
+union Word
+{
+	whole: u32,
+	half: u16,
+}
+
+class Circle
+{
+	pub r: int = 0,
+}
+
+fn larger<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn points(a: Point, b: Point) -> bool
+{
+	return a < b;
+}
+
+fn circles(a: Circle, b: Circle) -> bool
+{
+	return a >= b;
+}
+
+fn buffers(a: Buffer, b: Buffer) -> bool
+{
+	return a == b;
+}
+
+fn words(a: Word, b: Word) -> bool
+{
+	return a != b;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1 };
+	let q = larger(p, p);
+	let c = Circle { r: 1 };
+	let d = larger(c, c);
+	return q.x + d.r;
+}

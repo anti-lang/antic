@@ -1,4 +1,4 @@
 handles.anti:18:12: error: `for x in &e` takes each element in place, and the `operator fn value` of `QueueWalk<int>` gives a copy of `int`
-handles.anti:21:23: error: `Plain` has no `eq`, which `PriorityQueue` needs for `T`
-handles.anti:21:10: error: `Plain` has no `eq`, which `PriorityQueue` needs for `T`
+handles.anti:21:23: error: `Plain` has no `lt`, which `PriorityQueue` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
+handles.anti:21:10: error: `Plain` has no `lt`, which `PriorityQueue` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
 handles.anti:24:23: error: expected `Handle<str>`, found `Handle<int>`

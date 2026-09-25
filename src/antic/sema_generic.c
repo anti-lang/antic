@@ -542,9 +542,15 @@ static bool meets_hook(struct checker *c, struct type *t, const char *hook)
         return sema_hook(c, t, hook) != NULL;
     }
     if (type_has_fields(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
-        return sema_operator_symbol(c, t, hook) != NULL;
+        return sema_operator_symbol(c, t, hook) != NULL ||
+               (strcmp(hook, LANG_HOOK_EQ) == 0 && sema_default_eq(c, t));
     }
     return builtin_meets(t, hook);
+}
+
+bool sema_meets_hook(struct checker *c, struct type *t, const char *hook)
+{
+    return meets_hook(c, t, hook);
 }
 
 /* The type of the element that the hook of the type t gives, or NULL
@@ -617,9 +623,10 @@ static void check_meets(struct checker *c, struct type *t,
     for (i = 0; i < HOOK_COUNT; i++) {
         if ((p->hooks & (1u << i)) != 0 && !meets_hook(c, t, hook_names[i])) {
             sema_error_at(c, pos, "`%s` has no `%s`, which `%.*s` needs for "
-                          "`%.*s`", sema_tn(t), hook_names[i],
+                          "`%.*s`%s", sema_tn(t), hook_names[i],
                           (int)generic->length, generic->text,
-                          (int)p->name.length, p->name.text);
+                          (int)p->name.length, p->name.text,
+                          sema_no_order(t, hook_names[i]));
             return;
         }
     }

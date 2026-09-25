@@ -1,0 +1,8 @@
+exit 0
+point 1 0 1 1
+class 1 0 0
+equals 1
+entry 1 0 0 0 1
+stops 0 0
+text 1 0
+pairs 1 0 0

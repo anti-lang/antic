@@ -1046,6 +1046,7 @@ for p in &people { }     // p is a lent *Person: the element itself, for this tu
 
 - `operator fn hash(self) -> u64` joins the table of language hooks. The built-in types have it. A struct or class gets a default that hashes its fields in order, and may replace it.
 - Two values that are equal by `eq` have the same `hash`. The default keeps that rule, and a replacement must.
+- A struct or class gets a default `eq` as well and no default `lt`, since what order means is the type's own choice. A type used where `Ordered` is needed declares `operator fn lt`, and the refusal says so.
 - `anti.lang` ships `constraint Ordered = eq + lt;`.
 - `str` has the hooks `eq`, `lt` and `hash`, so it meets `eq`, `Ordered` and `hash`. `==` compares the text, `<` compares it byte by byte, which for UTF-8 is the order of the code points, and `hash` hashes the bytes.
 - A hashing collection mixes its hash with a random seed chosen when the program starts. Keys chosen by an attacker then cannot all land in one bucket. The seed never decides the order a program sees.
@@ -1276,7 +1277,7 @@ list.push(c.share());
 - `` `f32x128` exceeds the vector cap, use an array ``
 - `` this program needs a processor with AVX2 (x86-64-v3, 2013 or later) `` at run time
 - `` inherits belongs in the class header: class Circle inherits Shape ``
-- `` `Circle` has no `lt`, which `max` needs for `T` ``
+- `` `Circle` has no `lt`, which `max` needs for `T`. A struct or a class has no default order and declares `operator fn lt` ``
 - `` `max` uses `+` on `T`, which its constraints do not give. Add `add` to them ``
 - `` `g` is not generic. Put the comparison in parentheses ``
 - `` `map` takes type parameters, so it cannot be `abstract` or replaced ``

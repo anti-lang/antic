@@ -5,7 +5,7 @@ generics.anti:99:6: error: type `Itself` names itself
 generics.anti:102:13: error: the copies of `Grow` name ever deeper copies of it
 generics.anti:39:9: error: `sum` uses `+` on `T`, which its constraints do not give. Add `add` to them
 generics.anti:45:27: error: `T` has no function `perimeter`, since no interface of its constraints declares one
-generics.anti:114:15: error: `Circle` has no `lt`, which `max` needs for `T`
+generics.anti:114:15: error: `Circle` has no `lt`, which `max` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
 generics.anti:115:19: error: `g` is not generic. Put the comparison in parentheses
 generics.anti:116:13: error: nothing in the arguments gives `T` of `make`, so the call writes it out after the name
 generics.anti:117:23: error: `size` must be a constant for `N`

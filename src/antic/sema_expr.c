@@ -1124,6 +1124,30 @@ static bool symbol_is_operator(const struct symbol *sym)
     return sym->item != NULL ? sym->item->is_operator : sym->is_operator;
 }
 
+/* Whether the free function sym of the module of t takes t, or a
+   pointer to it, first. A generic function of a generic struct takes
+   each copy of it. */
+static bool takes_first(const struct symbol *sym, const struct type *t)
+{
+    const struct type *first;
+
+    if (sym->type == NULL || sym->type->kind != TYPE_FN ||
+        sym->type->param_count == 0) {
+        return false;
+    }
+    first = sym->type->params[0];
+    if (first->kind == TYPE_POINTER) {
+        first = first->element;
+    }
+    return first == t || (first->generic != NULL &&
+                          first->generic == t->generic &&
+                          sema_has_params(first));
+}
+
+/* DESIGN: an operator of a struct is a free function of its module, and
+   one module declares one function of a name. The `operator fn eq` of
+   one struct is therefore no operator of another struct of the module,
+   which keeps its default `==`. */
 static struct symbol *operator_symbol(struct checker *c, struct type *t,
                                       const char *text)
 {
@@ -1141,7 +1165,8 @@ static struct symbol *operator_symbol(struct checker *c, struct type *t,
         return m->symbol;
     }
     sym = sema_method_symbol(c, t, &name);
-    if (sym != NULL && symbol_is_operator(sym)) {
+    if (sym != NULL && symbol_is_operator(sym) &&
+        (m != NULL || takes_first(sym, t))) {
         return sym;
     }
     return NULL;
@@ -1166,7 +1191,6 @@ struct symbol *sema_hook(struct checker *c, struct type *t, const char *text)
     struct name name;
     struct item *m;
     struct symbol *sym;
-    const struct type *first;
 
     if (t != NULL && t->kind == TYPE_POINTER && !t->nullable) {
         t = t->element;
@@ -1181,18 +1205,7 @@ struct symbol *sema_hook(struct checker *c, struct type *t, const char *text)
         return m->kind == ITEM_FN && m->is_operator ? m->symbol : NULL;
     }
     sym = sema_method_symbol(c, t, &name);
-    if (sym == NULL || !symbol_is_operator(sym) ||
-        sym->type == NULL || sym->type->kind != TYPE_FN ||
-        sym->type->param_count == 0) {
-        return NULL;
-    }
-    first = sym->type->params[0];
-    if (first->kind == TYPE_POINTER) {
-        first = first->element;
-    }
-    /* A generic hook of a generic struct takes each copy of it. */
-    if (first != t && !(first->generic != NULL && first->generic == t->generic &&
-                        sema_has_params(first))) {
+    if (sym == NULL || !symbol_is_operator(sym) || !takes_first(sym, t)) {
         return NULL;
     }
     return sym;
@@ -1730,10 +1743,28 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
         if (op == TOKEN_EQ || op == TOKEN_NE) {
             if (type_has_fields(left) || left->kind == TYPE_ARRAY ||
                 left->kind == TYPE_SLICE) {
-                sema_error_at(c, e->pos, "`%s` is not defined on `%s`", o,
-                              sema_tn(left));
+                const struct struct_field *gap;
+                if (sema_equals(c, e, left)) {
+                    return sema_builtin(c, TYPE_BOOL);
+                }
+                gap = left->kind == TYPE_STRUCT && !left->is_union
+                          ? sema_eq_gap(c, left)
+                          : NULL;
+                if (gap != NULL) {
+                    sema_error_at(c, e->pos, "`%s` is not defined on `%s`, "
+                                  "whose field `%.*s` has no `eq`", o,
+                                  sema_tn(left), (int)gap->name.length,
+                                  gap->name.text);
+                } else {
+                    sema_error_at(c, e->pos, "`%s` is not defined on `%s`",
+                                  o, sema_tn(left));
+                }
                 return sema_builtin(c, TYPE_ERROR);
             }
+        } else if (left->kind == TYPE_STRUCT || left->kind == TYPE_CLASS) {
+            sema_error_at(c, e->pos, "`%s` is not defined on `%s`%s", o,
+                          sema_tn(left), sema_no_order(left, LANG_HOOK_LT));
+            return sema_builtin(c, TYPE_ERROR);
         } else if (!type_is_numeric(left) && left->kind != TYPE_CHAR &&
                    left->kind != TYPE_STR) {
             sema_error_at(c, e->pos,

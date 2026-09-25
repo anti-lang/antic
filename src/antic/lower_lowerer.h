@@ -463,6 +463,16 @@ void lower_branch(struct lowerer *l, const struct expr *e,
                   struct ir_block *then_block,
                   struct ir_block *else_block);
 
+/* A comparison op of two `str` values at a and b, of type t. */
+struct ir_operand lower_compare_text(struct lowerer *l, enum token_kind op,
+                                     const struct type *t,
+                                     struct ir_operand a, struct ir_operand b);
+
+/* lower_eq.c */
+
+/* The default `==` or `!=` e, which the checker marked `equals`. */
+struct ir_operand lower_equals(struct lowerer *l, const struct expr *e);
+
 /* lower_hash.c */
 
 /* The default hash of the receiver of e, a call that the checker marked

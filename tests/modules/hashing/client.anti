@@ -1,5 +1,5 @@
 //! A program that hashes the types of another module, through its generics and
-//! inside a struct of its own.
+//! inside a struct of its own, and compares them with the default `==`.
 
 import com.example.keys;
 
@@ -40,5 +40,15 @@ fn main() -> int
 		g.hash()));
 	printf("tuple %d\n".ptr, same(keys.with_one("x"), ("x", 1).hash()));
 	printf("larger %d\n".ptr, keys.larger(4, 9) as c_int);
+	printf("equal %d %d\n".ptr, (e == f) as c_int, (f == f) as c_int);
+	let t = keys.Tag<int> { item: 3, mark: 1 };
+	let u = keys.Tag<int> { item: 4, mark: 1 };
+	printf("tags %d %d\n".ptr, keys.same_tags(t, t) as c_int,
+		keys.same_tags(t, u) as c_int);
+	let a = keys.Coded { code: keys.Code { n: 12 }, mark: 1 };
+	let b = keys.Coded { code: keys.Code { n: 22 }, mark: 1 };
+	let c = keys.Coded { code: keys.Code { n: 23 }, mark: 1 };
+	printf("pick %d %d\n".ptr, keys.pick(a, b, 1, 0) as c_int,
+		keys.pick(a, c, 1, 0) as c_int);
 	return 0;
 }

@@ -171,6 +171,10 @@ struct generic_call {
 #define LANG_HOOK_HASH "hash"
 /* Not a hook: the function every iterator has, which collects it. */
 #define LANG_HOOK_TO_SLICE "to_slice"
+/* The operators of the table a struct and a class have by default, and
+   the one they never have by default. */
+#define LANG_HOOK_EQ "eq"
+#define LANG_HOOK_LT "lt"
 
 /* A set of pointers, open addressed and at most half full. The owner
    frees slots with free(). */
@@ -465,6 +469,8 @@ const struct type *sema_param_iface(const struct type *p,
 /* Whether the constraints of the parameter p give the hook named hook. */
 bool sema_param_has(const struct type *p, const char *hook);
 bool sema_param_hash(struct checker *c, struct expr *e, const struct type *p);
+/* Whether the type t meets the hook named hook, as a constraint asks. */
+bool sema_meets_hook(struct checker *c, struct type *t, const char *hook);
 void sema_check_generic_item(struct checker *c, const struct item *it);
 
 /* sema_copies.c */
@@ -487,6 +493,17 @@ bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
                     struct type **result);
 /* Whether e is `x.hash()` in the form that sema_hash_call gives. */
 bool sema_is_hash_call(const struct expr *e);
+/* Whether a value of type t has the default `==`: a class value, or a
+   struct whose every field has `==`, its own or the default. */
+bool sema_default_eq(struct checker *c, struct type *t);
+/* The first field of the struct t without `==`, or NULL. */
+const struct struct_field *sema_eq_gap(struct checker *c, struct type *t);
+/* Make e, `a == b` or `a != b` on two values of type t, the default
+   equality. Returns false when t has none. */
+bool sema_equals(struct checker *c, struct expr *e, struct type *t);
+/* The end of a refusal of the hook named hook on type t: what a struct
+   or a class without `lt` declares, and "" for any other. */
+const char *sema_no_order(const struct type *t, const char *hook);
 
 /* sema_pattern.c */
 
