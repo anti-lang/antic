@@ -9,9 +9,14 @@
 //! `LibcAllocator` is the default, over the C library. `ArenaAllocator` hands
 //! out memory from blocks that it takes from another allocator, and gives every
 //! block back at once.
+//!
+//! `Shared<T>` gives an object more than one owner, by a count of its handles.
+
+import anti.lang;
 
 extern fn anti_rt_mem_alloc(size: int, align: int) -> ?*byte;
 extern fn anti_rt_mem_free(p: ?*byte);
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 
 /// The largest `int`, which the bytes of a block never pass.
 const LARGEST: int = 0x7FFFFFFFFFFFFFFF;
@@ -184,4 +189,111 @@ fn padding(n: int, align: int) -> int
 		return 0;
 	}
 	return align - over;
+}
+
+/// The object of a `Shared<T>` and the number of its handles.
+class Cell<T>
+{
+	pub atomic count: int,
+	pub value: T,
+}
+
+/// An object with more than one owner, each holding a handle.
+///
+/// `Shared<Circle>.new(Circle { r: 2.0 })` takes the object and gives the first
+/// handle. `share()` gives another and counts it, and `=` between two handles
+/// is refused, so the count never changes where the source does not say so.
+/// `dup` of a handle is `share()`, and so is the copy a collection makes of an
+/// element. The object is torn down, through its `destruct`, when the last
+/// handle is freed.
+///
+/// The count is atomic, so the handles of one object may be used and freed on
+/// more than one thread at once. `T` must be thread-safe for more than one thread to
+/// change the object.
+///
+/// `read(f)` and `modify(f)` lend the object to `f` for the call. No other
+/// pointer to it leaves the handle.
+///
+/// Two shared objects that hold a handle of each other are never freed, since
+/// each keeps the count of the other above zero. A plain pointer for one of the
+/// two links is the fix.
+pub final class Shared<T>
+{
+	/* DESIGN: the handle owns its cell with `own`, which is what makes `=`
+	   refuse to copy a handle. `destruct` frees the cell itself when it
+	   holds the last count, and leaves `none` in the field in every case,
+	   so the teardown of `own` fields that follows it frees nothing. The
+	   field has no default, so a literal outside the module makes no
+	   handle, and a handle holds `none` only after its teardown. */
+	own cell: ?*Cell<T>,
+
+	/// The first handle of `value`, which the handle takes.
+	pub fn new(own value: T) -> Shared<T>
+	{
+		return Shared<T> {
+			cell: alloc Cell<T> { count: 1, value: moved(value) },
+		};
+	}
+
+	/// Another handle of the same object, which counts one more.
+	pub fn share(self) -> Shared<T>
+	{
+		let cell = self.cell catch fatal;
+		cell.count.add(1);
+		return Shared<T> { cell: cell };
+	}
+
+	/// The number of handles of the object at this moment.
+	pub fn count(self) -> int
+	{
+		let cell = self.cell catch fatal;
+		return cell.count.load();
+	}
+
+	/// Lend the object to `f` for the call, to read it.
+	pub fn read(self, f: fn(lent *T))
+	{
+		let cell = self.cell catch fatal;
+		f(&cell.value);
+	}
+
+	/// Lend the object to `f` for the call, to change it.
+	pub fn modify(self, f: fn(lent *T))
+	{
+		let cell = self.cell catch fatal;
+		f(&cell.value);
+	}
+
+	/// Another handle in `to`, as `share()` gives one.
+	///
+	/// DESIGN: `dup` gives a replaced `copy` memory that nothing has written,
+	/// and a collection gives it the bytes of the element. The bytes of this
+	/// handle go into `to` first in both cases, its table among them.
+	concrete fn copy(self, to: *Object)
+	{
+		memcpy(to as ?*byte, self as ?*byte, size_of(Shared<T>) as c_size_t);
+		let cell = self.cell catch fatal;
+		cell.count.add(1);
+	}
+
+	fn destruct(self)
+	{
+		let cell = self.cell else {
+			return;
+		};
+		self.cell = none;
+		if cell.count.sub(1) == 1 {
+			delete(cell);
+		}
+	}
+}
+
+/// `value` itself, which the call moves out of the parameter.
+///
+/// DESIGN: a field of a literal copies an `own` parameter and leaves it to the
+/// teardown of the function, while `return` moves it. `Shared.new` passes its
+/// value through here, so the cell takes it by a move.
+fn moved<T>(own value: T) -> T
+{
+	return value;
 }

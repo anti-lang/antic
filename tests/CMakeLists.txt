@@ -663,7 +663,8 @@ set_property(TEST program_pattern_replace_dev PROPERTY FIXTURES_REQUIRED
     lang_dev_object regex_dev_object)
 # The registry of the classes in dev mode, where the module that links
 # writes it. The program takes its allocator from anti.mem. A dev link
-# names the object of anti.mem on the command line.
+# names the object of anti.mem on the command line, and that of anti.lang,
+# which anti.mem imports.
 add_test(NAME dev_object_mem
     COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
             -I "${ANTIC_RUNTIME_DIR}/std"
@@ -677,11 +678,11 @@ add_test(NAME program_deserialize_dev
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/deserialize.anti"
         "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object}"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_tests_properties(program_deserialize_dev PROPERTIES
-    FIXTURES_REQUIRED mem_dev_object)
+    FIXTURES_REQUIRED "lang_dev_object;mem_dev_object")
 # The methods of `[]byte` and `patch` in dev mode, where the byte
 # literals compile in the constructor of the program's module. The
 # conversions call anti.text, whose object imports anti.mem.
@@ -1009,6 +1010,21 @@ foreach(case "pool|pool" "tree|pool,tree" "queue|queue")
     set_tests_properties(std_collection_${name}_dev PROPERTIES
         FIXTURES_REQUIRED "${fixtures}")
 endforeach()
+# Shared<T> in dev mode. Its copies come from the library file of anti.mem
+# into the module of the program, beside those of anti.collection.
+add_test(NAME std_shared_dev
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/shared.anti"
+        "-DOPTIONS=--dev"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+set_tests_properties(std_shared_dev PROPERTIES
+    FIXTURES_REQUIRED
+        "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object")
 
 # Every failing function of src/std/ is written with `may fail`, apart from
 # a binding, which refuses it.
@@ -3356,6 +3372,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "direct_imports|--front-end,--runtime,${ANTIC_RUNTIME_DIR},direct_imports.anti"
         "walk_interfaces|--front-end,--runtime,${ANTIC_RUNTIME_DIR},walk_interfaces.anti"
         "handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},handles.anti"
+        "shared_handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},shared_handles.anti"
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

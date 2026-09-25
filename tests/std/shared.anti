@@ -1,0 +1,329 @@
+//! `Shared<T>` of anti.mem: an object with more than one owner, each holding a
+//! handle.
+//!
+//! `share()` and `dup` give another handle and count it, `read` and `modify`
+//! lend the object, and the object is torn down once, through its `destruct`,
+//! when the last handle is freed. `Bag<T>` is a small collection of the test
+//! over `collection.Collection<T>`, which holds handles, copies them and frees
+//! them. The chunks of a `parallel` share and free handles of one object at
+//! once on the threads of the pool. Two objects that hold a handle of each
+//! other are never freed, which is the leak the documentation names, and a
+//! plain pointer for one of the links frees both.
+
+import anti.collection;
+import anti.lang;
+import anti.mem.{Shared};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An object that says when it is torn down.
+class Circle
+{
+	pub r: int = 0,
+
+	fn destruct(self)
+	{
+		printf("destruct Circle %d\n".ptr, self.r as c_int);
+	}
+}
+
+/// A test collection over the shared parts.
+class Bag<T> inherits collection.Collection<T>
+{
+	items: ?*T = none,
+	size: int = 0,
+
+	pub fn new() -> Bag<T>
+	{
+		return Bag<T> { from: collection.allocator(none) };
+	}
+
+	pub fn push(self, own x: T, at: lang.SourceLocation = here)
+	{
+		if self.count == self.size {
+			let n = self.grown(self.size, self.count + 1);
+			self.items = self.moved(self.items, self.count, n);
+			self.size = n;
+		}
+		let items = self.items catch fatal;
+		items[self.count] = x;
+		self.resized(1, at);
+	}
+
+	operator fn iter(self) -> BagWalk<T>
+	{
+		return BagWalk<T> {
+			watch: self.watch(),
+			items: self.items,
+			count: self.count,
+		};
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		if self.count == 0 {
+			return -1;
+		}
+		return 0;
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		if at + 1 >= self.count {
+			return -1;
+		}
+		return at + 1;
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		let items = self.items catch fatal;
+		f(&items[at]);
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		let items = self.items catch fatal;
+		return self.copy_element(&items[at]);
+	}
+
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let items = self.items catch fatal;
+		let after = -1;
+		if at + 1 < self.count {
+			after = at;
+		}
+		let taken = (items[at], after);
+		self.close_gap(items, at, self.count);
+		return taken;
+	}
+
+	fn destruct(self)
+	{
+		let i = self.count - 1;
+		while i >= 0 do {
+			let items = self.items catch fatal;
+			self.destroy_element(&items[i]);
+			i -= 1;
+		}
+		self.give_back(self.items);
+	}
+}
+
+class BagWalk<T>
+{
+	pub watch: lang.Watch,
+	pub items: ?*T,
+	pub count: int,
+	pub at: int = -1,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.count;
+	}
+
+	operator fn value(self) -> lent *T
+	{
+		let items = self.items catch fatal;
+		return &items[self.at];
+	}
+}
+
+/// A counter that threads change at once, through its atomic field.
+concurrent class Hits
+{
+	atomic n: int = 0,
+
+	pub fn bump(self)
+	{
+		self.n.add(1);
+	}
+
+	pub fn total(self) -> int
+	{
+		return self.n.load();
+	}
+
+	fn destruct(self)
+	{
+		printf("destruct Hits %d\n".ptr, self.n.load() as c_int);
+	}
+}
+
+/// A node that links to another by a handle or by a plain pointer.
+class Node
+{
+	pub name: int = 0,
+	pub next: ?Shared<Node> = none,
+	pub back: ?*Node = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(name: int) -> Node
+	{
+		Node.live.add(1);
+		return Node { name: name };
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+		printf("destruct Node %d\n".ptr, self.name as c_int);
+	}
+}
+
+fn radius(h: *Shared<Circle>) -> int
+{
+	let r = 0;
+	h.read(fn(p) {
+		r = p.r;
+	});
+	return r;
+}
+
+fn handles()
+{
+	printf("-- handles\n".ptr);
+	let c = Shared<Circle>.new(Circle { r: 2 });
+	printf("new: %d\n".ptr, c.count() as c_int);
+	let d = c.share();
+	printf("share: %d\n".ptr, c.count() as c_int);
+	d.modify(fn(p) {
+		p.r = 3;
+	});
+	printf("changed through d, read through c: %d\n".ptr, radius(&c) as c_int);
+	{
+		let e = c.share();
+		printf("in a block: %d\n".ptr, e.count() as c_int);
+	}
+	printf("after the block: %d\n".ptr, c.count() as c_int);
+	let h = dup(&c);
+	printf("dup on the heap: %d %d\n".ptr, c.count() as c_int,
+		radius(h) as c_int);
+	delete(h);
+	printf("deleted: %d\n".ptr, c.count() as c_int);
+	printf("leaving\n".ptr);
+}
+
+fn in_a_bag()
+{
+	printf("-- in a bag\n".ptr);
+	let c = Shared<Circle>.new(Circle { r: 5 });
+	{
+		let bag = Bag<Shared<Circle>>.new();
+		for i in 0..3 {
+			bag.push(c.share());
+		}
+		printf("three in the bag: %d\n".ptr, c.count() as c_int);
+		for h in &bag {
+			h.modify(fn(p) {
+				p.r += 1;
+			});
+		}
+		for h in bag {
+			printf("walked %d\n".ptr, radius(&h) as c_int);
+		}
+		printf("after the walks: %d\n".ptr, c.count() as c_int);
+		{
+			let found = bag.find_first(fn(h) {
+				return true;
+			});
+			printf("a copy found: %d\n".ptr, c.count() as c_int);
+		}
+		let copies = bag.find_all(fn(h) {
+			return true;
+		});
+		printf("three copies: %d\n".ptr, c.count() as c_int);
+		let gone = bag.remove_first(fn(h) {
+			return true;
+		});
+		printf("one removed and held: %d, bag %d\n".ptr, c.count() as c_int,
+			bag.count as c_int);
+		bag.clear();
+		printf("cleared: %d\n".ptr, c.count() as c_int);
+		bag.push(c.share());
+		bag.push(Shared<Circle>.new(Circle { r: 50 }));
+		printf("the bag ends: %d\n".ptr, c.count() as c_int);
+	}
+	printf("after the bag: %d\n".ptr, c.count() as c_int);
+}
+
+worker fn touch(chunk: []Shared<Hits>) -> int
+{
+	for h in &chunk {
+		for i in 0..1000 {
+			let more = h.share();
+			more.read(fn(p) {
+				p.bump();
+			});
+		}
+	}
+	return chunk.len;
+}
+
+fn on_threads()
+{
+	printf("-- on threads\n".ptr);
+	let first = Shared<Hits>.new(Hits { });
+	{
+		let handles: [8]Shared<Hits> = [first.share(), first.share(),
+			first.share(), first.share(), first.share(), first.share(),
+			first.share(), first.share()];
+		let parts = parallel handles[0..8] by 8 -> touch;
+		let n = 0;
+		for i in 0..parts.len {
+			n += parts[i];
+		}
+		free(parts.ptr);
+		let total = 0;
+		first.read(fn(p) {
+			total = p.total();
+		});
+		printf("%d handles, %d hits, count %d\n".ptr, n as c_int,
+			total as c_int, first.count() as c_int);
+	}
+	printf("after the chunks: %d\n".ptr, first.count() as c_int);
+}
+
+fn cycle()
+{
+	printf("-- two that hold each other\n".ptr);
+	{
+		let a = Shared<Node>.new(Node.of(1));
+		let b = Shared<Node>.new(Node.of(2));
+		a.modify(fn(p) {
+			p.next = b.share();
+		});
+		b.modify(fn(p) {
+			p.next = a.share();
+		});
+		printf("counts %d %d\n".ptr, a.count() as c_int, b.count() as c_int);
+	}
+	printf("never freed: %d live\n".ptr, Node.live.load() as c_int);
+	Node.live.store(0);
+
+	printf("-- a plain pointer for one link\n".ptr);
+	let b = alloc Node { name: 4 };
+	Node.live.add(1);
+	{
+		let a = Shared<Node>.new(Node.of(3));
+		a.modify(fn(p) {
+			p.back = b;
+		});
+		b.next = a.share();
+		printf("count %d\n".ptr, a.count() as c_int);
+	}
+	delete(b);
+	printf("both freed: %d live\n".ptr, Node.live.load() as c_int);
+}
+
+fn main() -> int
+{
+	handles();
+	in_a_bag();
+	on_threads();
+	cycle();
+	return 0;
+}

@@ -1,0 +1,3 @@
+shared_handles.anti:21:6: error: `Shared<Circle>` has `own` fields, use `dup` instead of `=`
+shared_handles.anti:22:10: error: `Shared<Circle>` has `own` fields, use `dup` instead of `=`
+shared_handles.anti:26:12: error: `p` is lent for the call and cannot be stored

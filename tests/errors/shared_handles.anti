@@ -1,0 +1,29 @@
+// The refusals of a handle of `Shared<T>`. `=` and `let` from an existing
+// handle would give the object an owner that its count does not know. A lent
+// object may not be kept past the call that lends it.
+
+import anti.mem.{Shared};
+
+class Circle
+{
+	pub r: int = 0,
+}
+
+class Keeper
+{
+	pub kept: ?*Circle = none,
+}
+
+fn main() -> int
+{
+	let c = Shared<Circle>.new(Circle { r: 1 });
+	let d = c.share();
+	d = c;
+	let f = d;
+	let e = Shared<Circle>.new(Circle { r: 2 });
+	let k = Keeper { };
+	e.read(fn(p) {
+		k.kept = p;
+	});
+	return 0;
+}

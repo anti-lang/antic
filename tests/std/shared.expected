@@ -1,0 +1,37 @@
+exit 0
+-- handles
+new: 1
+share: 2
+changed through d, read through c: 3
+in a block: 3
+after the block: 2
+dup on the heap: 3 3
+deleted: 2
+leaving
+destruct Circle 3
+-- in a bag
+three in the bag: 4
+walked 8
+walked 8
+walked 8
+after the walks: 4
+a copy found: 5
+three copies: 7
+one removed and held: 7, bag 2
+cleared: 5
+the bag ends: 6
+destruct Circle 50
+after the bag: 1
+destruct Circle 8
+-- on threads
+8 handles, 8000 hits, count 9
+after the chunks: 1
+destruct Hits 8000
+-- two that hold each other
+counts 2 2
+never freed: 2 live
+-- a plain pointer for one link
+count 2
+destruct Node 4
+destruct Node 3
+both freed: 0 live
