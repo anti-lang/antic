@@ -22,8 +22,6 @@ extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
 extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
-extern fn anti_rt_element_copy(into: ?*byte, from: ?*byte, arg: ?*byte);
-extern fn anti_rt_element_destroy(bytes: ?*byte, arg: ?*byte);
 
 /// The most elements a node holds.
 ///
@@ -762,11 +760,11 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 
 /// A map from keys to values that walks in the order of its keys.
 ///
-/// A key is found in logarithmic time. `for e in m` gives a copy of each entry
-/// as a `(K, V)`, and `keys()` and `values()` walk one side. `for v in
-/// &m.values()` changes the values in place. `range(lo, hi)`, `floor(k)`,
-/// `ceiling(k)`, `first()` and `last()` find entries by the order, and
-/// `pop_first()` and `pop_last()` take them out.
+/// A key is found in logarithmic time. `for (k, v) in m` gives each entry as a
+/// `(K, V)`, and `for (k, v) in &m` lends each value in place. `keys()` and
+/// `values()` walk one side, and `range(lo, hi)`, `floor(k)`, `ceiling(k)`,
+/// `first()` and `last()` find entries by the order. `pop_first()` and
+/// `pop_last()` take them out.
 ///
 /// The functions of `collection.Collection` see each entry as a `(K, V)`. A
 /// function that the `update` forms of the base lend one may change the value.
@@ -782,10 +780,10 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 		return made;
 	}
 
-	operator fn iter(self) -> SortedWalk<(K, V)>
+	operator fn iter(self) -> SortedEntries<K, V>
 	{
-		return SortedWalk<(K, V)>.over(self, self.first_place(), -1,
-			self.watch());
+		return SortedEntries<K, V>.over(self, self.slots, self.first_place(),
+			-1, self.watch());
 	}
 
 	/// A copy of the value of the key `k`, or `none`.
@@ -874,7 +872,7 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 	pub fn keys(self) -> SortedKeys<K, V>
 	{
 		return SortedKeys<K, V>.over(self, self.slots, self.first_place(),
-			self.key_type(), self.watch());
+			self.watch());
 	}
 
 	/// A walk of the values in the order of their keys, which lends each value
@@ -885,9 +883,9 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 			self.watch());
 	}
 
-	/// A walk of copies of the entries from the key `lo` up to and not
-	/// including the key `hi`.
-	pub fn range(self, lo: K, hi: K) -> SortedWalk<(K, V)>
+	/// A walk of the entries from the key `lo` up to and not including the key
+	/// `hi`, which lends each value in place to a walk with `&`.
+	pub fn range(self, lo: K, hi: K) -> SortedEntries<K, V>
 	{
 		let first = -1;
 		let stop = -1;
@@ -895,7 +893,8 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 			first = self.ceiling_place(&lo);
 			stop = self.ceiling_place(&hi);
 		}
-		return SortedWalk<(K, V)>.over(self, first, stop, self.watch());
+		return SortedEntries<K, V>.over(self, self.slots, first, stop,
+			self.watch());
 	}
 
 	/// A copy of the entry with the greatest key not above `k`, or `none`.
@@ -963,22 +962,6 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 		let gone = self.take_out(place);
 		self.resized(-1, at);
 		return gone;
-	}
-
-	/// A copy of the entry at the place `at`, whose key and value own what they
-	/// hold.
-	concrete fn copy_place(self, at: int) -> (K, V)
-	{
-		let key = self.copy_key(&self.slot(at).0);
-		let value = self.copy_value(at);
-		return (key, value);
-	}
-
-	/// Remove every entry.
-	concrete fn clear(self, at: lang.SourceLocation = here)
-	{
-		self.destroy_entries();
-		self.emptied(at);
 	}
 
 	/// Remove every entry that `test` accepts and give their number.
@@ -1162,44 +1145,13 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 	/// A copy of the key at `k`, which owns what it holds.
 	fn copy_key(self, k: *K) -> K
 	{
-		let made = *k;
-		anti_rt_element_copy(&made as ?*byte, k as ?*byte, self.key_type());
-		return made;
+		return dup(*k);
 	}
 
 	/// A copy of the value at the place `at`, which owns what it holds.
 	fn copy_value(self, at: int) -> V
 	{
-		let p = &self.slot(at).1;
-		let made = *p;
-		anti_rt_element_copy(&made as ?*byte, p as ?*byte, self.value_type());
-		return made;
-	}
-
-	/// Tear down the key and the value of every entry and zero their slots.
-	///
-	/// DESIGN: the map tears down and copies the key and the value of an entry
-	/// by the records of the key type and the value type, since the runtime
-	/// copies and tears down a tuple as bytes. A value of a class that owns
-	/// memory is then torn down once and copied whole.
-	fn destroy_entries(self)
-	{
-		let keys = self.key_type();
-		let values = self.value_type();
-		let place = self.first_place();
-		while place >= 0 do {
-			let after = self.next_place(place);
-			let entry = self.slot(place);
-			anti_rt_element_destroy(&entry.0 as ?*byte, keys);
-			anti_rt_element_destroy(&entry.1 as ?*byte, values);
-			memset(entry as ?*byte, 0, size_of((K, V)) as c_size_t);
-			place = after;
-		}
-	}
-
-	fn destruct(self)
-	{
-		self.destroy_entries();
+		return dup(self.slot(at).1);
 	}
 
 	/// The record of the key type in the descriptor of this copy of the class,
@@ -1545,26 +1497,72 @@ pub class SortedWalk<T>
 	}
 }
 
+/// A walk of the entries of a `SortedMap` in key order, from one place up to
+/// and not including another. Each turn gives a copy of the key and lends the
+/// value in place. `for (k, v) in &m` changes the values, and `for (k, v) in m`
+/// reads them.
+pub class SortedEntries<K: Ordered, V>
+{
+	watch: lang.Watch,
+	map: *SortedMap<K, V>,
+	slots: ?*(K, V),
+	at: int,
+	stop: int,
+	started: bool = false,
+
+	/// A walk of the entries of `map`, which lie at `slots`, from the place
+	/// `first` up to and not including the place `stop`, or to the end when it
+	/// is -1.
+	pub fn over(map: *SortedMap<K, V>, slots: ?*(K, V), first: int, stop: int,
+		watch: lang.Watch) -> SortedEntries<K, V>
+	{
+		return SortedEntries<K, V> {
+			watch: watch,
+			map: map,
+			slots: slots,
+			at: first,
+			stop: stop,
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		if self.started {
+			self.at = self.map.next_place(self.at);
+		}
+		self.started = true;
+		if self.at == self.stop {
+			self.at = -1;
+		}
+		return self.at >= 0;
+	}
+
+	operator fn value(self) -> (K, lent *V)
+	{
+		let slots = self.slots catch fatal;
+		let p = &slots[self.at];
+		return (dup(p.0), &p.1);
+	}
+}
+
 /// A walk of copies of the keys of a `SortedMap`.
 pub class SortedKeys<K: Ordered, V>
 {
 	watch: lang.Watch,
 	map: *SortedMap<K, V>,
 	slots: ?*(K, V),
-	key_type: ?*byte,
 	at: int,
 	started: bool = false,
 
 	/// A walk of the keys of `map`, whose entries lie at `slots`, from the
-	/// place `first`. `key_type` is the record of the key type.
+	/// place `first`.
 	pub fn over(map: *SortedMap<K, V>, slots: ?*(K, V), first: int,
-		key_type: ?*byte, watch: lang.Watch) -> SortedKeys<K, V>
+		watch: lang.Watch) -> SortedKeys<K, V>
 	{
 		return SortedKeys<K, V> {
 			watch: watch,
 			map: map,
 			slots: slots,
-			key_type: key_type,
 			at: first,
 		};
 	}
@@ -1581,10 +1579,7 @@ pub class SortedKeys<K: Ordered, V>
 	operator fn value(self) -> K
 	{
 		let slots = self.slots catch fatal;
-		let p = &slots[self.at].0;
-		let made = *p;
-		anti_rt_element_copy(&made as ?*byte, p as ?*byte, self.key_type);
-		return made;
+		return dup(slots[self.at].0);
 	}
 }
 

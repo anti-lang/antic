@@ -168,6 +168,16 @@ fn walks()
 		printf("%d ".ptr, e.0 as c_int);
 	}
 	printf("\n".ptr);
+	for (k, v) in &m {
+		*v -= k;
+	}
+	for (k, v) in &m.range(2, 5) {
+		*v = 0;
+	}
+	for (k, v) in m {
+		printf("%d:%d ".ptr, k as c_int, v as c_int);
+	}
+	printf("\n".ptr);
 }
 
 fn order()
@@ -298,6 +308,33 @@ fn owned()
 	printf("after the block, torn %d of 8\n".ptr, Tag.torn.load() as c_int);
 }
 
+/// Walks a map of values that own memory. The lent form changes each value in
+/// place, and the copy form reads the value that `value` lends, which the loop
+/// does not tear down. Each value is torn down once, when the map ends.
+fn owned_walks()
+{
+	let before = Tag.torn.load();
+	{
+		let tags = SortedMap<int, Tag>.new();
+		for k in 1..4 {
+			tags.set(k, Tag.of(k));
+		}
+		for (k, t) in &tags {
+			let p = t.n catch fatal;
+			p[0] = k * 10;
+		}
+		printf("lent walk, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+		let sum = 0;
+		for (k, t) in tags {
+			sum += t.number();
+		}
+		printf("copy walk %d, torn %d\n".ptr, sum as c_int,
+			(Tag.torn.load() - before) as c_int);
+	}
+	printf("after the block, torn %d of 3\n".ptr,
+		(Tag.torn.load() - before) as c_int);
+}
+
 fn allocations()
 {
 	let counting = Counting { };
@@ -338,6 +375,7 @@ fn main() -> int
 	shared() catch fatal;
 	texts();
 	owned();
+	owned_walks();
 	allocations();
 	return 0;
 }
