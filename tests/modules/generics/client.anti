@@ -52,6 +52,22 @@ class Numbers
 	}
 }
 
+/// Two rows of two values, read and written with two indices.
+class Plane
+{
+	pub values: [4]int,
+
+	operator fn index(self, x: int, y: int) -> int
+	{
+		return self.values[y * 2 + x];
+	}
+
+	operator fn set_index(self, x: int, y: int, v: int)
+	{
+		self.values[y * 2 + x] = v;
+	}
+}
+
 class NumbersIter
 {
 	pub list: *Numbers,
@@ -127,6 +143,9 @@ fn main() -> int
 	let n = Numbers { values: [1, 2, 3, 4] };
 	gen.swap(&n);
 	printf("%d %d %d\n".ptr, n[0] as c_int, n[1] as c_int, gen.count(&n) as c_int);
+	let plane = Plane { values: [1, 2, 3, 4] };
+	gen.swap_corners(&plane);
+	printf("%d %d\n".ptr, plane[0, 0] as c_int, plane[1, 1] as c_int);
 
 	let values = [7, 8];
 	let one = gen.first(values[0..2]) catch fatal;

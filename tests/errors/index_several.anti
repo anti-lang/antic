@@ -1,0 +1,44 @@
+//! The refusals of hooks with more than one index.
+
+class Grid
+{
+	operator fn index(self, x: int, y: int) -> int
+	{
+		return x + y;
+	}
+
+	operator fn set_index(self, x: int, v: int)
+	{
+	}
+}
+
+class Board
+{
+	operator fn index(self, x: int, y: int) -> int
+	{
+		return x + y;
+	}
+
+	operator fn set_index(self, x: int, y: str, v: int)
+	{
+	}
+}
+
+class Loose
+{
+	operator fn set_index(self, v: int)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let xs: [4]int = [1, 2, 3, 4];
+	let a = xs[1, 2];
+	let g = Grid { };
+	let b = g[1];
+	let c = g[1, 2, 3];
+	let d = g[1, "two"];
+	g[1, 2] += 1;
+	return a + b + c + d;
+}

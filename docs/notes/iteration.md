@@ -18,6 +18,9 @@ and iteration" in `docs/decisions.md`.
   path, so an abstract `next` dispatches through the table.
 - `e[i]` becomes the call `e.index(i)` in place. `e[i] = v` becomes the
   statement `e.set_index(i, v);`.
+- `e[x, y]` reaches the checker as an index node whose index is the tuple
+  `(x, y)`, marked `several`. It becomes `e.index(x, y)`, and `e[x, y] = v`
+  becomes `e.set_index(x, y, v);`.
 - `it.to_slice()` becomes `EXPR_COLLECT` when the type of `it` is an iterator
   and declares no `to_slice`.
 

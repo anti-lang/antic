@@ -364,7 +364,12 @@ struct expr {
         } call;
         struct {
             struct expr *base;
+            /* DESIGN: `g[x, y]` holds its indices as the tuple `(x, y)`
+               and sets `several`, so every walk of the tree reaches each
+               index. The checker spreads them into the arguments of
+               `index` or `set_index`. `g[(x, y)]` passes one tuple. */
             struct expr *index;
+            bool several;
         } index;
         struct {
             struct expr *base;

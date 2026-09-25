@@ -3091,7 +3091,7 @@ static void check_hook(struct checker *c, const struct item *m,
                           "`operator fn next` and `operator fn value`", self);
         }
     } else if (sema_name_is(&m->name, LANG_HOOK_INDEX)) {
-        ok = !sig->may_fail && sig->param_count == 2 &&
+        ok = !sig->may_fail && sig->param_count >= 2 &&
              sig->result->kind != TYPE_VOID;
         if (!ok) {
             sema_error_at(c, m->name_pos, "`operator fn index` is written "
@@ -3113,17 +3113,34 @@ static void check_hook(struct checker *c, const struct item *m,
         struct symbol *index = sema_hook(c, owner, LANG_HOOK_INDEX);
         const struct type *read = index != NULL ? index->type : NULL;
         bool paired = read != NULL && read->kind == TYPE_FN &&
-                      !read->may_fail && read->param_count == 2 &&
+                      !read->may_fail && read->param_count >= 2 &&
                       read->result->kind != TYPE_VOID;
-        ok = !sig->may_fail && sig->param_count == 3 &&
-             sig->result->kind == TYPE_VOID &&
-             (!paired || (sig->params[1] == read->params[1] &&
-                          sig->params[2] == read->result));
+        size_t i;
+        ok = !sig->may_fail && sig->param_count >= 3 &&
+             sig->result->kind == TYPE_VOID;
+        if (ok && paired) {
+            ok = sig->param_count == read->param_count + 1 &&
+                 sig->params[read->param_count] == read->result;
+            for (i = 1; ok && i < read->param_count; i++) {
+                ok = sig->params[i] == read->params[i];
+            }
+        }
         if (!ok && paired) {
+            /* The indices of `index` in order, then the element. */
+            struct text indices = {0};
+            for (i = 1; i < read->param_count; i++) {
+                if (read->param_count == 2) {
+                    text_appendf(&indices, "i: %s, ", sema_tn(read->params[i]));
+                } else {
+                    text_appendf(&indices, "i%zu: %s, ", i,
+                                 sema_tn(read->params[i]));
+                }
+            }
             sema_error_at(c, m->name_pos, "`operator fn set_index` is "
-                          "written `operator fn set_index(%s, i: %s, v: "
-                          "%s)`, as `index` reads", self,
-                          sema_tn(read->params[1]), sema_tn(read->result));
+                          "written `operator fn set_index(%s, %sv: %s)`, as "
+                          "`index` reads", self, text_cstr(&indices),
+                          sema_tn(read->result));
+            text_free(&indices);
         } else if (!ok) {
             sema_error_at(c, m->name_pos, "`operator fn set_index` is "
                           "written `operator fn set_index(%s, i: I, v: T)`",

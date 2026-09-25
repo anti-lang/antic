@@ -1,0 +1,7 @@
+exit 0
+grid 5 12 9
+held 4
+flip 5 0
+table 31 40
+cube 57
+pair 34

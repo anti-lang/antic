@@ -1,0 +1,8 @@
+index_several.anti:37:10: error: `[4]int` has no `operator fn index`, which `e[x, y]` calls
+index_several.anti:39:10: error: `Grid.index` takes 2 arguments, found 1
+index_several.anti:40:10: error: `Grid.index` takes 2 arguments, found 3
+index_several.anti:41:15: error: expected `int`, found `str`
+index_several.anti:42:2: error: `+=` takes no `operator fn set_index`, and `e[i] = e[i] + v` writes it
+index_several.anti:10:14: error: `operator fn set_index` is written `operator fn set_index(self, i1: int, i2: int, v: int)`, as `index` reads
+index_several.anti:22:14: error: `operator fn set_index` is written `operator fn set_index(self, i1: int, i2: int, v: int)`, as `index` reads
+index_several.anti:29:14: error: `operator fn set_index` is written `operator fn set_index(self, i: I, v: T)`

@@ -1486,6 +1486,26 @@ static struct expr *postfix(struct parser *p)
                 outer = new_expr(p, EXPR_INDEX, t);
                 outer->as.index.base = e;
                 outer->as.index.index = first;
+                /* `g[x, y]` gives the hooks every index. */
+                if (first != NULL && check(p, TOKEN_COMMA)) {
+                    struct list indices = {NULL, 0, 0,
+                                           sizeof(struct expr *)};
+                    struct expr *all = new_expr(p, EXPR_TUPLE, t);
+                    all->pos = first->pos;
+                    list_push(&indices, &first);
+                    while (accept(p, TOKEN_COMMA)) {
+                        struct expr *index = expression(p);
+                        if (index == NULL) {
+                            free(indices.data);
+                            return NULL;
+                        }
+                        list_push(&indices, &index);
+                    }
+                    all->as.tuple.elements =
+                        list_finish(p, &indices, &all->as.tuple.count);
+                    outer->as.index.index = all;
+                    outer->as.index.several = true;
+                }
             }
             p->no_struct_literal = saved;
             outer->pos = e->pos;

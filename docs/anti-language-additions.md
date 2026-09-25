@@ -618,8 +618,10 @@ A type joins a construct of the language through `operator fn`, as it already do
 | `==`, `<`, and the comparisons derived from them | `eq`, `lt` |
 | bitwise operators | `and`, `or`, `xor`, `shl`, `shr`, `not` |
 | `for x in e` | `iter` on the collection, `next` and `value` on the iterator |
-| `e[i]` | `index` to read, `set_index` for `e[i] = v` |
+| `e[i]`, `e[x, y]` | `index` to read, `set_index` for `e[i] = v` and `e[x, y] = v` |
 | a key of a hashing collection | `hash` |
+
+`index` and `set_index` take any number of indices, each with its own type. `operator fn index(self, x: int, y: int) -> T` makes `g[x, y]` read, and the matching `operator fn set_index(self, x: int, y: int, v: T)` makes `g[x, y] = v` write.
 
 `f"..."` writes a class through `to_text`, which every class has.
 

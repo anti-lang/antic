@@ -1,0 +1,89 @@
+//! Hooks with more than one index. `operator fn index(self, x: int, y: int)`
+//! makes `g[x, y]` read and `set_index` with the same indices makes `g[x, y] =
+//! v` write. Each index has its own type, a struct takes three through free
+//! functions of its module, and a generic reaches two through the constraints
+//! `index` and `set_index`. An index that is a tuple stays one index.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Grid
+{
+	pub cells: [6]int = [0; 6],
+	pub width: int = 3,
+
+	operator fn index(self, x: int, y: int) -> int
+	{
+		return self.cells[y * self.width + x];
+	}
+
+	operator fn set_index(self, x: int, y: int, v: int)
+	{
+		self.cells[y * self.width + x] = v;
+	}
+}
+
+/// Rows named by text and columns by a byte.
+class Table
+{
+	pub ages: [4]int = [30, 31, 40, 41],
+
+	operator fn index(self, row: str, column: u8) -> int
+	{
+		let at = column as int;
+		if row == "ann" {
+			return self.ages[at];
+		}
+		return self.ages[2 + at];
+	}
+}
+
+struct Cube
+{
+	side: int,
+}
+
+operator fn index(c: *Cube, x: int, y: int, z: int) -> int
+{
+	return (z * c.side + y) * c.side + x;
+}
+
+/// A single index that is a tuple.
+class Pairs
+{
+	operator fn index(self, p: (int, int)) -> int
+	{
+		return p.0 * 10 + p.1;
+	}
+}
+
+fn flip<G: index + set_index>(g: G)
+{
+	let first = g[0, 0];
+	g[0, 0] = g[1, 0];
+	g[1, 0] = first;
+}
+
+fn main() -> int
+{
+	let g = Grid { };
+	g[1, 0] = 5;
+	g[2, 1] = 7;
+	g[2, 1] = g[2, 1] + g[1, 0];
+	g[0, 1] = 9;
+	printf("grid %d %d %d\n".ptr, g[1, 0] as c_int, g[2, 1] as c_int,
+		g.index(0, 1) as c_int);
+	let held = alloc Grid { };
+	held[1, 1] = 4;
+	printf("held %d\n".ptr, held[1, 1] as c_int);
+	flip(&g);
+	printf("flip %d %d\n".ptr, g[0, 0] as c_int, g[1, 0] as c_int);
+	delete(held);
+
+	let t = Table { };
+	printf("table %d %d\n".ptr, t["ann", 1] as c_int, t["bob", 0] as c_int);
+	let c = Cube { side: 4 };
+	printf("cube %d\n".ptr, c[1, 2, 3] as c_int);
+	let p = Pairs { };
+	printf("pair %d\n".ptr, p[(3, 4)] as c_int);
+	return 0;
+}

@@ -665,7 +665,9 @@ static bool check_set_index(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
     struct expr *base = target->as.index.base;
-    struct expr *args[2];
+    struct expr *index = target->as.index.index;
+    struct expr **args;
+    size_t count = target->as.index.several ? index->as.tuple.count : 1;
     struct type *t = sema_check_expr(c, base, NULL);
     char spelling[OP_TEXT];
 
@@ -699,10 +701,17 @@ static bool check_set_index(struct checker *c, struct stmt *s)
         sema_check_expr(c, s->as.assign.value, NULL);
         return true;
     }
-    args[0] = target->as.index.index;
-    args[1] = s->as.assign.value;
+    /* `e[x, y] = v` is `e.set_index(x, y, v)`. */
+    args = types_alloc_array(c->arena, count + 1, sizeof *args);
+    if (target->as.index.several) {
+        memcpy(args, index->as.tuple.elements, count * sizeof *args);
+    } else {
+        args[0] = index;
+    }
+    args[count] = s->as.assign.value;
     s->kind = STMT_EXPR;
-    s->as.expr = sema_hook_call(c, base, LANG_HOOK_SET_INDEX, args, 2);
+    s->as.expr = sema_hook_call(c, base, LANG_HOOK_SET_INDEX, args,
+                                count + 1);
     sema_check_expr(c, s->as.expr, NULL);
     return true;
 }

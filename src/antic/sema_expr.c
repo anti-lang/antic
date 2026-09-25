@@ -2759,14 +2759,26 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_INDEX:
         t = sema_check_expr(c, e->as.index.base, NULL);
         /* DESIGN: `e[i]` on a type with the `index` hook is the call
-           `e.index(i)`, and the index takes the type the hook names. */
+           `e.index(i)`, and the index takes the type the hook names.
+           `e[x, y]` is `e.index(x, y)`. */
         if (!sema_is_error(t) && sema_hook(c, t, LANG_HOOK_INDEX) != NULL) {
             struct expr *index = e->as.index.index;
-            *e = *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX, &index, 1);
+            *e = e->as.index.several
+                     ? *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX,
+                                       index->as.tuple.elements,
+                                       index->as.tuple.count)
+                     : *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX,
+                                       &index, 1);
             return sema_check_expr(c, e, expected);
         }
         if (!sema_is_error(t) && t->kind == TYPE_PARAM) {
             return sema_param_index(c, e, t, false);
+        }
+        if (!sema_is_error(t) && e->as.index.several) {
+            sema_error_at(c, e->pos, "`%s` has no `operator fn index`, which "
+                          "`e[x, y]` calls", sema_tn(t));
+            sema_check_expr(c, e->as.index.index, NULL);
+            return sema_builtin(c, TYPE_ERROR);
         }
         if (!sema_require(c, e->as.index.index,
                           sema_check_expr(c, e->as.index.index,

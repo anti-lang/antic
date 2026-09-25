@@ -3135,6 +3135,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "own_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_params.s,own_params.anti"
         "lent_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_params.s,lent_params.anti"
         "lent_slices|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_slices.s,lent_slices.anti"
+        "index_several|-S,-o,${LISTINGS}/index_several.s,index_several.anti"
         "walk_copy|-S,-o,${LISTINGS}/walk_copy.s,walk_copy.anti"
         "walk_lent|-S,-o,${LISTINGS}/walk_lent.s,walk_lent.anti"
         "fn_may_fail|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fn_may_fail.s,fn_may_fail.anti"

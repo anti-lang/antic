@@ -1044,6 +1044,7 @@ static void io_expr_body(struct io *io, struct expr *e)
     case EXPR_INDEX:
         io_expr(io, &e->as.index.base);
         io_expr(io, &e->as.index.index);
+        io_bool(io, &e->as.index.several);
         break;
     case EXPR_SLICE:
         io_expr(io, &e->as.slice.base);

@@ -198,6 +198,14 @@ pub fn swap<C: index + set_index>(c: C)
 	c[1] = first;
 }
 
+/// Swaps the corners at (0, 0) and (1, 1) of a collection with two indices.
+pub fn swap_corners<G: index + set_index>(g: G)
+{
+	let first = g[0, 0];
+	g[0, 0] = g[1, 1];
+	g[1, 1] = first;
+}
+
 /// The count of values a walk gives.
 pub fn count<C: iter>(c: C) -> int
 {
