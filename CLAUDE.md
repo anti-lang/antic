@@ -23,7 +23,9 @@ nothing. A change to either specification changes it in the same commit. Its
 "Built" and "Not built yet" lines are the status page of the implementation,
 and a commit that builds a feature changes them.
 
-The choices inside a compiler pass are in `docs/notes/`. The design pages of the
+The choices inside a compiler pass are in `docs/notes/`.
+`docs/notes/value-rules.md` holds the pinned outputs a change rewrites, the
+leak-check pattern and the traps of the value rules. The design pages of the
 runtime archive, the build tool and the standard library are in `docs/site/`.
 The test machines are in `docs/vm-setup.md`. Do not re-open a settled decision
 without asking Eddie.
