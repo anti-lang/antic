@@ -1028,7 +1028,8 @@ struct ir_operand lower_address(struct lowerer *l,
        a struct or a tuple copies its bytes, then what its parts own. */
     case EXPR_OBJECT:
         slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
-        if (e->type->kind == TYPE_STRUCT || e->type->kind == TYPE_TUPLE) {
+        if (e->type->kind == TYPE_STRUCT || e->type->kind == TYPE_TUPLE ||
+            e->as.object.value) {
             struct ir_operand from = lower_expr(l, e->as.object.operand);
             ir_memcopy(l->f, l->b, lower_temp(l, slot), from,
                        lower_vtype_of(l, e->type));
@@ -2984,7 +2985,25 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                            : e->as.object.op == TOKEN_DELETE
                                ? "anti_rt_delete"
                                : "anti_rt_destroy";
+        const struct type *pointee = e->as.object.operand->type->element;
+        /* `dup` of a value that is no aggregate is its bytes. */
+        if (e->as.object.value) {
+            return lower_expr(l, e->as.object.operand);
+        }
         v = lower_expr(l, e->as.object.operand);
+        /* `destroy(p)` of a value that is no class value tears it down in
+           place, part by part, and a value that owns nothing not at all. */
+        if (e->as.object.op == TOKEN_DESTROY &&
+            pointee->kind != TYPE_CLASS) {
+            if (sema_needs_teardown(pointee)) {
+                lower_destroy_owned(l, pointee, v,
+                                    e->as.object.from != NULL
+                                        ? lower_expr(l, e->as.object.from)
+                                        : ir_int_op(IR_PTR, 0),
+                                    false);
+            }
+            return lower_none();
+        }
         if (e->as.object.from != NULL) {
             static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
             struct ir_operand args[3];

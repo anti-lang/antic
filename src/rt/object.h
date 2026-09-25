@@ -300,15 +300,6 @@ void anti_rt_element_serialize(void *out, void *bytes,
    it, a class through its own `to_text`. */
 void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg);
 
-/* Copy the element at from into into. A class value, and an array of
-   them, takes the copy of its table, which copies what it owns, and
-   every other type its bytes. */
-void anti_rt_element_copy(void *into, void *from, const struct anti_field *arg);
-
-/* Tear down the element at bytes: a class value, and an array of them,
-   with the teardown of its table. Every other type owns nothing. */
-void anti_rt_element_destroy(void *bytes, const struct anti_field *arg);
-
 /* A new buffer on the heap with the bytes at from, or NULL when there are
    none. The caller frees it with free. */
 void *anti_rt_copy_buffer(const void *from, int64_t bytes);

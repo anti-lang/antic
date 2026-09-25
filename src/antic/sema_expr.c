@@ -3233,6 +3233,15 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                           sema_tn(t));
             return sema_builtin(c, TYPE_ERROR);
         }
+        /* DESIGN: `dup(x)` of a value of a type parameter copies the
+           value. A copy of the generic copies a class value with its
+           copy, an owning struct part by part and a pointer by its
+           address. The mark keeps that meaning in every copy. */
+        if (e->as.object.op == TOKEN_DUP &&
+            (t->kind == TYPE_PARAM || e->as.object.value)) {
+            e->as.object.value = true;
+            return t;
+        }
         /* DESIGN: `dup` of a struct or a tuple value gives a copy of it,
            in which every part that owns something is copied as `dup`
            copies it. One that owns nothing gives its bytes. */
@@ -3251,6 +3260,21 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             sema_error_at(c, e->pos, "`%s` is a singleton and outlives the "
                           "program", sema_tn(t->element));
             return sema_builtin(c, TYPE_ERROR);
+        }
+        /* DESIGN: `destroy(p)` tears down the value that p points at in
+           place, of any type. A class value runs its teardown, an owning
+           struct or tuple goes part by part, and a value that owns
+           nothing is left alone. A generic reaches the teardown of each
+           argument so. */
+        if (e->as.object.op == TOKEN_DESTROY && t->kind == TYPE_POINTER &&
+            t->element->kind != TYPE_CLASS) {
+            if (type_is_lent(t)) {
+                sema_error_at(c, e->as.object.operand->pos, "the object is "
+                              "lent for the call and stays with its owner, "
+                              "so `%s` does not take it", what);
+                return sema_builtin(c, TYPE_ERROR);
+            }
+            return sema_builtin(c, TYPE_VOID);
         }
         if (t->kind != TYPE_POINTER || t->element->kind != TYPE_CLASS) {
             sema_error_at(c, e->as.object.operand->pos,

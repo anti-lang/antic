@@ -226,6 +226,13 @@ class Tag
 	}
 }
 
+/// A struct that owns a tag, so a collection of it tears each down.
+struct Held
+{
+	tag: Tag,
+	n: int,
+}
+
 fn total<C: collection.Iterable<int>>(c: *C) -> int
 {
 	let n = 0;
@@ -451,6 +458,39 @@ fn walks()
 	printf("total %d\n".ptr, total(&b) as c_int);
 }
 
+/// A collection of an owning struct and of an owning tuple tears down each
+/// element it removes and every element at its end, and its copies are copies
+/// of what each element owns.
+fn owning_elements()
+{
+	let before = Tag.torn.load();
+	{
+		let held = Bag<Held>.new();
+		held.push(Held { tag: Tag.of(1), n: 1 });
+		held.push(Held { tag: Tag.of(2), n: 2 });
+		held.push(Held { tag: Tag.of(1), n: 3 });
+		let ones = held.find_all(fn(h) { return h.n != 2; });
+		let gone = held.remove_all(fn(h) { return h.n == 2; });
+		printf("held: %d copies, %d removed, torn %d\n".ptr, ones.count as c_int,
+			gone as c_int, (Tag.torn.load() - before) as c_int);
+	}
+	printf("held after the block, torn %d\n".ptr,
+		(Tag.torn.load() - before) as c_int);
+	before = Tag.torn.load();
+	{
+		let pairs = Bag<(Tag, int)>.new();
+		pairs.push((Tag.of(1), 1));
+		pairs.push((Tag.of(2), 2));
+		let copies = pairs.find_all(fn(t) { return t.1 == 1; });
+		let gone = pairs.remove_all(fn(t) { return t.1 == 2; });
+		printf("tuples: %d copies, %d removed, torn %d\n".ptr,
+			copies.count as c_int, gone as c_int,
+			(Tag.torn.load() - before) as c_int);
+	}
+	printf("tuples after the block, torn %d\n".ptr,
+		(Tag.torn.load() - before) as c_int);
+}
+
 fn main() -> int
 {
 	allocations();
@@ -460,6 +500,7 @@ fn main() -> int
 	texts();
 	equality();
 	owned();
+	owning_elements();
 	walks();
 	return 0;
 }

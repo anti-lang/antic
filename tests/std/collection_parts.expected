@@ -31,4 +31,8 @@ eq: true false false true false
 copies 2, torn 3
 removed 1, torn 4
 after the block, torn 8
+held: 2 copies, 1 removed, torn 1
+held after the block, torn 5
+tuples: 1 copies, 1 removed, torn 1
+tuples after the block, torn 3
 total 7

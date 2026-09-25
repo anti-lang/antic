@@ -1,8 +1,10 @@
 owning_values.anti:26:7: error: `p` belongs to the caller and does not move. Mark it `own` or pass `dup(p)`
-owning_values.anti:32:10: error: `Pair` owns what its parts own, use `dup` instead of `=`
-owning_values.anti:33:6: error: `Pair` owns what its parts own, use `dup` instead of `=`
-owning_values.anti:35:10: error: `(Key, int)` owns what its parts own, use `dup` instead of `=`
-owning_values.anti:36:6: error: `(Key, int)` owns what its parts own, use `dup` instead of `=`
-owning_values.anti:37:13: error: `Pair` owns what its parts own, and the repeat form copies one value into every element
-owning_values.anti:39:10: error: `p` was moved into `take`
-owning_values.anti:41:9: error: `t` was moved into `take_tuple`
+owning_values.anti:31:10: error: the object is lent for the call and stays with its owner, so `destroy` does not take it
+owning_values.anti:36:9: error: `delete` needs a class pointer, found `*Pair`
+owning_values.anti:42:10: error: `Pair` owns what its parts own, use `dup` instead of `=`
+owning_values.anti:43:6: error: `Pair` owns what its parts own, use `dup` instead of `=`
+owning_values.anti:45:10: error: `(Key, int)` owns what its parts own, use `dup` instead of `=`
+owning_values.anti:46:6: error: `(Key, int)` owns what its parts own, use `dup` instead of `=`
+owning_values.anti:47:13: error: `Pair` owns what its parts own, and the repeat form copies one value into every element
+owning_values.anti:49:10: error: `p` was moved into `take`
+owning_values.anti:51:9: error: `t` was moved into `take_tuple`

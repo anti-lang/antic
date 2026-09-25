@@ -19,4 +19,7 @@ dup 0
 replaced 11 11
 replaced 0
 break 0
+destroy 0
+generic dup 1 1
+generic dup 0
 plain 2 2

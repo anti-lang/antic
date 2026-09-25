@@ -25,8 +25,6 @@ extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
 extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
-extern fn anti_rt_element_copy(into: ?*byte, from: ?*byte, arg: ?*byte);
-extern fn anti_rt_element_destroy(bytes: ?*byte, arg: ?*byte);
 
 /// The capacity a growing collection starts with when it is made without one.
 const FIRST_CAPACITY: int = 8;
@@ -431,18 +429,17 @@ pub abstract class Collection<T>
 	}
 
 	/// A copy of the element at `p`, which owns what it holds: a class value
-	/// takes the copy of its class, and every other type its bytes.
+	/// takes the copy of its class, an owning struct or tuple a copy of each
+	/// part that owns something, and every other type its bytes.
 	protected fn copy_element(self, p: *T) -> T
 	{
-		let made = *p;
-		anti_rt_element_copy(&made as ?*byte, p as ?*byte, self.element_type());
-		return made;
+		return dup(*p);
 	}
 
 	/// Tear down the element at `p`, which the collection then forgets.
 	protected fn destroy_element(self, p: *T)
 	{
-		anti_rt_element_destroy(p as ?*byte, self.element_type());
+		destroy(p);
 	}
 
 	/// The record of `T` in the descriptor of this copy of the class, which

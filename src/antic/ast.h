@@ -429,6 +429,10 @@ struct expr {
             enum token_kind op;     /* dup, delete or destroy */
             struct expr *operand;
             struct expr *from;      /* the allocator of delete or destroy */
+            /* `dup(x)` of a value of a type parameter, which copies the
+               value itself in every copy of the generic. A pointer copies
+               its address and never the object it points at. */
+            bool value;
         } object;
         struct {
             struct expr *job;       /* EXPR_JOIN: the job or the slice */

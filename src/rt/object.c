@@ -715,41 +715,6 @@ void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg)
     show_value(out, bytes, arg->type, arg->descriptor, arg->offset);
 }
 
-void anti_rt_element_copy(void *into, void *from, const struct anti_field *arg)
-{
-    int64_t t;
-
-    if (arg == NULL || into == NULL || from == NULL) {
-        return;
-    }
-    t = anti_rt_type_scalar(arg->type);
-    if (t == ANTI_TYPE_CLASS) {
-        anti_rt_copy_elements(from, into, 1, arg->descriptor);
-    } else if (t == ANTI_TYPE_ARRAY &&
-               ANTI_TYPE_ELEMENT(arg->type) == ANTI_TYPE_CLASS) {
-        anti_rt_copy_elements(from, into, array_length(arg), arg->descriptor);
-    } else {
-        memcpy(into, from, (size_t)arg->offset);
-    }
-}
-
-void anti_rt_element_destroy(void *bytes, const struct anti_field *arg)
-{
-    int64_t t;
-
-    if (arg == NULL || bytes == NULL) {
-        return;
-    }
-    t = anti_rt_type_scalar(arg->type);
-    if (t == ANTI_TYPE_CLASS) {
-        anti_rt_destroy(bytes, arg->descriptor);
-    } else if (t == ANTI_TYPE_ARRAY &&
-               ANTI_TYPE_ELEMENT(arg->type) == ANTI_TYPE_CLASS) {
-        anti_rt_destroy_elements(bytes, array_length(arg), arg->descriptor,
-                                 NULL);
-    }
-}
-
 /* The root frees nothing. The teardown the compiler writes for a class
    runs each destruct body of its chain and destroys what it owns. */
 void anti_lang_Object_destruct(struct anti_object *self)

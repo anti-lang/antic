@@ -16,7 +16,7 @@
    host writes the same file. */
 
 #define ANTL_SUFFIX ".antl"
-#define ANTL_VERSION 69
+#define ANTL_VERSION 70
 
 /* Append the library file of a checked and lowered module to out, with
    the package header of iface. strip_docs leaves the doc text out.

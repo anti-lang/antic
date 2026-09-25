@@ -93,6 +93,18 @@ fn early(n: int) -> int
 	return 0;
 }
 
+/// A copy of the value at `p`, whatever `T` is.
+fn copy_of<T>(p: *T) -> T
+{
+	return dup(*p);
+}
+
+/// Tear down the value at `p` in place.
+fn clear<T>(p: *T)
+{
+	destroy(p);
+}
+
 fn check(name: str)
 {
 	printf("%.*s %d\n".ptr, name.len as c_int, name.ptr,
@@ -177,6 +189,29 @@ fn main() -> int
 		}
 	}
 	check("break");
+	{
+		let room = alloc(Pair, 2) else {
+			return 1;
+		};
+		room[0] = make_pair(12);
+		room[1] = make_pair(13);
+		destroy(&room[0]);
+		clear(&room[1]);
+		free(room);
+	}
+	check("destroy");
+	{
+		let p = make_pair(14);
+		let q = copy_of(&p);
+		/* The leaf the copy makes, and the one `alloc` makes below. */
+		Leaf.live.add(2);
+		let leaf = alloc Leaf { };
+		let same = copy_of(&leaf);
+		printf("generic dup %d %d\n".ptr, (q.k.leaf != p.k.leaf) as c_int,
+			(same == leaf) as c_int);
+		delete(leaf);
+	}
+	check("generic dup");
 
 	let a = Plain { a: 1, b: 2 };
 	let b = Plain { a: 0, b: 0 };

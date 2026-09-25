@@ -1096,6 +1096,7 @@ static void io_expr_body(struct io *io, struct expr *e)
         io_token(io, &e->as.object.op);
         io_expr(io, &e->as.object.operand);
         io_expr(io, &e->as.object.from);
+        io_bool(io, &e->as.object.value);
         break;
     case EXPR_ATOMIC:
         IO_ENUM(io, e->as.atomic.op, ATOMIC_CAS);

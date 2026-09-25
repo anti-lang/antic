@@ -26,6 +26,16 @@ fn keep(p: Pair)
 	take(p);
 }
 
+fn lent_destroyed(lent p: *Pair)
+{
+	destroy(p);
+}
+
+fn deleted(p: Pair)
+{
+	delete(&p);
+}
+
 fn main() -> int
 {
 	let p = Pair { k: Key { }, n: 1 };

@@ -1085,6 +1085,7 @@ The collections are split into modules by family, one file each. Each can then b
 
 - A collection is a class used as a value. It owns its storage and is freed at the end of its block. It moves on return, is refused by `=` and is copied by `dup`.
 - Elements are stored by value, in the collection's own memory. A collection of pointers, such as `List<*Circle>`, owns the pointers and not what they point at.
+- An element that owns something, a class value or an owning struct or tuple, is torn down when the collection removes it or ends. A copy of such an element copies what it owns.
 - No pointer to an element ever leaves a collection, except through a `lent` parameter. Reading gives a copy, as a `?T` where nothing may be there. Changing hands a new value in by value, or runs inside the collection.
 - An element is addressed by key in a map, and by position in a list while one thread walks it. It is addressed by criteria in any collection, and by handle in a `Pool` or a `Tree`.
 - Criteria come in three explicit forms and never an ambiguous one: `_all` acts on every match and gives the count, `_first` on the first match in the collection's order, and `_one` on the one match. `_one` fails when nothing matches, and fails when more than one does, with the count. It is how criteria stand in for an address.
