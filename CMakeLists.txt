@@ -429,8 +429,9 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
 endif()
 
 # The standard library in src/std/, written as library files into std/ of the
-# runtime archive, where antic finds the modules under anti. without -I.
-set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection toml config args json log simd trace plugin)
+# runtime archive, where antic finds the modules under anti. without -I. A
+# module below another, such as collection/pool, lies in its directory.
+set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection collection/pool collection/tree toml config args json log simd trace plugin)
 set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/std/anti")
 # Every .anti file under src/std/anti/collection/ is a module of its own,
 # found here and never listed. They compile after anti.collection, each

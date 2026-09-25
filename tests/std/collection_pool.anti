@@ -1,0 +1,288 @@
+//! `Pool<T>` and `Handle<T>` of `anti.collection.pool`.
+//!
+//! A counting allocator shows the blocks that double, and the address of an
+//! element, read through a lending function, shows that it never moves. A
+//! handle of a removed element finds nothing, even once its slot holds another
+//! element. The versioned forms compare and set, and the shared parts of every
+//! collection work over the slots.
+
+import anti.collection.{Copies};
+import anti.collection.pool.{Handle, Pool};
+import anti.lang;
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+	pub bytes: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		self.bytes = size;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A class that owns memory and counts its teardowns.
+class Tag
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	concrete fn to_text(self) -> str
+	{
+		if self.number() == 1 {
+			return "one";
+		}
+		return "other";
+	}
+
+	fn destruct(self)
+	{
+		Tag.torn.add(1);
+	}
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+/// The address of the element `h` finds. The test compares it and never follows
+/// it.
+fn address(p: *Pool<Point>, h: Handle<Point>) -> ?*int
+{
+	let at: ?*int = none;
+	p.read(h, fn(e) {
+		at = &e.x;
+	});
+	return at;
+}
+
+fn blocks()
+{
+	let counting = Counting { };
+	{
+		let p = Pool<Point>.new(0, &counting);
+		printf("empty: %d allocations\n".ptr, counting.allocs as c_int);
+		let first = p.add(Point { x: 1, y: 1 });
+		let at = address(&p, first);
+		for i in 1..8 {
+			p.add(Point { x: i, y: i });
+		}
+		printf("8 elements: %d allocation\n".ptr, counting.allocs as c_int);
+		p.add(Point { x: 8, y: 8 });
+		printf("9 elements: %d allocations, the second block %d bytes\n".ptr,
+			counting.allocs as c_int, counting.bytes as c_int);
+		for i in 9..24 {
+			p.add(Point { x: i, y: i });
+		}
+		printf("24 elements: %d allocations\n".ptr, counting.allocs as c_int);
+		p.add(Point { x: 24, y: 24 });
+		printf("25 elements: %d allocations, the third block %d bytes\n".ptr,
+			counting.allocs as c_int, counting.bytes as c_int);
+		for i in 25..1000 {
+			p.add(Point { x: i, y: i });
+		}
+		printf("1000 elements: %d allocations, count %d\n".ptr,
+			counting.allocs as c_int, p.count as c_int);
+		let moved = address(&p, first) != at;
+		let back = p.get(first) catch fatal;
+		show(f"first element moved: {moved}, holds {back.x}");
+		let n = 0;
+		let sum = 0;
+		for e in p {
+			n += 1;
+			sum += e.x;
+		}
+		show(f"walked {n}, sum {sum}");
+	}
+	printf("after the block: %d frees\n".ptr, counting.frees as c_int);
+	let sized = Pool<int>.new(100, &counting);
+	let before = counting.allocs;
+	for i in 0..128 {
+		sized.add(i);
+	}
+	printf("made for 100: %d allocations for 128\n".ptr,
+		(counting.allocs - before) as c_int);
+}
+
+fn generations()
+{
+	let p = Pool<int>.new();
+	let a = p.add(10);
+	let b = p.add(20);
+	show(f"a at {a.index} generation {a.generation}, b at {b.index}");
+	let gone = p.remove(a) ?? -1;
+	show(f"removed {gone}, count {p.count}, contains a {p.contains(a)}");
+	let c = p.add(30);
+	show(f"c reuses {c.index} in generation {c.generation}");
+	let old = p.get(a) ?? -1;
+	let now = p.get(c) ?? -1;
+	show(f"a finds {old}, c finds {now}");
+	let set = p.set(a, 99);
+	let again = p.remove(a) ?? -1;
+	let read = p.read(a, fn(x) {
+		printf("not reached\n".ptr);
+	});
+	let changed = p.modify(a, fn(x) {
+		*x = 0;
+	});
+	show(f"stale: set {set}, remove {again}, read {read}, modify {changed}");
+	show(f"after: {p.to_text()}, b {p.get(b) ?? -1}");
+	p.remove(c);
+	p.remove(b);
+	let d = p.add(40);
+	let e = p.add(50);
+	show(f"d at {d.index} generation {d.generation}, e at {e.index} generation {e.generation}");
+	show(f"c finds {p.get(c) ?? -1}, b finds {p.get(b) ?? -1}");
+	let out = Handle<int> { index: 1000, generation: 0 };
+	show(f"far handle: {p.contains(out)}, {p.get(out) ?? -1}");
+}
+
+fn versions() may fail
+{
+	let p = Pool<int>.new();
+	let h = p.add(5);
+	let value_read = p.get_versioned(h) catch fatal;
+	let (value, version) = value_read;
+	show(f"read {value} at version {version}");
+	try p.set_if_version(h, value + 1, version);
+	let next_read = p.get_versioned(h) catch fatal;
+	let (next, later) = next_read;
+	show(f"set to {next}, version {later}");
+	p.set_if_version(h, 100, version) catch e {
+		let c = e as *pool.Changed;
+		show(f"{e.message} ({c.expected} {c.found})");
+	};
+	p.modify(h, fn(x) {
+		*x *= 2;
+	});
+	let doubled = p.get(h) ?? 0;
+	p.set(h, doubled + 1);
+	let last_read = p.get_versioned(h) catch fatal;
+	let (last, count) = last_read;
+	show(f"modify and set: {last} at version {count}");
+	p.read(h, fn(x) {
+		printf("read %d\n".ptr, *x as c_int);
+	});
+	let kept_read = p.get_versioned(h) catch fatal;
+	let (kept, still) = kept_read;
+	show(f"read keeps {kept} at version {still}");
+	p.remove(h);
+	let stale = p.get_versioned(h);
+	show(f"removed: {stale == none}");
+	p.set_if_version(h, 1, still) catch e {
+		show(f"{e.message}");
+	};
+}
+
+fn shared() may fail
+{
+	let p = Pool<int>.new();
+	let hs = Copies<Handle<int>>.new();
+	for i in 1..9 {
+		hs.add(p.add(i));
+	}
+	let evens = p.find_all(fn(x) {
+		return x % 2 == 0;
+	});
+	show(f"find_all: {evens.to_text()}");
+	let n = p.update_all(fn(x) {
+		return x > 6;
+	}, fn(x) {
+		*x *= 10;
+	});
+	let seven = hs.copy_place(6);
+	let seventy_read = p.get_versioned(seven) catch fatal;
+	let (seventy, v) = seventy_read;
+	show(f"update_all: {n}, {p.to_text()}, version of {seventy} {v}");
+	let one = try p.find_one(fn(x) {
+		return x == 3;
+	});
+	let removed = p.remove_all(fn(x) {
+		return x % 2 == 1;
+	});
+	show(f"find_one {one}, remove_all {removed}: {p.to_text()}, count {p.count}");
+	let three = hs.copy_place(2);
+	show(f"handle of 3 finds {p.get(three) ?? -1}");
+	let h = p.add(11);
+	show(f"11 reuses slot {h.index} in generation {h.generation}");
+	for x in &p {
+		*x += 1;
+	}
+	show(f"walked in place: {p.to_text()}");
+	let q = Pool<int>.new();
+	for x in p {
+		let y = x;
+		q.add(y);
+	}
+	show(f"copied by a walk: {q.to_text()}");
+	p.clear();
+	show(f"clear: {p.count} {p.is_empty()} {p.get(h) ?? -1}");
+}
+
+fn owned()
+{
+	{
+		let tags = Pool<Tag>.new();
+		let a = tags.add(Tag.of(1));
+		let b = tags.add(Tag.of(2));
+		tags.add(Tag.of(1));
+		show(tags.to_text());
+		tags.set(b, Tag.of(1));
+		printf("set: torn %d\n".ptr, Tag.torn.load() as c_int);
+		tags.set(b, Tag.of(3));
+		let stale = tags.remove(a);
+		printf("remove: torn %d\n".ptr, Tag.torn.load() as c_int);
+		let refused = tags.set(a, Tag.of(4));
+		printf("stale set %d: torn %d\n".ptr, refused as c_int, Tag.torn.load() as c_int);
+		let got = tags.get(b) catch fatal;
+		printf("copy of %d\n".ptr, got.number() as c_int);
+	}
+	printf("after the block, torn %d\n".ptr, Tag.torn.load() as c_int);
+}
+
+fn main() -> int
+{
+	blocks();
+	generations();
+	versions() catch fatal;
+	shared() catch fatal;
+	owned();
+	return 0;
+}

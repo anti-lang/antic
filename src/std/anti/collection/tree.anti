@@ -1,0 +1,303 @@
+//! A hierarchy of elements on handles.
+//!
+//! `Tree<T>` holds a scene graph, a menu or a document. Its elements stand in
+//! the slots of `anti.collection.pool`, so they never move and a handle of a
+//! removed element finds nothing. Each slot links its parent, its first and
+//! last child and its two siblings, so every step of a walk is one read.
+
+import anti.collection.{Copies};
+import anti.collection.pool;
+import anti.lang;
+import anti.mem;
+
+/// The words each slot of a tree keeps beside those of the pool: the slot of
+/// its parent, of its first and last child and of its two siblings.
+const LINKS: int = 5;
+const PARENT: int = 0;
+const FIRST: int = 1;
+const LAST: int = 2;
+const NEXT: int = 3;
+const PREVIOUS: int = 4;
+
+/// The link to no slot.
+const NO_NODE: int = -1;
+
+/// A hierarchy of elements, each reached by a `pool.Handle<T>`.
+///
+/// `add_root` adds an element at the top and `add_child` one below another,
+/// after its other children. `remove` takes an element out with its whole
+/// subtree. The reading and lending forms are those of `pool.Pool<T>`, and
+/// every one of them finds nothing for a handle whose element is gone.
+///
+/// `for` walks the elements in the order of their slots. `depth_first` and
+/// `breadth_first` give the handles of a subtree in the order of the tree. A
+/// shared `remove` form takes out the elements that match and leaves their
+/// children in their place, under the parent of each.
+pub class Tree<T> inherits pool.Slots<T>
+{
+	/// The last root, after which `add_root` links the next. The roots are
+	/// siblings without a parent.
+	last_root: int = NO_NODE,
+
+	/// An empty tree whose first block holds `capacity` elements, rounded up to
+	/// a power of two, with its memory from `from`, or from the C library when
+	/// it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Tree<T>
+	{
+		let made = Tree<T> { from: collection.allocator(from), extra_words: LINKS };
+		made.prepare(capacity);
+		return made;
+	}
+
+	/// Add `x` at the top of the tree, after the other roots, and give its
+	/// handle.
+	pub fn add_root(self, own x: T, at: lang.SourceLocation = here) -> pool.Handle<T>
+	{
+		let i = self.claim(x);
+		self.attach(i, NO_NODE);
+		self.resized(1, at);
+		return self.handle_at(i);
+	}
+
+	/// Add `x` below the element `parent` finds, after its other children, and
+	/// give its handle. Gives `none`, and tears `x` down, when that element is
+	/// gone.
+	pub fn add_child(self, parent: pool.Handle<T>, own x: T,
+		at: lang.SourceLocation = here) -> ?pool.Handle<T>
+	{
+		let p = self.slot_of(parent);
+		if p < 0 {
+			return none;
+		}
+		let i = self.claim(x);
+		self.attach(i, p);
+		self.resized(1, at);
+		return self.handle_at(i);
+	}
+
+	/// The handle of the parent of the element `h` finds, or `none` for a root
+	/// and for an element that is gone.
+	pub fn parent(self, h: pool.Handle<T>) -> ?pool.Handle<T>
+	{
+		let i = self.slot_of(h);
+		if i < 0 {
+			return none;
+		}
+		let p = self.extra(i, PARENT);
+		if p == NO_NODE {
+			return none;
+		}
+		return self.handle_at(p);
+	}
+
+	/// The handles of the children of the element `h` finds, in order, from the
+	/// allocator of the tree. None for an element that is gone.
+	pub fn children(self, h: pool.Handle<T>) -> Copies<pool.Handle<T>>
+	{
+		let out = Copies<pool.Handle<T>>.new(0, self.from);
+		let i = self.slot_of(h);
+		if i < 0 {
+			return out;
+		}
+		let c = self.extra(i, FIRST);
+		while c != NO_NODE do {
+			out.add(self.handle_at(c));
+			c = self.extra(c, NEXT);
+		}
+		return out;
+	}
+
+	/// The handles of the element `h` finds and of everything below it, each
+	/// element before its children and the children in order. None for an
+	/// element that is gone.
+	pub fn depth_first(self, h: pool.Handle<T>) -> Copies<pool.Handle<T>>
+	{
+		let out = Copies<pool.Handle<T>>.new(0, self.from);
+		let top = self.slot_of(h);
+		if top < 0 {
+			return out;
+		}
+		let node = top;
+		while true do {
+			out.add(self.handle_at(node));
+			let down = self.extra(node, FIRST);
+			if down != NO_NODE {
+				node = down;
+				continue;
+			}
+			while node != top && self.extra(node, NEXT) == NO_NODE do {
+				node = self.extra(node, PARENT);
+			}
+			if node == top {
+				break;
+			}
+			node = self.extra(node, NEXT);
+		}
+		return out;
+	}
+
+	/// The handles of the element `h` finds and of everything below it, level
+	/// by level, each level in order. None for an element that is gone.
+	pub fn breadth_first(self, h: pool.Handle<T>) -> Copies<pool.Handle<T>>
+	{
+		let out = Copies<pool.Handle<T>>.new(0, self.from);
+		let top = self.slot_of(h);
+		if top < 0 {
+			return out;
+		}
+		out.add(self.handle_at(top));
+		let k = 0;
+		while k < out.count do {
+			let next = out.copy_place(k);
+			let c = self.extra(next.index, FIRST);
+			while c != NO_NODE do {
+				out.add(self.handle_at(c));
+				c = self.extra(c, NEXT);
+			}
+			k += 1;
+		}
+		return out;
+	}
+
+	/// Remove the element `h` finds with its whole subtree, tear every element
+	/// of it down and give their number. Gives 0 for an element that is gone.
+	pub fn remove(self, h: pool.Handle<T>, at: lang.SourceLocation = here) -> int
+	{
+		let top = self.slot_of(h);
+		if top < 0 {
+			return 0;
+		}
+		self.detach(top);
+		let n = 0;
+		let node = top;
+		while true do {
+			while self.extra(node, FIRST) != NO_NODE do {
+				node = self.extra(node, FIRST);
+			}
+			let up = self.extra(node, PARENT);
+			let next = self.extra(node, NEXT);
+			let gone = self.release(node);
+			n += 1;
+			if node == top {
+				break;
+			}
+			self.set_extra(up, FIRST, next);
+			if next == NO_NODE {
+				self.set_extra(up, LAST, NO_NODE);
+				node = up;
+			} else {
+				self.set_extra(next, PREVIOUS, NO_NODE);
+				node = next;
+			}
+		}
+		self.resized(-n, at);
+		return n;
+	}
+
+	/// Move the element at the slot `at` out and give it with the next slot
+	/// that holds one. Its children take its place among its siblings, under
+	/// its parent.
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let after = self.next_place(at);
+		let first = self.extra(at, FIRST);
+		if first == NO_NODE {
+			self.detach(at);
+		} else {
+			self.lift(at, first);
+		}
+		let taken = self.release(at);
+		return (taken, after);
+	}
+
+	/// Link the slot `i` as the last child of the slot `p`, or as the last root
+	/// when `p` is `NO_NODE`.
+	fn attach(self, i: int, p: int)
+	{
+		let before = self.last_root;
+		if p != NO_NODE {
+			before = self.extra(p, LAST);
+		}
+		self.set_extra(i, PARENT, p);
+		self.set_extra(i, FIRST, NO_NODE);
+		self.set_extra(i, LAST, NO_NODE);
+		self.set_extra(i, NEXT, NO_NODE);
+		self.set_extra(i, PREVIOUS, before);
+		if before != NO_NODE {
+			self.set_extra(before, NEXT, i);
+		} else {
+			self.set_first(p, i);
+		}
+		self.set_last(p, i);
+	}
+
+	/// Take the slot `i` out of the list of its siblings.
+	fn detach(self, i: int)
+	{
+		let p = self.extra(i, PARENT);
+		let before = self.extra(i, PREVIOUS);
+		let after = self.extra(i, NEXT);
+		if before != NO_NODE {
+			self.set_extra(before, NEXT, after);
+		} else {
+			self.set_first(p, after);
+		}
+		if after != NO_NODE {
+			self.set_extra(after, PREVIOUS, before);
+		} else {
+			self.set_last(p, before);
+		}
+	}
+
+	/// Put the children of the slot `i`, the first of which is `first`, in its
+	/// place among its siblings, under its parent.
+	fn lift(self, i: int, first: int)
+	{
+		let p = self.extra(i, PARENT);
+		let last = self.extra(i, LAST);
+		let c = first;
+		while c != NO_NODE do {
+			self.set_extra(c, PARENT, p);
+			c = self.extra(c, NEXT);
+		}
+		let before = self.extra(i, PREVIOUS);
+		let after = self.extra(i, NEXT);
+		self.set_extra(first, PREVIOUS, before);
+		self.set_extra(last, NEXT, after);
+		if before != NO_NODE {
+			self.set_extra(before, NEXT, first);
+		} else {
+			self.set_first(p, first);
+		}
+		if after != NO_NODE {
+			self.set_extra(after, PREVIOUS, last);
+		} else {
+			self.set_last(p, last);
+		}
+	}
+
+	/// Make `i` the first child of the slot `p`. The first root needs no
+	/// record, since no function starts from it.
+	fn set_first(self, p: int, i: int)
+	{
+		if p != NO_NODE {
+			self.set_extra(p, FIRST, i);
+		}
+	}
+
+	/// Make `i` the last child of the slot `p`, or the last root.
+	fn set_last(self, p: int, i: int)
+	{
+		if p == NO_NODE {
+			self.last_root = i;
+		} else {
+			self.set_extra(p, LAST, i);
+		}
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the order of their slots.
+pub operator fn eq<T: eq>(a: Tree<T>, b: Tree<T>) -> bool
+{
+	return collection.equal<T>(&a, &b);
+}

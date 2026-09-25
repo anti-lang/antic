@@ -1,0 +1,176 @@
+//! `Tree<T>` of `anti.collection.tree`.
+//!
+//! A small scene graph shows the links of each element, the two orders of a
+//! subtree, the removal of a whole subtree and the handles it leaves stale, the
+//! reading and lending forms of a pool, and a shared `remove` form that leaves
+//! the children of what it removes in its place.
+
+import anti.collection.{Copies};
+import anti.collection.pool.{Handle};
+import anti.collection.tree.{Tree};
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A class that owns memory and counts its teardowns.
+class Node
+{
+	pub own name: ?*byte = none,
+
+	static atomic torn: int = 0;
+
+	pub fn named(s: str) -> Node
+	{
+		let p = alloc(byte, s.len + 1) catch fatal;
+		for i in 0..s.len {
+			p[i] = s[i];
+		}
+		p[s.len] = 0;
+		return Node { name: p };
+	}
+
+	fn destruct(self)
+	{
+		Node.torn.add(1);
+	}
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+/// The elements of the handles `hs` finds in `t`, as text.
+fn names(t: *Tree<str>, hs: *Copies<Handle<str>>) -> str
+{
+	let out = text.Builder.new();
+	for h in hs {
+		out.append(" ");
+		out.append(t.get(h) ?? "?");
+	}
+	return out.take();
+}
+
+fn shape()
+{
+	let t = Tree<str>.new();
+	let world = t.add_root("world");
+	let ui = t.add_root("ui");
+	let car = t.add_child(world, "car") catch fatal;
+	let house = t.add_child(world, "house") catch fatal;
+	let wheel = t.add_child(car, "wheel") catch fatal;
+	t.add_child(car, "door");
+	t.add_child(house, "roof");
+	t.add_child(ui, "menu");
+	t.add_child(wheel, "tyre");
+	show(f"count {t.count}: {t.to_text()}");
+	let up = t.parent(wheel) catch fatal;
+	let top = t.parent(world);
+	let above = t.get(up) ?? "?";
+	show(f"parent of wheel: {above}, of world: {top == none}");
+	let kids = t.children(world);
+	show(f"children of world:{names(&t, &kids)}");
+	let deep = t.depth_first(world);
+	show(f"depth first:{names(&t, &deep)}");
+	let wide = t.breadth_first(world);
+	show(f"breadth first:{names(&t, &wide)}");
+	let leaf = t.children(house);
+	let none_below = t.children(leaf.copy_place(0));
+	show(f"below roof: {none_below.count}");
+
+	let gone = t.remove(car);
+	show(f"removed {gone} with car, count {t.count}: {t.to_text()}");
+	let stale = t.get(wheel) ?? "gone";
+	let orphan = t.add_child(wheel, "hub");
+	let empty = t.depth_first(wheel);
+	show(f"wheel: {stale}, add_child {orphan == none}, depth first {empty.count}, remove {t.remove(wheel)}");
+	let after = t.depth_first(world);
+	show(f"world now:{names(&t, &after)}");
+	let bus = t.add_child(world, "bus") catch fatal;
+	let old = t.get(car) ?? "nothing";
+	show(f"bus reuses slot {bus.index} in generation {bus.generation}, car finds {old}");
+	let last = t.children(world);
+	show(f"children of world:{names(&t, &last)}");
+}
+
+fn forms() may fail
+{
+	let t = Tree<int>.new();
+	let a = t.add_root(1);
+	let b = t.add_child(a, 2) catch fatal;
+	t.add_child(b, 3);
+	t.add_child(b, 4);
+	t.add_child(a, 5);
+	t.modify(b, fn(x) {
+		*x *= 10;
+	});
+	let read = t.get_versioned(b) catch fatal;
+	let (value, version) = read;
+	show(f"modify: {value} at version {version}");
+	try t.set_if_version(b, 21, version);
+	t.set_if_version(b, 22, version) catch e {
+		show(f"{e.message}");
+	};
+	t.read(b, fn(x) {
+		printf("read %d\n".ptr, *x as c_int);
+	});
+	let n = t.update_all(fn(x) {
+		return x > 2;
+	}, fn(x) {
+		*x += 100;
+	});
+	show(f"update_all {n}: {t.to_text()}");
+	let found = t.find_all(fn(x) {
+		return x > 100;
+	});
+	show(f"find_all: {found.to_text()}");
+	let removed = t.remove_first(fn(x) {
+		return x == 121;
+	}) ?? -1;
+	let kids = t.depth_first(a);
+	let out = text.Builder.new();
+	for h in kids {
+		let v = t.get(h) ?? -1;
+		let p = t.parent(h);
+		let up = -1;
+		if let q = p {
+			up = t.get(q) ?? -1;
+		}
+		out.append(f" {v}<{up}");
+	}
+	show(f"remove_first {removed}, the children lifted:{out.take()}");
+	let n2 = t.remove_all(fn(x) {
+		return x > 100;
+	});
+	let below = t.children(a);
+	show(f"remove_all {n2}: {t.to_text()}, children of 1: {below.count}");
+	t.clear();
+	show(f"clear: {t.count} {t.contains(a)}");
+}
+
+fn owned()
+{
+	{
+		let t = Tree<Node>.new();
+		let root = t.add_root(Node.named("root"));
+		let mid = t.add_child(root, Node.named("mid")) catch fatal;
+		t.add_child(mid, Node.named("leaf"));
+		t.add_child(mid, Node.named("leaf2"));
+		t.add_child(root, Node.named("side"));
+		let n = t.remove(mid);
+		printf("removed %d, torn %d\n".ptr, n as c_int, Node.torn.load() as c_int);
+		let refused = t.add_child(mid, Node.named("late"));
+		printf("stale parent %d, torn %d\n".ptr, (refused == none) as c_int,
+			Node.torn.load() as c_int);
+	}
+	printf("after the block, torn %d\n".ptr, Node.torn.load() as c_int);
+}
+
+fn main() -> int
+{
+	shape();
+	forms() catch fatal;
+	owned();
+	return 0;
+}

@@ -1,0 +1,600 @@
+//! Elements at fixed addresses, reached by handles.
+//!
+//! `Pool<T>` keeps each element in a slot that never moves. It grows by adding
+//! blocks, each twice the size of the one before, so slot `i` is found with a
+//! few bit operations and no block is ever copied. `add` gives a `Handle<T>`, a
+//! slot index and a generation. Removing an element frees its slot for reuse
+//! and increments its generation, so an old handle finds nothing even after the
+//! slot holds another element.
+//!
+//! `Slots<T>` holds the storage and the reading and lending forms that a pool
+//! and `anti.collection.tree.Tree<T>` share.
+
+import anti.collection;
+import anti.lang;
+import anti.mem;
+
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+
+/// The number of blocks a pool may hold. With a first block of 8 slots the last
+/// one ends past slot 2^50, more than any memory holds.
+const BLOCKS: int = 48;
+
+/// The log2 of the smallest first block.
+const FIRST_SHIFT: int = 3;
+
+/// The words every slot keeps beside its element: the generation, the link and
+/// the version, in that order. A collection over `Slots<T>` adds its own after
+/// them.
+const SLOT_WORDS: int = 3;
+const GENERATION: int = 0;
+const LINK: int = 1;
+const VERSION: int = 2;
+
+/// The link of a slot that holds an element. A free slot links the next free
+/// one, or `NO_SLOT` at the end of the list.
+const LIVE: int = -2;
+const NO_SLOT: int = -1;
+
+/// The address of an element of a `Pool<T>` or a `Tree<T>`: the index of its
+/// slot and the generation of the slot when the element was added.
+///
+/// A handle is two integers. It may be copied, stored and passed between
+/// threads. Two handles are the same when both fields are, and a handle has no
+/// `==` of its own, since the `==` of this module is that of `Pool<T>`. It
+/// never finds the wrong element: once its element is removed it finds nothing,
+/// even after the slot is reused.
+pub struct Handle<T>
+{
+	index: int,
+	generation: int,
+}
+
+/// The failure of `set_if_version`, which found the element changed or gone.
+///
+/// `expected` holds the version the caller read and `found` the version the
+/// element holds now, or -1 when the handle finds no element.
+pub class Changed inherits lang.Error
+{
+	/// The version the caller gave.
+	pub expected: int = 0,
+	/// The version of the element now, or -1 when it is gone.
+	pub found: int = 0,
+	/// The bytes of the message, which the error frees. A copy made with `dup`
+	/// shares them with the error it copies.
+	transient made: ?*byte = none,
+
+	/// The failure of a set that expected `expected` and found `found`.
+	pub fn found_version(expected: int, found: int) -> *Changed
+	{
+		let e = alloc Changed { expected: expected, found: found };
+		let message = "";
+		if found < 0 {
+			message = f"the element of version {expected} is gone";
+		} else {
+			message = f"the element changed from version {expected} to {found}";
+		}
+		e.message = message;
+		e.made = message.ptr;
+		return e;
+	}
+
+	concrete fn destruct(self)
+	{
+		free(self.made);
+	}
+}
+
+/// The storage of `Pool<T>` and `Tree<T>`: slots in blocks that never move, a
+/// generation per slot and a list of the free slots.
+///
+/// Block `k` holds `2^(shift + k)` slots, and the slots before it number
+/// `2^shift * (2^k - 1)`. Its memory holds the elements, then the words of each
+/// slot. A slot that holds no element holds zero bytes. The places of the
+/// shared functions are the slot indices, walked in increasing order.
+///
+/// A version counts the changes of an element since it was added: `set`,
+/// `set_if_version`, `modify`, the `update` forms and each turn of a `for` that
+/// reaches it, since that turn may change it in place.
+pub abstract class Slots<T> inherits collection.Collection<T>
+{
+	/// The blocks, of which the first `blocks_made` are allocated.
+	blocks: [BLOCKS]?*byte = [none; BLOCKS],
+	blocks_made: int = 0,
+	/// The log2 of the size of the first block.
+	shift: int = FIRST_SHIFT,
+	/// The slots handed out so far. Every slot below holds an element or stands
+	/// in the free list.
+	used: int = 0,
+	/// The first free slot, or `NO_SLOT`.
+	free_slot: int = NO_SLOT,
+	/// The words a collection below keeps per slot beside those of the pool.
+	protected extra_words: int = 0,
+
+	/// Make the first block hold `capacity` slots, rounded up to a power of
+	/// two, and allocate it when `capacity` is above 0.
+	protected fn prepare(self, capacity: int)
+	{
+		while (1 << self.shift) < capacity do {
+			self.shift += 1;
+		}
+		if capacity > 0 {
+			self.make_block();
+		}
+	}
+
+	/// Whether `h` finds an element.
+	pub fn contains(self, h: Handle<T>) -> bool
+	{
+		return self.slot_of(h) >= 0;
+	}
+
+	/// A copy of the element `h` finds, or `none` when it is gone.
+	pub fn get(self, h: Handle<T>) -> ?T
+	{
+		let i = self.slot_of(h);
+		if i < 0 {
+			return none;
+		}
+		return self.copy_element(self.element(i));
+	}
+
+	/// A copy of the element `h` finds with its version, or `none` when it is
+	/// gone. `set_if_version` takes the version back.
+	pub fn get_versioned(self, h: Handle<T>) -> ?(T, int)
+	{
+		let i = self.slot_of(h);
+		if i < 0 {
+			return none;
+		}
+		let copy = self.copy_element(self.element(i));
+		return (copy, self.word(i, VERSION));
+	}
+
+	/// Replace the element `h` finds with `x`. Gives `false`, and tears `x`
+	/// down, when the element is gone.
+	pub fn set(self, h: Handle<T>, own x: T) -> bool
+	{
+		let i = self.slot_of(h);
+		if i < 0 {
+			return false;
+		}
+		self.replace(i, x);
+		return true;
+	}
+
+	/// Replace the element `h` finds with `x` when its version is still
+	/// `version`, as `get_versioned` gave it.
+	///
+	/// It fails with `Changed`, and tears `x` down, when the element changed
+	/// since or is gone.
+	pub fn set_if_version(self, h: Handle<T>, own x: T, version: int) may fail
+	{
+		let i = self.slot_of(h);
+		if i < 0 {
+			fail Changed.found_version(version, -1);
+		}
+		let now = self.word(i, VERSION);
+		if now != version {
+			fail Changed.found_version(version, now);
+		}
+		self.replace(i, x);
+	}
+
+	/// Lend the element `h` finds to `f` for reading. Gives `false` when it is
+	/// gone.
+	pub fn read(self, h: Handle<T>, f: fn(lent *T)) -> bool
+	{
+		let i = self.slot_of(h);
+		if i < 0 {
+			return false;
+		}
+		f(self.element(i));
+		return true;
+	}
+
+	/// Lend the element `h` finds to `f`, which may change it in place. Gives
+	/// `false` when it is gone.
+	pub fn modify(self, h: Handle<T>, f: fn(lent *T)) -> bool
+	{
+		let i = self.slot_of(h);
+		if i < 0 {
+			return false;
+		}
+		self.bump(i);
+		f(self.element(i));
+		return true;
+	}
+
+	/// Run `change` on every element that `test` accepts, in place, and give
+	/// their number. Each changed element takes a new version.
+	concrete fn update_all(self, test: fn(T) -> bool, change: fn(lent *T)) -> int
+	{
+		let n = 0;
+		let i = self.first_place();
+		while i >= 0 do {
+			if test(*self.element(i)) {
+				self.bump(i);
+				change(self.element(i));
+				n += 1;
+			}
+			i = self.next_place(i);
+		}
+		return n;
+	}
+
+	/// Run `change` on the first element that `test` accepts, in place, which
+	/// takes a new version. Gives `false` when no element matches.
+	concrete fn update_first(self, test: fn(T) -> bool, change: fn(lent *T)) -> bool
+	{
+		let i = self.first_place();
+		while i >= 0 do {
+			if test(*self.element(i)) {
+				self.bump(i);
+				change(self.element(i));
+				return true;
+			}
+			i = self.next_place(i);
+		}
+		return false;
+	}
+
+	/// Run `change` on the one element that `test` accepts, in place, which
+	/// takes a new version.
+	///
+	/// It fails with `collection.NotOne` and changes nothing when no element or
+	/// more than one matches.
+	concrete fn update_one(self, test: fn(T) -> bool, change: fn(lent *T)) may fail
+	{
+		let found = -1;
+		let n = 0;
+		let i = self.first_place();
+		while i >= 0 do {
+			if test(*self.element(i)) {
+				if n == 0 {
+					found = i;
+				}
+				n += 1;
+			}
+			i = self.next_place(i);
+		}
+		if n != 1 {
+			fail collection.NotOne.found("update_one", n);
+		}
+		self.bump(found);
+		change(self.element(found));
+	}
+
+	operator fn iter(self) -> SlotsWalk<T>
+	{
+		return SlotsWalk<T> {
+			watch: self.watch(),
+			blocks: &self.blocks[0],
+			shift: self.shift,
+			words: SLOT_WORDS + self.extra_words,
+			used: self.used,
+		};
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		return self.live_from(0);
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		return self.live_from(at + 1);
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		f(self.element(at));
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		return self.copy_element(self.element(at));
+	}
+
+	/// The slot `h` finds, or -1 when its element is gone.
+	protected fn slot_of(self, h: Handle<T>) -> int
+	{
+		let i = h.index;
+		if i < 0 || i >= self.used {
+			return -1;
+		}
+		if self.word(i, LINK) != LIVE || self.word(i, GENERATION) != h.generation {
+			return -1;
+		}
+		return i;
+	}
+
+	/// The handle of the element in the slot `i`.
+	protected fn handle_at(self, i: int) -> Handle<T>
+	{
+		return Handle<T> { index: i, generation: self.word(i, GENERATION) };
+	}
+
+	/// Put `x` into a free slot, reusing the last one freed first, and give the
+	/// index of the slot. The caller counts the change of the size.
+	protected fn claim(self, own x: T) -> int
+	{
+		let i = self.free_slot;
+		if i >= 0 {
+			self.free_slot = self.word(i, LINK);
+		} else {
+			i = self.used;
+			if self.block_of(i) >= self.blocks_made {
+				self.make_block();
+			}
+			self.used += 1;
+		}
+		let p = self.element(i);
+		*p = x;
+		self.set_word(i, LINK, LIVE);
+		self.set_word(i, VERSION, 0);
+		return i;
+	}
+
+	/// Move the element of the slot `i` out, free the slot and increment its
+	/// generation, so no handle of the element finds the slot again. The caller
+	/// counts the change of the size.
+	protected fn release(self, i: int) -> T
+	{
+		let p = self.element(i);
+		let taken = *p;
+		memset(p as ?*byte, 0, size_of(T) as c_size_t);
+		self.set_word(i, GENERATION, self.word(i, GENERATION) + 1);
+		self.set_word(i, VERSION, 0);
+		self.set_word(i, LINK, self.free_slot);
+		self.free_slot = i;
+		return taken;
+	}
+
+	/// The word `w` of the words a collection below keeps for the slot `i`.
+	protected fn extra(self, i: int, w: int) -> int
+	{
+		return self.word(i, SLOT_WORDS + w);
+	}
+
+	/// Write `v` into the word `w` of the words a collection below keeps for
+	/// the slot `i`.
+	protected fn set_extra(self, i: int, w: int, v: int)
+	{
+		self.set_word(i, SLOT_WORDS + w, v);
+	}
+
+	/// The element of the slot `i`, which holds one.
+	protected fn element(self, i: int) -> *T
+	{
+		return slot_element<T>(&self.blocks[0], self.shift, i);
+	}
+
+	/// Replace the element of the slot `i` with `x` and count a change of it.
+	fn replace(self, i: int, own x: T)
+	{
+		let p = self.element(i);
+		self.destroy_element(p);
+		memset(p as ?*byte, 0, size_of(T) as c_size_t);
+		*p = x;
+		self.bump(i);
+	}
+
+	/// Count a change of the element of the slot `i`.
+	fn bump(self, i: int)
+	{
+		self.set_word(i, VERSION, self.word(i, VERSION) + 1);
+	}
+
+	/// The first slot from `i` on that holds an element, or -1.
+	fn live_from(self, i: int) -> int
+	{
+		let at = i;
+		while at < self.used do {
+			if self.word(at, LINK) == LIVE {
+				return at;
+			}
+			at += 1;
+		}
+		return -1;
+	}
+
+	fn word(self, i: int, w: int) -> int
+	{
+		let words = slot_words<T>(&self.blocks[0], self.shift,
+			SLOT_WORDS + self.extra_words, i);
+		return words[w];
+	}
+
+	fn set_word(self, i: int, w: int, v: int)
+	{
+		let words = slot_words<T>(&self.blocks[0], self.shift,
+			SLOT_WORDS + self.extra_words, i);
+		words[w] = v;
+	}
+
+	/// The block that holds the slot `i`.
+	fn block_of(self, i: int) -> int
+	{
+		return highest_bit(i + (1 << self.shift)) - self.shift;
+	}
+
+	/// Allocate the next block, twice the size of the one before, with every
+	/// byte zero. Stops the program when the allocator has run out, which it
+	/// does long before the last block.
+	fn make_block(self)
+	{
+		let k = self.blocks_made;
+		let n = 1 << (self.shift + k);
+		let bytes = n * (size_of(T) + (SLOT_WORDS + self.extra_words) * size_of(int));
+		let made = self.from.alloc(bytes, block_align<T>()) catch fatal;
+		memset(made, 0, bytes as c_size_t);
+		self.blocks[k] = made;
+		self.blocks_made = k + 1;
+	}
+
+	fn destruct(self)
+	{
+		let i = self.used - 1;
+		while i >= 0 do {
+			if self.word(i, LINK) == LIVE {
+				self.destroy_element(self.element(i));
+			}
+			i -= 1;
+		}
+		let k = 0;
+		while k < self.blocks_made do {
+			self.from.free(self.blocks[k]);
+			k += 1;
+		}
+	}
+}
+
+/// A collection of elements at fixed addresses, reached by handles.
+///
+/// `add` puts an element into a free slot and gives its handle. The element
+/// stays at its address until `remove` takes it out, however the pool grows.
+/// `get`, `set`, `remove` and the lending forms find nothing for a handle whose
+/// element is gone. `for` walks the elements in the order of their slots.
+pub class Pool<T> inherits Slots<T>
+{
+	/// An empty pool whose first block holds `capacity` elements, rounded up to
+	/// a power of two, with its memory from `from`, or from the C library when
+	/// it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Pool<T>
+	{
+		let made = Pool<T> { from: collection.allocator(from) };
+		made.prepare(capacity);
+		return made;
+	}
+
+	/// Add `x`, which the pool now owns, and give its handle.
+	pub fn add(self, own x: T, at: lang.SourceLocation = here) -> Handle<T>
+	{
+		let i = self.claim(x);
+		self.resized(1, at);
+		return self.handle_at(i);
+	}
+
+	/// Remove the element `h` finds and give it, or `none` when it is gone.
+	pub fn remove(self, h: Handle<T>, at: lang.SourceLocation = here) -> ?T
+	{
+		let i = self.slot_of(h);
+		if i < 0 {
+			return none;
+		}
+		let taken = self.release(i);
+		self.resized(-1, at);
+		return taken;
+	}
+
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let after = self.next_place(at);
+		let taken = self.release(at);
+		return (taken, after);
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the order of their slots.
+pub operator fn eq<T: eq>(a: Pool<T>, b: Pool<T>) -> bool
+{
+	return collection.equal<T>(&a, &b);
+}
+
+/// The iterator of `Pool<T>` and `Tree<T>`, which lends each element in the
+/// order of the slots.
+pub class SlotsWalk<T>
+{
+	pub watch: lang.Watch,
+	pub blocks: *?*byte,
+	pub shift: int,
+	pub words: int,
+	pub used: int,
+	pub at: int = -1,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		while self.at < self.used do {
+			let words = slot_words<T>(self.blocks, self.shift, self.words, self.at);
+			if words[LINK] == LIVE {
+				words[VERSION] += 1;
+				return true;
+			}
+			self.at += 1;
+		}
+		return false;
+	}
+
+	operator fn value(self) -> lent *T
+	{
+		return slot_element<T>(self.blocks, self.shift, self.at);
+	}
+}
+
+/// The element of the slot `i` of the blocks at `blocks`, the first of which
+/// holds `2^shift` slots.
+fn slot_element<T>(blocks: *?*byte, shift: int, i: int) -> *T
+{
+	let j = i + (1 << shift);
+	let top = highest_bit(j);
+	let block = blocks[top - shift] catch fatal;
+	let items = block as *T;
+	return &items[j - (1 << top)];
+}
+
+/// The `words` words of the slot `i` of the blocks at `blocks`, which follow
+/// the elements of its block.
+fn slot_words<T>(blocks: *?*byte, shift: int, words: int, i: int) -> *int
+{
+	let j = i + (1 << shift);
+	let top = highest_bit(j);
+	let block = blocks[top - shift] catch fatal;
+	let n = 1 << top;
+	let all = &block[n * size_of(T)] as *int;
+	return &all[(j - n) * words];
+}
+
+/// The position of the highest bit that is set in `n`, which is above 0.
+fn highest_bit(n: int) -> int
+{
+	let v = n as u64;
+	let top = 0;
+	if v >= (1 as u64) << 32 {
+		v >>= 32;
+		top += 32;
+	}
+	if v >= (1 as u64) << 16 {
+		v >>= 16;
+		top += 16;
+	}
+	if v >= (1 as u64) << 8 {
+		v >>= 8;
+		top += 8;
+	}
+	if v >= (1 as u64) << 4 {
+		v >>= 4;
+		top += 4;
+	}
+	if v >= (1 as u64) << 2 {
+		v >>= 2;
+		top += 2;
+	}
+	if v >= (1 as u64) << 1 {
+		top += 1;
+	}
+	return top;
+}
+
+/// The alignment of a block: that of its words, or that of its elements when
+/// larger, the largest power of two that divides their size.
+fn block_align<T>() -> int
+{
+	let size = size_of(T);
+	let align = size_of(int);
+	if size > 0 && (size & -size) > align {
+		align = size & -size;
+	}
+	return align;
+}
