@@ -30,3 +30,29 @@ and iteration" in `docs/decisions.md`.
 - `lower_collect` walks the iterator the same way and writes each value into
   memory from `realloc`. The slice is a slot of the frame with the memory and
   the count.
+
+## Walking a collection
+
+The choices of the passes for "Walking a collection" of round five. The
+decisions stand under "Generics and collections" in `docs/decisions.md`.
+
+- The parser keeps the source of the walked expression in `over_text` of the
+  `for`, which the refusal of a change to a copy and the trap name.
+- `sema_iterate` moves a `value` call that gives a `lent` pointer into
+  `place` and makes `current` a `*` of it, typed by hand, since the call is
+  checked already. `for x in &e` binds `place`, and every other walk binds
+  `current`.
+- `watch_changes` finds the first plain field of type `anti.lang.Watch` of
+  the iterator. It builds four checked trees on the hidden local. One compares
+  the counts, and three give the pointer, the length and the line of the last
+  change. The fields are marked `promoted`, so the visibility of the
+  program does not apply to them.
+- `mark_walked` gives the element variable `copy_of`, the source of the walked
+  expression, or `lent_turn`. `walked_copy` of `check_assign` follows a place
+  through fields and array elements to such a variable and stops at a pointer
+  or a slice.
+- `walk_check` of `lower_for_hooks` writes the comparison in the test before
+  `next` and a failure block of the kind `IR_FAIL_CHECK`, which reads the
+  place of the change and calls `anti_rt_walk_changed`.
+- The copies of a generic clone `place` and the four trees with the rest of
+  the iteration, and the tree of a library file carries them.

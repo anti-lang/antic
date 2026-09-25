@@ -296,8 +296,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1045 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1044 each, without the `no_paths` test, which needs a
+- 1053 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1052 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -510,6 +510,12 @@ reports what it finished.
   collection and an iterator, `e[i]` and `e[i] = v` call `index` and
   `set_index`, and every iterator has `to_slice`. See "Language hooks and
   iteration" in `docs/decisions.md` and `docs/notes/iteration.md`.
+  `for x in e` gives a copy and refuses a change that reaches the copy
+  alone. `for x in &e` lends each element for one turn, over a slice, an
+  array and an iterator whose `value` gives a `lent *T`. A dev build traps
+  when a collection changed while a loop walks it, through
+  `anti.lang.Changes` and `anti.lang.Watch`. See "Generics and
+  collections" in `docs/decisions.md`.
 - The syntax of generics is built. Type parameters in `<>` on functions,
   structs, classes, variants, interfaces and the functions of a class
   body, `N: int`, type arguments in every type, the rule of C# in an
@@ -599,7 +605,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 62. See "The doc
+  class body and the `worker` mark, and its format version is 65. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops

@@ -322,14 +322,32 @@ free(all.ptr);
 
 `for x in c` gives a copy of each element, and the loop variable is read-only, so a change that would reach the copy alone is refused. `for x in &c` gives each element as a `lent` pointer for one turn of the loop, and a change through it reaches the element. Both forms hold for slices and for the collections of [Collections](#collections). A collection must not change its size while a loop walks it. A dev build traps when it does, naming the collection and both places, and `remove_all(test)` removes while it walks.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+class Person { pub age: int = 0, }
+class People
+{
+	pub all: [2]Person = [Person { }; 2],
+	operator fn iter(self) -> PeopleIter { return PeopleIter { list: self, at: -1 }; }
+}
+class PeopleIter
+{
+	pub list: *People,
+	pub at: int,
+	operator fn next(self) -> bool { self.at = self.at + 1; return self.at < 2; }
+	operator fn value(self) -> lent *Person { return &self.list.all[self.at]; }
+}
+let people = People { };
+```
+-->
+```anti
 for p in people { }       // p is a copy of each Person, read-only
 for p in &people {
 	p.age += 1;           // p is a lent *Person
 }
 ```
 
-Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice`. Not built yet: labels, `for x in &c` over a collection, the read-only loop variable of the copy form, and the trap on a collection that changes its size while a loop walks it.
+Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice`. `for x in &c` over a slice, an array and a collection whose `value` gives a `lent` pointer, the read-only loop variable of the copy form with its refusal, and the trap of a dev build on a collection that changes its size while a loop walks it, through `anti.lang.Changes` and `anti.lang.Watch`. Not built yet: labels.
 
 ## Functions
 
