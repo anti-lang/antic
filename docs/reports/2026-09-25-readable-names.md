@@ -62,3 +62,20 @@ of 1002, ASan 1001 of 1001 and UBSan 1001 of 1001, without `no_paths`. The
 logs are `build/logs/t8.log`, `build/logs/asan-test2.log` and
 `build/logs/ubsan-test2.log`. The docs-style checker reports nothing on
 every file touched but `tests/CMakeLists.txt`, which it reads as prose.
+
+## Proof of the push
+
+Taken after the push of the code and the report.
+
+```text
+$ git log --oneline -3
+39a0711 Report the readable names of the copies of generics
+a9fb975 Show copies of generics by their readable names
+5b2db9a Add the proof of the push to the report of the compilation of generics
+$ git status --short
+$ git rev-parse HEAD origin/main
+39a07115d5d8cb064be2c5d9a4431f0aeeaff0c0
+39a07115d5d8cb064be2c5d9a4431f0aeeaff0c0
+```
+
+Suites: host 1002 of 1002, ASan 1001 of 1001, UBSan 1001 of 1001.
