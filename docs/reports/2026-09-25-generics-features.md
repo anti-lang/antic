@@ -85,3 +85,18 @@ All stand under "Generics and collections" in `docs/decisions.md`:
 - Linking with the pinned clang prints `ld: warning: ignoring -lto_library`
   for a `libLTO.dylib` that the pinned archive lacks. No compile warning
   exists.
+
+## Proof of the push
+
+After the push of `59fa9dd`:
+
+```text
+$ git log --oneline -3
+59fa9dd Report what can be generic and the other features with generics
+1a5502a Record what can be generic and the other features with generics
+af42fcc Build the rest of what can be generic and the features with generics
+$ git status --short
+$ git rev-parse HEAD origin/main
+59fa9dd22597bdac1a670ce7250460cd60f6a471
+59fa9dd22597bdac1a670ce7250460cd60f6a471
+```
