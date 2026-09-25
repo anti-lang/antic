@@ -208,8 +208,8 @@ class Cell<T>
 /// handle is freed.
 ///
 /// The count is atomic, so the handles of one object may be used and freed on
-/// more than one thread at once. `T` must be thread-safe for more than one thread to
-/// change the object.
+/// more than one thread at once. The object must be of a thread-safe type for
+/// more than one thread to change it.
 ///
 /// `read(f)` and `modify(f)` lend the object to `f` for the call. No other
 /// pointer to it leaves the handle.
@@ -265,12 +265,12 @@ pub final class Shared<T>
 	}
 
 	/// Another handle in `to`, as `share()` gives one.
-	///
-	/// DESIGN: `dup` gives a replaced `copy` memory that nothing has written,
-	/// and a collection gives it the bytes of the element. The bytes of this
-	/// handle go into `to` first in both cases, its table among them.
 	concrete fn copy(self, to: *Object)
 	{
+		/* DESIGN: `dup` gives a replaced `copy` memory that nothing has
+		   written, and a collection gives it the bytes of the element. The
+		   bytes of this handle go into `to` first in both cases, its table
+		   among them. */
 		memcpy(to as ?*byte, self as ?*byte, size_of(Shared<T>) as c_size_t);
 		let cell = self.cell catch fatal;
 		cell.count.add(1);
@@ -289,11 +289,11 @@ pub final class Shared<T>
 }
 
 /// `value` itself, which the call moves out of the parameter.
-///
-/// DESIGN: a field of a literal copies an `own` parameter and leaves it to the
-/// teardown of the function, while `return` moves it. `Shared.new` passes its
-/// value through here, so the cell takes it by a move.
 fn moved<T>(own value: T) -> T
 {
+	/* DESIGN: a field of a literal copies an `own` parameter and leaves it
+	   to the teardown of the function, while `return` moves it.
+	   `Shared.new` passes its value through here, so the cell takes it by a
+	   move. */
 	return value;
 }
