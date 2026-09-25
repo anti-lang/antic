@@ -131,3 +131,45 @@ Circles that threads add to under the lock of the object.
   Runs under the lock of its object.
   Add one circle.
 
+## Ordered
+
+```anti
+pub constraint Ordered = eq + lt
+```
+
+Measurements that compare, which `Shelf` sorts by.
+
+## larger
+
+```anti
+pub fn larger<T: lt>(a: T, b: T) -> T
+```
+
+The larger of two measurements.
+
+## Shelf
+
+```anti
+pub class Shelf<T: Ordered, N: int>
+```
+
+A shelf of up to `N` measurements.
+
+- `items: [N]T`
+  The measurements, oldest first.
+- `count: int`
+  How many stand on the shelf.
+
+- `pub fn first(self) -> T`
+  The first measurement.
+
+## Radii
+
+```anti
+pub type Radii = Shelf<int, 4>
+```
+
+A copy of [`Shelf`](#Shelf).
+
+A shelf of four radii.
+

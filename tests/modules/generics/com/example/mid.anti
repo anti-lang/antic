@@ -1,0 +1,25 @@
+//! A library that uses the generics of `gen` itself, so the program and this
+//! module share copies.
+
+import com.example.gen;
+
+/// The larger of two counts.
+pub fn biggest(a: int, b: int) -> int
+{
+	return gen.max(a, b);
+}
+
+/// A box of `n`, of the type the program names too.
+pub fn boxed(n: int) -> gen.Box<int>
+{
+	return gen.Box<int> { value: n };
+}
+
+/// A list of `n` and `n + 1`.
+pub fn listed(n: int) -> *gen.List<int>
+{
+	let list = alloc gen.List<int> { items: []int { ptr: alloc(int, 1), len: 1 } };
+	list.push(n);
+	list.push(n + 1);
+	return list;
+}

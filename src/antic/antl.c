@@ -2238,8 +2238,11 @@ static void read_types(struct reader *r)
             }
             break;
         }
+        /* The tree of a generic carries the type of `none` before a
+           context gives it one. It carries the error type as well, on
+           the name of a module before a `.`, which no pass reads. */
         default:
-            if (kind < TYPE_NONE) {
+            if (kind <= TYPE_ERROR) {
                 t = types_builtin(r->types, (enum type_kind)kind);
             } else {
                 damaged(r);

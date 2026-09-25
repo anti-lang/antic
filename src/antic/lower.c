@@ -2237,8 +2237,8 @@ static void class_construct(struct lowerer *l, const struct item *it)
     }
     sig = m->symbol->type;
     target = lower_callee_function(l, m->symbol);
-    text_appendf(&name, "anti_%.*s_construct", (int)t->name.length,
-                 t->name.text);
+    text_appendf(&name, "anti_%.*s_construct", (int)types_c_name(t).length,
+                 types_c_name(t).text);
     f = ir_function_add(l->m, l->module_name, text_cstr(&name),
                         lower_ir_type_of(sig->result), IR_NO_AGG);
     text_free(&name);

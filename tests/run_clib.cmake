@@ -10,7 +10,7 @@
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, simd,
 #             classes, failing, tuples, flags, ledger, variants, nested,
-#             names or handlers
+#             names, handlers or generics
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
@@ -177,6 +177,21 @@ elseif(CASE STREQUAL "failing")
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/failing${EXE}")
     expect_output("${dir}/failing${EXE}" "${SOURCES}/failing.expected")
+elseif(CASE STREQUAL "generics")
+    # The copy of a generic that `export type` names crosses to C as the
+    # export class of that name, with its table, its init and one symbol
+    # per public function. The header compiles as C11 and as C++17.
+    library(stacks static "${dir}")
+    expect_header("${dir}/stacks.h" stacks.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/stacks.c"
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/stacks${EXE}")
+    expect_output("${dir}/stacks${EXE}" "${SOURCES}/stacks.expected")
+    configure_file("${SOURCES}/stacks.c" "${dir}/stacks.cpp" COPYONLY)
+    run(${CXX} -std=c++17 -fsyntax-only -I "${dir}" -I "${SOURCES}"
+        "${dir}/stacks.cpp")
 elseif(CASE STREQUAL "tuples")
     # A tuple of an exported signature crosses as the struct the header
     # writes for it, one per distinct tuple, and C builds one of its own.

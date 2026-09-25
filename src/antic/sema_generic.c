@@ -370,8 +370,18 @@ void sema_resolve_generics(struct checker *c)
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        if (it->symbol != NULL && it->kind == ITEM_TYPE) {
-            sema_alias_type(c, it->symbol);
+        struct type *t;
+        if (it->symbol == NULL || it->kind != ITEM_TYPE) {
+            continue;
+        }
+        t = sema_alias_type(c, it->symbol);
+        /* The copy an `export type` names is an export class or struct
+           to C, under the name of the `type`. The checks of what crosses
+           to C read that. */
+        if (it->exported && !sema_is_error(t) && t->generic != NULL &&
+            !sema_has_params(t) && t->c_name.length == 0) {
+            t->c_name = it->name;
+            t->item_exported = true;
         }
     }
 }

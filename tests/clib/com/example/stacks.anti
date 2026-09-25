@@ -1,0 +1,46 @@
+//! A generic stack, which a C program reaches through the copy an `export type`
+//! names.
+
+import anti.lang;
+
+/// A stack of up to eight values.
+pub class Stack<T>
+{
+	pub items: [8]T,
+	pub count: c_int = 0,
+
+	/// Put a value on top, unless the stack is full.
+	pub fn push(self, value: T)
+	{
+		if self.count < 8 {
+			self.items[self.count as int] = value;
+			self.count = self.count + 1;
+		}
+	}
+
+	/// Take the value on top.
+	pub fn pop(self) -> T
+	{
+		self.count = self.count - 1;
+		return self.items[self.count as int];
+	}
+
+	/// The number of values.
+	pub fn size(self) -> c_int
+	{
+		return self.count;
+	}
+}
+
+/// The stack of `c_int` that C uses.
+export type Ints = Stack<c_int>;
+
+/// The sum of the values of a stack, which C passes by pointer.
+export fn total(s: *Ints) -> c_int
+{
+	let sum: c_int = 0;
+	for i in 0..s.count as int {
+		sum = sum + s.items[i];
+	}
+	return sum;
+}

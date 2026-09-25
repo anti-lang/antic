@@ -68,6 +68,10 @@ struct entry {
     /* A function of a synchronized class that runs under the lock of its
        object, which the page says at the function. */
     bool locked;
+    /* A name that `type` gives a copy of a generic: the module and the
+       name of that generic, which the page links to. Empty otherwise. */
+    struct text copy_of_module;
+    struct text copy_of;
 };
 
 /* One page: a module with its items. */
@@ -108,6 +112,8 @@ static void entry_free(struct entry *e)
     free(e->members);
     text_free(&e->signature);
     text_free(&e->name);
+    text_free(&e->copy_of_module);
+    text_free(&e->copy_of);
 }
 
 static void page_free(struct page *p)
@@ -179,17 +185,84 @@ static bool c_function(const char *keyword)
     return strstr(keyword, "extern") != NULL;
 }
 
+/* DESIGN: a generic shows its type parameters after its name, each with
+   its constraints as the declaration wrote them, `<T: lt + eq, N: int>`.
+   The library file carries them in the public interface. A page built
+   from it then writes what the page built from the source writes. */
+static void constraint_list(struct text *out, const struct constraint_ref *refs,
+                            size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        text_append(out, i > 0 ? " + " : "");
+        if (refs[i].module.length > 0) {
+            text_appendf(out, "%.*s.", (int)refs[i].module.length,
+                         refs[i].module.text);
+        }
+        text_appendf(out, "%.*s", (int)refs[i].name.length, refs[i].name.text);
+    }
+}
+
+static void type_param(struct text *out, const struct type_param *p)
+{
+    text_appendf(out, "%.*s", (int)p->name.length, p->name.text);
+    if (p->constant) {
+        text_append(out, ": int");
+    } else if (p->constraint_count > 0) {
+        text_append(out, ": ");
+        constraint_list(out, p->constraints, p->constraint_count);
+    }
+}
+
+/* The parameters of a generic function. */
+static void fn_params(struct text *out, const struct item *it)
+{
+    size_t i;
+
+    if (it == NULL || it->type_param_count == 0) {
+        return;
+    }
+    text_append(out, "<");
+    for (i = 0; i < it->type_param_count; i++) {
+        text_append(out, i > 0 ? ", " : "");
+        type_param(out, &it->type_params[i]);
+    }
+    text_append(out, ">");
+}
+
+/* The parameters of a generic struct, class or variant. */
+static void type_params(struct text *out, const struct type *t)
+{
+    size_t i;
+
+    if (t->type_param_count == 0) {
+        return;
+    }
+    text_append(out, "<");
+    for (i = 0; i < t->type_param_count; i++) {
+        text_append(out, i > 0 ? ", " : "");
+        if (t->type_params[i]->param != NULL) {
+            type_param(out, t->type_params[i]->param);
+        }
+    }
+    text_append(out, ">");
+}
+
 static void fn_signature(struct text *out, const char *lead,
                          const char *keyword, const struct name *name,
-                         const struct type *t, const struct name *params,
-                         size_t param_count, bool self, bool variadic)
+                         const struct item *generic, const struct type *t,
+                         const struct name *params, size_t param_count,
+                         bool self, bool variadic)
 {
     const struct type *result = declared_result(t);
     size_t first = self ? 1 : 0;
     size_t i;
 
-    text_appendf(out, "%s%s %.*s(", lead, keyword, (int)name->length,
+    text_appendf(out, "%s%s %.*s", lead, keyword, (int)name->length,
                  name->text);
+    fn_params(out, generic);
+    text_append(out, "(");
     if (self) {
         text_append(out, "self");
     }
@@ -268,6 +341,7 @@ static void type_signature(struct text *out, const char *lead,
     case TYPE_VARIANT:
         text_appendf(out, "%svariant %.*s", lead, (int)name->length,
                      name->text);
+        type_params(out, t);
         break;
     case TYPE_CLASS:
         text_appendf(out, "%s%s%s%s%sclass %.*s", lead,
@@ -277,6 +351,7 @@ static void type_signature(struct text *out, const char *lead,
                      : t->safety == SAFETY_CONCURRENT ? "concurrent "
                                                       : "",
                      (int)name->length, name->text);
+        type_params(out, t);
         /* DESIGN: `anti.lang.Object` is the root of every class chain,
            so naming it after `inherits` says nothing a reader does not
            know. The base of a class that names one is written. */
@@ -297,6 +372,7 @@ static void type_signature(struct text *out, const char *lead,
         text_appendf(out, "%s%s %.*s", t->simd ? "simd " : "",
                      t->is_union ? "union" : "struct", (int)name->length,
                      name->text);
+        type_params(out, t);
         break;
     }
 }
@@ -421,8 +497,11 @@ static void body_entries(struct entry *item, const struct type *t, bool all)
         struct entry *one;
         bool self;
         size_t params;
+        /* A function with type parameters of its own compiles no copy
+           yet, so the library file leaves it out, and so does the
+           page. */
         if (m->kind != ITEM_FN || m->symbol == NULL ||
-            m->symbol->type == NULL) {
+            m->symbol->type == NULL || m->type_param_count > 0) {
             continue;
         }
         if (!all && m->vis != VIS_PUB) {
@@ -456,10 +535,40 @@ static void body_entries(struct entry *item, const struct type *t, bool all)
                                                      : m->params[j].name;
             }
         }
-        fn_signature(&one->signature, "", "fn", &m->name, m->symbol->type,
-                     names, params, self, false);
+        fn_signature(&one->signature, "", "fn", &m->name, NULL,
+                     m->symbol->type, names, params, self, false);
         free(names);
         one->doc = m->doc;
+    }
+}
+
+/* `constraint Name = a + b`, whose set its type holds with the
+   constraints the declaration wrote. */
+static void constraint_signature(struct text *out, const char *lead,
+                                 const struct name *name,
+                                 const struct type *set)
+{
+    const struct item *it = set != NULL ? set->declared_by : NULL;
+
+    text_appendf(out, "%sconstraint %.*s = ", lead, (int)name->length,
+                 name->text);
+    if (it != NULL) {
+        constraint_list(out, it->constraints, it->constraint_count);
+    }
+}
+
+/* `type Name = T`. A name of a copy of a generic links to the generic. */
+static void alias_signature(struct entry *one, const char *lead,
+                            const struct name *name, const struct type *t)
+{
+    text_appendf(&one->signature, "%stype %.*s = ", lead, (int)name->length,
+                 name->text);
+    type_name(&one->signature, t);
+    if (t->generic != NULL) {
+        text_append_bytes(&one->copy_of_module, t->generic->module.text,
+                          t->generic->module.length);
+        text_append_bytes(&one->copy_of, t->generic->name.text,
+                          t->generic->name.length);
     }
 }
 
@@ -478,16 +587,23 @@ static void interface_item(struct page *p, const struct symbol *sym)
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
     text_append_bytes(&one->name, sym->name.text, sym->name.length);
     one->doc = sym->doc;
+    if (sym->alias) {
+        alias_signature(one, lead, &sym->name, sym->type);
+        return;
+    }
     switch (sym->kind) {
     case SYMBOL_FN:
         fn_signature(&one->signature, lead, sym->worker ? "worker fn" : "fn",
-                     &sym->name, sym->type, sym->params,
+                     &sym->name, sym->item, sym->type, sym->params,
                      declared_params(sym->type, false), false, false);
         break;
     case SYMBOL_EXTERN_FN:
-        fn_signature(&one->signature, lead, "extern fn", &sym->name,
+        fn_signature(&one->signature, lead, "extern fn", &sym->name, NULL,
                      sym->type, sym->params,
                      declared_params(sym->type, false), false, sym->variadic);
+        break;
+    case SYMBOL_CONSTRAINT:
+        constraint_signature(&one->signature, lead, &sym->name, sym->type);
         break;
     case SYMBOL_CONST:
         text_appendf(&one->signature, "%sconst %.*s: ", lead,
@@ -522,6 +638,12 @@ static void tree_item(struct page *p, const struct item *it, bool notes)
     }
     lead = visibility_word(it->vis);
     switch (it->kind) {
+    case ITEM_TYPE:
+        alias_signature(one, lead, &it->name, sym->type);
+        break;
+    case ITEM_CONSTRAINT:
+        constraint_signature(&one->signature, lead, &it->name, sym->type);
+        break;
     case ITEM_FN:
     case ITEM_EXTERN_FN: {
         struct name *names = NULL;
@@ -535,7 +657,7 @@ static void tree_item(struct page *p, const struct item *it, bool notes)
                      it->kind == ITEM_EXTERN_FN
                          ? "extern fn"
                          : (it->worker ? "worker fn" : "fn"),
-                     &it->name, sym->type, names, it->param_count, false,
+                     &it->name, it, sym->type, names, it->param_count, false,
                      it->variadic);
         free(names);
         break;
@@ -550,6 +672,30 @@ static void tree_item(struct page *p, const struct item *it, bool notes)
         type_signature(&one->signature, lead, &it->name, sym->type);
         body_entries(one, sym->type, true);
         break;
+    }
+}
+
+/* The items of the tree in the order of the source, those the checker
+   took out among them: the generics, every `type` and every
+   `constraint`. */
+static void tree_items(struct page *p, const struct module *tree, bool notes)
+{
+    size_t i = 0;
+    size_t k = 0;
+
+    while (i < tree->item_count || k < tree->stripped_count) {
+        const struct item *a = i < tree->item_count ? tree->items[i] : NULL;
+        const struct item *b =
+            k < tree->stripped_count ? tree->stripped[k] : NULL;
+        if (b != NULL &&
+            (a == NULL || b->pos.line < a->pos.line ||
+             (b->pos.line == a->pos.line && b->pos.column < a->pos.column))) {
+            tree_item(p, b, notes);
+            k++;
+        } else {
+            tree_item(p, a, notes);
+            i++;
+        }
     }
 }
 
@@ -959,6 +1105,38 @@ static void entry_list(struct text *out, const struct entry *list,
     }
 }
 
+static const char *suffix_of(enum doc_form form);
+
+/* DESIGN: the name a `type` gives a copy of a generic links to that
+   generic, on the page of its module. The link stands after the
+   signature, which the page writes as code. */
+static void copy_link(struct text *out, const struct entry *e,
+                      const struct interface *iface, enum doc_form form)
+{
+    struct text href = {0};
+
+    if (e->copy_of.length == 0) {
+        return;
+    }
+    if (iface == NULL || strcmp(text_cstr(&e->copy_of_module),
+                                iface->module) != 0) {
+        text_appendf(&href, "%s%s", text_cstr(&e->copy_of_module),
+                     suffix_of(form));
+    }
+    text_appendf(&href, "#%s", text_cstr(&e->copy_of));
+    if (form == DOC_HTML) {
+        text_append(out, "<p>A copy of <a href=\"");
+        escape_html(out, text_cstr(&href), href.length);
+        text_append(out, "\"><code>");
+        escape_html(out, text_cstr(&e->copy_of), e->copy_of.length);
+        text_append(out, "</code></a>.</p>\n");
+    } else {
+        text_appendf(out, "A copy of [`%s`](%s).\n\n", text_cstr(&e->copy_of),
+                     text_cstr(&href));
+    }
+    text_free(&href);
+}
+
 static void entry_page(struct text *out, const struct entry *e,
                        const struct interface *iface, enum doc_form form)
 {
@@ -976,6 +1154,7 @@ static void entry_page(struct text *out, const struct entry *e,
         text_appendf(out, "## %s\n\n```anti\n%s\n```\n\n",
                      text_cstr(&e->name), text_cstr(&e->signature));
     }
+    copy_link(out, e, iface, form);
     doc_body(out, &e->doc, iface, form);
     entry_list(out, e->fields, e->field_count, DOC_CLASS_FIELDS, iface, form);
     entry_list(out, e->members, e->member_count, DOC_CLASS_MEMBERS, iface,
@@ -1261,9 +1440,7 @@ int doc_run(const char *const *sources, size_t count,
             if (dev) {
                 pages[i].note = tree->note;
             }
-            for (j = 0; j < tree->item_count; j++) {
-                tree_item(&pages[i], tree->items[j], dev);
-            }
+            tree_items(&pages[i], tree, dev);
         } else {
             pages[i].doc.text = iface->doc;
             pages[i].doc.length = iface->doc != NULL ? strlen(iface->doc) : 0;

@@ -1,0 +1,225 @@
+//! Generics that other modules use with their own arguments. The library file
+//! carries the checked tree of each body, and a module that uses one compiles
+//! its copy from that tree.
+
+import anti.lang;
+import anti.text;
+
+/// The larger of two values.
+pub fn max<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+/// Values that compare.
+pub constraint Ordered = eq + lt;
+
+const LIMIT: int = 100;
+
+// A private function, which a copy in another module calls.
+fn clamp(n: int) -> int
+{
+	if n > LIMIT {
+		return LIMIT;
+	}
+	return n;
+}
+
+// A private generic, which a public one calls.
+fn twice<T: add>(a: T) -> T
+{
+	return a + a;
+}
+
+/// A value added to itself, at most 100 for an `int`.
+pub fn double<T: add>(a: T) -> T
+{
+	return twice(a);
+}
+
+/// The count, clamped by a private function.
+pub fn clamped<T>(items: []T) -> int
+{
+	return clamp(items.len);
+}
+
+/// A growing list of values.
+pub class List<T>
+{
+	pub own items: []T,
+	pub count: int = 0,
+
+	pub fn push(self, value: T)
+	{
+		if self.count == self.items.len {
+			self.grow();
+		}
+		self.items[self.count] = value;
+		self.count = self.count + 1;
+	}
+
+	fn grow(self)
+	{
+		let grown = alloc(T, self.items.len * 2 + 4) else {
+			return;
+		};
+		for i in 0..self.count {
+			grown[i] = self.items[i];
+		}
+		free(self.items.ptr);
+		self.items = []T { ptr: grown, len: self.items.len * 2 + 4 };
+	}
+
+	/// The value at `i`.
+	pub fn get(self, i: int) -> T
+	{
+		return self.items[i];
+	}
+
+	/// The size of one value.
+	pub fn size(self) -> int
+	{
+		return size_of(T) as int;
+	}
+}
+
+/// The sum of a list.
+pub fn sum<T: add>(items: *List<T>, zero: T) -> T
+{
+	let total = zero;
+	for i in 0..items.count {
+		total = total + items.get(i);
+	}
+	return total;
+}
+
+/// Two values.
+pub struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+/// A pair of two values.
+pub fn make<A, B>(a: A, b: B) -> Pair<A, B>
+{
+	return Pair<A, B> { first: a, second: b };
+}
+
+/// A value or none.
+pub variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+/// A value of `T`.
+pub fn some<T>(v: T) -> Maybe<T>
+{
+	return Maybe<T>.Some { value: v };
+}
+
+/// No value of the type of `v`.
+pub fn nothing_like<T>(v: T) -> Maybe<T>
+{
+	return Maybe<T>.Nothing;
+}
+
+/// The value of `m`, or `d` without one.
+pub fn value_or<T>(m: Maybe<T>, d: T) -> T
+{
+	if let Some s = m {
+		return s.value;
+	}
+	return d;
+}
+
+/// `f` applied twice through a closure.
+pub fn apply<T>(v: T, f: fn(T) -> T) -> T
+{
+	let twice_f = fn(x: T) -> T { return f(f(x)); };
+	return twice_f(v);
+}
+
+/// A box of one value.
+pub class Box<T>
+{
+	pub value: T,
+
+	/// The value.
+	pub fn get(self) -> T
+	{
+		return self.value;
+	}
+}
+
+/// A box of an `int`.
+pub type IntBox = Box<int>;
+
+/// A box that this module makes itself.
+pub fn made() -> Box<int>
+{
+	return Box<int> { value: 5 };
+}
+
+/// A fixed ring of values.
+pub struct Ring<T, N: int>
+{
+	items: [N]T,
+	count: int,
+}
+
+/// The capacity of a ring.
+pub fn capacity<T, N: int>(r: *Ring<T, N>) -> int
+{
+	return N;
+}
+
+/// A shape with an area.
+pub abstract class Measured
+{
+	pub abstract fn area(self) -> int;
+}
+
+/// The larger area of two shapes.
+pub fn larger<T: Measured>(a: *T, b: *T) -> int
+{
+	return max(a.area(), b.area());
+}
+
+/// Swaps the first two values of an indexed collection.
+pub fn swap<C: index + set_index>(c: C)
+{
+	let first = c[0];
+	c[0] = c[1];
+	c[1] = first;
+}
+
+/// The count of values a walk gives.
+pub fn count<C: iter>(c: C) -> int
+{
+	let n = 0;
+	for x in c {
+		let kept = x;
+		n = n + 1;
+	}
+	return n;
+}
+
+/// The first value, which an empty slice lacks.
+pub fn first<T>(items: []T) -> T may fail
+{
+	if items.len == 0 {
+		fail "empty";
+	}
+	return items[0];
+}
+
+/// A label with a count.
+pub fn label<T>(items: []T, name: str) -> str
+{
+	return f"{name}: {items.len}";
+}

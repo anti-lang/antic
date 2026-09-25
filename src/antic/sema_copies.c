@@ -404,14 +404,19 @@ static struct item *member_copy(struct copies *k, struct item *owner,
     *sym = *member->symbol;
     sym->ir = 0;
     sym->item = n;
-    sym->name = symbol_name(k, copy, &member->name);
     sym->type = sema_subst(k->c, member->symbol->type, &map);
     sym->home = NULL;
     n->symbol = sym;
     n->owner = owner;
     n->home_module = owner->home_module;
     n->pub = member->pub;
-    n->exported = false;
+    /* A public function of a copy that C knows by a name has the symbol
+       `Name.f`, whose C symbol is `Name_f`, as one of an export class. */
+    n->exported = owner->exported && member->pub;
+    sym->exported = n->exported;
+    sym->name = n->exported
+                    ? types_member_symbol(k->c->arena, &copy->c_name, member)
+                    : symbol_name(k, copy, &member->name);
     if (member->body != NULL) {
         n->body = NULL;
         add_work(k, member, n, &map);
@@ -454,10 +459,14 @@ static struct item *type_item(struct copies *k, struct type *copy)
     made->type_params = NULL;
     made->type_param_count = 0;
     /* A copy stands in no interface: each module that uses the generic
-       makes its own. */
+       makes its own. One that an `export type` names is an export class
+       to C, which the module of that `type` defines. */
     made->pub = false;
     made->vis = VIS_PRIVATE;
-    made->exported = false;
+    made->exported = copy->c_name.length > 0;
+    if (made->exported) {
+        made->home_module = NULL;
+    }
     made->nested = NULL;
     made->nested_count = 0;
     count = copy->member_count;

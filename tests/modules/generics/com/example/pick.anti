@@ -1,0 +1,17 @@
+//! The smallest library with a generic, whose bytes every host writes the same.
+
+/// The larger of two values.
+pub fn pick<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+/// A value and a count.
+pub struct Tally<T>
+{
+	value: T,
+	count: int,
+}

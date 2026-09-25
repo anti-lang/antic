@@ -1022,6 +1022,11 @@ struct type *types_tuple(struct types *types, struct type *const *elements,
     return t;
 }
 
+struct name types_c_name(const struct type *t)
+{
+    return t->c_name.length > 0 ? t->c_name : t->name;
+}
+
 struct type *types_param(struct types *types, struct name name)
 {
     struct type *t = arena_alloc(types->arena, sizeof *t);

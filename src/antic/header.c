@@ -209,10 +209,11 @@ static const char *owned_note(const struct symbol *sym, size_t i)
    symbol of a function of a class. */
 static void c_type_name(struct text *out, const struct type *t)
 {
+    struct name name = types_c_name(t);
     size_t i;
 
-    for (i = 0; i < t->name.length; i++) {
-        text_appendf(out, "%c", t->name.text[i] == '.' ? '_' : t->name.text[i]);
+    for (i = 0; i < name.length; i++) {
+        text_appendf(out, "%c", name.text[i] == '.' ? '_' : name.text[i]);
     }
 }
 
@@ -871,10 +872,11 @@ static void aggregate(struct text *out, const struct symbol *sym,
     if (t->packed) {
         text_append(out, "#pragma pack(push, 1)\n");
     }
-    text_appendf(out, "typedef %s %.*s {\n", kind, (int)t->name.length,
-                 t->name.text);
+    text_appendf(out, "typedef %s %.*s {\n", kind,
+                 (int)types_c_name(t).length, types_c_name(t).text);
     struct_fields(out, t);
-    text_appendf(out, "} %.*s;\n", (int)t->name.length, t->name.text);
+    text_appendf(out, "} %.*s;\n", (int)types_c_name(t).length,
+                 types_c_name(t).text);
     if (t->packed) {
         text_append(out, "#pragma pack(pop)\n");
     }
@@ -954,6 +956,7 @@ static void member_signature(struct text *out, const struct type *owner,
                              bool pointer)
 {
     const struct type *t = m->symbol->type;
+    struct name c = types_c_name(owner);
     struct text inner = {0};
     struct text decl = {0};
     size_t i;
@@ -964,20 +967,19 @@ static void member_signature(struct text *out, const struct type *owner,
                types_body_table(owner, m) == BODY_BASE) {
         /* A body qualified by a base has the symbol `T.Q.f`, so that
            a plain body of its name keeps `T.f`. */
-        text_appendf(&inner, "%.*s_%.*s_%.*s(", (int)owner->name.length,
-                     owner->name.text, (int)m->qualifier.length,
+        text_appendf(&inner, "%.*s_%.*s_%.*s(", (int)c.length, c.text,
+                     (int)m->qualifier.length,
                      m->qualifier.text, (int)m->name.length, m->name.text);
     } else {
-        text_appendf(&inner, "%s%.*s_%.*s(", prefix, (int)owner->name.length,
-                     owner->name.text, (int)m->name.length, m->name.text);
+        text_appendf(&inner, "%s%.*s_%.*s(", prefix, (int)c.length, c.text,
+                     (int)m->name.length, m->name.text);
     }
     for (i = 0; i < t->param_count; i++) {
         struct text param = {0};
         struct text buffer = {0};
         size_t k = i - (m->has_self ? 1 : 0);
         if (i == 0 && m->has_self) {
-            text_appendf(&inner, "%.*s *self", (int)owner->name.length,
-                         owner->name.text);
+            text_appendf(&inner, "%.*s *self", (int)c.length, c.text);
             continue;
         }
         if (m->symbol->params != NULL && k < m->param_count) {
@@ -1021,7 +1023,7 @@ static const struct item *construct_with_arguments(const struct type *t)
    function, and the helpers under the `anti_` prefix. An abstract class
    has no complete value, so it gets no table symbol and no `init`. */
 /* DESIGN: a function of a synchronized class that code outside the
-   class calls runs under the lock of its object, and the header says so
+   class calls runs under the lock of its object. The header says so
    where it declares the function. */
 static void locked_note(struct text *out, const struct type *t,
                         const struct item *fn)
@@ -1038,8 +1040,8 @@ static void class_view(struct text *out, const struct symbol *sym)
     const struct type *t = sym->type;
     size_t limit = chain_members(t);
     const struct item **entries = ir_alloc(limit, sizeof *entries);
-    int name_length = (int)t->name.length;
-    const char *name_text = t->name.text;
+    int name_length = (int)types_c_name(t).length;
+    const char *name_text = types_c_name(t).text;
     size_t count;
     struct text to_root = {0};
     const struct item *made;

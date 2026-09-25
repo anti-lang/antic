@@ -142,4 +142,38 @@ let a = shapes.area(c);
 </li>
 </ul>
 </section>
+<section class="item" id="Ordered">
+<h2>Ordered</h2>
+<pre class="signature">pub constraint Ordered = eq + lt</pre>
+<p>Measurements that compare, which <a href="#Shelf"><code>Shelf</code></a> sorts by.</p>
+</section>
+<section class="item" id="larger">
+<h2>larger</h2>
+<pre class="signature">pub fn larger&lt;T: lt&gt;(a: T, b: T) -&gt; T</pre>
+<p>The larger of two measurements.</p>
+</section>
+<section class="item" id="Shelf">
+<h2>Shelf</h2>
+<pre class="signature">pub class Shelf&lt;T: Ordered, N: int&gt;</pre>
+<p>A shelf of up to <code>N</code> measurements.</p>
+<ul class="fields">
+<li><code>pub items: [N]T</code>
+<p>The measurements, oldest first.</p>
+</li>
+<li><code>pub count: int</code>
+<p>How many stand on the shelf.</p>
+</li>
+</ul>
+<ul class="members">
+<li><code>pub fn first(self) -&gt; T</code>
+<p>The first measurement.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="Radii">
+<h2>Radii</h2>
+<pre class="signature">pub type Radii = Shelf&lt;int, 4&gt;</pre>
+<p>A copy of <a href="#Shelf"><code>Shelf</code></a>.</p>
+<p>A shelf of four radii.</p>
+</section>
 </main>

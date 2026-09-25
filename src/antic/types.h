@@ -255,6 +255,12 @@ struct type {
     const struct symbolic **values; /* a copy: the constants, or NULL */
     struct type *copies;            /* a generic: its copies */
     struct type *next_copy;
+    /* DESIGN: a copy that `export type Name = G<Args>;` offers to C is
+       an export class to C under the name the `type` gives it. Its
+       table, its descriptor, its init and its functions carry that name
+       in their C symbols, and the header writes it. Empty for every
+       other type, whose C name is its name. */
+    struct name c_name;
     bool generic_ready;             /* a generic: its fields are known */
     /* TYPE_PARAM: the declaration, the hooks its constraints give and
        the interfaces they name. The hooks hold one bit per entry of the
@@ -665,6 +671,9 @@ uint64_t type_simd_bytes(const struct type *t);
 
 /* A new type parameter named name. Each call returns a distinct type. */
 struct type *types_param(struct types *types, struct name name);
+/* The name of t in C: the name an `export type` gives a copy, and the
+   name of any other type. */
+struct name types_c_name(const struct type *t);
 
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */

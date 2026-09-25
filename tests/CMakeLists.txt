@@ -1848,6 +1848,17 @@ add_test(NAME antl_docs_equivalent
 set_tests_properties(antl_docs_equivalent PROPERTIES
     FIXTURES_REQUIRED "docs_lines;docs_blocks")
 
+# A library with a generic carries the checked tree of its body, which
+# every host writes byte for byte the same. pick.antl.hex lists them.
+add_test(NAME antl_generic
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DSOURCE=${MODULES}/generics/com/example/pick.anti"
+        "-DROOT=${MODULES}/generics"
+        "-DOUTPUT=${LIBS}/pick.antl"
+        "-DEXPECTED=${MODULES}/generics/pick.antl.hex"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antl.cmake")
+
 add_test(NAME antl_twice
     COMMAND antic -c -I "${MODULES}" -I "${LIBS}"
             -o "${LIBS}/com/example/twice.antl"
@@ -1940,6 +1951,29 @@ foreach(mode release dev)
             "-DPROGRAM=crate"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/owned-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
+# Generics over a module boundary: a program and a second library use the
+# generics of a library with their own arguments. Each makes its copies
+# from the checked tree the library file carries, and a copy two modules
+# make is one type and one symbol. Release mode and dev mode print the
+# same.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME generics_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/generics"
+            "-DLIBRARIES=gen,mid"
+            "-DSTD=lang,mem,text"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/generics-${mode}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2727,7 +2761,8 @@ if(ANTIC_LLVM_AR)
 endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
-            failing tuples flags variants nested simd names handlers ledger)
+            failing tuples flags variants nested simd names handlers ledger
+            generics)
         # The C program of ledger starts its threads with pthreads.
         if(case STREQUAL "ledger" AND WIN32)
             continue()

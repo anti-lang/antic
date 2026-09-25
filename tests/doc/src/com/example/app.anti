@@ -8,3 +8,6 @@ pub fn draw(radius: int) -> int
 	let c = shapes.Circle { radius: radius, stroke: shapes.Stroke.Solid };
 	return shapes.area(c);
 }
+
+/// The shelf the program keeps two radii on.
+pub type Pair = shapes.Shelf<int, 2>;

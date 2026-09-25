@@ -77,7 +77,8 @@ bool lower_has_default(const struct struct_field *field)
 void lower_init_name(const struct type *t, bool exported, struct text *out)
 {
     if (exported) {
-        text_appendf(out, "anti_%.*s_init", (int)t->name.length, t->name.text);
+        text_appendf(out, "anti_%.*s_init", (int)types_c_name(t).length,
+                     types_c_name(t).text);
         return;
     }
     type_symbol_name(out, t);

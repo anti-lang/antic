@@ -1,0 +1,141 @@
+//! A program that uses the generics of a library with its own arguments, and
+//! shares copies with a second library. Release mode links the library files,
+//! and dev mode the objects of each module.
+
+import com.example.gen;
+import com.example.mid;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Money
+{
+	cents: int,
+}
+
+operator fn lt(a: Money, b: Money) -> bool
+{
+	return a.cents < b.cents;
+}
+
+class Person
+{
+	pub age: int,
+}
+
+class Square inherits gen.Measured
+{
+	pub side: int,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+class Numbers
+{
+	pub values: [4]int,
+
+	operator fn index(self, i: int) -> int
+	{
+		return self.values[i];
+	}
+
+	operator fn set_index(self, i: int, v: int)
+	{
+		self.values[i] = v;
+	}
+
+	operator fn iter(self) -> NumbersIter
+	{
+		return NumbersIter { list: self, at: -1 };
+	}
+}
+
+class NumbersIter
+{
+	pub list: *Numbers,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at < 4;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.list.values[self.at];
+	}
+}
+
+fn least<T: gen.Ordered>(a: T, b: T) -> T
+{
+	if a < b {
+		return a;
+	}
+	return b;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d\n".ptr, gen.max(3, 7) as c_int,
+		(gen.max(2.5, 1.5) * 2.0) as c_int,
+		gen.max(Money { cents: 5 }, Money { cents: 9 }).cents as c_int);
+	printf("%d %d %d\n".ptr, gen.double(21) as c_int, least(4, 2) as c_int,
+		mid.biggest(8, 6) as c_int);
+
+	let numbers = gen.List<int> { items: []int { ptr: alloc(int, 2), len: 2 } };
+	numbers.push(3);
+	numbers.push(4);
+	numbers.push(5);
+	printf("%d %d %d\n".ptr, numbers.count as c_int,
+		gen.sum(&numbers, 0) as c_int, numbers.size() as c_int);
+	let people = gen.List<*Person> {
+		items: []*Person { ptr: alloc(*Person, 1), len: 1 }
+	};
+	people.push(alloc Person { age: 30 });
+	people.push(alloc Person { age: 31 });
+	printf("%d %d %.*s\n".ptr, people.get(1).age as c_int,
+		gen.clamped(people.items) as c_int, people.type_name().len as c_int,
+		people.type_name().ptr);
+
+	let shared = mid.listed(10);
+	printf("%d %d %d\n".ptr, shared.get(1) as c_int,
+		gen.sum(shared, 0) as c_int, (shared is *gen.List<int>) as c_int);
+
+	let p = gen.make(3, 2.5);
+	printf("%d %d\n".ptr, p.first as c_int, p.second as c_int);
+	let m: gen.Maybe<int> = gen.some(9);
+	printf("%d %d\n".ptr, gen.value_or(m, 1) as c_int,
+		gen.value_or(gen.nothing_like(0), 1) as c_int);
+	printf("%d\n".ptr, gen.apply(5, fn(x: int) -> int { return x * 2; }) as c_int);
+
+	let a = mid.boxed(4);
+	let b: gen.IntBox = gen.made();
+	b = a;
+	printf("%d %.*s\n".ptr, b.get() as c_int, b.type_name().len as c_int,
+		b.type_name().ptr);
+
+	let ring = gen.Ring<Money, 8> { items: [Money { cents: 0 }; 8], count: 0 };
+	printf("%d\n".ptr, gen.capacity(&ring) as c_int);
+
+	let small = Square { side: 3 };
+	let big = Square { side: 4 };
+	printf("%d\n".ptr, gen.larger(&small, &big) as c_int);
+
+	let n = Numbers { values: [1, 2, 3, 4] };
+	gen.swap(&n);
+	printf("%d %d %d\n".ptr, n[0] as c_int, n[1] as c_int, gen.count(&n) as c_int);
+
+	let values = [7, 8];
+	let one = gen.first(values[0..2]) catch fatal;
+	let missing = gen.first(values[0..0]) catch e {
+		yield -1;
+	};
+	printf("%d %d\n".ptr, one as c_int, missing as c_int);
+	let text = gen.label(values[0..2], "values");
+	printf("%.*s\n".ptr, text.len as c_int, text.ptr);
+	free(text.ptr);
+	return 0;
+}

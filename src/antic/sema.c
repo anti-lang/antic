@@ -727,6 +727,19 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         if (t->module.length > 0) {
             struct type *imported =
                 sema_imported_struct(c, &t->module, &t->name, t->pos);
+            /* A generic of a library is named with its arguments, as
+               one of the module is. */
+            if (!sema_is_error(imported) && imported->type_param_count > 0) {
+                if (t->arg_count == 0) {
+                    sema_error_at(c, t->pos, "`%s` takes %zu type argument%s",
+                                  sema_tn(imported),
+                                  imported->type_param_count,
+                                  imported->type_param_count == 1 ? "" : "s");
+                    return sema_builtin(c, TYPE_ERROR);
+                }
+                return sema_copy_of(c, imported, t->args, t->arg_count,
+                                    t->pos);
+            }
             if (t->arg_count > 0 && !sema_is_error(imported)) {
                 sema_error_at(c, t->pos, "`%.*s.%.*s` is not generic",
                               (int)t->module.length, t->module.text,

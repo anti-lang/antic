@@ -140,3 +140,33 @@ pub synchronized class Tray
 		self.count += 1;
 	}
 }
+
+/// Measurements that compare, which `Shelf` sorts by.
+pub constraint Ordered = eq + lt;
+
+/// The larger of two measurements.
+pub fn larger<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+/// A shelf of up to `N` measurements.
+pub class Shelf<T: Ordered, N: int>
+{
+	/// The measurements, oldest first.
+	pub items: [N]T,
+	/// How many stand on the shelf.
+	pub count: int = 0,
+
+	/// The first measurement.
+	pub fn first(self) -> T
+	{
+		return self.items[0];
+	}
+}
+
+/// A shelf of four radii.
+pub type Radii = Shelf<int, 4>;
