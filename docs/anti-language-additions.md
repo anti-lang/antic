@@ -1234,6 +1234,8 @@ list.push(c.share());
 - It catches a use after free, a double free, and a read or write outside a heap block. At exit it reports the leaks, with where each block was allocated.
 - A pointer into a collection kept across a change of its size is a use after free. This is how such a mistake is found.
 - The back end emits the checks of AddressSanitizer around every load and store. The build links the AddressSanitizer runtime of the pinned clang. Its reports carry the names and lines of `-g`.
+- `anti run` and `anti test` run the program with the symbolizing of AddressSanitizer off. They put its report through Anti's symbolizer, the one behind the backtraces and `anti symbols resolve`, so every frame shows the readable name, the file and the line.
+- The runtime marks the allocations it makes at start and keeps until exit as intentionally kept, with the leak checker's own call for it. The leak report then holds only the program's own leaks.
 - Windows on ARM64 has no AddressSanitizer runtime, and the option is refused there with a message that says so.
 - The option is off by default in every build, since it makes a program run two to three times slower.
 
