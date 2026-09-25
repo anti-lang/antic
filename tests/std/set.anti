@@ -1,0 +1,439 @@
+//! `Set<T>` and `BitSet` of `anti.collection.set` through every operation.
+//!
+//! A set keeps its elements in insertion order, which removals and the growth
+//! of the room leave as it was. A bit set walks its numbers in increasing
+//! order. Elements that own memory count the blocks alive, so heavy churn ends
+//! with none alive.
+
+import anti.collection;
+import anti.collection.set.{BitSet, Set};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A value that owns memory and counts the blocks alive. Its copy makes a block
+/// of its own, so a copy that the map makes counts as well.
+class Owned
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Owned
+	{
+		return Owned { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Owned;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		give_back(self.n);
+	}
+}
+
+/// A key that owns memory, with `==` and `hash` over its number. Its blocks
+/// count in `Owned.live`.
+class Id
+{
+	pub n: ?*int = none,
+
+	pub fn of(n: int) -> Id
+	{
+		return Id { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Id) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Id;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		give_back(self.n);
+	}
+}
+
+/// A block that holds `n`, counted in `Owned.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Owned.live.add(1);
+	return p;
+}
+
+/// Free a block that `block` made.
+fn give_back(p: ?*int)
+{
+	if p != none {
+		Owned.live.add(-1);
+	}
+	free(p);
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+/// Print `label` and the elements of `s` in the order of a walk.
+fn items(label: str, s: *Set<int>)
+{
+	let out = text.Builder.new();
+	out.append(label);
+	for x in s {
+		out.append(f" {x}");
+	}
+	show(out.take());
+}
+
+fn members()
+{
+	let s = Set<int>.new();
+	show(f"empty: {s.count} {s.is_empty()}");
+	let first = s.add(3);
+	s.add(1);
+	s.add(4);
+	let again = s.add(1);
+	s.add(5);
+	s.add(9);
+	items("added:", &s);
+	let has = s.contains(4);
+	let lacks = s.contains(7);
+	let removed = s.remove(4);
+	let missing = s.remove(4);
+	show(f"add {first} {again}, contains {has} {lacks}, remove {removed} {missing}");
+	s.add(4);
+	s.add(2);
+	items("insertion order:", &s);
+	for i in 100..200 {
+		s.add(i);
+	}
+	for i in 100..200 {
+		s.remove(i);
+	}
+	items("after growth:", &s);
+	show(s.to_text());
+	let words = Set<str>.new();
+	words.add("b");
+	words.add("a");
+	words.add("b");
+	show(words.to_text());
+	let out = text.Builder.new();
+	words.serialize(&out);
+	s.serialize(&out);
+	show(out.take());
+}
+
+fn operations()
+{
+	let a = Set<int>.new();
+	let b = Set<int>.new();
+	for i in 1..7 {
+		a.add(i);
+	}
+	b.add(8);
+	b.add(4);
+	b.add(2);
+	b.add(6);
+	let common = a.intersect(b);
+	let only = a.minus(b);
+	items("intersect:", &common);
+	items("minus:", &only);
+	let small = Set<int>.new();
+	small.add(2);
+	small.add(5);
+	let empty = Set<int>.new();
+	let inside = small.is_subset(a);
+	let outside = b.is_subset(a);
+	let nothing = empty.is_subset(small);
+	let itself = a.is_subset(a);
+	show(f"is_subset: {inside} {outside} {nothing} {itself}");
+	let none_left = small.minus(a);
+	let none_common = empty.intersect(a);
+	show(f"empty results: {none_left.count} {none_common.count}");
+}
+
+fn criteria() may fail
+{
+	let s = Set<int>.new();
+	for i in 1..10 {
+		s.add(i);
+	}
+	let even = s.find_all(fn(x) {
+		return x % 2 == 0;
+	});
+	show(even.to_text());
+	let first = s.find_first(fn(x) {
+		return x > 4;
+	}) ?? -1;
+	let one = try s.find_one(fn(x) {
+		return x == 7;
+	});
+	show(f"first {first}, one {one}");
+	let n = s.update_all(fn(x) {
+		return true;
+	}, fn(p) {
+		*p = 0;
+	});
+	show(f"update_all {n}: elements never change in place");
+	items("unchanged:", &s);
+	let removed = s.remove_all(fn(x) {
+		return x % 3 == 0;
+	});
+	let taken = s.remove_first(fn(x) {
+		return x > 4;
+	}) ?? -1;
+	let only = try s.remove_one(fn(x) {
+		return x == 1;
+	});
+	show(f"remove {removed} {taken} {only}");
+	items("left:", &s);
+	s.add(3);
+	items("order kept:", &s);
+	s.clear();
+	show(f"clear: {s.count} {s.is_empty()}");
+	s.add(7);
+	items("after clear:", &s);
+}
+
+fn room()
+{
+	let counting = Counting { };
+	{
+		let s = Set<int>.new(100, &counting);
+		for i in 0..100 {
+			s.add(i);
+		}
+		show(f"made with room: {counting.allocs} allocation, capacity {s.capacity()}");
+		s.add(100);
+		show(f"past it: {counting.allocs} allocations");
+	}
+	show(f"after the block: {counting.frees} frees");
+	let s = Set<int>.new(0, &counting);
+	s.add(1);
+	show(f"small start: capacity {s.capacity()}");
+	let before = counting.allocs;
+	s.reserve(50);
+	show(f"reserve: capacity {s.capacity()} in {counting.allocs - before} allocation");
+	s.shrink();
+	show(f"shrink: capacity {s.capacity()}");
+	let c = dup(&s);
+	c.add(2);
+	items("copy:", c);
+	items("original:", &s);
+	delete(c);
+}
+
+/// Elements that own memory, torn down once each. The elements stand in locals,
+/// since a class value made at a parameter that does not take it is not torn
+/// down after the call.
+fn owned()
+{
+	{
+		let s = Set<Id>.new();
+		s.add(Id.of(1));
+		s.add(Id.of(2));
+		let refused = s.add(Id.of(1));
+		show(f"refused add {refused}: {Owned.live.load()} blocks");
+		let two = Id.of(2);
+		let gone = s.remove(two);
+		show(f"removed {gone}: {Owned.live.load()} blocks");
+		let other = Set<Id>.new();
+		other.add(Id.of(1));
+		other.add(Id.of(3));
+		let common = s.intersect(other);
+		let only = s.minus(other);
+		show(f"intersect {common.count}, minus {only.count}: {Owned.live.load()} blocks");
+		for x in s {
+			show(f"walk {x.value()}");
+		}
+	}
+	show(f"after the block: {Owned.live.load()} blocks");
+}
+
+/// Twenty thousand additions and removals over 700 elements that own memory.
+fn churn()
+{
+	let counting = Counting { };
+	{
+		let s = Set<Id>.new(0, &counting);
+		for i in 0..20000 {
+			s.add(Id.of(i % 700));
+			if i % 3 == 0 {
+				let gone = Id.of((i * 7) % 700);
+				s.remove(gone);
+			}
+			if i % 5000 == 4999 {
+				s.remove_all(fn(x) {
+					return x.value() % 2 == 0;
+				});
+			}
+		}
+		let total = 0;
+		for x in s {
+			total += 1;
+		}
+		let beyond = Owned.live.load() - s.count;
+		show(f"churn: {s.count} elements, {total} walked, {beyond} blocks beyond them");
+	}
+	let room = counting.allocs - counting.frees;
+	show(f"after churn: {Owned.live.load()} blocks, {room} blocks of room");
+}
+
+fn bits()
+{
+	let b = BitSet.new();
+	show(f"empty: {b.count} {b.is_empty()}");
+	let first = b.add(5);
+	b.add(200);
+	b.add(0);
+	b.add(63);
+	b.add(64);
+	let again = b.add(5);
+	let negative = b.add(-1);
+	show(f"add {first} {again} {negative}, count {b.count}");
+	show(b.to_text());
+	let has = b.contains(63);
+	let lacks = b.contains(62);
+	let far = b.contains(100000);
+	let below = b.contains(-3);
+	let removed = b.remove(63);
+	let missing = b.remove(63);
+	let beyond = b.remove(5000);
+	show(f"contains {has} {lacks} {far} {below}, remove {removed} {missing} {beyond}");
+	let out = text.Builder.new();
+	for n in b {
+		out.append(f" {n}");
+	}
+	show(out.take());
+	let o = BitSet.new();
+	o.add(5);
+	o.add(64);
+	o.add(1000);
+	let common = b.intersect(o);
+	let only = b.minus(o);
+	show(common.to_text());
+	show(only.to_text());
+	let inside = common.is_subset(b);
+	let outside = o.is_subset(b);
+	show(f"is_subset {inside} {outside}");
+	let same = BitSet.new();
+	same.add(64);
+	same.add(5);
+	let eq = common == same;
+	same.add(7);
+	let differ = common == same;
+	show(f"eq {eq} {differ} {common != same}");
+	let evens = b.find_all(fn(n) {
+		return n % 2 == 0;
+	});
+	show(evens.to_text());
+	let gone = b.remove_all(fn(n) {
+		return n > 100;
+	});
+	show(f"remove_all {gone}: {b.count}");
+	let text_out = text.Builder.new();
+	b.serialize(&text_out);
+	show(text_out.take());
+	let c = dup(&b);
+	c.add(1);
+	show(c.to_text());
+	delete(c);
+	show(b.to_text());
+	b.clear();
+	show(f"clear: {b.count} {b.is_empty()}");
+}
+
+fn bit_room()
+{
+	let counting = Counting { };
+	{
+		let b = BitSet.new(1000, &counting);
+		for i in 0..1000 {
+			b.add(i);
+		}
+		show(f"bits with room: {counting.allocs} allocation, capacity {b.capacity()}");
+		b.add(1024);
+		show(f"past it: {counting.allocs} allocations, capacity {b.capacity()}");
+		b.remove_all(fn(n) {
+			return n >= 10;
+		});
+		b.shrink();
+		show(f"shrink: capacity {b.capacity()}, count {b.count}");
+		for i in 0..50000 {
+			b.add((i * 7919) % 20000);
+			b.remove((i * 104729) % 20000);
+		}
+		show(f"churn: {b.count}");
+	}
+	show(f"after the block: {counting.allocs - counting.frees} blocks");
+}
+
+fn main() -> int
+{
+	members();
+	operations();
+	criteria() catch fatal;
+	room();
+	owned();
+	churn();
+	bits();
+	bit_room();
+	return 0;
+}

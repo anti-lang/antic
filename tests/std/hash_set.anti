@@ -1,0 +1,381 @@
+//! `HashSet<T>` of `anti.collection.set` through every operation.
+//!
+//! The set walks in a random order, a new one on every walk, so the program
+//! prints what does not depend on it: `serialize`, which sorts the elements,
+//! sums and counts. Elements that own memory count the blocks alive, so heavy
+//! churn ends with none alive.
+
+import anti.collection;
+import anti.collection.set.{HashSet};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A value that owns memory and counts the blocks alive. Its copy makes a block
+/// of its own, so a copy that the map makes counts as well.
+class Owned
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Owned
+	{
+		return Owned { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Owned;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		give_back(self.n);
+	}
+}
+
+/// A key that owns memory, with `==` and `hash` over its number. Its blocks
+/// count in `Owned.live`.
+class Id
+{
+	pub n: ?*int = none,
+
+	pub fn of(n: int) -> Id
+	{
+		return Id { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Id) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Id;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		give_back(self.n);
+	}
+}
+
+/// A block that holds `n`, counted in `Owned.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Owned.live.add(1);
+	return p;
+}
+
+/// Free a block that `block` made.
+fn give_back(p: ?*int)
+{
+	if p != none {
+		Owned.live.add(-1);
+	}
+	free(p);
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+/// Print `label` and the elements of `s`, which `serialize` sorts.
+fn sorted<T: eq + hash>(label: str, s: *HashSet<T>)
+{
+	let out = text.Builder.new();
+	out.append(label);
+	out.append(" ");
+	s.serialize(&out);
+	show(out.take());
+}
+
+fn members()
+{
+	let s = HashSet<int>.new();
+	show(f"empty: {s.count} {s.is_empty()}");
+	sorted("empty", &s);
+	let first = s.add(3);
+	s.add(1);
+	s.add(4);
+	let again = s.add(1);
+	s.add(5);
+	s.add(9);
+	sorted("added", &s);
+	let has = s.contains(4);
+	let lacks = s.contains(7);
+	let removed = s.remove(4);
+	let missing = s.remove(4);
+	show(f"add {first} {again}, contains {has} {lacks}, remove {removed} {missing}");
+	let sum = 0;
+	for x in s {
+		sum += x;
+	}
+	show(f"walk: {sum}");
+	let words = HashSet<str>.new();
+	words.add("b");
+	words.add("c");
+	words.add("a");
+	words.add("b");
+	sorted("words", &words);
+	let one = HashSet<str>.new();
+	one.add("only");
+	show(one.to_text());
+	let three = HashSet<int>.new();
+	three.add(1);
+	three.add(2);
+	three.add(3);
+	let t = three.to_text();
+	show(f"text of three: {t.len} bytes, as [1, 2, 3]");
+	free(t.ptr);
+	let firsts = HashSet<int>.new();
+	let right = 0;
+	let many = HashSet<int>.new();
+	for i in 0..40 {
+		many.add(i);
+	}
+	for walk in 0..40 {
+		let first_seen = -1;
+		let seen = HashSet<int>.new();
+		for x in many {
+			if first_seen < 0 {
+				first_seen = x;
+			}
+			seen.add(x * 1);
+		}
+		if seen.count == 40 {
+			right += 1;
+		}
+		firsts.add(first_seen);
+	}
+	let differ = firsts.count > 1;
+	show(f"walks: {right} of 40 saw all 40, orders differ: {differ}");
+}
+
+fn operations()
+{
+	let a = HashSet<int>.new();
+	let b = HashSet<int>.new();
+	for i in 1..7 {
+		a.add(i);
+	}
+	b.add(8);
+	b.add(4);
+	b.add(2);
+	b.add(6);
+	let common = a.intersect(b);
+	let only = a.minus(b);
+	sorted("intersect", &common);
+	sorted("minus", &only);
+	let small = HashSet<int>.new();
+	small.add(2);
+	small.add(5);
+	let empty = HashSet<int>.new();
+	let inside = small.is_subset(a);
+	let outside = b.is_subset(a);
+	let nothing = empty.is_subset(small);
+	let itself = a.is_subset(a);
+	show(f"is_subset: {inside} {outside} {nothing} {itself}");
+}
+
+fn criteria() may fail
+{
+	let s = HashSet<int>.new();
+	for i in 1..10 {
+		s.add(i);
+	}
+	let even = s.find_all(fn(x) {
+		return x % 2 == 0;
+	});
+	let sum = 0;
+	for x in even {
+		sum += x;
+	}
+	let first = s.find_first(fn(x) {
+		return x == 5;
+	}) ?? -1;
+	let one = try s.find_one(fn(x) {
+		return x == 7;
+	});
+	show(f"find_all {even.count} {sum}, first {first}, one {one}");
+	let n = s.update_all(fn(x) {
+		return true;
+	}, fn(p) {
+		*p = 0;
+	});
+	show(f"update_all {n}: elements never change in place");
+	sorted("unchanged", &s);
+	let removed = s.remove_all(fn(x) {
+		return x % 3 == 0;
+	});
+	let taken = s.remove_first(fn(x) {
+		return x == 5;
+	}) ?? -1;
+	let only = try s.remove_one(fn(x) {
+		return x == 1;
+	});
+	show(f"remove {removed} {taken} {only}");
+	sorted("left", &s);
+	s.clear();
+	show(f"clear: {s.count} {s.is_empty()}");
+	s.add(7);
+	sorted("after clear", &s);
+}
+
+fn room()
+{
+	let counting = Counting { };
+	{
+		let s = HashSet<int>.new(100, &counting);
+		for i in 0..100 {
+			s.add(i);
+		}
+		show(f"made with room: {counting.allocs} allocation, capacity {s.capacity()}");
+		for i in 100..200 {
+			s.add(i);
+		}
+		show(f"past it: {counting.allocs} allocations");
+	}
+	show(f"after the block: {counting.frees} frees");
+	let s = HashSet<int>.new(0, &counting);
+	s.add(1);
+	show(f"small start: capacity {s.capacity()}");
+	let before = counting.allocs;
+	s.reserve(50);
+	show(f"reserve: capacity {s.capacity()} in {counting.allocs - before} allocation");
+	s.shrink();
+	show(f"shrink: capacity {s.capacity()}");
+	let c = dup(&s);
+	c.add(2);
+	sorted("copy", c);
+	sorted("original", &s);
+	delete(c);
+	let words = HashSet<str>.new();
+	words.add("z");
+	words.add("y");
+	let floats = HashSet<f64>.new();
+	floats.add(2.5);
+	floats.add(-1.0);
+	let out = text.Builder.new();
+	words.serialize(&out);
+	floats.serialize(&out);
+	show(out.take());
+}
+
+/// Elements that own memory, torn down once each. The elements stand in locals,
+/// since a class value made at a parameter that does not take it is not torn
+/// down after the call.
+fn owned()
+{
+	{
+		let s = HashSet<Id>.new();
+		s.add(Id.of(1));
+		s.add(Id.of(2));
+		let refused = s.add(Id.of(1));
+		show(f"refused add {refused}: {Owned.live.load()} blocks");
+		let two = Id.of(2);
+		let gone = s.remove(two);
+		show(f"removed {gone}: {Owned.live.load()} blocks");
+		let other = HashSet<Id>.new();
+		other.add(Id.of(1));
+		other.add(Id.of(3));
+		let common = s.intersect(other);
+		let only = s.minus(other);
+		show(f"intersect {common.count}, minus {only.count}: {Owned.live.load()} blocks");
+		for x in s {
+			show(f"walk {x.value()}");
+		}
+	}
+	show(f"after the block: {Owned.live.load()} blocks");
+}
+
+/// Twenty thousand additions and removals over 700 elements that own memory.
+fn churn()
+{
+	let counting = Counting { };
+	{
+		let s = HashSet<Id>.new(0, &counting);
+		for i in 0..20000 {
+			s.add(Id.of(i % 700));
+			if i % 3 == 0 {
+				let gone = Id.of((i * 7) % 700);
+				s.remove(gone);
+			}
+			if i % 5000 == 4999 {
+				s.remove_all(fn(x) {
+					return x.value() % 2 == 0;
+				});
+			}
+		}
+		let total = 0;
+		for x in s {
+			total += 1;
+		}
+		let beyond = Owned.live.load() - s.count;
+		show(f"churn: {s.count} elements, {total} walked, {beyond} blocks beyond them");
+	}
+	let room = counting.allocs - counting.frees;
+	show(f"after churn: {Owned.live.load()} blocks, {room} blocks of room");
+}
+
+fn main() -> int
+{
+	members();
+	operations();
+	criteria() catch fatal;
+	room();
+	owned();
+	churn();
+	return 0;
+}

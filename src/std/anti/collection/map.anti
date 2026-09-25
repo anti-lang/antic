@@ -1355,7 +1355,7 @@ pub struct Stride
 }
 
 /// The order of a walk of `size` slots that the random `r` chooses.
-fn stride_of(size: int, r: u64) -> Stride
+pub fn stride_of(size: int, r: u64) -> Stride
 {
 	let mask = size - 1;
 	if size == 0 {
@@ -1370,8 +1370,14 @@ fn stride_of(size: int, r: u64) -> Stride
 	};
 }
 
+/// The slot the walk `s` stands at.
+pub fn stride_at(s: *Stride) -> int
+{
+	return s.at;
+}
+
 /// Move on to the next live slot of `marks`. Gives `false` after the last.
-fn advance(s: *Stride, marks: ?*u64) -> bool
+pub fn advance(s: *Stride, marks: ?*u64) -> bool
 {
 	let live = marks else {
 		return false;

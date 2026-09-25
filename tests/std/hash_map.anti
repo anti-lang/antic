@@ -205,6 +205,13 @@ fn lookups()
 	let one = HashMap<str, int>.new();
 	one.set("only", 1);
 	show(one.to_text());
+	let three = HashMap<int, int>.new();
+	three.set(1, 1);
+	three.set(2, 2);
+	three.set(3, 3);
+	let t = three.to_text();
+	show(f"text of three: {t.len} bytes, as {{1: 1, 2: 2, 3: 3}}");
+	free(t.ptr);
 }
 
 /// Every walk visits each entry once, and walks of one map do not all come in

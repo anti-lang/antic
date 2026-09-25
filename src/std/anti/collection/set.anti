@@ -1,0 +1,738 @@
+//! Sets that find an element by its hash, and a set of small numbers.
+//!
+//! `Set<T>` keeps its elements in insertion order, `HashSet<T>` in no order and
+//! walks them in a new random order on every walk, as the two maps of
+//! `anti.collection.map` do, on whose tables they stand. `BitSet` holds small
+//! numbers, one bit per number, and walks them in increasing order.
+//!
+//! The elements of a set never change in place. `update_all` and the other
+//! functions that lend an element lend a copy, whose change the set drops.
+
+import anti.collection;
+import anti.collection.map;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
+extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
+	arg: ?*byte);
+extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
+	arg: ?*byte);
+
+/// A set in insertion order.
+///
+/// Lookup takes constant time on average. A walk gives the elements in the
+/// order they were first added, which a removal leaves as it was, on every run
+/// and every machine. The element type needs `==` and `hash`.
+pub class Set<T: eq + hash> inherits map.EntryTable<T>
+{
+	/// An empty set with room for `capacity` elements from `from`, or from the
+	/// C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Set<T>
+	{
+		let made = Set<T> {
+			from: collection.allocator(from),
+			seed: lang.hash_seed(),
+		};
+		made.reserve(capacity);
+		return made;
+	}
+
+	/// Add `x`, which the set then owns. Gives `false` and tears `x` down when
+	/// the set holds it already.
+	pub fn add(self, own x: T, at: lang.SourceLocation = here) -> bool
+	{
+		let h = self.marked(x.hash());
+		let found = self.find_marked(h, x);
+		if found >= 0 {
+			return false;
+		}
+		let e = self.append(h, at);
+		*e = x;
+		return true;
+	}
+
+	/// Remove `x`. Gives `false` when the set does not hold it.
+	pub fn remove(self, x: T, at: lang.SourceLocation = here) -> bool
+	{
+		let found = self.find(x);
+		if found < 0 {
+			return false;
+		}
+		let gone = self.take_entry(found);
+		self.resized(-1, at);
+		return true;
+	}
+
+	/// Whether the set holds `x`.
+	pub fn contains(self, x: T) -> bool
+	{
+		return self.find(x) >= 0;
+	}
+
+	/// A new set of the elements of this set that `other` holds, in the order
+	/// of this set, from the allocator of this set.
+	pub fn intersect(self, other: Set<T>) -> Set<T>
+	{
+		let made = Set<T> { from: self.from, seed: self.seed };
+		for x in self {
+			if other.contains(x) {
+				made.add(dup(x));
+			}
+		}
+		return made;
+	}
+
+	/// A new set of the elements of this set that `other` does not hold, in the
+	/// order of this set, from the allocator of this set.
+	pub fn minus(self, other: Set<T>) -> Set<T>
+	{
+		let made = Set<T> { from: self.from, seed: self.seed };
+		for x in self {
+			if !other.contains(x) {
+				made.add(dup(x));
+			}
+		}
+		return made;
+	}
+
+	/// Whether `other` holds every element of this set.
+	pub fn is_subset(self, other: Set<T>) -> bool
+	{
+		for x in self {
+			if !other.contains(x) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	operator fn iter(self) -> SetWalk<T>
+	{
+		return SetWalk<T>.over(self.entries, self.hashes, self.used,
+			self.watch());
+	}
+
+	concrete fn entry_hash(self, e: *T) -> u64
+	{
+		return e.hash();
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		let copy = self.copy_element(self.entry(at));
+		f(&copy);
+	}
+
+	/// The position of `x`, or -1.
+	fn find(self, x: T) -> int
+	{
+		return self.find_marked(self.marked(x.hash()), x);
+	}
+
+	/// The place of `x`, whose marked hash is `h`, or -1.
+	fn find_marked(self, h: u64, x: T) -> int
+	{
+		return self.position(h, fn(e) {
+			return *e == x;
+		});
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the same order.
+pub operator fn eq<T: eq + hash>(a: Set<T>, b: Set<T>) -> bool
+{
+	return collection.equal<T>(&a, &b);
+}
+
+/// The iterator of `Set<T>`, which gives a copy of each element.
+pub class SetWalk<T>
+{
+	watch: lang.Watch,
+	entries: ?*T,
+	hashes: ?*u64,
+	used: int,
+	at: int = -1,
+
+	/// A walk of the `used` entries at `entries`, which `watch` guards.
+	pub fn over(entries: ?*T, hashes: ?*u64, used: int,
+		watch: lang.Watch) -> SetWalk<T>
+	{
+		return SetWalk<T> {
+			watch: watch,
+			entries: entries,
+			hashes: hashes,
+			used: used,
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		let hashes = self.hashes else {
+			return false;
+		};
+		self.at += 1;
+		while self.at < self.used && hashes[self.at] == 0 do {
+			self.at += 1;
+		}
+		return self.at < self.used;
+	}
+
+	operator fn value(self) -> T
+	{
+		let entries = self.entries catch fatal;
+		return dup(entries[self.at]);
+	}
+}
+
+/// A set in no order.
+///
+/// Lookup takes constant time on average. The elements stand in the hash table
+/// itself, which suits large sets with frequent removal. A walk gives them in a
+/// random order, a new one on every walk, so no program comes to depend on it.
+/// `serialize` writes them sorted when the element is a number, a `bool`, a
+/// `char` or a `str`, so saved files stay stable. The element type needs `==`
+/// and `hash`.
+pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
+{
+	/// An empty set with room for `capacity` elements from `from`, or from the
+	/// C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> HashSet<T>
+	{
+		let made = HashSet<T> {
+			from: collection.allocator(from),
+			seed: lang.hash_seed(),
+		};
+		made.reserve(capacity);
+		return made;
+	}
+
+	/// Add `x`, which the set then owns. Gives `false` and tears `x` down when
+	/// the set holds it already.
+	pub fn add(self, own x: T, at: lang.SourceLocation = here) -> bool
+	{
+		let h = self.marked(x.hash());
+		let found = self.find_marked(h, x);
+		if found >= 0 {
+			return false;
+		}
+		let e = self.put(h, at);
+		*e = x;
+		return true;
+	}
+
+	/// Remove `x`. Gives `false` when the set does not hold it.
+	pub fn remove(self, x: T, at: lang.SourceLocation = here) -> bool
+	{
+		let found = self.find(x);
+		if found < 0 {
+			return false;
+		}
+		let gone = self.take_entry(found);
+		self.resized(-1, at);
+		return true;
+	}
+
+	/// Whether the set holds `x`.
+	pub fn contains(self, x: T) -> bool
+	{
+		return self.find(x) >= 0;
+	}
+
+	/// A new set of the elements of this set that `other` holds, from the
+	/// allocator of this set.
+	pub fn intersect(self, other: HashSet<T>) -> HashSet<T>
+	{
+		let made = HashSet<T> { from: self.from, seed: self.seed };
+		for x in self {
+			if other.contains(x) {
+				made.add(dup(x));
+			}
+		}
+		return made;
+	}
+
+	/// A new set of the elements of this set that `other` does not hold, from
+	/// the allocator of this set.
+	pub fn minus(self, other: HashSet<T>) -> HashSet<T>
+	{
+		let made = HashSet<T> { from: self.from, seed: self.seed };
+		for x in self {
+			if !other.contains(x) {
+				made.add(dup(x));
+			}
+		}
+		return made;
+	}
+
+	/// Whether `other` holds every element of this set.
+	pub fn is_subset(self, other: HashSet<T>) -> bool
+	{
+		for x in self {
+			if !other.contains(x) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	operator fn iter(self) -> HashSetWalk<T>
+	{
+		let r = self.shuffle();
+		return HashSetWalk<T>.over(self.marks, self.slots, self.size, r,
+			self.watch());
+	}
+
+	concrete fn entry_hash(self, e: *T) -> u64
+	{
+		return e.hash();
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		let copy = self.copy_element(self.entry(self.slot_at(at)));
+		f(&copy);
+	}
+
+	/// The elements as text, `[1, 2, 3]`, in the order of a walk.
+	///
+	/// DESIGN: the text of `Collection<T>` compares each place with
+	/// `first_place()`, which starts a new random walk here, so the set writes
+	/// its own.
+	concrete fn to_text(self) -> str
+	{
+		let out = text.Builder.new();
+		let arg = anti_rt_type_arg(self as ?*byte, map.TYPE_DEPTH, 0);
+		out.append("[");
+		let first = true;
+		let place = self.first_place();
+		while place >= 0 do {
+			if !first {
+				out.append(", ");
+			}
+			anti_rt_element_text(&out, self.entry(self.slot_at(place)) as ?*byte,
+				arg);
+			first = false;
+			place = self.next_place(place);
+		}
+		out.append("]");
+		return out.take();
+	}
+
+	/// Write the elements to `out` as a JSON array, sorted when the element is
+	/// a number, a `bool`, a `char` or a `str`, and in the order of the slots
+	/// otherwise.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		let arg = anti_rt_type_arg(self as ?*byte, map.TYPE_DEPTH, 0);
+		let kind = map.kind_of(arg);
+		let n = self.count;
+		if n == 0 {
+			n = 1;
+		}
+		let made = self.from.alloc(n * size_of(int), size_of(int)) catch fatal;
+		let order = made as *int;
+		let found = 0;
+		let i = 0;
+		while i < self.size do {
+			if self.live(i) {
+				order[found] = i;
+				found += 1;
+			}
+			i += 1;
+		}
+		if map.ordered(kind) {
+			map.sort_by_key(order, found, fn(a, b) {
+				return map.before(self.entry(a) as ?*byte, self.entry(b) as ?*byte,
+					kind);
+			});
+		}
+		out.append("[");
+		i = 0;
+		while i < found do {
+			if i > 0 {
+				out.append(",");
+			}
+			anti_rt_element_serialize(out, self.entry(order[i]) as ?*byte, arg);
+			i += 1;
+		}
+		out.append("]");
+		self.from.free(made);
+	}
+
+	/// Whether the slot `i` holds an element.
+	fn live(self, i: int) -> bool
+	{
+		let marks = self.marks catch fatal;
+		return marks[i] > 1;
+	}
+
+	/// The slot of `x`, or -1.
+	fn find(self, x: T) -> int
+	{
+		return self.find_marked(self.marked(x.hash()), x);
+	}
+
+	/// The place of `x`, whose marked hash is `h`, or -1.
+	fn find_marked(self, h: u64, x: T) -> int
+	{
+		return self.slot_of(h, fn(e) {
+			return *e == x;
+		});
+	}
+}
+
+/// The iterator of `HashSet<T>`, which gives a copy of each element, from a
+/// random slot by a random odd stride.
+pub class HashSetWalk<T>
+{
+	watch: lang.Watch,
+	marks: ?*u64,
+	slots: ?*T,
+	order: map.Stride,
+
+	/// A walk of the `size` slots at `slots`, in the order the random `r`
+	/// chooses, which `watch` guards.
+	pub fn over(marks: ?*u64, slots: ?*T, size: int, r: u64,
+		watch: lang.Watch) -> HashSetWalk<T>
+	{
+		return HashSetWalk<T> {
+			watch: watch,
+			marks: marks,
+			slots: slots,
+			order: map.stride_of(size, r),
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		return map.advance(&self.order, self.marks);
+	}
+
+	operator fn value(self) -> T
+	{
+		let slots = self.slots catch fatal;
+		return dup(slots[map.stride_at(&self.order)]);
+	}
+}
+
+/// The number of bits in a word of a `BitSet`.
+const WORD_BITS: int = 64;
+
+/// A set of small numbers, one bit per number.
+///
+/// A number from 0 up takes one bit of room, and the room grows to hold the
+/// largest number added. `add` refuses a number below 0. A walk gives the
+/// numbers in increasing order.
+pub class BitSet inherits collection.Collection<int>
+{
+	/// The words of bits, number `n` at bit `n % 64` of word `n / 64`.
+	words: ?*u64 = none,
+	/// The number of words.
+	word_count: int = 0,
+
+	/// An empty set with room for the numbers below `capacity`, from `from` or
+	/// from the C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> BitSet
+	{
+		let made = BitSet { from: collection.allocator(from) };
+		made.reserve(capacity);
+		return made;
+	}
+
+	/// The number of numbers the room holds, 0 up to one below it.
+	pub fn capacity(self) -> int
+	{
+		return self.word_count * WORD_BITS;
+	}
+
+	/// Make room for the numbers below `n`, in one allocation.
+	pub fn reserve(self, n: int)
+	{
+		let need = (n + WORD_BITS - 1) / WORD_BITS;
+		if need > self.word_count {
+			self.resize(need);
+		}
+	}
+
+	/// Give back the words above the largest number.
+	pub fn shrink(self)
+	{
+		let need = self.word_count;
+		let words = self.words else {
+			return;
+		};
+		while need > 0 && words[need - 1] == 0 do {
+			need -= 1;
+		}
+		if need < self.word_count {
+			self.resize(need);
+		}
+	}
+
+	/// Add `n`. Gives `false` when the set holds it already or `n` is below 0.
+	pub fn add(self, n: int, at: lang.SourceLocation = here) -> bool
+	{
+		if n < 0 || self.contains(n) {
+			return false;
+		}
+		if n / WORD_BITS >= self.word_count {
+			let size = self.word_count;
+			if size < 1 {
+				size = 1;
+			}
+			while size <= n / WORD_BITS do {
+				size *= 2;
+			}
+			self.resize(size);
+		}
+		let words = self.words catch fatal;
+		words[n / WORD_BITS] |= bit(n);
+		self.resized(1, at);
+		return true;
+	}
+
+	/// Remove `n`. Gives `false` when the set does not hold it.
+	pub fn remove(self, n: int, at: lang.SourceLocation = here) -> bool
+	{
+		if !self.contains(n) {
+			return false;
+		}
+		let words = self.words catch fatal;
+		words[n / WORD_BITS] &= ~bit(n);
+		self.resized(-1, at);
+		return true;
+	}
+
+	/// Whether the set holds `n`.
+	pub fn contains(self, n: int) -> bool
+	{
+		if n < 0 || n / WORD_BITS >= self.word_count {
+			return false;
+		}
+		let words = self.words catch fatal;
+		return (words[n / WORD_BITS] & bit(n)) != 0;
+	}
+
+	/// A new set of the numbers of this set that `other` holds, from the
+	/// allocator of this set.
+	pub fn intersect(self, other: BitSet) -> BitSet
+	{
+		return self.combined(&other, false);
+	}
+
+	/// A new set of the numbers of this set that `other` does not hold, from
+	/// the allocator of this set.
+	pub fn minus(self, other: BitSet) -> BitSet
+	{
+		return self.combined(&other, true);
+	}
+
+	/// Whether `other` holds every number of this set.
+	pub fn is_subset(self, other: BitSet) -> bool
+	{
+		let i = 0;
+		while i < self.word_count do {
+			let theirs = other.word(i);
+			if (self.word(i) & ~theirs) != 0 {
+				return false;
+			}
+			i += 1;
+		}
+		return true;
+	}
+
+	/// Whether `other` holds the same numbers.
+	operator fn eq(self, other: BitSet) -> bool
+	{
+		if self.count != other.count {
+			return false;
+		}
+		return self.is_subset(other);
+	}
+
+	operator fn iter(self) -> BitWalk
+	{
+		return BitWalk.over(self.words, self.word_count, self.watch());
+	}
+
+	/// A place is the number itself.
+	concrete fn first_place(self) -> int
+	{
+		return self.next_place(-1);
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		return next_bit(self.words, self.word_count, at);
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *int))
+	{
+		let copy = at;
+		f(&copy);
+	}
+
+	concrete fn copy_place(self, at: int) -> int
+	{
+		return at;
+	}
+
+	concrete fn take_place(self, at: int) -> (int, int)
+	{
+		let words = self.words catch fatal;
+		words[at / WORD_BITS] &= ~bit(at);
+		return (at, self.next_place(at));
+	}
+
+	/// A copy of the numbers in new room of the same allocator.
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *BitSet;
+		made.words = none;
+		made.word_count = 0;
+		made.changes.count = 0;
+		made.reserve(self.word_count * WORD_BITS);
+		let words = self.words else {
+			return;
+		};
+		memcpy(made.words as ?*byte, words as ?*byte,
+			(self.word_count * size_of(u64)) as c_size_t);
+	}
+
+	fn destruct(self)
+	{
+		self.from.free(self.words as ?*byte);
+	}
+
+	/// The word `i`, or 0 beyond the room.
+	protected fn word(self, i: int) -> u64
+	{
+		if i >= self.word_count {
+			return 0;
+		}
+		let words = self.words catch fatal;
+		return words[i];
+	}
+
+	/// A new set of the words of this set with those of `other`, or without
+	/// them when `without` holds.
+	fn combined(self, other: *BitSet, without: bool) -> BitSet
+	{
+		let made = BitSet.new(self.word_count * WORD_BITS, self.from);
+		let into = made.words else {
+			return made;
+		};
+		let n = 0;
+		let i = 0;
+		while i < self.word_count do {
+			let w = self.word(i);
+			let theirs = other.word(i);
+			if without {
+				w &= ~theirs;
+			} else {
+				w &= theirs;
+			}
+			into[i] = w;
+			n += ones(w);
+			i += 1;
+		}
+		made.count = n;
+		return made;
+	}
+
+	/// Move the words into new room for `n` words, zero beyond the old ones,
+	/// and give back the old room. Room for none holds no block.
+	fn resize(self, n: int)
+	{
+		let old = self.words;
+		let keep = self.word_count;
+		if keep > n {
+			keep = n;
+		}
+		let made: ?*u64 = none;
+		if n > 0 {
+			let room = self.from.alloc(n * size_of(u64), size_of(u64)) catch fatal;
+			memset(room, 0, (n * size_of(u64)) as c_size_t);
+			if keep > 0 {
+				memcpy(room, old as ?*byte, (keep * size_of(u64)) as c_size_t);
+			}
+			made = room as ?*u64;
+		}
+		self.from.free(old as ?*byte);
+		self.words = made;
+		self.word_count = n;
+	}
+}
+
+/// The iterator of `BitSet`, which gives its numbers in increasing order.
+pub class BitWalk
+{
+	watch: lang.Watch,
+	words: ?*u64,
+	word_count: int,
+	at: int = -1,
+
+	/// A walk of the `word_count` words at `words`, which `watch` guards.
+	pub fn over(words: ?*u64, word_count: int, watch: lang.Watch) -> BitWalk
+	{
+		return BitWalk { watch: watch, words: words, word_count: word_count };
+	}
+
+	operator fn next(self) -> bool
+	{
+		self.at = next_bit(self.words, self.word_count, self.at);
+		return self.at >= 0;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+/// The bit of the number `n` in its word.
+fn bit(n: int) -> u64
+{
+	return (1 as u64) << ((n % WORD_BITS) as u64);
+}
+
+/// The first number after `at` whose bit is set in the `count` words at
+/// `words`, or -1.
+fn next_bit(words: ?*u64, count: int, at: int) -> int
+{
+	let bits = words else {
+		return -1;
+	};
+	let n = at + 1;
+	while n < count * WORD_BITS do {
+		let w = bits[n / WORD_BITS] >> ((n % WORD_BITS) as u64);
+		if w == 0 {
+			n = (n / WORD_BITS + 1) * WORD_BITS;
+		} else {
+			while (w & 1) == 0 do {
+				w >>= 1;
+				n += 1;
+			}
+			return n;
+		}
+	}
+	return -1;
+}
+
+/// The number of bits set in `w`.
+fn ones(w: u64) -> int
+{
+	let n = 0;
+	let rest = w;
+	while rest != 0 do {
+		rest &= rest - 1;
+		n += 1;
+	}
+	return n;
+}

@@ -1,0 +1,18 @@
+//! A `Map<K, V>` that gains an entry while a `for` walks it. `set` counts the
+//! change, and the loop of a dev build stops at the next turn and names the
+//! map, the loop and the change.
+
+import anti.collection.map.{Map};
+
+fn main() -> int
+{
+	let ages = Map<str, int>.new();
+	ages.set("Ann", 41);
+	ages.set("Bob", 30);
+	for (k, v) in ages {
+		if v == 41 {
+			ages.set("Cy", 7);
+		}
+	}
+	return 7;
+}

@@ -1,0 +1,36 @@
+exit 0
+empty: 0 true
+empty []
+added [1,3,4,5,9]
+add true false, contains true false, remove true false
+walk: 18
+words ["a","b","c"]
+["only"]
+text of three: 9 bytes, as [1, 2, 3]
+walks: 40 of 40 saw all 40, orders differ: true
+intersect [2,4,6]
+minus [1,3,5]
+is_subset: true false true true
+find_all 4 20, first 5, one 7
+update_all 9: elements never change in place
+unchanged [1,2,3,4,5,6,7,8,9]
+remove 3 5 1
+left [2,4,7,8]
+clear: 0 true
+after clear [7]
+made with room: 1 allocation, capacity 128
+past it: 2 allocations
+after the block: 2 frees
+small start: capacity 8
+reserve: capacity 64 in 1 allocation
+shrink: capacity 8
+copy [1,2]
+original [1]
+["y","z"][-1,2.5]
+refused add false: 2 blocks
+removed true: 2 blocks
+intersect 1, minus 0: 5 blocks
+walk 1
+after the block: 0 blocks
+churn: 312 elements, 312 walked, 0 blocks beyond them
+after churn: 0 blocks, 0 blocks of room

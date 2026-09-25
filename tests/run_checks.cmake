@@ -169,6 +169,29 @@ check(sorted_changed "was changed while"
       "${WORK}/anti_text_dev${OBJECT}" "${WORK}/anti_collection_dev${OBJECT}"
       "${WORK}/anti_reflect_dev${OBJECT}" "${WORK}/anti_collection_sorted_dev${OBJECT}")
 
+# The same over the maps and the sets of round five, whose modules stand
+# under anti/collection/ and import anti.collection.
+foreach(module map set)
+    execute_process(COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}"
+                            --runtime "${RUNTIME}"
+                            -o "${WORK}/anti_collection_${module}_dev"
+                            "${RUNTIME}/std/anti/collection/${module}.antl"
+                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "antic --dev of anti.collection.${module} failed\n${err}")
+    endif()
+endforeach()
+check(map_changed "was changed while"
+      "map_changed\\.anti:12: `ages` was changed while `for` walked it: changed at map_changed\\.anti:14"
+      ON "${WORK}/anti_lang_dev${OBJECT}" "${WORK}/anti_mem_dev${OBJECT}"
+      "${WORK}/anti_text_dev${OBJECT}" "${WORK}/anti_collection_dev${OBJECT}"
+      "${WORK}/anti_collection_map_dev${OBJECT}")
+check(set_changed "was changed while"
+      "set_changed\\.anti:12: `seen` was changed while `for` walked it: changed at set_changed\\.anti:13"
+      ON "${WORK}/anti_lang_dev${OBJECT}" "${WORK}/anti_mem_dev${OBJECT}"
+      "${WORK}/anti_text_dev${OBJECT}" "${WORK}/anti_collection_dev${OBJECT}"
+      "${WORK}/anti_collection_map_dev${OBJECT}" "${WORK}/anti_collection_set_dev${OBJECT}")
+
 # --checks puts them into a release build, and --no-checks takes them out
 # of a dev build. Both override the mode.
 set(bounds "${SOURCES}/bounds_array.anti")

@@ -1,0 +1,16 @@
+//! A `HashSet<T>` that loses an element while a `for` walks it. `remove` counts
+//! the change, and the loop of a dev build stops at the next turn and names the
+//! set, the loop and the change.
+
+import anti.collection.set.{HashSet};
+
+fn main() -> int
+{
+	let seen = HashSet<int>.new();
+	seen.add(1);
+	seen.add(2);
+	for n in seen {
+		seen.remove(3 - n);
+	}
+	return 7;
+}

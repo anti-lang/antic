@@ -11,6 +11,7 @@ keys 8 letters, values 134
 walks: 3134
 after {"Ann":42,"Cy":70,"Dee":22}
 {"only": 1}
+text of three: 18 bytes, as {1: 1, 2: 2, 3: 3}
 walks: 40 of 40 saw all 37, orders differ: true
 keys: 37, find_all: 37
 find_all 3 120, first 3, one 4
