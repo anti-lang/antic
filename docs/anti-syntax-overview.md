@@ -128,7 +128,7 @@ let t: (int, str) = (1, "one");
 let h: f16 = 1.5 as f16;
 ```
 
-Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of the runtime at `v1` and `v2`. Not built yet: `?T` beyond `?*T`, `?fn(...)` and `?Match`, see [Optional values](#optional-values).
+Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of the runtime at `v1` and `v2`, and `?T` of any type, see [Optional values](#optional-values).
 
 ## Literals
 
@@ -838,7 +838,16 @@ Built.
 
 `?T` is a `T` or `none`, for a value of any type, and follows every rule of `?*T`. It compares with `none`, narrows after a test, and works with `if let`, `let ... else` and `??`, and it is used as a `T` only after a test proves it holds one. `none` means that nothing is there, which is normal, and a failure is `may fail`: `map.get(key)` gives `?V`, and `text.parse_int(s)` stays `may fail`. A `?T` of a value type is the value and one flag byte, padded to the type's alignment, and `?*T` stays one pointer. The C header writes `?T` as a struct of the value and a `bool`.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+struct User { id: int, }
+class Ages { pub fn get(self, name: str) -> ?int { return none; } }
+class Queue { pub fn first(self) -> ?int { return none; } }
+let ages = Ages { };
+let queue = Queue { };
+```
+-->
+```anti
 fn find_user(id: int) -> ?User { return none; }
 
 let age = ages.get("Ann") ?? 0;
@@ -846,7 +855,7 @@ if let a = ages.get("Ann") { }
 let first = queue.first() else { return 1; };
 ```
 
-Built: `?*T`, `?fn(...)` and `?Match`, a struct of `anti.lang`. Not built yet: `?T` of any other type.
+Built: `?T` of any type, a struct of the value and a flag byte, with `none`, the tests and the narrowing, `if let`, `let ... else`, `??`, `?.`, the guards of `catch` and `catch none`. `?*T` and `?fn(...)` stay one pointer, and `?Match` is a `?T` of `Match`. A `?T` crosses to C as `struct anti_opt_<T>` with `value` and `has`. Not built yet: `map.get(key)`, which comes with the collections.
 
 ## Reflection
 
@@ -1447,7 +1456,7 @@ Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.
 
 ## Later
 
-Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it. The syntax of generics, its constraints, the compiled copies, the generics of library files and of C, what can be generic and the other features with generics are built, and none of the rest. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
+Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it. The syntax of generics, its constraints, the compiled copies, the generics of library files and of C, what can be generic, the other features with generics and the optional values are built, and none of the rest. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
 
 ## Reserved words
 

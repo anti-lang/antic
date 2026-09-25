@@ -246,10 +246,10 @@ sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
 four are built. Then generics and closures. Closures are built, `snapshot fn`
 included. Round five, generics and collections, stands in the same document.
-Its first six parts, the syntax of generics, the constraints, the
+Its first seven parts, the syntax of generics, the constraints, the
 compiled copies, the generics of library files and of C, what can be
-generic and the other features with generics, are built, and none of the
-rest.
+generic, the other features with generics and the optional values, are
+built, and none of the rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -482,8 +482,8 @@ reports what it finished.
   mode from where it stands, and a match of bytes is a `ByteMatch`. `patch`
   takes `into`, `at` and `limit` by position until named arguments are built,
   and `to_bytes` and `to_text` are calls of `anti.text`.
-  `Match` and `?Match` are structs of `anti.lang`, a match stands as a
-  condition, `if let` binds one, and the groups of a literal are fields. See
+  `Match` is a struct of `anti.lang` and `?Match` its `?T`, a match stands
+  as a condition, `if let` binds one, and the groups of a literal are fields. See
   "Regular expressions" in `docs/decisions.md` and `docs/notes/patterns.md`.
 - `f"..."` and `rf"..."` are built. Each text and each `{expr}` is a call
   on an `anti.text.Builder`, the format specification after a colon gives
@@ -498,6 +498,13 @@ reports what it finished.
   rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer
   of an `extern fn` is `?*T`. A failing function returns `?*Error`.
+- `?T` of any type is built. A `?T` of a value is the value and one flag
+  byte, a struct with C layout, and follows every rule of `?*T`: `none`,
+  the test and the narrowing, `if let`, `let ... else`, `??`, `?.` and the
+  guards of `catch`. `?*T` and `?fn(...)` stay one pointer, and a `?T` of a
+  type parameter whose argument is a pointer is that pointer. The header
+  writes `struct anti_opt_<T>` with `value` and `has`, and `?Match` is a
+  `?T` of `Match`. See "Optional values" in `docs/decisions.md`.
 - The language hooks are built. `operator fn` takes `iter`, `next`, `value`,
   `index` and `set_index` beside the operators, `for x in e` walks a
   collection and an iterator, `e[i]` and `e[i] = v` call `index` and

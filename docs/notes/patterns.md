@@ -44,20 +44,20 @@ user of the tools can observe, under "Regular expressions".
 - The call keeps its literal in `call.pattern`. `sema_check_call` gives the result the
   match of that literal, and the loop of `for` gives its variable the same when it walks
   such a call.
-- `types_match` makes one `Match` and one `?Match` per literal and one pair without. Each
-  pair points at its twin, so `types_with_none` and `types_without_none` take the twin,
-  and `type_is_nullable` holds for `?Match`. `sema_require` lets a match of a literal
-  reach a plain match and a match reach `?Match`.
+- `types_match` makes one `Match` per literal and one without. `types_with_none` gives
+  the `?Match` of each, a `?T` as any other, and `types_is_maybe_match` names it.
+  `sema_require` lets a match of a literal reach a plain match, a `?Match` of a literal
+  reach a plain `?Match`, and a match reach `?Match` with the flag set.
 - `sema_check_test` checks the operand of `if`, `while`, `&&`, `||` and `!`. It marks a
   call of `matches` as `tested` first, and writes a match it finds as `e != none`, which
   `sema_proved_names` reads as it reads a pointer's test. `sema_match_field` writes `m.1`
   and `m.year` as the call `m.group(1)` and `m.group("year")` over the checked base.
-- `if let m = e` reaches the `switch` of `if let` without a case. When `e` is a match,
-  `sema_if_let_match` writes the statement as a block of a `let` and an `if`, both
-  checked, with the symbol of the `let` narrowed in the first block.
-- Lowering tests the first word of a match with `lower_none_in_first_word`, as it tests a
-  function with its context: the comparison with `none`, `let ... else` and `??`. `none`
-  of a match writes zero into every field.
+- `if let m = e` reaches the `switch` of `if let` without a case. When `e` may be
+  `none`, a match among the rest, `sema_if_let_none` writes the statement as a block of a
+  `let` and an `if`, both checked, with the symbol of the `let` narrowed in the first
+  block.
+- Lowering tests a `?Match` by its flag, as it tests every `?T`: the comparison with
+  `none`, `let ... else` and `??`. `none` of a match writes the flag alone.
 - `lower_call` reads the out place of a failing call before it lowers the arguments. A
   failing call among them sets the out place of its own slot.
 - `src/rt/patterns.c` holds the walk of every method, the groups found again, the
