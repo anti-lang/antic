@@ -137,5 +137,12 @@ fn main() -> int
 	let text = gen.label(values[0..2], "values");
 	printf("%.*s\n".ptr, text.len as c_int, text.ptr);
 	free(text.ptr);
+
+	let end = gen.last(values[0..2]) ?? 0;
+	let none_end = gen.last(values[0..0]) ?? -1;
+	let halved = gen.half(8) ?? 0;
+	let odd = gen.half(7);
+	printf("%d %d %d %d\n".ptr, end as c_int, none_end as c_int,
+		halved as c_int, (odd == none) as c_int);
 	return 0;
 }

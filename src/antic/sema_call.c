@@ -2448,7 +2448,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
                       "call cannot fail");
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (e->as.call.handler.kind != HANDLE_NONE && types_is_match(fn->result)) {
+    if (e->as.call.handler.kind != HANDLE_NONE &&
+        types_is_maybe_match(fn->result)) {
         sema_error_at(c, e->as.call.handler.pos,
                       "this call cannot fail, and a match is tested with `if` "
                       "or `let ... else`");
@@ -2472,7 +2473,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
             c->types, types_pointer(c->types, (struct type *)provided));
     }
     /* The match of a pattern literal knows its groups. */
-    if (e->as.call.pattern != NULL && types_is_match(fn->result)) {
+    if (e->as.call.pattern != NULL && types_is_maybe_match(fn->result)) {
         return types_with_none(c->types,
                                types_match(c->types, e->as.call.pattern));
     }

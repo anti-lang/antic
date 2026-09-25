@@ -235,6 +235,7 @@ void sema_mark_address_taken(struct checker *c, struct expr *e);
 bool sema_spell(struct text *out, const struct expr *e);
 struct type *sema_usable_pointer(struct checker *c, const struct expr *e,
                                  struct type *t);
+struct type *sema_whole_optional(struct type *t, struct expr *e);
 bool sema_require(struct checker *c, struct expr *e, struct type *got,
                   struct type *expected);
 bool sema_simd_numeric(const struct type *lane);
@@ -462,7 +463,7 @@ struct type *sema_match_field(struct checker *c, struct expr *e,
 /* Check e where a condition stands. A match there is its test. */
 struct type *sema_check_test(struct checker *c, struct expr *e);
 /* `if let m = e { }` on the match t of the checked value. */
-void sema_if_let_match(struct checker *c, struct stmt *s, struct type *t);
+void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t);
 
 /* sema_export.c */
 

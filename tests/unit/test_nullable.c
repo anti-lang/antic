@@ -109,7 +109,7 @@ void test_nullable(void)
 
     /* `none` has type `?*T` for every T, and a context gives it the T. */
     rejects("fn f() { let p = none; }\n",
-            "`none` needs a pointer type from its context");
+            "`none` needs a type that may be `none` from its context");
 
     /* `?*T` cannot be dereferenced, called, indexed or passed where `*T`
        is expected until the program has checked it. */
@@ -257,8 +257,8 @@ void test_nullable(void)
                  "    take(m);",
                  "the `else` of a `let` leaves the block it stands in");
     body_rejects("    let n = 1 else { return; };",
-                 "the `else` of a `let` follows a value of type `?*T`, "
-                 "found `int`");
+                 "the `else` of a `let` follows a value of type `?*T` or "
+                 "`?T`, found `int`");
 
     /* `p catch fatal` and `p catch e { }` follow the error forms, with
        the error `anti.lang.NoneDereference`. The class is an ordinary
@@ -334,10 +334,10 @@ void test_nullable(void)
     body_rejects("    let q = maybe() ?? maybe();\n    take(q);",
                  "`q` may be `none`, check it or use `?*T`");
     body_rejects("    let n = 1;\n    let p = &n;\n    take(p ?? &n);",
-                 "`??` follows a value of type `?*T`, found `*int`");
+                 "`??` follows a value of type `?*T` or `?T`, found `*int`");
     body_rejects("    let p = maybe();\n"
                  "    if p != none {\n        take(p ?? p);\n    }",
-                 "`??` follows a value of type `?*T`, found `*int`");
+                 "`??` follows a value of type `?*T` or `?T`, found `*int`");
     body_rejects("    let b = true;\n    take(maybe() ?? &b);",
                  "expected `?*int`, found `*bool`");
     /* A function value follows the pointer rule. */
@@ -373,15 +373,21 @@ void test_nullable(void)
             "fn touch(n: *Node) { }\n"
             "fn f(p: ?*Node) { p?.touch(); }\n",
             "`?.` on `p.touch()`, which is not a pointer");
+    /* A `?T` of a value is a base of `?.` as a `?*T` is. */
+    accepts("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: ?Node) -> ?*Node { return p?.next; }\n");
+    rejects("struct Node { value: int, next: ?*Node }\n"
+            "fn f(p: ?Node) -> int { let v = p?.value; return 0; }\n",
+            "`?.` on `p.value`, which is not a pointer");
     rejects("struct Node { value: int, next: ?*Node }\n"
             "fn f(p: *Node) -> ?*Node { return p?.next; }\n",
-            "`?.` follows a value of type `?*T`, found `*Node`");
+            "`?.` follows a value of type `?*T` or `?T`, found `*Node`");
     rejects("struct Node { value: int, next: ?*Node }\n"
             "fn f(p: ?*Node) -> ?*Node {\n"
             "    if p != none { return p?.next; }\n"
             "    return none;\n"
             "}\n",
-            "`?.` follows a value of type `?*T`, found `*Node`");
+            "`?.` follows a value of type `?*T` or `?T`, found `*Node`");
     rejects("struct Node { value: int, next: ?*Node }\n"
             "fn f(p: ?*Node) -> *Node { return p?.next; }\n",
             "`p?.next` may be `none`, check it or use `?*T`");

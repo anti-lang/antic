@@ -223,3 +223,21 @@ pub fn label<T>(items: []T, name: str) -> str
 {
 	return f"{name}: {items.len}";
 }
+
+/// The last value, or `none` for an empty slice.
+pub fn last<T>(items: []T) -> ?T
+{
+	if items.len == 0 {
+		return none;
+	}
+	return items[items.len - 1];
+}
+
+/// The half of an even number, or `none` for an odd one.
+pub fn half(n: int) -> ?int
+{
+	if n % 2 != 0 {
+		return none;
+	}
+	return n / 2;
+}

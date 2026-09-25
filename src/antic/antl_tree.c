@@ -29,7 +29,7 @@
 _Static_assert(EXPR_PATTERN == 37, "raise ANTL_VERSION, then update this");
 _Static_assert(STMT_SELECT == 21, "raise ANTL_VERSION, then update this");
 _Static_assert(ITEM_TYPE == 9, "raise ANTL_VERSION, then update this");
-_Static_assert(TYPEX_CONST == 8, "raise ANTL_VERSION, then update this");
+_Static_assert(TYPEX_OPTIONAL == 9, "raise ANTL_VERSION, then update this");
 _Static_assert(HANDLE_ENCLOSING == 4, "raise ANTL_VERSION, then update this");
 _Static_assert(SIMD_OP_ALL == 10, "raise ANTL_VERSION, then update this");
 _Static_assert(SYNC_CHAN_DELETE == 6, "raise ANTL_VERSION, then update this");
@@ -783,7 +783,7 @@ static void io_typex_body(struct io *io, struct type_expr *x)
     void *array;
     size_t i;
 
-    IO_ENUM(io, x->kind, TYPEX_CONST);
+    IO_ENUM(io, x->kind, TYPEX_OPTIONAL);
     io_pos(io, &x->pos);
     io_token(io, &x->builtin);
     io_name(io, &x->module);
@@ -977,6 +977,7 @@ static void io_expr_body(struct io *io, struct expr *e)
     io_bool(io, &e->moves);
     io_field(io, &e->to_iface, e->type);
     io_bool(io, &e->to_context);
+    io_type(io, &e->to_optional);
     io_bool(io, &e->moves_snapshot);
     io_type(io, &e->param_type);
     switch (e->kind) {

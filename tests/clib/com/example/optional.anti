@@ -1,0 +1,45 @@
+//! A library for C whose signatures name optional values. A `?T` of a value
+//! crosses as the struct of the value and a `bool` that the header writes for
+//! it, one per T.
+
+import anti.lang;
+
+/// A point of the plane.
+export struct Spot
+{
+	x: i32,
+	y: i32,
+}
+
+/// The index of `want` below `limit` when it is even, or `none`.
+export fn optional_even(want: int, limit: int) -> ?int
+{
+	if want < limit && want % 2 == 0 {
+		return want;
+	}
+	return none;
+}
+
+/// The value `n` holds, or `fallback` where it holds none.
+export fn optional_or(n: ?int, fallback: int) -> int
+{
+	return n ?? fallback;
+}
+
+/// A spot on the diagonal, or `none` for a negative place.
+export fn optional_spot(at: i32) -> ?Spot
+{
+	if at < 0 {
+		return none;
+	}
+	return Spot { x: at, y: at };
+}
+
+/// The sum of a spot's coordinates, or -1 where there is no spot.
+export fn optional_sum(s: ?Spot) -> i32
+{
+	if let spot = s {
+		return spot.x + spot.y;
+	}
+	return -1;
+}

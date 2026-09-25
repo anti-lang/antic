@@ -534,12 +534,13 @@ static void check_block_narrowing(struct checker *c, struct block *b,
 
 /* Whether a value of t owns memory: an `own` field anywhere in the chain
    of a class, or a class value held inline that does. An array holds its
-   elements inline, so one of them makes the array an owner too. */
+   elements inline, and a `?T` its value, so one of them makes the array
+   or the `?T` an owner too. */
 bool sema_type_owns(const struct type *t)
 {
     size_t i;
 
-    while (t != NULL && t->kind == TYPE_ARRAY) {
+    while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
         t = t->element;
     }
     for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
@@ -599,7 +600,7 @@ bool sema_holds_mutex(const struct type *t)
     if (types_is_mutex(t)) {
         return true;
     }
-    if (t->kind == TYPE_ARRAY) {
+    if (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
         return sema_holds_mutex(t->element);
     }
     if (t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS &&
@@ -764,10 +765,14 @@ static void check_assign(struct checker *c, struct stmt *s)
         return;
     }
     /* A narrowed name is still a `?*T` variable, so an assignment to it
-       takes the declared type and any pointer the program has. */
+       takes the declared type and any pointer the program has. A `?T`
+       narrowed to its value is the same, and `+=` and the other compound
+       forms change the value it holds, which stays there. */
     if (target->kind == EXPR_NAME && target->symbol != NULL &&
-        type_is_nullable(target->symbol->type)) {
+        type_is_nullable(target->symbol->type) &&
+        (op == TOKEN_ASSIGN || target->symbol->type->kind != TYPE_OPTIONAL)) {
         t = target->symbol->type;
+        target->type = t;
     }
     /* A Mutex cannot be assigned, as it cannot be copied: the lock a
        thread holds would change under it. */
@@ -835,7 +840,8 @@ static void check_assign(struct checker *c, struct stmt *s)
     /* The value is checked first, so that `p = p.next` still reads the
        `p` the check proved. Then the narrowing ends: what it proved is
        about the value the assignment replaced. */
-    if (target->kind == EXPR_NAME && target->symbol != NULL) {
+    if (target->kind == EXPR_NAME && target->symbol != NULL &&
+        target->type == target->symbol->type) {
         sema_end_narrowing(c, target->symbol);
     }
     if (!sema_require(c, s->as.assign.value, v, t)) {
@@ -1175,7 +1181,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
                       "and a `catch` on a pointer guards no failure");
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (!type_is_nullable(value) || types_is_match(value)) {
+    if (!type_is_nullable(value) || types_is_maybe_match(value)) {
         sema_error_at(c, h->pos, "`catch` here guards a `?*T`, found `%s`",
                       sema_tn(value));
         return sema_builtin(c, TYPE_ERROR);
@@ -1621,7 +1627,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
             if (!sema_is_error(t) && !type_is_nullable(t)) {
                 sema_error_at(c, s->as.let.value->pos,
                               "the `else` of a `let` follows a value of type "
-                              "`?*T`, found `%s`", sema_tn(t));
+                              "`?*T` or `?T`, found `%s`", sema_tn(t));
                 t = sema_builtin(c, TYPE_ERROR);
             } else if (!sema_is_error(t)) {
                 t = types_without_none(c->types, t);
@@ -1705,8 +1711,13 @@ static void check_stmt(struct checker *c, struct stmt *s)
                 sym->address_taken = true;
             }
             /* A `catch` handler may put another pointer in the binding
-               with `yield`, so the binding needs a place of its own. */
-            if (s->as.let.guard.kind != HANDLE_NONE) {
+               with `yield`, so the binding needs a place of its own. So
+               does the value `let ... else` takes out of a `?T`, which
+               the path where it is there writes. */
+            if (s->as.let.guard.kind != HANDLE_NONE ||
+                (s->as.let.otherwise != NULL &&
+                 s->as.let.value->type != NULL &&
+                 s->as.let.value->type->kind == TYPE_OPTIONAL)) {
                 sym->address_taken = true;
             }
         }
@@ -1956,15 +1967,16 @@ static void check_stmt(struct checker *c, struct stmt *s)
         size_t k;
         size_t j;
         if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
-            types_is_match(over) &&
+            type_is_nullable(over) &&
             s->as.switch_stmt.arms[0].binds.length == 0) {
-            sema_if_let_match(c, s, over);
+            sema_if_let_none(c, s, over);
             return;
         }
         if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
             over->kind != TYPE_VARIANT) {
             sema_error_at(c, s->as.switch_stmt.value->pos, "`if let` takes a "
-                          "variant, found `%s`", sema_tn(over));
+                          "variant or a value that may be `none`, found `%s`",
+                          sema_tn(over));
             over = sema_builtin(c, TYPE_ERROR);
         }
         if (!sema_is_error(over) && over->kind == TYPE_STR) {

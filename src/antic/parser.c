@@ -489,6 +489,7 @@ static bool scan_type(const struct parser *p, struct angle_scan *s)
     }
     switch (k) {
     case TOKEN_QUESTION:
+    case TOKEN_QUESTION_QUESTION:
     case TOKEN_STAR:
     case TOKEN_QUESTION_STAR:
     case TOKEN_CHAN:
@@ -621,17 +622,31 @@ static struct type_expr *type_level(struct parser *p)
     struct type_expr *ty = node(p, sizeof *ty);
 
     ty->pos = pos_of(t);
+    /* `?T` is a T or `none`, for any type. `?*T` is one token, and `?fn`
+       stays the function type that may hold `none`, which the branches
+       below read. `??T` is `?` twice. */
+    if ((t->kind == TOKEN_QUESTION && peek_at(p, 1)->kind != TOKEN_FN) ||
+        t->kind == TOKEN_QUESTION_QUESTION) {
+        next(p);
+        ty->kind = TYPEX_OPTIONAL;
+        if ((ty->element = type(p)) == NULL) {
+            return NULL;
+        }
+        if (t->kind == TOKEN_QUESTION_QUESTION) {
+            struct type_expr *outer = node(p, sizeof *outer);
+            outer->pos = ty->pos;
+            outer->kind = TYPEX_OPTIONAL;
+            outer->element = ty;
+            ty = outer;
+        }
+        return ty;
+    }
     if (is_builtin_type(t->kind)) {
         next(p);
         ty->kind = TYPEX_BUILTIN;
         ty->builtin = t->kind;
-    } else if (t->kind == TOKEN_IDENT ||
-               (t->kind == TOKEN_QUESTION &&
-                peek_at(p, 1)->kind == TOKEN_IDENT)) {
-        /* `?Match` is a match that may be `none`. The checker refuses
-           the `?` before any other name. */
+    } else if (t->kind == TOKEN_IDENT) {
         ty->kind = TYPEX_NAMED;
-        ty->nullable = accept(p, TOKEN_QUESTION);
         expect_name(p, &ty->name);
         if (accept(p, TOKEN_DOT)) {
             ty->module = ty->name;

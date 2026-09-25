@@ -646,6 +646,25 @@ static enum token_kind compound_op(enum token_kind op)
 static void destroy_value(struct lowerer *l, struct ir_operand p,
                           const struct type *t, bool replaced);
 
+/* The teardown of the `?T` at p, which runs on the class value it holds
+   when its flag is set. */
+static void destroy_optional(struct lowerer *l, struct ir_operand p,
+                             const struct type *t, bool replaced)
+{
+    struct ir_block *held = lower_new_block(l);
+    struct ir_block *after = lower_new_block(l);
+
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
+                                      lower_optional_flag(l, t, p),
+                                      ir_int_op(IR_I8, 0))),
+              held, after);
+    l->b = held;
+    destroy_value(l, p, t->element, replaced);
+    ir_jump(l->f, l->b, after);
+    l->b = after;
+}
+
 static void destroy_array(struct lowerer *l, struct ir_operand base,
                           const struct type *t, bool replaced);
 
@@ -782,7 +801,9 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
             lower_free_snapshot(l, target->type, p.address);
         }
         if (local_needs_teardown(target->type)) {
-            if (target->type->kind == TYPE_ARRAY) {
+            if (target->type->kind == TYPE_OPTIONAL) {
+                destroy_optional(l, p.address, target->type, true);
+            } else if (target->type->kind == TYPE_ARRAY) {
                 destroy_array(l, p.address, target->type, true);
             } else {
                 destroy_value(l, p.address, target->type, true);
@@ -849,12 +870,22 @@ bool lower_type_needs_destruct(const struct type *t)
                 return true;
             }
             if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                lower_type_needs_destruct(f->type)) {
+                (lower_type_needs_destruct(f->type) ||
+                 lower_optional_needs_destruct(f->type))) {
                 return true;
             }
         }
     }
     return false;
+}
+
+/* DESIGN: a `?T` of a class value that needs the teardown holds an
+   object when its flag is set. It is torn down then, as the class value
+   is. */
+bool lower_optional_needs_destruct(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_OPTIONAL &&
+           lower_type_needs_destruct(t->element);
 }
 
 /* DESIGN: a local array whose element class needs the teardown is torn
@@ -870,7 +901,8 @@ static const struct type *innermost(const struct type *t)
 
 static bool local_needs_teardown(const struct type *t)
 {
-    return lower_type_needs_destruct(innermost(t));
+    return lower_type_needs_destruct(innermost(t)) ||
+           lower_optional_needs_destruct(t);
 }
 
 /* The count of elements of the class in the array t, through every
@@ -966,6 +998,11 @@ void lower_clear_tables(struct lowerer *l, struct ir_operand base,
     struct ir_operand at;
     uint32_t index;
 
+    /* A `?T` that holds nothing has nothing for the `=` to destroy. */
+    if (lower_optional_needs_destruct(t)) {
+        lower_set_optional(l, t, NULL, base, 0);
+        return;
+    }
     if (!lower_type_needs_destruct(element)) {
         return;
     }
@@ -1002,6 +1039,10 @@ void lower_clear_tables(struct lowerer *l, struct ir_operand base,
 
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
+    if (sym->type->kind == TYPE_OPTIONAL) {
+        destroy_optional(l, lower_temp(l, sym->ir), sym->type, false);
+        return;
+    }
     if (sym->type->kind == TYPE_ARRAY) {
         destroy_array(l, lower_temp(l, sym->ir), sym->type, false);
         return;
@@ -1241,17 +1282,15 @@ bool lower_is_handled_call(const struct expr *e)
 /* `let m = p catch fatal` and `let m = p catch e { }`. The handler runs
    when p is `none`, with an `anti.lang.NoneDereference` in hand, and it
    leaves the block or gives the binding a pointer with `yield`. */
+static void guard_missing(struct lowerer *l, const struct stmt *s,
+                          struct ir_block *join);
+
 static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
 {
-    const struct handler *h = &s->as.let.guard;
     const struct symbol *sym = s->as.let.symbol;
-    const struct type *error_type = s->as.let.guard_make->type->result;
     struct ir_block *bad = lower_new_block(l);
     struct ir_block *join = lower_new_block(l);
     struct ir_operand place;
-    struct ir_operand err;
-    struct handling scope;
-    uint32_t error;
 
     if (sym == NULL || l->b == NULL) {
         return;
@@ -1265,6 +1304,22 @@ static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
                                       ir_int_op(IR_PTR, 0))),
               bad, join);
     l->b = bad;
+    guard_missing(l, s, join);
+}
+
+/* The error forms of a `let` guard on the path where the value is `none`,
+   the current block, which ends at join. */
+static void guard_missing(struct lowerer *l, const struct stmt *s,
+                          struct ir_block *join)
+{
+    const struct handler *h = &s->as.let.guard;
+    const struct symbol *sym = s->as.let.symbol;
+    const struct type *error_type = s->as.let.guard_make->type->result;
+    struct ir_operand place = lower_temp(l, sym->ir);
+    struct ir_operand err;
+    struct handling scope;
+    uint32_t error;
+
     err = lower_temp(
         l, ir_call(l->f, l->b, IR_PTR,
                    ir_func_op(lower_callee_function(l, s->as.let.guard_make)),
@@ -1324,6 +1379,57 @@ static void destructure(struct lowerer *l, const struct stmt *s)
     }
 }
 
+/* DESIGN: `let v = o else { }` and `let v = o catch ...` on a `?T` of a
+   value build o in a slot of its own and test its flag. The path where
+   it is there copies the value into v. The other runs the `else` or the
+   handler, which leaves or gives v a value with `yield`. v is torn down
+   from there on, as any local of its type is. */
+static void lower_let_unwrap(struct lowerer *l, const struct stmt *s)
+{
+    struct symbol *sym = s->as.let.symbol;
+    const struct type *t = s->as.let.value->type;
+    struct ir_operand held =
+        lower_temp(l, ir_entry_slot(l->f, lower_vtype_of(l, t)));
+    struct ir_block *have = lower_new_block(l);
+    struct ir_block *missing = lower_new_block(l);
+    struct ir_block *rest = lower_new_block(l);
+    struct ir_operand place;
+
+    lower_build_into(l, s->as.let.value, held);
+    if (l->b == NULL || sym == NULL) {
+        return;
+    }
+    place = lower_temp(l, sym->ir);
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
+                                      lower_optional_flag(l, t, held),
+                                      ir_int_op(IR_I8, 0))),
+              have, missing);
+    l->b = have;
+    if (lower_is_aggregate(sym->type)) {
+        ir_memcopy(l->f, l->b, place, held, lower_vtype_of(l, sym->type));
+    } else {
+        ir_store(l->f, l->b, lower_ir_type_of(sym->type),
+                 lower_temp(l, ir_load(l->f, l->b,
+                                       lower_ir_type_of(sym->type), held)),
+                 place);
+    }
+    ir_jump(l->f, l->b, rest);
+    l->b = missing;
+    if (s->as.let.otherwise != NULL) {
+        lower_block(l, s->as.let.otherwise);
+        if (l->b != NULL) {
+            ir_jump(l->f, l->b, rest);
+        }
+    } else {
+        guard_missing(l, s, rest);
+    }
+    l->b = rest;
+    if (local_needs_teardown(sym->type)) {
+        push_exit_action(l, NULL, sym, false);
+    }
+}
+
 static void lower_let_value(struct lowerer *l, const struct stmt *s)
 {
     struct symbol *sym = s->as.let.symbol;
@@ -1378,8 +1484,14 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         }
         return;
     }
-    /* A function with its context and a match are aggregates that may be
-       `none`, so the guard and the `else` below read them as well. */
+    if ((s->as.let.otherwise != NULL ||
+         s->as.let.guard.kind != HANDLE_NONE) &&
+        s->as.let.value->type->kind == TYPE_OPTIONAL) {
+        lower_let_unwrap(l, s);
+        return;
+    }
+    /* A function with its context is an aggregate that may be `none`, so
+       the guard and the `else` below read it as well. */
     if (lower_is_aggregate(sym->type)) {
         lower_build_into(l, s->as.let.value, lower_temp(l, sym->ir));
         if (local_needs_teardown(sym->type)) {

@@ -46,10 +46,6 @@ fn types() -> int
 	return 0;
 }
 
-fn optional(p: ?Regex)
-{
-}
-
 fn main() -> int
 {
 	return 0;

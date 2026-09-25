@@ -106,9 +106,8 @@ struct anti_text anti_rt_regex_message(int32_t code)
 #include <pcre2.h>
 
 /* The layout of anti.lang.Match, which types_match of src/antic/types.c
-   declares in this order. pattern is NULL in a `?Match` that is `none`.
-   from and options are the search that found the match, which group
-   runs again. */
+   declares in this order. from and options are the search that found the
+   match, which group runs again. */
 struct anti_match {
     const void *pattern;
     struct anti_text all;
@@ -118,6 +117,13 @@ struct anti_match {
     struct anti_text subject;
     int64_t from;
     int64_t options;
+};
+
+/* The layout of a `?Match`, the match and the flag byte that says it is
+   there, as C lays out every `?T` of a value. */
+struct anti_maybe_match {
+    struct anti_match value;
+    uint8_t has;
 };
 
 /* The layout of anti.regex.Cursor. It holds where the next search starts
@@ -385,22 +391,26 @@ static int64_t advance(struct anti_cursor *c, struct anti_match *current,
     }
 }
 
-int64_t anti_rt_regex_next(struct anti_cursor *c, struct anti_match *current)
+int64_t anti_rt_regex_next(struct anti_cursor *c,
+                           struct anti_maybe_match *current)
 {
     pcre2_match_data *md = match_data(c->pattern, 0);
-    int64_t status = advance(c, current, md);
+    int64_t status = advance(c, &current->value, md);
 
     pcre2_match_data_free(md);
+    if (status == FOUND) {
+        current->has = 1;
+    }
     return status;
 }
 
 /* DESIGN: the match a walk stands at is a `?Match` field, and the checker
    narrows names alone. `value` reads it through anti_rt_regex_current.
-   It gives back the address it takes as the address of a `Match`, since
-   the two have one layout. */
-struct anti_match *anti_rt_regex_current(struct anti_match *current)
+   It gives the address of the match the field holds, which lies at
+   offset 0, or NULL where the walk has found none yet. */
+struct anti_match *anti_rt_regex_current(struct anti_maybe_match *current)
 {
-    return current;
+    return current->has != 0 ? &current->value : NULL;
 }
 
 /* A walk of a search of the runtime's own. */
@@ -413,16 +423,19 @@ static int64_t walk_begin(struct anti_matches *it, const void *pattern,
 }
 
 int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
-                            int64_t length, struct anti_match *out)
+                            int64_t length, struct anti_maybe_match *out)
 {
     struct anti_matches it;
+    pcre2_match_data *md = match_data(pattern, 0);
     int64_t status;
 
     (void)walk_begin(&it, pattern, s, length, 1);
-    status = anti_rt_regex_next(&it.cursor, &it.current);
-    *out = it.current;
-    if (status != FOUND) {
-        memset(out, 0, sizeof *out);
+    status = advance(&it.cursor, &it.current, md);
+    pcre2_match_data_free(md);
+    memset(out, 0, sizeof *out);
+    if (status == FOUND) {
+        out->value = it.current;
+        out->has = 1;
     }
     return status;
 }
@@ -878,20 +891,22 @@ _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
    functions, under names of their own, since anti.regex declares each
    external function with one signature. */
 int64_t anti_rt_regex_first_bytes(const void *pattern, const unsigned char *s,
-                                  int64_t length, struct anti_match *out)
+                                  int64_t length,
+                                  struct anti_maybe_match *out)
 {
     return anti_rt_regex_first(pattern, s, length, out);
 }
 
 int64_t anti_rt_regex_next_bytes(struct anti_cursor *c,
-                                 struct anti_match *current)
+                                 struct anti_maybe_match *current)
 {
     return anti_rt_regex_next(c, current);
 }
 
-struct anti_match *anti_rt_regex_current_bytes(struct anti_match *current)
+struct anti_match *anti_rt_regex_current_bytes(
+    struct anti_maybe_match *current)
 {
-    return current;
+    return anti_rt_regex_current(current);
 }
 
 int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,

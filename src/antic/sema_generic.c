@@ -586,6 +586,7 @@ bool sema_has_params(const struct type *t)
         return true;
     case TYPE_POINTER:
     case TYPE_SLICE:
+    case TYPE_OPTIONAL:
         return sema_has_params(t->element);
     case TYPE_ARRAY:
         return sema_has_params(t->element) ||
@@ -742,6 +743,11 @@ static struct type *subst(struct checker *c, struct type *t,
     case TYPE_SLICE:
         element = subst(c, t->element, map);
         return element == t->element ? t : types_slice(c->types, element);
+    /* `?T` with a pointer or a function type for T is the `?*U` or the
+       `?fn(...)` of it, one word with `none` as zero. */
+    case TYPE_OPTIONAL:
+        element = subst(c, t->element, map);
+        return element == t->element ? t : types_with_none(c->types, element);
     case TYPE_ARRAY: {
         const struct symbolic *length = subst_symbolic(c, t->length_of, map);
         element = subst(c, t->element, map);
@@ -1246,6 +1252,16 @@ static void unify(struct type *param, struct type *arg,
                 !param->param->constant) {
                 map->args[i] = arg;
             }
+        }
+        return;
+    }
+    /* A `?T` takes a `?U`, a `?*U` and a plain value of U, and each
+       gives T the U. */
+    if (param->kind == TYPE_OPTIONAL) {
+        if (arg->kind == TYPE_OPTIONAL) {
+            unify(param->element, arg->element, map);
+        } else if (map->types != NULL) {
+            unify(param->element, types_without_none(map->types, arg), map);
         }
         return;
     }

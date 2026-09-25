@@ -1,0 +1,73 @@
+//! A `?T` of a value is used as a T only after a test proves it holds one.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn find(want: int) -> ?int
+{
+	if want > 0 {
+		return want;
+	}
+	return none;
+}
+
+fn origin() -> ?Point
+{
+	return none;
+}
+
+fn untested() -> int
+{
+	let n = find(3);
+	let sum = n + 1;
+	let p = origin();
+	let x = p.x;
+	let plain: int = n;
+	return sum + x + plain;
+}
+
+fn compared() -> bool
+{
+	let n = find(3);
+	let m = find(4);
+	let k = 5;
+	if k == none {
+		return false;
+	}
+	return n == m;
+}
+
+fn coalesced() -> int
+{
+	let k = 5;
+	let word: ?str = "five";
+	let a = k ?? 0;
+	let b = find(1) ?? "one";
+	let c = word ?? 3;
+	return a + b + c;
+}
+
+fn chained() -> int
+{
+	let p = origin();
+	let v: int = p?.x;
+	return v;
+}
+
+fn narrowed() -> int
+{
+	let n = find(3);
+	if n != none {
+		n = none;
+		return n;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

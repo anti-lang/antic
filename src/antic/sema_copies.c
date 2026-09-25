@@ -1027,6 +1027,7 @@ static struct expr *xe(struct clone *cl, struct expr *e)
     n->type = cl->fresh && open_node(e) ? NULL : ty(cl, e->type, e->pos);
     n->symbol = xsym(cl, e->symbol);
     n->to_iface = xf(cl, e->type, e->to_iface);
+    n->to_optional = ty(cl, e->to_optional, e->pos);
     switch (e->kind) {
     case EXPR_NAME:
         if (names_generic(n->symbol) && !cl->callee) {

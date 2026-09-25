@@ -254,14 +254,16 @@ static void error_may_be_none(struct checker *c, const struct expr *e,
     struct text spelling = {0};
     const char *form = t != NULL && t->kind == TYPE_FN ? "?fn(...)" : "?*T";
 
-    /* A match that may be `none` is tested before it is read. */
-    if (types_is_match(t)) {
+    /* A `?T` of a value, a match among them, is tested before it is
+       read. */
+    if (t != NULL && t->kind == TYPE_OPTIONAL) {
         if (sema_spell(&spelling, e)) {
             sema_error_at(c, e->pos, "`%s` may be `none`, test it before "
                           "reading it", text_cstr(&spelling));
         } else {
-            sema_error_at(c, e->pos, "the match may be `none`, test it before "
-                          "reading it");
+            sema_error_at(c, e->pos, "the %s may be `none`, test it before "
+                          "reading it",
+                          types_is_maybe_match(t) ? "match" : "value");
         }
         text_free(&spelling);
         return;
@@ -289,6 +291,19 @@ struct type *sema_usable_pointer(struct checker *c, const struct expr *e,
     }
     error_may_be_none(c, e, t);
     return types_without_none(c->types, t);
+}
+
+/* DESIGN: a name narrowed from a `?T` reads the value it holds. A
+   comparison with `none` and a test read the whole variable again, its
+   flag included, so the name takes the declared type there. */
+struct type *sema_whole_optional(struct type *t, struct expr *e)
+{
+    if (e->kind == EXPR_NAME && e->symbol != NULL && e->symbol->type != NULL &&
+        e->symbol->type->kind == TYPE_OPTIONAL && !sema_is_error(t)) {
+        e->type = e->symbol->type;
+        return e->type;
+    }
+    return t;
 }
 
 /* `*T` passes where `?*T` is expected, because a pointer that never
@@ -516,18 +531,36 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
     if (got == expected) {
         return true;
     }
-    /* A match of a literal is a plain match, and a match is a match that
-       may be `none`. The reverse needs a test. */
-    if (types_is_match(got) && types_is_match(expected)) {
-        struct type *widened =
-            expected->pattern == NULL ? types_match_plain(c->types, got) : got;
-        if (!got->nullable && expected->nullable) {
-            widened = types_with_none(c->types, widened);
-        }
-        if (widened == expected) {
+    /* A match of a literal is a plain match, and a `?Match` of a literal
+       a plain `?Match`, since all of them have one layout. */
+    if (((types_is_match(got) && types_is_match(expected)) ||
+         (types_is_maybe_match(got) && types_is_maybe_match(expected))) &&
+        types_match_plain(c->types, got) == expected) {
+        return true;
+    }
+    /* DESIGN: a T is one of the values a `?T` holds, so it passes where
+       a `?T` is expected. Every conversion that reaches T reaches the `?T`
+       as well. Lowering writes the flag beside it. The reverse needs a
+       test the program wrote. */
+    if (expected->kind == TYPE_OPTIONAL && got->kind != TYPE_OPTIONAL &&
+        got->kind != TYPE_NONE) {
+        bool held;
+        c->quiet++;
+        held = sema_require(c, e, got, expected->element);
+        c->quiet--;
+        if (held) {
+            e->to_optional = expected;
             return true;
         }
-        if (got->nullable && !expected->nullable) {
+    }
+    if (got->kind == TYPE_OPTIONAL && expected->kind != TYPE_OPTIONAL) {
+        bool held;
+        c->quiet++;
+        held = sema_require(c, e, got->element, expected);
+        c->quiet--;
+        if (held) {
+            e->to_iface = NULL;
+            e->to_context = false;
             error_may_be_none(c, e, got);
             return false;
         }
@@ -746,13 +779,28 @@ static bool binary_operands(struct checker *c, struct expr *e,
        other, so the comparison names no type the program did not. */
     if (l->kind == EXPR_NONE || r->kind == EXPR_NONE) {
         struct expr *value = l->kind == EXPR_NONE ? r : l;
+        struct expr *none = l->kind == EXPR_NONE ? l : r;
         struct type **value_type = l->kind == EXPR_NONE ? right : left;
         struct type **none_type = l->kind == EXPR_NONE ? left : right;
         if (value->kind != EXPR_NONE) {
-            *value_type = sema_check_expr(c, value, outer);
-            *none_type = sema_check_expr(c, l->kind == EXPR_NONE ? l : r,
-                                         types_with_none(c->types,
-                                                         *value_type));
+            *value_type = sema_whole_optional(sema_check_expr(c, value, outer),
+                                              value);
+            if (sema_is_error(*value_type)) {
+                return false;
+            }
+            /* A value that is no pointer holds `none` only as a `?T`. */
+            if (!type_is_nullable(*value_type) &&
+                (*value_type)->kind != TYPE_POINTER &&
+                (*value_type)->kind != TYPE_FN) {
+                sema_error_at(c, none->pos, "`%s` cannot hold `none`",
+                              sema_tn(*value_type));
+                return false;
+            }
+            *none_type = sema_check_expr(
+                c, none,
+                type_is_nullable(*value_type)
+                    ? *value_type
+                    : types_with_none(c->types, *value_type));
             return !sema_is_error(*left) && !sema_is_error(*right);
         }
     }
@@ -772,6 +820,16 @@ static bool binary_operands(struct checker *c, struct expr *e,
     }
     if (sema_refuses_half(c, e->pos, *left) ||
         sema_refuses_half(c, e->pos, *right)) {
+        return false;
+    }
+    /* A `?T` takes part in an operator after a test alone, and compares
+       with `none` above. */
+    if (!sema_is_error(*left) && (*left)->kind == TYPE_OPTIONAL) {
+        error_may_be_none(c, l, *left);
+        return false;
+    }
+    if (!sema_is_error(*right) && (*right)->kind == TYPE_OPTIONAL) {
+        error_may_be_none(c, r, *right);
         return false;
     }
     return !sema_is_error(*left) && !sema_is_error(*right);
@@ -1299,12 +1357,12 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
         if (!binary_operands(c, e, NULL, &left, &right)) {
             return sema_builtin(c, TYPE_ERROR);
         }
-        /* A match compares with `none` alone, which reads its first
-           word as a pointer's comparison reads the pointer. */
+        /* A `?T` of a value compares with `none` alone, which reads its
+           flag. */
         if ((op == TOKEN_EQ || op == TOKEN_NE) &&
             (e->as.binary.left->kind == EXPR_NONE ||
              e->as.binary.right->kind == EXPR_NONE) &&
-            (types_is_match(left) || types_is_match(right))) {
+            (left->kind == TYPE_OPTIONAL || right->kind == TYPE_OPTIONAL)) {
             return sema_builtin(c, TYPE_BOOL);
         }
         if (left->kind == TYPE_PARAM || right->kind == TYPE_PARAM) {
@@ -2210,14 +2268,15 @@ static struct type *check_coalesce(struct checker *c, struct expr *e,
     struct type *left;
     struct type *got;
 
-    if (expected != NULL && (expected->kind == TYPE_POINTER ||
-                             (expected->kind == TYPE_FN && !expected->bound))) {
-        hint = types_with_none(c->types, expected);
+    if (expected != NULL && !sema_is_error(expected) &&
+        (expected->kind != TYPE_FN || !expected->bound)) {
+        hint = type_is_nullable(expected) ? expected
+                                          : types_with_none(c->types, expected);
     }
     left = sema_check_expr(c, e->as.binary.left, hint);
     if (!sema_is_error(left) && !type_is_nullable(left)) {
         sema_error_at(c, e->pos,
-                      "`??` follows a value of type `?*T`, found `%s`",
+                      "`??` follows a value of type `?*T` or `?T`, found `%s`",
                       sema_tn(left));
         left = sema_builtin(c, TYPE_ERROR);
     }
@@ -2226,23 +2285,38 @@ static struct type *check_coalesce(struct checker *c, struct expr *e,
         return left;
     }
     /* Two matches of two literals give a plain match. */
-    if (types_is_match(left)) {
+    if (types_is_maybe_match(left)) {
         left = types_match_plain(c->types, left);
     }
+    /* A right side that may be `none` gives a result that may be, and
+       any other gives the value. */
     got = sema_check_expr(c, right, left);
+    if (!type_is_nullable(got) && got->kind != TYPE_NONE &&
+        !sema_is_error(got)) {
+        struct type *bare = types_without_none(c->types, left);
+        bool held;
+        c->quiet++;
+        held = sema_require(c, right, got, bare);
+        c->quiet--;
+        if (held) {
+            return bare;
+        }
+    }
     if (!sema_require(c, right, got, left)) {
         return sema_builtin(c, TYPE_ERROR);
     }
-    return type_is_nullable(got) ? left : types_without_none(c->types, left);
+    return left;
 }
 
 /* DESIGN: `p?.x` and `p?.f(args)` give `none` when p is `none` and the
    field or the call otherwise. The checker binds p to a local of type
    `*T` in a scope of its own and checks the field or the call on it, so
-   every rule of `.` applies unchanged. The result is the `?*U` of a
-   pointer field or result, and anything else is refused, since Anti has
-   no optional values. A function value follows the pointer rule. A
-   chain `p?.a?.b` checks each `?.` on the `?*U` the one before gave. */
+   every rule of `.` applies unchanged. A `?T` of a value binds the
+   address of the value it holds, so a call changes that value and no
+   copy. The result is the `?*U` of a pointer field or result, and
+   anything else is refused, as "Small things" of the additions says. A
+   function value follows the pointer rule. A chain `p?.a?.b` checks each
+   `?.` on the `?*U` the one before gave. */
 static struct type *check_optional(struct checker *c, struct expr *e)
 {
     struct expr *access = sema_new_node(c, e->kind, e->pos);
@@ -2261,9 +2335,10 @@ static struct type *check_optional(struct checker *c, struct expr *e)
     if (sema_is_error(t)) {
         return t;
     }
-    if (t->kind != TYPE_POINTER || !t->nullable) {
-        sema_error_at(c, base->pos, "`?.` follows a value of type `?*T`, found "
-                      "`%s`", sema_tn(t));
+    if ((t->kind != TYPE_POINTER && t->kind != TYPE_OPTIONAL) ||
+        !t->nullable) {
+        sema_error_at(c, base->pos, "`?.` follows a value of type `?*T` or "
+                      "`?T`, found `%s`", sema_tn(t));
         return sema_builtin(c, TYPE_ERROR);
     }
     *access = *e;
@@ -2286,7 +2361,9 @@ static struct type *check_optional(struct checker *c, struct expr *e)
         sema_leave_scope(c, &scope);
         return sema_builtin(c, TYPE_ERROR);
     }
-    bound->type = types_without_none(c->types, t);
+    bound->type = t->kind == TYPE_OPTIONAL
+                      ? types_pointer(c->types, t->element)
+                      : types_without_none(c->types, t);
     result = sema_check_expr(c, access, NULL);
     sema_leave_scope(c, &scope);
     if (sema_is_error(result)) {
@@ -2310,7 +2387,8 @@ static struct type *check_optional(struct checker *c, struct expr *e)
     e->as.optional.base = base;
     e->as.optional.bound = bound;
     e->as.optional.access = access;
-    return types_with_none(c->types, result);
+    return type_is_nullable(result) ? result
+                                    : types_with_none(c->types, result);
 }
 
 static struct type *check_expr_inner(struct checker *c, struct expr *e,
@@ -2347,18 +2425,20 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                                  expected->kind == TYPE_FN)) {
             return expected;
         }
-        /* A match that may be `none` holds it, and a `Match` does not. */
-        if (expected != NULL && types_is_match(expected)) {
-            if (!expected->nullable) {
-                sema_error_at(c, e->pos, "`%s` cannot hold `none`",
-                              sema_tn(expected));
-                return sema_builtin(c, TYPE_ERROR);
-            }
+        /* A `?T` holds `none`, and a value of any other type does not. */
+        if (expected != NULL && expected->kind == TYPE_OPTIONAL) {
             return expected;
+        }
+        if (expected != NULL && !sema_is_error(expected) &&
+            expected->kind != TYPE_PARAM) {
+            sema_error_at(c, e->pos, "`%s` cannot hold `none`",
+                          sema_tn(expected));
+            return sema_builtin(c, TYPE_ERROR);
         }
         if (expected == NULL || !sema_is_error(expected)) {
             sema_error_at(c, e->pos,
-                          "`none` needs a pointer type from its context");
+                          "`none` needs a type that may be `none` from its "
+                          "context");
         }
         return sema_builtin(c, TYPE_ERROR);
     case EXPR_NAME:
@@ -2876,6 +2956,36 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
    `as f32` of the f16, marked promoted, so that lowering converts it
    where it converts every other `as`. An `as f16` stays f16, because it
    is the value that a write takes. */
+/* DESIGN: a literal where a `?T` is expected is a T, which then passes
+   as the `?T` that holds it. It takes its type from the T, so `0` where a
+   `?u8` stands is a `u8`. Every other expression keeps the `?T`, which
+   `none`, `??` and a handler that yields read. */
+static struct type *value_expected(const struct expr *e,
+                                   struct type *expected)
+{
+    if (expected == NULL || expected->kind != TYPE_OPTIONAL) {
+        return expected;
+    }
+    switch (e->kind) {
+    case EXPR_INT:
+    case EXPR_FLOAT:
+    case EXPR_CHAR:
+    case EXPR_STRING:
+    case EXPR_BYTES:
+    case EXPR_BOOL:
+    case EXPR_UNARY:
+    case EXPR_STRUCT_LIT:
+    case EXPR_TUPLE:
+    case EXPR_SLICE_LIT:
+    case EXPR_ARRAY_LIT:
+    case EXPR_ARRAY_REPEAT:
+    case EXPR_FORMAT:
+        return value_expected(e, expected->element);
+    default:
+        return expected;
+    }
+}
+
 struct type *sema_check_expr(struct checker *c, struct expr *e,
                              struct type *expected)
 {
@@ -2886,7 +2996,7 @@ struct type *sema_check_expr(struct checker *c, struct expr *e,
     if (e->prechecked) {
         return e->type;
     }
-    t = check_expr_inner(c, e, expected);
+    t = check_expr_inner(c, e, value_expected(e, expected));
     e->type = t;
     if (t->kind != TYPE_F16 || e->kind == EXPR_CAST) {
         return t;

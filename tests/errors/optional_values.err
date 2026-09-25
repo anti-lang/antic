@@ -1,0 +1,10 @@
+optional_values.anti:25:12: error: `n` may be `none`, test it before reading it
+optional_values.anti:27:10: error: `p` may be `none`, test it before reading it
+optional_values.anti:28:19: error: `n` may be `none`, test it before reading it
+optional_values.anti:37:10: error: `int` cannot hold `none`
+optional_values.anti:40:9: error: `n` may be `none`, test it before reading it
+optional_values.anti:47:10: error: `??` follows a value of type `?*T` or `?T`, found `int`
+optional_values.anti:48:21: error: expected `?int`, found `str`
+optional_values.anti:49:18: error: expected `str`, found an integer literal
+optional_values.anti:56:15: error: `p?.x` may be `none`, test it before reading it
+optional_values.anti:65:10: error: `n` may be `none`, test it before reading it

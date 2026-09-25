@@ -65,6 +65,7 @@ enum ir_type lower_ir_type_of(const struct type *t)
     case TYPE_CLASS:
     case TYPE_TUPLE:
     case TYPE_VARIANT:
+    case TYPE_OPTIONAL:
     case TYPE_ARRAY:
     case TYPE_STR:
     case TYPE_SLICE:
@@ -81,12 +82,46 @@ bool lower_is_context(const struct type *t)
     return t != NULL && t->kind == TYPE_FN && t->context;
 }
 
-/* DESIGN: a function with its context has its code first, and a match
-   its pattern, and each is zero for `none`. A test of either reads that
-   word as the test of a pointer reads the pointer. */
+/* DESIGN: a function with its context has its code first, which is zero
+   for `none`. A test of it reads that word as the test of a pointer reads
+   the pointer. */
 bool lower_none_in_first_word(const struct type *t)
 {
-    return lower_is_context(t) || (t != NULL && types_is_match(t));
+    return lower_is_context(t);
+}
+
+/* DESIGN: the test of a `?T` reads its flag byte, which lies after the
+   value. The value lies at offset 0, so the address of a `?T` is the
+   address of the value it holds. */
+struct ir_operand lower_optional_flag(struct lowerer *l, const struct type *t,
+                                      struct ir_operand address)
+{
+    static const struct name has = {OPTIONAL_HAS, sizeof OPTIONAL_HAS - 1};
+
+    return lower_temp(
+        l, ir_load(l->f, l->b, IR_I8,
+                   lower_offset_address(l, address,
+                                        lower_field_offset(l, t, &has))));
+}
+
+/* Write flag, 0 or 1, into the `?T` of type t at address. Write it into
+   every `?T` its value holds as well, down to the type value. That is
+   the type of what was written at offset 0. */
+void lower_set_optional(struct lowerer *l, const struct type *t,
+                        const struct type *value, struct ir_operand address,
+                        int flag)
+{
+    static const struct name has = {OPTIONAL_HAS, sizeof OPTIONAL_HAS - 1};
+
+    for (; t != NULL && t->kind == TYPE_OPTIONAL && t != value;
+         t = t->element) {
+        ir_store(l->f, l->b, IR_I8, ir_int_op(IR_I8, flag != 0 ? 1u : 0u),
+                 lower_offset_address(l, address,
+                                      lower_field_offset(l, t, &has)));
+        if (flag == 0) {
+            return;
+        }
+    }
 }
 
 /* A str, a slice, a bound function and a function with its context are
@@ -1304,8 +1339,11 @@ bool lower_place(struct lowerer *l, const struct expr *e,
     p->owner = NULL;
     p->type = lower_ir_type_of(e->type);
     switch (e->kind) {
+    /* A name narrowed from a `?T` reads the value at offset 0 of the
+       variable, which lives where its declared type puts it. */
     case EXPR_NAME:
-        p->in_temp = !sym->address_taken && !lower_is_aggregate(e->type);
+        p->in_temp = !sym->address_taken && !lower_is_aggregate(sym->type) &&
+                     !lower_is_aggregate(e->type);
         p->temp = sym->ir;
         p->address = p->in_temp ? lower_none() : lower_temp(l, sym->ir);
         return true;
@@ -2368,6 +2406,32 @@ static void teardown_field(struct lowerer *l, const struct type *up,
     if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
         return;
     }
+    /* A `?T` of a class value runs the teardown of the object it holds
+       when its flag is set. */
+    if (lower_optional_needs_destruct(f->type)) {
+        struct ir_block *held = lower_new_block(l);
+        struct ir_block *after = lower_new_block(l);
+        struct ir_operand args[2];
+        at = lower_offset_address(l, self,
+                                  lower_field_offset(l, up, &f->name));
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
+                                          lower_optional_flag(l, f->type, at),
+                                          ir_int_op(IR_I8, 0))),
+                  held, after);
+        l->b = held;
+        args[0] = at;
+        args[1] = from;
+        lower_check_table(l, lower_temp(l, ir_load(l->f, l->b, IR_PTR, at)),
+                          f->type->element);
+        ir_call(l->f, l->b, IR_VOID,
+                ir_func_op(lower_class_function(l, f->type->element,
+                                                "destroy")),
+                args, 2);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+        return;
+    }
     if (!f->owned && !(f->type->kind == TYPE_CLASS &&
                        lower_type_needs_destruct(f->type))) {
         return;
@@ -2491,6 +2555,30 @@ static void copy_field(struct lowerer *l, const struct type *up,
         offset = lower_field_offset(l, up, &f->name);
         into = lower_offset_address(l, to, offset);
         ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), into);
+        return;
+    }
+    /* A `?T` of a class value copies the object it holds with its own
+       copy when its flag is set. */
+    if (f->type->kind == TYPE_OPTIONAL &&
+        f->type->element->kind == TYPE_CLASS) {
+        struct ir_block *held = lower_new_block(l);
+        struct ir_block *after = lower_new_block(l);
+        offset = lower_field_offset(l, up, &f->name);
+        from = lower_offset_address(l, self, offset);
+        into = lower_offset_address(l, to, offset);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
+                                          lower_optional_flag(l, f->type,
+                                                              from),
+                                          ir_int_op(IR_I8, 0))),
+                  held, after);
+        l->b = held;
+        args[0] = from;
+        args[1] = into;
+        ir_call(l->f, l->b, IR_VOID,
+                ir_func_op(copy_of(l, f->type->element)), args, 2);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
         return;
     }
     if (!f->owned && f->type->kind != TYPE_CLASS) {

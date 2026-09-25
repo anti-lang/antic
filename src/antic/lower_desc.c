@@ -425,6 +425,12 @@ static uint64_t type_id_of(const struct type *t)
     if (t->kind == TYPE_FN && t->context) {
         return TYPE_ID_NONE;
     }
+    /* A `?T` of a value is the value and a flag, which no Value carries
+       and no reader of a type id knows. Its type id is none, as a
+       variant's is. */
+    if (t->kind == TYPE_OPTIONAL) {
+        return TYPE_ID_NONE;
+    }
     switch (t->kind) {
     case TYPE_POINTER: return TYPE_ID_PTR;
     case TYPE_FN: return TYPE_ID_FN;

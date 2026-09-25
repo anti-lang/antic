@@ -131,7 +131,7 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
         end(d, start, NULL);
         break;
     case TYPEX_NAMED:
-        label_name(d, t->nullable ? "type ?" : "type", &t->module, &t->name);
+        label_name(d, "type", &t->module, &t->name);
         end(d, start, NULL);
         dump_type_args(d, depth + 1, t->args, t->arg_count);
         break;
@@ -178,6 +178,11 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
         break;
     case TYPEX_CHAN:
         text_append(d->out, "type chan");
+        end(d, start, NULL);
+        dump_type(d, depth + 1, t->element);
+        break;
+    case TYPEX_OPTIONAL:
+        text_append(d->out, "type ?");
         end(d, start, NULL);
         dump_type(d, depth + 1, t->element);
         break;

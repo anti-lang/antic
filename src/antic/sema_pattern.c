@@ -640,7 +640,8 @@ bool sema_pattern_call(struct checker *c, struct expr *e, struct type **fn)
     } else if ((t->kind == TYPE_STR && sema_name_is(name, METHOD_TO_BYTES)) ||
                (is_byte_slice(t) && sema_name_is(name, METHOD_TO_TEXT))) {
         ok = convert_call(c, e, t->kind != TYPE_STR);
-    } else if (types_is_match(t) && is_match_method(name)) {
+    } else if ((types_is_match(t) || types_is_maybe_match(t)) &&
+               is_match_method(name)) {
         ok = match_call(c, e, t);
     } else {
         return false;
@@ -711,7 +712,7 @@ static void test_of(struct checker *c, struct expr *e, struct type *t)
     struct pos pos = e->pos;
 
     *value = *e;
-    none->type = types_with_none(c->types, t);
+    none->type = type_is_nullable(t) ? t : types_with_none(c->types, t);
     memset(e, 0, sizeof *e);
     e->kind = EXPR_BINARY;
     e->pos = pos;
@@ -735,7 +736,10 @@ struct type *sema_check_test(struct checker *c, struct expr *e)
         e->as.call.tested = true;
     }
     t = sema_check_expr(c, e, NULL);
-    if (sema_is_error(t) || !types_is_match(t)) {
+    if (types_is_match(t)) {
+        t = sema_whole_optional(t, e);
+    }
+    if (sema_is_error(t) || !types_is_maybe_match(t)) {
         return t;
     }
     test_of(c, e, t);
@@ -754,13 +758,13 @@ static struct stmt *new_stmt(struct checker *c, enum stmt_kind kind,
     return s;
 }
 
-/* DESIGN: `if let m = e { } else { }` on a match binds m in the first
-   block, where it matched, and runs the `else` where it did not. The
-   checker writes it as the block `{ let m = e; if m != none { } else { } }`
-   with m narrowed in the first block, so lowering reads a `let` and an
-   `if`. The `else` is checked before m is declared, so it does not see
-   m. */
-void sema_if_let_match(struct checker *c, struct stmt *s, struct type *t)
+/* DESIGN: `if let m = e { } else { }` on a value that may be `none`, a
+   match among them, binds m in the first block, where it holds one, and
+   runs the `else` where it does not. The checker writes it as the block
+   `{ let m = e; if m != none { } else { } }` with m narrowed in the first
+   block, so lowering reads a `let` and an `if`. The `else` is checked
+   before m is declared, so it does not see m. */
+void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t)
 {
     struct switch_arm *arm = &s->as.switch_stmt.arms[0];
     struct expr *value = s->as.switch_stmt.value;

@@ -8,11 +8,24 @@
 #include "types.h"
 #include "lower_lowerer.h"
 
-/* Put the value of e, of type t, at address. */
+/* Whether e is a T that the checker made the `?T` holding it. In a copy
+   of a generic that `?T` may be a `?*U`, which holds the `*U` as it is. */
+static bool wraps(const struct expr *e)
+{
+    return e->to_optional != NULL && e->to_optional->kind == TYPE_OPTIONAL;
+}
+
+/* Put the value of e, of type t, at address. A T that becomes its `?T`
+   is the `?T` there. */
 void lower_store_value(struct lowerer *l, const struct type *t,
                        const struct expr *e, struct ir_operand address)
 {
     struct ir_operand v;
+
+    if (wraps(e)) {
+        lower_build_into(l, e, address);
+        return;
+    }
 
     /* A named function as the default of an `own fn` field is checked
        before the function has its type, so the checker marks no
@@ -333,15 +346,17 @@ static void build_variant(struct lowerer *l, const struct expr *e,
     }
 }
 
+static void build_value_into(struct lowerer *l, const struct expr *e,
+                             struct ir_operand dest);
+static struct ir_operand lower_converted(struct lowerer *l,
+                                         const struct expr *e);
+
 /* Construct the aggregate value of e at dest. A literal fills its fields
    or elements in place, and any other value is copied. */
 void lower_build_into(struct lowerer *l, const struct expr *e,
                       struct ir_operand dest)
 {
-    const struct type *t = e->type;
-    const struct type *owner;
     struct ir_operand src;
-    size_t i;
 
     /* A plain function in the place of two words, or a `keep own`
        parameter that moves, is a pair lower_expr builds. */
@@ -351,24 +366,36 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
                    ir_aggregate(lower_agg_of(l, e->type)));
         return;
     }
-    switch (e->kind) {
-    /* `none` of a match writes zero into every field, its pattern
-       first. A text of a `ByteMatch` is a `[]byte`, two words as a `str`
-       is. */
-    case EXPR_NONE:
-        for (i = 0; i < t->field_count; i++) {
-            const struct struct_field *f = &t->fields[i];
-            struct ir_operand at = lower_offset_address(
-                l, dest, lower_field_offset(l, t, &f->name));
-            enum ir_type word = lower_ir_type_of(f->type);
-            if (f->type->kind == TYPE_STR || f->type->kind == TYPE_SLICE) {
-                ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
-                at = lower_offset_address(
-                    l, at, lower_field_offset(l, f->type, &lower_len_name));
-                word = IR_I64;
-            }
-            ir_store(l->f, l->b, word, ir_int_op(word, 0), at);
+    /* A T where a `?T` is expected is built in place, and the flag is
+       written after it. */
+    if (wraps(e)) {
+        if (e->to_iface != NULL || !lower_is_aggregate(e->type)) {
+            ir_store(l->f, l->b, lower_ir_type_of(e->type),
+                     lower_converted(l, e), dest);
+        } else {
+            build_value_into(l, e, dest);
         }
+        if (l->b != NULL) {
+            lower_set_optional(l, e->to_optional, e->type, dest, 1);
+        }
+        return;
+    }
+    build_value_into(l, e, dest);
+}
+
+/* The value of e, of its own type, written to dest. */
+static void build_value_into(struct lowerer *l, const struct expr *e,
+                             struct ir_operand dest)
+{
+    const struct type *t = e->type;
+    const struct type *owner;
+    struct ir_operand src;
+    size_t i;
+
+    switch (e->kind) {
+    /* `none` of a `?T` writes its flag, and the value stays as it is. */
+    case EXPR_NONE:
+        lower_set_optional(l, t, NULL, dest, 0);
         break;
     /* `T(args)` and `alloc T(args)` build the object in place and run
        its `construct` with the arguments. */
@@ -917,7 +944,8 @@ struct ir_operand lower_address(struct lowerer *l,
         return lower_simd_cast(l, e);
     }
     if (e->kind == EXPR_BINARY && e->as.binary.op == TOKEN_QUESTION_QUESTION &&
-        lower_none_in_first_word(e->type)) {
+        (lower_none_in_first_word(e->type) ||
+         e->as.binary.left->type->kind == TYPE_OPTIONAL)) {
         return coalesce(l, e);
     }
     switch (e->kind) {
@@ -968,11 +996,11 @@ struct ir_operand lower_address(struct lowerer *l,
                               ir_int_op(IR_PTR, 0));
         }
         slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
-        lower_build_into(l, e, lower_temp(l, slot));
+        build_value_into(l, e, lower_temp(l, slot));
         return lower_temp(l, slot);
     default:
         slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
-        lower_build_into(l, e, lower_temp(l, slot));
+        build_value_into(l, e, lower_temp(l, slot));
         return lower_temp(l, slot);
     }
 }
@@ -1104,8 +1132,64 @@ static struct ir_operand short_circuit(struct lowerer *l, const struct expr *e)
 
 /* p ?? q as a value. The result is p when it is not `none`, and q
    otherwise, which runs only then. */
+/* DESIGN: `o ?? v` of a `?T` gives the value o holds when its flag is
+   set and v otherwise. The value lies at offset 0 of o, so the result
+   reads it there. The result has a slot of its own, so a later write to
+   o leaves it as it is. */
+static struct ir_operand coalesce_value(struct lowerer *l,
+                                        const struct expr *e)
+{
+    const struct type *t = e->type;
+    const struct type *from = e->as.binary.left->type;
+    struct ir_operand left = lower_expr(l, e->as.binary.left);
+    struct ir_operand held = lower_optional_flag(l, from, left);
+    struct ir_block *have = lower_new_block(l);
+    struct ir_block *rest = lower_new_block(l);
+    struct ir_block *join = lower_new_block(l);
+    struct ir_operand slot;
+    uint32_t result = 0;
+
+    if (lower_is_aggregate(t)) {
+        slot = lower_temp(l, ir_entry_slot(l->f, lower_vtype_of(l, t)));
+    } else {
+        result = ir_unary(l->f, l->b, IR_COPY, lower_ir_type_of(t),
+                          ir_int_op(lower_ir_type_of(t), 0));
+        slot = lower_none();
+    }
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, held,
+                                      ir_int_op(IR_I8, 0))),
+              have, rest);
+    l->b = have;
+    if (result == 0) {
+        ir_memcopy(l->f, l->b, slot, left, lower_vtype_of(l, t));
+    } else {
+        ir_assign(l->f, l->b, result,
+                  lower_temp(l, ir_load(l->f, l->b, lower_ir_type_of(t),
+                                        left)));
+    }
+    ir_jump(l->f, l->b, join);
+    l->b = rest;
+    if (result == 0) {
+        lower_build_into(l, e->as.binary.right, slot);
+    } else {
+        struct ir_operand v = lower_expr(l, e->as.binary.right);
+        if (l->b != NULL) {
+            ir_assign(l->f, l->b, result, v);
+        }
+    }
+    if (l->b != NULL) {
+        ir_jump(l->f, l->b, join);
+    }
+    l->b = join;
+    return result == 0 ? slot : lower_temp(l, result);
+}
+
 static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
 {
+    if (e->as.binary.left->type->kind == TYPE_OPTIONAL) {
+        return coalesce_value(l, e);
+    }
     /* Of two functions with their context, the result is the address of
        the pair it takes, and the test reads the code. */
     bool pair = lower_none_in_first_word(e->type);
@@ -1139,9 +1223,12 @@ static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
 /* p?.x and p?.f(args) as a value. The field or the call reads the local
    the checker bound to p, and runs only when p is not `none`. The result
    is `none` otherwise. */
+/* DESIGN: a `?T` of a value as the base of `?.` binds the address of
+   the value it holds, and its flag decides. */
 static struct ir_operand lower_optional(struct lowerer *l,
                                         const struct expr *e)
 {
+    const struct type *base = e->as.optional.base->type;
     enum ir_type type = lower_ir_type_of(e->type);
     struct ir_operand p = lower_expr(l, e->as.optional.base);
     struct ir_operand v;
@@ -1152,8 +1239,12 @@ static struct ir_operand lower_optional(struct lowerer *l,
 
     lower_bind_value(l, e->as.optional.bound, p);
     result = ir_unary(l->f, l->b, IR_COPY, type, ir_int_op(type, 0));
-    is_none = lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, p,
-                                      ir_int_op(IR_PTR, 0)));
+    is_none = base->kind == TYPE_OPTIONAL
+                  ? lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
+                                            lower_optional_flag(l, base, p),
+                                            ir_int_op(IR_I8, 0)))
+                  : lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, p,
+                                            ir_int_op(IR_PTR, 0)));
     rest = lower_new_block(l);
     join = lower_new_block(l);
     ir_branch(l->f, l->b, is_none, join, rest);
@@ -1343,6 +1434,19 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     }
     if (e->as.binary.carry) {
         return lower_carry(l, e);
+    }
+    /* A `?T` of a value compares with `none` by its flag. */
+    if ((op == TOKEN_EQ || op == TOKEN_NE) &&
+        (e->as.binary.left->type->kind == TYPE_OPTIONAL ||
+         e->as.binary.right->type->kind == TYPE_OPTIONAL)) {
+        const struct expr *value = e->as.binary.left->kind == EXPR_NONE
+                                       ? e->as.binary.right
+                                       : e->as.binary.left;
+        struct ir_operand held =
+            lower_optional_flag(l, value->type, lower_expr(l, value));
+        return lower_temp(l, ir_binary(l->f, l->b,
+                                       op == TOKEN_EQ ? IR_EQ : IR_NE, IR_I8,
+                                       held, ir_int_op(IR_I8, 0)));
     }
     left = lower_expr(l, e->as.binary.left);
     right = lower_expr(l, e->as.binary.right);
@@ -2541,11 +2645,41 @@ static struct ir_operand lower_sync_op(struct lowerer *l,
 static struct ir_operand lower_expr_value(struct lowerer *l,
                                          const struct expr *e);
 
+
+/* The `?T` of type t that holds v, a value of type value, in a slot of
+   the frame. */
+static struct ir_operand lower_wrap(struct lowerer *l, const struct type *t,
+                                    const struct type *value,
+                                    struct ir_operand v)
+{
+    struct ir_operand slot =
+        lower_temp(l, ir_entry_slot(l->f, lower_vtype_of(l, t)));
+
+    if (lower_is_aggregate(value)) {
+        ir_memcopy(l->f, l->b, slot, v, lower_vtype_of(l, value));
+    } else {
+        ir_store(l->f, l->b, lower_ir_type_of(value), v, slot);
+    }
+    lower_set_optional(l, t, value, slot, 1);
+    return slot;
+}
+
+struct ir_operand lower_expr(struct lowerer *l, const struct expr *e)
+{
+    struct ir_operand v = lower_converted(l, e);
+
+    if (!wraps(e) || l->b == NULL) {
+        return v;
+    }
+    return lower_wrap(l, e->to_optional, e->type, v);
+}
+
 /* DESIGN: a pointer to a class becomes a pointer to one of its
    interfaces by adding the offset of the sub-object. The checker marked
    the expression, and every place a value flows into an interface slot
    passes through here. */
-struct ir_operand lower_expr(struct lowerer *l, const struct expr *e)
+static struct ir_operand lower_converted(struct lowerer *l,
+                                         const struct expr *e)
 {
     struct ir_operand v = lower_expr_value(l, e);
 

@@ -103,7 +103,7 @@ bool type_is_nullable(const struct type *t)
 {
     return t != NULL &&
            (t->kind == TYPE_POINTER || t->kind == TYPE_FN ||
-            types_is_match(t)) &&
+            t->kind == TYPE_OPTIONAL) &&
            t->nullable;
 }
 
@@ -114,8 +114,8 @@ struct type *types_without_none(struct types *types, struct type *t)
     if (!type_is_nullable(t)) {
         return t;
     }
-    if (types_is_match(t)) {
-        return t->twin;
+    if (t->kind == TYPE_OPTIONAL) {
+        return t->element;
     }
     key = *t;
     key.nullable = false;
@@ -123,16 +123,49 @@ struct type *types_without_none(struct types *types, struct type *t)
     return find_or_add(types, &key);
 }
 
+/* DESIGN: `?T` is the value and then a flag byte, which C lays out as a
+   struct of the two. The fields carry the names the C header gives them,
+   and the checker never looks them up. */
+static struct type *optional_of(struct types *types, struct type *element)
+{
+    struct struct_field fields[2];
+    struct type key = {0};
+    struct type *t;
+
+    for (t = types->derived; t != NULL; t = t->next) {
+        if (t->kind == TYPE_OPTIONAL && t->element == element) {
+            return t;
+        }
+    }
+    key.kind = TYPE_OPTIONAL;
+    key.element = element;
+    key.nullable = true;
+    t = arena_alloc(types->arena, sizeof *t);
+    *t = key;
+    memset(fields, 0, sizeof fields);
+    fields[0].name.text = OPTIONAL_VALUE;
+    fields[0].name.length = sizeof OPTIONAL_VALUE - 1;
+    fields[0].type = element;
+    fields[0].vis = VIS_PUB;
+    fields[1].name.text = OPTIONAL_HAS;
+    fields[1].name.length = sizeof OPTIONAL_HAS - 1;
+    fields[1].type = types_builtin(types, TYPE_BOOL);
+    fields[1].vis = VIS_PUB;
+    t->next = types->derived;
+    types->derived = t;
+    types_set_fields(types, t, fields, 2);
+    return t;
+}
+
 struct type *types_with_none(struct types *types, struct type *t)
 {
     struct type key;
 
-    if (t != NULL && types_is_match(t) && !t->nullable) {
-        return t->twin;
-    }
-    if (t == NULL || type_is_nullable(t) ||
-        (t->kind != TYPE_POINTER && t->kind != TYPE_FN)) {
+    if (t == NULL || t->kind == TYPE_ERROR) {
         return t;
+    }
+    if ((t->kind != TYPE_POINTER && t->kind != TYPE_FN) || t->nullable) {
+        return optional_of(types, t);
     }
     key = *t;
     key.nullable = true;
@@ -860,13 +893,11 @@ static struct type *match_form(struct types *types,
               : types_builtin(types, TYPE_STR);
     struct type *word = types_builtin(types, TYPE_I64);
     struct type *plain;
-    struct type *maybe;
     struct type *t;
     size_t i;
 
     for (t = types->derived; t != NULL; t = t->next) {
-        if (types_is_match(t) && !t->nullable &&
-            types_is_byte_match(t) == bytes &&
+        if (types_is_match(t) && types_is_byte_match(t) == bytes &&
             same_literal(t->pattern, pattern)) {
             return t;
         }
@@ -886,13 +917,7 @@ static struct type *match_form(struct types *types,
     fields[7].type = word;
     plain = match_struct(types, bytes ? LANG_BYTE_MATCH : LANG_MATCH, fields,
                          i);
-    maybe = match_struct(types, bytes ? LANG_BYTE_MATCH_NONE : LANG_MATCH_NONE,
-                         fields, i);
     plain->pattern = pattern;
-    maybe->pattern = pattern;
-    maybe->nullable = true;
-    plain->twin = maybe;
-    maybe->twin = plain;
     if (pattern == NULL) {
         if (bytes) {
             types->byte_match = plain;
@@ -917,26 +942,28 @@ struct type *types_match_of(struct types *types, bool bytes)
 
 bool types_is_match(const struct type *t)
 {
-    return lang_item(t, TYPE_STRUCT, LANG_MATCH) ||
-           lang_item(t, TYPE_STRUCT, LANG_MATCH_NONE) ||
-           types_is_byte_match(t);
+    return lang_item(t, TYPE_STRUCT, LANG_MATCH) || types_is_byte_match(t);
+}
+
+bool types_is_maybe_match(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_OPTIONAL && types_is_match(t->element);
 }
 
 bool types_is_byte_match(const struct type *t)
 {
-    return lang_item(t, TYPE_STRUCT, LANG_BYTE_MATCH) ||
-           lang_item(t, TYPE_STRUCT, LANG_BYTE_MATCH_NONE);
+    return lang_item(t, TYPE_STRUCT, LANG_BYTE_MATCH);
 }
 
 struct type *types_match_plain(struct types *types, struct type *t)
 {
-    struct type *plain;
-
+    if (types_is_maybe_match(t)) {
+        return types_with_none(types, types_match_plain(types, t->element));
+    }
     if (t->pattern == NULL) {
         return t;
     }
-    plain = types_match_of(types, types_is_byte_match(t));
-    return t->nullable ? plain->twin : plain;
+    return types_match_of(types, types_is_byte_match(t));
 }
 
 bool types_is_mutex(const struct type *t)
@@ -1437,6 +1464,10 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         }
         return;
     }
+    case TYPE_OPTIONAL:
+        text_append(out, "?");
+        print_type(out, t->element, qualified);
+        return;
     case TYPE_TUPLE:
         text_append(out, "(");
         for (i = 0; i < t->param_count; i++) {
@@ -1514,7 +1545,8 @@ bool type_is_integer(const struct type *t)
 bool type_has_fields(const struct type *t)
 {
     return t != NULL && (t->kind == TYPE_STRUCT || t->kind == TYPE_CLASS ||
-                         t->kind == TYPE_TUPLE || t->kind == TYPE_VARIANT);
+                         t->kind == TYPE_TUPLE || t->kind == TYPE_VARIANT ||
+                         t->kind == TYPE_OPTIONAL);
 }
 
 bool type_field_is_unit_break(const struct struct_field *f)
@@ -1573,6 +1605,7 @@ bool type_pointer_free(const struct type *t)
     case TYPE_FN:
         return false;
     case TYPE_ARRAY:
+    case TYPE_OPTIONAL:
         return type_pointer_free(t->element);
     case TYPE_STRUCT:
     case TYPE_CLASS:

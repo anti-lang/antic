@@ -729,21 +729,12 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
     switch (t->kind) {
     case TYPEX_BUILTIN:
         return builtin_of_token(c, t->builtin);
+    /* `?T` of any type. Before a pointer or a function type it is the
+       `?*T` or `?fn(...)` that holds `none` as zero, and before a type
+       that may already be `none` it is a `?T` of its own. */
+    case TYPEX_OPTIONAL:
+        return types_with_none(c->types, sema_resolve_type(c, t->element));
     case TYPEX_NAMED:
-        /* `?` stands before a name for a match alone, since a match is
-           the one value that is not a pointer and may be `none`. */
-        if (t->nullable) {
-            struct type_expr bare = *t;
-            struct type *named;
-            bare.nullable = false;
-            named = sema_resolve_type(c, &bare);
-            if (sema_is_error(named) || types_is_match(named)) {
-                return types_with_none(c->types, named);
-            }
-            sema_error_at(c, t->pos, "`?` stands before `*T`, `fn(...)`, "
-                          "`Match` or `ByteMatch`, found `%s`", sema_tn(named));
-            return sema_builtin(c, TYPE_ERROR);
-        }
         if (t->module.length > 0) {
             struct type *imported =
                 sema_imported_struct(c, &t->module, &t->name, t->pos);

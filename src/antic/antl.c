@@ -13,7 +13,7 @@
    fail when one of them changes, and the version changes with it. */
 _Static_assert(TYPE_STRUCT == 24, "raise ANTL_VERSION, then update this");
 _Static_assert(TYPE_VARIANT == 28, "raise ANTL_VERSION, then update this");
-_Static_assert(TYPE_PARAM == 29, "raise ANTL_VERSION, then update this");
+_Static_assert(TYPE_OPTIONAL == 30, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOL_CONSTRAINT == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
 _Static_assert(SYMBOLIC_CAST == 4, "raise ANTL_VERSION, then update this");
@@ -104,7 +104,8 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
 {
     const char *module = w->iface->module;
 
-    if ((t->kind == TYPE_CLASS && t->base == NULL) || types_is_job(t) ||
+    if ((t->kind == TYPE_CLASS && t->base == NULL) ||
+        t->kind == TYPE_OPTIONAL || types_is_job(t) ||
         types_is_flags(t) || types_is_mutex(t) || types_is_chan(t) ||
         types_is_regex(t) || types_is_match(t) || types_is_object_lock(t) ||
         types_is_field_descriptor(t)) {
@@ -272,6 +273,7 @@ static void visit_type(struct writer *w, const struct type *t)
         break;
     case TYPE_POINTER:
     case TYPE_SLICE:
+    case TYPE_OPTIONAL:
         visit_type(w, t->element);
         break;
     case TYPE_FN:
@@ -468,7 +470,9 @@ static void put_type(struct writer *w, const struct type *t)
            one reads which of them a signature names. */
         put_u8(w, t->nullable);
         break;
+    /* `?T` is its value type alone, since one element makes one. */
     case TYPE_SLICE:
+    case TYPE_OPTIONAL:
         put_type_ref(w, t->element);
         break;
     case TYPE_ARRAY:
@@ -1920,6 +1924,20 @@ static void read_types(struct reader *r)
                 t = types_slice(r->types, t);
             }
             break;
+        /* The element of a `?T` is never a `*U` or a `fn(...)`, which
+           would make a `?*U` of it. */
+        case TYPE_OPTIONAL:
+            t = type_ref(r, i);
+            if (t != NULL &&
+                ((t->kind == TYPE_POINTER || t->kind == TYPE_FN) &&
+                 !t->nullable)) {
+                damaged(r);
+                t = NULL;
+            }
+            if (t != NULL) {
+                t = types_with_none(r->types, t);
+            }
+            break;
         case TYPE_ARRAY: {
             struct type *element = type_ref(r, i);
             if (get_u8(r) != 0) {
@@ -2041,21 +2059,11 @@ static void read_types(struct reader *r)
                 t = types_match_of(r->types, true);
                 break;
             }
-            if (kind == TYPE_STRUCT &&
-                names_lang(&module, &name, LANG_BYTE_MATCH_NONE)) {
-                t = types_with_none(r->types, types_match_of(r->types, true));
-                break;
-            }
             /* A match of a literal is written as the plain match of its
                form, since the literal stays in the module that wrote
                it. */
             if (kind == TYPE_STRUCT && names_lang(&module, &name, LANG_MATCH)) {
                 t = types_match(r->types, NULL);
-                break;
-            }
-            if (kind == TYPE_STRUCT &&
-                names_lang(&module, &name, LANG_MATCH_NONE)) {
-                t = types_with_none(r->types, types_match(r->types, NULL));
                 break;
             }
             if (kind == TYPE_STRUCT &&

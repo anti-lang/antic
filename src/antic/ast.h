@@ -39,7 +39,8 @@ enum type_expr_kind {
     TYPEX_FN,       /* fn(T, U) -> R */
     TYPEX_TUPLE,    /* (int, str) */
     TYPEX_CHAN,     /* chan T */
-    TYPEX_CONST     /* 1024 */
+    TYPEX_CONST,    /* 1024 */
+    TYPEX_OPTIONAL  /* ?T */
 };
 
 struct type_expr {
@@ -52,8 +53,8 @@ struct type_expr {
        module and variant stand in module and name. Empty otherwise. */
     struct name member;
     struct type_expr *element;      /* TYPEX_POINTER, TYPEX_ARRAY, TYPEX_SLICE,
-                                       TYPEX_CHAN */
-    /* TYPEX_POINTER: `?*T`, and TYPEX_NAMED: `?Match` */
+                                       TYPEX_CHAN, TYPEX_OPTIONAL */
+    /* TYPEX_POINTER: `?*T`, and TYPEX_FN: `?fn(...)` */
     bool nullable;
     struct expr *length;            /* TYPEX_ARRAY, TYPEX_CONST */
     struct type_expr **params;      /* TYPEX_FN, TYPEX_TUPLE */
@@ -249,6 +250,12 @@ struct expr {
     /* A plain function where the form of two words is expected. Lowering
        pairs the code with the context `none`. Set by the checker. */
     bool to_context;
+    /* DESIGN: a T where a `?T` is expected becomes the `?T` that holds
+       it. The checker records the `?T` here and lowering writes the value
+       and the flag. The type stays T, so every rule of the value applies
+       to the expression. In a copy of a generic the `?T` may be a `?*U`,
+       which holds a `*U` as it is, and lowering then writes nothing. */
+    struct type *to_optional;
     /* EXPR_NAME: a `keep own` parameter that moves into an owner, which
        lowering then clears, so its exits free nothing. */
     bool moves_snapshot;

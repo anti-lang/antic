@@ -67,7 +67,16 @@ enum type_kind {
        the same type. It meets the hooks and the interfaces of its
        constraints and nothing else. The passes after the checker never
        see one, since a copy of the generic replaces every parameter. */
-    TYPE_PARAM
+    TYPE_PARAM,
+    /* DESIGN: `?T` of a value type, a T or `none`. It is a struct of the
+       value and one flag byte with C layout, `value` at offset 0 and `has`
+       after it, padded to the alignment of T. element is the T. `?*T` and
+       `?fn(...)` stay the pointer that may hold `none`, so `?` before a
+       pointer or a function type never makes one of these. Every rule of
+       layout, passing and returning is the struct's, so the passes after
+       the checker see a struct. The checker never gives out its fields: a
+       program reads the value after a test proves it is there. */
+    TYPE_OPTIONAL
 };
 
 struct struct_field {
@@ -232,14 +241,12 @@ struct type {
     struct type *mask;              /* TYPE_STRUCT, simd: its mask, or NULL */
 
     /* DESIGN: a match of a pattern is the struct `Match` of `anti.lang`,
-       and a result that may be `none` is its twin `?Match`, a second
-       struct of the same fields whose first word is zero for `none`. A
-       match found with a pattern literal carries the literal, so its
-       groups are fields the checker knows. Every such struct is one type
-       per literal and per form, and each converts to the plain `Match`
-       of its form, since all of them have one layout. */
+       and a result that may be `none` is its `?Match`, a `?T` as any
+       other. A match found with a pattern literal carries the literal, so
+       its groups are fields the checker knows. Every such struct is one
+       type per literal, and each converts to the plain `Match` of its
+       form, since all of them have one layout. */
     const struct expr *pattern;     /* Match: the literal, or NULL */
-    struct type *twin;              /* Match: the other form of it */
 
     /* DESIGN: generics. A generic struct, class or variant holds its
        type parameters. A copy of it names the generic and holds the
@@ -321,11 +328,15 @@ struct type *types_pointer_nullable(struct types *types,
 /* Either of the two, for a caller that carries the answer in a value. */
 struct type *types_pointer_of(struct types *types, struct type *element,
                               bool nullable);
-/* Whether t is `?*T`, `?fn(...)` or `?Match`. */
+/* Whether t is `?*T`, `?fn(...)` or `?T` of a value type. */
 bool type_is_nullable(const struct type *t);
-/* The same type without `none`: `*T` of a `?*T`, `fn()` of a `?fn()`. */
+/* The same type without `none`: `*T` of a `?*T`, `fn()` of a `?fn()`, T
+   of a `?T`. */
 struct type *types_without_none(struct types *types, struct type *t);
-/* The same type with `none`, for a pointer or a function type. */
+/* The same type with `none`: `?*T` of a `*T`, `?fn()` of a `fn()`, and
+   `?T` of any other type. A type that already holds `none` makes a `?T`
+   of its own, so `?T` of a `?*U` still tells the two `none` apart. The
+   error type stays itself. */
 struct type *types_with_none(struct types *types, struct type *t);
 struct type *types_array(struct types *types, struct type *element,
                          uint64_t length);
@@ -455,21 +466,23 @@ struct type *types_object(struct types *types);
 /* The runtime function that compiles one pattern literal before main,
    which IR_PATTERNS_START of each module calls. */
 #define REGEX_LITERAL "anti_rt_regex_literal"
+/* The fields of a `?T`, as the C header names them: the value and the
+   flag that says it is there. */
+#define OPTIONAL_VALUE "value"
+#define OPTIONAL_HAS "has"
 /* DESIGN: `Match` is the built-in struct of a match of a pattern, which
    the compiler declares in `anti.lang` as it does `Regex`. Its first
-   field is the pattern that found it, zero in a `?Match` that is `none`,
-   so the test of a match reads one word as the test of a pointer does.
-   The fields a program reads follow, and then the search that found the
-   match, from which `group` finds the groups again. The hidden fields
-   have names the lexer never reads. The methods of `str` are functions
-   of `anti.regex`, which the checker calls in their place. */
+   field is the pattern that found it. The fields a program reads follow,
+   and then the search that found the match, from which `group` finds the
+   groups again. The hidden fields have names the lexer never reads. A
+   match that may be `none` is a `?Match`, the match and its flag. The
+   methods of `str` are functions of `anti.regex`, which the checker calls
+   in their place. */
 #define LANG_MATCH "Match"
-#define LANG_MATCH_NONE "?Match"
 /* DESIGN: `ByteMatch` is the match of a byte pattern. It has the fields of
    a `Match` in the same order, and `all`, `pre`, `post` and its groups are
    `[]byte` slices of the searched data. */
 #define LANG_BYTE_MATCH "ByteMatch"
-#define LANG_BYTE_MATCH_NONE "?ByteMatch"
 #define MATCH_PATTERN "(pattern)"
 #define MATCH_ALL "all"
 #define MATCH_PRE "pre"
@@ -631,12 +644,13 @@ bool types_is_byte_regex(const struct type *t);
 struct type *types_match(struct types *types, const struct expr *pattern);
 /* The plain `Match`, or the plain `ByteMatch` when bytes holds. */
 struct type *types_match_of(struct types *types, bool bytes);
-/* Whether t is a `Match`, a `ByteMatch` or either with `?`, of any
-   literal. */
+/* Whether t is a `Match` or a `ByteMatch` of any literal. */
 bool types_is_match(const struct type *t);
-/* Whether t is a `ByteMatch` or a `?ByteMatch`. */
+/* Whether t is a `?Match` or a `?ByteMatch` of any literal. */
+bool types_is_maybe_match(const struct type *t);
+/* Whether t is a `ByteMatch` of any literal. */
 bool types_is_byte_match(const struct type *t);
-/* The match t without its literal, in the same form. */
+/* The match t without its literal, a `?Match` for a `?Match`. */
 struct type *types_match_plain(struct types *types, struct type *t);
 /* `chan T`, one per element type. */
 struct type *types_chan(struct types *types, struct type *element);

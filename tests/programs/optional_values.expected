@@ -1,0 +1,35 @@
+exit 0
+sizes 16 2 8 24 8
+find 5 1
+find 4 none
+narrowed 8
+compound 5
+assigned none
+coalesced -1
+if let 2
+if let none
+let else 1 2
+guarded 0
+the pointer is none
+yielded 70
+parsed 42
+parsed empty none
+parsed bad none
+tuple 1 one
+text empty
+bool false
+link 9
+bumped 8
+again 9
+kept 9
+first 3
+first of empty none
+first word alpha
+slot 3 4
+pointer first 8
+pointer first 5
+owners made
+owner 1 torn down
+shelf holds one
+owner 2 torn down
+owner 2 torn down

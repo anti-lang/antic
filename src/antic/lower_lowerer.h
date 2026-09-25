@@ -242,8 +242,16 @@ const struct ir_function *lower_fatal_signature(struct lowerer *l);
 const struct ir_function *lower_provider_signature(struct lowerer *l);
 bool lower_is_context(const struct type *t);
 /* Whether t is an aggregate that may be `none`, which its first word
-   says: a function with its context and a `?Match`. */
+   says: a function with its context. */
 bool lower_none_in_first_word(const struct type *t);
+/* The flag byte of the `?T` of type t at address, as an I8. */
+struct ir_operand lower_optional_flag(struct lowerer *l, const struct type *t,
+                                      struct ir_operand address);
+/* Write the flag of the `?T` of type t at address, and of each `?T`
+   inside it down to the type value that stands at offset 0. */
+void lower_set_optional(struct lowerer *l, const struct type *t,
+                        const struct type *value, struct ir_operand address,
+                        int flag);
 const struct ir_function *lower_context_signature(struct lowerer *l,
                                                   const struct type *t);
 void lower_push_argument(struct lowerer *l, struct ir_operand *args,
@@ -462,6 +470,8 @@ struct ir_operand lower_simd(struct lowerer *l, const struct expr *e);
 void lower_push_leave_action(struct lowerer *l);
 void lower_push_snapshot_action(struct lowerer *l, const struct symbol *param);
 bool lower_type_needs_destruct(const struct type *t);
+/* Whether t is a `?T` of a class value that needs the teardown. */
+bool lower_optional_needs_destruct(const struct type *t);
 void lower_clear_tables(struct lowerer *l, struct ir_operand base,
                         const struct type *t);
 void lower_handle_error(struct lowerer *l, const struct expr *call,

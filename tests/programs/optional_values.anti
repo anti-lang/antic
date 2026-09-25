@@ -1,0 +1,251 @@
+//! The rules of "Optional values" at run time.
+//!
+//! `?T` is a T or `none` for a value of any type, the value and one flag byte.
+//! It compares with `none`, narrows after a test, and works with `if let`,
+//! `??`, `?.` and the `else` of a `let`. `?*T` stays one pointer.
+
+import anti.io;
+import anti.text;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// A link of a chain, whose last link has no next.
+struct Link
+{
+	value: int,
+	next: ?*Link,
+}
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn bump(self) -> *Counter
+	{
+		self.n += 1;
+		return self;
+	}
+}
+
+/// A counter with memory of its own, torn down with what holds it.
+class Owner
+{
+	pub own name: ?*byte = none,
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		io.println(f"owner {self.n} torn down");
+	}
+}
+
+/// A class that holds an optional class value.
+class Shelf
+{
+	pub top: ?Owner = none,
+}
+
+fn find(xs: []int, want: int) -> ?int
+{
+	for i, x in xs {
+		if x == want {
+			return i;
+		}
+	}
+	return none;
+}
+
+fn origin(near: bool) -> ?Point
+{
+	if near {
+		return Point { x: 1, y: 2 };
+	}
+	return none;
+}
+
+fn counter(made: bool) -> ?Counter
+{
+	if made {
+		return Counter { n: 7 };
+	}
+	return none;
+}
+
+/// The first element, a `?T` of a type parameter.
+fn first<T>(xs: []T) -> ?T
+{
+	if xs.len == 0 {
+		return none;
+	}
+	return xs[0];
+}
+
+/// A generic struct whose field may hold nothing.
+struct Slot<T>
+{
+	value: ?T,
+}
+
+fn fill<T>(v: T) -> Slot<T>
+{
+	return Slot { value: v };
+}
+
+/// A failing function whose result may be `none` as well.
+fn parsed(s: str) -> ?int may fail
+{
+	if s.len == 0 {
+		return none;
+	}
+	if s.len == 3 {
+		fail "not a number";
+	}
+	return 42;
+}
+
+fn show(label: str, n: ?int)
+{
+	if n != none {
+		io.println(f"{label} {n}");
+	} else {
+		io.println(f"{label} none");
+	}
+}
+
+fn main() -> int
+{
+	/* Each `?T` of a value is the value and a flag byte, padded to the
+	   alignment of the value. `?*T` stays one pointer. */
+	io.println(f"sizes {size_of(?int)} {size_of(?u8)} {size_of(?i32)} {size_of(?Point)} {size_of(?*int)}");
+	if size_of(?Match) != size_of(Match) + 8 {
+		return 1;
+	}
+
+	/* A value converts to its `?T`, `none` is the other value, and a
+	   test narrows the name. */
+	let items = [3, 5, 8];
+	show("find 5", find(items[0..3], 5));
+	show("find 4", find(items[0..3], 4));
+	let n: ?int = 4;
+	if n == none {
+		return 2;
+	}
+	let doubled = n * 2;
+	io.println(f"narrowed {doubled}");
+	n += 1;
+	io.println(f"compound {n}");
+	n = none;
+	show("assigned", n);
+
+	/* `??` gives the value or the other side, `if let` binds the value,
+	   and `let ... else` leaves the block where there is none. */
+	let age = find(items[0..3], 9) ?? -1;
+	io.println(f"coalesced {age}");
+	if let at = find(items[0..3], 8) {
+		io.println(f"if let {at}");
+	} else {
+		return 3;
+	}
+	if let at = find(items[0..3], 1) {
+		return 4;
+	} else {
+		io.println("if let none");
+	}
+	let p = origin(true) else { return 5; };
+	io.println(f"let else {p.x} {p.y}");
+
+	/* `catch` guards a `?T` as it guards a `?*T`, and a failing call
+	   that gives a `?T` counts a failure as `none` with `catch none`. */
+	let guarded = find(items[0..3], 3) catch fatal;
+	io.println(f"guarded {guarded}");
+	let yielded = find(items[0..3], 7) catch e {
+		io.println(e.message);
+		yield 70;
+	};
+	io.println(f"yielded {yielded}");
+	let one = parsed("1") catch none;
+	show("parsed", one);
+	let blank = parsed("") catch none;
+	show("parsed empty", blank);
+	let bad = parsed("bad") catch none;
+	show("parsed bad", bad);
+
+	/* A `?T` of a tuple, a text and a `bool`. */
+	let pair: ?(int, str) = (1, "one");
+	if let both = pair {
+		io.println(f"tuple {both.0} {both.1}");
+	}
+	let text: ?str = none;
+	let shown = text ?? "empty";
+	io.println(f"text {shown}");
+	let flag: ?bool = false;
+	if let f = flag {
+		io.println(f"bool {f}");
+	}
+
+	/* `?.` on a `?T` of a struct gives the `?*U` of a pointer field. */
+	let tail = alloc Link { value: 9, next: none };
+	let head: ?Link = Link { value: 8, next: tail };
+	let missing: ?Link = none;
+	let after = head?.next else { return 6; };
+	io.println(f"link {after.value}");
+	if missing?.next != none {
+		return 7;
+	}
+	free(tail);
+
+	/* A `?T` of a class value, called through `?.` in place. */
+	let c = counter(true);
+	let bumped = c?.bump() else { return 8; };
+	io.println(f"bumped {bumped.n}");
+	let again = c?.bump() else { return 9; };
+	io.println(f"again {again.n}");
+	let none_counter = counter(false);
+	if none_counter?.bump() != none || none_counter != none {
+		return 10;
+	}
+	let kept = c else { return 11; };
+	io.println(f"kept {kept.n}");
+
+	/* A `?T` of a type parameter, in a function and in a struct. */
+	show("first", first(items[0..3]));
+	let empty: []int = items[0..0];
+	show("first of empty", first(empty));
+	let words = ["alpha", "beta"];
+	let word = first(words[0..2]) ?? "none";
+	io.println(f"first word {word}");
+	let slot = fill(Point { x: 3, y: 4 });
+	if let q = slot.value {
+		io.println(f"slot {q.x} {q.y}");
+	}
+	let nodes: [1]*Point = [alloc Point { x: 5, y: 6 }];
+	let pointer_first = first(nodes[0..1]);
+	io.println(f"pointer first {size_of(?*Point)}");
+	if pointer_first != none {
+		io.println(f"pointer first {pointer_first.x}");
+		free(pointer_first);
+	}
+
+	/* A `?T` of a class value that owns memory is torn down when it holds
+	   one. */
+	{
+		let o: ?Owner = Owner { n: 1, name: alloc(byte, 8) };
+		let nothing: ?Owner = none;
+		if nothing == none && o != none {
+			io.println("owners made");
+		}
+	}
+	{
+		let shelf = Shelf { top: Owner { n: 2, name: alloc(byte, 8) } };
+		if shelf.top != none {
+			io.println("shelf holds one");
+		}
+		let copy = dup(&shelf);
+		delete(copy);
+	}
+	return 0;
+}

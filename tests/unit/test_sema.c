@@ -492,7 +492,7 @@ void test_sema(void)
     rejects("fn f() { let x: int = 1.5; }", 1, 23,
             "expected `int`, found a float literal");
     rejects("fn f() { let p = none; }", 1, 18,
-            "`none` needs a pointer type from its context");
+            "`none` needs a type that may be `none` from its context");
     rejects("fn f(a: u8) { let b = -a; }", 1, 23,
             "unary `-` needs a signed integer or a float, found `byte`");
 

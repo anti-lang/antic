@@ -10,7 +10,7 @@
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, simd,
 #             classes, failing, tuples, flags, ledger, variants, nested,
-#             names, handlers or generics
+#             names, handlers, generics or optional
 #   CC        the C compiler of the build, with its options
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
@@ -203,6 +203,17 @@ elseif(CASE STREQUAL "tuples")
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/tuples${EXE}")
     expect_output("${dir}/tuples${EXE}" "${SOURCES}/tuples.expected")
+elseif(CASE STREQUAL "optional")
+    # A `?T` of an exported signature crosses as the struct of the value
+    # and a bool that the header writes for it, one per T.
+    library(optional static "${dir}")
+    expect_header("${dir}/optional.h" optional.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/optional.c"
+        "${library_file}" "${runtime_library}" ${LINK}
+        -o "${dir}/optional${EXE}")
+    expect_output("${dir}/optional${EXE}" "${SOURCES}/optional.expected")
 elseif(CASE STREQUAL "simd")
     # A simd struct of 16 bytes crosses as the vector type of C, which
     # the header writes per architecture, and one of another size as the

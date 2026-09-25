@@ -151,8 +151,10 @@ static bool type_names_error(const struct type *t)
 /* DESIGN: a tuple has no name of its own, so the header makes one from
    its elements: `(int, str)` becomes `anti_tuple_int_str`. A pointer
    writes `ptr_` before what it points at and a nullable pointer `optr_`,
-   an array its length, and a tuple its own elements. Two tuples of the
-   same elements are one type, so one name stands for one type. */
+   an array its length, and a tuple its own elements. A `?T` of a value
+   has none either, and is `opt_` before its value: `?int` becomes
+   `anti_opt_int`. Two tuples of the same elements are one type, and so
+   are two `?T` of one T, so one name stands for one type. */
 static void element_c_name(struct text *out, const struct type *t)
 {
     size_t i;
@@ -172,6 +174,10 @@ static void element_c_name(struct text *out, const struct type *t)
         return;
     case TYPE_FN:
         text_append(out, "fn");
+        return;
+    case TYPE_OPTIONAL:
+        text_append(out, "opt_");
+        element_c_name(out, t->element);
         return;
     case TYPE_TUPLE:
         text_append(out, "tuple");
@@ -296,6 +302,7 @@ static void declaration(struct text *out, const struct type *t,
         text_appendf(out, "%s%s", name[0] != '\0' ? " " : "", name);
         break;
     case TYPE_TUPLE:
+    case TYPE_OPTIONAL:
         text_append(out, "struct ");
         tuple_c_name(out, t);
         text_appendf(out, "%s%s", name[0] != '\0' ? " " : "", name);
@@ -405,7 +412,7 @@ static void emit_uses(struct text *out, const struct type *t,
     while (t->kind == TYPE_ARRAY) {
         t = t->element;
     }
-    if (t->kind == TYPE_TUPLE) {
+    if (t->kind == TYPE_TUPLE || t->kind == TYPE_OPTIONAL) {
         emit_tuples(out, t, ifaces, count, done);
         return;
     }
@@ -428,8 +435,9 @@ static void emit_uses(struct text *out, const struct type *t,
 
 /* DESIGN: the header writes one struct per distinct tuple of an
    exported signature, because C has no anonymous struct that two
-   translation units agree on. What an element holds by value is written
-   before it, so the definition stands complete. */
+   translation units agree on. A `?T` of a value is the struct of the
+   value and a `bool`, `value` and `has`, one per T. What an element holds
+   by value is written before it, so the definition stands complete. */
 static void tuple_view(struct text *out, const struct type *t,
                        const struct interface *const *ifaces, size_t count,
                        struct emitted *done)
@@ -442,12 +450,13 @@ static void tuple_view(struct text *out, const struct type *t,
         return;
     }
     mark_emitted(done, t);
-    for (i = 0; i < t->param_count; i++) {
-        emit_uses(out, t->params[i], ifaces, count, done);
+    for (i = 0; i < t->field_count; i++) {
+        emit_uses(out, t->fields[i].type, ifaces, count, done);
     }
     tuple_c_name(&tag, t);
     type_name(&written, t);
-    text_appendf(out, "/* The tuple %s. */\nstruct %s {\n",
+    text_appendf(out, "/* The %s %s. */\nstruct %s {\n",
+                 t->kind == TYPE_OPTIONAL ? "optional value" : "tuple",
                  text_cstr(&written), text_cstr(&tag));
     for (i = 0; i < t->field_count; i++) {
         struct text field = {0};
@@ -479,6 +488,10 @@ static void emit_tuples(struct text *out, const struct type *t,
     case TYPE_ARRAY:
     case TYPE_SLICE:
         emit_tuples(out, t->element, ifaces, count, done);
+        return;
+    case TYPE_OPTIONAL:
+        emit_tuples(out, t->element, ifaces, count, done);
+        tuple_view(out, t, ifaces, count, done);
         return;
     case TYPE_FN:
         for (i = 0; i < t->param_count; i++) {

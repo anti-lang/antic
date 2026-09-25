@@ -103,6 +103,10 @@ static bool c_representable(const struct type *t, bool field,
             }
         }
         return true;
+    /* A `?T` crosses as the struct of the value and a `bool` that the
+       header writes for it, so it crosses when its value does. */
+    case TYPE_OPTIONAL:
+        return c_representable(t->element, true, cls, hidden);
     /* An enum is its underlying integer, which the header writes as an
        enum of the same name. */
     case TYPE_ENUM:

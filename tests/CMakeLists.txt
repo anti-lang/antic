@@ -2775,7 +2775,7 @@ endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
             failing tuples flags variants nested simd names handlers ledger
-            generics)
+            generics optional)
         # The C program of ledger starts its threads with pthreads.
         if(case STREQUAL "ledger" AND WIN32)
             continue()
@@ -3049,6 +3049,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "nested_export|-S,-o,${LISTINGS}/nested_export.s,nested_export.anti"
         "hooks|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/hooks.s,hooks.anti"
         "closures|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/closures.s,closures.anti"
+        "optional_values|-S,-o,${LISTINGS}/optional_values.s,optional_values.anti"
         "snapshots|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/snapshots.s,snapshots.anti"
         "synchronized|-S,-o,${LISTINGS}/synchronized.s,synchronized.anti"
         "concurrent|-S,-o,${LISTINGS}/concurrent.s,concurrent.anti"
