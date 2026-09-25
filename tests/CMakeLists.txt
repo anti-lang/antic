@@ -497,15 +497,28 @@ foreach(name IN ITEMS wrapping saturating compound_wrapping mul_high flags
 endforeach()
 # The copies of generics in dev mode, which compiles each module apart and
 # prints what the release build of the same program prints.
-add_test(NAME program_generic_copies_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/generic_copies.anti"
-        "-DOPTIONS=--dev"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+foreach(name IN ITEMS generic_copies generic_constants generic_methods
+        generic_nested generic_sync generic_hooks generic_may_fail
+        generic_fn_args generic_variants construct_keep_own)
+    set(objects "")
+    if(name STREQUAL "generic_may_fail" OR name STREQUAL "generic_fn_args")
+        set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o")
+    endif()
+    add_test(NAME program_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${objects}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    if(NOT objects STREQUAL "")
+        set_tests_properties(program_${name}_dev PROPERTIES
+            FIXTURES_REQUIRED lang_dev_object)
+    endif()
+endforeach()
 # Locking and channels in dev mode, whose checks run inside every `sync`
 # block and every arm of a `select`. sync_exits fails with the errors of
 # anti.lang, so its dev link names the object of anti.lang.

@@ -1,0 +1,173 @@
+//! Language hooks work in generic types. `List<T>` declares `iter`, `index` and
+//! `set_index`, and its iterator `ListIter<T>` declares `next` and `value`, so
+//! `for x in list` and `list[i]` work for every copy. A generic struct takes
+//! its operators and its hooks from generic `operator fn` functions of its
+//! module, whose arguments come from the operands. A generic function
+//! constrained by the hooks walks and compares copies of both.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class List<T>
+{
+	items: [8]T,
+	pub count: int = 0,
+
+	fn construct(self, fill: T)
+	{
+		self.items = [fill; 8];
+	}
+
+	pub fn push(self, v: T)
+	{
+		self.items[self.count] = v;
+		self.count += 1;
+	}
+
+	operator fn iter(self) -> ListIter<T>
+	{
+		return ListIter<T> { list: self, at: -1 };
+	}
+
+	operator fn index(self, i: int) -> T
+	{
+		return self.items[i];
+	}
+
+	operator fn set_index(self, i: int, v: T)
+	{
+		self.items[i] = v;
+	}
+}
+
+class ListIter<T>
+{
+	pub list: *List<T>,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.list.count;
+	}
+
+	operator fn value(self) -> T
+	{
+		return self.list[self.at];
+	}
+}
+
+struct Money<T: add + lt>
+{
+	amount: T,
+}
+
+operator fn add<T: add + lt>(a: Money<T>, b: Money<T>) -> Money<T>
+{
+	return Money<T> { amount: a.amount + b.amount };
+}
+
+operator fn lt<T: add + lt>(a: Money<T>, b: Money<T>) -> bool
+{
+	return a.amount < b.amount;
+}
+
+fn total<T: add>(list: *List<T>, zero: T) -> T
+{
+	let sum = zero;
+	for x in list {
+		sum = sum + x;
+	}
+	return sum;
+}
+
+fn count<C: iter>(c: C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += 1;
+	}
+	return n;
+}
+
+struct Span<T>
+{
+	values: [4]T,
+	used: int,
+}
+
+struct SpanWalk<T>
+{
+	span: *Span<T>,
+	at: int,
+}
+
+operator fn iter<T>(s: *Span<T>) -> SpanWalk<T>
+{
+	return SpanWalk<T> { span: s, at: -1 };
+}
+
+operator fn next<T>(w: *SpanWalk<T>) -> bool
+{
+	w.at += 1;
+	return w.at < w.span.used;
+}
+
+operator fn value<T>(w: *SpanWalk<T>) -> T
+{
+	return w.span.values[w.at];
+}
+
+operator fn index<T>(s: *Span<T>, i: int) -> T
+{
+	return s.values[i];
+}
+
+fn largest<T: lt>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn main() -> int
+{
+	let ints = List<int>(0);
+	ints.push(3);
+	ints.push(4);
+	ints.push(5);
+	ints[1] = 40;
+	let sum = 0;
+	for x in ints {
+		sum += x;
+	}
+	printf("%d %d %d\n".ptr, sum as c_int, ints[1] as c_int,
+		total(&ints, 0) as c_int);
+
+	let cash = List<Money<int>>(Money<int> { amount: 0 });
+	cash.push(Money<int> { amount: 7 });
+	cash.push(Money<int> { amount: 2 });
+	let most = cash[0] + cash[1];
+	let biggest = largest(cash[0], cash[1]);
+	printf("%d %d %d\n".ptr, most.amount as c_int, biggest.amount as c_int,
+		total(&cash, Money<int> { amount: 100 }).amount as c_int);
+
+	let halves = List<Money<float>>(Money<float> { amount: 0.0 });
+	halves.push(Money<float> { amount: 0.5 });
+	halves.push(Money<float> { amount: 1.5 });
+	let seen = 0;
+	for m in halves {
+		seen += 1;
+	}
+	printf("%d %d %d\n".ptr, seen as c_int, count(&halves) as c_int,
+		(total(&halves, Money<float> { amount: 0.0 }).amount * 10.0) as c_int);
+
+	let span = Span<str> { values: ["a", "bc", "def", ""], used: 3 };
+	let letters = 0;
+	for word in span {
+		letters += word.len;
+	}
+	printf("%d %d %d\n".ptr, letters as c_int, span[2].len as c_int,
+		count(&span) as c_int);
+	return 0;
+}

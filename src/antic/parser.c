@@ -521,7 +521,14 @@ static bool scan_type(const struct parser *p, struct angle_scan *s)
         }
         if (peek_at(p, s->at)->kind == TOKEN_ARROW) {
             s->at++;
-            return scan_type(p, s);
+            if (!scan_type(p, s)) {
+                return false;
+            }
+        }
+        /* A failing function type ends with `may fail`. */
+        if (!s->half && is_word(p, peek_at(p, s->at), "may") &&
+            peek_at(p, s->at + 1)->kind == TOKEN_FAIL) {
+            s->at += 2;
         }
         return true;
     default:

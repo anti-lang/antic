@@ -1,0 +1,123 @@
+//! A variant takes type parameters, as `Result<T, E>` does. Each copy is a
+//! struct of a tag and a union of its cases with the arguments in place, so its
+//! size follows them. `switch` binds a copy of a case's fields and covers every
+//! case, and `if let`, `is` and `.tag` read the tag. A generic function builds
+//! and takes apart copies, a copy holds a copy of another generic, and a case
+//! takes a constant parameter as the length of an array.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Result<T, E>
+{
+	Ok { value: T },
+	Err { error: E },
+}
+
+variant Tree<T>
+{
+	Leaf { value: T },
+	Node { left: ?*Tree<T>, right: ?*Tree<T> },
+}
+
+variant Chunk<T, N: int>
+{
+	Full { items: [N]T },
+	Empty,
+}
+
+struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+fn half(n: int) -> Result<int, str>
+{
+	if n % 2 != 0 {
+		return Result<int, str>.Err { error: "odd" };
+	}
+	return Result<int, str>.Ok { value: n / 2 };
+}
+
+fn value_or<T, E>(r: Result<T, E>, fallback: T) -> T
+{
+	let v = fallback;
+	switch r {
+		Ok o => v = o.value,
+		Err e => v = fallback,
+	}
+	return v;
+}
+
+fn wrap<T>(v: T) -> Result<T, int>
+{
+	return Result<T, int>.Ok { value: v };
+}
+
+fn sum<T: add>(t: *Tree<T>, zero: T) -> T
+{
+	let total = zero;
+	switch *t {
+		Leaf l => total = l.value,
+		Node n => {
+			let left = n.left;
+			if left != none {
+				total = total + sum(left, zero);
+			}
+			let right = n.right;
+			if right != none {
+				total = total + sum(right, zero);
+			}
+		},
+	}
+	return total;
+}
+
+fn count<T, N: int>(c: Chunk<T, N>) -> int
+{
+	if let Full f = c {
+		return f.items.len;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let a = half(8);
+	let b = half(7);
+	printf("%d %d %d %d\n".ptr, value_or(a, -1) as c_int,
+		value_or(b, -1) as c_int, (a is Result.Ok) as c_int,
+		(b.tag != a.tag) as c_int);
+	switch b {
+		Ok o => printf("ok %d\n".ptr, o.value as c_int),
+		Err e => printf("err %.*s\n".ptr, e.error.len as c_int, e.error.ptr),
+	}
+	if let Ok o = wrap(2.5) {
+		printf("%d\n".ptr, (o.value * 2.0) as c_int);
+	}
+	let p = wrap(Pair<int, str> { first: 3, second: "three" });
+	if let Ok o = p {
+		printf("%d %.*s\n".ptr, o.value.first as c_int,
+			o.value.second.len as c_int, o.value.second.ptr);
+	}
+	printf("%d %d\n".ptr, size_of(Result<u8, u8>) as c_int,
+		size_of(Result<int, str>) as c_int);
+
+	let one = alloc Tree<int>.Leaf { value: 1 };
+	let two = alloc Tree<int>.Leaf { value: 2 };
+	let three = alloc Tree<int>.Leaf { value: 3 };
+	let inner = alloc Tree<int>.Node { left: two, right: three };
+	let root = Tree<int>.Node { left: one, right: inner };
+	printf("%d\n".ptr, sum(&root, 0) as c_int);
+	free(one);
+	free(two);
+	free(three);
+	free(inner);
+
+	let full = Chunk<u8, 3>.Full { items: [1, 2, 3] };
+	let empty = Chunk<u8, 3>.Empty;
+	let wide = Chunk<int, 5>.Full { items: [1, 2, 3, 4, 5] };
+	printf("%d %d %d %d\n".ptr, count(full) as c_int, count(empty) as c_int,
+		count(wide) as c_int, size_of(Chunk<int, 5>) as c_int);
+	return 0;
+}

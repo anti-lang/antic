@@ -1,0 +1,107 @@
+//! A generic function may be `may fail`, with the usual two channels: the
+//! result through the out pointer of its copy and the error as the value of the
+//! call. A generic function forwards the error of another with `try`, runs
+//! `undo` on the fail path, returns a tuple and takes a failing function of its
+//! type parameter. A function of a generic class and a function with type
+//! parameters of its own fail the same way. Each copy is handled with `catch`,
+//! `try` and `catch fatal`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn ordered<T: lt>(a: T, b: T) -> T may fail
+{
+	if b < a {
+		fail lang.Error.new(1, "descending");
+	}
+	return b;
+}
+
+/// The largest of three, and the first failure forwarded.
+fn chain<T: lt>(a: T, b: T, c: T) -> T may fail
+{
+	let first = try ordered(a, b);
+	return try ordered(first, c);
+}
+
+fn split<T: lt>(a: T, b: T) -> (T, T) may fail
+{
+	undo printf("undo\n".ptr);
+	let high = try ordered(a, b);
+	return (a, high);
+}
+
+fn apply<T>(v: T, f: fn(T) -> T may fail) -> T may fail
+{
+	let once = try f(v);
+	return try f(once);
+}
+
+fn halve(n: int) -> int may fail
+{
+	if n % 2 != 0 {
+		fail lang.Error.new(n, "odd");
+	}
+	return n / 2;
+}
+
+class Stock<T: lt>
+{
+	pub top: T,
+
+	pub fn raise(self, to: T) may fail
+	{
+		self.top = try ordered(self.top, to);
+	}
+
+	pub fn pick<U>(self, when: bool, u: U, other: U) -> U may fail
+	{
+		if !when {
+			fail "not picked";
+		}
+		return u;
+	}
+}
+
+fn main() -> int
+{
+	let a = chain(1, 2, 3) catch fatal;
+	let b = chain(1.5, 0.5, 3.5) catch e {
+		printf("%d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
+			e.message.ptr);
+		yield -1.0;
+	};
+	printf("%d %d\n".ptr, a as c_int, b as c_int);
+	let (low, high) = split(4, 9) catch fatal;
+	let bad = split(9, 4) catch e {
+		yield (0, 0);
+	};
+	printf("%d %d %d\n".ptr, low as c_int, high as c_int, bad.1 as c_int);
+	let q = apply(12, halve) catch fatal;
+	let odd = apply(6, halve) catch e {
+		printf("odd %d\n".ptr, e.code as c_int);
+		yield 0;
+	};
+	printf("%d %d\n".ptr, q as c_int, odd as c_int);
+
+	let s = Stock<int> { top: 5 };
+	s.raise(8) catch fatal;
+	s.raise(2) catch e {
+		printf("%.*s %d\n".ptr, e.message.len as c_int, e.message.ptr,
+			s.top as c_int);
+	};
+	let word = s.pick(true, "yes", "no") catch fatal;
+	let none_picked = s.pick(false, 1, 2) catch e {
+		printf("%.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield -2;
+	};
+	printf("%.*s %d\n".ptr, word.len as c_int, word.ptr, none_picked as c_int);
+	try {
+		let c = chain(3, 2, 1);
+		printf("unreached %d\n".ptr, c as c_int);
+	} catch e {
+		printf("try %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+	}
+	return 0;
+}

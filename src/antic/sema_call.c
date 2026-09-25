@@ -809,11 +809,16 @@ static bool names_sub_object(const struct expr *e)
    field f, and the module declares a function f whose first parameter is
    T or *T. Returns false after reporting an error. */
 /* Whether a is b, a class below b, or a copy of the generic b or of a
-   class below it. A function of b then takes a as `self`. */
+   class below it. A function of b then takes a as `self`. So does a
+   generic function whose first parameter is a copy of the generic of a,
+   as `operator fn add<T>(a: Money<T>, b: Money<T>)` is. Its call infers
+   the arguments. */
 static bool descends_or_copies(const struct type *a, const struct type *b)
 {
     for (; a != NULL; a = a->kind == TYPE_CLASS ? a->base : NULL) {
-        if (a == b || (a->generic != NULL && a->generic == b)) {
+        if (a == b || (a->generic != NULL && a->generic == b) ||
+            (b != NULL && a->generic != NULL && a->generic == b->generic &&
+             sema_has_params(b))) {
             return true;
         }
     }
@@ -871,6 +876,14 @@ static bool method_call(struct checker *c, struct expr *call)
         return false;
     }
     first = sema_member_type(c, f->type->params[0], s);
+    /* A generic function takes the receiver as it stands, and its call
+       infers the arguments from it. */
+    if (sema_has_params(first) && f->item != NULL &&
+        f->item->type_param_count > 0 && f->item->owner == NULL) {
+        first = first->kind == TYPE_POINTER
+                    ? types_pointer(c->types, type_has_fields(t) ? t : s)
+                    : s;
+    }
     if (first->kind == TYPE_POINTER && type_has_fields(t)) {
         struct expr *address = sema_new_node(c, EXPR_UNARY, receiver->pos);
         if (!sema_is_place(receiver)) {
@@ -2958,14 +2971,18 @@ static bool worker_type(struct checker *c, struct pos pos, const char *what,
     return true;
 }
 
-/* The function type of the worker that call of `parallel` or `dispatch`
-   names. It has one parameter before the arguments of the call, for the
-   chunk or the object that first names. NULL after an error. */
-static struct type *worker_callee(struct checker *c, struct expr *call,
-                                  const char *form, const char *first)
+/* The function type of the worker that the call at slot of `parallel`
+   or `dispatch` names. It has one parameter before the arguments of the
+   call, for the chunk or the object that first names, of type given. A
+   generic worker gives the signature of its copy. NULL after an error. */
+static struct type *worker_callee(struct checker *c, struct expr **slot,
+                                  const char *form, const char *first,
+                                  struct type *given)
 {
+    struct expr *call = *slot;
     struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
     size_t arg_count = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
+    const struct expr *outer_callee = c->callee;
     struct symbol *sym;
     struct type *fn;
 
@@ -2975,7 +2992,9 @@ static struct type *worker_callee(struct checker *c, struct expr *call,
     }
     sym = sema_lookup(c, &callee->as.name);
     callee->symbol = sym;
+    c->callee = callee;
     fn = sema_check_expr(c, callee, NULL);
+    c->callee = outer_callee;
     if (sema_is_error(fn)) {
         return NULL;
     }
@@ -2983,6 +3002,25 @@ static struct type *worker_callee(struct checker *c, struct expr *call,
         sema_error_at(c, callee->pos, "`%.*s` is not a `worker fn`",
                       (int)callee->as.name.length, callee->as.name.text);
         return NULL;
+    }
+    if (sym->item == NULL || sym->item->type_param_count == 0) {
+        if (callee->type_arg_count > 0) {
+            sema_refuse_type_args(c, callee, &callee->as.name);
+            return NULL;
+        }
+    } else if (fn->param_count == arg_count + 1) {
+        /* The copy is recorded on a call, so a worker named without
+           arguments becomes a call of none. */
+        if (call->kind != EXPR_CALL) {
+            call = sema_new_node(c, EXPR_CALL, callee->pos);
+            call->as.call.callee = callee;
+            *slot = call;
+        }
+        fn = sema_worker_copy(c, call, fn, sym, given);
+        if (fn == NULL) {
+            return NULL;
+        }
+        callee->type = fn;
     }
     if (fn->param_count != arg_count + 1) {
         sema_error_at(c, call->pos,
@@ -3063,10 +3101,11 @@ struct type *sema_check_parallel(struct checker *c, struct expr *e)
                       sema_tn(array));
         return sema_builtin(c, TYPE_ERROR);
     }
-    fn = worker_callee(c, call, "parallel", "chunk");
+    fn = worker_callee(c, &e->as.parallel.call, "parallel", "chunk", array);
     if (fn == NULL) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    call = e->as.parallel.call;
     if (fn->params[0]->kind != TYPE_SLICE ||
         fn->params[0]->element != array->element) {
         sema_error_at(c, callee->pos, "`%.*s` takes `%s` as its chunk, and the "
@@ -3100,10 +3139,11 @@ struct type *sema_check_dispatch(struct checker *c, struct expr *e)
                       sema_tn(object));
         return sema_builtin(c, TYPE_ERROR);
     }
-    fn = worker_callee(c, call, "dispatch", "object");
+    fn = worker_callee(c, &e->as.dispatch.call, "dispatch", "object", object);
     if (fn == NULL) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    call = e->as.dispatch.call;
     if (fn->params[0] != object) {
         sema_error_at(c, callee->pos,
                       "`%.*s` takes `%s` as its object, and this is "

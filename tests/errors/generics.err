@@ -22,3 +22,4 @@ generics.anti:127:25: error: `Loop` is a constraint, not a value
 generics.anti:76:18: error: `map` takes type parameters, so it cannot be `abstract` or replaced
 generics.anti:79:11: error: an `export fn` cannot be generic. Export a named copy with `export type`
 generics.anti:84:24: error: `export type` names a copy of a generic struct or class, and `Circle` is none
+generics.anti:140:14: error: `scale` takes type parameters, so it cannot be `abstract` or replaced

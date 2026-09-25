@@ -1,0 +1,195 @@
+//! A type nested in a generic class sees the type parameters of the class. Each
+//! copy of the class has a copy of each nested type with the same arguments,
+//! named after it: `Stack<int>.Node`. The program nests a struct whose field
+//! names the class's parameter and itself, a class with functions, a struct
+//! with a type parameter of its own, a type nested two deep, an array sized by
+//! a constant parameter, and an enum, which names no parameter.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Stack<T>
+{
+	struct Node
+	{
+		value: T,
+		next: ?*Node,
+	}
+
+	class Walker
+	{
+		pub at: ?*Node,
+
+		pub fn more(self) -> bool
+		{
+			return self.at != none;
+		}
+
+		pub fn take(self, fallback: T) -> T
+		{
+			let n = self.at else {
+				return fallback;
+			};
+			self.at = n.next;
+			return n.value;
+		}
+	}
+
+	struct Tagged<U>
+	{
+		value: T,
+		tag: U,
+	}
+
+	enum Mode
+	{
+		Push,
+		Pop,
+	}
+
+	head: ?*Node = none,
+	pub size: int = 0,
+	last: Mode = Mode.Pop,
+
+	pub fn push(self, v: T)
+	{
+		self.head = alloc Node { value: v, next: self.head };
+		self.size += 1;
+		self.last = Mode.Push;
+	}
+
+	pub fn pushed(self) -> bool
+	{
+		return self.last == Mode.Push;
+	}
+
+	pub fn top(self) -> Maybe<T>
+	{
+		let h = self.head else {
+			return Maybe<T>.Empty;
+		};
+		return Maybe<T>.Some { value: h.value };
+	}
+
+	/// Walks the nodes with a `Walker` and gives the last value it took.
+	pub fn walk(self, zero: T) -> T
+	{
+		let w = Walker { at: self.head };
+		let last = zero;
+		while w.more() do {
+			last = w.take(zero);
+		}
+		return last;
+	}
+
+	pub fn walker(self) -> str
+	{
+		let w = Walker { at: self.head };
+		return w.type_name();
+	}
+
+	pub fn tagged(self, zero: T) -> int
+	{
+		let t = Tagged<str> { value: zero, tag: "top" };
+		return t.tag.len;
+	}
+
+	fn destruct(self)
+	{
+		let n = self.head;
+		while n != none do {
+			let next = n.next;
+			free(n);
+			n = next;
+		}
+	}
+}
+
+variant Maybe<T>
+{
+	Empty,
+	Some { value: T },
+}
+
+class Grid<T, N: int>
+{
+	struct Row
+	{
+		cells: [N]T,
+	}
+
+	class Outer
+	{
+		struct Inner
+		{
+			row: Row,
+			count: int,
+		}
+
+		pub fn measure(self, row: Row) -> int
+		{
+			let inner = Inner { row: row, count: N };
+			return inner.count + size_of(Inner) as int;
+		}
+	}
+
+	rows: [2]Row,
+
+	fn construct(self, v: T)
+	{
+		self.rows = [Row { cells: [v; N] }; 2];
+	}
+
+	pub fn fill(self, v: T)
+	{
+		for i in 0..2 {
+			for j in 0..N {
+				self.rows[i].cells[j] = v;
+			}
+		}
+	}
+
+	pub fn at(self, i: int, j: int) -> T
+	{
+		return self.rows[i].cells[j];
+	}
+
+	pub fn width(self) -> int
+	{
+		let o = Outer { };
+		return o.measure(self.rows[0]);
+	}
+}
+
+fn main() -> int
+{
+	let s = Stack<int> { };
+	s.push(3);
+	s.push(4);
+	s.push(5);
+	switch s.top() {
+		Empty => printf("empty\n".ptr),
+		Some v => printf("top %d\n".ptr, v.value as c_int),
+	}
+	printf("%d %d %d %d\n".ptr, s.size as c_int, s.tagged(0) as c_int,
+		s.pushed() as c_int, s.walk(0) as c_int);
+	let name = s.walker();
+	printf("%.*s\n".ptr, name.len as c_int, name.ptr);
+	let words = Stack<str> { };
+	switch words.top() {
+		Empty => printf("empty\n".ptr),
+		Some v => printf("top %.*s\n".ptr, v.value.len as c_int, v.value.ptr),
+	}
+	words.push("a");
+	switch words.top() {
+		Empty => printf("empty\n".ptr),
+		Some v => printf("top %.*s\n".ptr, v.value.len as c_int, v.value.ptr),
+	}
+	let g = alloc Grid<u8, 3>(7);
+	let wide = alloc Grid<int, 5>(8);
+	wide.fill(9);
+	printf("%d %d %d %d\n".ptr, g.width() as c_int, g.at(1, 2) as c_int,
+		wide.width() as c_int, wide.at(0, 4) as c_int);
+	free(g);
+	free(wide);
+	return 0;
+}

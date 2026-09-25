@@ -1,1 +1,5 @@
-generic_copies.anti:18:9: error: antic compiles no copy of `Box.pair` yet, a function of a class with type parameters of its own
+generic_copies.anti:42:35: error: the chunk has type `*Person`, which holds a pointer. A worker takes and returns values alone
+generic_copies.anti:43:36: error: the result of a worker has type `*Person`, which holds a pointer. A worker takes and returns values alone
+generic_copies.anti:43:41: error: an argument of a worker has type `*Person`, which holds a pointer. A worker takes and returns values alone
+generic_copies.anti:45:18: error: a closure is never kept, and this one captures `k`, so a `snapshot fn` at a `keep own` parameter or an `own` field takes its value
+generic_copies.anti:46:40: error: a worker takes a closure through a `concurrent` parameter alone

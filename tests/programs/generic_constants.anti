@@ -1,0 +1,105 @@
+//! A type parameter may be an integer constant, written `N: int`, whose
+//! argument is a constant the compiler knows: an integer literal or the name of
+//! a constant. It sizes what belongs to the type, such as the length of a fixed
+//! array. Each argument makes a copy of its own, with its own size and name. A
+//! function infers a constant from the length of an array it is given, and the
+//! body of a generic reads the constant as a value, in a length and in a loop.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const SAMPLES: int = 6;
+
+struct Sample
+{
+	left: i16,
+	right: i16,
+}
+
+class Ring<T, N: int>
+{
+	items: [N]T,
+	next: int = 0,
+	pub count: int = 0,
+
+	fn construct(self, fill: T)
+	{
+		self.items = [fill; N];
+	}
+
+	pub fn push(self, v: T)
+	{
+		self.items[self.next] = v;
+		self.next = (self.next + 1) % N;
+		if self.count < N {
+			self.count += 1;
+		}
+	}
+
+	pub fn get(self, i: int) -> T
+	{
+		return self.items[(self.next - self.count + i + N) % N];
+	}
+
+	pub fn capacity(self) -> int
+	{
+		return N;
+	}
+}
+
+struct Matrix<T, R: int, C: int>
+{
+	cells: [R][C]T,
+}
+
+fn trace<T: add, R: int, C: int>(m: *Matrix<T, R, C>, zero: T) -> T
+{
+	let total = zero;
+	for i in 0..R {
+		if i < C {
+			total = total + m.cells[i][i];
+		}
+	}
+	return total;
+}
+
+fn length<T, N: int>(values: [N]T) -> int
+{
+	return N;
+}
+
+fn doubled<N: int>() -> [N * 2]int
+{
+	return [N; N * 2];
+}
+
+fn main() -> int
+{
+	let r = alloc Ring<int, 4>(0);
+	for i in 1..7 {
+		r.push(i);
+	}
+	printf("%d %d %d %d %d\n".ptr, r.count as c_int, r.capacity() as c_int,
+		r.get(0) as c_int, r.get(3) as c_int, size_of(Ring<int, 4>) as c_int);
+	let samples = alloc Ring<Sample, SAMPLES>(Sample { left: 0, right: 0 });
+	samples.push(Sample { left: 3, right: -3 });
+	printf("%d %d %d\n".ptr, samples.capacity() as c_int,
+		samples.get(0).right as c_int, size_of(Ring<Sample, SAMPLES>) as c_int);
+	printf("%.*s %.*s\n".ptr, r.type_name().len as c_int, r.type_name().ptr,
+		samples.type_name().len as c_int, samples.type_name().ptr);
+	free(r);
+	free(samples);
+
+	let m = Matrix<f32, 4, 4> {
+		cells: [[1.0, 0.0, 0.0, 0.0], [0.0, 2.0, 0.0, 0.0],
+			[0.0, 0.0, 3.0, 0.0], [0.0, 0.0, 0.0, 4.0]]
+	};
+	let wide = Matrix<int, 2, 3> { cells: [[5, 6, 7], [8, 9, 10]] };
+	printf("%d %d %d %d\n".ptr, trace(&m, 0.0) as c_int, trace(&wide, 0) as c_int,
+		size_of(Matrix<f32, 4, 4>) as c_int, size_of(Matrix<int, 2, 3>) as c_int);
+
+	let three: [3]u8 = [1, 2, 3];
+	let pair = doubled<2>();
+	printf("%d %d %d %d\n".ptr, length(three) as c_int, length(pair) as c_int,
+		pair[3] as c_int, pair.len as c_int);
+	return 0;
+}

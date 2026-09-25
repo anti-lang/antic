@@ -918,7 +918,7 @@ static size_t chain_functions(const struct type *t, const struct item **out,
         enum body_table fills = pass == 0 ? BODY_PLAIN : BODY_BASE;
         for (i = 0; i < t->member_count; i++) {
             const struct item *m = t->members[i];
-            if (m->kind != ITEM_FN || !m->pub ||
+            if (m->kind != ITEM_FN || !m->pub || m->type_param_count > 0 ||
                 types_body_table(t, m) != fills) {
                 continue;
             }

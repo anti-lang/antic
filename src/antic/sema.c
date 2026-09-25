@@ -445,10 +445,30 @@ static struct type *builtin_of_token(struct checker *c, enum token_kind k)
     }
 }
 
+/* Whether s is built of constant parameters and integers alone, with no
+   `size_of`. */
+static bool params_alone(const struct symbolic *s)
+{
+    if (s == NULL) {
+        return true;
+    }
+    switch (s->kind) {
+    case SYMBOLIC_INT:
+    case SYMBOLIC_PARAM:
+        return true;
+    case SYMBOLIC_SIZE_OF:
+        return false;
+    default:
+        return params_alone(s->a) && params_alone(s->b);
+    }
+}
+
 /* A constant expression of type int with a value of at least 1, or a
    symbolic value. DESIGN: a length computed from size_of stays symbolic,
    and the back end checks that it is at least 1 on its target. Chapter 2
-   allows it in struct fields and local variables. */
+   allows it in struct fields and local variables. A length computed from
+   constant parameters alone is an integer in every copy, so it stands
+   wherever a length does. */
 struct type *sema_array_of(struct checker *c, struct expr *e,
                            struct type *element)
 {
@@ -467,7 +487,7 @@ struct type *sema_array_of(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     if (v.kind == CONST_SYMBOLIC) {
-        if (!c->target_sized) {
+        if (!c->target_sized && !params_alone(v.as.symbolic)) {
             sema_error_at(c, e->pos,
                           "a length computed from `size_of` is allowed "
                           "only in a struct field or a local variable");
@@ -794,6 +814,10 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         /* A generic is named with its type arguments, and the name of
            anything else takes none. */
         if (sym->type != NULL && sym->type->type_param_count > 0) {
+            if (t->arg_count == 0 && sym->type->nested_in != NULL &&
+                sema_nested_own(sym->type) == 0) {
+                return sym->type;
+            }
             if (t->arg_count == 0) {
                 sema_error_at(c, t->pos, "`%s` takes %zu type argument%s",
                               sema_tn(sym->type),
@@ -2787,7 +2811,11 @@ static void check_contracts(struct checker *c, const struct item *it,
     for (j = 0; j < it->member_count; j++) {
         struct item *m = it->members[j];
         const struct item *above;
-        if (m->kind != ITEM_FN) {
+        /* A function with type parameters of its own that is abstract
+           or replaced is refused where it is declared. It fills and
+           leaves open nothing here. */
+        if (m->kind != ITEM_FN ||
+            (m->type_param_count > 0 && m->contract != FN_PLAIN)) {
             continue;
         }
         above = matched_above(t, m);
@@ -2882,7 +2910,8 @@ static void require_filled_chain(struct checker *c, const struct item *it,
         for (j = 0; j < base->member_count; j++) {
             const struct item *a = base->members[j];
             const struct item *filled;
-            if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT) {
+            if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT ||
+                a->type_param_count > 0) {
                 continue;
             }
             filled = types_primary_member(t, &a->name);

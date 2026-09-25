@@ -1,0 +1,11 @@
+exit 0
+1 descending
+3 -1
+undo
+4 9 0
+odd 3
+3 0
+descending 8
+not picked
+yes -2
+try descending

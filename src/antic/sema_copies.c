@@ -469,6 +469,9 @@ static struct item *type_item(struct copies *k, struct type *copy)
     }
     made->nested = NULL;
     made->nested_count = 0;
+    /* A copy of a type nested in a generic class stands as an item of
+       the module, which no pass after the checker leaves out. */
+    made->outer = NULL;
     count = copy->member_count;
     members = types_alloc_array(k->c->arena, count + 1, sizeof *members);
     fns = types_alloc_array(k->c->arena, count + 1, sizeof *fns);
@@ -528,6 +531,69 @@ static struct name copy_name(struct copies *k, const struct name *generic,
     return name;
 }
 
+/* The copy of the function generic with the arguments args and values,
+   one per parameter of map, made once. name is the name of its symbol,
+   owner the item of the class that holds it, or NULL. */
+static struct item *copy_function(struct copies *k, struct item *generic,
+                                  const struct generic_map *map,
+                                  struct name name, struct item *owner)
+{
+    size_t count = map->count;
+    struct item *n;
+    struct symbol *sym;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < k->fn_count; i++) {
+        bool same = k->fns[i].generic == generic && k->fns[i].count == count;
+        for (j = 0; same && j < count; j++) {
+            same = k->fns[i].args[j] == map->args[j] &&
+                   k->fns[i].values[j] == map->values[j];
+        }
+        if (same) {
+            return k->fns[i].copy;
+        }
+    }
+    n = arena_alloc(k->c->arena, sizeof *n);
+    *n = *generic;
+    sym = arena_alloc(k->c->arena, sizeof *sym);
+    *sym = *generic->symbol;
+    sym->ir = 0;
+    sym->item = n;
+    sym->name = name;
+    sym->type = sema_subst(k->c, generic->symbol->type, map);
+    sym->home = NULL;
+    n->symbol = sym;
+    n->name = owner != NULL ? generic->name : name;
+    n->type_params = NULL;
+    n->type_param_count = 0;
+    n->pub = false;
+    n->exported = false;
+    n->body = NULL;
+    if (owner != NULL) {
+        /* A function of a class keeps its visibility, which decides the
+           hidden lock of a synchronized class. It stands in no table and
+           in no interface. */
+        n->owner = owner;
+        n->home_module = owner->home_module;
+    } else {
+        n->home_module = generic_home(generic);
+        n->vis = VIS_PRIVATE;
+    }
+    k->fns = grow(k->fns, &k->fn_capacity, k->fn_count, sizeof *k->fns);
+    k->fns[k->fn_count].generic = generic;
+    k->fns[k->fn_count].args = map->args;
+    k->fns[k->fn_count].values = map->values;
+    k->fns[k->fn_count].count = count;
+    k->fns[k->fn_count].copy = n;
+    k->fn_count++;
+    k->added = grow(k->added, &k->added_capacity, k->added_count,
+                    sizeof *k->added);
+    k->added[k->added_count++] = n;
+    add_work(k, generic, n, map);
+    return n;
+}
+
 static struct item *fn_copy(struct copies *k, struct item *generic,
                             struct type **args,
                             const struct symbolic **values)
@@ -535,21 +601,8 @@ static struct item *fn_copy(struct copies *k, struct item *generic,
     size_t count = generic->type_param_count;
     struct generic_map map;
     struct type **params;
-    struct item *n;
-    struct symbol *sym;
     size_t i;
-    size_t j;
 
-    for (i = 0; i < k->fn_count; i++) {
-        bool same = k->fns[i].generic == generic;
-        for (j = 0; same && j < count; j++) {
-            same = k->fns[i].args[j] == args[j] &&
-                   k->fns[i].values[j] == values[j];
-        }
-        if (same) {
-            return k->fns[i].copy;
-        }
-    }
     params = types_alloc_array(k->c->arena, count + 1, sizeof *params);
     for (i = 0; i < count; i++) {
         params[i] = generic->type_params[i].type;
@@ -560,36 +613,9 @@ static struct item *fn_copy(struct copies *k, struct item *generic,
     map.args = args;
     map.values = values;
     map.count = count;
-    n = arena_alloc(k->c->arena, sizeof *n);
-    *n = *generic;
-    sym = arena_alloc(k->c->arena, sizeof *sym);
-    *sym = *generic->symbol;
-    sym->ir = 0;
-    sym->item = n;
-    sym->name = copy_name(k, &generic->name, args, values, count);
-    sym->type = sema_subst(k->c, generic->symbol->type, &map);
-    sym->home = NULL;
-    n->symbol = sym;
-    n->name = sym->name;
-    n->home_module = generic_home(generic);
-    n->type_params = NULL;
-    n->type_param_count = 0;
-    n->pub = false;
-    n->vis = VIS_PRIVATE;
-    n->exported = false;
-    n->body = NULL;
-    k->fns = grow(k->fns, &k->fn_capacity, k->fn_count, sizeof *k->fns);
-    k->fns[k->fn_count].generic = generic;
-    k->fns[k->fn_count].args = args;
-    k->fns[k->fn_count].values = values;
-    k->fns[k->fn_count].count = count;
-    k->fns[k->fn_count].copy = n;
-    k->fn_count++;
-    k->added = grow(k->added, &k->added_capacity, k->added_count,
-                    sizeof *k->added);
-    k->added[k->added_count++] = n;
-    add_work(k, generic, n, &map);
-    return n;
+    return copy_function(k, generic, &map,
+                         copy_name(k, &generic->name, args, values, count),
+                         NULL);
 }
 
 /* The copy of the generic g in the chain of t, a class, a struct or a
@@ -634,6 +660,70 @@ static struct symbol *member_of_receiver(struct clone *cl, const struct expr *e,
     return NULL;
 }
 
+/* DESIGN: a function of a class with type parameters of its own makes a
+   copy per class and per argument of its own, `Box<int>.map<float>`. No
+   table holds every such copy, so none stands in the table of its class
+   or among its members. The copy is a function of the module that keeps
+   its class as owner, and every call names it directly. args and values
+   hold the arguments of the class first, then its own. */
+static struct symbol *own_params_copy(struct clone *cl, const struct expr *e,
+                                      struct item *it, struct type **args,
+                                      const struct symbolic **values)
+{
+    struct copies *k = cl->k;
+    struct item *owner = (struct item *)it->owner;
+    struct type *g = owner->symbol->type;
+    size_t outer = owner->type_param_count;
+    size_t own = it->type_param_count;
+    struct type **params;
+    struct generic_map map;
+    struct text out = {0};
+    struct name name;
+    struct name own_name;
+    char *text;
+    size_t i;
+
+    if (e->as.call.copy_count != outer + own) {
+        copy_failed(cl, e->pos, &it->name, "since the call names no copy of it");
+        return NULL;
+    }
+    params = types_alloc_array(k->c->arena, outer + own + 1, sizeof *params);
+    for (i = 0; i < outer; i++) {
+        params[i] = g->type_params[i];
+    }
+    for (i = 0; i < own; i++) {
+        params[outer + i] = it->type_params[i].type;
+    }
+    memset(&map, 0, sizeof map);
+    map.types = k->c->types;
+    map.params = params;
+    map.args = args;
+    map.values = values;
+    map.count = outer + own;
+    own_name = copy_name(k, &it->name, args + outer, values + outer, own);
+    if (outer > 0) {
+        struct type *copy = sema_copy_named(k->c, g, args, values);
+        owner = type_item(k, copy);
+        if (owner == NULL) {
+            copy_failed(cl, e->pos, &it->name,
+                        "since its class is nested in a generic");
+            return NULL;
+        }
+        map.from = g;
+        map.to = copy;
+        type_symbol_name(&out, copy);
+    } else {
+        type_symbol_name(&out, g);
+    }
+    text_appendf(&out, ".%.*s", (int)own_name.length, own_name.text);
+    text = arena_alloc(k->c->arena, out.length + 1);
+    memcpy(text, text_cstr(&out), out.length + 1);
+    text_free(&out);
+    name.text = text;
+    name.length = strlen(text);
+    return copy_function(k, it, &map, name, owner)->symbol;
+}
+
 /* The symbol of the copy that the call e of the generic function sym
    reaches, from the arguments the checker recorded on e. NULL when sym
    is no generic. */
@@ -676,16 +766,13 @@ static struct symbol *callee_copy(struct clone *cl, const struct expr *e,
             return NULL;
         }
     }
+    if (owner != NULL && it->type_param_count > 0) {
+        return own_params_copy(cl, e, it, args, values);
+    }
     if (owner != NULL && owner->type_param_count > 0) {
         struct type *g = owner->symbol->type;
         struct type *copy;
         struct item *made;
-        if (it->type_param_count > 0) {
-            copy_failed(cl, e->pos, &sym->name,
-                        "a function of a class with type parameters of its "
-                        "own");
-            return NULL;
-        }
         copy = sema_copy_named(k->c, g, args, values);
         made = type_item(k, copy);
         if (made == NULL) {
@@ -700,11 +787,6 @@ static struct symbol *callee_copy(struct clone *cl, const struct expr *e,
         }
         copy_failed(cl, e->pos, &sym->name,
                     "since the copy of its class lacks it");
-        return NULL;
-    }
-    if (owner != NULL) {
-        copy_failed(cl, e->pos, &sym->name,
-                    "a function of a class with type parameters of its own");
         return NULL;
     }
     return fn_copy(k, it, args, values)->symbol;

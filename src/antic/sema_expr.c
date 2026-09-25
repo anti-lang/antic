@@ -904,7 +904,12 @@ struct symbol *sema_hook(struct checker *c, struct type *t, const char *text)
         return NULL;
     }
     first = sym->type->params[0];
-    if (first != t && !(first->kind == TYPE_POINTER && first->element == t)) {
+    if (first->kind == TYPE_POINTER) {
+        first = first->element;
+    }
+    /* A generic hook of a generic struct takes each copy of it. */
+    if (first != t && !(first->generic != NULL && first->generic == t->generic &&
+                        sema_has_params(first))) {
         return NULL;
     }
     return sym;
@@ -1077,6 +1082,10 @@ static struct type *check_operator(struct checker *c, struct expr *e,
     struct expr *callee = sema_new_node(c, EXPR_NAME, e->pos);
     struct expr **args = arena_alloc(c->arena, 2 * sizeof *args);
 
+    sig = sema_operator_copy(c, call, sig, fn, a->type, b->type);
+    if (sig == NULL) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (sig->param_count != 2) {
         sema_error_at(c, e->pos,
                       "`operator fn %.*s` takes one operand beside its "
@@ -1491,7 +1500,9 @@ static bool is_float_literal(const struct expr *e)
 }
 
 /* DESIGN: `v is Shape.Circle` tests the tag of v. The case is named by
-   its variant, which is the type of v, as a literal names it. */
+   its variant, which is the type of v, as a literal names it. A copy of
+   a generic variant takes the name of the generic, `r is Result.Ok`,
+   since the type of v gives the arguments. */
 static struct type *check_variant_test(struct checker *c, struct expr *e,
                                        struct type *from)
 {
@@ -1527,7 +1538,7 @@ static struct type *check_variant_test(struct checker *c, struct expr *e,
         named = sym != NULL && sym->kind == SYMBOL_STRUCT ? sym->type : NULL;
         which = &target->name;
     }
-    if (named != from) {
+    if (named != from && (from->generic == NULL || named != from->generic)) {
         sema_error_at(c, e->pos, "`%.*s.%.*s` is not a case of `%s`",
                       (int)target->module.length, target->module.text,
                       (int)target->name.length, target->name.text,

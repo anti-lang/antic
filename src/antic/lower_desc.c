@@ -82,17 +82,18 @@ static void table_of(const struct type *t, struct table *out)
        primary table keeps the inherited entry or a plain body. A body
        qualified by a base fills the primary table. It wins over a plain
        body of the same level, so it is added after it. The rule is
-       types_body_table's. */
+       types_body_table's. A function with type parameters of its own
+       stands in no table, since each of its copies is called directly. */
     for (i = 0; i < t->member_count; i++) {
         const struct item *m = t->members[i];
-        if (m->kind == ITEM_FN && m->pub &&
+        if (m->kind == ITEM_FN && m->pub && m->type_param_count == 0 &&
             types_body_table(t, m) == BODY_PLAIN) {
             table_add(out, m->name, member_params(m), m, NULL);
         }
     }
     for (i = 0; i < t->member_count; i++) {
         const struct item *m = t->members[i];
-        if (m->kind == ITEM_FN && m->pub &&
+        if (m->kind == ITEM_FN && m->pub && m->type_param_count == 0 &&
             types_body_table(t, m) == BODY_BASE) {
             table_add(out, m->name, member_params(m), m, NULL);
         }
@@ -1260,7 +1261,7 @@ static const struct item *find_member_fn(const struct type *t,
     for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
         for (i = 0; i < t->member_count; i++) {
             const struct item *m = t->members[i];
-            if (m->kind == ITEM_FN && m->pub &&
+            if (m->kind == ITEM_FN && m->pub && m->type_param_count == 0 &&
                 lower_same_name(&m->name, name)) {
                 return m;
             }

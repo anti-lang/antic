@@ -255,6 +255,14 @@ struct type {
     const struct symbolic **values; /* a copy: the constants, or NULL */
     struct type *copies;            /* a generic: its copies */
     struct type *next_copy;
+    /* DESIGN: a type nested in a generic class sees the parameters of
+       the classes around it. It is a generic of its own whose first
+       parameters are theirs, the outermost first, and then its own.
+       Its name without arguments in their bodies is the generic itself.
+       A copy of the class names the copy of it with the same arguments,
+       `List<int>.Node`. nested_in is the class it is
+       declared in, or NULL for any other type. */
+    struct type *nested_in;
     /* DESIGN: a copy that `export type Name = G<Args>;` offers to C is
        an export class to C under the name the `type` gives it. Its
        table, its descriptor, its init and its functions carry that name
@@ -731,6 +739,13 @@ void type_name_qualified(struct text *out, const struct type *t);
    modules then never share a symbol, while `type_name` still gives
    `List<Point>` as the program writes it. */
 void type_symbol_name(struct text *out, const struct type *t);
+/* The name of the copy of the generic g with the arguments args and
+   values, `Pair<int, str>`, with the modules of the arguments when
+   qualified is set. A copy of a type nested in a generic class is named
+   after the copy of the class, `List<int>.Node`. */
+void type_copy_name(struct text *out, const struct type *g,
+                    struct type *const *args,
+                    const struct symbolic *const *values, bool qualified);
 
 bool type_is_integer(const struct type *t);
 /* Whether f is a zero-width bitfield, written `_: T : 0`, which breaks the

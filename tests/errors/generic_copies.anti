@@ -1,19 +1,48 @@
-// A build past the front end compiles a copy of every generic it uses. A
-// function of a class with type parameters of its own is not compiled yet,
-// and its first call is refused.
+// A copy of a generic is held to the rules of its concrete types. A generic
+// worker is checked against the rules of workers in every copy: a chunk, an
+// argument and a result that hold a pointer are refused where the copy is
+// named, and so is a closure at a parameter that is not `concurrent`. A type
+// argument of function type is one C function pointer, so a closure that
+// gives it is refused as at a field.
 
-class Box<T>
+class Person
 {
-	pub value: T,
+	pub age: int,
+}
 
-	pub fn pair<U>(self, other: U) -> U
-	{
-		return other;
-	}
+worker fn count<T>(chunk: []T) -> int
+{
+	return chunk.len;
+}
+
+worker fn echo<T>(chunk: []int, v: T) -> T
+{
+	return v;
+}
+
+worker fn mapped<T>(chunk: []T, f: fn(T) -> T) -> T
+{
+	return f(chunk[0]);
+}
+
+class Holder<T>
+{
+	pub item: T,
+}
+
+fn keep_it<T>(v: T) -> Holder<T>
+{
+	return Holder<T> { item: v };
 }
 
 fn main() -> int
 {
-	let b = Box<int> { value: 7 };
-	return b.pair(0);
+	let people: [2]*Person = [alloc Person { age: 1 }, alloc Person { age: 2 }];
+	let ints: [2]int = [1, 2];
+	let n = parallel people[0..2] -> count;
+	let same = parallel ints[0..2] -> echo(people[0]);
+	let k = 3;
+	let h = keep_it(fn(x: int) -> int { return x + k; });
+	let m = parallel ints[0..2] -> mapped(fn(x) { return x + k; });
+	return 0;
 }

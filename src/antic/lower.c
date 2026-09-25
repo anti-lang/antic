@@ -1697,7 +1697,7 @@ static bool traced_function(const struct lowerer *l, const struct item *it)
     if (l->hooks && l->trace_marked && it->trace) {
         return true;
     }
-    return it->pub && lower_traced_class(l, owner);
+    return it->vis == VIS_PUB && lower_traced_class(l, owner);
 }
 
 /* The literal of the full name of the function, `module.Class.f`, which

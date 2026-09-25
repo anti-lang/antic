@@ -394,6 +394,9 @@ const struct symbolic *sema_subst_symbolic(struct checker *c,
                                            const struct generic_map *map);
 /* The map of the generic of copy to the arguments of copy. */
 struct generic_map sema_copy_map(const struct type *copy);
+/* The type parameters t declares itself: all of them, but those of the
+   class around a type nested in a generic class. */
+size_t sema_nested_own(const struct type *t);
 /* The copy of generic with these arguments, made on its first use. */
 struct type *sema_copy_named(struct checker *c, struct type *generic,
                              struct type **args,
@@ -412,6 +415,18 @@ struct type *sema_generic_named(struct checker *c, struct expr *e,
 struct type *sema_generic_call(struct checker *c, struct expr *e,
                                struct type *fn, const struct symbol *sym,
                                size_t fixed, const struct generic_call *g);
+/* The signature of the copy of the generic worker fn named sym that
+   call of `parallel` or `dispatch` reaches, whose chunk or object has
+   the type first. NULL after an error. */
+struct type *sema_worker_copy(struct checker *c, struct expr *call,
+                              struct type *fn, const struct symbol *sym,
+                              struct type *first);
+/* The signature of the `operator fn` sym that call makes of an operator
+   with operands of the types left and right. It is that of its copy when
+   sym is generic or a function of a copy. NULL after an error. */
+struct type *sema_operator_copy(struct checker *c, struct expr *call,
+                                struct type *fn, const struct symbol *sym,
+                                struct type *left, struct type *right);
 bool sema_param_operator(struct checker *c, struct expr *e,
                          enum token_kind op, const char *hook,
                          struct type *operand);

@@ -126,3 +126,19 @@ fn uses(a: int, b: int, c: int, size: int, circles: []*Circle)
 	let counted: Ring<int, int> = none;
 	let constraint_value = Loop;
 }
+
+abstract class Figure
+{
+	pub fn scale<U>(self, u: U) -> U
+	{
+		return u;
+	}
+}
+
+class Tile inherits Figure
+{
+	concrete fn scale<U>(self, u: U) -> U
+	{
+		return u;
+	}
+}

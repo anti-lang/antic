@@ -225,6 +225,7 @@ static void pair_braces(struct piece_list *l)
    list of types whose `>` a `(`, `.` or `{` follows, the rule of C#. */
 struct angles {
     struct piece_list *l;
+    const char *src;
     size_t *tokens;             /* the index of each token piece */
     size_t count;
     bool half;                  /* the first `>` of a `>>` is taken */
@@ -249,6 +250,19 @@ static enum token_kind angle_kind(const struct angles *a, size_t at)
 }
 
 static bool angle_type(struct angles *a, size_t *at);
+
+/* Whether the token at is the identifier word. */
+static bool angle_word(const struct angles *a, size_t at, const char *word)
+{
+    const struct token *t;
+
+    if (angle_kind(a, at) != TOKEN_IDENT) {
+        return false;
+    }
+    t = a->l->items[a->tokens[at]].token;
+    return t->length == strlen(word) &&
+           memcmp(a->src + t->offset, word, t->length) == 0;
+}
 
 static bool angle_close(struct angles *a, size_t *at)
 {
@@ -374,7 +388,14 @@ static bool angle_type(struct angles *a, size_t *at)
         }
         if (angle_kind(a, *at) == TOKEN_ARROW) {
             (*at)++;
-            return angle_type(a, at);
+            if (!angle_type(a, at)) {
+                return false;
+            }
+        }
+        /* A failing function type ends with `may fail`. */
+        if (!a->half && angle_word(a, *at, "may") &&
+            angle_kind(a, *at + 1) == TOKEN_FAIL) {
+            *at += 2;
         }
         return true;
     default:
@@ -384,7 +405,7 @@ static bool angle_type(struct angles *a, size_t *at)
 
 /* Whether the name at the token index at stands where a type does:
    after `:`, `->`, a pointer, a bracket, `alloc`, `as`, `is`, `chan`,
-   `inherits` or the `=` of a `type` item. */
+   `inherits`, the `=` of a `type` item, `size_of(` or `alloc(`. */
 static bool type_position(const struct angles *a, size_t at)
 {
     enum token_kind before;
@@ -412,17 +433,21 @@ static bool type_position(const struct angles *a, size_t at)
         return true;
     case TOKEN_ASSIGN:
         return at >= 3 && angle_kind(a, at - 3) == TOKEN_TYPE;
+    case TOKEN_LPAREN:
+        return at >= 2 && (angle_kind(a, at - 2) == TOKEN_SIZE_OF ||
+                           angle_kind(a, at - 2) == TOKEN_ALLOC);
     default:
         return false;
     }
 }
 
-static void mark_angles(struct piece_list *l)
+static void mark_angles(struct piece_list *l, const char *src)
 {
     struct angles a;
     size_t i;
 
     a.l = l;
+    a.src = src;
     a.tokens = files_array(l->count + 1, sizeof *a.tokens);
     a.marks = files_array(2 * l->count + 2, sizeof *a.marks);
     a.closes = files_array(2 * l->count + 2, sizeof *a.closes);
@@ -1645,7 +1670,7 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     }
     collect(source, length, &tokens, &pieces);
     pair_braces(&pieces);
-    mark_angles(&pieces);
+    mark_angles(&pieces, source);
     memset(&e, 0, sizeof e);
     e.src = source;
     e.out = out;

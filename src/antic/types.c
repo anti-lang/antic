@@ -445,7 +445,8 @@ bool types_holds_entry(const struct type *t, const struct item *m)
     for (; t != NULL; t = level_above(t)) {
         for (i = 0; i < t->member_count; i++) {
             if (t->members[i] == m) {
-                return types_primary_member(t, &m->name) == m;
+                return m->type_param_count == 0 &&
+                       types_primary_member(t, &m->name) == m;
             }
         }
     }
@@ -1464,25 +1465,45 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     }
 }
 
-void type_symbol_name(struct text *out, const struct type *t)
+void type_copy_name(struct text *out, const struct type *g,
+                    struct type *const *args,
+                    const struct symbolic *const *values, bool qualified)
 {
-    const struct type *g = t->generic;
+    const struct type *outer = g->nested_in;
+    size_t start = 0;
     size_t i;
 
-    if (g == NULL) {
-        text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
+    if (outer != NULL && g->name.length > outer->name.length + 1) {
+        start = outer->type_param_count;
+        type_copy_name(out, outer, args, values, qualified);
+        text_appendf(out, "%.*s", (int)(g->name.length - outer->name.length),
+                     g->name.text + outer->name.length);
+    } else {
+        text_appendf(out, "%.*s", (int)g->name.length, g->name.text);
+    }
+    if (start == g->type_param_count) {
         return;
     }
-    text_appendf(out, "%.*s<", (int)g->name.length, g->name.text);
-    for (i = 0; i < g->type_param_count; i++) {
-        text_append(out, i > 0 ? ", " : "");
-        if (t->values[i] != NULL) {
-            symbolic_print(out, t->values[i], true);
+    text_append(out, "<");
+    for (i = start; i < g->type_param_count; i++) {
+        text_append(out, i > start ? ", " : "");
+        if (values[i] != NULL) {
+            symbolic_print(out, values[i], qualified);
         } else {
-            print_type(out, t->args[i], true);
+            print_type(out, args[i], qualified);
         }
     }
     text_append(out, ">");
+}
+
+void type_symbol_name(struct text *out, const struct type *t)
+{
+    if (t->generic == NULL) {
+        text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
+        return;
+    }
+    type_copy_name(out, t->generic, t->args,
+                   (const struct symbolic *const *)t->values, true);
 }
 
 bool type_is_integer(const struct type *t)

@@ -1,0 +1,136 @@
+//! A generic class may be synchronized or concurrent, and its rules hold in
+//! every copy. The copies of a synchronized tally run every public function
+//! under the hidden lock of their object, and the chunks of a `parallel` add to
+//! one without losing an addition. A generic worker takes a pointer to either
+//! copy, since each is thread-safe, and one named without arguments takes them
+//! from the chunk or the object. A copy of a concurrent class keeps its guarded
+//! field under its lock and its atomic field atomic, the chunks of a `parallel`
+//! add to it, and a dispatched generic worker reads it. `sync obj { }` holds
+//! the lock of a copy.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Tally<T: add>
+{
+	sum: T,
+	calls: int = 0,
+
+	fn construct(self, zero: T)
+	{
+		self.sum = zero;
+	}
+
+	pub fn add(self, n: T)
+	{
+		self.sum = self.sum + n;
+		self.calls += 1;
+	}
+
+	pub fn add_twice(self, n: T)
+	{
+		self.add(n);
+		self.add(n);
+	}
+
+	pub fn total(self) -> T
+	{
+		return self.sum;
+	}
+
+	pub fn count(self) -> int
+	{
+		return self.calls;
+	}
+}
+
+concurrent class Bag<T>
+{
+	lock: Mutex,
+	last: T guarded by lock,
+	atomic added: int = 0,
+	first: T,
+
+	fn construct(self, first: T)
+	{
+		self.first = first;
+		self.last = first;
+	}
+
+	pub fn put(self, v: T)
+	{
+		sync self.lock {
+			self.last = v;
+		}
+		self.added.add(1);
+	}
+
+	pub fn size(self) -> int
+	{
+		return self.added.load();
+	}
+
+	pub fn start(self) -> T
+	{
+		return self.first;
+	}
+}
+
+worker fn fill<T: add>(chunk: []T, t: *Tally<T>) -> int
+{
+	for n in chunk {
+		t.add(n);
+	}
+	return chunk.len;
+}
+
+worker fn stuff<T>(chunk: []int, b: *Bag<T>, v: T) -> int
+{
+	for n in chunk {
+		b.put(v);
+	}
+	return chunk.len;
+}
+
+worker fn peek<T>(b: *Bag<T>) -> T
+{
+	return b.start();
+}
+
+fn main() -> int
+{
+	let ints = alloc Tally<int>(0);
+	let ones = alloc([20000]int, 1) else {
+		return 1;
+	};
+	for i in 0..20000 {
+		(*ones)[i] = 1;
+	}
+	let parts = parallel (*ones)[0..20000] by 8 -> fill(ints);
+	free(parts.ptr);
+	let floats = alloc Tally<float>(0.5);
+	let halves: [4]float = [0.25, 0.25, 0.25, 0.25];
+	let more = parallel halves[0..4] by 2 -> fill<float>(floats);
+	free(more.ptr);
+	printf("%d %d %d %d\n".ptr, ints.total() as c_int, ints.count() as c_int,
+		(floats.total() * 100.0) as c_int, floats.count() as c_int);
+	sync ints {
+		ints.add(10);
+		ints.add_twice(5);
+	}
+	printf("%d %d\n".ptr, ints.total() as c_int, ints.count() as c_int);
+	printf("%.*s %.*s\n".ptr, ints.type_name().len as c_int,
+		ints.type_name().ptr, floats.type_name().len as c_int,
+		floats.type_name().ptr);
+	free(ints);
+	free(floats);
+
+	let b = alloc Bag<int>(7);
+	let puts = parallel (*ones)[0..15000] by 6 -> stuff(b, 3);
+	free(puts.ptr);
+	free(ones);
+	let job = dispatch b -> peek;
+	let start = join(job);
+	printf("%d %d\n".ptr, b.size() as c_int, start as c_int);
+	free(b);
+	return 0;
+}

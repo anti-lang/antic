@@ -179,6 +179,40 @@ void sema_declare_generics(struct checker *c)
             it->symbol->type->declared_by = it;
         }
     }
+    /* A type nested in a generic class takes the parameters of the
+       class, then its own. Each class stands after the types nested in
+       it, so the walk from the end reaches a class first. */
+    for (i = module->item_count; i-- > 0;) {
+        struct item *it = module->items[i];
+        const struct item *outer = it->outer;
+        struct type_param *params;
+        struct type *t;
+        size_t count;
+        if (it->symbol == NULL || it->symbol->type == NULL || outer == NULL ||
+            outer->type_param_count == 0 ||
+            (it->kind != ITEM_STRUCT && it->kind != ITEM_CLASS &&
+             it->kind != ITEM_VARIANT)) {
+            continue;
+        }
+        t = it->symbol->type;
+        count = outer->type_param_count + it->type_param_count;
+        params = types_alloc_array(c->arena, count + 1, sizeof *params);
+        memcpy(params, outer->type_params,
+               outer->type_param_count * sizeof *params);
+        if (it->type_param_count > 0) {
+            memcpy(params + outer->type_param_count, it->type_params,
+                   it->type_param_count * sizeof *params);
+        }
+        it->type_params = params;
+        it->type_param_count = count;
+        t->type_param_count = count;
+        t->type_params = types_alloc_array(c->arena, count + 1,
+                                           sizeof *t->type_params);
+        for (j = 0; j < count; j++) {
+            t->type_params[j] = params[j].type;
+        }
+        t->nested_in = outer->symbol->type;
+    }
 }
 
 /* Add the constraint r to the set of p. */
@@ -640,6 +674,41 @@ const struct symbolic *sema_subst_symbolic(struct checker *c,
     return subst_symbolic(c, s, map);
 }
 
+/* The value of the constant parameter p where its generic names it. */
+static const struct symbolic *param_value(const struct type *p)
+{
+    const struct symbol *sym = p->param->symbol;
+
+    return sym != NULL && sym->value != NULL ? sym->value->as.symbolic : NULL;
+}
+
+/* The type t nested in a generic class, as the body of the class names
+   it. The arguments of map stand in place of the parameters. */
+static struct type *subst_nested(struct checker *c, struct type *t,
+                                 const struct generic_map *map)
+{
+    size_t count = t->type_param_count;
+    struct type **args = types_alloc_array(c->arena, count + 1, sizeof *args);
+    const struct symbolic **values =
+        types_alloc_array(c->arena, count + 1, sizeof *values);
+    bool changed = false;
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        struct type *p = t->type_params[i];
+        if (p->param->constant) {
+            args[i] = NULL;
+            values[i] = subst_symbolic(c, param_value(p), map);
+            changed = changed || values[i] != param_value(p);
+        } else {
+            args[i] = subst(c, p, map);
+            values[i] = NULL;
+            changed = changed || args[i] != p;
+        }
+    }
+    return changed ? copy_named(c, t, args, values) : t;
+}
+
 static struct type *subst(struct checker *c, struct type *t,
                           const struct generic_map *map)
 {
@@ -721,6 +790,9 @@ static struct type *subst(struct checker *c, struct type *t,
             element = subst(c, t->element, map);
             return element == t->element ? t : types_chan(c->types, element);
         }
+        if (t->generic == NULL && t->nested_in != NULL) {
+            return subst_nested(c, t, map);
+        }
         if (t->generic == NULL) {
             return t;
         }
@@ -750,18 +822,8 @@ static struct name copy_name(struct checker *c, const struct type *generic,
     struct text out = {0};
     struct name name;
     char *text;
-    size_t i;
 
-    text_appendf(&out, "%.*s<", (int)generic->name.length, generic->name.text);
-    for (i = 0; i < generic->type_param_count; i++) {
-        text_append(&out, i > 0 ? ", " : "");
-        if (values[i] != NULL) {
-            symbolic_print(&out, values[i], false);
-        } else {
-            type_name(&out, args[i]);
-        }
-    }
-    text_append(&out, ">");
+    type_copy_name(&out, generic, args, values, false);
     text = arena_alloc(c->arena, out.length + 1);
     memcpy(text, text_cstr(&out), out.length + 1);
     text_free(&out);
@@ -1037,30 +1099,46 @@ struct type *sema_copy_of(struct checker *c, struct type *generic,
                           struct pos pos)
 {
     size_t want = generic->type_param_count;
+    size_t outer = want - sema_nested_own(generic);
     struct type **args;
     const struct symbolic **values;
     bool ok = true;
     size_t i;
 
-    if (want == 0) {
+    if (want == outer) {
         sema_error_at(c, pos, "`%s` is not generic", sema_tn(generic));
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (count != want) {
+    if (count != want - outer) {
         sema_error_at(c, pos, "`%s` takes %zu type argument%s, found %zu",
-                      sema_tn(generic), want, want == 1 ? "" : "s", count);
+                      sema_tn(generic), want - outer,
+                      want - outer == 1 ? "" : "s", count);
         return sema_builtin(c, TYPE_ERROR);
     }
     args = types_alloc_array(c->arena, want + 1, sizeof *args);
     values = types_alloc_array(c->arena, want + 1, sizeof *values);
-    for (i = 0; i < want; i++) {
+    /* A type nested in a generic class is named in its body, where the
+       parameters of the class stand for themselves. */
+    for (i = 0; i < outer; i++) {
+        struct type *p = generic->type_params[i];
+        args[i] = p->param->constant ? NULL : p;
+        values[i] = p->param->constant ? param_value(p) : NULL;
+    }
+    for (i = outer; i < want; i++) {
         ok = resolve_arg(c, &generic->name, generic->type_params[i],
-                         written[i], &args[i], &values[i]) && ok;
+                         written[i - outer], &args[i], &values[i]) && ok;
     }
     if (!ok) {
         return sema_builtin(c, TYPE_ERROR);
     }
     return make_copy(c, generic, args, values, pos);
+}
+
+size_t sema_nested_own(const struct type *t)
+{
+    return t->nested_in != NULL
+               ? t->type_param_count - t->nested_in->type_param_count
+               : t->type_param_count;
 }
 
 /* The type a member of the copy has there: the type fn of the member of
@@ -1112,6 +1190,9 @@ struct type *sema_generic_named(struct checker *c, struct expr *e,
     if (s != NULL && (s == t || s->generic == t)) {
         return s;
     }
+    if (t->nested_in != NULL && sema_nested_own(t) == 0) {
+        return t;
+    }
     if (in_generic(c) && sema_checking_class(c) == t) {
         return t;
     }
@@ -1151,7 +1232,15 @@ static void unify(struct type *param, struct type *arg,
         arg->kind == TYPE_NONE) {
         return;
     }
+    /* DESIGN: a type argument of function type is the plain form, one C
+       function pointer. A function type is that wherever a type stands
+       but at a parameter. A closure, or a parameter of the form of two
+       words, that gives it is held to the rules of `keep`, as at a
+       field. */
     if (param->kind == TYPE_PARAM) {
+        if (arg->kind == TYPE_FN && arg->context && map->types != NULL) {
+            arg = types_fn_form(map->types, arg, false, false);
+        }
         for (i = 0; i < map->count; i++) {
             if (map->params[i] == param && map->args[i] == NULL &&
                 !param->param->constant) {
@@ -1283,10 +1372,9 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
             map.to = copy;
         } else if (copy == outer) {
             for (i = 0; i < outer_count; i++) {
-                map.args[i] = outer->type_params[i]->param->constant
-                                  ? NULL
-                                  : outer->type_params[i];
-                map.values[i] = NULL;
+                struct type *p = outer->type_params[i];
+                map.args[i] = p->param->constant ? NULL : p;
+                map.values[i] = p->param->constant ? param_value(p) : NULL;
             }
         }
     }
@@ -1300,7 +1388,12 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
     /* DESIGN: inference reads the arguments of the call, in order, and
        never the body or a later use of the result. An argument whose
        parameter names an unbound parameter is checked without a type
-       expected, and its type binds what stands in the same place. */
+       expected, and its type binds what stands in the same place. The
+       receiver of a generic function called as `v.f(args)` is its first
+       argument. */
+    for (i = 0; outer == NULL && i < fixed && i < fn->param_count; i++) {
+        unify(fn->params[i], e->as.call.args[i]->type, &map);
+    }
     for (i = fixed; i < e->as.call.arg_count && i < fn->param_count; i++) {
         struct type *p = subst(c, fn->params[i], &map);
         struct type *t;
@@ -1363,6 +1456,136 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
     e->as.call.copy_values = map.values;
     e->as.call.copy_count = map.count;
     return subst(c, fn, &map);
+}
+
+/* Check the arguments that map gives the generic function it against its
+   constraints and record them on call for its copy. Gives the signature
+   fn of the copy, or NULL when a parameter has no argument. */
+static struct type *finish_copy(struct checker *c, struct expr *call,
+                                struct type *fn, const struct item *it,
+                                struct generic_map *map)
+{
+    size_t i;
+
+    for (i = 0; i < map->count; i++) {
+        const struct type *p = map->params[i];
+        if (map->args[i] == NULL && map->values[i] == NULL) {
+            sema_error_at(c, call->pos, "nothing in the arguments gives `%.*s` "
+                          "of `%.*s`, so the call writes it out after the "
+                          "name", (int)p->name.length, p->name.text,
+                          (int)it->name.length, it->name.text);
+            return NULL;
+        }
+        if (map->args[i] != NULL) {
+            check_meets(c, map->args[i], p, &it->name, call->pos);
+        }
+    }
+    call->as.call.copy_args = map->args;
+    call->as.call.copy_values = map->values;
+    call->as.call.copy_count = map->count;
+    return subst(c, fn, map);
+}
+
+/* DESIGN: a generic `worker fn` named by `parallel` or `dispatch` takes
+   its arguments as a call does. They are written after its name, or
+   they come from the values it is given. The chunk or the object
+   comes first, then the arguments of the call. The copy's signature is
+   then checked against the worker rules, with the concrete types. */
+struct type *sema_worker_copy(struct checker *c, struct expr *call,
+                              struct type *fn, const struct symbol *sym,
+                              struct type *first)
+{
+    const struct item *it = sym->item;
+    struct expr *callee = call->as.call.callee;
+    size_t count = it->type_param_count;
+    struct type **params;
+    struct generic_map map;
+    size_t i;
+
+    if (callee->type_arg_count > 0 && callee->type_arg_count != count) {
+        sema_error_at(c, callee->type_args_pos,
+                      "`%.*s` takes %zu type argument%s, found %zu",
+                      (int)it->name.length, it->name.text, count,
+                      count == 1 ? "" : "s", callee->type_arg_count);
+        return NULL;
+    }
+    params = types_alloc_array(c->arena, count + 1, sizeof *params);
+    memset(&map, 0, sizeof map);
+    map.types = c->types;
+    map.count = count;
+    map.params = params;
+    map.args = types_alloc_array(c->arena, count + 1, sizeof *map.args);
+    map.values = types_alloc_array(c->arena, count + 1, sizeof *map.values);
+    for (i = 0; i < count; i++) {
+        params[i] = it->type_params[i].type;
+    }
+    for (i = 0; i < callee->type_arg_count; i++) {
+        if (!resolve_arg(c, &it->name, params[i], callee->type_args[i],
+                         &map.args[i], &map.values[i])) {
+            return NULL;
+        }
+    }
+    unify(fn->params[0], first, &map);
+    for (i = 0; i < call->as.call.arg_count && i + 1 < fn->param_count; i++) {
+        struct expr *arg = call->as.call.args[i];
+        struct type *p = subst(c, fn->params[i + 1], &map);
+        struct type *t;
+        if (!sema_has_params(p)) {
+            continue;
+        }
+        t = sema_check_expr(c, arg, NULL);
+        if (sema_is_error(t)) {
+            return NULL;
+        }
+        arg->prechecked = true;
+        unify(p, t, &map);
+    }
+    return finish_copy(c, call, fn, it, &map);
+}
+
+/* DESIGN: an operator on a copy of a generic struct calls the generic
+   `operator fn` of its module. Its arguments come from the types of the
+   operands, as those of a call come from its arguments. A function of
+   a copy of a generic class takes the arguments of the copy. */
+struct type *sema_operator_copy(struct checker *c, struct expr *call,
+                                struct type *fn, const struct symbol *sym,
+                                struct type *left, struct type *right)
+{
+    const struct item *it = sym->item;
+    const struct item *owner = it != NULL ? it->owner : NULL;
+    size_t count = it != NULL ? it->type_param_count : 0;
+    struct type **params;
+    struct generic_map map;
+    size_t i;
+
+    if (owner != NULL && owner->type_param_count > 0 && count == 0) {
+        struct type *copy = copy_in_chain(left, owner->symbol->type);
+        return copy != NULL ? sema_member_type(c, fn, copy) : fn;
+    }
+    if (count == 0 || owner != NULL) {
+        return fn;
+    }
+    params = types_alloc_array(c->arena, count + 1, sizeof *params);
+    memset(&map, 0, sizeof map);
+    map.types = c->types;
+    map.count = count;
+    map.params = params;
+    map.args = types_alloc_array(c->arena, count + 1, sizeof *map.args);
+    map.values = types_alloc_array(c->arena, count + 1, sizeof *map.values);
+    for (i = 0; i < count; i++) {
+        params[i] = it->type_params[i].type;
+    }
+    if (fn->param_count > 0) {
+        struct type *first = fn->params[0];
+        unify(first, first->kind == TYPE_POINTER && left->kind != TYPE_POINTER
+                         ? types_pointer(c->types, left)
+                         : left,
+              &map);
+    }
+    if (fn->param_count > 1 && right != NULL) {
+        unify(fn->params[1], right, &map);
+    }
+    return finish_copy(c, call, fn, it, &map);
 }
 
 /* Operators on a type parameter */
