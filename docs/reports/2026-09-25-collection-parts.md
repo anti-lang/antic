@@ -93,3 +93,20 @@ No compile warning on the host, ASan and UBSan builds. The linker prints
 1082, ASan 1081 of 1081 and UBSan 1081 of 1081. The docs-style checker reports
 nothing on every touched file but `tests/CMakeLists.txt`, whose `#` comments
 it reads as Markdown headings, as before.
+
+## Proof of the push
+
+After the push of `3d3c8bc`:
+
+```text
+$ git log --oneline -3
+3d3c8bc Report the parts every collection shares
+d878be1 Build the parts every collection shares in anti.collection
+05ff7eb Meet Iterable<T> and Iterator<T> of anti.collection through the hooks
+$ git status --short
+$ git rev-parse HEAD origin/main
+3d3c8bc3c3e94a46a222a0e6b1df57b84a313f64
+3d3c8bc3c3e94a46a222a0e6b1df57b84a313f64
+```
+
+Suite pass counts: host 1082 of 1082, ASan 1081 of 1081, UBSan 1081 of 1081.
