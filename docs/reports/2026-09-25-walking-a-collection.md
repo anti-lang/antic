@@ -86,3 +86,18 @@ No compile warning on the host, ASan and UBSan builds. The linker prints
 of 1053, ASan 1052 of 1052 and UBSan 1052 of 1052. The docs-style checker
 reports nothing on every touched file but `tests/CMakeLists.txt`, whose `#`
 comments it reads as Markdown, as before.
+
+## Proof of the push
+
+After the push of `2eb6be1`:
+
+```text
+$ git log --oneline -3
+2eb6be1 Report walking a collection
+0dbeb92 Record walking a collection in the decisions and the overview
+143f618 Build the language part of walking a collection
+$ git status --short
+$ git rev-parse HEAD origin/main
+2eb6be1b1feede257f9803865c0baf4677079093
+2eb6be1b1feede257f9803865c0baf4677079093
+```
