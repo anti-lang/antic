@@ -957,8 +957,8 @@ struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
     return operator_symbol(c, t, text);
 }
 
-/* Whether sym is a function written `operator fn`, of this module or of
-   a library file. */
+/* Whether sym is a function written `operator fn`, of the module being
+   checked or of a library file. */
 static bool symbol_is_operator(const struct symbol *sym)
 {
     return sym->item != NULL ? sym->item->is_operator : sym->is_operator;

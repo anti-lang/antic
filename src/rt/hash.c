@@ -1,10 +1,10 @@
 /* The hash of text and bytes, and the seed of the hashing collections.
 
    DESIGN: the seed is chosen from the random source of the system when
-   the runtime starts, so the keys an attacker picks cannot all land in
-   one bucket of a collection. The key `hash_seed` of the configuration,
-   `--anti.hash_seed=<n>` on the command line, fixes it, so a test sees
-   the same buckets on every run. A collection reads the seed once, when
+   the runtime starts. The keys an attacker picks then cannot all land in
+   one bucket of a collection. The key `hash_seed` of the configuration
+   fixes it, and so does `--anti.hash_seed=<n>` on the command line. A
+   test then sees the same buckets on every run. A collection reads the seed once, when
    it is made, and mixes it into the hash of every key. A later change
    of the key therefore reaches the collections made after it. */
 #include <stdint.h>

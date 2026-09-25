@@ -2,11 +2,10 @@
 
    DESIGN: one definition read from both sides. antic writes the default
    hash of a value inline with these constants, and the runtime hashes
-   text and bytes with them, so a value and the text it holds hash the
-   same way on every target. A scalar is its 64 bits through the
-   finalizer of MurmurHash3. A value of parts starts at the offset basis
-   of FNV-1a and takes each part as the mix of the hash so far xor the
-   hash of the part. */
+   text and bytes with them. Every target then gives one hash for one
+   value. A scalar is its 64 bits through the finalizer of MurmurHash3. A
+   value of parts starts at the offset basis of FNV-1a. It takes each part
+   as the mix of the hash so far xor the hash of the part. */
 #ifndef ANTI_HASH_H
 #define ANTI_HASH_H
 

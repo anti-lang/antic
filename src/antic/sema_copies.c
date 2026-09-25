@@ -992,9 +992,9 @@ static struct expr *receiver(struct clone *cl, struct expr *n,
     return value;
 }
 
-/* Whether e means what the argument of a type parameter makes of it: an
-   operator, or `e[i]`, on a value of one, and `x.hash()` on a value of a
-   type that names one. */
+/* Whether e means what the argument of a type parameter makes of it. An
+   operator and `e[i]` on a value of one do, and so does `x.hash()` on a
+   value of a type that names one. */
 static bool open_node(const struct expr *e)
 {
     switch (e->kind) {

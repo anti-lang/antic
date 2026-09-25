@@ -31,7 +31,7 @@ static bool has_own_hash(struct checker *c, struct type *t)
 
 /* The checked call of the function of type t that hashes a value of it
    inside the value x.hash() hashes. The receiver stands for that value
-   and is never lowered: lowering reads the function the callee names,
+   and is never lowered. Lowering reads the function the callee names,
    and a copy of a generic names its copy there. */
 static struct expr *nested_call(struct checker *c, struct pos pos,
                                 struct type *t)
@@ -84,10 +84,10 @@ static void add_call(struct checker *c, struct expr *e, struct type *t)
     e->as.call.hash_calls = calls;
 }
 
-/* Walk the value of type t that the default hash of the call e reaches,
-   and give e the call of every function of a struct or a variant inside
-   it. A class value calls the `hash` of its chain, which lowering finds
-   in its members. A pointer is hashed by its address and reaches
+/* Walk the value of type t that the default hash of the call e reaches.
+   Give e the call of every function of a struct or a variant inside it.
+   A class value calls the `hash` of its chain, which lowering finds in
+   its members. A pointer is hashed by its address and reaches
    nothing. A value of a type parameter needs the hook. */
 static void walk(struct checker *c, struct expr *e, struct type *t)
 {

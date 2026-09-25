@@ -6,15 +6,15 @@
 #include "target.h"
 
 /* DESIGN: a scalar hashes as the 64 bits of its value through the
-   finalizer of MurmurHash3, which spreads every bit of the input over
-   every bit of the output. A value made of parts starts at the offset
-   basis of FNV-1a and takes each part in order, as the mix of the hash
-   so far xor the hash of the part. The order of the parts therefore
-   counts. Text and bytes go to `anti_rt_hash_bytes` of src/rt/hash.c,
-   which takes eight bytes at a time through the same finalizer. The
+   finalizer of MurmurHash3. The finalizer spreads every bit of the input
+   over every bit of the output. A value made of parts starts at the
+   offset basis of FNV-1a. It takes each part in order, as the mix of the
+   hash so far xor the hash of the part. The order of the parts counts.
+   Text and bytes go to `anti_rt_hash_bytes` of src/rt/hash.c.
+   It takes eight bytes at a time through the same finalizer. The
    constants stand in src/rt/hash.h, which both sides read. Every target
-   gives the same hash for the same value, and the seed of a hashing
-   collection is mixed in by the collection. */
+   gives the same hash for the same value. A hashing collection mixes its
+   seed in itself. */
 
 static const struct name hash_name = {"hash", 4};
 
