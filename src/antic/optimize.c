@@ -1430,6 +1430,75 @@ static void remap_const(struct ir_const *c, const uint32_t *map,
    is main in module entry, or every function of that module when it has
    no main or when all is set. Every export fn is an entry too, because C
    code may call it. */
+static uint64_t global_hash(const struct ir_global *g)
+{
+    uint64_t h = 1469598103934665603u;
+    const char *p;
+
+    for (p = g->module; *p != '\0'; p++) {
+        h = (h ^ (unsigned char)*p) * 1099511628211u;
+    }
+    h = (h ^ '.') * 1099511628211u;
+    for (p = g->name; *p != '\0'; p++) {
+        h = (h ^ (unsigned char)*p) * 1099511628211u;
+    }
+    return h;
+}
+
+/* DESIGN: a whole program holds the declaration that one module writes
+   for a datum of another beside the definition that module wrote. The
+   library files are read one after the other. A live declaration
+   keeps the definition of the same module and name alive, which the
+   object then holds under that name. The definition of each declaration
+   by index, or IR_NO_INDEX, found through a table hashed by the name. */
+static uint32_t *definitions_of(const struct ir_module *m)
+{
+    uint32_t *out = ir_alloc(m->global_count, sizeof *out);
+    uint32_t *table;
+    size_t capacity = 1;
+    size_t i;
+
+    while (capacity < 2 * m->global_count + 2) {
+        capacity *= 2;
+    }
+    table = ir_alloc(capacity, sizeof *table);
+    for (i = 0; i < capacity; i++) {
+        table[i] = IR_NO_INDEX;
+    }
+    for (i = 0; i < m->global_count; i++) {
+        const struct ir_global *g = m->globals[i];
+        size_t slot;
+        out[i] = IR_NO_INDEX;
+        if (g->is_extern || g->module == NULL) {
+            continue;
+        }
+        slot = (size_t)global_hash(g) & (capacity - 1);
+        while (table[slot] != IR_NO_INDEX) {
+            slot = (slot + 1) & (capacity - 1);
+        }
+        table[slot] = (uint32_t)i;
+    }
+    for (i = 0; i < m->global_count; i++) {
+        const struct ir_global *g = m->globals[i];
+        size_t slot;
+        if (!g->is_extern || g->module == NULL) {
+            continue;
+        }
+        slot = (size_t)global_hash(g) & (capacity - 1);
+        while (table[slot] != IR_NO_INDEX) {
+            const struct ir_global *d = m->globals[table[slot]];
+            if (strcmp(d->module, g->module) == 0 &&
+                strcmp(d->name, g->name) == 0) {
+                out[i] = table[slot];
+                break;
+            }
+            slot = (slot + 1) & (capacity - 1);
+        }
+    }
+    free(table);
+    return out;
+}
+
 static void remove_unused_functions(struct ir_module *m, const char *entry,
                                     bool all)
 {
@@ -1437,6 +1506,7 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
     bool *live_globals = ir_alloc(m->global_count, sizeof *live_globals);
     uint32_t *map = ir_alloc(m->function_count, sizeof *map);
     uint32_t *global_map = ir_alloc(m->global_count, sizeof *global_map);
+    uint32_t *defined = definitions_of(m);
     bool has_main = false;
     bool grew = true;
     size_t n = 0;
@@ -1490,6 +1560,11 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
             }
             if (live_globals[i] && g->value != NULL) {
                 mark_const(m, g->value, live, live_globals, &grew);
+            }
+            if (live_globals[i] && defined[i] != IR_NO_INDEX &&
+                !live_globals[defined[i]]) {
+                live_globals[defined[i]] = true;
+                grew = true;
             }
         }
     }
@@ -1552,6 +1627,7 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
     free(live_globals);
     free(map);
     free(global_map);
+    free(defined);
 }
 
 void ir_optimize(struct ir_module *program, const char *entry)
