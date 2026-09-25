@@ -1059,6 +1059,30 @@ foreach(name IN ITEMS sorted_map sorted_set sorted_order sorted_trap)
         FIXTURES_REQUIRED
             "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;reflect_dev_object;collection_sorted_dev_object")
 endforeach()
+# The maps of anti.collection.map in dev mode, with the object of the
+# module beside those of the modules it imports.
+add_test(NAME dev_object_collection_map
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_map_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/collection/map.antl")
+set_tests_properties(dev_object_collection_map PROPERTIES
+    FIXTURES_SETUP collection_map_dev_object)
+foreach(name IN ITEMS map hash_map)
+    add_test(NAME std_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_map_dev${anti_object}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_tests_properties(std_${name}_dev PROPERTIES
+        FIXTURES_REQUIRED
+            "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_map_dev_object")
+endforeach()
 
 # Every failing function of src/std/ is written with `may fail`, apart from
 # a binding, which refuses it.

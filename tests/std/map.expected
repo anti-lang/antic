@@ -1,0 +1,62 @@
+exit 0
+empty: 0 true
+{}
+{"Ann": 41, "Bob": 31, "Cy": 7, "Dee": 22}
+add: true false, count 4 false
+get: 7 -1, contains: true false
+remove: 31 -1, count 3
+{"Ann": 41, "Cy": 7, "Dee": 22}
+update true false, read true false 42, modify true
+key Ann
+key Cy
+key Dee
+value 42
+value 70
+value 22
+Ann = 1042
+Cy = 1070
+Dee = 1022
+{"Ann": 42, "Cy": 70, "Dee": 22}
+after removals: 1 2 4 6 7 8
+added again: 1 2 4 6 7 8 3 20
+after growth: 1 2 4 6 7 8 3 20
+{1: 1000, 2: 4, 4: 16, 6: 36, 7: 49, 8: 64, 3: 333, 20: 400}
+at the ends: 2 4 6 7 8 3 21
+found 2 20
+found 4 40
+found 6 60
+first 3, one 4
+`find_one` found 4 elements where it needs exactly one
+update_all 3 0
+{1: 11, 2: 20, 3: 31, 4: 40, 5: 51, 6: 60}
+update_first true
+{1: 11, 2: 2, 3: 31, 4: 40, 5: 0, 6: 60}
+remove 2 4 2
+{5: 0, 6: 60}
+order kept: 5 6 8
+clear: 0 true
+{}
+after clear: 5
+made with room: 1 allocation, capacity 100
+past it: 2 allocations
+after the block: 2 frees
+small start: capacity 8
+doubled: capacity 16
+reserve: capacity 109 in 1 allocation
+shrink: capacity 5
+shrunk: 1 6 7 8 9
+shrink empty: capacity 0, 0 blocks
+{2: "two", 1: "one"}
+{"Ann":41,"say \"hi\"":2}[[2,"two"],[1,"one"]]{}[]
+{"x": 1}
+{"x": 10, "y": 2, "z": 3}
+dup owned: 10 11 2, 12 blocks
+after the block: 0 blocks
+replaced: 6 blocks
+removed 20: 5 blocks
+refused add false: 5 blocks
+walk 1 11
+key kept 1: 6 blocks
+after the block: 0 blocks
+churn: 312 entries, 312 walked, 0 blocks beyond them
+after churn: 0 blocks, 0 blocks of room

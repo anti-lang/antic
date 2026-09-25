@@ -1,0 +1,58 @@
+exit 0
+empty: 0 true
+empty {}
+set {"Ann":41,"Bob":31,"Cy":7,"Dee":22}
+add: true false, count 4 false
+get: 7 -1, contains: true false
+remove: 31 -1, count 3
+update true false, read true false 42, modify true
+changed {"Ann":42,"Cy":70,"Dee":22}
+keys 8 letters, values 134
+walks: 3134
+after {"Ann":42,"Cy":70,"Dee":22}
+{"only": 1}
+walks: 40 of 40 saw all 37, orders differ: true
+keys: 37, find_all: 37
+find_all 3 120, first 3, one 4
+`find_one` found 4 elements where it needs exactly one
+update_all 3 0
+update_all [[1,11],[2,20],[3,31],[4,40],[5,51],[6,60]]
+update_first true
+update_one [[1,11],[2,2],[3,31],[4,40],[5,0],[6,60]]
+remove 2 4 2
+removed [[5,0],[6,60]]
+clear: 0 true
+clear []
+after clear [[5,5]]
+made with room: 1 allocation, capacity 128
+past it: 2 allocations, capacity 256
+after the block: 2 frees
+small start: capacity 8
+doubled: capacity 16
+reserve: capacity 128 in 1 allocation
+shrink: capacity 8
+shrunk [[1,1]]
+shrink empty: capacity 0, 0 blocks
+{"Ann":41,"Bob":30,"Cy":7,"say \"hi\"":2}
+[[0,"n"],[1,"n"],[2,"n"],[3,"n"],[4,"n"],[5,"n"],[6,"n"],[7,"n"],[8,"n"],[9,"n"],[10,"n"],[11,"n"]]
+[[-5,false],[0,true],[3,true]]
+[[-1.25,2],[0.5,3],[2.5,1]]
+[["a",2],["m",3],["z",1]]
+[[2,2],[9223372036854775808,3],[18446744073709551615,-1]]
+[[-100,"c"],[-7,"a"],[40,"b"]]
+[[-0.5,"y"],[3.5,"x"]]
+[[false,0],[true,1]]
+[[{"x":1,"y":2},3]]
+{{"x": 1, "y": 2}: 3}
+original {"x":1}
+copy {"x":10,"y":2,"z":3}
+dup owned: 10 11 2, 12 blocks
+after the block: 0 blocks
+replaced: 6 blocks
+removed 20: 5 blocks
+refused add false: 5 blocks
+walk 1 11
+key kept 1: 6 blocks
+after the block: 0 blocks
+churn: 312 entries, 312 walked, 0 blocks beyond them, capacity 1024
+after churn: 0 blocks, 0 blocks of room

@@ -1,0 +1,1548 @@
+//! Maps from keys to values that find a key by its hash.
+//!
+//! `Map<K, V>` keeps its entries in one array in insertion order, with a hash
+//! table of positions into it, so it walks in the same order on every run and
+//! every machine. `HashMap<K, V>` keeps its entries in the hash table itself
+//! and walks them in an order it chooses at random on every walk, so no program
+//! comes to depend on it. Both mix the hash of a key with the seed that
+//! `lang.hash_seed()` gives when the map is made.
+//!
+//! `EntryTable<E>` and `SlotTable<E>` hold the two layouts for any element, and
+//! the sets of `anti.collection.set` build on them as well.
+
+import anti.collection;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
+extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
+	arg: ?*byte);
+extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
+	arg: ?*byte);
+
+/// The bit every kept hash carries, so a live mark is never 0 or `REMOVED`.
+const LIVE: u64 = 0x8000000000000000;
+
+/// The mark of a bucket or a slot whose entry was removed.
+const REMOVED: u64 = 1;
+
+/// The number of buckets or slots a table starts with.
+const FIRST_BUCKETS: int = 16;
+
+/// The depth of a map or a set in its chain of descriptors: the root, then
+/// `Collection`, then the table, then the class.
+pub const TYPE_DEPTH: int = 3;
+
+/// The type ids of the records of a descriptor that the map reads, as `enum
+/// anti_type` of `src/rt/object.h` and `reflect.TypeId` number them.
+///
+/// DESIGN: the map reads them without importing `anti.reflect`, whose
+/// descriptors every program that uses a map would link. The test
+/// `std_hash_map` sorts keys of each of these types, which a wrong number
+/// leaves out of order.
+const TYPE_NONE: int = 0;
+const TYPE_BOOL: int = 1;
+const TYPE_CHAR: int = 2;
+const TYPE_I8: int = 3;
+const TYPE_I16: int = 4;
+const TYPE_I32: int = 5;
+const TYPE_I64: int = 6;
+const TYPE_CLONG: int = 7;
+const TYPE_U8: int = 8;
+const TYPE_U16: int = 9;
+const TYPE_U32: int = 10;
+const TYPE_U64: int = 11;
+const TYPE_CULONG: int = 12;
+const TYPE_CWCHAR: int = 13;
+const TYPE_F32: int = 14;
+const TYPE_F64: int = 15;
+const TYPE_STR: int = 16;
+
+/// One record of a type in a descriptor.
+///
+/// DESIGN: the layout is that of `struct anti_field` of `src/rt/object.h`,
+/// which `anti_rt_type_arg` gives for each type argument of a class. The map
+/// reads the type id of its key from it.
+struct Record
+{
+	name: ?*byte,
+	name_length: int,
+	offset: int,
+	type_id: int,
+	owned: int,
+	descriptor: ?*byte,
+}
+
+/// The table of `Map<K, V>` and `Set<T>`: the entries in one array in the order
+/// they were added, and a hash table of their positions.
+///
+/// DESIGN: one block holds the entries, the marked hash of each entry and the
+/// buckets, so `new(capacity)` and `reserve(n)` allocate once. A bucket is two
+/// words, the marked hash and the position. A removed entry keeps its position
+/// with a hash of 0 until the room is rebuilt, and its bucket is marked
+/// `REMOVED`, so no other entry moves and the order stays. The room is rebuilt
+/// when it is full, in place when a quarter of it holds removed entries and
+/// twice as large otherwise. Buckets are at least twice the entries, so a probe
+/// always meets an empty bucket.
+pub abstract class EntryTable<E> inherits collection.Collection<E>
+{
+	/// The entries, `used` of them written, some of them removed.
+	protected entries: ?*E = none,
+	/// The marked hash of each entry, or 0 for one that was removed.
+	protected hashes: ?*u64 = none,
+	/// The number of entries written, removed ones included.
+	protected used: int = 0,
+	/// The seed mixed into every hash, read when the table was made.
+	protected seed: u64 = 0,
+	/// The block of room, from the allocator of the collection.
+	block: ?*byte = none,
+	/// Two words per bucket: the marked hash and the position.
+	buckets: ?*u64 = none,
+	/// The number of entries the room holds.
+	room_size: int = 0,
+	/// The number of buckets, a power of two.
+	bucket_count: int = 0,
+
+	/// The hash of the key of the element at `e`, before the seed.
+	abstract fn entry_hash(self, e: *E) -> u64;
+
+	/// The number of elements the room holds before it grows.
+	pub fn capacity(self) -> int
+	{
+		return self.room_size;
+	}
+
+	/// Make room for `n` more elements, in one allocation.
+	pub fn reserve(self, n: int)
+	{
+		if n > 0 && self.count + n > self.room_size - (self.used - self.count) {
+			self.rebuild(self.count + n);
+		}
+	}
+
+	/// Give back the room that holds no element.
+	pub fn shrink(self)
+	{
+		if self.room_size > self.count {
+			self.rebuild(self.count);
+		}
+	}
+
+	/// The hash `h` of a key mixed with the seed and marked live.
+	protected fn marked(self, h: u64) -> u64
+	{
+		return lang.seeded(h, self.seed) | LIVE;
+	}
+
+	/// The position of the entry of the marked hash `h` that `same` accepts, or
+	/// -1.
+	protected fn position(self, h: u64, same: fn(lent *E) -> bool) -> int
+	{
+		let words = self.buckets else {
+			return -1;
+		};
+		let entries = self.entries catch fatal;
+		let mask = self.bucket_count - 1;
+		let i = (h & (mask as u64)) as int;
+		while words[2 * i] != 0 do {
+			if words[2 * i] == h {
+				let at = words[2 * i + 1] as int;
+				if same(&entries[at]) {
+					return at;
+				}
+			}
+			i = (i + 1) & mask;
+		}
+		return -1;
+	}
+
+	/// The entry at the position `at`, which a function of the table reads in
+	/// place.
+	protected fn entry(self, at: int) -> *E
+	{
+		let entries = self.entries catch fatal;
+		return &entries[at];
+	}
+
+	/// The new entry of the marked hash `h` at the end, which holds zero bytes
+	/// until the caller writes each of its parts. No entry of the table has its
+	/// key.
+	///
+	/// DESIGN: the caller writes the parts of the entry in place, `e.1 = v`,
+	/// since a tuple literal cannot take an `own` parameter that owns memory.
+	protected fn append(self, h: u64, at: lang.SourceLocation) -> *E
+	{
+		if self.used == self.room_size {
+			self.make_room();
+		}
+		let entries = self.entries catch fatal;
+		let hashes = self.hashes catch fatal;
+		let made = self.used;
+		hashes[made] = h;
+		self.place(h, made);
+		self.used += 1;
+		self.resized(1, at);
+		return &entries[made];
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		return self.next_place(-1);
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		let hashes = self.hashes else {
+			return -1;
+		};
+		let i = at + 1;
+		while i < self.used do {
+			if hashes[i] != 0 {
+				return i;
+			}
+			i += 1;
+		}
+		return -1;
+	}
+
+	concrete fn copy_place(self, at: int) -> E
+	{
+		return self.copy_element(self.entry(at));
+	}
+
+	concrete fn take_place(self, at: int) -> (E, int)
+	{
+		let entries = self.entries catch fatal;
+		let hashes = self.hashes catch fatal;
+		self.forget(at);
+		hashes[at] = 0;
+		let after = self.next_place(at);
+		let taken = (entries[at], after);
+		memset(&entries[at] as ?*byte, 0, size_of(E) as c_size_t);
+		return taken;
+	}
+
+	/// Move the element at the place `at` out of the table. `count` still
+	/// counts it, and the caller takes it off.
+	protected fn take_entry(self, at: int) -> E
+	{
+		let (taken, after) = self.take_place(at);
+		return taken;
+	}
+
+	/// A copy of every element in new room of the same allocator.
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *EntryTable<E>;
+		made.entries = none;
+		made.hashes = none;
+		made.block = none;
+		made.buckets = none;
+		made.used = 0;
+		made.room_size = 0;
+		made.bucket_count = 0;
+		made.count = 0;
+		made.rebuild(self.count);
+		let hashes = self.hashes else {
+			return;
+		};
+		let i = 0;
+		while i < self.used do {
+			if hashes[i] != 0 {
+				let slot = made.append(hashes[i], self.changes.at);
+				*slot = self.copy_element(self.entry(i));
+			}
+			i += 1;
+		}
+		made.changes.count = 0;
+	}
+
+	fn destruct(self)
+	{
+		let hashes = self.hashes else {
+			return;
+		};
+		let i = self.used - 1;
+		while i >= 0 do {
+			if hashes[i] != 0 {
+				self.destroy_element(self.entry(i));
+			}
+			i -= 1;
+		}
+		self.from.free(self.block);
+	}
+
+	/// Write the position `at` of the marked hash `h` into its bucket.
+	fn place(self, h: u64, at: int)
+	{
+		let words = self.buckets catch fatal;
+		let mask = self.bucket_count - 1;
+		let i = (h & (mask as u64)) as int;
+		while words[2 * i] != 0 && words[2 * i] != REMOVED do {
+			i = (i + 1) & mask;
+		}
+		words[2 * i] = h;
+		words[2 * i + 1] = at as u64;
+	}
+
+	/// Mark the bucket of the entry at the position `at` removed.
+	fn forget(self, at: int)
+	{
+		let words = self.buckets catch fatal;
+		let hashes = self.hashes catch fatal;
+		let h = hashes[at];
+		let mask = self.bucket_count - 1;
+		let i = (h & (mask as u64)) as int;
+		while words[2 * i] != 0 do {
+			if words[2 * i] == h && words[2 * i + 1] == at as u64 {
+				words[2 * i] = REMOVED;
+				return;
+			}
+			i = (i + 1) & mask;
+		}
+	}
+
+	/// Room for one more entry: the same room without the removed entries when
+	/// a quarter of it holds them, and twice the room otherwise.
+	fn make_room(self)
+	{
+		let removed = self.used - self.count;
+		if self.room_size > 0 && removed * 4 >= self.room_size {
+			self.rebuild(self.room_size);
+		} else {
+			self.rebuild(self.grown(self.room_size, self.count + 1));
+		}
+	}
+
+	/// Move the entries into new room for `n`, in their order and without the
+	/// removed ones, and give back the old room. Room for none holds no block.
+	fn rebuild(self, n: int)
+	{
+		let old = self.block;
+		let old_entries = self.entries;
+		let old_hashes = self.hashes;
+		let old_used = self.used;
+		let buckets = 0;
+		let block: ?*byte = none;
+		if n > 0 {
+			buckets = FIRST_BUCKETS;
+			while buckets < 2 * n do {
+				buckets *= 2;
+			}
+			let at_hashes = aligned(n * size_of(E), 8);
+			let at_buckets = at_hashes + 8 * n;
+			let total = at_buckets + 16 * buckets;
+			let made = self.from.alloc(total, block_align(size_of(E))) catch fatal;
+			memset(made, 0, total as c_size_t);
+			self.entries = made as ?*E;
+			self.hashes = &made[at_hashes] as ?*u64;
+			self.buckets = &made[at_buckets] as ?*u64;
+			block = made;
+		} else {
+			self.entries = none;
+			self.hashes = none;
+			self.buckets = none;
+		}
+		self.block = block;
+		self.room_size = n;
+		self.bucket_count = buckets;
+		self.used = 0;
+		let from_hashes = old_hashes else {
+			return;
+		};
+		let from_entries = old_entries catch fatal;
+		let entries = self.entries else {
+			self.from.free(old);
+			return;
+		};
+		let hashes = self.hashes catch fatal;
+		let i = 0;
+		while i < old_used do {
+			let h = from_hashes[i];
+			if h != 0 {
+				memcpy(&entries[self.used] as ?*byte, &from_entries[i] as ?*byte,
+					size_of(E) as c_size_t);
+				hashes[self.used] = h;
+				self.place(h, self.used);
+				self.used += 1;
+			}
+			i += 1;
+		}
+		self.from.free(old);
+	}
+}
+
+/// The table of `HashMap<K, V>` and `HashSet<T>`: the entries in the slots of
+/// the hash table itself, with no order to keep.
+///
+/// DESIGN: one block holds a mark per slot and the slots. A mark is 0 for an
+/// empty slot, `REMOVED` for one whose entry was removed, and the marked hash
+/// otherwise, whose low bits give the slot again when the table grows. A
+/// removal moves no entry, so a walk that removes finds every entry once. The
+/// table grows before the live and the removed entries reach half the slots: to
+/// twice the slots when more than a quarter are live, and to the same number
+/// without the removed entries otherwise.
+///
+/// A walk starts at a random slot. A `for` also steps by a random odd stride,
+/// which visits every slot of a table of a power of two once.
+pub abstract class SlotTable<E> inherits collection.Collection<E>
+{
+	/// A mark per slot.
+	protected marks: ?*u64 = none,
+	/// The slots.
+	protected slots: ?*E = none,
+	/// The number of slots, a power of two, or 0 before the first entry.
+	protected size: int = 0,
+	/// The seed mixed into every hash, read when the table was made.
+	protected seed: u64 = 0,
+	/// The block of room, from the allocator of the collection.
+	block: ?*byte = none,
+	/// The number of slots marked `REMOVED`.
+	removed: int = 0,
+	/// The number of walks so far, which chooses the order of the next one.
+	walks: u64 = 0,
+
+	/// The hash of the key of the element at `e`, before the seed.
+	abstract fn entry_hash(self, e: *E) -> u64;
+
+	/// The number of elements the room holds before it grows.
+	pub fn capacity(self) -> int
+	{
+		return self.size / 2;
+	}
+
+	/// Make room for `n` more elements, in one allocation.
+	pub fn reserve(self, n: int)
+	{
+		if n > 0 && (self.count + self.removed + n) * 2 > self.size {
+			let size = FIRST_BUCKETS;
+			while size < 2 * (self.count + n) do {
+				size *= 2;
+			}
+			self.resize(size);
+		}
+	}
+
+	/// Give back the room that holds no element.
+	pub fn shrink(self)
+	{
+		let size = 0;
+		if self.count > 0 {
+			size = FIRST_BUCKETS;
+			while size < 2 * self.count do {
+				size *= 2;
+			}
+		}
+		if size < self.size || self.removed > 0 {
+			self.resize(size);
+		}
+	}
+
+	/// The hash `h` of a key mixed with the seed and marked live.
+	protected fn marked(self, h: u64) -> u64
+	{
+		return lang.seeded(h, self.seed) | LIVE;
+	}
+
+	/// The slot of the entry of the marked hash `h` that `same` accepts, or -1.
+	protected fn slot_of(self, h: u64, same: fn(lent *E) -> bool) -> int
+	{
+		let marks = self.marks else {
+			return -1;
+		};
+		let slots = self.slots catch fatal;
+		let mask = self.size - 1;
+		let i = (h & (mask as u64)) as int;
+		while marks[i] != 0 do {
+			if marks[i] == h && same(&slots[i]) {
+				return i;
+			}
+			i = (i + 1) & mask;
+		}
+		return -1;
+	}
+
+	/// The entry in the slot `at`, which a function of the table reads in
+	/// place.
+	protected fn entry(self, at: int) -> *E
+	{
+		let slots = self.slots catch fatal;
+		return &slots[at];
+	}
+
+	/// The new entry of the marked hash `h` in a free slot, which holds zero
+	/// bytes until the caller writes each of its parts, as `EntryTable<E>` has
+	/// it. No entry of the table has its key.
+	protected fn put(self, h: u64, at: lang.SourceLocation) -> *E
+	{
+		if (self.count + self.removed + 1) * 2 > self.size {
+			let size = self.size;
+			if size < FIRST_BUCKETS {
+				size = FIRST_BUCKETS;
+			} else if (self.count + 1) * 4 > size {
+				size *= 2;
+			}
+			self.resize(size);
+		}
+		let marks = self.marks catch fatal;
+		let slots = self.slots catch fatal;
+		let i = self.free_slot(h);
+		if marks[i] == REMOVED {
+			self.removed -= 1;
+		}
+		marks[i] = h;
+		self.resized(1, at);
+		return &slots[i];
+	}
+
+	/// A random number for the order of the next walk.
+	protected fn shuffle(self) -> u64
+	{
+		self.walks += 1;
+		return lang.seeded(self.walks, self.seed);
+	}
+
+	/// A place is the slot where the walk started in the high half and the
+	/// steps from it in the low half.
+	concrete fn first_place(self) -> int
+	{
+		if self.count == 0 {
+			return -1;
+		}
+		let start = (self.shuffle() & ((self.size - 1) as u64)) as int;
+		return self.live_from(start, 0);
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		return self.live_from(at >> 32, (at & 0xFFFFFFFF) + 1);
+	}
+
+	concrete fn copy_place(self, at: int) -> E
+	{
+		return self.copy_element(self.entry(self.slot_at(at)));
+	}
+
+	concrete fn take_place(self, at: int) -> (E, int)
+	{
+		let marks = self.marks catch fatal;
+		let slots = self.slots catch fatal;
+		let i = self.slot_at(at);
+		marks[i] = REMOVED;
+		self.removed += 1;
+		let after = self.next_place(at);
+		let taken = (slots[i], after);
+		memset(&slots[i] as ?*byte, 0, size_of(E) as c_size_t);
+		return taken;
+	}
+
+	/// The slot of the place `at`.
+	protected fn slot_at(self, at: int) -> int
+	{
+		return ((at >> 32) + (at & 0xFFFFFFFF)) & (self.size - 1);
+	}
+
+	/// Move the element at the place `at` out of the table. `count` still
+	/// counts it, and the caller takes it off.
+	protected fn take_entry(self, at: int) -> E
+	{
+		let (taken, after) = self.take_place(at);
+		return taken;
+	}
+
+	/// A copy of every element in new room of the same allocator.
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *SlotTable<E>;
+		made.marks = none;
+		made.slots = none;
+		made.block = none;
+		made.size = 0;
+		made.removed = 0;
+		made.count = 0;
+		made.reserve(self.count);
+		let marks = self.marks else {
+			return;
+		};
+		let i = 0;
+		while i < self.size do {
+			if marks[i] > REMOVED {
+				let slot = made.put(marks[i], self.changes.at);
+				*slot = self.copy_element(self.entry(i));
+			}
+			i += 1;
+		}
+		made.changes.count = 0;
+	}
+
+	fn destruct(self)
+	{
+		let marks = self.marks else {
+			return;
+		};
+		let i = self.size - 1;
+		while i >= 0 do {
+			if marks[i] > REMOVED {
+				self.destroy_element(self.entry(i));
+			}
+			i -= 1;
+		}
+		self.from.free(self.block);
+	}
+
+	/// The place of the first live slot at `step` or after it on the walk from
+	/// `start`, or -1.
+	fn live_from(self, start: int, step: int) -> int
+	{
+		let marks = self.marks else {
+			return -1;
+		};
+		let mask = self.size - 1;
+		let k = step;
+		while k < self.size do {
+			if marks[(start + k) & mask] > REMOVED {
+				return (start << 32) | k;
+			}
+			k += 1;
+		}
+		return -1;
+	}
+
+	/// The first empty or removed slot on the probe of the marked hash `h`.
+	fn free_slot(self, h: u64) -> int
+	{
+		let marks = self.marks catch fatal;
+		let mask = self.size - 1;
+		let i = (h & (mask as u64)) as int;
+		while marks[i] > REMOVED do {
+			i = (i + 1) & mask;
+		}
+		return i;
+	}
+
+	/// Move the entries into a table of `size` slots and give back the old
+	/// room. A table of no slots holds no block.
+	fn resize(self, size: int)
+	{
+		let old = self.block;
+		let old_marks = self.marks;
+		let old_slots = self.slots;
+		let old_size = self.size;
+		if size > 0 {
+			let at_slots = aligned(8 * size, block_align(size_of(E)));
+			let total = at_slots + size * size_of(E);
+			let made = self.from.alloc(total, block_align(size_of(E))) catch fatal;
+			memset(made, 0, total as c_size_t);
+			self.marks = made as ?*u64;
+			self.slots = &made[at_slots] as ?*E;
+			self.block = made;
+		} else {
+			self.marks = none;
+			self.slots = none;
+			self.block = none;
+		}
+		self.size = size;
+		self.removed = 0;
+		let from_marks = old_marks else {
+			return;
+		};
+		let from_slots = old_slots catch fatal;
+		let slots = self.slots else {
+			self.from.free(old);
+			return;
+		};
+		let marks = self.marks catch fatal;
+		let i = 0;
+		while i < old_size do {
+			let h = from_marks[i];
+			if h > REMOVED {
+				let to = self.free_slot(h);
+				memcpy(&slots[to] as ?*byte, &from_slots[i] as ?*byte,
+					size_of(E) as c_size_t);
+				marks[to] = h;
+			}
+			i += 1;
+		}
+		self.from.free(old);
+	}
+}
+
+/// A map in insertion order.
+///
+/// Lookup takes constant time on average. A walk gives the entries in the order
+/// their keys were first added, which a removal and a replaced value leave as
+/// it was, on every run and every machine. A key removed and added again goes
+/// to the end. The key type needs `==` and `hash`.
+///
+/// Reading gives a copy of a value. `set` and `add` take a copy of the key and
+/// the value itself. The keys of a map never change in place: `update_all` and
+/// the other functions that lend an entry put back a key that the change
+/// replaced.
+pub class Map<K: eq + hash, V> inherits EntryTable<(K, V)>
+{
+	/// An empty map with room for `capacity` entries from `from`, or from the C
+	/// library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Map<K, V>
+	{
+		let made = Map<K, V> {
+			from: collection.allocator(from),
+			seed: lang.hash_seed(),
+		};
+		made.reserve(capacity);
+		return made;
+	}
+
+	/// A copy of the value under `k`, or `none`.
+	pub fn get(self, k: K) -> ?V
+	{
+		let at = self.find(k);
+		if at < 0 {
+			return none;
+		}
+		let e = self.entry(at);
+		return dup(e.1);
+	}
+
+	/// Whether the map holds the key `k`.
+	pub fn contains(self, k: K) -> bool
+	{
+		return self.find(k) >= 0;
+	}
+
+	/// Write `v` under `k`, replacing the value there. A new key goes to the
+	/// end of the order.
+	pub fn set(self, k: K, own v: V, at: lang.SourceLocation = here)
+	{
+		let h = self.marked(k.hash());
+		let found = self.position(h, fn(e) {
+			return e.0 == k;
+		});
+		let e = self.entry_for(found, h, k, at);
+		e.1 = v;
+	}
+
+	/// Write `v` under `k` when the map does not hold `k`. Gives `false` and
+	/// changes nothing when it does.
+	pub fn add(self, k: K, own v: V, at: lang.SourceLocation = here) -> bool
+	{
+		let h = self.marked(k.hash());
+		let found = self.position(h, fn(e) {
+			return e.0 == k;
+		});
+		if found >= 0 {
+			return false;
+		}
+		let e = self.append(h, at);
+		e.0 = dup(k);
+		e.1 = v;
+		return true;
+	}
+
+	/// Remove the entry of `k` and give its value, or `none`.
+	pub fn remove(self, k: K, at: lang.SourceLocation = here) -> ?V
+	{
+		let found = self.find(k);
+		if found < 0 {
+			return none;
+		}
+		let (key, value) = self.take_entry(found);
+		self.resized(-1, at);
+		return value;
+	}
+
+	/// Run `change` on the value under `k`, in place. Gives `false` when the
+	/// map does not hold `k`.
+	pub fn update(self, k: K, change: fn(lent *V)) -> bool
+	{
+		let found = self.find(k);
+		if found < 0 {
+			return false;
+		}
+		let e = self.entry(found);
+		change(&e.1);
+		return true;
+	}
+
+	/// Lend the value under `k` to `f`. Gives `false` when the map does not
+	/// hold `k`.
+	pub fn read(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.update(k, f);
+	}
+
+	/// Lend the value under `k` to `f`, which may change it. Gives `false` when
+	/// the map does not hold `k`.
+	pub fn modify(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.update(k, f);
+	}
+
+	/// The keys, in the order of the map.
+	pub fn keys(self) -> MapKeys<K, V>
+	{
+		return MapKeys<K, V>.over(self.entries, self.hashes, self.used,
+			self.watch());
+	}
+
+	/// The values, in the order of the map. `for v in &m.values()` lends each
+	/// one.
+	pub fn values(self) -> MapValues<K, V>
+	{
+		return MapValues<K, V>.over(self.entries, self.hashes, self.used,
+			self.watch());
+	}
+
+	operator fn iter(self) -> MapWalk<K, V>
+	{
+		return MapWalk<K, V>.over(self.entries, self.hashes, self.used,
+			self.watch());
+	}
+
+	concrete fn entry_hash(self, e: *(K, V)) -> u64
+	{
+		return e.0.hash();
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *(K, V)))
+	{
+		lend_entry(self.entry(at), f);
+	}
+
+	/// The entries as text, `{"Ann": 41, "Bob": 30}`, each key and value as
+	/// `to_text` of a collection writes an element.
+	concrete fn to_text(self) -> str
+	{
+		let out = text.Builder.new();
+		let key = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
+		let value = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
+		out.append("{");
+		let place = self.first_place();
+		while place >= 0 do {
+			let e = self.entry(place);
+			if place != self.first_place() {
+				out.append(", ");
+			}
+			anti_rt_element_text(&out, &e.0 as ?*byte, key);
+			out.append(": ");
+			anti_rt_element_text(&out, &e.1 as ?*byte, value);
+			place = self.next_place(place);
+		}
+		out.append("}");
+		return out.take();
+	}
+
+	/// Write the entries to `out` in the order of the map: a JSON object when
+	/// the keys are `str`, and an array of `[key, value]` pairs otherwise.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		let key = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
+		let value = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
+		let object = kind_of(key) == TYPE_STR;
+		open_entries(out, object);
+		let place = self.first_place();
+		let first = true;
+		while place >= 0 do {
+			let e = self.entry(place);
+			write_entry(out, object, first, &e.0 as ?*byte, key, &e.1 as ?*byte,
+				value);
+			first = false;
+			place = self.next_place(place);
+		}
+		close_entries(out, object);
+	}
+
+	/// The entry found at `found`, or a new one of the marked hash `h` with a
+	/// copy of the key `k` when `found` is -1.
+	fn entry_for(self, found: int, h: u64, k: K, at: lang.SourceLocation) -> *(K, V)
+	{
+		if found >= 0 {
+			return self.entry(found);
+		}
+		let e = self.append(h, at);
+		e.0 = dup(k);
+		return e;
+	}
+
+	/// The position of the key `k`, or -1.
+	fn find(self, k: K) -> int
+	{
+		return self.position(self.marked(k.hash()), fn(e) {
+			return e.0 == k;
+		});
+	}
+}
+
+/// Whether `a` and `b` hold equal entries in the same order.
+pub operator fn eq<K: eq + hash, V: eq>(a: Map<K, V>, b: Map<K, V>) -> bool
+{
+	return a.equal_by(&b, fn(x, y) {
+		return x.0 == y.0 && x.1 == y.1;
+	});
+}
+
+/// The iterator of `Map<K, V>`, which gives each key as a copy and lends its
+/// value.
+pub class MapWalk<K, V>
+{
+	watch: lang.Watch,
+	entries: ?*(K, V),
+	hashes: ?*u64,
+	used: int,
+	at: int = -1,
+
+	/// A walk of the `used` entries at `entries`, which `watch` guards.
+	pub fn over(entries: ?*(K, V), hashes: ?*u64, used: int,
+		watch: lang.Watch) -> MapWalk<K, V>
+	{
+		return MapWalk<K, V> {
+			watch: watch,
+			entries: entries,
+			hashes: hashes,
+			used: used,
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		self.at = next_entry(self.hashes, self.at, self.used);
+		return self.at < self.used;
+	}
+
+	operator fn value(self) -> (K, lent *V)
+	{
+		let entries = self.entries catch fatal;
+		return (dup(entries[self.at].0), &entries[self.at].1);
+	}
+}
+
+/// The keys of a `Map<K, V>`, each as a copy.
+pub class MapKeys<K, V>
+{
+	watch: lang.Watch,
+	entries: ?*(K, V),
+	hashes: ?*u64,
+	used: int,
+	at: int = -1,
+
+	/// The keys of the `used` entries at `entries`, which `watch` guards.
+	pub fn over(entries: ?*(K, V), hashes: ?*u64, used: int,
+		watch: lang.Watch) -> MapKeys<K, V>
+	{
+		return MapKeys<K, V> {
+			watch: watch,
+			entries: entries,
+			hashes: hashes,
+			used: used,
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		self.at = next_entry(self.hashes, self.at, self.used);
+		return self.at < self.used;
+	}
+
+	operator fn value(self) -> K
+	{
+		let entries = self.entries catch fatal;
+		return dup(entries[self.at].0);
+	}
+}
+
+/// The values of a `Map<K, V>`, each lent in place.
+pub class MapValues<K, V>
+{
+	watch: lang.Watch,
+	entries: ?*(K, V),
+	hashes: ?*u64,
+	used: int,
+	at: int = -1,
+
+	/// The values of the `used` entries at `entries`, which `watch` guards.
+	pub fn over(entries: ?*(K, V), hashes: ?*u64, used: int,
+		watch: lang.Watch) -> MapValues<K, V>
+	{
+		return MapValues<K, V> {
+			watch: watch,
+			entries: entries,
+			hashes: hashes,
+			used: used,
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		self.at = next_entry(self.hashes, self.at, self.used);
+		return self.at < self.used;
+	}
+
+	operator fn value(self) -> lent *V
+	{
+		let entries = self.entries catch fatal;
+		return &entries[self.at].1;
+	}
+}
+
+/// The position of the first entry after `at` whose hash is not 0, or `used`.
+fn next_entry(hashes: ?*u64, at: int, used: int) -> int
+{
+	let marks = hashes else {
+		return used;
+	};
+	let i = at + 1;
+	while i < used && marks[i] == 0 do {
+		i += 1;
+	}
+	return i;
+}
+
+/// A map in no order.
+///
+/// Lookup takes constant time on average. The entries stand in the hash table
+/// itself, with no order to maintain, which suits large maps with frequent
+/// removal. A walk gives them in a random order, a new one on every walk, so no
+/// program comes to depend on it. `serialize` writes the entries sorted by key
+/// when the key is a number, a `bool`, a `char` or a `str`, so saved files stay
+/// stable. The key type needs `==` and `hash`.
+///
+/// Reading gives a copy of a value. `set` and `add` take a copy of the key and
+/// the value itself. The keys never change in place, as in `Map<K, V>`.
+pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
+{
+	/// An empty map with room for `capacity` entries from `from`, or from the C
+	/// library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> HashMap<K, V>
+	{
+		let made = HashMap<K, V> {
+			from: collection.allocator(from),
+			seed: lang.hash_seed(),
+		};
+		made.reserve(capacity);
+		return made;
+	}
+
+	/// A copy of the value under `k`, or `none`.
+	pub fn get(self, k: K) -> ?V
+	{
+		let at = self.find(k);
+		if at < 0 {
+			return none;
+		}
+		let e = self.entry(at);
+		return dup(e.1);
+	}
+
+	/// Whether the map holds the key `k`.
+	pub fn contains(self, k: K) -> bool
+	{
+		return self.find(k) >= 0;
+	}
+
+	/// Write `v` under `k`, replacing the value there.
+	pub fn set(self, k: K, own v: V, at: lang.SourceLocation = here)
+	{
+		let h = self.marked(k.hash());
+		let found = self.slot_of(h, fn(e) {
+			return e.0 == k;
+		});
+		let e = self.entry_for(found, h, k, at);
+		e.1 = v;
+	}
+
+	/// Write `v` under `k` when the map does not hold `k`. Gives `false` and
+	/// changes nothing when it does.
+	pub fn add(self, k: K, own v: V, at: lang.SourceLocation = here) -> bool
+	{
+		let h = self.marked(k.hash());
+		let found = self.slot_of(h, fn(e) {
+			return e.0 == k;
+		});
+		if found >= 0 {
+			return false;
+		}
+		let e = self.put(h, at);
+		e.0 = dup(k);
+		e.1 = v;
+		return true;
+	}
+
+	/// Remove the entry of `k` and give its value, or `none`.
+	pub fn remove(self, k: K, at: lang.SourceLocation = here) -> ?V
+	{
+		let found = self.find(k);
+		if found < 0 {
+			return none;
+		}
+		let (key, value) = self.take_entry(found);
+		self.resized(-1, at);
+		return value;
+	}
+
+	/// Run `change` on the value under `k`, in place. Gives `false` when the
+	/// map does not hold `k`.
+	pub fn update(self, k: K, change: fn(lent *V)) -> bool
+	{
+		let found = self.find(k);
+		if found < 0 {
+			return false;
+		}
+		let e = self.entry(found);
+		change(&e.1);
+		return true;
+	}
+
+	/// Lend the value under `k` to `f`. Gives `false` when the map does not
+	/// hold `k`.
+	pub fn read(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.update(k, f);
+	}
+
+	/// Lend the value under `k` to `f`, which may change it. Gives `false` when
+	/// the map does not hold `k`.
+	pub fn modify(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.update(k, f);
+	}
+
+	/// The keys, in a random order.
+	pub fn keys(self) -> HashMapKeys<K, V>
+	{
+		let r = self.shuffle();
+		return HashMapKeys<K, V>.over(self.marks, self.slots, self.size, r,
+			self.watch());
+	}
+
+	/// The values, in a random order. `for v in &m.values()` lends each one.
+	pub fn values(self) -> HashMapValues<K, V>
+	{
+		let r = self.shuffle();
+		return HashMapValues<K, V>.over(self.marks, self.slots, self.size, r,
+			self.watch());
+	}
+
+	operator fn iter(self) -> HashMapWalk<K, V>
+	{
+		let r = self.shuffle();
+		return HashMapWalk<K, V>.over(self.marks, self.slots, self.size, r,
+			self.watch());
+	}
+
+	concrete fn entry_hash(self, e: *(K, V)) -> u64
+	{
+		return e.0.hash();
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *(K, V)))
+	{
+		lend_entry(self.entry(self.slot_at(at)), f);
+	}
+
+	/// The entries as text, `{"Ann": 41, "Bob": 30}`, in the order of a walk.
+	concrete fn to_text(self) -> str
+	{
+		let out = text.Builder.new();
+		let key = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
+		let value = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
+		out.append("{");
+		let first = true;
+		let place = self.first_place();
+		while place >= 0 do {
+			let e = self.entry(self.slot_at(place));
+			if !first {
+				out.append(", ");
+			}
+			anti_rt_element_text(&out, &e.0 as ?*byte, key);
+			out.append(": ");
+			anti_rt_element_text(&out, &e.1 as ?*byte, value);
+			first = false;
+			place = self.next_place(place);
+		}
+		out.append("}");
+		return out.take();
+	}
+
+	/// Write the entries to `out`, a JSON object when the keys are `str` and an
+	/// array of `[key, value]` pairs otherwise. They stand sorted by key when
+	/// the key is a number, a `bool`, a `char` or a `str`, and in the order of
+	/// the slots otherwise.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		let key = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
+		let value = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
+		let kind = kind_of(key);
+		let object = kind == TYPE_STR;
+		let order = self.sorted(kind);
+		open_entries(out, object);
+		let i = 0;
+		while i < self.count do {
+			let e = self.entry(order[i]);
+			write_entry(out, object, i == 0, &e.0 as ?*byte, key,
+				&e.1 as ?*byte, value);
+			i += 1;
+		}
+		close_entries(out, object);
+		self.from.free(order as ?*byte);
+	}
+
+	/// The entry found at `found`, or a new one of the marked hash `h` with a
+	/// copy of the key `k` when `found` is -1.
+	fn entry_for(self, found: int, h: u64, k: K, at: lang.SourceLocation) -> *(K, V)
+	{
+		if found >= 0 {
+			return self.entry(found);
+		}
+		let e = self.put(h, at);
+		e.0 = dup(k);
+		return e;
+	}
+
+	/// The slot of the key `k`, or -1.
+	fn find(self, k: K) -> int
+	{
+		return self.slot_of(self.marked(k.hash()), fn(e) {
+			return e.0 == k;
+		});
+	}
+
+	/// The live slots, sorted by key when the key of `kind` has an order, in
+	/// room of the allocator of the map.
+	fn sorted(self, kind: int) -> *int
+	{
+		let n = self.count;
+		if n == 0 {
+			n = 1;
+		}
+		let made = self.from.alloc(n * size_of(int), size_of(int)) catch fatal;
+		let order = made as *int;
+		let marks = self.marks else {
+			return order;
+		};
+		let slots = self.slots catch fatal;
+		let found = 0;
+		let i = 0;
+		while i < self.size do {
+			if marks[i] > REMOVED {
+				order[found] = i;
+				found += 1;
+			}
+			i += 1;
+		}
+		if ordered(kind) {
+			sort_by_key(order, found, fn(a, b) {
+				return before(&slots[a].0 as ?*byte, &slots[b].0 as ?*byte, kind);
+			});
+		}
+		return order;
+	}
+}
+
+/// The iterator of `HashMap<K, V>`, which gives each key as a copy and lends
+/// its value, from a random slot by a random odd stride.
+pub class HashMapWalk<K, V>
+{
+	watch: lang.Watch,
+	marks: ?*u64,
+	slots: ?*(K, V),
+	order: Stride,
+
+	/// A walk of the `size` slots at `slots`, in the order the random `r`
+	/// chooses, which `watch` guards.
+	pub fn over(marks: ?*u64, slots: ?*(K, V), size: int, r: u64,
+		watch: lang.Watch) -> HashMapWalk<K, V>
+	{
+		return HashMapWalk<K, V> {
+			watch: watch,
+			marks: marks,
+			slots: slots,
+			order: stride_of(size, r),
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		return self.order.advance(self.marks);
+	}
+
+	operator fn value(self) -> (K, lent *V)
+	{
+		let slots = self.slots catch fatal;
+		return (dup(slots[self.order.at].0), &slots[self.order.at].1);
+	}
+}
+
+/// The keys of a `HashMap<K, V>`, each as a copy, in a random order.
+pub class HashMapKeys<K, V>
+{
+	watch: lang.Watch,
+	marks: ?*u64,
+	slots: ?*(K, V),
+	order: Stride,
+
+	/// A walk of the `size` slots at `slots`, in the order the random `r`
+	/// chooses, which `watch` guards.
+	pub fn over(marks: ?*u64, slots: ?*(K, V), size: int, r: u64,
+		watch: lang.Watch) -> HashMapKeys<K, V>
+	{
+		return HashMapKeys<K, V> {
+			watch: watch,
+			marks: marks,
+			slots: slots,
+			order: stride_of(size, r),
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		return self.order.advance(self.marks);
+	}
+
+	operator fn value(self) -> K
+	{
+		let slots = self.slots catch fatal;
+		return dup(slots[self.order.at].0);
+	}
+}
+
+/// The values of a `HashMap<K, V>`, each lent in place, in a random order.
+pub class HashMapValues<K, V>
+{
+	watch: lang.Watch,
+	marks: ?*u64,
+	slots: ?*(K, V),
+	order: Stride,
+
+	/// A walk of the `size` slots at `slots`, in the order the random `r`
+	/// chooses, which `watch` guards.
+	pub fn over(marks: ?*u64, slots: ?*(K, V), size: int, r: u64,
+		watch: lang.Watch) -> HashMapValues<K, V>
+	{
+		return HashMapValues<K, V> {
+			watch: watch,
+			marks: marks,
+			slots: slots,
+			order: stride_of(size, r),
+		};
+	}
+
+	operator fn next(self) -> bool
+	{
+		return self.order.advance(self.marks);
+	}
+
+	operator fn value(self) -> lent *V
+	{
+		let slots = self.slots catch fatal;
+		return &slots[self.order.at].1;
+	}
+}
+
+/// The order of a walk of a table of slots: from a random slot by a random odd
+/// stride, which visits each slot of a table of a power of two once.
+pub struct Stride
+{
+	size: int,
+	start: int,
+	stride: int,
+	step: int,
+	at: int,
+}
+
+/// The order of a walk of `size` slots that the random `r` chooses.
+fn stride_of(size: int, r: u64) -> Stride
+{
+	let mask = size - 1;
+	if size == 0 {
+		mask = 0;
+	}
+	return Stride {
+		size: size,
+		start: (r & (mask as u64)) as int,
+		stride: (((r >> 32) & (mask as u64)) as int) | 1,
+		step: -1,
+		at: 0,
+	};
+}
+
+/// Move on to the next live slot of `marks`. Gives `false` after the last.
+fn advance(s: *Stride, marks: ?*u64) -> bool
+{
+	let live = marks else {
+		return false;
+	};
+	let mask = s.size - 1;
+	s.step += 1;
+	while s.step < s.size do {
+		s.at = (s.start + s.step * s.stride) & mask;
+		if live[s.at] > REMOVED {
+			return true;
+		}
+		s.step += 1;
+	}
+	return false;
+}
+
+/// Lend the entry at `e` to `f`, and put back its key when `f` changed it.
+fn lend_entry<K: eq, V>(e: *(K, V), f: fn(lent *(K, V)))
+{
+	let key = dup(e.0);
+	f(e);
+	if !(e.0 == key) {
+		e.0 = dup(key);
+	}
+}
+
+/// The type id of the record `arg` without the type it is built on, or the id
+/// of `None` when there is no record.
+pub fn kind_of(arg: ?*byte) -> int
+{
+	let record = arg as ?*Record else {
+		return TYPE_NONE;
+	};
+	return record.type_id & 0xFF;
+}
+
+/// Whether the values of the type id `kind` have an order that `before` reads:
+/// a number, a `bool`, a `char` and a `str`.
+pub fn ordered(kind: int) -> bool
+{
+	return kind >= TYPE_BOOL && kind <= TYPE_STR;
+}
+
+/// Whether the value at `a` comes before the one at `b`, both of the type id
+/// `kind`, which `ordered` accepts.
+pub fn before(a: ?*byte, b: ?*byte, kind: int) -> bool
+{
+	if kind == TYPE_STR {
+		return *(a as *str) < *(b as *str);
+	} else if kind == TYPE_BOOL || kind == TYPE_U8 {
+		return *(a as *u8) < *(b as *u8);
+	} else if kind == TYPE_I8 {
+		return *(a as *i8) < *(b as *i8);
+	} else if kind == TYPE_I16 {
+		return *(a as *i16) < *(b as *i16);
+	} else if kind == TYPE_U16 {
+		return *(a as *u16) < *(b as *u16);
+	} else if kind == TYPE_I32 {
+		return *(a as *i32) < *(b as *i32);
+	} else if kind == TYPE_U32 || kind == TYPE_CHAR {
+		return *(a as *u32) < *(b as *u32);
+	} else if kind == TYPE_I64 {
+		return *(a as *i64) < *(b as *i64);
+	} else if kind == TYPE_U64 {
+		return *(a as *u64) < *(b as *u64);
+	} else if kind == TYPE_CLONG {
+		return *(a as *c_long) < *(b as *c_long);
+	} else if kind == TYPE_CULONG {
+		return *(a as *c_ulong) < *(b as *c_ulong);
+	} else if kind == TYPE_CWCHAR {
+		return *(a as *c_wchar) < *(b as *c_wchar);
+	} else if kind == TYPE_F32 {
+		return *(a as *f32) < *(b as *f32);
+	} else if kind == TYPE_F64 {
+		return *(a as *f64) < *(b as *f64);
+	}
+	return false;
+}
+
+/// Sort the `n` numbers at `order` in place, with a heap, so that `less` holds
+/// for no number over one before it.
+pub fn sort_by_key(order: *int, n: int, less: fn(int, int) -> bool)
+{
+	let start = n / 2 - 1;
+	while start >= 0 do {
+		sift(order, start, n, less);
+		start -= 1;
+	}
+	let end = n - 1;
+	while end > 0 do {
+		let top = order[0];
+		order[0] = order[end];
+		order[end] = top;
+		sift(order, 0, end, less);
+		end -= 1;
+	}
+}
+
+/// Move the number at `at` down the heap of the first `n` at `order`.
+fn sift(order: *int, at: int, n: int, less: fn(int, int) -> bool)
+{
+	let root = at;
+	while 2 * root + 1 < n do {
+		let child = 2 * root + 1;
+		if child + 1 < n && less(order[child], order[child + 1]) {
+			child += 1;
+		}
+		if !less(order[root], order[child]) {
+			return;
+		}
+		let held = order[root];
+		order[root] = order[child];
+		order[child] = held;
+		root = child;
+	}
+}
+
+/// Open the entries of a map written as a JSON object or as an array.
+fn open_entries(out: *text.Builder, object: bool)
+{
+	if object {
+		out.append("{");
+	} else {
+		out.append("[");
+	}
+}
+
+/// Close what `open_entries` opened.
+fn close_entries(out: *text.Builder, object: bool)
+{
+	if object {
+		out.append("}");
+	} else {
+		out.append("]");
+	}
+}
+
+/// Write one entry, the key at `k` of the record `key` and the value at `v` of
+/// the record `value`, as a member of an object or as a pair in an array.
+fn write_entry(out: *text.Builder, object: bool, first: bool, k: ?*byte,
+	key: ?*byte, v: ?*byte, value: ?*byte)
+{
+	if !first {
+		out.append(",");
+	}
+	if object {
+		anti_rt_element_serialize(out, k, key);
+		out.append(":");
+		anti_rt_element_serialize(out, v, value);
+		return;
+	}
+	out.append("[");
+	anti_rt_element_serialize(out, k, key);
+	out.append(",");
+	anti_rt_element_serialize(out, v, value);
+	out.append("]");
+}
+
+/// `n` rounded up to a multiple of `to`, a power of two.
+fn aligned(n: int, to: int) -> int
+{
+	return (n + to - 1) & -to;
+}
+
+/// The alignment of a block of room whose elements are `size` bytes: that of
+/// the element, and at least that of the words beside it.
+fn block_align(size: int) -> int
+{
+	let align = size & -size;
+	if align < 8 {
+		align = 8;
+	}
+	return align;
+}

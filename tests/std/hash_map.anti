@@ -1,0 +1,534 @@
+//! `HashMap<K, V>` of `anti.collection.map` through every operation.
+//!
+//! The map walks in a random order, a new one on every walk, so the program
+//! prints what does not depend on it: `serialize`, which sorts by key, sums and
+//! counts. A walk visits every entry once, and two walks of one map come in two
+//! orders. Keys and values that own memory count the blocks alive, so heavy
+//! churn ends with none alive.
+
+import anti.collection;
+import anti.collection.map.{HashMap};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A value that owns memory and counts the blocks alive. Its copy makes a block
+/// of its own, so a copy that the map makes counts as well.
+class Owned
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Owned
+	{
+		return Owned { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Owned;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		give_back(self.n);
+	}
+}
+
+/// A key that owns memory, with `==` and `hash` over its number. Its blocks
+/// count in `Owned.live`.
+class Id
+{
+	pub n: ?*int = none,
+
+	pub fn of(n: int) -> Id
+	{
+		return Id { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Id) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Id;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		give_back(self.n);
+	}
+}
+
+/// A block that holds `n`, counted in `Owned.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Owned.live.add(1);
+	return p;
+}
+
+/// Free a block that `block` made.
+fn give_back(p: ?*int)
+{
+	if p != none {
+		Owned.live.add(-1);
+	}
+	free(p);
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+/// Print `label` and the entries of `m`, which `serialize` sorts by key.
+fn sorted<K: eq + hash, V>(label: str, m: *HashMap<K, V>)
+{
+	let out = text.Builder.new();
+	out.append(label);
+	out.append(" ");
+	m.serialize(&out);
+	show(out.take());
+}
+
+fn lookups()
+{
+	let m = HashMap<str, int>.new();
+	show(f"empty: {m.count} {m.is_empty()}");
+	sorted("empty", &m);
+	m.set("Cy", 7);
+	m.set("Ann", 41);
+	m.set("Bob", 30);
+	let added = m.add("Dee", 22);
+	let again = m.add("Ann", 99);
+	m.set("Bob", 31);
+	sorted("set", &m);
+	show(f"add: {added} {again}, count {m.count} {m.is_empty()}");
+	let cy = m.get("Cy") ?? -1;
+	let zed = m.get("Zed") ?? -1;
+	let ann = m.contains("Ann");
+	let nobody = m.contains("Zed");
+	show(f"get: {cy} {zed}, contains: {ann} {nobody}");
+	let bob = m.remove("Bob") ?? -1;
+	let gone = m.remove("Bob") ?? -1;
+	show(f"remove: {bob} {gone}, count {m.count}");
+	let hit = m.update("Ann", fn(p) {
+		*p += 1;
+	});
+	let miss = m.update("Zed", fn(p) {
+		*p = 0;
+	});
+	let seen = 0;
+	let read = m.read("Ann", fn(p) {
+		seen = *p;
+	});
+	let unread = m.read("Zed", fn(p) {
+		seen = -1;
+	});
+	let changed = m.modify("Cy", fn(p) {
+		*p = 70;
+	});
+	show(f"update {hit} {miss}, read {read} {unread} {seen}, modify {changed}");
+	sorted("changed", &m);
+	let letters = 0;
+	for k in m.keys() {
+		letters += k.len;
+	}
+	let sum = 0;
+	for v in m.values() {
+		sum += v;
+	}
+	show(f"keys {letters} letters, values {sum}");
+	for (k, v) in &m {
+		*v += 1000;
+	}
+	sum = 0;
+	for (k, v) in m {
+		sum += v;
+	}
+	for v in &m.values() {
+		*v -= 1000;
+	}
+	show(f"walks: {sum}");
+	sorted("after", &m);
+	let one = HashMap<str, int>.new();
+	one.set("only", 1);
+	show(one.to_text());
+}
+
+/// Every walk visits each entry once, and walks of one map do not all come in
+/// the same order.
+fn walks()
+{
+	let m = HashMap<int, int>.new();
+	for i in 0..50 {
+		m.set(i, i);
+	}
+	for i in 0..50 {
+		if i % 4 == 0 {
+			m.remove(i);
+		}
+	}
+	let firsts = HashMap<int, int>.new();
+	let right = 0;
+	for walk in 0..40 {
+		let seen = HashMap<int, int>.new();
+		let first = -1;
+		for (k, v) in m {
+			if first < 0 {
+				first = k;
+			}
+			seen.set(k, v * 1);
+		}
+		if seen.count == m.count && seen.count == 37 {
+			right += 1;
+		}
+		firsts.set(first, 1);
+	}
+	let many = firsts.count > 1;
+	show(f"walks: {right} of 40 saw all 37, orders differ: {many}");
+	let keys = HashMap<int, int>.new();
+	for k in m.keys() {
+		keys.set(k, k * 1);
+	}
+	let all = m.find_all(fn(e) {
+		return true;
+	});
+	let slots = 0;
+	for e in all {
+		slots += 1;
+	}
+	show(f"keys: {keys.count}, find_all: {slots}");
+}
+
+fn criteria() may fail
+{
+	let m = HashMap<int, int>.new();
+	for i in 1..7 {
+		m.set(i, i * 10);
+	}
+	let even = m.find_all(fn(e) {
+		return e.0 % 2 == 0;
+	});
+	let sum = 0;
+	for e in even {
+		sum += e.1;
+	}
+	let first = m.find_first(fn(e) {
+		return e.1 == 30;
+	}) ?? (-1, -1);
+	let one = try m.find_one(fn(e) {
+		return e.1 == 40;
+	});
+	show(f"find_all {even.count} {sum}, first {first.0}, one {one.0}");
+	let many = m.find_one(fn(e) {
+		return e.0 > 2;
+	}) catch e {
+		show(f"{e.message}");
+		yield (0, 0);
+	};
+	let n = m.update_all(fn(e) {
+		return e.0 % 2 == 1;
+	}, fn(p) {
+		p.1 += 1;
+		p.0 = 99;
+	});
+	show(f"update_all {n} {many.0}");
+	sorted("update_all", &m);
+	let hit = m.update_first(fn(e) {
+		return e.0 == 5;
+	}, fn(p) {
+		p.1 = 0;
+	});
+	try m.update_one(fn(e) {
+		return e.0 == 2;
+	}, fn(p) {
+		p.1 = 2;
+	});
+	show(f"update_first {hit}");
+	sorted("update_one", &m);
+	let removed = m.remove_all(fn(e) {
+		return e.1 % 2 == 1;
+	});
+	let taken = m.remove_first(fn(e) {
+		return e.0 == 4;
+	}) ?? (-1, -1);
+	let only = try m.remove_one(fn(e) {
+		return e.0 == 2;
+	});
+	show(f"remove {removed} {taken.0} {only.0}");
+	sorted("removed", &m);
+	m.clear();
+	show(f"clear: {m.count} {m.is_empty()}");
+	sorted("clear", &m);
+	m.set(5, 5);
+	sorted("after clear", &m);
+}
+
+fn room()
+{
+	let counting = Counting { };
+	{
+		let m = HashMap<int, int>.new(100, &counting);
+		for i in 0..100 {
+			m.set(i, i);
+		}
+		show(f"made with room: {counting.allocs} allocation, capacity {m.capacity()}");
+		for i in 100..200 {
+			m.set(i, i);
+		}
+		show(f"past it: {counting.allocs} allocations, capacity {m.capacity()}");
+	}
+	show(f"after the block: {counting.frees} frees");
+	let m = HashMap<int, int>.new(0, &counting);
+	m.set(1, 1);
+	show(f"small start: capacity {m.capacity()}");
+	for k in 2..10 {
+		m.set(k, k);
+	}
+	show(f"doubled: capacity {m.capacity()}");
+	let before = counting.allocs;
+	m.reserve(100);
+	show(f"reserve: capacity {m.capacity()} in {counting.allocs - before} allocation");
+	for k in 2..10 {
+		m.remove(k);
+	}
+	m.shrink();
+	show(f"shrink: capacity {m.capacity()}");
+	sorted("shrunk", &m);
+	m.clear();
+	m.shrink();
+	show(f"shrink empty: capacity {m.capacity()}, {counting.allocs - counting.frees} blocks");
+}
+
+/// A point, which has `==` and no `lt`, as a key.
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+operator fn eq(a: Point, b: Point) -> bool
+{
+	return a.x == b.x && a.y == b.y;
+}
+
+fn texts()
+{
+	let names = HashMap<str, int>.new();
+	names.set("Cy", 7);
+	names.set("Ann", 41);
+	names.set("say \"hi\"", 2);
+	names.set("Bob", 30);
+	let numbers = HashMap<int, str>.new();
+	for i in 0..12 {
+		numbers.set(11 - i, "n");
+	}
+	let signed = HashMap<i8, bool>.new();
+	signed.set(3, true);
+	signed.set(-5, false);
+	signed.set(0, true);
+	let floats = HashMap<f64, int>.new();
+	floats.set(2.5, 1);
+	floats.set(-1.25, 2);
+	floats.set(0.5, 3);
+	let chars = HashMap<char, int>.new();
+	chars.set('z', 1);
+	chars.set('a', 2);
+	chars.set('m', 3);
+	let wide = HashMap<u64, i32>.new();
+	wide.set(18446744073709551615, -1);
+	wide.set(2, 2);
+	wide.set(9223372036854775808, 3);
+	let halves = HashMap<i32, str>.new();
+	halves.set(-7, "a");
+	halves.set(40, "b");
+	halves.set(-100, "c");
+	let small = HashMap<f32, str>.new();
+	small.set(3.5, "x");
+	small.set(-0.5, "y");
+	let flags = HashMap<bool, int>.new();
+	flags.set(true, 1);
+	flags.set(false, 0);
+	let points = HashMap<Point, int>.new();
+	points.set(Point { x: 1, y: 2 }, 3);
+	let out = text.Builder.new();
+	names.serialize(&out);
+	out.append("\n");
+	numbers.serialize(&out);
+	out.append("\n");
+	signed.serialize(&out);
+	out.append("\n");
+	floats.serialize(&out);
+	out.append("\n");
+	chars.serialize(&out);
+	out.append("\n");
+	wide.serialize(&out);
+	out.append("\n");
+	halves.serialize(&out);
+	out.append("\n");
+	small.serialize(&out);
+	out.append("\n");
+	flags.serialize(&out);
+	out.append("\n");
+	points.serialize(&out);
+	show(out.take());
+	show(points.to_text());
+}
+
+fn copies()
+{
+	let a = HashMap<str, int>.new();
+	a.set("x", 1);
+	a.set("y", 2);
+	let b = dup(&a);
+	b.set("x", 10);
+	b.set("z", 3);
+	a.remove("y");
+	sorted("original", &a);
+	sorted("copy", b);
+	delete(b);
+	{
+		let one = Id.of(1);
+		let two = Id.of(2);
+		let m = HashMap<Id, Owned>.new();
+		m.set(one, Owned.of(10));
+		m.set(two, Owned.of(20));
+		let c = dup(&m);
+		c.set(one, Owned.of(11));
+		let x = m.get(one) ?? Owned.of(-1);
+		let y = c.get(one) ?? Owned.of(-1);
+		show(f"dup owned: {x.value()} {y.value()} {c.count}, {Owned.live.load()} blocks");
+		delete(c);
+	}
+	show(f"after the block: {Owned.live.load()} blocks");
+}
+
+/// Keys and values that own memory: a replaced value, a removed entry, a
+/// refused `add` and a key that a change replaced are each torn down once.
+///
+/// The keys stand in locals, since a class value made at a parameter that does
+/// not take it is not torn down after the call.
+fn owned()
+{
+	{
+		let one = Id.of(1);
+		let two = Id.of(2);
+		let m = HashMap<Id, Owned>.new();
+		m.set(one, Owned.of(10));
+		m.set(two, Owned.of(20));
+		m.set(one, Owned.of(11));
+		show(f"replaced: {Owned.live.load()} blocks");
+		let t = m.remove(two) ?? Owned.of(-1);
+		show(f"removed {t.value()}: {Owned.live.load()} blocks");
+		let added = m.add(one, Owned.of(12));
+		show(f"refused add {added}: {Owned.live.load()} blocks");
+		for (k, v) in &m {
+			show(f"walk {k.value()} {v.value()}");
+		}
+		m.update_all(fn(e) {
+			return true;
+		}, fn(p) {
+			p.0 = Id.of(7);
+		});
+		for k in m.keys() {
+			show(f"key kept {k.value()}: {Owned.live.load()} blocks");
+		}
+	}
+	show(f"after the block: {Owned.live.load()} blocks");
+}
+
+/// Twenty thousand sets and removals over 700 keys, with a `remove_all` now and
+/// then, grow, clean and walk the table. No block is left afterwards.
+fn churn()
+{
+	let counting = Counting { };
+	{
+		let m = HashMap<Id, Owned>.new(0, &counting);
+		for i in 0..20000 {
+			let k = Id.of(i % 700);
+			m.set(k, Owned.of(i));
+			if i % 3 == 0 {
+				let gone = Id.of((i * 7) % 700);
+				let value = m.remove(gone);
+			}
+			if i % 5000 == 4999 {
+				m.remove_all(fn(e) {
+					return e.0.value() % 2 == 0;
+				});
+			}
+		}
+		let total = 0;
+		for (k, v) in m {
+			total += 1;
+		}
+		let beyond = Owned.live.load() - 2 * m.count;
+		show(f"churn: {m.count} entries, {total} walked, {beyond} blocks beyond them, capacity {m.capacity()}");
+	}
+	let room = counting.allocs - counting.frees;
+	show(f"after churn: {Owned.live.load()} blocks, {room} blocks of room");
+}
+
+fn main() -> int
+{
+	lookups();
+	walks();
+	criteria() catch fatal;
+	room();
+	texts();
+	copies();
+	owned();
+	churn();
+	return 0;
+}
