@@ -42,9 +42,9 @@ pub const TYPE_DEPTH: int = 3;
 /// anti_type` of `src/rt/object.h` and `reflect.TypeId` number them.
 ///
 /// DESIGN: the map reads them without importing `anti.reflect`, whose
-/// descriptors every program that uses a map would link. The test
-/// `std_hash_map` sorts keys of each of these types, which a wrong number
-/// leaves out of order.
+/// descriptors every program that uses a map would link. The test of the hash
+/// map sorts keys of each of these types, which a wrong number leaves out of
+/// order.
 const TYPE_NONE: int = 0;
 const TYPE_BOOL: int = 1;
 const TYPE_CHAR: int = 2;
@@ -174,7 +174,7 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 	/// key.
 	///
 	/// DESIGN: the caller writes the parts of the entry in place, `e.1 = v`,
-	/// since a tuple literal cannot take an `own` parameter that owns memory.
+	/// since a tuple literal cannot take an owning parameter that owns memory.
 	protected fn append(self, h: u64, at: lang.SourceLocation) -> *E
 	{
 		if self.used == self.room_size {
@@ -505,10 +505,10 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 
 	/// A random number for the order of the next walk.
 	///
-	/// DESIGN: the order comes from a number the system draws for the table
-	/// at its first walk, never from the seed of the hashes, which a test
-	/// may fix. So the seed never decides the order a program sees, and each
-	/// walk mixes in its own count.
+	/// DESIGN: the order comes from a number the system draws for the table at
+	/// its first walk, never from the seed of the hashes, which a test may fix.
+	/// So the seed never decides the order a program sees, and each walk mixes
+	/// in its own count.
 	protected fn shuffle(self) -> u64
 	{
 		if self.walk_seed == 0 {
@@ -695,9 +695,9 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 /// to the end. The key type needs `==` and `hash`.
 ///
 /// Reading gives a copy of a value. `set` and `add` take a copy of the key and
-/// the value itself. The keys of a map never change in place: `update_all` and
-/// the other functions that lend an entry put back a key that the change
-/// replaced.
+/// the value itself. The keys of a map never change in place: the update forms
+/// of the base and the other functions that lend an entry put back a key that
+/// the change replaced.
 pub class Map<K: eq + hash, V> inherits EntryTable<(K, V)>
 {
 	/// An empty map with room for `capacity` entries from `from`, or from the C
@@ -1418,8 +1418,8 @@ fn lend_entry<K: eq, V>(e: *(K, V), f: fn(lent *(K, V)))
 	}
 }
 
-/// The type id of the record `arg` without the type it is built on, or the id
-/// of `None` when there is no record.
+/// The type id of the record `arg` without the type it is built on, or the id 0
+/// of no type when there is no record.
 pub fn kind_of(arg: ?*byte) -> int
 {
 	let record = arg as ?*Record else {

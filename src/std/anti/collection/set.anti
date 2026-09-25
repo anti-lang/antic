@@ -5,8 +5,9 @@
 //! `anti.collection.map` do, on whose tables they stand. `BitSet` holds small
 //! numbers, one bit per number, and walks them in increasing order.
 //!
-//! The elements of a set never change in place. `update_all` and the other
-//! functions that lend an element lend a copy, whose change the set drops.
+//! The elements of a set never change in place. The update forms of the base
+//! and the other functions that lend an element lend a copy, whose change the
+//! set drops.
 
 import anti.collection;
 import anti.collection.map;
