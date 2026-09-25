@@ -20,8 +20,8 @@ extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 ///
 /// `for` walks copies of the elements in the order of the array, which is not
 /// the order of `pop`. An element is never lent in a walk, since a change in
-/// place would break the order of the heap. `update_all`, `update_first` and
-/// `update_one` restore the order after their changes.
+/// place would break the order of the heap. The three update forms restore the
+/// order after their changes.
 pub class PriorityQueue<T: Ordered> inherits collection.Collection<T>
 {
 	/// The array, with one slot more than `capacity` that swaps go through.

@@ -88,14 +88,17 @@ pub class Changed inherits lang.Error
 /// The storage of `Pool<T>` and `Tree<T>`: slots in blocks that never move, a
 /// generation per slot and a list of the free slots.
 ///
-/// Block `k` holds `2^(shift + k)` slots, and the slots before it number
-/// `2^shift * (2^k - 1)`. Its memory holds the elements, then the words of each
-/// slot. A slot that holds no element holds zero bytes. The places of the
-/// shared functions are the slot indices, walked in increasing order.
+/// Each block holds twice the slots of the one before, and the first holds a
+/// power of two. A slot lies in the block that the highest bit of its index
+/// plus that power names. The memory of a block holds its elements, then the
+/// words of each slot. A slot that holds no element holds zero bytes. The
+/// places of the shared functions are the slot indices, walked in increasing
+/// order.
 ///
 /// A version counts the changes of an element since it was added: `set`,
-/// `set_if_version`, `modify`, the `update` forms and each turn of a `for` that
-/// reaches it, since that turn may change it in place.
+/// `set_if_version`, `modify`, `update_all`, `update_first`, `update_one` and
+/// each turn of a `for` that reaches it, since that turn may change it in
+/// place.
 pub abstract class Slots<T> inherits collection.Collection<T>
 {
 	/// The blocks, of which the first `blocks_made` are allocated.
