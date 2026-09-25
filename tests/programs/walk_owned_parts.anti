@@ -1,0 +1,168 @@
+//! The loop owns every part of the value of an iterator that it receives by
+//! value, and tears each one down at the end of its turn, on every exit of the
+//! body: its end, `break`, `continue`, `return` and `fail`. The lent parts are
+//! borrowed and never torn down. An iterator here builds a fresh key per turn
+//! that owns a leaf, and each walk runs under a leak check, the count of the
+//! leaves alive. A value given whole by value is torn down each turn as well.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Leaf.live.sub(1);
+	}
+}
+
+/// A key that owns a leaf.
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	Leaf.live.add(1);
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+/// Three counts, walked with a fresh key for each.
+class Counts
+{
+	pub values: [3]int = [10, 20, 30],
+
+	operator fn iter(self) -> CountsIter
+	{
+		return CountsIter { counts: self, at: -1 };
+	}
+}
+
+class CountsIter
+{
+	pub counts: *Counts,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 3;
+	}
+
+	operator fn value(self) -> (Key, lent *int)
+	{
+		return (key(self.at), &self.counts.values[self.at]);
+	}
+}
+
+/// Gives a fresh key by value, with no lent part.
+class Keys
+{
+	pub at: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at <= 3;
+	}
+
+	operator fn value(self) -> Key
+	{
+		return key(self.at);
+	}
+}
+
+fn check(name: str)
+{
+	printf("%.*s %d\n".ptr, name.len as c_int, name.ptr,
+		Leaf.live.load() as c_int);
+}
+
+fn first_at_least(m: *Counts, least: int) -> int
+{
+	for (k, v) in &m {
+		if *v >= least {
+			return k.n;
+		}
+	}
+	return -1;
+}
+
+fn copy_at_least(m: *Counts, least: int) -> int
+{
+	for e in m {
+		if e.1 >= least {
+			return e.0.n;
+		}
+	}
+	return -1;
+}
+
+fn failing(m: *Counts) -> int may fail
+{
+	for (k, v) in &m {
+		if k.n == 1 {
+			fail "stopped";
+		}
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let m = Counts { };
+	for (k, v) in &m {
+		*v += k.n;
+	}
+	check("end");
+	for (k, v) in &m {
+		break;
+	}
+	check("break");
+	for (k, v) in &m {
+		if k.n < 2 {
+			continue;
+		}
+		*v += 100;
+	}
+	check("continue");
+	printf("return %d\n".ptr, first_at_least(&m, 21) as c_int);
+	check("return");
+	let failed = failing(&m) catch e {
+		yield -1;
+	};
+	printf("fail %d\n".ptr, failed as c_int);
+	check("fail");
+	for e in &m {
+		*e.1 += 1;
+	}
+	check("whole");
+	for (k, v) in m {
+		if k.n == 1 {
+			break;
+		}
+	}
+	check("copy break");
+	for e in m {
+		printf("copy %d %d\n".ptr, e.0.n as c_int, e.1 as c_int);
+	}
+	check("copy end");
+	printf("copy return %d\n".ptr, copy_at_least(&m, 30) as c_int);
+	check("copy return");
+
+	let keys = Keys { };
+	for k in keys {
+		if k.n == 2 {
+			break;
+		}
+	}
+	check("by value break");
+	return 0;
+}

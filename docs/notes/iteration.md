@@ -31,6 +31,12 @@ and iteration" in `docs/decisions.md`.
   and `current` to `*` over it, a node the checker alone writes. Lowering
   builds that node with `copy_parts_into`, which reads each lent part
   through its pointer.
+- A `for` over such a value, in the form `for x in e` or with a pattern,
+  gives the loop `element` of the type of the value. Lowering binds it from
+  `place`, and `lower_copy_parts` or `bind_pattern` read the copy and the
+  names from it. The exit action of `element` runs `destroy_local`, which
+  tears down a tuple part by part and passes over its pointers, so every
+  exit of the body tears down what the loop received by value.
 - `e[x, y]` reaches the checker as an index node whose index is the tuple
   `(x, y)`, marked `several`. It becomes `e.index(x, y)`, and `e[x, y] = v`
   becomes `e.set_index(x, y, v);`.

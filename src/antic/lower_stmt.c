@@ -358,6 +358,7 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
 }
 
 static bool local_needs_teardown(const struct type *t);
+static bool parts_need_teardown(const struct type *t);
 
 /* DESIGN: the check of a walk over a collection that counts its changes.
    The test of every turn compares the two counts before it calls `next`.
@@ -409,8 +410,10 @@ static void bind_loop_name(struct lowerer *l, struct symbol *sym,
 /* Give the names of `for (k, v) in e` the parts of the element at the
    address at. An element lent whole gives each name the address of its
    part. Any other element gives each name the value of its part: a copy,
-   or the lent pointer the value of the iterator holds there. The element
-   keeps its teardown, and the names, which are read-only, take none. */
+   or the lent pointer the value of the iterator holds there. In the form
+   `for (k, v) in e` a lent part gives a copy of what it points at. The
+   element keeps its teardown, and the names, which are read-only, take
+   none. */
 static void bind_pattern(struct lowerer *l, const struct stmt *s,
                          struct ir_operand at)
 {
@@ -424,6 +427,9 @@ static void bind_pattern(struct lowerer *l, const struct stmt *s,
         struct symbol *name = s->as.for_loop.names[i].symbol;
         struct ir_operand part = lower_offset_address(
             l, at, lower_field_offset(l, tuple, &tuple->fields[i].name));
+        if (type_is_lent(tuple->params[i]) && !type_is_lent(name->type)) {
+            part = lower_temp(l, ir_load(l->f, l->b, IR_PTR, part));
+        }
         if (s->as.for_loop.element->type->kind == TYPE_POINTER) {
             bind_loop_name(l, name, IR_PTR, part);
         } else if (lower_is_aggregate(name->type)) {
@@ -446,13 +452,16 @@ static void bind_pattern(struct lowerer *l, const struct stmt *s,
 static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
 {
     const struct iteration *it = &s->as.for_loop.hooks;
-    /* A pattern binds the whole element first, and its names from it. */
-    struct symbol *sym = s->as.for_loop.pattern
+    /* A pattern, and the copy of a value with lent parts, bind the whole
+       element first and read it. */
+    struct symbol *sym = s->as.for_loop.element != NULL
                              ? s->as.for_loop.element
                              : s->as.for_loop.names[0].symbol;
-    /* `for x in &e` binds the lent pointer, and `for x in e` the copy. */
+    /* `for x in &e` binds the lent pointer, and `for x in e` the copy. A
+       value with lent parts is bound as it is, and the copy read from it. */
     const struct expr *current =
-        s->as.for_loop.by_pointer ? it->place : it->current;
+        s->as.for_loop.by_pointer || type_holds_lent(sym->type) ? it->place
+                                                                : it->current;
     struct ir_block *test = lower_new_block(l);
     struct ir_block *body = lower_new_block(l);
     struct ir_block *exit = lower_new_block(l);
@@ -498,12 +507,20 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
         }
     }
     /* A copy of an element that the iterator lends belongs to the
-       collection, as the copy of a slice element does. */
+       collection, as the copy of a slice element does. A value with lent
+       parts gives the loop the parts it receives by value. The teardown
+       of the value leaves its pointers alone. */
     if (it->place == NULL && local_needs_teardown(sym->type)) {
+        push_exit_action(l, NULL, sym, false);
+    } else if (type_holds_lent(sym->type) && parts_need_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
     if (s->as.for_loop.pattern) {
         bind_pattern(l, s, lower_temp(l, sym->ir));
+    } else if (s->as.for_loop.element != NULL) {
+        struct symbol *copy = s->as.for_loop.names[0].symbol;
+        lower_copy_parts(l, sym->type, copy->type, lower_temp(l, sym->ir),
+                         lower_temp(l, copy->ir));
     }
     lower_block(l, s->as.for_loop.body);
     lower_run_defers(l, &pass, false);
@@ -1137,10 +1154,51 @@ void lower_clear_tables(struct lowerer *l, struct ir_operand base,
 
 /* A local that may have moved, and an `own` parameter, are torn down
    only when their table is not zero. */
+/* Whether a part of the tuple t needs a teardown. The value of an
+   iterator that the loop receives is torn down part by part. */
+static bool parts_need_teardown(const struct type *t)
+{
+    size_t i;
+
+    if (t == NULL || t->kind != TYPE_TUPLE) {
+        return false;
+    }
+    for (i = 0; i < t->param_count; i++) {
+        if (local_needs_teardown(t->params[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
     bool made_only = sym->moved || sym->own_param;
 
+    /* The value of an iterator with lent parts: each part the loop
+       received by value, and never a lent pointer. */
+    if (sym->type->kind == TYPE_TUPLE) {
+        const struct type *t = sym->type;
+        size_t i;
+        for (i = 0; i < t->param_count; i++) {
+            const struct type *part = t->params[i];
+            struct ir_operand at;
+            if (!local_needs_teardown(part)) {
+                continue;
+            }
+            at = lower_offset_address(
+                l, lower_temp(l, sym->ir),
+                lower_field_offset(l, t, &t->fields[i].name));
+            if (part->kind == TYPE_OPTIONAL) {
+                destroy_optional(l, at, part, made_only);
+            } else if (part->kind == TYPE_ARRAY) {
+                destroy_array(l, at, part, made_only);
+            } else {
+                destroy_value(l, at, part, made_only);
+            }
+        }
+        return;
+    }
     if (sym->type->kind == TYPE_OPTIONAL) {
         destroy_optional(l, lower_temp(l, sym->ir), sym->type, made_only);
         return;
@@ -2378,7 +2436,7 @@ static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
     case STMT_FOR:
         /* The element of a `for` over an array or a slice is copied
            into a place of its own when it is an aggregate. */
-        sym = s->as.for_loop.pattern ? s->as.for_loop.element
+        sym = s->as.for_loop.element != NULL ? s->as.for_loop.element
               : s->as.for_loop.name_count > 0
                   ? s->as.for_loop
                         .names[s->as.for_loop.name_count - 1].symbol
@@ -2392,13 +2450,13 @@ static void reserve_stmt(struct lowerer *l, struct ir_block *entry,
            that is an aggregate always. */
         for (j = 0; j < s->as.for_loop.name_count; j++) {
             struct symbol *name = s->as.for_loop.names[j].symbol;
+            bool read = s->as.for_loop.element != NULL;
             if (name == NULL || name == sym ||
-                (j + 1 == s->as.for_loop.name_count &&
-                 !s->as.for_loop.pattern)) {
+                (j + 1 == s->as.for_loop.name_count && !read)) {
                 continue;
             }
             if (name->address_taken ||
-                (s->as.for_loop.pattern && lower_is_aggregate(name->type))) {
+                (read && lower_is_aggregate(name->type))) {
                 name->ir = ir_slot(l->f, entry,
                                    lower_vtype_of(l, name->type));
             }

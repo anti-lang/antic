@@ -346,6 +346,11 @@ struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
                                 struct ir_operand *args, size_t count);
 struct ir_operand lower_slice_length(struct lowerer *l, struct ir_operand p,
                                      const struct type *slice);
+/* The copy of every part of the value lent of an iterator at src into the
+   tuple copy at dest. A lent part gives what it points at. */
+void lower_copy_parts(struct lowerer *l, const struct type *lent,
+                      const struct type *copy, struct ir_operand src,
+                      struct ir_operand dest);
 
 /* lower_desc.c */
 

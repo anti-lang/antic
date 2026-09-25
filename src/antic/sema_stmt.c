@@ -832,11 +832,17 @@ static void bind_pattern(struct checker *c, struct stmt *s,
             tuple = sema_builtin(c, TYPE_ERROR);
         }
     }
-    whole = arena_alloc(c->arena, sizeof *whole);
-    whole->kind = SYMBOL_LOCAL;
-    whole->pos = names[0].pos;
-    whole->type = sema_is_error(tuple) ? tuple : element;
-    s->as.for_loop.element = whole;
+    whole = s->as.for_loop.element;
+    if (whole == NULL) {
+        whole = arena_alloc(c->arena, sizeof *whole);
+        whole->kind = SYMBOL_LOCAL;
+        whole->pos = names[0].pos;
+        whole->type = element;
+        s->as.for_loop.element = whole;
+    }
+    if (sema_is_error(tuple)) {
+        whole->type = tuple;
+    }
     for (i = 0; i < count; i++) {
         struct type *part = sema_is_error(tuple) ? tuple : tuple->fields[i].type;
         struct symbol *sym =
@@ -2110,6 +2116,22 @@ static void check_stmt(struct checker *c, struct stmt *s)
            name binds the element itself, and a range without a name
            repeats its block and counts in a temporary that no body can
            read. */
+        /* DESIGN: the loop owns every part of the value of an iterator
+           that it receives by value, and tears each down at the end of its
+           turn on every exit of the body, as a `let` is torn down. The lent
+           parts are borrowed. A value with lent parts lives whole in a
+           symbol of no scope that the loop tears down, which leaves the
+           pointers alone, and a pattern or the copy of `for x in e` reads
+           it. `for x in &e` binds such a value itself. */
+        if (s->as.for_loop.hooks.place != NULL &&
+            type_holds_lent(s->as.for_loop.hooks.place->type) &&
+            (s->as.for_loop.pattern || !s->as.for_loop.by_pointer)) {
+            struct symbol *holder = arena_alloc(c->arena, sizeof *holder);
+            holder->kind = SYMBOL_LOCAL;
+            holder->pos = s->pos;
+            holder->type = s->as.for_loop.hooks.place->type;
+            s->as.for_loop.element = holder;
+        }
         if (s->as.for_loop.pattern) {
             bind_pattern(c, s, element);
         } else if (names > 1) {

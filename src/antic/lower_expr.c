@@ -389,9 +389,15 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
 static void copy_parts_into(struct lowerer *l, const struct expr *e,
                             struct ir_operand dest)
 {
-    const struct type *lent = e->as.unary.operand->type;
-    const struct type *copy = e->type;
     struct ir_operand src = lower_address(l, e->as.unary.operand);
+
+    lower_copy_parts(l, e->as.unary.operand->type, e->type, src, dest);
+}
+
+void lower_copy_parts(struct lowerer *l, const struct type *lent,
+                      const struct type *copy, struct ir_operand src,
+                      struct ir_operand dest)
+{
     size_t i;
 
     for (i = 0; i < lent->param_count; i++) {
