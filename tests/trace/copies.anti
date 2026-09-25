@@ -1,0 +1,49 @@
+//! A copy of a generic fails. The trace of the calls that lead there names each
+//! function as the program writes it, `copies.Box<int>.check` and
+//! `copies.through<int>`. Their symbols escape the angle brackets.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Print the names of the three frames that lead here.
+fn report()
+{
+	let t = lang.StackTrace.capture(1);
+	defer delete(t);
+	let named = t.symbolize();
+	for i in 0..3 {
+		printf("%.*s\n".ptr, named[i].function.len as c_int,
+			named[i].function.ptr);
+	}
+}
+
+class Box<T>
+{
+	pub value: T,
+
+	pub fn check(self, bad: bool) -> T may fail
+	{
+		if bad {
+			report();
+			fail "bad value";
+		}
+		return self.value;
+	}
+}
+
+fn through<T>(b: *Box<T>, bad: bool) -> T may fail
+{
+	let v = try b.check(bad);
+	return v;
+}
+
+fn main() -> int
+{
+	let b = Box<int> { value: 3 };
+	let v = through(&b, true) catch e {
+		printf("%.*s\n".ptr, e.at.function.len as c_int, e.at.function.ptr);
+		yield 0;
+	};
+	return v;
+}

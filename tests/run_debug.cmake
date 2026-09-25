@@ -23,9 +23,11 @@ file(WRITE "${root}/com/example/step.anti"
      "\treturn m * 2;\n"
      "}\n")
 # Line 5 holds the call of the imported module, line 10 the call of the
-# function that holds it and line 11 the subtraction. main calls through
-# helper so that the frame below the breakpoint is a function of the
-# program and not the runtime entry, which shares its address with main.
+# function that holds it and line 11 the call of a copy of a generic and
+# the subtraction. Line 16 holds the addition in the copy. main calls
+# through helper so that the frame below the breakpoint is a function of
+# the program and not the runtime entry, which shares its address with
+# main.
 file(WRITE "${root}/app.anti"
      "import com.example.step;\n"
      "\n"
@@ -37,7 +39,12 @@ file(WRITE "${root}/app.anti"
      "fn main() -> int\n"
      "{\n"
      "\tlet v = helper();\n"
-     "\treturn v - 8;\n"
+     "\treturn twice(v) - 16;\n"
+     "}\n"
+     "\n"
+     "fn twice<T: add>(v: T) -> T\n"
+     "{\n"
+     "\treturn v + v;\n"
      "}\n")
 
 execute_process(COMMAND "${ANTIC}" -c -I "${root}"
@@ -80,8 +87,8 @@ if(bare MATCHES "\.loc |\.file |\.cv_")
     message(FATAL_ERROR "a build without -g wrote a source position")
 endif()
 
-# The program runs the same either way, and returns 0 from 3 + 1 times 2
-# less 8.
+# The program runs the same either way, and returns 0 from 3 + 1 times 2,
+# doubled, less 16.
 foreach(name app plain)
     execute_process(COMMAND "${WORK}/${name}" RESULT_VARIABLE code
                     OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
@@ -99,10 +106,10 @@ endforeach()
 # brackets, `com.example.step[step]`. The character before the segment is
 # left open for both.
 #
-# gdb reads a position for every frame. lldb reads one for the frame that
-# stops and names the function alone below it, because the compile unit
-# describes no function of its own yet. The step that adds variables adds
-# those descriptions, and this test tightens with it.
+# The compile unit holds an entry per function, with the name a person
+# reads, so both debuggers read a position for every frame. A copy of a
+# generic is named as the program writes it, `app.twice<int>`, where its
+# symbol escapes the angle brackets.
 function(session file line)
     if(KIND STREQUAL "lldb")
         set(command "${DEBUGGER}" -b -o "breakpoint set -f ${file} -l ${line}"
@@ -130,11 +137,15 @@ session(step.anti 4)
 holds("${session}" "com\\.example\\.step.step[^\n]*step\\.anti:4")
 holds("${session}" "app.helper")
 holds("${session}" "app.main|anti\\.rt.main")
-if(NOT KIND STREQUAL "lldb")
-    holds("${session}" "app.helper[^\n]*app\\.anti:5")
-    holds("${session}" "(app.main|anti\\.rt.main)[^\n]*app\\.anti:10")
-endif()
+holds("${session}" "app.helper[^\n]*app\\.anti:5")
+holds("${session}" "(app.main|anti\\.rt.main)[^\n]*app\\.anti:10")
 
 # A breakpoint in the program's own file resolves as well.
 session(app.anti 5)
 holds("${session}" "app.helper[^\n]*app\\.anti:5")
+
+# A breakpoint in a copy of a generic names the copy as the program writes
+# it, and its caller below it.
+session(app.anti 16)
+holds("${session}" "app\\.twice<int>[^\n]*app\\.anti:16")
+holds("${session}" "(app.main|anti\\.rt.main)[^\n]*app\\.anti:11")

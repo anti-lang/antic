@@ -24,20 +24,31 @@ unit of its own under `-g`, but only for an assembly file that carries no
 `.file` directive, and that unit names the assembly file and takes the lines
 of the assembly text rather than the Anti source.
 
-So the unit is antic's. It holds one entry with no children:
+So the unit is antic's. It holds one entry, and a child entry per function:
 
 | Attribute | Form | Value |
 |---|---|---|
 | `DW_AT_stmt_list` | `sec_offset` | the start of `.debug_line` |
 | `DW_AT_low_pc` | `addr` | the label before the first function |
-| `DW_AT_high_pc` | `data4` | the bytes of all the functions |
+| `DW_AT_high_pc` | `data4`, `addr` on Mach-O | the end of the last function |
 | `DW_AT_name` | `string` | the source of the program's own module |
 | `DW_AT_producer` | `string` | `antic` and its version |
-| `DW_AT_language` | `data2` | 0x8001, the code of an assembler |
+| `DW_AT_language` | `data2` | 0x0c, C99 |
 
-Function names come from the symbol table, so no entry per function is
-needed. A backtrace names `prog.main` and `com.example.step.step` from the
-symbols that every build already writes.
+The entry of a function, `DW_TAG_subprogram`, holds its name, its first byte
+and its length. The name is the one a person reads, `app.List<int>.push`,
+where the symbol table holds `app.List$3cint$3e.push`. lldb names a frame
+after the entry, and makes a function of one only when the unit names a
+language whose type system it has. The code of an assembler, 0x8001, gave
+it none, so the unit names C99.
+
+On ELF and COFF the end of the unit is its length, a difference of two
+labels. On Mach-O a difference of two labels in two atoms is a pair of
+relocations, which lldb does not apply when it reads an object. The unit
+covered the first function alone, and lldb found no line past it. The end
+is therefore an address on Mach-O, one relocation that the debug map moves.
+Each function's own length is a difference inside one atom and stays a
+number.
 
 The version is 4, which is what llvm-mc writes into the line table of an
 assembly file. The two agree.

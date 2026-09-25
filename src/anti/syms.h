@@ -1,7 +1,11 @@
 #ifndef ANTI_SYMS_H
 #define ANTI_SYMS_H
 
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+
+#include "text.h"
 
 /* `anti symbols`, the three commands over the symbols archives of a
    deployment. Each returns the exit status of the command. */
@@ -25,5 +29,12 @@ int syms_check(const char *conf, const char *const *symbols, size_t count);
    of every frame whose module has an archive among symbols. */
 int syms_resolve(const char *trace, const char *const *symbols,
                  size_t count);
+
+/* Append to function the name of the function at vaddr in the text of a
+   symbols map, as a person reads it. Append its `file:line` to where when
+   the map gives one. Returns false when no line of the map holds
+   vaddr. */
+bool syms_map_lookup(const char *map, uint64_t vaddr, struct text *function,
+                     struct text *where);
 
 #endif

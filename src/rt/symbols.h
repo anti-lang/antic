@@ -27,6 +27,26 @@ struct anti_found {
 size_t anti_rt_coff_demangle(const char *name, size_t length, char *out,
                              size_t room);
 
+/* DESIGN: antic writes a byte of a function name that an assembler
+   cannot read as `$` and two lowercase hex digits, so the symbol of
+   `List<int>.push` is `List$3cint$3e.push`. It escapes every byte outside
+   letters, digits, `_` and `.`, and `$` is outside them, so a `$` of a
+   name is `$24` in its symbol. Every `$` of an escaped name therefore
+   starts an escape, and the escaped form of a name is one text only.
+   The reverse takes a name back only where it is such a form: its bytes
+   are letters, digits, `_`, `.` and `$`, every `$` stands before two
+   lowercase hex digits of a byte the escape would write, it holds one
+   escape at least, and it holds a `.`, which parts the module from the
+   name in every Anti symbol and which no C identifier holds. Any other
+   name, a `$` of a C symbol among them, stays as it is.
+
+   Write to out the name that the symbol name of length bytes spells.
+   Returns its length, or 0 when name is no escaped Anti name or the
+   result needs more than room bytes. The result is never longer than
+   name. */
+size_t anti_rt_symbol_unescape(const char *name, size_t length, char *out,
+                               size_t room);
+
 /* One function of a walk over a symbol table. It carries the name
    without the prefix a format adds, the address and the size. The size
    is 0 where the table names none, and a walk that returns true

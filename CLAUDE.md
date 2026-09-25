@@ -408,9 +408,10 @@ reports what it finished.
   `FileConfig`. The default provider is a static `default` of the interface,
   which the manifest overrides, so an `inject` field of one needs no entry.
   See "Standard interfaces" in `docs/decisions.md`.
-- `antic -g` writes the line of every statement, and the link then keeps the
-  debug sections. lldb and gdb stop by file and line and print a backtrace of
-  Anti function names. Variables are the next step. See `docs/notes/debug.md`.
+- `antic -g` writes the line of every statement and an entry per function,
+  and the link then keeps the debug sections. lldb and gdb stop by file and
+  line and print a backtrace of Anti function names. A copy of a generic is
+  `app.List<int>.push` there, although its symbol escapes the brackets. Variables are the next step. See `docs/notes/debug.md`.
 - Error origins and stack traces are built. The first `fail` of an error
   writes `at` and, when backtraces are on, `frames`. `e.text()` names the
   position, the causes and the trace. `StackTrace` has `capture`, `frames`,

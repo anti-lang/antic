@@ -79,8 +79,41 @@ static void program_without_functions(void)
     remove(MAP);
 }
 
+/* A line of a map names a function as a person reads it, and the name
+   may hold a blank. The line ends with its location where the map gives
+   one. A name the map holds escaped reads back as well. */
+static void map_names(void)
+{
+    static const char map[] =
+        "# build -\n"
+        "0000000000001000-0000000000001010 app.Pair<int, str>.swap "
+        "app.anti:12\n"
+        "0000000000001010-0000000000001020 app.List<int>.push\n"
+        "0000000000001020-0000000000001030 app.List$3cbyte$3e.push "
+        "src/app.anti:7\n";
+    struct text function = {0};
+    struct text where = {0};
+
+    CHECK(syms_map_lookup(map, 0x1004, &function, &where));
+    CHECK_STR(text_cstr(&function), "app.Pair<int, str>.swap");
+    CHECK_STR(text_cstr(&where), "app.anti:12");
+    text_free(&function);
+    text_free(&where);
+    CHECK(syms_map_lookup(map, 0x1010, &function, &where));
+    CHECK_STR(text_cstr(&function), "app.List<int>.push");
+    CHECK_STR(text_cstr(&where), "");
+    text_free(&function);
+    CHECK(syms_map_lookup(map, 0x102f, &function, &where));
+    CHECK_STR(text_cstr(&function), "app.List<byte>.push");
+    CHECK_STR(text_cstr(&where), "src/app.anti:7");
+    CHECK(!syms_map_lookup(map, 0x1030, &function, &where));
+    text_free(&function);
+    text_free(&where);
+}
+
 void test_syms(void)
 {
     unit_without_id();
     program_without_functions();
+    map_names();
 }

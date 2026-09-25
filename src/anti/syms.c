@@ -969,6 +969,29 @@ static bool cursor_token(struct cursor *c, const char **token, size_t *length)
     return *length > 0;
 }
 
+/* Whether the n bytes at s are a location, `<file>:<line>`. */
+static bool is_location(const char *s, size_t n)
+{
+    size_t digits = 0;
+
+    while (digits < n && s[n - 1 - digits] >= '0' && s[n - 1 - digits] <= '9') {
+        digits++;
+    }
+    return digits > 0 && digits + 1 < n && s[n - 1 - digits] == ':';
+}
+
+/* Append the name a person reads for the n bytes of a symbol at s. */
+static void append_name(struct text *out, const char *s, size_t n)
+{
+    char *readable = malloc(n + 1);
+    size_t length = readable != NULL
+                        ? anti_rt_symbol_unescape(s, n, readable, n)
+                        : 0;
+
+    text_append_bytes(out, length > 0 ? readable : s, length > 0 ? length : n);
+    free(readable);
+}
+
 /* One entry of a map: the range of a function, its name and where the
    debug information gave them, its file and line. */
 struct mapped {
@@ -978,12 +1001,10 @@ struct mapped {
     struct text where;
 };
 
-/* The function of vaddr from the lines of a map, and its file and line
-   as `file:line` in where. */
-static bool map_lookup(const struct text *map, uint64_t vaddr,
-                       struct mapped *out)
+bool syms_map_lookup(const char *map, uint64_t vaddr, struct text *function,
+                     struct text *where_out)
 {
-    const char *line = text_cstr(map);
+    const char *line = map;
 
     while (*line != '\0') {
         const char *stop = strchr(line, '\n');
@@ -998,22 +1019,51 @@ static bool map_lookup(const struct text *map, uint64_t vaddr,
         c.at = line;
         c.end = line + length;
         cursor_blank(&c);
+        /* DESIGN: a name may hold a blank, as `Pair<int, str>.swap`
+           does, and a location never does, since it ends the line in
+           the form `<file>:<line>`. The name is therefore the rest of
+           the line, less a last word of that form. */
         if (line[0] != '#' && cursor_hex(&c, &start) &&
             cursor_char(&c, '-') && cursor_hex(&c, &end) &&
-            cursor_blank(&c) && cursor_token(&c, &name, &name_length) &&
-            vaddr >= start &&
+            cursor_blank(&c) && c.at < c.end && vaddr >= start &&
             (vaddr < end || (end == start && vaddr == start))) {
-            cursor_blank(&c);
-            cursor_token(&c, &where, &where_length);
-            text_append_bytes(&out->function, name, name_length);
+            const char *stop_at = c.end;
+            name = c.at;
+            while (stop_at > name && is_blank(stop_at[-1])) {
+                stop_at--;
+            }
+            where = stop_at;
+            while (where > name && !is_blank(where[-1])) {
+                where--;
+            }
+            where_length = (size_t)(stop_at - where);
+            if (where > name && is_location(where, where_length)) {
+                stop_at = where;
+                while (stop_at > name && is_blank(stop_at[-1])) {
+                    stop_at--;
+                }
+            } else {
+                where_length = 0;
+            }
+            name_length = (size_t)(stop_at - name);
+            append_name(function, name, name_length);
             if (where_length > 0) {
-                text_append_bytes(&out->where, where, where_length);
+                text_append_bytes(where_out, where, where_length);
             }
             return true;
         }
         line += length + (stop != NULL ? 1 : 0);
     }
     return false;
+}
+
+/* The function of vaddr from the lines of a map, and its file and line
+   as `file:line` in where. */
+static bool map_lookup(const struct text *map, uint64_t vaddr,
+                       struct mapped *out)
+{
+    return syms_map_lookup(text_cstr(map), vaddr, &out->function,
+                           &out->where);
 }
 
 /* The function and the line of offset into the module the unit holds
@@ -1048,8 +1098,8 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
     if (elf) {
         const uint8_t *bytes = (const uint8_t *)twin->data;
         if (anti_rt_elf_function(bytes, twin->length, vaddr, &found)) {
-            text_append_bytes(&out->function, found.function,
-                              found.function_length);
+            append_name(&out->function, found.function,
+                        found.function_length);
         }
         if (anti_rt_elf_line(bytes, twin->length, vaddr, &found) &&
             found.file != NULL) {
@@ -1064,8 +1114,8 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
         if (anti_rt_macho_table((const uint8_t *)twin->data, twin->length,
                                 false, 0, &t)) {
             if (anti_rt_macho_function(&t, vaddr, &found)) {
-                text_append_bytes(&out->function, found.function,
-                                  found.function_length);
+                append_name(&out->function, found.function,
+                            found.function_length);
             }
             /* The link of Mach-O leaves the line table in the objects
                that its debug map names, which stand where it was

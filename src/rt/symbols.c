@@ -40,6 +40,63 @@ size_t anti_rt_coff_demangle(const char *name, size_t length, char *out,
     return n + (length - at - 1);
 }
 
+/* Whether antic writes the byte c of a name as it is in a symbol. */
+static bool plain_byte(unsigned char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '_' || c == '.';
+}
+
+/* The value of a lowercase hex digit, or -1. */
+static int hex_digit(char c)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    return c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+}
+
+size_t anti_rt_symbol_unescape(const char *name, size_t length, char *out,
+                               size_t room)
+{
+    size_t escapes = 0;
+    size_t n = 0;
+    size_t i;
+    bool dot = false;
+
+    for (i = 0; i < length; i++) {
+        unsigned char c = (unsigned char)name[i];
+        if (c == '$') {
+            int high = i + 2 < length ? hex_digit(name[i + 1]) : -1;
+            int low = i + 2 < length ? hex_digit(name[i + 2]) : -1;
+            unsigned char byte;
+            if (high < 0 || low < 0) {
+                return 0;
+            }
+            byte = (unsigned char)(high * 16 + low);
+            if (plain_byte(byte) || byte == 0) {
+                return 0;
+            }
+            if (n < room) {
+                out[n] = (char)byte;
+            }
+            n++;
+            i += 2;
+            escapes++;
+            continue;
+        }
+        if (!plain_byte(c)) {
+            return 0;
+        }
+        dot = dot || c == '.';
+        if (n < room) {
+            out[n] = (char)c;
+        }
+        n++;
+    }
+    return escapes > 0 && dot && n <= room ? n : 0;
+}
+
 /* DESIGN: every read goes through these helpers, which take the bytes
    little-endian at any alignment and refuse a read past the end. A file
    of another host or a damaged file then gives no answer, never a crash.

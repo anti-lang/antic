@@ -1,5 +1,6 @@
 //! A program that prints the raw trace of the calls that lead to `inner`, which
-//! `anti symbols resolve` turns into names and lines.
+//! `anti symbols resolve` turns into names and lines. One call goes through a
+//! copy of a generic, whose symbol escapes its name.
 
 import anti.io;
 import anti.lang;
@@ -13,10 +14,17 @@ fn inner(depth: int) -> int
 	return depth;
 }
 
+/// One call more on the trace, through a copy of a generic whose name holds a
+/// blank, `through<float, str>`.
+fn through<A, B>(depth: int, weight: A, tag: B) -> int
+{
+	return inner(depth);
+}
+
 /// One call more on the trace.
 fn outer(depth: int) -> int
 {
-	return inner(depth + 1) + 1;
+	return through(depth + 1, 2.5, "tag") + 1;
 }
 
 fn main() -> int

@@ -35,13 +35,24 @@ static bool add_function(void *context, const char *name, uint64_t vaddr,
 {
     struct map *m = context;
     struct entry *e;
+    size_t length = strlen(name);
+    char *readable;
+    size_t unescaped;
 
     if (m->count == m->capacity) {
         m->items = files_grow(m->items, &m->capacity, sizeof *m->items);
     }
     e = &m->items[m->count++];
     memset(e, 0, sizeof *e);
-    text_append(&e->name, name);
+    /* The map names a function as a trace of the program would, with
+       the escapes of its symbol read back. */
+    readable = malloc(length + 1);
+    unescaped = readable != NULL
+                    ? anti_rt_symbol_unescape(name, length, readable, length)
+                    : 0;
+    text_append_bytes(&e->name, unescaped > 0 ? readable : name,
+                      unescaped > 0 ? unescaped : length);
+    free(readable);
     e->vaddr = vaddr;
     e->size = size;
     return false;

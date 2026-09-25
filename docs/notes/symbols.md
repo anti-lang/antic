@@ -34,6 +34,30 @@ link starts at the address of `__TEXT`, which the load commands of the
 debug link give. The lookup takes the byte before the return address,
 which lies in the call and names its line, as `symbolize` does.
 
+## Reading an escaped name
+
+A symbol of a copy of a generic escapes each byte an assembler cannot read
+as `$` and two lowercase hex digits, so `app.List<int>.push` is the symbol
+`app.List$3cint$3e.push`. `anti_rt_symbol_unescape` of `src/rt/symbols.c`
+reads it back, and `symbolize`, `resolve` and the map all call it. It reads
+a name back only where the name is an escaped form without doubt:
+
+- every byte is a letter, a digit, `_`, `.` or `$`;
+- every `$` stands before two lowercase hex digits;
+- the byte those digits give is one the escape writes, never a letter, a
+  digit, `_`, `.` or 0;
+- the name holds one escape at least, and a `.`.
+
+antic escapes `$` itself as `$24`, so a `$` of an Anti name never stands
+bare in a symbol. The escape then maps one name to one symbol, and the rules
+above take back exactly those symbols. A C symbol holds no `.`, and one
+with a bare `$` breaks the second rule, so either stays as it is.
+
+The map writes the name a person reads, which may hold a blank, as
+`Pair<int, str>.swap` does. A location ends a line and holds no blank, in
+the form `<file>:<line>`. The reader of a map therefore takes the rest of
+the line as the name, less a last word of that form.
+
 ## The zip reader
 
 The reader finds the end record from the back of the file and walks the

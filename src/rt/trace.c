@@ -55,6 +55,78 @@ static struct anti_text text_part(const char *s, size_t n)
     return t;
 }
 
+/* The texts a lookup makes, kept for the life of the program so a frame
+   may point at them. Equal texts are kept once. */
+struct kept {
+    struct kept *next;
+    size_t length;
+    char bytes[1];
+};
+
+static struct kept *kept_texts;
+#if defined(_WIN32)
+static SRWLOCK kept_lock = SRWLOCK_INIT;
+#else
+static pthread_mutex_t kept_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
+static struct anti_text keep(const char *s, size_t n)
+{
+    struct kept *k;
+
+#if defined(_WIN32)
+    AcquireSRWLockExclusive(&kept_lock);
+#else
+    pthread_mutex_lock(&kept_lock);
+#endif
+    for (k = kept_texts; k != NULL; k = k->next) {
+        if (k->length == n && memcmp(k->bytes, s, n) == 0) {
+            break;
+        }
+    }
+    if (k == NULL) {
+        k = malloc(sizeof *k + n);
+        if (k != NULL) {
+            memcpy(k->bytes, s, n);
+            k->bytes[n] = 0;
+            k->length = n;
+            k->next = kept_texts;
+            kept_texts = k;
+        }
+    }
+#if defined(_WIN32)
+    ReleaseSRWLockExclusive(&kept_lock);
+#else
+    pthread_mutex_unlock(&kept_lock);
+#endif
+    return k != NULL ? text_part(k->bytes, k->length) : text_of(NULL);
+}
+
+/* The name of a function as a person reads it, from the n bytes of its
+   symbol at s: `List<int>.push` of the symbol `List$3cint$3e.push`. A
+   name without an escape stays where it is when stable says s outlives
+   the frame, and is kept otherwise. */
+static struct anti_text function_name(const char *s, size_t n, bool stable)
+{
+    char *readable;
+    size_t length;
+    struct anti_text t;
+
+    if (s == NULL || memchr(s, '$', n) == NULL) {
+        return stable ? text_part(s, n) : keep(s, n);
+    }
+    readable = malloc(n + 1);
+    if (readable == NULL) {
+        return stable ? text_part(s, n) : keep(s, n);
+    }
+    length = anti_rt_symbol_unescape(s, n, readable, n);
+    t = length > 0 ? keep(readable, length)
+        : stable   ? text_part(s, n)
+                   : keep(s, n);
+    free(readable);
+    return t;
+}
+
 /* DESIGN: a static library for C has no notice, so the runtime names
    `anti_licenses` without needing it. ELF takes a weak reference, which
    is 0 without a definition. COFF names a default that the linker takes
@@ -315,7 +387,8 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
        before it, which is the call and names its line. */
     vaddr = frame->address - 1 - (uint64_t)slide;
     if (anti_rt_macho_function(&t, vaddr, &found)) {
-        out->function = text_part(found.function, found.function_length);
+        out->function = function_name(found.function, found.function_length,
+                                       true);
     }
     if (anti_rt_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
         const struct loaded *l = load(object, true);
@@ -469,7 +542,8 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
        before it, which is the call and names its line. */
     vaddr = frame->address - 1 - frame->base;
     if (anti_rt_elf_function(l->bytes, l->size, vaddr, &found)) {
-        out->function = text_part(found.function, found.function_length);
+        out->function = function_name(found.function, found.function_length,
+                                       true);
     }
     if (anti_rt_elf_line(l->bytes, l->size, vaddr, &found) &&
         found.file != NULL) {
@@ -540,41 +614,6 @@ int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
 #endif
     }
     return count;
-}
-
-/* The texts a Windows lookup makes, kept for the life of the program so
-   a frame may point at them. Equal texts are kept once. */
-struct kept {
-    struct kept *next;
-    size_t length;
-    char bytes[1];
-};
-
-static struct kept *kept_texts;
-static SRWLOCK kept_lock = SRWLOCK_INIT;
-
-static struct anti_text keep(const char *s, size_t n)
-{
-    struct kept *k;
-
-    AcquireSRWLockExclusive(&kept_lock);
-    for (k = kept_texts; k != NULL; k = k->next) {
-        if (k->length == n && memcmp(k->bytes, s, n) == 0) {
-            break;
-        }
-    }
-    if (k == NULL) {
-        k = malloc(sizeof *k + n);
-        if (k != NULL) {
-            memcpy(k->bytes, s, n);
-            k->bytes[n] = 0;
-            k->length = n;
-            k->next = kept_texts;
-            kept_texts = k;
-        }
-    }
-    ReleaseSRWLockExclusive(&kept_lock);
-    return k != NULL ? text_part(k->bytes, k->length) : text_of(NULL);
 }
 
 void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
@@ -762,8 +801,8 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
         char name[512];
         size_t named = anti_rt_coff_demangle(symbol.info.Name, n, name,
                                              sizeof name);
-        out->function = named > 0 ? keep(name, named)
-                                  : keep(symbol.info.Name, n);
+        out->function = named > 0 ? function_name(name, named, false)
+                                  : function_name(symbol.info.Name, n, false);
     }
     memset(&line, 0, sizeof line);
     line.SizeOfStruct = sizeof line;

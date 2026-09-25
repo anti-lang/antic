@@ -2400,6 +2400,9 @@ foreach(case
         "stack|stack_trace|||stack_trace.pattern||0"
         "stack_g|stack_trace|-g||stack_trace.g.pattern||0"
         "stack_dev|stack_trace|--dev||stack_trace.pattern||0"
+        "copies|copies|||copies.pattern||0"
+        "copies_g|copies|-g||copies.pattern||0"
+        "copies_dev|copies|--dev||copies.pattern||0"
         "origin|origin|||origin.pattern||0"
         "origin_dev|origin|--dev||origin.trace.pattern||0"
         "origin_option|origin||--anti.backtrace|origin.trace.pattern||0"
@@ -3212,6 +3215,20 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
             "-DHOLDS=${once}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/copies_merge.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-copies"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
+    # The debug information names a copy as a person reads it, the DWARF
+    # entry on ELF and Mach-O and the CodeView record on COFF, and the
+    # symbol keeps the escaped name.
+    add_test(NAME asm_debug_copies_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DTARGET=${target}"
+            "-DTRIPLE=${triple}"
+            "-DOPTIONS=-g"
+            "-DHOLDS=.asciz \"copies_merge.pick<int>\"|pick$3cint$3e:"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/copies_merge.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-debug-copies"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
     # A shared library for C, with the constructor section of the target.
     add_test(NAME asm_clib_${target}

@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "symbols.h"
+#include "target.h"
+#include "text.h"
 
 /* The name that anti_rt_coff_demangle gives for symbol, or "" when it gives
    none. */
@@ -18,6 +20,72 @@ static void demangles(const char *symbol, size_t room, const char *expected)
     CHECK(length < sizeof out);
     out[length < sizeof out ? length : 0] = 0;
     CHECK_STR(out, expected);
+}
+
+/* The name that anti_rt_symbol_unescape gives for symbol, or "" when it
+   gives none. */
+static void unescapes(const char *symbol, size_t room, const char *expected)
+{
+    char out[128];
+    size_t length;
+
+    memset(out, 'x', sizeof out);
+    length = anti_rt_symbol_unescape(symbol, strlen(symbol), out, room);
+    CHECK(length < sizeof out);
+    out[length < sizeof out ? length : 0] = 0;
+    CHECK_STR(out, expected);
+}
+
+/* The symbol mangle writes for name in module on an ELF target, read back
+   gives name, a `$` of the name among the bytes it escapes. */
+static void round_trip(const char *module, const char *name)
+{
+    struct text symbol = {0};
+    struct text wanted = {0};
+    char out[256];
+    size_t length;
+
+    CHECK(mangle(&symbol, TARGET_LINUX_X86_64, module, name));
+    text_appendf(&wanted, "%s.%s", module, name);
+    length = anti_rt_symbol_unescape(text_cstr(&symbol), symbol.length, out,
+                                     sizeof out);
+    out[length < sizeof out ? length : 0] = 0;
+    CHECK_STR(length > 0 ? out : text_cstr(&symbol), text_cstr(&wanted));
+    text_free(&symbol);
+    text_free(&wanted);
+}
+
+static void symbol_escapes(void)
+{
+    unescapes("app.List$3cint$3e.push", 128, "app.List<int>.push");
+    unescapes("app.List$3c$2ageo.Point$3e.push", 128,
+              "app.List<*geo.Point>.push");
+    unescapes("app.Pair$3cint$2c$20str$3e.swap", 128,
+              "app.Pair<int, str>.swap");
+    /* `$` itself is an escape, so a name that holds one reads back. */
+    unescapes("app.a$24b", 128, "app.a$b");
+    /* A name without an escape, or with a `$` that is none of the form,
+       stays as it is. */
+    unescapes("app.main", 128, "");
+    unescapes("app.a$b", 128, "");
+    unescapes("app.a$3C", 128, "");
+    unescapes("app.a$3", 128, "");
+    unescapes("app.a$", 128, "");
+    /* The escape of a byte the escape leaves alone is no escape. */
+    unescapes("app.a$41", 128, "");
+    unescapes("app.a$2e", 128, "");
+    unescapes("app.a$00", 128, "");
+    /* A C name holds no `.`, and a byte outside the form is no name. */
+    unescapes("foo$3cbar", 128, "");
+    unescapes("app.a$3cb@plt", 128, "");
+    /* A name that does not fit is none. */
+    unescapes("app.List$3cint$3e.push", 17, "");
+    unescapes("app.List$3cint$3e.push", 18, "app.List<int>.push");
+    round_trip("app", "List<int>.push");
+    round_trip("com.example", "Map<str, List<*com.example.Point>>.get");
+    round_trip("app", "max<[4]f32>");
+    round_trip("app", "a$b<fn(int) -> ?*byte>");
+    round_trip("app", "main");
 }
 
 /* Malformed ELF and DWARF input. Each image is built by hand in a buffer
@@ -537,6 +605,7 @@ void test_symbols(void)
     demangles("_A8geometry_length", 14, "");
     demangles("_A8geometry_length", 15, "geometry.length");
     demangles("_A8geometry_length", 8, "");
+    symbol_escapes();
     nobits_sections();
     line_overflow();
     empty_entry_formats();

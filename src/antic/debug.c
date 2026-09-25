@@ -12,14 +12,16 @@
    `.file` directive, and then names the assembly file rather than the
    Anti source. So antic writes the unit itself, as the bytes of
    .debug_abbrev and .debug_info, and llvm-mc writes the line table those
-   bytes point at. The unit holds one entry, the range of the code and the
-   name of the line table. Names of functions come from the symbol table,
-   which every build already carries. */
+   bytes point at. The unit holds the range of the code and the name of
+   the line table, and one entry per function with its name and its
+   range. */
 
 /* The DWARF codes that the compile unit needs. */
 enum {
     DW_TAG_compile_unit = 0x11,
+    DW_TAG_subprogram = 0x2e,
     DW_CHILDREN_no = 0x00,
+    DW_CHILDREN_yes = 0x01,
     DW_AT_name = 0x03,
     DW_AT_stmt_list = 0x10,
     DW_AT_low_pc = 0x11,
@@ -31,11 +33,15 @@ enum {
     DW_FORM_data4 = 0x06,
     DW_FORM_string = 0x08,
     DW_FORM_sec_offset = 0x17,
-    /* No DWARF language code names Anti. The code of an assembler is the
-       one llvm-mc writes for a file of `.loc` directives, and the
-       debuggers are tested against it. A code of its own replaces this
-       one the day Anti has one. */
-    DW_LANG_assembler = 0x8001,
+    /* DESIGN: no DWARF language code names Anti, so the unit names C99.
+       lldb makes a function of an entry only through the type system of
+       the language of its unit. It has none for the code of an assembler,
+       which the unit named before. The name of a function in
+       the debug information then reached no frame. A debugger reads the
+       unit as C, and an expression at its prompt is parsed as C. Eddie
+       chose C99 on 2026-09-25. A code of Anti's own replaces it the day
+       Anti has one. */
+    DW_LANG_C99 = 0x0c,
     /* The version of the unit. llvm-mc writes a line table of version 4
        for an assembly file, and the two agree. */
     DWARF_VERSION = 4,
@@ -179,6 +185,12 @@ void debug_open(struct debug *d, struct text *out,
         text_appendf(out, "    .cv_func_id %zu\n", d->function);
         mark(d, out, start);
     }
+    /* The entry of the function in the compile unit takes its start
+       from this label, which stands at its first byte. */
+    if (!codeview(d)) {
+        text_appendf(out, "%santi_debug_fn%zu:\n", local(d), d->function);
+        mark(d, out, start);
+    }
     d->function++;
     /* The position of the declaration marks its own range, which joins
        the one above it. */
@@ -243,21 +255,46 @@ static void attribute(struct text *out, unsigned at, unsigned form,
     text_appendf(out, "    .byte %u, %u          /* %s */\n", at, form, name);
 }
 
-/* The abbreviation of the one entry of the unit. */
+/* DESIGN: Mach-O parts a section into atoms at every symbol that is not
+   local. llvm-mc writes a difference of two labels in two atoms as a pair
+   of relocations. The length of the whole code is such a
+   difference, and lldb reads the object of a program without applying
+   them. The unit then covered the first function alone, and lldb found
+   no function and no line at any other address. On Mach-O the unit
+   therefore gives the end of its code as an address. That is one
+   relocation, which the debug map moves as it moves the start. Whether
+   the unit gives its end so. */
+static bool end_as_address(const struct debug *d)
+{
+    return target_info(d->target)->format == FORMAT_MACHO;
+}
+
+/* The abbreviations of the unit and of the entry of each function. */
 static void abbreviations(struct debug *d, struct text *out)
 {
     section(d, out, "debug_abbrev");
     text_appendf(out, "%santi_debug_abbrev:\n", local(d));
     text_appendf(out, "    .byte 1              /* the abbreviation */\n"
                       "    .byte %u             /* DW_TAG_compile_unit */\n"
-                      "    .byte %u              /* DW_CHILDREN_no */\n",
-                 DW_TAG_compile_unit, DW_CHILDREN_no);
+                      "    .byte %u              /* DW_CHILDREN_yes */\n",
+                 DW_TAG_compile_unit, DW_CHILDREN_yes);
     attribute(out, DW_AT_stmt_list, DW_FORM_sec_offset, "DW_AT_stmt_list");
     attribute(out, DW_AT_low_pc, DW_FORM_addr, "DW_AT_low_pc");
-    attribute(out, DW_AT_high_pc, DW_FORM_data4, "DW_AT_high_pc");
+    attribute(out, DW_AT_high_pc, end_as_address(d) ? DW_FORM_addr
+                                                    : DW_FORM_data4,
+              "DW_AT_high_pc");
     attribute(out, DW_AT_name, DW_FORM_string, "DW_AT_name");
     attribute(out, DW_AT_producer, DW_FORM_string, "DW_AT_producer");
     attribute(out, DW_AT_language, DW_FORM_data2, "DW_AT_language");
+    text_append(out, "    .byte 0, 0           /* the end of the "
+                     "attributes */\n");
+    text_appendf(out, "    .byte 2              /* the abbreviation */\n"
+                      "    .byte %u             /* DW_TAG_subprogram */\n"
+                      "    .byte %u              /* DW_CHILDREN_no */\n",
+                 DW_TAG_subprogram, DW_CHILDREN_no);
+    attribute(out, DW_AT_name, DW_FORM_string, "DW_AT_name");
+    attribute(out, DW_AT_low_pc, DW_FORM_addr, "DW_AT_low_pc");
+    attribute(out, DW_AT_high_pc, DW_FORM_data4, "DW_AT_high_pc");
     text_append(out, "    .byte 0, 0           /* the end of the "
                      "attributes */\n"
                      "    .byte 0              /* the end of the "
@@ -280,10 +317,30 @@ static void section_offset(struct debug *d, struct text *out,
     }
 }
 
-/* The compile unit: the range of the code, the line table and the name. */
-static void compile_unit(struct debug *d, struct text *out)
+/* The name that the readers of ELF and Mach-O give a function. That is its
+   module path, a dot and its name, or the C name of an export fn. */
+static void reader_name(struct text *out, const struct ir_function *f)
+{
+    if (f->module == NULL || f->exported) {
+        mach_function_symbol(out, TARGET_LINUX_X86_64, f);
+    } else {
+        text_appendf(out, "%s.%s", f->module, f->name);
+    }
+}
+
+/* The compile unit: the range of the code, the line table and the name.
+   An entry of each function follows with its name and its range.
+
+   DESIGN: the entry names the function as a person reads it,
+   `app.List<int>.push`. The symbol table keeps the escaped symbol that
+   the assembler and the linker need. A debugger takes the name of
+   a frame from the entry. */
+static void compile_unit(struct debug *d, struct text *out,
+                         struct mach_function *const *functions)
 {
     const char *l = local(d);
+    size_t id = 0;
+    size_t i;
 
     section(d, out, "debug_line");
     text_appendf(out, "%santi_debug_line:\n", l);
@@ -303,27 +360,38 @@ static void compile_unit(struct debug *d, struct text *out)
                  DWARF_ADDRESS_SIZE);
     section_offset(d, out, "line", "DW_AT_stmt_list");
     text_appendf(out, "    .quad %santi_debug_code    /* DW_AT_low_pc */\n", l);
-    text_appendf(out, "    .long %santi_debug_code_end - "
-                      "%santi_debug_code    /* DW_AT_high_pc */\n",
-                 l, l);
+    if (end_as_address(d)) {
+        text_appendf(out, "    .quad %santi_debug_code_end    "
+                          "/* DW_AT_high_pc */\n", l);
+    } else {
+        text_appendf(out, "    .long %santi_debug_code_end - "
+                          "%santi_debug_code    /* DW_AT_high_pc */\n",
+                     l, l);
+    }
     text_append(out, "    .asciz ");
     quoted(out, unit_file(d));
     text_append(out, "\n");
     text_appendf(out, "    .asciz \"antic %s\"\n", ANTIC_VERSION);
     text_appendf(out, "    .short %u          /* DW_AT_language */\n",
-                 DW_LANG_assembler);
-    text_appendf(out, "%santi_debug_unit_end:\n", l);
-}
-
-/* The name that the readers of ELF and Mach-O give a function. That is its
-   module path, a dot and its name, or the C name of an export fn. */
-static void reader_name(struct text *out, const struct ir_function *f)
-{
-    if (f->module == NULL || f->exported) {
-        mach_function_symbol(out, TARGET_LINUX_X86_64, f);
-    } else {
-        text_appendf(out, "%s.%s", f->module, f->name);
+                 DW_LANG_C99);
+    for (i = 0; i < d->m->function_count; i++) {
+        struct text name = {0};
+        if (functions[i] == NULL) {
+            continue;
+        }
+        reader_name(&name, d->m->functions[i]);
+        text_append(out, "    .byte 2              /* DW_TAG_subprogram */\n"
+                         "    .asciz ");
+        quoted(out, text_cstr(&name));
+        text_appendf(out, "\n    .quad %santi_debug_fn%zu    /* DW_AT_low_pc */\n"
+                          "    .long %santi_debug_fn%zu_end - %santi_debug_fn%zu"
+                          "    /* DW_AT_high_pc */\n",
+                     l, id, l, id, l, id);
+        text_free(&name);
+        id++;
     }
+    text_append(out, "    .byte 0              /* the end of the children */\n");
+    text_appendf(out, "%santi_debug_unit_end:\n", l);
 }
 
 /* The symbol record of each function, in the order the emitter wrote
@@ -419,7 +487,7 @@ void debug_sections(struct debug *d, struct text *out,
         }
     } else if (d->on) {
         start = out->length;
-        compile_unit(d, out);
+        compile_unit(d, out, functions);
         mark(d, out, start);
     }
 }
