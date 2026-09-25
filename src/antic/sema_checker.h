@@ -345,6 +345,9 @@ size_t sema_proved_names(const struct expr *cond, bool want_true,
                          struct symbol **out, size_t count);
 struct type *sema_proved_type(struct checker *c, const struct symbol *sym);
 bool sema_type_owns(const struct type *t);
+/* How a message names what an owning type owns: its `own` fields for a
+   class, its parts for a struct or a tuple. */
+const char *sema_owns_phrase(const struct type *t);
 bool sema_reads_existing(const struct expr *e);
 struct name sema_place_name(const struct expr *e);
 bool sema_move_local(struct checker *c, struct expr *e,

@@ -358,7 +358,6 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
 }
 
 static bool local_needs_teardown(const struct type *t);
-static bool parts_need_teardown(const struct type *t);
 
 /* DESIGN: the check of a walk over a collection that counts its changes.
    The test of every turn compares the two counts before it calls `next`.
@@ -510,9 +509,8 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
        collection, as the copy of a slice element does. A value with lent
        parts gives the loop the parts it receives by value. The teardown
        of the value leaves its pointers alone. */
-    if (it->place == NULL && local_needs_teardown(sym->type)) {
-        push_exit_action(l, NULL, sym, false);
-    } else if (type_holds_lent(sym->type) && parts_need_teardown(sym->type)) {
+    if ((it->place == NULL || type_holds_lent(sym->type)) &&
+        local_needs_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
     if (s->as.for_loop.pattern) {
@@ -957,41 +955,17 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
 
 /* DESIGN: a local of a class whose chain declares `destruct` or owns
    memory is torn down at the end of its block, as if the program had
-   written `defer destroy(&c)` after the `let`. A class value held inline
+   written `defer destroy(&c)` after the `let`. So is a struct or a tuple
+   that owns something, part by part. A class value held inline
    is owned, so one that needs the teardown asks for it too. A heap object
    is never torn down by itself, and `delete` is the only way to free
    one. */
 bool lower_type_needs_destruct(const struct type *t)
 {
-    size_t i;
-
-    if (t == NULL || t->kind != TYPE_CLASS) {
-        return false;
-    }
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
-        for (i = 0; i < t->member_count; i++) {
-            const struct item *m = t->members[i];
-            static const struct name destruct_name = {"destruct", 8};
-            /* The root's `destruct` is empty and never asks for one. */
-            if (m->kind == ITEM_FN &&
-                lower_same_name(&m->name, &destruct_name) &&
-                m->runtime == NULL && lower_has_body(m)) {
-                return true;
-            }
-        }
-        for (i = 0; i < t->field_count; i++) {
-            const struct struct_field *f = &t->fields[i];
-            if (f->owned) {
-                return true;
-            }
-            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                (lower_type_needs_destruct(f->type) ||
-                 lower_optional_needs_destruct(f->type))) {
-                return true;
-            }
-        }
-    }
-    return false;
+    return t != NULL &&
+           (t->kind == TYPE_CLASS || t->kind == TYPE_STRUCT ||
+            t->kind == TYPE_TUPLE) &&
+           sema_needs_teardown(t);
 }
 
 /* DESIGN: a `?T` of a class value that needs the teardown holds an
@@ -1038,15 +1012,24 @@ static struct ir_operand element_count(struct lowerer *l, const struct type *t)
     return count;
 }
 
+struct ir_operand lower_array_count(struct lowerer *l, const struct type *t)
+{
+    return element_count(l, t);
+}
+
 /* The teardown of the class value at p. The end of a block checks its
    table in the runtime. An assignment passes over a value whose table is
-   zero, which was never made. */
+   zero, which was never made. A struct or a tuple goes part by part. */
 static void destroy_value(struct lowerer *l, struct ir_operand p,
                           const struct type *t, bool replaced)
 {
     struct ir_operand args[2];
     struct ir_block *after;
 
+    if (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE) {
+        lower_destroy_owned(l, t, p, ir_int_op(IR_PTR, 0), replaced);
+        return;
+    }
     if (!replaced) {
         lower_object_call(l, "anti_rt_destroy", p, t);
         return;
@@ -1121,6 +1104,12 @@ void lower_clear_tables(struct lowerer *l, struct ir_operand base,
     if (!lower_type_needs_destruct(element)) {
         return;
     }
+    /* A struct or a tuple clears what each of its parts would tear
+       down. */
+    if (element->kind != TYPE_CLASS) {
+        lower_clear_owned(l, t, base);
+        return;
+    }
     if (t->kind != TYPE_ARRAY) {
         ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), base);
         return;
@@ -1154,51 +1143,10 @@ void lower_clear_tables(struct lowerer *l, struct ir_operand base,
 
 /* A local that may have moved, and an `own` parameter, are torn down
    only when their table is not zero. */
-/* Whether a part of the tuple t needs a teardown. The value of an
-   iterator that the loop receives is torn down part by part. */
-static bool parts_need_teardown(const struct type *t)
-{
-    size_t i;
-
-    if (t == NULL || t->kind != TYPE_TUPLE) {
-        return false;
-    }
-    for (i = 0; i < t->param_count; i++) {
-        if (local_needs_teardown(t->params[i])) {
-            return true;
-        }
-    }
-    return false;
-}
-
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
     bool made_only = sym->moved || sym->own_param;
 
-    /* The value of an iterator with lent parts: each part the loop
-       received by value, and never a lent pointer. */
-    if (sym->type->kind == TYPE_TUPLE) {
-        const struct type *t = sym->type;
-        size_t i;
-        for (i = 0; i < t->param_count; i++) {
-            const struct type *part = t->params[i];
-            struct ir_operand at;
-            if (!local_needs_teardown(part)) {
-                continue;
-            }
-            at = lower_offset_address(
-                l, lower_temp(l, sym->ir),
-                lower_field_offset(l, t, &t->fields[i].name));
-            if (part->kind == TYPE_OPTIONAL) {
-                destroy_optional(l, at, part, made_only);
-            } else if (part->kind == TYPE_ARRAY) {
-                destroy_array(l, at, part, made_only);
-            } else {
-                destroy_value(l, at, part, made_only);
-            }
-        }
-        return;
-    }
     if (sym->type->kind == TYPE_OPTIONAL) {
         destroy_optional(l, lower_temp(l, sym->ir), sym->type, made_only);
         return;
@@ -1680,7 +1628,8 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
            A handler that leaves the block never passes here. The defers it
            runs on the way out leave the slot alone. The zero table of a
            call that wrote nothing so reaches no teardown. */
-        if (has_out && local_needs_teardown(sym->type)) {
+        if (has_out && local_needs_teardown(sym->type) &&
+            s->as.let.name_count == 0) {
             push_exit_action(l, NULL, sym, false);
         }
         return;
@@ -1696,7 +1645,9 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
     if (lower_is_aggregate(sym->type)) {
         lower_build_into(l, s->as.let.value, lower_temp(l, sym->ir));
         lower_clear_moved(l, s->as.let.value);
-        if (local_needs_teardown(sym->type)) {
+        /* A destructuring hands each part to its name, which tears it
+           down, so the value it takes apart takes no teardown. */
+        if (local_needs_teardown(sym->type) && s->as.let.name_count == 0) {
             push_exit_action(l, NULL, sym, false);
         }
         if (!lower_none_in_first_word(sym->type)) {

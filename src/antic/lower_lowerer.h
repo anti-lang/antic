@@ -488,6 +488,27 @@ struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
                                       struct ir_operand value);
 void lower_clear_moved(struct lowerer *l, const struct expr *value);
 bool lower_type_needs_destruct(const struct type *t);
+/* The teardown of the value of type t at at, part by part for a struct,
+   a tuple, an array and a `?T`. A class value runs its teardown, which
+   gives what it owns back to the allocator from. made_only passes over a
+   class value whose table is zero, which moved away or was never made. */
+void lower_destroy_owned(struct lowerer *l, const struct type *t,
+                         struct ir_operand at, struct ir_operand from,
+                         bool made_only);
+/* The copy of what the value of type t at from owns into the value at
+   into, whose bytes are already the same. Each class value, each `own fn`
+   and each part that holds one is copied as `dup` copies it. */
+void lower_copy_owned(struct lowerer *l, const struct type *t,
+                      struct ir_operand from, struct ir_operand into);
+/* Clear what the value of type t at at would tear down, so that its
+   teardown passes over it. That is the table of each class value, the
+   flag of each `?T` and the snapshot of each `own fn`. */
+void lower_clear_owned(struct lowerer *l, const struct type *t,
+                       struct ir_operand at);
+/* Whether a copy of a value of type t copies more than its bytes. */
+bool lower_copies_parts(const struct type *t);
+/* The count of elements of the innermost element type of the array t. */
+struct ir_operand lower_array_count(struct lowerer *l, const struct type *t);
 /* Whether t is a `?T` of a class value that needs the teardown. */
 bool lower_optional_needs_destruct(const struct type *t);
 void lower_clear_tables(struct lowerer *l, struct ir_operand base,

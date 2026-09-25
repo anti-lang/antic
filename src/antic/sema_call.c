@@ -1331,9 +1331,10 @@ static void note_move(struct checker *c, const struct symbol *callee,
         return;
     }
     if (sema_type_owns(arg->type) && sema_reads_existing(arg)) {
-        sema_error_at(c, arg->pos, "`%s` has `own` fields, and a value that "
-                      "stays where it is does not move into `%.*s`, use "
-                      "`dup`", sema_tn(arg->type), (int)by.length, by.text);
+        sema_error_at(c, arg->pos, "`%s` %s, and a value that stays where it "
+                      "is does not move into `%.*s`, use `dup`",
+                      sema_tn(arg->type), sema_owns_phrase(arg->type),
+                      (int)by.length, by.text);
     }
 }
 

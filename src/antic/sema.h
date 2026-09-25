@@ -239,6 +239,15 @@ struct stmt *sema_arm_fallthrough(const struct stmt *body);
 /* Whether a field without a written default takes `T { }`: an inline
    class value whose class a literal may write with no field named. */
 bool sema_field_takes_literal(const struct struct_field *f);
+/* Whether fn has a body: here, in the runtime, or in the module whose
+   library file declared it. */
+bool sema_has_body(const struct item *fn);
+/* Whether a value of type t needs a teardown at the end of its block, and
+   so owns something. A class value does when its chain declares
+   `destruct` or owns memory, and an `own fn` does. A `?T`, an array, a
+   struct and a tuple do with a part that does. Lowering tears down what
+   this names. */
+bool sema_needs_teardown(const struct type *t);
 
 /* The doc warnings of `anti check`: markup outside the doc subset, a
    backtick name that resolves nowhere, a `pub` item with a `//#` note and

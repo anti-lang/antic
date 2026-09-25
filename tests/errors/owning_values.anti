@@ -1,0 +1,42 @@
+//! A struct or a tuple with a part that owns something follows the value rules
+//! of a class value: `=` refuses to copy it, and a name that moved is refused.
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Key = none,
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+fn take(own p: Pair)
+{
+}
+
+fn take_tuple(own t: (Key, int))
+{
+}
+
+fn keep(p: Pair)
+{
+	take(p);
+}
+
+fn main() -> int
+{
+	let p = Pair { k: Key { }, n: 1 };
+	let q = p;
+	q = p;
+	let t = (Key { }, 1);
+	let u = t;
+	u = t;
+	let all = [Pair { k: Key { }, n: 1 }; 2];
+	take(p);
+	let n = p.n;
+	take_tuple(t);
+	return t.1 + n;
+}

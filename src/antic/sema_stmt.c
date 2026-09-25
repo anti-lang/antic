@@ -536,12 +536,95 @@ static void check_block_narrowing(struct checker *c, struct block *b,
    of a class, or a class value held inline that does. An array holds its
    elements inline, and a `?T` its value, so one of them makes the array
    or the `?T` an owner too. */
+bool sema_has_body(const struct item *fn)
+{
+    return fn->body != NULL || fn->runtime != NULL ||
+           (fn->symbol != NULL && fn->symbol->home != NULL &&
+            fn->contract != FN_ABSTRACT);
+}
+
+/* DESIGN: a struct or a tuple is owning when any of its parts owns
+   something, transitively. Such a part is a class value that needs a
+   teardown, and a collection is one. So is an `own fn`, a `?T` or an
+   array of an owning type, and an owning struct or tuple. An owning one
+   follows the value rules of a class value, and one that owns nothing
+   stays plain data. A union owns nothing, since no teardown knows which
+   of its fields it holds. */
+bool sema_needs_teardown(const struct type *t)
+{
+    static const struct name destruct_name = {"destruct", 8};
+    size_t i;
+
+    if (t == NULL) {
+        return false;
+    }
+    switch (t->kind) {
+    case TYPE_OPTIONAL:
+    case TYPE_ARRAY:
+        return sema_needs_teardown(t->element);
+    case TYPE_FN:
+        return t->owned;
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+        if (t->is_union) {
+            return false;
+        }
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                sema_needs_teardown(f->type)) {
+                return true;
+            }
+        }
+        return false;
+    case TYPE_CLASS:
+        break;
+    default:
+        return false;
+    }
+    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+        for (i = 0; i < t->member_count; i++) {
+            const struct item *m = t->members[i];
+            /* The root's `destruct` is empty and never asks for one. */
+            if (m->kind == ITEM_FN && m->name.length == destruct_name.length &&
+                memcmp(m->name.text, destruct_name.text,
+                       destruct_name.length) == 0 &&
+                m->runtime == NULL && sema_has_body(m)) {
+                return true;
+            }
+        }
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if (f->owned) {
+                return true;
+            }
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                sema_needs_teardown(f->type)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+const char *sema_owns_phrase(const struct type *t)
+{
+    while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
+        t = t->element;
+    }
+    return t != NULL && t->kind == TYPE_CLASS ? "has `own` fields"
+                                              : "owns what its parts own";
+}
+
 bool sema_type_owns(const struct type *t)
 {
     size_t i;
 
     while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
         t = t->element;
+    }
+    if (t != NULL && (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE)) {
+        return sema_needs_teardown(t);
     }
     for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
         for (i = 0; i < t->field_count; i++) {
@@ -600,8 +683,8 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             struct type *t)
 {
     if (!sema_is_error(t) && sema_type_owns(t) && sema_reads_existing(value)) {
-        sema_error_at(c, value->pos, "`%s` has `own` fields, use `dup` instead "
-                      "of `=`", sema_tn(t));
+        sema_error_at(c, value->pos, "`%s` %s, use `dup` instead of `=`",
+                      sema_tn(t), sema_owns_phrase(t));
     }
     sema_refuse_lock_copy(c, value, t);
 }

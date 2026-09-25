@@ -1009,6 +1009,7 @@ let first = queue.first() else { return; };
 
 - `own` before a parameter takes ownership of the argument: `pub fn push(self, own item: T)`. Passing a local moves it, and naming the local again is refused: `` `c` was moved into `shapes` by `push` ``. A literal or a call result passed there needs nothing. This extends the `own` parameter of errors to every type.
 - For a type that owns no memory, a move is a copy of its bytes. For one that does, the move is what keeps one owner.
+- A struct or a tuple is owning when any of its parts owns something, transitively: a class value, a collection, an `own fn`, a `?T` of an owning type, or an owning struct or tuple. It follows the value rules of a class value. It is torn down part by part at the end of its block on every exit, `=` refuses it and `dup` copies it. It moves when returned or passed to an `own` parameter, naming it after a move is refused, and it is torn down with its owner as a field, an array element, an element inside a collection or inside a `?T`. A struct or a tuple that owns nothing keeps the rules of plain C data: `=` copies it and nothing is torn down. The C header writes an owning struct with its layout unchanged and marks it as owning in a comment. Structs still take no `own` field.
 
 ## Lending
 

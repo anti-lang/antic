@@ -1,0 +1,22 @@
+exit 0
+struct let 0
+tuple let 0
+struct returned 2
+struct returned 0
+tuple early 3
+tuple returned 0
+struct own 3
+struct own 0
+tuple own 3
+tuple own 0
+class field 0
+struct field 0
+array 0
+optional 0
+dup 1 1
+dup alive 4
+dup 0
+replaced 11 11
+replaced 0
+break 0
+plain 2 2

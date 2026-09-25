@@ -3125,9 +3125,9 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         /* The repeat form writes one value into every element, which
            gives what it owns one owner per element. */
         if (!sema_is_error(t) && sema_type_owns(t)) {
-            sema_error_at(c, e->as.array_repeat.value->pos, "`%s` has `own` "
-                          "fields, and the repeat form copies one value into "
-                          "every element", sema_tn(t));
+            sema_error_at(c, e->as.array_repeat.value->pos, "`%s` %s, and "
+                          "the repeat form copies one value into every "
+                          "element", sema_tn(t), sema_owns_phrase(t));
         }
         return sema_array_of(c, e->as.array_repeat.count, t);
     }
@@ -3232,6 +3232,15 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                           "`dup` copies an `own fn`, and this is `%s`",
                           sema_tn(t));
             return sema_builtin(c, TYPE_ERROR);
+        }
+        /* DESIGN: `dup` of a struct or a tuple value gives a copy of it,
+           in which every part that owns something is copied as `dup`
+           copies it. One that owns nothing gives its bytes. */
+        if (e->as.object.op == TOKEN_DUP &&
+            (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE) &&
+            !t->is_union && !types_is_chan(t) && !types_is_mutex(t) &&
+            !types_is_object_lock(t) && !types_is_job(t)) {
+            return t;
         }
         /* All three read the table of the object, so all three need a
            pointer the program has checked. `dup(p)` then gives the type

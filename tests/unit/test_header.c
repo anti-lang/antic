@@ -9,10 +9,11 @@
 #include "sema.h"
 #include "types.h"
 
-/* Check source as module path, make its interface and compare the header
-   that antic writes for it. */
-static void header_of(const char *path, const char *source, bool bundled,
-                      const char *expected)
+/* Check source as module path, make its interface and write the header
+   that antic writes for it into out. Returns false when the source does
+   not check. */
+static bool header_text(const char *path, const char *source, bool bundled,
+                        struct text *out)
 {
     struct arena arena = {0};
     struct diagnostics diags = {0};
@@ -21,7 +22,7 @@ static void header_of(const char *path, const char *source, bool bundled,
     struct types types;
     struct interface iface;
     const struct interface *ifaces[1];
-    struct text out = {0};
+    bool ok = true;
 
     types_init(&types, &arena);
     if (!lex(source, strlen(source), &arena, &diags, &tokens) ||
@@ -30,16 +31,58 @@ static void header_of(const char *path, const char *source, bool bundled,
         check_failures++;
         fprintf(stderr, "header source does not check: %s\n",
                 diags.count > 0 ? diags.items[0].message : "");
+        ok = false;
     } else {
         sema_interface(module, path, &arena, &iface);
         ifaces[0] = &iface;
-        header_write(&out, "geo", ifaces, 1, bundled);
-        CHECK_STR(text_cstr(&out), expected);
+        header_write(out, "geo", ifaces, 1, bundled);
     }
-    text_free(&out);
     token_list_free(&tokens);
     diagnostics_free(&diags);
     arena_free(&arena);
+    return ok;
+}
+
+/* Check source as module path, make its interface and compare the header
+   that antic writes for it. */
+static void header_of(const char *path, const char *source, bool bundled,
+                      const char *expected)
+{
+    struct text out = {0};
+
+    if (header_text(path, source, bundled, &out)) {
+        CHECK_STR(text_cstr(&out), expected);
+    }
+    text_free(&out);
+}
+
+/* An owning struct keeps its layout, and a comment before it says that
+   it owns what its parts own. A struct that owns nothing has none. */
+static void owning_structs(void)
+{
+    static const char note[] = "/* owning: it owns what its parts own. Copy "
+                               "it by value only to move it. */\n";
+    struct text out = {0};
+    const char *owner;
+    const char *plain;
+
+    if (header_text("com.example.geo",
+                    "export class Leaf { pub n: c_int = 0,"
+                    " fn destruct(self) { } }\n"
+                    "export struct Owner { leaf: Leaf, n: c_int }\n"
+                    "export struct Plain { n: c_int }\n",
+                    false, &out)) {
+        owner = strstr(text_cstr(&out), "typedef struct Owner {");
+        plain = strstr(text_cstr(&out), "typedef struct Plain {");
+        CHECK(owner != NULL && plain != NULL);
+        if (owner != NULL && plain != NULL) {
+            CHECK(owner - text_cstr(&out) >= (ptrdiff_t)strlen(note) &&
+                  strncmp(owner - strlen(note), note, strlen(note)) == 0);
+            CHECK(!(plain - text_cstr(&out) >= (ptrdiff_t)strlen(note) &&
+                    strncmp(plain - strlen(note), note, strlen(note)) == 0));
+        }
+    }
+    text_free(&out);
 }
 
 void test_header(void)
@@ -309,4 +352,5 @@ void test_header(void)
               "#endif\n"
               "\n"
               "#endif\n");
+    owning_structs();
 }

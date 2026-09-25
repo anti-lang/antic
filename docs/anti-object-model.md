@@ -50,6 +50,7 @@ Contents:
 - A struct bound from C with `anti bind` is a struct. An exported struct is a struct.
 - A struct that appears in a class, or is exported, gets a descriptor in read-only data. The struct does not reference it. See [Descriptor and reflection](#descriptor-and-reflection).
 - A struct cannot inherit, implement or `use` anything, and cannot be inherited or implemented.
+- A struct or a tuple is owning when any of its parts owns something, transitively: a class value, a collection, an `own fn`, a `?T` of an owning type, or an owning struct or tuple. An owning struct or tuple follows the value rules of a class value, which [Destruction](#destruction) and [Ownership and copies](#ownership-and-copies) give. A struct or a tuple that owns nothing keeps the rules of plain C data: `=` copies it and nothing is torn down. Owning pointer fields stay a class feature, and a struct takes no `own` field.
 
 ## Enum
 
@@ -192,6 +193,7 @@ Four levels, and each applies where it makes sense:
 - Memory a class takes itself in its `construct` stays its own, and its `destruct` frees it the way it took it.
 - A local of class type whose chain declares `destruct` or has `own` fields is destroyed at the end of its block, as if `destroy(&c)` had been written as the last `defer`. A heap object is never destroyed by itself.
 - A local of array type whose element type has `destruct` or `own` fields is destroyed element by element at the end of its block, last to first.
+- A local of an owning struct or tuple is torn down part by part at the end of its block, on every exit. A class value is torn down so too. Held as a field, an array element, a collection element or the value of a `?T`, an owning struct or tuple goes with its owner.
 - An `own` slice of class values destroys its elements last to first before its buffer is freed. Every sequence of class values has that one order.
 - A direct call `c.destruct()` is refused.
 - `destruct` does not run on an object whose `construct` failed. A `construct` that fails after acquiring something frees it on the fail path, which `undo` writes.
@@ -202,6 +204,7 @@ Four levels, and each applies where it makes sense:
 - `own` before a pointer or slice field says the object owns the memory behind it. It is refused on `str`, which is immutable and shared. It is refused on inline class and struct fields, which are owned by definition. A class value held inline is destroyed with what holds it. A local whose inline field needs a teardown is therefore torn down at the end of its block. Ownership is a tree by rule, stated and not checked.
 - `dup(p)` allocates the object's concrete size from the descriptor and copies it. Value fields copy. `own` fields and inline class fields get fresh memory and a copy of their contents, recursively. Other pointer fields copy the address. `Object.copy(self, to: *Object)` is the function behind it. It fills `to`, which `dup` has already allocated at the concrete size from the descriptor. A class may replace it with `concrete fn copy(self, to: *Object)`, which fills the fields of `to` and never allocates. `dup` returns a pointer of the same static type as `p`.
 - `=` between two values of a class with `own` fields anywhere in its chain is refused, because a byte copy would give two owners. `dup` is the way, and the message says so. The refusal applies to copying an existing value. A fresh value on the right, a literal, `T(args)` or the result of `dup`, is a move and stays allowed, so `shelf.items[0] = Item { ... }` compiles. `=` into a place that holds an owning value destroys the old value first, then moves the new one in. A place whose table is zero, an unfilled element of `alloc(T, n)`, holds no value, and nothing is destroyed. The zero-table trap stays for use, not for assignment into. Every place a program can assign into before it holds a value has a zero table there: `alloc(T, n)` zeroes its elements, and the compiler zeroes the storage it supplies for the out pointer of a `catch` binding before the call. `=` between values without `own` fields copies bytes, table pointers included.
+- An owning struct or tuple follows the same rules. `=` refuses to copy an existing one and `dup(s)` copies it, each part that owns something as `dup` copies it. It moves when it is returned or passed to an `own` parameter, and naming it after a move is refused. `dup` of a struct or a tuple that owns nothing gives its bytes.
 - `serialize` follows `own` fields and writes other pointers as addresses. `equals` compares the contents of `own` fields and the addresses of others. `destruct` frees `own` fields.
 - `transient` before a `?*T` or a `?fn(...)` field marks derived state, which the class rebuilds from its other fields. `dup` writes `none` into the copy, which derives its own. The field list of the descriptor leaves the field out, so the default `equals`, `hash` and `serialize` pass over it. The class frees what the field holds in its own `destruct`, and `own` on a transient field is refused.
 
@@ -316,6 +319,7 @@ Four levels, and each applies where it makes sense:
 - The header compiles as C11 and as C++17. Names that are keywords in either get a trailing `_`. No generated struct is named `class`.
 - A bound function crosses as a struct of two pointers. A class is exportable when every `pub` function follows the export signature rule. `anti bind --header` writes all of the above from the `.antl`.
 - A bound struct is never a class. A C library's struct has no table pointer and gets none.
+- An owning struct keeps its layout in the header, and a comment before it marks it as owning. C code then does not copy it by value and keep both copies.
 
 ## Messages
 

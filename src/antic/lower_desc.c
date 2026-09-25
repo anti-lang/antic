@@ -1234,9 +1234,7 @@ static struct ir_global *interface_descriptor(struct lowerer *l,
    abstract function has none anywhere. */
 bool lower_has_body(const struct item *fn)
 {
-    return fn->body != NULL || fn->runtime != NULL ||
-           (fn->symbol != NULL && fn->symbol->home != NULL &&
-            fn->contract != FN_ABSTRACT);
+    return sema_has_body(fn);
 }
 
 /* DESIGN: the compiler writes a teardown and a copy for every complete

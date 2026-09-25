@@ -442,6 +442,19 @@ static void emit_uses(struct text *out, const struct type *t,
    translation units agree on. A `?T` of a value is the struct of the
    value and a `bool`, `value` and `has`, one per T. What an element holds
    by value is written before it, so the definition stands complete. */
+/* DESIGN: an owning struct or tuple keeps its layout in the header, and
+   a comment says it owns what its parts own. Anti tears it down once and
+   copies it with `dup`, so C code that copies it by value and keeps both
+   copies frees what they own twice. */
+static void owning_note(struct text *out, const struct type *t)
+{
+    if ((t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE) &&
+        sema_needs_teardown(t)) {
+        text_append(out, "/* owning: it owns what its parts own. Copy it "
+                         "by value only to move it. */\n");
+    }
+}
+
 static void tuple_view(struct text *out, const struct type *t,
                        const struct interface *const *ifaces, size_t count,
                        struct emitted *done)
@@ -459,6 +472,7 @@ static void tuple_view(struct text *out, const struct type *t,
     }
     tuple_c_name(&tag, t);
     type_name(&written, t);
+    owning_note(out, t);
     text_appendf(out, "/* The %s %s. */\nstruct %s {\n",
                  t->kind == TYPE_OPTIONAL ? "optional value" : "tuple",
                  text_cstr(&written), text_cstr(&tag));
@@ -886,6 +900,7 @@ static void aggregate(struct text *out, const struct symbol *sym,
         vector_typedef(out, t);
         return;
     }
+    owning_note(out, t);
     if (t->packed) {
         text_append(out, "#pragma pack(push, 1)\n");
     }

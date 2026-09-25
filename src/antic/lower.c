@@ -2392,6 +2392,255 @@ void lower_dup_snapshot(struct lowerer *l, const struct type *t,
     ir_store(l->f, l->b, IR_PTR, made, lower_context_word(l, t, into));
 }
 
+/* What each_element does to an element. */
+enum each { EACH_DESTROY, EACH_COPY, EACH_CLEAR };
+
+/* A loop over the elements of the innermost element type of the array t
+   at base, last to first. It tears each down, copies what each owns into
+   the element at the same place of into, or clears each. */
+static void each_element(struct lowerer *l, const struct type *t,
+                         struct ir_operand base, struct ir_operand into,
+                         struct ir_operand from, bool made_only,
+                         enum each what);
+
+void lower_destroy_owned(struct lowerer *l, const struct type *t,
+                         struct ir_operand at, struct ir_operand from,
+                         bool made_only)
+{
+    struct ir_operand args[2];
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_CLASS: {
+        struct ir_block *after = NULL;
+        if (made_only) {
+            after = lower_when_made(l, at);
+        } else {
+            lower_check_table(l, lower_temp(l, ir_load(l->f, l->b, IR_PTR, at)),
+                              t);
+        }
+        args[0] = at;
+        args[1] = from;
+        ir_call(l->f, l->b, IR_VOID,
+                ir_func_op(lower_class_function(l, t, "destroy")), args, 2);
+        if (after != NULL) {
+            ir_jump(l->f, l->b, after);
+            l->b = after;
+        }
+        return;
+    }
+    case TYPE_OPTIONAL: {
+        struct ir_block *held = lower_new_block(l);
+        struct ir_block *after = lower_new_block(l);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
+                                          lower_optional_flag(l, t, at),
+                                          ir_int_op(IR_I8, 0))),
+                  held, after);
+        l->b = held;
+        lower_destroy_owned(l, t->element, at, from, made_only);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+        return;
+    }
+    case TYPE_ARRAY:
+        each_element(l, t, at, lower_none(), from, made_only, EACH_DESTROY);
+        return;
+    case TYPE_FN:
+        lower_free_snapshot(l, t, at);
+        return;
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+        /* The parts go last to first, as the locals of a block do. */
+        for (i = t->field_count; i > 0; i--) {
+            const struct struct_field *f = &t->fields[i - 1];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                sema_needs_teardown(f->type)) {
+                lower_destroy_owned(
+                    l, f->type,
+                    lower_offset_address(l, at,
+                                         lower_field_offset(l, t, &f->name)),
+                    from, made_only);
+            }
+        }
+        return;
+    default:
+        return;
+    }
+}
+
+void lower_clear_owned(struct lowerer *l, const struct type *t,
+                       struct ir_operand at)
+{
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_CLASS:
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
+        return;
+    case TYPE_OPTIONAL:
+        lower_set_optional(l, t, NULL, at, 0);
+        return;
+    case TYPE_FN:
+        if (t->owned) {
+            ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
+                     lower_context_word(l, t, at));
+        }
+        return;
+    case TYPE_ARRAY:
+        each_element(l, t, at, lower_none(), lower_none(), false, EACH_CLEAR);
+        return;
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                sema_needs_teardown(f->type)) {
+                lower_clear_owned(
+                    l, f->type,
+                    lower_offset_address(l, at,
+                                         lower_field_offset(l, t, &f->name)));
+            }
+        }
+        return;
+    default:
+        return;
+    }
+}
+
+static struct ir_function *copy_of(struct lowerer *l, const struct type *t);
+
+void lower_copy_owned(struct lowerer *l, const struct type *t,
+                      struct ir_operand from, struct ir_operand into)
+{
+    struct ir_operand args[2];
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_CLASS:
+        lower_check_table(l, lower_temp(l, ir_load(l->f, l->b, IR_PTR, from)),
+                          t);
+        args[0] = from;
+        args[1] = into;
+        ir_call(l->f, l->b, IR_VOID, ir_func_op(copy_of(l, t)), args, 2);
+        return;
+    case TYPE_OPTIONAL: {
+        struct ir_block *held = lower_new_block(l);
+        struct ir_block *after = lower_new_block(l);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
+                                          lower_optional_flag(l, t, from),
+                                          ir_int_op(IR_I8, 0))),
+                  held, after);
+        l->b = held;
+        lower_copy_owned(l, t->element, from, into);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+        return;
+    }
+    case TYPE_ARRAY:
+        each_element(l, t, from, into, lower_none(), false, EACH_COPY);
+        return;
+    case TYPE_FN:
+        if (t->owned) {
+            lower_dup_snapshot(l, t, from, into);
+        }
+        return;
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            struct ir_operand offset;
+            if ((f->form != FIELD_PLAIN && f->form != FIELD_USE) ||
+                !lower_copies_parts(f->type)) {
+                continue;
+            }
+            offset = lower_field_offset(l, t, &f->name);
+            lower_copy_owned(l, f->type, lower_offset_address(l, from, offset),
+                             lower_offset_address(l, into, offset));
+        }
+        return;
+    default:
+        return;
+    }
+}
+
+bool lower_copies_parts(const struct type *t)
+{
+    size_t i;
+
+    while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
+        t = t->element;
+    }
+    if (t->kind == TYPE_CLASS) {
+        return true;
+    }
+    if (t->kind == TYPE_FN) {
+        return t->owned;
+    }
+    if ((t->kind != TYPE_STRUCT && t->kind != TYPE_TUPLE) || t->is_union) {
+        return false;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        const struct struct_field *f = &t->fields[i];
+        if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+            lower_copies_parts(f->type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void each_element(struct lowerer *l, const struct type *t,
+                         struct ir_operand base, struct ir_operand into,
+                         struct ir_operand from, bool made_only,
+                         enum each what)
+{
+    const struct type *element = t;
+    struct ir_operand size;
+    struct ir_block *test = lower_new_block(l);
+    struct ir_block *body = lower_new_block(l);
+    struct ir_block *done = lower_new_block(l);
+    struct ir_operand offset;
+    uint32_t index;
+
+    while (element->kind == TYPE_ARRAY) {
+        element = element->element;
+    }
+    size = lower_size_operand(l, element);
+    index = ir_unary(l->f, l->b, IR_COPY, IR_I64, lower_array_count(l, t));
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_SGT, IR_I8,
+                                      lower_temp(l, index),
+                                      ir_int_op(IR_I64, 0))),
+              body, done);
+    l->b = body;
+    ir_assign(l->f, l->b, index,
+              lower_temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64,
+                                      lower_temp(l, index),
+                                      ir_int_op(IR_I64, 1))));
+    offset = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                     lower_temp(l, index), size));
+    if (what == EACH_COPY) {
+        struct ir_operand a =
+            lower_temp(l, ir_ptradd(l->f, l->b, base, offset));
+        struct ir_operand b =
+            lower_temp(l, ir_ptradd(l->f, l->b, into, offset));
+        lower_copy_owned(l, element, a, b);
+    } else if (what == EACH_CLEAR) {
+        lower_clear_owned(l, element,
+                          lower_temp(l, ir_ptradd(l->f, l->b, base, offset)));
+    } else {
+        lower_destroy_owned(l, element,
+                            lower_temp(l, ir_ptradd(l->f, l->b, base, offset)),
+                            from, made_only);
+    }
+    ir_jump(l->f, l->b, test);
+    l->b = done;
+}
+
 /* The teardown of the field f of level up, in the object at self. Owned
    memory goes back to the allocator from. */
 static void teardown_field(struct lowerer *l, const struct type *up,
@@ -2406,6 +2655,20 @@ static void teardown_field(struct lowerer *l, const struct type *up,
     struct ir_operand v;
 
     if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
+        return;
+    }
+    /* A struct, a tuple or an array held inline that owns something is
+       torn down part by part with its owner. */
+    if (!f->owned &&
+        (f->type->kind == TYPE_STRUCT || f->type->kind == TYPE_TUPLE ||
+         f->type->kind == TYPE_ARRAY ||
+         (f->type->kind == TYPE_OPTIONAL &&
+          f->type->element->kind != TYPE_CLASS)) &&
+        sema_needs_teardown(f->type)) {
+        lower_destroy_owned(l, f->type,
+                            lower_offset_address(
+                                l, self, lower_field_offset(l, up, &f->name)),
+                            from, false);
         return;
     }
     /* A `?T` of a class value runs the teardown of the object it holds
@@ -2557,6 +2820,19 @@ static void copy_field(struct lowerer *l, const struct type *up,
         offset = lower_field_offset(l, up, &f->name);
         into = lower_offset_address(l, to, offset);
         ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), into);
+        return;
+    }
+    /* A struct, a tuple or an array held inline copies each part that
+       a copy reaches, as `dup` of it does. */
+    if (!f->owned &&
+        (f->type->kind == TYPE_STRUCT || f->type->kind == TYPE_TUPLE ||
+         f->type->kind == TYPE_ARRAY ||
+         (f->type->kind == TYPE_OPTIONAL &&
+          f->type->element->kind != TYPE_CLASS)) &&
+        lower_copies_parts(f->type)) {
+        offset = lower_field_offset(l, up, &f->name);
+        lower_copy_owned(l, f->type, lower_offset_address(l, self, offset),
+                         lower_offset_address(l, to, offset));
         return;
     }
     /* A `?T` of a class value copies the object it holds with its own
