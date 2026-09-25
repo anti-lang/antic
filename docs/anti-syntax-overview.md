@@ -1477,7 +1477,7 @@ Built: `ByteRegex` and `ByteRegex.compile`, the mode of a pattern literal taken 
 
 ## Collections
 
-The collections of `anti.collection` are generic classes used as values, one module per family: `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>`, `Map<K, V>` and `HashMap<K, V>`, `Set<T>`, `HashSet<T>` and `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`, `Tree<T>` and `PriorityQueue<T>`. `anti.collection` itself holds `Iterable<T>` and `Iterator<T>`. A collection owns its storage and stores its elements by value. It is freed at the end of its block, moves on return, is refused by `=` and is copied by `dup`. No pointer to an element leaves it except through a `lent` parameter: reading gives a copy, as a `?T` where nothing may be there, and `read` and `modify` lend an element to a function.
+The collections of `anti.collection` are generic classes used as values, one module per family: `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>`, `Map<K, V>` and `HashMap<K, V>`, `Set<T>`, `HashSet<T>` and `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`, `Tree<T>` and `PriorityQueue<T>`. `anti.collection` itself holds `Iterable<T>` and `Iterator<T>`. A collection owns its storage and stores its elements by value. It is freed at the end of its block, moves on return, is refused by `=` and is copied by `dup`. No pointer to an element leaves it except through a `lent` parameter: reading gives a copy, as a `?T` where nothing may be there, and `read` and `modify` lend an element to a function. `union` stays a keyword and names a function after `fn` and a member after `.`, as `alloc` and `free` do, so a set has `union(o)`.
 
 ```anti not-built
 import anti.collection.list.{List};

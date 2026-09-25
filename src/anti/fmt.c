@@ -1786,6 +1786,23 @@ static bool breaks_line(struct emitter *e, const struct piece_list *l,
     return true;
 }
 
+/* `union` after `fn`, `::` or `.` names a function, as the parser reads
+   it, and is written as a name: no space before its `(` and no item
+   brace after a statement that calls it. */
+static void name_unions(struct token_list *tokens)
+{
+    size_t i;
+
+    for (i = 1; i < tokens->count; i++) {
+        enum token_kind before = tokens->items[i - 1].kind;
+        if (tokens->items[i].kind == TOKEN_UNION &&
+            (before == TOKEN_FN || before == TOKEN_COLON_COLON ||
+             before == TOKEN_DOT || before == TOKEN_QUESTION_DOT)) {
+            tokens->items[i].kind = TOKEN_IDENT;
+        }
+    }
+}
+
 bool fmt_source(const char *source, size_t length, struct text *out)
 {
     struct arena arena = {0};
@@ -1801,6 +1818,7 @@ bool fmt_source(const char *source, size_t length, struct text *out)
         arena_free(&arena);
         return false;
     }
+    name_unions(&tokens);
     collect(source, length, &tokens, &pieces);
     pair_braces(&pieces);
     sort_import_lists(&pieces, source);

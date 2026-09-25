@@ -1,0 +1,67 @@
+//! `union` names a function of a class and follows `.`, as `alloc` and `free`
+//! do, so that a set has `union(o)`. The program declares one abstract in a
+//! base, fills it with a `concrete fn` and declares one on a generic class. It
+//! calls each through the table, by the class name, as a bound function and
+//! inside a condition. A `union` type stands beside them.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Word
+{
+	whole: u32,
+	half: u16,
+}
+
+abstract class Mask
+{
+	abstract fn union(self, o: *Mask) -> u32;
+	abstract fn bits(self) -> u32;
+}
+
+class Flags inherits Mask
+{
+	pub value: u32 = 0,
+
+	concrete fn union(self, o: *Mask) -> u32
+	{
+		return self.value | o.bits();
+	}
+
+	concrete fn bits(self) -> u32
+	{
+		return self.value;
+	}
+}
+
+class Bag<T>
+{
+	pub first: T,
+	pub second: T,
+
+	pub fn union(self, o: *Bag<T>) -> Bag<T>
+	{
+		return Bag<T> { first: self.first, second: o.second };
+	}
+}
+
+fn main() -> int
+{
+	let a = alloc Flags { value: 3 };
+	let b = alloc Flags { value: 12 };
+	let m: *Mask = a;
+	printf("%d\n".ptr, m.union(b) as c_int);
+	printf("%d\n".ptr, Flags.union(a, b) as c_int);
+	let f = m.union;
+	printf("%d\n".ptr, f(b) as c_int);
+	if a.union(b) == 15 {
+		printf("both\n".ptr);
+	}
+	let x = Bag<int> { first: 1, second: 2 };
+	let y = Bag<int> { first: 3, second: 4 };
+	let z = x.union(&y);
+	printf("%d %d\n".ptr, z.first as c_int, z.second as c_int);
+	printf("%d\n".ptr, size_of(Word) as c_int);
+	delete(a);
+	delete(b);
+	return 0;
+}

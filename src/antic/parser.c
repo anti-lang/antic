@@ -211,6 +211,23 @@ static bool expect_member_name(struct parser *p, struct name *name)
     return expect_name(p, name);
 }
 
+/* DESIGN: `union` names a function of a struct or class and follows
+   `.` as well, so that a set has `union(o)`. The declaration of a union
+   type stands at module level, before a name, and never after `fn` or
+   `.`. An `inject` field keeps to `alloc` and `free`. */
+static bool expect_function_name(struct parser *p, struct name *name)
+{
+    const struct token *t = peek(p);
+
+    if (t->kind == TOKEN_UNION) {
+        next(p);
+        name->text = p->source + t->offset;
+        name->length = t->length;
+        return true;
+    }
+    return expect_member_name(p, name);
+}
+
 static void *node(struct parser *p, size_t size)
 {
     return arena_alloc(p->arena, size);
@@ -1547,7 +1564,7 @@ static struct expr *postfix(struct parser *p)
                 outer->as.field.name.text = p->source + peek(p)->offset;
                 outer->as.field.name.length = peek(p)->length;
                 next(p);
-            } else if (!expect_member_name(p, &outer->as.field.name)) {
+            } else if (!expect_function_name(p, &outer->as.field.name)) {
                 return NULL;
             }
             /* `geo.max<int>(a, b)` and `geo.List<int>.new()`. */
@@ -3068,7 +3085,7 @@ static struct item *member_level(struct parser *p, const struct item *owner)
     }
     m->kind = ITEM_FN;
     m->name_pos = pos_of(peek(p));
-    if (!expect_member_name(p, &m->name)) {
+    if (!expect_function_name(p, &m->name)) {
         return NULL;
     }
     /* DESIGN: `concrete fn Serializable::f` fills the table of that base
@@ -3083,7 +3100,7 @@ static struct item *member_level(struct parser *p, const struct item *owner)
         m->qualifier = m->name;
         m->qualifier_pos = m->name_pos;
         m->name_pos = pos_of(peek(p));
-        if (!expect_member_name(p, &m->name)) {
+        if (!expect_function_name(p, &m->name)) {
             return NULL;
         }
     }

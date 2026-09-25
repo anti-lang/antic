@@ -1153,7 +1153,7 @@ The collections are split into modules by family, one file each. Each can then b
 
 ### Sets
 
-`Set<T>`, `SortedSet<T>` and `HashSet<T>` follow the three maps: the same orders and the same constraints on `T`. Each has `add(own x) -> bool`, `remove(x) -> bool`, `contains(x)`, `union(o)`, `intersect(o)` and `minus(o)`, which make new sets, and `is_subset(o)`. `SortedSet` adds `range`, `floor`, `ceiling`, `first` and `last`.
+`Set<T>`, `SortedSet<T>` and `HashSet<T>` follow the three maps: the same orders and the same constraints on `T`. Each has `add(own x) -> bool`, `remove(x) -> bool`, `contains(x)`, `union(o)`, `intersect(o)` and `minus(o)`, which make new sets, and `is_subset(o)`. `SortedSet` adds `range`, `floor`, `ceiling`, `first` and `last`. `union` stays a keyword, and it names a function after `fn` and a member after `.`, as `alloc` and `free` do, so a set declares and calls `union(o)`.
 
 **`BitSet`**, a set of small integers, one bit per value: `add(n)`, `remove(n)`, `contains(n)`, `count`, the set operations, and `for n in b` in increasing order.
 
