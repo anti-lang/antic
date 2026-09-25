@@ -6,16 +6,12 @@ where a later step folds them in. They come from "Stable elements" and
 
 - `Pool<T>` and `Handle<T>` are built in `anti.collection.pool`, `Tree<T>` in
   `anti.collection.tree` and `PriorityQueue<T>` in `anti.collection.queue`.
-  Each module is a file under `src/std/anti/collection/`, and the build writes
-  its library file under `std/anti/collection/` of the runtime archive.
+  Each module is a file under `src/std/anti/collection/`, which the build
+  finds without a list, and its library file lies under
+  `std/anti/collection/` of the runtime archive.
   `tests/std/collection_pool.anti`, `collection_tree.anti` and
   `collection_queue.anti` run in release and dev mode, and
   `errors/handles.anti` holds the refusals.
-- [provisional] `ANTIC_STD_MODULES` of `CMakeLists.txt` names a module below
-  another by its path, `collection/pool`, and the build makes the directory of
-  each library file. Reason: a module path mirrors the directories under a
-  search root, and the specification names `anti.collection.pool` beside
-  `anti.collection`.
 - [provisional] `anti.collection.pool` holds `Slots<T>`, a public abstract
   class over `collection.Collection<T>` with the storage, the handles and the
   reading and lending forms. `Pool<T>` and `Tree<T>` inherit it, and
@@ -94,7 +90,8 @@ where a later step folds them in. They come from "Stable elements" and
   place would break the order of the heap without the queue knowing.
 - `==` of the three collections is declared, `pub operator fn eq<T: eq>` in
   each module and `T: Ordered` for the queue, and is not reachable from a
-  program. A generic `operator fn` read from a library file loses the mark of
+  program: `a == b` of two `Pool<int>` is refused with `` `==` is not defined
+  on `Pool<int>` ``. A generic `operator fn` read from a library file loses the mark of
   `operator fn`, since `symbol_is_operator` of `src/antic/sema_expr.c` reads
   the mark of the declaration in the tree of the generic, where it is not set.
   The fix lies in `src/antic/`, outside this step.
