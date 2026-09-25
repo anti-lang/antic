@@ -25,7 +25,7 @@ const struct anti_descriptor *const anti_lang_Object_ancestors[1] = {
 
 const struct anti_descriptor anti_lang_Object_descriptor = {
     object_name, 6, NULL, (int64_t)sizeof(struct anti_object), 0,
-    anti_lang_Object_ancestors, 0, NULL, NULL, 0, 0, NULL, NULL, 0, NULL
+    anti_lang_Object_ancestors, 0, NULL, NULL, 0, 0, NULL, NULL, 0, NULL, 0, NULL
 };
 
 const struct anti_descriptor *anti_rt_descriptor(const void *object)
@@ -514,6 +514,240 @@ static void serialize_into(struct anti_builder *b, const void *object,
 void anti_lang_Object_serialize(struct anti_object *self, void *out)
 {
     serialize_into(out, self, anti_rt_descriptor(self));
+}
+
+/* Elements of a generic collection */
+
+const struct anti_field *anti_rt_type_arg(const void *object, int64_t depth,
+                                          int64_t index)
+{
+    const struct anti_descriptor *d = anti_rt_descriptor(object);
+    const struct anti_descriptor *up;
+
+    if (d == NULL || depth < 0 || depth > d->depth || d->ancestors == NULL) {
+        return NULL;
+    }
+    up = d->ancestors[depth];
+    if (up == NULL || index < 0 || index >= up->type_arg_count) {
+        return NULL;
+    }
+    return &up->type_args[index];
+}
+
+/* The number of elements of an array argument. Its record holds the
+   size of the whole array and the descriptor of a struct or a class
+   element. */
+static int64_t array_length(const struct anti_field *arg)
+{
+    size_t size = anti_rt_element_size(arg->type, arg->descriptor);
+
+    return size == 0 ? 0 : arg->offset / (int64_t)size;
+}
+
+/* A class value in place, written by the `serialize` of its table, so a
+   class that replaces it, a collection among them, writes its own form. */
+static void serialize_object(struct anti_builder *b, void *object)
+{
+    void (*write)(struct anti_object *, void *) =
+        (void (*)(struct anti_object *, void *))anti_rt_entry_body(
+            object, ANTI_ENTRY_SERIALIZE);
+
+    if (write == NULL) {
+        put(b, "null");
+        return;
+    }
+    write(object, b);
+}
+
+void anti_rt_element_serialize(void *out, void *bytes,
+                               const struct anti_field *arg)
+{
+    struct anti_builder *b = out;
+    int64_t t;
+    int64_t i;
+
+    if (arg == NULL) {
+        put(b, "null");
+        return;
+    }
+    t = anti_rt_type_scalar(arg->type);
+    if (t == ANTI_TYPE_CLASS) {
+        serialize_object(b, bytes);
+        return;
+    }
+    if (t == ANTI_TYPE_ARRAY) {
+        size_t size = anti_rt_element_size(arg->type, arg->descriptor);
+        put(b, "[");
+        for (i = 0; i < array_length(arg); i++) {
+            char *at = (char *)bytes + (size_t)i * size;
+            put(b, i == 0 ? "" : ",");
+            if (ANTI_TYPE_ELEMENT(arg->type) == ANTI_TYPE_CLASS) {
+                serialize_object(b, at);
+            } else {
+                put_value(b, at, ANTI_TYPE_ELEMENT(arg->type),
+                          arg->descriptor, 0);
+            }
+        }
+        put(b, "]");
+        return;
+    }
+    put_value(b, bytes, arg->type, arg->descriptor, 0);
+}
+
+static void show_value(struct anti_builder *b, void *bytes, int64_t type,
+                       const struct anti_descriptor *d, int64_t size);
+
+/* A class value in place, written by the `to_text` of its table. */
+static void show_object(struct anti_builder *b, void *object)
+{
+    struct anti_text (*text)(struct anti_object *) =
+        (struct anti_text(*)(struct anti_object *))anti_rt_entry_body(
+            object, ANTI_ENTRY_TO_TEXT);
+    struct anti_text shown;
+
+    if (text == NULL) {
+        put(b, "none");
+        return;
+    }
+    shown = text(object);
+    anti_rt_builder_append(b, shown.ptr, shown.len);
+}
+
+/* count elements of the type id in a row, as `[a, b]`. */
+static void show_row(struct anti_builder *b, char *at, int64_t count,
+                     int64_t type, const struct anti_descriptor *d)
+{
+    size_t size = anti_rt_element_size(type << 8, d);
+    int64_t i;
+
+    put(b, "[");
+    for (i = 0; i < count && size > 0; i++) {
+        put(b, i == 0 ? "" : ", ");
+        show_value(b, at + (size_t)i * size, type, d, (int64_t)size);
+    }
+    put(b, "]");
+}
+
+/* DESIGN: the text of an element, as `to_text` of a collection writes
+   it. A number, a bool and `none` stand as they are, and a str and a
+   char as a quoted JSON string. A class writes its own `to_text`, in
+   place or through a pointer. A struct is `{"x": 1, "y": 2}`, and an
+   array and a slice are `[1, 2]`. A pointer to anything else writes what
+   it points at, and a type that no walk reads is `?`. size is the bytes
+   of an array, which its type id does not give. */
+static void show_value(struct anti_builder *b, void *bytes, int64_t type,
+                       const struct anti_descriptor *d, int64_t size)
+{
+    int64_t t = anti_rt_type_scalar(type);
+    int64_t i;
+
+    switch (t) {
+    case ANTI_TYPE_CLASS:
+        show_object(b, bytes);
+        return;
+    case ANTI_TYPE_PTR:
+    case ANTI_TYPE_FN: {
+        void *value;
+        memcpy(&value, bytes, sizeof value);
+        if (value == NULL) {
+            put(b, "none");
+        } else if (t == ANTI_TYPE_PTR &&
+                   ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_CLASS) {
+            show_object(b, anti_rt_object_of(value));
+        } else if (t == ANTI_TYPE_PTR && anti_rt_element_walked(type, d)) {
+            show_value(b, value, ANTI_TYPE_ELEMENT(type), d, 0);
+        } else {
+            put(b, "?");
+        }
+        return;
+    }
+    case ANTI_TYPE_SLICE: {
+        struct anti_text s;
+        memcpy(&s, bytes, sizeof s);
+        if (anti_rt_element_size(type, d) == 0) {
+            put(b, "?");
+        } else {
+            show_row(b, (char *)s.ptr, s.len, ANTI_TYPE_ELEMENT(type), d);
+        }
+        return;
+    }
+    case ANTI_TYPE_ARRAY: {
+        size_t one = anti_rt_element_size(type, d);
+        if (one == 0 || size == 0) {
+            put(b, "?");
+        } else {
+            show_row(b, bytes, size / (int64_t)one, ANTI_TYPE_ELEMENT(type), d);
+        }
+        return;
+    }
+    case ANTI_TYPE_STRUCT:
+        if (d == NULL) {
+            put(b, "?");
+            return;
+        }
+        put(b, "{");
+        for (i = 0; i < d->field_count; i++) {
+            const struct anti_field *f = &d->fields[i];
+            put(b, i == 0 ? "" : ", ");
+            put_text(b, f->name, f->name_length);
+            put(b, ": ");
+            show_value(b, (char *)bytes + f->offset, f->type, f->descriptor,
+                       0);
+        }
+        put(b, "}");
+        return;
+    case ANTI_TYPE_NONE:
+    case ANTI_TYPE_UNION:
+        put(b, "?");
+        return;
+    default:
+        put_value(b, bytes, type, d, 0);
+        return;
+    }
+}
+
+void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg)
+{
+    if (arg == NULL) {
+        put(out, "?");
+        return;
+    }
+    show_value(out, bytes, arg->type, arg->descriptor, arg->offset);
+}
+
+void anti_rt_element_copy(void *into, void *from, const struct anti_field *arg)
+{
+    int64_t t;
+
+    if (arg == NULL || into == NULL || from == NULL) {
+        return;
+    }
+    t = anti_rt_type_scalar(arg->type);
+    if (t == ANTI_TYPE_CLASS) {
+        anti_rt_copy_elements(from, into, 1, arg->descriptor);
+    } else if (t == ANTI_TYPE_ARRAY &&
+               ANTI_TYPE_ELEMENT(arg->type) == ANTI_TYPE_CLASS) {
+        anti_rt_copy_elements(from, into, array_length(arg), arg->descriptor);
+    } else {
+        memcpy(into, from, (size_t)arg->offset);
+    }
+}
+
+void anti_rt_element_destroy(void *bytes, const struct anti_field *arg)
+{
+    int64_t t;
+
+    if (arg == NULL || bytes == NULL) {
+        return;
+    }
+    t = anti_rt_type_scalar(arg->type);
+    if (t == ANTI_TYPE_CLASS) {
+        anti_rt_destroy(bytes, arg->descriptor);
+    } else if (t == ANTI_TYPE_ARRAY &&
+               ANTI_TYPE_ELEMENT(arg->type) == ANTI_TYPE_CLASS) {
+        anti_rt_destroy_elements(bytes, array_length(arg), arg->descriptor,
+                                 NULL);
+    }
 }
 
 /* The root frees nothing. The teardown the compiler writes for a class

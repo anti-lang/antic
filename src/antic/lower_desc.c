@@ -205,7 +205,7 @@ uint32_t lower_fields_agg(struct lowerer *l, size_t n)
 uint32_t lower_descriptor_agg(struct lowerer *l)
 {
     static const char name[] = "anti.rt.Descriptor";
-    struct ir_field fields[15];
+    struct ir_field fields[DESCRIPTOR_ITEMS];
     uint32_t agg = ir_agg_find(l->m, name);
 
     if (agg != IR_NO_AGG) {
@@ -250,7 +250,16 @@ uint32_t lower_descriptor_agg(struct lowerer *l)
     fields[13].type = ir_scalar(IR_I64);
     fields[14].name = "versions";
     fields[14].type = ir_scalar(IR_PTR);
-    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 15, false, 0);
+    /* DESIGN: a copy of a generic class records its type arguments, one
+       field record each. The offset of a record holds the size of its
+       argument. A generic collection then writes, copies and tears down
+       its elements through the runtime, as a walk of the fields does. */
+    fields[15].name = "type_arg_count";
+    fields[15].type = ir_scalar(IR_I64);
+    fields[16].name = "type_args";
+    fields[16].type = ir_scalar(IR_PTR);
+    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, DESCRIPTOR_ITEMS,
+                         false, 0);
 }
 
 /* The depth of a class in its chain. The root anti.lang.Object is 0. */
@@ -548,6 +557,83 @@ struct ir_global *lower_class_fields(struct lowerer *l,
             item->items[5].integer = 0;
         }
         value->items[n++] = *item;
+    }
+    g = ir_global_add_value(l->m, module, name, value);
+    free(module);
+    free(name);
+    return g;
+}
+
+/* The descriptor that the record of a type argument t carries. It is
+   that of a class or a struct, or of the class or struct that a pointer,
+   a slice or an array reaches. */
+static const struct ir_global *arg_descriptor(struct lowerer *l,
+                                              const struct type *t)
+{
+    while (t->kind == TYPE_ARRAY) {
+        t = t->element;
+    }
+    return field_descriptor(l, t);
+}
+
+/* The records of the type arguments of the copy t, one per parameter.
+   A record names the parameter and names its type as a field record
+   does. It holds the size of the argument where a field holds its
+   offset. A constant argument has type id none. */
+static struct ir_global *class_type_args(struct lowerer *l,
+                                         const struct type *t)
+{
+    size_t count = t->generic->type_param_count;
+    struct ir_const *value;
+    struct ir_global *g;
+    struct token_text text;
+    char *module;
+    char *name;
+    size_t i;
+
+    g = lower_class_global(l, t, "type_args", &module, &name);
+    if (g != NULL) {
+        return g;
+    }
+    value = ir_const_agg(l->m, ir_aggregate(lower_fields_agg(l, count)), count);
+    for (i = 0; i < count; i++) {
+        const struct type *param = t->generic->type_params[i];
+        const struct type *arg = t->args[i];
+        const struct ir_global *descriptor =
+            arg != NULL ? arg_descriptor(l, arg) : NULL;
+        struct ir_const *item = ir_const_agg(l->m, ir_aggregate(field_agg(l)),
+                                             6);
+        text.bytes = param->name.text;
+        text.length = param->name.length;
+        item->items[0].kind = IR_CONST_ADDR;
+        item->items[0].scalar = IR_PTR;
+        item->items[0].global = lower_literal_global(l, &text)->index;
+        item->items[1].kind = IR_CONST_INT;
+        item->items[1].scalar = IR_I64;
+        item->items[1].integer = param->name.length;
+        item->items[2].scalar = IR_I64;
+        if (arg != NULL) {
+            item->items[2].kind = IR_CONST_SYM;
+            item->items[2].sym = ir_sym_size_of(l->m, lower_vtype_of(l, arg));
+        } else {
+            item->items[2].kind = IR_CONST_INT;
+            item->items[2].integer = 0;
+        }
+        item->items[3].kind = IR_CONST_INT;
+        item->items[3].scalar = IR_I64;
+        item->items[3].integer = arg != NULL ? type_id(arg) : TYPE_ID_NONE;
+        item->items[4].kind = IR_CONST_INT;
+        item->items[4].scalar = IR_I64;
+        item->items[4].integer = 0;
+        item->items[5].scalar = IR_PTR;
+        if (descriptor != NULL) {
+            item->items[5].kind = IR_CONST_ADDR;
+            item->items[5].global = descriptor->index;
+        } else {
+            item->items[5].kind = IR_CONST_INT;
+            item->items[5].integer = 0;
+        }
+        value->items[i] = *item;
     }
     g = ir_global_add_value(l->m, module, name, value);
     free(module);
@@ -930,7 +1016,8 @@ struct ir_global *lower_class_descriptor(struct lowerer *l,
     }
     /* The global is added before its ancestors, so a chain that comes
        back around finds it and does not build it twice. */
-    value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)), 15);
+    value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)),
+                         DESCRIPTOR_ITEMS);
     g = ir_global_add_value(l->m, module, name, value);
     g->exported = t->item_exported;
     free(module);
@@ -1029,6 +1116,18 @@ struct ir_global *lower_class_descriptor(struct lowerer *l,
         value->items[14].kind = IR_CONST_INT;
         value->items[14].integer = 0;
     }
+    value->items[15].kind = IR_CONST_INT;
+    value->items[15].scalar = IR_I64;
+    value->items[15].integer = 0;
+    value->items[16].kind = IR_CONST_INT;
+    value->items[16].scalar = IR_PTR;
+    value->items[16].integer = 0;
+    if (t->generic != NULL && t->args != NULL &&
+        t->generic->type_param_count > 0) {
+        value->items[15].integer = t->generic->type_param_count;
+        value->items[16].kind = IR_CONST_ADDR;
+        value->items[16].global = class_type_args(l, t)->index;
+    }
     return g;
 }
 
@@ -1063,11 +1162,12 @@ struct ir_global *lower_struct_descriptor(struct lowerer *l,
     }
     /* The global is added before the field list, so a struct that
        points at itself finds it. */
-    value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)), 15);
+    value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)),
+                         DESCRIPTOR_ITEMS);
     g = ir_global_add_value(l->m, module, name, value);
     free(module);
     free(name);
-    for (k = 0; k < 15; k++) {
+    for (k = 0; k < DESCRIPTOR_ITEMS; k++) {
         value->items[k].kind = IR_CONST_INT;
         value->items[k].scalar = l->m->aggs[lower_descriptor_agg(l)]
                                      ->fields[k].type.type;
@@ -1113,9 +1213,10 @@ static struct ir_global *interface_descriptor(struct lowerer *l,
     if (g != NULL) {
         return g;
     }
-    value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)), 15);
+    value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)),
+                         DESCRIPTOR_ITEMS);
     memcpy(value->items, l->m->globals[of->index]->value->items,
-           15 * sizeof *value->items);
+           DESCRIPTOR_ITEMS * sizeof *value->items);
     value->items[9].kind = IR_CONST_SYM;
     value->items[9].scalar = IR_I64;
     value->items[9].sym =

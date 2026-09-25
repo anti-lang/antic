@@ -20,7 +20,7 @@ static const int64_t chain[1] = {1};
 
 EXPORTED struct anti_descriptor anti_bad_class = {
     (const unsigned char *)"Impl", 4, NULL, 32, 0, NULL, 0, NULL, NULL, 0, 0,
-    NULL, (const unsigned char *)"1.0.0", 5, NULL
+    NULL, (const unsigned char *)"1.0.0", 5, NULL, 0, NULL
 };
 
 EXPORTED struct anti_provides anti_bad_entry = {

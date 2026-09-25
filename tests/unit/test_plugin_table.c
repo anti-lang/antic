@@ -77,7 +77,7 @@ static struct anti_versions versions = {
 };
 static const struct anti_descriptor service = {
     (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
-    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL
 };
 
 /* Bytes without a NUL after them, which a read past a length reaches. */

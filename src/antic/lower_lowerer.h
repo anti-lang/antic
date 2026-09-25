@@ -354,6 +354,9 @@ size_t lower_table_index(const struct type *t, const struct name *name,
                          size_t params);
 struct ir_operand lower_entry_offset(struct lowerer *l, size_t index);
 uint32_t lower_fields_agg(struct lowerer *l, size_t n);
+/* The number of items of a class descriptor, as struct anti_descriptor
+   of src/rt/object.h lays them out. */
+#define DESCRIPTOR_ITEMS 17
 uint32_t lower_descriptor_agg(struct lowerer *l);
 uint32_t lower_class_depth(const struct type *t);
 struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,

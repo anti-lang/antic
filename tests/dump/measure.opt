@@ -1,6 +1,6 @@
 type str = struct { ptr: ptr, len: i64 }
 type measure.V2 = struct { x: f32, y: f32 }
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
 type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }

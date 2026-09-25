@@ -1,9 +1,9 @@
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }
 type main.H = struct { tag: i8, n: i32 }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
-global main.H.descriptor anti.rt.Descriptor { @main.1, i64 1, ptr 0, size_of main.H, i64 0, ptr 0, i64 2, @main.H.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0 }
+global main.H.descriptor anti.rt.Descriptor { @main.1, i64 1, ptr 0, size_of main.H, i64 0, ptr 0, i64 2, @main.H.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global main.1 size 2 align 1 bytes 48 00
 global main.2 size 4 align 1 bytes 74 61 67 00
 global main.3 size 2 align 1 bytes 6e 00

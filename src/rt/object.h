@@ -147,6 +147,11 @@ struct anti_descriptor {
     /* The chain and the floor of an abstract class, NULL for every
        other. */
     const struct anti_versions *versions;
+    /* The type arguments of a copy of a generic class, one record each,
+       whose offset holds the size of the argument. A constant argument
+       has type id none. None for every other class. */
+    int64_t type_arg_count;
+    const struct anti_field *type_args;
 };
 
 /* DESIGN: the seven functions of the root take the entries after the
@@ -274,6 +279,35 @@ void anti_rt_destroy_elements(void *elements, int64_t count,
    another. */
 void anti_rt_copy_elements(void *from, void *into, int64_t count,
                            const struct anti_descriptor *type);
+
+/* DESIGN: a generic collection reaches the type of its elements through
+   the record of its type argument, which the descriptor of its copy
+   holds. The four functions below write, copy and tear down one element
+   as a walk of the fields treats a field of that type. */
+
+/* The record of the type argument index of the class at depth of the
+   chain of object, or NULL when it has none. */
+const struct anti_field *anti_rt_type_arg(const void *object, int64_t depth,
+                                          int64_t index);
+
+/* Append the element at bytes to the anti.text.Builder out as JSON, as
+   `serialize` writes a field of its type. A class writes the
+   `serialize` of its own table. */
+void anti_rt_element_serialize(void *out, void *bytes,
+                               const struct anti_field *arg);
+
+/* Append the element at bytes to out as `to_text` of a collection writes
+   it, a class through its own `to_text`. */
+void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg);
+
+/* Copy the element at from into into. A class value, and an array of
+   them, takes the copy of its table, which copies what it owns, and
+   every other type its bytes. */
+void anti_rt_element_copy(void *into, void *from, const struct anti_field *arg);
+
+/* Tear down the element at bytes: a class value, and an array of them,
+   with the teardown of its table. Every other type owns nothing. */
+void anti_rt_element_destroy(void *bytes, const struct anti_field *arg);
 
 /* A new buffer on the heap with the bytes at from, or NULL when there are
    none. The caller frees it with free. */

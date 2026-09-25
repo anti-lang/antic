@@ -312,7 +312,7 @@ void test_optimize(void)
               "type anti.rt.Descriptor = struct { name: ptr, "
               "name_length: i64, parent: ptr, size: i64, depth: i64, "
               "ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, "
-              "offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }\n"
+              "offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
               "type anti.lang.Object = struct { table: ptr }\n"
               "type main.Box = struct { super: anti.lang.Object, n: i64 }\n"
               "type [2]ptr = array 2 of ptr\n"
@@ -387,7 +387,7 @@ void test_optimize(void)
               "    let n = size_of(H);\n"
               "    return n * 1 + 4 - 4;\n"
               "}\n",
-              "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }\n"
+              "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
               "type main.H = struct { tag: i8, n: i32 }\n"
               "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
               "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"

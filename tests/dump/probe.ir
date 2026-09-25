@@ -1,5 +1,5 @@
 type str = struct { ptr: ptr, len: i64 }
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }
 type probe.Wide = struct { a: i8, b: clong, c: cwchar, d: i16 }
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [4]anti.rt.Field = array 4 of anti.rt.Field
@@ -27,7 +27,7 @@ extern fn printf(ptr, ...) -> i32
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 extern fn malloc(i64) -> ptr
 extern fn free(ptr)
-global probe.Wide.descriptor anti.rt.Descriptor { @probe.1, i64 4, ptr 0, size_of probe.Wide, i64 0, ptr 0, i64 4, @probe.Wide.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.Wide.descriptor anti.rt.Descriptor { @probe.1, i64 4, ptr 0, size_of probe.Wide, i64 0, ptr 0, i64 4, @probe.Wide.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.1 size 5 align 1 bytes 57 69 64 65 00
 global probe.2 size 2 align 1 bytes 61 00
 global probe.3 size 2 align 1 bytes 62 00
@@ -35,55 +35,55 @@ global probe.4 size 2 align 1 bytes 63 00
 global probe.5 size 2 align 1 bytes 64 00
 global probe.Wide.fields [4]anti.rt.Field { anti.rt.Field { @probe.2, i64 1, offset_of probe.Wide.a, i64 3, i64 0, ptr 0 }, anti.rt.Field { @probe.3, i64 1, offset_of probe.Wide.b, i64 7, i64 0, ptr 0 }, anti.rt.Field { @probe.4, i64 1, offset_of probe.Wide.c, i64 13, i64 0, ptr 0 }, anti.rt.Field { @probe.5, i64 1, offset_of probe.Wide.d, i64 4, i64 0, ptr 0 } }
 global probe.package.version size 6 align 1 bytes 30 2e 30 2e 30 00
-global probe.WideBox.descriptor anti.rt.Descriptor { @probe.9, i64 7, ptr 0, size_of probe.WideBox, i64 0, ptr 0, i64 2, @probe.WideBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.WideBox.descriptor anti.rt.Descriptor { @probe.9, i64 7, ptr 0, size_of probe.WideBox, i64 0, ptr 0, i64 2, @probe.WideBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.9 size 8 align 1 bytes 57 69 64 65 42 6f 78 00
 global probe.10 size 2 align 1 bytes 74 00
 global probe.WideBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.WideBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.WideBox.t, i64 21, i64 0, @probe.Wide.descriptor } }
-global probe.MixedBox.descriptor anti.rt.Descriptor { @probe.13, i64 8, ptr 0, size_of probe.MixedBox, i64 0, ptr 0, i64 2, @probe.MixedBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.MixedBox.descriptor anti.rt.Descriptor { @probe.13, i64 8, ptr 0, size_of probe.MixedBox, i64 0, ptr 0, i64 2, @probe.MixedBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.13 size 9 align 1 bytes 4d 69 78 65 64 42 6f 78 00
 global probe.MixedBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.MixedBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.MixedBox.t, i64 22, i64 0, ptr 0 } }
-global probe.Flags.descriptor anti.rt.Descriptor { @probe.16, i64 5, ptr 0, size_of probe.Flags, i64 0, ptr 0, i64 4, @probe.Flags.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.Flags.descriptor anti.rt.Descriptor { @probe.16, i64 5, ptr 0, size_of probe.Flags, i64 0, ptr 0, i64 4, @probe.Flags.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.16 size 6 align 1 bytes 46 6c 61 67 73 00
 global probe.17 size 8 align 1 bytes 76 69 73 69 62 6c 65 00
 global probe.18 size 6 align 1 bytes 6c 61 79 65 72 00
 global probe.19 size 6 align 1 bytes 6c 65 76 65 6c 00
 global probe.20 size 4 align 1 bytes 70 61 64 00
 global probe.Flags.fields [4]anti.rt.Field { anti.rt.Field { @probe.17, i64 7, offset_of probe.Flags.visible, i64 0, i64 0, ptr 0 }, anti.rt.Field { @probe.18, i64 5, offset_of probe.Flags.layer, i64 0, i64 0, ptr 0 }, anti.rt.Field { @probe.19, i64 5, offset_of probe.Flags.level, i64 0, i64 0, ptr 0 }, anti.rt.Field { @probe.20, i64 3, offset_of probe.Flags.pad, i64 0, i64 0, ptr 0 } }
-global probe.FlagsBox.descriptor anti.rt.Descriptor { @probe.23, i64 8, ptr 0, size_of probe.FlagsBox, i64 0, ptr 0, i64 2, @probe.FlagsBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.FlagsBox.descriptor anti.rt.Descriptor { @probe.23, i64 8, ptr 0, size_of probe.FlagsBox, i64 0, ptr 0, i64 2, @probe.FlagsBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.23 size 9 align 1 bytes 46 6c 61 67 73 42 6f 78 00
 global probe.FlagsBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.FlagsBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.FlagsBox.t, i64 21, i64 0, @probe.Flags.descriptor } }
-global probe.Spread.descriptor anti.rt.Descriptor { @probe.26, i64 6, ptr 0, size_of probe.Spread, i64 0, ptr 0, i64 4, @probe.Spread.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.Spread.descriptor anti.rt.Descriptor { @probe.26, i64 6, ptr 0, size_of probe.Spread, i64 0, ptr 0, i64 4, @probe.Spread.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.26 size 7 align 1 bytes 53 70 72 65 61 64 00
 global probe.Spread.fields [4]anti.rt.Field { anti.rt.Field { @probe.2, i64 1, offset_of probe.Spread.a, i64 3, i64 0, ptr 0 }, anti.rt.Field { @probe.3, i64 1, offset_of probe.Spread.b, i64 0, i64 0, ptr 0 }, anti.rt.Field { @probe.4, i64 1, offset_of probe.Spread.c, i64 0, i64 0, ptr 0 }, anti.rt.Field { @probe.5, i64 1, offset_of probe.Spread.d, i64 0, i64 0, ptr 0 } }
-global probe.SpreadBox.descriptor anti.rt.Descriptor { @probe.29, i64 9, ptr 0, size_of probe.SpreadBox, i64 0, ptr 0, i64 2, @probe.SpreadBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.SpreadBox.descriptor anti.rt.Descriptor { @probe.29, i64 9, ptr 0, size_of probe.SpreadBox, i64 0, ptr 0, i64 2, @probe.SpreadBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.29 size 10 align 1 bytes 53 70 72 65 61 64 42 6f 78 00
 global probe.SpreadBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.SpreadBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.SpreadBox.t, i64 21, i64 0, @probe.Spread.descriptor } }
-global probe.Tight.descriptor anti.rt.Descriptor { @probe.32, i64 5, ptr 0, size_of probe.Tight, i64 0, ptr 0, i64 3, @probe.Tight.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.Tight.descriptor anti.rt.Descriptor { @probe.32, i64 5, ptr 0, size_of probe.Tight, i64 0, ptr 0, i64 3, @probe.Tight.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.32 size 6 align 1 bytes 54 69 67 68 74 00
 global probe.Tight.fields [3]anti.rt.Field { anti.rt.Field { @probe.2, i64 1, offset_of probe.Tight.a, i64 3, i64 0, ptr 0 }, anti.rt.Field { @probe.3, i64 1, offset_of probe.Tight.b, i64 5, i64 0, ptr 0 }, anti.rt.Field { @probe.4, i64 1, offset_of probe.Tight.c, i64 4, i64 0, ptr 0 } }
-global probe.TightBox.descriptor anti.rt.Descriptor { @probe.35, i64 8, ptr 0, size_of probe.TightBox, i64 0, ptr 0, i64 2, @probe.TightBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.TightBox.descriptor anti.rt.Descriptor { @probe.35, i64 8, ptr 0, size_of probe.TightBox, i64 0, ptr 0, i64 2, @probe.TightBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.35 size 9 align 1 bytes 54 69 67 68 74 42 6f 78 00
 global probe.TightBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.TightBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.TightBox.t, i64 21, i64 0, @probe.Tight.descriptor } }
-global probe.TightBits.descriptor anti.rt.Descriptor { @probe.38, i64 9, ptr 0, size_of probe.TightBits, i64 0, ptr 0, i64 2, @probe.TightBits.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.TightBits.descriptor anti.rt.Descriptor { @probe.38, i64 9, ptr 0, size_of probe.TightBits, i64 0, ptr 0, i64 2, @probe.TightBits.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.38 size 10 align 1 bytes 54 69 67 68 74 42 69 74 73 00
 global probe.TightBits.fields [2]anti.rt.Field { anti.rt.Field { @probe.2, i64 1, offset_of probe.TightBits.a, i64 0, i64 0, ptr 0 }, anti.rt.Field { @probe.3, i64 1, offset_of probe.TightBits.b, i64 0, i64 0, ptr 0 } }
-global probe.TightBitsBox.descriptor anti.rt.Descriptor { @probe.41, i64 12, ptr 0, size_of probe.TightBitsBox, i64 0, ptr 0, i64 2, @probe.TightBitsBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.TightBitsBox.descriptor anti.rt.Descriptor { @probe.41, i64 12, ptr 0, size_of probe.TightBitsBox, i64 0, ptr 0, i64 2, @probe.TightBitsBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.41 size 13 align 1 bytes 54 69 67 68 74 42 69 74 73 42 6f 78 00
 global probe.TightBitsBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.TightBitsBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.TightBitsBox.t, i64 21, i64 0, @probe.TightBits.descriptor } }
-global probe.Aligned.descriptor anti.rt.Descriptor { @probe.44, i64 7, ptr 0, size_of probe.Aligned, i64 0, ptr 0, i64 2, @probe.Aligned.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.Aligned.descriptor anti.rt.Descriptor { @probe.44, i64 7, ptr 0, size_of probe.Aligned, i64 0, ptr 0, i64 2, @probe.Aligned.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.44 size 8 align 1 bytes 41 6c 69 67 6e 65 64 00
 global probe.Aligned.fields [2]anti.rt.Field { anti.rt.Field { @probe.2, i64 1, offset_of probe.Aligned.a, i64 3, i64 0, ptr 0 }, anti.rt.Field { @probe.3, i64 1, offset_of probe.Aligned.b, i64 5, i64 0, ptr 0 } }
-global probe.AlignedBox.descriptor anti.rt.Descriptor { @probe.47, i64 10, ptr 0, size_of probe.AlignedBox, i64 0, ptr 0, i64 2, @probe.AlignedBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.AlignedBox.descriptor anti.rt.Descriptor { @probe.47, i64 10, ptr 0, size_of probe.AlignedBox, i64 0, ptr 0, i64 2, @probe.AlignedBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.47 size 11 align 1 bytes 41 6c 69 67 6e 65 64 42 6f 78 00
 global probe.AlignedBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.AlignedBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.AlignedBox.t, i64 21, i64 0, @probe.Aligned.descriptor } }
-global probe.BitUnionBox.descriptor anti.rt.Descriptor { @probe.50, i64 11, ptr 0, size_of probe.BitUnionBox, i64 0, ptr 0, i64 2, @probe.BitUnionBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.BitUnionBox.descriptor anti.rt.Descriptor { @probe.50, i64 11, ptr 0, size_of probe.BitUnionBox, i64 0, ptr 0, i64 2, @probe.BitUnionBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.50 size 12 align 1 bytes 42 69 74 55 6e 69 6f 6e 42 6f 78 00
 global probe.BitUnionBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.BitUnionBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.BitUnionBox.t, i64 22, i64 0, ptr 0 } }
-global probe.Breaks.descriptor anti.rt.Descriptor { @probe.53, i64 6, ptr 0, size_of probe.Breaks, i64 0, ptr 0, i64 5, @probe.Breaks.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.Breaks.descriptor anti.rt.Descriptor { @probe.53, i64 6, ptr 0, size_of probe.Breaks, i64 0, ptr 0, i64 5, @probe.Breaks.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.53 size 7 align 1 bytes 42 72 65 61 6b 73 00
 global probe.54 size 2 align 1 bytes 5f 00
 global probe.Breaks.fields [5]anti.rt.Field { anti.rt.Field { @probe.2, i64 1, offset_of probe.Breaks.a, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.54, i64 1, offset_of probe.Breaks._, i64 10, i64 0, ptr 0 }, anti.rt.Field { @probe.3, i64 1, offset_of probe.Breaks.b, i64 0, i64 0, ptr 0 }, anti.rt.Field { @probe.54, i64 1, offset_of probe.Breaks._, i64 11, i64 0, ptr 0 }, anti.rt.Field { @probe.4, i64 1, offset_of probe.Breaks.c, i64 0, i64 0, ptr 0 } }
-global probe.BreaksBox.descriptor anti.rt.Descriptor { @probe.57, i64 9, ptr 0, size_of probe.BreaksBox, i64 0, ptr 0, i64 2, @probe.BreaksBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0 }
+global probe.BreaksBox.descriptor anti.rt.Descriptor { @probe.57, i64 9, ptr 0, size_of probe.BreaksBox, i64 0, ptr 0, i64 2, @probe.BreaksBox.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global probe.57 size 10 align 1 bytes 42 72 65 61 6b 73 42 6f 78 00
 global probe.BreaksBox.fields [2]anti.rt.Field { anti.rt.Field { @probe.4, i64 1, offset_of probe.BreaksBox.c, i64 8, i64 0, ptr 0 }, anti.rt.Field { @probe.10, i64 1, offset_of probe.BreaksBox.t, i64 21, i64 0, @probe.Breaks.descriptor } }
 global probe.59 size 30 align 1 bytes 70 72 6f 62 65 2e 61 6e 74 69 3a 31 33 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
