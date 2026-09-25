@@ -504,6 +504,10 @@ void test_parser(void)
     tree("import com.niese.geo as g;\nimport anti.text;\n",
          "import com.niese.geo as g\n"
          "import anti.text\n");
+    tree("import anti.collection.map.{Map, HashMap};\n"
+         "import anti.regex.{Regex};\n",
+         "import anti.collection.map.{Map, HashMap}\n"
+         "import anti.regex.{Regex}\n");
     tree("import geometry;\n"
          "import geometry as g;\n"
          "pub struct Shape {\n"
@@ -728,6 +732,24 @@ void test_parser(void)
     {
         static const struct expected_error e[] = {{2, 1, "expected `;`"}};
         errors("import geometry\nfn main() -> int { return 0; }\n", e, 1);
+    }
+    {
+        static const struct expected_error e[] = {
+            {1, 19, "a direct import lists at least one name"}};
+        errors("import anti.text.{};\nfn main() -> int { return 0; }\n", e,
+               1);
+    }
+    {
+        static const struct expected_error e[] = {
+            {1, 26, "expected `;`"}};
+        errors("import anti.text.{equal} as t;\n"
+               "fn main() -> int { return 0; }\n", e, 1);
+    }
+    {
+        static const struct expected_error e[] = {
+            {1, 25, "expected identifier"}};
+        errors("import anti.text.{equal,};\nfn main() -> int { return 0; }\n",
+               e, 1);
     }
     {
         static const struct expected_error e[] = {

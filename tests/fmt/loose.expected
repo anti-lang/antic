@@ -1,9 +1,13 @@
 /*!
 A module written in none of the forms the canonical one asks for, so that `anti
 fmt` has every rule to apply: the indent, the braces, the parentheses of a
-condition, one statement per line and the width of a doc comment.
+condition, one statement per line, the width of a doc comment and the order of
+the names of a direct import.
 */
 import anti.lang;
+import anti.text.{Align, Builder, equal};
+import anti.mem.{Allocator,
+	LibcAllocator};
 
 /// The flags of a pixel, which a bitfield holds. The width of a field stands
 /// behind a colon of its own, and the canonical form keeps the space before it.

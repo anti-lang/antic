@@ -1,0 +1,93 @@
+//! A library whose public items another module names without the name of this
+//! module, through a direct import: a struct, a constant, functions, an enum, a
+//! variant, a class, an interface, a generic struct, a generic class, a generic
+//! function, a constraint and a type.
+
+/// A point of the plane.
+pub struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// The x of the origin.
+pub const ORIGIN_X: int = 7;
+
+/// The area of a rectangle of `w` by `h`.
+pub fn area(w: int, h: int) -> int
+{
+	return w * h;
+}
+
+/// Two colours.
+pub enum Color
+{
+	Red,
+	Green,
+}
+
+/// A shape of the plane.
+pub variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+/// A counter that counts up from where it starts.
+pub class Counter
+{
+	pub n: int = 0,
+
+	/// A counter that starts at `n`.
+	pub fn from(n: int) -> *Counter
+	{
+		return alloc Counter { n: n };
+	}
+
+	/// Count one up and give the count.
+	pub fn bump(self) -> int
+	{
+		self.n = self.n + 1;
+		return self.n;
+	}
+}
+
+/// A shape with an area.
+pub abstract class Measured
+{
+	pub abstract fn size(self) -> int;
+}
+
+/// Two values of one type.
+pub struct Pair<T>
+{
+	a: T,
+	b: T,
+}
+
+/// One value, which a function of the class gives back.
+pub class Holder<T>
+{
+	pub item: T,
+
+	/// The value held.
+	pub fn get(self) -> T
+	{
+		return self.item;
+	}
+}
+
+/// Values that compare.
+pub constraint Ordered = eq + lt;
+
+/// The larger of two values.
+pub fn larger<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+/// A pair of integers.
+pub type Row = Pair<int>;

@@ -1,0 +1,71 @@
+//! A program that names the items of two libraries without their module names,
+//! through direct imports, and reaches each module by its name as well.
+
+import com.example.frame.{corner, twice};
+import com.example.shapes.{Color, Counter, Holder, Measured, ORIGIN_X, Ordered,
+	Pair, Point, Row, Shape, area, larger};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Square inherits Measured
+{
+	pub side: int,
+
+	concrete fn size(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn least<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b {
+		return a;
+	}
+	return b;
+}
+
+fn radius(s: Shape) -> int
+{
+	let r = 0;
+	switch s {
+		Circle c => r = c.r,
+		Empty => r = 0,
+	}
+	return r;
+}
+
+fn main() -> int
+{
+	let p = Point { x: ORIGIN_X, y: 2 };
+	let q: shapes.Point = p;
+	printf("point %d %d\n".ptr, q.x as c_int, q.y as c_int);
+	printf("area %d %d\n".ptr, area(3, 4) as c_int,
+		shapes.area(2, 5) as c_int);
+	let c = Color.Green;
+	printf("color %d %d\n".ptr, c as c_int, (c == shapes.Color.Green) as c_int);
+	printf("radius %d %d\n".ptr, radius(Shape.Circle { r: 6 }) as c_int,
+		radius(Shape.Empty) as c_int);
+	let counter = Counter.from(4);
+	counter.bump();
+	printf("counter %d\n".ptr, counter.bump() as c_int);
+	delete(counter);
+	let sq = alloc Square { side: 3 };
+	let m: *Measured = sq;
+	printf("size %d\n".ptr, m.size() as c_int);
+	delete(sq);
+	let pair = Pair<int> { a: 1, b: 9 };
+	let row: Row = pair;
+	printf("larger %d %d\n".ptr, larger(row.a, row.b) as c_int,
+		least(row.a, row.b) as c_int);
+	let held = alloc Holder<int> { item: 11 };
+	printf("held %d\n".ptr, held.get() as c_int);
+	delete(held);
+	let items: [3]int = [1, 2, 3];
+	let at = corner(items[0..3]);
+	printf("corner %d %d\n".ptr, at.x as c_int, at.y as c_int);
+	let two = twice(5);
+	printf("twice %d %d %d\n".ptr, two.a as c_int, two.b as c_int,
+		frame.qualified(3) as c_int);
+	return 0;
+}

@@ -2016,6 +2016,27 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# Direct imports. A program and a library name the items of another
+# library without its module name, and reach the module by its name as
+# well. A generic among them has its copy made in the program.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME direct_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/direct"
+            "-DLIBRARIES=shapes,frame"
+            "-DSTD=lang"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/direct-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # `may fail` over a module boundary: the library file records the flag, so
 # the program handles the error, `try` forwards it and `undo` runs on the
 # fail path alone.
@@ -3152,6 +3173,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "generic_syntax|--front-end,generic_syntax.anti"
         "constraints|--front-end,constraints.anti"
         "hashing|--front-end,hashing.anti"
+        "direct_imports|--front-end,--runtime,${ANTIC_RUNTIME_DIR},direct_imports.anti"
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

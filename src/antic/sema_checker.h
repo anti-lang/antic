@@ -205,6 +205,7 @@ const struct interface *sema_find_library(const struct checker *c,
 struct symbol *sema_library_item(const struct checker *c,
                                  const struct interface *lib,
                                  const struct name *name);
+bool sema_direct_item(const struct symbol *sym);
 struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
                             const struct name *name, struct pos pos,
                             const char *duplicate_message);

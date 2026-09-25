@@ -1,0 +1,9 @@
+direct_imports.anti:10:8: error: `lang` is already declared
+direct_imports.anti:11:29: error: `anti.mem` has no public item `Block`
+direct_imports.anti:11:36: error: `anti.mem` has no public item `Missing`
+direct_imports.anti:12:20: error: `Error` of `anti.regex` clashes with `Error` of `anti.lang`
+direct_imports.anti:13:28: error: `Builder` of `anti.text` is listed twice
+direct_imports.anti:13:49: error: `equal` of `anti.text` clashes with the module `equal` imported on line 8
+direct_imports.anti:13:56: error: `slice` of `anti.text` clashes with `slice` declared on line 15
+direct_imports.anti:28:14: error: `Note` has no function `byte_count`
+direct_imports.anti:30:10: error: unknown name `Align`

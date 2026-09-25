@@ -261,19 +261,10 @@ struct symbol *sema_library_item(const struct checker *c,
     return NULL;
 }
 
-/* Declare a symbol in the current scope. A second name in the same scope
-   is an error, a name that an outer scope holds is shadowed. */
-struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
-                            const struct name *name, struct pos pos,
-                            const char *duplicate_message)
+/* Put a name and its symbol into the scope s. */
+static void scope_put(struct scope *s, const struct name *name,
+                      struct symbol *sym)
 {
-    struct scope *s = c->scope;
-    struct symbol *sym;
-
-    if (sema_scope_find_local(s, name) != NULL) {
-        sema_error_at(c, pos, duplicate_message, (int)name->length, name->text);
-        return NULL;
-    }
     if (s->count == s->capacity) {
         size_t capacity = s->capacity == 0 ? 16 : s->capacity * 2;
         struct scope_entry *entries =
@@ -287,6 +278,24 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
         s->entries = entries;
         s->capacity = capacity;
     }
+    s->entries[s->count].name = *name;
+    s->entries[s->count].symbol = sym;
+    s->count++;
+}
+
+/* Declare a symbol in the current scope. A second name in the same scope
+   is an error, a name that an outer scope holds is shadowed. */
+struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
+                            const struct name *name, struct pos pos,
+                            const char *duplicate_message)
+{
+    struct scope *s = c->scope;
+    struct symbol *sym;
+
+    if (sema_scope_find_local(s, name) != NULL) {
+        sema_error_at(c, pos, duplicate_message, (int)name->length, name->text);
+        return NULL;
+    }
     sym = arena_alloc(c->arena, sizeof *sym);
     sym->kind = kind;
     sym->name = *name;
@@ -294,10 +303,15 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
     sym->frame = c->function;
     sym->depth = s->depth;
     sym->loops = c->loop_depth;
-    s->entries[s->count].name = *name;
-    s->entries[s->count].symbol = sym;
-    s->count++;
+    scope_put(s, name, sym);
     return sym;
+}
+
+/* Whether sym is an item of a library that a direct import put into the
+   module scope under its own name. */
+bool sema_direct_item(const struct symbol *sym)
+{
+    return sym != NULL && sym->home != NULL && sym->kind != SYMBOL_MODULE;
 }
 
 /* DESIGN: the name after `catch` is any identifier. The object model makes
@@ -1669,6 +1683,63 @@ static void declare_import(struct checker *c, const struct import *imp)
                        imp->module_pos, "`%.*s` is already declared");
     if (sym != NULL) {
         sym->home = lib;
+    }
+}
+
+/* DESIGN: a direct import puts each listed item of the module into the
+   module scope under its own name, as `import anti.text.{Builder}` does
+   for `Builder`. The entry holds the symbol of the library, the one `text.Builder`
+   resolves to, so a use reads the same item either way. The import
+   declares the name of the module as a plain one does. The listed names
+   go in after the items of the module, so a clash with an item, with the
+   name of a module or with a name of another list is found here. It is
+   reported at the listed name and names both. A name the compiler
+   declares, such as `Object`, stays behind the entry, as it stays
+   behind an item of the module. */
+static void declare_direct_names(struct checker *c, const struct import *imp)
+{
+    const struct interface *lib = sema_find_library(c, &imp->module);
+    size_t i;
+
+    if (lib == NULL) {
+        return;
+    }
+    for (i = 0; i < imp->name_count; i++) {
+        const struct import_name *n = &imp->names[i];
+        struct symbol *item = sema_library_item(c, lib, &n->name);
+        const struct symbol *held;
+        if (item == NULL) {
+            sema_error_at(c, n->pos, "`%.*s` has no public item `%.*s`",
+                          (int)imp->module.length, imp->module.text,
+                          (int)n->name.length, n->name.text);
+            continue;
+        }
+        held = sema_scope_find_local(&c->module_scope, &n->name);
+        if (held == NULL) {
+            scope_put(&c->module_scope, &n->name, item);
+        } else if (held == item) {
+            sema_error_at(c, n->pos, "`%.*s` of `%.*s` is listed twice",
+                          (int)n->name.length, n->name.text,
+                          (int)imp->module.length, imp->module.text);
+        } else if (held->kind == SYMBOL_MODULE) {
+            sema_error_at(c, n->pos, "`%.*s` of `%.*s` clashes with the "
+                          "module `%.*s` imported on line %d",
+                          (int)n->name.length, n->name.text,
+                          (int)imp->module.length, imp->module.text,
+                          (int)n->name.length, n->name.text, held->pos.line);
+        } else if (sema_direct_item(held)) {
+            sema_error_at(c, n->pos, "`%.*s` of `%.*s` clashes with `%.*s` "
+                          "of `%s`", (int)n->name.length, n->name.text,
+                          (int)imp->module.length, imp->module.text,
+                          (int)n->name.length, n->name.text,
+                          held->home->module);
+        } else {
+            sema_error_at(c, n->pos, "`%.*s` of `%.*s` clashes with `%.*s` "
+                          "declared on line %d", (int)n->name.length,
+                          n->name.text, (int)imp->module.length,
+                          imp->module.text, (int)n->name.length,
+                          n->name.text, held->pos.line);
+        }
     }
 }
 
@@ -3496,6 +3567,9 @@ bool sema_check(struct module *module, const char *module_name,
         declare_import(&c, &module->imports[i]);
     }
     declare_items(&c);
+    for (i = 0; i < module->import_count; i++) {
+        declare_direct_names(&c, &module->imports[i]);
+    }
     sema_declare_generics(&c);
     sema_resolve_generics(&c);
     resolve_bases(&c);

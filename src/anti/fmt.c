@@ -50,6 +50,8 @@ struct piece {
        the `>` or `>>` that closes one or two. */
     bool angle_open;
     int angle_close;
+    /* The `{` and the `}` of the list of a direct import. */
+    bool import_list;
 };
 
 struct piece_list {
@@ -216,6 +218,93 @@ static void pair_braces(struct piece_list *l)
         l->items[j - 1].dropped = true;
     }
     free(open);
+}
+
+/* Whether the name of piece a sorts after the name of piece b, in the
+   order of their bytes. */
+static bool name_after(const char *src, const struct piece *a,
+                       const struct piece *b)
+{
+    size_t n = a->length < b->length ? a->length : b->length;
+    int order = memcmp(src + a->offset, src + b->offset, n);
+
+    return order > 0 || (order == 0 && a->length > b->length);
+}
+
+/* DESIGN: the names of a direct import stand sorted in the order of
+   their bytes, as in `{Builder, equal}`. The pass trades the text of
+   the names between their places. A line break of the author then stays
+   after the same place. A list that holds an
+   ordinary comment keeps its order, since the comment belongs to the
+   name beside it. */
+static void sort_import_lists(struct piece_list *l, const char *src)
+{
+    size_t i;
+
+    for (i = 0; i < l->count; i++) {
+        size_t open = i + 1;
+        size_t close;
+        size_t j;
+        bool commented = false;
+        if (kind_at(l, i) != TOKEN_IMPORT) {
+            continue;
+        }
+        while (open < l->count &&
+               (l->items[open].kind == PIECE_COMMENT ||
+                (kind_at(l, open) != TOKEN_LBRACE &&
+                 kind_at(l, open) != TOKEN_SEMICOLON))) {
+            open++;
+        }
+        if (kind_at(l, open) != TOKEN_LBRACE || l->items[open].match <= open) {
+            continue;
+        }
+        close = l->items[open].match;
+        l->items[open].import_list = true;
+        l->items[close].import_list = true;
+        for (j = open + 1; j < close; j++) {
+            commented = commented || l->items[j].kind == PIECE_COMMENT;
+        }
+        if (commented) {
+            continue;
+        }
+        /* An insertion sort over the names, which the commas between
+           them leave in place. */
+        for (j = open + 1; j < close; j++) {
+            size_t k = j;
+            if (kind_at(l, j) != TOKEN_IDENT) {
+                continue;
+            }
+            while (k > open + 1) {
+                size_t before = k - 1;
+                struct piece *a;
+                struct piece *b;
+                const struct token *token;
+                size_t offset;
+                size_t length;
+                while (before > open && kind_at(l, before) != TOKEN_IDENT) {
+                    before--;
+                }
+                if (before == open) {
+                    break;
+                }
+                a = &l->items[before];
+                b = &l->items[k];
+                if (!name_after(src, a, b)) {
+                    break;
+                }
+                token = a->token;
+                offset = a->offset;
+                length = a->length;
+                a->token = b->token;
+                a->offset = b->offset;
+                a->length = b->length;
+                b->token = token;
+                b->offset = offset;
+                b->length = length;
+                k = before;
+            }
+        }
+    }
 }
 
 /* DESIGN: `<` and `>` around type parameters and type arguments stand
@@ -832,6 +921,12 @@ static bool space_before(const struct emitter *e, const struct piece *p)
         return true;
     }
     prev = e->prev->token->kind;
+    /* The list of a direct import stands without spaces inside its
+       braces, `{Builder, equal}`. */
+    if ((e->prev->import_list && prev == TOKEN_LBRACE) ||
+        (p->import_list && cur == TOKEN_RBRACE)) {
+        return false;
+    }
     /* A list of type arguments stands without spaces inside its angle
        brackets and against the name before it. */
     if (p->angle_open || p->angle_close > 0 || e->prev->angle_open) {
@@ -1493,6 +1588,22 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     enum token_kind kind = p->token->kind;
     bool space;
 
+    /* The braces of a direct import open and close a list as brackets
+       do, so a comma inside it ends nothing. */
+    if (p->import_list && kind == TOKEN_LBRACE) {
+        note_token(e, kind);
+        append_piece(e, p, space_before(e, p));
+        push_bracket(e, false);
+        return;
+    }
+    if (p->import_list && kind == TOKEN_RBRACE) {
+        note_token(e, kind);
+        append_piece(e, p, space_before(e, p));
+        if (e->brackets > 0) {
+            e->brackets--;
+        }
+        return;
+    }
     switch (kind) {
     case TOKEN_LBRACE:
         emit_brace_open(e, l, p);
@@ -1678,6 +1789,7 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     }
     collect(source, length, &tokens, &pieces);
     pair_braces(&pieces);
+    sort_import_lists(&pieces, source);
     mark_angles(&pieces, source);
     memset(&e, 0, sizeof e);
     e.src = source;

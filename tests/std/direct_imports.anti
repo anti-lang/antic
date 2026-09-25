@@ -1,0 +1,34 @@
+//! Direct imports of the standard library. The listed names stand without the
+//! name of their module: a class and its static function, an enum, functions
+//! and a function that may fail, which `try` forwards. Each module stays
+//! reachable by its name, and `f"..."` finds `anti.text` through it.
+import anti.io.{println};
+import anti.lang;
+import anti.text.{Align, Builder, equal, parse_int};
+
+/// The sum of the integers `a` and `b` spell.
+fn sum(a: str, b: str) -> int may fail
+{
+	let x = try parse_int(a);
+	let y = try text.parse_int(b);
+	return x + y;
+}
+
+fn main() -> int
+{
+	let b = Builder.new();
+	b.append("left");
+	b.append_text("x", 3, Align.Right);
+	println(b.text());
+	if !equal(b.text(), "left  x") || !text.equal("a", "a") {
+		return 1;
+	}
+	let n = sum("40", "2") catch e {
+		println(e.message);
+		return 2;
+	};
+	let shown = f"{n}";
+	io.println(shown);
+	free(shown.ptr);
+	return 0;
+}

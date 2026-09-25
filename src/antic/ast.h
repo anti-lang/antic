@@ -968,11 +968,21 @@ struct item {
     const char *home_file;
 };
 
+/* One name of the list of a direct import. */
+struct import_name {
+    struct name name;
+    struct pos pos;
+};
+
 struct import {
     struct pos pos;
     struct pos module_pos;
     struct name module;
     struct name alias;              /* empty without as */
+    /* `import anti.text.{Builder, equal};`: the names listed after the
+       path, in the order written. None for a plain import. */
+    struct import_name *names;
+    size_t name_count;
 };
 
 /* `provides Interface as Class;` at module level: one interface a

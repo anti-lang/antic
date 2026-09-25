@@ -1,0 +1,32 @@
+//! The refusals of direct imports. A listed name is a public item of its
+//! module, and one that clashes with a name the file already has is refused,
+//! naming both: an item of the module, the name of an imported module, a name
+//! of another list and a name listed twice. A module is imported once, with its
+//! list or without one. A name that no list holds stays behind the name of its
+//! module, and a listed function is no function of a type of this module.
+
+import anti.io as equal;
+import anti.lang.{Error};
+import anti.lang;
+import anti.mem.{Allocator, Block, Missing};
+import anti.regex.{Error};
+import anti.text.{Builder, Builder, byte_count, equal, slice};
+
+fn slice() -> int
+{
+	return 0;
+}
+
+struct Note
+{
+	s: str,
+}
+
+fn main() -> int
+{
+	let n = Note { s: "note" };
+	let count = n.byte_count();
+	let b = Builder.new();
+	let a = Align.Left;
+	return slice();
+}

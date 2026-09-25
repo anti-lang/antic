@@ -915,7 +915,12 @@ static void dump_module(struct dumper *d, const struct module *module)
             text_appendf(d->out, " as %.*s", (int)imp->alias.length,
                          imp->alias.text);
         }
-        text_append(d->out, "\n");
+        for (j = 0; j < imp->name_count; j++) {
+            text_appendf(d->out, "%s%.*s", j == 0 ? ".{" : ", ",
+                         (int)imp->names[j].name.length,
+                         imp->names[j].name.text);
+        }
+        text_append(d->out, imp->name_count > 0 ? "}\n" : "\n");
     }
     for (i = 0; i < module->provides_count; i++) {
         const struct provides *pr = &module->provides[i];

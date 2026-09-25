@@ -1,0 +1,23 @@
+//! A library that names items of `com.example.shapes` through a direct import,
+//! in a generic among them, whose copy another module makes from the tree this
+//! library file carries.
+
+import com.example.shapes.{Pair, Point, area};
+
+/// The point at the corner of `n` items, which a copy computes.
+pub fn corner<T>(items: []T) -> Point
+{
+	return Point { x: items.len, y: area(items.len, 2) };
+}
+
+/// A pair of the same value twice.
+pub fn twice<T>(v: T) -> Pair<T>
+{
+	return Pair<T> { a: v, b: v };
+}
+
+/// The area through the module name, which the direct import keeps.
+pub fn qualified(w: int) -> int
+{
+	return shapes.area(w, w);
+}

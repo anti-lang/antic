@@ -499,8 +499,11 @@ struct symbol *sema_method_symbol(const struct checker *c,
         member_visible(c, s, m)) {
         return m->symbol;
     }
+    /* An item of another library that a direct import names is no
+       function of the module that declares the type. */
     if (sema_same_name(&s->module, &c->module_name)) {
-        return sema_scope_find_local(&c->module_scope, name);
+        struct symbol *sym = sema_scope_find_local(&c->module_scope, name);
+        return sema_direct_item(sym) ? NULL : sym;
     }
     lib = sema_find_library(c, &s->module);
     return lib != NULL ? sema_library_item(c, lib, name) : NULL;

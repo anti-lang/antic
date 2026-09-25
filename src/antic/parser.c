@@ -3882,7 +3882,8 @@ static void sync_import(struct parser *p, int line)
 }
 
 /* A module path: identifiers joined by dots. The name holds the path with
-   its dots and without any space between the tokens. */
+   its dots and without any space between the tokens. A dot before `{`
+   opens the list of a direct import and ends the path. */
 static bool module_path(struct parser *p, struct name *out)
 {
     struct text path = {0};
@@ -3896,13 +3897,41 @@ static bool module_path(struct parser *p, struct name *out)
         }
         text_appendf(&path, "%s%.*s", path.length > 0 ? "." : "",
                      (int)segment.length, segment.text);
-    } while (accept(p, TOKEN_DOT));
+    } while (peek_at(p, 1)->kind != TOKEN_LBRACE && accept(p, TOKEN_DOT));
     copy = node(p, path.length + 1);
     memcpy(copy, text_cstr(&path), path.length + 1);
     out->text = copy;
     out->length = path.length;
     text_free(&path);
     return true;
+}
+
+/* The list of a direct import, `.{Builder, equal}`, after its path. The
+   names stand in the order written, and `anti fmt` sorts them. */
+static bool import_names(struct parser *p, struct import *imp)
+{
+    struct list names = {NULL, 0, 0, sizeof(struct import_name)};
+
+    if (!check(p, TOKEN_DOT) || peek_at(p, 1)->kind != TOKEN_LBRACE) {
+        return true;
+    }
+    next(p);
+    next(p);
+    if (check(p, TOKEN_RBRACE)) {
+        error_here(p, "a direct import lists at least one name");
+        return false;
+    }
+    do {
+        struct import_name n;
+        n.pos = pos_of(peek(p));
+        if (!expect_name(p, &n.name)) {
+            free(names.data);
+            return false;
+        }
+        list_push(&names, &n);
+    } while (accept(p, TOKEN_COMMA));
+    imp->names = list_finish(p, &names, &imp->name_count);
+    return expect(p, TOKEN_RBRACE);
 }
 
 /* An item of the module, after every type nested in it. A nested type
@@ -4093,8 +4122,9 @@ bool parse(const char *source, const struct token_list *tokens,
         memset(&imp, 0, sizeof imp);
         imp.pos = pos_of(next(&p));
         imp.module_pos = pos_of(peek(&p));
-        if (module_path(&p, &imp.module) &&
-            (!accept(&p, TOKEN_AS) || expect_name(&p, &imp.alias)) &&
+        if (module_path(&p, &imp.module) && import_names(&p, &imp) &&
+            (imp.name_count > 0 || !accept(&p, TOKEN_AS) ||
+             expect_name(&p, &imp.alias)) &&
             expect(&p, TOKEN_SEMICOLON)) {
             list_push(&imports, &imp);
         } else {
