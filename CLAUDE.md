@@ -246,8 +246,9 @@ sum types, then locking and channels, all three built. Then injection, hooks
 and tracing, plugins and runtime configuration, which belong together. All
 four are built. Then generics and closures. Closures are built, `snapshot fn`
 included. Round five, generics and collections, stands in the same document.
-Its first three parts, the syntax of generics, the constraints and the
-compiled copies of a module's own generics, are built, and none of the rest.
+Its first four parts, the syntax of generics, the constraints, the
+compiled copies and the generics of library files and of C, are built, and
+none of the rest.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -294,8 +295,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1002 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1001 each, without the `no_paths` test, which needs a
+- 1006 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1005 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -512,9 +513,12 @@ reports what it finished.
   and measured alone. Every use with concrete arguments compiles a copy of
   its own, `max<int>` and `List<int>.push`, a clone of the checked tree
   with the arguments in place. A dev build marks a copy link-once, and a
-  release build merges copies whose code is identical. A generic in a
-  library file comes next. See "Generics and collections" in
-  `docs/decisions.md` and `docs/notes/generics.md`.
+  release build merges copies whose code is identical. A library file
+  carries the checked tree of every generic, and a module that uses one
+  makes its copies from it under the path of the generic's module.
+  `export type` writes a copy into the C header, and `anti doc` shows
+  generics. See "Generics and collections" in `docs/decisions.md` and
+  `docs/notes/generics.md`.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
   See "Small things" in `docs/decisions.md`.
@@ -584,7 +588,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 61. See "The doc
+  class body and the `worker` mark, and its format version is 62. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops

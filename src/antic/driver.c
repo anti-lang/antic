@@ -2024,6 +2024,7 @@ const struct interface *driver_interface(const struct options *o,
     struct text source = {0};
     struct text module = {0};
     char *kept;
+    char *kept_module;
     size_t length = strlen(o->input);
     bool library_file = length > strlen(ANTL_SUFFIX) &&
                         strcmp(o->input + length - strlen(ANTL_SUFFIX),
@@ -2111,7 +2112,11 @@ const struct interface *driver_interface(const struct options *o,
                         libraries)) {
         goto done;
     }
-    if (!sema_check(parsed, text_cstr(&module), o->package_name, libraries,
+    /* The types of the module name its path. A page reads the module of
+       the generic a copy names, so the path lives as long as they do. */
+    kept_module = arena_alloc(arena, module.length + 1);
+    memcpy(kept_module, text_cstr(&module), module.length + 1);
+    if (!sema_check(parsed, kept_module, o->package_name, libraries,
                     paths.count, types, arena, &diags, false)) {
         warnings_apply(parsed, &diags, 0, false);
         report_diagnostics(o, &diags);
@@ -2121,7 +2126,7 @@ const struct interface *driver_interface(const struct options *o,
     warnings_apply(parsed, &diags, 0, false);
     report_diagnostics(o, &diags);
     iface = arena_alloc(arena, sizeof *iface);
-    sema_interface(parsed, text_cstr(&module), arena, iface);
+    sema_interface(parsed, kept_module, arena, iface);
     *tree = parsed;
 
 done:
