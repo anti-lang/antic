@@ -1551,17 +1551,21 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
                           "`%s`", o, sema_tn(left), sema_tn(right));
             return sema_builtin(c, TYPE_ERROR);
         }
+        /* DESIGN: a `str` has the hooks `eq` and `lt`. `==` compares
+           the text and `<` its bytes as unsigned numbers, which is the
+           order of the code points for UTF-8. */
         if (op == TOKEN_EQ || op == TOKEN_NE) {
             if (type_has_fields(left) || left->kind == TYPE_ARRAY ||
-                left->kind == TYPE_SLICE || left->kind == TYPE_STR) {
+                left->kind == TYPE_SLICE) {
                 sema_error_at(c, e->pos, "`%s` is not defined on `%s`", o,
                               sema_tn(left));
                 return sema_builtin(c, TYPE_ERROR);
             }
-        } else if (!type_is_numeric(left) && left->kind != TYPE_CHAR) {
+        } else if (!type_is_numeric(left) && left->kind != TYPE_CHAR &&
+                   left->kind != TYPE_STR) {
             sema_error_at(c, e->pos,
-                          "`%s` needs numeric or `char` operands, found "
-                          "`%s`", o, sema_tn(left));
+                          "`%s` needs numeric, `char` or `str` operands, "
+                          "found `%s`", o, sema_tn(left));
             return sema_builtin(c, TYPE_ERROR);
         }
         return sema_builtin(c, TYPE_BOOL);

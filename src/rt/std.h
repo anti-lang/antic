@@ -81,6 +81,13 @@ struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len);
 int anti_rt_same_bytes(const unsigned char *a, int64_t a_length,
                        const unsigned char *b, int64_t b_length);
 
+/* -1, 0 or 1 as the a_length bytes at a come before, equal or after the
+   b_length bytes at b, compared as unsigned bytes. A run that begins the
+   other comes first. `<` on two `str` values calls it, which gives the
+   order of the code points for UTF-8. */
+int64_t anti_rt_compare_bytes(const unsigned char *a, int64_t a_length,
+                              const unsigned char *b, int64_t b_length);
+
 /* The fields of `anti.text.Builder`, which the class declares in this
    order after the table pointer that every object begins with. The
    runtime appends to one when it serializes an object. */

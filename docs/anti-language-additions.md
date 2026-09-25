@@ -1038,6 +1038,7 @@ for p in &people { }     // p is a lent *Person: the element itself, for this tu
 - `operator fn hash(self) -> u64` joins the table of language hooks. The built-in types have it. A struct or class gets a default that hashes its fields in order, and may replace it.
 - Two values that are equal by `eq` have the same `hash`. The default keeps that rule, and a replacement must.
 - `anti.lang` ships `constraint Ordered = eq + lt;`.
+- `str` has the hooks `eq`, `lt` and `hash`, so it meets `eq`, `Ordered` and `hash`. `==` compares the text, `<` compares it byte by byte, which for UTF-8 is the order of the code points, and `hash` hashes the bytes.
 - A hashing collection mixes its hash with a random seed chosen when the program starts. Keys chosen by an attacker then cannot all land in one bucket. The seed never decides the order a program sees.
 
 ## Direct imports

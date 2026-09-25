@@ -77,6 +77,18 @@ int anti_rt_same_bytes(const unsigned char *a, int64_t a_length,
            (a_length == 0 || memcmp(a, b, (size_t)a_length) == 0);
 }
 
+int64_t anti_rt_compare_bytes(const unsigned char *a, int64_t a_length,
+                              const unsigned char *b, int64_t b_length)
+{
+    int64_t shorter = a_length < b_length ? a_length : b_length;
+    int order = shorter > 0 ? memcmp(a, b, (size_t)shorter) : 0;
+
+    if (order != 0) {
+        return order < 0 ? -1 : 1;
+    }
+    return a_length < b_length ? -1 : a_length > b_length ? 1 : 0;
+}
+
 /* Make room for count more bytes and the NUL after them. Returns false
    when the memory runs out or no size holds them, and the builder keeps
    what it holds. */

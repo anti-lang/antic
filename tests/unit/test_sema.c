@@ -511,7 +511,7 @@ void test_sema(void)
     rejects("fn f(x: int) -> bool { return x as bool; }", 1, 31,
             "cannot convert `int` to `bool`");
     rejects("fn f(a: bool, b: bool) -> bool { return a < b; }", 1, 41,
-            "`<` needs numeric or `char` operands, found `bool`");
+            "`<` needs numeric, `char` or `str` operands, found `bool`");
 
     /* `x in lo..hi` is `x >= lo && x < hi`, so the bounds take the type
        of the value, which the two comparisons take. */

@@ -1,0 +1,25 @@
+exit 0
+apart 1
+eq 1
+ne 0
+eq case 0
+eq length 0
+eq empty 1
+eq empty not 0
+lt 1
+lt equal 0
+le equal 1
+lt prefix 1
+gt prefix 1
+ge 1
+lt empty 1
+lt byte 1
+utf8 1 1
+utf8 2 1
+utf8 3 1
+utf8 4 1
+larger pear
+same 1
+same not 0
+hash 1
+hash not 0

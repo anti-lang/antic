@@ -1,0 +1,71 @@
+//! `str` has the hooks `eq`, `lt` and `hash`, so it meets `eq`, `Ordered` and
+//! `hash`. `==` compares the text and not the address, `<` compares byte by
+//! byte, which for UTF-8 is the order of the code points, and a text that
+//! begins another comes before it. `hash` hashes the bytes. A generic reaches
+//! each hook through its constraints.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn larger<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn same<T: eq>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+fn fingerprint<T: hash>(x: T) -> u64
+{
+	return x.hash();
+}
+
+fn show(name: str, v: bool)
+{
+	printf("%.*s %d\n".ptr, name.len as c_int, name.ptr, v as c_int);
+}
+
+fn main() -> int
+{
+	/* The same bytes at two addresses. */
+	let part = "lo";
+	let word = f"hel{part}";
+	show("apart", word.ptr != "hello".ptr);
+	show("eq", word == "hello");
+	show("ne", word != "hello");
+	show("eq case", word == "hellO");
+	show("eq length", word == "hell");
+	show("eq empty", "" == "");
+	show("eq empty not", word == "");
+
+	show("lt", "apple" < "banana");
+	show("lt equal", "apple" < "apple");
+	show("le equal", "apple" <= "apple");
+	show("lt prefix", "app" < "apple");
+	show("gt prefix", "apple" > "app");
+	show("ge", "b" >= "abc");
+	show("lt empty", "" < "a");
+	show("lt byte", "Z" < "a");
+
+	/* UTF-8 keeps the order of the code points: U+007F before U+00E9
+	   before U+4E2D before U+1F600. */
+	show("utf8 1", "\x7f" < "é");
+	show("utf8 2", "é" < "中");
+	show("utf8 3", "中" < "😀");
+	show("utf8 4", "zé" > "z\x7f");
+
+	let big = larger("pear", "peach");
+	printf("larger %.*s\n".ptr, big.len as c_int, big.ptr);
+	show("same", same(word, "hello"));
+	show("same not", same(word, "world"));
+	show("hash", fingerprint(word) == "hello".hash());
+	show("hash not", fingerprint("hello") == fingerprint("hellp"));
+	free(word.ptr);
+	return 0;
+}

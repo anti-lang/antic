@@ -505,11 +505,11 @@ static bool builtin_meets(const struct type *t, const char *hook)
     }
     if (strcmp(hook, "eq") == 0) {
         return !type_has_fields(t) && t->kind != TYPE_ARRAY &&
-               t->kind != TYPE_SLICE && t->kind != TYPE_STR &&
-               t->kind != TYPE_F16 && t->kind != TYPE_VOID;
+               t->kind != TYPE_SLICE && t->kind != TYPE_F16 &&
+               t->kind != TYPE_VOID;
     }
     if (strcmp(hook, "lt") == 0) {
-        return numeric || t->kind == TYPE_CHAR;
+        return numeric || t->kind == TYPE_CHAR || t->kind == TYPE_STR;
     }
     if (strcmp(hook, "add") == 0 || strcmp(hook, "sub") == 0 ||
         strcmp(hook, "mul") == 0 || strcmp(hook, "div") == 0) {
