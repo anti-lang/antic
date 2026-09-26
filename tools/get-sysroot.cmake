@@ -112,10 +112,11 @@ endfunction()
 # inside <root>. A host that cannot write a link, as Windows may not, gets
 # a copy of the file instead.
 # Only a path of the package's own system, which starts with `/`, is such
-# a link. The sysroot of a Windows target over the Build Tools is made of
-# junctions to C:/Program Files, which CMake reads as absolute links, and
-# they stay. Windows follows no link written with `/`, so a Windows host
-# writes the relative link with its own separator.
+# a link. Windows reads it back as `\usr\...`, so the destination takes
+# the separator of CMake first. The sysroot of a Windows target over the
+# Build Tools is made of junctions to C:/Program Files, which CMake reads
+# as absolute links, and they stay. Windows follows no link written with
+# `/`, so a Windows host writes the relative link with its own separator.
 function(relative_links root)
     file(GLOB_RECURSE entries LIST_DIRECTORIES true "${root}/*")
     foreach(entry IN LISTS entries)
@@ -123,7 +124,8 @@ function(relative_links root)
             continue()
         endif()
         file(READ_SYMLINK "${entry}" destination)
-        if(NOT destination MATCHES "^/")
+        file(TO_CMAKE_PATH "${destination}" destination)
+        if(NOT destination MATCHES "^/" OR destination MATCHES "^//")
             continue()
         endif()
         get_filename_component(directory "${entry}" DIRECTORY)
