@@ -176,14 +176,16 @@ void anti_rt_store_integer(void *bytes, int64_t type, uint64_t value)
 }
 
 /* DESIGN: equals and hash take each field by its kind, as the default
-   `==` and hash of a struct do. The two then always agree. A scalar, an
-   enum, a pointer and a function compare by their bytes, so a pointer
-   compares by its address. A str compares by its bytes. An own slice
-   compares element by element, and a plain slice by its address and its
-   length. A struct element of an own slice compares field by field under
-   the same rule. A class element compares through the equals of its own
-   table. An inline struct, class, array or union field and a bitfield
-   are passed over, as before. */
+   `==` and hash of a struct do. The two then always agree, and a class
+   and a struct with the same fields compare alike. A scalar, an enum, a
+   pointer and a function compare by their bytes, so a pointer compares
+   by its address. A str compares by its bytes. An own slice compares
+   element by element, and a plain slice by its address and its length.
+   A struct compares field by field under the same rule, in place, in an
+   array or in an own slice. A class value compares through the equals
+   of its own table. An array compares element by element through every
+   level of it. A bitfield and a field of type id none are passed over,
+   and the checker refuses the default `==` of a class with a union. */
 
 static int same_value(const unsigned char *a, const unsigned char *b,
                       int64_t type, const struct anti_descriptor *d,
@@ -231,13 +233,38 @@ static uint64_t hash_fields(uint64_t h, const unsigned char *p,
     return h;
 }
 
+/* The bytes of one element of the array of type id type through every
+   level of it, or 0 where the record does not give them. d is the
+   descriptor of a struct or a class element. */
+static size_t array_element_size(int64_t type, const struct anti_descriptor *d)
+{
+    int64_t inner = ANTI_TYPE_INNER(type);
+
+    if (inner == ANTI_TYPE_STRUCT || inner == ANTI_TYPE_CLASS) {
+        return d != NULL ? (size_t)d->size : 0;
+    }
+    return anti_rt_type_size(inner);
+}
+
+/* Whether a class field of descriptor d is the sub-object of an
+   interface, a view of the object that holds it. No value of an abstract
+   class stands in place otherwise, and only an abstract class carries
+   versions. Its table leads back to that object, so it is passed over. */
+static int sub_object(const struct anti_descriptor *d)
+{
+    return d != NULL && d->versions != NULL;
+}
+
 /* Whether the element of type id element at a and b is the same, in an
-   own slice. */
+   own slice, an array or in place. */
 static int same_element(const unsigned char *a, const unsigned char *b,
                         int64_t element, const struct anti_descriptor *d)
 {
     if (element == ANTI_TYPE_STRUCT) {
         return d != NULL && same_fields(a, b, d);
+    }
+    if (element == ANTI_TYPE_CLASS && sub_object(d)) {
+        return 1;
     }
     if (element == ANTI_TYPE_CLASS) {
         int8_t (*equals)(struct anti_object *, struct anti_object *) =
@@ -254,6 +281,9 @@ static uint64_t hash_element(uint64_t h, const unsigned char *p,
 {
     if (element == ANTI_TYPE_STRUCT) {
         return d != NULL ? hash_fields(h, p, d) : h;
+    }
+    if (element == ANTI_TYPE_CLASS && sub_object(d)) {
+        return h;
     }
     if (element == ANTI_TYPE_CLASS) {
         uint64_t (*hash)(struct anti_object *) =
@@ -276,6 +306,18 @@ static int same_value(const unsigned char *a, const unsigned char *b,
     size_t size;
 
     switch (t) {
+    case ANTI_TYPE_STRUCT:
+    case ANTI_TYPE_CLASS:
+        return same_element(a, b, t, d);
+    case ANTI_TYPE_ARRAY:
+        size = array_element_size(type, d);
+        for (i = 0; size > 0 && i < ANTI_TYPE_COUNT(type); i++) {
+            if (!same_element(a + (size_t)i * size, b + (size_t)i * size,
+                              ANTI_TYPE_INNER(type), d)) {
+                return 0;
+            }
+        }
+        return 1;
     case ANTI_TYPE_STR:
         memcpy(&x, a, sizeof x);
         memcpy(&y, b, sizeof y);
@@ -314,6 +356,15 @@ static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
     size_t size;
 
     switch (t) {
+    case ANTI_TYPE_STRUCT:
+    case ANTI_TYPE_CLASS:
+        return hash_element(h, p, t, d);
+    case ANTI_TYPE_ARRAY:
+        size = array_element_size(type, d);
+        for (i = 0; size > 0 && i < ANTI_TYPE_COUNT(type); i++) {
+            h = hash_element(h, p + (size_t)i * size, ANTI_TYPE_INNER(type), d);
+        }
+        return h;
     case ANTI_TYPE_STR:
         memcpy(&x, p, sizeof x);
         h = hash_run(h, (const unsigned char *)&x.len, sizeof x.len);

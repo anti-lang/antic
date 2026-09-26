@@ -1755,7 +1755,8 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
                 }
                 gap = left->kind == TYPE_STRUCT && !left->is_union
                           ? sema_eq_gap(c, left)
-                          : NULL;
+                      : left->kind == TYPE_CLASS ? sema_class_gap(left)
+                                                 : NULL;
                 if (gap != NULL) {
                     sema_error_at(c, e->pos, "`%s` is not defined on `%s`, "
                                   "whose field `%.*s` has no `eq`", o,

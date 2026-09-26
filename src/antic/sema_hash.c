@@ -255,9 +255,10 @@ static void walk_parts(struct checker *c, struct expr *e, struct type *t)
 }
 
 /* Walk what the default `==` of a value of type t compares. That is the
-   parts of a struct or a tuple, the fields of each case of a variant and
-   the value a `?T` holds. A class value calls the `equals` of its chain,
-   which lowering finds in its members. */
+   parts of a struct or a tuple and the fields of each case of a variant.
+   It is also the value a `?T` holds and the elements of an array. A class
+   value calls the `equals` of its chain, which lowering finds in its
+   members. */
 static void walk_inside(struct checker *c, struct expr *e, struct type *t)
 {
     size_t i;
@@ -279,6 +280,7 @@ static void walk_inside(struct checker *c, struct expr *e, struct type *t)
         }
         return;
     case TYPE_OPTIONAL:
+    case TYPE_ARRAY:
         walk_eq(c, e, t->element);
         return;
     default:
@@ -310,9 +312,13 @@ static void walk_eq(struct checker *c, struct expr *e, struct type *t)
 
 /* Whether a part of type t of a struct, a tuple or a variant has `==`. A
    slice part has it and compares as the view it is, by its address and
-   its length. */
+   its length. An array part has it when its elements have it, and
+   compares element by element. */
 static bool part_has_eq(struct checker *c, struct type *t)
 {
+    if (t->kind == TYPE_ARRAY) {
+        return part_has_eq(c, t->element);
+    }
     return t->kind == TYPE_SLICE || sema_meets_hook(c, t, LANG_HOOK_EQ);
 }
 
@@ -332,6 +338,67 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
     return NULL;
 }
 
+/* Whether a value of type t holds a union in place, directly, in a
+   struct or in an array. A class value compares through its own
+   `equals`. */
+static bool holds_union(const struct type *t)
+{
+    size_t i;
+
+    while (t->kind == TYPE_ARRAY) {
+        t = t->element;
+    }
+    if (t->kind != TYPE_STRUCT) {
+        return false;
+    }
+    if (t->is_union) {
+        return true;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (!type_field_is_unit_break(&t->fields[i]) &&
+            holds_union(t->fields[i].type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Whether a class of the chain of t below the root replaces `equals`. */
+static bool own_equals(const struct type *t)
+{
+    static const struct name equals = {"equals", 6};
+    size_t i;
+
+    for (; t != NULL && t->base != NULL; t = t->base) {
+        for (i = 0; i < t->member_count; i++) {
+            if (t->members[i]->kind == ITEM_FN &&
+                sema_same_name(&t->members[i]->name, &equals)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+const struct struct_field *sema_class_gap(const struct type *t)
+{
+    size_t i;
+
+    if (own_equals(t)) {
+        return NULL;
+    }
+    for (; t != NULL; t = t->base) {
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                holds_union(f->type)) {
+                return f;
+            }
+        }
+    }
+    return NULL;
+}
+
 /* DESIGN: a struct and a class get a default `==` and no default `<`,
    since what order means is the type's own choice. The default of a
    class value is the `equals` of its class, which the class replaces
@@ -339,17 +406,20 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
    order, each with its own `==`, so it keeps the rule that values equal
    by `eq` hash alike wherever each field keeps it. A union holds one
    field and says not which, a simd struct compares lane by lane, and a
-   Mutex is no value, so none of the three has the default. A tuple, a
+   Mutex is no value, so none of the three has the default. A class
+   that holds a union in place has none either, since the `equals` of
+   `Object` walks every other field as this default does. A tuple, a
    variant and a `?T` have it when every part has `==`: a tuple part by
    part, a variant by its case and then the fields of that case, a `?T`
-   by its flag and then the value it holds. */
+   by its flag and then the value it holds. An array part compares
+   element by element. */
 bool sema_default_eq(struct checker *c, struct type *t)
 {
     size_t i;
 
     switch (t->kind) {
     case TYPE_CLASS:
-        return true;
+        return sema_class_gap(t) == NULL;
     case TYPE_STRUCT:
         return !t->is_union && !type_is_simd(t) && !types_is_mutex(t) &&
                sema_eq_gap(c, t) == NULL;

@@ -2,8 +2,9 @@
 //! default `==` and no default `<`, so a type used where `lt` or `Ordered` is
 //! needed declares `operator fn lt`, and the refusal says so. A struct with a
 //! field that has no `==` gets no default and the refusal names the field. A
-//! union gets none, and neither does a tuple, a variant or a `?T` with a part
-//! that has no `==`.
+//! union gets none. A class that holds one gets none unless it replaces
+//! `equals`, and the refusal names the field. A tuple, a variant or a `?T` with
+//! a part that has no `==` gets none either.
 
 struct Point
 {
@@ -12,7 +13,7 @@ struct Point
 
 struct Buffer
 {
-	data: [4]int,
+	data: Word,
 }
 
 union Word
@@ -23,13 +24,28 @@ union Word
 
 variant Held
 {
-	Some { data: [2]int },
+	Some { data: [2]f16 },
 	Nothing,
 }
 
 class Circle
 {
 	pub r: int = 0,
+}
+
+class Holder
+{
+	pub word: Word,
+}
+
+class Replaced
+{
+	pub word: Word,
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		return other is *Replaced;
+	}
 }
 
 fn larger<T: Ordered>(a: T, b: T) -> T
@@ -60,7 +76,17 @@ fn words(a: Word, b: Word) -> bool
 	return a != b;
 }
 
-fn tuples(a: ([2]int, int), b: ([2]int, int)) -> bool
+fn holders(a: Holder, b: Holder) -> bool
+{
+	return a == b;
+}
+
+fn replaced(a: Replaced, b: Replaced) -> bool
+{
+	return a == b;
+}
+
+fn tuples(a: ([2]f16, int), b: ([2]f16, int)) -> bool
 {
 	return a == b;
 }

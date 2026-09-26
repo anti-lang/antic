@@ -507,6 +507,10 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t);
 /* Make e, `a == b` or `a != b` on two values of type t, the default
    equality. Returns false when t has none. */
 bool sema_equals(struct checker *c, struct expr *e, struct type *t);
+/* The first field of the chain of the class t that holds a union in
+   place, which the `equals` of `Object` cannot compare, or NULL. A class
+   that replaces `equals` has none. */
+const struct struct_field *sema_class_gap(const struct type *t);
 /* The end of a refusal of the hook named hook on type t: what a struct
    or a class without `lt` declares, and "" for any other. */
 const char *sema_no_order(const struct type *t, const char *hook);

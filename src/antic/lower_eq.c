@@ -186,6 +186,54 @@ static void compare_optional(struct lowerer *l, const struct expr *e,
     l->b = join;
 }
 
+/* Two arrays of type t at a and b, element by element through every
+   level of the array. The walk leaves at the first element that differs,
+   as require does for every part. */
+static void compare_array(struct lowerer *l, const struct expr *e,
+                          struct comparison *cmp, struct ir_operand a,
+                          struct ir_operand b, const struct type *t)
+{
+    struct ir_operand count = ir_int_op(IR_I64, 1);
+    const struct type *element = t;
+    struct ir_operand size;
+    struct ir_block *test = lower_new_block(l);
+    struct ir_block *body = lower_new_block(l);
+    struct ir_block *done = lower_new_block(l);
+    uint32_t index;
+    struct ir_operand offset;
+
+    for (; element->kind == TYPE_ARRAY; element = element->element) {
+        struct ir_operand length =
+            element->length_of != NULL
+                ? ir_sym_operand(l->m, lower_sym_of(l, element->length_of))
+                : ir_int_op(IR_I64, element->length);
+        count = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64, count,
+                                        length));
+    }
+    size = lower_size_operand(l, element);
+    index = ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_SLT, IR_I8,
+                                      lower_temp(l, index), count)),
+              body, done);
+    l->b = body;
+    offset = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                     lower_temp(l, index), size));
+    {
+        struct ir_operand x = lower_temp(l, ir_ptradd(l->f, l->b, a, offset));
+        struct ir_operand y = lower_temp(l, ir_ptradd(l->f, l->b, b, offset));
+        compare_at(l, e, cmp, x, y, element);
+    }
+    ir_assign(l->f, l->b, index,
+              lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64,
+                                      lower_temp(l, index),
+                                      ir_int_op(IR_I64, 1))));
+    ir_jump(l->f, l->b, test);
+    l->b = done;
+}
+
 /* Compare the values of type t in memory at a and b. */
 static void compare_at(struct lowerer *l, const struct expr *e,
                        struct comparison *cmp, struct ir_operand a,
@@ -245,6 +293,9 @@ static void compare_at(struct lowerer *l, const struct expr *e,
         return;
     case TYPE_TUPLE:
         compare_fields(l, e, cmp, a, b, t);
+        return;
+    case TYPE_ARRAY:
+        compare_array(l, e, cmp, a, b, t);
         return;
     case TYPE_VARIANT:
         own = own_eq(e, t);

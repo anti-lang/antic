@@ -14,8 +14,11 @@
    knows the size of each type on the host it runs on. The low byte names
    the type. A pointer, a slice, an array and an enum hold the id of the
    type they are built on in the byte above. The id of `[]i32` is
-   ANTI_TYPE_SLICE | ANTI_TYPE_I32 << 8. src/antic/lower_desc.c writes these
-   numbers, and the unit test records_type_ids pins the two together. */
+   ANTI_TYPE_SLICE | ANTI_TYPE_I32 << 8. An array holds two more. The id
+   of its element through every level of it stands in the third byte. The
+   count of those elements stands from the fourth byte up, and is 0 where
+   a length is symbolic. src/antic/lower_desc.c writes these numbers, and the unit
+   test records_type_ids pins the two together. */
 enum anti_type {
     ANTI_TYPE_NONE,     /* a bitfield, which no walk reads */
     ANTI_TYPE_BOOL,
@@ -49,6 +52,9 @@ enum anti_type {
    byte above is written as the integer it is built on. */
 #define ANTI_TYPE_OF(id) ((int64_t)(id) & 0xFF)
 #define ANTI_TYPE_ELEMENT(id) (((int64_t)(id) >> 8) & 0xFF)
+/* The element of an array through every level of it, and their count. */
+#define ANTI_TYPE_INNER(id) (((int64_t)(id) >> 16) & 0xFF)
+#define ANTI_TYPE_COUNT(id) ((int64_t)((uint64_t)(id) >> 24))
 
 /* The type id of a scalar type, with an enum replaced by its integer. */
 int64_t anti_rt_type_scalar(int64_t type);

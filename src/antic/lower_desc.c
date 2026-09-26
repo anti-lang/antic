@@ -464,7 +464,10 @@ static uint64_t type_id_of(const struct type *t)
    width, so the record is the same on every target. A pointer, a slice,
    an array and an enum add the id of the type they are built on in the
    byte above their own. An enum there is written as its integer, so a
-   walk knows the size of every element. */
+   walk knows the size of every element. An array adds two more. The id
+   of its element through every level of it stands in the third byte. The
+   count of those elements stands from the fourth byte up, and is 0 where
+   a length is symbolic. equals and hash of the runtime walk the array by the two. */
 static uint64_t type_id(const struct type *t)
 {
     const struct type *on = t->kind == TYPE_ENUM ? t->base
@@ -472,11 +475,24 @@ static uint64_t type_id(const struct type *t)
                                     t->kind == TYPE_ARRAY
                                 ? t->element
                                 : NULL;
+    uint64_t id;
 
     if (on != NULL && on->kind == TYPE_ENUM) {
         on = on->base;
     }
-    return type_id_of(t) | (on != NULL ? type_id_of(on) << 8 : 0);
+    id = type_id_of(t) | (on != NULL ? type_id_of(on) << 8 : 0);
+    if (t->kind == TYPE_ARRAY) {
+        uint64_t count = 1;
+        const struct type *inner = t;
+        for (; inner->kind == TYPE_ARRAY; inner = inner->element) {
+            count = inner->length_of != NULL ? 0 : count * inner->length;
+        }
+        if (inner->kind == TYPE_ENUM) {
+            inner = inner->base;
+        }
+        id |= type_id_of(inner) << 16 | count << 24;
+    }
+    return id;
 }
 
 /* The descriptor a field of type t carries. It is the one of its class
@@ -486,6 +502,11 @@ static const struct ir_global *field_descriptor(struct lowerer *l,
                                                 const struct type *t)
 {
     if (t->kind == TYPE_POINTER || t->kind == TYPE_SLICE) {
+        t = t->element;
+    }
+    /* An array reaches the descriptor of its element through every
+       level of it. */
+    while (t->kind == TYPE_ARRAY) {
         t = t->element;
     }
     if (t->kind == TYPE_CLASS) {

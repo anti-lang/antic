@@ -433,7 +433,9 @@ static void records_type_ids(void)
         {ANTI_TYPE_PTR | ANTI_TYPE_I32 << 8, "(none)"},
         {ANTI_TYPE_FN, "(none)"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_U16 << 8, "(none)"},
-        {ANTI_TYPE_ARRAY | ANTI_TYPE_I8 << 8, "(none)"},
+        {ANTI_TYPE_ARRAY | ANTI_TYPE_I8 << 8 | ANTI_TYPE_I8 << 16 |
+             (uint64_t)4 << 24,
+         "(none)"},
         {ANTI_TYPE_STRUCT, "Size.descriptor"},
         {ANTI_TYPE_UNION, "(none)"},
         {ANTI_TYPE_ENUM | ANTI_TYPE_U8 << 8, "(none)"},
@@ -444,6 +446,14 @@ static void records_type_ids(void)
         {ANTI_TYPE_SLICE | ANTI_TYPE_U8 << 8, "(none)"},
         {ANTI_TYPE_F16, "(none)"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_F16 << 8, "(none)"},
+        /* An array holds its element through every level and their
+           count, and reaches the descriptor of a struct element. */
+        {ANTI_TYPE_ARRAY | ANTI_TYPE_ARRAY << 8 | ANTI_TYPE_U16 << 16 |
+             (uint64_t)6 << 24,
+         "(none)"},
+        {ANTI_TYPE_ARRAY | ANTI_TYPE_STRUCT << 8 | ANTI_TYPE_STRUCT << 16 |
+             (uint64_t)2 << 24,
+         "Size.descriptor"},
     };
     static const struct field_expect size[] = {
         {ANTI_TYPE_I32, "(none)"},
@@ -463,7 +473,7 @@ static void records_type_ids(void)
         "    n: f32, o: f64, p: str, q: *i32, r: fn(i32) -> i32,\n"
         "    s: []u16, t: [4]i8, u: Size, v: Bits, w: Mode, x: Inner,\n"
         "    y: *Size, z: []Size, own next: *Inner, modes: []Mode,\n"
-        "    half: f16, halves: []f16,\n"
+        "    half: f16, halves: []f16, grid: [2][3]u16, path: [2]Size,\n"
         "}\n");
     CHECK(l.ok);
     check_field_records(&l.ir, "Holder.fields", holder,

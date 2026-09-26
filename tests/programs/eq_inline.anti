@@ -1,0 +1,115 @@
+//! The `equals` and `hash` of `Object` walk an inline struct, class or array
+//! field by the rules of the default `==` of a struct, so a class and a struct
+//! with the same fields compare alike. A struct field compares field by field,
+//! a class value through the `equals` of its class and an array element by
+//! element, through every level of it. The sub-object of an interface is a view
+//! of the object that holds it and is passed over.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Tag
+{
+	pub code: int = 0,
+	pub label: str = "",
+}
+
+struct Plain
+{
+	at: Point,
+	tag: Tag,
+	grid: [2][2]int,
+	path: [2]Point,
+}
+
+class Boxed
+{
+	pub at: Point,
+	pub tag: Tag,
+	pub grid: [2][2]int,
+	pub path: [2]Point,
+}
+
+abstract class Ink
+{
+	abstract fn colour(self) -> int;
+}
+
+class Stamp
+{
+	implements ink: Ink,
+	pub shade: int = 2,
+
+	concrete fn Ink::colour(self) -> int
+	{
+		return self.shade;
+	}
+}
+
+fn plain(y: int, label: str, corner: int, end: int) -> Plain
+{
+	return Plain {
+		at: Point { x: 1, y: y }, tag: Tag { code: 7, label: label },
+		grid: [[1, 2], [3, corner]],
+		path: [Point { x: 0, y: 0 }, Point { x: end, y: 0 }]
+	};
+}
+
+fn boxed(y: int, label: str, corner: int, end: int) -> *Boxed
+{
+	return alloc Boxed {
+		at: Point { x: 1, y: y }, tag: Tag { code: 7, label: label },
+		grid: [[1, 2], [3, corner]],
+		path: [Point { x: 0, y: 0 }, Point { x: end, y: 0 }]
+	};
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let ab = f"ab";
+	let a = plain(2, "ab", 4, 5);
+	let same = plain(2, ab, 4, 5);
+	let at = plain(3, "ab", 4, 5);
+	let label = plain(2, "ba", 4, 5);
+	let corner = plain(2, "ab", 9, 5);
+	let end = plain(2, "ab", 4, 6);
+	printf("struct %d %d %d %d %d\n".ptr, b(a == same), b(a == at),
+		b(a == label), b(a == corner), b(a == end));
+
+	let x = boxed(2, "ab", 4, 5);
+	let y = boxed(2, ab, 4, 5);
+	let u = boxed(3, "ab", 4, 5);
+	let v = boxed(2, "ba", 4, 5);
+	let w = boxed(2, "ab", 9, 5);
+	let z = boxed(2, "ab", 4, 6);
+	printf("class %d %d %d %d %d %d\n".ptr, b(*x == *y), b(*x == *u),
+		b(*x == *v), b(*x == *w), b(*x == *z), b(x.hash() == y.hash()));
+	let s = alloc Stamp { shade: 2 };
+	let t = alloc Stamp { shade: 2 };
+	let r = alloc Stamp { shade: 3 };
+	printf("stamp %d %d %d\n".ptr, b(*s == *t), b(*s == *r),
+		b(s.hash() == t.hash()));
+	delete(s);
+	delete(t);
+	delete(r);
+	delete(x);
+	delete(y);
+	delete(u);
+	delete(v);
+	delete(w);
+	delete(z);
+	free(ab.ptr);
+	return 0;
+}
