@@ -404,21 +404,22 @@ static int same_value(const unsigned char *a, const unsigned char *b,
         return memcmp(a, b, (size_t)ANTI_TYPE_ELEMENT(type) * sizeof(void *)) ==
                0;
     case ANTI_TYPE_REGEX: {
-        const void *x;
-        const void *y;
-        memcpy(&x, a, sizeof x);
-        memcpy(&y, b, sizeof y);
-        return anti_rt_pattern_same(x, y);
+        const void *pattern_a;
+        const void *pattern_b;
+        memcpy(&pattern_a, a, sizeof pattern_a);
+        memcpy(&pattern_b, b, sizeof pattern_b);
+        return anti_rt_pattern_same(pattern_a, pattern_b);
     }
     case ANTI_TYPE_TUPLE:
         return d == NULL || same_fields(a, b, d);
     case ANTI_TYPE_VARIANT: {
-        const struct anti_field *x = anti_rt_variant_case(a, d);
-        if (x != anti_rt_variant_case(b, d)) {
+        const struct anti_field *which = anti_rt_variant_case(a, d);
+        if (which != anti_rt_variant_case(b, d)) {
             return 0;
         }
-        return x == NULL || x->descriptor == NULL ||
-               same_fields(a + x->offset, b + x->offset, x->descriptor);
+        return which == NULL || which->descriptor == NULL ||
+               same_fields(a + which->offset, b + which->offset,
+                           which->descriptor);
     }
     case ANTI_TYPE_OPTIONAL:
         if (optional_has(a, d) != optional_has(b, d)) {
@@ -481,21 +482,21 @@ static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
     case ANTI_TYPE_HANDLE:
         return hash_run(h, p, (size_t)ANTI_TYPE_ELEMENT(type) * sizeof(void *));
     case ANTI_TYPE_REGEX: {
-        const void *x;
+        const void *pattern;
         uint64_t v;
-        memcpy(&x, p, sizeof x);
-        v = anti_rt_pattern_hash(x);
+        memcpy(&pattern, p, sizeof pattern);
+        v = anti_rt_pattern_hash(pattern);
         return hash_run(h, (const unsigned char *)&v, sizeof v);
     }
     case ANTI_TYPE_TUPLE:
         return d == NULL ? h : hash_fields(h, p, d);
     case ANTI_TYPE_VARIANT: {
-        const struct anti_field *x = anti_rt_variant_case(p, d);
-        uint64_t tag = x != NULL ? (uint64_t)x->owned : 0;
+        const struct anti_field *which = anti_rt_variant_case(p, d);
+        uint64_t tag = which != NULL ? (uint64_t)which->owned : 0;
         h = hash_run(h, (const unsigned char *)&tag, sizeof tag);
-        return x == NULL || x->descriptor == NULL
+        return which == NULL || which->descriptor == NULL
                    ? h
-                   : hash_fields(h, p + x->offset, x->descriptor);
+                   : hash_fields(h, p + which->offset, which->descriptor);
     }
     case ANTI_TYPE_OPTIONAL: {
         unsigned char has = (unsigned char)optional_has(p, d);
