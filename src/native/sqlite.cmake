@@ -39,8 +39,11 @@ string(STRIP "${antic_sqlite_blessing}" antic_sqlite_blessing)
 if(antic_sqlite_blessing STREQUAL "")
     message(FATAL_ERROR "sqlite3.h holds no dedication to the public domain")
 endif()
-file(WRITE "${ANTIC_SQLITE_WORK}/licence.txt"
-     "SQLite is in the public domain.\n\n${antic_sqlite_blessing}\n")
+# The text is written with LF on every host, as LICENSES/sqlite.txt holds
+# it. file(WRITE) writes CRLF on Windows.
+file(CONFIGURE OUTPUT "${ANTIC_SQLITE_WORK}/licence.txt"
+     CONTENT "SQLite is in the public domain.\n\n${antic_sqlite_blessing}\n"
+     @ONLY NEWLINE_STYLE UNIX)
 antic_native_license(sqlite "${ANTIC_SQLITE_WORK}/licence.txt")
 
 # DESIGN: sqlite3.c of the amalgamation with no compile-time option of our

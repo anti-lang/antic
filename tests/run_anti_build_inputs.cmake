@@ -12,10 +12,21 @@
 # before it reaches any of them (S45, S40, M13 of docs/audit/summary.md),
 # and nothing is written outside the cache.
 
+# The file:// URL of a directory: file:///tmp/repo, and file:///C:/repo
+# for a Windows path, whose drive follows the third slash.
+function(file_url path out)
+    if(path MATCHES "^/")
+        set(${out} "file://${path}" PARENT_SCOPE)
+    else()
+        set(${out} "file:///${path}" PARENT_SCOPE)
+    endif()
+endfunction()
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 set(project "${WORK}/project")
 set(repo "${WORK}/repo")
+file_url("${repo}" repo_url)
 set(digest "5b0c2d1e7a94f3c6b8d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6")
 file(COPY "${FIXTURE}/consumer/src" DESTINATION "${project}")
 file(WRITE "${project}/anti.toml"
@@ -24,7 +35,7 @@ file(WRITE "${project}/anti.toml"
      "version = \"0.1.0\"\n"
      "\n"
      "[repositories]\n"
-     "local = \"file://${repo}\"\n"
+     "local = \"${repo_url}\"\n"
      "\n"
      "[dependencies]\n"
      "\"com.example.units\" = { version = \"1.2.0\", repo = \"local\" }\n")
@@ -123,7 +134,7 @@ function(write_lock version module digest_value)
          "[[package]]\n"
          "name = \"com.example.units\"\n"
          "version = \"${version}\"\n"
-         "repo = \"file://${repo}\"\n"
+         "repo = \"${repo_url}\"\n"
          "modules = [\n"
          "    { path = \"${module}\", sha256 = ${digest_value} },\n"
          "]\n")

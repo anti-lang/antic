@@ -6,6 +6,7 @@
 #   SOURCES   the directory of the check programs
 #   WORK      a directory for the files
 #   STRINGS   a tool that lists the strings of a file
+#   OBJECT    the suffix of an object of the host, .o or .obj
 #
 # Each program runs to its end and exits with 7 when the checks are
 # absent. With them it prints the file, the line, the operation and the
@@ -103,7 +104,7 @@ if(NOT status EQUAL 0)
 endif()
 check(walk_changed "was changed while"
       "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
-      ON "${WORK}/anti_lang_dev.o")
+      ON "${WORK}/anti_lang_dev${OBJECT}")
 # The same over the base of the generic collections, which counts the
 # change in `remove_all`. anti.collection imports anti.mem and anti.text,
 # so the dev build links an object of each.
@@ -118,8 +119,8 @@ foreach(module mem text collection)
 endforeach()
 check(collection_changed "was changed while"
       "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
-      ON "${WORK}/anti_lang_dev.o" "${WORK}/anti_mem_dev.o"
-      "${WORK}/anti_text_dev.o" "${WORK}/anti_collection_dev.o")
+      ON "${WORK}/anti_lang_dev${OBJECT}" "${WORK}/anti_mem_dev${OBJECT}"
+      "${WORK}/anti_text_dev${OBJECT}" "${WORK}/anti_collection_dev${OBJECT}")
 
 # --checks puts them into a release build, and --no-checks takes them out
 # of a dev build. Both override the mode.

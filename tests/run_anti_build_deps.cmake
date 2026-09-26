@@ -13,6 +13,16 @@
 # library files a library project writes, the repository layout and the
 # lock file that names a version and its digest.
 
+# The file:// URL of a directory: file:///tmp/repo, and file:///C:/repo
+# for a Windows path, whose drive follows the third slash.
+function(file_url path out)
+    if(path MATCHES "^/")
+        set(${out} "file://${path}" PARENT_SCOPE)
+    else()
+        set(${out} "file:///${path}" PARENT_SCOPE)
+    endif()
+endfunction()
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 file(COPY "${FIXTURE}/units" "${FIXTURE}/consumer" DESTINATION "${WORK}")
@@ -84,13 +94,14 @@ file(WRITE "${repo}/index.toml"
      "dependencies = []\n")
 file(REMOVE_RECURSE "${WORK}/fetched")
 file(COPY "${FIXTURE}/consumer" DESTINATION "${WORK}/fetched")
+file_url("${WORK}/repo" repo_url)
 file(WRITE "${WORK}/fetched/consumer/anti.toml"
      "[package]\n"
      "name = \"com.example.consumer\"\n"
      "version = \"0.1.0\"\n"
      "\n"
      "[repositories]\n"
-     "local = \"file://${WORK}/repo\"\n"
+     "local = \"${repo_url}\"\n"
      "\n"
      "[dependencies]\n"
      "\"com.example.units\" = { version = \"1.2.0\", repo = \"local\" }\n")

@@ -13,6 +13,19 @@
 #   RAYLIB    the pinned raylib source
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
+#   CLANG_DIR the pinned clang of the build
+
+# anti bind takes the pinned clang of build/deps beside its tree, and
+# otherwise the first clang on PATH. A tree configured with a pinned clang
+# elsewhere, as on the test machines, puts that one first on PATH.
+if(CLANG_DIR)
+    file(TO_NATIVE_PATH "${CLANG_DIR}/bin" clang_bin)
+    if(WIN32)
+        set(ENV{PATH} "${clang_bin};$ENV{PATH}")
+    else()
+        set(ENV{PATH} "${clang_bin}:$ENV{PATH}")
+    endif()
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")

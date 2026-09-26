@@ -93,6 +93,15 @@ target_compile_definitions(antic_unit_tests PRIVATE
     ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}})
 add_test(NAME unit COMMAND antic_unit_tests)
 
+# The suffix antic gives an object of the host target, the one that
+# src/antic/target.c names: .obj on Windows and .o elsewhere. Every dev
+# object a test links is named with it.
+if(ANTIC_HOST_TARGET MATCHES "^windows-")
+    set(anti_object ".obj")
+else()
+    set(anti_object ".o")
+endif()
+
 # The signal table of the runtime, in a program of its own. src/rt/signal.h
 # shares its name with the header of C, so the include path of the unit
 # tests would hide the one of C from src/rt/signal.c. The test starts
@@ -551,7 +560,7 @@ foreach(name IN ITEMS generic_copies generic_constants generic_methods
     if(name STREQUAL "generic_may_fail" OR name STREQUAL "generic_fn_args" OR
        name STREQUAL "walk_generic" OR name STREQUAL "hash_generic" OR
        name STREQUAL "walk_owned_parts")
-        set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o")
+        set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object}")
     endif()
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
@@ -582,7 +591,7 @@ foreach(name IN ITEMS sync_exits sync_workers channels select_two
         lock_free_queue)
     set(objects "")
     if(name STREQUAL "sync_exits")
-        set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o")
+        set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object}")
     endif()
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
@@ -614,7 +623,7 @@ add_test(NAME program_pattern_literals_dev
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/pattern_literals.anti"
         "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev.o"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev${anti_object}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_property(TEST program_pattern_literals_dev PROPERTY FIXTURES_REQUIRED
@@ -628,7 +637,7 @@ add_test(NAME program_pattern_replace_dev
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/pattern_replace.anti"
         "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev.o"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev${anti_object}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_property(TEST program_pattern_replace_dev PROPERTY FIXTURES_REQUIRED
@@ -649,7 +658,7 @@ add_test(NAME program_deserialize_dev
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/deserialize.anti"
         "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev.o"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_tests_properties(program_deserialize_dev PROPERTIES
@@ -671,7 +680,7 @@ foreach(name IN ITEMS pattern_bytes pattern_patch)
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
             "-DOPTIONS=--dev"
-            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev.o"
+            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
     set_property(TEST program_${name}_dev PROPERTY FIXTURES_REQUIRED
@@ -934,7 +943,7 @@ add_test(NAME std_collection_parts_dev
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/collection_parts.anti"
         "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev.o"
+        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 set_tests_properties(std_collection_parts_dev PROPERTIES
@@ -954,7 +963,7 @@ foreach(module IN ITEMS pool tree queue)
         FIXTURES_SETUP collection_${module}_dev_object)
 endforeach()
 set(collection_dev_objects
-    "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev.o,${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev.o")
+    "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object}")
 foreach(case "pool|pool" "tree|pool,tree" "queue|queue")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
@@ -965,7 +974,7 @@ foreach(case "pool|pool" "tree|pool,tree" "queue|queue")
         collection_dev_object)
     foreach(module IN LISTS modules)
         string(APPEND objects
-            ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev.o")
+            ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev${anti_object}")
         list(APPEND fixtures collection_${module}_dev_object)
     endforeach()
     add_test(NAME std_collection_${name}_dev
@@ -1352,6 +1361,7 @@ foreach(case IN LISTS anti_bind_cases)
             "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
             "-DCC=${anti_bind_cc}"
             "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bind-${case}"
             -DCASE=${case}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_bind.cmake")
@@ -2544,6 +2554,7 @@ if(ANTIC_LLVM_MC AND ANTIC_STRINGS)
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/checks"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks"
             "-DSTRINGS=${ANTIC_STRINGS}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_checks.cmake")
 endif()
 

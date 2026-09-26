@@ -15,6 +15,14 @@
 # lock file, `anti run` and the project `anti new` writes.
 
 set(project "${WORK}/app")
+# A Windows host writes app.exe and objects named .obj, and its symbols
+# lie in a PDB, so the map of its archive names no function.
+set(exe "")
+set(obj ".o")
+if(HOST MATCHES "^windows-")
+    set(exe ".exe")
+    set(obj ".obj")
+endif()
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 file(COPY "${FIXTURE}/app" DESTINATION "${WORK}")
@@ -46,7 +54,7 @@ endfunction()
 # The dev build of the two modules. The program prints the word of the
 # second module and ends with its status.
 build("the dev build" build)
-set(program "${project}/dist/${HOST}/dev/app")
+set(program "${project}/dist/${HOST}/dev/app${exe}")
 if(NOT EXISTS "${program}")
     message(FATAL_ERROR "the dev build wrote no ${program}")
 endif()
@@ -65,7 +73,7 @@ endif()
 # The cache key of a module is the digest of its input, the compiler
 # version and the target, so a build that changes nothing writes no
 # object again.
-set(object "${project}/build/${HOST}/dev/obj/com/example/greet.o")
+set(object "${project}/build/${HOST}/dev/obj/com/example/greet${obj}")
 if(NOT EXISTS "${object}")
     message(FATAL_ERROR "the dev build wrote no ${object}")
 endif()
@@ -101,7 +109,7 @@ endif()
 
 # Release mode compiles the whole program in one call.
 build("the release build" build --release)
-set(release "${project}/dist/${HOST}/release/app")
+set(release "${project}/dist/${HOST}/release/app${exe}")
 execute_process(COMMAND "${release}" RESULT_VARIABLE status
     OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 9 OR NOT out MATCHES "^one")
@@ -151,24 +159,35 @@ if(NOT CMAKE_MATCH_1 STREQUAL id)
     message(FATAL_ERROR "app.debug carries ${CMAKE_MATCH_1} and the program "
                         "carries ${id}")
 endif()
-foreach(name com.example.app.main com.example.greet.word)
-    if(NOT map MATCHES "${name}")
-        message(FATAL_ERROR "the map names no ${name}")
+if(HOST MATCHES "^windows-")
+    if(NOT EXISTS "${WORK}/symbols/app.pdb")
+        message(FATAL_ERROR "the symbols archive holds no app.pdb")
     endif()
-endforeach()
-if(NOT map MATCHES "greet.anti:[0-9]+")
-    message(FATAL_ERROR "the map carries no file and line:\n${map}")
+else()
+    foreach(name com.example.app.main com.example.greet.word)
+        if(NOT map MATCHES "${name}")
+            message(FATAL_ERROR "the map names no ${name}")
+        endif()
+    endforeach()
+    if(NOT map MATCHES "greet.anti:[0-9]+")
+        message(FATAL_ERROR "the map carries no file and line:\n${map}")
+    endif()
 endif()
 
 # `anti build` passes -g in dev mode and never in release, so the
-# assembly of a dev build carries the line of every statement.
+# assembly of a dev build carries the line of every statement: `.loc` of
+# DWARF, or `.cv_loc` of CodeView on Windows.
+set(line_directive ".loc ")
+if(HOST MATCHES "^windows-")
+    set(line_directive ".cv_loc ")
+endif()
 file(READ "${project}/build/${HOST}/dev/app.s" dev_assembly)
 file(READ "${project}/build/${HOST}/release/app.s" release_assembly)
-string(FIND "${dev_assembly}" ".loc" at)
+string(FIND "${dev_assembly}" "${line_directive}" at)
 if(at LESS 0)
     message(FATAL_ERROR "the dev build passed no -g")
 endif()
-string(FIND "${release_assembly}" ".loc" at)
+string(FIND "${release_assembly}" "${line_directive}" at)
 if(NOT at LESS 0)
     message(FATAL_ERROR "the release build passed -g")
 endif()
