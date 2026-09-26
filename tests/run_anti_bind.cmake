@@ -12,6 +12,7 @@
 #   ABI       tests/abi, whose abi_raymath.expected the case raymath reads
 #   RAYLIB    the pinned raylib source
 #   CC        the C compiler of the build, with its options
+#   HOST_LINK the options of a link of a program of this host
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
@@ -61,8 +62,8 @@ endfunction()
 # Build the two probes that anti bind wrote, run both and compare their
 # output byte for byte. include is the directory of the header.
 function(compare_probes name include)
-    run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" -o "${WORK}/probe_c"
-        "${WORK}/out/probe_${name}.c")
+    run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" ${HOST_LINK}
+        -o "${WORK}/probe_c" "${WORK}/out/probe_${name}.c")
     run("${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
         -I "${WORK}/lib" -o "${WORK}/probe_anti" "${WORK}/out/probe_${name}.anti")
     program_output(c_hex c_status "${WORK}/probe_c.out" "${WORK}/probe_c")

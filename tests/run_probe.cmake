@@ -7,13 +7,14 @@
 #   SOURCES   tests/abi
 #   WORK      a directory for the executables
 #   CC        the C compiler of the build, with its options
+#   HOST_LINK the options of a link of a program of this host
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
 
 file(MAKE_DIRECTORY "${WORK}")
-execute_process(COMMAND ${CC} ${ANTIC_C_WARNINGS} -std=c11 -o "${WORK}/probe_c"
-        "${SOURCES}/probe.c"
+execute_process(COMMAND ${CC} ${ANTIC_C_WARNINGS} -std=c11 ${HOST_LINK}
+        -o "${WORK}/probe_c" "${SOURCES}/probe.c"
     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "${CC} probe.c failed\n${err}")

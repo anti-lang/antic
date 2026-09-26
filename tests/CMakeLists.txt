@@ -1326,6 +1326,7 @@ foreach(case IN LISTS anti_bind_cases)
             "-DABI=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
             "-DCC=${anti_bind_cc}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bind-${case}"
             -DCASE=${case}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_bind.cmake")
@@ -1429,6 +1430,8 @@ set_tests_properties(publish_manifest PROPERTIES
 add_test(NAME release_dry_run
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DCC=${CMAKE_C_COMPILER}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            "-DSDK=${ANTIC_MACOS_SDK}"
             "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_dry_run.cmake")
@@ -2609,6 +2612,7 @@ if(NOT WIN32)
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe"
             "-DCC=${ANTIC_TEST_CC}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_probe.cmake")
 endif()
 
@@ -2998,6 +3002,7 @@ if(ANTIC_LLVM_AR)
                 "-DCASE=${case}"
                 "-DCC=${ANTIC_TEST_CC}"
                 "-DCXX=${ANTIC_TEST_CXX}"
+                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
                 "-DTARGET=${ANTIC_HOST_TARGET}"
                 "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")

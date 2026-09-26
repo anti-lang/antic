@@ -10,7 +10,11 @@
 # test after git add and not before.
 #
 #   cmake -DROOT=<repository> -DWORK=<dir> -DCC=<compiler>
-#         -DLLVM_BIN=<dir> -P tests/run_release_dry_run.cmake
+#         -DHOST_LINK=<options> -DSDK=<Apple SDK> -DLLVM_BIN=<dir>
+#         -P tests/run_release_dry_run.cmake
+#
+# HOST_LINK holds the options of a link of a program of this host and SDK
+# the Apple SDK of the build, which is empty on another system.
 
 if(NOT APPLE)
     message("SKIP: a release is made on the development Mac")
@@ -51,8 +55,7 @@ endfunction()
 # for that processor, because the packer checks it under Rosetta, and the
 # others are compiled for this machine. Each prints the version, which is
 # what the release script reads.
-execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE sdk
-                OUTPUT_STRIP_TRAILING_WHITESPACE ENCODING NONE)
+set(sdk "${SDK}")
 if(NOT sdk)
     message("SKIP: this machine names no macOS SDK")
     return()
@@ -62,11 +65,11 @@ foreach(program antic anti)
          "#include <stdio.h>\n"
          "int main(void) { printf(\"${program} ${version}\\n\"); return 0; }\n")
     run("the fixture ${program} did not compile"
-        "${CC}" ${ANTIC_C_WARNINGS} -O0 -isysroot "${sdk}"
+        "${CC}" ${ANTIC_C_WARNINGS} -O0 -isysroot "${sdk}" ${HOST_LINK}
         -o "${WORK}/fixture/${program}"
         "${WORK}/fixture/${program}.c")
     execute_process(COMMAND "${CC}" ${ANTIC_C_WARNINGS} -arch x86_64 -O0
-                            -isysroot "${sdk}"
+                            -isysroot "${sdk}" ${HOST_LINK}
                             -o "${WORK}/fixture/${program}-x86_64"
                             "${WORK}/fixture/${program}.c"
                     RESULT_VARIABLE failed OUTPUT_QUIET ERROR_QUIET)

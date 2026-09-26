@@ -48,3 +48,39 @@ if(NOT ANTIC_SYSTEM_COMPILER)
     set(CMAKE_C_COMPILER "${ANTIC_CLANG_DIR}/bin/clang${antic_exe}" CACHE
         FILEPATH "the pinned clang" FORCE)
 endif()
+
+# The options of a link of a host program, which the build and the test
+# scripts that link a C program on this host pass.
+# DESIGN: a Mac links its host programs with the pinned ld64.lld, as
+# tools/pack-anti.cmake links the macOS programs of a release. The
+# programs the suite tests and the ones a release ships then come from
+# one linker. Eddie decided this. Apple's ld took the -lto_library that
+# the pinned clang passes, which names a libLTO.dylib the release of
+# anti-lang/llvm-tools does not carry, and it warned at every link.
+# ld64.lld reads the libSystem.tbd of Apple's newest SDK as malformed, so
+# the build takes the pinned SDK of tools/macos-sdk-pin, as the packer
+# does.
+set(ANTIC_HOST_LINK_OPTIONS "")
+if(CMAKE_HOST_APPLE AND NOT ANTIC_SYSTEM_COMPILER)
+    execute_process(COMMAND "${CMAKE_COMMAND}"
+                            "-DPIN=${antic_root}/tools/macos-sdk-pin"
+                            -P "${antic_root}/tools/macos-sdk.cmake"
+                    OUTPUT_VARIABLE antic_sdk OUTPUT_STRIP_TRAILING_WHITESPACE
+                    ERROR_VARIABLE antic_sdk_error
+                    RESULT_VARIABLE antic_sdk_failed)
+    if(antic_sdk_failed)
+        message(FATAL_ERROR "${antic_sdk_error}")
+    endif()
+    set(CMAKE_OSX_SYSROOT "${antic_sdk}" CACHE PATH "the pinned Apple SDK"
+        FORCE)
+    set(ANTIC_HOST_LINK_OPTIONS "--ld-path=${ANTIC_LLVM_DIR}/bin/ld64.lld")
+    # The flags of the cache reach the checks of project() as well, and a
+    # tree configured before keeps no other linker.
+    foreach(kind EXE SHARED MODULE)
+        string(REGEX REPLACE "--ld-path=[^ ]*" "" antic_flags
+               "${CMAKE_${kind}_LINKER_FLAGS}")
+        string(STRIP "${ANTIC_HOST_LINK_OPTIONS} ${antic_flags}" antic_flags)
+        set(CMAKE_${kind}_LINKER_FLAGS "${antic_flags}" CACHE STRING
+            "Flags of the linker" FORCE)
+    endforeach()
+endif()

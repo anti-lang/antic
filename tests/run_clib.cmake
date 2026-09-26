@@ -12,6 +12,7 @@
 #             classes, failing, tuples, flags, ledger, variants, nested,
 #             names, handlers, generics or optional
 #   CC        the C compiler of the build, with its options
+#   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
 #   LLVM_OBJDUMP  llvm-objdump, which lists the symbols of the runtime
@@ -25,7 +26,7 @@ set(STATIC_SUFFIX ".a")
 set(HOST_SHARED_SUFFIX ".so")
 set(EXE "")
 set(DRIVER cc)
-set(LINK "")
+set(LINK ${HOST_LINK})
 set(TARGET_OPTION "")
 if("${TARGET}" MATCHES "^windows-")
     set(PREFIX "")
@@ -169,7 +170,7 @@ elseif(CASE STREQUAL "classes")
             "${dir}/canvas.cpp")
     else()
         run(${CXX} -std=c++17 -I "${dir}" -I "${SOURCES}" "${dir}/canvas.cpp"
-            "${library_file}" "${runtime_library}" -o "${dir}/canvaspp")
+            "${library_file}" "${runtime_library}" ${LINK} -o "${dir}/canvaspp")
         expect_output("${dir}/canvaspp" "${SOURCES}/canvas.expected")
     endif()
 elseif(CASE STREQUAL "failing")
@@ -401,7 +402,8 @@ elseif(CASE STREQUAL "bundle")
     # One of the duplicates is a symbol that the runtime library defines,
     # and not only one that antic writes into the library object. Every
     # linker spells a duplicate its own way, and llvm-objdump lists a
-    # definition of COFF, ELF and Mach-O each its own way.
+    # definition of COFF, ELF and Mach-O each its own way. ld64.lld names
+    # a Mach-O symbol without the underscore that llvm-objdump prints.
     file(GLOB runtime_libraries "${RUNTIME}/lib/${TARGET}/*/${RUNTIME_LIBRARY}")
     list(GET runtime_libraries 0 runtime_library)
     set(linked "${out}${err}")
@@ -413,7 +415,7 @@ elseif(CASE STREQUAL "bundle")
     foreach(item IN LISTS reported)
         string(REGEX REPLACE "^${spelled}" "" name "${item}")
         string(REGEX REPLACE "([][+.*()^$?|\\])" "\\\\\\1" pattern "${name}")
-        if(defined MATCHES "(\\(sec +[1-9][0-9]*\\)\\(fl 0x[0-9a-f]+\\)\\(ty +[0-9a-f]+\\)\\(scl +2\\) \\(nx [0-9]+\\) 0x[0-9a-f]+ |\n[0-9a-f]+ g [^\n]*[ \t])${pattern}\r?\n")
+        if(defined MATCHES "(\\(sec +[1-9][0-9]*\\)\\(fl 0x[0-9a-f]+\\)\\(ty +[0-9a-f]+\\)\\(scl +2\\) \\(nx [0-9]+\\) 0x[0-9a-f]+ |\n[0-9a-f]+ g [^\n]*[ \t])_?${pattern}\r?\n")
             set(runtime_duplicate "${name}")
             break()
         endif()
