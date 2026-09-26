@@ -111,6 +111,11 @@ endfunction()
 # absolute link under <root> becomes the relative link to the same path
 # inside <root>. A host that cannot write a link, as Windows may not, gets
 # a copy of the file instead.
+# Only a path of the package's own system, which starts with `/`, is such
+# a link. The sysroot of a Windows target over the Build Tools is made of
+# junctions to C:/Program Files, which CMake reads as absolute links, and
+# they stay. Windows follows no link written with `/`, so a Windows host
+# writes the relative link with its own separator.
 function(relative_links root)
     file(GLOB_RECURSE entries LIST_DIRECTORIES true "${root}/*")
     foreach(entry IN LISTS entries)
@@ -118,11 +123,14 @@ function(relative_links root)
             continue()
         endif()
         file(READ_SYMLINK "${entry}" destination)
-        if(NOT IS_ABSOLUTE "${destination}")
+        if(NOT destination MATCHES "^/")
             continue()
         endif()
         get_filename_component(directory "${entry}" DIRECTORY)
         file(RELATIVE_PATH relative "${directory}" "${root}${destination}")
+        if(CMAKE_HOST_WIN32)
+            file(TO_NATIVE_PATH "${relative}" relative)
+        endif()
         file(REMOVE "${entry}")
         file(CREATE_LINK "${relative}" "${entry}" RESULT failed SYMBOLIC)
         if(failed AND EXISTS "${root}${destination}" AND
