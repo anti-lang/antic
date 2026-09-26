@@ -333,43 +333,48 @@ about structs, enums, classes, interfaces and errors lives there, and
 ### Warnings
 
 - Our own code compiles with warnings as errors everywhere. That is antic, anti, the
-  runtime and the glue around the native libraries. It is also the tests and whatever the
-  packer and the release script build. A part of our code built without it is a gap to close. Eddie decided this.
+  runtime and the glue around the native libraries. It is also the tests and whatever
+  the packer and the release script build. A part of our code built without it is a gap
+  to close. Eddie decided this.
 - A warning is fixed by changing the code so it is correct. No pragma, no `-Wno-` flag
   and no cast or `(void)` whose only purpose is to hide it. A warning that is genuinely
-  wrong is silenced at its one line, with a comment giving the reason. Eddie decided this.
+  wrong is silenced at its one line, with a comment giving the reason. Eddie decided
+  this.
 - The third-party sources in `src/native/` compile with the warning flags of their own
   projects, not ours, and are never patched to silence a warning. The glue around them
   stays under our flags. Eddie decided this.
-- [provisional] The flags stand in two files. `tools/warnings.cmake` holds
-  `ANTIC_C_WARNINGS`, `ANTIC_CXX_WARNINGS` for the C++ files of the tests and
-  `ANTIC_MSVC_WARNINGS`. `src/native/warnings.cmake` holds the set of each third-party
-  project. The build, the packer and every test script that compiles C read them, and the
-  test `warning_set` refuses a warning flag, `-w` or a definition that turns warnings off
-  anywhere else. Reason: the cross builds of anti_rt and the packer carried three
+- The flags stand in two files. `tools/warnings.cmake` holds `ANTIC_C_WARNINGS`,
+  `ANTIC_CXX_WARNINGS` for the C++ files of the tests and `ANTIC_MSVC_WARNINGS`.
+  `src/native/warnings.cmake` holds the set of each third-party project. The build, the
+  packer and every test script that compiles C read them, and the test `warning_set`
+  refuses a warning flag, `-w` or a definition that turns warnings off anywhere else.
+  Eddie accepted this. Reason: the cross builds of anti_rt and the packer carried three
   warnings fewer than the host build, and a Mac builds its runtime from the cross build
   alone, so `-Wshadow` never read the runtime of a macOS program.
-- [provisional] Where a third-party project has a Makefile and a CMake build, its flags
-  are those of the Makefile. PCRE2 and SQLite take none, since neither of PCRE2's builds
-  adds a warning flag unless asked and sqlite.org compiles the amalgamation with none.
-  Mbed TLS takes `WARNING_CFLAGS` of `library/Makefile`, miniaudio the flags of its one
+- Where a third-party project has a Makefile and a CMake build, its flags are those of
+  the Makefile. PCRE2 and SQLite take none, since neither of PCRE2's builds adds a
+  warning flag unless asked and sqlite.org compiles the amalgamation with none. Mbed TLS
+  takes `WARNING_CFLAGS` of `library/Makefile`, miniaudio the flags of its one
   `CMakeLists.txt` and raylib the warnings of `src/Makefile`. raylib keeps the two
   definitions of its CMake build that turn off a system's deprecations,
   `_CRT_SECURE_NO_WARNINGS` for the C runtime of MSVC and `GL_SILENCE_DEPRECATION` on
-  macOS. Reason: the Makefile is the build of a static library of the release, and a
-  choice per project keeps the five alike. Only raylib warns, 67 times for unused
-  functions of its bundled stb and m3d headers on the two Windows targets.
-- [provisional] A compile of our code includes a third-party header as a system header,
-  with `-isystem`, so the header is read under its project's rules and our code under
-  ours. The test `anti_bind_clang` does the same for `tests/bind/layout.h`, which stands
-  in for the header of a C library and holds an enum above `INT_MAX` on purpose. Reason:
-  `sqlite3.h` raises `-Wlanguage-extension-token` on Windows, and the header is not ours
-  to change.
-- [provisional] antic and anti open a file and read the environment through
-  `src/antic/platform.c`, the platform layer that rule 22 names for the tools. On Windows
-  it calls `_fsopen` with `_SH_DENYNO` and `_dupenv_s`, which behave as `fopen` and
-  `getenv` do there, and no build defines `_CRT_SECURE_NO_WARNINGS`. The C test programs
-  call it as well. Reason: the C runtime of Microsoft deprecates `fopen` and `getenv`, and
+  macOS. Eddie accepted this. Reason: the Makefile is the build of a static library of
+  the release, and a choice per project keeps the five alike. Only raylib warns, 67
+  times for unused functions of its bundled stb and m3d headers on the two Windows
+  targets.
+- A compile of our code includes a third-party header as a system header, with
+  `-isystem`. The header is then read under its project's rules and our code under ours.
+  Eddie accepted this. Reason: `sqlite3.h` raises `-Wlanguage-extension-token` on
+  Windows, and the header is not ours to change.
+- `tests/bind/layout.h` is ours and is included as any header of ours. Its enum
+  `LayoutWide` holds a value above `INT_MAX` on purpose. A pragma push and pop silences
+  the warning of C11 at that one line, with a comment giving the reason. Eddie decided
+  this.
+- antic and anti open a file and read the environment through `src/antic/platform.c`,
+  the platform layer that rule 22 names for the tools. On Windows it calls `_fsopen`
+  with `_SH_DENYNO` and `_dupenv_s`, which behave as `fopen` and `getenv` do there, and
+  no build defines `_CRT_SECURE_NO_WARNINGS`. The C test programs call it as well. Eddie
+  accepted this. Reason: the C runtime of Microsoft deprecates `fopen` and `getenv`, and
   the definition hid the warnings of every file at once.
 
 ### PCRE2
@@ -1070,7 +1075,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The suite's macos-x86_64 programs, which a macos-arm64 host runs under Rosetta, compile with `--cpu v1` and link the archive's v1 runtime. Reason: Rosetta has no AVX2 and runs no program of the default level. With a runtime per level those 85 programs need nothing of their own.
 - The vector byte cap is one constant of the level table, `CPU_VECTOR_BYTE_CAP`, 256 today. The checker reads it for the size of a simd struct. Reason: the section calls it a constant in the level table, and `Simd structs` gives 256 bytes to start. The size of a `simd struct` is what it caps, not the width of a register.
 - `anti build --cpu <level>` forwards the level to `antic`, and `docs/tooling.md` holds the rule. `src/anti/build.c` passes it to every call of a target, and a level of another architecture is refused by name.
-- `tools/docs-style/check_docs.py` is not run on CMake files. It covers prose and code comments, and it reads a CMake comment as a heading and a `foreach` line as prose. A CMake comment follows the comment rules by hand. Reason: the checker has no CMake mode, and 105 findings in one file drown the ones that mean something.
+- `tools/docs-style/check_docs.py` checks Markdown documents, `.md` files, and nothing else. A file of any other kind is not read, named or found in a directory. The data files under `docs/audit/data/` are tool output and stay exactly as the tools wrote them. CMake files and source code are code: their comments follow the docs-style rules for comments, but they are not run through the checker. Over `docs/` the checker reports nothing and exits 0.
 - The archive compiles the runtime eighteen times, three levels for each of six targets. Reason: it runs once per runtime archive build, which is a release-day job, and the archive caches the result by target and level.
 
 ## Builds of a host and builds of a release
@@ -1094,6 +1099,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - Step 4 checks the CodeView record of every Windows executable before its PDB goes into an archive, with `tools/check-pdb.cmake`. The record has to name the PDB by file name alone. Its GUID has to be the GUID that the PDB carries in its info stream. Reason: the GUID is what ties a shipped program to the symbols of its own build. An archive whose PDB belongs to another link is worse than no archive. A record that holds a path holds the path of the machine that linked it. The test `pdb_guid` runs the same script over a program antic linked for both Windows targets, with `-g` and without it.
 - A release links its macOS binaries against a pinned Apple SDK. `tools/macos-sdk-pin` names the version, the directory name and the SHA-256 of `usr/lib/libSystem.tbd` of that SDK, and `tools/macos-sdk.cmake` resolves it by version through the Command Line Tools. The packer includes that file and never calls a bare `xcrun --show-sdk-path`. It refuses an SDK that is absent, naming the version to install, and one whose `libSystem.tbd` does not match the digest. Reason: a bare `xcrun` follows whatever Xcode is installed. Xcode brought macOS SDK 27.0 on 2026-09-20, whose `libSystem.tbd` names the target `arm64e.x1-macos`. The pinned ld64.lld read that file as malformed and left every symbol of libSystem undefined, and step 3 stopped at "macos-arm64: antic did not link". The digest is there because a version alone does not see an SDK that changed under its own name. The test `macos_sdk` reads the pin, links both macOS targets against the SDK and refuses a substituted `libSystem.tbd`.
 - `MACOS_SDK_VERSION` moves only as a deliberate step, together with the pinned LLVM. Reason: the SDK the pin can name is bounded by what the pinned ld64.lld parses, and 27.0 is already past it. `docs/toolchain-later.md` holds what the day of that bump needs. `APPLE_SDK` of `tools/get-sysroot.cmake` and `anti sdk export` are unchanged, because both take a real SDK by path and neither is in the release path.
+- A Mac links its host programs with the pinned ld64.lld, as the packer links the macOS programs of a release. The build and every test script that links a C program on the Mac pass `ANTIC_HOST_LINK_OPTIONS` of `tools/pinned-compiler.cmake`, and the build takes the SDK of `tools/macos-sdk-pin` as `CMAKE_OSX_SYSROOT`. The Mac's test builds and its shipped programs then come from one pinned linker. Eddie decided this. Reason: the pinned clang passes `-lto_library` with a `libLTO.dylib` that the release of `anti-lang/llvm-tools` does not carry, and Apple's `ld` warned at every host link. ld64.lld reads the SDK of the newest Xcode as malformed, so the pinned SDK comes with it. A build with `-DANTIC_SYSTEM_COMPILER=ON` keeps the linker and the SDK of Apple's toolchain.
 - A release carries one manifest. The packer writes `SHA256SUMS` beside the packages. Step 4 adds the line of each symbols archive to it, and step 6 signs that file in place into `SHA256SUMS.sig`. The packages, the symbols archives and `SHA256SUMS` are assets of the GitHub release of the tag. anti-lang.com serves `SHA256SUMS.sig` and the public key alone, as the split under "Build tool and distribution" decides. The earlier wording of this entry put the packages and the signature together in a version directory of a download area, and the split supersedes it. Reason: the file a user verifies is then the file the key signed. A second manifest over a subset would be the one the installers read and the one no signature covered.
 - An uninstaller removes a directory only when it holds the marker that the installer wrote, `.anti-install` of the data directory. It removes the two executables of the bin directory and nothing else there. `ANTI_HOME` names another tree, and the marker is checked there as well. Reason: the uninstallers took whatever `ANTI_HOME` named and removed it whole. A variable left over from another run, or a data directory a user shares with something else, would take its siblings with it. The marker is one file, and a tree without it was not written by the installer.
 - The two installers read `SHA256SUMS.sig` from anti-lang.com before they trust a line of the `SHA256SUMS` of the GitHub release, with the public key each of them carries, on macOS, on Linux and on Windows. The key is the carried one and never one fetched beside the signature. A signature that is missing, or that covers another manifest, stops the install. A signature that stands on the release beside the binaries is not read at all, which the test `installer_github` holds. openssl makes the check, and an installer that finds no openssl stops as well. Reason: the digest of a download proves nothing on its own, because whoever serves the package serves the manifest beside it. The LLVM tools are the other case, and a missing openssl only warns there, since `tools/llvm-pin` of the package carries their digest too.

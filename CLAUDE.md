@@ -50,19 +50,22 @@ without asking Eddie.
   silence a warning. Our glue code around them stays under our flags. See
   "Warnings" in `docs/c-guidelines.md`.
 - A commit that changes only files under `docs/`, or `CLAUDE.md`, `README.md`
-  or `CHANGELOG.md`, runs the docs-style checker and nothing else. That covers
-  reports and notes. Prose is prose wherever it sits. A push made only of such
-  commits needs no suite.
+  or `CHANGELOG.md`, runs the docs-style checker over its `.md` files and
+  nothing else. That covers reports and notes. Prose is prose wherever it
+  sits. A push made only of such commits needs no suite.
 - A commit that changes anything else runs the full suite on the host first.
   A push that includes such a commit runs both sanitizer suites first, once
   per push and not once per commit. `cmake --preset asan` and `cmake --preset
   ubsan`, each with the full suite. UndefinedBehaviorSanitizer found a real
   defect on its first run here, a `bool` field read as 64 that the ordinary
   build passed over.
-- Every comment and every `.md` file follows the docs-style rules. Run
-  `python3 tools/docs-style/check_docs.py <files>` before committing, and fix
-  every finding. The copy under `tools/` is pinned on purpose, so the rules do
-  not change when the skill it came from syncs.
+- Every comment and every `.md` file follows the docs-style rules. The checker
+  reads `.md` files alone. Run `python3 tools/docs-style/check_docs.py <files>`
+  on the `.md` files before committing, read its exit status without a pipe,
+  and fix every finding. Comments in source and CMake files follow the rules
+  for comments without the checker. The tool output under `docs/audit/data/`
+  stays as the tools wrote it. The copy under `tools/` is pinned on purpose, so
+  the rules do not change when the skill it came from syncs.
 - No workflow runs. Every workflow stays `workflow_dispatch` only, which the
   test `workflows_dispatch_only` checks. Hosted build minutes are limited.
 - One commit per logical change. Push to `origin/main` directly, no pull

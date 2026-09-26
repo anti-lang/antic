@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Flag AI writing patterns in comments, docstrings, and markdown files.
+"""Flag AI writing patterns in Markdown documents, the `.md` files.
+
+A file of any other kind, named or found in a directory, is not read.
 
 Usage:
     python3 check_docs.py FILE [FILE ...]
-    python3 check_docs.py --strict src/ docs/
+    python3 check_docs.py --strict docs/
 
 Exit code 0 means no errors. Exit code 1 means at least one error.
 Add "docs-style:ignore" to a line to skip that line.
@@ -112,24 +114,6 @@ DOCSTRING_OPENERS = re.compile(
     re.IGNORECASE,
 )
 
-BANNER = re.compile(r"(#|//|--)\s*[=*#/_~-]{6,}")
-# Match commented-out code without matching English prose. A bare keyword is
-# not enough, because sentences start with "for", "from", "while" and "return".
-# Every branch also demands a syntactic mark that prose does not carry.
-COMMENTED_CODE = re.compile(
-    r"^\s*(?:#|//)\s*(?:"
-    r"(?:def|class|function)\s+\w+\s*[({:]"                 # def f( / class C:
-    r"|import\s+[\w.]+\s*$"                                 # import os
-    r"|from\s+[\w.]+\s+import\b"                           # from x import y
-    r"|(?:if|elif|for|while|switch|else|try|except|finally|with)\b[^?]*[:{]\s*$"
-    r"|(?:return|yield|raise|throw|delete|await)\b[^?]*[)\]};]\s*$"
-    r"|(?:return|yield)\s+[\w.\[\]\"']+\s*$"
-    r"|(?:const|let|var)\s+\w+\s*="                         # const x =
-    r"|(?:public|private|protected)\s+[\w<>\[\].]+\s+\w+\s*[({;]"
-    r"|[\w.\[\]\"\']+\s*(?:\+|-|\*|/|//|%|\|\||&&)?=[^=]\s*\S"   # x = 1, x += 1
-    r"|\w[\w.]*\([^)]*\)\s*[;{]?\s*$"                     # foo(a, b);
-    r")"
-)
 CAPS_RUN = re.compile(r"\b([A-Z]{3,}\b[ ]+){2,}[A-Z]{3,}\b")
 CAPS_ALLOW = {"TODO", "FIXME", "HACK", "NOTE", "SAFETY", "WARNING", "XXX", "BUG"}
 TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
@@ -137,26 +121,11 @@ TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 MAX_SENTENCE_WORDS = 25
 MAX_HEADING_DEPTH = 3
 
-LINE_COMMENT = {
-    ".py": "#", ".sh": "#", ".bash": "#", ".zsh": "#", ".rb": "#", ".pl": "#",
-    ".r": "#", ".yaml": "#", ".yml": "#", ".toml": "#", ".tf": "#", ".mk": "#",
-    ".js": "//", ".jsx": "//", ".ts": "//", ".tsx": "//", ".java": "//", ".c": "//",
-    ".h": "//", ".cpp": "//", ".hpp": "//", ".cs": "//", ".go": "//", ".rs": "//",
-    ".swift": "//", ".kt": "//", ".scala": "//", ".php": "//", ".dart": "//",
-    ".sql": "--", ".lua": "--", ".hs": "--",
-}
-BLOCK_COMMENT = {
-    ".py": [('"""', '"""'), ("'''", "'''")],
-    ".js": [("/*", "*/")], ".jsx": [("/*", "*/")], ".ts": [("/*", "*/")],
-    ".tsx": [("/*", "*/")], ".java": [("/*", "*/")], ".c": [("/*", "*/")],
-    ".h": [("/*", "*/")], ".cpp": [("/*", "*/")], ".hpp": [("/*", "*/")],
-    ".cs": [("/*", "*/")], ".go": [("/*", "*/")], ".rs": [("/*", "*/")],
-    ".swift": [("/*", "*/")], ".kt": [("/*", "*/")], ".scala": [("/*", "*/")],
-    ".php": [("/*", "*/")], ".dart": [("/*", "*/")], ".css": [("/*", "*/")],
-    ".scss": [("/*", "*/")], ".html": [("<!--", "-->")], ".xml": [("<!--", "-->")],
-    ".vue": [("<!--", "-->")], ".svelte": [("<!--", "-->")],
-}
-MARKDOWN_EXT = {".md", ".markdown", ".mdx", ".rst", ".txt"}
+# DESIGN: the checker reads Markdown documents, `.md` files, and nothing
+# else. Tool output such as the data of the audit stays as the tools wrote
+# it. The comments of source and CMake files follow the rules for comments
+# without this checker.
+MARKDOWN_EXT = {".md"}
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
              ".next", "target", "vendor", ".tox", ".mypy_cache"}
 
@@ -340,105 +309,9 @@ def check_markdown(path, lines, findings):
     flush()
 
 
-def script_metadata_lines(lines):
-    """Return line numbers inside a PEP 723 inline script metadata block."""
-    inside = False
-    out = set()
-    for i, raw in enumerate(lines, start=1):
-        stripped = raw.strip()
-        if not inside and re.match(r"^#\s*///\s*\w+", stripped):
-            inside = True
-            out.add(i)
-            continue
-        if inside:
-            out.add(i)
-            if re.match(r"^#\s*///\s*$", stripped):
-                inside = False
-    return out
-
-
-def extract_comments(path, lines, ext):
-    """Return (lineno, text) pairs for every comment and docstring in a source file."""
-    marker = LINE_COMMENT.get(ext)
-    blocks = BLOCK_COMMENT.get(ext, [])
-    out = []
-    open_block = None
-    metadata = script_metadata_lines(lines)
-    for i, raw in enumerate(lines, start=1):
-        # PEP 723 metadata is TOML, not prose.
-        if i in metadata:
-            continue
-        # A shebang is an interpreter directive, not prose. It is only valid on
-        # line 1, and it cannot carry a docs-style:ignore, because the kernel
-        # would pass the comment to the interpreter as part of its name.
-        if i == 1 and raw.startswith("#!"):
-            continue
-        text = raw
-        if open_block:
-            end = text.find(open_block)
-            if end >= 0:
-                out.append((i, text[:end]))
-                open_block = None
-            else:
-                out.append((i, text))
-            continue
-        matched = False
-        for start, end in blocks:
-            idx = text.find(start)
-            if idx >= 0:
-                rest = text[idx + len(start):]
-                close = rest.find(end)
-                if close >= 0:
-                    out.append((i, rest[:close]))
-                else:
-                    out.append((i, rest))
-                    open_block = end
-                matched = True
-                break
-        if matched:
-            continue
-        if marker:
-            idx = text.find(marker)
-            if idx >= 0 and text[:idx].count('"') % 2 == 0:
-                out.append((i, text[idx + len(marker):]))
-    return out
-
-
-def check_source(path, lines, ext, findings):
-    metadata = script_metadata_lines(lines)
-    for i, raw in enumerate(lines, start=1):
-        if i in metadata:
-            continue
-        if BANNER.search(raw):
-            findings.append(Finding(path, i, "error", "banner",
-                                    "banner comment. Delete it."))
-        if COMMENTED_CODE.match(raw):
-            findings.append(Finding(path, i, "error", "dead-code",
-                                    "commented-out code. Git holds the history."))
-        if re.search(r"(#|//)\s*(TODO|FIXME|HACK)\b(?!\s*\()", raw):
-            findings.append(Finding(path, i, "warning", "todo",
-                                    "TODO without an owner. Use TODO(name): reason."))
-    comments = extract_comments(path, lines, ext)
-    block = []
-    block_start = 0
-    previous = -2
-    for lineno, text in comments:
-        if text.strip():
-            check_text_line(path, lineno, text, findings)
-        if lineno != previous + 1 or not text.strip():
-            if block:
-                check_sentence_length(path, block_start, block, findings)
-            block = []
-        if text.strip():
-            if not block:
-                block_start = lineno
-            block.append(text)
-        previous = lineno
-    if block:
-        check_sentence_length(path, block_start, block, findings)
-
-
 def check_file(path, findings):
+    if os.path.splitext(path)[1].lower() not in MARKDOWN_EXT:
+        return
     try:
         with open(path, encoding="utf-8", errors="replace") as handle:
             lines = handle.read().splitlines()
@@ -447,11 +320,7 @@ def check_file(path, findings):
         return
     if any("docs-style:ignore-file" in line for line in lines[:10]):
         return
-    ext = os.path.splitext(path)[1].lower()
-    if ext in MARKDOWN_EXT:
-        check_markdown(path, lines, findings)
-    elif ext in LINE_COMMENT or ext in BLOCK_COMMENT:
-        check_source(path, lines, ext, findings)
+    check_markdown(path, lines, findings)
 
 
 def collect(targets):
@@ -464,7 +333,7 @@ def collect(targets):
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
             for name in sorted(files):
                 ext = os.path.splitext(name)[1].lower()
-                if ext in MARKDOWN_EXT or ext in LINE_COMMENT or ext in BLOCK_COMMENT:
+                if ext in MARKDOWN_EXT:
                     paths.append(os.path.join(root, name))
     return paths
 
