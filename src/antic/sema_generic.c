@@ -541,6 +541,9 @@ static bool meets_hook(struct checker *c, struct type *t, const char *hook)
         strcmp(hook, LANG_HOOK_SET_INDEX) == 0) {
         return sema_hook(c, t, hook) != NULL;
     }
+    if (t->kind == TYPE_ARRAY && strcmp(hook, LANG_HOOK_EQ) == 0) {
+        return sema_default_eq(c, t);
+    }
     if (type_has_fields(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
         return sema_operator_symbol(c, t, hook) != NULL ||
                (strcmp(hook, LANG_HOOK_EQ) == 0 && sema_default_eq(c, t));

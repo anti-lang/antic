@@ -1,0 +1,48 @@
+//! `a == b` on two arrays of the same type compares them element by element,
+//! through every level of the array, as inside a struct. An element with
+//! `operator fn eq` goes through it, and a generic takes an array where its
+//! constraints give `eq`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A name equal to another of the same length.
+struct Name
+{
+	text: str,
+}
+
+operator fn eq(a: Name, b: Name) -> bool
+{
+	return a.text.len == b.text.len;
+}
+
+fn same<T: eq>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let x: [3]int = [1, 2, 3];
+	let y: [3]int = [1, 2, 3];
+	let z: [3]int = [1, 2, 4];
+	printf("ints %d %d %d %d\n".ptr, b(x == y), b(x == z), b(x != z),
+		b(same(x, y)));
+	let g: [2][2]int = [[1, 2], [3, 4]];
+	let h: [2][2]int = [[1, 2], [3, 4]];
+	let k: [2][2]int = [[1, 2], [4, 3]];
+	printf("grid %d %d\n".ptr, b(g == h), b(g == k));
+	let n: [2]Name = [Name { text: "ab" }, Name { text: "c" }];
+	let m: [2]Name = [Name { text: "xy" }, Name { text: "z" }];
+	let o: [2]Name = [Name { text: "x" }, Name { text: "z" }];
+	printf("names %d %d\n".ptr, b(n == m), b(n == o));
+	let s: [2]str = ["one", "two"];
+	let t: [2]str = ["one", "two"];
+	printf("texts %d\n".ptr, b(s == t));
+	return 0;
+}

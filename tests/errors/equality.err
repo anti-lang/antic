@@ -4,7 +4,8 @@ equality.anti:71:9: error: `==` is not defined on `Buffer`, whose field `data` h
 equality.anti:76:9: error: `!=` is not defined on `Word`
 equality.anti:81:9: error: `==` is not defined on `Holder`, whose field `word` has no `eq`
 equality.anti:91:9: error: `==` is not defined on `([2]f16, int)`
-equality.anti:96:9: error: `==` is not defined on `Held`
-equality.anti:101:9: error: `==` is not defined on `?[]int`
-equality.anti:107:10: error: `Point` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
-equality.anti:109:10: error: `Circle` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
+equality.anti:96:9: error: `==` is not defined on `[2]f16`
+equality.anti:101:9: error: `==` is not defined on `Held`
+equality.anti:106:9: error: `==` is not defined on `?[]int`
+equality.anti:112:10: error: `Point` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
+equality.anti:114:10: error: `Circle` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`

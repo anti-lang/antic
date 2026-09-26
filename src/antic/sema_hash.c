@@ -411,8 +411,8 @@ const struct struct_field *sema_class_gap(const struct type *t)
    `Object` walks every other field as this default does. A tuple, a
    variant and a `?T` have it when every part has `==`: a tuple part by
    part, a variant by its case and then the fields of that case, a `?T`
-   by its flag and then the value it holds. An array part compares
-   element by element. */
+   by its flag and then the value it holds. An array compares element by
+   element through every level of it, alone as well as as a part. */
 bool sema_default_eq(struct checker *c, struct type *t)
 {
     size_t i;
@@ -434,6 +434,8 @@ bool sema_default_eq(struct checker *c, struct type *t)
         return true;
     case TYPE_OPTIONAL:
         return sema_meets_hook(c, t->element, LANG_HOOK_EQ);
+    case TYPE_ARRAY:
+        return part_has_eq(c, t->element);
     default:
         return false;
     }

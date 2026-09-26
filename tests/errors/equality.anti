@@ -3,8 +3,8 @@
 //! needed declares `operator fn lt`, and the refusal says so. A struct with a
 //! field that has no `==` gets no default and the refusal names the field. A
 //! union gets none. A class that holds one gets none unless it replaces
-//! `equals`, and the refusal names the field. A tuple, a variant or a `?T` with
-//! a part that has no `==` gets none either.
+//! `equals`, and the refusal names the field. A tuple, a variant, a `?T` or an
+//! array with a part that has no `==` gets none either.
 
 struct Point
 {
@@ -87,6 +87,11 @@ fn replaced(a: Replaced, b: Replaced) -> bool
 }
 
 fn tuples(a: ([2]f16, int), b: ([2]f16, int)) -> bool
+{
+	return a == b;
+}
+
+fn halves(a: [2]f16, b: [2]f16) -> bool
 {
 	return a == b;
 }
