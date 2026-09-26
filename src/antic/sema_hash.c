@@ -271,6 +271,14 @@ static void walk_eq(struct checker *c, struct expr *e, struct type *t)
     }
 }
 
+/* Whether a part of type t of a struct, a tuple or a variant has `==`. A
+   slice part has it and compares as the view it is, by its address and
+   its length. */
+static bool part_has_eq(struct checker *c, struct type *t)
+{
+    return t->kind == TYPE_SLICE || sema_meets_hook(c, t, LANG_HOOK_EQ);
+}
+
 const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
 {
     size_t i;
@@ -280,7 +288,7 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
         if (type_field_is_unit_break(f) || types_is_mutex(f->type)) {
             continue;
         }
-        if (!sema_meets_hook(c, f->type, LANG_HOOK_EQ)) {
+        if (!part_has_eq(c, f->type)) {
             return f;
         }
     }

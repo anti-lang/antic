@@ -9,7 +9,8 @@
    no `operator fn eq` of a later part runs. Each part compares as its
    own `==` does: a number by its value, which makes zero of either sign
    one value and NaN equal to nothing, a `str` by its bytes, a pointer by
-   its address and a function by its code. A part with `operator fn eq`
+   its address and a function by its code. A slice part compares by its
+   address and its length, as the default hash takes it. A part with `operator fn eq`
    goes through that function, a class value through the `equals` of its
    chain, and any other struct part through its fields. */
 
@@ -145,6 +146,18 @@ static void compare_at(struct lowerer *l, const struct expr *e,
     case TYPE_STR:
         require(l, cmp, lower_compare_text(l, TOKEN_EQ, t, a, b));
         return;
+    case TYPE_SLICE: {
+        /* A slice part compares as the view it is: its address and its
+           length. */
+        struct ir_operand x = lower_temp(l, ir_load(l->f, l->b, IR_PTR, a));
+        struct ir_operand y = lower_temp(l, ir_load(l->f, l->b, IR_PTR, b));
+        require(l, cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, x,
+                                                y)));
+        require(l, cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
+                                                lower_slice_length(l, a, t),
+                                                lower_slice_length(l, b, t))));
+        return;
+    }
     case TYPE_FN: {
         /* A function with its context compares by its code. */
         struct ir_operand x = lower_temp(l, ir_load(l->f, l->b, IR_PTR, a));

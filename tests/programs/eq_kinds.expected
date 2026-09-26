@@ -1,0 +1,4 @@
+exit 0
+str 1 0 1 0
+own 1 0 1 0
+struct 1 0 1 0

@@ -79,6 +79,18 @@ static struct ir_operand float_bits(struct lowerer *l, struct ir_operand v,
     return binary(l, IR_AND, bits, mask);
 }
 
+/* The hash of the pointer v. A pointer has no conversion to an integer
+   in the IR, so its word goes through a slot. Every target has pointers
+   of 64 bits. */
+static struct ir_operand hash_address(struct lowerer *l, struct ir_operand v)
+{
+    struct ir_vtype of = {IR_PTR, IR_NO_AGG};
+    struct ir_operand slot = lower_temp(l, ir_entry_slot(l->f, of));
+
+    ir_store(l->f, l->b, IR_PTR, v, slot);
+    return mix(l, lower_temp(l, ir_load(l->f, l->b, IR_I64, slot)));
+}
+
 /* The hash of the scalar v of type t. */
 static struct ir_operand hash_value(struct lowerer *l, struct ir_operand v,
                                     const struct type *t)
@@ -93,13 +105,8 @@ static struct ir_operand hash_value(struct lowerer *l, struct ir_operand v,
     if (type == IR_F32 || type == IR_F64) {
         return mix(l, float_bits(l, v, type));
     }
-    /* A pointer has no conversion to an integer in the IR, so its word
-       goes through a slot. Every target has pointers of 64 bits. */
     if (type == IR_PTR) {
-        struct ir_vtype of = {IR_PTR, IR_NO_AGG};
-        struct ir_operand slot = lower_temp(l, ir_entry_slot(l->f, of));
-        ir_store(l->f, l->b, IR_PTR, v, slot);
-        return mix(l, lower_temp(l, ir_load(l->f, l->b, IR_I64, slot)));
+        return hash_address(l, v);
     }
     if (type != IR_I64) {
         v = lower_temp(l, ir_unary(l->f, l->b,
@@ -230,8 +237,21 @@ static struct ir_operand class_hash(struct lowerer *l, struct ir_operand at,
     return lower_rt_call(l, RUNTIME_ROOT "hash", IR_I64, params, &at, 1);
 }
 
+/* The hash of a slice part of type t at at. It takes the address and the
+   length, the view the slice is, and not the elements it sees. */
+static struct ir_operand hash_view(struct lowerer *l, struct ir_operand at,
+                                   const struct type *t)
+{
+    struct ir_operand p = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+    struct ir_operand h =
+        combine(l, i64(ANTI_HASH_START), hash_address(l, p));
+
+    return combine(l, h, mix(l, lower_slice_length(l, at, t)));
+}
+
 /* The fields of the struct or tuple t at at, taken into h in order. A
-   unit break holds no value, and a Mutex is no part of a value. */
+   unit break holds no value, and a Mutex is no part of a value. A slice
+   part hashes as the view it is, as the default `==` compares it. */
 static struct ir_operand hash_fields(struct lowerer *l, const struct expr *call,
                                      struct ir_operand at, const struct type *t,
                                      struct ir_operand h)
@@ -258,7 +278,9 @@ static struct ir_operand hash_fields(struct lowerer *l, const struct expr *call,
                        : ir_sym_operand(l->m, ir_sym_offset_of(l->m, agg,
                                                                (uint32_t)i));
             struct ir_operand field = lower_offset_address(l, at, offset);
-            part = hash_at(l, call, field, f->type);
+            part = f->type->kind == TYPE_SLICE
+                       ? hash_view(l, field, f->type)
+                       : hash_at(l, call, field, f->type);
         }
         h = combine(l, h, part);
     }

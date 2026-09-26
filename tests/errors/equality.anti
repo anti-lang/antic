@@ -11,7 +11,7 @@ struct Point
 
 struct Buffer
 {
-	data: []int,
+	data: [4]int,
 }
 
 union Word

@@ -1,0 +1,80 @@
+//! The default `==` and `hash` take each field by its kind, so the two agree. A
+//! `str` compares and hashes by its bytes, an `own` slice element by element
+//! and a plain slice or a pointer by address. The `equals` and `hash` of
+//! `Object` follow the rule for a class, and the default of a struct follows it
+//! as well.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Named
+{
+	pub name: str = "",
+	pub count: int = 0,
+}
+
+class Held
+{
+	pub own items: []int,
+	pub view: []int,
+}
+
+struct Span
+{
+	text: str,
+	part: []int,
+	at: ?*int,
+}
+
+fn pair(a: int, b: int) -> []int
+{
+	let s = []int { ptr: alloc(int, 2), len: 2 };
+	s[0] = a;
+	s[1] = b;
+	return s;
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let one = f"ada";
+	let two = f"ada";
+	let a = alloc Named { name: one, count: 1 };
+	let c = alloc Named { name: two, count: 1 };
+	let d = alloc Named { name: "bob", count: 1 };
+	printf("str %d %d %d %d\n".ptr, b(*a == *c), b(*a == *d),
+		b(a.hash() == c.hash()), b(a.hash() == d.hash()));
+
+	let shared = pair(5, 6);
+	let other = pair(5, 6);
+	let x = alloc Held { items: pair(1, 2), view: shared };
+	let y = alloc Held { items: pair(1, 2), view: shared };
+	let z = alloc Held { items: pair(1, 3), view: shared };
+	let w = alloc Held { items: pair(1, 2), view: other };
+	printf("own %d %d %d %d\n".ptr, b(*x == *y), b(*x == *z),
+		b(x.hash() == y.hash()), b(*x == *w));
+
+	let s = Span { text: one, part: shared, at: none };
+	let t = Span { text: two, part: shared, at: none };
+	let u = Span { text: one, part: other, at: none };
+	printf("struct %d %d %d %d\n".ptr, b(s == t), b(s == u),
+		b(s.hash() == t.hash()), b(s.hash() == u.hash()));
+
+	delete(a);
+	delete(c);
+	delete(d);
+	delete(x);
+	delete(y);
+	delete(z);
+	delete(w);
+	free(shared.ptr);
+	free(other.ptr);
+	free(one.ptr);
+	free(two.ptr);
+	return 0;
+}

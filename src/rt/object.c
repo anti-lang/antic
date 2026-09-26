@@ -175,14 +175,164 @@ void anti_rt_store_integer(void *bytes, int64_t type, uint64_t value)
     }
 }
 
-/* The bytes of a field that equals and hash compare: a scalar, a pointer
-   and an enum. A str, a slice and an inline value give 0. */
-static size_t compared_size(int64_t type)
+/* DESIGN: equals and hash take each field by its kind, as the default
+   `==` and hash of a struct do. The two then always agree. A scalar, an
+   enum, a pointer and a function compare by their bytes, so a pointer
+   compares by its address. A str compares by its bytes. An own slice
+   compares element by element, and a plain slice by its address and its
+   length. A struct element of an own slice compares field by field under
+   the same rule. A class element compares through the equals of its own
+   table. An inline struct, class, array or union field and a bitfield
+   are passed over, as before. */
+
+static int same_value(const unsigned char *a, const unsigned char *b,
+                      int64_t type, const struct anti_descriptor *d,
+                      int64_t owned);
+static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
+                           const struct anti_descriptor *d, int64_t owned);
+
+/* FNV-1a of count bytes at p into h. */
+static uint64_t hash_run(uint64_t h, const unsigned char *p, size_t count)
+{
+    size_t k;
+
+    for (k = 0; k < count; k++) {
+        h = (h ^ p[k]) * 1099511628211u;
+    }
+    return h;
+}
+
+/* Whether the fields that d itself declares are the same at a and b. */
+static int same_fields(const unsigned char *a, const unsigned char *b,
+                       const struct anti_descriptor *d)
+{
+    int64_t i;
+
+    for (i = 0; i < d->field_count; i++) {
+        const struct anti_field *f = &d->fields[i];
+        if (!same_value(a + f->offset, b + f->offset, f->type, f->descriptor,
+                        f->owned)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* The fields that d itself declares at p, into h. */
+static uint64_t hash_fields(uint64_t h, const unsigned char *p,
+                            const struct anti_descriptor *d)
+{
+    int64_t i;
+
+    for (i = 0; i < d->field_count; i++) {
+        const struct anti_field *f = &d->fields[i];
+        h = hash_value(h, p + f->offset, f->type, f->descriptor, f->owned);
+    }
+    return h;
+}
+
+/* Whether the element of type id element at a and b is the same, in an
+   own slice. */
+static int same_element(const unsigned char *a, const unsigned char *b,
+                        int64_t element, const struct anti_descriptor *d)
+{
+    if (element == ANTI_TYPE_STRUCT) {
+        return d != NULL && same_fields(a, b, d);
+    }
+    if (element == ANTI_TYPE_CLASS) {
+        int8_t (*equals)(struct anti_object *, struct anti_object *) =
+            (int8_t(*)(struct anti_object *, struct anti_object *))
+                anti_rt_entry_body(a, ANTI_ENTRY_EQUALS);
+        return equals != NULL &&
+               equals((struct anti_object *)a, (struct anti_object *)b) != 0;
+    }
+    return same_value(a, b, element, NULL, 0);
+}
+
+static uint64_t hash_element(uint64_t h, const unsigned char *p,
+                             int64_t element, const struct anti_descriptor *d)
+{
+    if (element == ANTI_TYPE_STRUCT) {
+        return d != NULL ? hash_fields(h, p, d) : h;
+    }
+    if (element == ANTI_TYPE_CLASS) {
+        uint64_t (*hash)(struct anti_object *) =
+            (uint64_t(*)(struct anti_object *))anti_rt_entry_body(
+                p, ANTI_ENTRY_HASH);
+        uint64_t v = hash != NULL ? hash((struct anti_object *)p) : 0;
+        return hash_run(h, (const unsigned char *)&v, sizeof v);
+    }
+    return hash_value(h, p, element, NULL, 0);
+}
+
+static int same_value(const unsigned char *a, const unsigned char *b,
+                      int64_t type, const struct anti_descriptor *d,
+                      int64_t owned)
 {
     int64_t t = anti_rt_type_scalar(type);
+    struct anti_text x;
+    struct anti_text y;
+    int64_t i;
+    size_t size;
 
-    return t == ANTI_TYPE_STR || t == ANTI_TYPE_SLICE ? 0
-                                                      : anti_rt_type_size(t);
+    switch (t) {
+    case ANTI_TYPE_STR:
+        memcpy(&x, a, sizeof x);
+        memcpy(&y, b, sizeof y);
+        return x.len == y.len &&
+               (x.len == 0 || memcmp(x.ptr, y.ptr, (size_t)x.len) == 0);
+    case ANTI_TYPE_SLICE:
+        memcpy(&x, a, sizeof x);
+        memcpy(&y, b, sizeof y);
+        if (x.len != y.len) {
+            return 0;
+        }
+        if (!owned || x.ptr == y.ptr) {
+            return x.ptr == y.ptr;
+        }
+        size = anti_rt_element_size(type, d);
+        for (i = 0; size > 0 && i < x.len; i++) {
+            if (!same_element(x.ptr + (size_t)i * size,
+                              y.ptr + (size_t)i * size,
+                              ANTI_TYPE_ELEMENT(type), d)) {
+                return 0;
+            }
+        }
+        return 1;
+    default:
+        size = anti_rt_type_size(t);
+        return size == 0 || memcmp(a, b, size) == 0;
+    }
+}
+
+static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
+                           const struct anti_descriptor *d, int64_t owned)
+{
+    int64_t t = anti_rt_type_scalar(type);
+    struct anti_text x;
+    int64_t i;
+    size_t size;
+
+    switch (t) {
+    case ANTI_TYPE_STR:
+        memcpy(&x, p, sizeof x);
+        h = hash_run(h, (const unsigned char *)&x.len, sizeof x.len);
+        return x.len > 0 ? hash_run(h, x.ptr, (size_t)x.len) : h;
+    case ANTI_TYPE_SLICE:
+        memcpy(&x, p, sizeof x);
+        h = hash_run(h, (const unsigned char *)&x.len, sizeof x.len);
+        if (!owned) {
+            return hash_run(h, (const unsigned char *)&x.ptr, sizeof x.ptr);
+        }
+        size = anti_rt_element_size(type, d);
+        for (i = 0; size > 0 && i < x.len; i++) {
+            h = hash_element(h, x.ptr + (size_t)i * size,
+                             ANTI_TYPE_ELEMENT(type), d);
+        }
+        return h;
+    default:
+        return hash_run(h, p, anti_rt_type_size(t));
+    }
 }
 
 /* Compare the fields the chain declares, from the class up to the root.
@@ -191,7 +341,6 @@ int8_t anti_lang_Object_equals(struct anti_object *self,
                                struct anti_object *other)
 {
     const struct anti_descriptor *d = anti_rt_descriptor(self);
-    int64_t i;
 
     if (self == other) {
         return 1;
@@ -201,16 +350,9 @@ int8_t anti_lang_Object_equals(struct anti_object *self,
         return 0;
     }
     for (; d != NULL; d = d->parent) {
-        for (i = 0; i < d->field_count; i++) {
-            const struct anti_field *f = &d->fields[i];
-            size_t size = compared_size(f->type);
-            if (size == 0) {
-                continue;
-            }
-            if (memcmp((const char *)self + f->offset,
-                       (const char *)other + f->offset, size) != 0) {
-                return 0;
-            }
+        if (!same_fields((const unsigned char *)self,
+                         (const unsigned char *)other, d)) {
+            return 0;
         }
     }
     return 1;
@@ -221,22 +363,11 @@ int8_t anti_lang_Object_equals(struct anti_object *self,
 static uint64_t hash_level(const struct anti_object *self,
                            const struct anti_descriptor *d, uint64_t h)
 {
-    int64_t i;
-    size_t k;
-
     if (d == NULL) {
         return h;
     }
     h = hash_level(self, d->parent, h);
-    for (i = 0; i < d->field_count; i++) {
-        const struct anti_field *f = &d->fields[i];
-        const unsigned char *bytes = (const unsigned char *)self + f->offset;
-        size_t size = compared_size(f->type);
-        for (k = 0; k < size; k++) {
-            h = (h ^ bytes[k]) * 1099511628211u;
-        }
-    }
-    return h;
+    return hash_fields(h, (const unsigned char *)self, d);
 }
 
 /* FNV-1a over the same fields that equals compares, so two equal objects
