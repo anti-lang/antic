@@ -365,11 +365,14 @@ static void simple_lines(struct blob *line, int64_t delta)
     line_unit(line, 4, &h, &p);
 }
 
-/* Look vaddr up in a line table alone. */
+/* Look vaddr up in a line table alone. The name of the file in found
+   points into the image, which is static so that the caller can read it
+   until the next call. A buffer of the frame was gone when the caller
+   read the name, which ASan reports on Linux. */
 static bool line_of(const struct blob *line, uint64_t vaddr,
                     struct anti_found *found)
 {
-    uint8_t image[2048];
+    static uint8_t image[2048];
     size_t size = elf_image(image, sizeof image, ELF_NULL, line);
 
     memset(found, 0, sizeof *found);
