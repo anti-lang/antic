@@ -321,20 +321,28 @@ static void windows_debug(struct link_command *c, const struct link_inputs *in)
     add(c, "/ignore:4099");
 }
 
-/* The output and the PDB of a Windows link. The PDB takes the name of the
-   output with its suffix replaced, as the linker names it by default, and
-   stands beside it. */
+/* The PDB takes the name of the output with its suffix replaced, as the
+   linker names it by default, and stands beside it. */
+void link_pdb_path(struct text *out, const char *executable)
+{
+    const char *slash = strrchr(executable, '/');
+    const char *dot = strrchr(slash != NULL ? slash : executable, '.');
+
+    text_appendf(out, "%.*s.pdb",
+                 (int)(dot != NULL ? (size_t)(dot - executable)
+                                   : strlen(executable)),
+                 executable);
+}
+
+/* The output and the PDB of a Windows link. */
 static void windows_output(struct link_command *c, const struct link_inputs *in)
 {
     struct text *output = next(c);
     struct text *pdb = next(c);
-    const char *name = in->executable;
-    const char *slash = strrchr(name, '/');
-    const char *dot = strrchr(slash != NULL ? slash : name, '.');
 
-    text_appendf(output, "/OUT:%s", name);
-    text_appendf(pdb, "/PDB:%.*s.pdb",
-                 (int)(dot != NULL ? (size_t)(dot - name) : strlen(name)), name);
+    text_appendf(output, "/OUT:%s", in->executable);
+    text_append(pdb, "/PDB:");
+    link_pdb_path(pdb, in->executable);
     add(c, text_cstr(output));
     add(c, text_cstr(pdb));
 }

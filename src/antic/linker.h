@@ -166,6 +166,11 @@ void link_target_dir(struct text *out, enum target t, bool glibc);
    share of Windows, and no relative path joins them. */
 bool link_relative(struct text *out, const char *path, const char *directory);
 
+/* Append the path of the PDB of a Windows link whose output is
+   executable: the output with its suffix replaced by `.pdb`, beside it.
+   The link and the symbols archive of anti build both name it so. */
+void link_pdb_path(struct text *out, const char *executable);
+
 /* The directories that may hold the glibc start files for a Linux target,
    in the order of search, ending with NULL. */
 const char *const *link_crt_dirs(enum target t);

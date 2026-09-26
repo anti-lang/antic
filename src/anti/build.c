@@ -20,6 +20,7 @@
 #include "driver.h"
 #include "files.h"
 #include "header.h"
+#include "linker.h"
 #include "manifest.h"
 #include "modpath.h"
 #include "process.h"
@@ -548,8 +549,10 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     entries[count].executable = true;
     count++;
     if (target_info(t)->format == FORMAT_COFF) {
+        /* The debug link writes its PDB under the name the linker gives
+           it, which drops the suffix `.debug`. */
         text_appendf(&pdb_name, "%s.pdb", text_cstr(&stem));
-        text_appendf(&pdb_path, "%s.pdb", text_cstr(&debug_path));
+        link_pdb_path(&pdb_path, text_cstr(&debug_path));
         if (files_exists(text_cstr(&pdb_path))) {
             entries[count].name = text_cstr(&pdb_name);
             entries[count].file = text_cstr(&pdb_path);

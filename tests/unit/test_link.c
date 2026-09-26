@@ -181,6 +181,26 @@ static void strips_debug(void)
 /* A Windows link runs in the directory of its output, and names each
    path relative to that directory. Two paths on different roots have no
    relative path. */
+/* The PDB of a Windows link takes the name of the output with its suffix
+   replaced. anti build reads the PDB of its debug link by this name. */
+static void pdb_names(void)
+{
+    static const char *const cases[][2] = {
+        {"app.exe", "app.pdb"},
+        {"build/app.debug", "build/app.pdb"},
+        {"dir.v2/app", "dir.v2/app.pdb"},
+        {"plain", "plain.pdb"},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        struct text out = {0};
+        link_pdb_path(&out, cases[i][0]);
+        CHECK(strcmp(text_cstr(&out), cases[i][1]) == 0);
+        text_free(&out);
+    }
+}
+
 static void relative_paths(void)
 {
     static const char *const cases[][3] = {
@@ -622,6 +642,7 @@ void test_link(void)
     dynamic_modes();
     strips_debug();
     relative_paths();
+    pdb_names();
     runtime_entry();
     runtime_markers();
     runtime_licence(ANTIC_SOURCE_DIR "/src/rt/LICENSE");
