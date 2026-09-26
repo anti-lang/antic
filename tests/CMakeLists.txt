@@ -1,14 +1,9 @@
 # Unit tests link the compiler's code directly. Program tests in
 # tests/programs compile .anti files with antic and run the result.
 
-# llvm-mc of the pinned release, which many tests pass to antic. The
-# search stands above the first of them: a fresh build directory has no
-# cache entry yet, and a value read before find_program writes it is
-# empty. cpu_check_refuses then ran antic with no assembler, and the
-# dry run of the release script found it in an export of the tree.
-find_program(ANTIC_LLVM_MC NAMES llvm-mc
-    HINTS "${ANTIC_LLVM_DIR}/bin"
-    DOC "llvm-mc from LLVM 23.1.1")
+# ANTIC_LLVM_MC and ANTIC_LLVM_AR, the llvm-mc and the llvm-ar of the
+# pinned release, stand in tools/pinned-compiler.cmake, which runs before
+# the first test reads either.
 
 add_executable(antic_unit_tests
     unit/test_main.c
@@ -242,25 +237,12 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
     else()
         set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/libanti_rt.a")
     endif()
-    # DESIGN: the library of the host target is the one this build
-    # compiled, at the optimisation of this build. A Debug build writes a
-    # call to the runtime's own helper where a release writes the
-    # exclusive loop, so the mnemonics of a level are not in it. The
-    # check is of what the archive ships, which is a cross build, and it
-    # skips the host's own library. The Mac builds no host library, so
-    # all three targets are cross builds there.
-    set(cpu_host_build no)
-    if(target STREQUAL "${ANTIC_HOST_TARGET}"
-       AND NOT ANTIC_HOST_OS STREQUAL "macos")
-        set(cpu_host_build yes)
-    endif()
     add_test(NAME cpu_level_${level}
         COMMAND "${CMAKE_COMMAND}"
             "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
             "-DLIBRARY=${library}"
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
-            "-DHOST_BUILD=${cpu_host_build}"
             "-DUSES=${uses}"
             "-DAVOIDS=${avoids}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_runtime.cmake")
@@ -451,6 +433,21 @@ if(ANTIC_LLVM_MC)
     add_test(NAME toolchain_pin
         COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_RUNTIME_DIR}/bin"
             -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
+endif()
+
+# Every tool a build of this tree runs comes from the pinned release, and
+# antic and anti were linked by the pinned lld. A reader's build takes the
+# tools of the machine on purpose.
+if(NOT ANTIC_SYSTEM_COMPILER)
+    add_test(NAME pinned_tools
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCHECK=${PROJECT_SOURCE_DIR}/tools/pinned-tools.cmake"
+            "-DCACHE=${CMAKE_BINARY_DIR}/CMakeCache.txt"
+            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+            "-DLLVM_DIR=${ANTIC_LLVM_DIR}"
+            "-DOS=${ANTIC_HOST_OS}"
+            "-DPROGRAMS=$<TARGET_FILE:antic>,$<TARGET_FILE:anti>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pinned_tools.cmake")
 endif()
 
 file(GLOB program_sources CONFIGURE_DEPENDS
@@ -3004,9 +3001,6 @@ endif()
 # Libraries for C, built with antic --lib and used from C programs on the
 # host. Windows compiles the programs with the pinned clang against the
 # xwin sysroot of the runtime archive.
-find_program(ANTIC_LLVM_AR NAMES llvm-ar
-    HINTS "${ANTIC_LLVM_DIR}/bin"
-    DOC "llvm-ar from LLVM 23.1.1")
 
 # The text of a float takes no digit from the C library in any runtime of
 # the archive. std/float_text.anti holds the text itself.

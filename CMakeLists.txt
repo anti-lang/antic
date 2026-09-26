@@ -109,6 +109,11 @@ else()
 endif()
 set(ANTIC_HOST_TARGET "${ANTIC_HOST_OS}-${ANTIC_HOST_CPU}")
 
+# Every tool the build runs is one of the pinned release, and a tool of
+# the host stops the configure step here. See tools/pinned-tools.cmake.
+antic_use_pinned_tools()
+antic_refuse_host_tools()
+
 # The compiler's code is a library so that the unit tests link the same
 # objects as the antic executable. It links PCRE2 to check every pattern
 # literal.
@@ -196,67 +201,20 @@ endfunction()
 # libanti_rt.a, or anti_rt.lib on Windows, and licenses/ with the licence
 # of each component.
 set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
-# DESIGN: one list of runtime sources. The host library and the cross
-# builds both read it, so a new source reaches every target at once.
-# license_stub.c is not here, because it sits beside the library.
+# DESIGN: one list of runtime sources. The cross build of every target
+# reads it, so a new source reaches every target at once. license_stub.c
+# is not here, because it sits beside the library.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
     errno f16 fs hash hooks init io json license loaded lock mem object
     platform_posix platform_windows plugin reflect registry signal snapshot start
     symbols sync text threads toml trace utf)
-set(anti_rt_files "")
-foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
-    list(APPEND anti_rt_files "src/rt/${source}.c")
-endforeach()
-# DESIGN: a macOS runtime library comes from the cross build below on every
-# host, the Mac included, so that one object links to the same bytes on
-# every host. A Mac builds no host library of its own.
-if(NOT ANTIC_HOST_OS STREQUAL "macos")
-    antic_cpu_levels(host_levels "${ANTIC_HOST_TARGET}")
-    foreach(level IN LISTS host_levels)
-        set(out "${ANTIC_RUNTIME_DIR}/lib/${ANTIC_HOST_TARGET}/${level}")
-        # DESIGN: the runtime carries no hidden visibility. A program
-        # that hosts a plugin exports its runtime symbols, and a plugin
-        # is bound against them at load. A shared library for C keeps
-        # the documented surface through the export list of its link.
-        add_library(anti_rt_${level} STATIC ${anti_rt_files})
-        set_target_properties(anti_rt_${level} PROPERTIES
-            OUTPUT_NAME anti_rt
-            ARCHIVE_OUTPUT_DIRECTORY "${out}")
-        target_compile_definitions(anti_rt_${level} PRIVATE
-            ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}})
-        # DESIGN: sanitizers check antic. Anti programs link the runtime without a
-        # sanitizer runtime, so the runtime carries no sanitizer instrumentation,
-        # whatever CMAKE_C_FLAGS holds in a sanitizer configuration.
-        if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-            antic_cpu_march(host_march "${level}")
-            target_compile_options(anti_rt_${level} PRIVATE
-                -fno-sanitize=all "${host_march}")
-        elseif(MSVC AND level STREQUAL "v3")
-            # MSVC names a level with /arch: and has a value for AVX2 and
-            # none for the SSE4.2 of v2. A reader's build on Windows then
-            # writes the baseline for v1 and v2.
-            target_compile_options(anti_rt_${level} PRIVATE /arch:AVX2)
-        endif()
-
-        # The licence stub of a bundled archive lies beside the runtime library as
-        # an object of its own, so that a program never links it instead of the
-        # licence text of src/rt/license.c.
-        add_library(anti_rt_license_stub_${level} OBJECT src/rt/license_stub.c)
-        if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-            target_compile_options(anti_rt_license_stub_${level} PRIVATE
-                -fno-sanitize=all)
-        endif()
-        add_custom_target(anti_rt_license_stub_copy_${level} ALL
-            COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-                "$<TARGET_OBJECTS:anti_rt_license_stub_${level}>"
-                "${out}/anti_rt_license_stub${CMAKE_C_OUTPUT_EXTENSION}"
-            DEPENDS anti_rt_license_stub_${level}
-            COMMAND_EXPAND_LISTS
-            VERBATIM)
-    endforeach()
-endif()
-
+# DESIGN: the runtime library of every target comes from the cross build
+# below, on every host and for the host's own target as well. Eddie
+# decided this. The pinned clang compiles it against the pinned sysroot of
+# the target, musl for Linux, so one target's library is the same bytes
+# whichever host built it. A library the host built took the build type
+# of the tree, the headers of glibc and the outline atomics of libgcc,
+# which a musl program does not link.
 configure_file(src/rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
 
 # The sysroot of each target that lld links against, which
@@ -264,11 +222,6 @@ configure_file(src/rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYON
 # archive with the licences of its components.
 antic_shared_path(ANTIC_SYSROOT_DIR "${ANTIC_DEPS_DIR}/sysroot"
     "sysroots from tools/get-sysroot.cmake")
-# The LLVM tools of this host lie in bin/ of ANTIC_LLVM_DIR, which
-# tools/pinned-compiler.cmake names and fills.
-find_program(ANTIC_LLVM_AR NAMES llvm-ar
-    HINTS "${ANTIC_LLVM_DIR}/bin"
-    DOC "llvm-ar from LLVM 23.1.1")
 set(ANTIC_TARGETS linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
     windows-x86_64 windows-arm64)
 # DESIGN: the Linux link mode against glibc takes a sysroot and a runtime
@@ -383,8 +336,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
         OUTPUT_VARIABLE clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
     foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
         set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
-        if(NOT EXISTS "${sysroot}" OR
-           (target STREQUAL ANTIC_HOST_TARGET AND NOT target MATCHES "^macos-"))
+        if(NOT EXISTS "${sysroot}")
             continue()
         endif()
         if(target STREQUAL "linux-x86_64" OR target STREQUAL "linux-arm64")

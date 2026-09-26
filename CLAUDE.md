@@ -36,6 +36,16 @@ without asking Eddie.
   "generated with" notes in commits, files or pull requests.
 - Commit messages: a short subject line, a body that states what changed and
   why. No emoji, no trailers.
+- Every tool a build runs comes from the pinned release of
+  `anti-lang/llvm-tools` under `build/deps/`, on every host: the Mac,
+  anti-linux and anti-windows alike. clang compiles, lld links, llvm-mc
+  assembles and llvm-ar archives. Never a compiler, linker, assembler or
+  archiver of the host: no system gcc or clang, no Apple ld, no GNU ld, no
+  MSVC. Each target's runtime is the cross build against its pinned
+  sysroot, musl for Linux, the host's own target included. The configure
+  step refuses a tree that would run a tool of the host, and the test
+  `pinned_tools` checks it. See "Scope and toolchain" in
+  `docs/decisions.md`.
 - Warnings are errors in all of our own code. That is the compiler, the
   tools, the runtime and the native glue code. It is also the tests and
   anything the packer or the release script builds. A part of our code built without them is a gap to
