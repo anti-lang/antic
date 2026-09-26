@@ -590,6 +590,8 @@ static void interface_item(struct page *p, const struct symbol *sym)
 {
     struct entry *one;
     const char *lead = "pub ";
+    struct name shown;
+    const char *colon;
 
     if (sym->type == NULL || sym->internal) {
         return;
@@ -597,6 +599,14 @@ static void interface_item(struct page *p, const struct symbol *sym)
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
     text_append_bytes(&one->name, sym->name.text, sym->name.length);
     one->doc = sym->doc;
+    /* An `operator fn` that shares its name stands as `eq:Point`, which
+       keeps its heading apart from the others, and its signature names
+       the operator alone. */
+    shown = sym->name;
+    colon = memchr(shown.text, ':', shown.length);
+    if (colon != NULL) {
+        shown.length = (size_t)(colon - shown.text);
+    }
     if (sym->alias) {
         alias_signature(one, lead, &sym->name, sym->type);
         return;
@@ -604,7 +614,7 @@ static void interface_item(struct page *p, const struct symbol *sym)
     switch (sym->kind) {
     case SYMBOL_FN:
         fn_signature(&one->signature, lead, sym->worker ? "worker fn" : "fn",
-                     &sym->name, sym->item, sym->type, sym->params,
+                     &shown, sym->item, sym->type, sym->params,
                      declared_params(sym->type, false), false, false);
         break;
     case SYMBOL_EXTERN_FN:

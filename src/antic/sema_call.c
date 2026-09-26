@@ -493,16 +493,49 @@ static bool field_visible(const struct checker *c, const struct type *s,
 /* DESIGN: `v.f(args)` resolves in the namespace of v's type first, and
    then in the module that declares the type. A function of the body wins
    over a free function of the same name. */
+/* The module-level `operator fn` of the module of s that shares the name
+   name with another and takes s first, declared as `name:S`, or NULL. */
+static struct symbol *shared_operator(const struct checker *c,
+                                      const struct type *s,
+                                      const struct name *name)
+{
+    const struct type *g = s->generic != NULL ? s->generic : s;
+    const struct interface *lib;
+    char text[256];
+    struct name shared;
+
+    if ((s->kind != TYPE_STRUCT && s->kind != TYPE_CLASS &&
+         s->kind != TYPE_VARIANT) ||
+        name->length + g->name.length + 2 > sizeof text) {
+        return NULL;
+    }
+    memcpy(text, name->text, name->length);
+    text[name->length] = ':';
+    memcpy(text + name->length + 1, g->name.text, g->name.length);
+    shared.text = text;
+    shared.length = name->length + 1 + g->name.length;
+    if (sema_same_name(&s->module, &c->module_name)) {
+        return sema_scope_find_local(&c->module_scope, &shared);
+    }
+    lib = sema_find_library(c, &s->module);
+    return lib != NULL ? sema_library_item(c, lib, &shared) : NULL;
+}
+
 struct symbol *sema_method_symbol(const struct checker *c,
                                   const struct type *s,
                                   const struct name *name)
 {
     const struct interface *lib;
     struct item *m = reached_member(s, name);
+    struct symbol *shared;
 
     if (m != NULL && m->kind == ITEM_FN && m->symbol != NULL &&
         member_visible(c, s, m)) {
         return m->symbol;
+    }
+    shared = shared_operator(c, s, name);
+    if (shared != NULL) {
+        return shared;
     }
     /* An item of another library that a direct import names is no
        function of the module that declares the type. */

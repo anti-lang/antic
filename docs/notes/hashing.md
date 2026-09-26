@@ -28,3 +28,10 @@ under "Generics and collections".
 - `same_value` and `hash_value` of `src/rt/object.c` take a field of a class by its type id. An `own` slice walks its elements by `anti_rt_element_size`, a struct element through the field records of its descriptor, and a class element through the `equals` and `hash` entries of its own table.
 - `sema_default_eq` takes a tuple and each case of a variant through `sema_eq_gap`, and a `?T` through the hook of its element. `walk_inside` walks the parts of each form and `walk_eq` gives a part with `operator fn eq`, a variant among them, its checked call. `compare_cases` of `lower_eq.c` compares the tags and then branches per case into the fields of the case, and `compare_optional` compares the flags and then the values when both hold one. `binary_operands` lets `==` and `!=` read two `?T` values whole.
 - The tests: `programs/eq_default.anti`, `programs/eq_kinds.anti`, `programs/eq_parts.anti`, `listing_error_equality`, and the default of a library's generics in `hashing_modules_release` and `hashing_modules_dev`.
+
+## Operator functions that share a name
+
+- `declared_name` of `sema.c` gives a module-level `operator fn` whose name another one of the module has the shared name `op:Type`, from the syntax of its first parameter, and marks the item `overloaded`. The item keeps its own name, which `check_operator_item` checks against the operator table, and its symbol takes the shared one.
+- `shared_operator` of `sema_call.c` builds `op:Type` from the type of a receiver, its generic where it is a copy, and looks it up in the module scope or the library of the type before `sema_method_symbol` looks up the plain name. `operator_symbol`, `sema_hook` and `a.eq(b)` all go through it.
+- `declare_function` of `lower.c` names the IR function by the symbol, as for a function of a struct body. `copy_function` names a copy of a shared generic by the shared name, and `put_declaration` of `antl_tree.c` writes the declaration of one under it, so the reader finds its symbol in the items section.
+- `interface_item` of `src/anti/doc.c` cuts the signature name at the colon.

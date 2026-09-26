@@ -1,0 +1,90 @@
+//! Operator functions at module level share a name when their first parameters
+//! differ, and each operator picks one by the type of its left operand. `Point`
+//! and `Rect` each have their own `==` and `hash`, and the generic `Pair<T>`
+//! has its own `==`. Each is reached by the operator, as a method, through a
+//! generic and inside the default `==` of a struct that holds one.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+struct Rect
+{
+	w: int,
+	h: int,
+}
+
+struct Pair<T>
+{
+	first: T,
+	second: T,
+}
+
+/// Points are equal on `x` alone.
+operator fn eq(a: Point, b: Point) -> bool
+{
+	return a.x == b.x;
+}
+
+/// Rects are equal by their area.
+operator fn eq(a: Rect, b: Rect) -> bool
+{
+	return a.w * a.h == b.w * b.h;
+}
+
+/// Pairs are equal in either order.
+operator fn eq<T: eq>(a: Pair<T>, b: Pair<T>) -> bool
+{
+	return (a.first == b.first && a.second == b.second) ||
+		(a.first == b.second && a.second == b.first);
+}
+
+operator fn hash(p: Point) -> u64
+{
+	return p.x as u64;
+}
+
+operator fn hash(r: Rect) -> u64
+{
+	return (r.w * r.h) as u64;
+}
+
+struct Both
+{
+	at: Point,
+	size: Rect,
+}
+
+fn same<T: eq>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1, y: 2 };
+	let q = Point { x: 1, y: 3 };
+	let r = Rect { w: 2, h: 3 };
+	let s = Rect { w: 3, h: 2 };
+	let t = Rect { w: 1, h: 1 };
+	printf("point %d %d %d\n".ptr, b(p == q), b(p.eq(q)), b(same(p, q)));
+	printf("rect %d %d %d\n".ptr, b(r == s), b(r != t), b(same(r, t)));
+	printf("hash %d %d\n".ptr, (p.hash() == q.hash()) as c_int,
+		r.hash() as c_int);
+	let one = Pair<int> { first: 1, second: 2 };
+	let two = Pair<int> { first: 2, second: 1 };
+	printf("pair %d %d\n".ptr, b(one == two), b(same(one, two)));
+	let x = Both { at: p, size: r };
+	let y = Both { at: q, size: s };
+	printf("both %d\n".ptr, b(x == y));
+	return 0;
+}

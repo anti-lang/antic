@@ -47,6 +47,12 @@ fn main() -> int
 		keys.same_tags(t, u) as c_int);
 	printf("pairs %d %d\n".ptr, keys.same_pair((1, "x"), (1, "x")) as c_int,
 		keys.same_pair((1, "x"), (1, "y")) as c_int);
+	let l = keys.Label { text: "ab" };
+	let k = keys.Label { text: "ax" };
+	let x = keys.Boxed<int> { item: 3 };
+	let y = keys.Boxed<int> { item: 4 };
+	printf("shared %d %d %d\n".ptr, (l == k) as c_int, (x == x) as c_int,
+		(x == y) as c_int);
 	let a = keys.Coded { code: keys.Code { n: 12 }, mark: 1 };
 	let b = keys.Coded { code: keys.Code { n: 22 }, mark: 1 };
 	let c = keys.Coded { code: keys.Code { n: 23 }, mark: 1 };

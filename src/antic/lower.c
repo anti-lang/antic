@@ -1677,8 +1677,11 @@ static void declare_function(struct lowerer *l, const struct item *it)
 {
     const struct type *t = it->symbol->type;
     /* A function of a struct body carries the name `T.f`, which its
-       symbol holds, so its symbol becomes `module.T.f`. */
-    char *name = lower_cstr(it->owner != NULL ? &it->symbol->name : &it->name);
+       symbol holds, so its symbol becomes `module.T.f`. An `operator fn`
+       that shares its name carries `eq:T` there as well. */
+    char *name = lower_cstr(it->owner != NULL || it->overloaded
+                                ? &it->symbol->name
+                                : &it->name);
     const char *module =
         it->home_module != NULL ? it->home_module : l->module_name;
     struct ir_function *f;

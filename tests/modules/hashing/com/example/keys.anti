@@ -60,6 +60,32 @@ pub operator fn eq(a: Code, b: Code) -> bool
 	return a.n % 10 == b.n % 10;
 }
 
+/// A label equal to another with the same first letter.
+pub struct Label
+{
+	text: str,
+}
+
+/// Whether `a` and `b` start with the same letter, a second `operator fn eq` of
+/// the module.
+pub operator fn eq(a: Label, b: Label) -> bool
+{
+	return a.text.len > 0 && b.text.len > 0 && a.text[0] == b.text[0];
+}
+
+/// A value in a box.
+pub struct Boxed<T>
+{
+	item: T,
+}
+
+/// Whether the items of two boxes are equal, a generic `operator fn eq` beside
+/// the other two.
+pub operator fn eq<T: eq>(a: Boxed<T>, b: Boxed<T>) -> bool
+{
+	return a.item == b.item;
+}
+
 /// A code with a mark, whose `==` is the default.
 pub struct Coded
 {

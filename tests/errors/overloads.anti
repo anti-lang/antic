@@ -1,0 +1,60 @@
+//! The refusals of `operator fn` items that share a name. Two of them may not
+//! take the same type first, and one that shares its name cannot be `export`,
+//! since C has one function of a name. Ordinary functions keep one function per
+//! name, and so does an ordinary function beside an `operator fn`. A shared
+//! `operator fn` is reached through its operator or as a method, and a bare
+//! call of its name finds nothing.
+
+struct Point
+{
+	x: int,
+}
+
+export struct Rect
+{
+	w: int,
+}
+
+operator fn eq(a: Point, b: Point) -> bool
+{
+	return a.x == b.x;
+}
+
+operator fn eq(a: *Point, b: Point) -> bool
+{
+	return a.x == b.x;
+}
+
+export operator fn eq(a: Rect, b: Rect) -> bool
+{
+	return a.w == b.w;
+}
+
+fn area(r: Rect) -> int
+{
+	return r.w;
+}
+
+fn area(p: Point) -> int
+{
+	return p.x;
+}
+
+fn lt(a: Point, b: Point) -> bool
+{
+	return a.x < b.x;
+}
+
+operator fn lt(a: Rect, b: Rect) -> bool
+{
+	return a.w < b.w;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1 };
+	if eq(p, p) {
+		return 1;
+	}
+	return 0;
+}

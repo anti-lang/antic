@@ -623,6 +623,8 @@ A type joins a construct of the language through `operator fn`, as it already do
 
 `index` and `set_index` take any number of indices, each with its own type. `operator fn index(self, x: int, y: int) -> T` makes `g[x, y]` read, and the matching `operator fn set_index(self, x: int, y: int, v: T)` makes `g[x, y] = v` write.
 
+Operator functions at module level may share a name when the types of their first parameters differ, and the compiler picks one by the type of the left operand. One module then gives `Point` and `Rect` each its own `==`. This holds for `operator fn` alone, and ordinary functions keep one function per name.
+
 `f"..."` writes a class through `to_text`, which every class has.
 
 The guide gives this table as the one place a programmer looks to make a type work with the language.

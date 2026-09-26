@@ -266,6 +266,10 @@ struct type *sema_member_type_in(struct checker *c, struct type *fn,
                                  const struct item *owner, struct type *s);
 struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
                                     const char *text);
+/* The shared name `op:Type` of a module-level `operator fn` whose name
+   another one of its module has. */
+struct name sema_shared_name(struct arena *arena, const struct name *op,
+                             const struct name *type);
 bool sema_is_iterator(struct checker *c, struct type *t);
 struct expr *sema_hook_call(struct checker *c, struct expr *base,
                             const char *name, struct expr **args,

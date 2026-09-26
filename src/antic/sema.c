@@ -2220,6 +2220,77 @@ static void check_provides(struct checker *c, struct module *module)
    `module->items` once, and a later pass reads what an earlier one
    declared. */
 
+struct name sema_shared_name(struct arena *arena, const struct name *op,
+                             const struct name *type)
+{
+    char *text = arena_alloc(arena, op->length + type->length + 2);
+    struct name out;
+
+    memcpy(text, op->text, op->length);
+    text[op->length] = ':';
+    memcpy(text + op->length + 1, type->text, type->length);
+    text[op->length + 1 + type->length] = '\0';
+    out.text = text;
+    out.length = op->length + 1 + type->length;
+    return out;
+}
+
+static bool module_operator(const struct item *it)
+{
+    return it->kind == ITEM_FN && it->is_operator && it->owner == NULL;
+}
+
+/* The name of the type the first parameter of it names, through a `*`,
+   or an empty name. A generic type gives its own name without the
+   arguments. */
+static struct name first_type_name(const struct item *it)
+{
+    struct name none = {NULL, 0};
+    const struct type_expr *t;
+
+    if (it->param_count == 0) {
+        return none;
+    }
+    t = it->params[0].type;
+    while (t != NULL && t->kind == TYPEX_POINTER) {
+        t = t->element;
+    }
+    return t != NULL && t->kind == TYPEX_NAMED ? t->name : none;
+}
+
+/* Whether another module-level `operator fn` of the module has the name
+   of it. */
+static bool shares_name(const struct module *module, const struct item *it)
+{
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        const struct item *other = module->items[i];
+        if (other != it && module_operator(other) &&
+            sema_same_name(&other->name, &it->name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The name the item it declares its symbol under: its own, or the shared
+   name of an `operator fn` whose name another one of the module has. */
+static struct name declared_name(struct checker *c, struct item *it)
+{
+    struct name type;
+
+    if (!module_operator(it) || !shares_name(c->module, it)) {
+        return it->name;
+    }
+    type = first_type_name(it);
+    if (type.length == 0) {
+        return it->name;
+    }
+    it->overloaded = true;
+    return sema_shared_name(c->arena, &it->name, &type);
+}
+
 /* Declare every item first, so each can be used before its
    declaration. */
 static void declare_items(struct checker *c)
@@ -2229,7 +2300,22 @@ static void declare_items(struct checker *c)
 
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        it->symbol = sema_declare(c, item_symbol_kind(it->kind), &it->name,
+        struct name name = declared_name(c, it);
+        if (it->overloaded &&
+            sema_scope_find_local(c->scope, &name) != NULL) {
+            struct name type = first_type_name(it);
+            sema_error_at(c, it->name_pos, "`operator fn %.*s` is already "
+                          "declared for `%.*s`", (int)it->name.length,
+                          it->name.text, (int)type.length, type.text);
+            continue;
+        }
+        if (it->overloaded && it->exported) {
+            sema_error_at(c, it->name_pos, "`operator fn %.*s` shares its "
+                          "name with another, and C has one function of a "
+                          "name, so it cannot be `export`",
+                          (int)it->name.length, it->name.text);
+        }
+        it->symbol = sema_declare(c, item_symbol_kind(it->kind), &name,
                                   it->name_pos, "`%.*s` is already declared");
         if (it->symbol == NULL) {
             continue;

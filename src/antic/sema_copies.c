@@ -613,8 +613,12 @@ static struct item *fn_copy(struct copies *k, struct item *generic,
     map.args = args;
     map.values = values;
     map.count = count;
+    /* A shared `operator fn` names its copies by its shared name. */
     return copy_function(k, generic, &map,
-                         copy_name(k, &generic->name, args, values, count),
+                         copy_name(k,
+                                   generic->overloaded ? &generic->symbol->name
+                                                       : &generic->name,
+                                   args, values, count),
                          NULL);
 }
 

@@ -1566,10 +1566,13 @@ static struct symbol *read_extern(struct reader *r)
    the reader gives that symbol the declaration. */
 static void put_declaration(struct writer *w, const struct item *it)
 {
+    /* A shared `operator fn` stands under its shared name, which the
+       items section gives its symbol. */
+    const struct name *name = it->overloaded ? &it->symbol->name : &it->name;
     size_t i;
 
     antl_put_u8(w, (uint8_t)it->kind);
-    antl_put_bytes(w, it->name.text, it->name.length);
+    antl_put_bytes(w, name->text, name->length);
     antl_put_u32(w, (uint32_t)it->pos.line);
     antl_put_u32(w, (uint32_t)it->pos.column);
     antl_put_u8(w, (uint8_t)it->vis);

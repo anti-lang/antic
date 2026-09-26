@@ -952,6 +952,13 @@ struct item {
        `assert` rule: on in dev mode and off in release, with `--trace`
        and `--no-trace` deciding instead. */
     bool trace;                     /* ITEM_CLASS, ITEM_FN in a body */
+    /* DESIGN: `operator fn` items of a module may share a name. Their
+       first parameters then name different types. Each of them
+       declares its symbol as `eq:Point`, the operator and that type.
+       The module scope, the IR and a library file keep those apart. The
+       item keeps its name, which the operator table checks. A lookup
+       for a type tries its shared name first. */
+    bool overloaded;
     /* DESIGN: `synchronized class` runs every function that is not
        private under a hidden lock of the object, and `concurrent class`
        has the checker prove every field guarded, atomic or fixed. Both
