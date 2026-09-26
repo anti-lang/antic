@@ -1887,6 +1887,7 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     tree->compile_copies = o->library || (!o->front_end && !o->dump_types);
+    tree->no_reflect = o->no_reflect;
     if (!sema_check(tree, text_cstr(module), o->package_name, libraries,
                     paths.count, &types, &arena, &diags,
                     whole_program_check(o))) {

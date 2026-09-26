@@ -3156,6 +3156,12 @@ bool lower_module(struct module *module, const char *module_name,
             if (lower_declared_copy(t) == NULL) {
                 class_copy(&l, t);
             }
+            if (it->default_eq != NULL) {
+                lower_class_equals(&l, it);
+            }
+            if (it->default_hash != NULL) {
+                lower_class_hash(&l, it);
+            }
         }
     }
     for (i = 0; i < module->item_count; i++) {

@@ -591,6 +591,9 @@ struct type *types_object(struct types *types);
 #define MEM_MODULE "anti.mem"
 #define MEM_ALLOCATOR "Allocator"
 #define ROOT_DESERIALIZE "deserialize"
+/* The module whose functions read the field lists, the function lists
+   and the registry that `--no-reflect` drops. */
+#define REFLECT_MODULE "anti.reflect"
 
 /* DESIGN: `anti.lang.Object` declares nine hooks with empty bodies after
    its seven functions. They take the entries after those in the table of

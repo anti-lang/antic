@@ -962,6 +962,12 @@ struct item {
        item keeps its name, which the operator table checks. A lookup
        for a type tries its shared name first. */
     bool overloaded;
+    /* ITEM_CLASS: the default `==` and hash that the compiler writes for
+       the class. Each is a checked `==` or `x.hash()`, which carries the
+       calls of the operators of its fields. Set by the checker, and NULL
+       where the chain declares its own. */
+    struct expr *default_eq;
+    struct expr *default_hash;
     /* DESIGN: `synchronized class` runs every function that is not
        private under a hidden lock of the object, and `concurrent class`
        has the checker prove every field guarded, atomic or fixed. Both
@@ -1107,6 +1113,9 @@ struct module {
     /* Set by the driver on a build past the front end: the checker
        makes a compiled copy for every use of a generic. */
     bool compile_copies;
+    /* Set by the driver under --no-reflect, which drops the field lists
+       that serialize, deserialize and reflect read. */
+    bool no_reflect;
     /* The items sema_strip_generics took out: the generics, every `type`
        and every `constraint`. The interface of the module carries them. */
     struct item **stripped;

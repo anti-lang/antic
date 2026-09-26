@@ -39,3 +39,10 @@ under "Generics and collections".
 - `declare_function` of `lower.c` names the IR function by the symbol, as for a function of a struct body. `copy_function` names a copy of a shared generic by the shared name, and `put_declaration` of `antl_tree.c` writes the declaration of one under it, so the reader finds its symbol in the items section.
 - `interface_item` of `src/anti/doc.c` cuts the signature name at the colon.
 - `call_on_first` of `sema_call.c` turns a bare call whose name no scope holds and `shared_in_module` finds as `name:` into a call of a method on its first argument, marked `bare`, so `refuse_field` names the missing `operator fn` instead of a field.
+
+## The default of a class as code
+
+- `sema_class_defaults` of `sema_hash.c` runs after the copies of the module and gives each concrete class whose chain declares no `equals` a checked `==` in `default_eq`, and one without `hash` a checked `x.hash()` in `default_hash`. `walk_eq` and `walk` fill their calls from the fields of the chain, an `own` slice from its element.
+- `lower_class_equals` of `lower_eq.c` and `lower_class_hash` of `lower_hash.c` write `C.equals` and `C.hash` through `lower_class_function`, which gives the first an i8 and two pointers and the second an i64. `lower_class_table` names them where the entry is the root's, one the runtime implements. `class_equals` and `class_hash` call them for a class value inside another value.
+- `anti_lang_Object_equals` and `anti_lang_Object_hash` of `src/rt/object.c` call the entry of the object's table, since a call of `x.equals(y)` names the root and C code calls both by name. The walk of the fields for equality is gone from the runtime.
+- `refuse_without_reflect` of `sema_call.c` reads the flag `no_reflect` that the driver sets on the module.

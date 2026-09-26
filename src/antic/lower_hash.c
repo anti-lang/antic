@@ -220,21 +220,24 @@ static struct ir_operand call_hash(struct lowerer *l, struct ir_function *fn,
 }
 
 /* The `hash` a class value of type t calls: the one of the lowest class
-   of its chain that declares one, or that of the root. The value has
+   of its chain that declares one, or the default the compiler writes for
+   t. The value has
    its class, so the call is direct. */
 static struct ir_operand class_hash(struct lowerer *l, struct ir_operand at,
                                     const struct type *t)
 {
-    static const enum ir_type params[] = {IR_PTR};
     const struct item *m = NULL;
 
-    for (; t != NULL && t->kind == TYPE_CLASS && m == NULL; t = t->base) {
-        m = lower_level_fn(t, &hash_name);
+    const struct type *up;
+
+    for (up = t; up != NULL && up->kind == TYPE_CLASS && m == NULL;
+         up = up->base) {
+        m = lower_level_fn(up, &hash_name);
     }
     if (m != NULL) {
         return call_hash(l, lower_callee_function(l, m->symbol), at);
     }
-    return lower_rt_call(l, RUNTIME_ROOT "hash", IR_I64, params, &at, 1);
+    return call_hash(l, lower_class_function(l, t, "hash"), at);
 }
 
 /* The hash of a slice part of type t at at. It takes the address and the
@@ -454,4 +457,56 @@ struct ir_operand lower_hash(struct lowerer *l, const struct expr *e)
         return hash_at(l, e, at, t);
     }
     return hash_value(l, lower_expr(l, receiver), t);
+}
+
+/* DESIGN: the default `hash` of a class is code the compiler writes,
+   `C.hash`. It takes the same fields its default `equals` compares, so
+   two equal objects hash alike. Each field goes into the hash as a part of a
+   struct does, an `own` slice element by element. */
+void lower_class_hash(struct lowerer *l, const struct item *it)
+{
+    const struct type *t = it->symbol->type;
+    struct ir_function *f = lower_class_function(l, t, "hash");
+    const struct expr *e = it->default_hash;
+    const struct type *up;
+    struct ir_operand self;
+    struct ir_operand h = i64(ANTI_HASH_START);
+    size_t i;
+
+    l->f = f;
+    l->b = ir_block_add(f);
+    self = lower_temp(l, f->params[0].temp);
+    for (up = t; up != NULL; up = up->base) {
+        for (i = 0; i < up->field_count; i++) {
+            const struct struct_field *fd = &up->fields[i];
+            struct ir_operand at;
+            struct ir_operand part;
+            if ((fd->form != FIELD_PLAIN && fd->form != FIELD_USE) ||
+                fd->transient || types_is_mutex(fd->type) ||
+                types_is_object_lock(fd->type) || lower_unreadable(fd->type)) {
+                continue;
+            }
+            if (fd->bits != 0) {
+                struct ir_operand v = lower_temp(
+                    l, ir_bitload(l->f, l->b, lower_ir_type_of(fd->type), self,
+                                  lower_agg_of(l, up), (uint32_t)i));
+                h = combine(l, h, hash_value(l, v, fd->type));
+                continue;
+            }
+            at = lower_offset_address(l, self,
+                                      lower_field_offset(l, up, &fd->name));
+            if (fd->owned && fd->type->kind == TYPE_SLICE) {
+                struct ir_operand p =
+                    lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+                part = hash_run(l, e, p, lower_slice_length(l, at, fd->type),
+                                fd->type->element);
+            } else if (fd->type->kind == TYPE_SLICE) {
+                part = hash_view(l, at, fd->type);
+            } else {
+                part = hash_at(l, e, at, fd->type);
+            }
+            h = combine(l, h, part);
+        }
+    }
+    ir_ret(l->f, l->b, IR_I64, h);
 }

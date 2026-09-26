@@ -511,6 +511,10 @@ bool sema_equals(struct checker *c, struct expr *e, struct type *t);
    place, which the `equals` of `Object` cannot compare, or NULL. A class
    that replaces `equals` has none. */
 const struct struct_field *sema_class_gap(const struct type *t);
+/* Give the class it the checked `==` and `x.hash()` of the default
+   `equals` and `hash` the compiler writes for it, where its chain declares
+   neither. */
+void sema_class_defaults(struct checker *c, struct item *it);
 /* The end of a refusal of the hook named hook on type t: what a struct
    or a class without `lt` declares, and "" for any other. */
 const char *sema_no_order(const struct type *t, const char *hook);

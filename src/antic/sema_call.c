@@ -2297,6 +2297,41 @@ static void refuse_field(struct checker *c, const struct expr *e,
                   (int)name->length, name->text);
 }
 
+/* DESIGN: `--no-reflect` drops the field lists, the function lists and
+   the registry. The default `serialize`, `Object.deserialize` and every
+   function of `anti.reflect` read them. A call of one is therefore refused
+   where it stands rather than giving an empty answer at run time. `==` and
+   `hash` read none, since the compiler writes both as code, and a class
+   that writes its own `serialize` keeps it. */
+static void refuse_without_reflect(struct checker *c, const struct expr *e)
+{
+    const struct expr *callee;
+    const struct symbol *sym;
+
+    if (e->kind != EXPR_CALL) {
+        return;
+    }
+    callee = e->as.call.callee;
+    sym = callee->symbol;
+    if (sym == NULL) {
+        return;
+    }
+    if (sym->item != NULL && sym->item->runtime != NULL &&
+        (sema_name_is(&sym->item->name, "serialize") ||
+         sema_name_is(&sym->item->name, ROOT_DESERIALIZE))) {
+        sema_error_at(c, e->pos, "`%.*s` reads the field lists, which "
+                      "`--no-reflect` drops", (int)sym->item->name.length,
+                      sym->item->name.text);
+        return;
+    }
+    if (sym->home != NULL && sym->home->module != NULL &&
+        strcmp(sym->home->module, REFLECT_MODULE) == 0) {
+        sema_error_at(c, e->pos, "`" REFLECT_MODULE "` reads the field "
+                      "lists, the function lists and the registry, which "
+                      "`--no-reflect` drops");
+    }
+}
+
 /* Whether the module declares a shared `operator fn` of the name name,
    one it holds as `name:Type`. */
 static bool shared_in_module(const struct checker *c, const struct name *name)
@@ -2358,6 +2393,9 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
     c->callee = callee;
     t = check_call(c, e, expected, &g);
     c->callee = saved;
+    if (c->module->no_reflect && !sema_is_error(t)) {
+        refuse_without_reflect(c, e);
+    }
     return t;
 }
 

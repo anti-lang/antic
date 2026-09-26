@@ -513,6 +513,17 @@ add_test(NAME program_walk_forms_dev
         "-DOPTIONS=--dev"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+# The default `==` and hash of a class without the field lists, which
+# --no-reflect drops. The compiler writes both as code.
+add_test(NAME program_eq_compiled_no_reflect
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/eq_compiled.anti"
+        "-DOPTIONS=--no-reflect"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 # The default hash in dev mode, which writes it in each module apart, and
 # the patterns of `for`.
 foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived
@@ -3291,6 +3302,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "hashing|--front-end,hashing.anti"
         "equality|--front-end,equality.anti"
         "overloads|--front-end,overloads.anti"
+        "no_reflect|--front-end,--no-reflect,--runtime,${ANTIC_RUNTIME_DIR},no_reflect.anti"
         "direct_imports|--front-end,--runtime,${ANTIC_RUNTIME_DIR},direct_imports.anti"
         "walk_interfaces|--front-end,--runtime,${ANTIC_RUNTIME_DIR},walk_interfaces.anti"
         "handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},handles.anti"

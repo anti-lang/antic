@@ -62,24 +62,22 @@ static struct ir_operand call_eq(struct lowerer *l, struct ir_function *fn,
 }
 
 /* The `equals` a class value of type t calls: the one of the lowest
-   class of its chain that declares one, or that of the root. The value
-   has its class, so the call is direct. */
+   class of its chain that declares one, or the default the compiler
+   writes for t. The value has its class, so the call is direct. */
 static struct ir_operand class_equals(struct lowerer *l, const struct type *t,
                                       struct ir_operand a, struct ir_operand b)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_PTR};
+    const struct type *up;
     const struct item *m = NULL;
-    struct ir_operand args[2];
 
-    for (; t != NULL && t->kind == TYPE_CLASS && m == NULL; t = t->base) {
-        m = lower_level_fn(t, &equals_name);
+    for (up = t; up != NULL && up->kind == TYPE_CLASS && m == NULL;
+         up = up->base) {
+        m = lower_level_fn(up, &equals_name);
     }
     if (m != NULL) {
         return call_eq(l, lower_callee_function(l, m->symbol), a, b);
     }
-    args[0] = a;
-    args[1] = b;
-    return lower_rt_call(l, RUNTIME_ROOT "equals", IR_I8, params, args, 2);
+    return call_eq(l, lower_class_function(l, t, "equals"), a, b);
 }
 
 /* Whether the Regex values at a and b have one text and one mode, which
@@ -297,6 +295,12 @@ static void compare_at(struct lowerer *l, const struct expr *e,
         require(l, cmp, class_equals(l, t, a, b));
         return;
     case TYPE_STRUCT:
+        /* A union or a Match is no part a default reads. The checker
+           refuses `==` on either, and the default of a class passes over
+           a field that holds one. */
+        if (t->is_union || types_is_match(t)) {
+            return;
+        }
         if (types_is_regex(t)) {
             require(l, cmp, same_pattern(l, a, b));
             return;
@@ -358,4 +362,189 @@ struct ir_operand lower_equals(struct lowerer *l, const struct expr *e)
                                          ir_int_op(IR_I8, 0)));
     }
     return result;
+}
+
+/* Whether a value of type t holds a union or a Match in place, which no
+   default reads. It may stand there directly or in a struct, an array, a
+   `?T` or a case of a variant. */
+bool lower_unreadable(const struct type *t)
+{
+    size_t i;
+
+    while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
+        t = t->element;
+    }
+    if (t->kind == TYPE_VARIANT) {
+        for (i = 0; i < t->param_count; i++) {
+            if (t->params[i] != NULL && lower_unreadable(t->params[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (t->kind != TYPE_STRUCT) {
+        return false;
+    }
+    if (t->is_union || types_is_match(t)) {
+        return true;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (!type_field_is_unit_break(&t->fields[i]) &&
+            lower_unreadable(t->fields[i].type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Two `own` slices of type t at a and b: the same length, and then equal
+   elements, one by one. */
+static void compare_owned(struct lowerer *l, const struct expr *e,
+                          struct comparison *cmp, struct ir_operand a,
+                          struct ir_operand b, const struct type *t)
+{
+    const struct type *element = t->element;
+    struct ir_operand count = lower_slice_length(l, a, t);
+    struct ir_operand x = lower_temp(l, ir_load(l->f, l->b, IR_PTR, a));
+    struct ir_operand y = lower_temp(l, ir_load(l->f, l->b, IR_PTR, b));
+    struct ir_operand size = lower_size_operand(l, element);
+    struct ir_block *test;
+    struct ir_block *body;
+    struct ir_block *done;
+    struct ir_operand offset;
+    uint32_t index;
+
+    require(l, cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, count,
+                                            lower_slice_length(l, b, t))));
+    test = lower_new_block(l);
+    body = lower_new_block(l);
+    done = lower_new_block(l);
+    index = ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_SLT, IR_I8,
+                                      lower_temp(l, index), count)),
+              body, done);
+    l->b = body;
+    offset = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                     lower_temp(l, index), size));
+    {
+        struct ir_operand p = lower_temp(l, ir_ptradd(l->f, l->b, x, offset));
+        struct ir_operand q = lower_temp(l, ir_ptradd(l->f, l->b, y, offset));
+        compare_at(l, e, cmp, p, q, element);
+    }
+    ir_assign(l->f, l->b, index,
+              lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64,
+                                      lower_temp(l, index),
+                                      ir_int_op(IR_I64, 1))));
+    ir_jump(l->f, l->b, test);
+    l->b = done;
+}
+
+/* Field index of level up of a class, at self and at other. */
+static void compare_member(struct lowerer *l, const struct expr *e,
+                           struct comparison *cmp, const struct type *up,
+                           size_t index, struct ir_operand self,
+                           struct ir_operand other)
+{
+    const struct struct_field *f = &up->fields[index];
+    struct ir_operand offset;
+    struct ir_operand a;
+    struct ir_operand b;
+
+    if ((f->form != FIELD_PLAIN && f->form != FIELD_USE) || f->transient ||
+        types_is_mutex(f->type) || types_is_object_lock(f->type) ||
+        lower_unreadable(f->type)) {
+        return;
+    }
+    if (f->bits != 0) {
+        enum ir_type type = lower_ir_type_of(f->type);
+        uint32_t agg = lower_agg_of(l, up);
+        struct ir_operand x = lower_temp(
+            l, ir_bitload(l->f, l->b, type, self, agg, (uint32_t)index));
+        struct ir_operand y = lower_temp(
+            l, ir_bitload(l->f, l->b, type, other, agg, (uint32_t)index));
+        require(l, cmp, same_value(l, f->type, x, y));
+        return;
+    }
+    offset = lower_field_offset(l, up, &f->name);
+    a = lower_offset_address(l, self, offset);
+    b = lower_offset_address(l, other, offset);
+    if (f->owned && f->type->kind == TYPE_SLICE) {
+        compare_owned(l, e, cmp, a, b, f->type);
+        return;
+    }
+    /* An `own fn` is the code and the snapshot, each compared as a
+       pointer compares. */
+    if (f->owned && f->type->kind == TYPE_FN) {
+        uint32_t agg = lower_agg_of(l, f->type);
+        struct ir_operand second =
+            ir_sym_operand(l->m, ir_sym_offset_of(l->m, agg, 1));
+        struct ir_operand x = lower_temp(l, ir_load(l->f, l->b, IR_PTR, a));
+        struct ir_operand y = lower_temp(l, ir_load(l->f, l->b, IR_PTR, b));
+        require(l, cmp, same_value(l, f->type, x, y));
+        x = lower_temp(l, ir_load(l->f, l->b, IR_PTR,
+                                  lower_offset_address(l, a, second)));
+        y = lower_temp(l, ir_load(l->f, l->b, IR_PTR,
+                                  lower_offset_address(l, b, second)));
+        require(l, cmp, same_value(l, f->type, x, y));
+        return;
+    }
+    compare_at(l, e, cmp, a, b, f->type);
+}
+
+/* DESIGN: the default `equals` of a class is code the compiler writes,
+   `C.equals`, so it reads no field list and works under `--no-reflect`.
+   The same object is equal to itself. Two objects of different classes
+   are never equal, which their descriptors tell. Every field of the chain
+   is then compared as the default `==` of a struct compares a part. An
+   `own` slice compares element by element and an `own fn` by its code and
+   its snapshot. A lock, a `transient` field, the sub-object of an
+   interface and a field that holds a union or a Match are passed over. */
+void lower_class_equals(struct lowerer *l, const struct item *it)
+{
+    static const enum ir_type one[] = {IR_PTR};
+    const struct type *t = it->symbol->type;
+    struct ir_function *f = lower_class_function(l, t, "equals");
+    const struct expr *e = it->default_eq;
+    const struct type *up;
+    struct comparison cmp;
+    struct ir_block *done;
+    struct ir_block *next;
+    struct ir_operand self;
+    struct ir_operand other;
+    struct ir_operand ours;
+    struct ir_operand theirs;
+    size_t i;
+
+    l->f = f;
+    l->b = ir_block_add(f);
+    self = lower_temp(l, f->params[0].temp);
+    other = lower_temp(l, f->params[1].temp);
+    cmp.result = ir_unary(l->f, l->b, IR_COPY, IR_I8, ir_int_op(IR_I8, 1));
+    cmp.differ = lower_new_block(l);
+    done = lower_new_block(l);
+    next = lower_new_block(l);
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, self, other)),
+              done, next);
+    l->b = next;
+    require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, other,
+                                             ir_int_op(IR_PTR, 0))));
+    ours = lower_rt_call(l, "anti_rt_descriptor", IR_PTR, one, &self, 1);
+    theirs = lower_rt_call(l, "anti_rt_descriptor", IR_PTR, one, &other, 1);
+    require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, ours,
+                                             theirs)));
+    for (up = t; up != NULL; up = up->base) {
+        for (i = 0; i < up->field_count; i++) {
+            compare_member(l, e, &cmp, up, i, self, other);
+        }
+    }
+    ir_jump(l->f, l->b, done);
+    l->b = cmp.differ;
+    ir_assign(l->f, l->b, cmp.result, ir_int_op(IR_I8, 0));
+    ir_jump(l->f, l->b, done);
+    l->b = done;
+    ir_ret(l->f, l->b, IR_I8, lower_temp(l, cmp.result));
 }

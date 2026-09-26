@@ -3721,6 +3721,11 @@ bool sema_check(struct module *module, const char *module_name,
     if (c.ok && module->compile_copies) {
         sema_compile_copies(&c);
     }
+    if (c.ok) {
+        for (i = 0; i < module->item_count; i++) {
+            sema_class_defaults(&c, module->items[i]);
+        }
+    }
     free(c.module_scope.entries);
     return c.ok;
 }

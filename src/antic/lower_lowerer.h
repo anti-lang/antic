@@ -473,11 +473,23 @@ struct ir_operand lower_compare_text(struct lowerer *l, enum token_kind op,
 /* The default `==` or `!=` e, which the checker marked `equals`. */
 struct ir_operand lower_equals(struct lowerer *l, const struct expr *e);
 
+/* Write the default `equals` of the class it, from the checked `==` the
+   checker gave it. */
+void lower_class_equals(struct lowerer *l, const struct item *it);
+
+/* Whether a value of type t holds a union or a Match in place, which the
+   default of a class passes over. */
+bool lower_unreadable(const struct type *t);
+
 /* lower_hash.c */
 
 /* The default hash of the receiver of e, a call that the checker marked
    `hashes`. */
 struct ir_operand lower_hash(struct lowerer *l, const struct expr *e);
+
+/* Write the default `hash` of the class it, from the checked `x.hash()`
+   the checker gave it. */
+void lower_class_hash(struct lowerer *l, const struct item *it);
 
 /* lower_simd.c */
 

@@ -372,21 +372,27 @@ static bool holds_union(const struct type *t)
     return false;
 }
 
-/* Whether a class of the chain of t below the root replaces `equals`. */
-static bool own_equals(const struct type *t)
+/* Whether a class of the chain of t below the root declares the function
+   name. */
+static bool declares(const struct type *t, const char *name)
 {
-    static const struct name equals = {"equals", 6};
     size_t i;
 
     for (; t != NULL && t->base != NULL; t = t->base) {
         for (i = 0; i < t->member_count; i++) {
             if (t->members[i]->kind == ITEM_FN &&
-                sema_same_name(&t->members[i]->name, &equals)) {
+                sema_name_is(&t->members[i]->name, name)) {
                 return true;
             }
         }
     }
     return false;
+}
+
+/* Whether a class of the chain of t below the root replaces `equals`. */
+static bool own_equals(const struct type *t)
+{
+    return declares(t, "equals");
 }
 
 const struct struct_field *sema_class_gap(const struct type *t)
@@ -471,4 +477,56 @@ const char *sema_no_order(const struct type *t, const char *hook)
     }
     return ". A struct or a class has no default order and declares "
            "`operator fn lt`";
+}
+
+/* DESIGN: the compiler writes the default `equals` and `hash` of each
+   class as code, as it writes the default `==` of a struct. They work in
+   every build, and `--no-reflect` drops nothing they read. The checker
+   gives the class a checked `==` and a checked `x.hash()`. Their lists
+   hold the call of each operator the fields reach, and lowering writes
+   both functions from the type with them. An
+   `own` slice reaches the calls of its elements, which it compares one by
+   one. */
+void sema_class_defaults(struct checker *c, struct item *it)
+{
+    struct type *t;
+    struct type *up;
+    size_t i;
+
+    if (it->kind != ITEM_CLASS || it->is_abstract ||
+        it->type_param_count > 0 || it->symbol == NULL ||
+        it->symbol->type == NULL || it->symbol->type->kind != TYPE_CLASS) {
+        return;
+    }
+    t = it->symbol->type;
+    if (!declares(t, "equals")) {
+        struct expr *e = sema_new_node(c, EXPR_BINARY, it->pos);
+        e->as.binary.op = TOKEN_EQ;
+        e->as.binary.equals = true;
+        for (up = t; up != NULL; up = up->base) {
+            for (i = 0; i < up->field_count; i++) {
+                const struct struct_field *f = &up->fields[i];
+                if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
+                    continue;
+                }
+                walk_eq(c, e, f->owned && f->type->kind == TYPE_SLICE
+                                  ? f->type->element
+                                  : f->type);
+            }
+        }
+        it->default_eq = e;
+    }
+    if (!declares(t, "hash")) {
+        struct expr *e = sema_new_node(c, EXPR_CALL, it->pos);
+        e->as.call.hashes = true;
+        for (up = t; up != NULL; up = up->base) {
+            for (i = 0; i < up->field_count; i++) {
+                const struct struct_field *f = &up->fields[i];
+                if (f->form == FIELD_PLAIN || f->form == FIELD_USE) {
+                    walk(c, e, f->type);
+                }
+            }
+        }
+        it->default_hash = e;
+    }
 }

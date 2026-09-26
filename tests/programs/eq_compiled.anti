@@ -1,0 +1,74 @@
+//! The compiler writes the default `equals` and `hash` of each class as code,
+//! as it writes the default `==` of a struct, so they work in every build,
+//! `--no-reflect` included. A field of a struct with its own `==` compares
+//! through it: `Point` is equal on `x` alone, so two holders whose points
+//! differ in `y` are equal and hash alike. A call through `*Object` reaches the
+//! same function, and two objects of different classes are never equal.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// Points are equal on `x` alone.
+operator fn eq(a: Point, b: Point) -> bool
+{
+	return a.x == b.x;
+}
+
+operator fn hash(p: Point) -> u64
+{
+	return p.x as u64;
+}
+
+class Holder
+{
+	pub at: Point,
+	pub n: int = 0,
+}
+
+class Other
+{
+	pub at: Point,
+	pub n: int = 0,
+}
+
+class Outer
+{
+	pub inner: Holder,
+	pub label: str = "",
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let one = alloc Holder { at: Point { x: 1, y: 2 }, n: 5 };
+	let two = alloc Holder { at: Point { x: 1, y: 3 }, n: 5 };
+	let three = alloc Holder { at: Point { x: 2, y: 2 }, n: 5 };
+	let four = alloc Holder { at: Point { x: 1, y: 2 }, n: 6 };
+	printf("holder %d %d %d %d\n".ptr, b(*one == *two), b(*one == *three),
+		b(*one == *four), b(one.hash() == two.hash()));
+	let as_object: *Object = two;
+	let other = alloc Other { at: Point { x: 1, y: 2 }, n: 5 };
+	let other_object: *Object = other;
+	printf("object %d %d\n".ptr, b(one.equals(as_object)),
+		b(one.equals(other_object)));
+	let x = alloc Outer { inner: Holder { at: Point { x: 1, y: 2 } } };
+	let y = alloc Outer { inner: Holder { at: Point { x: 1, y: 9 } } };
+	printf("outer %d %d\n".ptr, b(*x == *y), b(x.hash() == y.hash()));
+	delete(one);
+	delete(two);
+	delete(three);
+	delete(four);
+	delete(other);
+	delete(x);
+	delete(y);
+	return 0;
+}

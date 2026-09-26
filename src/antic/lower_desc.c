@@ -1572,13 +1572,18 @@ struct ir_function *lower_class_function(struct lowerer *l,
     text_appendf(&name, ".%s", part);
     f = lower_find_function(l->m, module, text_cstr(&name));
     if (f == NULL) {
+        /* The default `equals` gives a bool and `hash` a u64. */
+        enum ir_type result = strcmp(part, "equals") == 0 ? IR_I8
+                              : strcmp(part, "hash") == 0 ? IR_I64
+                                                          : IR_VOID;
         f = lower_defines(l, t, module)
-                ? ir_function_add(l->m, module, text_cstr(&name), IR_VOID,
+                ? ir_function_add(l->m, module, text_cstr(&name), result,
                                   IR_NO_AGG)
-                : ir_declare_add(l->m, module, text_cstr(&name), IR_VOID,
+                : ir_declare_add(l->m, module, text_cstr(&name), result,
                                  IR_NO_AGG);
         ir_param_add(f, IR_PTR, IR_NO_AGG);
-        if (strcmp(part, "copy") == 0 || strcmp(part, "destroy") == 0) {
+        if (strcmp(part, "copy") == 0 || strcmp(part, "destroy") == 0 ||
+            strcmp(part, "equals") == 0) {
             ir_param_add(f, IR_PTR, IR_NO_AGG);
         }
     }
@@ -1645,13 +1650,22 @@ struct ir_global *lower_class_table(struct lowerer *l, const struct type *t)
     value->items[0].global = lower_class_descriptor(l, t)->index;
     for (i = 0; i < table.count; i++) {
         static const struct name destruct_name = {"destruct", 8};
+        static const struct name equals_name = {"equals", 6};
+        static const struct name hash_name = {"hash", 4};
         const struct item *fn = table.entries[i].fn;
+        /* The root's `equals` and `hash`, which the runtime holds, stand
+           for the defaults the compiler writes for each class. */
+        bool root = fn == NULL || fn->runtime != NULL;
         const struct ir_function *written =
             lower_same_name(&table.entries[i].name, &destruct_name)
                 ? lower_class_function(l, t, "destroy")
             : lower_same_name(&table.entries[i].name, &copy_name) &&
                     lower_declared_copy(t) == NULL
                 ? lower_class_function(l, t, "copy")
+            : root && lower_same_name(&table.entries[i].name, &equals_name)
+                ? lower_class_function(l, t, "equals")
+            : root && lower_same_name(&table.entries[i].name, &hash_name)
+                ? lower_class_function(l, t, "hash")
                 : NULL;
         value->items[i + 1].scalar = IR_PTR;
         if (written != NULL) {

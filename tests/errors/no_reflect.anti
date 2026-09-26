@@ -1,0 +1,39 @@
+//! Under `--no-reflect` a call of the default `serialize`, of
+//! `Object.deserialize` and of any function of `anti.reflect` is refused, since
+//! each reads what the option drops: the field lists, the function lists and
+//! the registry. A class that writes its own `serialize` keeps it, and `==` and
+//! `hash` work, since the compiler writes both as code.
+import anti.mem;
+import anti.reflect;
+import anti.text;
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+class Written
+{
+	pub n: int = 0,
+
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		out.append("{}");
+	}
+}
+
+fn main() -> int
+{
+	let p = alloc Plain { n: 1 };
+	let w = alloc Written { n: 1 };
+	let out = text.Builder.new();
+	p.serialize(&out);
+	w.serialize(&out);
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 64);
+	let back = Object.deserialize(out.text(), &arena);
+	let d = reflect.describe(p as *byte);
+	let same = *p == *p && p.hash() == p.hash();
+	delete(p);
+	delete(w);
+	return 0;
+}

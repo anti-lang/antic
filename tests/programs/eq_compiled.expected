@@ -1,0 +1,4 @@
+exit 0
+holder 1 0 0 1
+object 1 0
+outer 1 1

@@ -176,24 +176,6 @@ void anti_rt_store_integer(void *bytes, int64_t type, uint64_t value)
     }
 }
 
-/* DESIGN: equals and hash take each field by its kind, as the default
-   `==` and hash of a struct do. The two then always agree, and a class
-   and a struct with the same fields compare alike. A scalar, an enum, a
-   pointer and a function compare by their bytes, so a pointer compares
-   by its address. A str compares by its bytes. An own slice compares
-   element by element, and a plain slice by its address and its length.
-   A struct compares field by field under the same rule, in place, in an
-   array or in an own slice. A class value compares through the equals
-   of its own table. An array compares element by element through every
-   level of it. A bitfield and a field of type id none are passed over,
-   and the checker refuses the default `==` of a class with a union. */
-
-static int same_value(const unsigned char *a, const unsigned char *b,
-                      int64_t type, const struct anti_descriptor *d,
-                      int64_t owned);
-static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
-                           const struct anti_descriptor *d, int64_t owned);
-
 /* FNV-1a of count bytes at p into h. */
 static uint64_t hash_run(uint64_t h, const unsigned char *p, size_t count)
 {
@@ -259,35 +241,6 @@ static int optional_has(const unsigned char *bytes,
     return d != NULL && d->field_count >= 2 && bytes[d->fields[1].offset] != 0;
 }
 
-/* Whether the fields that d itself declares are the same at a and b. */
-static int same_fields(const unsigned char *a, const unsigned char *b,
-                       const struct anti_descriptor *d)
-{
-    int64_t i;
-
-    for (i = 0; i < d->field_count; i++) {
-        const struct anti_field *f = &d->fields[i];
-        if (!same_value(a + f->offset, b + f->offset, f->type, f->descriptor,
-                        f->owned)) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-/* The fields that d itself declares at p, into h. */
-static uint64_t hash_fields(uint64_t h, const unsigned char *p,
-                            const struct anti_descriptor *d)
-{
-    int64_t i;
-
-    for (i = 0; i < d->field_count; i++) {
-        const struct anti_field *f = &d->fields[i];
-        h = hash_value(h, p + f->offset, f->type, f->descriptor, f->owned);
-    }
-    return h;
-}
-
 const struct anti_descriptor *
 anti_rt_array_element_descriptor(int64_t type, const struct anti_descriptor *d)
 {
@@ -333,248 +286,38 @@ size_t anti_rt_array_element_size(int64_t type,
     return anti_rt_type_size(inner);
 }
 
-/* Whether a class field of descriptor d is the sub-object of an
-   interface, a view of the object that holds it. No value of an abstract
-   class stands in place otherwise, and only an abstract class carries
-   versions. Its table leads back to that object, so it is passed over. */
-static int sub_object(const struct anti_descriptor *d)
-{
-    return d != NULL && d->versions != NULL;
-}
-
-/* Whether the element of type id element at a and b is the same, in an
-   own slice, an array or in place. */
-static int same_element(const unsigned char *a, const unsigned char *b,
-                        int64_t element, const struct anti_descriptor *d)
-{
-    /* A tuple has the id of a struct and no descriptor, and is passed
-       over. */
-    if (element == ANTI_TYPE_STRUCT) {
-        return d == NULL || same_fields(a, b, d);
-    }
-    if (element == ANTI_TYPE_CLASS && sub_object(d)) {
-        return 1;
-    }
-    if (element == ANTI_TYPE_CLASS) {
-        int8_t (*equals)(struct anti_object *, struct anti_object *) =
-            (int8_t(*)(struct anti_object *, struct anti_object *))
-                anti_rt_entry_body(a, ANTI_ENTRY_EQUALS);
-        return equals != NULL &&
-               equals((struct anti_object *)a, (struct anti_object *)b) != 0;
-    }
-    return same_value(a, b, element, NULL, 0);
-}
-
-static uint64_t hash_element(uint64_t h, const unsigned char *p,
-                             int64_t element, const struct anti_descriptor *d)
-{
-    if (element == ANTI_TYPE_STRUCT) {
-        return d != NULL ? hash_fields(h, p, d) : h;
-    }
-    if (element == ANTI_TYPE_CLASS && sub_object(d)) {
-        return h;
-    }
-    if (element == ANTI_TYPE_CLASS) {
-        uint64_t (*hash)(struct anti_object *) =
-            (uint64_t(*)(struct anti_object *))anti_rt_entry_body(
-                p, ANTI_ENTRY_HASH);
-        uint64_t v = hash != NULL ? hash((struct anti_object *)p) : 0;
-        return hash_run(h, (const unsigned char *)&v, sizeof v);
-    }
-    return hash_value(h, p, element, NULL, 0);
-}
-
-static int same_value(const unsigned char *a, const unsigned char *b,
-                      int64_t type, const struct anti_descriptor *d,
-                      int64_t owned)
-{
-    int64_t t = anti_rt_type_scalar(type);
-    struct anti_text x;
-    struct anti_text y;
-    int64_t i;
-    size_t size;
-
-    switch (t) {
-    case ANTI_TYPE_STRUCT:
-    case ANTI_TYPE_CLASS:
-        return same_element(a, b, t, d);
-    /* A channel is its handle, and an own fn its code and its snapshot,
-       each compared as a pointer compares. */
-    case ANTI_TYPE_HANDLE:
-        return memcmp(a, b, (size_t)ANTI_TYPE_ELEMENT(type) * sizeof(void *)) ==
-               0;
-    case ANTI_TYPE_REGEX: {
-        const void *pattern_a;
-        const void *pattern_b;
-        memcpy(&pattern_a, a, sizeof pattern_a);
-        memcpy(&pattern_b, b, sizeof pattern_b);
-        return anti_rt_pattern_same(pattern_a, pattern_b);
-    }
-    case ANTI_TYPE_TUPLE:
-        return d == NULL || same_fields(a, b, d);
-    case ANTI_TYPE_VARIANT: {
-        const struct anti_field *which = anti_rt_variant_case(a, d);
-        if (which != anti_rt_variant_case(b, d)) {
-            return 0;
-        }
-        return which == NULL || which->descriptor == NULL ||
-               same_fields(a + which->offset, b + which->offset,
-                           which->descriptor);
-    }
-    case ANTI_TYPE_OPTIONAL:
-        if (optional_has(a, d) != optional_has(b, d)) {
-            return 0;
-        }
-        return !optional_has(a, d) ||
-               same_value(a + d->fields[0].offset, b + d->fields[0].offset,
-                          d->fields[0].type, d->fields[0].descriptor, 0);
-    case ANTI_TYPE_ARRAY:
-        size = anti_rt_array_element_size(type, d);
-        for (i = 0; size > 0 && i < ANTI_TYPE_COUNT(type); i++) {
-            if (!same_element(a + (size_t)i * size, b + (size_t)i * size,
-                              ANTI_TYPE_INNER(type),
-                              anti_rt_array_element_descriptor(type, d))) {
-                return 0;
-            }
-        }
-        return 1;
-    case ANTI_TYPE_STR:
-        memcpy(&x, a, sizeof x);
-        memcpy(&y, b, sizeof y);
-        return x.len == y.len &&
-               (x.len == 0 || memcmp(x.ptr, y.ptr, (size_t)x.len) == 0);
-    case ANTI_TYPE_SLICE:
-        memcpy(&x, a, sizeof x);
-        memcpy(&y, b, sizeof y);
-        if (x.len != y.len) {
-            return 0;
-        }
-        if (!owned || x.ptr == y.ptr) {
-            return x.ptr == y.ptr;
-        }
-        size = anti_rt_element_size(type, d);
-        for (i = 0; size > 0 && i < x.len; i++) {
-            if (!same_element(x.ptr + (size_t)i * size,
-                              y.ptr + (size_t)i * size,
-                              ANTI_TYPE_ELEMENT(type), d)) {
-                return 0;
-            }
-        }
-        return 1;
-    default:
-        size = anti_rt_type_size(t);
-        return size == 0 || memcmp(a, b, size) == 0;
-    }
-}
-
-static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
-                           const struct anti_descriptor *d, int64_t owned)
-{
-    int64_t t = anti_rt_type_scalar(type);
-    struct anti_text x;
-    int64_t i;
-    size_t size;
-
-    switch (t) {
-    case ANTI_TYPE_STRUCT:
-    case ANTI_TYPE_CLASS:
-        return hash_element(h, p, t, d);
-    case ANTI_TYPE_HANDLE:
-        return hash_run(h, p, (size_t)ANTI_TYPE_ELEMENT(type) * sizeof(void *));
-    case ANTI_TYPE_REGEX: {
-        const void *pattern;
-        uint64_t v;
-        memcpy(&pattern, p, sizeof pattern);
-        v = anti_rt_pattern_hash(pattern);
-        return hash_run(h, (const unsigned char *)&v, sizeof v);
-    }
-    case ANTI_TYPE_TUPLE:
-        return d == NULL ? h : hash_fields(h, p, d);
-    case ANTI_TYPE_VARIANT: {
-        const struct anti_field *which = anti_rt_variant_case(p, d);
-        uint64_t tag = which != NULL ? (uint64_t)which->owned : 0;
-        h = hash_run(h, (const unsigned char *)&tag, sizeof tag);
-        return which == NULL || which->descriptor == NULL
-                   ? h
-                   : hash_fields(h, p + which->offset, which->descriptor);
-    }
-    case ANTI_TYPE_OPTIONAL: {
-        unsigned char has = (unsigned char)optional_has(p, d);
-        h = hash_run(h, &has, 1);
-        return has == 0 ? h
-                        : hash_value(h, p + d->fields[0].offset,
-                                     d->fields[0].type,
-                                     d->fields[0].descriptor, 0);
-    }
-    case ANTI_TYPE_ARRAY:
-        size = anti_rt_array_element_size(type, d);
-        for (i = 0; size > 0 && i < ANTI_TYPE_COUNT(type); i++) {
-            h = hash_element(h, p + (size_t)i * size, ANTI_TYPE_INNER(type),
-                             anti_rt_array_element_descriptor(type, d));
-        }
-        return h;
-    case ANTI_TYPE_STR:
-        memcpy(&x, p, sizeof x);
-        h = hash_run(h, (const unsigned char *)&x.len, sizeof x.len);
-        return x.len > 0 ? hash_run(h, x.ptr, (size_t)x.len) : h;
-    case ANTI_TYPE_SLICE:
-        memcpy(&x, p, sizeof x);
-        h = hash_run(h, (const unsigned char *)&x.len, sizeof x.len);
-        if (!owned) {
-            return hash_run(h, (const unsigned char *)&x.ptr, sizeof x.ptr);
-        }
-        size = anti_rt_element_size(type, d);
-        for (i = 0; size > 0 && i < x.len; i++) {
-            h = hash_element(h, x.ptr + (size_t)i * size,
-                             ANTI_TYPE_ELEMENT(type), d);
-        }
-        return h;
-    default:
-        return hash_run(h, p, anti_rt_type_size(t));
-    }
-}
-
-/* Compare the fields the chain declares, from the class up to the root.
-   Two objects of different classes are never equal. */
+/* DESIGN: the compiler writes the default `equals` and `hash` of every
+   class as code, and a class that replaces one fills its entry. The root
+   functions stay for C code, which calls them by name, and each calls
+   the entry of the object's own table. The runtime keeps no walk of the
+   fields for either, and its walk serves serialize, deserialize and
+   reflect alone. */
 int8_t anti_lang_Object_equals(struct anti_object *self,
                                struct anti_object *other)
 {
-    const struct anti_descriptor *d = anti_rt_descriptor(self);
+    int8_t (*equals)(struct anti_object *, struct anti_object *);
 
     if (self == other) {
         return 1;
     }
-    if (self == NULL || other == NULL ||
-        d != anti_rt_descriptor(other)) {
+    if (self == NULL || other == NULL) {
         return 0;
     }
-    for (; d != NULL; d = d->parent) {
-        if (!same_fields((const unsigned char *)self,
-                         (const unsigned char *)other, d)) {
-            return 0;
-        }
-    }
-    return 1;
+    equals = (int8_t(*)(struct anti_object *, struct anti_object *))
+        anti_rt_entry_body(self, ANTI_ENTRY_EQUALS);
+    return equals != NULL && equals(self, other) != 0;
 }
 
-/* FNV-1a over the fields that the level d of the chain of self declares,
-   and those of every level above it first, into h. */
-static uint64_t hash_level(const struct anti_object *self,
-                           const struct anti_descriptor *d, uint64_t h)
-{
-    if (d == NULL) {
-        return h;
-    }
-    h = hash_level(self, d->parent, h);
-    return hash_fields(h, (const unsigned char *)self, d);
-}
-
-/* FNV-1a over the same fields that equals compares, so two equal objects
-   hash alike. The fields go in the order of the object, those of the root
-   of the chain first. */
 uint64_t anti_lang_Object_hash(struct anti_object *self)
 {
-    return hash_level(self, anti_rt_descriptor(self), 1469598103934665603u);
+    uint64_t (*hash)(struct anti_object *);
+
+    if (self == NULL) {
+        return 0;
+    }
+    hash = (uint64_t(*)(struct anti_object *))anti_rt_entry_body(
+        self, ANTI_ENTRY_HASH);
+    return hash != NULL ? hash(self) : 0;
 }
 
 /* Append the bytes of a C string. */
