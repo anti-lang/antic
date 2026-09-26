@@ -49,7 +49,8 @@ enum anti_type {
     ANTI_TYPE_VARIANT,  /* carries its descriptor: the tag, then the cases. */
     ANTI_TYPE_OPTIONAL, /* a `?T` of a value: the value, then the flag. */
     ANTI_TYPE_HANDLE,   /* compared by identity, of the words above. */
-    ANTI_TYPE_REGEX     /* the handle of a compiled pattern. */
+    ANTI_TYPE_REGEX,    /* the handle of a compiled pattern. */
+    ANTI_TYPE_TUPLE     /* carries its descriptor, one record per part. */
 };
 
 /* The type a type id names, and the type it is built on. An enum in the
@@ -66,6 +67,14 @@ int64_t anti_rt_type_scalar(int64_t type);
 /* The bytes that a value of the type id takes on this host. A struct, a
    union, an array and a class give 0, since their id holds no size. */
 size_t anti_rt_type_size(int64_t type);
+
+struct anti_descriptor;
+
+/* The bytes of one element of the array of type id type through every
+   level of it, or 0 where the record does not give them. d is the
+   descriptor of the element. */
+size_t anti_rt_array_element_size(int64_t type,
+                                  const struct anti_descriptor *d);
 
 /* Whether the type id is a signed integer, an enum over one among them. */
 int anti_rt_type_signed(int64_t type);

@@ -402,7 +402,7 @@ enum type_id {
     TYPE_ID_F64, TYPE_ID_STR, TYPE_ID_PTR, TYPE_ID_FN, TYPE_ID_SLICE,
     TYPE_ID_ARRAY, TYPE_ID_STRUCT, TYPE_ID_UNION, TYPE_ID_ENUM,
     TYPE_ID_CLASS, TYPE_ID_F16, TYPE_ID_VARIANT, TYPE_ID_OPTIONAL,
-    TYPE_ID_HANDLE, TYPE_ID_REGEX
+    TYPE_ID_HANDLE, TYPE_ID_REGEX, TYPE_ID_TUPLE
 };
 
 /* The type id of t alone, without the type it is built on. */
@@ -451,9 +451,9 @@ static uint64_t type_id_of(const struct type *t)
     case TYPE_SLICE: return TYPE_ID_SLICE;
     case TYPE_ARRAY: return TYPE_ID_ARRAY;
     case TYPE_STRUCT: return t->is_union ? TYPE_ID_UNION : TYPE_ID_STRUCT;
-    /* A tuple is an anonymous struct, and no module declares it, so it
-       has the id of a struct and no descriptor of its own. */
-    case TYPE_TUPLE: return TYPE_ID_STRUCT;
+    /* A tuple is an anonymous struct that no module declares. It has
+       an id and a descriptor of its own, as a `?T` has. */
+    case TYPE_TUPLE: return TYPE_ID_TUPLE;
     case TYPE_ENUM: return TYPE_ID_ENUM;
     case TYPE_CLASS: return TYPE_ID_CLASS;
     default:
@@ -509,6 +509,8 @@ static const struct ir_global *variant_descriptor(struct lowerer *l,
                                                   const struct type *t);
 static const struct ir_global *optional_descriptor(struct lowerer *l,
                                                    const struct type *t);
+static const struct ir_global *tuple_descriptor(struct lowerer *l,
+                                                const struct type *t);
 static struct ir_const *field_record(struct lowerer *l, const struct name *name,
                                      uint32_t agg, uint32_t index,
                                      uint64_t type, uint64_t word,
@@ -537,6 +539,9 @@ static const struct ir_global *field_descriptor(struct lowerer *l,
     }
     if (t->kind == TYPE_OPTIONAL) {
         return optional_descriptor(l, t);
+    }
+    if (t->kind == TYPE_TUPLE) {
+        return tuple_descriptor(l, t);
     }
     return t->kind == TYPE_STRUCT ? lower_struct_descriptor(l, t) : NULL;
 }
@@ -758,6 +763,47 @@ static const struct ir_global *optional_descriptor(struct lowerer *l,
             TYPE_ID_BOOL, 0, NULL);
         text_appendf(&fields, "optional.%s.fields", text_cstr(&shown));
         give_fields(l, g, l->module_name, text_cstr(&fields), list, 2);
+    }
+    text_free(&shown);
+    text_free(&name);
+    text_free(&fields);
+    return g;
+}
+
+/* DESIGN: a tuple has a descriptor of its own, with one record per part,
+   named `_0` upwards as the parts are. No module declares a tuple, so each
+   module that needs the descriptor writes one of its own, named after its
+   type, as for a `?T`. */
+static const struct ir_global *tuple_descriptor(struct lowerer *l,
+                                                const struct type *t)
+{
+    uint32_t agg = lower_agg_of(l, t);
+    struct text shown = {0};
+    struct text name = {0};
+    struct text fields = {0};
+    struct token_text text;
+    struct ir_global *g;
+    struct ir_const *list;
+    size_t i;
+
+    type_name_qualified(&shown, t);
+    text_appendf(&name, "tuple.%s.descriptor", text_cstr(&shown));
+    g = lower_find_global(l->m, l->module_name, text_cstr(&name));
+    if (g == NULL) {
+        text.bytes = text_cstr(&shown);
+        text.length = shown.length;
+        g = value_descriptor(l, t, l->module_name, text_cstr(&name), &text);
+        list = ir_const_agg(l->m, ir_aggregate(lower_fields_agg(l,
+                                                                t->field_count)),
+                            t->field_count);
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            list->items[i] = *field_record(l, &f->name, agg, (uint32_t)i,
+                                           type_id(f->type), 0, f->type);
+        }
+        text_appendf(&fields, "tuple.%s.fields", text_cstr(&shown));
+        give_fields(l, g, l->module_name, text_cstr(&fields), list,
+                    t->field_count);
     }
     text_free(&shown);
     text_free(&name);

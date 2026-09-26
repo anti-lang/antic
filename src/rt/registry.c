@@ -519,6 +519,48 @@ static bool read_owned(struct reader *r, void **out, int64_t type,
     return value != NULL;
 }
 
+/* DESIGN: a tuple and an array read as the JSON arrays serialize writes.
+   The text holds exactly as many values as the tuple has parts, or as the
+   array has elements through every level of it. Any other count fails
+   the text. */
+static bool read_parts(struct reader *r, unsigned char *bytes,
+                       const struct anti_descriptor *d, int depth)
+{
+    int64_t i;
+
+    if (!take(r, '[')) {
+        return false;
+    }
+    for (i = 0; i < d->field_count; i++) {
+        const struct anti_field *f = &d->fields[i];
+        if ((i > 0 && !take(r, ',')) ||
+            !read_value(r, bytes + f->offset, f->type, f->descriptor, 0,
+                        depth)) {
+            return false;
+        }
+    }
+    return take(r, ']');
+}
+
+static bool read_array(struct reader *r, unsigned char *bytes, int64_t type,
+                       const struct anti_descriptor *d, int depth)
+{
+    size_t size = anti_rt_array_element_size(type, d);
+    int64_t i;
+
+    if (!take(r, '[')) {
+        return false;
+    }
+    for (i = 0; i < ANTI_TYPE_COUNT(type); i++) {
+        if ((i > 0 && !take(r, ',')) ||
+            !read_value(r, bytes + (size_t)i * size, ANTI_TYPE_INNER(type), d,
+                        0, depth)) {
+            return false;
+        }
+    }
+    return take(r, ']');
+}
+
 /* DESIGN: a variant reads as the object serialize writes, one member
    that names the case and holds its fields. The tag of that case is
    written first. The bytes of its fields are cleared and then filled
@@ -671,6 +713,17 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
         /* A struct without a descriptor was written as null, and keeps
            its default. */
         return skip_value(r, depth + 1);
+    case ANTI_TYPE_TUPLE:
+        if (d == NULL) {
+            return skip_value(r, depth + 1);
+        }
+        return read_parts(r, bytes, d, depth + 1);
+    case ANTI_TYPE_ARRAY:
+        if (anti_rt_array_element_size(type, d) == 0 ||
+            ANTI_TYPE_COUNT(type) == 0) {
+            return skip_value(r, depth + 1);
+        }
+        return read_array(r, bytes, type, d, depth + 1);
     case ANTI_TYPE_VARIANT:
         if (d == NULL || d->field_count < 1 || take_word(r, "null")) {
             return d == NULL || d->field_count < 1 ? skip_value(r, depth + 1)

@@ -461,6 +461,8 @@ static void records_type_ids(void)
            identity. */
         {ANTI_TYPE_HANDLE | (uint64_t)1 << 8, "(none)"},
         {ANTI_TYPE_HANDLE | (uint64_t)2 << 8, "(none)"},
+        /* A tuple carries a descriptor of its own, as a `?T` does. */
+        {ANTI_TYPE_TUPLE, "tuple.(i32, str).descriptor"},
     };
     static const struct field_expect size[] = {
         {ANTI_TYPE_I32, "(none)"},
@@ -483,7 +485,7 @@ static void records_type_ids(void)
         "    y: *Size, z: []Size, own next: *Inner, modes: []Mode,\n"
         "    half: f16, halves: []f16, grid: [2][3]u16, path: [2]Size,\n"
         "    pick: Pick, maybe: ?i32, pipe: chan i32,\n"
-        "    own run: fn(i32) -> i32,\n"
+        "    own run: fn(i32) -> i32, pair: (i32, str),\n"
         "}\n");
     CHECK(l.ok);
     check_field_records(&l.ir, "Holder.fields", holder,

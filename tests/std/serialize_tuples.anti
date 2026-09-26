@@ -1,0 +1,94 @@
+//! A tuple has a runtime description of its own, so a tuple field of a class
+//! compares, hashes, serializes and reads back as a tuple part of a struct
+//! does. `serialize` writes a tuple as a JSON array of its parts, and an array
+//! field as a JSON array of its elements, through every level of it in order.
+//! `Object.deserialize` reads both back, and fails when the count of a tuple or
+//! of an array differs from the one its type has. `reflect.field` names the
+//! type of each field.
+import anti.io;
+import anti.mem;
+import anti.reflect;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Record
+{
+	pub pair: (int, str) = (0, ""),
+	pub nested: (Point, ?int) = (Point { x: 0, y: 0 }, none),
+	pub counts: [3]i32 = [0, 0, 0],
+	pub grid: [2][2]int = [[0, 0], [0, 0]],
+	pub path: [2]Point = [Point { x: 0, y: 0 }, Point { x: 0, y: 0 }],
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+/// Read text back, or `none` where it fails.
+fn read(text: str, arena: *mem.ArenaAllocator) -> ?*Record
+{
+	let back = Object.deserialize(text, arena);
+	if back == none || !(back is *Record) {
+		return none;
+	}
+	return back as *Record;
+}
+
+fn main() -> int
+{
+	let r = alloc Record {
+		pair: (7, "seven"), nested: (Point { x: 1, y: 2 }, 3),
+		counts: [4, 5, 6], grid: [[1, 2], [3, 4]],
+		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }]
+	};
+	let out = text.Builder.new();
+	r.serialize(&out);
+	io.println(out.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 4096);
+	let back = read(out.text(), &arena) else {
+		return 1;
+	};
+	printf("back %d %d\n".ptr, b(*r == *back), b(r.hash() == back.hash()));
+
+	let other = alloc Record {
+		pair: (7, "sevens"), nested: (Point { x: 1, y: 2 }, 3),
+		counts: [4, 5, 6], grid: [[1, 2], [3, 4]],
+		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }]
+	};
+	let apart = alloc Record {
+		pair: (7, "seven"), nested: (Point { x: 1, y: 2 }, none),
+		counts: [4, 5, 6], grid: [[1, 2], [3, 4]],
+		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }]
+	};
+	printf("differ %d %d\n".ptr, b(*r == *other), b(*r == *apart));
+
+	let short = "{\"type\":\"Record\",\"counts\":[1,2]}";
+	let long = "{\"type\":\"Record\",\"pair\":[1,\"a\",2]}";
+	let flat = "{\"type\":\"Record\",\"grid\":[1,2,3,4]}";
+	printf("counts %d %d %d\n".ptr, b(read(short, &arena) == none),
+		b(read(long, &arena) == none), b(read(flat, &arena) != none));
+
+	let desc = reflect.describe(r as *byte) else {
+		return 2;
+	};
+	let i = 0;
+	while i < reflect.field_count(desc) do {
+		let f = reflect.field(desc, i);
+		printf("%.*s %d\n".ptr, f.name.len as c_int, f.name.ptr,
+			(f.type_id == reflect.TypeId.Tuple) as c_int);
+		i += 1;
+	}
+	arena.free_all();
+	delete(r);
+	delete(other);
+	delete(apart);
+	return 0;
+}

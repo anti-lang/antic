@@ -288,15 +288,14 @@ static uint64_t hash_fields(uint64_t h, const unsigned char *p,
     return h;
 }
 
-/* The bytes of one element of the array of type id type through every
-   level of it, or 0 where the record does not give them. d is the
-   descriptor of a struct or a class element. */
-static size_t array_element_size(int64_t type, const struct anti_descriptor *d)
+size_t anti_rt_array_element_size(int64_t type,
+                                  const struct anti_descriptor *d)
 {
     int64_t inner = ANTI_TYPE_INNER(type);
 
     if (inner == ANTI_TYPE_STRUCT || inner == ANTI_TYPE_CLASS ||
-        inner == ANTI_TYPE_VARIANT || inner == ANTI_TYPE_OPTIONAL) {
+        inner == ANTI_TYPE_VARIANT || inner == ANTI_TYPE_OPTIONAL ||
+        inner == ANTI_TYPE_TUPLE) {
         return d != NULL ? (size_t)d->size : 0;
     }
     return anti_rt_type_size(inner);
@@ -379,6 +378,8 @@ static int same_value(const unsigned char *a, const unsigned char *b,
         memcpy(&y, b, sizeof y);
         return anti_rt_pattern_same(x, y);
     }
+    case ANTI_TYPE_TUPLE:
+        return d == NULL || same_fields(a, b, d);
     case ANTI_TYPE_VARIANT: {
         const struct anti_field *x = anti_rt_variant_case(a, d);
         if (x != anti_rt_variant_case(b, d)) {
@@ -395,7 +396,7 @@ static int same_value(const unsigned char *a, const unsigned char *b,
                same_value(a + d->fields[0].offset, b + d->fields[0].offset,
                           d->fields[0].type, d->fields[0].descriptor, 0);
     case ANTI_TYPE_ARRAY:
-        size = array_element_size(type, d);
+        size = anti_rt_array_element_size(type, d);
         for (i = 0; size > 0 && i < ANTI_TYPE_COUNT(type); i++) {
             if (!same_element(a + (size_t)i * size, b + (size_t)i * size,
                               ANTI_TYPE_INNER(type), d)) {
@@ -453,6 +454,8 @@ static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
         v = anti_rt_pattern_hash(x);
         return hash_run(h, (const unsigned char *)&v, sizeof v);
     }
+    case ANTI_TYPE_TUPLE:
+        return d == NULL ? h : hash_fields(h, p, d);
     case ANTI_TYPE_VARIANT: {
         const struct anti_field *x = anti_rt_variant_case(p, d);
         uint64_t tag = x != NULL ? (uint64_t)x->owned : 0;
@@ -470,7 +473,7 @@ static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
                                      d->fields[0].descriptor, 0);
     }
     case ANTI_TYPE_ARRAY:
-        size = array_element_size(type, d);
+        size = anti_rt_array_element_size(type, d);
         for (i = 0; size > 0 && i < ANTI_TYPE_COUNT(type); i++) {
             h = hash_element(h, p + (size_t)i * size, ANTI_TYPE_INNER(type), d);
         }
@@ -611,7 +614,8 @@ size_t anti_rt_element_size(int64_t type, const struct anti_descriptor *d)
     int64_t element = ANTI_TYPE_ELEMENT(type);
 
     if (element == ANTI_TYPE_STRUCT || element == ANTI_TYPE_CLASS ||
-        element == ANTI_TYPE_VARIANT || element == ANTI_TYPE_OPTIONAL) {
+        element == ANTI_TYPE_VARIANT || element == ANTI_TYPE_OPTIONAL ||
+        element == ANTI_TYPE_TUPLE) {
         return d != NULL ? (size_t)d->size : 0;
     }
     return anti_rt_type_size(element);
@@ -766,6 +770,40 @@ static void put_value(struct anti_builder *b, const void *bytes,
             put(b, "{}");
         }
         put(b, "}");
+        return;
+    }
+    /* A tuple is a JSON array of its parts, and an array one of its
+       elements through every level of it, in order. */
+    case ANTI_TYPE_TUPLE: {
+        int64_t i;
+        if (d == NULL) {
+            put(b, "null");
+            return;
+        }
+        put(b, "[");
+        for (i = 0; i < d->field_count; i++) {
+            const struct anti_field *f = &d->fields[i];
+            put(b, i == 0 ? "" : ",");
+            put_value(b, (const char *)bytes + f->offset, f->type,
+                      f->descriptor, 0);
+        }
+        put(b, "]");
+        return;
+    }
+    case ANTI_TYPE_ARRAY: {
+        size_t size = anti_rt_array_element_size(type, d);
+        int64_t i;
+        if (size == 0 || ANTI_TYPE_COUNT(type) == 0) {
+            put(b, "null");
+            return;
+        }
+        put(b, "[");
+        for (i = 0; i < ANTI_TYPE_COUNT(type); i++) {
+            put(b, i == 0 ? "" : ",");
+            put_value(b, (const char *)bytes + (size_t)i * size,
+                      ANTI_TYPE_INNER(type), d, 0);
+        }
+        put(b, "]");
         return;
     }
     case ANTI_TYPE_OPTIONAL:

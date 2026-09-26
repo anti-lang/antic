@@ -1,11 +1,11 @@
 //! A field that the default `serialize` cannot write is `null`, and
-//! `Object.deserialize` leaves it at its default: a bitfield, an array, a
-//! union, and an `own` slice of class values or of slices. A pointer, a
-//! function pointer and an `own` slice without elements are `null` too, and
-//! that `null` is their value, so they come back as `none` or empty whatever
-//! their default is. A `str` is always a string, the empty one included. Every
-//! field below holds a value other than its default before the object is
-//! written.
+//! `Object.deserialize` leaves it at its default: a bitfield, a union, and an
+//! `own` slice of class values or of slices. An array is written as its
+//! elements and comes back with them. A pointer, a function pointer and an
+//! `own` slice without elements are `null` too, and that `null` is their value,
+//! so they come back as `none` or empty whatever their default is. A `str` is
+//! always a string, the empty one included. Every field below holds a value
+//! other than its default before the object is written.
 import anti.io;
 import anti.mem;
 import anti.text;

@@ -956,7 +956,7 @@ destroy(back, &arena);
 arena.free_all();
 ```
 
-Built: descriptors, `get`, `set`, `call`, `new`, `Value` and `Object.deserialize` with an `Allocator`. A variant and a `?T` of a value have descriptors of their own, so a field of either compares, hashes, serializes and reads back. Not built yet: `type_of(T)`, the descriptor of any type.
+Built: descriptors, `get`, `set`, `call`, `new`, `Value` and `Object.deserialize` with an `Allocator`. A variant, a tuple and a `?T` of a value have descriptors of their own, so a field of each compares, hashes, serializes and reads back. An array field is written as a JSON array of its elements. Not built yet: `type_of(T)`, the descriptor of any type.
 
 ## Operators on classes
 
