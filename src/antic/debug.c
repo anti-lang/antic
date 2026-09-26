@@ -397,7 +397,8 @@ static void compile_unit(struct debug *d, struct text *out,
 /* The symbol record of each function, in the order the emitter wrote
    them. Each is an S_LPROC32 without a type, closed by an S_END. lld-link
    fills in the parent, the end and the next record. A record ends on a
-   multiple of 4, which the PDB asks for. */
+   multiple of 4, which the PDB asks for. A module that wrote no function
+   writes no subsection, since lld-link warns of an empty one. */
 static void symbol_records(struct debug *d, struct text *out,
                            struct mach_function *const *functions)
 {
@@ -405,6 +406,11 @@ static void symbol_records(struct debug *d, struct text *out,
     size_t id = 0;
     size_t i;
 
+    for (i = 0; i < d->m->function_count && functions[i] == NULL; i++) {
+    }
+    if (i == d->m->function_count) {
+        return;
+    }
     text_appendf(out, "    .long %u            /* DEBUG_S_SYMBOLS */\n"
                       "    .long %santi_cv_symbols_end - %santi_cv_symbols\n"
                       "%santi_cv_symbols:\n",

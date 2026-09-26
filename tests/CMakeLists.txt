@@ -435,6 +435,19 @@ if(ANTIC_LLVM_MC)
             -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
 endif()
 
+# A module that writes no function writes no empty CodeView subsection of
+# symbols, which lld-link warns of.
+foreach(target windows-x86_64 windows-arm64)
+    add_test(NAME codeview_empty_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DSTD=${ANTIC_RUNTIME_DIR}/std"
+            "-DSOURCE=${ANTIC_RUNTIME_DIR}/std/anti/collection/tree.antl"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/codeview-empty"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_codeview_empty.cmake")
+endforeach()
+
 # Every tool a build of this tree runs comes from the pinned release, and
 # antic and anti were linked by the pinned lld. A reader's build takes the
 # tools of the machine on purpose.
