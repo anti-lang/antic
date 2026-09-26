@@ -1,0 +1,88 @@
+//! `alloc(T, n)` of a struct, a tuple or a `?T` that holds a class value
+//! zero-fills its elements, as it does for a class. `=` into an element then
+//! finds a zero table and destroys nothing. Before the fix it destroyed what
+//! the memory held last, which here is the bytes a freed block left behind.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Leaf.live.sub(1);
+	}
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+fn key(n: int) -> Key
+{
+	Leaf.live.add(1);
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+/// Leave a freed block of non-zero bytes for the next allocation to reuse.
+fn litter(bytes: int)
+{
+	let junk = alloc(u8, bytes) else {
+		return;
+	};
+	let i = 0;
+	while i < bytes do {
+		junk[i] = 0x55;
+		i += 1;
+	}
+	free(junk);
+}
+
+fn main() -> int
+{
+	litter(2 * size_of(Pair));
+	let pairs = alloc(Pair, 2) else {
+		return 1;
+	};
+	pairs[0] = Pair { k: key(1), n: 1 };
+	pairs[1] = Pair { k: key(2), n: 2 };
+	printf("pairs %d %d\n".ptr, pairs[0].k.n as c_int, pairs[1].n as c_int);
+	destroy(&pairs[0]);
+	destroy(&pairs[1]);
+	free(pairs);
+
+	litter(2 * size_of((Key, int)));
+	let tuples = alloc((Key, int), 2) else {
+		return 1;
+	};
+	tuples[0] = (key(3), 3);
+	tuples[1] = (key(4), 4);
+	printf("tuples %d %d\n".ptr, tuples[0].0.n as c_int, tuples[1].1 as c_int);
+	destroy(&tuples[0]);
+	destroy(&tuples[1]);
+	free(tuples);
+
+	litter(2 * size_of(?Key));
+	let optionals = alloc(?Key, 2) else {
+		return 1;
+	};
+	optionals[0] = key(5);
+	optionals[1] = none;
+	printf("optionals %d\n".ptr, (optionals[1] == none) as c_int);
+	destroy(&optionals[0]);
+	free(optionals);
+
+	printf("live %d\n".ptr, Leaf.live.load() as c_int);
+	return 0;
+}

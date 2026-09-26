@@ -357,7 +357,6 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
     l->b = exit;
 }
 
-static bool local_needs_teardown(const struct type *t);
 
 /* DESIGN: the check of a walk over a collection that counts its changes.
    The test of every turn compares the two counts before it calls `next`.
@@ -472,7 +471,7 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     around.outer = l->defers;
     l->defers = &around;
     lower_bind_cursor(l, it);
-    if (local_needs_teardown(it->cursor->type)) {
+    if (lower_needs_teardown(it->cursor->type)) {
         push_exit_action(l, NULL, it->cursor, false);
     }
     loop.continue_to = test;
@@ -510,7 +509,7 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
        parts gives the loop the parts it receives by value. The teardown
        of the value leaves its pointers alone. */
     if ((it->place == NULL || type_holds_lent(sym->type)) &&
-        local_needs_teardown(sym->type)) {
+        lower_needs_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
     if (s->as.for_loop.pattern) {
@@ -912,7 +911,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         if (target->type->kind == TYPE_FN && target->type->owned) {
             lower_free_snapshot(l, target->type, p.address);
         }
-        if (local_needs_teardown(target->type)) {
+        if (lower_needs_teardown(target->type)) {
             if (target->type->kind == TYPE_OPTIONAL) {
                 destroy_optional(l, p.address, target->type, true);
             } else if (target->type->kind == TYPE_ARRAY) {
@@ -988,7 +987,7 @@ static const struct type *innermost(const struct type *t)
     return t;
 }
 
-static bool local_needs_teardown(const struct type *t)
+bool lower_needs_teardown(const struct type *t)
 {
     return lower_type_needs_destruct(innermost(t)) ||
            lower_optional_needs_destruct(t);
@@ -1163,7 +1162,7 @@ static void destroy_local(struct lowerer *l, const struct symbol *sym)
    teardown passes over a value whose table is zero. */
 void lower_push_own_action(struct lowerer *l, const struct symbol *param)
 {
-    if (local_needs_teardown(param->type)) {
+    if (lower_needs_teardown(param->type)) {
         push_exit_action(l, NULL, param, false);
     }
 }
@@ -1177,7 +1176,7 @@ struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
 {
     uint32_t slot;
 
-    if (!local_needs_teardown(arg->type) || l->b == NULL) {
+    if (!lower_needs_teardown(arg->type) || l->b == NULL) {
         return value;
     }
     slot = ir_entry_slot(l->f, lower_vtype_of(l, arg->type));
@@ -1192,7 +1191,7 @@ struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
 void lower_clear_moved(struct lowerer *l, const struct expr *value)
 {
     if (value->kind != EXPR_NAME || !value->moves || value->symbol == NULL ||
-        value->symbol->caught || !local_needs_teardown(value->type) ||
+        value->symbol->caught || !lower_needs_teardown(value->type) ||
         l->b == NULL) {
         return;
     }
@@ -1522,7 +1521,7 @@ static void destructure(struct lowerer *l, const struct stmt *s)
         } else {
             bound->ir = ir_load(l->f, l->b, lower_ir_type_of(bound->type), at);
         }
-        if (local_needs_teardown(bound->type)) {
+        if (lower_needs_teardown(bound->type)) {
             push_exit_action(l, NULL, bound, false);
         }
     }
@@ -1574,7 +1573,7 @@ static void lower_let_unwrap(struct lowerer *l, const struct stmt *s)
         guard_missing(l, s, rest);
     }
     l->b = rest;
-    if (local_needs_teardown(sym->type)) {
+    if (lower_needs_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
 }
@@ -1628,7 +1627,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
            A handler that leaves the block never passes here. The defers it
            runs on the way out leave the slot alone. The zero table of a
            call that wrote nothing so reaches no teardown. */
-        if (has_out && local_needs_teardown(sym->type) &&
+        if (has_out && lower_needs_teardown(sym->type) &&
             s->as.let.name_count == 0) {
             push_exit_action(l, NULL, sym, false);
         }
@@ -1647,7 +1646,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         lower_clear_moved(l, s->as.let.value);
         /* A destructuring hands each part to its name, which tears it
            down, so the value it takes apart takes no teardown. */
-        if (local_needs_teardown(sym->type) && s->as.let.name_count == 0) {
+        if (lower_needs_teardown(sym->type) && s->as.let.name_count == 0) {
             push_exit_action(l, NULL, sym, false);
         }
         if (!lower_none_in_first_word(sym->type)) {

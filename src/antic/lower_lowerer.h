@@ -533,6 +533,10 @@ bool lower_copies_parts(const struct type *t);
 struct ir_operand lower_array_count(struct lowerer *l, const struct type *t);
 /* Whether t is a `?T` of a class value that needs the teardown. */
 bool lower_optional_needs_destruct(const struct type *t);
+/* Whether a place of type t holds a value that `=` destroys before it
+   moves the new one in: a value with a teardown, in an array at any
+   depth, or a `?T` of one. */
+bool lower_needs_teardown(const struct type *t);
 void lower_clear_tables(struct lowerer *l, struct ir_operand base,
                         const struct type *t);
 void lower_handle_error(struct lowerer *l, const struct expr *call,

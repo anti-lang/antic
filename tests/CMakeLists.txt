@@ -857,6 +857,17 @@ set_tests_properties(program_args PROPERTIES
 set_tests_properties(program_nullable PROPERTIES
     ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
 
+# macOS malloc fills fresh memory with 0xaa under MallocScribble, so an
+# element of `alloc(T, n)` in tests/programs/alloc_owning.anti that the
+# compiler failed to zero holds a table there, as the heap of the Linux VM
+# gave it one. Other systems ignore the variable.
+set_tests_properties(program_alloc_owning PROPERTIES
+    ENVIRONMENT "MallocScribble=1")
+if(TEST program_alloc_owning_macos-x86_64)
+    set_tests_properties(program_alloc_owning_macos-x86_64 PROPERTIES
+        ENVIRONMENT "MallocScribble=1")
+endif()
+
 # The workers of tests/programs/channel_workers.anti wait on each other, so
 # each needs a thread of the pool. Its .args file passes --anti.threads=4,
 # which every run of the program takes. A program that leaves a mutex

@@ -2921,8 +2921,13 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         v = lower_expr(l, e->as.alloc.count);
         /* DESIGN: the elements of a class come zeroed, so one the
            program has not filled has a zero table, which the zero-table
-           check reports. Other elements are C's and keep malloc. */
-        if (e->type->element->kind == TYPE_CLASS) {
+           check reports. So do the elements of a type that `=` tears
+           down, a struct, a tuple or a `?T` holding a class value or an
+           owned pointer: `=` into one reads the table and the flag of
+           the old value, and destroys nothing where they are zero.
+           Other elements are C's and keep malloc. */
+        if (e->type->element->kind == TYPE_CLASS ||
+            lower_needs_teardown(e->type->element)) {
             struct ir_operand args[2];
             args[0] = v;
             args[1] = lower_size_operand(l, e->type->element);
