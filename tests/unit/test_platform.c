@@ -1,7 +1,8 @@
 /* The platform layer of the runtime, src/rt/platform.h, on the host. It
    checks the steps of a long sleep and the environment in full length
-   and in UTF-8. It also checks the path rules every system shares and a
-   library opened from a path outside ASCII. */
+   and in UTF-8. It also checks the path rules every system shares, the
+   forms of a Windows path, the clocks, the entropy and a library opened
+   from a path outside ASCII. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)
@@ -15,6 +16,7 @@
 
 #include "../binary_stdio.h"
 #include "../../src/rt/platform.h"
+#include "../../src/rt/std.h"
 #include "check.h"
 
 #if defined(_WIN32)
@@ -121,6 +123,45 @@ static void paths(void)
     CHECK(!anti_rt_path_is_absolute("a/anti.toml"));
     CHECK(anti_rt_path_last_separator(path) == path + 3);
     CHECK(anti_rt_path_last_separator("anti.toml") == NULL);
+#if defined(_WIN32)
+    {
+        /* A drive, a root of the drive and a share are absolute, and a
+           backslash separates as a slash does, whichever comes last. */
+        const char *mixed = "a\\b/c\\d.toml";
+        const char *slash_last = "a\\b/c.toml";
+        CHECK(anti_rt_path_is_absolute("C:\\anti\\anti.toml"));
+        CHECK(anti_rt_path_is_absolute("c:/anti.toml"));
+        CHECK(anti_rt_path_is_absolute("\\anti.toml"));
+        CHECK(anti_rt_path_is_absolute("\\\\server\\share\\anti.toml"));
+        CHECK(!anti_rt_path_is_absolute("anti\\anti.toml"));
+        CHECK(!anti_rt_path_is_absolute("1:anti.toml"));
+        CHECK(anti_rt_path_last_separator(mixed) == mixed + 5);
+        CHECK(anti_rt_path_last_separator(slash_last) == slash_last + 3);
+    }
+#endif
+}
+
+/* The monotonic clock never goes back, and the wall clock stands after
+   2026-01-01. A sleep of a millisecond passes at least one on the
+   monotonic clock. The entropy fills every byte it is asked for, and two
+   draws of 32 bytes differ. */
+static void clocks_and_entropy(void)
+{
+    int64_t before = anti_rt_monotonic();
+    int64_t after;
+    unsigned char one[32];
+    unsigned char two[32];
+
+    anti_rt_sleep(1000000);
+    after = anti_rt_monotonic();
+    CHECK(after - before >= 1000000);
+    CHECK(anti_rt_wall() > (int64_t)1767225600 * 1000000000);
+    memset(one, 0, sizeof one);
+    memset(two, 0, sizeof two);
+    CHECK(anti_rt_entropy(one, sizeof one) == 0);
+    CHECK(anti_rt_entropy(two, 5) == 0);
+    CHECK(anti_rt_entropy(two + 5, sizeof two - 5) == 0);
+    CHECK(memcmp(one, two, sizeof one) != 0);
 }
 
 /* The library of an empty plugin table, copied by the build into a
@@ -148,6 +189,7 @@ int main(void)
     sleep_steps();
     environment();
     paths();
+    clocks_and_entropy();
     library_outside_ascii();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);

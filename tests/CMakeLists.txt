@@ -54,6 +54,7 @@ add_executable(antic_unit_tests
     unit/test_zip.c
     unit/test_syms.c
     unit/test_files.c
+    unit/test_tool_platform.c
     ../src/anti/bindexpr.c
     ../src/anti/bindtype.c
     ../src/anti/deps.c
