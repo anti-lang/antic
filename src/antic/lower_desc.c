@@ -401,7 +401,7 @@ enum type_id {
     TYPE_ID_U32, TYPE_ID_U64, TYPE_ID_CULONG, TYPE_ID_CWCHAR, TYPE_ID_F32,
     TYPE_ID_F64, TYPE_ID_STR, TYPE_ID_PTR, TYPE_ID_FN, TYPE_ID_SLICE,
     TYPE_ID_ARRAY, TYPE_ID_STRUCT, TYPE_ID_UNION, TYPE_ID_ENUM,
-    TYPE_ID_CLASS, TYPE_ID_F16
+    TYPE_ID_CLASS, TYPE_ID_F16, TYPE_ID_VARIANT, TYPE_ID_OPTIONAL
 };
 
 /* The type id of t alone, without the type it is built on. */
@@ -434,11 +434,13 @@ static uint64_t type_id_of(const struct type *t)
     if (t->kind == TYPE_FN && t->context) {
         return TYPE_ID_NONE;
     }
-    /* A `?T` of a value is the value and a flag, which no Value carries
-       and no reader of a type id knows. Its type id is none, as a
-       variant's is. */
+    /* A variant and a `?T` of a value carry descriptors of their own,
+       which a walk reads. No Value carries either. */
+    if (t->kind == TYPE_VARIANT) {
+        return TYPE_ID_VARIANT;
+    }
     if (t->kind == TYPE_OPTIONAL) {
-        return TYPE_ID_NONE;
+        return TYPE_ID_OPTIONAL;
     }
     switch (t->kind) {
     case TYPE_POINTER: return TYPE_ID_PTR;
@@ -472,7 +474,8 @@ static uint64_t type_id(const struct type *t)
 {
     const struct type *on = t->kind == TYPE_ENUM ? t->base
                             : t->kind == TYPE_POINTER || t->kind == TYPE_SLICE ||
-                                    t->kind == TYPE_ARRAY
+                                    t->kind == TYPE_ARRAY ||
+                                    t->kind == TYPE_OPTIONAL
                                 ? t->element
                                 : NULL;
     uint64_t id;
@@ -495,6 +498,16 @@ static uint64_t type_id(const struct type *t)
     return id;
 }
 
+static const struct ir_global *variant_descriptor(struct lowerer *l,
+                                                  const struct type *t);
+static const struct ir_global *optional_descriptor(struct lowerer *l,
+                                                   const struct type *t);
+static struct ir_const *field_record(struct lowerer *l, const struct name *name,
+                                     uint32_t agg, uint32_t index,
+                                     uint64_t type, uint64_t word,
+                                     const struct type *reach);
+static const struct ir_global *version_global(struct lowerer *l);
+
 /* The descriptor a field of type t carries. It is the one of its class
    or struct, or of the class or struct that a pointer or a slice
    reaches. Every other type gives NULL, as a union and a Job do. */
@@ -512,6 +525,12 @@ static const struct ir_global *field_descriptor(struct lowerer *l,
     if (t->kind == TYPE_CLASS) {
         return lower_class_descriptor(l, t);
     }
+    if (t->kind == TYPE_VARIANT) {
+        return variant_descriptor(l, t);
+    }
+    if (t->kind == TYPE_OPTIONAL) {
+        return optional_descriptor(l, t);
+    }
     return t->kind == TYPE_STRUCT ? lower_struct_descriptor(l, t) : NULL;
 }
 
@@ -528,7 +547,6 @@ struct ir_global *lower_class_fields(struct lowerer *l,
     size_t count = lower_own_fields(t);
     struct ir_const *value;
     struct ir_global *g;
-    struct token_text text;
     char *module;
     char *name;
     size_t i;
@@ -543,45 +561,200 @@ struct ir_global *lower_class_fields(struct lowerer *l,
     value = ir_const_agg(l->m, ir_aggregate(lower_fields_agg(l, count)), count);
     for (i = 0; i < t->field_count; i++) {
         const struct struct_field *f = &t->fields[i];
-        const struct ir_global *descriptor;
         struct ir_const *item;
         if (!lower_listed_field(f)) {
             continue;
         }
-        item = ir_const_agg(l->m, ir_aggregate(field_agg(l)), 6);
-        text.bytes = f->name.text;
-        text.length = f->name.length;
-        item->items[0].kind = IR_CONST_ADDR;
-        item->items[0].scalar = IR_PTR;
-        item->items[0].global = lower_literal_global(l, &text)->index;
-        item->items[1].kind = IR_CONST_INT;
-        item->items[1].scalar = IR_I64;
-        item->items[1].integer = f->name.length;
-        item->items[2].kind = IR_CONST_SYM;
-        item->items[2].scalar = IR_I64;
-        item->items[2].sym = ir_sym_offset_of(l->m, lower_agg_of(l, t),
-                                              (uint32_t)i);
-        item->items[3].kind = IR_CONST_INT;
-        item->items[3].scalar = IR_I64;
-        item->items[3].integer = f->bits != 0 ? TYPE_ID_NONE
-                                              : type_id(f->type);
-        item->items[4].kind = IR_CONST_INT;
-        item->items[4].scalar = IR_I64;
-        item->items[4].integer = f->owned ? 1 : 0;
-        item->items[5].scalar = IR_PTR;
-        descriptor = field_descriptor(l, f->type);
-        if (descriptor != NULL) {
-            item->items[5].kind = IR_CONST_ADDR;
-            item->items[5].global = descriptor->index;
-        } else {
-            item->items[5].kind = IR_CONST_INT;
-            item->items[5].integer = 0;
-        }
+        item = field_record(l, &f->name, lower_agg_of(l, t), (uint32_t)i,
+                            f->bits != 0 ? TYPE_ID_NONE : type_id(f->type),
+                            f->owned ? 1 : 0, f->type);
         value->items[n++] = *item;
     }
     g = ir_global_add_value(l->m, module, name, value);
     free(module);
     free(name);
+    return g;
+}
+
+/* One field record. It holds the name, the offset of field index of the
+   aggregate agg, the type id and a word. The word is the `own` bit of a
+   field and the tag of the case of a variant. The record carries the
+   descriptor that a field of type reach carries, and none for NULL. */
+static struct ir_const *field_record(struct lowerer *l, const struct name *name,
+                                     uint32_t agg, uint32_t index,
+                                     uint64_t type, uint64_t word,
+                                     const struct type *reach)
+{
+    struct ir_const *item = ir_const_agg(l->m, ir_aggregate(field_agg(l)), 6);
+    const struct ir_global *descriptor;
+    struct token_text text;
+
+    text.bytes = name->text;
+    text.length = name->length;
+    item->items[0].kind = IR_CONST_ADDR;
+    item->items[0].scalar = IR_PTR;
+    item->items[0].global = lower_literal_global(l, &text)->index;
+    item->items[1].kind = IR_CONST_INT;
+    item->items[1].scalar = IR_I64;
+    item->items[1].integer = name->length;
+    item->items[2].kind = IR_CONST_SYM;
+    item->items[2].scalar = IR_I64;
+    item->items[2].sym = ir_sym_offset_of(l->m, agg, index);
+    item->items[3].kind = IR_CONST_INT;
+    item->items[3].scalar = IR_I64;
+    item->items[3].integer = type;
+    item->items[4].kind = IR_CONST_INT;
+    item->items[4].scalar = IR_I64;
+    item->items[4].integer = word;
+    item->items[5].scalar = IR_PTR;
+    descriptor = reach != NULL ? field_descriptor(l, reach) : NULL;
+    if (descriptor != NULL) {
+        item->items[5].kind = IR_CONST_ADDR;
+        item->items[5].global = descriptor->index;
+    } else {
+        item->items[5].kind = IR_CONST_INT;
+        item->items[5].integer = 0;
+    }
+    return item;
+}
+
+/* Add the descriptor of the variant or `?T` t named name of module, with
+   the text written in it. Its field list comes after, from fill, so a
+   field that reaches t again finds the descriptor. */
+static struct ir_global *value_descriptor(struct lowerer *l,
+                                          const struct type *t,
+                                          const char *module, const char *name,
+                                          const struct token_text *text)
+{
+    struct ir_const *value = ir_const_agg(
+        l->m, ir_aggregate(lower_descriptor_agg(l)), DESCRIPTOR_ITEMS);
+    struct ir_global *g = ir_global_add_value(l->m, module, name, value);
+    size_t k;
+
+    for (k = 0; k < DESCRIPTOR_ITEMS; k++) {
+        value->items[k].kind = IR_CONST_INT;
+        value->items[k].scalar =
+            l->m->aggs[lower_descriptor_agg(l)]->fields[k].type.type;
+        value->items[k].integer = 0;
+    }
+    value->items[0].kind = IR_CONST_ADDR;
+    value->items[0].global = lower_literal_global(l, text)->index;
+    value->items[1].integer = text->length;
+    value->items[3].kind = IR_CONST_SYM;
+    value->items[3].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
+    value->items[12].kind = IR_CONST_ADDR;
+    value->items[12].global = version_global(l)->index;
+    value->items[13].integer = (uint64_t)strlen(l->version);
+    return g;
+}
+
+/* Give the descriptor g the field list list of count records, a global
+   of module named name. `--no-reflect` drops it, as it drops the list of
+   a struct. */
+static void give_fields(struct lowerer *l, struct ir_global *g,
+                        const char *module, const char *name,
+                        struct ir_const *list, size_t count)
+{
+    struct ir_const *value = g->value;
+
+    if (l->no_reflect) {
+        return;
+    }
+    value->items[6].integer = count;
+    value->items[7].kind = IR_CONST_ADDR;
+    value->items[7].global = ir_global_add_value(l->m, module, name, list)->index;
+}
+
+/* DESIGN: a variant has a descriptor of its own, written by the module
+   that declares it, as a struct has. Its field list holds the tag first
+   and then one record per case, in the order of the cases. A case record
+   names the case and holds the offset of the union. The tag of the case
+   stands in the word of `own`, and the record carries the descriptor of
+   the fields of the case. A case without fields has type id none. A walk reads the tag and
+   then the fields of the case it names. */
+static const struct ir_global *variant_descriptor(struct lowerer *l,
+                                                  const struct type *t)
+{
+    static const struct name tag = {VARIANT_TAG, sizeof VARIANT_TAG - 1};
+    static const struct name part = {VARIANT_UNION, sizeof VARIANT_UNION - 1};
+    uint32_t agg = lower_agg_of(l, t);
+    uint32_t u = (uint32_t)(lower_field_of(t, &part) - t->fields);
+    size_t count = t->param_count + 1;
+    struct token_text text;
+    struct ir_global *g;
+    struct ir_const *list;
+    char *module;
+    char *name;
+    char *list_module;
+    char *list_name;
+    size_t k;
+
+    g = struct_global(l, t, "descriptor", &module, &name);
+    if (g != NULL) {
+        return g;
+    }
+    text.bytes = t->name.text;
+    text.length = t->name.length;
+    g = value_descriptor(l, t, module, name, &text);
+    free(module);
+    free(name);
+    list = ir_const_agg(l->m, ir_aggregate(lower_fields_agg(l, count)), count);
+    list->items[0] = *field_record(
+        l, &tag, agg, (uint32_t)(lower_field_of(t, &tag) - t->fields),
+        type_id(t->base), 0, NULL);
+    for (k = 0; k < t->param_count; k++) {
+        const struct type *payload = t->params[k];
+        list->items[k + 1] = *field_record(
+            l, &t->base->fields[k].name, agg, u,
+            payload != NULL ? TYPE_ID_STRUCT : TYPE_ID_NONE,
+            (uint64_t)t->base->fields[k].number, payload);
+    }
+    if (struct_global(l, t, "fields", &list_module, &list_name) == NULL) {
+        give_fields(l, g, list_module, list_name, list, count);
+        free(list_module);
+        free(list_name);
+    }
+    return g;
+}
+
+/* DESIGN: a `?T` of a value has a descriptor of its own, with two
+   records. The value stands at offset 0 and carries the descriptor of its
+   type, and the flag `has` follows. No module declares a `?T`, so each module that needs
+   the descriptor writes one of its own, named after its type. */
+static const struct ir_global *optional_descriptor(struct lowerer *l,
+                                                   const struct type *t)
+{
+    static const struct name value = {OPTIONAL_VALUE,
+                                      sizeof OPTIONAL_VALUE - 1};
+    static const struct name has = {OPTIONAL_HAS, sizeof OPTIONAL_HAS - 1};
+    uint32_t agg = lower_agg_of(l, t);
+    struct text shown = {0};
+    struct text name = {0};
+    struct text fields = {0};
+    struct token_text text;
+    struct ir_global *g;
+    struct ir_const *list;
+
+    type_name_qualified(&shown, t);
+    text_appendf(&name, "optional.%s.descriptor", text_cstr(&shown));
+    g = lower_find_global(l->m, l->module_name, text_cstr(&name));
+    if (g == NULL) {
+        text.bytes = text_cstr(&shown);
+        text.length = shown.length;
+        g = value_descriptor(l, t, l->module_name, text_cstr(&name), &text);
+        list = ir_const_agg(l->m, ir_aggregate(lower_fields_agg(l, 2)), 2);
+        list->items[0] = *field_record(
+            l, &value, agg, (uint32_t)(lower_field_of(t, &value) - t->fields),
+            type_id(t->element), 0, t->element);
+        list->items[1] = *field_record(
+            l, &has, agg, (uint32_t)(lower_field_of(t, &has) - t->fields),
+            TYPE_ID_BOOL, 0, NULL);
+        text_appendf(&fields, "optional.%s.fields", text_cstr(&shown));
+        give_fields(l, g, l->module_name, text_cstr(&fields), list, 2);
+    }
+    text_free(&shown);
+    text_free(&name);
+    text_free(&fields);
     return g;
 }
 

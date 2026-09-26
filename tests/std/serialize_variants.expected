@@ -1,0 +1,12 @@
+exit 0
+{"type":"Drawing","shape":{"Rect":{"w":2,"h":3}},"at":{"x":1,"y":2},"size":null,"label":"a"}
+back 1 1
+{"type":"Drawing","shape":{"Empty":{}},"at":null,"size":null,"label":""}
+back 1 1
+{"type":"Drawing","shape":{"Circle":{"r":2}},"at":null,"size":4,"label":""}
+back 1 1
+equal 1 0 0 0 0 1
+shape 1
+at 1
+size 1
+label 0

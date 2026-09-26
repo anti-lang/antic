@@ -204,6 +204,32 @@ static uint64_t hash_run(uint64_t h, const unsigned char *p, size_t count)
     return h;
 }
 
+const struct anti_field *anti_rt_variant_case(const unsigned char *bytes,
+                                              const struct anti_descriptor *d)
+{
+    uint64_t tag;
+    int64_t i;
+
+    if (d == NULL || d->field_count < 1) {
+        return NULL;
+    }
+    tag = anti_rt_load_integer(bytes + d->fields[0].offset, d->fields[0].type);
+    for (i = 1; i < d->field_count; i++) {
+        if ((uint64_t)d->fields[i].owned == tag) {
+            return &d->fields[i];
+        }
+    }
+    return NULL;
+}
+
+/* Whether the `?T` of descriptor d at bytes holds a value. A descriptor
+   without its list, under `--no-reflect`, gives 0. */
+static int optional_has(const unsigned char *bytes,
+                        const struct anti_descriptor *d)
+{
+    return d != NULL && d->field_count >= 2 && bytes[d->fields[1].offset] != 0;
+}
+
 /* Whether the fields that d itself declares are the same at a and b. */
 static int same_fields(const unsigned char *a, const unsigned char *b,
                        const struct anti_descriptor *d)
@@ -240,7 +266,8 @@ static size_t array_element_size(int64_t type, const struct anti_descriptor *d)
 {
     int64_t inner = ANTI_TYPE_INNER(type);
 
-    if (inner == ANTI_TYPE_STRUCT || inner == ANTI_TYPE_CLASS) {
+    if (inner == ANTI_TYPE_STRUCT || inner == ANTI_TYPE_CLASS ||
+        inner == ANTI_TYPE_VARIANT || inner == ANTI_TYPE_OPTIONAL) {
         return d != NULL ? (size_t)d->size : 0;
     }
     return anti_rt_type_size(inner);
@@ -309,6 +336,21 @@ static int same_value(const unsigned char *a, const unsigned char *b,
     case ANTI_TYPE_STRUCT:
     case ANTI_TYPE_CLASS:
         return same_element(a, b, t, d);
+    case ANTI_TYPE_VARIANT: {
+        const struct anti_field *x = anti_rt_variant_case(a, d);
+        if (x != anti_rt_variant_case(b, d)) {
+            return 0;
+        }
+        return x == NULL || x->descriptor == NULL ||
+               same_fields(a + x->offset, b + x->offset, x->descriptor);
+    }
+    case ANTI_TYPE_OPTIONAL:
+        if (optional_has(a, d) != optional_has(b, d)) {
+            return 0;
+        }
+        return !optional_has(a, d) ||
+               same_value(a + d->fields[0].offset, b + d->fields[0].offset,
+                          d->fields[0].type, d->fields[0].descriptor, 0);
     case ANTI_TYPE_ARRAY:
         size = array_element_size(type, d);
         for (i = 0; size > 0 && i < ANTI_TYPE_COUNT(type); i++) {
@@ -359,6 +401,22 @@ static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
     case ANTI_TYPE_STRUCT:
     case ANTI_TYPE_CLASS:
         return hash_element(h, p, t, d);
+    case ANTI_TYPE_VARIANT: {
+        const struct anti_field *x = anti_rt_variant_case(p, d);
+        uint64_t tag = x != NULL ? (uint64_t)x->owned : 0;
+        h = hash_run(h, (const unsigned char *)&tag, sizeof tag);
+        return x == NULL || x->descriptor == NULL
+                   ? h
+                   : hash_fields(h, p + x->offset, x->descriptor);
+    }
+    case ANTI_TYPE_OPTIONAL: {
+        unsigned char has = (unsigned char)optional_has(p, d);
+        h = hash_run(h, &has, 1);
+        return has == 0 ? h
+                        : hash_value(h, p + d->fields[0].offset,
+                                     d->fields[0].type,
+                                     d->fields[0].descriptor, 0);
+    }
     case ANTI_TYPE_ARRAY:
         size = array_element_size(type, d);
         for (i = 0; size > 0 && i < ANTI_TYPE_COUNT(type); i++) {
@@ -500,7 +558,8 @@ size_t anti_rt_element_size(int64_t type, const struct anti_descriptor *d)
 {
     int64_t element = ANTI_TYPE_ELEMENT(type);
 
-    if (element == ANTI_TYPE_STRUCT || element == ANTI_TYPE_CLASS) {
+    if (element == ANTI_TYPE_STRUCT || element == ANTI_TYPE_CLASS ||
+        element == ANTI_TYPE_VARIANT || element == ANTI_TYPE_OPTIONAL) {
         return d != NULL ? (size_t)d->size : 0;
     }
     return anti_rt_type_size(element);
@@ -637,6 +696,33 @@ static void put_value(struct anti_builder *b, const void *bytes,
         return;
     case ANTI_TYPE_CLASS:
         serialize_into(b, bytes, d);
+        return;
+    /* A variant is an object whose one member names the case and holds
+       its fields, `{"Circle":{"r":2}}`, and a `?T` is its value or null. */
+    case ANTI_TYPE_VARIANT: {
+        const struct anti_field *c = anti_rt_variant_case(bytes, d);
+        if (c == NULL) {
+            put(b, "null");
+            return;
+        }
+        put(b, "{");
+        put_text(b, c->name, c->name_length);
+        put(b, ":");
+        if (c->descriptor != NULL) {
+            put_struct(b, (const char *)bytes + c->offset, c->descriptor);
+        } else {
+            put(b, "{}");
+        }
+        put(b, "}");
+        return;
+    }
+    case ANTI_TYPE_OPTIONAL:
+        if (!optional_has(bytes, d)) {
+            put(b, "null");
+        } else {
+            put_value(b, (const char *)bytes + d->fields[0].offset,
+                      d->fields[0].type, d->fields[0].descriptor, 0);
+        }
         return;
     default:
         if (anti_rt_type_size(t) == 0) {

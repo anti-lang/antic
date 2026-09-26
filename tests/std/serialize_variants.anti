@@ -1,0 +1,111 @@
+//! A variant and a `?T` have descriptors of their own, so a class with a field
+//! of each compares, hashes, serializes and reads back by value. `serialize`
+//! writes a variant as an object whose one member names the case and holds its
+//! fields, and a `?T` as its value or `null`. `Object.deserialize` reads both
+//! back, and the object it reads is `==` to the one written, with the same
+//! hash. `reflect.field` names the type of each field.
+import anti.io;
+import anti.mem;
+import anti.reflect;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Drawing
+{
+	pub shape: Shape,
+	pub at: ?Point = none,
+	pub size: ?int = none,
+	pub label: str = "",
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+/// Write `d`, read it back and compare the two.
+fn round(d: *Drawing) -> c_int
+{
+	let out = text.Builder.new();
+	d.serialize(&out);
+	io.println(out.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(out.text(), &arena);
+	if back == none || !(back is *Drawing) {
+		return 9;
+	}
+	let e = back as *Drawing;
+	printf("back %d %d\n".ptr, b(*d == *e), b(d.hash() == e.hash()));
+	arena.free_all();
+	return 0;
+}
+
+fn main() -> int
+{
+	let d = alloc Drawing {
+		shape: Shape.Rect { w: 2, h: 3 }, at: Point { x: 1, y: 2 },
+		label: "a"
+	};
+	let empty = alloc Drawing { shape: Shape.Empty };
+	let circle = alloc Drawing { shape: Shape.Circle { r: 2 }, size: 4 };
+	if round(d) != 0 || round(empty) != 0 || round(circle) != 0 {
+		return 1;
+	}
+
+	let same = alloc Drawing {
+		shape: Shape.Rect { w: 2, h: 3 }, at: Point { x: 1, y: 2 },
+		label: "a"
+	};
+	let wide = alloc Drawing {
+		shape: Shape.Rect { w: 3, h: 3 }, at: Point { x: 1, y: 2 },
+		label: "a"
+	};
+	let round_one = alloc Drawing {
+		shape: Shape.Circle { r: 2 }, at: Point { x: 1, y: 2 }, label: "a"
+	};
+	let moved = alloc Drawing {
+		shape: Shape.Rect { w: 2, h: 3 }, at: Point { x: 1, y: 3 },
+		label: "a"
+	};
+	let nowhere = alloc Drawing {
+		shape: Shape.Rect { w: 2, h: 3 }, label: "a"
+	};
+	printf("equal %d %d %d %d %d %d\n".ptr, b(*d == *same), b(*d == *wide),
+		b(*d == *round_one), b(*d == *moved), b(*d == *nowhere),
+		b(d.hash() == same.hash()));
+
+	let desc = reflect.describe(d as *byte) else {
+		return 2;
+	};
+	let i = 0;
+	while i < reflect.field_count(desc) do {
+		let f = reflect.field(desc, i);
+		printf("%.*s %d\n".ptr, f.name.len as c_int, f.name.ptr,
+			(f.type_id == reflect.TypeId.Variant ||
+			f.type_id == reflect.TypeId.Optional) as c_int);
+		i += 1;
+	}
+	delete(d);
+	delete(empty);
+	delete(circle);
+	delete(same);
+	delete(wide);
+	delete(round_one);
+	delete(moved);
+	delete(nowhere);
+	return 0;
+}

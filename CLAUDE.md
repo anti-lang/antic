@@ -229,10 +229,6 @@ directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
     of a class body goes through its unit, which
     `programs/class_bitfields.anti` checks.
     `docs/reports/2026-09-22-first-sessions-20-to-24.md` reports 20 to 24.
-25. A variant gets a descriptor with its tag and each case's fields, so
-    `serialize`, `deserialize` and `reflect` handle it. It replaces the
-    entry under "Sum types" in `docs/decisions.md` that gives a variant
-    none.
 26. Done. Plugins on Linux and Windows, and the Linux link mode against
     glibc. A module names a library of the glibc sysroot with
     `link linux "X11";`. A Linux program that reaches one, or that can

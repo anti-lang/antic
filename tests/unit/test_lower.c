@@ -454,6 +454,9 @@ static void records_type_ids(void)
         {ANTI_TYPE_ARRAY | ANTI_TYPE_STRUCT << 8 | ANTI_TYPE_STRUCT << 16 |
              (uint64_t)2 << 24,
          "Size.descriptor"},
+        /* A variant and a `?T` carry descriptors of their own. */
+        {ANTI_TYPE_VARIANT, "Pick.descriptor"},
+        {ANTI_TYPE_OPTIONAL | ANTI_TYPE_I32 << 8, "optional.?i32.descriptor"},
     };
     static const struct field_expect size[] = {
         {ANTI_TYPE_I32, "(none)"},
@@ -467,6 +470,7 @@ static void records_type_ids(void)
         "union Bits { i: i32, f: f32 }\n"
         "enum Mode: u8 { A, B }\n"
         "class Inner { pub v: int = 0 }\n"
+        "variant Pick { One { n: i32 }, None2 }\n"
         "class Holder {\n"
         "    a: bool, b: char, c: i8, d: i16, e: i32, f: i64, g: c_long,\n"
         "    h: u8, i: u16, j: u32, k: u64, l: c_ulong, m: c_wchar,\n"
@@ -474,6 +478,7 @@ static void records_type_ids(void)
         "    s: []u16, t: [4]i8, u: Size, v: Bits, w: Mode, x: Inner,\n"
         "    y: *Size, z: []Size, own next: *Inner, modes: []Mode,\n"
         "    half: f16, halves: []f16, grid: [2][3]u16, path: [2]Size,\n"
+        "    pick: Pick, maybe: ?i32,\n"
         "}\n");
     CHECK(l.ok);
     check_field_records(&l.ir, "Holder.fields", holder,

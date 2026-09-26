@@ -45,7 +45,9 @@ enum anti_type {
     ANTI_TYPE_UNION,
     ANTI_TYPE_ENUM,
     ANTI_TYPE_CLASS,
-    ANTI_TYPE_F16       /* last, so the ids before it stay as they were */
+    ANTI_TYPE_F16,      /* after the others, so their ids stay */
+    ANTI_TYPE_VARIANT,  /* carries its descriptor: the tag, then the cases */
+    ANTI_TYPE_OPTIONAL  /* a `?T` of a value: the value, then the flag */
 };
 
 /* The type a type id names, and the type it is built on. An enum in the
@@ -73,6 +75,11 @@ uint64_t anti_rt_load_integer(const void *bytes, int64_t type);
 void anti_rt_store_integer(void *bytes, int64_t type, uint64_t value);
 
 struct anti_descriptor;
+
+/* The record of the case that the tag of the variant at bytes names,
+   among the records of its descriptor d, or NULL. */
+const struct anti_field *anti_rt_variant_case(const unsigned char *bytes,
+                                              const struct anti_descriptor *d);
 
 /* The bytes of one element that a pointer or a slice of the type id
    reaches, or 0 when the id does not give them. d is the descriptor of

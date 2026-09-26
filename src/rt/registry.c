@@ -519,6 +519,45 @@ static bool read_owned(struct reader *r, void **out, int64_t type,
     return value != NULL;
 }
 
+/* DESIGN: a variant reads as the object serialize writes, one member
+   that names the case and holds its fields. The tag of that case is
+   written first. The bytes of its fields are cleared and then filled
+   from the text, so a field the text leaves out is zero. A name that is
+   no case fails the text. */
+static bool read_variant(struct reader *r, unsigned char *bytes,
+                         const struct anti_descriptor *d, int depth)
+{
+    unsigned char name[NAME_ROOM];
+    const struct anti_field *c = NULL;
+    size_t length;
+    int64_t i;
+
+    if (!take(r, '{') || !read_string(r, name, NAME_ROOM, &length) ||
+        !take(r, ':')) {
+        return false;
+    }
+    for (i = 1; i < d->field_count && c == NULL; i++) {
+        if ((size_t)d->fields[i].name_length == length &&
+            memcmp(d->fields[i].name, name, length) == 0) {
+            c = &d->fields[i];
+        }
+    }
+    if (c == NULL) {
+        return false;
+    }
+    anti_rt_store_integer(bytes + d->fields[0].offset, d->fields[0].type,
+                          (uint64_t)c->owned);
+    if (c->descriptor != NULL) {
+        memset(bytes + c->offset, 0, (size_t)c->descriptor->size);
+        if (!fill(r, bytes + c->offset, c->descriptor, false, depth)) {
+            return false;
+        }
+    } else if (!take(r, '{') || !take(r, '}')) {
+        return false;
+    }
+    return take(r, '}');
+}
+
 /* Read one value of the type id into bytes, as serialize writes it. A
    value the type cannot hold fails the whole text. d and owned are the
    descriptor and the `own` bit of the field, as in put_value of
@@ -632,6 +671,28 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
         /* A struct without a descriptor was written as null, and keeps
            its default. */
         return skip_value(r, depth + 1);
+    case ANTI_TYPE_VARIANT:
+        if (d == NULL || d->field_count < 1 || take_word(r, "null")) {
+            return d == NULL || d->field_count < 1 ? skip_value(r, depth + 1)
+                                                  : true;
+        }
+        return read_variant(r, bytes, d, depth + 1);
+    case ANTI_TYPE_OPTIONAL: {
+        unsigned char *at = bytes;
+        if (d == NULL || d->field_count < 2) {
+            return skip_value(r, depth + 1);
+        }
+        if (take_word(r, "null")) {
+            at[d->fields[1].offset] = 0;
+            return true;
+        }
+        if (!read_value(r, at + d->fields[0].offset, d->fields[0].type,
+                        d->fields[0].descriptor, 0, depth + 1)) {
+            return false;
+        }
+        at[d->fields[1].offset] = 1;
+        return true;
+    }
     default:
         if (anti_rt_type_size(t) == 0) {
             return skip_value(r, depth + 1);

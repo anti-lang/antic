@@ -238,6 +238,7 @@ tests
 - `v is Shape.Circle` gives a `bool`. `v.tag` is the tag as its enum. There is no other access to a case's fields than `switch`, and `if let Circle c = s { }`, which is a `switch` of one arm.
 - A variant is a value type with C layout. It may be a struct field, an array element, a parameter and a result. It passes by value under the struct rules. It cannot have functions, since it is a struct.
 - `anti bind` never produces a variant, because C declares none. An exported variant is written as above.
+- A variant has a descriptor with its tag and each case's fields, so `==`, `hash`, `serialize`, `deserialize` and `reflect` handle a field of variant type, in a struct and in a class alike.
 
 ## Locking and channels
 
@@ -1001,6 +1002,7 @@ if let a = ages.get("Ann") { ... }
 let first = queue.first() else { return; };
 ```
 
+- A `?T` of a value has a descriptor of its own, with the value and the flag, so `==`, `hash`, `serialize`, `deserialize` and `reflect` handle a field of type `?T` as they handle a variant.
 - A `?T` compares with `none`, narrows after a test, and works with `if let`, `let ... else` and `??`. A `?T` is used as a `T` only after a test proves it holds one.
 - `?T` of a value type is the value and one flag byte, padded to the type's alignment. `?*T` stays one pointer, with `none` as address zero, as now.
 - The match result of [The match](#the-match) is a `?Match` under this rule.
