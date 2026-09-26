@@ -2071,9 +2071,14 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
             l->b = arm;
             entry[k] = arm;
             if (at->bound != NULL) {
-                ir_memcopy(l->f, l->b, lower_temp(l, at->bound->ir),
-                           lower_case_address(l, variant, address),
-                           lower_vtype_of(l, at->bound->type));
+                /* The address and the type are bound first, since C
+                   leaves the order of two calls with effects in one
+                   argument list open. */
+                struct ir_operand fields =
+                    lower_case_address(l, variant, address);
+                struct ir_vtype bound = lower_vtype_of(l, at->bound->type);
+                ir_memcopy(l->f, l->b, lower_temp(l, at->bound->ir), fields,
+                           bound);
             }
             lower_stmt(l, body);
             if ((falls[k] = sema_arm_fallthrough(body)) != NULL) {

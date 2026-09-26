@@ -2003,6 +2003,8 @@ static void snapshot_entry(struct lowerer *l, const struct item *it,
                            ir_sym_offset_of(l->m, agg, (uint32_t)(i + 1))));
         struct ir_operand len_offset;
         struct ir_operand offset;
+        struct ir_operand length;
+        struct ir_operand length_at;
         uint32_t slot;
         uint32_t ptr;
 
@@ -2015,14 +2017,17 @@ static void snapshot_entry(struct lowerer *l, const struct item *it,
         offset = lower_temp(l, ir_load(l->f, entry, IR_I64, lower_temp(l, at)));
         ptr = ir_ptradd(l->f, entry, base, offset);
         ir_store(l->f, entry, IR_PTR, lower_temp(l, ptr), lower_temp(l, slot));
-        ir_store(l->f, entry, IR_I64,
-                 lower_temp(l, ir_load(l->f, entry, IR_I64,
+        /* The length is read before the address it goes to is made,
+           each bound first, since C leaves the order of two calls in
+           one argument list open. */
+        length = lower_temp(l, ir_load(l->f, entry, IR_I64,
                                        lower_temp(l, ir_ptradd(
                                                          l->f, entry,
                                                          lower_temp(l, at),
-                                                         len_offset)))),
-                 lower_temp(l, ir_ptradd(l->f, entry, lower_temp(l, slot),
-                                         len_offset)));
+                                                         len_offset))));
+        length_at = lower_temp(l, ir_ptradd(l->f, entry, lower_temp(l, slot),
+                                            len_offset));
+        ir_store(l->f, entry, IR_I64, length, length_at);
         sym->ir = slot;
     }
 }
@@ -2554,13 +2559,18 @@ void lower_copy_owned(struct lowerer *l, const struct type *t,
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
             struct ir_operand offset;
+            struct ir_operand part;
+            struct ir_operand copy;
             if ((f->form != FIELD_PLAIN && f->form != FIELD_USE) ||
                 !lower_copies_parts(f->type)) {
                 continue;
             }
+            /* Each address is bound first, since C leaves the order of
+               two calls in one argument list open. */
             offset = lower_field_offset(l, t, &f->name);
-            lower_copy_owned(l, f->type, lower_offset_address(l, from, offset),
-                             lower_offset_address(l, into, offset));
+            part = lower_offset_address(l, from, offset);
+            copy = lower_offset_address(l, into, offset);
+            lower_copy_owned(l, f->type, part, copy);
         }
         return;
     default:
@@ -2833,9 +2843,14 @@ static void copy_field(struct lowerer *l, const struct type *up,
          (f->type->kind == TYPE_OPTIONAL &&
           f->type->element->kind != TYPE_CLASS)) &&
         lower_copies_parts(f->type)) {
+        struct ir_operand part;
+        struct ir_operand copy;
+        /* Each address is bound first, since C leaves the order of two
+           calls in one argument list open. */
         offset = lower_field_offset(l, up, &f->name);
-        lower_copy_owned(l, f->type, lower_offset_address(l, self, offset),
-                         lower_offset_address(l, to, offset));
+        part = lower_offset_address(l, self, offset);
+        copy = lower_offset_address(l, to, offset);
+        lower_copy_owned(l, f->type, part, copy);
         return;
     }
     /* A `?T` of a class value copies the object it holds with its own
