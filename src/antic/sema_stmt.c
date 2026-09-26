@@ -2908,8 +2908,13 @@ bool sema_thread_safe_symbol(const struct symbol *sym)
 }
 
 /* The capture of sym in the anonymous function it, added when it is not
-   there yet. */
-static struct capture *capture_in(struct item *it, struct symbol *sym)
+   there yet.
+   DESIGN: the list lives in the arena, as the item does. A copy of a
+   generic and an item read from a library file hold a list of the arena
+   as well, so realloc can grow none of them, and a list of the heap had
+   no owner to free it. A grown list leaves the old one in the arena. */
+static struct capture *capture_in(struct checker *c, struct item *it,
+                                  struct symbol *sym)
 {
     size_t i;
 
@@ -2922,12 +2927,11 @@ static struct capture *capture_in(struct item *it, struct symbol *sym)
         size_t capacity = it->capture_capacity == 0 ? 4
                                                     : it->capture_capacity * 2;
         struct capture *grown =
-            capacity <= SIZE_MAX / sizeof *grown
-                ? realloc(it->captures, capacity * sizeof *grown)
-                : NULL;
-        if (grown == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
+            types_alloc_array(c->arena, capacity, sizeof *grown);
+
+        if (it->capture_count > 0) {
+            memcpy(grown, it->captures,
+                   it->capture_count * sizeof *grown);
         }
         it->captures = grown;
         it->capture_capacity = capacity;
@@ -2950,7 +2954,7 @@ void sema_capture(struct checker *c, struct symbol *sym)
     sym->captured = true;
     for (it = c->function; it != NULL && it != sym->frame;
          it = it->enclosing) {
-        capture_in(it, sym);
+        capture_in(c, it, sym);
     }
 }
 
@@ -2988,7 +2992,7 @@ void sema_note_write(struct checker *c, const struct expr *e)
     sema_note_field_write(c, e);
     for (it = c->function; sym != NULL && it != NULL && it != sym->frame;
          it = it->enclosing) {
-        struct capture *cap = capture_in(it, sym);
+        struct capture *cap = capture_in(c, it, sym);
         if (!cap->written) {
             cap->written = true;
             cap->write = e->pos;
@@ -3011,7 +3015,7 @@ void sema_note_call(struct checker *c, const struct expr *callee)
     }
     for (it = c->function; it != NULL && it != sym->frame;
          it = it->enclosing) {
-        struct capture *cap = capture_in(it, sym);
+        struct capture *cap = capture_in(c, it, sym);
         if (!cap->called) {
             cap->called = true;
             cap->call = callee->pos;

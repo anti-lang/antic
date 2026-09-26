@@ -1846,7 +1846,7 @@ static int compile(const struct options *o, struct text *source,
     ir_module_init(&program, &arena, "");
 
     if (!read_source(o->input, source)) {
-        return 1;
+        goto done;
     }
     if (!lex(text_cstr(source), source->length, &arena, &diags, &tokens)) {
         report_diagnostics(o, &diags);

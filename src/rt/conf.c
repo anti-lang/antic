@@ -98,6 +98,12 @@ struct retired {
 
 static struct retired *retired;
 
+/* The path of every file the file layer read. The source of a key points
+   into one, and a later layer or include may replace the source while a
+   reader holds it, so every path stays until the program ends, as a
+   replaced value does. */
+static struct retired *paths;
+
 /* A startup error: the message through the failure routine and status
    70, the status of every refusal at start. The format is a literal. */
 #define startup_error(...) anti_rt_fail_exit(70, "anti: " __VA_ARGS__)
@@ -471,7 +477,7 @@ struct including {
     const struct including *from;
 };
 
-static void read_file(const char *path, const struct including *from);
+static void read_file(char *path, const struct including *from);
 
 /* Whether the key is the word, or starts with it and a dot. */
 static int key_under(struct anti_text key, const char *word)
@@ -681,8 +687,9 @@ static void read_keys(const struct anti_toml *doc, const char *path)
    order, depth first, then its own keys. The including file therefore
    wins per key. The path is the one the caller resolved, and the reader
    keeps it. */
-static void read_file(const char *path, const struct including *from)
+static void read_file(char *path, const struct including *from)
 {
+    struct retired *kept;
     struct including here;
     const struct including *up;
     struct anti_toml *doc;
@@ -713,6 +720,15 @@ static void read_file(const char *path, const struct including *from)
     if (doc == NULL) {
         startup_error("%s is not the TOML subset", path);
     }
+    kept = malloc(sizeof *kept);
+    if (kept == NULL) {
+        startup_error("out of memory at program start");
+    }
+    kept->value = path;
+    hold();
+    kept->next = paths;
+    paths = kept;
+    release();
     here.path = path;
     here.from = from;
     read_includes(doc, path, &here);
