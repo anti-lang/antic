@@ -45,12 +45,13 @@ extern fn anti_rt_reflect_call(object: ?*Object, index: int, args: ?*Value,
 /// A pointer, a slice, an array and an enum are built on another type, which
 /// `Field.element` names. An enum there is the integer it is built on. `None`
 /// is a bitfield, which no walk reads. A `Variant` and an `Optional`, a `?T` of
-/// a value, carry descriptors of their own, and no `Value` carries either.
+/// a value, carry descriptors of their own, and no `Value` carries either. A
+/// `Handle` is a channel or an `own fn`, and a `Regex` a compiled pattern.
 pub enum TypeId: u8
 {
 	None, Bool, Char, I8, I16, I32, I64, CLong, U8, U16, U32, U64, CULong,
 	CWchar, F32, F64, Str, Ptr, Fn, Slice, Array, Struct, Union, Enum, Class,
-	F16, Variant, Optional
+	F16, Variant, Optional, Handle, Regex
 }
 
 /// The code of the error of an index that names no field or function.

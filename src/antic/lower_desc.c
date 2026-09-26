@@ -401,7 +401,8 @@ enum type_id {
     TYPE_ID_U32, TYPE_ID_U64, TYPE_ID_CULONG, TYPE_ID_CWCHAR, TYPE_ID_F32,
     TYPE_ID_F64, TYPE_ID_STR, TYPE_ID_PTR, TYPE_ID_FN, TYPE_ID_SLICE,
     TYPE_ID_ARRAY, TYPE_ID_STRUCT, TYPE_ID_UNION, TYPE_ID_ENUM,
-    TYPE_ID_CLASS, TYPE_ID_F16, TYPE_ID_VARIANT, TYPE_ID_OPTIONAL
+    TYPE_ID_CLASS, TYPE_ID_F16, TYPE_ID_VARIANT, TYPE_ID_OPTIONAL,
+    TYPE_ID_HANDLE, TYPE_ID_REGEX
 };
 
 /* The type id of t alone, without the type it is built on. */
@@ -419,20 +420,22 @@ static uint64_t type_id_of(const struct type *t)
         [TYPE_F16] = TYPE_ID_F16,
     };
 
-    /* DESIGN: a Mutex and a channel are handles of objects that threads
-       share. A Regex is the handle of a compiled pattern, and a Match
-       holds slices of a searched text. A walk has nothing to write or copy
-       there, so their type id is none, as a variant's is. `serialize`
-       and `reflect.get` pass over them. */
-    if (types_is_mutex(t) || types_is_chan(t) || types_is_regex(t) ||
-        types_is_match(t) || types_is_object_lock(t)) {
+    /* DESIGN: a Mutex and an object lock are locks, which are no data. A
+       Match holds slices of a searched text and has no `==`. Their type
+       id is none. A channel is the handle of an object that threads
+       share, and an `own fn` is two words that own a snapshot. Both have
+       the type id of a handle, which `equals` and `hash` compare by
+       identity. A Regex has one of its own, compared by its text and its
+       mode. `serialize`, `deserialize` and `reflect.get` pass over all of
+       them, since no Value and no text carries one. */
+    if (types_is_mutex(t) || types_is_match(t) || types_is_object_lock(t)) {
         return TYPE_ID_NONE;
     }
-    /* An `own fn` field is two words and owns its snapshot. No Value
-       carries two words, and a copy would give the snapshot two owners,
-       so its type id is none as well. */
-    if (t->kind == TYPE_FN && t->context) {
-        return TYPE_ID_NONE;
+    if (types_is_chan(t) || (t->kind == TYPE_FN && t->context)) {
+        return TYPE_ID_HANDLE;
+    }
+    if (types_is_regex(t)) {
+        return TYPE_ID_REGEX;
     }
     /* A variant and a `?T` of a value carry descriptors of their own,
        which a walk reads. No Value carries either. */
@@ -484,6 +487,10 @@ static uint64_t type_id(const struct type *t)
         on = on->base;
     }
     id = type_id_of(t) | (on != NULL ? type_id_of(on) << 8 : 0);
+    /* A handle holds the count of its words in the byte above. */
+    if (id == TYPE_ID_HANDLE) {
+        id |= (uint64_t)(types_is_chan(t) ? 1 : 2) << 8;
+    }
     if (t->kind == TYPE_ARRAY) {
         uint64_t count = 1;
         const struct type *inner = t;

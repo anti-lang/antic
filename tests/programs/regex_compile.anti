@@ -4,8 +4,8 @@
 //! `regex.Error`. A literal and a compiled pattern read `\d`, `\w` and `\s` as
 //! their ASCII sets, `(*UCP)` gives the three their Unicode meaning, and
 //! `\p{Nd}` names any decimal digit. The inline flags change the whole pattern
-//! or one group. The methods of `str` are not built yet, so the program asks
-//! PCRE2 through the handle whether a pattern matches.
+//! or one group. The program asks PCRE2 through the code the handle holds first
+//! whether a pattern matches.
 
 import anti.lang;
 import anti.regex;
@@ -17,10 +17,17 @@ extern fn pcre2_match_8(code: ?*byte, subject: ?*byte, length: c_size_t,
 	start: c_size_t, options: u32, data: ?*byte, context: ?*byte) -> c_int;
 extern fn pcre2_match_data_free_8(data: ?*byte);
 
+/// The code PCRE2 compiled, which the handle holds first.
+fn code(r: Regex) -> ?*byte
+{
+	let at = r.handle as *?*byte;
+	return *at;
+}
+
 fn matches(r: Regex, s: str) -> bool
 {
-	let data = pcre2_match_data_create_from_pattern_8(r.handle, none);
-	let n = pcre2_match_8(r.handle, s.ptr, s.len as c_size_t, 0, 0, data, none);
+	let data = pcre2_match_data_create_from_pattern_8(code(r), none);
+	let n = pcre2_match_8(code(r), s.ptr, s.len as c_size_t, 0, 0, data, none);
 	pcre2_match_data_free_8(data);
 	return n > 0;
 }

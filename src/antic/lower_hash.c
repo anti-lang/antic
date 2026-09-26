@@ -262,7 +262,8 @@ static struct ir_operand hash_fields(struct lowerer *l, const struct expr *call,
     for (i = 0; i < t->field_count; i++) {
         const struct struct_field *f = &t->fields[i];
         struct ir_operand part;
-        if (type_field_is_unit_break(f) || types_is_mutex(f->type)) {
+        if (type_field_is_unit_break(f) || types_is_mutex(f->type) ||
+            types_is_object_lock(f->type)) {
             continue;
         }
         if (f->bits != 0) {
@@ -409,6 +410,14 @@ static struct ir_operand hash_at(struct lowerer *l, const struct expr *call,
         }
         return hash_variant(l, call, at, t);
     case TYPE_STRUCT:
+        /* A Regex hashes its text and its mode, as its `==` compares. */
+        if (types_is_regex(t)) {
+            static const enum ir_type params[] = {IR_PTR};
+            struct ir_operand handle =
+                lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+            return mix(l, lower_rt_call(l, "anti_rt_pattern_hash", IR_I64,
+                                        params, &handle, 1));
+        }
         own = own_hash(call, t);
         if (own != NULL) {
             return call_hash(l, lower_callee_function(

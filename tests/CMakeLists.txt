@@ -802,7 +802,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     # on the host target alone. errors/pattern_level.anti holds the
     # refusal.
     set(rosetta_sources ${program_sources})
-    list(FILTER rosetta_sources EXCLUDE REGEX "/(pattern_[a-z]+|regex_compile)\\.anti$")
+    list(FILTER rosetta_sources EXCLUDE REGEX "/(pattern_[a-z]+|regex_compile|eq_handles)\\.anti$")
     foreach(source IN LISTS rosetta_sources)
         get_filename_component(name "${source}" NAME_WE)
         add_test(NAME program_${name}_macos-x86_64

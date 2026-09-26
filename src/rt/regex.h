@@ -10,6 +10,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* DESIGN: the handle of a compiled pattern holds the code PCRE2 compiled,
+   the pattern as it was written and whether it searches bytes. `==` of a
+   Regex compares the text and the mode, which PCRE2 keeps no copy of, so
+   the handle keeps them. ANTI_PATTERN_CODE gives the code to PCRE2. */
+struct anti_pattern {
+    void *code;
+    unsigned char *text;
+    int64_t length;
+    int64_t bytes;
+};
+
+#define ANTI_PATTERN_CODE(p) (((const struct anti_pattern *)(p))->code)
+
 /* The compiled form of the pattern of length bytes at bytes, or NULL when
    it does not compile. Then *code holds the error number of PCRE2 and
    *offset the byte of the pattern where PCRE2 stopped. */

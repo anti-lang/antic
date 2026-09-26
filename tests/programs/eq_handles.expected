@@ -1,0 +1,6 @@
+exit 0
+lock 1 0 1
+chan 1 0
+fn 1 0 1
+regex 1 0 1
+rule 1 0 1

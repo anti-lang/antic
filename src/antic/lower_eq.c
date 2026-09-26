@@ -12,7 +12,8 @@
    its address and a function by its code. A slice part compares by its
    address and its length, as the default hash takes it. A part with `operator fn eq`
    goes through that function, a class value through the `equals` of its
-   chain, and any other struct part through its fields. */
+   chain, a Regex through its text and its mode, and any other struct
+   part through its fields. A lock is no data and is passed over. */
 
 static const struct name equals_name = {"equals", 6};
 
@@ -81,6 +82,19 @@ static struct ir_operand class_equals(struct lowerer *l, const struct type *t,
     return lower_rt_call(l, RUNTIME_ROOT "equals", IR_I8, params, args, 2);
 }
 
+/* Whether the Regex values at a and b have one text and one mode, which
+   the runtime answers from their handles. */
+static struct ir_operand same_pattern(struct lowerer *l, struct ir_operand a,
+                                      struct ir_operand b)
+{
+    static const enum ir_type params[] = {IR_PTR, IR_PTR};
+    struct ir_operand args[2];
+
+    args[0] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, a));
+    args[1] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, b));
+    return lower_rt_call(l, "anti_rt_pattern_same", IR_I8, params, args, 2);
+}
+
 /* Whether the scalars x and y of type t are equal, as an i8. */
 static struct ir_operand same_value(struct lowerer *l, const struct type *t,
                                     struct ir_operand x, struct ir_operand y)
@@ -104,7 +118,8 @@ static void compare_fields(struct lowerer *l, const struct expr *e,
 
     for (i = 0; i < t->field_count; i++) {
         const struct struct_field *f = &t->fields[i];
-        if (type_field_is_unit_break(f) || types_is_mutex(f->type)) {
+        if (type_field_is_unit_break(f) || types_is_mutex(f->type) ||
+            types_is_object_lock(f->type)) {
             continue;
         }
         if (f->bits != 0) {
@@ -282,6 +297,10 @@ static void compare_at(struct lowerer *l, const struct expr *e,
         require(l, cmp, class_equals(l, t, a, b));
         return;
     case TYPE_STRUCT:
+        if (types_is_regex(t)) {
+            require(l, cmp, same_pattern(l, a, b));
+            return;
+        }
         own = own_eq(e, t);
         if (own != NULL) {
             require(l, cmp, call_eq(l, lower_callee_function(

@@ -5,6 +5,7 @@
 
 #include "f16.h"
 #include "object.h"
+#include "regex.h"
 #include "std.h"
 #include "utf.h"
 
@@ -204,6 +205,34 @@ static uint64_t hash_run(uint64_t h, const unsigned char *p, size_t count)
     return h;
 }
 
+int8_t anti_rt_pattern_same(const void *a, const void *b)
+{
+    const struct anti_pattern *x = a;
+    const struct anti_pattern *y = b;
+
+    if (x == y) {
+        return 1;
+    }
+    if (x == NULL || y == NULL) {
+        return 0;
+    }
+    return x->bytes == y->bytes && x->length == y->length &&
+           (x->length == 0 ||
+            memcmp(x->text, y->text, (size_t)x->length) == 0);
+}
+
+uint64_t anti_rt_pattern_hash(const void *p)
+{
+    const struct anti_pattern *x = p;
+    uint64_t h = 1469598103934665603u;
+
+    if (x == NULL) {
+        return h;
+    }
+    h = hash_run(h, (const unsigned char *)&x->bytes, sizeof x->bytes);
+    return x->length > 0 ? hash_run(h, x->text, (size_t)x->length) : h;
+}
+
 const struct anti_field *anti_rt_variant_case(const unsigned char *bytes,
                                               const struct anti_descriptor *d)
 {
@@ -287,8 +316,10 @@ static int sub_object(const struct anti_descriptor *d)
 static int same_element(const unsigned char *a, const unsigned char *b,
                         int64_t element, const struct anti_descriptor *d)
 {
+    /* A tuple has the id of a struct and no descriptor, and is passed
+       over. */
     if (element == ANTI_TYPE_STRUCT) {
-        return d != NULL && same_fields(a, b, d);
+        return d == NULL || same_fields(a, b, d);
     }
     if (element == ANTI_TYPE_CLASS && sub_object(d)) {
         return 1;
@@ -336,6 +367,18 @@ static int same_value(const unsigned char *a, const unsigned char *b,
     case ANTI_TYPE_STRUCT:
     case ANTI_TYPE_CLASS:
         return same_element(a, b, t, d);
+    /* A channel is its handle, and an own fn its code and its snapshot,
+       each compared as a pointer compares. */
+    case ANTI_TYPE_HANDLE:
+        return memcmp(a, b, (size_t)ANTI_TYPE_ELEMENT(type) * sizeof(void *)) ==
+               0;
+    case ANTI_TYPE_REGEX: {
+        const void *x;
+        const void *y;
+        memcpy(&x, a, sizeof x);
+        memcpy(&y, b, sizeof y);
+        return anti_rt_pattern_same(x, y);
+    }
     case ANTI_TYPE_VARIANT: {
         const struct anti_field *x = anti_rt_variant_case(a, d);
         if (x != anti_rt_variant_case(b, d)) {
@@ -401,6 +444,15 @@ static uint64_t hash_value(uint64_t h, const unsigned char *p, int64_t type,
     case ANTI_TYPE_STRUCT:
     case ANTI_TYPE_CLASS:
         return hash_element(h, p, t, d);
+    case ANTI_TYPE_HANDLE:
+        return hash_run(h, p, (size_t)ANTI_TYPE_ELEMENT(type) * sizeof(void *));
+    case ANTI_TYPE_REGEX: {
+        const void *x;
+        uint64_t v;
+        memcpy(&x, p, sizeof x);
+        v = anti_rt_pattern_hash(x);
+        return hash_run(h, (const unsigned char *)&v, sizeof v);
+    }
     case ANTI_TYPE_VARIANT: {
         const struct anti_field *x = anti_rt_variant_case(p, d);
         uint64_t tag = x != NULL ? (uint64_t)x->owned : 0;
@@ -966,6 +1018,8 @@ static void show_value(struct anti_builder *b, void *bytes, int64_t type,
         return;
     case ANTI_TYPE_NONE:
     case ANTI_TYPE_UNION:
+    case ANTI_TYPE_HANDLE:
+    case ANTI_TYPE_REGEX:
         put(b, "?");
         return;
     default:

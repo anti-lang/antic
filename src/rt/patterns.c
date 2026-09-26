@@ -183,7 +183,7 @@ static int64_t failure(int rc)
 static pcre2_match_data *match_data(const void *pattern, int full)
 {
     pcre2_match_data *md = full ? pcre2_match_data_create_from_pattern(
-                                      pattern, NULL)
+                                      ANTI_PATTERN_CODE(pattern), NULL)
                                 : pcre2_match_data_create(1, NULL);
 
     if (md == NULL) {
@@ -211,7 +211,8 @@ static int crlf_newline(const void *pattern)
 {
     uint32_t newline = 0;
 
-    (void)pcre2_pattern_info(pattern, PCRE2_INFO_NEWLINE, &newline);
+    (void)pcre2_pattern_info(ANTI_PATTERN_CODE(pattern), PCRE2_INFO_NEWLINE,
+                             &newline);
     return newline == PCRE2_NEWLINE_CRLF || newline == PCRE2_NEWLINE_ANY ||
            newline == PCRE2_NEWLINE_ANYCRLF;
 }
@@ -259,7 +260,7 @@ static int64_t search(struct anti_cursor *c, pcre2_match_data *md,
         if (c->at < length && (s[c->at] & 0xC0) == 0x80) {
             c->options &= ~(int64_t)PCRE2_NO_UTF_CHECK;
         }
-        rc = pcre2_match(c->pattern, s, (PCRE2_SIZE)length, (PCRE2_SIZE)c->at,
+        rc = pcre2_match(ANTI_PATTERN_CODE(c->pattern), s, (PCRE2_SIZE)length, (PCRE2_SIZE)c->at,
                          (uint32_t)c->options, md, NULL);
         if (rc == PCRE2_ERROR_NOMATCH) {
             if ((c->options & RETRY) == 0) {
@@ -446,7 +447,8 @@ int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
                            int64_t length)
 {
     pcre2_match_data *md = match_data(pattern, 0);
-    int rc = pcre2_match(pattern, s, (PCRE2_SIZE)length, 0, 0, md, NULL);
+    int rc = pcre2_match(ANTI_PATTERN_CODE(pattern), s, (PCRE2_SIZE)length, 0,
+                         0, md, NULL);
 
     pcre2_match_data_free(md);
     if (rc == PCRE2_ERROR_NOMATCH) {
@@ -486,10 +488,12 @@ static int64_t named_group(const void *pattern, const PCRE2_SIZE *ov,
     }
     memcpy(text, name, (size_t)length);
     text[length] = '\0';
-    if (pcre2_substring_nametable_scan(pattern, text, &first, &last) < 0) {
+    if (pcre2_substring_nametable_scan(ANTI_PATTERN_CODE(pattern), text,
+                                       &first, &last) < 0) {
         return NO_GROUP;
     }
-    (void)pcre2_pattern_info(pattern, PCRE2_INFO_NAMEENTRYSIZE, &size);
+    (void)pcre2_pattern_info(ANTI_PATTERN_CODE(pattern),
+                             PCRE2_INFO_NAMEENTRYSIZE, &size);
     for (entry = first; entry <= last; entry += size) {
         number = (int64_t)((entry[0] << 8) | entry[1]);
         if (ov[2 * number] != PCRE2_UNSET) {
@@ -503,7 +507,7 @@ static int64_t named_group(const void *pattern, const PCRE2_SIZE *ov,
 static pcre2_match_data *search_again(const struct anti_match *m)
 {
     pcre2_match_data *md = match_data(m->pattern, 1);
-    int rc = pcre2_match(m->pattern, m->subject.ptr,
+    int rc = pcre2_match(ANTI_PATTERN_CODE(m->pattern), m->subject.ptr,
                          (PCRE2_SIZE)m->subject.len, (PCRE2_SIZE)m->from,
                          (uint32_t)m->options, md, NULL);
 

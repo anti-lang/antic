@@ -328,7 +328,8 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
 
     for (i = 0; i < t->field_count; i++) {
         const struct struct_field *f = &t->fields[i];
-        if (type_field_is_unit_break(f) || types_is_mutex(f->type)) {
+        if (type_field_is_unit_break(f) || types_is_mutex(f->type) ||
+            types_is_object_lock(f->type)) {
             continue;
         }
         if (!part_has_eq(c, f->type)) {
@@ -338,20 +339,28 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
     return NULL;
 }
 
-/* Whether a value of type t holds a union in place, directly, in a
-   struct or in an array. A class value compares through its own
-   `equals`. */
+/* Whether a value of type t holds a union or a Match in place. It may
+   stand there directly or in a struct, an array, a `?T` or a case of a
+   variant. Neither can be compared. A class value compares through its own `equals`. */
 static bool holds_union(const struct type *t)
 {
     size_t i;
 
-    while (t->kind == TYPE_ARRAY) {
+    while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
         t = t->element;
+    }
+    if (t->kind == TYPE_VARIANT) {
+        for (i = 0; i < t->param_count; i++) {
+            if (t->params[i] != NULL && holds_union(t->params[i])) {
+                return true;
+            }
+        }
+        return false;
     }
     if (t->kind != TYPE_STRUCT) {
         return false;
     }
-    if (t->is_union) {
+    if (t->is_union || types_is_match(t)) {
         return true;
     }
     for (i = 0; i < t->field_count; i++) {
@@ -405,9 +414,10 @@ const struct struct_field *sema_class_gap(const struct type *t)
    with `concrete fn equals`. That of a struct compares its fields in
    order, each with its own `==`, so it keeps the rule that values equal
    by `eq` hash alike wherever each field keeps it. A union holds one
-   field and says not which, a simd struct compares lane by lane, and a
-   Mutex is no value, so none of the three has the default. A class
-   that holds a union in place has none either, since the `equals` of
+   field and says not which, a simd struct compares lane by lane, a
+   Mutex is no value and a Match holds slices of a searched text, so
+   none of the four has the default. A class that holds a union or a
+   Match in place has none either, since the `equals` of
    `Object` walks every other field as this default does. A tuple, a
    variant and a `?T` have it when every part has `==`: a tuple part by
    part, a variant by its case and then the fields of that case, a `?T`
@@ -422,7 +432,7 @@ bool sema_default_eq(struct checker *c, struct type *t)
         return sema_class_gap(t) == NULL;
     case TYPE_STRUCT:
         return !t->is_union && !type_is_simd(t) && !types_is_mutex(t) &&
-               sema_eq_gap(c, t) == NULL;
+               !types_is_match(t) && sema_eq_gap(c, t) == NULL;
     case TYPE_TUPLE:
         return sema_eq_gap(c, t) == NULL;
     case TYPE_VARIANT:

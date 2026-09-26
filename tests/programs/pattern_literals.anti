@@ -10,11 +10,13 @@ import anti.regex;
 extern fn printf(format: ?*byte, ...) -> c_int;
 extern fn pcre2_pattern_info_8(code: ?*byte, what: u32, out: ?*u32) -> c_int;
 
-/// The number of groups of r, which PCRE2 names PCRE2_INFO_CAPTURECOUNT.
+/// The number of groups of r, which PCRE2 names PCRE2_INFO_CAPTURECOUNT. The
+/// handle holds the code PCRE2 compiled first.
 fn groups(r: Regex) -> int
 {
 	let n: u32 = 0;
-	pcre2_pattern_info_8(r.handle, 4, &n);
+	let at = r.handle as *?*byte;
+	pcre2_pattern_info_8(*at, 4, &n);
 	return n as int;
 }
 

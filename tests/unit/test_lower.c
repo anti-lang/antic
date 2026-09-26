@@ -457,6 +457,10 @@ static void records_type_ids(void)
         /* A variant and a `?T` carry descriptors of their own. */
         {ANTI_TYPE_VARIANT, "Pick.descriptor"},
         {ANTI_TYPE_OPTIONAL | ANTI_TYPE_I32 << 8, "optional.?i32.descriptor"},
+        /* A channel is one word and an `own fn` two, compared by
+           identity. */
+        {ANTI_TYPE_HANDLE | (uint64_t)1 << 8, "(none)"},
+        {ANTI_TYPE_HANDLE | (uint64_t)2 << 8, "(none)"},
     };
     static const struct field_expect size[] = {
         {ANTI_TYPE_I32, "(none)"},
@@ -478,7 +482,8 @@ static void records_type_ids(void)
         "    s: []u16, t: [4]i8, u: Size, v: Bits, w: Mode, x: Inner,\n"
         "    y: *Size, z: []Size, own next: *Inner, modes: []Mode,\n"
         "    half: f16, halves: []f16, grid: [2][3]u16, path: [2]Size,\n"
-        "    pick: Pick, maybe: ?i32,\n"
+        "    pick: Pick, maybe: ?i32, pipe: chan i32,\n"
+        "    own run: fn(i32) -> i32,\n"
         "}\n");
     CHECK(l.ok);
     check_field_records(&l.ir, "Holder.fields", holder,

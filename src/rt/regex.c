@@ -16,6 +16,39 @@
    option of the compile stands for one. */
 #define TEXT_OPTIONS PCRE2_UTF
 
+/* The handle of compiled, which PCRE2 compiled from the length bytes of
+   the pattern at bytes, or NULL for a compile that failed. A handle that
+   finds no memory gives the code back and reports PCRE2_ERROR_NOMEMORY
+   through *code and *offset. */
+static void *keep(pcre2_code *compiled, const unsigned char *bytes,
+                  int64_t length, int is_bytes, int32_t *code,
+                  int64_t *offset)
+{
+    struct anti_pattern *p;
+
+    if (compiled == NULL) {
+        return NULL;
+    }
+    p = malloc(sizeof *p);
+    if (p != NULL) {
+        p->text = malloc(length > 0 ? (size_t)length : 1);
+    }
+    if (p == NULL || p->text == NULL) {
+        free(p);
+        pcre2_code_free(compiled);
+        *code = PCRE2_ERROR_NOMEMORY;
+        *offset = 0;
+        return NULL;
+    }
+    if (length > 0) {
+        memcpy(p->text, bytes, (size_t)length);
+    }
+    p->code = compiled;
+    p->length = length;
+    p->bytes = is_bytes;
+    return p;
+}
+
 void *anti_rt_regex_compile(const unsigned char *bytes, int64_t length,
                             int32_t *code, int64_t *offset)
 {
@@ -28,7 +61,7 @@ void *anti_rt_regex_compile(const unsigned char *bytes, int64_t length,
         *code = (int32_t)error;
         *offset = (int64_t)at;
     }
-    return compiled;
+    return keep(compiled, bytes, length, 0, code, offset);
 }
 
 /* DESIGN: a byte pattern compiles without UTF mode, so `.` and every
@@ -468,20 +501,24 @@ void *anti_rt_regex_compile_bytes(const unsigned char *bytes, int64_t length,
     }
     free(w.out);
     free(w.from);
-    return compiled;
+    return keep(compiled, bytes, length, 1, code, offset);
 }
 
 int anti_rt_regex_is_bytes(const void *compiled)
 {
-    uint32_t options = 0;
-
-    (void)pcre2_pattern_info(compiled, PCRE2_INFO_ALLOPTIONS, &options);
-    return (options & PCRE2_UTF) == 0;
+    return ((const struct anti_pattern *)compiled)->bytes != 0;
 }
 
 void anti_rt_regex_free(void *compiled)
 {
-    pcre2_code_free(compiled);
+    struct anti_pattern *p = compiled;
+
+    if (p == NULL) {
+        return;
+    }
+    pcre2_code_free(p->code);
+    free(p->text);
+    free(p);
 }
 
 void anti_rt_regex_message_into(int32_t code, unsigned char *out,
@@ -514,7 +551,8 @@ int64_t anti_rt_regex_group_count(const void *compiled)
 {
     uint32_t count = 0;
 
-    (void)pcre2_pattern_info(compiled, PCRE2_INFO_CAPTURECOUNT, &count);
+    (void)pcre2_pattern_info(ANTI_PATTERN_CODE(compiled),
+                             PCRE2_INFO_CAPTURECOUNT, &count);
     return (int64_t)count;
 }
 
@@ -532,11 +570,13 @@ int64_t anti_rt_regex_group_number(const void *compiled,
     }
     memcpy(text, name, (size_t)length);
     text[length] = '\0';
-    number = pcre2_substring_number_from_name(compiled, text);
+    number = pcre2_substring_number_from_name(ANTI_PATTERN_CODE(compiled),
+                                              text);
     if (number == PCRE2_ERROR_NOUNIQUESUBSTRING) {
         PCRE2_SPTR first = NULL;
         PCRE2_SPTR last = NULL;
-        (void)pcre2_substring_nametable_scan(compiled, text, &first, &last);
+        (void)pcre2_substring_nametable_scan(ANTI_PATTERN_CODE(compiled),
+                                             text, &first, &last);
         /* An entry starts with its number in two bytes, high first. */
         return first == NULL ? -1 : (int64_t)((first[0] << 8) | first[1]);
     }

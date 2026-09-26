@@ -1,0 +1,89 @@
+//! The fields that hold a handle compare by what the handle means. A Mutex is
+//! not data and stays out of `==` and `hash`. A channel and an `own fn` compare
+//! by identity, the handle or the code and the snapshot. A Regex compares by
+//! its pattern text and its mode, so a literal and the same text compiled at
+//! run time are equal, in a class and in a struct alike.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+class Guarded
+{
+	pub lock: Mutex,
+	pub n: int = 0,
+}
+
+class Piped
+{
+	pub pipe: chan int,
+}
+
+class Slot
+{
+	own f: fn(int) -> int,
+
+	fn construct(self, keep own f: fn(int) -> int)
+	{
+		self.f = f;
+	}
+}
+
+class Searched
+{
+	pub pattern: Regex,
+}
+
+struct Rule
+{
+	pattern: Regex,
+	weight: int,
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let g = alloc Guarded { lock: Mutex.new(), n: 1 };
+	let h = alloc Guarded { lock: Mutex.new(), n: 1 };
+	let i = alloc Guarded { lock: Mutex.new(), n: 2 };
+	sync g.lock {
+		printf("lock %d %d %d\n".ptr, b(*g == *h), b(*g == *i),
+			b(g.hash() == h.hash()));
+	}
+
+	let one = chan int(1);
+	let two = chan int(1);
+	let p = alloc Piped { pipe: one };
+	let q = alloc Piped { pipe: one };
+	let r = alloc Piped { pipe: two };
+	printf("chan %d %d\n".ptr, b(*p == *q), b(*p == *r));
+
+	let k = 3;
+	let plain = alloc Slot(twice);
+	let also = alloc Slot(twice);
+	let caught = alloc Slot(snapshot fn(x: int) -> int { return x + k; });
+	printf("fn %d %d %d\n".ptr, b(*plain == *also), b(*plain == *caught),
+		b(plain.hash() == also.hash()));
+
+	let made = Regex.compile("a+b") catch fatal;
+	let s = alloc Searched { pattern: re"a+b" };
+	let t = alloc Searched { pattern: made };
+	let u = alloc Searched { pattern: re"a+c" };
+	printf("regex %d %d %d\n".ptr, b(*s == *t), b(*s == *u),
+		b(s.hash() == t.hash()));
+	let x = Rule { pattern: re"a+b", weight: 1 };
+	let y = Rule { pattern: made, weight: 1 };
+	let z = Rule { pattern: re"a+c", weight: 1 };
+	printf("rule %d %d %d\n".ptr, b(x == y), b(x == z), b(x.hash() == y.hash()));
+	return 0;
+}
