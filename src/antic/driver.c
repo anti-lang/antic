@@ -2048,8 +2048,12 @@ const struct interface *driver_interface(const struct options *o,
             exit(70);
         }
         with_input.libraries[0] = o->input;
-        memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
-               o->library_count * sizeof *o->libraries);
+        /* memcpy takes no null pointer, even for no bytes, and o->libraries
+           is null when no library was named. */
+        if (o->library_count > 0) {
+            memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
+                   o->library_count * sizeof *o->libraries);
+        }
         with_input.library_count = o->library_count + 1;
         if (!read_bytes(o->input, &source) ||
             !antl_header((const uint8_t *)source.data, source.length, arena,
@@ -2170,8 +2174,12 @@ bool driver_library_header(const struct options *o, struct text *out)
         exit(70);
     }
     with_input.libraries[0] = o->input;
-    memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
-           o->library_count * sizeof *o->libraries);
+    /* memcpy takes no null pointer, even for no bytes, and o->libraries
+       is null when no library was named. */
+    if (o->library_count > 0) {
+        memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
+               o->library_count * sizeof *o->libraries);
+    }
     with_input.library_count = o->library_count + 1;
     if (!read_bytes(o->input, &source) ||
         !antl_header((const uint8_t *)source.data, source.length, &arena,
@@ -2263,8 +2271,12 @@ static int compile_library_file(const struct options *o,
         exit(70);
     }
     with_input.libraries[0] = o->input;
-    memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
-           o->library_count * sizeof *o->libraries);
+    /* memcpy takes no null pointer, even for no bytes, and o->libraries
+       is null when no library was named. */
+    if (o->library_count > 0) {
+        memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
+               o->library_count * sizeof *o->libraries);
+    }
     with_input.library_count = o->library_count + 1;
     if (!read_bytes(o->input, &bytes)) {
         goto done;

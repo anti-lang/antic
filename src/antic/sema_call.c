@@ -1996,7 +1996,11 @@ static struct type *check_simd_value(struct checker *c, struct expr *e,
         sema_usable_pointer(c, receiver, base);
     }
     args[0] = receiver;
-    memcpy(args + 1, e->as.call.args, count * sizeof *args);
+    /* memcpy takes no null pointer, even for no bytes, and a call with no
+       arguments holds none. */
+    if (count > 0) {
+        memcpy(args + 1, e->as.call.args, count * sizeof *args);
+    }
     op = sema_name_is(name, SIMD_STORE)     ? SIMD_OP_STORE
          : sema_name_is(name, SIMD_SHUFFLE) ? SIMD_OP_SHUFFLE
          : sema_name_is(name, SIMD_SUM)     ? SIMD_OP_SUM
