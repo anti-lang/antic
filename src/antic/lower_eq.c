@@ -270,11 +270,16 @@ static void compare_at(struct lowerer *l, const struct expr *e,
            length. */
         struct ir_operand x = lower_temp(l, ir_load(l->f, l->b, IR_PTR, a));
         struct ir_operand y = lower_temp(l, ir_load(l->f, l->b, IR_PTR, b));
+        struct ir_operand n;
+        struct ir_operand m;
         require(l, cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, x,
                                                 y)));
-        require(l, cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
-                                                lower_slice_length(l, a, t),
-                                                lower_slice_length(l, b, t))));
+        /* Each length is bound first, since C leaves the order of two
+           calls in one argument list open. */
+        n = lower_slice_length(l, a, t);
+        m = lower_slice_length(l, b, t);
+        require(l, cmp,
+                lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, n, m)));
         return;
     }
     case TYPE_FN: {
