@@ -341,9 +341,6 @@ void test_variant(void)
     rejects(SHAPE
             "fn f(s: Shape, t: Shape) { s.tag = t.tag; }\n",
             2, 28, "the `tag` of a variant is read-only");
-    rejects(SHAPE
-            "fn f(s: Shape, t: Shape) -> bool { return s == t; }\n",
-            2, 43, "`==` is not defined on `Shape`");
 
     /* A literal names its case. */
     rejects(SHAPE

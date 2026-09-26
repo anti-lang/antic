@@ -240,35 +240,72 @@ static struct expr *nested_eq(struct checker *c, struct pos pos,
     return e;
 }
 
-/* Give the default `==` e the call of every `operator fn eq` of a part
-   of the struct t. A part is a field of struct or class type, or such a
-   field of a struct part that takes the default. A class value without one
-   calls the `equals` of its chain, which lowering finds in its members.
-   A field of a type parameter is read again in each copy. */
-static void walk_eq(struct checker *c, struct expr *e, struct type *t)
+static void walk_eq(struct checker *c, struct expr *e, struct type *t);
+
+/* Walk each part of the struct, tuple or case t with walk_eq. */
+static void walk_parts(struct checker *c, struct expr *e, struct type *t)
 {
     size_t i;
 
     for (i = 0; i < t->field_count; i++) {
-        struct type *f = t->fields[i].type;
-        if (type_field_is_unit_break(&t->fields[i]) ||
-            (f->kind != TYPE_STRUCT && f->kind != TYPE_CLASS)) {
-            continue;
-        }
-        if (sema_operator_symbol(c, f, LANG_HOOK_EQ) != NULL) {
-            struct expr *call;
-            if (listed(e->as.binary.eq_calls, e->as.binary.eq_count, f)) {
-                continue;
-            }
-            call = nested_eq(c, e->pos, f);
-            if (call != NULL) {
-                append(c, &e->as.binary.eq_calls, &e->as.binary.eq_count,
-                       call);
-            }
-        } else if (f->kind == TYPE_STRUCT) {
-            walk_eq(c, e, f);
+        if (!type_field_is_unit_break(&t->fields[i])) {
+            walk_eq(c, e, t->fields[i].type);
         }
     }
+}
+
+/* Walk what the default `==` of a value of type t compares. That is the
+   parts of a struct or a tuple, the fields of each case of a variant and
+   the value a `?T` holds. A class value calls the `equals` of its chain,
+   which lowering finds in its members. */
+static void walk_inside(struct checker *c, struct expr *e, struct type *t)
+{
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_STRUCT:
+        if (!t->is_union) {
+            walk_parts(c, e, t);
+        }
+        return;
+    case TYPE_TUPLE:
+        walk_parts(c, e, t);
+        return;
+    case TYPE_VARIANT:
+        for (i = 0; i < t->param_count; i++) {
+            if (t->params[i] != NULL) {
+                walk_parts(c, e, t->params[i]);
+            }
+        }
+        return;
+    case TYPE_OPTIONAL:
+        walk_eq(c, e, t->element);
+        return;
+    default:
+        return;
+    }
+}
+
+/* Give the default `==` e the call of the `operator fn eq` of a part of
+   type t, once per type. A part without one is walked inside. A part of
+   a type parameter is read again in each copy. */
+static void walk_eq(struct checker *c, struct expr *e, struct type *t)
+{
+    struct expr *call;
+
+    if ((t->kind == TYPE_STRUCT || t->kind == TYPE_CLASS ||
+         t->kind == TYPE_VARIANT) &&
+        sema_operator_symbol(c, t, LANG_HOOK_EQ) != NULL) {
+        if (listed(e->as.binary.eq_calls, e->as.binary.eq_count, t)) {
+            return;
+        }
+        call = nested_eq(c, e->pos, t);
+        if (call != NULL) {
+            append(c, &e->as.binary.eq_calls, &e->as.binary.eq_count, call);
+        }
+        return;
+    }
+    walk_inside(c, e, t);
 }
 
 /* Whether a part of type t of a struct, a tuple or a variant has `==`. A
@@ -302,17 +339,34 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
    order, each with its own `==`, so it keeps the rule that values equal
    by `eq` hash alike wherever each field keeps it. A union holds one
    field and says not which, a simd struct compares lane by lane, and a
-   Mutex is no value, so none of the three has the default. */
+   Mutex is no value, so none of the three has the default. A tuple, a
+   variant and a `?T` have it when every part has `==`: a tuple part by
+   part, a variant by its case and then the fields of that case, a `?T`
+   by its flag and then the value it holds. */
 bool sema_default_eq(struct checker *c, struct type *t)
 {
-    if (t->kind == TYPE_CLASS) {
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_CLASS:
         return true;
-    }
-    if (t->kind != TYPE_STRUCT || t->is_union || type_is_simd(t) ||
-        types_is_mutex(t)) {
+    case TYPE_STRUCT:
+        return !t->is_union && !type_is_simd(t) && !types_is_mutex(t) &&
+               sema_eq_gap(c, t) == NULL;
+    case TYPE_TUPLE:
+        return sema_eq_gap(c, t) == NULL;
+    case TYPE_VARIANT:
+        for (i = 0; i < t->param_count; i++) {
+            if (t->params[i] != NULL && sema_eq_gap(c, t->params[i]) != NULL) {
+                return false;
+            }
+        }
+        return true;
+    case TYPE_OPTIONAL:
+        return sema_meets_hook(c, t->element, LANG_HOOK_EQ);
+    default:
         return false;
     }
-    return sema_eq_gap(c, t) == NULL;
 }
 
 bool sema_equals(struct checker *c, struct expr *e, struct type *t)
@@ -323,9 +377,7 @@ bool sema_equals(struct checker *c, struct expr *e, struct type *t)
     e->as.binary.equals = true;
     e->as.binary.eq_calls = NULL;
     e->as.binary.eq_count = 0;
-    if (t->kind == TYPE_STRUCT) {
-        walk_eq(c, e, t);
-    }
+    walk_inside(c, e, t);
     return true;
 }
 

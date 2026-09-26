@@ -1,6 +1,9 @@
-equality.anti:38:9: error: `<` is not defined on `Point`. A struct or a class has no default order and declares `operator fn lt`
-equality.anti:43:9: error: `>=` is not defined on `Circle`. A struct or a class has no default order and declares `operator fn lt`
-equality.anti:48:9: error: `==` is not defined on `Buffer`, whose field `data` has no `eq`
-equality.anti:53:9: error: `!=` is not defined on `Word`
-equality.anti:59:10: error: `Point` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
-equality.anti:61:10: error: `Circle` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
+equality.anti:45:9: error: `<` is not defined on `Point`. A struct or a class has no default order and declares `operator fn lt`
+equality.anti:50:9: error: `>=` is not defined on `Circle`. A struct or a class has no default order and declares `operator fn lt`
+equality.anti:55:9: error: `==` is not defined on `Buffer`, whose field `data` has no `eq`
+equality.anti:60:9: error: `!=` is not defined on `Word`
+equality.anti:65:9: error: `==` is not defined on `([2]int, int)`
+equality.anti:70:9: error: `==` is not defined on `Held`
+equality.anti:75:9: error: `==` is not defined on `?[]int`
+equality.anti:81:10: error: `Point` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
+equality.anti:83:10: error: `Circle` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`

@@ -1,0 +1,92 @@
+//! A tuple, a variant and a `?T` get the default `==` when every part has one,
+//! and it agrees with their default hash. A tuple compares part by part, a
+//! variant by its case and then the fields of that case, and a `?T` is equal
+//! when both are `none` or both hold equal values. A part with `operator fn eq`
+//! goes through it. A key of a hashing collection may then be a tuple, which
+//! `keys` checks with the two hooks a map asks of its key type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// A name equal to another of the same length.
+struct Name
+{
+	text: str,
+}
+
+operator fn eq(a: Name, b: Name) -> bool
+{
+	return a.text.len == b.text.len;
+}
+
+operator fn hash(n: Name) -> u64
+{
+	return n.text.len as u64;
+}
+
+fn same<T: eq>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+/// Whether `a` and `b` are one key, as a hashing map finds it.
+fn keys<K: eq + hash>(a: K, b: K) -> bool
+{
+	return a.hash() == b.hash() && a == b;
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let t = (1, "a");
+	let u = (1, "a");
+	let v = (2, "a");
+	printf("tuple %d %d %d %d\n".ptr, b(t == u), b(t == v), b(t != v),
+		b(same(t, u)));
+	printf("keys %d %d\n".ptr, b(keys((1, 2), (1, 2))), b(keys((1, 2), (2,
+		1))));
+	let n = (Name { text: "ab" }, 1);
+	let m = (Name { text: "cd" }, 1);
+	printf("own %d %d\n".ptr, b(n == m), b(n.hash() == m.hash()));
+
+	let c = Shape.Circle { r: 1 };
+	let d = Shape.Circle { r: 1 };
+	let e = Shape.Circle { r: 2 };
+	let r = Shape.Rect { w: 1, h: 1 };
+	let x = Shape.Empty;
+	let y = Shape.Empty;
+	printf("variant %d %d %d %d %d\n".ptr, b(c == d), b(c == e), b(c == r),
+		b(x == y), b(same(c, r)));
+	printf("hashed %d\n".ptr, b(keys(c, d)));
+
+	let some: ?int = 3;
+	let same_value: ?int = 3;
+	let other: ?int = 4;
+	let empty: ?int = none;
+	let blank: ?int = none;
+	printf("optional %d %d %d %d\n".ptr, b(some == same_value),
+		b(some == other), b(some == empty), b(empty == blank));
+	let p: ?Point = Point { x: 1, y: 2 };
+	let q: ?Point = Point { x: 1, y: 2 };
+	printf("point %d %d\n".ptr, b(p == q), b(keys(p, q)));
+	let mixed = (some, c, p);
+	let again = (same_value, d, q);
+	printf("mixed %d\n".ptr, b(mixed == again));
+	return 0;
+}

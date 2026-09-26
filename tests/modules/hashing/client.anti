@@ -45,6 +45,8 @@ fn main() -> int
 	let u = keys.Tag<int> { item: 4, mark: 1 };
 	printf("tags %d %d\n".ptr, keys.same_tags(t, t) as c_int,
 		keys.same_tags(t, u) as c_int);
+	printf("pairs %d %d\n".ptr, keys.same_pair((1, "x"), (1, "x")) as c_int,
+		keys.same_pair((1, "x"), (1, "y")) as c_int);
 	let a = keys.Coded { code: keys.Code { n: 12 }, mark: 1 };
 	let b = keys.Coded { code: keys.Code { n: 22 }, mark: 1 };
 	let c = keys.Coded { code: keys.Code { n: 23 }, mark: 1 };

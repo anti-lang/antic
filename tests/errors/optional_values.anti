@@ -37,7 +37,7 @@ fn compared() -> bool
 	if k == none {
 		return false;
 	}
-	return n == m;
+	return n == k && m == none;
 }
 
 fn coalesced() -> int

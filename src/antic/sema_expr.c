@@ -1040,7 +1040,13 @@ static bool binary_operands(struct checker *c, struct expr *e,
         return false;
     }
     /* A `?T` takes part in an operator after a test alone, and compares
-       with `none` above. */
+       with `none` above. `==` and `!=` of two `?T` values compare them
+       whole, flag and value, as the default `==` of a `?T` does. */
+    if ((e->as.binary.op == TOKEN_EQ || e->as.binary.op == TOKEN_NE) &&
+        !sema_is_error(*left) && !sema_is_error(*right) &&
+        (*left)->kind == TYPE_OPTIONAL && (*right)->kind == TYPE_OPTIONAL) {
+        return true;
+    }
     if (!sema_is_error(*left) && (*left)->kind == TYPE_OPTIONAL) {
         error_may_be_none(c, l, *left);
         return false;

@@ -1,8 +1,8 @@
 //! Types and generics of hashing that another module uses: a struct with a hash
 //! of its own, a generic struct whose hash is generic, and generic functions
-//! that hash and order a value of a type parameter. Two generics compare with
-//! the default `==`, one over a type parameter and one over a struct whose part
-//! has `operator fn eq`.
+//! that hash and order a value of a type parameter. Three generics compare with
+//! the default `==`: one over a type parameter, one over a tuple of two and one
+//! over a struct whose part has `operator fn eq`.
 
 /// A name whose hash reads the first letter alone.
 pub struct Name
@@ -69,6 +69,12 @@ pub struct Coded
 
 /// Whether two tags are equal by the default `==`.
 pub fn same_tags<T: eq>(a: Tag<T>, b: Tag<T>) -> bool
+{
+	return a == b;
+}
+
+/// Whether two pairs are equal by the default `==` of a tuple.
+pub fn same_pair<A: eq, B: eq>(a: (A, B), b: (A, B)) -> bool
 {
 	return a == b;
 }

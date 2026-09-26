@@ -1,0 +1,9 @@
+exit 0
+tuple 1 0 1 1
+keys 1 0
+own 1 1
+variant 1 0 0 1 0
+hashed 1
+optional 1 0 0 1
+point 1 1
+mixed 1

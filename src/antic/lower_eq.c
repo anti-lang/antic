@@ -1,5 +1,5 @@
-/* The default `==` of a struct and of a class value, which `a == b`
-   gives on a type without `operator fn eq`. */
+/* The default `==` of a struct, a class value, a tuple, a variant and a
+   `?T`, which `a == b` gives on a type without `operator fn eq`. */
 
 #include "lower_lowerer.h"
 #include "target.h"
@@ -128,6 +128,64 @@ static void compare_fields(struct lowerer *l, const struct expr *e,
     }
 }
 
+/* Two variants of type t at a and b: the same case, and then the fields
+   of that case. A case without fields has nothing more to compare. */
+static void compare_cases(struct lowerer *l, const struct expr *e,
+                          struct comparison *cmp, struct ir_operand a,
+                          struct ir_operand b, const struct type *t)
+{
+    enum ir_type tag_type = lower_ir_type_of(t->base);
+    struct ir_operand x = lower_load_tag(l, t, a);
+    struct ir_operand y = lower_load_tag(l, t, b);
+    struct ir_block *join = lower_new_block(l);
+    size_t i;
+
+    require(l, cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, x, y)));
+    for (i = 0; i < t->param_count; i++) {
+        struct ir_block *yes;
+        struct ir_block *no;
+        struct ir_operand is_case;
+        if (t->params[i] == NULL) {
+            continue;
+        }
+        yes = lower_new_block(l);
+        no = lower_new_block(l);
+        is_case = lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, x,
+                                          ir_int_op(tag_type,
+                                                    t->base->fields[i].number)));
+        ir_branch(l->f, l->b, is_case, yes, no);
+        l->b = yes;
+        {
+            struct ir_operand at_a = lower_case_address(l, t, a);
+            struct ir_operand at_b = lower_case_address(l, t, b);
+            compare_fields(l, e, cmp, at_a, at_b, t->params[i]);
+        }
+        ir_jump(l->f, l->b, join);
+        l->b = no;
+    }
+    ir_jump(l->f, l->b, join);
+    l->b = join;
+}
+
+/* Two values of the `?T` t at a and b: both empty, or both holding equal
+   values. */
+static void compare_optional(struct lowerer *l, const struct expr *e,
+                             struct comparison *cmp, struct ir_operand a,
+                             struct ir_operand b, const struct type *t)
+{
+    struct ir_operand x = lower_optional_flag(l, t, a);
+    struct ir_operand y = lower_optional_flag(l, t, b);
+    struct ir_block *held = lower_new_block(l);
+    struct ir_block *join = lower_new_block(l);
+
+    require(l, cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, x, y)));
+    ir_branch(l->f, l->b, x, held, join);
+    l->b = held;
+    compare_at(l, e, cmp, a, b, t->element);
+    ir_jump(l->f, l->b, join);
+    l->b = join;
+}
+
 /* Compare the values of type t in memory at a and b. */
 static void compare_at(struct lowerer *l, const struct expr *e,
                        struct comparison *cmp, struct ir_operand a,
@@ -185,6 +243,22 @@ static void compare_at(struct lowerer *l, const struct expr *e,
         }
         compare_fields(l, e, cmp, a, b, t);
         return;
+    case TYPE_TUPLE:
+        compare_fields(l, e, cmp, a, b, t);
+        return;
+    case TYPE_VARIANT:
+        own = own_eq(e, t);
+        if (own != NULL) {
+            require(l, cmp, call_eq(l, lower_callee_function(
+                                           l, own->as.call.callee->symbol),
+                                    a, b));
+            return;
+        }
+        compare_cases(l, e, cmp, a, b, t);
+        return;
+    case TYPE_OPTIONAL:
+        compare_optional(l, e, cmp, a, b, t);
+        return;
     default:
         /* The checker gives the default to no other part. */
         return;
@@ -202,11 +276,7 @@ struct ir_operand lower_equals(struct lowerer *l, const struct expr *e)
 
     cmp.result = ir_unary(l->f, l->b, IR_COPY, IR_I8, ir_int_op(IR_I8, 1));
     cmp.differ = lower_new_block(l);
-    if (t->kind == TYPE_CLASS) {
-        require(l, &cmp, class_equals(l, t, a, b));
-    } else {
-        compare_fields(l, e, &cmp, a, b, t);
-    }
+    compare_at(l, e, &cmp, a, b, t);
     ir_jump(l->f, l->b, done);
     l->b = cmp.differ;
     ir_assign(l->f, l->b, cmp.result, ir_int_op(IR_I8, 0));

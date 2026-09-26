@@ -1048,6 +1048,7 @@ for p in &people { }     // p is a lent *Person: the element itself, for this tu
 - Two values that are equal by `eq` have the same `hash`. The default keeps that rule, and a replacement must.
 - A struct or class gets a default `eq` as well and no default `lt`, since what order means is the type's own choice. A type used where `Ordered` is needed declares `operator fn lt`, and the refusal says so.
 - The default `eq` and `hash` of a struct or class take each field by its kind, so the two always agree: a `str` by its bytes, an `own []T` element by element where `T` has `==`, a plain slice or a pointer by address, and every other field as the rules above give it. The runtime's `equals` and `hash` of `Object` follow the same rule.
+- Tuples, variants and `?T` get a default `eq` and `hash` when every part has one: a tuple part by part, a variant by its case and then that case's fields, and a `?T` equal when both are `none` or both hold equal values. So `Map<(int, int), V>` works.
 - `anti.lang` ships `constraint Ordered = eq + lt;`.
 - `str` has the hooks `eq`, `lt` and `hash`, so it meets `eq`, `Ordered` and `hash`. `==` compares the text, `<` compares it byte by byte, which for UTF-8 is the order of the code points, and `hash` hashes the bytes.
 - A hashing collection mixes its hash with a random seed chosen when the program starts. Keys chosen by an attacker then cannot all land in one bucket. The seed never decides the order a program sees.
