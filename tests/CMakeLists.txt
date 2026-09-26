@@ -70,10 +70,12 @@ add_executable(antic_unit_tests
     ../src/rt/f16.c
     ../src/rt/fs.c
     ../src/rt/json.c
+    ../src/rt/platform_posix.c
+    ../src/rt/platform_windows.c
     ../src/rt/symbols.c
     ../src/rt/text.c
     ../src/rt/toml.c)
-target_link_libraries(antic_unit_tests PRIVATE antic_core)
+target_link_libraries(antic_unit_tests PRIVATE antic_core ${CMAKE_DL_LIBS})
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
 # CRT of Windows hold it themselves.
 if(UNIX AND NOT APPLE)

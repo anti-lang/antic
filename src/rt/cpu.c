@@ -8,6 +8,7 @@
    Windows on ARM64 answers up to the ARMv8.2 dot products and has no
    query above them, so armv8.5 passes there. */
 #include "cpu_level.h"
+#include "platform.h"
 #include "std.h"
 
 #include <stdio.h>
@@ -272,16 +273,25 @@ static int32_t machine_level(void)
 int32_t anti_rt_cpu_level(void)
 {
 #if defined(ANTI_DEV_CPU)
-    /* A test on this machine sees the refusal of a lower one. */
-    const char *simulated = getenv("ANTI_CPU_LEVEL");
+    /* A test on this machine sees the refusal of a lower one. The
+       variable is read through the platform layer, as every read of the
+       environment in the runtime is, since the C runtime of Windows
+       deprecates getenv. */
+    char *simulated = NULL;
+    int32_t level = ANTI_CPU_NONE;
     size_t i;
 
-    if (simulated != NULL) {
+    if (anti_rt_getenv("ANTI_CPU_LEVEL", &simulated) == 0 &&
+        simulated != NULL) {
         for (i = 0; i < sizeof rows / sizeof rows[0]; i++) {
             const char *name = anti_rt_cpu_level_name(rows[i].level);
             if (strcmp(simulated, name) == 0) {
-                return rows[i].level;
+                level = rows[i].level;
             }
+        }
+        free(simulated);
+        if (level != ANTI_CPU_NONE) {
+            return level;
         }
     }
 #endif
