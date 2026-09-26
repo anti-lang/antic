@@ -11,6 +11,13 @@ The bar differs by where the code runs.
 - `tests/` must be correct and must not hide a failure. The structure and naming rules do not apply.
 - `src/std/` is Anti code and is audited against the language's own rules, not these.
 
+## Warnings
+
+- Our own code compiles with warnings as errors everywhere. That is antic, anti, the runtime and the glue code around the native libraries. It is also the tests and anything the packer or the release script builds. A part of our code built without them is a gap to close.
+- Fixing a warning means changing the code so it is correct. Silencing it is not a fix: no pragma, no `-Wno-` flag, no cast or `(void)` whose only purpose is to hide it. A warning that is genuinely wrong is silenced at that one line, with a comment giving the reason.
+- The third-party sources in `src/native/` compile with the warning flags their own projects use, not ours, and are never patched to silence a warning. Our glue code around them stays under our flags, and it includes their headers with `-isystem`.
+- The flags have one definition each. `tools/warnings.cmake` holds ours and `src/native/warnings.cmake` those of the third-party projects. The test `warning_set` refuses a warning flag spelled anywhere else.
+
 ## Severity
 
 - Severe: undefined behaviour, a read or write outside an object, a use after free, or a double free. Also any way for malformed input to cause one of these.
@@ -21,7 +28,7 @@ The bar differs by where the code runs.
 
 ### Language
 
-1. C11 as the pinned clang compiles it, with warnings as errors. No compiler extension outside a file that exists to hold one, such as the platform layer.
+1. C11 as the pinned clang compiles it, with warnings as errors, as [Warnings](#warnings) sets out. No compiler extension outside a file that exists to hold one, such as the platform layer.
 2. No variable-length arrays and no `alloca`.
 3. No behaviour that depends on the implementation. That rules out relying on the signedness of `char`. It rules out shifting a negative value, or shifting by the width of the type or more. It also rules out relying on the order in which the arguments of a call are evaluated.
 

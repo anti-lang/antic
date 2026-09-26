@@ -330,6 +330,48 @@ about structs, enums, classes, interfaces and errors lives there, and
 - [provisional] The reader uses some strings of a library file as C strings, such as a module path or a package name. Such a string with a NUL inside makes the file damaged. Reason: `strcmp` would compare the text before the NUL, so `foo\0x` would match `foo`.
 - [provisional] The start flag of `init.c` is atomic, since a static library for C sets it on first use from any thread of the host. Reason: rule 23.
 
+### Warnings
+
+- Our own code compiles with warnings as errors everywhere. That is antic, anti, the
+  runtime and the glue around the native libraries. It is also the tests and whatever the
+  packer and the release script build. A part of our code built without it is a gap to close. Eddie decided this.
+- A warning is fixed by changing the code so it is correct. No pragma, no `-Wno-` flag
+  and no cast or `(void)` whose only purpose is to hide it. A warning that is genuinely
+  wrong is silenced at its one line, with a comment giving the reason. Eddie decided this.
+- The third-party sources in `src/native/` compile with the warning flags of their own
+  projects, not ours, and are never patched to silence a warning. The glue around them
+  stays under our flags. Eddie decided this.
+- [provisional] The flags stand in two files. `tools/warnings.cmake` holds
+  `ANTIC_C_WARNINGS`, `ANTIC_CXX_WARNINGS` for the C++ files of the tests and
+  `ANTIC_MSVC_WARNINGS`. `src/native/warnings.cmake` holds the set of each third-party
+  project. The build, the packer and every test script that compiles C read them, and the
+  test `warning_set` refuses a warning flag, `-w` or a definition that turns warnings off
+  anywhere else. Reason: the cross builds of anti_rt and the packer carried three
+  warnings fewer than the host build, and a Mac builds its runtime from the cross build
+  alone, so `-Wshadow` never read the runtime of a macOS program.
+- [provisional] Where a third-party project has a Makefile and a CMake build, its flags
+  are those of the Makefile. PCRE2 and SQLite take none, since neither of PCRE2's builds
+  adds a warning flag unless asked and sqlite.org compiles the amalgamation with none.
+  Mbed TLS takes `WARNING_CFLAGS` of `library/Makefile`, miniaudio the flags of its one
+  `CMakeLists.txt` and raylib the warnings of `src/Makefile`. raylib keeps the two
+  definitions of its CMake build that turn off a system's deprecations,
+  `_CRT_SECURE_NO_WARNINGS` for the C runtime of MSVC and `GL_SILENCE_DEPRECATION` on
+  macOS. Reason: the Makefile is the build of a static library of the release, and a
+  choice per project keeps the five alike. Only raylib warns, 67 times for unused
+  functions of its bundled stb and m3d headers on the two Windows targets.
+- [provisional] A compile of our code includes a third-party header as a system header,
+  with `-isystem`, so the header is read under its project's rules and our code under
+  ours. The test `anti_bind_clang` does the same for `tests/bind/layout.h`, which stands
+  in for the header of a C library and holds an enum above `INT_MAX` on purpose. Reason:
+  `sqlite3.h` raises `-Wlanguage-extension-token` on Windows, and the header is not ours
+  to change.
+- [provisional] antic and anti open a file and read the environment through
+  `src/antic/platform.c`, the platform layer that rule 22 names for the tools. On Windows
+  it calls `_fsopen` with `_SH_DENYNO` and `_dupenv_s`, which behave as `fopen` and
+  `getenv` do there, and no build defines `_CRT_SECURE_NO_WARNINGS`. The C test programs
+  call it as well. Reason: the C runtime of Microsoft deprecates `fopen` and `getenv`, and
+  the definition hid the warnings of every file at once.
+
 ### PCRE2
 
 - PCRE2 10.48 is pinned in `tools/pcre2-pin` by version and by the SHA-256 of
@@ -366,11 +408,9 @@ about structs, enums, classes, interfaces and errors lives there, and
   `PCRE2_STATIC`. `SUPPORT_JIT` is never defined. The limits of matching, nesting and
   names stay the defaults of the release. Reason: the smallest configuration that gives
   the decided build.
-- [provisional] PCRE2 compiles with the warnings of anti_rt, `-Wall -Wextra -Wpedantic
-  -Werror`, and `-Wno-overlength-strings`. Reason: the table of messages in
-  `pcre2_error.c` is one literal of 5,686 bytes, above the 4,095 that C11 guarantees, and
-  clang, which compiles every target, takes it. No other warning is raised on any of the
-  six targets.
+- PCRE2 compiles with the warning flags of its own build, which are none. See
+  "Warnings" above. The entry that gave it the warnings of anti_rt and
+  `-Wno-overlength-strings` is replaced by Eddie's rule for third-party sources.
 - [provisional] `pcre2.h` stays in `build/<preset>/native/pcre2/include/` and is not yet
   part of the runtime archive. Reason: antic and the glue of `anti.regex` compile against
   it in the build, and no program of a user reads it. The directory of headers in the
@@ -466,12 +506,11 @@ about structs, enums, classes, interfaces and errors lives there, and
   `immintrin.h`, whose `__m256i` is the union of MSVC. The AVX2 constants of
   `stb_image_resize2.h` in raylib were then initialised byte by byte from 64-bit values,
   which clang truncated. PCRE2 builds and passes its tests under the new order.
-- [provisional] raylib compiles with `-Wall -Werror`, `-Wno-missing-braces` and
-  `-Wno-unused-function`. Reason: raylib's Makefile turns off the first, and `rtextures.c`
-  and `rtext.c` silence the second with a pragma for `__GNUC__`, which clang for MSVC does
-  not define. `-Wextra` and `-Wpedantic` raise hundreds of findings in the bundled stb
-  and GLFW sources. miniaudio takes the warnings of anti_rt, `-Wall -Wextra -Wpedantic
-  -Werror`, which raise nothing on any target.
+- raylib compiles with the warnings of its `src/Makefile`, `-Wall -Wno-missing-braces
+  -Werror=pointer-arith -Werror=implicit-function-declaration`, and miniaudio with those
+  of its `CMakeLists.txt`, `-Wall -Wextra -Wpedantic`. See "Warnings" above. The entry
+  that added `-Werror` and `-Wno-unused-function` to raylib and gave miniaudio the
+  warnings of anti_rt is replaced by Eddie's rule for third-party sources.
 - [provisional] raylib compiles with `-fno-strict-aliasing`, as its Makefile does, and
   `-fwrapv-pointer`. Reason: `stb_vorbis.c` checks a bound by comparing a pointer after
   an addition that may overflow, and clang folds that comparison to false without it.
@@ -608,14 +647,11 @@ libraries named "at run time" are loaded by the library itself and need no link.
   `libsqlite3.a`, or `sqlite3.lib` on Windows, the name of SQLite's own builds. Reason:
   the smallest option, and a C project that links the published file finds it under its
   usual name.
-- [provisional] Both compile as C99 with the warnings of anti_rt, `-Wall -Wextra
-  -Wpedantic -Werror`, which raise nothing for Mbed TLS on any target and nothing for
-  SQLite on Linux and macOS. On Windows SQLite turns four off:
-  `-Wlanguage-extension-token`, which `__int64` in `sqlite3.h` and the `__try` blocks of
-  `SQLITE_USE_SEH` raise, and `-Wsign-compare`, `-Wunused-variable` and
-  `-Wunused-function`, which the exception filter and the lock check of those blocks
-  raise. Reason: SQLite writes that code for `_MSC_VER`, which clang for MSVC defines.
-  The probe keeps the first off too, since it includes `sqlite3.h`.
+- Both compile as C99 with the warning flags of their own builds: none for SQLite, and
+  `-Wall -Wextra -Wformat=2 -Wno-format-nonliteral` of `library/Makefile` for Mbed TLS.
+  Neither raises a warning on any target. See "Warnings" above. The entry that gave both
+  the warnings of anti_rt, with four turned off for SQLite on Windows, is replaced by
+  Eddie's rule for third-party sources. The probe reads `sqlite3.h` as a system header.
 - [provisional] Both Linux libraries compile against musl, as PCRE2 does, and a program
   links them in the default static mode. Reason: neither loads a library of the system
   at run time, so the glibc mode of "Runtime archive" does not apply to them.

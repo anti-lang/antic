@@ -36,8 +36,19 @@ without asking Eddie.
   "generated with" notes in commits, files or pull requests.
 - Commit messages: a short subject line, a body that states what changed and
   why. No emoji, no trailers.
-- Warnings are errors. `CMakeLists.txt` sets `-Wall -Wextra -Wpedantic -Werror`
-  and `/W4 /WX`. The build produces zero warnings on clang, gcc and MSVC.
+- Warnings are errors in all of our own code. That is the compiler, the
+  tools, the runtime and the native glue code. It is also the tests and
+  anything the packer or the release script builds. A part of our code built without them is a gap to
+  close. The set stands in `tools/warnings.cmake` alone, and the test
+  `warning_set` refuses a flag spelled anywhere else.
+- A warning is fixed by changing the code so it is correct. No pragma, no
+  `-Wno-` flag, no cast or `(void)` whose only purpose is to hide it. A
+  warning that is genuinely wrong is silenced at that one line, with a
+  comment giving the reason.
+- Third-party sources in `src/native/` build with the warning flags of their
+  own projects, from `src/native/warnings.cmake`, and are never patched to
+  silence a warning. Our glue code around them stays under our flags. See
+  "Warnings" in `docs/c-guidelines.md`.
 - A commit that changes only files under `docs/`, or `CLAUDE.md`, `README.md`
   or `CHANGELOG.md`, runs the docs-style checker and nothing else. That covers
   reports and notes. Prose is prose wherever it sits. A push made only of such

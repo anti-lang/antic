@@ -211,7 +211,7 @@ exported interface of the previous version in the index to enforce it.
 
 | Test | Checks |
 |---|---|
-| Header compiles | `<name>.h` compiles with `cc -std=c11 -Wall -Werror` and `c++ -std=c++17` on every target |
+| Header compiles | `<name>.h` compiles with `cc -std=c11` and `c++ -std=c++17` on every target, under the warnings of `tools/warnings.cmake` with warnings as errors |
 | Round trip | A C program calls every exported function of a fixture library with struct-by-value arguments and compares results with the Anti test suite |
 | Exports only | The shared library's export table equals the set of `export` names plus `anti_licenses` |
 | Two libraries | Two Anti shared libraries load into one C process. Two static archives with `libanti_rt.a` link into one program |

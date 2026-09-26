@@ -67,7 +67,7 @@ sysroot.
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
+                ${ANTIC_C_WARNINGS} -fvisibility=hidden
                 "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                 -c "${PROJECT_SOURCE_DIR}/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/rt/${source}.c"
