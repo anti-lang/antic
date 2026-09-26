@@ -447,10 +447,11 @@ static void records_type_ids(void)
         {ANTI_TYPE_F16, "(none)"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_F16 << 8, "(none)"},
         /* An array holds its element through every level and their
-           count, and reaches the descriptor of a struct element. */
+           count. An array of arrays carries a descriptor of its levels,
+           and one of a struct reaches the descriptor of the struct. */
         {ANTI_TYPE_ARRAY | ANTI_TYPE_ARRAY << 8 | ANTI_TYPE_U16 << 16 |
              (uint64_t)6 << 24,
-         "(none)"},
+         "array.[2][3]u16.descriptor"},
         {ANTI_TYPE_ARRAY | ANTI_TYPE_STRUCT << 8 | ANTI_TYPE_STRUCT << 16 |
              (uint64_t)2 << 24,
          "Size.descriptor"},

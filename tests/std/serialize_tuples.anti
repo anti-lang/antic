@@ -1,10 +1,10 @@
 //! A tuple has a runtime description of its own, so a tuple field of a class
 //! compares, hashes, serializes and reads back as a tuple part of a struct
 //! does. `serialize` writes a tuple as a JSON array of its parts, and an array
-//! field as a JSON array of its elements, through every level of it in order.
-//! `Object.deserialize` reads both back, and fails when the count of a tuple or
-//! of an array differs from the one its type has. `reflect.field` names the
-//! type of each field.
+//! field as nested JSON arrays, one per level, `[[1, 2], [3, 4]]` for a
+//! `[2][2]int`. `Object.deserialize` reads both back, and fails when the count
+//! of a tuple or of any level of an array differs from the one its type has.
+//! `reflect.field` names the type of each field.
 import anti.io;
 import anti.mem;
 import anti.reflect;
@@ -25,6 +25,7 @@ class Record
 	pub counts: [3]i32 = [0, 0, 0],
 	pub grid: [2][2]int = [[0, 0], [0, 0]],
 	pub path: [2]Point = [Point { x: 0, y: 0 }, Point { x: 0, y: 0 }],
+	pub rows: [2][1]Point = [[Point { x: 0, y: 0 }], [Point { x: 0, y: 0 }]],
 }
 
 fn b(v: bool) -> c_int
@@ -47,7 +48,8 @@ fn main() -> int
 	let r = alloc Record {
 		pair: (7, "seven"), nested: (Point { x: 1, y: 2 }, 3),
 		counts: [4, 5, 6], grid: [[1, 2], [3, 4]],
-		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }]
+		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }],
+		rows: [[Point { x: 1, y: 1 }], [Point { x: 2, y: 2 }]]
 	};
 	let out = text.Builder.new();
 	r.serialize(&out);
@@ -61,20 +63,25 @@ fn main() -> int
 	let other = alloc Record {
 		pair: (7, "sevens"), nested: (Point { x: 1, y: 2 }, 3),
 		counts: [4, 5, 6], grid: [[1, 2], [3, 4]],
-		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }]
+		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }],
+		rows: [[Point { x: 1, y: 1 }], [Point { x: 2, y: 2 }]]
 	};
 	let apart = alloc Record {
 		pair: (7, "seven"), nested: (Point { x: 1, y: 2 }, none),
 		counts: [4, 5, 6], grid: [[1, 2], [3, 4]],
-		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }]
+		path: [Point { x: 5, y: 6 }, Point { x: 7, y: 8 }],
+		rows: [[Point { x: 1, y: 1 }], [Point { x: 2, y: 2 }]]
 	};
 	printf("differ %d %d\n".ptr, b(*r == *other), b(*r == *apart));
 
 	let short = "{\"type\":\"Record\",\"counts\":[1,2]}";
 	let long = "{\"type\":\"Record\",\"pair\":[1,\"a\",2]}";
 	let flat = "{\"type\":\"Record\",\"grid\":[1,2,3,4]}";
-	printf("counts %d %d %d\n".ptr, b(read(short, &arena) == none),
-		b(read(long, &arena) == none), b(read(flat, &arena) != none));
+	let ragged = "{\"type\":\"Record\",\"grid\":[[1,2],[3]]}";
+	let nested = "{\"type\":\"Record\",\"grid\":[[1,2],[3,4]]}";
+	printf("counts %d %d %d %d %d\n".ptr, b(read(short, &arena) == none),
+		b(read(long, &arena) == none), b(read(flat, &arena) == none),
+		b(read(ragged, &arena) == none), b(read(nested, &arena) != none));
 
 	let desc = reflect.describe(r as *byte) else {
 		return 2;

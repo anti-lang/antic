@@ -520,9 +520,9 @@ static bool read_owned(struct reader *r, void **out, int64_t type,
 }
 
 /* DESIGN: a tuple and an array read as the JSON arrays serialize writes.
-   The text holds exactly as many values as the tuple has parts, or as the
-   array has elements through every level of it. Any other count fails
-   the text. */
+   The text holds exactly as many values as the tuple has parts. An array
+   holds one JSON array per level, each as long as its level. Any other
+   count fails the text. */
 static bool read_parts(struct reader *r, unsigned char *bytes,
                        const struct anti_descriptor *d, int depth)
 {
@@ -542,23 +542,50 @@ static bool read_parts(struct reader *r, unsigned char *bytes,
     return take(r, ']');
 }
 
-static bool read_array(struct reader *r, unsigned char *bytes, int64_t type,
-                       const struct anti_descriptor *d, int depth)
+/* Level k of an array at bytes, of levels levels of the lengths lengths.
+   The elements of the last level have size bytes, the type id inner and
+   the descriptor e. */
+static bool read_level(struct reader *r, unsigned char *bytes,
+                       const int64_t *lengths, int64_t levels, int64_t k,
+                       size_t size, int64_t inner,
+                       const struct anti_descriptor *e, int depth)
 {
-    size_t size = anti_rt_array_element_size(type, d);
+    size_t block = size;
     int64_t i;
 
-    if (!take(r, '[')) {
+    if (depth > DEPTH_LIMIT || !take(r, '[')) {
         return false;
     }
-    for (i = 0; i < ANTI_TYPE_COUNT(type); i++) {
-        if ((i > 0 && !take(r, ',')) ||
-            !read_value(r, bytes + (size_t)i * size, ANTI_TYPE_INNER(type), d,
-                        0, depth)) {
+    for (i = k + 1; i < levels; i++) {
+        block *= (size_t)lengths[i];
+    }
+    for (i = 0; i < lengths[k]; i++) {
+        unsigned char *at = bytes + (size_t)i * block;
+        if (i > 0 && !take(r, ',')) {
+            return false;
+        }
+        if (k + 1 == levels ? !read_value(r, at, inner, e, 0, depth + 1)
+                            : !read_level(r, at, lengths, levels, k + 1, size,
+                                          inner, e, depth + 1)) {
             return false;
         }
     }
     return take(r, ']');
+}
+
+static bool read_array(struct reader *r, unsigned char *bytes, int64_t type,
+                       const struct anti_descriptor *d, int depth)
+{
+    int64_t lengths[ANTI_ARRAY_LEVELS];
+    int64_t levels = anti_rt_array_levels(type, d, lengths);
+
+    if (levels == 0) {
+        return skip_value(r, depth);
+    }
+    return read_level(r, bytes, lengths, levels, 0,
+                      anti_rt_array_element_size(type, d),
+                      ANTI_TYPE_INNER(type),
+                      anti_rt_array_element_descriptor(type, d), depth);
 }
 
 /* DESIGN: a variant reads as the object serialize writes, one member

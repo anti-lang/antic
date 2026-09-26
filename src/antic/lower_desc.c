@@ -511,6 +511,8 @@ static const struct ir_global *optional_descriptor(struct lowerer *l,
                                                    const struct type *t);
 static const struct ir_global *tuple_descriptor(struct lowerer *l,
                                                 const struct type *t);
+static const struct ir_global *array_descriptor(struct lowerer *l,
+                                                const struct type *t);
 static struct ir_const *field_record(struct lowerer *l, const struct name *name,
                                      uint32_t agg, uint32_t index,
                                      uint64_t type, uint64_t word,
@@ -526,8 +528,12 @@ static const struct ir_global *field_descriptor(struct lowerer *l,
     if (t->kind == TYPE_POINTER || t->kind == TYPE_SLICE) {
         t = t->element;
     }
-    /* An array reaches the descriptor of its element through every
-       level of it. */
+    /* An array of arrays has a descriptor of its own, which holds the
+       length of each level. An array of one level reaches the descriptor
+       of its element. */
+    if (t->kind == TYPE_ARRAY && t->element->kind == TYPE_ARRAY) {
+        return array_descriptor(l, t);
+    }
     while (t->kind == TYPE_ARRAY) {
         t = t->element;
     }
@@ -589,7 +595,7 @@ struct ir_global *lower_class_fields(struct lowerer *l,
 }
 
 /* One field record. It holds the name, the offset of field index of the
-   aggregate agg, the type id and a word. The word is the `own` bit of a
+   aggregate agg, or 0 for IR_NO_AGG, the type id and a word. The word is the `own` bit of a
    field and the tag of the case of a variant. The record carries the
    descriptor that a field of type reach carries, and none for NULL. */
 static struct ir_const *field_record(struct lowerer *l, const struct name *name,
@@ -609,9 +615,14 @@ static struct ir_const *field_record(struct lowerer *l, const struct name *name,
     item->items[1].kind = IR_CONST_INT;
     item->items[1].scalar = IR_I64;
     item->items[1].integer = name->length;
-    item->items[2].kind = IR_CONST_SYM;
     item->items[2].scalar = IR_I64;
-    item->items[2].sym = ir_sym_offset_of(l->m, agg, index);
+    if (agg == IR_NO_AGG) {
+        item->items[2].kind = IR_CONST_INT;
+        item->items[2].integer = 0;
+    } else {
+        item->items[2].kind = IR_CONST_SYM;
+        item->items[2].sym = ir_sym_offset_of(l->m, agg, index);
+    }
     item->items[3].kind = IR_CONST_INT;
     item->items[3].scalar = IR_I64;
     item->items[3].integer = type;
@@ -804,6 +815,63 @@ static const struct ir_global *tuple_descriptor(struct lowerer *l,
         text_appendf(&fields, "tuple.%s.fields", text_cstr(&shown));
         give_fields(l, g, l->module_name, text_cstr(&fields), list,
                     t->field_count);
+    }
+    text_free(&shown);
+    text_free(&name);
+    text_free(&fields);
+    return g;
+}
+
+/* DESIGN: an array of more than one level has a descriptor of its own,
+   with one record per level, the outermost first. The word of a record
+   holds the length of its level, and the last record carries the type id
+   and the descriptor of the element. A walk then writes and reads one
+   JSON array per level. An array with a symbolic length has none, and its
+   count of 0 keeps it out of every walk. Each module that needs the
+   descriptor writes one of its own, named after its type. */
+static const struct ir_global *array_descriptor(struct lowerer *l,
+                                                const struct type *t)
+{
+    struct text shown = {0};
+    struct text name = {0};
+    struct text fields = {0};
+    struct token_text text;
+    struct ir_global *g;
+    struct ir_const *list;
+    const struct type *level;
+    size_t count = 0;
+    size_t i = 0;
+
+    for (level = t; level->kind == TYPE_ARRAY; level = level->element) {
+        if (level->length_of != NULL) {
+            return NULL;
+        }
+        count++;
+    }
+    type_name_qualified(&shown, t);
+    text_appendf(&name, "array.%s.descriptor", text_cstr(&shown));
+    g = lower_find_global(l->m, l->module_name, text_cstr(&name));
+    if (g == NULL) {
+        text.bytes = text_cstr(&shown);
+        text.length = shown.length;
+        g = value_descriptor(l, t, l->module_name, text_cstr(&name), &text);
+        list = ir_const_agg(l->m, ir_aggregate(lower_fields_agg(l, count)),
+                            count);
+        for (level = t; level->kind == TYPE_ARRAY; level = level->element) {
+            bool last = level->element->kind != TYPE_ARRAY;
+            char part[24];
+            struct name label;
+            struct ir_const *item;
+            snprintf(part, sizeof part, "_%zu", i);
+            label.text = part;
+            label.length = strlen(part);
+            item = field_record(l, &label, IR_NO_AGG, 0,
+                                last ? type_id(level->element) : TYPE_ID_ARRAY,
+                                level->length, last ? level->element : NULL);
+            list->items[i++] = *item;
+        }
+        text_appendf(&fields, "array.%s.fields", text_cstr(&shown));
+        give_fields(l, g, l->module_name, text_cstr(&fields), list, count);
     }
     text_free(&shown);
     text_free(&name);

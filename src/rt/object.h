@@ -72,9 +72,26 @@ struct anti_descriptor;
 
 /* The bytes of one element of the array of type id type through every
    level of it, or 0 where the record does not give them. d is the
-   descriptor of the element. */
+   descriptor the record of the array carries. */
 size_t anti_rt_array_element_size(int64_t type,
                                   const struct anti_descriptor *d);
+
+/* The descriptor of the element of the array of type id type, through
+   every level of it. An array of arrays carries a descriptor of its own
+   in d, and its last record carries the one of the element. An array of
+   one level carries the one of the element itself. */
+const struct anti_descriptor *
+anti_rt_array_element_descriptor(int64_t type, const struct anti_descriptor *d);
+
+/* The most levels of an array a walk writes as nested JSON arrays. */
+#define ANTI_ARRAY_LEVELS 16
+
+/* Write the length of each level of the array of type id type into
+   lengths, the outermost first, and give the count of levels. It gives 0
+   where the record does not give them or there are more than
+   ANTI_ARRAY_LEVELS. */
+int64_t anti_rt_array_levels(int64_t type, const struct anti_descriptor *d,
+                             int64_t lengths[ANTI_ARRAY_LEVELS]);
 
 /* Whether the type id is a signed integer, an enum over one among them. */
 int anti_rt_type_signed(int64_t type);
