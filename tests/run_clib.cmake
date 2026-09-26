@@ -60,9 +60,15 @@ if("${TARGET}" MATCHES "^windows-")
     if(CROSS)
         list(APPEND CC "--target=${arch}-pc-windows-msvc")
     endif()
+    # -idirafter searches the sysroot after clang's own headers, as the
+    # driver does for MSVC. With -isystem, the arm_neon.h of the MSVC CRT
+    # made float32x4_t the union __n128, which clang passes in integer
+    # registers, and the vectors of clib_simd reached Anti in the wrong
+    # registers on windows-arm64.
     list(APPEND CC -fms-runtime-lib=dll -nostdlibinc
-         -isystem "${win}/crt/include" -isystem "${win}/sdk/include/ucrt"
-         -isystem "${win}/sdk/include/um" -isystem "${win}/sdk/include/shared")
+         -idirafter "${win}/crt/include" -idirafter "${win}/sdk/include/ucrt"
+         -idirafter "${win}/sdk/include/um"
+         -idirafter "${win}/sdk/include/shared")
     set(CXX ${CC} -x c++)
     set(LINK -fuse-ld=lld -B "${RUNTIME}/bin" -L "${win}/crt/lib/${arch}"
              -L "${win}/sdk/lib/ucrt/${arch}" -L "${win}/sdk/lib/um/${arch}")
