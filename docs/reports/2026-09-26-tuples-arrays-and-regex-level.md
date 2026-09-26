@@ -53,6 +53,6 @@ macos-x86_64 machine with AVX2, or the release runner `macos-15-intel`, can.
 
 ## Questions for Eddie
 
-- An array of more than one level is written as one flat JSON array, since
-  the record carries the count of all elements and not the length of each
-  level. Should the record carry each length so the text nests?
+- An array of more than one level is written as one flat JSON array. The
+  record carries the count of all elements and not the length of each level.
+  Should the record carry each length so the text nests?
