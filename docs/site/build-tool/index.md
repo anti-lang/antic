@@ -436,7 +436,7 @@ Comments run from `//` to the end of the line or from `/*` to `*/`, and block co
 
 Visibility decides the audience of `///`. On a `pub` item it documents the contract for the user of the library, and on a private item it documents the item for its developer. A `//#` note records an implementation detail, such as the invariant of a struct or the reason for an algorithm. The `//!` text is the user's guide to the module, and `//#!` is the developer's guide. The block form suits these two, and the line form suits item docs. [Chapter 4]({{% relref "/programming/writing-a-compiler/04-lexer" %}}) defines both forms in the lexer.
 
-A block of one line holds its text between the opener and `*/`. Over several lines the text starts on the line after the opener and ends on the line before `*/`. Text on a delimiter line is a lexical error. Common leading whitespace is stripped, and nothing else. A fenced code block inside a block comment must not contain `*/`, so such an item takes the line form.
+A block of one line holds its text between the opener and `*/`. Over more than one line the text starts on the line after the opener and ends on the line before `*/`. Text on a delimiter line is a lexical error. Common leading whitespace is stripped, and nothing else. A fenced code block inside a block comment must not contain `*/`, so such an item takes the line form.
 
 ### Doc markup
 
