@@ -3,6 +3,7 @@
    result back. */
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -190,13 +191,17 @@ static size_t strings_at(const struct text *t)
 
 static size_t section_at(size_t number) { return 20 + 40 * (number - 1); }
 
+/* The size of the buffer that takes a name of a section or a symbol. A
+   longer name from the string table is cut to fit. */
+#define NAME_SIZE 64
+
 static void section_name(const struct text *t, size_t number, char *out)
 {
     const char *field = t->data + section_at(number);
 
     if (field[0] == '/') {
         unsigned long offset = strtoul(field + 1, NULL, 10);
-        strcpy(out, t->data + strings_at(t) + offset);
+        snprintf(out, NAME_SIZE, "%s", t->data + strings_at(t) + offset);
     } else {
         memcpy(out, field, 8);
         out[8] = '\0';
@@ -208,7 +213,8 @@ static void symbol_name(const struct text *t, size_t index, char *out)
     size_t at = get(t, 8, 4) + 18 * index;
 
     if (get(t, at, 4) == 0) {
-        strcpy(out, t->data + strings_at(t) + get(t, at + 4, 4));
+        snprintf(out, NAME_SIZE, "%s",
+                 t->data + strings_at(t) + get(t, at + 4, 4));
     } else {
         memcpy(out, t->data + at, 8);
         out[8] = '\0';
@@ -222,7 +228,7 @@ static long find_symbol(const struct text *t, const char *name, int nth)
 
     for (i = 0; i < symbols_of(t);
          i += 1 + (unsigned char)t->data[get(t, 8, 4) + 18 * i + 17]) {
-        char got[64];
+        char got[NAME_SIZE];
         symbol_name(t, i, got);
         if (strcmp(got, name) == 0 && nth-- == 0) {
             return (long)i;
@@ -328,7 +334,7 @@ static void test_directives(void)
                           {"bar", 0, 3, EXTERNAL, false, 0, 0}}, 2};
     struct text out = {0};
     struct text error = {0};
-    char name[64];
+    char name[NAME_SIZE];
     size_t at;
 
     CHECK(join(&a, &b, &out, &error));
@@ -443,7 +449,7 @@ static void test_codeview(void)
                           {"bar", 0, 2, EXTERNAL, false, 0, 0}}, 2};
     struct text out = {0};
     struct text error = {0};
-    char name[64];
+    char name[NAME_SIZE];
     size_t i;
     int debug = 0;
 
@@ -567,7 +573,7 @@ static void test_long_names(void)
     struct text out = {0};
     struct text error = {0};
     size_t h = section_at(2);
-    char name[64];
+    char name[NAME_SIZE];
     size_t i;
 
     build(&a, &first);

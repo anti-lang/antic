@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 #include "symmap.h"
@@ -21,7 +22,7 @@
 
 static void write_file(const char *path, const char *text)
 {
-    FILE *f = fopen(path, "wb");
+    FILE *f = platform_open(path, true);
 
     if (f != NULL) {
         fwrite(text, 1, strlen(text), f);
@@ -64,7 +65,7 @@ static void program_without_functions(void)
 
     write_file(PROGRAM, "no program");
     CHECK(symmap_write(PROGRAM, TARGET_LINUX_X86_64, "-", MAP));
-    f = fopen(MAP, "rb");
+    f = platform_open(MAP, false);
     if (f != NULL) {
         while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
             text_append_bytes(&map, buffer, n);

@@ -1,6 +1,7 @@
 /* Copy a file with one byte replaced: poke_byte <in> <out> <offset>
    <value>, both numbers in decimal. The tests of a damaged library file
    write it with this, since a CMake script cannot write a NUL byte. */
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,12 +22,12 @@ int main(int argc, char **argv)
     }
     offset = strtoul(argv[3], NULL, 10);
     value = (int)strtoul(argv[4], NULL, 10);
-    in = fopen(argv[1], "rb");
+    in = platform_open(argv[1], false);
     if (in == NULL) {
         fprintf(stderr, "poke_byte: cannot read %s\n", argv[1]);
         return 1;
     }
-    out = fopen(argv[2], "wb");
+    out = platform_open(argv[2], true);
     if (out == NULL) {
         fprintf(stderr, "poke_byte: cannot write %s\n", argv[2]);
         fclose(in);

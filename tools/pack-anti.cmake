@@ -184,7 +184,7 @@ function(build_program host output program)
         set(win "${SYSROOT}/${host}")
         # antic is a Windows program too, and it takes the C runtime of
         # the machine as the programs it compiles do.
-        list(APPEND common -D_CRT_SECURE_NO_WARNINGS -fms-runtime-lib=dll
+        list(APPEND common -fms-runtime-lib=dll
              -isystem "${resource}/include" -isystem "${win}/crt/include"
              -isystem "${win}/sdk/include/ucrt"
              -isystem "${win}/sdk/include/um"

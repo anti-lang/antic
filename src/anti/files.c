@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../antic/platform.h"
 #include "text.h"
 
 #if defined(_WIN32)
@@ -166,7 +167,7 @@ bool files_remove_tree(const char *path)
 
 bool files_copy(const char *from, const char *to)
 {
-    FILE *in = fopen(from, "rb");
+    FILE *in = platform_open(from, false);
     FILE *out;
     char buffer[65536];
     size_t n;
@@ -175,7 +176,7 @@ bool files_copy(const char *from, const char *to)
     if (in == NULL) {
         return false;
     }
-    out = fopen(to, "wb");
+    out = platform_open(to, true);
     if (out == NULL) {
         fclose(in);
         return false;
@@ -198,7 +199,7 @@ static void cannot_read(const char *path)
 
 bool files_read(const char *path, struct text *out)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_open(path, false);
     char buffer[65536];
     size_t start = out->length;
     size_t n;
@@ -233,7 +234,7 @@ bool files_read_reported(const char *path, struct text *out)
 
 bool files_write(const char *path, const struct text *bytes)
 {
-    FILE *f = fopen(path, "wb");
+    FILE *f = platform_open(path, true);
     bool ok;
 
     if (f == NULL) {

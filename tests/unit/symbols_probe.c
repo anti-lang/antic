@@ -11,12 +11,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "symbols.h"
 
 static unsigned char *read_all(const char *path, size_t *size)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_open(path, false);
     unsigned char *bytes = NULL;
     size_t room = 0;
     size_t n;

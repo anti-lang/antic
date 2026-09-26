@@ -2,6 +2,7 @@
    replaces every occurrence of one byte string with another. The two are
    of one length, so every length and offset of the file stays valid. A
    library file holds NUL bytes, which a CMake script cannot write. */
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +25,7 @@ int main(int argc, char **argv)
         return 2;
     }
     from_length = strlen(argv[3]);
-    in = fopen(argv[1], "rb");
+    in = platform_open(argv[1], false);
     bytes = malloc(capacity);
     if (in == NULL || bytes == NULL) {
         fprintf(stderr, "antl_rename: cannot read %s\n", argv[1]);
@@ -49,7 +50,7 @@ int main(int argc, char **argv)
             i += from_length - 1;
         }
     }
-    out = fopen(argv[2], "wb");
+    out = platform_open(argv[2], true);
     if (out == NULL || fwrite(bytes, 1, size, out) != size ||
         fclose(out) != 0) {
         fprintf(stderr, "antl_rename: cannot write %s\n", argv[2]);

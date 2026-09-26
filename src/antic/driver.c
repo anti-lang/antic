@@ -15,6 +15,7 @@
 #include "lower.h"
 #include "header.h"
 #include "modpath.h"
+#include "platform.h"
 #include "notice.h"
 #include "optimize.h"
 #include "whole.h"
@@ -86,7 +87,7 @@ static bool ends_with(const char *s, const char *suffix)
 /* Read the whole of a binary file. */
 static bool read_bytes(const char *path, struct text *out)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_open(path, false);
     char buffer[4096];
     size_t n;
     bool ok;
@@ -111,7 +112,7 @@ static bool read_bytes(const char *path, struct text *out)
    LEX_SOURCE_MAX is rejected as well, since the lexer refuses it. */
 static bool read_source(const char *path, struct text *out)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_open(path, false);
     char buffer[4096];
     size_t n;
     size_t total = 0;
@@ -146,7 +147,7 @@ static bool read_source(const char *path, struct text *out)
 
 static bool write_file(const char *path, const struct text *content)
 {
-    FILE *f = fopen(path, "wb");
+    FILE *f = platform_open(path, true);
     bool ok;
 
     if (f == NULL) {
@@ -264,7 +265,7 @@ static bool find_crt_dir(enum target t, struct text *out)
         struct text path = {0};
         FILE *f;
         text_appendf(&path, "%s/Scrt1.o", dirs[i]);
-        f = fopen(text_cstr(&path), "rb");
+        f = platform_open(text_cstr(&path), false);
         text_free(&path);
         if (f != NULL) {
             fclose(f);
@@ -335,7 +336,7 @@ static void link_facts_free(struct link_facts *f)
 
 static bool file_exists(const char *path)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_open(path, false);
 
     if (f != NULL) {
         fclose(f);
@@ -1036,7 +1037,7 @@ static bool has_main(const struct ir_module *program, const char *module)
    of it would name other code. */
 static bool digest_file(struct anti_sha256 *s, const char *path)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_open(path, false);
     unsigned char bytes[4096];
     size_t n;
     bool ok;
@@ -1404,7 +1405,7 @@ static const char *search_roots(const struct options *o, const char *module,
             text_appendf(&path, "%c", *p == '.' ? '/' : *p);
         }
         text_append(&path, ANTL_SUFFIX);
-        f = fopen(text_cstr(&path), "rb");
+        f = platform_open(text_cstr(&path), false);
         if (f != NULL) {
             fclose(f);
             copy = arena_alloc(arena, path.length + 1);
@@ -2585,7 +2586,7 @@ static void index_others(struct text *out, const char *path, const char *name)
 {
     struct text file = {0};
     const char *block;
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_open(path, false);
 
     if (f == NULL) {
         return;

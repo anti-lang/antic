@@ -61,12 +61,11 @@ endmacro()
 
 # One warning set for clang, gcc and MSVC. Warnings are errors so that
 # the code in the book compiles without noise on every platform.
-# DESIGN: the C runtime of Microsoft deprecates fopen, getenv and the other
-# functions that C11 defines, for MSVC and for clang with its headers alike,
-# and the warnings are errors here.
-if(WIN32)
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-endif()
+# DESIGN: the C runtime of Microsoft deprecates fopen, getenv and other
+# functions that C11 defines, for MSVC and for clang with its headers
+# alike. No build defines _CRT_SECURE_NO_WARNINGS to hide that. The code
+# calls the functions it does not deprecate, through src/antic/platform.c
+# in the tools and src/rt/platform_windows.c in the runtime.
 if(MSVC)
     add_compile_options(/W4 /WX /utf-8)
 else()

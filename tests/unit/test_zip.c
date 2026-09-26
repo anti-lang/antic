@@ -2,10 +2,12 @@
    outside the file, and the deflate streams are broken or unpack past
    the size their entry declares. */
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 #include "text.h"
@@ -13,7 +15,10 @@
 
 #define ARCHIVE "test_zip.zip"
 
-static void put16(struct text *out, unsigned long value)
+/* The fields of the format are 16 and 32 bits wide. Both writers take a
+   value as wide as any size_t. A length then passes without a conversion
+   that narrows it where long is 32 bits, as on Windows. */
+static void put16(struct text *out, uint64_t value)
 {
     unsigned char bytes[2];
 
@@ -22,7 +27,7 @@ static void put16(struct text *out, unsigned long value)
     text_append_bytes(out, bytes, sizeof bytes);
 }
 
-static void put32(struct text *out, unsigned long value)
+static void put32(struct text *out, uint64_t value)
 {
     put16(out, value & 0xffff);
     put16(out, (value >> 16) & 0xffff);
@@ -72,7 +77,7 @@ static void write_archive(const struct entry *entries, size_t count)
         put16(&out, e->method);
         put32(&out, 0);
         put32(&out, e->crc);
-        put32(&out, (unsigned long)e->packed);
+        put32(&out, e->packed);
         put32(&out, e->size);
         put16(&out, name_length);
         put16(&out, 0);
@@ -85,7 +90,7 @@ static void write_archive(const struct entry *entries, size_t count)
         put16(&directory, e->method);
         put32(&directory, 0);
         put32(&directory, e->crc);
-        put32(&directory, (unsigned long)e->packed);
+        put32(&directory, e->packed);
         put32(&directory, e->size);
         put16(&directory, name_length);
         put16(&directory, 0);
@@ -104,11 +109,11 @@ static void write_archive(const struct entry *entries, size_t count)
         put16(&out, 0);
         put16(&out, count);
         put16(&out, count);
-        put32(&out, (unsigned long)directory.length);
+        put32(&out, directory.length);
         put32(&out, at);
         put16(&out, 0);
     }
-    f = fopen(ARCHIVE, "wb");
+    f = platform_open(ARCHIVE, true);
     if (f != NULL) {
         fwrite(out.data, 1, out.length, f);
         fclose(f);
@@ -120,7 +125,7 @@ static void write_archive(const struct entry *entries, size_t count)
 /* The bytes of the archive, for a test that breaks them. */
 static void read_archive(struct text *out)
 {
-    FILE *f = fopen(ARCHIVE, "rb");
+    FILE *f = platform_open(ARCHIVE, false);
     char buffer[4096];
     size_t n;
 
@@ -135,7 +140,7 @@ static void read_archive(struct text *out)
 
 static void write_bytes(const char *bytes, size_t length)
 {
-    FILE *f = fopen(ARCHIVE, "wb");
+    FILE *f = platform_open(ARCHIVE, true);
 
     if (f != NULL) {
         fwrite(bytes, 1, length, f);
@@ -531,7 +536,7 @@ static void write_limits(void)
     one.bytes = "x";
     one.size = 1;
     CHECK(!zip_write(ARCHIVE, &one, 1));
-    f = fopen(ARCHIVE, "rb");
+    f = platform_open(ARCHIVE, false);
     CHECK(f == NULL);
     if (f != NULL) {
         fclose(f);

@@ -1,3 +1,4 @@
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 #include <stdio.h>
@@ -223,7 +224,7 @@ static void runtime_entry(void)
     };
     struct text start = {0};
     char buffer[4096];
-    FILE *f = fopen(ANTIC_SOURCE_DIR "/src/rt/start.c", "rb");
+    FILE *f = platform_open(ANTIC_SOURCE_DIR "/src/rt/start.c", false);
     size_t n;
     size_t i;
 
@@ -257,7 +258,7 @@ static void runtime_markers(void)
 {
     struct text source = {0};
     char buffer[4096];
-    FILE *f = fopen(ANTIC_SOURCE_DIR "/src/rt/license.c", "rb");
+    FILE *f = platform_open(ANTIC_SOURCE_DIR "/src/rt/license.c", false);
     size_t n;
 
     CHECK(f != NULL);
@@ -282,7 +283,7 @@ static void runtime_markers(void)
 static void runtime_licence(const char *path)
 {
     char buffer[256] = "";
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_open(path, false);
     size_t n = 0;
 
     CHECK(f != NULL);

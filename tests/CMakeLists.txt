@@ -1281,7 +1281,7 @@ add_test(NAME anti_check
 # The documentation generator: the pages of the fixture, the doc
 # equivalence of docs/tooling.md, the two forms and the two options that
 # need the source.
-add_executable(antl_rename doc/antl_rename.c)
+add_executable(antl_rename doc/antl_rename.c ../src/antic/platform.c)
 add_test(NAME anti_doc
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
@@ -2350,7 +2350,7 @@ if(NOT WIN32)
     set_tests_properties(dev_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 endif()
 
-add_executable(poke_byte modules/poke_byte.c)
+add_executable(poke_byte modules/poke_byte.c ../src/antic/platform.c)
 add_test(NAME dev_library_verify
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
@@ -2908,7 +2908,8 @@ set_tests_properties(conf_environment_utf8 PROPERTIES
 
 # The readers of the symbol table and the line table, on the binaries
 # that this host links for the other targets.
-add_executable(symbols_probe unit/symbols_probe.c ../src/rt/symbols.c)
+add_executable(symbols_probe unit/symbols_probe.c ../src/rt/symbols.c
+    ../src/antic/platform.c)
 target_include_directories(symbols_probe PRIVATE ../src/rt)
 foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
     add_test(NAME trace_symbols_${target}

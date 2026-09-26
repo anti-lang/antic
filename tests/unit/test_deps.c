@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 #include "deps.h"
@@ -13,7 +14,7 @@
 /* Write text into a file of the working directory and give its name. */
 static const char *fixture(const char *name, const char *text)
 {
-    FILE *f = fopen(name, "wb");
+    FILE *f = platform_open(name, true);
 
     if (f == NULL) {
         return NULL;

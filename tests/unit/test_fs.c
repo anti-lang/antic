@@ -4,13 +4,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 #include "std.h"
 
 static void write_bytes(const char *name, const char *bytes, size_t n)
 {
-    FILE *f = fopen(name, "wb");
+    FILE *f = platform_open(name, true);
 
     CHECK(f != NULL);
     if (f != NULL) {

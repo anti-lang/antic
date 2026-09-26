@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "linker.h"
+#include "platform.h"
 #include "selfpath.h"
 
 /* DESIGN: an XDG variable counts only when it holds an absolute path.
@@ -124,7 +125,7 @@ bool user_dir_of(struct text *out, enum user_dir_os os, enum user_dir which,
    behind where a shell would have removed it. */
 static const char *from_environment(const char *name)
 {
-    const char *value = getenv(name);
+    const char *value = platform_getenv(name);
 
     return value != NULL && value[0] != '\0' ? value : NULL;
 }
