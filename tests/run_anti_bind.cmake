@@ -185,7 +185,9 @@ elseif(CASE STREQUAL "raymath")
     file(STRINGS "${ABI}/abi_raymath.expected" lines)
     list(REMOVE_AT lines 0)
     list(JOIN lines "\n" printed)
-    file(WRITE "${WORK}/raymath_calls.expected" "${printed}\n")
+    # file(WRITE) writes CRLF on Windows, and the program writes LF.
+    file(CONFIGURE OUTPUT "${WORK}/raymath_calls.expected"
+         CONTENT "${printed}\n" @ONLY NEWLINE_STYLE UNIX)
     expect_calls(raymath "${RAYLIB}/src" "${BIND}/raymath_calls.anti"
                  "${WORK}/raymath_calls.expected")
 elseif(CASE STREQUAL "raylib")

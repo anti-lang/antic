@@ -15,8 +15,9 @@
 # lock file, `anti run` and the project `anti new` writes.
 
 set(project "${WORK}/app")
-# A Windows host writes app.exe and objects named .obj, and its symbols
-# lie in a PDB, so the map of its archive names no function.
+# A Windows host writes app.exe, its assembly app.exe.s and objects named
+# .obj, and its symbols lie in a PDB, so the map of its archive names no
+# function.
 set(exe "")
 set(obj ".o")
 if(HOST MATCHES "^windows-")
@@ -181,8 +182,8 @@ set(line_directive ".loc ")
 if(HOST MATCHES "^windows-")
     set(line_directive ".cv_loc ")
 endif()
-file(READ "${project}/build/${HOST}/dev/app.s" dev_assembly)
-file(READ "${project}/build/${HOST}/release/app.s" release_assembly)
+file(READ "${project}/build/${HOST}/dev/app${exe}.s" dev_assembly)
+file(READ "${project}/build/${HOST}/release/app${exe}.s" release_assembly)
 string(FIND "${dev_assembly}" "${line_directive}" at)
 if(at LESS 0)
     message(FATAL_ERROR "the dev build passed no -g")
