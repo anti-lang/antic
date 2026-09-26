@@ -4,8 +4,8 @@
 #   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   WORK      a directory for the output
-#   CASE      header, clang, raymath, raylib, api, refusals, api_malformed,
-#             clang_malformed or ast_malformed
+#   CASE      header, clang, escaped_path, raymath, raylib, api, refusals,
+#             api_malformed, clang_malformed or ast_malformed
 #   SOURCES   tests/clib, for the case header
 #   DUMP      tests/dump, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -75,7 +75,10 @@ endfunction()
 # Build the two probes that anti bind wrote, run both and compare their
 # output byte for byte. include is the directory of the header.
 function(compare_probes name include)
+    # The probe of C prints through the streams of C, which Windows opens
+    # in text mode, so it takes binary_stdio.h as every C test file does.
     run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" ${HOST_LINK}
+        -include "${CMAKE_CURRENT_LIST_DIR}/binary_stdio.h"
         -o "${WORK}/probe_c" "${WORK}/out/probe_${name}.c")
     run("${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
         -I "${WORK}/lib" -o "${WORK}/probe_anti" "${WORK}/out/probe_${name}.anti")
@@ -146,6 +149,29 @@ elseif(CASE STREQUAL "clang")
     compare_probes(layout "${BIND}")
     expect_calls(layout "${BIND}" "${BIND}/layout_calls.anti"
                  "${BIND}/layout_calls.expected")
+elseif(CASE STREQUAL "escaped_path")
+    # A path given with a backslash, as every native path of Windows is.
+    # clang escapes it in the line markers of `-E`, and the macros of the
+    # header are still its own. The binding equals that of the case clang.
+    # A directory of POSIX may hold a backslash in its name, so the same
+    # path stands on every host.
+    # file() reads a backslash as a separator, so a POSIX host makes the
+    # directory and the copy with its own commands.
+    if(WIN32)
+        file(MAKE_DIRECTORY "${WORK}/escaped")
+        file(COPY_FILE "${BIND}/layout.h" "${WORK}/escaped/layout.h")
+        file(TO_NATIVE_PATH "${WORK}/escaped/layout.h" header)
+    else()
+        set(dir "${WORK}/back\\slash")
+        set(header "${dir}/layout.h")
+        run(mkdir -p "${dir}")
+        run(cp "${BIND}/layout.h" "${header}")
+    endif()
+    run("${ANTI}" bind --clang "${header}" --module bindtest.layout
+        -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${run_err}")
+    expect_file("${WORK}/out/layout.anti" "${BIND}/layout.anti.expected")
+    expect_file("${WORK}/warnings" "${BIND}/layout.warnings")
 elseif(CASE STREQUAL "raymath")
     # raymath of the pinned raylib, read through clang. Its probe agrees
     # with C, and the functions of tests/abi/abi_raymath.anti called

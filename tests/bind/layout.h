@@ -38,13 +38,16 @@ enum LayoutMode
 /* LAYOUT_LARGE lies above INT_MAX on purpose: anti bind gives an enum
    whose values need an unsigned int the type c_uint. C23 allows such an
    enumerator and C11 leaves it to the compiler, which warns under
-   -Wpedantic. The warning is silenced at that line alone. */
+   -Wpedantic. For an MSVC target clang keeps the enum an int and warns
+   under -Wmicrosoft-enum-value, and the value keeps the same 32 bits.
+   Both warnings are silenced at that line alone. */
 enum LayoutWide
 {
     LAYOUT_SMALL = 0,
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc23-extensions"
+#pragma clang diagnostic ignored "-Wmicrosoft-enum-value"
 #elif defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"

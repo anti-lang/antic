@@ -1036,6 +1036,26 @@ static bool lookup(void *context, const char *name, struct bind_eval *out)
     return false;
 }
 
+/* The file name of a line marker, from the character after its opening
+   quote to its closing one. clang writes the name as a string of C, so a
+   backslash of a Windows path stands as `\\` and is read back as one. */
+static const char *marker_file(struct reader *r, const char *from,
+                               const char *close)
+{
+    char *name = arena_alloc(&r->b->arena, (size_t)(close - from) + 1);
+    char *out = name;
+    const char *in;
+
+    for (in = from; in < close; in++) {
+        if (in[0] == '\\' && in + 1 < close) {
+            in++;
+        }
+        *out++ = *in;
+    }
+    *out = '\0';
+    return name;
+}
+
 /* The line markers, the macros and the pragmas of the output of
    `clang -E -dD`. A line marker `# 12 "file" 2` says that the next line
    is line 12 of file, and every line after it counts one. */
@@ -1058,8 +1078,7 @@ static void read_preprocessed(struct reader *r, char *text)
             char *close = quote != NULL ? strrchr(quote + 1, '"') : NULL;
             line = strtol(at + 2, NULL, 10);
             if (close != NULL) {
-                *close = '\0';
-                file = bind_strdup(r->b, quote + 1);
+                file = marker_file(r, quote + 1, close);
             }
         } else {
             bool here = file != NULL && strcmp(file, r->header) == 0;
