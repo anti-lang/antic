@@ -330,6 +330,19 @@ reports what it finished.
   `if let`, `v is Shape.Circle` and `v.tag` read the tag, a variant crosses
   a module, and the header writes the enum of its tags. See "Sum types" in
   `docs/decisions.md` and `docs/notes/variants.md`.
+- The default `==` is built. A struct, a class value, a tuple, a variant,
+  a `?T` and an array compare part by part, a field by its kind, and agree
+  with the default hash. `<` has no default, so `Ordered` needs `operator
+  fn lt`. Module-level `operator fn` items share a name across the types
+  of their first parameters, declared as `eq:Point`, and a bare call picks
+  by its first argument. `union` names a function after `fn` and `.`. See
+  "Generics and collections" in `docs/decisions.md` and `docs/notes/hashing.md`.
+- Variants, `?T`, tuples and arrays of more than one level have runtime
+  descriptors. `equals`, `hash`, `serialize`, `deserialize` and `reflect`
+  handle a field of each, an array field serializes as nested JSON arrays,
+  a channel and an `own fn` compare by identity and a Regex by its text.
+  The handle of a compiled pattern is `struct anti_pattern` of
+  `src/rt/regex.h`.
 - Locking and channels are built. `Mutex.new()` makes an `anti.lang.Mutex`,
   `sync m { }` holds it for a block and unlocks it on every exit, and a
   nested `sync` on the same place in one function is refused. `chan int(16)`
@@ -635,7 +648,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 71. See "The doc
+  class body and the `worker` mark, and its format version is 72. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
