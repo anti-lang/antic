@@ -732,7 +732,11 @@ static bool elf_each_function(void *context, const char *name, uint64_t value,
 {
     struct functions *f = context;
 
-    if (name[0] == '$' || name[0] == 0 || type != ELF_STT_FUNC ||
+    /* A function of Anti has no type in the symbol table, since its
+       assembly writes none, so an untyped symbol in a section of code
+       counts, as it does for the lookup of a trace. */
+    if (name[0] == '$' || name[0] == 0 ||
+        (type != ELF_STT_FUNC && type != ELF_STT_NOTYPE) ||
         (flags & ELF_SHF_EXECINSTR) == 0) {
         return false;
     }

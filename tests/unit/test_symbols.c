@@ -245,6 +245,9 @@ enum {
     ELF_SECTIONS
 };
 
+/* The type and binding byte of the symbol of elf_image. */
+static uint8_t elf_symbol_info = 0x12;      /* global function */
+
 /* An ELF file with one function symbol, `anti_licenses` at 0x1000, and
    the line table line. The section nobits is of type NOBITS with a size
    of 1 GiB. Its bytes stand past the size the file reports, which the
@@ -268,7 +271,7 @@ static size_t elf_image(uint8_t *out, size_t room, int nobits,
     memset(out, 0, room);
     memset(symbols, 0, sizeof symbols);
     put(symbols + 24, 1, 4);
-    symbols[24 + 4] = 0x12;     /* global function */
+    symbols[24 + 4] = elf_symbol_info;
     put(symbols + 24 + 6, ELF_SYMTAB, 2);
     put(symbols + 24 + 8, 0x1000, 8);
     put(symbols + 24 + 16, 0x10, 8);
@@ -314,6 +317,41 @@ static size_t elf_image(uint8_t *out, size_t room, int nobits,
         memcpy(out + offsets[i], contents[i], sizes[i]);
     }
     return end;
+}
+
+static bool count_function(void *context, const char *name, uint64_t vaddr,
+                           uint64_t size)
+{
+    int *count = context;
+
+    (void)size;
+    CHECK(strcmp(name, "anti_licenses") == 0 && vaddr == 0x1000);
+    *count += 1;
+    return false;
+}
+
+/* The functions of an ELF program take a symbol without a type in a
+   section of code, as the lookup of a trace does. The assembly antic
+   writes gives its functions no type, and the map of a symbols archive
+   listed none of them on Linux. */
+static void untyped_functions(void)
+{
+    struct blob line = {0};
+    uint8_t image[1024];
+    size_t size;
+    int count = 0;
+
+    elf_symbol_info = 0x10;     /* global, no type */
+    size = elf_image(image, sizeof image, ELF_NULL, &line);
+    elf_symbol_info = 0x12;
+    anti_rt_elf_functions(image, size, count_function, &count);
+    CHECK(count == 1);
+    elf_symbol_info = 0x11;     /* global object */
+    size = elf_image(image, sizeof image, ELF_NULL, &line);
+    elf_symbol_info = 0x12;
+    count = 0;
+    anti_rt_elf_functions(image, size, count_function, &count);
+    CHECK(count == 0);
 }
 
 /* A line table of one DWARF 4 unit with the two rows of two_rows. */
@@ -607,6 +645,7 @@ void test_symbols(void)
     demangles("_A8geometry_length", 8, "");
     symbol_escapes();
     nobits_sections();
+    untyped_functions();
     line_overflow();
     empty_entry_formats();
     long_leb();
