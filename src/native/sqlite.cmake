@@ -45,19 +45,8 @@ antic_native_license(sqlite "${ANTIC_SQLITE_WORK}/licence.txt")
 
 # DESIGN: sqlite3.c of the amalgamation with no compile-time option of our
 # own, the defaults of the release: serialized threading, and extensions
-# loaded at run time. It compiles under the warnings of anti_rt.
-set(ANTIC_SQLITE_WARNINGS -Wall -Wextra -Wpedantic -Werror)
-
-# DESIGN: four warnings are off on Windows alone, where SQLite compiles
-# the code it writes for _MSC_VER, which clang for MSVC defines.
-# -Wlanguage-extension-token of -Wpedantic reports __int64 in sqlite3.h,
-# so the probe needs it off as well, and the __try blocks of SQLITE_USE_SEH.
-# -Wsign-compare, -Wunused-variable and -Wunused-function report the
-# exception filter and the lock check of those blocks. The filter compares
-# a DWORD with an int, and the lock check is a function for an assert that
-# the release compiles out. No warning is raised on the other four targets.
-set(ANTIC_SQLITE_WARNINGS_windows -Wno-language-extension-token
-    -Wno-sign-compare -Wno-unused-variable -Wno-unused-function)
+# loaded at run time. It compiles with the warnings of SQLite's own build,
+# ANTIC_SQLITE_WARNINGS of src/native/warnings.cmake.
 
 set(antic_sqlite_probe "${PROJECT_SOURCE_DIR}/tests/abi/sqlite_probe.c")
 foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
@@ -65,19 +54,16 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     antic_native_library(name "${target}" sqlite3)
     set(work "${ANTIC_SQLITE_WORK}/${target}")
     set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${name}")
-    set(warnings ${ANTIC_SQLITE_WARNINGS})
-    if(target MATCHES "^windows-")
-        list(APPEND warnings ${ANTIC_SQLITE_WARNINGS_windows})
-    endif()
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2
-        ${warnings} ${flags}
+        ${flags}
         "-ffile-prefix-map=${ANTIC_SQLITE_SOURCE}=."
         "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
         "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=.")
     set(object "${work}/sqlite3.o")
     add_custom_command(OUTPUT "${object}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-        COMMAND ${compile} -c "${ANTIC_SQLITE_SOURCE}/sqlite3.c"
+        COMMAND ${compile} ${ANTIC_SQLITE_WARNINGS}
+            -c "${ANTIC_SQLITE_SOURCE}/sqlite3.c"
             -o "${object}"
         DEPENDS "${ANTIC_SQLITE_SOURCE}/sqlite3.c"
             "${ANTIC_SQLITE_SOURCE}/sqlite3.h"
@@ -95,8 +81,8 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     set(probe "${work}/sqlite_probe.o")
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-        COMMAND ${compile} -Wshadow -Wconversion -Wstrict-prototypes
-            -I "${ANTIC_SQLITE_SOURCE}"
+        COMMAND ${compile} ${ANTIC_C_WARNINGS}
+            -isystem "${ANTIC_SQLITE_SOURCE}"
             -c "${antic_sqlite_probe}" -o "${probe}"
         DEPENDS "${antic_sqlite_probe}" "${ANTIC_SQLITE_SOURCE}/sqlite3.h"
         VERBATIM)

@@ -49,11 +49,11 @@ list(APPEND ANTIC_PCRE2_FILES "${ANTIC_PCRE2_WORK}/pcre2_chartables.c")
 # DESIGN: antic links the PCRE2 of its host, compiled from the same files
 # with the compiler of antic, so the check of a pattern literal and the
 # program that compiles it at start read the pattern with one library. The
-# library takes the warnings of anti_rt above and not the stricter set of
-# antic, which is written for the code of this repository.
+# library takes the warnings of PCRE2's own build, which replace the set of
+# the directory, since the sources are not ours.
 add_library(antic_pcre2 STATIC ${ANTIC_PCRE2_FILES})
 if(MSVC)
-    set_property(TARGET antic_pcre2 PROPERTY COMPILE_OPTIONS /W4 /WX /utf-8)
+    set_property(TARGET antic_pcre2 PROPERTY COMPILE_OPTIONS /utf-8)
 else()
     set_property(TARGET antic_pcre2 PROPERTY COMPILE_OPTIONS
         ${ANTIC_PCRE2_WARNINGS}

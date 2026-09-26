@@ -67,6 +67,12 @@ if("${TARGET}" MATCHES "^windows-")
              -L "${win}/sdk/lib/ucrt/${arch}" -L "${win}/sdk/lib/um/${arch}")
 endif()
 
+# Every C and C++ file of the tests compiles under the warnings of the
+# repository, and a warning is an error.
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
+list(APPEND CXX ${ANTIC_CXX_WARNINGS})
+list(APPEND CC ${ANTIC_C_WARNINGS})
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 function(run)
@@ -173,7 +179,7 @@ elseif(CASE STREQUAL "failing")
     expect_header("${dir}/failing.h" failing.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/failing.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/failing.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/failing${EXE}")
     expect_output("${dir}/failing${EXE}" "${SOURCES}/failing.expected")
@@ -185,7 +191,7 @@ elseif(CASE STREQUAL "generics")
     expect_header("${dir}/stacks.h" stacks.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/stacks.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/stacks.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/stacks${EXE}")
     expect_output("${dir}/stacks${EXE}" "${SOURCES}/stacks.expected")
@@ -199,7 +205,7 @@ elseif(CASE STREQUAL "tuples")
     expect_header("${dir}/tuples.h" tuples.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/tuples.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/tuples.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/tuples${EXE}")
     expect_output("${dir}/tuples${EXE}" "${SOURCES}/tuples.expected")
@@ -210,7 +216,7 @@ elseif(CASE STREQUAL "optional")
     expect_header("${dir}/optional.h" optional.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/optional.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/optional.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/optional${EXE}")
     expect_output("${dir}/optional${EXE}" "${SOURCES}/optional.expected")
@@ -222,7 +228,7 @@ elseif(CASE STREQUAL "simd")
     expect_header("${dir}/simdlib.h" simdlib.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/simd.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/simd.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/simd${EXE}")
     expect_output("${dir}/simd${EXE}" "${SOURCES}/simd.expected")
@@ -233,7 +239,7 @@ elseif(CASE STREQUAL "flags")
     expect_header("${dir}/flags.h" flags.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/flags.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/flags.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/flags${EXE}")
     expect_output("${dir}/flags${EXE}" "${SOURCES}/flags.expected")
@@ -244,7 +250,7 @@ elseif(CASE STREQUAL "ledger")
     expect_header("${dir}/ledger.h" ledger.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/ledger.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/ledger.c"
         "${library_file}" "${runtime_library}" ${LINK} -lpthread
         -o "${dir}/ledger${EXE}")
     expect_output("${dir}/ledger${EXE}" "${SOURCES}/ledger.expected")
@@ -256,7 +262,7 @@ elseif(CASE STREQUAL "handlers")
     expect_header("${dir}/handlers.h" handlers.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/handlers.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/handlers.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/handlers${EXE}")
     expect_output("${dir}/handlers${EXE}" "${SOURCES}/handlers.expected")
@@ -267,7 +273,7 @@ elseif(CASE STREQUAL "names")
     library(names static "${dir}")
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/names.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/names.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/names${EXE}")
     expect_output("${dir}/names${EXE}" "${SOURCES}/names.expected")
@@ -280,11 +286,11 @@ elseif(CASE STREQUAL "variants")
     expect_header("${dir}/variants.h" variants.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/variants.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/variants.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/variants${EXE}")
     expect_output("${dir}/variants${EXE}" "${SOURCES}/variants.expected")
-    run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
         "${SOURCES}/variants.cpp")
 elseif(CASE STREQUAL "nested")
     # An export class whose layout holds types nested in it. The header
@@ -295,11 +301,11 @@ elseif(CASE STREQUAL "nested")
     expect_header("${dir}/nested.h" nested.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" "${SOURCES}/nested.c"
+    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/nested.c"
         "${library_file}" "${runtime_library}" ${LINK}
         -o "${dir}/nested${EXE}")
     expect_output("${dir}/nested${EXE}" "${SOURCES}/nested.expected")
-    run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
         "${SOURCES}/nested.cpp")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
@@ -362,13 +368,13 @@ elseif(CASE STREQUAL "header")
     expect_header("${dir}/geo.h" geo.h)
     library(shapes static "${dir}")
     expect_header("${dir}/shapes.h" shapes.h)
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CC} -std=c11 -I "${dir}" -fsyntax-only
         "${SOURCES}/header.c")
-    run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
         "${SOURCES}/header.cpp")
-    run(${CC} -std=c11 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CC} -std=c11 -I "${dir}" -fsyntax-only
         "${SOURCES}/shapes.c")
-    run(${CXX} -std=c++17 -Wall -Werror -I "${dir}" -fsyntax-only
+    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
         "${SOURCES}/shapes.cpp")
 elseif(CASE STREQUAL "bundle")
     library(geo static "${dir}" --bundle-runtime)

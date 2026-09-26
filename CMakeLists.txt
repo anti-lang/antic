@@ -59,18 +59,19 @@ macro(antic_shared_path name default doc)
     endif()
 endmacro()
 
-# One warning set for clang, gcc and MSVC. Warnings are errors so that
-# the code in the book compiles without noise on every platform.
+# One warning set for clang, gcc and MSVC, from tools/warnings.cmake.
+# Warnings are errors so that the code in the book compiles without noise
+# on every platform.
 # DESIGN: the C runtime of Microsoft deprecates fopen, getenv and other
 # functions that C11 defines, for MSVC and for clang with its headers
 # alike. No build defines _CRT_SECURE_NO_WARNINGS to hide that. The code
 # calls the functions it does not deprecate, through src/antic/platform.c
 # in the tools and src/rt/platform_windows.c in the runtime.
+include(tools/warnings.cmake)
 if(MSVC)
-    add_compile_options(/W4 /WX /utf-8)
+    add_compile_options(${ANTIC_MSVC_WARNINGS} /utf-8)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic -Werror
-        -Wshadow -Wconversion -Wstrict-prototypes)
+    add_compile_options(${ANTIC_C_WARNINGS})
     # DESIGN: debug information and __FILE__ carry the absolute path of
     # this checkout into every file a user receives. The map replaces it
     # with a dot, so a program that links anti_rt names no directory of
@@ -320,7 +321,7 @@ function(anti_cross_runtime_at target triple level root)
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                -Wall -Wextra -Wpedantic -Werror
+                ${ANTIC_C_WARNINGS}
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
@@ -353,7 +354,7 @@ function(anti_cross_runtime_at target triple level root)
     add_custom_command(OUTPUT "${stub}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-            -Wall -Wextra -Wpedantic -Werror
+            ${ANTIC_C_WARNINGS}
             "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
             -c "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c" -o "${stub}"
         DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c"

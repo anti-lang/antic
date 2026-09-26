@@ -31,6 +31,10 @@ set(hosts macos-arm64 macos-x86_64 linux-x86_64 linux-arm64
           windows-x86_64 windows-arm64)
 string(REPLACE ";" " " host_words "${hosts}")
 
+# The fixtures are C this test writes, under the warnings of the
+# repository.
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/bin" "${WORK}/fixture")
 
@@ -58,9 +62,11 @@ foreach(program antic anti)
          "#include <stdio.h>\n"
          "int main(void) { printf(\"${program} ${version}\\n\"); return 0; }\n")
     run("the fixture ${program} did not compile"
-        "${CC}" -O0 -isysroot "${sdk}" -o "${WORK}/fixture/${program}"
+        "${CC}" ${ANTIC_C_WARNINGS} -O0 -isysroot "${sdk}"
+        -o "${WORK}/fixture/${program}"
         "${WORK}/fixture/${program}.c")
-    execute_process(COMMAND "${CC}" -arch x86_64 -O0 -isysroot "${sdk}"
+    execute_process(COMMAND "${CC}" ${ANTIC_C_WARNINGS} -arch x86_64 -O0
+                            -isysroot "${sdk}"
                             -o "${WORK}/fixture/${program}-x86_64"
                             "${WORK}/fixture/${program}.c"
                     RESULT_VARIABLE failed OUTPUT_QUIET ERROR_QUIET)
@@ -85,7 +91,7 @@ foreach(pair "windows-x86_64=x86_64-pc-windows-msvc=X64"
     list(GET parts 1 triple)
     list(GET parts 2 machine)
     file(MAKE_DIRECTORY "${WORK}/fixture/${host}")
-    execute_process(COMMAND "${CC}" "--target=${triple}" -c
+    execute_process(COMMAND "${CC}" ${ANTIC_C_WARNINGS} "--target=${triple}" -c
                             -o "${WORK}/fixture/${host}/windows.obj"
                             "${WORK}/fixture/windows.c"
                     RESULT_VARIABLE failed OUTPUT_QUIET ERROR_QUIET)

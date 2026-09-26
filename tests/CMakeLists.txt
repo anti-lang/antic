@@ -369,6 +369,12 @@ add_test(NAME workflows_dispatch_only
         "-DWORKFLOWS=${PROJECT_SOURCE_DIR}/.github/workflows"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_workflows.cmake")
 
+# The warning flags of the build stand in tools/warnings.cmake and
+# src/native/warnings.cmake alone, as docs/c-guidelines.md requires.
+add_test(NAME warning_set
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warning_set.cmake")
+
 # Rule 25: every symbol a runtime library of the archive defines starts
 # with anti_rt_, on every target and level.
 add_test(NAME rt_names

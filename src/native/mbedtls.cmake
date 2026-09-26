@@ -57,8 +57,8 @@ set(ANTIC_MBEDTLS_SOURCES
 # DESIGN: include/mbedtls/mbedtls_config.h of the release, unchanged, and
 # no definition of our own. It holds TLS 1.2 and 1.3, the PSA crypto API,
 # the sockets of net_sockets.c, the entropy of the operating system and
-# no threading. It compiles under the warnings of anti_rt.
-set(ANTIC_MBEDTLS_WARNINGS -Wall -Wextra -Wpedantic -Werror)
+# no threading. It compiles with the warnings of Mbed TLS's own build,
+# ANTIC_MBEDTLS_WARNINGS of src/native/warnings.cmake.
 
 set(antic_mbedtls_probe "${PROJECT_SOURCE_DIR}/tests/abi/mbedtls_probe.c")
 foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
@@ -67,7 +67,7 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     set(work "${ANTIC_MBEDTLS_WORK}/${target}")
     set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${name}")
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2
-        ${ANTIC_MBEDTLS_WARNINGS} ${flags}
+        ${flags}
         "-ffile-prefix-map=${ANTIC_MBEDTLS_SOURCE}=."
         "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
         "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=.")
@@ -77,7 +77,8 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         set(object "${work}/${source}.o")
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND ${compile} -I "${ANTIC_MBEDTLS_INCLUDE}"
+            COMMAND ${compile} ${ANTIC_MBEDTLS_WARNINGS}
+                -I "${ANTIC_MBEDTLS_INCLUDE}"
                 -I "${ANTIC_MBEDTLS_SOURCE}/library"
                 -c "${input}" -o "${object}"
             DEPENDS "${input}"
@@ -97,8 +98,8 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     set(probe "${work}/mbedtls_probe.o")
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-        COMMAND ${compile} -Wshadow -Wconversion -Wstrict-prototypes
-            -I "${ANTIC_MBEDTLS_INCLUDE}"
+        COMMAND ${compile} ${ANTIC_C_WARNINGS}
+            -isystem "${ANTIC_MBEDTLS_INCLUDE}"
             -c "${antic_mbedtls_probe}" -o "${probe}"
         DEPENDS "${antic_mbedtls_probe}"
         VERBATIM)

@@ -14,7 +14,7 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     set(work "${ANTIC_PCRE2_WORK}/${target}")
     set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${name}")
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-        ${ANTIC_PCRE2_WARNINGS} ${flags}
+        ${flags}
         "-ffile-prefix-map=${ANTIC_PCRE2_SOURCE}=."
         "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
         "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=.")
@@ -24,7 +24,7 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         set(object "${work}/${source}.o")
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND ${compile} ${ANTIC_PCRE2_DEFINES}
+            COMMAND ${compile} ${ANTIC_PCRE2_WARNINGS} ${ANTIC_PCRE2_DEFINES}
                 -I "${ANTIC_PCRE2_INCLUDE}" -I "${ANTIC_PCRE2_SOURCE}/src"
                 -c "${input}" -o "${object}"
             DEPENDS "${input}" "${ANTIC_PCRE2_INCLUDE}/config.h"
@@ -45,8 +45,8 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     set(probe "${work}/pcre2_probe.o")
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-        COMMAND ${compile} -Wshadow -Wconversion -Wstrict-prototypes
-            -I "${ANTIC_PCRE2_INCLUDE}"
+        COMMAND ${compile} ${ANTIC_C_WARNINGS}
+            -isystem "${ANTIC_PCRE2_INCLUDE}"
             -c "${PROJECT_SOURCE_DIR}/tests/abi/pcre2_probe.c" -o "${probe}"
         DEPENDS "${PROJECT_SOURCE_DIR}/tests/abi/pcre2_probe.c"
             "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
@@ -64,9 +64,9 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                -Wall -Wextra -Wpedantic -Werror ${flags}
+                ${ANTIC_C_WARNINGS} ${flags}
                 "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
-                -I "${ANTIC_PCRE2_INCLUDE}"
+                -isystem "${ANTIC_PCRE2_INCLUDE}"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
                 "${PROJECT_SOURCE_DIR}/src/rt/regex.h"

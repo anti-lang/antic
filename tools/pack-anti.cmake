@@ -128,6 +128,7 @@ endfunction()
 # and anti the same way. src/rt holds a signal.h, which hides the one of
 # the C library from a source of the compiler that finds it.
 include("${tools_dir}/sources.cmake")
+include("${tools_dir}/warnings.cmake")
 
 # DESIGN: antic checks every pattern literal with PCRE2, so antic and anti,
 # which links the same compiler, compile the PCRE2 sources of the build
@@ -171,8 +172,7 @@ function(build_program host output program)
     foreach(dir IN LISTS program_dirs)
         list(APPEND program_includes -I "${root}/${dir}")
     endforeach()
-    set(common --target=${triple} -std=c11 -O2 -Wall -Wextra -Wpedantic
-               -Werror "-ffile-prefix-map=${root}=."
+    set(common --target=${triple} -std=c11 -O2 "-ffile-prefix-map=${root}=."
                "-DANTIC_VERSION=\"${version}\"")
     set(link "")
     if(host MATCHES "^macos-")
@@ -231,7 +231,8 @@ function(build_program host output program)
         string(REGEX REPLACE "\\.c$" "" name "${source}")
         string(REPLACE "/" "_" name "${name}")
         set(object "${DEST}/work/${host}/objects/${program}/${name}.o")
-        execute_process(COMMAND "${CLANG}" ${common} ${includes} -c
+        execute_process(COMMAND "${CLANG}" ${common} ${ANTIC_C_WARNINGS}
+                                ${includes} -c
                                 -o "${object}" "${root}/${source}"
                         RESULT_VARIABLE failed)
         if(failed)
@@ -242,7 +243,7 @@ function(build_program host output program)
     foreach(source IN LISTS pcre2_files)
         get_filename_component(name "${source}" NAME_WE)
         set(object "${DEST}/work/${host}/objects/${program}/${name}.o")
-        execute_process(COMMAND "${CLANG}" ${common} -Wno-overlength-strings
+        execute_process(COMMAND "${CLANG}" ${common} ${ANTIC_PCRE2_WARNINGS}
                                 ${ANTIC_PCRE2_DEFINES}
                                 "-ffile-prefix-map=${pcre2_source}=."
                                 "-ffile-prefix-map=${build_dir}=."

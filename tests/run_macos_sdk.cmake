@@ -73,13 +73,15 @@ if(NOT CLANG OR NOT EXISTS "${CLANG}")
     message("SKIP: the pinned clang is not built")
     return()
 endif()
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
 file(WRITE "${WORK}/probe.c" "int main(void) { return 0; }\n")
 foreach(pair "macos-arm64=arm64-apple-macos11" "macos-x86_64=x86_64-apple-macos11")
     string(REPLACE "=" ";" parts "${pair}")
     list(GET parts 0 host)
     list(GET parts 1 triple)
     execute_process(
-        COMMAND "${CLANG}" "--target=${triple}" -isysroot "${sdk}"
+        COMMAND "${CLANG}" ${ANTIC_C_WARNINGS} "--target=${triple}"
+                -isysroot "${sdk}"
                 "--ld-path=${LLVM_BIN}/ld64.lld" -o "${WORK}/probe-${host}"
                 "${WORK}/probe.c"
         RESULT_VARIABLE failed OUTPUT_VARIABLE out ERROR_VARIABLE err

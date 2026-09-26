@@ -20,10 +20,6 @@ set(ANTIC_PCRE2_SOURCES auto_possess chkdint compile compile_cgroup
 set(ANTIC_PCRE2_DEFINES -DHAVE_CONFIG_H -DPCRE2_CODE_UNIT_WIDTH=8
     -DSUPPORT_UNICODE -DPCRE2_STATIC)
 
-# DESIGN: PCRE2 compiles under the warnings of anti_rt, and warnings are
-# errors. The one exception is -Woverlength-strings of -Wpedantic, which
-# the table of error messages in pcre2_error.c raises as one literal of
-# 5,686 bytes. C11 only guarantees 4,095 bytes, and every compiler of the
-# six targets is clang, which takes it.
-set(ANTIC_PCRE2_WARNINGS -Wall -Wextra -Wpedantic -Werror
-    -Wno-overlength-strings)
+# The warnings of PCRE2's own build, which src/native/warnings.cmake holds
+# beside those of the other native libraries.
+include("${CMAKE_CURRENT_LIST_DIR}/warnings.cmake")

@@ -39,16 +39,11 @@ set(ANTIC_RAYLIB_AUDIO -Dminiaudio_c)
 # configuration is raylib's config.h, unchanged.
 set(ANTIC_RAYLIB_DEFINES -DPLATFORM_DESKTOP_GLFW -DGRAPHICS_API_OPENGL_33)
 
-# DESIGN: raylib compiles with -Wall and warnings are errors, with the two
-# exceptions of raylib's own build. -Wmissing-braces is off in its
-# Makefile. -Wunused-function is what rtextures.c and rtext.c silence with
-# a pragma for __GNUC__, which clang for MSVC does not define. -Wextra and
-# -Wpedantic raise hundreds of findings in the bundled stb and GLFW
-# sources, which are not ours to change. -fwrapv-pointer keeps the bounds
-# check of stb_vorbis.c, which compares a pointer after an addition that
-# may overflow, and which clang would otherwise fold to false.
-set(ANTIC_RAYLIB_WARNINGS -Wall -Wno-missing-braces -Wno-unused-function
-    -Werror)
+# DESIGN: raylib compiles with the warnings of its own Makefile,
+# ANTIC_RAYLIB_WARNINGS of src/native/warnings.cmake. -fwrapv-pointer
+# keeps the bounds check of stb_vorbis.c, which compares a pointer after
+# an addition that may overflow, and which clang would otherwise fold to
+# false.
 set(ANTIC_RAYLIB_OPTIONS -fno-strict-aliasing -fwrapv-pointer)
 
 # The system libraries a program of <target> links for raylib, beyond the
@@ -70,9 +65,9 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     if(target MATCHES "^linux-")
         set(platform -D_GLFW_X11)
     elseif(target MATCHES "^macos-")
-        set(platform -DGL_SILENCE_DEPRECATION)
+        set(platform ${ANTIC_RAYLIB_WARNINGS_macos})
     else()
-        set(platform -D_CRT_SECURE_NO_WARNINGS -DUNICODE)
+        set(platform ${ANTIC_RAYLIB_WARNINGS_windows} -DUNICODE)
     endif()
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2
         ${flags}
@@ -126,9 +121,8 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     endif()
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-        COMMAND ${compile} -Wall -Wextra -Wpedantic -Werror -Wshadow
-            -Wconversion -Wstrict-prototypes ${probe_main}
-            -I "${ANTIC_RAYLIB_SOURCE}"
+        COMMAND ${compile} ${ANTIC_C_WARNINGS} ${probe_main}
+            -isystem "${ANTIC_RAYLIB_SOURCE}"
             -c "${antic_raylib_probe}" -o "${probe}"
         DEPENDS "${antic_raylib_probe}" "${ANTIC_RAYLIB_SOURCE}/raylib.h"
         VERBATIM)
@@ -199,9 +193,9 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2 ${flags}
             "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
             "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
-            -Wall -Wextra -Wpedantic -Werror -Wshadow -Wconversion
-            -Wstrict-prototypes ${probe_main}
-            -I "${ANTIC_RAYLIB_SOURCE}" -I "${ANTIC_MINIAUDIO_SOURCE}"
+            ${ANTIC_C_WARNINGS} ${probe_main}
+            -isystem "${ANTIC_RAYLIB_SOURCE}"
+            -isystem "${ANTIC_MINIAUDIO_SOURCE}"
             -c "${antic_media_audio_probe}" -o "${probe}"
         DEPENDS "${antic_media_audio_probe}" "${ANTIC_RAYLIB_SOURCE}/raylib.h"
             "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.h"

@@ -28,9 +28,9 @@ antic_native_license(miniaudio "${ANTIC_MINIAUDIO_SOURCE}/LICENSE")
 # back end stays in, and miniaudio loads the one it uses at run time: ALSA,
 # PulseAudio or JACK on Linux, Core Audio on macOS and WASAPI, DirectSound
 # or WinMM on Windows. So it compiles against the C library alone, and a
-# program links no audio library. It compiles under the warnings of
-# anti_rt, which raise nothing on any of the six targets.
-set(ANTIC_MINIAUDIO_WARNINGS -Wall -Wextra -Wpedantic -Werror)
+# program links no audio library. It compiles with the warnings of
+# miniaudio's own build, ANTIC_MINIAUDIO_WARNINGS of
+# src/native/warnings.cmake.
 
 # The system libraries a program of <target> links for miniaudio, beyond
 # the C library that antic links for every program.
@@ -72,9 +72,8 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     endif()
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-        COMMAND ${compile} ${ANTIC_MINIAUDIO_WARNINGS} -Wshadow -Wconversion
-            -Wstrict-prototypes ${probe_main}
-            -I "${ANTIC_MINIAUDIO_SOURCE}"
+        COMMAND ${compile} ${ANTIC_C_WARNINGS} ${probe_main}
+            -isystem "${ANTIC_MINIAUDIO_SOURCE}"
             -c "${antic_miniaudio_probe}" -o "${probe}"
         DEPENDS "${antic_miniaudio_probe}"
             "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.h"

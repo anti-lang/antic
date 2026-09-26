@@ -26,6 +26,7 @@ endif()
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
 file(WRITE "${WORK}/tiny.c" "int main(void) { return 0; }\n")
 
 function(triple_of host out)
@@ -42,7 +43,7 @@ function(link_stand_in host out)
     set(lib "${SYSROOT}/${host}/usr/lib")
     set(object "${WORK}/tiny.${host}.o")
     set(program "${WORK}/tiny.${host}")
-    execute_process(COMMAND "${CLANG}" --target=${triple}
+    execute_process(COMMAND "${CLANG}" ${ANTIC_C_WARNINGS} --target=${triple}
                             --sysroot "${SYSROOT}/${host}" -O2
                             -c -o "${object}" "${WORK}/tiny.c"
                     RESULT_VARIABLE failed ERROR_VARIABLE err ENCODING NONE)
