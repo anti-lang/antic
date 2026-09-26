@@ -86,5 +86,7 @@ fn main() -> int
 	let x = Both { at: p, size: r };
 	let y = Both { at: q, size: s };
 	printf("both %d\n".ptr, b(x == y));
+	printf("bare %d %d %d %d\n".ptr, b(eq(p, q)), b(eq(r, t)), b(eq(one, two)),
+		hash(r) as c_int);
 	return 0;
 }

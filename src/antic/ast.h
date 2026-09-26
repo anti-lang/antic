@@ -391,6 +391,9 @@ struct expr {
             /* The sub-object whose table `T.f` reaches, for a body
                qualified by an interface. NULL for every other field. */
             const struct struct_field *through;
+            /* The callee that a bare call of a shared `operator fn`
+               becomes, on its first argument. */
+            bool bare;
             /* The checker checked the base already. The call of a method
                of a pattern that it wrote reads the type there. */
             bool checked;

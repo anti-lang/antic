@@ -2,4 +2,4 @@ overloads.anti:23:13: error: `operator fn eq` is already declared for `Point`
 overloads.anti:28:20: error: `operator fn eq` shares its name with another, and C has one function of a name, so it cannot be `export`
 overloads.anti:38:4: error: `area` is already declared
 overloads.anti:48:13: error: `lt` is already declared
-overloads.anti:56:5: error: unknown name `eq`
+overloads.anti:56:5: error: no `operator fn eq` of the module takes `int` first

@@ -2281,14 +2281,72 @@ static struct type *check_call(struct checker *c, struct expr *e,
    name, and the class or the receiver the callee is reached through. The
    callee is the name checked now, so a generic function named there is
    a call and not a value. */
+/* Refuse the field name of a value of type t that e reads. The callee of
+   a bare call of a shared `operator fn` names the type none of them
+   takes. */
+static void refuse_field(struct checker *c, const struct expr *e,
+                         const struct type *t, const struct name *name)
+{
+    if (e->as.field.bare) {
+        sema_error_at(c, e->pos, "no `operator fn %.*s` of the module takes "
+                      "`%s` first", (int)name->length, name->text,
+                      sema_tn(t));
+        return;
+    }
+    sema_error_at(c, e->pos, "`%s` has no field `%.*s`", sema_tn(t),
+                  (int)name->length, name->text);
+}
+
+/* Whether the module declares a shared `operator fn` of the name name,
+   one it holds as `name:Type`. */
+static bool shared_in_module(const struct checker *c, const struct name *name)
+{
+    size_t i;
+
+    for (i = 0; i < c->module_scope.count; i++) {
+        const struct name *n = &c->module_scope.entries[i].name;
+        if (n->length > name->length && n->text[name->length] == ':' &&
+            memcmp(n->text, name->text, name->length) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: a bare call `eq(a, b)` of a shared `operator fn` picks the
+   function by the type of its first argument, as `a == b` does. The call
+   becomes `a.eq(b)`, whose receiver the lookup of a function of a type
+   reads, and each argument is still checked once. */
+static void call_on_first(struct checker *c, struct expr *e)
+{
+    struct expr *callee = e->as.call.callee;
+    struct expr *field;
+
+    if (callee->kind != EXPR_NAME || e->as.call.arg_count == 0 ||
+        callee->type_arg_count > 0 ||
+        sema_lookup(c, &callee->as.name) != NULL ||
+        !shared_in_module(c, &callee->as.name)) {
+        return;
+    }
+    field = sema_new_node(c, EXPR_FIELD, callee->pos);
+    field->as.field.base = e->as.call.args[0];
+    field->as.field.name = callee->as.name;
+    field->as.field.bare = true;
+    e->as.call.callee = field;
+    e->as.call.args++;
+    e->as.call.arg_count--;
+}
+
 struct type *sema_check_call(struct checker *c, struct expr *e,
                              struct type *expected)
 {
-    struct expr *callee = e->as.call.callee;
+    struct expr *callee;
     const struct expr *saved = c->callee;
     struct generic_call g;
     struct type *t;
 
+    call_on_first(c, e);
+    callee = e->as.call.callee;
     memset(&g, 0, sizeof g);
     g.written = callee->type_args;
     g.count = callee->type_arg_count;
@@ -2967,8 +3025,7 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                               sema_tn(s), (int)name->length, name->text);
                 return sema_builtin(c, TYPE_ERROR);
             }
-            sema_error_at(c, e->pos, "`%s` has no field `%.*s`", sema_tn(s),
-                          (int)name->length, name->text);
+            refuse_field(c, e, s, name);
             return sema_builtin(c, TYPE_ERROR);
         }
         /* A field the checker wrote to reach a base or a promoted name
@@ -3015,8 +3072,7 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                       name->text + 1);
         return sema_builtin(c, TYPE_ERROR);
     }
-    sema_error_at(c, e->pos, "`%s` has no field `%.*s`", sema_tn(base),
-                  (int)name->length, name->text);
+    refuse_field(c, e, base, name);
     return sema_builtin(c, TYPE_ERROR);
 }
 

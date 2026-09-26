@@ -35,3 +35,4 @@ under "Generics and collections".
 - `shared_operator` of `sema_call.c` builds `op:Type` from the type of a receiver, its generic where it is a copy, and looks it up in the module scope or the library of the type before `sema_method_symbol` looks up the plain name. `operator_symbol`, `sema_hook` and `a.eq(b)` all go through it.
 - `declare_function` of `lower.c` names the IR function by the symbol, as for a function of a struct body. `copy_function` names a copy of a shared generic by the shared name, and `put_declaration` of `antl_tree.c` writes the declaration of one under it, so the reader finds its symbol in the items section.
 - `interface_item` of `src/anti/doc.c` cuts the signature name at the colon.
+- `call_on_first` of `sema_call.c` turns a bare call whose name no scope holds and `shared_in_module` finds as `name:` into a call of a method on its first argument, marked `bare`, so `refuse_field` names the missing `operator fn` instead of a field.
