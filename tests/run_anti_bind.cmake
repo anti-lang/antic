@@ -60,15 +60,8 @@ endfunction()
 
 # Build the two probes that anti bind wrote, run both and compare their
 # output byte for byte. include is the directory of the header.
-# DESIGN: the probe and the shim are C that anti bind writes, and they
-# compile under the warnings of the repository. The header they bind is
-# the C library's, a stand-in for one in tests/bind/layout.h, and it is
-# read as a system header, as the third-party headers of src/native/ are.
-# Its enum LayoutWide holds a value above INT_MAX on purpose, which C11
-# leaves to the compiler and C23 allows.
 function(compare_probes name include)
-    run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -isystem "${include}"
-        -o "${WORK}/probe_c"
+    run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" -o "${WORK}/probe_c"
         "${WORK}/out/probe_${name}.c")
     run("${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
         -I "${WORK}/lib" -o "${WORK}/probe_anti" "${WORK}/out/probe_${name}.anti")
@@ -90,7 +83,7 @@ endfunction()
 # Compile the shim, link a program that calls through the binding and
 # compare its output with the file expected.
 function(expect_calls name include program expected)
-    run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -isystem "${include}" -c
+    run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" -c
         -o "${WORK}/shim${CMAKE_C_OUTPUT_EXTENSION}"
         "${WORK}/out/shim_${name}.c")
     run("${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
