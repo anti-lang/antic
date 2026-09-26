@@ -97,6 +97,15 @@ else()
     set(anti_object ".o")
 endif()
 
+# llvm-objdump and llvm-readobj of the runtime archive, with the suffix of
+# an executable of the host, .exe on Windows. Every test names them by
+# these two. Spelled without the suffix, the file was missing on Windows,
+# and each test that reads a library there skipped.
+set(ANTIC_RUNTIME_OBJDUMP
+    "${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}")
+set(ANTIC_RUNTIME_READOBJ
+    "${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}")
+
 # The signal table of the runtime, in a program of its own. src/rt/signal.h
 # shares its name with the header of C, so the include path of the unit
 # tests would hide the one of C from src/rt/signal.c. The test starts
@@ -239,7 +248,7 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
     endif()
     add_test(NAME cpu_level_${level}
         COMMAND "${CMAKE_COMMAND}"
-            "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DLIBRARY=${library}"
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
@@ -262,7 +271,7 @@ foreach(target linux-arm64 macos-arm64 windows-arm64)
         endif()
         add_test(NAME atomic_load_${target}_${level}
             COMMAND "${CMAKE_COMMAND}"
-                "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+                "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
                 "-DLIBRARY=${library}"
                 "-DTARGET=${target}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_atomic_load.cmake")
@@ -373,7 +382,7 @@ add_test(NAME warning_set
 # with anti_rt_, on every target and level.
 add_test(NAME rt_names
     COMMAND "${CMAKE_COMMAND}"
-        "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_rt_names.cmake")
 set_tests_properties(rt_names PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -1251,7 +1260,7 @@ if(APPLE)
     add_test(NAME anti_build_framework
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
-            "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
@@ -1266,7 +1275,7 @@ endif()
 add_test(NAME linux_modes
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
-        "-DREADOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj"
+        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
@@ -1731,7 +1740,7 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${program}.anti"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cross"
@@ -1770,7 +1779,7 @@ foreach(target windows-x86_64 windows-arm64)
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DREADOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DCHECK=${CMAKE_SOURCE_DIR}/tools/check-pdb.cmake"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
@@ -1834,7 +1843,7 @@ foreach(target macos-arm64 macos-x86_64)
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DOPTIONS=${framework_options}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/framework/core_foundation.anti"
@@ -3047,7 +3056,7 @@ if(ANTIC_LLVM_AR)
                 "-DCXX=${ANTIC_TEST_CXX}"
                 "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
                 "-DTARGET=${ANTIC_HOST_TARGET}"
-                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
     endforeach()
 endif()
@@ -3072,7 +3081,7 @@ if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
                 "-DCC=${CMAKE_C_COMPILER}"
                 "-DCXX=${CMAKE_C_COMPILER}"
                 "-DTARGET=${target}"
-                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
                 -DCROSS=ON
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
         set_tests_properties(clib_bundle_${target} PROPERTIES
@@ -3102,7 +3111,7 @@ if(ANTIC_LLVM_MC)
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DLLVM_READOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj"
+                "-DLLVM_READOBJ=${ANTIC_RUNTIME_READOBJ}"
                 "-DTARGET=${target}"
                 "-DTRIPLE=${triple}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.anti"
