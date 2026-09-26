@@ -1,0 +1,38 @@
+// The name of a copy doubles with each alias of the chain, since `Pair<A, A>`
+// spells its argument twice. A name longer than 64 KiB is refused once, at
+// the generic, rather than built out to the end of the chain.
+struct Pair<A, B>
+{
+	a: A,
+	b: B,
+}
+
+type T0 = Pair<int, int>;
+type T1 = Pair<T0, T0>;
+type T2 = Pair<T1, T1>;
+type T3 = Pair<T2, T2>;
+type T4 = Pair<T3, T3>;
+type T5 = Pair<T4, T4>;
+type T6 = Pair<T5, T5>;
+type T7 = Pair<T6, T6>;
+type T8 = Pair<T7, T7>;
+type T9 = Pair<T8, T8>;
+type T10 = Pair<T9, T9>;
+type T11 = Pair<T10, T10>;
+type T12 = Pair<T11, T11>;
+type T13 = Pair<T12, T12>;
+type T14 = Pair<T13, T13>;
+type T15 = Pair<T14, T14>;
+type T16 = Pair<T15, T15>;
+type T17 = Pair<T16, T16>;
+type T18 = Pair<T17, T17>;
+type T19 = Pair<T18, T18>;
+type T20 = Pair<T19, T19>;
+type T21 = Pair<T20, T20>;
+type T22 = Pair<T21, T21>;
+type T23 = Pair<T22, T22>;
+
+fn deep(t: T23) -> int
+{
+	return 0;
+}

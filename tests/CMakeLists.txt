@@ -3311,6 +3311,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "pattern_methods|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_methods.s,pattern_methods.anti"
         "pattern_bytes|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_bytes.s,pattern_bytes.anti"
         "generics|--front-end,generics.anti"
+        "copy_names|--front-end,copy_names.anti"
         "generic_syntax|--front-end,generic_syntax.anti"
         "constraints|--front-end,constraints.anti"
         "hashing|--front-end,hashing.anti"

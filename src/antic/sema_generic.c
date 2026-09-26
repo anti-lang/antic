@@ -942,18 +942,33 @@ static struct type *subst(struct checker *c, struct type *t,
 
 /* Copies */
 
-/* The name of a copy as a program writes it, `Pair<int, str>`. */
+/* DESIGN: the name of a copy spells its arguments, so `Pair<A, A>` holds
+   the name of A twice, and a chain of copies or of `type` lines doubles
+   it at each step. A name is cut at COPY_NAME_MAX bytes and ends in three
+   periods. Every name then stays below a few times the bound, so a chain
+   that the depth bound below refuses costs little memory on the way. A
+   copy is found by its arguments and never by its name, so a cut name
+   finds no other copy. Outside a chain of copies a cut name is refused
+   once, since the symbols of two copies could then be one. */
+#define COPY_NAME_MAX 65536
+
+/* The name of a copy as a program writes it, `Pair<int, str>`, and
+   whether it was cut. */
 static struct name copy_name(struct checker *c, const struct type *generic,
                              struct type *const *args,
-                             const struct symbolic *const *values)
+                             const struct symbolic *const *values, bool *cut)
 {
     struct text out = {0};
     struct name name;
+    size_t length;
     char *text;
 
     type_copy_name(&out, generic, args, values, false);
-    text = arena_alloc(c->arena, out.length + 1);
-    memcpy(text, text_cstr(&out), out.length + 1);
+    *cut = out.length > COPY_NAME_MAX;
+    length = *cut ? COPY_NAME_MAX : out.length;
+    text = arena_alloc(c->arena, length + 4);
+    memcpy(text, text_cstr(&out), length);
+    memcpy(text + length, *cut ? "..." : "", *cut ? 4 : 1);
     text_free(&out);
     name.text = text;
     name.length = strlen(text);
@@ -1096,6 +1111,7 @@ static struct type *copy_named(struct checker *c, struct type *generic,
     struct type *copy;
     size_t count = generic->type_param_count;
     bool itself = true;
+    bool cut;
     size_t i;
 
     for (i = 0; i < count; i++) {
@@ -1119,7 +1135,13 @@ static struct type *copy_named(struct checker *c, struct type *generic,
         }
     }
     copy = types_struct(c->types, generic->module,
-                        copy_name(c, generic, args, values));
+                        copy_name(c, generic, args, values, &cut));
+    if (cut && c->copy_depth == 0 && !c->copy_name_refused) {
+        c->copy_name_refused = true;
+        sema_error_at(c, generic->type_params[0]->param->pos,
+                      "a copy of `%s` has a name longer than %d bytes",
+                      sema_tn(generic), COPY_NAME_MAX);
+    }
     copy->kind = generic->kind;
     copy->generic = generic;
     copy->args = args;

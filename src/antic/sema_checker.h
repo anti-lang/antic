@@ -121,6 +121,7 @@ struct checker {
        too deep was refused. */
     int copy_depth;
     bool copy_refused;
+    bool copy_name_refused;         /* a cut copy name was reported */
     const struct type *copy_root;   /* the generic the chain began with */
     /* The fields of concurrent classes that the module writes after
        `construct`, reported at their declarations at the end. */
