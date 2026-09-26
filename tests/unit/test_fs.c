@@ -1,5 +1,6 @@
 /* anti_rt_fs_read of src/rt/fs.c, the one reader of a whole file that the
    configuration, discovery and the trace of the runtime share. */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,7 +47,14 @@ void test_fs(void)
         free(bytes);
     }
     remove(name);
-    /* A file that is not there, and a directory, give NULL. */
+    /* A file that is not there, and a directory, give NULL. A directory
+       is refused before its size is read: Linux opens one as a stream
+       whose end lies at the largest offset, and the read asked malloc
+       for 2^63 bytes, which ASan stops. */
     CHECK(anti_rt_fs_read(name, &length) == NULL);
+    errno = 0;
     CHECK(anti_rt_fs_read(".", &length) == NULL);
+#if !defined(_WIN32)
+    CHECK(errno == EISDIR);
+#endif
 }

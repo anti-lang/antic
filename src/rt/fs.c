@@ -27,6 +27,7 @@
 #include <windows.h>
 #else
 #include <dirent.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #endif
 
@@ -167,6 +168,19 @@ unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
     if (f == NULL) {
         return NULL;
     }
+#if !defined(_WIN32)
+    /* A directory opens as a stream on POSIX, and on Linux its end lies at
+       the largest offset, so the size below would ask for 2^63 bytes.
+       Windows opens no directory. */
+    {
+        struct stat info;
+        if (fstat(fileno(f), &info) == 0 && S_ISDIR(info.st_mode)) {
+            fclose(f);
+            errno = EISDIR;
+            return NULL;
+        }
+    }
+#endif
     size = anti_rt_fs_size(f);
     if (size >= 0 && (uint64_t)size >= SIZE_MAX) {
         errno = ENOMEM;
