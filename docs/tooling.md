@@ -101,8 +101,11 @@ anti sdk export              # on a Mac with the SDK; writes apple-sdk-<version>
 anti sdk import apple-sdk-<version>.tar.xz    # on the other host
 ```
 
-antic and anti use only what is in the package, and no tool of the host. The one
-exception is `antic --linker platform`, which a user asks for by name.
+antic and anti use only what is in the package, and no tool of the host. There are
+two exceptions, `antic --linker platform` and `anti bind --clang`. A user asks for
+each by name to work with the user's own C world, outside building programs. A binding
+is generated once and committed as Anti source, and building programs never needs
+clang.
 
 The installer is one command:
 

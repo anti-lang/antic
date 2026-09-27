@@ -110,8 +110,9 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
   all six targets with the native libraries and their headers, the sysroots of every
   target and the licence texts. Nothing is downloaded at install time or later. One package builds for all
   six targets with no network. Apple's frameworks are the one thing a package lacks.
-- antic and anti use only what is in the package. The one exception is
-  `antic --linker platform`, which a user asks for by name.
+- antic and anti use only what is in the package. The two exceptions are
+  `antic --linker platform` and `anti bind --clang`, which a user asks for by name
+  to work with the user's own C world. Building programs never needs either.
 - A change that makes a package depend on something outside it, or on a tool of the
   host, is refused like a warning.
 

@@ -391,10 +391,12 @@ generator writes shim and binding in one run, so they cannot drift.
 `--clang` does not use libclang. It runs clang with
 `-Xclang -ast-dump=json -fsyntax-only` on the header and reads the JSON with the JSON
 scanner that `anti` already has. It runs the pinned clang in a development tree, and
-otherwise the first `clang` on `PATH`. It checks the major version of that clang and
-refuses one it has not been tested against, naming the versions it accepts. The
-installers ship no clang, so a user needs one for `--clang` only. A binding is generated
-once and committed. C layout is not read from clang: antic computes it, as it does for
+otherwise the first `clang` on `PATH`. It accepts the major version of the pinned clang
+alone. When clang is missing or of another major, it names the major it needs, the
+archive of the pinned clang for the host and the page of its release. No package ships
+clang, so a user needs one for `--clang` only. It is one of the two exceptions to the
+rule that antic and anti use only what is in the package. A binding is generated once
+and committed as Anti source, and the bindings Anti ships come from Anti's own build. C layout is not read from clang: antic computes it, as it does for
 every struct.
 
 The output uses the C type names from [C types](#c-types). Unions, bitfields, packed
