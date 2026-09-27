@@ -1240,7 +1240,8 @@ static int back_end(const struct options *o, struct module *tree,
     program->plugin = is_plugin(o);
     if (o->memory_checks) {
         memcheck_declare(program, module,
-                         o->lib == LIB_NONE && has_main(program, module));
+                         o->lib == LIB_NONE && has_main(program, module),
+                         o->target);
     }
     functions = calloc(program->function_count + 1, sizeof *functions);
     if (functions == NULL) {

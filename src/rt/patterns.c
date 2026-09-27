@@ -3,6 +3,7 @@
 #include "atomic.h"
 #include "cpu_level.h"
 #include "regex.h"
+#include "rt.h"
 #include "std.h"
 
 #include <stdlib.h>
@@ -15,6 +16,20 @@
    The constructor may run before main checks the processor. PCRE2 is
    built for the default level of its target, so the check runs here
    first. */
+/* DESIGN: the handle of a literal and the copy of its text live until
+   exit. They are marked as kept, so the leak check of a program of
+   --memory-checks leaves them out of its report. The code of PCRE2 is
+   marked with them. */
+static void *kept(void *compiled)
+{
+    const struct anti_pattern *p = compiled;
+
+    anti_rt_memory_kept(p);
+    anti_rt_memory_kept(p->text);
+    anti_rt_memory_kept(p->code);
+    return compiled;
+}
+
 void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
 {
     unsigned char message[ANTI_RT_REGEX_MESSAGE_ROOM];
@@ -30,7 +45,7 @@ void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
                           "start: %s", (int)length, (const char *)bytes,
                           (const char *)message);
     }
-    return compiled;
+    return kept(compiled);
 }
 
 /* The byte pattern literal of length bytes at bytes, compiled before main
@@ -50,7 +65,7 @@ void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
                           "compile at start: %s", (int)length,
                           (const char *)bytes, (const char *)message);
     }
-    return compiled;
+    return kept(compiled);
 }
 
 /* The error numbers of PCRE2 lie between -256 and 511: the failures of a

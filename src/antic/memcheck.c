@@ -9,7 +9,33 @@ bool memcheck_available(enum target t)
     return t != TARGET_WINDOWS_ARM64;
 }
 
-void memcheck_declare(struct ir_module *m, const char *module, bool links)
+bool memcheck_leaks(enum target t)
+{
+    return target_info(t)->os != OS_WINDOWS;
+}
+
+/* The function that replaces the one of the runtime which marks a block
+   as kept until exit. It hands the block to the leak checker. */
+static void declare_kept(struct ir_module *m, const char *module)
+{
+    struct ir_function *ignore = ir_extern_add(m, MEMCHECK_IGNORE, IR_VOID,
+                                               false);
+    struct ir_function *f;
+    struct ir_block *b;
+    struct ir_operand block;
+    struct ir_operand none = {IR_NONE, IR_VOID, {0}};
+
+    ir_param_add(ignore, IR_PTR, IR_NO_AGG);
+    f = ir_function_add(m, module, MEMCHECK_KEPT, IR_VOID, IR_NO_AGG);
+    f->exported = true;
+    block = ir_temp_op(f, ir_param_add(f, IR_PTR, IR_NO_AGG));
+    b = ir_block_add(f);
+    ir_call(f, b, IR_VOID, ir_func_op(ignore), &block, 1);
+    ir_ret(f, b, IR_VOID, none);
+}
+
+void memcheck_declare(struct ir_module *m, const char *module, bool links,
+                      enum target t)
 {
     static const char *const names[2] = {MEMCHECK_LOAD, MEMCHECK_STORE};
     uint32_t index[2];
@@ -25,10 +51,13 @@ void memcheck_declare(struct ir_module *m, const char *module, bool links)
     m->memcheck_load = index[0];
     m->memcheck_store = index[1];
     /* DESIGN: the leak check of AddressSanitizer is off by default on
-       macOS. The program turns it on through the hook that the runtime
-       reads its options from. The hook is a function of the module that
-       links, so a program defines it once. */
-    if (links) {
+       macOS, and a report there ends the program with SIGABRT. The
+       program turns the one on and the other off through the hook that
+       the runtime reads its options from. The hook is a function of the module that
+       links, so a program defines it once. Windows gets neither the hook
+       nor the marking, since its runtime has no leak check. */
+    if (links && memcheck_leaks(t)) {
+        declare_kept(m, module);
         static const char options[] = MEMCHECK_OPTIONS;
         struct ir_global *g =
             ir_global_add(m, module, "memory_check_options",

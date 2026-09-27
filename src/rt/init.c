@@ -19,3 +19,17 @@ int anti_rt_ready(void)
 {
     return (int)anti_rt_atomic_load(&ready, (int64_t)sizeof ready);
 }
+
+/* DESIGN: the runtime marks what it keeps until exit through a function
+   that a program of --memory-checks replaces. The definition here is
+   weak on ELF and Mach-O, so the one of the program wins and every other
+   program pays one call that returns. Windows has no leak check in its
+   runtime of AddressSanitizer, so no program replaces it there. */
+#if defined(_WIN32)
+void anti_rt_memory_kept(const void *p)
+#else
+__attribute__((weak)) void anti_rt_memory_kept(const void *p)
+#endif
+{
+    (void)p;
+}

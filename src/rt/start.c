@@ -93,6 +93,21 @@ static void *allocate(size_t size)
     return p;
 }
 
+/* DESIGN: the arguments and the environment live until exit, and no
+   pointer to them outlives main. The leak check of a program of
+   --memory-checks would report them, so the start marks each block of
+   both slices as kept. Before runtime_options drops the options of the
+   runtime from the list, so their strings are marked as well. */
+static void kept(struct anti_slice s)
+{
+    int64_t i;
+
+    anti_rt_memory_kept(s.ptr);
+    for (i = 0; i < s.len; i++) {
+        anti_rt_memory_kept(s.ptr[i].ptr);
+    }
+}
+
 /* A str holding UTF-8 bytes, with a NUL after them. */
 static struct anti_str make_str(unsigned char *bytes, size_t length)
 {
@@ -191,8 +206,10 @@ int main(void)
     anti_rt_cpu_check();
     anti_rt_init();
     args = arguments();
+    kept(args);
     runtime_options(&args);
     env = environment();
+    kept(env);
     return (int)anti_main(args, env);
 }
 #else
@@ -219,15 +236,19 @@ static struct anti_slice strings(char **list, size_t count)
 int main(int argc, char **argv)
 {
     struct anti_slice args;
+    struct anti_slice env;
     size_t count = 0;
 
     anti_rt_cpu_check();
     anti_rt_init();
     args = strings(argv, (size_t)argc);
+    kept(args);
     runtime_options(&args);
     while (environ != NULL && environ[count] != NULL) {
         count++;
     }
-    return (int)anti_main(args, strings(environ, count));
+    env = strings(environ, count);
+    kept(env);
+    return (int)anti_main(args, env);
 }
 #endif

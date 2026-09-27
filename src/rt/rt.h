@@ -11,6 +11,13 @@ void anti_rt_init(void);
 /* 1 after anti_rt_init, else 0. */
 int anti_rt_ready(void);
 
+/* Mark the heap block at p as kept from start to exit, so the leak check
+   of a program of --memory-checks leaves it out of its report. The
+   module that links such a program defines the function and calls the
+   leak checker's own `__lsan_ignore_object`. The runtime's definition in
+   src/rt/init.c does nothing. */
+void anti_rt_memory_kept(const void *p);
+
 /* --anti.backtrace of the command line: 1 on, 0 off and -1 when the
    command line did not name it. src/rt/start.c writes it before main. */
 extern int anti_rt_option_backtrace;

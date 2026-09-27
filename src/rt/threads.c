@@ -21,6 +21,7 @@
 #include "conf.h"
 #include "hooks.h"
 #include "object.h"
+#include "rt.h"
 #include "std.h"
 
 #if defined(_WIN32)
@@ -176,6 +177,16 @@ static void finish_one(struct one *job)
     job->done = 1;
 }
 
+#if defined(__APPLE__)
+/* DESIGN: on macOS the thread-local variables of a thread live in one
+   heap block per image, which dyld allocates on the first access and
+   frees when the thread ends. A worker of the pool runs until exit, and
+   the leak check of a program of --memory-checks finds no pointer to its
+   block. The worker takes the address of this variable once as it
+   starts, which makes the block, and marks the block as kept. */
+static _Thread_local char thread_block;
+#endif
+
 #if defined(_WIN32)
 static DWORD WINAPI worker_main(LPVOID unused)
 #else
@@ -183,6 +194,9 @@ static void *worker_main(void *unused)
 #endif
 {
     (void)unused;
+#if defined(__APPLE__)
+    anti_rt_memory_kept(&thread_block);
+#endif
     for (;;) {
         struct jobs *j;
         struct one *single;

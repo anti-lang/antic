@@ -2,8 +2,10 @@
 //! program runs: a read after `free`, a second `free` of one block, a write
 //! past the end of a heap block and a block that is never freed. The argument
 //! names the case. `clean` makes none, so a build with the checks runs it to
-//! its end and reports nothing.
+//! its end and reports nothing. It also compiles a pattern literal and runs the
+//! worker pool, whose blocks the runtime keeps until exit.
 
+import anti.regex;
 import anti.text;
 
 extern fn malloc(n: u64) -> ?*Pair;
@@ -48,12 +50,28 @@ fn kept() -> *Cell
 	return alloc Cell { n: 7 };
 }
 
+worker fn total(chunk: []int) -> int
+{
+	let sum = 0;
+	for n in chunk {
+		sum += n;
+	}
+	return sum;
+}
+
 fn clean() -> int
 {
 	let p = alloc Cell { n: 7 };
 	let n = p.n;
 	free(p);
-	return n - 7;
+	let numbers = [1, 2, 3, 4];
+	let parts = parallel numbers[0..4] by 2 -> total;
+	let sum = parts[0] + parts[1];
+	free(parts.ptr);
+	if !"2026-09-27".matches(re"\d{4}-\d\d-\d\d") {
+		return 1;
+	}
+	return n - 7 + sum - 10;
 }
 
 fn main(args: []str, env: []str) -> int
