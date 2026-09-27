@@ -1077,7 +1077,7 @@ add_test(NAME dev_object_collection_set
             "${ANTIC_RUNTIME_DIR}/std/anti/collection/set.antl")
 set_tests_properties(dev_object_collection_set PROPERTIES
     FIXTURES_SETUP collection_set_dev_object)
-foreach(name IN ITEMS map hash_map set hash_set)
+foreach(name IN ITEMS map map_tuple hash_map set hash_set)
     add_test(NAME std_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

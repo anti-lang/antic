@@ -1,0 +1,14 @@
+exit 0
+set: (1, 2)=120 (2, 1)=21 (3, 4)=34 (5, 6)=56
+add: true false, count 4, 4 blocks
+get: 21 -1, contains: true false
+remove: 120 -1, count 3
+update: (2, 1)=21 (3, 4)=340 (5, 6)=56
+update true: 7 blocks
+after lookups: 0 blocks, 0 blocks of room
+original: (0, 1)=1 (1, 0)=10
+copy: (0, 1)=2 (1, 0)=10
+eq: true false, 4 blocks
+after copies: 0 blocks
+churn: 287 entries, 287 walked, 287 found, 0 blocks beyond them
+after churn: 0 blocks, 0 blocks of room

@@ -1,0 +1,203 @@
+//! `Map<(int, int), V>` of `anti.collection.map`, a map whose key is a tuple.
+//!
+//! The key takes the default `==` and hash of a tuple, part by part, which
+//! makes two keys of `(1, 2)` and `(2, 1)`. The values own memory and count the
+//! blocks alive, and a counting allocator gives the room, so every case ends
+//! with no block alive and the room given back.
+
+import anti.collection;
+import anti.collection.map.{Map};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A value that owns memory and counts the blocks alive. Its copy makes a block
+/// of its own, so a copy that the map makes counts as well.
+class Owned
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Owned
+	{
+		return Owned { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Owned) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Owned;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		give_back(self.n);
+	}
+}
+
+/// A block that holds `n`, counted in `Owned.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Owned.live.add(1);
+	return p;
+}
+
+/// Free a block that `block` made.
+fn give_back(p: ?*int)
+{
+	if p != none {
+		Owned.live.add(-1);
+	}
+	free(p);
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+/// Print `label` and the entries of `m` in the order of a walk.
+fn entries_of(label: str, m: *Map<(int, int), Owned>)
+{
+	let out = text.Builder.new();
+	out.append(label);
+	for (k, v) in &*m {
+		out.append(f" ({k.0}, {k.1})={v.value()}");
+	}
+	show(out.take());
+}
+
+/// Set, add, get, contains and remove by a tuple key. The two orders of the
+/// same parts are two keys.
+fn lookups()
+{
+	let counting = Counting { };
+	{
+		let m = Map<(int, int), Owned>.new(0, &counting);
+		m.set((1, 2), Owned.of(12));
+		m.set((2, 1), Owned.of(21));
+		m.set((3, 4), Owned.of(34));
+		m.set((1, 2), Owned.of(120));
+		let added = m.add((5, 6), Owned.of(56));
+		let again = m.add((2, 1), Owned.of(-1));
+		entries_of("set:", &m);
+		show(f"add: {added} {again}, count {m.count}, {Owned.live.load()} blocks");
+		let a = m.get((2, 1)) ?? Owned.of(-1);
+		let b = m.get((4, 3)) ?? Owned.of(-1);
+		let has = m.contains((3, 4));
+		let lacks = m.contains((4, 3));
+		show(f"get: {a.value()} {b.value()}, contains: {has} {lacks}");
+		let gone = m.remove((1, 2)) ?? Owned.of(-1);
+		let missing = m.remove((1, 2)) ?? Owned.of(-1);
+		show(f"remove: {gone.value()} {missing.value()}, count {m.count}");
+		let hit = m.update((3, 4), fn(p) {
+			let n = p.n catch fatal;
+			n[0] = 340;
+		});
+		entries_of("update:", &m);
+		show(f"update {hit}: {Owned.live.load()} blocks");
+	}
+	let room = counting.allocs - counting.frees;
+	show(f"after lookups: {Owned.live.load()} blocks, {room} blocks of room");
+}
+
+/// A copy with `dup` and `==` over two maps with tuple keys.
+fn copies()
+{
+	{
+		let m = Map<(int, int), Owned>.new();
+		m.set((0, 1), Owned.of(1));
+		m.set((1, 0), Owned.of(10));
+		let c = dup(&m);
+		let same = m == *c;
+		c.set((0, 1), Owned.of(2));
+		let changed = m == *c;
+		entries_of("original:", &m);
+		entries_of("copy:", c);
+		show(f"eq: {same} {changed}, {Owned.live.load()} blocks");
+		delete(c);
+	}
+	show(f"after copies: {Owned.live.load()} blocks");
+}
+
+/// Twenty thousand sets and removals over the 690 keys `(i % 30, i % 23)`, with
+/// a `remove_all` now and then, grow, rebuild and walk the map. No block is
+/// left afterwards, and the room goes back to the allocator.
+fn churn()
+{
+	let counting = Counting { };
+	{
+		let m = Map<(int, int), Owned>.new(0, &counting);
+		for i in 0..20000 {
+			m.set((i % 30, i % 23), Owned.of(i));
+			if i % 3 == 0 {
+				let gone = m.remove(((i * 7) % 30, (i * 7) % 23));
+			}
+			if i % 5000 == 4999 {
+				m.remove_all(fn(e) {
+					return e.0.0 % 2 == 0;
+				});
+			}
+		}
+		let total = 0;
+		let found = 0;
+		for (k, v) in m {
+			total += 1;
+			if m.contains(k) {
+				found += 1;
+			}
+		}
+		let beyond = Owned.live.load() - m.count;
+		show(f"churn: {m.count} entries, {total} walked, {found} found, {beyond} blocks beyond them");
+	}
+	let room = counting.allocs - counting.frees;
+	show(f"after churn: {Owned.live.load()} blocks, {room} blocks of room");
+}
+
+fn main() -> int
+{
+	lookups();
+	copies();
+	churn();
+	return 0;
+}
