@@ -82,9 +82,9 @@ At `b0a8071` it passes 541 of 541 with three skipped. Its sanitizer suites did n
 At `45d8fcb` on 2026-09-24 it passes 710 of 724 with three skipped. The 14 that fail
 fail the same way at `db447ea`, before the glibc mode: the outline atomics of the host
 runtime, `deps_dir`, `anti_build`, five `anti_bind_*` and three `clib_*`.
-At `17a37ff` on 2026-09-27 it passes 982 of 983 with two skipped, and ASan and UBSan
-981 of 982 each. `deps_dir` fails in all three, since the VM configures with the four
-directories above and not with `build/deps`. The sysroots have to be installed again
+At `41a8372` on 2026-09-27 it passes 983 of 983 with two skipped, and ASan and UBSan
+982 of 982 each. `deps_dir` passes the four directories above on to the copy it
+configures. The sysroots have to be installed again
 after `026ed4f`, which moved X11 and OpenGL into the glibc sysroot.
 
 | Untested item | Tests that run it |
@@ -157,8 +157,7 @@ not run. Of the other 700 tests 689 pass, `plugin_host`, `plugin_versions` and
 `linux_modes` among them. The 11 that fail are `program_sync_exits_dev`,
 `program_deserialize_dev`, `deps_dir`, `anti_build`, `anti_build_deps`,
 `anti_build_inputs`, four `anti_bind_*` and `clib_simd`.
-At `17a37ff` on 2026-09-27 it passes 954 of 955 with five skipped, and `deps_dir` fails
-as on Linux. The checks of the runtime that read it with llvm-objdump ran there for the
+At `41a8372` on 2026-09-27 it passes 955 of 955 with five skipped. The checks of the runtime that read it with llvm-objdump ran there for the
 first time, since the tests named the tool without `.exe` before `446c9ba`. The sysroots have to be installed again after `74708ad`. Before it, the
 command above rewrote the junctions of the Windows sysroots into links that name
 nothing.
