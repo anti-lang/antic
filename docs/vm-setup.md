@@ -82,13 +82,17 @@ At `b0a8071` it passes 541 of 541 with three skipped. Its sanitizer suites did n
 At `45d8fcb` on 2026-09-24 it passes 710 of 724 with three skipped. The 14 that fail
 fail the same way at `db447ea`, before the glibc mode: the outline atomics of the host
 runtime, `deps_dir`, `anti_build`, five `anti_bind_*` and three `clib_*`.
+At `17a37ff` on 2026-09-27 it passes 982 of 983 with two skipped, and ASan and UBSan
+981 of 982 each. `deps_dir` fails in all three, since the VM configures with the four
+directories above and not with `build/deps`. The sysroots have to be installed again
+after `026ed4f`, which moved X11 and OpenGL into the glibc sysroot.
 
 | Untested item | Tests that run it |
 |---|---|
 | linux-arm64 programs, which the Mac only links | `program_*`, `std_*`, `dev_modules` |
 | Static PIE programs against musl | `program_*`, linked with ld.lld against `~/.local/share/anti-vm/sysroot/linux-arm64` |
 | Dynamic PIE programs against glibc 2.35, with libX11 and libGL | `linux_modes`, `plugin_host`, `plugin_versions` |
-| C objects built against glibc in a musl program | `program_abi_structs`, `program_abi_raymath`, `program_abi_wchar`, whose C files gcc compiles |
+| C objects built against glibc in a musl program | `program_abi_structs`, `program_abi_raymath`, `program_abi_wchar`, whose C files the pinned clang compiles |
 | The 16-aligned register rule of AAPCS64 outside Apple | `program_abi_structs` |
 | `.init_array` constructors of a shared library | `clib_shared`, `clib_loader`, `clib_two` |
 | The dynamic linker path `/lib/ld-linux-aarch64.so.1` | `program_platform_linker` with GNU ld |
@@ -153,6 +157,11 @@ not run. Of the other 700 tests 689 pass, `plugin_host`, `plugin_versions` and
 `linux_modes` among them. The 11 that fail are `program_sync_exits_dev`,
 `program_deserialize_dev`, `deps_dir`, `anti_build`, `anti_build_deps`,
 `anti_build_inputs`, four `anti_bind_*` and `clib_simd`.
+At `17a37ff` on 2026-09-27 it passes 954 of 955 with five skipped, and `deps_dir` fails
+as on Linux. The checks of the runtime that read it with llvm-objdump ran there for the
+first time, since the tests named the tool without `.exe` before `446c9ba`. The sysroots have to be installed again after `74708ad`. Before it, the
+command above rewrote the junctions of the Windows sysroots into links that name
+nothing.
 Extract a tree from the Mac with `tar -xmf`. Ninja otherwise keeps objects that are newer
 than the files the tar restores.
 
