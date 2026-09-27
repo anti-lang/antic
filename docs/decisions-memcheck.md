@@ -17,10 +17,54 @@ step folds them in.
   the frame and around globals, the runtime reports nothing there.
 - [provisional] A check carries the line of the access it guards. Reason: the
   frame of a report then names the line of the statement.
-- [provisional] `--memory-checks` turns `-g` on. Reason: the specification
+- [provisional] `--memory-checks` turns `-g` on, for antic and for a release
+  build of `anti build`, `anti run` and `anti test`. Reason: the specification
   says a report carries the names and lines of `-g`.
 - [provisional] The module that links defines `__asan_default_options`, which
-  gives `detect_leaks=1`. Reason: the leak check is off by default on macOS.
+  gives `detect_leaks=1:abort_on_error=0`. Reason: the leak check is off by
+  default on macOS, and a report there ends the program with SIGABRT, which
+  writes a crash report. The program exits with status 1 instead, as on
+  Linux.
+- [provisional] On windows-x86_64 the module that links defines neither the
+  options hook nor `anti_rt_memory_kept`, and a program reports no leaks.
+  Reason: the runtime of AddressSanitizer for Windows has no leak check, and
+  it ends at start a program that sets `detect_leaks=1`.
+- [provisional] The runtime marks a block it keeps with
+  `anti_rt_memory_kept(p)` of `src/rt/rt.h`. Its own definition is weak and
+  does nothing. The module that links a program of `--memory-checks` defines
+  it with a call of `__lsan_ignore_object`. Reason: the runtime archive is
+  one per target and level, so the runtime cannot name a function of
+  AddressSanitizer that only some of its programs link. ld64.lld refuses an
+  undefined weak reference, and a weak definition works on ELF and Mach-O
+  alike.
+- [provisional] The runtime marks the arguments and the environment with
+  every string of both, before it takes out the options of the runtime. It
+  marks the handle, the text and the code of PCRE2 of each pattern literal.
+  On
+  macOS each worker of the pool marks its thread-local block as it starts.
+  Reason: dyld allocates that block on the heap, the worker runs until
+  exit, and the leak check reads no pointer to it. Taking the address makes
+  the block, about a kilobyte per worker, in every program on macOS.
+- [provisional] `anti run` and `anti test` add `symbolize=0` to
+  `ASAN_OPTIONS` of the program and read its standard error line by line. A
+  frame `#N 0x<pc> (<module>+0x<offset>)` whose module the readers of
+  `src/rt/symbols.c` read is written `#N 0x<pc> in <function>
+  <file>:<line>`, the form of the runtime's own symbolizer. Where no line
+  is known, the module stands in place of the line. Every other line is
+  written as it came. The offset is looked up as it stands, since the
+  runtime already printed the instruction before the return address.
+  Reason: this is the lookup of `anti symbols resolve`, on the module
+  itself instead of its debug twin.
+- [provisional] The runtime of AddressSanitizer and dyld are universal
+  Mach-O files. A frame in one takes the slice of the processor it names
+  after the path. Reason: those frames then carry a name too.
+- [provisional] On Windows `anti run` and `anti test` leave the symbolizing
+  of AddressSanitizer on. Reason: Anti's symbolizer reads no PDB and would
+  leave every frame of Windows raw.
+- [provisional] The cache key of a dev object of `anti build` carries
+  `memory-checks`. The key of a library file does not. Reason: the checks
+  change the object, and the library file is the same with and without
+  them.
 - [provisional] The runtime archive carries the runtime of AddressSanitizer of
   the pinned clang in `lib/<target>/`: the dynamic library on both macOS
   targets, `libclang_rt.asan.a`, `libclang_rt.asan_static.a` and their `.syms`
@@ -34,17 +78,10 @@ step folds them in.
   Reason: the runtime of AddressSanitizer is built against glibc, and musl has
   none.
 
-## Open questions
+## Answered questions
 
-- How does a report get the file and line of each frame? On macOS the runtime
-  names each frame with `dladdr`. `atos` does not read the debug map of an
-  antic `-g` link, so the frames carry function names and no lines. On Linux the
-  runtime archive holds no symbolizer, so a frame carries only the module and an
-  offset. Two ways reach the lines, and both lie outside this step. One:
-  `anti-lang/llvm-tools` ships `llvm-symbolizer` and `dsymutil`, a macOS link
-  runs `dsymutil`, and the options hook names the symbolizer. Two: `anti_rt`
-  answers the hook `__sanitizer_symbolize_code` of the runtime with its own
-  reader of `src/rt/symbols.c`.
-- May `src/rt/start.c` keep the arguments and the environment in static
-  storage? The start allocates both and drops the last pointer to them when
-  `main` returns. The leak check then reports them in every program.
+The two open questions of the first session have their answers under
+"Generics and collections" in `docs/decisions.md`. `anti run` and `anti
+test` put the report through Anti's symbolizer, and the runtime marks what
+it keeps until exit with the leak checker's own call. The entries above
+build both.
