@@ -8,6 +8,8 @@
 #   HOST     the target name of this host
 #   OTHER    a target name that is not this host's
 #   CPU      a processor level of this host's architecture
+#   CHECK_PDB tools/check-pdb.cmake
+#   READOBJ  llvm-readobj of the runtime archive
 #   WORK     a directory this run writes into
 #
 # It covers the dev mode of docs/tooling-addendum.md with its cache,
@@ -163,6 +165,17 @@ endif()
 if(HOST MATCHES "^windows-")
     if(NOT EXISTS "${WORK}/symbols/app.pdb")
         message(FATAL_ERROR "the symbols archive holds no app.pdb")
+    endif()
+    # The PDB of the archive is the one of the shipped program: the GUID
+    # of its CodeView record is the GUID the PDB carries.
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DBINARY=${release}"
+                            "-DPDB=${WORK}/symbols/app.pdb"
+                            "-DREADOBJ=${READOBJ}" -P "${CHECK_PDB}"
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the PDB of the archive is not the one of "
+                            "${release}\n${out}${err}")
     endif()
 else()
     foreach(name com.example.app.main com.example.greet.word)

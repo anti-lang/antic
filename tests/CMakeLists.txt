@@ -1218,6 +1218,8 @@ add_test(NAME anti_build
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DOTHER=${anti_build_other}"
         "-DCPU=${anti_build_cpu}"
+        "-DCHECK_PDB=${PROJECT_SOURCE_DIR}/tools/check-pdb.cmake"
+        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build.cmake")
 

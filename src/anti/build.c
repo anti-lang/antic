@@ -501,7 +501,11 @@ static void archive_stem(enum target t, const char *name, struct text *out)
    sections kept and the map of that program. All three carry the build
    id of the binary, because the digest leaves what `-g` added out. That
    id is what ties a frame of a trace to this archive. A Windows link
-   writes the symbols to a PDB, which goes in as well. */
+   writes the symbols to a PDB. The archive holds the PDB of the release
+   link, whose GUID the shipped program carries. Eddie decided this. The
+   debug link of Windows is named <stem>.debug.exe, so its own PDB is
+   <stem>.debug.pdb and leaves the one of the release link alone. Named
+   <stem>.debug, it wrote <stem>.pdb over it. */
 static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
                           size_t main_at, const struct strings *libraries,
                           const char *deliverable)
@@ -524,8 +528,9 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     archive_stem(t, deliverable, &stem);
     text_appendf(&debug_name, "%s.debug", text_cstr(&stem));
     text_appendf(&map_name, "%s.map", text_cstr(&stem));
-    text_appendf(&debug_path, "%s/%s", text_cstr(&b->build_dir),
-                 text_cstr(&debug_name));
+    text_appendf(&debug_path, "%s/%s%s", text_cstr(&b->build_dir),
+                 text_cstr(&debug_name),
+                 target_info(t)->format == FORMAT_COFF ? ".exe" : "");
     text_appendf(&map_path, "%s/%s", text_cstr(&b->build_dir),
                  text_cstr(&map_name));
     text_appendf(&archive, "%s/%s-symbols.zip", text_cstr(&b->dist_dir),
@@ -549,16 +554,19 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     entries[count].executable = true;
     count++;
     if (target_info(t)->format == FORMAT_COFF) {
-        /* The debug link writes its PDB under the name the linker gives
-           it, which drops the suffix `.debug`. */
+        /* The PDB of the release link, beside the program in the build
+           directory. Every Windows link writes one. */
         text_appendf(&pdb_name, "%s.pdb", text_cstr(&stem));
-        link_pdb_path(&pdb_path, text_cstr(&debug_path));
-        if (files_exists(text_cstr(&pdb_path))) {
-            entries[count].name = text_cstr(&pdb_name);
-            entries[count].file = text_cstr(&pdb_path);
-            entries[count].executable = false;
-            count++;
+        link_pdb_path(&pdb_path, text_cstr(&b->name));
+        if (!files_exists(text_cstr(&pdb_path))) {
+            fprintf(stderr, "anti: the link of %s wrote no %s\n",
+                    text_cstr(&b->name), text_cstr(&pdb_path));
+            goto done;
         }
+        entries[count].name = text_cstr(&pdb_name);
+        entries[count].file = text_cstr(&pdb_path);
+        entries[count].executable = false;
+        count++;
     }
     entries[count].name = text_cstr(&map_name);
     entries[count].file = text_cstr(&map_path);
