@@ -1163,6 +1163,8 @@ add_test(NAME deps_dir
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/deps_dir"
             "-DDEPS=${ANTIC_DEPS_DIR}" "-DGENERATOR=${CMAKE_GENERATOR}"
+            "-DCLANG=${ANTIC_CLANG_DIR}" "-DLLVM=${ANTIC_LLVM_DIR}"
+            "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_deps_dir.cmake")
 
 # A Linux program of a release names no glibc symbol above the pinned

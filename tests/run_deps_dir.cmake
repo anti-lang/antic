@@ -3,7 +3,14 @@
 # copy of the sources, whose own build/deps does not exist, configures
 # against DEPS, downloads nothing and builds.
 #
+# DEPS is the directory of downloads of this tree, ANTI_DEPS_DIR when it was
+# set and build/deps otherwise. The tree may take clang, the LLVM tools, the
+# sysroots or raylib from a directory of its own, as the VMs of
+# docs/vm-setup.md do. The copy takes such a directory as the tree did, and
+# its cache names that one. Every other download comes from DEPS.
+#
 #   cmake -DROOT=<repository> -DWORK=<dir> -DDEPS=<deps directory>
+#         -DCLANG=<dir> -DLLVM=<dir> -DSYSROOT=<dir> -DRAYLIB=<dir>
 #         -DGENERATOR=<generator> -P tests/run_deps_dir.cmake
 
 file(REMOVE_RECURSE "${WORK}")
@@ -14,8 +21,16 @@ foreach(entry CMakeLists.txt CMakePresets.json LICENSE README.md CHANGELOG.md
     file(COPY "${ROOT}/${entry}" DESTINATION "${source}")
 endforeach()
 
+# The directories of the tree outside DEPS, passed on as the tree took them.
+set(own "")
+foreach(name CLANG LLVM SYSROOT RAYLIB)
+    string(FIND "${${name}}/" "${DEPS}/" at)
+    if(NOT at EQUAL 0)
+        list(APPEND own "-DANTIC_${name}_DIR=${${name}}")
+    endif()
+endforeach()
 execute_process(COMMAND "${CMAKE_COMMAND}" -S "${source}" -B "${WORK}/tree"
-                        -G "${GENERATOR}" "-DANTI_DEPS_DIR=${DEPS}"
+                        -G "${GENERATOR}" "-DANTI_DEPS_DIR=${DEPS}" ${own}
                 RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
                 ENCODING NONE)
 if(NOT status EQUAL 0)
@@ -32,9 +47,18 @@ endif()
 foreach(name CLANG LLVM SYSROOT RAYLIB)
     file(STRINGS "${WORK}/tree/CMakeCache.txt" line
          REGEX "^ANTIC_${name}_DIR:")
-    string(FIND "${line}" "=${DEPS}/" at)
-    if(at EQUAL -1)
-        message(FATAL_ERROR "the cache names ${line}, which is not in ${DEPS}")
+    string(FIND "${${name}}/" "${DEPS}/" under)
+    if(under EQUAL 0)
+        string(FIND "${line}" "=${DEPS}/" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "the cache names ${line}, which is not in ${DEPS}")
+        endif()
+    else()
+        string(REGEX MATCH "^[^=]*=(.*)$" line "${line}")
+        if(NOT CMAKE_MATCH_1 STREQUAL "${${name}}")
+            message(FATAL_ERROR "the cache names ${line}, not ${${name}} of "
+                                "the tree")
+        endif()
     endif()
 endforeach()
 
