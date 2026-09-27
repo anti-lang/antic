@@ -6,15 +6,22 @@ The entries below belong under "Generics and collections" in
 
 ## Built
 
-- "Maps" and "Sets" of round five are built apart from the point under
-  "Blocked" below. `anti.collection.map` holds `Map<K, V>` and `HashMap<K, V>`,
-  `anti.collection.set` holds `Set<T>`, `HashSet<T>` and `BitSet`. Each has
-  every operation of its table in `docs/anti-language-additions.md` and the
-  parts of `Collection<T>`, with `capacity()`, `reserve(n)` and `shrink()`.
+- "Maps" and "Sets" of round five are built. `anti.collection.map` holds
+  `Map<K, V>` and `HashMap<K, V>`, `anti.collection.set` holds `Set<T>`,
+  `HashSet<T>` and `BitSet`. Each has every operation of its table in
+  `docs/anti-language-additions.md` and the parts of `Collection<T>`, with
+  `capacity()`, `reserve(n)` and `shrink()`.
   `std_map`, `std_hash_map`, `std_set` and `std_hash_set` run them in release
   and in dev mode, with the order after removals and heavy churn under a leak
   check. The checks `map_changed` and `set_changed` stop a dev build whose walk
   sees the collection change.
+- `serialize` of a `HashMap` writes its entries sorted by the bytes of the text
+  `serialize` writes for each key, not by `lt`. The order is the same whatever
+  order a walk takes, needs no test of whether a key has `lt`, and holds for
+  every key type `serialize` can write. So `9`, `10` and `-3` stand as `-3`,
+  `10`, `9`. `serialize` of a `HashSet` sorts its elements the same way.
+  Eddie decided it, and `std_hash_map` and `std_hash_set` check it over
+  numbers, `str`, structs with and without `lt` and every built-in key type.
 
 ## Provisional
 
@@ -67,16 +74,20 @@ The entries below belong under "Generics and collections" in
 - [provisional] `to_text` of a map writes `{"Ann": 41}`, each key and value as
   an element of a collection. `serialize` writes a JSON object when the key is
   `str` and an array of `[key, value]` pairs otherwise. `Map` and `Set` write in
-  their order. `HashMap` and `HashSet` sort when the key or the element is a
-  number, a `bool`, a `char` or a `str`, and write in slot order otherwise.
+  their order, and `HashMap` and `HashSet` in the order of the entry above.
   `to_text` of both writes in the order of a walk. Reason: the principles give
   the forms, and the specification sorts a `HashMap` for saved files, which
   holds for a `HashSet` as well.
+- [provisional] Two keys of a `HashMap` may write the same text, as two keys
+  that differ in a pointer alone do. The bytes of the text of the value then
+  decide between them. Two entries that write the same key and value write
+  the same bytes in either order. Reason: the order of the keys alone leaves
+  such entries in slot order, so the file would change from run to run.
 - [provisional] The map reads the type of a key from the record of the type
   argument, `anti_rt_type_arg` at depth 3, and keeps the type ids it needs as
   constants of its own. Reason: importing `anti.reflect` for `TypeId` links its
-  descriptors into every program with a map. `std_hash_map` sorts keys of every
-  kind the constants name.
+  descriptors into every program with a map. It needs the id of `str` alone,
+  which decides between a JSON object and an array of pairs.
 - [provisional] `==` of `Map` and of `Set` compares the entries in order, as
   `collection.equal` does. Reason: the principles say element by element.
 - [provisional] `==` of `HashMap` and of `HashSet` holds when the counts agree
@@ -108,16 +119,6 @@ The entries below belong under "Generics and collections" in
 - [provisional] No map or set has `deserialize` yet. Reason: `Collection<T>`
   has none, and this step names `serialize` alone.
 
-## Blocked
-
-This needs a change outside `src/std/anti/collection/`, or a decision.
-
-- `serialize` of a `HashMap` sorts a key of a struct, a class or a variant that
-  has `operator fn lt` in slot order, since a generic without the constraint
-  `lt` cannot ask whether its argument has it. The keys of the built-in types
-  sort. This needs a compile-time test of a hook in `src/antic/`, or a
-  decision on another form.
-
 ## Resolved on main
 
 - `==` of a generic class from a library file reaches a program since the
@@ -125,3 +126,7 @@ This needs a change outside `src/std/anti/collection/`, or a decision.
 - One module gives `==` to `Map` and `HashMap`, and to `Set` and `HashSet`,
   through the shared names of `operator fn`.
 - `union` names a member after `fn` and after a dot, so `s.union(o)` parses.
+- `serialize` of a `HashMap` with a key of a struct, a class or a variant that
+  has `operator fn lt` wrote in slot order, since a generic cannot ask whether
+  its argument has `lt`. Eddie's decision to sort by the text of each key, the
+  entry under "Built", takes the question away.
