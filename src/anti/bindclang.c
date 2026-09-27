@@ -14,11 +14,11 @@
 #include "selfpath.h"
 #include "target.h"
 
-/* DESIGN: anti bind accepts the major versions of clang it was tested
-   against, which is the major version of the pinned clang. The JSON of
-   the AST dump is not a stable interface. A version that renamed a field
-   would bind a header wrong without a word. */
-static const int accepted_majors[] = {23};
+/* DESIGN: anti bind accepts the major version of clang it was tested
+   against, which is the major version of the pinned clang,
+   ANTI_CLANG_VERSION of tools/llvm-version. The JSON of the AST dump is
+   not a stable interface. A version that renamed a field would bind a
+   header wrong without a word. */
 
 /* The clang to run. In a development tree it is the pinned clang, which
    the configure step installs into build/deps/clang of the checkout. anti
@@ -86,34 +86,43 @@ static int major_version(const char *text)
     return leading_int(at + strlen("clang version "));
 }
 
+/* The end of the refusal of a clang that is missing or of another major
+   version: the major that bind --clang needs, the archive of the pinned
+   clang for this host and the page of its release. */
+static void where_to_get(int needed)
+{
+    enum target host;
+    const char *name = "<host>";
+
+    if (target_host(&host)) {
+        name = target_name(host);
+    }
+    fprintf(stderr, "bind --clang needs clang %d. Get clang-%s-%s.tar.xz "
+            "from %s, or another clang %d, and put it first on PATH.\n",
+            needed, ANTI_CLANG_TAG, name, ANTI_CLANG_PAGE, needed);
+}
+
 static bool check_version(const char *clang)
 {
     const char *argv[] = {clang, "--version", NULL};
     struct text out = {0};
     int status = process_capture(argv, &out);
+    int needed = leading_int(ANTI_CLANG_VERSION);
     int major;
-    size_t i;
 
     if (status != 0) {
-        fprintf(stderr, "anti: bind --clang runs clang, and `%s --version` "
-                "failed. Install clang %d or put it on PATH.\n", clang,
-                accepted_majors[0]);
+        fprintf(stderr, "anti: `%s --version` failed. ", clang);
+        where_to_get(needed);
         text_free(&out);
         return false;
     }
     major = major_version(text_cstr(&out));
     text_free(&out);
-    for (i = 0; i < sizeof accepted_majors / sizeof accepted_majors[0]; i++) {
-        if (major == accepted_majors[i]) {
-            return true;
-        }
+    if (major == needed) {
+        return true;
     }
-    fprintf(stderr, "anti: %s is clang %d, and anti bind was tested against "
-            "clang", clang, major);
-    for (i = 0; i < sizeof accepted_majors / sizeof accepted_majors[0]; i++) {
-        fprintf(stderr, "%s %d", i > 0 ? "," : "", accepted_majors[i]);
-    }
-    fputs(" only. Put one of those first on PATH.\n", stderr);
+    fprintf(stderr, "anti: %s is clang %d, and ", clang, major);
+    where_to_get(needed);
     return false;
 }
 

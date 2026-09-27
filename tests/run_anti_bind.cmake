@@ -14,6 +14,10 @@
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CLANG_DIR the pinned clang of the build
+#   CLANG_VERSION, CLANG_TAG, CLANG_PAGE the version of the pinned clang, the
+#             tag of its release and the page of that release, which the
+#             refusal of another clang names
+#   HOST      the target name of this host
 
 # anti bind takes the pinned clang of build/deps beside its tree, and
 # otherwise the first clang on PATH. A tree configured with a pinned clang
@@ -28,6 +32,14 @@ if(CLANG_DIR)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
+# What the refusal of a missing clang or of another major version names: the
+# major of the pinned clang, its archive for this host and the page of its
+# release. The page holds dots, which stand for themselves.
+string(REGEX MATCH "^[0-9]+" clang_major "${CLANG_VERSION}")
+string(REPLACE "." "\\." clang_page "${CLANG_PAGE}")
+string(REPLACE "." "\\." clang_asset "clang-${CLANG_TAG}-${HOST}.tar.xz")
+set(clang_where "needs clang ${clang_major}\\. Get ${clang_asset} from ${clang_page}, or another clang ${clang_major}, and put it first on PATH")
 include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
 
 function(run)
@@ -236,8 +248,14 @@ elseif(CASE STREQUAL "refusals")
          "#!/bin/sh\necho 'Homebrew clang version 19.1.7'\necho 'Target: x'\n")
     file(CHMOD "${WORK}/fake/clang" PERMISSIONS OWNER_READ OWNER_WRITE
          OWNER_EXECUTE)
-    expect_refusal("clang 19, and anti bind was tested against clang 23 only"
+    expect_refusal("is clang 19, and bind --clang ${clang_where}"
         "${CMAKE_COMMAND}" -E env "PATH=${WORK}/fake:$ENV{PATH}"
+        "${WORK}/bin/anti" bind --clang "${BIND}/layout.h" -o "${WORK}/out"
+        --runtime "${RUNTIME}")
+    # With no clang on PATH the refusal names the same version and place.
+    file(MAKE_DIRECTORY "${WORK}/empty")
+    expect_refusal("failed\\. bind --clang ${clang_where}"
+        "${CMAKE_COMMAND}" -E env "PATH=${WORK}/empty"
         "${WORK}/bin/anti" bind --clang "${BIND}/layout.h" -o "${WORK}/out"
         --runtime "${RUNTIME}")
 elseif(CASE STREQUAL "api_malformed")
@@ -367,8 +385,7 @@ cat \"$d/ast\"
         -o "${WORK}/out" --runtime "${RUNTIME}")
     file(WRITE "${WORK}/fake/version"
          "clang version 99999999999999999999.1.0\nTarget: x\n")
-    expect_refusal("is clang -1, and anti bind was tested against clang 23"
-        ${fake})
+    expect_refusal("is clang -1, and bind --clang ${clang_where}" ${fake})
     file(WRITE "${WORK}/fake/version" "clang version 23.1.0\nTarget: x\n")
     file(WRITE "${WORK}/fake/pre" "# 1 \"${h}\"\n#pragma pack(99999999999999999999)\n")
     file(WRITE "${WORK}/fake/ast" "{\"kind\": \"TranslationUnitDecl\", \"inner\": [")

@@ -1385,6 +1385,10 @@ foreach(case IN LISTS anti_bind_cases)
             "-DCC=${anti_bind_cc}"
             "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
             "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+            "-DCLANG_VERSION=${ANTI_CLANG_VERSION}"
+            "-DCLANG_TAG=${ANTI_CLANG_TAG}"
+            "-DCLANG_PAGE=${ANTI_CLANG_PAGE}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bind-${case}"
             -DCASE=${case}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_bind.cmake")

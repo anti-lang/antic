@@ -137,6 +137,8 @@ include("${tools_dir}/warnings.cmake")
 # build wrote. The library of the runtime tree is not taken: it is built
 # for the default level of its target, and antic runs on every level.
 include("${root}/src/native/pcre2-files.cmake")
+include("${root}/tools/clang-release.cmake")
+antic_clang_release(clang_version clang_tag clang_page)
 set(pcre2_work "${build_dir}/native/pcre2")
 set(pcre2_files "")
 if(NOT DEFINED ANTIC)
@@ -173,7 +175,10 @@ function(build_program host output program)
         list(APPEND program_includes -I "${root}/${dir}")
     endforeach()
     set(common --target=${triple} -std=c11 -O2 "-ffile-prefix-map=${root}=."
-               "-DANTIC_VERSION=\"${version}\"")
+               "-DANTIC_VERSION=\"${version}\""
+               "-DANTI_CLANG_VERSION=\"${clang_version}\""
+               "-DANTI_CLANG_TAG=\"${clang_tag}\""
+               "-DANTI_CLANG_PAGE=\"${clang_page}\"")
     set(link "")
     if(host MATCHES "^macos-")
         list(APPEND common -isysroot "${macos_sdk}")

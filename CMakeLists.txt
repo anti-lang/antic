@@ -147,6 +147,15 @@ target_compile_definitions(antic_core PRIVATE
 target_compile_definitions(anti PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
 
+# The pinned clang that anti bind --clang names, from
+# tools/clang-release.cmake.
+include(tools/clang-release.cmake)
+antic_clang_release(ANTI_CLANG_VERSION ANTI_CLANG_TAG ANTI_CLANG_PAGE)
+target_compile_definitions(anti PRIVATE
+    ANTI_CLANG_VERSION="${ANTI_CLANG_VERSION}"
+    ANTI_CLANG_TAG="${ANTI_CLANG_TAG}"
+    ANTI_CLANG_PAGE="${ANTI_CLANG_PAGE}")
+
 # DESIGN: the levels of tools/cpu-levels are the table src/antic/cpu.c holds, and
 # the test cpu_levels_pin compares the two. The build reads the file rather
 # than repeating the names, so the runtime archive's native libraries are
