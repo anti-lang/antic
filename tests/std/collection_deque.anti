@@ -1,0 +1,316 @@
+//! `Deque<T>` of `anti.collection.deque`, every operation of the round.
+//!
+//! Both ends, the ring wrapping past the end of its room and growing while it
+//! wraps, the room under a counting allocator, the operations every collection
+//! has, a removal inside the ring, `dup`, a deque of a class whose `destruct`
+//! counts its calls, and a deque of pointers that owns the pointers and not the
+//! objects.
+
+import anti.collection;
+import anti.collection.deque.{Deque};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A class that owns memory and counts its teardowns.
+class Tag
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	fn destruct(self)
+	{
+		Tag.torn.add(1);
+	}
+}
+
+/// An object a deque of pointers points at, which counts the ones alive.
+class Circle
+{
+	pub r: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(r: int) -> *Circle
+	{
+		Circle.live.add(1);
+		return alloc Circle { r: r };
+	}
+
+	fn destruct(self)
+	{
+		Circle.live.sub(1);
+	}
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn ends()
+{
+	let d = Deque<int>.new();
+	let empty_front = d.pop_front() ?? -1;
+	let empty_back = d.pop_back() ?? -1;
+	let no_front = d.front() ?? -1;
+	let no_back = d.back() ?? -1;
+	printf("empty: %d %d %d %d %d\n".ptr, d.is_empty() as c_int,
+		empty_front as c_int, empty_back as c_int, no_front as c_int,
+		no_back as c_int);
+	d.push_back(2);
+	d.push_back(3);
+	d.push_front(1);
+	d.push_front(0);
+	let front = d.front() ?? -1;
+	let back = d.back() ?? -1;
+	show(f"pushed: {d.to_text()} front {front} back {back} count {d.count}");
+	let first = d.pop_front() ?? -1;
+	let last = d.pop_back() ?? -1;
+	show(f"popped: {first} {last} {d.to_text()}");
+	d.pop_back();
+	d.pop_back();
+	let gone = d.pop_front() ?? -1;
+	show(f"emptied: {gone} {d.to_text()} {d.is_empty()}");
+}
+
+fn wrapping()
+{
+	let counting = Counting { };
+	let d = Deque<int>.new(4, &counting);
+	for i in 0..4 {
+		d.push_back(i);
+	}
+	d.pop_front();
+	d.pop_front();
+	d.push_back(4);
+	d.push_back(5);
+	show(f"wrapped: {d.to_text()} allocations {counting.allocs}");
+	d.push_front(1);
+	show(f"grown while wrapped: {d.to_text()} allocations {counting.allocs}");
+	let sum = 0;
+	for x in d {
+		sum += x;
+	}
+	for p in &d {
+		*p *= 10;
+	}
+	show(f"walks: sum {sum} then {d.to_text()}");
+	let at_back = Deque<int>.new(2);
+	for i in 0..20 {
+		let third = i % 3 == 0;
+		at_back.push_front(i);
+		if third {
+			at_back.pop_back();
+		}
+	}
+	show(f"front only: {at_back.to_text()}");
+}
+
+fn room()
+{
+	let counting = Counting { };
+	{
+		let d = Deque<int>.new(0, &counting);
+		for i in 0..8 {
+			d.push_back(i);
+		}
+		printf("small start: %d allocation for 8\n".ptr, counting.allocs as c_int);
+		d.push_front(-1);
+		printf("doubled: %d allocations\n".ptr, counting.allocs as c_int);
+		d.reserve(100);
+		for i in 0..100 {
+			d.push_front(i);
+		}
+		printf("within the reserve: %d allocations\n".ptr, counting.allocs as c_int);
+		for i in 0..100 {
+			d.pop_back();
+		}
+		d.shrink();
+		d.shrink();
+		let front = d.front() ?? -1;
+		let back = d.back() ?? -1;
+		printf("shrink: %d allocations, %d frees, count %d, %d to %d\n".ptr,
+			counting.allocs as c_int, counting.frees as c_int, d.count as c_int,
+			front as c_int, back as c_int);
+		d.clear();
+		d.shrink();
+		printf("shrink of none: %d frees\n".ptr, counting.frees as c_int);
+		d.push_front(7);
+		printf("again: %d allocations\n".ptr, counting.allocs as c_int);
+	}
+	printf("after the block: %d frees\n".ptr, counting.frees as c_int);
+}
+
+fn shared() may fail
+{
+	let d = Deque<int>.new(4);
+	for i in 3..7 {
+		d.push_back(i);
+	}
+	d.push_front(2);
+	d.push_front(1);
+	let evens = d.find_all(fn(x) {
+		return x % 2 == 0;
+	});
+	let first = d.find_first(fn(x) {
+		return x > 2;
+	}) ?? -1;
+	let one = try d.find_one(fn(x) {
+		return x == 4;
+	});
+	show(f"find: {evens.to_text()} {first} {one}");
+	let n = d.update_all(fn(x) {
+		return x % 2 == 1;
+	}, fn(p) {
+		*p *= 10;
+	});
+	show(f"update: {n} {d.to_text()}");
+	let middle = d.remove_first(fn(x) {
+		return x == 30;
+	}) ?? -1;
+	show(f"removed inside: {middle} {d.to_text()}");
+	let removed = d.remove_all(fn(x) {
+		return x >= 10;
+	});
+	let last = try d.remove_one(fn(x) {
+		return x == 6;
+	});
+	show(f"remove: {removed} {last} {d.to_text()}");
+	d.push_front(0);
+	d.push_back(8);
+	let a = Deque<int>.new();
+	a.push_back(2);
+	a.push_back(4);
+	a.push_front(0);
+	a.push_back(8);
+	let b = Deque<int>.new();
+	b.push_back(0);
+	show(f"eq: {a == d} {a == b} {a != b}");
+	let out = text.Builder.new();
+	d.serialize(&out);
+	show(out.take());
+	let copy = dup(&d);
+	copy.push_front(-1);
+	d.pop_back();
+	show(f"dup: {copy.to_text()} {d.to_text()}");
+	delete(copy);
+	d.clear();
+	show(f"clear: {d.count} {d.is_empty()} {d.to_text()}");
+}
+
+fn owned()
+{
+	let before = Tag.torn.load();
+	{
+		let tags = Deque<Tag>.new(2);
+		tags.push_back(Tag.of(1));
+		tags.push_back(Tag.of(2));
+		tags.push_front(Tag.of(0));
+		tags.push_front(Tag.of(-1));
+		printf("made, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+		{
+			let head = tags.pop_front() ?? Tag.of(99);
+			let tail = tags.pop_back() ?? Tag.of(99);
+			let seen = tags.front() ?? Tag.of(99);
+			printf("taken %d %d, front %d, torn %d\n".ptr, head.number() as c_int,
+				tail.number() as c_int, seen.number() as c_int,
+				(Tag.torn.load() - before) as c_int);
+		}
+		printf("taken ones torn at their block, torn %d\n".ptr,
+			(Tag.torn.load() - before) as c_int);
+		let copy = dup(&tags);
+		let removed = tags.remove_all(fn(t) {
+			return t.number() == 1;
+		});
+		printf("removed %d, torn %d\n".ptr, removed as c_int,
+			(Tag.torn.load() - before) as c_int);
+		delete(copy);
+		printf("copy deleted, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+	}
+	printf("after the block, torn %d\n".ptr,
+		(Tag.torn.load() - before) as c_int);
+}
+
+fn pointers()
+{
+	let made = [Circle.make(1), Circle.make(2), Circle.make(3)];
+	{
+		let circles = Deque<*Circle>.new();
+		circles.push_back(made[0]);
+		circles.push_front(made[1]);
+		circles.push_back(made[2]);
+		let top = circles.pop_front() ?? made[0];
+		circles.clear();
+		printf("pointers: %d alive, front was %d\n".ptr,
+			Circle.live.load() as c_int, top.r as c_int);
+		circles.push_back(made[1]);
+	}
+	printf("after the deque, %d alive\n".ptr, Circle.live.load() as c_int);
+	for i in 0..3 {
+		delete(made[i]);
+	}
+	printf("after delete, %d alive\n".ptr, Circle.live.load() as c_int);
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	ends();
+	wrapping();
+	room();
+	shared() catch fatal;
+	owned();
+	pointers();
+	let d = Deque<int>.new();
+	d.push_back(3);
+	d.push_front(4);
+	printf("through Iterable: %d\n".ptr, total(&d) as c_int);
+	return 0;
+}

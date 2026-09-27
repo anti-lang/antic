@@ -40,6 +40,8 @@ remove: 2 10 50 [30, 6]
 gave -1
 eq: true false true
 ["Ann","Bob"][1,2,3]
+dup: [1, 2, 3, 9] [7, 2, 3]
+dup of lists: [1, 2, 30] [1, 2] 2
 clear: 0 true []
 tags: [one, other, other, other] torn 4
 replaced, torn 5
@@ -47,7 +49,8 @@ taken 4, torn 5
 taken ones torn at their block, torn 7
 copies 5, torn 7
 sorted and reversed, torn 7, count 2
-after the block, torn 13
+copy deleted, torn 9
+after the block, torn 15
 clear, torn 2
 cleared list at its end, torn 2
 pointers: 3 alive, top 1, filtered 2

@@ -1,0 +1,288 @@
+//! `Ring<T, N>` of `anti.collection.ring`, every operation of the round.
+//!
+//! A ring takes its room once, when it is made, and a counting allocator shows
+//! that nothing after that allocates: pushes past the full ring, pops, walks,
+//! and every operation of a collection that makes nothing new. It also runs a
+//! ring of a class whose `destruct` counts its calls, a push into a full ring
+//! of those, and a ring of pointers that owns the pointers and not the objects.
+
+import anti.collection;
+import anti.collection.ring.{Ring};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The capacity of the rings of samples.
+const SAMPLES: int = 4;
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A class that owns memory and counts its teardowns.
+class Tag
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	fn destruct(self)
+	{
+		Tag.torn.add(1);
+	}
+}
+
+/// An object a ring of pointers points at, which counts the ones alive.
+class Circle
+{
+	pub r: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(r: int) -> *Circle
+	{
+		Circle.live.add(1);
+		return alloc Circle { r: r };
+	}
+
+	fn destruct(self)
+	{
+		Circle.live.sub(1);
+	}
+}
+
+struct Sample
+{
+	left: i16,
+	right: i16,
+}
+
+fn sample(i: int) -> Sample
+{
+	return Sample { left: i as i16, right: -i as i16 };
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn operations()
+{
+	let counting = Counting { };
+	let r = Ring<int, 4>.new(&counting);
+	let empty_pop = r.pop() ?? -1;
+	let empty_peek = r.peek() ?? -1;
+	printf("made: %d allocation, empty %d, full %d, %d %d\n".ptr,
+		counting.allocs as c_int, r.is_empty() as c_int, r.is_full() as c_int,
+		empty_pop as c_int, empty_peek as c_int);
+	let taken = [false, false, false, false, false];
+	for i in 0..5 {
+		taken[i] = r.push(i + 1);
+	}
+	show(f"pushed: {taken[0]} {taken[3]} {taken[4]} {r.to_text()} full {r.is_full()}");
+	let oldest = r.pop() ?? -1;
+	let again = r.push(5);
+	let peeked = r.peek() ?? -1;
+	show(f"wrapped: {oldest} {again} {peeked} {r.to_text()} count {r.count}");
+	let sum = 0;
+	for step in 0..1000 {
+		let x = r.pop() ?? 0;
+		sum += x;
+		r.push(step);
+	}
+	show(f"a thousand turns: {sum} {r.to_text()}");
+	let walked = 0;
+	for x in r {
+		walked += x;
+	}
+	for p in &r {
+		*p -= 990;
+	}
+	show(f"walks: {walked} {r.to_text()}");
+	let first = r.find_first(fn(x) {
+		return x > 7;
+	}) ?? -1;
+	let n = r.update_all(fn(x) {
+		return x % 2 == 0;
+	}, fn(p) {
+		*p *= 10;
+	});
+	let hit = r.update_first(fn(x) {
+		return x == 9;
+	}, fn(p) {
+		*p = 90;
+	});
+	show(f"find and update: {first} {n} {hit} {r.to_text()}");
+	let middle = r.remove_first(fn(x) {
+		return x == 80;
+	}) ?? -1;
+	r.push(1);
+	let removed = r.remove_all(fn(x) {
+		return x > 50;
+	});
+	show(f"remove: {middle} {removed} {r.to_text()}");
+	let one = r.remove_one(fn(x) {
+		return x == 1;
+	}) catch e {
+		yield -1;
+	};
+	r.push(3);
+	r.push(4);
+	let many = r.find_one(fn(x) {
+		return x >= 0;
+	}) catch e {
+		yield -1;
+	};
+	let other = Ring<int, 4>.new(&counting);
+	other.push(7);
+	other.push(3);
+	other.push(4);
+	let same = r == other;
+	other.pop();
+	show(f"one: {one} {many} eq {same} {r == other} {r != other}");
+	r.clear();
+	for i in 0..4 {
+		r.push(i);
+	}
+	printf("after every operation: %d allocations for two rings, %d frees\n".ptr,
+		counting.allocs as c_int, counting.frees as c_int);
+	let found = r.find_all(fn(x) {
+		return x > 1;
+	});
+	show(f"find_all makes a collection of its own: {found.to_text()} {counting.allocs} allocations");
+	let out = text.Builder.new();
+	r.serialize(&out);
+	show(out.take());
+	let copy = dup(&r);
+	copy.pop();
+	copy.push(9);
+	show(f"dup: {copy.to_text()} {r.to_text()} {counting.allocs} allocations");
+	delete(copy);
+}
+
+fn samples()
+{
+	let counting = Counting { };
+	{
+		let r = Ring<Sample, SAMPLES>.new(&counting);
+		let dropped = 0;
+		for i in 0..100 {
+			if !r.push(sample(i)) {
+				dropped += 1;
+				r.pop();
+				r.push(sample(i));
+			}
+		}
+		let last = r.peek() ?? Sample { left: 0, right: 0 };
+		printf("samples: %d dropped, oldest %d %d, %d allocation\n".ptr,
+			dropped as c_int, last.left as c_int, last.right as c_int,
+			counting.allocs as c_int);
+	}
+	printf("after the block: %d free\n".ptr, counting.frees as c_int);
+}
+
+fn owned()
+{
+	let before = Tag.torn.load();
+	{
+		let tags = Ring<Tag, 2>.new();
+		tags.push(Tag.of(1));
+		tags.push(Tag.of(2));
+		let refused = tags.push(Tag.of(3));
+		printf("full: %d, torn %d\n".ptr, refused as c_int,
+			(Tag.torn.load() - before) as c_int);
+		{
+			let oldest = tags.pop() ?? Tag.of(99);
+			let next = tags.peek() ?? Tag.of(99);
+			printf("taken %d, next %d, torn %d\n".ptr, oldest.number() as c_int,
+				next.number() as c_int, (Tag.torn.load() - before) as c_int);
+		}
+		printf("taken ones torn at their block, torn %d\n".ptr,
+			(Tag.torn.load() - before) as c_int);
+		tags.push(Tag.of(4));
+		let copy = dup(&tags);
+		tags.clear();
+		printf("cleared, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+		delete(copy);
+		printf("copy deleted, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+		tags.push(Tag.of(5));
+	}
+	printf("after the block, torn %d\n".ptr,
+		(Tag.torn.load() - before) as c_int);
+}
+
+fn pointers()
+{
+	let made = [Circle.make(1), Circle.make(2), Circle.make(3)];
+	{
+		let circles = Ring<*Circle, 2>.new();
+		circles.push(made[0]);
+		circles.push(made[1]);
+		let full = circles.push(made[2]);
+		let top = circles.pop() ?? made[2];
+		printf("pointers: %d alive, full %d, oldest %d\n".ptr,
+			Circle.live.load() as c_int, full as c_int, top.r as c_int);
+		circles.push(made[2]);
+	}
+	printf("after the ring, %d alive\n".ptr, Circle.live.load() as c_int);
+	for i in 0..3 {
+		delete(made[i]);
+	}
+	printf("after delete, %d alive\n".ptr, Circle.live.load() as c_int);
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	operations();
+	samples();
+	owned();
+	pointers();
+	let r = Ring<int, 3>.new();
+	r.push(3);
+	r.push(4);
+	printf("through Iterable: %d\n".ptr, total(&r) as c_int);
+	return 0;
+}

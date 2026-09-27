@@ -1,0 +1,267 @@
+//! `Grid<T>` of `anti.collection.grid`, every operation of the round.
+//!
+//! Making a grid, `g[x, y]` in both directions, `get`, `width` and `height`,
+//! lending the buffer row by row, the room under a counting allocator, the
+//! operations every collection has, with the remove forms and `clear` putting
+//! the fill value back, `dup`, a grid of a class whose `destruct` counts its
+//! calls, and a grid of pointers that owns the pointers and not the objects.
+
+import anti.collection;
+import anti.collection.grid.{Grid};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A class that owns memory and counts its teardowns.
+class Tag
+{
+	pub own n: ?*int = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	fn destruct(self)
+	{
+		Tag.torn.add(1);
+	}
+}
+
+/// An object a grid of pointers points at, which counts the ones alive.
+class Circle
+{
+	pub r: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(r: int) -> *Circle
+	{
+		Circle.live.add(1);
+		return alloc Circle { r: r };
+	}
+
+	fn destruct(self)
+	{
+		Circle.live.sub(1);
+	}
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn cells()
+{
+	let counting = Counting { };
+	{
+		let g = Grid<int>.new(3, 2, 0, &counting);
+		show(f"made: {g.width} x {g.height}, count {g.count}, {g.to_text()}, {counting.allocs} allocation");
+		for y in 0..g.height {
+			for x in 0..g.width {
+				g[x, y] = 10 * y + x;
+			}
+		}
+		show(f"row by row: {g.to_text()}");
+		let corner = g.get(2, 1) ?? -1;
+		let past_x = g.get(3, 0) ?? -1;
+		let past_y = g.get(0, 2) ?? -1;
+		let below = g.get(-1, 0) ?? -1;
+		show(f"index and get: {g[1, 0]} {g[0, 1]} {corner} {past_x} {past_y} {below}");
+		let total = 0;
+		g.lend_slice(fn(s) {
+			for v in s {
+				total += v;
+			}
+			s[s.len - 1] = 99;
+		});
+		for p in &g {
+			*p += 1;
+		}
+		let sum = 0;
+		for v in g {
+			sum += v;
+		}
+		show(f"lend_slice and walks: {total} {sum} {g.to_text()}");
+		printf("after every operation: %d allocation\n".ptr, counting.allocs as c_int);
+	}
+	printf("after the block: %d free\n".ptr, counting.frees as c_int);
+	let empty = Grid<int>.new(0, 4, 7);
+	let negative = Grid<int>.new(-2, 3, 7);
+	let missing = empty.get(0, 0) ?? -1;
+	show(f"empty: {empty.width} x {empty.height} {empty.count} {empty.is_empty()} {missing} {negative.width} x {negative.height}");
+}
+
+fn shared() may fail
+{
+	let g = Grid<int>.new(2, 3, 0);
+	for i in 0..6 {
+		g[i % 2, i / 2] = i + 1;
+	}
+	let odd = g.find_all(fn(v) {
+		return v % 2 == 1;
+	});
+	let first = g.find_first(fn(v) {
+		return v > 3;
+	}) ?? -1;
+	let one = try g.find_one(fn(v) {
+		return v == 5;
+	});
+	show(f"find: {odd.to_text()} {first} {one}");
+	let n = g.update_all(fn(v) {
+		return v > 4;
+	}, fn(p) {
+		*p *= 10;
+	});
+	show(f"update: {n} {g.to_text()}");
+	let removed = g.remove_all(fn(v) {
+		return v >= 50;
+	});
+	let taken = g.remove_first(fn(v) {
+		return v > 1;
+	}) ?? -1;
+	let last = try g.remove_one(fn(v) {
+		return v == 4;
+	});
+	show(f"remove puts the fill back: {removed} {taken} {last} {g.to_text()} count {g.count}");
+	let many = g.remove_one(fn(v) {
+		return v == 0;
+	}) catch e {
+		let e1 = e as *collection.NotOne;
+		printf("%.*s (count %d)\n".ptr, e.message.len as c_int, e.message.ptr,
+			e1.count as c_int);
+		yield -1;
+	};
+	printf("gave %d\n".ptr, many as c_int);
+	let a = Grid<int>.new(2, 3, 0);
+	a[0, 0] = 1;
+	a[1, 1] = 3;
+	let b = Grid<int>.new(3, 2, 0);
+	b[0, 0] = 1;
+	b[1, 1] = 3;
+	let c = Grid<int>.new(3, 2, 0);
+	c[0, 0] = 1;
+	c[1, 1] = 3;
+	show(f"eq: {a == g} {a == b} {b == c} {a != b}");
+	let out = text.Builder.new();
+	g.serialize(&out);
+	show(out.take());
+	let copy = dup(&g);
+	copy[1, 2] = 8;
+	show(f"dup: {copy.to_text()} {g.to_text()}");
+	delete(copy);
+	g[1, 2] = 5;
+	g.clear();
+	show(f"clear: {g.count} {g.to_text()}");
+}
+
+fn owned()
+{
+	let before = Tag.torn.load();
+	{
+		let fill = Tag.of(0);
+		let tags = Grid<Tag>.new(2, 2, fill);
+		printf("made, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+		tags[1, 1] = Tag.of(4);
+		tags[0, 1] = Tag.of(3);
+		tags[0, 1] = Tag.of(5);
+		printf("replaced, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+		{
+			let copy = tags[1, 1];
+			let got = tags.get(0, 1) ?? Tag.of(99);
+			printf("copies %d %d, torn %d\n".ptr, copy.number() as c_int,
+				got.number() as c_int, (Tag.torn.load() - before) as c_int);
+		}
+		printf("copies torn at their block, torn %d\n".ptr,
+			(Tag.torn.load() - before) as c_int);
+		let removed = tags.remove_all(fn(t) {
+			return t.number() == 4;
+		});
+		let after = tags[1, 1];
+		printf("removed %d, torn %d, cell now %d\n".ptr, removed as c_int,
+			(Tag.torn.load() - before) as c_int, after.number() as c_int);
+		let copy = dup(&tags);
+		delete(copy);
+		printf("copy deleted, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
+	}
+	printf("after the block, torn %d\n".ptr,
+		(Tag.torn.load() - before) as c_int);
+}
+
+fn pointers()
+{
+	let made = [Circle.make(1), Circle.make(2), Circle.make(3)];
+	{
+		let circles = Grid<*Circle>.new(2, 2, made[0]);
+		circles[1, 0] = made[1];
+		circles[1, 1] = made[2];
+		circles[1, 1] = made[1];
+		let biggest = circles.find_first(fn(p) {
+			return p.r > 1;
+		}) ?? made[0];
+		circles.clear();
+		printf("pointers: %d alive, found %d, cell %d\n".ptr,
+			Circle.live.load() as c_int, biggest.r as c_int,
+			circles[1, 0].r as c_int);
+	}
+	printf("after the grid, %d alive\n".ptr, Circle.live.load() as c_int);
+	for i in 0..3 {
+		delete(made[i]);
+	}
+	printf("after delete, %d alive\n".ptr, Circle.live.load() as c_int);
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	cells();
+	shared() catch fatal;
+	owned();
+	pointers();
+	let g = Grid<int>.new(2, 2, 3);
+	printf("through Iterable: %d\n".ptr, total(&g) as c_int);
+	return 0;
+}

@@ -207,6 +207,32 @@ pub class List<T> inherits collection.Collection<T>
 		return ListWalk<T>.over(self.items, self.count, self.watch());
 	}
 
+	/// A list in `to` with room of its own for `count` elements from the same
+	/// allocator, and a copy of each element in it, as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: `dup` gives a replaced `copy` memory that nothing has
+		   written, and a collection gives it the bytes of the element. The
+		   bytes of this list go into `to` first in both cases, its table
+		   among them, and the copy then takes room of its own. */
+		memcpy(to as ?*byte, self as ?*byte, size_of(List<T>) as c_size_t);
+		let made = to as *List<T>;
+		made.items = none;
+		made.capacity = 0;
+		if self.count == 0 {
+			return;
+		}
+		let items = self.items catch fatal;
+		let room = self.room(self.count) catch fatal;
+		let i = 0;
+		while i < self.count do {
+			room[i] = self.copy_element(&items[i]);
+			i += 1;
+		}
+		made.items = room;
+		made.capacity = self.count;
+	}
+
 	concrete fn first_place(self) -> int
 	{
 		if self.count == 0 {

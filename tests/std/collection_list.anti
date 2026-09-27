@@ -2,8 +2,8 @@
 //!
 //! The ends, a position and an index, lending, sorting and reshaping, the room
 //! under a counting allocator, the operations every collection has, a list of a
-//! class whose `destruct` counts its calls, and a list of pointers that owns
-//! the pointers and not the objects.
+//! class whose `destruct` counts its calls, `dup` of a list and of a list of
+//! lists, and a list of pointers that owns the pointers and not the objects.
 
 import anti.collection;
 import anti.collection.list.{List};
@@ -371,6 +371,22 @@ fn shared() may fail
 	words.serialize(&out);
 	a.serialize(&out);
 	show(out.take());
+	let copy = dup(&a);
+	copy.push(9);
+	a[0] = 7;
+	show(f"dup: {copy.to_text()} {a.to_text()}");
+	delete(copy);
+	let rows = List<List<int>>.new();
+	rows.push(numbers(2));
+	rows.push(numbers(3));
+	let rows_copy = dup(&rows);
+	rows.modify(0, fn(p) {
+		p.push(30);
+	});
+	let mine = rows[0];
+	let theirs = rows_copy[0];
+	show(f"dup of lists: {mine.to_text()} {theirs.to_text()} {rows_copy.count}");
+	delete(rows_copy);
 	l.clear();
 	show(f"clear: {l.count} {l.is_empty()} {l.to_text()}");
 }
@@ -408,6 +424,9 @@ fn owned()
 		tags.reverse();
 		printf("sorted and reversed, torn %d, count %d\n".ptr,
 			(Tag.torn.load() - before) as c_int, tags.count as c_int);
+		let twin = dup(&tags);
+		delete(twin);
+		printf("copy deleted, torn %d\n".ptr, (Tag.torn.load() - before) as c_int);
 	}
 	printf("after the block, torn %d\n".ptr,
 		(Tag.torn.load() - before) as c_int);

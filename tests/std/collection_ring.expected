@@ -1,0 +1,25 @@
+exit 0
+made: 1 allocation, empty 1, full 0, -1 -1
+pushed: true true false [1, 2, 3, 4] full true
+wrapped: 1 true 2 [2, 3, 4, 5] count 4
+a thousand turns: 495524 [996, 997, 998, 999]
+walks: 3990 [6, 7, 8, 9]
+find and update: 8 2 true [60, 7, 80, 90]
+remove: 80 2 [7, 1]
+one: 1 -1 eq true false true
+after every operation: 2 allocations for two rings, 0 frees
+find_all makes a collection of its own: [2, 3] 3 allocations
+[0,1,2,3]
+dup: [1, 2, 3, 9] [0, 1, 2, 3] 4 allocations
+samples: 96 dropped, oldest 96 -96, 1 allocation
+after the block: 1 free
+full: 0, torn 1
+taken 1, next 2, torn 1
+taken ones torn at their block, torn 3
+cleared, torn 5
+copy deleted, torn 7
+after the block, torn 8
+pointers: 3 alive, full 0, oldest 1
+after the ring, 3 alive
+after delete, 0 alive
+through Iterable: 7
