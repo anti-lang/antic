@@ -13,7 +13,9 @@
 #   text and _real@, _xmm@ and _ymm@ for a number, and the inline
 #   functions of the Windows C headers, which every object that calls one
 #   defines once more. ARM64 writes the numbers and one of the functions
-#   with a second underscore in front.
+#   with a second underscore in front. The wchar.h of the Windows SDK
+#   10.0.26100 defines _Avx2WmemEnabledWeakValue as selectany on x86_64,
+#   the same way, and the Build Tools of the Windows VM bring it.
 
 if(NOT EXISTS "${OBJDUMP}")
     message("SKIP: no llvm-objdump in the runtime archive")
@@ -27,7 +29,7 @@ if(libraries STREQUAL "")
 endif()
 
 set(coff_inline fprintf printf snprintf vfprintf _local_stdio_printf_options
-    __local_stdio_printf_options)
+    __local_stdio_printf_options _Avx2WmemEnabledWeakValue)
 set(bad "")
 foreach(library IN LISTS libraries)
     execute_process(COMMAND "${OBJDUMP}" --syms "${library}"
