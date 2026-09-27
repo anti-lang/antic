@@ -6,7 +6,7 @@ The entries below belong under "Generics and collections" in
 
 ## Built
 
-- "Maps" and "Sets" of round five are built apart from the four points under
+- "Maps" and "Sets" of round five are built apart from the point under
   "Blocked" below. `anti.collection.map` holds `Map<K, V>` and `HashMap<K, V>`,
   `anti.collection.set` holds `Set<T>`, `HashSet<T>` and `BitSet`. Each has
   every operation of its table in `docs/anti-language-additions.md` and the
@@ -79,6 +79,17 @@ The entries below belong under "Generics and collections" in
   kind the constants name.
 - [provisional] `==` of `Map` and of `Set` compares the entries in order, as
   `collection.equal` does. Reason: the principles say element by element.
+- [provisional] `==` of `HashMap` and of `HashSet` holds when the counts agree
+  and the other holds every entry of the one, in any order. Each is an
+  `operator fn eq` of the module beside the one of `Map` or `Set`, under the
+  shared names `eq:HashMap` and `eq:HashSet`. Reason: the hashed collections
+  have no order to compare in, and the shared names give one module a hook per
+  class.
+- [provisional] `union` of `Set` gives the elements of this set in its order
+  and then those of the other set it lacks, in the other's order. `union` of
+  `HashSet` and of `BitSet` gives the elements of both. Each makes the new set
+  from the allocator of this set. Reason: a `Set` keeps insertion order, and
+  the order of `a.union(b)` is the order of adding `a` and then `b`.
 - [provisional] `intersect`, `minus` and `is_subset` take the other set by
   value, `a.intersect(b)`, and make the new set from the allocator of `a` in the
   order of `a`. Reason: the table writes `intersect(o)`, and `==` takes its
@@ -99,24 +110,18 @@ The entries below belong under "Generics and collections" in
 
 ## Blocked
 
-Each needs a change outside `src/std/anti/collection/`, or a decision.
+This needs a change outside `src/std/anti/collection/`, or a decision.
 
-- `==` of a map and a set does not reach a program. A generic free
-  `operator fn eq` of a library file is not found as the hook of its class, so
-  `a == b` over `Map<str, int>` gives `` `==` is not defined ``. The same
-  function in the module of the program works, and a free hook of a class that
-  is not generic works from a library file. The fix lies in `src/antic/`,
-  around `operator_symbol` and `check_operator` of `sema_expr.c`.
-- A module gives `==` to one generic class only. A free `operator fn eq` is
-  one name in its module, so `anti.collection.map` cannot give it to both `Map`
-  and `HashMap`, nor `anti.collection.set` to both `Set` and `HashSet`. A hook
-  in a class body cannot ask for `V: eq`. Which form should give the second
-  class its hook?
-- `union` is a keyword, so `s.union(o)` does not parse, for `Set`, `HashSet`
-  and `BitSet`. Should the parser take a keyword as a member name after `.` and
-  `fn`, or does the function take another name?
 - `serialize` of a `HashMap` sorts a key of a struct, a class or a variant that
   has `operator fn lt` in slot order, since a generic without the constraint
   `lt` cannot ask whether its argument has it. The keys of the built-in types
   sort. This needs a compile-time test of a hook in `src/antic/`, or a
   decision on another form.
+
+## Resolved on main
+
+- `==` of a generic class from a library file reaches a program since the
+  library format carries the `operator` mark, version 71.
+- One module gives `==` to `Map` and `HashMap`, and to `Set` and `HashSet`,
+  through the shared names of `operator fn`.
+- `union` names a member after `fn` and after a dot, so `s.union(o)` parses.
