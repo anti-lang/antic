@@ -13,10 +13,11 @@ import anti.mem;
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 
-/// A queue of at most `N` elements of type `T` in room that the ring takes once.
+/// A queue of at most `N` elements of type `T` in room that the ring takes
+/// once.
 ///
-/// Nothing the ring does after `new` allocates. `find_all` and `to_text` make
-/// a new collection and a new text, which take room of their own.
+/// Nothing the ring does after `new` allocates. `find_all` and `to_text` make a
+/// new collection and a new text, which take room of their own.
 pub class Ring<T, N: int> inherits collection.Collection<T>
 {
 	items: ?*T = none,
@@ -101,8 +102,7 @@ pub class Ring<T, N: int> inherits collection.Collection<T>
 		made.head = 0;
 	}
 
-	/// A place is the position of an element from the oldest, 0 for the
-	/// oldest.
+	/// A place is the position of an element from the oldest, 0 for the oldest.
 	concrete fn first_place(self) -> int
 	{
 		if self.count == 0 {

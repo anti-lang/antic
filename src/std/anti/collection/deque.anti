@@ -1,11 +1,11 @@
 //! `Deque<T>`, a ring buffer that grows.
 //!
 //! A deque holds its elements by value in one block of room from the allocator
-//! it was made with. They stand in a ring that starts at `head` and wraps at the
-//! end of the room, so both ends take and give an element without moving the
-//! others. It grows by doubling, or by `reserve` in one allocation, and `shrink`
-//! gives back the room past the last element. It has every operation of
-//! `anti.collection.Collection<T>`.
+//! it was made with. They stand in a ring that starts at `head` and wraps at
+//! the end of the room, so both ends take and give an element without moving
+//! the others. It grows by doubling, or by `reserve` in one allocation, and
+//! `shrink` gives back the room past the last element. It has every operation
+//! of `anti.collection.Collection<T>`.
 
 import anti.collection;
 import anti.lang;
@@ -16,9 +16,9 @@ extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 
 /// A sequence of elements of type `T` that grows and shrinks at both ends.
 ///
-/// `push_front` and `push_back` add an element, `pop_front` and `pop_back`
-/// take one off, and `front` and `back` give a copy. The last four give `none`
-/// when the deque is empty.
+/// `push_front` and `push_back` add an element, `pop_front` and `pop_back` take
+/// one off, and `front` and `back` give a copy. The last four give `none` when
+/// the deque is empty.
 pub class Deque<T> inherits collection.Collection<T>
 {
 	items: ?*T = none,
@@ -174,9 +174,9 @@ pub class Deque<T> inherits collection.Collection<T>
 		return self.copy_element(&items[self.slot(at)]);
 	}
 
-	/// The first element leaves by moving `head` on and the last by leaving
-	/// its slot. Any other element leaves a gap that the elements after it
-	/// close, each moved one slot back as bytes.
+	/// The first element leaves by moving `head` on and the last by leaving its
+	/// slot. Any other element leaves a gap that the elements after it close,
+	/// each moved one slot back as bytes.
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
 		let items = self.items catch fatal;
@@ -217,9 +217,9 @@ pub class Deque<T> inherits collection.Collection<T>
 		}
 	}
 
-	/// Move the elements in order into room for `n`, which is at least
-	/// `count`, the first at the start. Stops the program when the allocator
-	/// has run out.
+	/// Move the elements in order into room for `n`, which is at least `count`,
+	/// the first at the start. Stops the program when the allocator has run
+	/// out.
 	fn resize(self, n: int)
 	{
 		if n == 0 {

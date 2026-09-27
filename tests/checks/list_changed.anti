@@ -1,6 +1,6 @@
-//! A `List<T>` that grows while a `for` walks it. `push` counts the change,
-//! and the loop of a dev build stops at the next turn and names the list, the
-//! loop and the change.
+//! A `List<T>` that grows while a `for` walks it. `push` counts the change, and
+//! the loop of a dev build stops at the next turn and names the list, the loop
+//! and the change.
 
 import anti.collection.list.{List};
 

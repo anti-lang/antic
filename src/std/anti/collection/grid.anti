@@ -28,10 +28,10 @@ pub class Grid<T> inherits collection.Collection<T>
 	pub height: int = 0,
 	items: ?*T = none,
 
-	/// A grid of `width` columns and `height` rows, each cell a copy of
-	/// `fill`, with room from `from`, or from the C library when it is `none`.
-	/// A width or a height below 0 counts as 0. The room comes in one
-	/// allocation, and the program stops when the allocator has run out.
+	/// A grid of `width` columns and `height` rows, each cell a copy of `fill`,
+	/// with room from `from`, or from the C library when it is `none`. A width
+	/// or a height below 0 counts as 0. The room comes in one allocation, and
+	/// the program stops when the allocator has run out.
 	pub fn new(width: int, height: int, fill: T,
 		from: ?*mem.Allocator = none) -> Grid<T>
 	{
@@ -113,8 +113,8 @@ pub class Grid<T> inherits collection.Collection<T>
 		return n;
 	}
 
-	/// Take the first element that `test` accepts out of its cell, which
-	/// takes a copy of the fill value, and give it, or `none`.
+	/// Take the first element that `test` accepts out of its cell, which takes
+	/// a copy of the fill value, and give it, or `none`.
 	concrete fn remove_first(self, test: fn(T) -> bool,
 		at: lang.SourceLocation = here) -> ?T
 	{
@@ -226,8 +226,8 @@ pub class Grid<T> inherits collection.Collection<T>
 	}
 
 	/// The element in column `x` of row `y`, which must be inside the grid. A
-	/// dev build traps outside it, as it does for an array: at `x` against
-	/// the width, then at `y` against the height.
+	/// dev build traps outside it, as it does for an array: at `x` against the
+	/// width, then at `y` against the height.
 	fn slot(self, x: int, y: int) -> *T
 	{
 		/* DESIGN: `row` and `rows` are indexed for the check of each
