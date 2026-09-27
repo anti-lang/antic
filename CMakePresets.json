@@ -31,12 +31,14 @@
     ],
     "buildPresets": [
         { "name": "host", "configurePreset": "host" },
-        { "name": "asan", "configurePreset": "asan" },
+        { "name": "asan", "configurePreset": "asan",
+          "environment": { "ASAN_OPTIONS": "detect_leaks=1" } },
         { "name": "ubsan", "configurePreset": "ubsan" }
     ],
     "testPresets": [
         { "name": "host", "configurePreset": "host", "output": { "outputOnFailure": true } },
-        { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } },
+        { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true },
+          "environment": { "ASAN_OPTIONS": "detect_leaks=1" } },
         { "name": "ubsan", "configurePreset": "ubsan", "output": { "outputOnFailure": true } }
     ]
 }
