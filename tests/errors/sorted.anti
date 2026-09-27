@@ -1,8 +1,8 @@
 //! The refusals of the sorted collections.
 //!
-//! A set lends no element in a walk, since its elements are its keys. Both
-//! take only keys that have an order, and a map compares with `==` only when
-//! its values have `eq`.
+//! A set lends no element in a walk, since its elements are its keys. Both take
+//! only keys that have an order, and a map compares with `==` only when its
+//! values have `eq`.
 
 import anti.collection.sorted.{SortedMap, SortedSet};
 
