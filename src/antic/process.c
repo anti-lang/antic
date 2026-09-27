@@ -345,7 +345,7 @@ static char **environment_with(const char *name, const char *value,
     char **list;
     size_t i;
 
-    while (environ[count] != NULL) {
+    while (environ != NULL && environ[count] != NULL) {
         count++;
     }
     list = malloc((count + 2) * sizeof *list);
@@ -359,7 +359,7 @@ static char **environment_with(const char *name, const char *value,
         }
     }
     text_appendf(entry, "%s=%s", name, value);
-    list[kept++] = (char *)text_cstr(entry);
+    list[kept++] = entry->data;
     list[kept] = NULL;
     return list;
 }
