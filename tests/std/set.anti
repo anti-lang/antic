@@ -193,8 +193,21 @@ fn operations()
 	b.add(6);
 	let common = a.intersect(b);
 	let only = a.minus(b);
+	let both = a.union(b);
 	items("intersect:", &common);
 	items("minus:", &only);
+	items("union:", &both);
+	let turned = b.union(a);
+	items("union the other way:", &turned);
+	let copy = dup(&a);
+	let same = a == *copy;
+	let order = both == turned;
+	copy.remove(3);
+	let fewer = a == *copy;
+	copy.add(3);
+	let moved = a == *copy;
+	show(f"eq: {same} {order} {fewer} {moved} {a != *copy}");
+	delete(copy);
 	let small = Set<int>.new();
 	small.add(2);
 	small.add(5);
@@ -206,7 +219,8 @@ fn operations()
 	show(f"is_subset: {inside} {outside} {nothing} {itself}");
 	let none_left = small.minus(a);
 	let none_common = empty.intersect(a);
-	show(f"empty results: {none_left.count} {none_common.count}");
+	let only_a = empty.union(a);
+	show(f"empty results: {none_left.count} {none_common.count} {only_a.count}");
 }
 
 fn criteria() may fail
@@ -368,8 +382,12 @@ fn bits()
 	o.add(1000);
 	let common = b.intersect(o);
 	let only = b.minus(o);
+	let both = b.union(o);
+	let turned = o.union(b);
 	show(common.to_text());
 	show(only.to_text());
+	show(both.to_text());
+	show(f"union {both.count} {both == turned}");
 	let inside = common.is_subset(b);
 	let outside = o.is_subset(b);
 	show(f"is_subset {inside} {outside}");

@@ -218,6 +218,19 @@ fn operations()
 	let only = a.minus(b);
 	sorted("intersect", &common);
 	sorted("minus", &only);
+	let both = a.union(b);
+	sorted("union", &both);
+	let turned = HashSet<int>.new();
+	for i in 1..9 by -1 {
+		turned.add(i);
+	}
+	turned.remove(7);
+	let same = both == turned;
+	turned.remove(8);
+	let fewer = both == turned;
+	turned.add(9);
+	let other = both == turned;
+	show(f"eq: {same} {fewer} {other} {both != turned}");
 	let small = HashSet<int>.new();
 	small.add(2);
 	small.add(5);

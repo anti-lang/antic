@@ -75,6 +75,24 @@ pub class Set<T: eq + hash> inherits map.EntryTable<T>
 		return self.find(x) >= 0;
 	}
 
+	/// A new set of the elements of this set and then those of `other` that
+	/// this set does not hold, each in its own order, from the allocator of
+	/// this set.
+	pub fn union(self, other: Set<T>) -> Set<T>
+	{
+		let made = Set<T> { from: self.from, seed: self.seed };
+		made.reserve(self.count + other.count);
+		for x in self {
+			made.add(dup(x));
+		}
+		for x in other {
+			if !made.contains(x) {
+				made.add(dup(x));
+			}
+		}
+		return made;
+	}
+
 	/// A new set of the elements of this set that `other` holds, in the order
 	/// of this set, from the allocator of this set.
 	pub fn intersect(self, other: Set<T>) -> Set<T>
@@ -244,6 +262,23 @@ pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
 		return self.find(x) >= 0;
 	}
 
+	/// A new set of the elements of this set and of `other`, from the allocator
+	/// of this set.
+	pub fn union(self, other: HashSet<T>) -> HashSet<T>
+	{
+		let made = HashSet<T> { from: self.from, seed: self.seed };
+		made.reserve(self.count + other.count);
+		for x in self {
+			made.add(dup(x));
+		}
+		for x in other {
+			if !made.contains(x) {
+				made.add(dup(x));
+			}
+		}
+		return made;
+	}
+
 	/// A new set of the elements of this set that `other` holds, from the
 	/// allocator of this set.
 	pub fn intersect(self, other: HashSet<T>) -> HashSet<T>
@@ -387,6 +422,15 @@ pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
 	}
 }
 
+/// Whether `a` and `b` hold equal elements, in any order.
+pub operator fn eq<T: eq + hash>(a: HashSet<T>, b: HashSet<T>) -> bool
+{
+	if a.count != b.count {
+		return false;
+	}
+	return a.is_subset(b);
+}
+
 /// The iterator of `HashSet<T>`, which gives a copy of each element, from a
 /// random slot by a random odd stride.
 pub class HashSetWalk<T>
@@ -517,6 +561,32 @@ pub class BitSet inherits collection.Collection<int>
 		}
 		let words = self.words catch fatal;
 		return (words[n / WORD_BITS] & bit(n)) != 0;
+	}
+
+	/// A new set of the numbers of this set and of `other`, from the allocator
+	/// of this set.
+	pub fn union(self, other: BitSet) -> BitSet
+	{
+		let n = self.word_count;
+		if other.word_count > n {
+			n = other.word_count;
+		}
+		let made = BitSet.new(n * WORD_BITS, self.from);
+		let into = made.words else {
+			return made;
+		};
+		let found = 0;
+		let i = 0;
+		while i < n do {
+			let mine = self.word(i);
+			let theirs = other.word(i);
+			let w = mine | theirs;
+			into[i] = w;
+			found += ones(w);
+			i += 1;
+		}
+		made.count = found;
+		return made;
 	}
 
 	/// A new set of the numbers of this set that `other` holds, from the

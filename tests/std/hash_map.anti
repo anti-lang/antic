@@ -442,6 +442,20 @@ fn copies()
 	let b = dup(&a);
 	b.set("x", 10);
 	b.set("z", 3);
+	let c = dup(&a);
+	let same = a == *c;
+	c.set("x", 5);
+	let changed = a == *c;
+	c.set("x", 1);
+	let back = a == *c;
+	let t = HashMap<str, int>.new();
+	t.set("y", 2);
+	t.set("x", 1);
+	let order = a == t;
+	t.set("z", 3);
+	let more = a == t;
+	show(f"eq: {same} {changed} {back} {order} {more} {a != t}");
+	delete(c);
 	a.remove("y");
 	sorted("original", &a);
 	sorted("copy", b);
@@ -458,6 +472,18 @@ fn copies()
 		let y = c.get(one) ?? Owned.of(-1);
 		show(f"dup owned: {x.value()} {y.value()} {c.count}, {Owned.live.load()} blocks");
 		delete(c);
+	}
+	show(f"after the block: {Owned.live.load()} blocks");
+	{
+		let one = Id.of(1);
+		let a = HashMap<Id, Id>.new();
+		a.set(one, Id.of(5));
+		let b = dup(&a);
+		let same = a == *b;
+		b.set(one, Id.of(6));
+		let changed = a == *b;
+		delete(b);
+		show(f"eq owned: {same} {changed}, {Owned.live.load()} blocks");
 	}
 	show(f"after the block: {Owned.live.load()} blocks");
 }

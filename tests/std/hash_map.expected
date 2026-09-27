@@ -45,9 +45,12 @@ shrink empty: capacity 0, 0 blocks
 [[false,0],[true,1]]
 [[{"x":1,"y":2},3]]
 {{"x": 1, "y": 2}: 3}
+eq: true false true true false true
 original {"x":1}
 copy {"x":10,"y":2,"z":3}
 dup owned: 10 11 2, 12 blocks
+after the block: 0 blocks
+eq owned: true false, 3 blocks
 after the block: 0 blocks
 replaced: 6 blocks
 removed 20: 5 blocks

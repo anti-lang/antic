@@ -1257,6 +1257,24 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 	}
 }
 
+/// Whether `a` and `b` hold equal values under equal keys, in any order.
+pub operator fn eq<K: eq + hash, V: eq>(a: HashMap<K, V>, b: HashMap<K, V>) -> bool
+{
+	if a.count != b.count {
+		return false;
+	}
+	for (k, v) in a {
+		let same = false;
+		b.read(k, fn(w) {
+			same = *w == v;
+		});
+		if !same {
+			return false;
+		}
+	}
+	return true;
+}
+
 /// The iterator of `HashMap<K, V>`, which gives each key as a copy and lends
 /// its value, from a random slot by a random odd stride.
 pub class HashMapWalk<K, V>

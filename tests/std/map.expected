@@ -48,9 +48,12 @@ shrunk: 1 6 7 8 9
 shrink empty: capacity 0, 0 blocks
 {2: "two", 1: "one"}
 {"Ann":41,"say \"hi\"":2}[[2,"two"],[1,"one"]]{}[]
+eq: true false true false true
 {"x": 1}
 {"x": 10, "y": 2, "z": 3}
 dup owned: 10 11 2, 12 blocks
+after the block: 0 blocks
+eq owned: true false, 3 blocks
 after the block: 0 blocks
 replaced: 6 blocks
 removed 20: 5 blocks
