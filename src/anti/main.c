@@ -25,15 +25,17 @@ static int usage(FILE *out)
 {
     fputs("usage: anti new <name>\n"
           "       anti build [--release] [--target <t>|all] [--offline]\n"
-          "                  [--strip-docs] [--cpu <level>]\n"
+          "                  [--strip-docs] [--cpu <level>] [--memory-checks]\n"
           "                  [--lib static|shared] [--bundle-runtime]\n"
           "                  [--soname] [--runtime <dir>] [--llvm-mc <path>]\n"
           "                  [--llvm-ar <path>]\n"
           "       anti run [--release] [--cpu <level>] [--offline]\n"
+          "                [--memory-checks]\n"
           "                [--runtime <dir>] [--llvm-mc <path>]\n"
           "       anti sdk export [--sdk <MacOSX.sdk>] [-o <dir>]\n"
           "       anti sdk import <bundle> [--sysroot <dir>]\n"
-          "       anti test [--release] [--work <dir>] [-I <dir>]\n"
+          "       anti test [--release] [--memory-checks] [--work <dir>]\n"
+          "                 [-I <dir>]\n"
           "                 [--runtime <dir>] [--llvm-mc <path>]\n"
           "                 <file.anti>...\n"
           "       anti check [--warn-undocumented] [--targets all]\n"
@@ -73,6 +75,12 @@ static int usage(FILE *out)
           "write a library for C instead, with its header beside it.\n"
           "\n"
           "run builds for the host and runs what it wrote.\n"
+          "\n"
+          "--memory-checks on build, run and test passes the option of the\n"
+          "same name to antic, which checks every load and store while the\n"
+          "program runs and reports the leaks at exit. run and test put the\n"
+          "report through Anti's symbolizer, so each frame names its\n"
+          "function, file and line.\n"
           "\n"
           "sdk export packs the .tbd stubs and the version of Apple's SDK into\n"
           "apple-sdk-<version>.tar.xz, on a Mac. sdk import unpacks that bundle\n"
@@ -240,6 +248,8 @@ static int build_command(int argc, char **argv)
             request.offline = true;
         } else if (strcmp(argv[i], "--strip-docs") == 0) {
             request.strip_docs = true;
+        } else if (strcmp(argv[i], "--memory-checks") == 0) {
+            request.memory_checks = true;
         } else if (strcmp(argv[i], "--bundle-runtime") == 0) {
             request.bundle_runtime = true;
         } else if (strcmp(argv[i], "--soname") == 0) {
@@ -464,12 +474,15 @@ static int test_command(int argc, char **argv)
     size_t count = 0;
     size_t root_count = 0;
     bool release = false;
+    bool memory_checks = false;
     int status;
     int i;
 
     for (i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--release") == 0) {
             release = true;
+        } else if (strcmp(argv[i], "--memory-checks") == 0) {
+            memory_checks = true;
         } else if (strcmp(argv[i], "--work") == 0 && i + 1 < argc) {
             work = argv[++i];
         } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
@@ -497,7 +510,8 @@ static int test_command(int argc, char **argv)
         goto done;
     }
     status = test_run(sources, count, roots, root_count, work, runtime,
-                      llvm_mc, release, inject.entries, inject.count);
+                      llvm_mc, release, memory_checks, inject.entries,
+                      inject.count);
 
 done:
     manifest_inject_free(&inject);

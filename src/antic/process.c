@@ -223,6 +223,7 @@ int process_capture(const char *const argv[], struct text *out)
 
 #include <errno.h>
 #include <spawn.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -329,6 +330,102 @@ int process_capture(const char *const argv[], struct text *out)
         text_append(out, buffer);
     }
     close(fds[0]);
+    return wait_for(pid, argv[0]);
+}
+
+/* The environment of antic with name set to value: a copy of environ
+   whose entry of name gives way to the new one. The strings stay those of
+   environ, and the caller frees the list and entry. */
+static char **environment_with(const char *name, const char *value,
+                               struct text *entry)
+{
+    size_t length = strlen(name);
+    size_t count = 0;
+    size_t kept = 0;
+    char **list;
+    size_t i;
+
+    while (environ[count] != NULL) {
+        count++;
+    }
+    list = malloc((count + 2) * sizeof *list);
+    if (list == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < count; i++) {
+        if (strncmp(environ[i], name, length) != 0 ||
+            environ[i][length] != '=') {
+            list[kept++] = environ[i];
+        }
+    }
+    text_appendf(entry, "%s=%s", name, value);
+    list[kept++] = (char *)text_cstr(entry);
+    list[kept] = NULL;
+    return list;
+}
+
+int process_run_lines(const char *const argv[], const char *name,
+                      const char *value,
+                      void (*each)(void *context, const char *line,
+                                   size_t length),
+                      void *context)
+{
+    posix_spawn_file_actions_t actions;
+    struct text entry = {0};
+    struct text pending = {0};
+    char **env;
+    int fds[2];
+    pid_t pid;
+    char buffer[4096];
+    ssize_t n;
+    int err;
+
+    env = environment_with(name, value, &entry);
+    if (env == NULL) {
+        fprintf(stderr, "antic: cannot run %s: out of memory\n", argv[0]);
+        text_free(&entry);
+        return -1;
+    }
+    if (pipe(fds) != 0) {
+        fprintf(stderr, "antic: pipe: %s\n", strerror(errno));
+        free(env);
+        text_free(&entry);
+        return -1;
+    }
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_adddup2(&actions, fds[1], STDERR_FILENO);
+    posix_spawn_file_actions_addclose(&actions, fds[0]);
+    posix_spawn_file_actions_addclose(&actions, fds[1]);
+    err = posix_spawnp(&pid, argv[0], &actions, NULL, (char *const *)argv,
+                       env);
+    posix_spawn_file_actions_destroy(&actions);
+    close(fds[1]);
+    free(env);
+    text_free(&entry);
+    if (err != 0) {
+        fprintf(stderr, "antic: cannot run %s: %s\n", argv[0], strerror(err));
+        close(fds[0]);
+        return -1;
+    }
+    while ((n = read(fds[0], buffer, sizeof buffer)) > 0) {
+        size_t start = 0;
+        size_t i;
+        for (i = 0; i < (size_t)n; i++) {
+            if (buffer[i] != '\n') {
+                continue;
+            }
+            text_append_bytes(&pending, buffer + start, i + 1 - start);
+            each(context, pending.data, pending.length);
+            pending.length = 0;
+            start = i + 1;
+        }
+        text_append_bytes(&pending, buffer + start, (size_t)n - start);
+    }
+    if (pending.length > 0) {
+        each(context, pending.data, pending.length);
+    }
+    close(fds[0]);
+    text_free(&pending);
     return wait_for(pid, argv[0]);
 }
 

@@ -17,6 +17,7 @@
 #include "files.h"
 #include "modpath.h"
 #include "process.h"
+#include "syms.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
@@ -40,7 +41,7 @@ static bool read_unit(const char *source, const char *const *roots,
 /* The options every call of this run shares. */
 static void base_options(struct options *o, const char *runtime,
                          const char *llvm_mc, const char **roots,
-                         size_t root_count)
+                         size_t root_count, bool memory_checks)
 {
     memset(o, 0, sizeof *o);
     o->roots = roots;
@@ -59,6 +60,10 @@ static void base_options(struct options *o, const char *runtime,
        runs the standard library's tests too, so the run allows the
        `anti.` module paths that a reader's program may not write. */
     o->internal = true;
+    /* --memory-checks carries the lines of -g, which its reports name,
+       as it does for antic. */
+    o->memory_checks = memory_checks;
+    o->debug = memory_checks;
 }
 
 /* Write the library file of a module, which the runner imports. */
@@ -303,7 +308,7 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
     }
     argv[0] = text_cstr(&program);
     argv[1] = NULL;
-    ok = process_run(argv) == 0;
+    ok = (o.memory_checks ? syms_run_checked(argv) : process_run(argv)) == 0;
 done:
     imports_free(&imports);
     arena_free(&framework_arena);
@@ -319,7 +324,7 @@ done:
 int test_run(const char *const *sources, size_t source_count,
              const char *const *roots, size_t root_count, const char *work,
              const char *runtime, const char *llvm_mc, bool release,
-             const char **inject, size_t inject_count)
+             bool memory_checks, const char **inject, size_t inject_count)
 {
     struct options base;
     const char **search;
@@ -344,7 +349,8 @@ int test_run(const char *const *sources, size_t source_count,
     for (i = 0; i < root_count; i++) {
         search[i + 1] = roots[i];
     }
-    base_options(&base, runtime, llvm_mc, search, root_count + 1);
+    base_options(&base, runtime, llvm_mc, search, root_count + 1,
+                 memory_checks);
     /* DESIGN: `[inject.test]` of the manifest lies over `[inject]`, so a
        test run takes the fake of an interface where the manifest names
        one. Every compile of the run carries the same table. */

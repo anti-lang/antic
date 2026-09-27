@@ -19,4 +19,16 @@ int process_run_in(const char *directory, const char *const argv[]);
    out. */
 int process_capture(const char *const argv[], struct text *out);
 
+#if !defined(_WIN32)
+/* Run a program as process_run does, with the environment variable name
+   set to value, and hand each line of its standard error to each, with
+   its newline. A last line without one comes last. Standard output stays
+   the one of antic. */
+int process_run_lines(const char *const argv[], const char *name,
+                      const char *value,
+                      void (*each)(void *context, const char *line,
+                                   size_t length),
+                      void *context);
+#endif
+
 #endif

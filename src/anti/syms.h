@@ -37,4 +37,11 @@ int syms_resolve(const char *trace, const char *const *symbols,
 bool syms_map_lookup(const char *map, uint64_t vaddr, struct text *function,
                      struct text *where);
 
+/* Run the program argv of --memory-checks as `anti run` and `anti test`
+   do and return its exit status. The program runs with the symbolizing
+   of AddressSanitizer off, and each frame of its report comes out with
+   the function, the file and the line that Anti's symbolizer reads from
+   its module. */
+int syms_run_checked(const char *const argv[]);
+
 #endif

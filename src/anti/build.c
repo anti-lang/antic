@@ -24,6 +24,7 @@
 #include "manifest.h"
 #include "modpath.h"
 #include "process.h"
+#include "syms.h"
 #include "sha256.h"
 #include "symmap.h"
 #include "target.h"
@@ -105,9 +106,10 @@ struct build {
    the first three. The level joins them because it decides the
    instructions, and the debug flag because it decides the lines. The
    strict flag is --warnings-as-errors, which decides whether a warning
-   stops the file. */
+   stops the file. The flag of --memory-checks decides whether the
+   object carries the checks. */
 static void cache_key(const char *input, enum target t, enum cpu_level cpu,
-                      bool debug, bool strict, struct text *out)
+                      bool debug, bool strict, bool checked, struct text *out)
 {
     struct anti_sha256 digest;
     struct text bytes = {0};
@@ -118,9 +120,9 @@ static void cache_key(const char *input, enum target t, enum cpu_level cpu,
         anti_rt_sha256_update(&digest, bytes.data, bytes.length);
     }
     anti_rt_sha256_hex(&digest, hex);
-    text_appendf(out, "%s %s %s %s %s%s\n", hex, ANTIC_VERSION,
+    text_appendf(out, "%s %s %s %s %s%s%s\n", hex, ANTIC_VERSION,
                  target_name(t), cpu_name(cpu), debug ? "g" : "no-g",
-                 strict ? " strict" : "");
+                 strict ? " strict" : "", checked ? " memory-checks" : "");
     text_free(&bytes);
 }
 
@@ -163,6 +165,14 @@ static bool write_key(const char *output, const struct text *key)
     return ok;
 }
 
+/* Whether the objects carry the lines of -g. --memory-checks turns them
+   on in release mode too, as it does for antic, since its reports name
+   the lines. */
+static bool build_debug(const struct build *b)
+{
+    return !b->r->release || b->r->memory_checks;
+}
+
 /* The options every call of one target shares. */
 static void base_options(struct build *b, struct options *o,
                          enum target t, enum cpu_level cpu)
@@ -184,8 +194,10 @@ static void base_options(struct build *b, struct options *o,
     o->roots = b->roots;
     o->root_count = 1;
     /* DESIGN: dev mode carries the line of every statement and release
-       mode never does, which is the rule of docs/tooling.md. */
-    o->debug = !b->r->release;
+       mode does not, which is the rule of docs/tooling.md. A release
+       build of --memory-checks carries them for its reports. */
+    o->debug = build_debug(b);
+    o->memory_checks = b->r->memory_checks;
     o->frameworks = b->frameworks;
     o->framework_count = b->framework_count;
     o->linux_libraries = b->linux_libraries;
@@ -243,7 +255,7 @@ static bool module_library(struct build *b, const struct unit *u,
        module of the project with --warnings-as-errors. A library file
        that a dev build wrote was checked without it, and the key keeps
        the two apart. */
-    cache_key(u->source, t, cpu, false, b->r->release, &key);
+    cache_key(u->source, t, cpu, false, b->r->release, false, &key);
     if (cached(text_cstr(output), &key)) {
         ok = true;
         goto done;
@@ -284,7 +296,8 @@ static bool module_object(struct build *b, const char *library,
         goto done;
     }
     text_appendf(out, "%s%s", text_cstr(&base), target_info(t)->object_suffix);
-    cache_key(library, t, cpu, !b->r->release, false, &key);
+    cache_key(library, t, cpu, build_debug(b), false, b->r->memory_checks,
+              &key);
     if (cached(text_cstr(out), &key)) {
         ok = true;
         goto done;
@@ -1052,7 +1065,8 @@ static int build_project(const struct build_request *r, int depth)
             } else {
                 argv[0] = text_cstr(&program);
                 argv[1] = NULL;
-                status = process_run(argv);
+                status = r->memory_checks ? syms_run_checked(argv)
+                                          : process_run(argv);
             }
         }
         text_free(&program);

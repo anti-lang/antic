@@ -1,0 +1,24 @@
+//! A module whose test frees one block twice. `anti test --memory-checks`
+//! reports the second `free` with the function, the file and the line of each
+//! frame.
+
+struct Cell
+{
+	n: int,
+}
+
+fn make() -> *Cell
+{
+	return alloc Cell { n: 7 };
+}
+
+tests
+{
+	fn frees_twice()
+	{
+		let p = make();
+		let q = p;
+		free(p);
+		free(q);
+	}
+}

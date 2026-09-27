@@ -1282,6 +1282,21 @@ add_test(NAME anti_test
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test.cmake")
 
+# `anti run --memory-checks` and `anti test --memory-checks` put the report
+# of each memory error through Anti's symbolizer, and the dev cache keeps
+# the objects with and without the checks apart.
+add_test(NAME anti_memory_checks
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
+        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_tests.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-checks"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_memory_checks.cmake")
+set_tests_properties(anti_memory_checks PROPERTIES TIMEOUT 300)
+
 # `anti build`, `anti run` and `anti new` over a two-module project: the
 # dev cache, release mode, the -g rule, --target, --cpu and the lock file.
 if(ANTIC_HOST_CPU STREQUAL "arm64")
