@@ -8,16 +8,37 @@
 #include <stdlib.h>
 
 #if defined(_WIN32)
+#include <errno.h>
 #include <share.h>
+#include <windows.h>
 
 /* DESIGN: fopen of the Windows C runtime is _fsopen with _SH_DENYNO,
    which shares the file for reading and writing. The C runtime
    deprecates the first and not the second, so the call is the same one
    by the name that is not deprecated. fopen_s would lock the file
    against every other open. */
+/* DESIGN: Windows lets a scanner of the machine hold a program that just
+   ran, or was just written, without sharing it for writing, for a moment.
+   A write then fails with EACCES. anti build writes the program into
+   dist/ at every build, right after a user ran it, and failed three builds
+   in ten on the Windows VM. A write waits for the file up to two seconds,
+   in steps of 50 ms, as the file copies of CMake retry. A read never
+   waits, and a file that stays locked still fails. */
+#define OPEN_WRITE_TRIES 40
+#define OPEN_WRITE_STEP_MS 50
+
 FILE *platform_open(const char *path, bool writing)
 {
-    return _fsopen(path, writing ? "wb" : "rb", _SH_DENYNO);
+    FILE *f = _fsopen(path, writing ? "wb" : "rb", _SH_DENYNO);
+    int tries = 1;
+
+    while (f == NULL && writing && errno == EACCES &&
+           tries < OPEN_WRITE_TRIES) {
+        Sleep(OPEN_WRITE_STEP_MS);
+        f = _fsopen(path, "wb", _SH_DENYNO);
+        tries++;
+    }
+    return f;
 }
 
 /* DESIGN: getenv gives storage that the program never frees. _dupenv_s,

@@ -17,6 +17,47 @@
 #include "../binary_stdio.h"
 #include "check.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+
+/* Close the handle of the file after 300 ms. */
+static DWORD WINAPI release_later(LPVOID handle)
+{
+    Sleep(300);
+    CloseHandle((HANDLE)handle);
+    return 0;
+}
+
+/* A file that another handle holds without sharing it for writing, as a
+   scanner of Windows holds a program that just ran, opens for writing
+   once that handle is closed. anti build rewrote the program in dist/
+   right after a run of it and failed. */
+static void write_waits_for_lock(const char *path)
+{
+    HANDLE held;
+    HANDLE thread;
+    FILE *f;
+
+    held = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,
+                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    CHECK(held != INVALID_HANDLE_VALUE);
+    if (held == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    thread = CreateThread(NULL, 0, release_later, held, 0, NULL);
+    CHECK(thread != NULL);
+    f = platform_open(path, true);
+    CHECK(f != NULL);
+    if (f != NULL) {
+        CHECK(fclose(f) == 0);
+    }
+    if (thread != NULL) {
+        WaitForSingleObject(thread, INFINITE);
+        CloseHandle(thread);
+    }
+}
+#endif
+
 /* Set the environment variable name to value, on the host's own call. */
 static void put(const char *name, const char *value)
 {
@@ -72,6 +113,9 @@ void test_tool_platform(void)
     bytes = read_all(path, &length);
     CHECK(bytes != NULL && length == 1 && bytes[0] == 'c');
     free(bytes);
+#if defined(_WIN32)
+    write_waits_for_lock(path);
+#endif
     remove(path);
 
     put("ANTIC_TOOL_PLATFORM", "value");
