@@ -1192,12 +1192,18 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 	}
 }
 
+/// Whether `a` and `b` hold equal keys with equal values.
+pub operator fn eq<K: Ordered, V: eq>(a: SortedMap<K, V>, b: SortedMap<K, V>) -> bool
+{
+	return collection.equal<(K, V)>(&a, &b);
+}
+
 /// A set that walks its elements in order.
 ///
 /// An element is found in logarithmic time. `for x in s` gives a copy of each
 /// element, `range(lo, hi)`, `floor(x)`, `ceiling(x)`, `first()` and `last()`
-/// find elements by the order, and `intersect(o)` and `minus(o)` make new sets
-/// from the allocator of this one.
+/// find elements by the order, and `union(o)`, `intersect(o)` and `minus(o)`
+/// make new sets from the allocator of this one.
 ///
 /// A function that the `update` forms of the base lend an element may change it
 /// only in ways that keep its place in the order. A change that breaks the
@@ -1247,6 +1253,29 @@ pub class SortedSet<T: Ordered> inherits BTree<T>
 	pub fn contains(self, x: T) -> bool
 	{
 		return self.find(&x) >= 0;
+	}
+
+	/// A new set of the elements that this set or `o` holds.
+	pub fn union(self, o: *SortedSet<T>) -> SortedSet<T>
+	{
+		let made = SortedSet<T> { from: self.from };
+		let mine = self.first_place();
+		let theirs = o.first_place();
+		while mine >= 0 || theirs >= 0 do {
+			let place = made.append_place(here);
+			if theirs < 0 || mine >= 0 && *self.slot(mine) < *o.slot(theirs) {
+				*made.slot(place) = self.copy_place(mine);
+				mine = self.next_place(mine);
+			} else if mine < 0 || *o.slot(theirs) < *self.slot(mine) {
+				*made.slot(place) = o.copy_place(theirs);
+				theirs = o.next_place(theirs);
+			} else {
+				*made.slot(place) = self.copy_place(mine);
+				mine = self.next_place(mine);
+				theirs = o.next_place(theirs);
+			}
+		}
+		return made;
 	}
 
 	/// A new set of the elements that this set and `o` both hold.
@@ -1365,12 +1394,6 @@ pub class SortedSet<T: Ordered> inherits BTree<T>
 		return self.copy_place(at);
 	}
 
-	/// Whether this set and `other` hold equal elements.
-	operator fn eq(self, other: SortedSet<T>) -> bool
-	{
-		return collection.equal<T>(self, &other);
-	}
-
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
 		f(self.slot(at));
@@ -1482,6 +1505,12 @@ pub class SortedSet<T: Ordered> inherits BTree<T>
 			out_of_order();
 		}
 	}
+}
+
+/// Whether `a` and `b` hold equal elements.
+pub operator fn eq<T: Ordered>(a: SortedSet<T>, b: SortedSet<T>) -> bool
+{
+	return collection.equal<T>(&a, &b);
 }
 
 /// A walk of copies of the elements of a sorted collection, from one place up

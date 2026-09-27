@@ -3406,6 +3406,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "direct_imports|--front-end,--runtime,${ANTIC_RUNTIME_DIR},direct_imports.anti"
         "walk_interfaces|--front-end,--runtime,${ANTIC_RUNTIME_DIR},walk_interfaces.anti"
         "handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},handles.anti"
+        "sorted|--front-end,--runtime,${ANTIC_RUNTIME_DIR},sorted.anti"
         "shared_handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},shared_handles.anti"
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti")
     string(REPLACE "|" ";" parts "${case}")

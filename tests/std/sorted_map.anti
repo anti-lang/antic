@@ -284,6 +284,25 @@ fn texts()
 	show(f"after June: {later.1}");
 }
 
+fn equality()
+{
+	let a = SortedMap<str, int>.new();
+	let b = SortedMap<str, int>.new();
+	a.set("Bob", 7);
+	a.set("Ann", 41);
+	b.set("Ann", 41);
+	b.set("Bob", 7);
+	let same = a == b;
+	b.set("Bob", 8);
+	let other_value = a == b;
+	b.set("Bob", 7);
+	b.set("Cy", 3);
+	let longer = a == b;
+	let gone = a.add("Di", 3);
+	let other_key = a == b;
+	show(f"eq {same} {other_value} {longer} {other_key} {a != b}");
+}
+
 fn owned()
 {
 	{
@@ -381,6 +400,7 @@ fn main() -> int
 	order();
 	shared() catch fatal;
 	texts();
+	equality();
 	owned();
 	owned_walks();
 	allocations();

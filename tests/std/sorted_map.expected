@@ -26,6 +26,7 @@ after clear {1: 1}
 {"Ann": 41, "Bob": 7}
 {"Ann":41,"Bob":7}
 after June: Christmas
+eq true false false false true
 {1: one, 2: other, 3: one}
 replaced with 5, torn 1, copy 1
 removed, torn 1

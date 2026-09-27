@@ -1,0 +1,6 @@
+sorted.anti:24:12: error: `for x in &e` takes each element in place, and the `operator fn value` of `SortedWalk<int>` gives a copy of `int`
+sorted.anti:27:23: error: `Plain` has no `lt`, which `SortedSet` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
+sorted.anti:27:14: error: `Plain` has no `lt`, which `SortedSet` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
+sorted.anti:28:23: error: `Plain` has no `lt`, which `SortedMap` needs for `K`. A struct or a class has no default order and declares `operator fn lt`
+sorted.anti:28:14: error: `Plain` has no `lt`, which `SortedMap` needs for `K`. A struct or a class has no default order and declares `operator fn lt`
+sorted.anti:31:13: error: `Half` has no `eq`, which `eq:SortedMap` needs for `V`

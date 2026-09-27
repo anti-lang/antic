@@ -1,0 +1,33 @@
+//! The refusals of the sorted collections.
+//!
+//! A set lends no element in a walk, since its elements are its keys. Both
+//! take only keys that have an order, and a map compares with `==` only when
+//! its values have `eq`.
+
+import anti.collection.sorted.{SortedMap, SortedSet};
+
+struct Plain
+{
+	x: int,
+}
+
+/// A value with no `eq`, since `f16` has no operator.
+struct Half
+{
+	data: [2]f16,
+}
+
+fn main() -> int
+{
+	let s = SortedSet<int>.new();
+	let added = s.add(1);
+	for x in &s {
+		*x = 2;
+	}
+	let plain = SortedSet<Plain>.new();
+	let keyed = SortedMap<Plain, int>.new();
+	let a = SortedMap<int, Half>.new();
+	let b = SortedMap<int, Half>.new();
+	let same = a == b;
+	return 0;
+}

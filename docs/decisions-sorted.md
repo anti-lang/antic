@@ -2,8 +2,9 @@
 
 The decisions of `SortedMap<K, V>` and `SortedSet<T>` of round five, for a
 later step to fold into "Generics and collections" of `docs/decisions.md`. Both
-are built in `anti.collection.sorted`, apart from `union(o)` of the set and `==`
-of the map. `docs/reports/2026-09-25-add5-sorted.md` names the blockers.
+are built in `anti.collection.sorted` with every operation of "Maps" and "Sets".
+`docs/reports/2026-09-25-add5-sorted.md` and
+`docs/reports/2026-09-27-add5-sorted.md` report the step.
 
 - `SortedMap<K: Ordered, V>` and `SortedSet<T: Ordered>` are B-trees over one
   abstract base, `BTree<T>`. It inherits `collection.Collection<T>` and fills
@@ -27,7 +28,9 @@ of the map. `docs/reports/2026-09-25-add5-sorted.md` names the blockers.
   `Collection<T>` reach an element by an `int` place.
 - The map adds `range(lo, hi)`, `floor(k)`, `ceiling(k)`, `first()`, `last()`,
   `pop_first()` and `pop_last()`, and the set adds `range`, `floor`,
-  `ceiling`, `first` and `last`, as "Maps" and "Sets" list them.
+  `ceiling`, `first` and `last`, as "Maps" and "Sets" list them. The set has
+  `union(o)`, `intersect(o)`, `minus(o)` and `is_subset(o)`, which walk both
+  sets once in order.
 - [provisional] `range(lo, hi)` with `lo` not below `hi` walks nothing.
   Reason: the range stops before `hi`, so it holds no key.
 - [provisional] `floor`, `ceiling`, `first`, `last`, `pop_first` and
@@ -54,17 +57,19 @@ of the map. `docs/reports/2026-09-25-add5-sorted.md` names the blockers.
   a lookup gives a copy of the value alone. The teardown and the copy of a
   whole entry are the base's, whose `destroy` and `dup` take the tuple part by
   part.
-- [provisional] `intersect(o)` and `minus(o)` make the new set from the
-  allocator of this set. Reason: "Principles" says everything a collection
+- [provisional] `union(o)`, `intersect(o)` and `minus(o)` make the new set from
+  the allocator of this set, and an element both sets hold is copied from this
+  one. Reason: "Principles" says everything a collection
   allocates comes from its allocator.
 - [provisional] `serialize` writes a map with `str` keys as a JSON object,
   `{"Ann":41}`, and any other map as an array of pairs. It reads the type id in
   the record of the key type and compares it with `anti.reflect.TypeId.Str`, so
   `anti.collection.sorted` imports `anti.reflect`. Reason: "Principles" names
   both forms, and a generic body cannot name the type of `K` otherwise.
-- The set has `==` through `operator fn eq`, since `T: Ordered` gives its
-  elements `eq`.
-- Not built: `union(o)` of the set, which the parser refuses as the name of a
-  function because `union` is a keyword. `==` of the map, which needs `eq` on
-  `V` alone, the same refusal `docs/reports/2026-09-25-add5-seq.md` reports
-  for `List`. `deserialize` of a map, which no collection has yet.
+- The map and the set have `==` through a generic `operator fn eq` of the
+  module that calls `collection.equal`, as "Generics and collections" gives
+  every collection. The map's is `eq<K: Ordered, V: eq>` and compares the
+  entries in key order, so a map whose values have no `eq` has no `==`, and the
+  refusal names `V`. The set's is `eq<T: Ordered>`. `tests/errors/sorted.anti`
+  holds the refusals.
+- Not built: `deserialize` of a map, which no collection has yet.
