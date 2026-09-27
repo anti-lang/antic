@@ -24,6 +24,7 @@ extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
 extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
+extern fn anti_rt_text_slice(bytes: ?*byte, len: int) -> str;
 
 /// The bit every kept hash carries, so a live mark is never 0 or `REMOVED`.
 const LIVE: u64 = 0x8000000000000000;
@@ -42,25 +43,10 @@ pub const TYPE_DEPTH: int = 3;
 /// anti_type` of `src/rt/object.h` and `reflect.TypeId` number them.
 ///
 /// DESIGN: the map reads them without importing `anti.reflect`, whose
-/// descriptors every program that uses a map would link. The test of the hash
-/// map sorts keys of each of these types, which a wrong number leaves out of
-/// order.
+/// descriptors every program that uses a map would link. `serialize` writes a
+/// map whose key is `str` as a JSON object, which a wrong number turns into an
+/// array of pairs.
 const TYPE_NONE: int = 0;
-const TYPE_BOOL: int = 1;
-const TYPE_CHAR: int = 2;
-const TYPE_I8: int = 3;
-const TYPE_I16: int = 4;
-const TYPE_I32: int = 5;
-const TYPE_I64: int = 6;
-const TYPE_CLONG: int = 7;
-const TYPE_U8: int = 8;
-const TYPE_U16: int = 9;
-const TYPE_U32: int = 10;
-const TYPE_U64: int = 11;
-const TYPE_CULONG: int = 12;
-const TYPE_CWCHAR: int = 13;
-const TYPE_F32: int = 14;
-const TYPE_F64: int = 15;
 const TYPE_STR: int = 16;
 
 /// One record of a type in a descriptor.
@@ -1021,9 +1007,9 @@ fn next_entry(hashes: ?*u64, at: int, used: int) -> int
 /// Lookup takes constant time on average. The entries stand in the hash table
 /// itself, with no order to maintain, which suits large maps with frequent
 /// removal. A walk gives them in a random order, a new one on every walk, so no
-/// program comes to depend on it. `serialize` writes the entries sorted by key
-/// when the key is a number, a `bool`, a `char` or a `str`, so saved files stay
-/// stable. The key type needs `==` and `hash`.
+/// program comes to depend on it. `serialize` writes the entries sorted by the
+/// bytes of the text of each key, so saved files stay stable. The key type
+/// needs `==` and `hash`.
 ///
 /// Reading gives a copy of a value. `set` and `add` take a copy of the key and
 /// the value itself. The keys never change in place, as in `Map<K, V>`.
@@ -1183,26 +1169,67 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 	}
 
 	/// Write the entries to `out`, a JSON object when the keys are `str` and an
-	/// array of `[key, value]` pairs otherwise. They stand sorted by key when
-	/// the key is a number, a `bool`, a `char` or a `str`, and in the order of
-	/// the slots otherwise.
+	/// array of `[key, value]` pairs otherwise. They stand sorted by the bytes
+	/// of the text of each key, and by those of the value where two keys write
+	/// the same text.
+	///
+	/// DESIGN: the order of the text is the same whatever order a walk takes,
+	/// needs no test of whether a key has `lt`, and holds for every key
+	/// `serialize` can write. The value decides between two keys that differ in
+	/// what `serialize` leaves out, so the bytes written never depend on the
+	/// slots.
 	concrete fn serialize(self, out: *text.Builder)
 	{
 		let key = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
 		let value = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
-		let kind = kind_of(key);
-		let object = kind == TYPE_STR;
-		let order = self.sorted(kind);
+		let object = kind_of(key) == TYPE_STR;
+		let texts = text.Builder.new();
+		let starts = numbers(self.from, 2 * self.count + 1);
+		let order = numbers(self.from, self.count);
+		let found = 0;
+		let marks = self.marks;
+		let slots = self.slots;
+		if marks != none && slots != none {
+			let i = 0;
+			while i < self.size do {
+				if marks[i] > REMOVED {
+					order[found] = found;
+					starts[2 * found] = texts.len();
+					anti_rt_element_serialize(&texts, &slots[i].0 as ?*byte, key);
+					starts[2 * found + 1] = texts.len();
+					anti_rt_element_serialize(&texts, &slots[i].1 as ?*byte, value);
+					found += 1;
+				}
+				i += 1;
+			}
+		}
+		starts[2 * found] = texts.len();
+		let all = texts.text();
+		sort_by_text(order, found, all, starts, 2);
 		open_entries(out, object);
-		let i = 0;
-		while i < self.count do {
-			let e = self.entry(order[i]);
-			write_entry(out, object, i == 0, &e.0 as ?*byte, key,
-				&e.1 as ?*byte, value);
-			i += 1;
+		let n = 0;
+		while n < found do {
+			if n > 0 {
+				out.append(",");
+			}
+			let k = text_at(all, starts, 2 * order[n]);
+			let v = text_at(all, starts, 2 * order[n] + 1);
+			if object {
+				out.append(k);
+				out.append(":");
+				out.append(v);
+			} else {
+				out.append("[");
+				out.append(k);
+				out.append(",");
+				out.append(v);
+				out.append("]");
+			}
+			n += 1;
 		}
 		close_entries(out, object);
 		self.from.free(order as ?*byte);
+		self.from.free(starts as ?*byte);
 	}
 
 	/// The entry found at `found`, or a new one of the marked hash `h` with a
@@ -1223,37 +1250,6 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 		return self.slot_of(self.marked(k.hash()), fn(e) {
 			return e.0 == k;
 		});
-	}
-
-	/// The live slots, sorted by key when the key of `kind` has an order, in
-	/// room of the allocator of the map.
-	fn sorted(self, kind: int) -> *int
-	{
-		let n = self.count;
-		if n == 0 {
-			n = 1;
-		}
-		let made = self.from.alloc(n * size_of(int), size_of(int)) catch fatal;
-		let order = made as *int;
-		let marks = self.marks else {
-			return order;
-		};
-		let slots = self.slots catch fatal;
-		let found = 0;
-		let i = 0;
-		while i < self.size do {
-			if marks[i] > REMOVED {
-				order[found] = i;
-				found += 1;
-			}
-			i += 1;
-		}
-		if ordered(kind) {
-			sort_by_key(order, found, fn(a, b) {
-				return before(&slots[a].0 as ?*byte, &slots[b].0 as ?*byte, kind);
-			});
-		}
-		return order;
 	}
 }
 
@@ -1446,47 +1442,45 @@ pub fn kind_of(arg: ?*byte) -> int
 	return record.type_id & 0xFF;
 }
 
-/// Whether the values of the type id `kind` have an order that `before` reads:
-/// a number, a `bool`, a `char` and a `str`.
-pub fn ordered(kind: int) -> bool
+/// Room for `n` numbers from `from`, and for one when `n` is 0.
+pub fn numbers(from: *mem.Allocator, n: int) -> *int
 {
-	return kind >= TYPE_BOOL && kind <= TYPE_STR;
+	let count = n;
+	if count == 0 {
+		count = 1;
+	}
+	let made = from.alloc(count * size_of(int), size_of(int)) catch fatal;
+	return made as *int;
 }
 
-/// Whether the value at `a` comes before the one at `b`, both of the type id
-/// `kind`, which `ordered` accepts.
-pub fn before(a: ?*byte, b: ?*byte, kind: int) -> bool
+/// The text `k` of `all`, the bytes from `starts[k]` up to `starts[k + 1]`.
+pub fn text_at(all: str, starts: *int, k: int) -> str
 {
-	if kind == TYPE_STR {
-		return *(a as *str) < *(b as *str);
-	} else if kind == TYPE_BOOL || kind == TYPE_U8 {
-		return *(a as *u8) < *(b as *u8);
-	} else if kind == TYPE_I8 {
-		return *(a as *i8) < *(b as *i8);
-	} else if kind == TYPE_I16 {
-		return *(a as *i16) < *(b as *i16);
-	} else if kind == TYPE_U16 {
-		return *(a as *u16) < *(b as *u16);
-	} else if kind == TYPE_I32 {
-		return *(a as *i32) < *(b as *i32);
-	} else if kind == TYPE_U32 || kind == TYPE_CHAR {
-		return *(a as *u32) < *(b as *u32);
-	} else if kind == TYPE_I64 {
-		return *(a as *i64) < *(b as *i64);
-	} else if kind == TYPE_U64 {
-		return *(a as *u64) < *(b as *u64);
-	} else if kind == TYPE_CLONG {
-		return *(a as *c_long) < *(b as *c_long);
-	} else if kind == TYPE_CULONG {
-		return *(a as *c_ulong) < *(b as *c_ulong);
-	} else if kind == TYPE_CWCHAR {
-		return *(a as *c_wchar) < *(b as *c_wchar);
-	} else if kind == TYPE_F32 {
-		return *(a as *f32) < *(b as *f32);
-	} else if kind == TYPE_F64 {
-		return *(a as *f64) < *(b as *f64);
-	}
-	return false;
+	let bytes = all.ptr as *byte;
+	return anti_rt_text_slice(&bytes[starts[k]] as ?*byte,
+		starts[k + 1] - starts[k]);
+}
+
+/// Sort the `n` numbers at `order`, each an entry of `width` texts of `all`
+/// that `starts` bounds, by the bytes of the first text of each entry, then by
+/// those of the next where the first are equal.
+pub fn sort_by_text(order: *int, n: int, all: str, starts: *int, width: int)
+{
+	sort_by_key(order, n, fn(a, b) {
+		let c = 0;
+		while c < width do {
+			let x = text_at(all, starts, a * width + c);
+			let y = text_at(all, starts, b * width + c);
+			if x < y {
+				return true;
+			}
+			if y < x {
+				return false;
+			}
+			c += 1;
+		}
+		return false;
+	});
 }
 
 /// Sort the `n` numbers at `order` in place, with a heap, so that `less` holds

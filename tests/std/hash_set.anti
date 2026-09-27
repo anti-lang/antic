@@ -1,9 +1,9 @@
 //! `HashSet<T>` of `anti.collection.set` through every operation.
 //!
 //! The set walks in a random order, a new one on every walk, so the program
-//! prints what does not depend on it: `serialize`, which sorts the elements,
-//! sums and counts. Elements that own memory count the blocks alive, so heavy
-//! churn ends with none alive.
+//! prints what does not depend on it: `serialize`, which sorts the elements by
+//! the bytes of their text, sums and counts. Elements that own memory count the
+//! blocks alive, so heavy churn ends with none alive.
 
 import anti.collection;
 import anti.collection.set.{HashSet};
@@ -131,7 +131,8 @@ fn show(s: str)
 	free(s.ptr);
 }
 
-/// Print `label` and the elements of `s`, which `serialize` sorts.
+/// Print `label` and the elements of `s`, which `serialize` sorts by their
+/// text.
 fn sorted<T: eq + hash>(label: str, s: *HashSet<T>)
 {
 	let out = text.Builder.new();
@@ -324,6 +325,12 @@ fn room()
 	words.serialize(&out);
 	floats.serialize(&out);
 	show(out.take());
+	let numbers = HashSet<int>.new();
+	numbers.add(9);
+	numbers.add(100);
+	numbers.add(-3);
+	numbers.add(10);
+	sorted("by text", &numbers);
 }
 
 /// Elements that own memory, torn down once each. The elements stand in locals,

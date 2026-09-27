@@ -1,10 +1,10 @@
 //! `HashMap<K, V>` of `anti.collection.map` through every operation.
 //!
 //! The map walks in a random order, a new one on every walk, so the program
-//! prints what does not depend on it: `serialize`, which sorts by key, sums and
-//! counts. A walk visits every entry once, and two walks of one map come in two
-//! orders. Keys and values that own memory count the blocks alive, so heavy
-//! churn ends with none alive.
+//! prints what does not depend on it: `serialize`, which sorts by the bytes of
+//! the text of each key, sums and counts. A walk visits every entry once, and
+//! two walks of one map come in two orders. Keys and values that own memory
+//! count the blocks alive, so heavy churn ends with none alive.
 
 import anti.collection;
 import anti.collection.map.{HashMap};
@@ -132,7 +132,8 @@ fn show(s: str)
 	free(s.ptr);
 }
 
-/// Print `label` and the entries of `m`, which `serialize` sorts by key.
+/// Print `label` and the entries of `m`, which `serialize` sorts by the text of
+/// each key.
 fn sorted<K: eq + hash, V>(label: str, m: *HashMap<K, V>)
 {
 	let out = text.Builder.new();
@@ -434,6 +435,59 @@ fn texts()
 	show(points.to_text());
 }
 
+/// A score, whose `lt` puts the higher value first.
+struct Score
+{
+	value: int,
+}
+
+operator fn lt(a: Score, b: Score) -> bool
+{
+	return a.value > b.value;
+}
+
+/// A key whose pointer `serialize` writes as `null`, so two keys that differ in
+/// the pointer alone write the same text.
+struct Tagged
+{
+	id: int,
+	at: ?*int,
+}
+
+/// `serialize` sorts by the bytes of the text of each key, not by the value of
+/// a number and not by `lt`, and by the text of the value where two keys write
+/// the same text, so the output never depends on the slots.
+fn text_order()
+{
+	let numbers = HashMap<int, int>.new();
+	numbers.set(9, 1);
+	numbers.set(100, 2);
+	numbers.set(-3, 3);
+	numbers.set(10, 4);
+	sorted("numbers", &numbers);
+	let scores = HashMap<Score, str>.new();
+	scores.set(Score { value: 2 }, "b");
+	scores.set(Score { value: 10 }, "c");
+	scores.set(Score { value: 1 }, "a");
+	sorted("scores", &scores);
+	let points = HashMap<Point, int>.new();
+	points.set(Point { x: 2, y: 5 }, 2);
+	points.set(Point { x: 10, y: 0 }, 1);
+	points.set(Point { x: 1, y: 2 }, 3);
+	points.set(Point { x: -4, y: 9 }, 4);
+	sorted("points", &points);
+	let cells: [6]int = [0, 0, 0, 0, 0, 0];
+	let tied = HashMap<Tagged, str>.new();
+	tied.set(Tagged { id: 1, at: &cells[3] }, "d");
+	tied.set(Tagged { id: 1, at: &cells[0] }, "a");
+	tied.set(Tagged { id: 1, at: &cells[5] }, "f");
+	tied.set(Tagged { id: 0, at: none }, "z");
+	tied.set(Tagged { id: 1, at: &cells[2] }, "c");
+	tied.set(Tagged { id: 1, at: &cells[4] }, "e");
+	tied.set(Tagged { id: 1, at: &cells[1] }, "b");
+	sorted("tied", &tied);
+}
+
 fn copies()
 {
 	let a = HashMap<str, int>.new();
@@ -560,6 +614,7 @@ fn main() -> int
 	criteria() catch fatal;
 	room();
 	texts();
+	text_order();
 	copies();
 	owned();
 	churn();

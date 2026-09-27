@@ -213,9 +213,8 @@ pub class SetWalk<T>
 /// Lookup takes constant time on average. The elements stand in the hash table
 /// itself, which suits large sets with frequent removal. A walk gives them in a
 /// random order, a new one on every walk, so no program comes to depend on it.
-/// `serialize` writes them sorted when the element is a number, a `bool`, a
-/// `char` or a `str`, so saved files stay stable. The element type needs `==`
-/// and `hash`.
+/// `serialize` writes them sorted by the bytes of the text of each, so saved
+/// files stay stable. The element type needs `==` and `hash`.
 pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
 {
 	/// An empty set with room for `capacity` elements from `from`, or from the
@@ -359,45 +358,40 @@ pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
 		return out.take();
 	}
 
-	/// Write the elements to `out` as a JSON array, sorted when the element is
-	/// a number, a `bool`, a `char` or a `str`, and in the order of the slots
-	/// otherwise.
+	/// Write the elements to `out` as a JSON array, sorted by the bytes of the
+	/// text of each, as `serialize` of a `HashMap` sorts its keys.
 	concrete fn serialize(self, out: *text.Builder)
 	{
 		let arg = anti_rt_type_arg(self as ?*byte, map.TYPE_DEPTH, 0);
-		let kind = map.kind_of(arg);
-		let n = self.count;
-		if n == 0 {
-			n = 1;
-		}
-		let made = self.from.alloc(n * size_of(int), size_of(int)) catch fatal;
-		let order = made as *int;
+		let texts = text.Builder.new();
+		let starts = map.numbers(self.from, self.count + 1);
+		let order = map.numbers(self.from, self.count);
 		let found = 0;
 		let i = 0;
 		while i < self.size do {
 			if self.live(i) {
-				order[found] = i;
+				order[found] = found;
+				starts[found] = texts.len();
+				anti_rt_element_serialize(&texts, self.entry(i) as ?*byte, arg);
 				found += 1;
 			}
 			i += 1;
 		}
-		if map.ordered(kind) {
-			map.sort_by_key(order, found, fn(a, b) {
-				return map.before(self.entry(a) as ?*byte, self.entry(b) as ?*byte,
-					kind);
-			});
-		}
+		starts[found] = texts.len();
+		let all = texts.text();
+		map.sort_by_text(order, found, all, starts, 1);
 		out.append("[");
 		i = 0;
 		while i < found do {
 			if i > 0 {
 				out.append(",");
 			}
-			anti_rt_element_serialize(out, self.entry(order[i]) as ?*byte, arg);
+			out.append(map.text_at(all, starts, order[i]));
 			i += 1;
 		}
 		out.append("]");
-		self.from.free(made);
+		self.from.free(order as ?*byte);
+		self.from.free(starts as ?*byte);
 	}
 
 	/// Whether the slot `i` holds an element.

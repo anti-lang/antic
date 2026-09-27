@@ -29,6 +29,7 @@ shrink: capacity 8
 copy [1,2]
 original [1]
 ["y","z"][-1,2.5]
+by text [-3,10,100,9]
 refused add false: 2 blocks
 removed true: 2 blocks
 intersect 1, minus 0: 5 blocks
