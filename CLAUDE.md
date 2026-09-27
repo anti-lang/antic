@@ -333,8 +333,8 @@ Its first nine parts, the syntax of generics, the constraints, the
 compiled copies, the generics of library files and of C, what can be
 generic, the other features with generics, the optional values, ownership
 at a call and lending, are built. So are the language part of walking a
-collection, hashing and order, direct imports and the parts every collection
-shares in `anti.collection`, and none of the rest. See
+collection, hashing and order, direct imports, the parts every collection
+shares in `anti.collection` and `Shared<T>` of `anti.mem`, and none of the rest. See
 `docs/notes/collections.md`.
 
 `docs/work-order-completion.md` is the work order those items come from, with

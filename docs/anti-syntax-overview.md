@@ -118,7 +118,7 @@ if equal(b.text(), "one") && text.equal("a", "a") {
 }
 ```
 
-Built: direct imports. The first example waits for `anti.collection.map` and `Shared`, which are not built yet.
+Built: direct imports. The first example waits for `anti.collection.map`, which is not built yet.
 
 ## Types
 
@@ -859,7 +859,7 @@ let shapes = List<Shared<Circle>>.new();
 shapes.push(c.share());
 ```
 
-Built: `own` and `transient` fields, the `own` parameter of any type and `lent`. A local passed to an `own` parameter moves, the caller tears it down no more and names it no more, and the function tears it down at every exit unless it moves on by a call, `=`, `let` or `return`. A `lent` parameter has the type `lent *T`, which goes to another `lent` parameter, the object of a call and a comparison, and which `=`, `return`, a parameter without `lent`, `own`, a snapshot and `delete` refuse. A `lent` slice parameter has the type `lent []T` under the same rules. A pointer or a slice derived from a lent one is lent, and goes to an `extern fn` as its one exit. `tests/programs/own_params.anti`, `tests/programs/lent_params.anti` and `tests/programs/lent_slices.anti` run them, and `tests/errors/own_params.anti`, `tests/errors/lent_params.anti` and `tests/errors/lent_slices.anti` hold the refusals. Not built yet: `Shared<T>`.
+Built: `own` and `transient` fields, the `own` parameter of any type and `lent`. A local passed to an `own` parameter moves, the caller tears it down no more and names it no more, and the function tears it down at every exit unless it moves on by a call, `=`, `let` or `return`. A `lent` parameter has the type `lent *T`, which goes to another `lent` parameter, the object of a call and a comparison, and which `=`, `return`, a parameter without `lent`, `own`, a snapshot and `delete` refuse. A `lent` slice parameter has the type `lent []T` under the same rules. A pointer or a slice derived from a lent one is lent, and goes to an `extern fn` as its one exit. `tests/programs/own_params.anti`, `tests/programs/lent_params.anti` and `tests/programs/lent_slices.anti` run them, and `tests/errors/own_params.anti`, `tests/errors/lent_params.anti` and `tests/errors/lent_slices.anti` hold the refusals. `Shared<T>` of `anti.mem` is built: `tests/std/shared.anti` runs it in both modes, and `tests/errors/shared_handles.anti` holds the refusals.
 
 ## Pointers
 
