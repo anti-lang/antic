@@ -34,14 +34,20 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 486 | ASan, UBSan, 485 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
-| Linux VM | 419 | ASan, UBSan, 407 each on 2026-09-19 | glibc sysroot, linux-arm64 programs, gdb |
-| Windows VM | 399 | none | windows-arm64 programs, the Win32 expected files |
+| Mac | 1160 | ASan, UBSan, 1159 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
+| Linux VM | 983 | ASan, UBSan, 982 each | glibc sysroot, linux-arm64 programs, gdb |
+| Windows VM | 955 | none | windows-arm64 programs, the Win32 expected files |
 
-The counts of the Mac and of the two VMs are of 2026-09-20, from the release
-script's own step 5. A host runs fewer tests than the Mac because a test that
-needs something it lacks skips, `release_dry_run` and `sysroot_digest` among
-them.
+The counts are of 2026-09-27. A host runs fewer tests than the Mac because a test that
+needs something it lacks is not registered or skips. Linux skips `release_dry_run` and
+`macos_sdk`. Windows also skips `sysroot_digest`, `installer_github` and
+`manifest_signature`.
+
+On the VMs two scripts in the home directory run a whole check. `~/antic-check-run.sh`
+on Linux builds and runs `host`, `asan` and `ubsan` into `~/run-host.log`,
+`~/run-asan.log` and `~/run-ubsan.log`, and writes `~/run-done` at the end.
+`%USERPROFILE%\check-run.cmd` on Windows configures `build`, not `build\host`, and
+builds and runs the suite. Neither script is in the repository.
 
 `debug_info` runs the debugger of the host, lldb on the Mac and gdb on Linux, and takes
 neither from the other. No host here debugs a Windows program.
@@ -86,6 +92,68 @@ when started by hand.
   as `com.example.step[step]`, and a test that matches a function name leaves the character
   before the segment open.
 
+## Sanitizers
+
+- LeakSanitizer runs on the Mac only through the presets.
+  `cmake --build --preset asan` and `ctest --preset asan` set
+  `ASAN_OPTIONS=detect_leaks=1`. `ctest --test-dir build/asan` checks no leak on the
+  Mac, and Linux checks leaks in every form.
+- The build runs antic under ASan on the standard library. A leak there stops the
+  build, and dozens of tests then fail with `cannot find module`. Read the first
+  `Direct leak` of the build log.
+- The Linux VM has no llvm-symbolizer. Run with `ASAN_OPTIONS=symbolize=0`, take each
+  `(binary+0xoffset)` of a stack and give the offset to `addr2line -f -C -s -e`.
+- ASan on Linux checks a use after return by default and the Mac does not. A pointer
+  into the frame of a returned function fails on Linux alone.
+- glibc declares both pointers of `memcpy` non-null, and UBSan on Linux stops at
+  `memcpy(p, NULL, 0)`. The C library of macOS declares nothing, so the Mac passes.
+- glibc opens a directory as a stream, and its end reads as the largest offset. A read
+  of the whole file then asks for 2^63 bytes, which ASan refuses with a stop.
+- A race test on the slow ASan build of the VM sees orders the Mac never shows. A
+  reader that stops at a flag reads once more after it.
+- `MallocScribble=1` fills fresh memory of macOS `malloc` with `0xaa`. A test of memory
+  that must be zeroed sets it, as `program_alloc_owning` does.
+
+## Windows traps
+
+- CMake's `file(WRITE)` writes CRLF on Windows. A file compared byte for byte is written
+  with `file(CONFIGURE OUTPUT ... CONTENT ... @ONLY NEWLINE_STYLE UNIX)`.
+- clang for an MSVC target evaluates the arguments of a call from the last to the first.
+  Two calls with effects in one argument list give other output there, in antic and in a
+  C test program alike. Bind each to a local first.
+- `if(EXISTS)` needs the `.exe` of a program, while `execute_process` finds it without.
+  The tests name the tools of the runtime archive by `ANTIC_RUNTIME_OBJDUMP` and
+  `ANTIC_RUNTIME_READOBJ`. Without the suffix, 13 checks of the runtime skipped.
+- antic writes objects as `.obj`, and the tests name a dev object with `anti_object`.
+- The `file://` URL of a Windows path is `file:///C:/dir`. anti refuses `file://C:/dir`.
+- Windows follows no link written with `/`. `file(READ_SYMLINK)` gives a link back with
+  backslashes. CMake reads a junction as a link to an absolute path such as
+  `C:/Program Files`.
+- Windows holds a program for a moment after it ran, and a write fails with `EACCES`.
+  `platform_open` of the tools retries a write for up to two seconds.
+- clang ignores `--ld-path` for an MSVC target. `-fuse-ld=lld` with `-B<dir>` finds
+  `lld-link` in that directory.
+- The `arm_neon.h` of the MSVC CRT makes `float32x4_t` a union, which clang passes in
+  integer registers. The C of the tests names the sysroot with `-idirafter`, so clang's
+  own headers come first.
+- clang writes the file name of a line marker of `-E` as a string of C, with each
+  backslash doubled.
+- `%LOCALAPPDATA%/anti-vm` expands to a path with both separators. A comparison of paths
+  in a tool unescapes and compares text, never assumes one separator.
+- An installed Anti in `%USERPROFILE%\.anti\bin` stood on the PATH of the VM, and CMake
+  took `llvm-ar` and `lld-link` from it. The configure step now sets every tool itself.
+
+## CMake traps
+
+- `if(x IN_LIST y)` needs a policy that `cmake -P` does not set. Scripts use
+  `list(FIND)`.
+- `string(REGEX REPLACE "^[^=]*=" ...)` replaces again after each match, since `^` holds
+  anew. Take a value with `REGEX MATCH` and `CMAKE_MATCH_1`.
+- `file()` reads a backslash as a separator. A POSIX path that holds one is made with
+  `mkdir` and `cp`.
+- A tree configured before keeps the tools of its stored compiler information as plain
+  variables over the cache. `antic_use_pinned_tools` sets them after `project()`.
+
 ## Test hooks
 
 - `ANTI_DEV_CPU` compiles the processor simulation into `src/rt/cpu.c`. With it,
@@ -105,15 +173,23 @@ when started by hand.
 - `setenv` and `unsetenv` are POSIX and outside the C11 library. The headers of
   Apple declare them under `-std=c11` and musl and glibc do not, so a file that
   uses them without `_POSIX_C_SOURCE` compiles on the Mac alone.
-- On a host that is not the Mac, `runtime/lib/<host target>/` holds the library
-  that build compiled, at its own optimisation. Every other target is a cross
-  build. A Debug build writes a call where a release writes the exclusive loop,
-  so a test of a level's instructions skips the host's own library.
+- Every host builds the runtime of every target as the cross build since
+  `7c0a805`. A Linux host built its own before, and failed seven tests. That
+  library had the glibc headers, the build type of the tree and the outline
+  atomics of libgcc.
 - The Windows VM answers ssh with `cmd`, not with a shell. A command with `;`
   or `&&` in it reaches the program as arguments. Send a `.cmd` file, or call
   `cmd /c` with one command.
 
 ## For the next session
+
+- Auto mode refuses `git checkout -- .` and other resets of the working tree. To split
+  a finished change into commits, save `git diff` as a patch, cut it by file and hunk and
+  apply each part with `git apply --cached`. The working tree stays as it is.
+- Copy the checkout with `git archive` or `git ls-files`, never with `cp -r .`, which
+  copies `build/` into itself.
+- One suite per build tree at a time. Two `ctest` runs in one tree fail each other's
+  tests. A command started with `&` in a tool call keeps running after the call returns.
 
 - The toolchain is frozen at `23.1.1-anti.3`. A toolchain change goes to
   `docs/toolchain-later.md` as one line.

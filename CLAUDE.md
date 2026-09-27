@@ -27,8 +27,9 @@ The choices inside a compiler pass are in `docs/notes/`.
 `docs/notes/value-rules.md` holds the pinned outputs a change rewrites, the
 leak-check pattern and the traps of the value rules. The design pages of the
 runtime archive, the build tool and the standard library are in `docs/site/`.
-The test machines are in `docs/vm-setup.md`. Do not re-open a settled decision
-without asking Eddie.
+The test machines are in `docs/vm-setup.md`, and the traps of the hosts, the
+sanitizers, Windows and CMake scripts in `docs/notes/hosts-and-harness.md`. Do
+not re-open a settled decision without asking Eddie.
 
 ## Rules
 
