@@ -1,0 +1,22 @@
+//! A column past the width of a `Grid<T>`, in a row that holds cells after it.
+//! A dev build checks each index against its own dimension and traps as it
+//! does for an array. A build without the checks reads the first cell of the
+//! next row and exits with 7.
+
+import anti.collection.grid.{Grid};
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let g = Grid<int>.new(3, 2, 0);
+	sink(g[opaque(3), 0]);
+	return 7;
+}

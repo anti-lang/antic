@@ -121,6 +121,36 @@ check(collection_changed "was changed while"
       "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
       ON "${WORK}/anti_lang_dev${OBJECT}" "${WORK}/anti_mem_dev${OBJECT}"
       "${WORK}/anti_text_dev${OBJECT}" "${WORK}/anti_collection_dev${OBJECT}")
+# The same over List<T>, which counts the change in `push`, and the index
+# checks of List<T> and Grid<T>, which trap as an array does. Grid<T> checks
+# each index against its own dimension, so a column past the width traps in
+# a row that holds cells after it. The patterns leave the file of a trap in a
+# generic open: a copy from a library file names the file of the program
+# with the line of the library. The dev build links an object of each module
+# the program reaches.
+foreach(module list grid)
+    execute_process(COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}"
+                            --runtime "${RUNTIME}"
+                            -o "${WORK}/anti_collection_${module}_dev"
+                            "${RUNTIME}/std/anti/collection/${module}.antl"
+                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR
+            "antic --dev of anti.collection.${module} failed\n${err}")
+    endif()
+endforeach()
+set(collection_objects "${WORK}/anti_lang_dev${OBJECT}"
+    "${WORK}/anti_mem_dev${OBJECT}" "${WORK}/anti_text_dev${OBJECT}"
+    "${WORK}/anti_collection_dev${OBJECT}")
+check(list_changed "was changed while"
+      "list_changed\\.anti:12: `people` was changed while `for` walked it: changed at list_changed\\.anti:14"
+      ON ${collection_objects} "${WORK}/anti_collection_list_dev${OBJECT}")
+check(list_bounds "index out of bounds"
+      "\\.anti:[0-9]+: index out of bounds: index 5, length 4"
+      ON ${collection_objects} "${WORK}/anti_collection_list_dev${OBJECT}")
+check(grid_bounds "index out of bounds"
+      "\\.anti:[0-9]+: index out of bounds: index 3, length 3"
+      ON ${collection_objects} "${WORK}/anti_collection_grid_dev${OBJECT}")
 
 # --checks puts them into a release build, and --no-checks takes them out
 # of a dev build. Both override the mode.

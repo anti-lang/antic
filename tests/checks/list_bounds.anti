@@ -1,0 +1,24 @@
+//! An index past the end of a `List<T>`. A dev build traps as it does for an
+//! array, at the line of the list that indexes its elements. A build without
+//! the checks reads the room past the last element and exits with 7.
+
+import anti.collection.list.{List};
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let l = List<int>.new();
+	for i in 0..4 {
+		l.push(i);
+	}
+	sink(l[opaque(5)]);
+	return 7;
+}

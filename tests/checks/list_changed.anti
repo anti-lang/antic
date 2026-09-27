@@ -1,0 +1,18 @@
+//! A `List<T>` that grows while a `for` walks it. `push` counts the change,
+//! and the loop of a dev build stops at the next turn and names the list, the
+//! loop and the change.
+
+import anti.collection.list.{List};
+
+fn main() -> int
+{
+	let people = List<int>.new();
+	people.push(1);
+	people.push(2);
+	for n in people {
+		if n == 1 {
+			people.push(3);
+		}
+	}
+	return 7;
+}
