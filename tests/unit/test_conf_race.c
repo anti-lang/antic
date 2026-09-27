@@ -71,7 +71,10 @@ static int64_t done;
 static int64_t digits;
 
 /* Read the key and every byte of its value until the main thread is
-   done. */
+   done, and once more after that. The main thread stores `done` after
+   the configuration, so the last read sees the value of the file. A
+   reader that stopped at `done` could leave with no read after the file,
+   which the slow ASan build of the Linux VM did now and then. */
 #if defined(_WIN32)
 static DWORD WINAPI read_key(LPVOID unused)
 #else
@@ -81,7 +84,8 @@ static void *read_key(void *unused)
     int64_t sum = 0;
 
     (void)unused;
-    while (anti_rt_atomic_load(&done, (int64_t)sizeof done) == 0) {
+    for (;;) {
+        int64_t finished = anti_rt_atomic_load(&done, (int64_t)sizeof done);
         struct anti_text t =
             anti_rt_conf_get((const unsigned char *)"threads", 7);
         int64_t i;
@@ -89,6 +93,9 @@ static void *read_key(void *unused)
             sum += t.ptr[i] - '0';
         }
         anti_rt_atomic_store(&started, (int64_t)sizeof started, 1);
+        if (finished != 0) {
+            break;
+        }
     }
     anti_rt_atomic_store(&digits, (int64_t)sizeof digits, sum > 0);
 #if defined(_WIN32)
