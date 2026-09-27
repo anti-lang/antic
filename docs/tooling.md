@@ -13,6 +13,7 @@ for C.
 Contents:
 
 - [Scope](#scope)
+- [Binary distribution](#binary-distribution)
 - [Commands](#commands)
 - [Project layout](#project-layout)
 - [Manifest](#manifest)
@@ -46,6 +47,83 @@ same syntax tree as `antic`.
 
 `anti` lives in `src/anti/`, links `antic_core` and is MIT. The book describes it and
 shows none of its code.
+
+## Binary distribution
+
+Eddie decided this target on 2026-09-27. "Binary distribution" in
+`docs/decisions.md` holds each rule with what it replaces. The packages and the
+installer do not reach it yet, and `docs/reports/2026-09-27-distribution-target.md`
+lists the gap.
+
+Two toolchains serve two purposes:
+
+- Building Anti takes the pinned toolchain of `anti-lang/llvm-tools` under
+  `build/deps/`, clang included. It builds antic, anti, the runtime, the native
+  libraries and the tests on every host, and never a tool of the host.
+- Using Anti takes the LLVM tools that antic needs to turn its assembly into programs.
+  They travel inside every package at the same pinned version. No C compiler is
+  shipped, and no user needs one, since antic writes assembly itself.
+
+Anti ships six packages, one per platform: Windows, Linux and macOS, each on x86_64
+and ARM64. Each is complete on its own, and nothing is downloaded at install time or
+later. A package holds:
+
+- antic and anti, native binaries of the package's platform;
+- the pinned LLVM tools of that platform: llvm-mc, lld for ELF, Mach-O and COFF, and
+  llvm-ar;
+- the standard library;
+- the runtime of all six targets at every processor level, with the static native
+  libraries PCRE2, raylib, miniaudio, Mbed TLS and SQLite, and their headers;
+- the two musl sysroots and the two glibc sysroots with their X11 and OpenGL
+  packages;
+- the stubs of libSystem for macOS and the Windows import libraries of mingw-w64;
+- the licence texts of everything in it.
+
+From any one package, a user builds programs for all six targets with no network.
+
+The Windows targets link against the import libraries of the mingw-w64 project,
+generated from its `.def` files. They also link against `ucrtbase.dll`, which every
+supported Windows has. They never link against the libraries of Microsoft's CRT and SDK, which
+may not be redistributed.
+
+glibc and every other library under a copyleft licence ship with their licence text
+in `licenses/`. Beside it stand the exact upstream source packages and versions it
+came from, so its source is available as the licence requires.
+
+Apple's frameworks are the one exception. Their stubs belong to Apple's SDK and are
+never shipped. A macOS program that names no framework links from any host with the
+package alone. One that names a framework, as a raylib or miniaudio program does, takes
+the stubs from the Command Line Tools on a Mac. On another host the user carries them
+over, under the user's own licence to the SDK:
+
+```sh
+anti sdk export              # on a Mac with the SDK; writes apple-sdk-<version>.tar.xz
+anti sdk import apple-sdk-<version>.tar.xz    # on the other host
+```
+
+antic and anti use only what is in the package, and no tool of the host. The one
+exception is `antic --linker platform`, which a user asks for by name.
+
+The installer is one command:
+
+```sh
+curl -fsSL https://anti-lang.com/install.sh | bash
+```
+
+```powershell
+irm https://anti-lang.com/install.ps1 | iex
+```
+
+It detects the platform and downloads that platform's one package from the GitHub
+release. It checks the package against `SHA256SUMS`, and `SHA256SUMS` against its
+signature with the release key from anti-lang.com. It unpacks the package into the
+install directories of the platform and puts antic and anti on the path. It downloads
+nothing else and installs no CMake. The downloads page offers the same package for a
+manual install, with the same checks as commands.
+
+A release is tested on each VM by a fresh install from the package with the network
+off. The install builds and runs a raylib program and a plugin host for its own target,
+and cross-builds a program for every other target.
 
 ## Commands
 

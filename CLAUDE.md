@@ -98,6 +98,23 @@ without asking Eddie.
   the Mac's.
 - Every session ends with a report in `docs/reports/<date>-<subject>.md`.
 
+## Distribution
+
+The target stands under "Binary distribution" in `docs/decisions.md`.
+
+- Building Anti takes the pinned toolchain under `build/deps/`, clang included, on
+  every host. Using Anti takes the pinned LLVM tools that travel inside every
+  package. No C compiler ships, and no user needs one.
+- Six packages, one per platform, each complete on its own. Each holds antic and
+  anti, the pinned LLVM tools and the standard library. It also holds the runtime of
+  all six targets with the native libraries and their headers, the sysroots of every
+  target and the licence texts. Nothing is downloaded at install time or later. One package builds for all
+  six targets with no network. Apple's frameworks are the one thing a package lacks.
+- antic and anti use only what is in the package. The one exception is
+  `antic --linker platform`, which a user asks for by name.
+- A change that makes a package depend on something outside it, or on a tool of the
+  host, is refused like a warning.
+
 ## Context and budget
 
 - Read what the task needs. Name sections, not documents: "Tables and dispatch" in
@@ -261,6 +278,47 @@ directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
     load a plugin, links dynamically against glibc 2.35. A Windows host
     links with an import library its plugins resolve against.
     `docs/reports/2026-09-24-glibc-and-plugins.md` reports it.
+
+The gap to "Binary distribution" in `docs/decisions.md`, one item per difference, in
+the order they are best built. `docs/reports/2026-09-27-distribution-target.md` holds
+the same list.
+
+27. The LLVM tools into the package. The packer copies llvm-mc, ld.lld, ld64.lld,
+    lld-link and llvm-ar of the platform into `bin/`, and the installers stop
+    downloading them from `anti-lang/llvm-tools`.
+28. antic and anti take their tools from the package alone. Today antic falls back
+    on an lld of the search path, and a Windows link without a sysroot reads `LIB`
+    of an MSVC environment. Two messages of antic name `tools/get-sysroot.cmake`,
+    which a user has no use for.
+29. The two glibc sysroots, with their X11 and OpenGL packages and the glibc runtime
+    of both Linux targets, into every package. Today no package holds them. A program
+    that reaches `link linux`, raylib, miniaudio or a plugin then links only where a
+    user installed them.
+30. The source record of every copyleft part. `licenses/` names the exact upstream
+    source packages and versions of glibc, the kernel headers and every other
+    copyleft component beside their licence texts. Today it holds the licence texts
+    alone.
+31. The headers of the native libraries into the runtime archive, item 16. Today
+    `lib/<target>/` holds their static libraries alone.
+32. The Windows sysroot of mingw-w64: pinned import libraries for both Windows
+    targets, generated from the `.def` files of the mingw-w64 project. A program
+    links `ucrtbase.dll`. The lld link drops `msvcrt.lib`, `libvcruntime.lib`, `ucrt.lib`
+    and `legacy_stdio_definitions.lib`. The runtime, the native libraries and the
+    tests compile against headers that agree with those libraries. Today they take
+    the headers and libraries of xwin, or of the Build Tools on a Windows host.
+33. xwin leaves `tools/get-sysroot.cmake`, `tools/sysroot-pins`, the installers and
+    `ANTI_MICROSOFT`, once item 32 links every Windows program.
+34. The installers download the package alone and use `| bash`. They drop the LLVM
+    tools, xwin, the step for the stubs of the Command Line Tools and CMake. Nothing
+    a user runs needs CMake. antic and anti never run it. The installers run it for
+    `tools/get-sysroot.cmake` alone, which item 33 and this item take away. The
+    package then carries no scripts for an installer. The downloads page shows the
+    manual install with the same checks as commands.
+35. `--bundle-runtime` on Mach-O without Apple's `ld -r`. ld64.lld 23.1.1 has no
+    relocatable output, so the join needs a design of its own.
+36. The test of a release with the network off. On each VM, a fresh install from
+    the package builds and runs a raylib program and a plugin host for its own
+    target. It also cross-builds a program for every other target.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures

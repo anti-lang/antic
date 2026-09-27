@@ -110,9 +110,10 @@ the tools of its host, and a build of antic takes clang as well.
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
 the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives
 of clang in the same release. `tools/get-llvm.cmake` takes the
-archive of the host into `build/deps/llvm`, and the installers take it into the install
-directory. Both check the digest of the pin, the line of `SHA256SUMS` and the
-signature. A toolchain bump is a new release there and a new pin here.
+archive of the host into `build/deps/llvm`, and checks the digest of the pin, the line
+of `SHA256SUMS` and the signature. A toolchain bump is a new release there and a new
+pin here. Every package carries the LLVM tools of its platform, as "Binary
+distribution" in `docs/decisions.md` decides, so an installer downloads none.
 
 The public key that checks `SHA256SUMS.sig` with `openssl pkeyutl -verify` lives in the
 installers, which anti-lang.com serves, and in `tools/keys/release.pem` of the repository,
@@ -144,12 +145,14 @@ A file we build carries the prefix `anti-`, as in `anti-raylib-6.0-linux-x86_64.
 A mirror of an untouched upstream file keeps its own name, as in `raylib-6.0.tar.gz`. A
 variant, should one appear, follows the target in the name.
 
-Two sysroots can never be served here. Apple's SDK is Apple's and the Windows CRT and SDK
-are Microsoft's, and neither licence allows redistribution. The CRT stays a step on the
-user's machine, which is why `tools/get-sysroot.cmake` asks for `ACCEPT_LICENSE`. Apple's
-SDK comes from a Mac the user owns, with `anti sdk export` and `anti sdk import`, for a
-program that names a framework. Zig's stubs of libSystem are ours to serve, and every
-package carries them.
+Apple's SDK is never served here, since its licence allows no redistribution. A
+program that names a framework takes its stubs from the Command Line Tools on a Mac. On
+another host it takes them from a Mac the user owns, with `anti sdk export` there and
+`anti sdk import` on that host. Zig's stubs of libSystem are ours to serve, and every
+package carries them. The Windows targets link against the import libraries of the
+mingw-w64 project and `ucrtbase.dll`, never against Microsoft's CRT and SDK, which may
+not be redistributed. Every package carries those import libraries, and the two glibc
+sysroots with their X11 and OpenGL packages.
 
 ### Publishing
 
@@ -191,16 +194,18 @@ the site.
 
 ### After publishing a package
 
-A package is accepted when a machine of that host installs it with the installer of the site and links
-for every target it claims. The checks that a build on the development Mac cannot make:
+A package is accepted when a machine of that host installs it and links for every
+target, with the network off after the download. The checks that a build on the
+development Mac cannot make:
 
-1. `curl -fsSL https://anti-lang.com/install.sh | sh` on the target machine.
-2. `antic hello.anti` for the host itself, then run the program.
-3. `antic --target linux-x86_64` and `--target linux-arm64`, because the package carries
-   both Linux sysroots and claims to link them anywhere.
-4. Run the foreign one under `qemu-x86_64` or `qemu-aarch64` when the machine has it.
+1. `curl -fsSL https://anti-lang.com/install.sh | bash` on the target machine, or
+   `irm https://anti-lang.com/install.ps1 | iex` on Windows.
+2. Turn the network off.
+3. Build and run a raylib program and a plugin host for the host itself.
+4. Cross-build a program for every other target.
+5. Run a foreign Linux one under `qemu-x86_64` or `qemu-aarch64` when the machine has it.
 
-Step 3 is the one that found the missing zlib in our own lld. The musl objects of Alpine
+Step 4 is the one that found the missing zlib in our own lld. The musl objects of Alpine
 for x86_64 carry `SHF_COMPRESSED` debug sections, and a linker without zlib stops on
 every one of them. No check on the Mac saw it, because the LLVM release that the macOS
 package carried then had zlib. Every archive of `anti-lang/llvm-tools` links zlib in.
