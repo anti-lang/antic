@@ -27,6 +27,18 @@ struct Pair
 	n: int,
 }
 
+/// A class two levels above the `destruct`.
+class Outer
+{
+	pub holder: Holder = Holder { },
+}
+
+/// A class that holds the `destruct` through a struct.
+class Wrap
+{
+	pub pair: Pair = Pair { c: Counted { }, n: 0 },
+}
+
 class Plain
 {
 	pub n: int = 0,
@@ -42,6 +54,10 @@ fn copies(p: *Counted, o: ?Counted)
 	let e = d;
 	let h = Holder { };
 	let g = h;
+	let outer = Outer { };
+	let other_outer = outer;
+	let wrap = Wrap { };
+	let other_wrap = wrap;
 	let pair = Pair { c: Counted { }, n: 1 };
 	let other = pair;
 	if let c = o {

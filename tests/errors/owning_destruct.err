@@ -1,7 +1,9 @@
-owning_destruct.anti:38:10: error: `Counted` has a `destruct`, use `dup` instead of `=`
-owning_destruct.anti:39:6: error: `Counted` has a `destruct`, use `dup` instead of `=`
-owning_destruct.anti:40:6: error: `Counted` has a `destruct`, use `dup` instead of `=`
-owning_destruct.anti:42:10: error: `Derived` has a `destruct`, use `dup` instead of `=`
-owning_destruct.anti:44:10: error: `Holder` has `own` fields, use `dup` instead of `=`
-owning_destruct.anti:46:14: error: `Pair` owns what its parts own, use `dup` instead of `=`
-owning_destruct.anti:47:13: error: `?Counted` has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:50:10: error: `Counted` has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:51:6: error: `Counted` has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:52:6: error: `Counted` has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:54:10: error: `Derived` has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:56:10: error: `Holder` holds `Counted` in `counted`, which has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:58:20: error: `Outer` holds `Holder` in `holder`, which holds `Counted` in `counted`, which has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:60:19: error: `Wrap` holds `Pair` in `pair`, which holds `Counted` in `c`, which has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:62:14: error: `Pair` owns what its parts own, use `dup` instead of `=`
+owning_destruct.anti:63:13: error: `?Counted` has a `destruct`, use `dup` instead of `=`

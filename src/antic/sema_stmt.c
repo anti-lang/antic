@@ -607,17 +607,16 @@ bool sema_needs_teardown(const struct type *t)
     return false;
 }
 
-/* Whether a field of the chain of the class t owns something: an `own`
-   field, or a plain one whose type owns something. */
-static bool fields_own(const struct type *t)
+static const char own_fields_phrase[] = "has `own` fields";
+
+/* Whether a class of the chain of t declares a field `own`. */
+static bool own_field_in_chain(const struct type *t)
 {
     size_t i;
 
     for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
         for (i = 0; i < t->field_count; i++) {
-            const struct struct_field *f = &t->fields[i];
-            if (f->owned || ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                             sema_type_owns(f->type))) {
+            if (t->fields[i].owned) {
                 return true;
             }
         }
@@ -625,15 +624,96 @@ static bool fields_own(const struct type *t)
     return false;
 }
 
+/* Whether a class of the chain of t below the root has a `destruct` with
+   a body. */
+static bool destruct_in_chain(const struct type *t)
+{
+    size_t i;
+
+    for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
+        for (i = 0; i < t->member_count; i++) {
+            const struct item *m = t->members[i];
+            if (m->kind == ITEM_FN && sema_name_is(&m->name, "destruct") &&
+                m->runtime == NULL && sema_has_body(m)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* The first field of the class, struct or tuple t whose type owns
+   something, through the chain of a class, or NULL. */
+static const struct struct_field *owning_field(const struct type *t)
+{
+    size_t i;
+
+    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                sema_type_owns(f->type)) {
+                return f;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: the refusal of a copy names what makes the class owning. Its own
+   `own` fields and its `destruct` come first. Otherwise the message follows
+   the first field that owns something down to its reason, `holds `Counted`
+   in `counted`, which has a `destruct``. A field whose class has `own`
+   fields keeps the phrase of the class itself. Writes into out. */
+static void owns_reason(char *out, size_t size, const struct type *t)
+{
+    const struct struct_field *f;
+    const struct type *inner;
+    char sub[160];
+
+    if (t->kind == TYPE_CLASS && own_field_in_chain(t)) {
+        snprintf(out, size, "%s", own_fields_phrase);
+        return;
+    }
+    if (t->kind == TYPE_CLASS && destruct_in_chain(t)) {
+        snprintf(out, size, "has a `destruct`");
+        return;
+    }
+    f = owning_field(t);
+    inner = f != NULL ? f->type : NULL;
+    while (inner != NULL &&
+           (inner->kind == TYPE_ARRAY || inner->kind == TYPE_OPTIONAL)) {
+        inner = inner->element;
+    }
+    if (inner == NULL || (inner->kind != TYPE_CLASS &&
+                          inner->kind != TYPE_STRUCT &&
+                          inner->kind != TYPE_TUPLE)) {
+        snprintf(out, size, "%s", own_fields_phrase);
+        return;
+    }
+    owns_reason(sub, sizeof sub, inner);
+    if (inner->kind == TYPE_CLASS && strcmp(sub, own_fields_phrase) == 0) {
+        snprintf(out, size, "%s", own_fields_phrase);
+        return;
+    }
+    snprintf(out, size, "holds `%s` in `%.*s`, which %s", sema_tn(inner),
+             (int)f->name.length, f->name.text, sub);
+}
+
 const char *sema_owns_phrase(const struct type *t)
 {
+    static char buffers[2][160];
+    static size_t next;
+    char *buffer = buffers[next++ % 2];
+
     while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
         t = t->element;
     }
     if (t == NULL || t->kind != TYPE_CLASS) {
         return "owns what its parts own";
     }
-    return fields_own(t) ? "has `own` fields" : "has a `destruct`";
+    owns_reason(buffer, sizeof buffers[0], t);
+    return buffer;
 }
 
 /* DESIGN: one rule says what owns something. A type owns something when
