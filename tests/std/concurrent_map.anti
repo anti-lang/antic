@@ -322,8 +322,12 @@ fn owned()
 		}
 		show(f"owned: {m.count()} {copy.count()} {removed} {four.value()} {total}");
 		delete(copy);
+		let before = m.capacity();
 		m.reserve(1000);
+		let reserved = m.capacity();
 		m.shrink();
+		let shrunk = m.capacity();
+		show(f"room: {before >= m.count()} {reserved >= m.count() + 1000} {shrunk < reserved} {shrunk >= m.count()}");
 		m.clear();
 	}
 	show(f"owned: {Id.live.load()} blocks alive, {counting.allocs - counting.frees} allocations held");

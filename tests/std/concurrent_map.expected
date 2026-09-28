@@ -34,4 +34,5 @@ changed copy: false 9 0
 equal again: true
 one fewer: false
 owned: 133 67 66 8 20000
+room: true true true true
 owned: 0 blocks alive, 0 allocations held

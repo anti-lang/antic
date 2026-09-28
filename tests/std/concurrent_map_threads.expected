@@ -2,3 +2,4 @@ exit 0
 keys: 0 wrong, 133333 left, sum right 1, watcher sane 1
 shared: 400000 updates, 400000 compare and sets
 removed 133333, 8 left
+closure: 200008 entries, sum 1399994

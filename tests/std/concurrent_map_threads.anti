@@ -80,6 +80,21 @@ worker fn shared_keys(chunk: []int, m: *ConcurrentMap<int, int>) -> int
 	return retries;
 }
 
+/// Run `f` on every element of `items` from the chunks of a `parallel`.
+fn each(items: []int, concurrent f: fn(int))
+{
+	let parts = parallel items by 8 -> run(f);
+	free(parts.ptr);
+}
+
+worker fn run(chunk: []int, concurrent f: fn(int)) -> int
+{
+	for n in chunk {
+		f(n);
+	}
+	return chunk.len;
+}
+
 /// Walk and search the map while the chunks change it. Gives the number of
 /// entries it saw in every walk together, which only has to be sane.
 worker fn watch(m: *ConcurrentMap<int, int>, walks: int) -> int
@@ -151,6 +166,16 @@ fn main() -> int
 		return e.0 >= 0;
 	});
 	printf("removed %d, %d left\n".ptr, removed as c_int, m.count() as c_int);
+	each((*keys)[0..KEYS], fn(k) {
+		let v = k % 7;
+		m.set(k, v);
+	});
+	let sevens = 0;
+	for v in m.values() {
+		sevens += v;
+	}
+	printf("closure: %d entries, sum %d\n".ptr, m.count() as c_int,
+		sevens as c_int);
 	free(keys);
 	return 0;
 }

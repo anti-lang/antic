@@ -113,6 +113,21 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 		return self.size.load() == 0;
 	}
 
+	/// The number of entries the parts hold room for at this moment.
+	pub fn capacity(self) -> int
+	{
+		let room = 0;
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				room += part.entries.capacity();
+			}
+			i += 1;
+		}
+		return room;
+	}
+
 	/// Make room for `n` more entries, spread over the parts.
 	pub fn reserve(self, n: int)
 	{
@@ -669,8 +684,10 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 		};
 		let i = 0;
 		while i < PARTS do {
-			destroy(&parts[i].entries);
-			destroy(&parts[i].versions);
+			let part = &parts[i];
+			destroy(&part.entries);
+			destroy(&part.versions);
+			part.lock.destroy();
 			i += 1;
 		}
 		self.from.free(parts as ?*byte);
