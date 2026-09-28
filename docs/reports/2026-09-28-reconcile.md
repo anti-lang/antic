@@ -61,3 +61,18 @@ end before the next step.
 The first reconcile session ended while it waited for the ASan suite it
 had started in the background, `build/drive/logs/rc-suite-asan.log`, which
 stops at `emit_identity`. Nothing in the tree failed.
+
+## Proof of the push
+
+After the push of `09f7687`:
+
+```text
+$ git log --oneline -3
+09f7687 Report the reconcile of the round five lanes
+bc0fa0d Fold the decisions of the round five lanes into docs/decisions.md
+8a0332d Compare two pools, two queues and two trees with ==
+$ git status --short
+$ git rev-parse HEAD origin/main
+09f7687514ac65686974c0e6c8a698a8ada635ae
+09f7687514ac65686974c0e6c8a698a8ada635ae
+```
