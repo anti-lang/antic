@@ -2514,13 +2514,24 @@ static struct type *check_call(struct checker *c, struct expr *e,
                (sym = sema_library_item(c, module->home,
                         &callee->as.field.base->as.field.name)) != NULL &&
                sym->kind == SYMBOL_STRUCT) {
-        if (type_is_simd(sym->type) &&
+        struct type *owner = sym->type;
+        if (type_is_simd(owner) &&
             simd_static_name(&callee->as.field.name)) {
-            return check_simd_static(c, e, sym->type);
+            return check_simd_static(c, e, owner);
         }
+        /* `m.List<int>.new()` names a copy, as `List<int>.new()` does. */
+        if (callee->as.field.base->type_arg_count > 0) {
+            owner = sema_copy_of(c, owner, callee->as.field.base->type_args,
+                                 callee->as.field.base->type_arg_count,
+                                 callee->as.field.base->type_args_pos);
+            if (sema_is_error(owner)) {
+                return owner;
+            }
+        }
+        g->owner = owner;
         /* `m.T.f(args)` calls a function of the body of a type of
            another module, which takes no self. */
-        fn = check_type_member(c, callee, sym->type);
+        fn = check_type_member(c, callee, owner);
         callee->type = fn;
         if (sema_is_error(fn)) {
             return fn;

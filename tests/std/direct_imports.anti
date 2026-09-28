@@ -1,7 +1,10 @@
 //! Direct imports of the standard library. The listed names stand without the
 //! name of their module: a class and its static function, an enum, functions
 //! and a function that may fail, which `try` forwards. Each module stays
-//! reachable by its name, and `f"..."` finds `anti.text` through it.
+//! reachable by its name, and `f"..."` finds `anti.text` through it. A generic
+//! class takes its type arguments by its listed name and by the name of its
+//! module, `map.HashMap<str, bool>.new()`.
+import anti.collection.map.{HashMap, Map};
 import anti.io.{println};
 import anti.lang;
 import anti.text.{Align, Builder, equal, parse_int};
@@ -30,5 +33,12 @@ fn main() -> int
 	let shown = f"{n}";
 	io.println(shown);
 	free(shown.ptr);
+	let ages = Map<str, int>.new();
+	ages.set("Ann", 41);
+	let seen = map.HashMap<str, bool>.new();
+	seen.set("Ann", true);
+	if ages.count + seen.count != 2 {
+		return 3;
+	}
 	return 0;
 }
