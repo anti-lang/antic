@@ -1092,6 +1092,39 @@ foreach(name IN ITEMS map map_tuple hash_map set hash_set)
         FIXTURES_REQUIRED
             "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_map_dev_object;collection_set_dev_object")
 endforeach()
+# The collections threads share, of anti.collection.concurrent, in dev
+# mode. The module stands on the maps and on the error of a versioned set
+# in anti.collection.pool, so the link names the objects of both.
+add_test(NAME dev_object_collection_concurrent
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_concurrent_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/collection/concurrent.antl")
+set_tests_properties(dev_object_collection_concurrent PROPERTIES
+    FIXTURES_SETUP collection_concurrent_dev_object)
+foreach(name IN ITEMS concurrent_map concurrent_map_threads spsc_ring
+        spsc_ring_threads)
+    add_test(NAME std_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${collection_dev_objects},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_map_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_pool_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_concurrent_dev${anti_object}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_tests_properties(std_${name}_dev PROPERTIES
+        FIXTURES_REQUIRED
+            "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_map_dev_object;collection_pool_dev_object;collection_concurrent_dev_object")
+endforeach()
+# The runs with threads spin while the ring is full or empty and wait on the
+# locks of the map. A side that stops for good leaves the other spinning,
+# and the timeout reports it.
+foreach(name IN ITEMS std_concurrent_map_threads std_spsc_ring_threads
+        std_concurrent_map_threads_dev std_spsc_ring_threads_dev)
+    set_tests_properties(${name} PROPERTIES TIMEOUT 120)
+endforeach()
 
 # Every failing function of src/std/ is written with `may fail`, apart from
 # a binding, which refuses it.

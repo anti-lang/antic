@@ -1,0 +1,344 @@
+//! `ConcurrentMap<K, V>` of `anti.collection.concurrent` through every
+//! operation on one thread.
+//!
+//! The map has no order, so the program prints what does not depend on it:
+//! `serialize`, which sorts by the text of each key, sums and counts. Keys and
+//! values that own memory count the blocks alive, and an allocator counts what
+//! the map takes, so every block goes back where it came from.
+
+import anti.collection;
+import anti.collection.concurrent.{ConcurrentMap};
+import anti.collection.pool;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A key that owns memory, with `==` and `hash` over its number. Its copy makes
+/// a block of its own, and every block counts in `Id.live`.
+class Id
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Id
+	{
+		return Id { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Id) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Id;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		Id.live.add(-1);
+		free(p);
+	}
+}
+
+/// A block that holds `n`, counted in `Id.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Id.live.add(1);
+	return p;
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+/// Print `label` and the entries of `m`, which `serialize` sorts by the text of
+/// each key.
+fn sorted<K: eq + hash, V>(label: str, m: *ConcurrentMap<K, V>)
+{
+	let out = text.Builder.new();
+	out.append(label);
+	out.append(" ");
+	m.serialize(&out);
+	show(out.take());
+}
+
+fn lookups()
+{
+	let m = ConcurrentMap<str, int>.new();
+	show(f"empty: {m.count()} {m.is_empty()}");
+	sorted("empty", &m);
+	m.set("Cy", 7);
+	m.set("Ann", 41);
+	m.set("Bob", 30);
+	let added = m.add("Dee", 22);
+	let again = m.add("Ann", 99);
+	m.set("Bob", 31);
+	sorted("set", &m);
+	show(f"add: {added} {again}, count {m.count()} {m.is_empty()}");
+	let cy = m.get("Cy") ?? -1;
+	let zed = m.get("Zed") ?? -1;
+	let ann = m.contains("Ann");
+	let nobody = m.contains("Zed");
+	show(f"get: {cy} {zed}, contains: {ann} {nobody}");
+	let bob = m.remove("Bob") ?? -1;
+	let gone = m.remove("Bob") ?? -1;
+	show(f"remove: {bob} {gone}, count {m.count()}");
+	let hit = m.update("Ann", fn(p) {
+		*p += 1;
+	});
+	let miss = m.update("Zed", fn(p) {
+		*p = 0;
+	});
+	let seen = 0;
+	let read = m.read("Ann", fn(p) {
+		seen = *p;
+	});
+	let unread = m.read("Zed", fn(p) {
+		seen = -1;
+	});
+	let changed = m.modify("Cy", fn(p) {
+		*p = 70;
+	});
+	show(f"update {hit} {miss}, read {read} {unread} {seen}, modify {changed}");
+	sorted("changed", &m);
+	let letters = 0;
+	for k in m.keys() {
+		letters += k.len;
+	}
+	let sum = 0;
+	for v in m.values() {
+		sum += v;
+	}
+	let pairs = 0;
+	for (k, v) in m {
+		pairs += k.len * 1000 + v;
+	}
+	show(f"keys {letters} letters, values {sum}, walk {pairs}");
+	let one = ConcurrentMap<str, int>.new();
+	one.set("only", 1);
+	show(one.to_text());
+}
+
+fn versions() may fail
+{
+	let m = ConcurrentMap<int, int>.new();
+	m.set(1, 10);
+	let (v, first) = m.get_versioned(1) ?? (-1, -1);
+	try m.set_if_version(1, v + 1, first);
+	let (w, second) = m.get_versioned(1) ?? (-1, -1);
+	show(f"versioned: {v} then {w}, new version {second != first}");
+	m.set_if_version(1, 99, first) catch e {
+		let c = e as *pool.Changed;
+		show(f"stale: {e.message}, found is the new version {c.found == second}");
+	};
+	m.modify(1, fn(p) {
+		*p += 1;
+	});
+	let (x, third) = m.get_versioned(1) ?? (-1, -1);
+	show(f"modify changes the version: {third != second} {x}");
+	m.remove(1);
+	m.set_if_version(1, 5, third) catch e {
+		show(f"gone: {e.message}");
+	};
+	m.set(1, 12);
+	let (y, fourth) = m.get_versioned(1) ?? (-1, -1);
+	let fresh = fourth != first && fourth != second && fourth != third;
+	show(f"added again: {y}, a version never given before {fresh}");
+	let nothing = m.get_versioned(2);
+	show(f"no key: {nothing == none}");
+}
+
+fn criteria() may fail
+{
+	let m = ConcurrentMap<int, int>.new();
+	for i in 1..7 {
+		m.set(i, i * 10);
+	}
+	let even = m.find_all(fn(e) {
+		return e.0 % 2 == 0;
+	});
+	let sum = 0;
+	for e in even {
+		sum += e.1;
+	}
+	let first = m.find_first(fn(e) {
+		return e.1 == 30;
+	}) ?? (-1, -1);
+	let one = try m.find_one(fn(e) {
+		return e.1 == 40;
+	});
+	show(f"find_all {even.count} {sum}, first {first.0}, one {one.0}");
+	let many = m.find_one(fn(e) {
+		return e.0 > 2;
+	}) catch e {
+		show(f"{e.message}");
+		yield (0, 0);
+	};
+	let (before, old) = m.get_versioned(3) ?? (-1, -1);
+	let n = m.update_all(fn(e) {
+		return e.0 % 2 == 1;
+	}, fn(p) {
+		p.1 += 1;
+	});
+	let (after, now) = m.get_versioned(3) ?? (-1, -1);
+	show(f"update_all {n} {many.0}, version moved {old != now}");
+	sorted("update_all", &m);
+	let hit = m.update_first(fn(e) {
+		return e.0 == 5;
+	}, fn(p) {
+		p.1 = 0;
+	});
+	try m.update_one(fn(e) {
+		return e.0 == 2;
+	}, fn(p) {
+		p.1 = 2;
+	});
+	m.update_one(fn(e) {
+		return e.0 == 9;
+	}, fn(p) {
+		p.1 = 9;
+	}) catch e {
+		show(f"{e.message}");
+	};
+	show(f"update_first {hit}");
+	sorted("update_one", &m);
+	let removed = m.remove_all(fn(e) {
+		return e.1 % 2 == 1;
+	});
+	let taken = m.remove_first(fn(e) {
+		return e.0 == 4;
+	}) ?? (-1, -1);
+	let only = try m.remove_one(fn(e) {
+		return e.0 == 2;
+	});
+	let none_left = m.remove_one(fn(e) {
+		return e.0 == 2;
+	}) catch e {
+		show(f"{e.message}");
+		yield (0, 0);
+	};
+	show(f"remove {removed} {taken.0} {only.0} {none_left.0}, count {m.count()}");
+	sorted("removed", &m);
+	let gone = m.get_versioned(1);
+	show(f"a removed key has no version: {gone == none}");
+	m.clear();
+	show(f"clear: {m.count()} {m.is_empty()}");
+	sorted("clear", &m);
+	m.set(5, 5);
+	sorted("after clear", &m);
+}
+
+fn copies()
+{
+	let a = ConcurrentMap<int, int>.new();
+	for i in 0..40 {
+		a.set(i, i * i);
+	}
+	let b = dup(&a);
+	show(f"dup: {b.count()} {a == *b}");
+	b.set(3, 0);
+	show(f"changed copy: {a == *b} {a.get(3) ?? -1} {b.get(3) ?? -1}");
+	b.set(3, 9);
+	show(f"equal again: {a == *b}");
+	b.remove(39);
+	show(f"one fewer: {a == *b}");
+	delete(b);
+}
+
+fn owned()
+{
+	let counting = Counting { };
+	{
+		let m = ConcurrentMap<Id, Id>.new(64, &counting);
+		for i in 0..200 {
+			let k = Id.of(i);
+			m.set(k, Id.of(i * 2));
+		}
+		for i in 0..200 {
+			if i % 3 == 0 {
+				let k = Id.of(i);
+				let gone = m.remove(k);
+			}
+		}
+		let one = Id.of(1);
+		m.set(one, Id.of(-1));
+		let copy = dup(&m);
+		let key = Id.of(4);
+		let missing = Id.of(-1);
+		let four = m.get(key) ?? missing;
+		let removed = copy.remove_all(fn(e) {
+			return e.0.value() < 100;
+		});
+		let total = 0;
+		for (k, v) in copy {
+			total += v.value();
+		}
+		show(f"owned: {m.count()} {copy.count()} {removed} {four.value()} {total}");
+		delete(copy);
+		m.reserve(1000);
+		m.shrink();
+		m.clear();
+	}
+	show(f"owned: {Id.live.load()} blocks alive, {counting.allocs - counting.frees} allocations held");
+}
+
+fn main() -> int
+{
+	lookups();
+	versions() catch e {
+		show(f"versions: {e.message}");
+	};
+	criteria() catch e {
+		show(f"criteria: {e.message}");
+	};
+	copies();
+	owned();
+	return 0;
+}

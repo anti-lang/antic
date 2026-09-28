@@ -1,0 +1,22 @@
+exit 0
+empty: 0 true false -1 -1
+full: 4 pushed, 4 true [0, 1, 2, 3]
+pop 0 1, push true, peek 2, 3
+wrapped: 609773 [997, 998, 999], 0 allocations in the loop
+walk [997,998,999]
+sum 2994
+find_all 3, first 30, one 50
+`find_one` found 6 elements where it needs exactly one
+`update_one` found no element where it needs exactly one
+update_all 3, first true, -1 [1, 21, 30, 41, 50, 0, 70]
+remove_all 3 [30, 50, 0, 70] 4
+remove_first 50 [30, 0, 70]
+`remove_one` found no element where it needs exactly one
+remove_one 30 -1 [0, 70]
+refilled [0, 70, 100, 101, 102, 103, 104, 105] 8 true
+clear: popped 0, 1 true [7]
+dup: [0, 1, 4, 9] true
+changed copy: false [0, 1, 4, 9] [1, 4, 9, 9]
+owned: front 7, 3 held, 4 alive
+owned copy: true 1 8 true
+owned: 0 alive, 0 allocations held

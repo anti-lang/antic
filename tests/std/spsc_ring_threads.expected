@@ -1,0 +1,6 @@
+exit 0
+to main: 2000000 sent, 0 out of order, 0 left
+from main: 0 out of order, 0 left
+pairs: 0 wrong
+tags: 0 wrong
+tags: 0 alive

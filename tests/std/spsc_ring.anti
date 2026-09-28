@@ -1,0 +1,267 @@
+//! `SpscRing<T, N>` of `anti.collection.concurrent` through every operation on
+//! one thread, which is then both the producer and the consumer.
+//!
+//! A ring takes its room once, when it is made, and a counting allocator shows
+//! that pushing and popping allocate nothing after that. The positions run past
+//! the capacity many times, so every slot is reused. A ring of a class that
+//! owns memory counts the blocks alive, so every element the ring drops, and
+//! every one it still holds at its end, is torn down.
+
+import anti.collection;
+import anti.collection.concurrent.{SpscRing};
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A class that owns memory, with `==` over its number. Its copy makes a block
+/// of its own, and every block counts in `Tag.live`.
+class Tag
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		Tag.live.add(1);
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Tag) -> bool
+	{
+		return self.number() == other.number();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Tag;
+		let p = alloc(int, 1) catch fatal;
+		p[0] = self.number();
+		Tag.live.add(1);
+		made.n = p;
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		Tag.live.add(-1);
+		free(p);
+	}
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn serialized<T, N: int>(label: str, r: *SpscRing<T, N>)
+{
+	let out = text.Builder.new();
+	out.append(label);
+	out.append(" ");
+	r.serialize(&out);
+	show(out.take());
+}
+
+fn basics()
+{
+	let counting = Counting { };
+	let r = SpscRing<int, 4>.new(&counting);
+	let first = r.peek() ?? -1;
+	let nothing = r.pop() ?? -1;
+	show(f"empty: {r.count()} {r.is_empty()} {r.is_full()} {first} {nothing}");
+	let pushed = 0;
+	for i in 0..6 {
+		if r.push(i) {
+			pushed += 1;
+		}
+	}
+	show(f"full: {pushed} pushed, {r.count()} {r.is_full()} {r.to_text()}");
+	let a = r.pop() ?? -1;
+	let b = r.pop() ?? -1;
+	let again = r.push(10);
+	let peeked = r.peek() ?? -1;
+	show(f"pop {a} {b}, push {again}, peek {peeked}, {r.count()}");
+	let made = counting.allocs;
+	let order = 0;
+	for round in 0..1000 {
+		let v = r.pop() ?? -1;
+		order = order * 3 % 1000003 + v;
+		r.push(round);
+	}
+	let spent = counting.allocs - made;
+	show(f"wrapped: {order} {r.to_text()}, {spent} allocations in the loop");
+	let sum = 0;
+	for x in r {
+		sum += x;
+	}
+	serialized("walk", &r);
+	show(f"sum {sum}");
+}
+
+fn criteria() may fail
+{
+	let r = SpscRing<int, 8>.new();
+	for i in 0..5 {
+		r.pop();
+	}
+	for i in 1..8 {
+		r.push(i * 10);
+	}
+	let even = r.find_all(fn(x) {
+		return x % 20 == 0;
+	});
+	let first = r.find_first(fn(x) {
+		return x > 25;
+	}) ?? -1;
+	let one = try r.find_one(fn(x) {
+		return x == 50;
+	});
+	show(f"find_all {even.count}, first {first}, one {one}");
+	let many = r.find_one(fn(x) {
+		return x > 10;
+	}) catch e {
+		show(f"{e.message}");
+		yield -1;
+	};
+	let n = r.update_all(fn(x) {
+		return x % 20 == 0;
+	}, fn(p) {
+		*p += 1;
+	});
+	let hit = r.update_first(fn(x) {
+		return x > 60;
+	}, fn(p) {
+		*p = 0;
+	});
+	try r.update_one(fn(x) {
+		return x == 10;
+	}, fn(p) {
+		*p = 1;
+	});
+	r.update_one(fn(x) {
+		return x == 99;
+	}, fn(p) {
+		*p = 99;
+	}) catch e {
+		show(f"{e.message}");
+	};
+	show(f"update_all {n}, first {hit}, {many} {r.to_text()}");
+	let removed = r.remove_all(fn(x) {
+		return x % 2 == 1;
+	});
+	show(f"remove_all {removed} {r.to_text()} {r.count()}");
+	let taken = r.remove_first(fn(x) {
+		return x == 50;
+	}) ?? -1;
+	show(f"remove_first {taken} {r.to_text()}");
+	let only = try r.remove_one(fn(x) {
+		return x == 30;
+	});
+	let gone = r.remove_one(fn(x) {
+		return x == 30;
+	}) catch e {
+		show(f"{e.message}");
+		yield -1;
+	};
+	show(f"remove_one {only} {gone} {r.to_text()}");
+	for i in 0..6 {
+		r.push(100 + i);
+	}
+	show(f"refilled {r.to_text()} {r.count()} {r.is_full()}");
+	let next = r.pop() ?? -1;
+	r.clear();
+	let after = r.push(7);
+	show(f"clear: popped {next}, {r.count()} {after} {r.to_text()}");
+}
+
+fn copies()
+{
+	let a = SpscRing<int, 5>.new();
+	for i in 0..3 {
+		a.push(i);
+		a.pop();
+	}
+	for i in 0..4 {
+		a.push(i * i);
+	}
+	let b = dup(&a);
+	show(f"dup: {b.to_text()} {a == *b}");
+	b.pop();
+	b.push(9);
+	show(f"changed copy: {a == *b} {a.to_text()} {b.to_text()}");
+	delete(b);
+}
+
+fn owned()
+{
+	let counting = Counting { };
+	{
+		let r = SpscRing<Tag, 3>.new(&counting);
+		for i in 0..10 {
+			if !r.push(Tag.of(i)) {
+				let t = r.pop() ?? Tag.of(-1);
+				r.push(Tag.of(i));
+			}
+		}
+		let front = r.peek() ?? Tag.of(-1);
+		show(f"owned: front {front.number()}, {r.count()} held, {Tag.live.load()} alive");
+		let copy = dup(&r);
+		let same = r == *copy;
+		let dropped = copy.remove_all(fn(t) {
+			return t.number() == 8;
+		});
+		let removed = r.remove_first(fn(t) {
+			return t.number() == 8;
+		}) ?? Tag.of(-1);
+		show(f"owned copy: {same} {dropped} {removed.number()} {r == *copy}");
+		delete(copy);
+	}
+	show(f"owned: {Tag.live.load()} alive, {counting.allocs - counting.frees} allocations held");
+}
+
+fn main() -> int
+{
+	basics();
+	criteria() catch e {
+		show(f"criteria: {e.message}");
+	};
+	copies();
+	owned();
+	return 0;
+}

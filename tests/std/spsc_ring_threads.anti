@@ -1,0 +1,178 @@
+//! An `SpscRing` between two threads at full speed.
+//!
+//! A dispatched job produces a long run of numbers into a small ring while the
+//! main thread consumes them, and then the two swap sides. Neither side waits:
+//! a full ring makes the producer try the push again, and an empty one makes
+//! the consumer try the pop again. Every value must arrive once and in order. A
+//! ring of tuples whose capacity is no power of two checks that no element
+//! arrives half written, and a ring of objects that own memory checks that each
+//! crosses whole and is torn down once.
+
+import anti.collection.concurrent.{SpscRing};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The length of the run of numbers.
+const RUN: int = 2000000;
+
+/// The length of the runs of tuples and of objects.
+const SHORT_RUN: int = 200000;
+
+/// A class that owns memory and counts the blocks alive.
+class Tag
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Tag
+	{
+		let p = alloc(int, 1) catch fatal;
+		p[0] = n;
+		Tag.live.add(1);
+		return Tag { n: p };
+	}
+
+	pub fn number(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		Tag.live.add(-1);
+		free(p);
+	}
+}
+
+/// Push `0` up to `n` into `r`, trying each push again while the ring is full.
+worker fn produce(r: *SpscRing<int, 64>, n: int) -> int
+{
+	for i in 0..n {
+		while true do {
+			let v = i;
+			if r.push(v) {
+				break;
+			}
+		}
+	}
+	return n;
+}
+
+/// Pop `n` values from `r`, trying each pop again while the ring is empty.
+/// Gives the number that did not arrive in order.
+worker fn consume(r: *SpscRing<int, 64>, n: int) -> int
+{
+	let wrong = 0;
+	for i in 0..n {
+		while true do {
+			if let v = r.pop() {
+				if v != i {
+					wrong += 1;
+				}
+				break;
+			}
+		}
+	}
+	return wrong;
+}
+
+/// Push the tuples `(i, 3 * i + 1)` into `r`.
+worker fn produce_pairs(r: *SpscRing<(int, int), 7>, n: int) -> int
+{
+	for i in 0..n {
+		while true do {
+			let pair = (i, 3 * i + 1);
+			if r.push(pair) {
+				break;
+			}
+		}
+	}
+	return n;
+}
+
+/// Push objects numbered `0` up to `n` into `r`.
+worker fn produce_tags(r: *SpscRing<Tag, 16>, n: int) -> int
+{
+	for i in 0..n {
+		while true do {
+			if r.push(Tag.of(i)) {
+				break;
+			}
+		}
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let r = SpscRing<int, 64>.new();
+	let producer = dispatch &r -> produce(RUN);
+	let wrong = 0;
+	for i in 0..RUN {
+		while true do {
+			if let v = r.pop() {
+				if v != i {
+					wrong += 1;
+				}
+				break;
+			}
+		}
+	}
+	let sent = join(producer);
+	printf("to main: %d sent, %d out of order, %d left\n".ptr, sent as c_int,
+		wrong as c_int, r.count() as c_int);
+
+	let consumer = dispatch &r -> consume(RUN);
+	for i in 0..RUN {
+		while true do {
+			let v = i;
+			if r.push(v) {
+				break;
+			}
+		}
+	}
+	let late = join(consumer);
+	printf("from main: %d out of order, %d left\n".ptr, late as c_int,
+		r.count() as c_int);
+
+	let pairs = SpscRing<(int, int), 7>.new();
+	let pair_job = dispatch &pairs -> produce_pairs(SHORT_RUN);
+	let torn = 0;
+	for i in 0..SHORT_RUN {
+		while true do {
+			if let p = pairs.pop() {
+				if p.0 != i || p.1 != 3 * i + 1 {
+					torn += 1;
+				}
+				break;
+			}
+		}
+	}
+	join(pair_job);
+	printf("pairs: %d wrong\n".ptr, torn as c_int);
+
+	{
+		let tags = SpscRing<Tag, 16>.new();
+		let tag_job = dispatch &tags -> produce_tags(SHORT_RUN);
+		let lost = 0;
+		for i in 0..SHORT_RUN {
+			while true do {
+				if let t = tags.pop() {
+					if t.number() != i {
+						lost += 1;
+					}
+					break;
+				}
+			}
+		}
+		join(tag_job);
+		printf("tags: %d wrong\n".ptr, lost as c_int);
+	}
+	printf("tags: %d alive\n".ptr, Tag.live.load() as c_int);
+	return 0;
+}

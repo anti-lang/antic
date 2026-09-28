@@ -1,0 +1,37 @@
+exit 0
+empty: 0 true
+empty {}
+set {"Ann":41,"Bob":31,"Cy":7,"Dee":22}
+add: true false, count 4 false
+get: 7 -1, contains: true false
+remove: 31 -1, count 3
+update true false, read true false 42, modify true
+changed {"Ann":42,"Cy":70,"Dee":22}
+keys 8 letters, values 134, walk 8134
+{"only": 1}
+versioned: 10 then 11, new version true
+stale: the element changed from version 1 to 2, found is the new version true
+modify changes the version: true 12
+gone: the element of version 3 is gone
+added again: 12, a version never given before true
+no key: true
+find_all 3 120, first 3, one 4
+`find_one` found 4 elements where it needs exactly one
+update_all 3 0, version moved true
+update_all [[1,11],[2,20],[3,31],[4,40],[5,51],[6,60]]
+`update_one` found no element where it needs exactly one
+update_first true
+update_one [[1,11],[2,2],[3,31],[4,40],[5,0],[6,60]]
+`remove_one` found no element where it needs exactly one
+remove 2 4 2 0, count 2
+removed [[5,0],[6,60]]
+a removed key has no version: true
+clear: 0 true
+clear []
+after clear [[5,5]]
+dup: 40 true
+changed copy: false 9 0
+equal again: true
+one fewer: false
+owned: 133 67 66 8 20000
+owned: 0 blocks alive, 0 allocations held

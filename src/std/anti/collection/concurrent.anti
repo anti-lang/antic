@@ -1,0 +1,1290 @@
+//! The collections that threads share without one lock around the whole.
+//!
+//! `ConcurrentMap<K, V>` is a map for many threads at once. It splits its
+//! entries into parts by the hash of the key, and each part has a lock of its
+//! own, so threads that use keys of different parts never wait for each other.
+//! `SpscRing<T, N>` passes elements from one producing thread to one consuming
+//! thread with no lock at all. Each side writes one atomic counter and only
+//! reads the other's, so neither side ever waits.
+//!
+//! Both are concurrent classes. They have the operations of the plain
+//! collections, less every operation by position, since between threads a
+//! position can go stale at any moment. Reading gives a copy, and no pointer to
+//! an element leaves them except through a `lent` parameter.
+
+import anti.collection;
+import anti.collection.map;
+import anti.collection.pool;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+
+/// The number of parts of a `ConcurrentMap`, each with a lock of its own.
+///
+/// DESIGN: a power of two, so the part of a key is a few bits of its hash.
+/// Sixteen locks let as many threads work on different parts at once, and cost
+/// a lock word and two empty tables each.
+const PARTS: int = 16;
+
+/// One part of a `ConcurrentMap`: its lock, the entries whose key hashes to it
+/// and the version of each.
+///
+/// DESIGN: a struct of the module and not a type nested in the map, since a
+/// library file carries no type nested in a generic class yet. The checker
+/// therefore does not see that `lock` guards the other fields, and every
+/// function of the map reaches them inside `sync part.lock` alone.
+struct Part<K: eq + hash, V>
+{
+	lock: Mutex,
+	entries: map.HashMap<K, V>,
+	/// The version of each key of `entries`: the value of `clock` at its last
+	/// change.
+	versions: map.HashMap<K, Stamp>,
+	/// The changes of the part so far, which give each change a version the
+	/// part never gave before.
+	clock: int,
+}
+
+/// The version of an entry of a `ConcurrentMap`.
+///
+/// A struct and not an `int`: antic fails to lower `remove` of a map whose
+/// values are `int` and whose key has a `destruct`, as
+/// `docs/reports/2026-09-28-add5-concurrent.md` records.
+struct Stamp
+{
+	version: int,
+}
+
+/// A map from keys to values that many threads use at once.
+///
+/// The entries stand in parts, chosen by the hash of the key, and each part has
+/// a lock of its own. An operation on one key locks the part of that key alone,
+/// so threads that use keys of different parts do not wait for each other. The
+/// operations that walk the map lock one part at a time, and the `_one` forms
+/// lock every part while they look, so that the one match they find is the only
+/// one.
+///
+/// `read`, `modify`, `update` and the functions given to the `find`, `update`
+/// and `remove` forms run inside the lock of a part. A slow function holds up
+/// every thread that uses a key of that part, and a function that calls the map
+/// again waits for itself forever.
+///
+/// A map has no order. `for (k, v) in m`, `keys` and `values` walk copies of
+/// the entries taken part by part, so an entry that another thread adds or
+/// removes meanwhile may be in the walk or not.
+pub concurrent class ConcurrentMap<K: eq + hash, V>
+{
+	/// The allocator of every block the map holds.
+	from: *mem.Allocator,
+	/// The room of the `PARTS` parts. `new` and `copy` alone write it, each
+	/// into a map no other thread can reach yet.
+	parts: ?*Part<K, V> = none unchecked(unguarded-field, "`copy` writes it into the new map before any thread can reach that map"),
+	/// The seed mixed into the hash of a key to choose its part.
+	seed: u64 = 0,
+	/// The number of entries.
+	atomic size: int = 0,
+
+	/// An empty map with room for `capacity` entries from `from`, or from the C
+	/// library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none)
+		-> ConcurrentMap<K, V>
+	{
+		let chosen = collection.allocator(from);
+		let parts = made_parts<K, V>(chosen, capacity);
+		return ConcurrentMap<K, V> {
+			from: chosen,
+			parts: parts,
+			seed: lang.hash_seed(),
+		};
+	}
+
+	/// The number of entries at this moment.
+	pub fn count(self) -> int
+	{
+		return self.size.load();
+	}
+
+	/// Whether the map holds no entry at this moment.
+	pub fn is_empty(self) -> bool
+	{
+		return self.size.load() == 0;
+	}
+
+	/// Make room for `n` more entries, spread over the parts.
+	pub fn reserve(self, n: int)
+	{
+		let each = (n + PARTS - 1) / PARTS;
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				part.entries.reserve(each);
+				part.versions.reserve(each);
+			}
+			i += 1;
+		}
+	}
+
+	/// Give back the room past the entries of each part.
+	pub fn shrink(self)
+	{
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				part.entries.shrink();
+				part.versions.shrink();
+			}
+			i += 1;
+		}
+	}
+
+	/// A copy of the value under `k`, or `none`.
+	pub fn get(self, k: K) -> ?V
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			return part.entries.get(k);
+		}
+	}
+
+	/// Whether the map holds the key `k`.
+	pub fn contains(self, k: K) -> bool
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			return part.entries.contains(k);
+		}
+	}
+
+	/// Write `v` under `k`, replacing the value there.
+	pub fn set(self, k: K, own v: V)
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			if !part.entries.contains(k) {
+				self.size.add(1);
+			}
+			part.entries.set(k, v);
+			changed(part, k);
+		}
+	}
+
+	/// Write `v` under `k` when the map does not hold `k`. Gives `false`, and
+	/// tears `v` down, when it does.
+	pub fn add(self, k: K, own v: V) -> bool
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			if !part.entries.add(k, v) {
+				return false;
+			}
+			changed(part, k);
+			self.size.add(1);
+		}
+		return true;
+	}
+
+	/// Remove the entry of `k` and give its value, or `none`.
+	pub fn remove(self, k: K) -> ?V
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			if !part.entries.contains(k) {
+				return none;
+			}
+			let gone = part.versions.remove(k);
+			self.size.sub(1);
+			return part.entries.remove(k);
+		}
+	}
+
+	/// Run `change` on the value under `k`, in place, inside the lock of its
+	/// part. Gives `false` when the map does not hold `k`.
+	pub fn update(self, k: K, change: fn(lent *V)) -> bool
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			if !part.entries.update(k, change) {
+				return false;
+			}
+			changed(part, k);
+		}
+		return true;
+	}
+
+	/// Lend the value under `k` to `f`, inside the lock of its part. Gives
+	/// `false` when the map does not hold `k`.
+	pub fn read(self, k: K, f: fn(lent *V)) -> bool
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			return part.entries.read(k, f);
+		}
+	}
+
+	/// Lend the value under `k` to `f`, which may change it, inside the lock of
+	/// its part. Gives `false` when the map does not hold `k`.
+	pub fn modify(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.update(k, f);
+	}
+
+	/// A copy of the value under `k` and its version, or `none`.
+	///
+	/// The version changes with every change of the entry, and an entry removed
+	/// and added again never takes a version it had before. `set_if_version`
+	/// takes it back.
+	pub fn get_versioned(self, k: K) -> ?(V, int)
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			let value = part.entries.get(k) else {
+				return none;
+			};
+			let stamp = part.versions.get(k) ?? Stamp { version: 0 };
+			return (value, stamp.version);
+		}
+	}
+
+	/// Write `v` under `k` when its version is still `version`, as
+	/// `get_versioned` gave it, so a thread can read, compute and write back
+	/// only if nothing changed meanwhile.
+	///
+	/// It fails with `anti.collection.pool.Changed`, and tears `v` down, when
+	/// the entry changed since or is gone.
+	pub fn set_if_version(self, k: K, own v: V, version: int) may fail
+	{
+		let part = self.part_of(k);
+		sync part.lock {
+			let now = part.versions.get(k) else {
+				fail pool.Changed.found_version(version, -1);
+			};
+			if now.version != version {
+				fail pool.Changed.found_version(version, now.version);
+			}
+			part.entries.set(k, v);
+			changed(part, k);
+		}
+	}
+
+	/// Copies of every entry that `test` accepts, from the allocator of the
+	/// map. `test` runs inside the lock of each part in turn.
+	pub fn find_all(self, test: fn((K, V)) -> bool) -> collection.Copies<(K, V)>
+	{
+		let found = collection.Copies<(K, V)>.new(0, self.from);
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				let some = part.entries.find_all(test);
+				for e in some {
+					found.add(dup(e));
+				}
+			}
+			i += 1;
+		}
+		return found;
+	}
+
+	/// A copy of an entry that `test` accepts, or `none`. `test` runs inside
+	/// the lock of each part in turn.
+	pub fn find_first(self, test: fn((K, V)) -> bool) -> ?(K, V)
+	{
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				if let e = part.entries.find_first(test) {
+					return e;
+				}
+			}
+			i += 1;
+		}
+		return none;
+	}
+
+	/// A copy of the one entry that `test` accepts. `test` runs with every part
+	/// locked.
+	///
+	/// It fails with `anti.collection.NotOne` when no entry or more than one
+	/// matches.
+	pub fn find_one(self, test: fn((K, V)) -> bool) -> (K, V) may fail
+	{
+		let n = 0;
+		let found: ?(K, V) = none;
+		self.whole(fn() {
+			n = self.matches(test);
+			if n == 1 {
+				found = self.first_locked(test);
+			}
+		});
+		let e = found else {
+			fail collection.NotOne.found("find_one", n);
+		};
+		return e;
+	}
+
+	/// Run `change` on every entry that `test` accepts, in place, and give
+	/// their number. Both run inside the lock of each part in turn.
+	pub fn update_all(self, test: fn((K, V)) -> bool,
+		change: fn(lent *(K, V))) -> int
+	{
+		let n = 0;
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				n += part.entries.update_all(test, fn(e) {
+					change(e);
+					changed(part, e.0);
+				});
+			}
+			i += 1;
+		}
+		return n;
+	}
+
+	/// Run `change` on an entry that `test` accepts, in place. Gives `false`
+	/// when no entry matches. Both run inside the lock of each part in turn.
+	pub fn update_first(self, test: fn((K, V)) -> bool,
+		change: fn(lent *(K, V))) -> bool
+	{
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				if update_in(part, test, change) {
+					return true;
+				}
+			}
+			i += 1;
+		}
+		return false;
+	}
+
+	/// Run `change` on the one entry that `test` accepts, in place. Both run
+	/// with every part locked.
+	///
+	/// It fails with `anti.collection.NotOne` and changes nothing when no entry
+	/// or more than one matches.
+	pub fn update_one(self, test: fn((K, V)) -> bool,
+		change: fn(lent *(K, V))) may fail
+	{
+		let n = 0;
+		self.whole(fn() {
+			n = self.matches(test);
+			if n == 1 {
+				let i = 0;
+				while i < PARTS do {
+					if update_in(self.part(i), test, change) {
+						return;
+					}
+					i += 1;
+				}
+			}
+		});
+		if n != 1 {
+			fail collection.NotOne.found("update_one", n);
+		}
+	}
+
+	/// Remove every entry that `test` accepts and give their number. `test`
+	/// runs inside the lock of each part in turn.
+	pub fn remove_all(self, test: fn((K, V)) -> bool) -> int
+	{
+		let n = 0;
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				let gone = part.entries.remove_all(fn(e) {
+					return forgets(part, test, e);
+				});
+				self.size.sub(gone);
+				n += gone;
+			}
+			i += 1;
+		}
+		return n;
+	}
+
+	/// Remove an entry that `test` accepts and give it, or `none`. `test` runs
+	/// inside the lock of each part in turn.
+	pub fn remove_first(self, test: fn((K, V)) -> bool) -> ?(K, V)
+	{
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				if let e = self.remove_in(part, test) {
+					return e;
+				}
+			}
+			i += 1;
+		}
+		return none;
+	}
+
+	/// Remove the one entry that `test` accepts and give it. `test` runs with
+	/// every part locked.
+	///
+	/// It fails with `anti.collection.NotOne` and removes nothing when no entry
+	/// or more than one matches.
+	pub fn remove_one(self, test: fn((K, V)) -> bool) -> (K, V) may fail
+	{
+		let n = 0;
+		let taken: ?(K, V) = none;
+		self.whole(fn() {
+			n = self.matches(test);
+			let i = 0;
+			while n == 1 && i < PARTS do {
+				if let e = self.remove_in(self.part(i), test) {
+					taken = e;
+					return;
+				}
+				i += 1;
+			}
+		});
+		let e = taken else {
+			fail collection.NotOne.found("remove_one", n);
+		};
+		return e;
+	}
+
+	/// Remove every entry, one part at a time.
+	pub fn clear(self)
+	{
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				self.size.sub(part.entries.count);
+				part.entries.clear();
+				part.versions.clear();
+			}
+			i += 1;
+		}
+	}
+
+	/// Copies of the keys, taken part by part.
+	pub fn keys(self) -> Snapshot<K>
+	{
+		let taken = Snapshot<K>.new(self.from);
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				for k in part.entries.keys() {
+					taken.add(dup(k));
+				}
+			}
+			i += 1;
+		}
+		return taken;
+	}
+
+	/// Copies of the values, taken part by part.
+	pub fn values(self) -> Snapshot<V>
+	{
+		let taken = Snapshot<V>.new(self.from);
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				for v in part.entries.values() {
+					taken.add(dup(v));
+				}
+			}
+			i += 1;
+		}
+		return taken;
+	}
+
+	operator fn iter(self) -> Snapshot<(K, V)>
+	{
+		let taken = Snapshot<(K, V)>.new(self.from);
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				for (k, v) in part.entries {
+					taken.add((dup(k), dup(v)));
+				}
+			}
+			i += 1;
+		}
+		return taken;
+	}
+
+	/// The entries as text, `{"Ann": 41}`, in no order, as a `HashMap` writes
+	/// them.
+	concrete fn to_text(self) -> str
+	{
+		let all = self.gathered();
+		return all.to_text();
+	}
+
+	/// Write the entries to `out` as a `HashMap` writes them: a JSON object
+	/// when the keys are `str` and an array of `[key, value]` pairs otherwise,
+	/// sorted by the text of each key.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		let all = self.gathered();
+		all.serialize(out);
+	}
+
+	/// A map in `to` with parts of its own from the same allocator, and a copy
+	/// of each entry and its version in them, as `dup` makes one. Each part of
+	/// this map is locked while it is copied.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: `dup` gives a replaced `copy` memory that nothing has
+		   written. The bytes of this map go into `to` first, its table among
+		   them, and the copy then takes parts of its own. */
+		memcpy(to as ?*byte, self as ?*byte,
+			size_of(ConcurrentMap<K, V>) as c_size_t);
+		let made = to as *ConcurrentMap<K, V>;
+		let theirs = made_parts<K, V>(self.from, 0);
+		made.parts = theirs;
+		let total = 0;
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				let into = &theirs[i];
+				into.entries = copied(&part.entries);
+				into.versions = copied(&part.versions);
+				into.clock = part.clock;
+				total += part.entries.count;
+			}
+			i += 1;
+		}
+		made.size.store(total);
+	}
+
+	/// The part of the key `k`, chosen by the top bits of its seeded hash,
+	/// which the table of the part does not use to choose a slot.
+	fn part_of(self, k: K) -> *Part<K, V>
+	{
+		let h = lang.seeded(k.hash(), self.seed);
+		return self.part((h >> 60) as int);
+	}
+
+	/// The part at `i`, from 0.
+	fn part(self, i: int) -> *Part<K, V>
+	{
+		let parts = self.parts catch fatal;
+		return &parts[i];
+	}
+
+	/// Run `f` with every part locked, taken in the order of the parts, so two
+	/// threads that lock them all never wait for each other in a cycle.
+	fn whole(self, f: fn())
+	{
+		self.locked_from(0, f);
+	}
+
+	fn locked_from(self, i: int, f: fn())
+	{
+		if i == PARTS {
+			f();
+			return;
+		}
+		let part = self.part(i);
+		sync part.lock {
+			self.locked_from(i + 1, f);
+		}
+	}
+
+	/// The number of entries that `test` accepts, with every part locked.
+	fn matches(self, test: fn((K, V)) -> bool) -> int
+	{
+		let n = 0;
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			let none_found = part.entries.find_first(fn(e) {
+				if test(e) {
+					n += 1;
+				}
+				return false;
+			});
+			i += 1;
+		}
+		return n;
+	}
+
+	/// A copy of the first entry that `test` accepts, with every part locked.
+	fn first_locked(self, test: fn((K, V)) -> bool) -> ?(K, V)
+	{
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			if let e = part.entries.find_first(test) {
+				return e;
+			}
+			i += 1;
+		}
+		return none;
+	}
+
+	/// Remove the first entry of `part` that `test` accepts, with the lock of
+	/// `part` held, and give it.
+	fn remove_in(self, part: *Part<K, V>, test: fn((K, V)) -> bool) -> ?(K, V)
+	{
+		let taken = part.entries.remove_first(fn(e) {
+			return forgets(part, test, e);
+		});
+		if taken != none {
+			self.size.sub(1);
+		}
+		return taken;
+	}
+
+	/// All the entries in one `HashMap`, taken part by part.
+	fn gathered(self) -> map.HashMap<K, V>
+	{
+		let all = map.HashMap<K, V>.new(self.size.load(), self.from);
+		let i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			sync part.lock {
+				for (k, v) in part.entries {
+					all.set(k, dup(v));
+				}
+			}
+			i += 1;
+		}
+		return all;
+	}
+
+	fn destruct(self)
+	{
+		let parts = self.parts else {
+			return;
+		};
+		let i = 0;
+		while i < PARTS do {
+			destroy(&parts[i].entries);
+			destroy(&parts[i].versions);
+			i += 1;
+		}
+		self.from.free(parts as ?*byte);
+	}
+}
+
+/// Whether `a` and `b` hold the same keys with equal values.
+///
+/// It takes copies of the entries of `a` part by part and looks each up in `b`,
+/// so it holds one lock at a time and never waits for a thread that compares
+/// the two the other way round.
+pub operator fn eq<K: eq + hash, V: eq>(a: ConcurrentMap<K, V>,
+	b: ConcurrentMap<K, V>) -> bool
+{
+	if a.count() != b.count() {
+		return false;
+	}
+	for (k, v) in a {
+		let theirs = b.get(k) else {
+			return false;
+		};
+		if !(theirs == v) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/// The room of the `PARTS` parts from `from`, each with an empty table of its
+/// own and room for its share of `capacity`. The program stops when the
+/// allocator has run out.
+fn made_parts<K: eq + hash, V>(from: *mem.Allocator, capacity: int)
+	-> *Part<K, V>
+{
+	let size = PARTS * size_of(Part<K, V>);
+	let room = from.alloc(size, room_align<Part<K, V>>()) catch fatal;
+	memset(room, 0, size as c_size_t);
+	let parts = room as *Part<K, V>;
+	let each = (capacity + PARTS - 1) / PARTS;
+	let i = 0;
+	while i < PARTS do {
+		parts[i].entries = map.HashMap<K, V>.new(each, from);
+		parts[i].versions = map.HashMap<K, Stamp>.new(each, from);
+		i += 1;
+	}
+	return parts;
+}
+
+/// Give the entry of `k` in `part` a version the part never gave before, with
+/// the lock of `part` held.
+fn changed<K: eq + hash, V>(part: *Part<K, V>, k: K)
+{
+	part.clock += 1;
+	part.versions.set(k, Stamp { version: part.clock });
+}
+
+/// Run `change` on the first entry of `part` that `test` accepts, with the lock
+/// of `part` held. Gives `false` when no entry matches.
+fn update_in<K: eq + hash, V>(part: *Part<K, V>, test: fn((K, V)) -> bool,
+	change: fn(lent *(K, V))) -> bool
+{
+	return part.entries.update_first(test, fn(e) {
+		change(e);
+		changed(part, e.0);
+	});
+}
+
+/// Whether `test` accepts `e`, and when it does, forget the version of its key,
+/// since the table of `part` removes it next.
+fn forgets<K: eq + hash, V>(part: *Part<K, V>, test: fn((K, V)) -> bool,
+	e: (K, V)) -> bool
+{
+	if !test(e) {
+		return false;
+	}
+	let gone = part.versions.remove(e.0);
+	return true;
+}
+
+/// A copy of the value at `p`, which owns a copy of what it holds.
+fn copied<T>(p: *T) -> T
+{
+	return dup(*p);
+}
+
+/// Copies of the elements of a collection that threads share, taken at one
+/// moment, which `for` walks.
+///
+/// The copies are the walk's own, from the allocator of the collection, and go
+/// back to it when the walk ends. A change of the collection meanwhile does not
+/// reach them.
+pub class Snapshot<T>
+{
+	from: *mem.Allocator,
+	items: ?*T = none,
+	capacity: int = 0,
+	/// The number of copies.
+	pub count: int = 0,
+	at: int = -1,
+
+	/// An empty snapshot whose room comes from `from`.
+	pub fn new(from: *mem.Allocator) -> Snapshot<T>
+	{
+		return Snapshot<T> { from: from };
+	}
+
+	/// Add `x` after the last copy.
+	pub fn add(self, own x: T)
+	{
+		if self.count == self.capacity {
+			self.grow();
+		}
+		let items = self.items catch fatal;
+		items[self.count] = x;
+		self.count += 1;
+	}
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.count;
+	}
+
+	operator fn value(self) -> T
+	{
+		let items = self.items catch fatal;
+		return dup(items[self.at]);
+	}
+
+	/// Twice the room, or 8 for the first, with the copies moved into it as
+	/// bytes.
+	fn grow(self)
+	{
+		let size = self.capacity * 2;
+		if size == 0 {
+			size = 8;
+		}
+		let room = self.from.alloc(size * size_of(T), room_align<T>()) catch fatal;
+		memset(room, 0, (size * size_of(T)) as c_size_t);
+		if self.count > 0 {
+			memcpy(room, self.items as ?*byte,
+				(self.count * size_of(T)) as c_size_t);
+		}
+		self.from.free(self.items as ?*byte);
+		self.items = room as ?*T;
+		self.capacity = size;
+	}
+
+	fn destruct(self)
+	{
+		let items = self.items else {
+			return;
+		};
+		let i = 0;
+		while i < self.count do {
+			destroy(&items[i]);
+			i += 1;
+		}
+		self.from.free(items as ?*byte);
+	}
+}
+
+/// A ring of fixed capacity `N` that passes elements from one producing thread
+/// to one consuming thread with no lock, such as samples between an audio
+/// thread and the rest of a program.
+///
+/// The ring takes room for `N` elements from its allocator when it is made and
+/// never allocates again. It holds two atomic counters: `given`, the elements
+/// the producer has pushed, which the producer alone writes, and `taken`, the
+/// elements the consumer has taken, which the consumer alone writes. The slots
+/// from `taken` up to `given` belong to the consumer and the others to the
+/// producer. Each side writes a slot and then moves its counter on, so the
+/// other side sees the slot only once it is whole. Neither side ever waits:
+/// `push` gives `false` when the ring is full and `pop` gives `none` when it is
+/// empty.
+///
+/// One thread at a time is the producer and calls `push` and `is_full`. One
+/// thread at a time is the consumer and calls every other function but `count`
+/// and `is_empty`, which either side may call. The `find`, `update` and
+/// `remove` forms, `clear`, `for`, `to_text`, `serialize`, `==` and `dup` reach
+/// the elements the consumer holds at the moment of the call.
+pub concurrent class SpscRing<T, N: int>
+{
+	/// The allocator of the room.
+	from: *mem.Allocator,
+	/// The room of `N` slots. The element at position `p` of the stream stands
+	/// in the slot `p % N`. `new` and `copy` alone write it, each into a ring
+	/// no other thread can reach yet.
+	items: ?*T = none unchecked(unguarded-field, "`copy` writes it into the new ring before any thread can reach that ring"),
+	/// The number of elements the producer has pushed.
+	atomic given: int = 0,
+	/// The number of elements the consumer has taken.
+	atomic taken: int = 0,
+	/// The last value of `taken` the producer read. `taken` only grows, so the
+	/// copy is never ahead of it, and the producer reads `taken` again only
+	/// when the copy says the ring is full.
+	taken_seen: int = 0 unchecked(unguarded-field, "the producing thread alone reads and writes it, and the atomic counters order the slots"),
+	/// The last value of `given` the consumer read, never ahead of it. The
+	/// consumer reads `given` again only when the copy says the ring is empty.
+	given_seen: int = 0 unchecked(unguarded-field, "the consuming thread alone reads and writes it, and the atomic counters order the slots"),
+
+	/// An empty ring with room for `N` elements from `from`, or from the C
+	/// library when it is `none`. The room comes in one allocation, and the
+	/// program stops when the allocator has run out.
+	pub fn new(from: ?*mem.Allocator = none) -> SpscRing<T, N>
+	{
+		let chosen = collection.allocator(from);
+		return SpscRing<T, N> { from: chosen, items: ring_room<T>(chosen, N) };
+	}
+
+	/// Add `x` after the newest element and give `true`, or give `false` when
+	/// the ring is full. The ring owns `x` once it holds it, and a full ring
+	/// tears `x` down. The producer alone calls it.
+	pub fn push(self, own x: T) -> bool
+	{
+		let given = self.given.load();
+		if given - self.taken_seen >= N {
+			self.taken_seen = self.taken.load();
+			if given - self.taken_seen >= N {
+				return false;
+			}
+		}
+		let items = self.items catch fatal;
+		items[given % N] = x;
+		self.given.store(given + 1);
+		return true;
+	}
+
+	/// Whether the ring holds `N` elements, so that `push` gives `false`. The
+	/// producer alone calls it.
+	pub fn is_full(self) -> bool
+	{
+		let taken = self.taken.load();
+		return self.given.load() - taken >= N;
+	}
+
+	/// Take the oldest element off, or `none` when the ring is empty. The
+	/// consumer alone calls it.
+	pub fn pop(self) -> ?T
+	{
+		let taken = self.taken.load();
+		if taken == self.given_seen {
+			self.given_seen = self.given.load();
+			if taken == self.given_seen {
+				return none;
+			}
+		}
+		let (got, at) = self.take(taken);
+		self.taken.store(taken + 1);
+		return got;
+	}
+
+	/// A copy of the oldest element, or `none` when the ring is empty. The
+	/// consumer alone calls it.
+	pub fn peek(self) -> ?T
+	{
+		let (head, tail) = self.held();
+		if head == tail {
+			return none;
+		}
+		let items = self.items catch fatal;
+		return dup(items[head % N]);
+	}
+
+	/// The number of elements at this moment, which either side may ask.
+	pub fn count(self) -> int
+	{
+		let taken = self.taken.load();
+		let n = self.given.load() - taken;
+		if n > N {
+			return N;
+		}
+		return n;
+	}
+
+	/// Whether the ring holds no element at this moment, which either side may
+	/// ask.
+	pub fn is_empty(self) -> bool
+	{
+		return self.count() == 0;
+	}
+
+	/// Copies of every element that `test` accepts, oldest first, from the
+	/// allocator of the ring.
+	pub fn find_all(self, test: fn(T) -> bool) -> collection.Copies<T>
+	{
+		let found = collection.Copies<T>.new(0, self.from);
+		let (head, tail) = self.held();
+		let items = self.items catch fatal;
+		let p = head;
+		while p < tail do {
+			if test(items[p % N]) {
+				found.add(dup(items[p % N]));
+			}
+			p += 1;
+		}
+		return found;
+	}
+
+	/// A copy of the oldest element that `test` accepts, or `none`.
+	pub fn find_first(self, test: fn(T) -> bool) -> ?T
+	{
+		let (head, tail) = self.held();
+		let p = self.first_match(head, tail, test);
+		if p < 0 {
+			return none;
+		}
+		let items = self.items catch fatal;
+		return dup(items[p % N]);
+	}
+
+	/// A copy of the one element that `test` accepts.
+	///
+	/// It fails with `anti.collection.NotOne` when no element or more than one
+	/// matches.
+	pub fn find_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		let (head, tail) = self.held();
+		let p = try self.one_match("find_one", head, tail, test);
+		let items = self.items catch fatal;
+		return dup(items[p % N]);
+	}
+
+	/// Run `change` on every element that `test` accepts, in place, and give
+	/// their number.
+	pub fn update_all(self, test: fn(T) -> bool, change: fn(lent *T)) -> int
+	{
+		let (head, tail) = self.held();
+		let items = self.items catch fatal;
+		let n = 0;
+		let p = head;
+		while p < tail do {
+			if test(items[p % N]) {
+				change(&items[p % N]);
+				n += 1;
+			}
+			p += 1;
+		}
+		return n;
+	}
+
+	/// Run `change` on the oldest element that `test` accepts, in place. Gives
+	/// `false` when no element matches.
+	pub fn update_first(self, test: fn(T) -> bool, change: fn(lent *T)) -> bool
+	{
+		let (head, tail) = self.held();
+		let p = self.first_match(head, tail, test);
+		if p < 0 {
+			return false;
+		}
+		let items = self.items catch fatal;
+		change(&items[p % N]);
+		return true;
+	}
+
+	/// Run `change` on the one element that `test` accepts, in place.
+	///
+	/// It fails with `anti.collection.NotOne` and changes nothing when no
+	/// element or more than one matches.
+	pub fn update_one(self, test: fn(T) -> bool, change: fn(lent *T)) may fail
+	{
+		let (head, tail) = self.held();
+		let p = try self.one_match("update_one", head, tail, test);
+		let items = self.items catch fatal;
+		change(&items[p % N]);
+	}
+
+	/// Remove every element that `test` accepts and give their number. The
+	/// others keep their order.
+	///
+	/// DESIGN: the elements the ring keeps move towards the newest, from the
+	/// newest down, and `taken` moves past the room they leave. The producer
+	/// writes no slot below `given`, so the move reaches no slot it uses.
+	pub fn remove_all(self, test: fn(T) -> bool) -> int
+	{
+		let (head, tail) = self.held();
+		let items = self.items catch fatal;
+		let keep = tail;
+		let p = tail - 1;
+		while p >= head do {
+			let slot = &items[p % N];
+			if test(*slot) {
+				destroy(slot);
+				memset(slot as ?*byte, 0, size_of(T) as c_size_t);
+			} else {
+				keep -= 1;
+				if keep != p {
+					let to = &items[keep % N];
+					memcpy(to as ?*byte, slot as ?*byte, size_of(T) as c_size_t);
+					memset(slot as ?*byte, 0, size_of(T) as c_size_t);
+				}
+			}
+			p -= 1;
+		}
+		self.taken.store(keep);
+		return keep - head;
+	}
+
+	/// Remove the oldest element that `test` accepts and give it, or `none`.
+	pub fn remove_first(self, test: fn(T) -> bool) -> ?T
+	{
+		let (head, tail) = self.held();
+		let p = self.first_match(head, tail, test);
+		if p < 0 {
+			return none;
+		}
+		return self.take_at(head, p);
+	}
+
+	/// Remove the one element that `test` accepts and give it.
+	///
+	/// It fails with `anti.collection.NotOne` and removes nothing when no
+	/// element or more than one matches.
+	pub fn remove_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		let (head, tail) = self.held();
+		let p = try self.one_match("remove_one", head, tail, test);
+		return self.take_at(head, p);
+	}
+
+	/// Remove every element the consumer holds.
+	pub fn clear(self)
+	{
+		let (head, tail) = self.held();
+		let items = self.items catch fatal;
+		let p = head;
+		while p < tail do {
+			let slot = &items[p % N];
+			destroy(slot);
+			memset(slot as ?*byte, 0, size_of(T) as c_size_t);
+			p += 1;
+		}
+		self.taken.store(tail);
+	}
+
+	operator fn iter(self) -> Snapshot<T>
+	{
+		let (head, tail) = self.held();
+		let items = self.items catch fatal;
+		let taken = Snapshot<T>.new(self.from);
+		let p = head;
+		while p < tail do {
+			taken.add(dup(items[p % N]));
+			p += 1;
+		}
+		return taken;
+	}
+
+	/// The elements as text, `[1, 2, 3]`, oldest first.
+	concrete fn to_text(self) -> str
+	{
+		let all = self.find_all(fn(x) {
+			return true;
+		});
+		return all.to_text();
+	}
+
+	/// Write the elements to `out` as a JSON array, oldest first.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		let all = self.find_all(fn(x) {
+			return true;
+		});
+		all.serialize(out);
+	}
+
+	/// A ring in `to` with room of its own for `N` elements from the same
+	/// allocator, and a copy of each element the consumer holds in it in order,
+	/// as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: `dup` gives a replaced `copy` memory that nothing has
+		   written. The bytes of this ring go into `to` first, its table among
+		   them, and the copy then takes room of its own, with the elements
+		   from its first slot. */
+		let (head, tail) = self.held();
+		let items = self.items catch fatal;
+		let room = ring_room<T>(self.from, N);
+		let p = head;
+		while p < tail do {
+			room[p - head] = dup(items[p % N]);
+			p += 1;
+		}
+		memcpy(to as ?*byte, self as ?*byte, size_of(SpscRing<T, N>) as c_size_t);
+		let made = to as *SpscRing<T, N>;
+		made.items = room;
+		made.given.store(tail - head);
+		made.taken.store(0);
+		made.taken_seen = 0;
+		made.given_seen = 0;
+	}
+
+	/// The positions the consumer holds, from the oldest up to and not
+	/// including `given` as it reads it now. The consumer alone calls it.
+	fn held(self) -> (int, int)
+	{
+		let head = self.taken.load();
+		self.given_seen = self.given.load();
+		return (head, self.given_seen);
+	}
+
+	/// The element at the position `p`, moved out of its slot, which it leaves
+	/// zero, and `p`. The consumer alone calls it.
+	fn take(self, p: int) -> (T, int)
+	{
+		let items = self.items catch fatal;
+		let slot = &items[p % N];
+		let got = (*slot, p);
+		memset(slot as ?*byte, 0, size_of(T) as c_size_t);
+		return got;
+	}
+
+	/// Remove the element at the position `p` of those from `head` and give it.
+	/// The elements before it move one slot towards the newest, and `taken`
+	/// moves past the slot they leave.
+	fn take_at(self, head: int, p: int) -> T
+	{
+		let (got, at) = self.take(p);
+		let items = self.items catch fatal;
+		let q = p - 1;
+		while q >= head do {
+			let to = &items[(q + 1) % N];
+			let from = &items[q % N];
+			memcpy(to as ?*byte, from as ?*byte, size_of(T) as c_size_t);
+			q -= 1;
+		}
+		memset(&items[head % N] as ?*byte, 0, size_of(T) as c_size_t);
+		self.taken.store(head + 1);
+		return got;
+	}
+
+	/// The first position from `head` up to `tail` whose element `test`
+	/// accepts, or -1.
+	fn first_match(self, head: int, tail: int, test: fn(T) -> bool) -> int
+	{
+		let items = self.items catch fatal;
+		let p = head;
+		while p < tail do {
+			if test(items[p % N]) {
+				return p;
+			}
+			p += 1;
+		}
+		return -1;
+	}
+
+	/// The one position from `head` up to `tail` whose element `test` accepts.
+	/// It fails with `NotOne`, which names the form, when there are none or
+	/// more.
+	fn one_match(self, form: str, head: int, tail: int, test: fn(T) -> bool)
+		-> int may fail
+	{
+		let items = self.items catch fatal;
+		let found = -1;
+		let n = 0;
+		let p = head;
+		while p < tail do {
+			if test(items[p % N]) {
+				found = p;
+				n += 1;
+			}
+			p += 1;
+		}
+		if n != 1 {
+			fail collection.NotOne.found(form, n);
+		}
+		return found;
+	}
+
+	fn destruct(self)
+	{
+		let items = self.items else {
+			return;
+		};
+		let p = self.taken.load();
+		let tail = self.given.load();
+		while p < tail do {
+			destroy(&items[p % N]);
+			p += 1;
+		}
+		self.from.free(items as ?*byte);
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the same order from the oldest,
+/// as the consumer of each holds them.
+pub operator fn eq<T: eq, N: int>(a: SpscRing<T, N>, b: SpscRing<T, N>) -> bool
+{
+	let mine = a.find_all(fn(x) {
+		return true;
+	});
+	let theirs = b.find_all(fn(x) {
+		return true;
+	});
+	return collection.equal<T>(&mine, &theirs);
+}
+
+/// Room for `n` elements from `from`, all zero. The program stops when the
+/// allocator has run out.
+fn ring_room<T>(from: *mem.Allocator, n: int) -> *T
+{
+	let size = n * size_of(T);
+	let room = from.alloc(size, room_align<T>()) catch fatal;
+	memset(room, 0, size as c_size_t);
+	return room as *T;
+}
+
+/// The alignment of the room of an element: the largest power of two that
+/// divides its size, which every alignment the layout gives it divides.
+fn room_align<T>() -> int
+{
+	let size = size_of(T);
+	if size <= 0 {
+		return 1;
+	}
+	return size & -size;
+}
