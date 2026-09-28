@@ -1,0 +1,102 @@
+//! `break` and `continue` inside a handler leave their statement before its
+//! end. Each tears down the temporaries the statement made before the handler,
+//! as `return` and `fail` do, and leaves those of the loop itself alone. Each
+//! `Box` counts itself alive, so a temporary missed or torn down twice shows in
+//! the count.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub own inner: ?*Box = none,
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(n: int) -> Box
+	{
+		Box.live.add(1);
+		return Box { n: n };
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+
+	concrete fn destruct(self)
+	{
+		Box.live.sub(1);
+	}
+}
+
+/// `n` itself, or a failure for an odd `n`.
+fn even(n: int) -> int may fail
+{
+	if n % 2 == 1 {
+		fail "odd";
+	}
+	return n;
+}
+
+fn live(label: str, n: int)
+{
+	printf("%.*s: %d, %d boxes\n".ptr, label.len as c_int, label.ptr, n as c_int,
+		Box.live.load() as c_int);
+}
+
+fn continued() -> int
+{
+	let sum = 0;
+	let i = 0;
+	while i < 6 do {
+		i += 1;
+		let n = even(Box.make(i).n) catch {
+			continue;
+		};
+		sum += n;
+	}
+	return sum;
+}
+
+fn broken() -> int
+{
+	let sum = 0;
+	for i in 0..6 {
+		let n = even(Box.make(i + 1).get()) catch {
+			break;
+		};
+		sum += n;
+	}
+	return sum;
+}
+
+fn nested() -> int
+{
+	let sum = 0;
+	for i in 0..4 {
+		let j = 0;
+		while j < 4 do {
+			j += 1;
+			let n = even(Box.make(j).n) catch {
+				continue;
+			};
+			sum += n;
+		}
+		let m = even(Box.make(i).n) catch {
+			continue;
+		};
+		sum += m;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	live("continue", continued());
+	live("break", broken());
+	live("nested", nested());
+	return 0;
+}

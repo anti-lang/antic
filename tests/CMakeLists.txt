@@ -575,11 +575,13 @@ endforeach()
 foreach(name IN ITEMS generic_copies generic_constants generic_methods
         generic_nested generic_sync generic_hooks generic_may_fail
         generic_fn_args generic_variants construct_keep_own walk_generic
-        hash_generic generic_static walk_owned_parts dropped_failing)
+        hash_generic generic_static walk_owned_parts dropped_failing
+        handler_exit_temps)
     set(objects "")
     if(name STREQUAL "generic_may_fail" OR name STREQUAL "generic_fn_args" OR
        name STREQUAL "walk_generic" OR name STREQUAL "hash_generic" OR
-       name STREQUAL "walk_owned_parts" OR name STREQUAL "dropped_failing")
+       name STREQUAL "walk_owned_parts" OR name STREQUAL "dropped_failing" OR
+       name STREQUAL "handler_exit_temps")
         set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object}")
     endif()
     add_test(NAME program_${name}_dev

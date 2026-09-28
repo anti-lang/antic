@@ -336,6 +336,7 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
     loop.break_to = exit;
     loop.outer = l->loop;
     loop.defers_at = l->defers;
+    loop.temps_at = l->temp_count;
     l->loop_depth++;
     ir_jump(l->f, l->b, first);
     if (is_while) {
@@ -478,6 +479,7 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     loop.break_to = exit;
     loop.outer = l->loop;
     loop.defers_at = l->defers;
+    loop.temps_at = l->temp_count;
     l->loop_depth++;
     ir_jump(l->f, l->b, test);
     l->b = test;
@@ -652,6 +654,7 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
     loop.break_to = exit;
     loop.outer = l->loop;
     loop.defers_at = l->defers;
+    loop.temps_at = l->temp_count;
     l->loop_depth++;
     ir_jump(l->f, l->b, test);
     l->b = test;
@@ -2241,7 +2244,12 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
     case STMT_FAIL:
         lower_fail(l, s);
         return;
+    /* DESIGN: `break` and `continue` in a handler leave their statement
+       before its end, so each ends the temporaries that statements inside
+       the loop still keep, as an exit of the function ends them all. The
+       temporaries of the loop itself stay. */
     case STMT_BREAK:
+        lower_end_temps(l, l->loop->temps_at, false);
         run_defers_to(l, l->loop->defers_at, false);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, l->loop->break_to);
@@ -2249,6 +2257,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         l->b = NULL;
         return;
     case STMT_CONTINUE:
+        lower_end_temps(l, l->loop->temps_at, false);
         run_defers_to(l, l->loop->defers_at, false);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, l->loop->continue_to);

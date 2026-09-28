@@ -30,6 +30,9 @@ struct loop {
     struct ir_block *break_to;
     struct loop *outer;
     struct defers *defers_at;   /* the block scope the loop started in */
+    /* The temporaries kept when the loop started. `break` and `continue`
+       end those kept since, which statements inside the loop made. */
+    size_t temps_at;
 };
 
 /* DESIGN: the statements of `defer` are recorded per block and run at
