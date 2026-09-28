@@ -1,0 +1,62 @@
+//! A class that owns nothing but a `destruct` of its own owns something by the
+//! one rule, so `dup` copies it and a move hands it on. Each `Counted` counts
+//! itself alive, so a teardown missed or run twice shows in the count.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+class Counted
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(n: int) -> Counted
+	{
+		Counted.live.add(1);
+		return Counted { n: n };
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		Counted.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+fn keep(own c: Counted) -> int
+{
+	let d = c;
+	return d.n;
+}
+
+fn first(own o: ?Counted) -> int
+{
+	if let c = o {
+		return c.n;
+	}
+	return -1;
+}
+
+fn main() -> int
+{
+	{
+		let a = Counted.make(1);
+		let twin = dup(&a);
+		twin.n = 2;
+		printf("dup: %d %d, %d alive\n".ptr, a.n as c_int, twin.n as c_int,
+			Counted.live.load() as c_int);
+		delete(twin);
+		let b = Counted.make(3);
+		printf("moved: %d\n".ptr, keep(b) as c_int);
+		let o: ?Counted = Counted.make(4);
+		printf("bound: %d\n".ptr, first(o) as c_int);
+	}
+	printf("%d alive\n".ptr, Counted.live.load() as c_int);
+	return 0;
+}

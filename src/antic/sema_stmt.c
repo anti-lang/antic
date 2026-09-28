@@ -607,25 +607,12 @@ bool sema_needs_teardown(const struct type *t)
     return false;
 }
 
-const char *sema_owns_phrase(const struct type *t)
-{
-    while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
-        t = t->element;
-    }
-    return t != NULL && t->kind == TYPE_CLASS ? "has `own` fields"
-                                              : "owns what its parts own";
-}
-
-bool sema_type_owns(const struct type *t)
+/* Whether a field of the chain of the class t owns something: an `own`
+   field, or a plain one whose type owns something. */
+static bool fields_own(const struct type *t)
 {
     size_t i;
 
-    while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
-        t = t->element;
-    }
-    if (t != NULL && (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE)) {
-        return sema_needs_teardown(t);
-    }
     for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
@@ -636,6 +623,31 @@ bool sema_type_owns(const struct type *t)
         }
     }
     return false;
+}
+
+const char *sema_owns_phrase(const struct type *t)
+{
+    while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
+        t = t->element;
+    }
+    if (t == NULL || t->kind != TYPE_CLASS) {
+        return "owns what its parts own";
+    }
+    return fields_own(t) ? "has `own` fields" : "has a `destruct`";
+}
+
+/* DESIGN: one rule says what owns something. A type owns something when
+   its teardown does anything: an `own` field, a part that owns something,
+   or a `destruct` of its own in its chain. `sema_needs_teardown` is that
+   rule. A function moves by the rules of a snapshot instead. A value of
+   an owning type is not copied by `=`, `let` or `if let`, and `dup`
+   copies it. */
+bool sema_type_owns(const struct type *t)
+{
+    while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
+        t = t->element;
+    }
+    return t != NULL && t->kind != TYPE_FN && sema_needs_teardown(t);
 }
 
 /* Whether e reads a value that already lives somewhere. A literal, a

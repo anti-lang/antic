@@ -558,7 +558,7 @@ add_test(NAME program_eq_compiled_no_reflect
 # The default hash in dev mode, which writes it in each module apart, and
 # the patterns of `for`.
 foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived
-        lent_tuples owning_values destroy_locals temporaries)
+        lent_tuples owning_values destroy_locals temporaries owning_destruct)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -3456,6 +3456,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "own_moves|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_moves.s,own_moves.anti"
         "own_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/own_params.s,own_params.anti"
         "if_let_moves|-S,-o,${LISTINGS}/if_let_moves.s,if_let_moves.anti"
+        "owning_destruct|-S,-o,${LISTINGS}/owning_destruct.s,owning_destruct.anti"
+        "collection_copy|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/collection_copy.s,collection_copy.anti"
         "lent_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_params.s,lent_params.anti"
         "lent_slices|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_slices.s,lent_slices.anti"
         "index_several|-S,-o,${LISTINGS}/index_several.s,index_several.anti"

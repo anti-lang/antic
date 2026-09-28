@@ -1,0 +1,58 @@
+//! A type owns something when its teardown does anything: an `own` field, a
+//! part that owns something, or a `destruct` of its own. A value of such a type
+//! is not copied by `=`, `let` or `if let`, and `dup` copies it.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Derived inherits Counted
+{
+	pub m: int = 0,
+}
+
+class Holder
+{
+	pub counted: Counted = Counted { },
+}
+
+struct Pair
+{
+	c: Counted,
+	n: int,
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn copies(p: *Counted, o: ?Counted)
+{
+	let a = Counted { n: 1 };
+	let b = a;
+	b = a;
+	b = *p;
+	let d = Derived { m: 2 };
+	let e = d;
+	let h = Holder { };
+	let g = h;
+	let pair = Pair { c: Counted { }, n: 1 };
+	let other = pair;
+	if let c = o {
+	}
+	let x = Plain { n: 1 };
+	let y = x;
+	let twin = dup(&a);
+	delete(twin);
+}
+
+fn main() -> int
+{
+	return 0;
+}

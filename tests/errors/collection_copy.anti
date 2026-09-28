@@ -1,0 +1,27 @@
+//! `=` between two collections is refused, and so is a `let` that would copy
+//! one, since a collection has a `destruct` and owns its room. `dup` copies
+//! one, and a call result moves.
+
+import anti.collection.list.{List};
+import anti.collection.map.{Map};
+
+fn made() -> List<int>
+{
+	return List<int>.new();
+}
+
+fn copies(m: *Map<str, int>)
+{
+	let a = List<int>.new();
+	let b = made();
+	b = a;
+	let c = a;
+	let n = *m;
+	let twin = dup(&a);
+	delete(twin);
+}
+
+fn main() -> int
+{
+	return 0;
+}

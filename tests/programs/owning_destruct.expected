@@ -1,0 +1,5 @@
+exit 0
+dup: 1 2, 2 alive
+moved: 3
+bound: 4
+0 alive

@@ -1,0 +1,3 @@
+collection_copy.anti:17:6: error: `List<int>` has a `destruct`, use `dup` instead of `=`
+collection_copy.anti:18:10: error: `List<int>` has a `destruct`, use `dup` instead of `=`
+collection_copy.anti:19:10: error: `Map<str, int>` has a `destruct`, use `dup` instead of `=`

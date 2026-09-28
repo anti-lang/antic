@@ -659,7 +659,7 @@ reports what it finished.
   `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`,
   `Tree<T>` and `PriorityQueue<T>`. Each has the operations of its family and
   those of `Collection<T>`, and takes an optional allocator when it is made.
-  `dup` copies every collection. The refusal of `=` between two collections,
+  `dup` copies every collection, and `=` between two collections is refused.
   `deserialize` of a collection and the thread-safe collections are not
   built. See "Generics and collections" in `docs/decisions.md`.
 - `--memory-checks` is built for antic, `anti build`, `anti run` and `anti
