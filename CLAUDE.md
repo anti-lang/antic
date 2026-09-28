@@ -335,8 +335,9 @@ compiled copies, the generics of library files and of C, what can be
 generic, the other features with generics, the optional values, ownership
 at a call and lending, are built. So are the language part of walking a
 collection, hashing and order, direct imports, the parts every collection
-shares in `anti.collection` and `Shared<T>` of `anti.mem`, and none of the rest. See
-`docs/notes/collections.md`.
+shares in `anti.collection`, `Shared<T>` of `anti.mem`, the collections of
+`anti.collection` and `--memory-checks`. The thread-safe collections are not.
+See `docs/notes/collections.md`.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -361,7 +362,8 @@ reports what it finished.
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`,
   `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`,
-  `anti.simd`, `anti.trace`, `anti.plugin` and `anti.regex`.
+  `anti.simd`, `anti.trace`, `anti.plugin` and `anti.regex`, and the
+  collection modules under `anti.collection`.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
@@ -383,8 +385,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1160 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1159 each, without the `no_paths` test, which needs a
+- 1198 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1197 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -651,6 +653,23 @@ reports what it finished.
   reachable by its name. A listed name that clashes with a name of the file
   is refused, naming both, and `anti fmt` sorts the list. See "Generics and
   collections" in `docs/decisions.md` and `docs/notes/direct-imports.md`.
+- The collections of round five are built, each module a file under
+  `src/std/anti/collection/`: `List<T>`, `Deque<T>`, `Ring<T, N>` and
+  `Grid<T>`, `Map<K, V>` and `HashMap<K, V>`, `Set<T>`, `HashSet<T>` and
+  `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`,
+  `Tree<T>` and `PriorityQueue<T>`. Each has the operations of its family and
+  those of `Collection<T>`, and takes an optional allocator when it is made.
+  `dup` of `SortedMap`, `SortedSet`, `Pool`, `Tree` and `PriorityQueue`, the
+  refusal of `=` between two collections, `deserialize` of a collection and
+  the thread-safe collections are not built. See "Generics and collections"
+  in `docs/decisions.md`.
+- `--memory-checks` is built for antic, `anti build`, `anti run` and `anti
+  test`. The back end calls the checks of AddressSanitizer at every load and
+  store, the program links its runtime from the runtime archive, the runtime
+  marks the blocks it keeps until exit, and `anti run` and `anti test` put the
+  report through Anti's symbolizer. `memory_checks_list` finds a pointer into
+  a `List` kept across a push that grows it. windows-arm64 refuses the option,
+  and windows-x86_64 reports no leaks.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
   See "Small things" in `docs/decisions.md`.
