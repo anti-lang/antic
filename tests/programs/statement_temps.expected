@@ -1,0 +1,10 @@
+exit 0
+field: 1, 0 boxes
+receiver: 2, 0 boxes
+pointer into the value: 3, 0 boxes
+chain: 6, 0 boxes
+inside the if: 0, 0 boxes
+after the loop: 3, 0 boxes
+on one path: 0, 0 boxes
+returned: 7, 0 boxes
+struct literal: 8, 0 boxes

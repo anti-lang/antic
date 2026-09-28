@@ -849,6 +849,31 @@ uint32_t ir_load(struct ir_function *f, struct ir_block *b, enum ir_type type,
     return result;
 }
 
+uint32_t ir_entry_zero_slot(struct ir_function *f)
+{
+    uint32_t slot = ir_entry_slot(f, ir_scalar(IR_PTR));
+    struct ir_block *b = f->blocks[0];
+    size_t at = 0;
+    struct ir_inst *inst;
+
+    while (at < b->count && b->insts[at].op == IR_SLOT) {
+        at++;
+    }
+    b->insts = ir_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
+    memmove(&b->insts[at + 1], &b->insts[at],
+            (b->count - at) * sizeof *b->insts);
+    b->count++;
+    inst = &b->insts[at];
+    memset(inst, 0, sizeof *inst);
+    inst->of = ir_scalar(IR_VOID);
+    inst->op = IR_STORE;
+    inst->type = IR_PTR;
+    inst->result = IR_NO_RESULT;
+    inst->a = ir_int_op(IR_PTR, 0);
+    inst->b = ir_temp_op(f, slot);
+    return slot;
+}
+
 void ir_store(struct ir_function *f, struct ir_block *b, enum ir_type type,
               struct ir_operand value, struct ir_operand pointer)
 {

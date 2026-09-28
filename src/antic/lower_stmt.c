@@ -1932,7 +1932,71 @@ static void lower_fail(struct lowerer *l, const struct stmt *s)
    of it is emitted, so `-g` writes one `.loc` per statement. A statement
    that holds a block leaves the cursor on the last line of the block.
    That is where the code after the block comes from. */
+static void lower_stmt_kind(struct lowerer *l, const struct stmt *s);
+
+/* DESIGN: a fresh value that a statement reads through a field or passes
+   as a receiver lives to the end of the statement, as a temporary of C++
+   does, and is then torn down. `Box.make(1).n` reads the field and then
+   tears the box down. The value may be made on one path of the statement
+   alone, so a slot of the frame holds its address once it is made and
+   zero before, and the end of the statement tears down what the slot
+   holds. A condition of `if` or of a loop ends its values before its
+   branch, and an exit of the function ends every value still kept. */
+void lower_keep_temp(struct lowerer *l, const struct expr *e,
+                     struct ir_operand address)
+{
+    struct statement_temp *t;
+
+    if (l->b == NULL || e == NULL || e->type == NULL ||
+        (e->kind != EXPR_CALL && e->kind != EXPR_STRUCT_LIT &&
+         e->kind != EXPR_TUPLE) ||
+        (e->kind == EXPR_CALL && e->as.call.hashes) ||
+        e->type->kind == TYPE_POINTER || !lower_needs_teardown(e->type)) {
+        return;
+    }
+    l->temps = ir_grow(l->temps, &l->temp_capacity, l->temp_count,
+                       sizeof *l->temps);
+    t = &l->temps[l->temp_count++];
+    t->holder = ir_entry_zero_slot(l->f);
+    t->type = e->type;
+    ir_store(l->f, l->b, IR_PTR, address, lower_temp(l, t->holder));
+}
+
+void lower_end_temps(struct lowerer *l, size_t mark, bool pop)
+{
+    size_t i;
+
+    for (i = l->temp_count; i > mark && l->b != NULL; i--) {
+        const struct statement_temp *t = &l->temps[i - 1];
+        struct ir_operand holder = lower_temp(l, t->holder);
+        struct ir_operand p =
+            lower_temp(l, ir_load(l->f, l->b, IR_PTR, holder));
+        struct ir_block *made = lower_new_block(l);
+        struct ir_block *after = lower_new_block(l);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, p,
+                                          ir_int_op(IR_PTR, 0))),
+                  made, after);
+        l->b = made;
+        lower_destroy_owned(l, t->type, p, ir_int_op(IR_PTR, 0), false);
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), holder);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+    }
+    if (pop && l->temp_count > mark) {
+        l->temp_count = mark;
+    }
+}
+
 static void lower_stmt(struct lowerer *l, const struct stmt *s)
+{
+    size_t mark = l->temp_count;
+
+    lower_stmt_kind(l, s);
+    lower_end_temps(l, mark, true);
+}
+
+static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
 {
     struct ir_operand v;
 
@@ -2322,6 +2386,11 @@ static void run_defers_to(struct lowerer *l, const struct defers *stop,
 {
     const struct defers *scope;
 
+    /* An exit of the function ends every value a statement still keeps,
+       before the locals it was made after. */
+    if (stop == NULL) {
+        lower_end_temps(l, 0, false);
+    }
     for (scope = l->defers; scope != stop; scope = scope->outer) {
         lower_run_defers(l, scope, failing);
     }

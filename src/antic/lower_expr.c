@@ -2111,6 +2111,25 @@ static const struct type *fresh_argument(const struct symbol *sym,
     return t != NULL && lower_needs_teardown(t) ? t : NULL;
 }
 
+/* A fresh value whose address a call takes, a receiver among them, lives
+   to the end of the statement, since the callee may give out a pointer
+   into it. fn is the type of the function, arg the argument at index and
+   value what it lowered to. */
+static void keep_address_argument(struct lowerer *l, const struct type *fn,
+                                  size_t index, const struct expr *arg,
+                                  struct ir_operand value)
+{
+    if (arg->kind == EXPR_UNARY && arg->as.unary.op == TOKEN_AMP) {
+        lower_keep_temp(l, arg->as.unary.operand, value);
+        return;
+    }
+    if (fn != NULL && index < fn->param_count &&
+        fn->params[index]->kind == TYPE_POINTER && arg->type != NULL &&
+        arg->type->kind != TYPE_POINTER) {
+        lower_keep_temp(l, arg, value);
+    }
+}
+
 void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
                           const struct type *fn, const struct expr *const *args,
                           const struct ir_operand *values, size_t count,
@@ -2212,6 +2231,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     for (i = 0; i < n; i++) {
         struct ir_operand value = lower_argument(l, e->as.call.args[i]);
         values[i] = value;
+        keep_address_argument(l, fn, i, e->as.call.args[i], value);
         lower_push_argument(l, args, &given, value,
                             fn != NULL && i < fn->param_count ? fn->params[i]
                                                               : NULL);
@@ -3147,6 +3167,10 @@ void lower_branch(struct lowerer *l, const struct expr *e,
         lower_branch(l, e->as.unary.operand, else_block, then_block);
         return;
     }
-    v = lower_expr(l, e);
+    {
+        size_t mark = l->temp_count;
+        v = lower_expr(l, e);
+        lower_end_temps(l, mark, true);
+    }
     ir_branch(l->f, l->b, v, then_block, else_block);
 }

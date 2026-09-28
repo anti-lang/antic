@@ -934,14 +934,22 @@ static bool method_call(struct checker *c, struct expr *call)
                     ? types_pointer(c->types, type_has_fields(t) ? t : s)
                     : s;
     }
+    /* DESIGN: a call result or a literal may be the receiver. It lives
+       to the end of its statement, as a temporary of C++ does, so a
+       pointer the function gives out into it stays good there. */
     if (first->kind == TYPE_POINTER && type_has_fields(t)) {
         struct expr *address = sema_new_node(c, EXPR_UNARY, receiver->pos);
-        if (!sema_is_place(receiver)) {
+        bool fresh = receiver->kind == EXPR_CALL ||
+                     receiver->kind == EXPR_STRUCT_LIT ||
+                     receiver->kind == EXPR_TUPLE;
+        if (!sema_is_place(receiver) && !fresh) {
             sema_error_at(c, receiver->pos, "calling `%.*s` needs a place",
                           (int)f->name.length, f->name.text);
             return false;
         }
-        sema_mark_address_taken(c, receiver);
+        if (!fresh) {
+            sema_mark_address_taken(c, receiver);
+        }
         address->as.unary.op = TOKEN_AMP;
         address->as.unary.operand = receiver;
         address->type = first;

@@ -630,6 +630,9 @@ uint32_t ir_slot(struct ir_function *f, struct ir_block *b,
 /* Add a slot to the entry block, after the slots already there. Lowering
    uses it for a value that it needs in the middle of a function. */
 uint32_t ir_entry_slot(struct ir_function *f, struct ir_vtype of);
+/* Add a slot of one pointer to the entry block, which holds zero from the
+   start of the function. */
+uint32_t ir_entry_zero_slot(struct ir_function *f);
 uint32_t ir_load(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand pointer);
 void ir_store(struct ir_function *f, struct ir_block *b, enum ir_type type,

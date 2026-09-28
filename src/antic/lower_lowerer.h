@@ -96,6 +96,13 @@ struct lower_pattern {
     bool bytes;
 };
 
+/* A fresh value of type that a statement keeps to its end. holder is a
+   slot that holds zero until the value is made, and then its address. */
+struct statement_temp {
+    uint32_t holder;
+    const struct type *type;
+};
+
 struct lowerer {
     struct ir_module *m;
     const char *file;           /* the source path, for an assertion */
@@ -118,6 +125,12 @@ struct lowerer {
        `return v` puts what the function computed. */
     struct ir_operand result_out;
     const struct symbol *moved;     /* the local a `return` hands over */
+    /* The fresh values the statements being lowered read through a field
+       or pass as a receiver, which each statement tears down where it
+       ends. Each has a slot that holds its address once it is made. */
+    struct statement_temp *temps;
+    size_t temp_count;
+    size_t temp_capacity;
     bool may_fail;              /* the function was written `may fail` */
     bool no_reflect;            /* --no-reflect: no field list */
     bool dev;                   /* --dev: every dispatch checks its table */
@@ -537,6 +550,15 @@ bool lower_optional_needs_destruct(const struct type *t);
    moves the new one in: a value with a teardown, in an array at any
    depth, or a `?T` of one. */
 bool lower_needs_teardown(const struct type *t);
+/* Keep the fresh value that expression e gave at address to the end of
+   its statement, when e is a call result or a literal whose type has a
+   teardown. */
+void lower_keep_temp(struct lowerer *l, const struct expr *e,
+                     struct ir_operand address);
+/* Tear down the values kept since mark, last first. pop forgets them,
+   which the end of a statement does and an exit of the function does
+   not, since other paths still reach them. */
+void lower_end_temps(struct lowerer *l, size_t mark, bool pop);
 /* The value of the call e, whose error a handler takes, written into a
    slot of the frame whose tables are zeroed first. An aggregate is the
    address of its slot. */

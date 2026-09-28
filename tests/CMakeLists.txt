@@ -558,7 +558,8 @@ add_test(NAME program_eq_compiled_no_reflect
 # The default hash in dev mode, which writes it in each module apart, and
 # the patterns of `for`.
 foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived
-        lent_tuples owning_values destroy_locals temporaries owning_destruct)
+        lent_tuples owning_values destroy_locals temporaries owning_destruct
+        statement_temps)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

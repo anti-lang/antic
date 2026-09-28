@@ -1,0 +1,85 @@
+//! A fresh value that a statement reads through a field or passes as a receiver
+//! lives to the end of the statement and is then torn down, as a temporary of
+//! C++ is. A condition of `if` or of a loop ends its values before its branch,
+//! and a `return` ends them before it leaves. Each `Box` counts itself alive,
+//! so a value missed or torn down twice shows in the count.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub own inner: ?*Box = none,
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(n: int) -> Box
+	{
+		Box.live.add(1);
+		return Box { n: n };
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+
+	pub fn next(self) -> Box
+	{
+		return Box.make(self.n + 1);
+	}
+
+	pub fn me(self) -> *Box
+	{
+		return self;
+	}
+
+	concrete fn destruct(self)
+	{
+		Box.live.sub(1);
+	}
+}
+
+/// A struct that owns what its `Box` owns.
+struct Pair
+{
+	a: Box,
+	n: int,
+}
+
+fn live(label: str, n: int)
+{
+	printf("%.*s: %d, %d boxes\n".ptr, label.len as c_int, label.ptr, n as c_int,
+		Box.live.load() as c_int);
+}
+
+fn early() -> int
+{
+	return Box.make(7).n;
+}
+
+fn main() -> int
+{
+	let n = Box.make(1).n;
+	live("field", n);
+	n = Box.make(2).get();
+	live("receiver", n);
+	n = Box.make(3).me().n;
+	live("pointer into the value", n);
+	n = Box.make(4).next().next().n;
+	live("chain", n);
+	if Box.make(5).n == 5 {
+		live("inside the if", Box.live.load());
+	}
+	let i = 0;
+	while Box.make(i).n < 3 do {
+		i += 1;
+	}
+	live("after the loop", i);
+	let yes = i > 10 && Box.make(6).n == 6;
+	live("on one path", yes as int);
+	live("returned", early());
+	n = Pair { a: Box.make(8), n: 8 }.n;
+	live("struct literal", n);
+	return 0;
+}

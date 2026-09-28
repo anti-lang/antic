@@ -1216,6 +1216,9 @@ struct ir_operand lower_field_address(struct lowerer *l,
     struct ir_operand address;
 
     address = pointer ? lower_expr(l, base) : lower_address(l, base);
+    if (!pointer) {
+        lower_keep_temp(l, base, address);
+    }
     return lower_offset_address(l, address,
                                 lower_field_offset(l, s, &e->as.field.name));
 }
@@ -1372,6 +1375,9 @@ bool lower_place(struct lowerer *l, const struct expr *e,
             p->address = base->type->kind == TYPE_POINTER
                              ? lower_expr(l, base)
                              : lower_address(l, base);
+            if (base->type->kind != TYPE_POINTER) {
+                lower_keep_temp(l, base, p->address);
+            }
             p->object = p->address;
             p->owner = owner;
             return true;
@@ -1382,6 +1388,9 @@ bool lower_place(struct lowerer *l, const struct expr *e,
             const struct type *s = pointer ? base->type->element : base->type;
             struct ir_operand address =
                 pointer ? lower_expr(l, base) : lower_address(l, base);
+            if (!pointer) {
+                lower_keep_temp(l, base, address);
+            }
             p->object = address;
             p->owner = s;
             p->address = lower_offset_address(
@@ -1819,6 +1828,7 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
     l->failing_error = lower_none();
     l->may_fail = it->may_fail;
     l->result_out = lower_none();
+    l->temp_count = 0;
     entry = lower_new_block(l);
     l->b = entry;
     /* DESIGN: `self` is the first IR parameter of a member function
@@ -3214,6 +3224,7 @@ bool lower_module(struct module *module, const char *module_name,
         }
     }
     free(l.anonymous);
+    free(l.temps);
     patterns_start(&l);
     free(l.regex_literals);
     /* A function or a datum defined here under the path of another
