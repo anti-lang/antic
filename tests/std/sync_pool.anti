@@ -1,0 +1,293 @@
+//! `SyncPool<T>` of `anti.collection.synchronized` through every operation on
+//! one thread.
+//!
+//! Elements that own memory count the blocks alive, and an allocator counts
+//! what the pool takes, so every block goes back where it came from. A walk
+//! takes copies and leaves the versions as they are.
+
+import anti.collection;
+import anti.collection.pool;
+import anti.collection.synchronized.{SyncPool};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A key that owns memory, with `==` and `hash` over its number. Its copy makes
+/// a block of its own, and every block counts in `Id.live`.
+class Id
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Id
+	{
+		return Id { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Id) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Id;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		Id.live.add(-1);
+		free(p);
+	}
+}
+
+/// A block that holds `n`, counted in `Id.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Id.live.add(1);
+	return p;
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn handles()
+{
+	let p = SyncPool<int>.new();
+	show(f"empty: {p.count()} {p.is_empty()} {p}");
+	let a = p.add(10);
+	let b = p.add(20);
+	let c = p.add(30);
+	let twenty = p.get(b) ?? -1;
+	let has = p.contains(c);
+	let gone = p.remove(b) ?? -1;
+	let stale = p.get(b) ?? -1;
+	let lacks = p.contains(b);
+	show(f"get {twenty}, contains {has}, remove {gone}, then {stale} {lacks}, count {p.count()}");
+	let d = p.add(40);
+	let reused = d.index == b.index;
+	let old = p.get(b) ?? -1;
+	show(f"a stale handle finds nothing: slot reused {reused}, {old}, {p}");
+	let set = p.set(a, 11);
+	let not_set = p.set(b, 99);
+	let seen = 0;
+	let read = p.read(c, fn(x) {
+		seen = *x;
+	});
+	let unread = p.read(b, fn(x) {
+		seen = -1;
+	});
+	let changed = p.modify(d, fn(x) {
+		*x += 1;
+	});
+	show(f"set {set} {not_set}, read {read} {unread} {seen}, modify {changed}, {p}");
+	let out = text.Builder.new();
+	p.serialize(&out);
+	show(out.take());
+	let sum = 0;
+	for x in p {
+		sum += x;
+	}
+	show(f"walk {sum}");
+}
+
+fn versions() may fail
+{
+	let p = SyncPool<int>.new();
+	let h = p.add(10);
+	let (v, first) = p.get_versioned(h) ?? (-1, -1);
+	try p.set_if_version(h, v + 1, first);
+	let (w, second) = p.get_versioned(h) ?? (-1, -1);
+	show(f"versioned: {v} then {w}, versions {first} {second}");
+	p.set_if_version(h, 99, first) catch e {
+		let c = e as *pool.Changed;
+		show(f"stale: {e.message}, found {c.found}");
+	};
+	let sum = 0;
+	for x in p {
+		sum += x;
+	}
+	let (x, walked) = p.get_versioned(h) ?? (-1, -1);
+	show(f"a walk keeps the version: {walked == second}");
+	p.modify(h, fn(x) {
+		*x += 1;
+	});
+	let (y, third) = p.get_versioned(h) ?? (-1, -1);
+	show(f"modify changes the version: {third} {y}");
+	p.remove(h);
+	p.set_if_version(h, 5, third) catch e {
+		show(f"gone: {e.message}");
+	};
+	show(f"no element: {p.get_versioned(h) == none}");
+}
+
+fn criteria() may fail
+{
+	let p = SyncPool<int>.new();
+	for i in 1..7 {
+		let x = i * 10;
+		let h = p.add(x);
+	}
+	let big = p.find_all(fn(x) {
+		return x > 30;
+	});
+	let first = p.find_first(fn(x) {
+		return x > 25;
+	}) ?? -1;
+	let one = try p.find_one(fn(x) {
+		return x == 40;
+	});
+	let many = p.find_one(fn(x) {
+		return x > 20;
+	}) catch e {
+		show(f"{e.message}");
+		yield 0;
+	};
+	show(f"find_all {big.count}, first {first}, one {one} {many}");
+	let n = p.update_all(fn(x) {
+		return x % 20 == 10;
+	}, fn(q) {
+		*q += 1;
+	});
+	let hit = p.update_first(fn(x) {
+		return x > 40;
+	}, fn(q) {
+		*q = 0;
+	});
+	try p.update_one(fn(x) {
+		return x == 20;
+	}, fn(q) {
+		*q = 2;
+	});
+	p.update_one(fn(x) {
+		return x == 99;
+	}, fn(q) {
+		*q = 9;
+	}) catch e {
+		show(f"{e.message}");
+	};
+	show(f"update_all {n}, update_first {hit}, {p}");
+	let removed = p.remove_all(fn(x) {
+		return x % 2 == 1;
+	});
+	let taken = p.remove_first(fn(x) {
+		return x == 40;
+	}) ?? -1;
+	let only = try p.remove_one(fn(x) {
+		return x == 2;
+	});
+	let none_left = p.remove_one(fn(x) {
+		return x == 2;
+	}) catch e {
+		show(f"{e.message}");
+		yield -1;
+	};
+	show(f"remove {removed} {taken} {only} {none_left}, {p}");
+	p.clear();
+	show(f"clear: {p.count()} {p.is_empty()} {p}");
+}
+
+fn owned()
+{
+	let counting = Counting { };
+	{
+		let p = SyncPool<Id>.new(4, &counting);
+		let handles = collection.Copies<pool.Handle<Id>>.new();
+		for i in 0..100 {
+			handles.add(p.add(Id.of(i)));
+		}
+		let extra = p.add(Id.of(1000));
+		let copy = dup(&p);
+		let removed = 0;
+		for h in handles {
+			if h.index % 2 == 0 {
+				let gone = copy.remove(h);
+				if gone != none {
+					removed += 1;
+				}
+			}
+		}
+		p.set_if_version(extra, Id.of(1001), 0) catch e {
+			show(f"owned: {e.message}");
+		};
+		p.set_if_version(extra, Id.of(0), 0) catch e {
+			show(f"owned stale: {e.message}");
+		};
+		let replaced = p.set(extra, Id.of(2000));
+		let found = p.find_all(fn(x) {
+			return x.value() < 10;
+		});
+		let changed = p.update_all(fn(x) {
+			return x.value() > 90;
+		}, fn(q) {
+			*q = Id.of(q.value() * 10);
+		});
+		let total = 0;
+		for x in copy {
+			total += x.value();
+		}
+		let theirs = copy.get(extra) ?? Id.of(-1);
+		show(f"owned: {p.count()} {copy.count()} {removed} {replaced} {found.count} {changed} {total} {theirs.value()}");
+		delete(copy);
+	}
+	show(f"owned: {Id.live.load()} blocks alive, {counting.allocs - counting.frees} allocations held");
+}
+
+fn main() -> int
+{
+	handles();
+	versions() catch e {
+		show(f"versions: {e.message}");
+	};
+	criteria() catch e {
+		show(f"criteria: {e.message}");
+	};
+	owned();
+	return 0;
+}

@@ -1,0 +1,30 @@
+exit 0
+empty: 0 true true true
+ends: 10 50 50, count 4 false
+[10, 20, 30, 40]
+[10,20,30,40]
+reverse [40, 30, 20, 10]
+sort [10, 20, 30, 40]
+sort_by [40, 30, 20, 10]
+sort_with [40, 20, 30, 10]
+filter [40, 20, 30], map [20, 10, 15, 5], the list [40, 20, 30, 10]
+walk 100
+clear 0 []
+from_list [7, 8], version of 8 is 2
+versioned: 2 then 200, new version true, [1, 200, 3, 4]
+stale: the element of version 2 is gone, found -1
+update changes the version: true, the element of version 5 is gone
+gone: 1 removed, the element of version 6 is gone
+added again: 201, a version never given before true
+`find_one` found 2 elements where it needs exactly one
+no match: true 0
+find_all 3, first 30, one 40
+`find_one` found 4 elements where it needs exactly one
+`update_one` found no element where it needs exactly one
+update_all 3 0, update_first true, [11, 2, 31, 40, 0, 60]
+`remove_one` found no element where it needs exactly one
+remove 2 40 2 -1, [0, 60]
+dup: 10 11, versions kept true, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+owned stale: the element of version 6 is gone
+owned: 99 50 50 10 9 12560
+owned: 0 blocks alive, 0 allocations held

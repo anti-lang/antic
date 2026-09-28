@@ -1,0 +1,298 @@
+//! `SyncSet<T>` of `anti.collection.synchronized` through every operation on
+//! one thread.
+//!
+//! The set keeps the order the elements were first added, so `to_text` and
+//! `serialize` print it. Elements that own memory count the blocks alive, and
+//! an allocator counts what the set takes, so every block goes back where it
+//! came from. The versioned set takes a version from `version_of` and fails
+//! once the element was replaced or left.
+
+import anti.collection;
+import anti.collection.pool;
+import anti.collection.set;
+import anti.collection.synchronized.{SyncSet};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A key that owns memory, with `==` and `hash` over its number. Its copy makes
+/// a block of its own, and every block counts in `Id.live`.
+class Id
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Id
+	{
+		return Id { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Id) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Id;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		Id.live.add(-1);
+		free(p);
+	}
+}
+
+/// A block that holds `n`, counted in `Id.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Id.live.add(1);
+	return p;
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn members()
+{
+	let s = SyncSet<str>.new();
+	show(f"empty: {s.count()} {s.is_empty()} {s}");
+	let ann = s.add("Ann");
+	let bob = s.add("Bob");
+	let again = s.add("Ann");
+	let cy = s.add("Cy");
+	show(f"add: {ann} {bob} {again} {cy}, count {s.count()} {s.is_empty()}");
+	let has = s.contains("Bob");
+	let lacks = s.contains("Dee");
+	let gone = s.remove("Bob");
+	let not_there = s.remove("Bob");
+	show(f"contains {has} {lacks}, remove {gone} {not_there}, {s}");
+	let out = text.Builder.new();
+	s.serialize(&out);
+	show(out.take());
+	let letters = 0;
+	for x in s {
+		letters += x.len;
+	}
+	show(f"walk {letters} letters");
+	s.reserve(100);
+	let reserved = s.capacity();
+	s.shrink();
+	show(f"room: {reserved >= 102} {s.capacity() < reserved} {s.capacity() >= s.count()}");
+}
+
+fn algebra()
+{
+	let a = SyncSet<int>.new();
+	let b = SyncSet<int>.new();
+	for i in 0..6 {
+		let x = i;
+		let added = a.add(x);
+	}
+	for i in 3..9 {
+		let x = i;
+		let added = b.add(x);
+	}
+	let both = a.union(b.to_set());
+	let common = a.intersect(b.to_set());
+	let only = a.minus(b.to_set());
+	let small = common.is_subset(a.to_set());
+	let big = a.is_subset(common.to_set());
+	show(f"union {both}, intersect {common}, minus {only}, subset {small} {big}");
+	let v = both.version_of(7) ?? -1;
+	both.set_if_version(7, v) catch e {
+		show(f"union: {e.message}");
+	};
+	let w = both.version_of(7) ?? -1;
+	show(f"a made set starts at version {v}, then {w != v}, {both}");
+}
+
+fn versions() may fail
+{
+	let s = SyncSet<int>.new();
+	for i in 1..5 {
+		let x = i * 10;
+		let added = s.add(x);
+	}
+	let first = s.version_of(20) ?? -1;
+	try s.set_if_version(20, first);
+	let second = s.version_of(20) ?? -1;
+	show(f"versioned: new version {second != first}, the element moves {s}");
+	s.set_if_version(20, first) catch e {
+		let c = e as *pool.Changed;
+		show(f"stale: {e.message}, found is the new version {c.found == second}");
+	};
+	let gone = s.remove(20);
+	s.set_if_version(20, second) catch e {
+		show(f"gone: {e.message}");
+	};
+	let added = s.add(20);
+	let third = s.version_of(20) ?? -1;
+	let fresh = third != first && third != second;
+	show(f"added again: a version never given before {fresh}");
+	show(f"no element: {s.version_of(99) == none}");
+}
+
+fn criteria() may fail
+{
+	let s = SyncSet<int>.new();
+	for i in 1..7 {
+		let x = i * 10;
+		let added = s.add(x);
+	}
+	let big = s.find_all(fn(x) {
+		return x > 30;
+	});
+	let first = s.find_first(fn(x) {
+		return x > 25;
+	}) ?? -1;
+	let one = try s.find_one(fn(x) {
+		return x == 40;
+	});
+	let many = s.find_one(fn(x) {
+		return x > 20;
+	}) catch e {
+		show(f"{e.message}");
+		yield 0;
+	};
+	show(f"find_all {big.count}, first {first}, one {one} {many}");
+	let n = s.update_all(fn(x) {
+		return x > 30;
+	}, fn(p) {
+		*p = 0;
+	});
+	let hit = s.update_first(fn(x) {
+		return x == 10;
+	}, fn(p) {
+		*p = 1;
+	});
+	try s.update_one(fn(x) {
+		return x == 20;
+	}, fn(p) {
+		*p = 2;
+	});
+	s.update_one(fn(x) {
+		return x == 99;
+	}, fn(p) {
+		*p = 9;
+	}) catch e {
+		show(f"{e.message}");
+	};
+	show(f"update drops the change: {n} {hit}, {s}");
+	let removed = s.remove_all(fn(x) {
+		return x > 40;
+	});
+	let taken = s.remove_first(fn(x) {
+		return x > 15;
+	}) ?? -1;
+	let only = try s.remove_one(fn(x) {
+		return x == 40;
+	});
+	let none_left = s.remove_one(fn(x) {
+		return x == 40;
+	}) catch e {
+		show(f"{e.message}");
+		yield -1;
+	};
+	show(f"remove {removed} {taken} {only} {none_left}, {s}");
+	show(f"a removed element has no version: {s.version_of(20) == none}");
+	s.clear();
+	show(f"clear: {s.count()} {s.is_empty()} {s}");
+}
+
+fn owned()
+{
+	let counting = Counting { };
+	{
+		let s = SyncSet<Id>.new(8, &counting);
+		for i in 0..100 {
+			let added = s.add(Id.of(i));
+		}
+		let twice = s.add(Id.of(3));
+		let copy = dup(&s);
+		let removed = copy.remove_all(fn(x) {
+			return x.value() % 2 == 0;
+		});
+		let five = Id.of(5);
+		let v = s.version_of(five) ?? -1;
+		s.set_if_version(Id.of(5), v) catch e {
+			show(f"owned: {e.message}");
+		};
+		s.set_if_version(Id.of(5), v) catch e {
+			show(f"owned stale: {e.message}");
+		};
+		let found = s.find_all(fn(x) {
+			return x.value() < 10;
+		});
+		let joined = s.union(copy.to_set());
+		let total = 0;
+		for x in copy {
+			total += x.value();
+		}
+		show(f"owned: {s.count()} {copy.count()} {twice} {removed} {found.count} {joined.count()} {total}");
+		delete(copy);
+		s.clear();
+	}
+	show(f"owned: {Id.live.load()} blocks alive, {counting.allocs - counting.frees} allocations held");
+}
+
+fn main() -> int
+{
+	members();
+	algebra();
+	versions() catch e {
+		show(f"versions: {e.message}");
+	};
+	criteria() catch e {
+		show(f"criteria: {e.message}");
+	};
+	owned();
+	return 0;
+}

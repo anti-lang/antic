@@ -1122,6 +1122,40 @@ foreach(name IN ITEMS concurrent_map concurrent_map_threads
         FIXTURES_REQUIRED
             "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_map_dev_object;collection_pool_dev_object;collection_concurrent_dev_object")
 endforeach()
+# The collections behind one lock each, of anti.collection.synchronized, in
+# dev mode. The module stands on the list, the maps, the sets, the pool and
+# the walk of anti.collection.concurrent, so the link names the object of
+# each.
+add_test(NAME dev_object_collection_synchronized
+    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+            -I "${ANTIC_RUNTIME_DIR}/std"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_synchronized_dev"
+            "${ANTIC_RUNTIME_DIR}/std/anti/collection/synchronized.antl")
+set_tests_properties(dev_object_collection_synchronized PROPERTIES
+    FIXTURES_SETUP collection_synchronized_dev_object)
+set(synchronized_objects "${collection_dev_objects}")
+set(synchronized_fixtures lang_dev_object mem_dev_object text_dev_object
+    collection_dev_object)
+foreach(module IN ITEMS list map set pool concurrent synchronized)
+    string(APPEND synchronized_objects
+        ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev${anti_object}")
+    list(APPEND synchronized_fixtures collection_${module}_dev_object)
+endforeach()
+foreach(name IN ITEMS sync_list sync_list_threads sync_map sync_map_threads
+        sync_set sync_set_threads sync_pool sync_pool_threads)
+    add_test(NAME std_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${synchronized_objects}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_tests_properties(std_${name}_dev PROPERTIES
+        FIXTURES_REQUIRED "${synchronized_fixtures}")
+endforeach()
 # `dup` and the hash of every collection in dev mode. Each program holds
 # every collection, so the link names the object of every collection
 # module and of anti.reflect, which anti.collection.sorted imports.
@@ -1149,12 +1183,16 @@ foreach(name IN ITEMS dup hash equals)
         FIXTURES_REQUIRED "${dup_fixtures}")
 endforeach()
 # The runs with threads spin while the ring is full or empty and wait on the
-# locks of the map. A side that stops for good leaves the other spinning,
-# and the timeout reports it.
+# locks of the maps and of the synchronized collections. A side that stops
+# for good leaves the other spinning or waiting, and the timeout reports it.
 foreach(name IN ITEMS std_concurrent_map_threads std_spsc_ring_threads
         std_concurrent_map_threads_dev std_spsc_ring_threads_dev
         std_concurrent_map_equal std_concurrent_map_equal_dev)
     set_tests_properties(${name} PROPERTIES TIMEOUT 120)
+endforeach()
+foreach(kind IN ITEMS list map set pool)
+    set_tests_properties(std_sync_${kind}_threads std_sync_${kind}_threads_dev
+        PROPERTIES TIMEOUT 120)
 endforeach()
 
 # Every failing function of src/std/ is written with `may fail`, apart from

@@ -1,0 +1,169 @@
+//! Many threads on one `SyncPool` at once.
+//!
+//! The chunks of a `parallel` add their numbers, change each through its
+//! handle, read it back and remove every third, while a dispatched job walks
+//! and searches the pool. Every chunk then counts on two shared elements, with
+//! `modify` and with a loop of `get_versioned` and `set_if_version`, so no
+//! count goes missing when two threads change one element. A versioned set
+//! fails once another thread changed the element, and a copy made with `dup`
+//! takes a lock of its own. The totals come out the same on every run.
+
+import anti.collection.pool;
+import anti.collection.synchronized.{SyncPool};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The numbers the chunks of the `parallel` add.
+const NUMBERS: int = 100000;
+
+/// Add each number of `chunk`, double it through its handle, check it and
+/// remove every third. Gives the number of elements that read back wrong.
+worker fn own_numbers(chunk: []int, p: *SyncPool<int>) -> int
+{
+	let wrong = 0;
+	for n in chunk {
+		let x = n;
+		let h = p.add(x);
+		p.modify(h, fn(v) {
+			*v *= 2;
+		});
+		let v = p.get(h) ?? -1;
+		if v != 2 * n {
+			wrong += 1;
+		}
+		if n % 3 == 0 {
+			let gone = p.remove(h) ?? -1;
+			if gone != 2 * n || p.contains(h) {
+				wrong += 1;
+			}
+		}
+	}
+	return wrong;
+}
+
+/// Count on `a` with `modify` and on `b` with a compare and set that tries
+/// again when another thread changed it first, once per number of `chunk`.
+/// Gives the number of compare and sets that found it changed.
+worker fn count(chunk: []int, p: *SyncPool<int>, a: pool.Handle<int>,
+	b: pool.Handle<int>) -> int
+{
+	let retries = 0;
+	for n in chunk {
+		p.modify(a, fn(v) {
+			*v += 1;
+		});
+		let done = false;
+		while !done do {
+			let (v, version) = p.get_versioned(b) ?? (0, -1);
+			p.set_if_version(b, v + 1, version) catch e {
+				retries += 1;
+				continue;
+			};
+			done = true;
+		}
+	}
+	return retries;
+}
+
+/// Walk and search the pool while the chunks change it. Gives the number of
+/// elements it saw, which only has to be sane.
+worker fn watch(p: *SyncPool<int>, walks: int) -> int
+{
+	let seen = 0;
+	for i in 0..walks {
+		for x in *p {
+			if x < 0 || x >= 2 * NUMBERS {
+				return -1;
+			}
+			seen += 1;
+		}
+		let big = p.find_all(fn(x) {
+			return x > NUMBERS;
+		});
+		seen += big.count;
+	}
+	return seen;
+}
+
+/// Add one to the element `h` of `p`, from another thread.
+worker fn bump(p: *SyncPool<int>, h: pool.Handle<int>) -> int
+{
+	let hit = p.modify(h, fn(v) {
+		*v += 1;
+	});
+	return p.get(h) ?? -1;
+}
+
+/// Add `n` elements to `p`, from another thread.
+worker fn more(p: *SyncPool<int>, n: int) -> int
+{
+	for i in 0..n {
+		let x = i;
+		let h = p.add(x);
+	}
+	return p.count();
+}
+
+fn main() -> int
+{
+	let numbers = alloc([NUMBERS]int, 1) else {
+		return 1;
+	};
+	for i in 0..NUMBERS {
+		(*numbers)[i] = i;
+	}
+	let p = SyncPool<int>.new();
+	let watcher = dispatch &p -> watch(10);
+	let wrongs = parallel (*numbers)[0..NUMBERS] by 16 -> own_numbers(&p);
+	let wrong = 0;
+	for w in wrongs {
+		wrong += w;
+	}
+	free(wrongs.ptr);
+	let seen = join(watcher);
+	let sum = 0;
+	for x in p {
+		sum += x;
+	}
+	let expected = 0;
+	for n in 0..NUMBERS {
+		if n % 3 != 0 {
+			expected += 2 * n;
+		}
+	}
+	printf("numbers: %d wrong, %d left, sum right %d, watcher sane %d\n".ptr,
+		wrong as c_int, p.count() as c_int, (sum == expected) as c_int,
+		(seen >= 0) as c_int);
+
+	let counters = SyncPool<int>.new();
+	let a = counters.add(0);
+	let b = counters.add(0);
+	let retried = parallel (*numbers)[0..NUMBERS] by 16 -> count(&counters, a, b);
+	free(retried.ptr);
+	let updates = counters.get(a) ?? -1;
+	let swaps = counters.get(b) ?? -1;
+	printf("shared: %d updates, %d compare and sets\n".ptr, updates as c_int,
+		swaps as c_int);
+
+	let (value, version) = counters.get_versioned(a) ?? (0, -1);
+	let job = dispatch &counters -> bump(a);
+	let bumped = join(job);
+	counters.set_if_version(a, 0, version) catch e {
+		let c = e as *pool.Changed;
+		printf("stale after another thread: %d then %d, found version %d\n".ptr,
+			value as c_int, bumped as c_int, (c.found == version + 1) as c_int);
+	};
+
+	let copy = dup(&p);
+	let grown = dispatch copy -> more(10);
+	let size = join(grown);
+	printf("copy: %d more in the copy, %d in the pool\n".ptr,
+		(size - p.count()) as c_int, p.count() as c_int);
+	delete(copy);
+	let removed = p.remove_all(fn(x) {
+		return x % 4 == 0;
+	});
+	printf("removed %d, %d left\n".ptr, removed as c_int, p.count() as c_int);
+	free(numbers);
+	return 0;
+}

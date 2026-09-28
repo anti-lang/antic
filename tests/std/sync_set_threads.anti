@@ -1,0 +1,176 @@
+//! Many threads on one `SyncSet` at once.
+//!
+//! The chunks of a `parallel` add their numbers, add a few numbers that every
+//! chunk shares, and remove the multiples of three again, while a dispatched job
+//! walks and searches the set. Each shared number is added once, whichever
+//! chunk comes first. Every chunk then replaces the shared elements with a loop
+//! of `version_of` and `set_if_version`, trying again when another thread came
+//! first.
+//! A versioned set fails once another thread replaced the element, and a copy
+//! made with `dup` takes a lock of its own. The totals come out the same on
+//! every run.
+
+import anti.collection.pool;
+import anti.collection.synchronized.{SyncSet};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The numbers the chunks of the `parallel` add.
+const NUMBERS: int = 100000;
+
+/// The shared numbers, below 0 and so apart from the numbers of the chunks.
+const SHARED: int = 8;
+
+/// Add the numbers of `chunk` and the shared ones, then remove the multiples of
+/// three. Gives the number of shared numbers this chunk added first, and counts
+/// in the thousands the numbers that went wrong.
+worker fn fill(chunk: []int, s: *SyncSet<int>) -> int
+{
+	let first = 0;
+	let wrong = 0;
+	for n in chunk {
+		let x = n;
+		if !s.add(x) {
+			wrong += 1;
+		}
+		let shared = -1 - n % SHARED;
+		if s.add(shared) {
+			first += 1;
+		}
+	}
+	for n in chunk {
+		if !s.contains(n) {
+			wrong += 1;
+		}
+		if n % 3 == 0 && !s.remove(n) {
+			wrong += 1;
+		}
+	}
+	return first + 1000 * wrong;
+}
+
+/// Replace a shared element once per number of `chunk`, trying again when
+/// another thread replaced it first. Gives the number of tries that failed.
+worker fn replace(chunk: []int, s: *SyncSet<int>) -> int
+{
+	let retries = 0;
+	for n in chunk {
+		let shared = -1 - n % SHARED;
+		let done = false;
+		while !done do {
+			let version = s.version_of(shared) ?? -1;
+			let again = shared;
+			s.set_if_version(again, version) catch e {
+				retries += 1;
+				continue;
+			};
+			done = true;
+		}
+	}
+	return retries;
+}
+
+/// Walk and search the set while the chunks change it. Gives the number of
+/// elements it saw, which only has to be sane.
+worker fn watch(s: *SyncSet<int>, walks: int) -> int
+{
+	let seen = 0;
+	for i in 0..walks {
+		for x in *s {
+			if x < -SHARED || x >= NUMBERS {
+				return -1;
+			}
+			seen += 1;
+		}
+		let odd = s.find_all(fn(x) {
+			return x % 2 == 1;
+		});
+		seen += odd.count;
+	}
+	return seen;
+}
+
+/// Replace `x` in `s` from another thread, and give its new version.
+worker fn swap(s: *SyncSet<int>, x: int) -> int
+{
+	let version = s.version_of(x) ?? -1;
+	let y = x;
+	s.set_if_version(y, version) catch e {
+		return -1;
+	};
+	return s.version_of(x) ?? -1;
+}
+
+/// Add `n` numbers from `from` to `s`, from another thread.
+worker fn more(s: *SyncSet<int>, from: int, n: int) -> int
+{
+	for x in from..from + n {
+		let y = x;
+		let added = s.add(y);
+	}
+	return s.count();
+}
+
+fn main() -> int
+{
+	let numbers = alloc([NUMBERS]int, 1) else {
+		return 1;
+	};
+	for i in 0..NUMBERS {
+		(*numbers)[i] = i;
+	}
+	let s = SyncSet<int>.new();
+	let watcher = dispatch &s -> watch(10);
+	let results = parallel (*numbers)[0..NUMBERS] by 16 -> fill(&s);
+	let first = 0;
+	let wrong = 0;
+	for r in results {
+		first += r % 1000;
+		wrong += r / 1000;
+	}
+	free(results.ptr);
+	let seen = join(watcher);
+	let sum = 0;
+	for x in s {
+		if x >= 0 {
+			sum += x;
+		}
+	}
+	let expected = 0;
+	for n in 0..NUMBERS {
+		if n % 3 != 0 {
+			expected += n;
+		}
+	}
+	printf("numbers: %d wrong, %d shared added once, %d left, sum right %d, watcher sane %d\n".ptr,
+		wrong as c_int, first as c_int, s.count() as c_int,
+		(sum == expected) as c_int, (seen >= 0) as c_int);
+
+	let before = s.version_of(-1) ?? -1;
+	let retried = parallel (*numbers)[0..NUMBERS] by 16 -> replace(&s);
+	free(retried.ptr);
+	let after = s.version_of(-1) ?? -1;
+	let shared = s.find_all(fn(x) {
+		return x < 0;
+	});
+	printf("replaced: %d shared left, newer version %d\n".ptr,
+		shared.count as c_int, (after > before) as c_int);
+
+	let version = s.version_of(-2) ?? -1;
+	let job = dispatch &s -> swap(-2);
+	let theirs = join(job);
+	s.set_if_version(-2, version) catch e {
+		let c = e as *pool.Changed;
+		printf("stale after another thread: found theirs %d\n".ptr,
+			(c.found == theirs) as c_int);
+	};
+
+	let copy = dup(&s);
+	let grown = dispatch copy -> more(NUMBERS, 10);
+	let size = join(grown);
+	printf("copy: %d more in the copy, %d in the set\n".ptr,
+		(size - s.count()) as c_int, s.count() as c_int);
+	delete(copy);
+	free(numbers);
+	return 0;
+}

@@ -1,0 +1,25 @@
+exit 0
+empty: 0 true []
+add: true true false true, count 3 false
+contains true false, remove true false, ["Ann", "Cy"]
+["Ann","Cy"]
+walk 5 letters
+room: true true true
+union [0, 1, 2, 3, 4, 5, 6, 7, 8], intersect [3, 4, 5], minus [0, 1, 2], subset true false
+a made set starts at version 0, then true, [0, 1, 2, 3, 4, 5, 6, 8, 7]
+versioned: new version true, the element moves [10, 30, 40, 20]
+stale: the element changed from version 2 to 5, found is the new version true
+gone: the element of version 5 is gone
+added again: a version never given before true
+no element: true
+`find_one` found 4 elements where it needs exactly one
+find_all 3, first 30, one 40 0
+`update_one` found no element where it needs exactly one
+update drops the change: 3 true, [10, 20, 30, 40, 50, 60]
+`remove_one` found no element where it needs exactly one
+remove 2 20 40 -1, [10, 30]
+a removed element has no version: true
+clear: 0 true []
+owned stale: the element changed from version 6 to 101
+owned: 100 50 false 50 10 100 2500
+owned: 0 blocks alive, 0 allocations held

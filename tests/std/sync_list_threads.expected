@@ -1,0 +1,7 @@
+exit 0
+numbers: 0 missed, 34285 left, sum right 1, watcher sane 1
+shared: 40000 updates, 40000 compare and sets
+stale after another thread: 8 counters, found -1
+the other thread's count stands: 1
+copy: 34385 in the copy, 34285 in the list
+closure: 17142 removed, 17183 left

@@ -1,0 +1,7 @@
+exit 0
+keys: 0 wrong, 66666 left, sum right 1, watcher sane 1
+shared: 200000 updates, 200000 compare and sets
+stale after another thread: 50000 then 50001, a newer version 1
+copy: 10 in the copy, 66674 in the map
+removed 66666, 8 left
+closure: 100008 entries, sum 699996

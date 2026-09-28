@@ -1,0 +1,6 @@
+exit 0
+numbers: 0 wrong, 66666 left, sum right 1, watcher sane 1
+shared: 100000 updates, 100000 compare and sets
+stale after another thread: 100000 then 100001, found version 1
+copy: 10 more in the copy, 66666 in the pool
+removed 33333, 33333 left

@@ -1,0 +1,23 @@
+exit 0
+empty: 0 true []
+get 20, contains true, remove 20, then -1 false, count 2
+a stale handle finds nothing: slot reused true, -1, [10, 40, 30]
+set true false, read true false 30, modify true, [11, 41, 30]
+[11,41,30]
+walk 82
+versioned: 10 then 11, versions 0 1
+stale: the element changed from version 0 to 1, found 1
+a walk keeps the version: true
+modify changes the version: 2 12
+gone: the element of version 2 is gone
+no element: true
+`find_one` found 4 elements where it needs exactly one
+find_all 3, first 30, one 40 0
+`update_one` found no element where it needs exactly one
+update_all 3, update_first true, [11, 2, 31, 40, 0, 60]
+`remove_one` found no element where it needs exactly one
+remove 2 40 2 -1, [0, 60]
+clear: 0 true []
+owned stale: the element changed from version 0 to 1
+owned: 101 51 50 true 10 10 3500 1000
+owned: 0 blocks alive, 0 allocations held

@@ -1,0 +1,345 @@
+//! `SyncList<T>` of `anti.collection.synchronized` through every operation on
+//! one thread.
+//!
+//! Elements that own memory count the blocks alive, and an allocator counts
+//! what the list takes, so every block goes back where it came from. The
+//! versioned set takes a version from `find_first_versioned` and fails once the
+//! element changed or left.
+
+import anti.collection;
+import anti.collection.list;
+import anti.collection.pool;
+import anti.collection.synchronized.{SyncList};
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts what it hands out.
+class Counting inherits mem.Allocator
+{
+	pub allocs: int = 0,
+	pub frees: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.allocs += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.frees += 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// A key that owns memory, with `==` and `hash` over its number. Its copy makes
+/// a block of its own, and every block counts in `Id.live`.
+class Id
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Id
+	{
+		return Id { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Id) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Id;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		Id.live.add(-1);
+		free(p);
+	}
+}
+
+/// A block that holds `n`, counted in `Id.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Id.live.add(1);
+	return p;
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn ends()
+{
+	let l = SyncList<int>.new();
+	show(f"empty: {l.count()} {l.is_empty()} {l.first() == none} {l.pop() == none}");
+	for i in 1..6 {
+		l.push(i * 10);
+	}
+	let first = l.first() ?? -1;
+	let last = l.last() ?? -1;
+	let popped = l.pop() ?? -1;
+	show(f"ends: {first} {last} {popped}, count {l.count()} {l.is_empty()}");
+	show(l.to_text());
+	let out = text.Builder.new();
+	l.serialize(&out);
+	show(out.take());
+	l.reverse();
+	show(f"reverse {l}");
+	l.sort();
+	show(f"sort {l}");
+	l.sort_by<int, int>(fn(x) {
+		return -x;
+	});
+	show(f"sort_by {l}");
+	l.sort_with(fn(a, b) {
+		return *a % 20 < *b % 20;
+	});
+	show(f"sort_with {l}");
+	let big = l.filter(fn(x) {
+		return x > 15;
+	});
+	let halves = l.map<int, int>(fn(x) {
+		return x / 2;
+	});
+	show(f"filter {big}, map {halves}, the list {l}");
+	let sum = 0;
+	for x in l {
+		sum += x;
+	}
+	show(f"walk {sum}");
+	l.reserve(100);
+	l.shrink();
+	l.clear();
+	show(f"clear {l.count()} {l}");
+	let from = list.List<int>.new();
+	from.push(7);
+	from.push(8);
+	let made = SyncList<int>.from_list(from);
+	let (x, v) = made.find_first_versioned(fn(n) {
+		return n == 8;
+	}) ?? (-1, -1);
+	show(f"from_list {made}, version of 8 is {v}");
+}
+
+fn versions() may fail
+{
+	let l = SyncList<int>.new();
+	for i in 1..5 {
+		l.push(i);
+	}
+	let (v, first) = l.find_first_versioned(fn(x) {
+		return x == 2;
+	}) ?? (-1, -1);
+	try l.set_if_version(v * 100, first);
+	let (w, second) = try l.find_one_versioned(fn(x) {
+		return x == 200;
+	});
+	show(f"versioned: {v} then {w}, new version {second != first}, {l}");
+	l.set_if_version(99, first) catch e {
+		let c = e as *pool.Changed;
+		show(f"stale: {e.message}, found {c.found}");
+	};
+	l.update_first(fn(x) {
+		return x == 200;
+	}, fn(p) {
+		*p += 1;
+	});
+	let (x, third) = l.find_first_versioned(fn(x) {
+		return x == 201;
+	}) ?? (-1, -1);
+	l.set_if_version(0, second) catch e {
+		show(f"update changes the version: {third != second}, {e.message}");
+	};
+	let n = l.remove_all(fn(x) {
+		return x == 201;
+	});
+	l.set_if_version(0, third) catch e {
+		show(f"gone: {n} removed, {e.message}");
+	};
+	l.push(201);
+	let (y, fourth) = l.find_first_versioned(fn(x) {
+		return x == 201;
+	}) ?? (-1, -1);
+	let fresh = fourth != first && fourth != second && fourth != third;
+	show(f"added again: {y}, a version never given before {fresh}");
+	let nothing = l.find_first_versioned(fn(x) {
+		return x == 1000;
+	});
+	let two = l.find_one_versioned(fn(x) {
+		return x < 4;
+	}) catch e {
+		show(f"{e.message}");
+		yield (0, 0);
+	};
+	show(f"no match: {nothing == none} {two.0}");
+}
+
+fn criteria() may fail
+{
+	let l = SyncList<int>.new();
+	for i in 1..7 {
+		l.push(i * 10);
+	}
+	let even = l.find_all(fn(x) {
+		return x % 20 == 0;
+	});
+	let first = l.find_first(fn(x) {
+		return x > 25;
+	}) ?? -1;
+	let one = try l.find_one(fn(x) {
+		return x == 40;
+	});
+	show(f"find_all {even.count}, first {first}, one {one}");
+	let many = l.find_one(fn(x) {
+		return x > 20;
+	}) catch e {
+		show(f"{e.message}");
+		yield 0;
+	};
+	let n = l.update_all(fn(x) {
+		return x % 20 == 10;
+	}, fn(p) {
+		*p += 1;
+	});
+	let hit = l.update_first(fn(x) {
+		return x > 40;
+	}, fn(p) {
+		*p = 0;
+	});
+	try l.update_one(fn(x) {
+		return x == 20;
+	}, fn(p) {
+		*p = 2;
+	});
+	l.update_one(fn(x) {
+		return x == 99;
+	}, fn(p) {
+		*p = 9;
+	}) catch e {
+		show(f"{e.message}");
+	};
+	show(f"update_all {n} {many}, update_first {hit}, {l}");
+	let removed = l.remove_all(fn(x) {
+		return x % 2 == 1;
+	});
+	let taken = l.remove_first(fn(x) {
+		return x == 40;
+	}) ?? -1;
+	let only = try l.remove_one(fn(x) {
+		return x == 2;
+	});
+	let none_left = l.remove_one(fn(x) {
+		return x == 2;
+	}) catch e {
+		show(f"{e.message}");
+		yield -1;
+	};
+	show(f"remove {removed} {taken} {only} {none_left}, {l}");
+}
+
+fn copies()
+{
+	let a = SyncList<int>.new();
+	for i in 0..10 {
+		a.push(i);
+	}
+	let b = dup(&a);
+	b.push(10);
+	let (x, v) = a.find_first_versioned(fn(n) {
+		return n == 3;
+	}) ?? (-1, -1);
+	let (y, w) = b.find_first_versioned(fn(n) {
+		return n == 3;
+	}) ?? (-1, -1);
+	show(f"dup: {a.count()} {b.count()}, versions kept {v == w}, {b}");
+	delete(b);
+}
+
+fn owned()
+{
+	let counting = Counting { };
+	{
+		let l = SyncList<Id>.new(4, &counting);
+		for i in 0..100 {
+			l.push(Id.of(i));
+		}
+		let copy = dup(&l);
+		let popped = l.pop();
+		let removed = copy.remove_all(fn(x) {
+			return x.value() % 2 == 0;
+		});
+		let found = l.find_all(fn(x) {
+			return x.value() < 10;
+		});
+		let (x, v) = l.find_first_versioned(fn(x) {
+			return x.value() == 5;
+		}) ?? (Id.of(-1), -1);
+		l.set_if_version(Id.of(500), v) catch e {
+			show(f"owned: {e.message}");
+		};
+		l.set_if_version(Id.of(501), v) catch e {
+			show(f"owned stale: {e.message}");
+		};
+		let changed = l.update_all(fn(x) {
+			return x.value() > 90;
+		}, fn(p) {
+			*p = Id.of(p.value() * 10);
+		});
+		let kept = l.filter(fn(x) {
+			return x.value() > 400;
+		});
+		let total = 0;
+		for x in kept {
+			total += x.value();
+		}
+		show(f"owned: {l.count()} {copy.count()} {removed} {found.count} {changed} {total}");
+		delete(copy);
+		l.clear();
+	}
+	show(f"owned: {Id.live.load()} blocks alive, {counting.allocs - counting.frees} allocations held");
+}
+
+fn main() -> int
+{
+	ends();
+	versions() catch e {
+		show(f"versions: {e.message}");
+	};
+	criteria() catch e {
+		show(f"criteria: {e.message}");
+	};
+	copies();
+	owned();
+	return 0;
+}

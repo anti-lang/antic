@@ -1,0 +1,214 @@
+//! Many threads on one `SyncList` at once.
+//!
+//! The chunks of a `parallel` push their numbers and remove the multiples of
+//! seven again, while a dispatched job walks and searches the list. Every chunk
+//! then counts on a few shared counters, with `update_first` and with a loop of
+//! `find_first_versioned` and `set_if_version`, so no count goes missing when
+//! two threads change one element. A versioned set fails once another thread
+//! changed the element, and a copy made with `dup` takes a lock of its own.
+//! The totals come out the same on every run.
+
+import anti.collection.pool;
+import anti.collection.synchronized.{SyncList};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The numbers the chunks of the `parallel` push.
+const NUMBERS: int = 40000;
+
+/// The counters every chunk counts on.
+const SHARED: int = 4;
+
+/// Push the numbers of `chunk` and remove the multiples of seven again. Gives
+/// the number of removals that found nothing.
+worker fn fill(chunk: []int, l: *SyncList<int>) -> int
+{
+	for n in chunk {
+		let x = n;
+		l.push(x);
+	}
+	let missed = 0;
+	for n in chunk {
+		if n % 7 == 0 {
+			let gone = l.remove_first(fn(x) {
+				return x == n;
+			}) ?? -1;
+			if gone != n {
+				missed += 1;
+			}
+		}
+	}
+	return missed;
+}
+
+/// Count on the shared counters, once with `update_first` and once with a
+/// compare and set that tries again when another thread changed the counter
+/// first. Gives the number of compare and sets that found it changed.
+worker fn count(chunk: []int, l: *SyncList<(int, int)>) -> int
+{
+	let retries = 0;
+	for n in chunk {
+		let key = n % SHARED;
+		l.update_first(fn(e) {
+			return e.0 == key;
+		}, fn(p) {
+			p.1 += 1;
+		});
+		let other = SHARED + n % SHARED;
+		let done = false;
+		while !done do {
+			let (e, version) = l.find_first_versioned(fn(e) {
+				return e.0 == other;
+			}) ?? ((other, 0), -1);
+			l.set_if_version((other, e.1 + 1), version) catch err {
+				retries += 1;
+				continue;
+			};
+			done = true;
+		}
+	}
+	return retries;
+}
+
+/// Walk and search the list while the chunks change it. Gives the number of
+/// elements it saw, which only has to be sane.
+worker fn watch(l: *SyncList<int>, walks: int) -> int
+{
+	let seen = 0;
+	for i in 0..walks {
+		for x in *l {
+			if x < 0 || x >= NUMBERS {
+				return -1;
+			}
+			seen += 1;
+		}
+		let odd = l.find_all(fn(x) {
+			return x % 2 == 1;
+		});
+		seen += odd.count;
+	}
+	return seen;
+}
+
+/// Add one to the counter `key` of `l`, from another thread.
+worker fn bump(l: *SyncList<(int, int)>, key: int) -> int
+{
+	let hit = l.update_first(fn(e) {
+		return e.0 == key;
+	}, fn(p) {
+		p.1 += 1;
+	});
+	return l.count();
+}
+
+/// Push `n` numbers onto `l`, from another thread.
+worker fn more(l: *SyncList<int>, n: int) -> int
+{
+	for i in 0..n {
+		let x = i;
+		l.push(x);
+	}
+	return l.count();
+}
+
+/// Run `f` on every element of `items` from the chunks of a `parallel`.
+fn each(items: []int, concurrent f: fn(int))
+{
+	let parts = parallel items by 8 -> run(f);
+	free(parts.ptr);
+}
+
+worker fn run(chunk: []int, concurrent f: fn(int)) -> int
+{
+	for n in chunk {
+		f(n);
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let numbers = alloc([NUMBERS]int, 1) else {
+		return 1;
+	};
+	for i in 0..NUMBERS {
+		(*numbers)[i] = i;
+	}
+	let l = SyncList<int>.new();
+	let watcher = dispatch &l -> watch(10);
+	let misses = parallel (*numbers)[0..NUMBERS] by 16 -> fill(&l);
+	let missed = 0;
+	for m in misses {
+		missed += m;
+	}
+	free(misses.ptr);
+	let seen = join(watcher);
+	let sum = 0;
+	for x in l {
+		sum += x;
+	}
+	let expected = 0;
+	for n in 0..NUMBERS {
+		if n % 7 != 0 {
+			expected += n;
+		}
+	}
+	printf("numbers: %d missed, %d left, sum right %d, watcher sane %d\n".ptr,
+		missed as c_int, l.count() as c_int, (sum == expected) as c_int,
+		(seen >= 0) as c_int);
+
+	let counters = SyncList<(int, int)>.new();
+	for k in 0..2 * SHARED {
+		counters.push((k, 0));
+	}
+	let retried = parallel (*numbers)[0..NUMBERS] by 16 -> count(&counters);
+	free(retried.ptr);
+	let updates = 0;
+	let swaps = 0;
+	for e in counters {
+		if e.0 < SHARED {
+			updates += e.1;
+		} else {
+			swaps += e.1;
+		}
+	}
+	printf("shared: %d updates, %d compare and sets\n".ptr, updates as c_int,
+		swaps as c_int);
+
+	let (e, version) = counters.find_first_versioned(fn(e) {
+		return e.0 == 0;
+	}) ?? ((0, 0), -1);
+	let job = dispatch &counters -> bump(0);
+	let held = join(job);
+	counters.set_if_version((0, 0), version) catch err {
+		let c = err as *pool.Changed;
+		printf("stale after another thread: %d counters, found %d\n".ptr,
+			held as c_int, c.found as c_int);
+	};
+	let now = counters.find_first(fn(e) {
+		return e.0 == 0;
+	}) ?? (0, 0);
+	printf("the other thread's count stands: %d\n".ptr,
+		(now.1 == e.1 + 1) as c_int);
+
+	let copy = dup(&l);
+	let grown = dispatch copy -> more(100);
+	let size = join(grown);
+	printf("copy: %d in the copy, %d in the list\n".ptr, size as c_int,
+		l.count() as c_int);
+	delete(copy);
+
+	let removed = l.remove_all(fn(x) {
+		return x % 2 == 0;
+	});
+	each((*numbers)[0..NUMBERS], fn(n) {
+		if n % 1000 == 0 {
+			let x = n;
+			l.push(x);
+		}
+	});
+	printf("closure: %d removed, %d left\n".ptr, removed as c_int,
+		l.count() as c_int);
+	free(numbers);
+	return 0;
+}

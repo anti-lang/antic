@@ -1,0 +1,1363 @@
+//! The collections that threads share behind one lock each.
+//!
+//! `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` hold a
+//! `List`, a `Map`, a `Set` and a `Pool`. Each is a synchronized class, so
+//! every public function runs under the hidden lock of its object and a
+//! closure at a `concurrent` parameter or a worker may change one.
+//!
+//! They have the operations of the plain collections, less every operation by
+//! position and `lend_slice`. Between threads a position can go stale at any
+//! moment, so an element is addressed by criteria, key or handle, and a slice
+//! of the whole buffer would be reached without the lock. Reading gives a copy,
+//! and no pointer to an element leaves them except through a `lent` parameter.
+//!
+//! `read`, `modify` and the functions given to the `find`, `update` and
+//! `remove` forms run inside the lock. A slow function holds up every other
+//! thread that uses the collection. The lock counts, so such a function may
+//! read the collection again, but it must not change it, since the plain
+//! collection inside is walking its elements.
+//!
+//! Every element carries a version, so a thread can read, compute and write
+//! back only if nothing changed meanwhile. `set_if_version` fails with
+//! `anti.collection.pool.Changed` when the element changed or is gone.
+//!
+//! `for x in c` walks copies of the elements taken under the lock, so an
+//! element that another thread adds or removes meanwhile is not in the walk.
+
+import anti.collection;
+import anti.collection.concurrent.{Snapshot};
+import anti.collection.list;
+import anti.collection.map as maps;
+import anti.collection.pool;
+import anti.collection.set;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+
+/// The version of an entry of a `SyncMap` or an element of a `SyncSet`.
+///
+/// A struct and not an `int`: antic fails to lower `remove` of a map whose
+/// values are `int` and whose key has a `destruct`, as
+/// `docs/reports/2026-09-28-add5-concurrent.md` records.
+struct Stamp
+{
+	version: int,
+}
+
+/// A list that more than one thread adds to and searches.
+///
+/// Each element carries a version: a stamp from a clock of the list, which
+/// counts its changes. `push`, `set_if_version` and the change of each
+/// `update_*` give the element the next stamp, so no two elements of a list
+/// ever share one, and a version names one element until that element changes
+/// or leaves. `find_first_versioned` and `find_one_versioned` give it, and
+/// `set_if_version` takes it back.
+///
+/// The functions given to the `find`, `update` and `remove` forms and to
+/// `sort_with` run inside the lock. A slow function holds up every other
+/// thread that uses the list.
+pub synchronized class SyncList<T>
+{
+	/// The allocator of every block the list holds.
+	from: *mem.Allocator,
+	/// The elements in order, each with its version.
+	items: list.List<(T, int)>,
+	/// The last version the list gave.
+	clock: int = 0,
+
+	/// An empty list with room for `capacity` elements from `from`, or from the
+	/// C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> SyncList<T>
+	{
+		let chosen = collection.allocator(from);
+		return SyncList<T> {
+			from: chosen,
+			items: list.List<(T, int)>.new(capacity, chosen),
+		};
+	}
+
+	/// A list of the elements of `items`, in order, each with a version of its
+	/// own, with room from `from`, or from the C library when it is `none`.
+	pub fn from_list(own items: list.List<T>, from: ?*mem.Allocator = none)
+		-> SyncList<T>
+	{
+		let chosen = collection.allocator(from);
+		let n = items.count;
+		return SyncList<T> {
+			from: chosen,
+			items: numbered<T>(items, chosen),
+			clock: n,
+		};
+	}
+
+	/// The number of elements at this moment.
+	pub fn count(self) -> int
+	{
+		return self.items.count;
+	}
+
+	/// Whether the list holds no element at this moment.
+	pub fn is_empty(self) -> bool
+	{
+		return self.items.count == 0;
+	}
+
+	/// Add `x` after the last element, with a version of its own.
+	///
+	/// DESIGN: the pair of the list holds a copy of `x`, and `x` is torn down
+	/// when the call returns. A literal takes no owning value from a parameter,
+	/// `use dup instead of =`, and a copy of a generic is held to the same rule.
+	pub fn push(self, own x: T)
+	{
+		self.clock += 1;
+		self.items.push((dup(x), self.clock));
+	}
+
+	/// Take the last element off, or `none` when the list is empty.
+	pub fn pop(self) -> ?T
+	{
+		return taken<T>(&self.items, self.items.count - 1);
+	}
+
+	/// A copy of the first element, or `none` when the list is empty.
+	pub fn first(self) -> ?T
+	{
+		return copied<T>(&self.items, 0);
+	}
+
+	/// A copy of the last element, or `none` when the list is empty.
+	pub fn last(self) -> ?T
+	{
+		return copied<T>(&self.items, self.items.count - 1);
+	}
+
+	/// Room for `n` more elements, in one allocation.
+	pub fn reserve(self, n: int)
+	{
+		self.items.reserve(n);
+	}
+
+	/// Give back the room past the last element.
+	pub fn shrink(self)
+	{
+		self.items.shrink();
+	}
+
+	/// Copies of every element that `test` accepts, in order, from the
+	/// allocator of the list.
+	pub fn find_all(self, test: fn(T) -> bool) -> collection.Copies<T>
+	{
+		let found = collection.Copies<T>.new(0, self.from);
+		for p in &self.items {
+			if test(p.0) {
+				found.add(dup(p.0));
+			}
+		}
+		return found;
+	}
+
+	/// A copy of the first element that `test` accepts, or `none`.
+	pub fn find_first(self, test: fn(T) -> bool) -> ?T
+	{
+		return copied<T>(&self.items, self.place(test));
+	}
+
+	/// A copy of the one element that `test` accepts.
+	///
+	/// It fails with `anti.collection.NotOne` when no element or more than one
+	/// matches.
+	pub fn find_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		let (x, version) = try self.find_one_versioned(test);
+		return x;
+	}
+
+	/// A copy of the first element that `test` accepts with its version, or
+	/// `none`. `set_if_version` takes the version back.
+	pub fn find_first_versioned(self, test: fn(T) -> bool) -> ?(T, int)
+	{
+		return self.items.find_first(fn(e) {
+			return test(e.0);
+		});
+	}
+
+	/// A copy of the one element that `test` accepts with its version.
+	/// `set_if_version` takes the version back.
+	///
+	/// It fails with `anti.collection.NotOne` when no element or more than one
+	/// matches.
+	pub fn find_one_versioned(self, test: fn(T) -> bool) -> (T, int) may fail
+	{
+		return try self.items.find_one(fn(e) {
+			return test(e.0);
+		});
+	}
+
+	/// Replace the element of version `version` with `x`, which takes a new
+	/// version, so a thread can read, compute and write back only if nothing
+	/// changed meanwhile.
+	///
+	/// It fails with `anti.collection.pool.Changed`, whose `found` is -1, and
+	/// tears `x` down, when no element holds `version`: the element changed
+	/// since or is gone.
+	pub fn set_if_version(self, own x: T, version: int) may fail
+	{
+		let at = self.place_of(version);
+		if at < 0 {
+			fail pool.Changed.found_version(version, -1);
+		}
+		self.clock += 1;
+		self.items[at] = (dup(x), self.clock);
+	}
+
+	/// Run `change` on every element that `test` accepts, in place, and give
+	/// their number. Each changed element takes a new version.
+	pub fn update_all(self, test: fn(T) -> bool, change: fn(lent *T)) -> int
+	{
+		return self.items.update_all(fn(e) {
+			return test(e.0);
+		}, fn(e) {
+			change(&e.0);
+			self.clock += 1;
+			e.1 = self.clock;
+		});
+	}
+
+	/// Run `change` on the first element that `test` accepts, in place. Gives
+	/// `false` when no element matches. The element takes a new version.
+	pub fn update_first(self, test: fn(T) -> bool, change: fn(lent *T)) -> bool
+	{
+		return self.items.update_first(fn(e) {
+			return test(e.0);
+		}, fn(e) {
+			change(&e.0);
+			self.clock += 1;
+			e.1 = self.clock;
+		});
+	}
+
+	/// Run `change` on the one element that `test` accepts, in place. The
+	/// element takes a new version.
+	///
+	/// It fails with `anti.collection.NotOne` and changes nothing when no
+	/// element or more than one matches.
+	pub fn update_one(self, test: fn(T) -> bool, change: fn(lent *T)) may fail
+	{
+		try self.items.update_one(fn(e) {
+			return test(e.0);
+		}, fn(e) {
+			change(&e.0);
+			self.clock += 1;
+			e.1 = self.clock;
+		});
+	}
+
+	/// Remove every element that `test` accepts and give their number.
+	pub fn remove_all(self, test: fn(T) -> bool) -> int
+	{
+		return self.items.remove_all(fn(e) {
+			return test(e.0);
+		});
+	}
+
+	/// Remove the first element that `test` accepts and give it, or `none`.
+	pub fn remove_first(self, test: fn(T) -> bool) -> ?T
+	{
+		return taken<T>(&self.items, self.place(test));
+	}
+
+	/// Remove the one element that `test` accepts and give it.
+	///
+	/// It fails with `anti.collection.NotOne` and removes nothing when no
+	/// element or more than one matches.
+	pub fn remove_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		let (x, version) = try self.items.remove_one(fn(e) {
+			return test(e.0);
+		});
+		return x;
+	}
+
+	/// Remove every element.
+	pub fn clear(self)
+	{
+		self.items.clear();
+	}
+
+	/// Reverse the order of the elements in place.
+	pub fn reverse(self)
+	{
+		self.items.reverse();
+	}
+
+	/// A new list of copies of the elements `test` accepts, in order, with room
+	/// from `from`, or from the C library when it is `none`. Each copy keeps
+	/// the version of its element.
+	pub fn filter(self, test: fn(T) -> bool, from: ?*mem.Allocator = none)
+		-> SyncList<T>
+	{
+		let chosen = collection.allocator(from);
+		return SyncList<T> {
+			from: chosen,
+			items: self.kept(test, chosen),
+			clock: self.clock,
+		};
+	}
+
+	/// Sort the elements in place by `less`, which says whether its first
+	/// element comes before its second. The sort is stable and allocates
+	/// nothing, and each element keeps its version. `sort` and `sort_by` of
+	/// this module call it.
+	pub fn sort_with(self, less: fn(lent *T, lent *T) -> bool)
+	{
+		self.items.sort_with(fn(a, b) {
+			return less(&a.0, &b.0);
+		});
+	}
+
+	operator fn iter(self) -> Snapshot<T>
+	{
+		let taken = Snapshot<T>.new(self.from);
+		for p in &self.items {
+			taken.add(dup(p.0));
+		}
+		return taken;
+	}
+
+	/// The elements as text, `[1, 2, 3]`.
+	concrete fn to_text(self) -> str
+	{
+		let all = self.find_all(fn(x) {
+			return true;
+		});
+		return all.to_text();
+	}
+
+	/// Write the elements to `out` as a JSON array, in order.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		let all = self.find_all(fn(x) {
+			return true;
+		});
+		all.serialize(out);
+	}
+
+	/// A list in `to` with a copy of each element and its version, as `dup`
+	/// makes one, taken under the lock.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: `dup` hands `copy` memory that nothing has written. The
+		   bytes of an empty list of the same allocator go into it first,
+		   its table and a free hidden lock among them, and each collection
+		   of the copy then takes the copy of the one here. The bytes of this
+		   list would carry its lock as this thread holds it. */
+		let blank = blank_list<T>(self.from);
+		memcpy(to as ?*byte, &blank as ?*byte, size_of(SyncList<T>) as c_size_t);
+		let made = to as *SyncList<T>;
+		self.items.copy(&made.items as *Object);
+		made.clock = self.clock;
+	}
+
+	/// Copies of the elements `test` accepts with their versions, in order,
+	/// with room from `from`.
+	fn kept(self, test: fn(T) -> bool, from: *mem.Allocator) -> list.List<(T, int)>
+	{
+		let out = list.List<(T, int)>.new(0, from);
+		for p in &self.items {
+			if test(p.0) {
+				out.push((dup(p.0), p.1));
+			}
+		}
+		return out;
+	}
+
+	/// The position of the first element that `test` accepts, or -1.
+	fn place(self, test: fn(T) -> bool) -> int
+	{
+		let at = 0;
+		for p in &self.items {
+			if test(p.0) {
+				return at;
+			}
+			at += 1;
+		}
+		return -1;
+	}
+
+	/// The position of the element of version `version`, or -1.
+	fn place_of(self, version: int) -> int
+	{
+		let at = 0;
+		for p in &self.items {
+			if p.1 == version {
+				return at;
+			}
+			at += 1;
+		}
+		return -1;
+	}
+}
+
+/// Sort the elements of `l` in place, smallest first. The sort is stable and
+/// allocates nothing. A call on a list reaches it as `l.sort()`.
+pub fn sort<T: Ordered>(l: *SyncList<T>)
+{
+	l.sort_with(fn(a, b) {
+		return *a < *b;
+	});
+}
+
+/// Sort the elements of `l` in place by the key `key` gives each, smallest
+/// first. The sort is stable and allocates nothing. A call on a list reaches it
+/// as `l.sort_by(key)`.
+pub fn sort_by<T, K: Ordered>(l: *SyncList<T>, key: fn(T) -> K)
+{
+	l.sort_with(fn(a, b) {
+		return key(*a) < key(*b);
+	});
+}
+
+/// A new list of what `f` gives for each element of `l`, in order, with room
+/// from `from`, or from the C library when it is `none`. A call on a list
+/// reaches it as `l.map(f)`.
+///
+/// `f` runs on copies taken under the lock of `l`, and not inside it.
+pub fn map<T, U>(l: *SyncList<T>, f: fn(T) -> U, from: ?*mem.Allocator = none)
+	-> SyncList<U>
+{
+	let out = list.List<U>.new(l.count(), from);
+	for x in l {
+		out.push(f(x));
+	}
+	return SyncList<U>.from_list(out, from);
+}
+
+/// The elements of `items` in order, each with its position from 1 as its
+/// version, with room from `from`.
+fn numbered<T>(own items: list.List<T>, from: *mem.Allocator) -> list.List<(T, int)>
+{
+	let out = list.List<(T, int)>.new(items.count, from);
+	let n = 0;
+	for p in &items {
+		n += 1;
+		out.push((dup(*p), n));
+	}
+	return out;
+}
+
+/// An empty list from `from`, whose bytes the `copy` of a list starts from.
+///
+/// DESIGN: a function of the module, since a call of `SyncList<T>.new` in a
+/// function of the class takes no type arguments.
+fn blank_list<T>(from: *mem.Allocator) -> SyncList<T>
+{
+	return SyncList<T>.new(0, from);
+}
+
+/// An empty map from `from`, as `blank_list`.
+fn blank_map<K: eq + hash, V>(from: *mem.Allocator) -> SyncMap<K, V>
+{
+	return SyncMap<K, V>.new(0, from);
+}
+
+/// An empty set from `from`, as `blank_list`.
+fn blank_set<T: eq + hash>(from: *mem.Allocator) -> SyncSet<T>
+{
+	return SyncSet<T>.new(0, from);
+}
+
+/// An empty pool from `from`, as `blank_list`.
+fn blank_pool<T>(from: *mem.Allocator) -> SyncPool<T>
+{
+	return SyncPool<T>.new(0, from);
+}
+
+/// A copy of the element at `at` of `items`, or `none` outside the list.
+///
+/// DESIGN: the functions of `SyncList` that give a `?T` call it or `taken`,
+/// since antic fails to lower a public function of a synchronized class that
+/// returns a value where its result is a `?T`. The element comes apart from
+/// the result of a call, which hands each part to its name.
+fn copied<T>(items: *list.List<(T, int)>, at: int) -> ?T
+{
+	if at < 0 || at >= items.count {
+		return none;
+	}
+	let (x, version) = (*items)[at];
+	return x;
+}
+
+/// Remove the element at `at` of `items` and give it, or `none` outside the
+/// list.
+fn taken<T>(items: *list.List<(T, int)>, at: int) -> ?T
+{
+	if at < 0 || at >= items.count {
+		return none;
+	}
+	let (x, version) = items.remove_at(at);
+	return x;
+}
+
+/// A copy of the value under `k` in `entries` and its version in `versions`,
+/// or `none`, for the reason of `copied`.
+fn versioned<K: eq + hash, V>(entries: *maps.Map<K, V>,
+	versions: *maps.Map<K, Stamp>, k: K) -> ?(V, int)
+{
+	let value = entries.get(k) else {
+		return none;
+	};
+	let stamp = versions.get(k) ?? Stamp { version: 0 };
+	return (dup(value), stamp.version);
+}
+
+/// A shared lookup table with modest traffic, in insertion order.
+///
+/// Each entry carries a version: a stamp from a clock of the map, which counts
+/// its changes. `set`, `add`, `set_if_version`, `update`, `modify` and the
+/// change of each `update_*` give the entry the next stamp. An entry removed
+/// and added again takes a stamp it never had.
+///
+/// `read`, `modify`, `update` and the functions given to the `find`, `update`
+/// and `remove` forms run inside the lock. A slow function holds up every other
+/// thread that uses the map.
+pub synchronized class SyncMap<K: eq + hash, V>
+{
+	/// The allocator of every block the map holds.
+	from: *mem.Allocator,
+	/// The entries in insertion order.
+	entries: maps.Map<K, V>,
+	/// The version of each key of `entries`.
+	versions: maps.Map<K, Stamp>,
+	/// The last version the map gave.
+	clock: int = 0,
+
+	/// An empty map with room for `capacity` entries from `from`, or from the C
+	/// library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> SyncMap<K, V>
+	{
+		let chosen = collection.allocator(from);
+		return SyncMap<K, V> {
+			from: chosen,
+			entries: maps.Map<K, V>.new(capacity, chosen),
+			versions: maps.Map<K, Stamp>.new(capacity, chosen),
+		};
+	}
+
+	/// The number of entries at this moment.
+	pub fn count(self) -> int
+	{
+		return self.entries.count;
+	}
+
+	/// Whether the map holds no entry at this moment.
+	pub fn is_empty(self) -> bool
+	{
+		return self.entries.count == 0;
+	}
+
+	/// The number of entries the room holds before it grows.
+	pub fn capacity(self) -> int
+	{
+		return self.entries.capacity();
+	}
+
+	/// Make room for `n` more entries, in one allocation per table.
+	pub fn reserve(self, n: int)
+	{
+		self.entries.reserve(n);
+		self.versions.reserve(n);
+	}
+
+	/// Give back the room that holds no entry.
+	pub fn shrink(self)
+	{
+		self.entries.shrink();
+		self.versions.shrink();
+	}
+
+	/// A copy of the value under `k`, or `none`.
+	pub fn get(self, k: K) -> ?V
+	{
+		return self.entries.get(k);
+	}
+
+	/// Whether the map holds the key `k`.
+	pub fn contains(self, k: K) -> bool
+	{
+		return self.entries.contains(k);
+	}
+
+	/// Write `v` under `k`, replacing the value there.
+	pub fn set(self, k: K, own v: V)
+	{
+		self.entries.set(k, v);
+		self.stamp(k);
+	}
+
+	/// Write `v` under `k` when the map does not hold `k`. Gives `false`, and
+	/// tears `v` down, when it does.
+	pub fn add(self, k: K, own v: V) -> bool
+	{
+		if !self.entries.add(k, v) {
+			return false;
+		}
+		self.stamp(k);
+		return true;
+	}
+
+	/// Remove the entry of `k` and give its value, or `none`.
+	pub fn remove(self, k: K) -> ?V
+	{
+		let gone = self.versions.remove(k);
+		return self.entries.remove(k);
+	}
+
+	/// Run `change` on the value under `k`, in place. Gives `false` when the
+	/// map does not hold `k`.
+	pub fn update(self, k: K, change: fn(lent *V)) -> bool
+	{
+		if !self.entries.update(k, change) {
+			return false;
+		}
+		self.stamp(k);
+		return true;
+	}
+
+	/// Lend the value under `k` to `f` for reading. Gives `false` when the map
+	/// does not hold `k`.
+	pub fn read(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.entries.read(k, f);
+	}
+
+	/// Lend the value under `k` to `f`, which may change it in place. Gives
+	/// `false` when the map does not hold `k`.
+	pub fn modify(self, k: K, f: fn(lent *V)) -> bool
+	{
+		return self.update(k, f);
+	}
+
+	/// A copy of the value under `k` and its version, or `none`.
+	/// `set_if_version` takes the version back.
+	pub fn get_versioned(self, k: K) -> ?(V, int)
+	{
+		return versioned<K, V>(&self.entries, &self.versions, k);
+	}
+
+	/// Write `v` under `k` when its version is still `version`, as
+	/// `get_versioned` gave it, so a thread can read, compute and write back
+	/// only if nothing changed meanwhile.
+	///
+	/// It fails with `anti.collection.pool.Changed`, and tears `v` down, when
+	/// the entry changed since or is gone.
+	pub fn set_if_version(self, k: K, own v: V, version: int) may fail
+	{
+		let now = self.versions.get(k) else {
+			fail pool.Changed.found_version(version, -1);
+		};
+		if now.version != version {
+			fail pool.Changed.found_version(version, now.version);
+		}
+		self.entries.set(k, v);
+		self.stamp(k);
+	}
+
+	/// Copies of every entry that `test` accepts, in insertion order, from the
+	/// allocator of the map.
+	pub fn find_all(self, test: fn((K, V)) -> bool) -> collection.Copies<(K, V)>
+	{
+		return self.entries.find_all(test);
+	}
+
+	/// A copy of the first entry that `test` accepts, or `none`.
+	pub fn find_first(self, test: fn((K, V)) -> bool) -> ?(K, V)
+	{
+		return self.entries.find_first(test);
+	}
+
+	/// A copy of the one entry that `test` accepts.
+	///
+	/// It fails with `anti.collection.NotOne` when no entry or more than one
+	/// matches.
+	pub fn find_one(self, test: fn((K, V)) -> bool) -> (K, V) may fail
+	{
+		return try self.entries.find_one(test);
+	}
+
+	/// Run `change` on every entry that `test` accepts, in place, and give
+	/// their number. The key of an entry never changes, as in `Map`, and each
+	/// changed entry takes a new version.
+	pub fn update_all(self, test: fn((K, V)) -> bool,
+		change: fn(lent *(K, V))) -> int
+	{
+		return self.entries.update_all(test, fn(e) {
+			let k = dup(e.0);
+			change(e);
+			self.stamp(k);
+		});
+	}
+
+	/// Run `change` on the first entry that `test` accepts, in place. Gives
+	/// `false` when no entry matches. The entry takes a new version.
+	pub fn update_first(self, test: fn((K, V)) -> bool,
+		change: fn(lent *(K, V))) -> bool
+	{
+		return self.entries.update_first(test, fn(e) {
+			let k = dup(e.0);
+			change(e);
+			self.stamp(k);
+		});
+	}
+
+	/// Run `change` on the one entry that `test` accepts, in place. The entry
+	/// takes a new version.
+	///
+	/// It fails with `anti.collection.NotOne` and changes nothing when no entry
+	/// or more than one matches.
+	pub fn update_one(self, test: fn((K, V)) -> bool,
+		change: fn(lent *(K, V))) may fail
+	{
+		try self.entries.update_one(test, fn(e) {
+			let k = dup(e.0);
+			change(e);
+			self.stamp(k);
+		});
+	}
+
+	/// Remove every entry that `test` accepts and give their number.
+	pub fn remove_all(self, test: fn((K, V)) -> bool) -> int
+	{
+		return self.entries.remove_all(fn(e) {
+			return self.forgets(test, e);
+		});
+	}
+
+	/// Remove the first entry that `test` accepts and give it, or `none`.
+	pub fn remove_first(self, test: fn((K, V)) -> bool) -> ?(K, V)
+	{
+		return self.entries.remove_first(fn(e) {
+			return self.forgets(test, e);
+		});
+	}
+
+	/// Remove the one entry that `test` accepts and give it.
+	///
+	/// It fails with `anti.collection.NotOne` and removes nothing when no entry
+	/// or more than one matches.
+	pub fn remove_one(self, test: fn((K, V)) -> bool) -> (K, V) may fail
+	{
+		let e = try self.entries.remove_one(test);
+		let gone = self.versions.remove(e.0);
+		return e;
+	}
+
+	/// Remove every entry.
+	pub fn clear(self)
+	{
+		self.entries.clear();
+		self.versions.clear();
+	}
+
+	/// Copies of the keys, in insertion order.
+	pub fn keys(self) -> Snapshot<K>
+	{
+		let taken = Snapshot<K>.new(self.from);
+		for k in self.entries.keys() {
+			taken.add(dup(k));
+		}
+		return taken;
+	}
+
+	/// Copies of the values, in insertion order.
+	pub fn values(self) -> Snapshot<V>
+	{
+		let taken = Snapshot<V>.new(self.from);
+		for v in self.entries.values() {
+			taken.add(dup(v));
+		}
+		return taken;
+	}
+
+	operator fn iter(self) -> Snapshot<(K, V)>
+	{
+		let taken = Snapshot<(K, V)>.new(self.from);
+		for (k, v) in self.entries {
+			taken.add((dup(k), dup(v)));
+		}
+		return taken;
+	}
+
+	/// The entries as text, `{"Ann": 41}`, in insertion order.
+	concrete fn to_text(self) -> str
+	{
+		return self.entries.to_text();
+	}
+
+	/// Write the entries to `out` as a `Map` writes them: a JSON object when
+	/// the keys are `str` and an array of `[key, value]` pairs otherwise.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		self.entries.serialize(out);
+	}
+
+	/// A map in `to` with a copy of each entry and its version, as `dup` makes
+	/// one, taken under the lock.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: as `copy` of `SyncList`, from the bytes of an empty map. */
+		let blank = blank_map<K, V>(self.from);
+		memcpy(to as ?*byte, &blank as ?*byte, size_of(SyncMap<K, V>) as c_size_t);
+		let made = to as *SyncMap<K, V>;
+		self.entries.copy(&made.entries as *Object);
+		self.versions.copy(&made.versions as *Object);
+		made.clock = self.clock;
+	}
+
+	/// Whether `test` accepts `e`, and when it does, forget the version of its
+	/// key, since the map removes the entry next.
+	fn forgets(self, test: fn((K, V)) -> bool, e: (K, V)) -> bool
+	{
+		if !test(e) {
+			return false;
+		}
+		let gone = self.versions.remove(e.0);
+		return true;
+	}
+
+	/// Give the entry of `k` a version the map never gave before.
+	fn stamp(self, k: K)
+	{
+		self.clock += 1;
+		self.versions.set(k, Stamp { version: self.clock });
+	}
+}
+
+/// A shared membership set, in the order the elements were first added.
+///
+/// Each element carries a version: a stamp from a clock of the set. `add` and
+/// `set_if_version` give the element the next stamp, and an element removed and
+/// added again takes a stamp it never had. The elements of a set that `union`,
+/// `intersect` or `minus` made start at version 0, which no stamp is. An element of a set is its own key
+/// and never changes in place, so `version_of` gives the version alone.
+///
+/// The functions given to the `find`, `update` and `remove` forms run inside
+/// the lock. A slow function holds up every other thread that uses the set.
+pub synchronized class SyncSet<T: eq + hash>
+{
+	/// The allocator of every block the set holds.
+	from: *mem.Allocator,
+	/// The elements in the order they were first added.
+	items: set.Set<T>,
+	/// The version of each element of `items`.
+	versions: maps.Map<T, Stamp>,
+	/// The last version the set gave.
+	clock: int = 0,
+
+	/// An empty set with room for `capacity` elements from `from`, or from the
+	/// C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> SyncSet<T>
+	{
+		let chosen = collection.allocator(from);
+		return SyncSet<T> {
+			from: chosen,
+			items: set.Set<T>.new(capacity, chosen),
+			versions: maps.Map<T, Stamp>.new(capacity, chosen),
+		};
+	}
+
+	/// The number of elements at this moment.
+	pub fn count(self) -> int
+	{
+		return self.items.count;
+	}
+
+	/// Whether the set holds no element at this moment.
+	pub fn is_empty(self) -> bool
+	{
+		return self.items.count == 0;
+	}
+
+	/// The number of elements the room holds before it grows.
+	pub fn capacity(self) -> int
+	{
+		return self.items.capacity();
+	}
+
+	/// Make room for `n` more elements, in one allocation per table.
+	pub fn reserve(self, n: int)
+	{
+		self.items.reserve(n);
+		self.versions.reserve(n);
+	}
+
+	/// Give back the room that holds no element.
+	pub fn shrink(self)
+	{
+		self.items.shrink();
+		self.versions.shrink();
+	}
+
+	/// Add `x`, which the set then owns, with a version of its own. Gives
+	/// `false` and tears `x` down when the set holds it already.
+	pub fn add(self, own x: T) -> bool
+	{
+		if self.items.contains(x) {
+			return false;
+		}
+		self.stamp(x);
+		return self.items.add(x);
+	}
+
+	/// Remove `x`. Gives `false` when the set does not hold it.
+	pub fn remove(self, x: T) -> bool
+	{
+		if !self.items.remove(x) {
+			return false;
+		}
+		let gone = self.versions.remove(x);
+		return true;
+	}
+
+	/// Whether the set holds `x`.
+	pub fn contains(self, x: T) -> bool
+	{
+		return self.items.contains(x);
+	}
+
+	/// The version of the element equal to `x`, or `none` when the set does not
+	/// hold one. `set_if_version` takes it back.
+	pub fn version_of(self, x: T) -> ?int
+	{
+		if !self.items.contains(x) {
+			return none;
+		}
+		let version: ?int = self.version(x);
+		return version;
+	}
+
+	/// Replace the element equal to `x` with `x` when its version is still
+	/// `version`, as `version_of` gave it. The element moves to the end of the
+	/// order and takes a new version.
+	///
+	/// It fails with `anti.collection.pool.Changed`, and tears `x` down, when
+	/// the element was replaced since or is gone.
+	pub fn set_if_version(self, own x: T, version: int) may fail
+	{
+		if !self.items.contains(x) {
+			fail pool.Changed.found_version(version, -1);
+		}
+		let now = self.version(x);
+		if now != version {
+			fail pool.Changed.found_version(version, now);
+		}
+		let gone = self.items.remove(x);
+		self.stamp(x);
+		let added = self.items.add(x);
+	}
+
+	/// A new set of the elements of this set and then those of `other` that
+	/// this set does not hold, each in its own order, from the allocator of
+	/// this set. `a.union(b.to_set())` joins two synchronized sets and holds
+	/// one lock at a time.
+	pub fn union(self, own other: set.Set<T>) -> SyncSet<T>
+	{
+		return SyncSet<T> {
+			from: self.from,
+			items: self.items.union(other),
+			versions: maps.Map<T, Stamp>.new(0, self.from),
+		};
+	}
+
+	/// A new set of the elements of this set that `other` holds, in the order
+	/// of this set.
+	pub fn intersect(self, own other: set.Set<T>) -> SyncSet<T>
+	{
+		return SyncSet<T> {
+			from: self.from,
+			items: self.items.intersect(other),
+			versions: maps.Map<T, Stamp>.new(0, self.from),
+		};
+	}
+
+	/// A new set of the elements of this set that `other` does not hold, in the
+	/// order of this set.
+	pub fn minus(self, own other: set.Set<T>) -> SyncSet<T>
+	{
+		return SyncSet<T> {
+			from: self.from,
+			items: self.items.minus(other),
+			versions: maps.Map<T, Stamp>.new(0, self.from),
+		};
+	}
+
+	/// Whether `other` holds every element of this set.
+	pub fn is_subset(self, own other: set.Set<T>) -> bool
+	{
+		return self.items.is_subset(other);
+	}
+
+	/// The elements as a plain set, copies taken under the lock, from the
+	/// allocator of this set.
+	pub fn to_set(self) -> set.Set<T>
+	{
+		let all = set.Set<T>.new(self.items.count, self.from);
+		for x in self.items {
+			let added = all.add(dup(x));
+		}
+		return all;
+	}
+
+	/// Copies of every element that `test` accepts, in order, from the
+	/// allocator of the set.
+	pub fn find_all(self, test: fn(T) -> bool) -> collection.Copies<T>
+	{
+		return self.items.find_all(test);
+	}
+
+	/// A copy of the first element that `test` accepts, or `none`.
+	pub fn find_first(self, test: fn(T) -> bool) -> ?T
+	{
+		return self.items.find_first(test);
+	}
+
+	/// A copy of the one element that `test` accepts.
+	///
+	/// It fails with `anti.collection.NotOne` when no element or more than one
+	/// matches.
+	pub fn find_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		return try self.items.find_one(test);
+	}
+
+	/// Lend a copy of every element that `test` accepts to `change` and give
+	/// their number. An element of a set never changes in place, so the set
+	/// drops the change, as `Set` does.
+	pub fn update_all(self, test: fn(T) -> bool, change: fn(lent *T)) -> int
+	{
+		return self.items.update_all(test, change);
+	}
+
+	/// Lend a copy of the first element that `test` accepts to `change`. Gives
+	/// `false` when no element matches. The set drops the change.
+	pub fn update_first(self, test: fn(T) -> bool, change: fn(lent *T)) -> bool
+	{
+		return self.items.update_first(test, change);
+	}
+
+	/// Lend a copy of the one element that `test` accepts to `change`. The set
+	/// drops the change.
+	///
+	/// It fails with `anti.collection.NotOne` when no element or more than one
+	/// matches.
+	pub fn update_one(self, test: fn(T) -> bool, change: fn(lent *T)) may fail
+	{
+		try self.items.update_one(test, change);
+	}
+
+	/// Remove every element that `test` accepts and give their number.
+	pub fn remove_all(self, test: fn(T) -> bool) -> int
+	{
+		return self.items.remove_all(fn(x) {
+			return self.forgets(test, x);
+		});
+	}
+
+	/// Remove the first element that `test` accepts and give it, or `none`.
+	pub fn remove_first(self, test: fn(T) -> bool) -> ?T
+	{
+		return self.items.remove_first(fn(x) {
+			return self.forgets(test, x);
+		});
+	}
+
+	/// Remove the one element that `test` accepts and give it.
+	///
+	/// It fails with `anti.collection.NotOne` and removes nothing when no
+	/// element or more than one matches.
+	pub fn remove_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		let x = try self.items.remove_one(test);
+		let gone = self.versions.remove(x);
+		return x;
+	}
+
+	/// Remove every element.
+	pub fn clear(self)
+	{
+		self.items.clear();
+		self.versions.clear();
+	}
+
+	operator fn iter(self) -> Snapshot<T>
+	{
+		let taken = Snapshot<T>.new(self.from);
+		for x in self.items {
+			taken.add(dup(x));
+		}
+		return taken;
+	}
+
+	/// The elements as text, `[1, 2, 3]`, in order.
+	concrete fn to_text(self) -> str
+	{
+		return self.items.to_text();
+	}
+
+	/// Write the elements to `out` as a JSON array, in order.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		self.items.serialize(out);
+	}
+
+	/// A set in `to` with a copy of each element and its version, as `dup`
+	/// makes one, taken under the lock.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: as `copy` of `SyncList`, from the bytes of an empty set. */
+		let blank = blank_set<T>(self.from);
+		memcpy(to as ?*byte, &blank as ?*byte, size_of(SyncSet<T>) as c_size_t);
+		let made = to as *SyncSet<T>;
+		self.items.copy(&made.items as *Object);
+		self.versions.copy(&made.versions as *Object);
+		made.clock = self.clock;
+	}
+
+	/// The version of the element equal to `x`, which the set holds. An
+	/// element of a set that `union`, `intersect` or `minus` made has version 0
+	/// until it is replaced.
+	fn version(self, x: T) -> int
+	{
+		let stamp = self.versions.get(x) ?? Stamp { version: 0 };
+		return stamp.version;
+	}
+
+	/// Whether `test` accepts `x`, and when it does, forget its version, since
+	/// the set removes it next.
+	fn forgets(self, test: fn(T) -> bool, x: T) -> bool
+	{
+		if !test(x) {
+			return false;
+		}
+		let gone = self.versions.remove(x);
+		return true;
+	}
+
+	/// Give the element `x` a version the set never gave before.
+	fn stamp(self, x: T)
+	{
+		self.clock += 1;
+		self.versions.set(x, Stamp { version: self.clock });
+	}
+}
+
+/// Objects that threads share by handle.
+///
+/// The elements keep the versions of `Pool`: a version counts the changes of an
+/// element since it was added, from 0. `set`, `set_if_version`, `modify` and
+/// the change of each `update_*` count one. A walk with `for` takes copies and
+/// counts none.
+///
+/// `read`, `modify` and the functions given to the `find`, `update` and
+/// `remove` forms run inside the lock. A slow function holds up every other
+/// thread that uses the pool.
+pub synchronized class SyncPool<T>
+{
+	/// The allocator of every block the pool holds.
+	from: *mem.Allocator,
+	/// The elements at their handles.
+	items: pool.Pool<T>,
+
+	/// An empty pool with room for `capacity` elements from `from`, or from the
+	/// C library when it is `none`.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> SyncPool<T>
+	{
+		let chosen = collection.allocator(from);
+		return SyncPool<T> {
+			from: chosen,
+			items: pool.Pool<T>.new(capacity, chosen),
+		};
+	}
+
+	/// The number of elements at this moment.
+	pub fn count(self) -> int
+	{
+		return self.items.count;
+	}
+
+	/// Whether the pool holds no element at this moment.
+	pub fn is_empty(self) -> bool
+	{
+		return self.items.count == 0;
+	}
+
+	/// Add `x` and give its handle, which any thread may use.
+	pub fn add(self, own x: T) -> pool.Handle<T>
+	{
+		return self.items.add(x);
+	}
+
+	/// Remove the element `h` finds and give it, or `none` when it is gone.
+	pub fn remove(self, h: pool.Handle<T>) -> ?T
+	{
+		return self.items.remove(h);
+	}
+
+	/// Whether `h` finds an element.
+	pub fn contains(self, h: pool.Handle<T>) -> bool
+	{
+		return self.items.contains(h);
+	}
+
+	/// A copy of the element `h` finds, or `none` when it is gone.
+	pub fn get(self, h: pool.Handle<T>) -> ?T
+	{
+		return self.items.get(h);
+	}
+
+	/// Replace the element `h` finds with `x`. Gives `false`, and tears `x`
+	/// down, when the element is gone.
+	pub fn set(self, h: pool.Handle<T>, own x: T) -> bool
+	{
+		return self.items.set(h, x);
+	}
+
+	/// A copy of the element `h` finds with its version, or `none` when it is
+	/// gone. `set_if_version` takes the version back.
+	pub fn get_versioned(self, h: pool.Handle<T>) -> ?(T, int)
+	{
+		return self.items.get_versioned(h);
+	}
+
+	/// Replace the element `h` finds with `x` when its version is still
+	/// `version`, as `get_versioned` gave it.
+	///
+	/// It fails with `anti.collection.pool.Changed`, and tears `x` down, when
+	/// the element changed since or is gone.
+	pub fn set_if_version(self, h: pool.Handle<T>, own x: T, version: int)
+		may fail
+	{
+		try self.items.set_if_version(h, x, version);
+	}
+
+	/// Lend the element `h` finds to `f` for reading. Gives `false` when it is
+	/// gone.
+	pub fn read(self, h: pool.Handle<T>, f: fn(lent *T)) -> bool
+	{
+		return self.items.read(h, f);
+	}
+
+	/// Lend the element `h` finds to `f`, which may change it in place. Gives
+	/// `false` when it is gone.
+	pub fn modify(self, h: pool.Handle<T>, f: fn(lent *T)) -> bool
+	{
+		return self.items.modify(h, f);
+	}
+
+	/// Copies of every element that `test` accepts, in the order of their
+	/// slots, from the allocator of the pool.
+	pub fn find_all(self, test: fn(T) -> bool) -> collection.Copies<T>
+	{
+		return self.items.find_all(test);
+	}
+
+	/// A copy of the first element that `test` accepts, or `none`.
+	pub fn find_first(self, test: fn(T) -> bool) -> ?T
+	{
+		return self.items.find_first(test);
+	}
+
+	/// A copy of the one element that `test` accepts.
+	///
+	/// It fails with `anti.collection.NotOne` when no element or more than one
+	/// matches.
+	pub fn find_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		return try self.items.find_one(test);
+	}
+
+	/// Run `change` on every element that `test` accepts, in place, and give
+	/// their number. Each changed element takes a new version.
+	pub fn update_all(self, test: fn(T) -> bool, change: fn(lent *T)) -> int
+	{
+		return self.items.update_all(test, change);
+	}
+
+	/// Run `change` on the first element that `test` accepts, in place. Gives
+	/// `false` when no element matches.
+	pub fn update_first(self, test: fn(T) -> bool, change: fn(lent *T)) -> bool
+	{
+		return self.items.update_first(test, change);
+	}
+
+	/// Run `change` on the one element that `test` accepts, in place.
+	///
+	/// It fails with `anti.collection.NotOne` and changes nothing when no
+	/// element or more than one matches.
+	pub fn update_one(self, test: fn(T) -> bool, change: fn(lent *T)) may fail
+	{
+		try self.items.update_one(test, change);
+	}
+
+	/// Remove every element that `test` accepts and give their number.
+	pub fn remove_all(self, test: fn(T) -> bool) -> int
+	{
+		return self.items.remove_all(test);
+	}
+
+	/// Remove the first element that `test` accepts and give it, or `none`.
+	pub fn remove_first(self, test: fn(T) -> bool) -> ?T
+	{
+		return self.items.remove_first(test);
+	}
+
+	/// Remove the one element that `test` accepts and give it.
+	///
+	/// It fails with `anti.collection.NotOne` and removes nothing when no
+	/// element or more than one matches.
+	pub fn remove_one(self, test: fn(T) -> bool) -> T may fail
+	{
+		return try self.items.remove_one(test);
+	}
+
+	/// Remove every element. Every handle then finds nothing.
+	pub fn clear(self)
+	{
+		self.items.clear();
+	}
+
+	operator fn iter(self) -> Snapshot<T>
+	{
+		let taken = Snapshot<T>.new(self.from);
+		let none_found = self.items.find_first(fn(x) {
+			taken.add(dup(x));
+			return false;
+		});
+		return taken;
+	}
+
+	/// The elements as text, `[1, 2, 3]`, in the order of their slots.
+	concrete fn to_text(self) -> str
+	{
+		return self.items.to_text();
+	}
+
+	/// Write the elements to `out` as a JSON array, in the order of their
+	/// slots.
+	concrete fn serialize(self, out: *text.Builder)
+	{
+		self.items.serialize(out);
+	}
+
+	/// A pool in `to` with a copy of each element at the same handle and with
+	/// the same version, as `dup` makes one, taken under the lock.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: as `copy` of `SyncList`, from the bytes of an empty pool. */
+		let blank = blank_pool<T>(self.from);
+		memcpy(to as ?*byte, &blank as ?*byte, size_of(SyncPool<T>) as c_size_t);
+		let made = to as *SyncPool<T>;
+		self.items.copy(&made.items as *Object);
+	}
+}
