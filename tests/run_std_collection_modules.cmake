@@ -13,14 +13,14 @@ include("${ROOT}/tools/std-modules.cmake")
 
 set(tree "${WORK}/${ANTI_STD_COLLECTION_DIR}")
 file(REMOVE_RECURSE "${WORK}")
-file(MAKE_DIRECTORY "${tree}/sync")
+file(MAKE_DIRECTORY "${tree}/synchronized")
 file(WRITE "${tree}/list.anti"
     "import anti.collection;\nimport anti.collection.deque.{Deque};\n")
 file(WRITE "${tree}/deque.anti" "import anti.collection.{Iterable};\n")
 file(WRITE "${tree}/map.anti"
     "import anti.collection.set;\nimport anti.collection.list;\n")
 file(WRITE "${tree}/set.anti" "import anti.text;\n")
-file(WRITE "${tree}/sync/list.anti"
+file(WRITE "${tree}/synchronized/list.anti"
     "import anti.collection.map.{Map};\nimport anti.collection.list;\n")
 anti_std_collection_modules("${tree}" modules)
 
@@ -28,8 +28,8 @@ list(LENGTH modules count)
 if(NOT count EQUAL 5)
     message(FATAL_ERROR "5 modules expected, found ${count}: ${modules}")
 endif()
-foreach(pair "deque;list" "set;map" "list;map" "map;sync/list"
-        "list;sync/list")
+foreach(pair "deque;list" "set;map" "list;map" "map;synchronized/list"
+        "list;synchronized/list")
     list(GET pair 0 first)
     list(GET pair 1 then)
     list(FIND modules "${ANTI_STD_COLLECTION_DIR}/${first}" a)
@@ -40,7 +40,7 @@ foreach(pair "deque;list" "set;map" "list;map" "map;sync/list"
 endforeach()
 
 # Two modules that import each other have no order, and the build says so.
-file(WRITE "${tree}/set.anti" "import anti.collection.sync.list;\n")
+file(WRITE "${tree}/set.anti" "import anti.collection.synchronized.list;\n")
 file(WRITE "${WORK}/cycle.cmake"
     "include(\"${ROOT}/tools/std-modules.cmake\")\n"
     "anti_std_collection_modules(\"${tree}\" modules)\n")
