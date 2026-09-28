@@ -1,0 +1,300 @@
+//! `dup` of every collection, reached through the fields of one owner.
+//!
+//! `Every` holds a field of each collection type. `dup` of it copies each field
+//! with the `copy` of its collection, which takes new memory from the same
+//! allocator and copies every element with `copy_element`. The copy and the
+//! original then change apart, and both are torn down. Every element owns a
+//! block counted in `Item.live`, and every block of room goes through a
+//! counting allocator, so both read 0 after each case. A handle of a `Pool` and
+//! of a `Tree` finds the same element in the copy, and a handle of a removed
+//! element finds nothing in either.
+
+import anti.collection.{Copies};
+import anti.collection.concurrent.{ConcurrentMap, SpscRing};
+import anti.collection.deque.{Deque};
+import anti.collection.grid.{Grid};
+import anti.collection.list.{List};
+import anti.collection.map.{HashMap, Map};
+import anti.collection.pool.{Handle, Pool};
+import anti.collection.queue.{PriorityQueue};
+import anti.collection.ring.{Ring};
+import anti.collection.set.{BitSet, HashSet, Set};
+import anti.collection.sorted.{SortedMap, SortedSet};
+import anti.collection.tree.{Tree};
+import anti.lang;
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts the blocks it holds out.
+class Counting inherits mem.Allocator
+{
+	pub held: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.held += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.held -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// An element that owns memory, with `==`, `hash` and `<` over its number. Its
+/// copy makes a block of its own, and every block counts in `Item.live`.
+class Item
+{
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Item
+	{
+		return Item { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Item) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	operator fn lt(self, other: Item) -> bool
+	{
+		return self.value() < other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Item;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		Item.live.add(-1);
+		free(p);
+	}
+}
+
+/// A block that holds `n`, counted in `Item.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Item.live.add(1);
+	return p;
+}
+
+/// A class with a field of each collection type, all with room from one
+/// allocator.
+class Every
+{
+	pub list: List<Item>,
+	pub deque: Deque<Item>,
+	pub ring: Ring<Item, 4>,
+	pub grid: Grid<Item>,
+	pub map: Map<str, Item>,
+	pub hashed: HashMap<int, Item>,
+	pub set: Set<Item>,
+	pub hash_set: HashSet<Item>,
+	pub bits: BitSet,
+	pub sorted: SortedMap<int, Item>,
+	pub sorted_set: SortedSet<Item>,
+	pub pool: Pool<Item>,
+	pub tree: Tree<Item>,
+	pub queue: PriorityQueue<Item>,
+	pub copies: Copies<Item>,
+	pub shared: ConcurrentMap<int, Item>,
+	pub spsc: SpscRing<Item, 4>,
+
+	/// An owner whose collections hold `n` elements each, from 1, the grid four
+	/// and the ring as many as fit.
+	pub fn of(n: int, from: *mem.Allocator) -> Every
+	{
+		let fill = Item.of(0);
+		let e = Every {
+			list: List<Item>.new(0, from),
+			deque: Deque<Item>.new(0, from),
+			ring: Ring<Item, 4>.new(from),
+			grid: Grid<Item>.new(2, 2, fill, from),
+			map: Map<str, Item>.new(0, from),
+			hashed: HashMap<int, Item>.new(0, from),
+			set: Set<Item>.new(0, from),
+			hash_set: HashSet<Item>.new(0, from),
+			bits: BitSet.new(0, from),
+			sorted: SortedMap<int, Item>.new(0, from),
+			sorted_set: SortedSet<Item>.new(0, from),
+			pool: Pool<Item>.new(0, from),
+			tree: Tree<Item>.new(0, from),
+			queue: PriorityQueue<Item>.new(0, from),
+			copies: Copies<Item>.new(0, from),
+			shared: ConcurrentMap<int, Item>.new(0, from),
+			spsc: SpscRing<Item, 4>.new(from),
+		};
+		for i in 1..n + 1 {
+			e.list.push(Item.of(i));
+			e.deque.push_front(Item.of(i));
+			e.ring.push(Item.of(i));
+			e.map.set(f_key(i), Item.of(i));
+			e.hashed.set(i, Item.of(i));
+			e.set.add(Item.of(i));
+			e.hash_set.add(Item.of(i));
+			e.bits.add(i);
+			e.sorted.set(n - i, Item.of(i));
+			e.sorted_set.add(Item.of(n - i));
+			e.pool.add(Item.of(i));
+			e.tree.add_root(Item.of(i));
+			e.queue.push(Item.of(n - i));
+			e.copies.add(Item.of(i));
+			e.shared.set(i, Item.of(i));
+			e.spsc.push(Item.of(i));
+		}
+		return e;
+	}
+
+	/// The counts of the collections, in the order of the fields.
+	pub fn counts(self) -> str
+	{
+		return f"{self.list.count} {self.deque.count} {self.ring.count} {self.grid.count} {self.map.count} {self.hashed.count} {self.set.count} {self.hash_set.count} {self.bits.count} {self.sorted.count} {self.sorted_set.count} {self.pool.count} {self.tree.count} {self.queue.count} {self.copies.count} {self.shared.count()} {self.spsc.count()}";
+	}
+}
+
+/// A generic class whose copy holds collections of `T`.
+class Box<T: Ordered>
+{
+	pub pool: Pool<T>,
+	pub sorted_set: SortedSet<T>,
+	pub queue: PriorityQueue<T>,
+}
+
+/// The key of `i` in a map of `str` keys. The text is a literal, so it owns no
+/// memory.
+fn f_key(i: int) -> str
+{
+	if i == 1 {
+		return "one";
+	}
+	if i == 2 {
+		return "two";
+	}
+	if i == 3 {
+		return "three";
+	}
+	return "more";
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+/// The number of the element `x` holds, or -1 when it holds none.
+fn number(x: ?Item) -> int
+{
+	if let got = x {
+		return got.value();
+	}
+	return -1;
+}
+
+fn every()
+{
+	let counting = Counting { };
+	{
+		let e = Every.of(3, &counting);
+		let twin = dup(&e);
+		show(f"copy:     {twin.counts()}");
+		twin.list.push(Item.of(9));
+		twin.sorted.set(9, Item.of(9));
+		twin.sorted_set.add(Item.of(9));
+		twin.queue.push(Item.of(0));
+		twin.pool.add(Item.of(9));
+		twin.tree.add_root(Item.of(9));
+		e.copies.add(Item.of(9));
+		show(f"original: {e.counts()}");
+		show(f"copy:     {twin.counts()}");
+		show(f"sorted: {number(twin.sorted.get(9))} {number(e.sorted.get(9))} {number(twin.sorted.get(0))} {number(twin.sorted_set.last())} {number(e.sorted_set.last())}");
+		show(f"queue first: {number(e.queue.pop())} {number(twin.queue.pop())}");
+		delete(twin);
+		show(f"after the copy: {e.counts()}");
+	}
+	show(f"every: {Item.live.load()} blocks alive, {counting.held} blocks of room held");
+}
+
+fn handles()
+{
+	let counting = Counting { };
+	{
+		let e = Every.of(0, &counting);
+		let a = e.pool.add(Item.of(1));
+		let b = e.pool.add(Item.of(2));
+		let c = e.pool.add(Item.of(3));
+		let removed = e.pool.remove(b);
+		let root = e.tree.add_root(Item.of(10));
+		let child = e.tree.add_child(root, Item.of(11)) catch fatal;
+		let gone = e.tree.add_child(root, Item.of(12)) catch fatal;
+		e.tree.remove(gone);
+		let twin = dup(&e);
+		show(f"pool: {number(twin.pool.get(a))} {number(twin.pool.get(c))} {number(twin.pool.get(b))}");
+		let d = twin.pool.add(Item.of(4));
+		show(f"reused slot: {d.index == b.index} {number(twin.pool.get(b))} {number(twin.pool.get(d))} {number(e.pool.get(d))}");
+		let up = twin.tree.parent(child) catch fatal;
+		show(f"tree: {number(twin.tree.get(root))} {number(twin.tree.get(child))} {up.index == root.index} {number(twin.tree.get(gone))}");
+		twin.tree.remove(child);
+		show(f"removed in the copy: {number(twin.tree.get(child))} {number(e.tree.get(child))}");
+		delete(twin);
+	}
+	show(f"handles: {Item.live.load()} blocks alive, {counting.held} blocks of room held");
+}
+
+fn boxes()
+{
+	{
+		let b = Box<Item> {
+			pool: Pool<Item>.new(),
+			sorted_set: SortedSet<Item>.new(),
+			queue: PriorityQueue<Item>.new(),
+		};
+		let h = b.pool.add(Item.of(5));
+		for i in 0..30 {
+			b.sorted_set.add(Item.of(i));
+			b.queue.push(Item.of(30 - i));
+		}
+		let twin = dup(&b);
+		b.sorted_set.clear();
+		show(f"box: {number(twin.pool.get(h))} {twin.sorted_set.count} {b.sorted_set.count} {number(twin.queue.pop())}");
+		delete(twin);
+	}
+	show(f"boxes: {Item.live.load()} blocks alive");
+}
+
+fn main() -> int
+{
+	every();
+	handles();
+	boxes();
+	return 0;
+}

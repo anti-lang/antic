@@ -19,6 +19,7 @@ extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn memmove(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
 extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
 extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
@@ -300,6 +301,46 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 		self.root = -1;
 		self.count = 0;
 		self.resized(0, at);
+	}
+
+	/// A tree in `to` with a block of its own for the nodes in use from the
+	/// same allocator, copied node by node: the links of each node as they are,
+	/// and a copy of each of its elements in the same slot, as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: a node is an index into the block, so the links of the
+		   first `used` nodes stay right in a block of the copy, and so do
+		   the root and the list of the free nodes. The copy takes room for
+		   those nodes alone. The bytes of the object go into `to` first,
+		   the fields of a collection above among them. */
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *BTree<T>;
+		made.block = none;
+		made.slots = none;
+		made.links = none;
+		made.nodes = 0;
+		let nodes = self.used;
+		made.used = 0;
+		if nodes == 0 {
+			return;
+		}
+		made.resize(nodes);
+		made.used = nodes;
+		let links = self.links catch fatal;
+		let theirs = made.links catch fatal;
+		memcpy(theirs as ?*byte, links as ?*byte,
+			(nodes * LINKS * size_of(int)) as c_size_t);
+		let n = 0;
+		while n < nodes do {
+			let i = 0;
+			let held = self.held(n);
+			while i < held do {
+				let p = made.slot(n * NODE_MAX + i);
+				*p = self.copy_element(self.slot(n * NODE_MAX + i));
+				i += 1;
+			}
+			n += 1;
+		}
 	}
 
 	/// The place of the last element, or -1 when there is none.

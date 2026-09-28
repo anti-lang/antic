@@ -589,6 +589,32 @@ pub class Copies<T> inherits Collection<T>
 		return taken;
 	}
 
+	/// Copies in `to` with room of their own for `count` elements from the same
+	/// allocator, and a copy of each element in it, as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: `dup` gives a replaced `copy` memory that nothing has
+		   written, and a collection gives it the bytes of the element. The
+		   bytes of these copies go into `to` first in both cases, its table
+		   among them, and the copy then takes room of its own. */
+		memcpy(to as ?*byte, self as ?*byte, size_of(Copies<T>) as c_size_t);
+		let made = to as *Copies<T>;
+		made.items = none;
+		made.capacity = 0;
+		if self.count == 0 {
+			return;
+		}
+		let items = self.items catch fatal;
+		let room = self.room(self.count) catch fatal;
+		let i = 0;
+		while i < self.count do {
+			room[i] = self.copy_element(&items[i]);
+			i += 1;
+		}
+		made.items = room;
+		made.capacity = self.count;
+	}
+
 	/// Add `x` at the end, which the collection now owns.
 	pub fn add(self, own x: T, at: lang.SourceLocation = here)
 	{

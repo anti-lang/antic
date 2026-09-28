@@ -255,6 +255,35 @@ pub class PriorityQueue<T: Ordered> inherits collection.Collection<T>
 		memcpy(&items[to] as ?*byte, &items[from] as ?*byte, size_of(T) as c_size_t);
 	}
 
+	/// A queue in `to` with room of its own for `count` elements and the spare
+	/// slot from the same allocator, and a copy of each element in the same
+	/// place of the array, as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: `dup` gives a replaced `copy` memory that nothing has
+		   written, and a collection gives it the bytes of the element. The
+		   bytes of this queue go into `to` first in both cases, its table
+		   among them, and the copy then takes room of its own. The order of
+		   the array is a heap already, so the copy keeps it. */
+		memcpy(to as ?*byte, self as ?*byte,
+			size_of(PriorityQueue<T>) as c_size_t);
+		let made = to as *PriorityQueue<T>;
+		made.items = none;
+		made.capacity = 0;
+		if self.count == 0 {
+			return;
+		}
+		let items = self.items catch fatal;
+		let room = self.room(self.count + 1) catch fatal;
+		let i = 0;
+		while i < self.count do {
+			room[i] = self.copy_element(&items[i]);
+			i += 1;
+		}
+		made.items = room;
+		made.capacity = self.count;
+	}
+
 	fn destruct(self)
 	{
 		let items = self.items else {

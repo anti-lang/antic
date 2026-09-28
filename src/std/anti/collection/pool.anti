@@ -15,6 +15,7 @@ import anti.lang;
 import anti.mem;
 
 extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
 
 /// The number of blocks a pool may hold. With a first block of 8 slots the last
 /// one ends past slot 2^50, more than any memory holds.
@@ -297,6 +298,41 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 	concrete fn copy_place(self, at: int) -> T
 	{
 		return self.copy_element(self.element(at));
+	}
+
+	/// A pool in `to` with blocks of its own of the same sizes from the same
+	/// allocator, the words of every slot as they are and a copy of each
+	/// element in the same slot, as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: the copy keeps the index and the generation of every slot
+		   and the list of the free ones, so a handle of this collection
+		   finds the same element in the copy and a handle of a removed
+		   element finds nothing in either. A collection below keeps its
+		   links in the words of the slots, and they hold slot indices,
+		   which stay right in the copy. The bytes of the object go into
+		   `to` first, the fields of a collection below among them. */
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Slots<T>;
+		let blocks = self.blocks_made;
+		made.blocks_made = 0;
+		while made.blocks_made < blocks do {
+			made.make_block();
+		}
+		let words = SLOT_WORDS + self.extra_words;
+		let i = 0;
+		while i < self.used do {
+			let w = 0;
+			while w < words do {
+				made.set_word(i, w, self.word(i, w));
+				w += 1;
+			}
+			if self.word(i, LINK) == LIVE {
+				let p = made.element(i);
+				*p = self.copy_element(self.element(i));
+			}
+			i += 1;
+		}
 	}
 
 	/// The slot `h` finds, or -1 when its element is gone.
